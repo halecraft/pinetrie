@@ -13,7 +13,7 @@ const LANE = threadIdFor("0123456789abcdef")
 function behind(to = "l2") {
   const b = basics()
   putLane(b, LANE, entryId("p-1"))
-  writeEntry(b.root, row("p-1", null, { role: "chat", content: "go" }))
+  writeEntry(b.root, row("p-1", null, { role: "person", content: "go" }))
   writeLaneTip(b.root, LANE, entryId("p-1"))
   putValue(
     b,

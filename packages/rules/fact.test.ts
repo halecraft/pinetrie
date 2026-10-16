@@ -1,10 +1,10 @@
 import {
+  canvasIdFor,
   entryId,
   type JjProposedChangesRecord,
   type ProposedChangesFact,
   type QueuedFact,
   type ThreadName,
-  taskIdFor,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -82,15 +82,15 @@ describe("a fact", () => {
       toName: "sable-meadow",
       why: {
         kind: "archived",
-        task: taskIdFor("t"),
-        record: { task: taskIdFor("t"), by: ADA, at: 1 },
+        canvas: canvasIdFor("t"),
+        record: { canvas: canvasIdFor("t"), by: ADA, at: 1 },
       },
       by: ADA,
     }
     expect(decodeFact(encodeFact(fact, "Ada", 1))).toEqual(fact)
     expect(decodeQueuedFact(encodeQueuedFact(fact))).toEqual(fact)
     expect(factLine(fact)).toBe(
-      "■ the answer was not sent: sable-meadow's task is archived",
+      "■ the answer was not sent: sable-meadow's canvas is archived",
     )
   })
 

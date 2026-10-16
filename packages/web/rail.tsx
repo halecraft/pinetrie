@@ -418,7 +418,7 @@ export function LiveRail({
 }
 
 /**
- * A task's rail before its first message, a new tab's: a hollow dot where that message
+ * A canvas's rail before its first message, a new canvas's: a hollow dot where that message
  * will be drawn. It is as wide as the rail it
  * turns into, so the columns do not move when the first message lands.
  */

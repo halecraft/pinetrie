@@ -1,26 +1,26 @@
-// host/titles — a task's title from a model: unasked as its root's first lane
+// host/titles — a canvas's title from a model: unasked as its root's first lane
 // starts, or when a person asks (Auto-update title). `planTitling` and
 // `titleStillWanted` decide; this carries them out.
 //
 // Both are called inside a command's step on the documents' keeper, so they
 // gather and plan there, and only the request goes outside it. The mark is a
-// late write (`later.ts`), so none lands in a task archived meanwhile.
+// late write (`later.ts`), so none lands in a canvas archived meanwhile.
 
 import {
+  type CanvasId,
   ERR,
   type Position,
   type Refusal,
   type RootId,
-  type TaskId,
   type ThreadId,
   type WriterId,
 } from "@pinetrie/core"
 import type { PiSetup } from "@pinetrie/pi"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import {
+  readCanvases,
   readLaneRecords,
   readMarks,
-  readTasks,
   readTreeIndex,
 } from "@pinetrie/reads"
 import {
@@ -32,8 +32,8 @@ import {
   titleStillWanted,
 } from "@pinetrie/rules"
 import { type Basics, failed } from "./basics.ts"
+import { canvasesNow } from "./canvases.ts"
 import type { Later } from "./later.ts"
-import { tasksNow } from "./tasks.ts"
 
 /** A title request's size: the skill aside, the first message and the newest. */
 const TITLE_BUDGET = 6_000
@@ -41,7 +41,7 @@ const TITLE_BUDGET = 6_000
 export interface Titles {
   /**
    * A lane was just created in `root` at `at`, for `prompt`, which the run
-   * writes: its task's title, when it is the root's first lane, the task
+   * writes: its canvas's title, when it is the root's first lane, the canvas
    * has none, and titles are on.
    */
   laneStarted(input: {
@@ -50,30 +50,30 @@ export interface Titles {
     readonly at: Position
     readonly prompt: { readonly author: string; readonly text: string }
   }): Promise<void>
-  /** Auto-update title: `retitling`, or refused for a task with no message. */
-  asked(task: TaskId, by: WriterId): Promise<Outcome>
+  /** Auto-update title: `retitling`, or refused for a canvas with no message. */
+  asked(canvas: CanvasId, by: WriterId): Promise<Outcome>
 }
 
 export function createTitles(deps: {
   readonly basics: Pick<Basics, "session" | "places" | "docs" | "log" | "now">
   readonly later: Pick<Later, "outside">
-  /** The settled `titles.enabled`: whether a task is titled unasked. */
+  /** The settled `titles.enabled`: whether a canvas is titled unasked. */
   readonly enabled: boolean
   /** The title model, and its skill. */
   readonly piSetup: Pick<PiSetup, "complete" | "skill">
 }): Titles {
   const { basics, later } = deps
   const { session, places, log } = basics
-  // Tasks an unasked title is being asked for.
-  const asking = new Set<TaskId>()
+  // Canvases an unasked title is being asked for.
+  const asking = new Set<CanvasId>()
 
   /**
-   * Gather and plan in the caller's step, from `root`, the task's first;
+   * Gather and plan in the caller's step, from `root`, the canvas's first;
    * ask outside it, then write in a step of its own. Returns the refusal,
    * or null once asked or skipped.
    */
   async function consider(
-    task: TaskId,
+    canvas: CanvasId,
     root: RootId,
     trigger: TitleTrigger,
   ): Promise<Refusal | null> {
@@ -81,19 +81,21 @@ export function createTitles(deps: {
     const plan = planTitling({
       index: readTreeIndex(doc),
       root,
-      marked: readMarks(session).has(task),
+      marked: readMarks(session).has(canvas),
       lanes: readLaneRecords(session).values(),
       trigger,
       enabled: deps.enabled,
-      inFlight: asking.has(task),
+      inFlight: asking.has(canvas),
     })
     if (plan.kind === "refused") return plan
     if (plan.kind === "skip") return null
     const { by } = plan
     void later.outside({
-      scope: { kind: "task", task },
+      scope: { kind: "canvas", canvas },
       what: "a title",
-      ...(trigger.kind === "lane" ? { held: { set: asking, key: task } } : {}),
+      ...(trigger.kind === "lane"
+        ? { held: { set: asking, key: canvas } }
+        : {}),
       failed: failed(basics, "titling a thread"),
       request: async () => {
         const skill = await deps.piSetup.skill("pinetrie:skill:tab-title")
@@ -119,13 +121,13 @@ export function createTitles(deps: {
       },
       plan: title => {
         const marks = readMarks(session)
-        if (!titleStillWanted(marks.get(task), by)) return null
+        if (!titleStillWanted(marks.get(canvas), by)) return null
         const planned = planMark({
-          of: { kind: "task", task },
+          of: { kind: "canvas", canvas },
           title,
           by,
           now: basics.now(),
-          tasks: readTasks(places),
+          canvases: readCanvases(places),
           marks,
           columns: new Set(),
           columnTitles: new Map(),
@@ -138,12 +140,12 @@ export function createTitles(deps: {
 
   return {
     laneStarted: async ({ root, ...started }) => {
-      const task = tasksNow(basics).taskOfThread.get(started.lane)
-      if (task !== undefined)
-        await consider(task, root, { kind: "lane", ...started })
+      const canvas = canvasesNow(basics).canvasOfThread.get(started.lane)
+      if (canvas !== undefined)
+        await consider(canvas, root, { kind: "lane", ...started })
     },
-    asked: async (task, by) => {
-      const root = tasksNow(basics).rootsOf.get(task)?.[0]
+    asked: async (canvas, by) => {
+      const root = canvasesNow(basics).rootsOf.get(canvas)?.[0]
       if (root === undefined)
         return {
           kind: "refused",
@@ -151,7 +153,7 @@ export function createTitles(deps: {
           message: "there is no message to title yet",
         }
       return (
-        (await consider(task, root, { kind: "asked", by })) ?? {
+        (await consider(canvas, root, { kind: "asked", by })) ?? {
           kind: "retitling",
         }
       )

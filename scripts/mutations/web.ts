@@ -20,8 +20,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a chat the page plans is never sent",
     file: "packages/interface/perform.ts",
-    from: '    case "chat":\n      void ports.session.chat(\n',
-    to: '    case "chat":\n      return\n      void ports.session.chat(\n',
+    from: '    case "send":\n      void ports.session.send(\n',
+    to: '    case "send":\n      return\n      void ports.session.send(\n',
     suite: "browser",
     scenario: "tools",
     expect:

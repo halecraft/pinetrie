@@ -2,15 +2,15 @@
 // no two writers mint one key.
 
 import {
+  type CanvasId,
+  canvasIdFor,
   cardIdOfKind,
   type NoteColumnId,
   type ReferenceCardId,
   type RootId,
   rootIdFor,
-  type TaskId,
   type TextCardId,
   type ThreadId,
-  taskIdFor,
   textCardId,
   threadIdFor,
 } from "@pinetrie/core"
@@ -52,7 +52,7 @@ export const newThreadId = (): ThreadId => threadIdFor(newUuidv7())
 export const newRootId = (): RootId => rootIdFor(newUuidv7())
 
 /**
- * A new task's id, minted by the tab that opens it, as it mints a root's
- * The host accepts only this shape (`parseNewTask`).
+ * A new canvas's id, minted by the tab that opens it, as it mints a root's
+ * The host accepts only this shape (`parseNewCanvas`).
  */
-export const newTaskId = (): TaskId => taskIdFor(newUuidv7())
+export const newCanvasId = (): CanvasId => canvasIdFor(newUuidv7())

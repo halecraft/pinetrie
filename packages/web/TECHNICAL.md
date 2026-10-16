@@ -260,7 +260,7 @@ mount claims it (*A card's focus*, below).
   as a reveal does, removed on `animationend`. The outline and its fade are
   CSS.
 
-## Searching a task (`search-bar.tsx`, `match-list.tsx`, ADR-0101)
+## Searching a canvas (`search-bar.tsx`, `match-list.tsx`, ADR-0101)
 
 The search's values are the interface's (`packages/interface/TECHNICAL.md`,
 "Search"). `App` holds its state and builds its result; the page draws the
@@ -280,13 +280,13 @@ bar, each column's matches, and the rail's marks.
 - **A covered column marks nothing read** (ADR-0077): the attention effect
   and `leave` skip `read` while `matches` is not null. It follows its end
   under the layer as before. A mention drawn under the layer still counts as
-  seen (`useInbox` reads `shown`), since it is drawn in a column of the task
+  seen (`useInbox` reads `shown`), since it is drawn in a column of the canvas
   you are on.
 - **An empty query is no search.** `Column.matches` is null until the query
   has a word, so the page is as it was while the bar is open and empty.
 - **The stage is a column**: the bar while open, then `.stage-row`,
   which holds `.rail-side` (the 🔍 in `.search-lead`, then the rail) and
-  `#strip`. A new tab's rail has no 🔍 and the same width, so `#strip`'s
+  `#strip`. A new canvas's rail has no 🔍 and the same width, so `#strip`'s
   left edge does not move across its first send. The bar's own `.search-lead`
   holds the pressed 🔍 over the rail.
 - **Focus.** The bar focuses its field as it mounts, and `/` while it is open
@@ -321,7 +321,7 @@ colour. There are no connector lines, so sibling branches never cross.
   `RootId`'s hash picks the slot its trunk takes, and track *n* takes
   `(seed + 7n) mod 12`. Which slot is the same in any client; the page's
   colour for a slot is `colors.ts`'s (`slotColor`). The seed of the root you are on, or of the root a
-  new tab minted, is `TrackSeed`, a context `App` provides around the
+  new canvas minted, is `TrackSeed`, a context `App` provides around the
   stage; `useTrackColors()` turns a track into its colour, slot and
   `--track` style. It changes only with the root, which remounts the
   columns anyway, so memoised messages are not redrawn for it. Context
@@ -344,8 +344,8 @@ colour. There are no connector lines, so sibling branches never cross.
   fork dot and the rail.
 - **A root's colour is its trunk's** (`trackSlot` of its `rootSeed`, track
   0): the rail's trunk and the first column take it. A folded list's tile
-  (ADR-0088) takes its task's (`taskSlot`), seeded the same way by the
-  task's id.
+  (ADR-0088) takes its canvas's (`canvasSlot`), seeded the same way by the
+  canvas's id.
 
 ## Layout: columns scroll independently
 
@@ -371,17 +371,17 @@ and dropped: forks far apart could not be seen together
 
 ## The strip (`strip.tsx`, ADR-0116)
 
-`Strip` draws a task's strip (`taskStrip`, `StripView`): the task column
-(`task-column.tsx`), then each card on the canvas in its order, then, among
-them, your branches not yet sent. Its first column is a `TaskColumn` by its
-type (`Strip = [TaskColumn, ...CardColumn[]]`), so no strip lacks one.
+`Strip` draws a canvas's strip (`canvasStrip`, `StripView`): the canvas column
+(`canvas-column.tsx`), then each card on the canvas in its order, then, among
+them, your branches not yet sent. Its first column is a `CanvasColumn` by its
+type (`Strip = [CanvasColumn, ...CardColumn[]]`), so no strip lacks one.
 
 - **A folded column is a `.folded-column`** (`folded-column.tsx`), never a
   `.column`: a strip with `data-card` and `data-kind` (`thread` or
   `note-column`, as the wide `Column` and `NoteColumn` carry too), which a
   click unfolds. So `.column` counts whole thread columns, and the browser
-  suite counts with it. The folded task column is a
-  `.task-column.folded-column`. Both draw one `FoldedStrip`
+  suite counts with it. The folded canvas column is a
+  `.canvas-column.folded-column`. Both draw one `FoldedStrip`
   (`folded-strip.tsx`): ⇥, the mark `foldedMark` decides, the name on its
   side, the detail.
 - **A strip is its header turned on its side** (ADR-0137): a thread's
@@ -390,7 +390,7 @@ type (`Strip = [TaskColumn, ...CardColumn[]]`), so no strip lacks one.
   Every row above the name has a fixed height, and their sums are the
   registered properties `--strip-mark-top` and `--strip-name-top` (with
   `--strip-width` and `--strip-name-max`), one rule per `data-kind` and one
-  for `.task-column`. The strip is laid out by them, and a fold reads them
+  for `.canvas-column`. The strip is laid out by them, and a fold reads them
   from the wide column before its strip exists: a change to a strip's rows
   that does not change them moves the strip away from where a fold lands
   its name. Registered (`@property`, `<length>`), they compute to px; an
@@ -401,25 +401,25 @@ type (`Strip = [TaskColumn, ...CardColumn[]]`), so no strip lacks one.
   on the canvas, is what Alt+arrows move by.
 - **A column's ⋯** (`column-menu.tsx`, `columnHeadEnd`'s `menu`) is its
   card's, for everyone: its width, one column or two (`cardWidth`); a
-  thread's adds a section of Copy to this task, Copy to your inventory
-  and Move to your inventory, and no task (ADR-0127); and, for a reader
+  thread's adds a section of Copy to this canvas, Copy to your inventory
+  and Move to your inventory, and no canvas (ADR-0127); and, for a reader
   who may write, it ends in a `trash` section, Move to trash, on every
   column (ADR-0161). Each item's class is `column-<key>`
   (`.column-width`, `.column-copy`, `.column-copy-inventory`,
-  `.column-take`, `.column-trash`). Neither it nor the task column makes
+  `.column-take`, `.column-trash`). Neither it nor the canvas column makes
   a column: ＋ past the last column does (ADR-0138).
 - **Every ＋ is one split button** (`AddButton`, `add-button.tsx`): it
-  draws a `StartButton`, its main item and a `Menu` of the rest, with no
-  words of its own; each button's class is `add-<key>`. The sidebar's and
-  a board column's start a new tab; the strip's, in `.canvas-end` while
-  the canvas takes a drop there (so never on a read-only task), is drawn
-  folded, ＋ over its ▾, and makes a column of the task
+  draws a `StartButton`, its main item and, when it has one, a `Menu` of
+  the rest, with no words of its own; each button's class is `add-<key>`.
+  The sidebar's and a board column's make a canvas, with no menu; the strip's, in `.canvas-end` while
+  the canvas takes a drop there (so never on a read-only canvas), is drawn
+  folded, ＋ over its ▾, and makes a column of the canvas
   (`newColumnButton`).
 - **A copy's fork row and a parent elsewhere's** (`Origin`, kind `source`)
   follow a `ThreadLink`; one held by someone else is disabled. A column
   whose path above its thread is folded (`ColumnView.above`) draws
   "↑ N earlier messages" under it, which unfolds it for the column's life.
-- **The rail draws a task's forest** (`taskRail`), with each stub a button
+- **The rail draws a canvas's forest** (`canvasRail`), with each stub a button
   at its fork's row (`.rail-stub`).
 - **A thread in your inventory** is a `ThreadFaceView` in its slot and a
   `ThreadPreviewView` opened (`thread-preview.tsx`), whose **put** puts it
@@ -440,7 +440,7 @@ type (`Strip = [TaskColumn, ...CardColumn[]]`), so no strip lacks one.
   alone would lose to `.column-head button`. A focused column moves with
   Alt+←/→ (`Focus.inColumn`), and is scrolled into view when it moves with
   focus inside it.
-- **The task column lists its canvas's trash** (`.task-trash`, a row per
+- **The canvas column lists its canvas's trash** (`.canvas-trash`, a row per
   column, `.trash-row[data-card]`, its `.trash-restore`; `data-soon` on a
   row whose deletion is close, in the warning colour), under a line saying
   how long a column is kept (`.trash-keep`). `App` passes the keep
@@ -459,7 +459,7 @@ motion"); `use-fold-motion.ts` measures and plays it.
   until `whenDrawn` sees the strip, which runs after React's commit and
   before the paint, and are cancelled there. Cancelled before the commit,
   the old layout shows for a frame (S165): the fold is dispatched from an
-  animation's end, outside any event, so React renders it in a later task.
+  animation's end, outside any event, so React renders it in a later canvas.
 - **An unfold lands first, then animates** the column its commit draws,
   from where its strip was, before its first paint. Its render (S164: a
   quarter second for 150 messages here) comes before the motion.
@@ -539,10 +539,10 @@ serves the rail's outline and the column's spot.
 Every drag that starts in the page is one engine's: a column's header (a
 folded strip's, a note column's too), a card frame's header, a slot's card,
 a board card, a sidebar row. Each handle carries `dragProps` (`data-drag-card`
-or `data-drag-task`), and the engine finds its source with
+or `data-drag-canvas`), and the engine finds its source with
 `sourceOfElement`. It decides nothing: `drag.ts` in `@pinetrie/interface`
 does (`dragVerdict` over `putLanding` and `planRootDrop`, `drawPlan`,
-`dropIntents`, `hoverOpens`). It gathers by source (`DragAt`): a task's
+`dropIntents`, `hoverOpens`). It gathers by source (`DragAt`): a canvas's
 drag reads only the root zones, a card's the strip, ▦ and the drop
 zones. It marks a target with the attribute the plan's mark names, and
 rings and opens what the plan's `opens` names, on the element the target
@@ -556,7 +556,7 @@ set `data-card-drag`.
   at `pointerdown` it falls before anything is seen to move. Columns still
   springing back from a cancel are reset before they are measured, or a
   quick second drag reads a column where it was drawn, not where it is.
-- **A task's landing leaves the dragged item out of the places it
+- **A canvas's landing leaves the dragged item out of the places it
   measures.** Each frame reads the zones' boxes, and the dragged item's
   box carries its translate: its centre follows the pointer, offset by
   where it was pressed, and counted among the others it moved every
@@ -571,17 +571,17 @@ set `data-card-drag`.
   frame to 33 ms at 4× throttling; written on change, it is the
   baseline's. The engine keeps the element it marked and the mark it
   wrote, and writes again only when either changes. When it read the mark
-  back from `data-drag-verdict` instead, a task's mark (`data-root-drop`)
+  back from `data-drag-verdict` instead, a canvas's mark (`data-root-drop`)
   never matched, and was written every frame.
 - **A drag writes to the DOM, never to React state**: a transform,
   `data-dragging` on what moves, `data-reordering` on the strip,
   `data-card-drag` on the body (an empty pinned strip shows, and drop zones
   are outlined), `data-drag-verdict` on the target (`move`, `copy`,
-  `replace`, `refused`) or `data-root-drop` for a task's landing,
+  `replace`, `refused`) or `data-root-drop` for a canvas's landing,
   `data-hover-open` on the target's own element (a sidebar row a card is
   onto, ▦) while its ring fills. It reads the intent state from a function each frame, never
   rebuilt for it. The order changes once, on the drop: a reorder's
-  `moveColumn`, a landing's `put`, a task's own drop, the intents a key or
+  `moveColumn`, a landing's `put`, a canvas's own drop, the intents a key or
   a menu would send.
 - **The click a release sends after a drag is swallowed**, so a header's
   buttons start drags too and a press that moves less than 5 px is their
@@ -858,7 +858,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   no place to choose. The words are `.start-words`: `Menu` passes no
   attributes to its trigger, so they sit on a span inside it.
 - **A column's header** (ADR-0040) names who works in it (`✦ amber-fox`,
-  `✦ new agent`, or nothing in a conversation), then, in a second row, where
+  `✦ new agent`, or nothing in a chat), then, in a second row, where
   it forks. It shows no commit and nothing of where the lane works.
 - **The work strip** (`WorkStripView`, a row of the column's header,
   ADR-0113) is the lane's
@@ -904,7 +904,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
 - **Open proposed changes in your repo** ("changes ready to accept") are your inbox's
   rows for the threads you follow, each leading with the thread's name and
   opening it, and a thread card's ⇡ for everyone (ADR-0091). Move to Done
-  in an item's `⋯` names the threads whose proposed changes it withdraws (`openProposedByTask`,
+  in an item's `⋯` names the threads whose proposed changes it withdraws (`openProposedByCanvas`,
   `dropsWords`). All read `openProposed`, which keeps only `proposedChangesStatus`'s
   `open` (ADR-0067): one accepted work already holds (`held`) has nothing to
   add, so it is neither counted nor named, as the strip says.
@@ -1409,7 +1409,7 @@ has one row per drawn kind with three components (`Face`, `Normal`,
 DrawnKind]: Renderings<K> }`: a kind added to `CardRecord` does not
 compile until it draws all three (`renderings.test.ts` proves it with
 `@ts-expect-error`). `DrawFace` and `DrawCard` pick the row by the card's
-kind, in a switch that is total too. A task's card is no `DrawnCard`: the
+kind, in a switch that is total too. A canvas's card is no `DrawnCard`: the
 board draws it (`boardView`), and an inventory never holds one
 (`heldBy`).
 
@@ -1545,7 +1545,7 @@ plain `#setup` anchor: `usePage` hears the hash change.
   page). With `display: none`, `useStripNarrow` would measure the strip at
   0 and turn an open pane into a modal dialog over the page.
 - **Showing anything in the stage leaves the page**: `planIntent` puts
-  `{ kind: "page", to: null }` first when a plan shows a root, a new tab or
+  `{ kind: "page", to: null }` first when a plan shows a root, a new canvas or
   the board (`showsStage`). The keys that act on cards or undo do
   nothing while a page shows (`keyAct`'s `page`).
 - **A narrow pane is a modal dialog in the top layer.** Back or Forward onto
@@ -1633,7 +1633,7 @@ What S151 measured, and these handlers rest on:
   against another column (alignment does) must place that column first.
 - **A renamed root's item is an `<input class="open-title-input">`, not a
   `.open-root`**: an input inside a button is invalid HTML, so while the
-  field is open, `.open-root[data-task]` is gone. Enter, Escape and blur all
+  field is open, `.open-root[data-canvas]` is gone. Enter, Escape and blur all
   go through one `finish` that acts once: removing a focused field can fire
   a blur after Enter or Escape, which would save again, or save a cancel.
   Only Enter and Escape give the item focus back; a blur leaves focus where
@@ -1698,21 +1698,21 @@ What S151 measured, and these handlers rest on:
   disabled item: it returns false, so the check expecting the item fails and
   the suite goes on.
 
-- **Selectors for the sidebar and the board:** a task in the sidebar is
-  `#sidebar .open-root[data-task="…"]` (ADR-0116); the one you are on has
+- **Selectors for the sidebar and the board:** a canvas in the sidebar is
+  `#sidebar .open-root[data-canvas="…"]` (ADR-0116); the one you are on has
   `aria-current="true"` and its wrap `data-selected`, its × is the
   `.open-close` after it, its `⋯` (`.open-menu`) holds `.rename-root`,
   `.retitle-root` and `.move-to` (`.closes` for
   the archive), a root being renamed is `.open-title-input`, and ＋'s
-  buttons are `.add-agent`, `.add-menu` and `.add-conversation` (past the
-  last column, `#strip > .canvas-end`'s, with `.add-note-column`); a new tab
-  is a task's `.open-root` (ADR-0126). Folded, an item's `.open-root` holds
+  button is `.add-canvas`, with no menu (ADR-0158); past the last column,
+  `#strip > .canvas-end`'s are `.add-agent`, `.add-menu`, `.add-chat` and
+  `.add-note-column`. A new canvas is a canvas's `.open-root` (ADR-0126). Folded, an item's `.open-root` holds
   `.open-icon` (`.open-sprite` or `.open-initials`), its
   menu ends in `.open-close-item`, its tooltip is `.open-tip` and its
   rename field sits in `.open-rename`; the fold control is `.list-fold`, and
   the inventory's toggle is the account menu's `.account-inventory`. The board is `#board`: a `.board-column[data-state]`
   per open state and `.board-archive` for the archive, each item a
-  `.thread-card[data-task][data-entry]` with `.board-open`, `.board-label`,
+  `.thread-card[data-canvas][data-entry]` with `.board-open`, `.board-label`,
   `.reader-trigger` per reader (its menu `.reader`, `.open` while open),
   `.root-ready` when a thread has work ready, and `.item-menu`; the states
   scroll in `.board-states`, a head's count is `.board-count` (`[data-kept]`
@@ -1748,8 +1748,8 @@ What S151 measured, and these handlers rest on:
 - **A page with nothing in the sidebar opens on the board**, so a browser check
   that opens a second page opens its thread from there (`openFromBoard`), or
   from a reader on a thread card. To step away from a root so its columns
-  unmount, a check opens a new tab and closes its column again, which
-  discards its task (`stepAway`, `stepBack`).
+  unmount, a check opens a new canvas and closes its column again, which
+  discards its canvas (`stepAway`, `stepBack`).
 - **`.column` must stay `#strip`'s direct child**: `use-drag.ts` and
   `focus.ts` query `#strip > [data-card]`. A column's `.column-body` is inside
   `.column-thread`.

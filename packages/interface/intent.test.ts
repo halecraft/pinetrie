@@ -1,8 +1,10 @@
 import {
   type AskIndex,
   atEntry,
+  type CanvasId,
   type CardId,
   type CardRecord,
+  canvasIdFor,
   cardIdOfKind,
   type EntryId,
   ERR,
@@ -12,11 +14,9 @@ import {
   indexTree,
   NO_CONTENT,
   rootIdFor,
-  type TaskId,
   type TextCard,
   type TextPlace,
   type ThreadCard,
-  taskIdFor,
   textCardId,
   threadIdFor,
   type WriterId,
@@ -28,18 +28,18 @@ import { describe, expect, test } from "vitest"
 import type { ColumnKey } from "./columns.ts"
 import type { CardFacts, Effect, IntentState } from "./effects.ts"
 import {
+  canvasesFor,
+  NEW_CANVAS,
   NEW_NOTE_COLUMN,
   NEW_ROOT,
-  NEW_TASK,
   NEW_TEXT,
   NEW_THREAD,
   NO_CLIPS,
-  tasksFor,
   threadOfEntry,
   tree,
 } from "./fixtures.ts"
 import {
-  afterTaskMove,
+  afterCanvasMove,
   type ColumnAct,
   type Intent,
   nameEffects,
@@ -51,21 +51,23 @@ import {
   layoutReducer,
   resolveLayout,
 } from "./layout.ts"
+import { AGENT_PREFILL } from "./message-tools.ts"
 import { threadLink } from "./thread-link.ts"
 
-const _TEST_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
+const _TEST_CANVAS = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 
 const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
-/** Each root's task, by its root entry: the sidebar's key. */
-const R1_ID = taskIdFor("01a0ffd2-0000-7000-8000-0000000000a1")
-const R2_ID = taskIdFor("01a0ffd2-0000-7000-8000-0000000000a2")
-const R9_ID = taskIdFor("01a0ffd2-0000-7000-8000-0000000000a9")
-const ROOT_IDS = new Map<EntryId, TaskId>([
+/** Each root's canvas, by its root entry: the sidebar's key. */
+const R1_ID = canvasIdFor("01a0ffd2-0000-7000-8000-0000000000a1")
+const R2_ID = canvasIdFor("01a0ffd2-0000-7000-8000-0000000000a2")
+const R9_ID = canvasIdFor("01a0ffd2-0000-7000-8000-0000000000a9")
+const ROOT_IDS = new Map<EntryId, CanvasId>([
   [entryId("1-r1"), R1_ID],
   [entryId("5-r2"), R2_ID],
   [entryId("8-r9"), R9_ID],
 ])
-const TASK_OF = (root: string): TaskId => ROOT_IDS.get(entryId(root)) ?? R9_ID
+const ROOT_CANVAS = (root: string): CanvasId =>
+  ROOT_IDS.get(entryId(root)) ?? R9_ID
 
 // r1 -> a -> b, with a branch a -> c; and r2 -> d.
 const index = tree({
@@ -76,30 +78,33 @@ const index = tree({
   "5-r2": null,
   "6-d": "5-r2",
 })
-const TASKS = tasksFor(index, ...[...ROOT_IDS].map(([e, t]) => [t, e] as const))
+const CANVASES = canvasesFor(
+  index,
+  ...[...ROOT_IDS].map(([e, t]) => [t, e] as const),
+)
 /** r1's threads: its trunk, through 3-b, and the branch at 2-a, 4-c. */
 const TRUNK = threadOfEntry("1-r1")
 const C = threadOfEntry("4-c")
-/** A branch's thread, and its column's key, in r1's task. */
+/** A branch's thread, and its column's key, in r1's canvas. */
 const F = threadIdFor("01a0ffd2-0000-7000-8000-0000000000f1")
 /** On `root`'s tab, its first column unfolded (`defaultView`). */
 const onRoot = (root: string): Layout =>
   resolveLayout(
     layoutReducer(initialLayout(), {
       kind: "show",
-      here: { kind: "task", task: TASK_OF(root) },
+      here: { kind: "canvas", canvas: ROOT_CANVAS(root) },
     }),
     {
       index,
       lanes: [],
       archived: new Set(),
-      list: [TASK_OF(root)],
-      canvases: TASKS.index.canvases,
+      list: [ROOT_CANVAS(root)],
+      cardsOn: CANVASES.index.cardsOn,
       unstarted: new Map(),
       holders: new Map(),
     },
   )
-/** On no task. */
+/** On no canvas. */
 const onNothing: Layout = layoutReducer(initialLayout(), {
   kind: "show",
   here: { kind: "nothing" },
@@ -113,20 +118,23 @@ const at = (
   index,
   asks,
   cards,
-  tasks: TASKS,
+  canvases: CANVASES,
   listWidth: "full",
   page: null,
   searching: false,
   clips: NO_CLIPS,
 })
 /** A root shown: the root you are on, and in the sidebar, at its end if it was not. */
-const shown = (root: string, id: TaskId): Effect[] => [
+const shown = (root: string, id: CanvasId): Effect[] => [
   {
     kind: "layout",
     moves: false,
-    action: { kind: "show", here: { kind: "task", task: TASK_OF(root) } },
+    action: {
+      kind: "show",
+      here: { kind: "canvas", canvas: ROOT_CANVAS(root) },
+    },
   },
-  { kind: "list", act: { kind: "ensure", task: id } },
+  { kind: "list", act: { kind: "ensure", canvas: id } },
 ]
 const ME = writerId("ada@x.io")
 /** A thread whose card a link finds. */
@@ -139,14 +147,14 @@ const inventoryOf = (holder: WriterId): ThreadCard => ({
   place: { kind: "inventory", holder },
   content: NO_CONTENT,
 })
-/** A link to a thread on `task`'s canvas. */
-const linkOn = (task: TaskId) =>
+/** A link to a thread on `canvas`'s canvas. */
+const linkOn = (canvas: CanvasId) =>
   threadLink(
     LINKED,
     [
       {
         ...inventoryOf(ME),
-        place: { kind: "canvas", task, order: "1", width: 1 },
+        place: { kind: "canvas", canvas, order: "1", width: 1 },
       },
     ],
     ME,
@@ -165,7 +173,7 @@ const plan = (intent: Intent, state: IntentState = R1) =>
   planIntent(intent, state, {
     key: "k",
     root: NEW_ROOT,
-    task: NEW_TASK,
+    canvas: NEW_CANVAS,
     thread: NEW_THREAD,
     noteColumn: NEW_NOTE_COLUMN,
     reference: cardIdOfKind(
@@ -186,24 +194,27 @@ const column = (
   act: Extract<Intent, { kind: "column" }>["act"],
   key: ColumnKey = UNSTARTED,
 ): Intent => ({ kind: "column", column: key, act })
-/** A change to your view of r1's task, as an effect. */
+/** A change to your view of r1's canvas, as an effect. */
 const onR1 = (change: object): Effect =>
   ({
     kind: "layout",
     moves: false,
-    action: { kind: "view", task: R1_ID, first: TRUNK, change },
+    action: { kind: "view", canvas: R1_ID, first: TRUNK, change },
   }) as Effect
 
 describe("planIntent", () => {
   test("× on a root closes it for you: it leaves the sidebar, and nothing shared is written", () => {
     expect(
-      plan({ kind: "close", here: { kind: "task", task: TASK_OF("1-r1") } }),
+      plan({
+        kind: "close",
+        here: { kind: "canvas", canvas: ROOT_CANVAS("1-r1") },
+      }),
     ).toEqual([
-      { kind: "list", act: { kind: "close", task: R1_ID } },
+      { kind: "list", act: { kind: "close", canvas: R1_ID } },
       {
         kind: "layout",
         moves: false,
-        action: { kind: "closeTask", task: TASK_OF("1-r1") },
+        action: { kind: "closeCanvas", canvas: ROOT_CANVAS("1-r1") },
       },
     ])
   })
@@ -214,7 +225,10 @@ describe("planIntent", () => {
 
   test("showing a root opens it in the sidebar; reordering the sidebar places it by id", () => {
     expect(
-      plan({ kind: "show", here: { kind: "task", task: TASK_OF("5-r2") } }),
+      plan({
+        kind: "show",
+        here: { kind: "canvas", canvas: ROOT_CANVAS("5-r2") },
+      }),
     ).toEqual(shown("5-r2", R2_ID))
     expect(plan({ kind: "show", here: { kind: "nothing" } })).toEqual([
       {
@@ -226,43 +240,50 @@ describe("planIntent", () => {
     expect(
       plan({
         kind: "moveInList",
-        task: TASK_OF("5-r2"),
-        before: TASK_OF("1-r1"),
+        canvas: ROOT_CANVAS("5-r2"),
+        before: ROOT_CANVAS("1-r1"),
       }),
     ).toEqual([
-      { kind: "list", act: { kind: "place", task: R2_ID, before: R1_ID } },
+      { kind: "list", act: { kind: "place", canvas: R2_ID, before: R1_ID } },
     ])
     expect(
-      plan({ kind: "moveInList", task: TASK_OF("5-r2"), before: null }),
+      plan({ kind: "moveInList", canvas: ROOT_CANVAS("5-r2"), before: null }),
     ).toEqual([
-      { kind: "list", act: { kind: "place", task: R2_ID, before: null } },
+      { kind: "list", act: { kind: "place", canvas: R2_ID, before: null } },
     ])
   })
 
   test("a move on the board asks the host; into the archive it closes the root for you once accepted", () => {
     const [from, to] = [workflowStateIdFor("d"), workflowStateIdFor("x")]
     const move = (closes: boolean) =>
-      plan({ kind: "moveTask", task: R1_ID, from, to, before: null, closes })
+      plan({
+        kind: "moveCanvas",
+        canvas: R1_ID,
+        from,
+        to,
+        before: null,
+        closes,
+      })
     const request = {
-      kind: "move-task",
-      task: R1_ID,
+      kind: "move-canvas",
+      canvas: R1_ID,
       from,
       to,
       before: null,
     } as const
     expect(move(false)).toEqual([
-      { kind: "moveTask", move: request, moved: [] },
+      { kind: "moveCanvas", move: request, moved: [] },
     ])
     expect(move(true)).toEqual([
       {
-        kind: "moveTask",
+        kind: "moveCanvas",
         move: request,
         moved: [
-          { kind: "list", act: { kind: "close", task: R1_ID } },
+          { kind: "list", act: { kind: "close", canvas: R1_ID } },
           {
             kind: "layout",
             moves: false,
-            action: { kind: "closeTask", task: TASK_OF("1-r1") },
+            action: { kind: "closeCanvas", canvas: ROOT_CANVAS("1-r1") },
           },
         ],
       },
@@ -303,59 +324,59 @@ describe("planIntent", () => {
     ).toEqual(onR1({ kind: "opened", card: NEW_THREAD, pending }))
   })
 
-  test("a new tab from a first message's edit starts with its text", () => {
+  test("a new canvas from a first message's edit starts with its text", () => {
     const prefill = { text: "again", blank: false }
-    expect(
-      plan(column({ kind: "newTab", prefill, asksAgent: true })),
-    ).toContainEqual({
+    expect(plan(column({ kind: "newCanvas", prefill }))).toContainEqual({
       kind: "layout",
       moves: false,
       action: {
         kind: "view",
-        task: NEW_TASK,
+        canvas: NEW_CANVAS,
         first: null,
-        change: {
-          kind: "opened",
-          card: NEW_THREAD,
-          prefill,
-          asksAgent: true,
-        },
+        change: { kind: "opened", card: NEW_THREAD, prefill },
       },
     })
   })
 
-  test("＋ opens a new tab: its task and its thread written now, shown and in the sidebar, its column unfolded, taking focus", () => {
-    expect(
-      plan({ kind: "newTab", asksAgent: true, state: workflowStateIdFor("d") }),
-    ).toEqual([
-      { kind: "armFocus", key: { kind: "column", key: NEW_THREAD } },
-      {
-        kind: "request",
-        intent: {
-          kind: "open-thread",
-          thread: NEW_THREAD,
-          root: NEW_ROOT,
-          task: NEW_TASK,
-          start: { kind: "new-task", state: workflowStateIdFor("d") },
+  test("＋ opens a new canvas: its canvas and its thread written now, shown and in the sidebar, its thread's box starting with @agent, taking focus", () => {
+    expect(plan({ kind: "newCanvas", state: workflowStateIdFor("d") })).toEqual(
+      [
+        { kind: "armFocus", key: { kind: "column", key: NEW_THREAD } },
+        {
+          kind: "request",
+          intent: {
+            kind: "open-thread",
+            thread: NEW_THREAD,
+            root: NEW_ROOT,
+            canvas: NEW_CANVAS,
+            start: { kind: "new-canvas", state: workflowStateIdFor("d") },
+          },
         },
-      },
-      {
-        kind: "layout",
-        moves: false,
-        action: {
-          kind: "view",
-          task: NEW_TASK,
-          first: null,
-          change: { kind: "opened", card: NEW_THREAD, asksAgent: true },
+        {
+          kind: "layout",
+          moves: false,
+          action: {
+            kind: "view",
+            canvas: NEW_CANVAS,
+            first: null,
+            change: {
+              kind: "opened",
+              card: NEW_THREAD,
+              prefill: AGENT_PREFILL,
+            },
+          },
         },
-      },
-      {
-        kind: "layout",
-        moves: false,
-        action: { kind: "show", here: { kind: "task", task: NEW_TASK } },
-      },
-      { kind: "list", act: { kind: "ensure", task: NEW_TASK } },
-    ])
+        {
+          kind: "layout",
+          moves: false,
+          action: {
+            kind: "show",
+            here: { kind: "canvas", canvas: NEW_CANVAS },
+          },
+        },
+        { kind: "list", act: { kind: "ensure", canvas: NEW_CANVAS } },
+      ],
+    )
   })
 
   test("a branch is opened on the host, just after its thread, its column unfolded with what it starts with, taking focus", () => {
@@ -378,7 +399,7 @@ describe("planIntent", () => {
           kind: "open-thread",
           thread: NEW_THREAD,
           root: TEST_ROOT,
-          task: R1_ID,
+          canvas: R1_ID,
           start: { kind: "branch", at: at2 },
         },
       },
@@ -388,7 +409,7 @@ describe("planIntent", () => {
         prefill: { text: "hi", blank: false },
       }),
     ])
-    // Off a task, nothing.
+    // Off a canvas, nothing.
     expect(
       plan(
         column(
@@ -400,13 +421,13 @@ describe("planIntent", () => {
     ).toEqual([])
   })
 
-  test("× on any column trashes its card alone, asking nothing, your message there staying with it; a new tab's only thread, not yet started, takes its task out of the sidebar too", () => {
+  test("× on any column trashes its card alone, asking nothing, your message there staying with it; a new canvas's only thread, not yet started, takes its canvas out of the sidebar too", () => {
     const thread: CardRecord = {
       kind: "thread",
       id: F,
       owner: ME,
       placer: ME,
-      place: { kind: "canvas", task: R1_ID, order: "zz", width: 1 },
+      place: { kind: "canvas", canvas: R1_ID, order: "zz", width: 1 },
       content: NO_CONTENT,
     }
     const state = at(onRoot("1-r1"), undefined, {
@@ -415,20 +436,20 @@ describe("planIntent", () => {
     })
     const away = {
       card: F,
-      from: { kind: "canvas", task: R1_ID },
+      from: { kind: "canvas", canvas: R1_ID },
       to: { kind: "trash" },
     }
     const column = { kind: "column", key: F } as const
     expect(plan({ kind: "discard", card: F, at: column }, state)).toMatchObject(
       [{ kind: "moveCard", move: away, how: { actedAt: column } }],
     )
-    // Alone on its task's canvas: a new tab's, whose task then leaves the sidebar.
-    const alone = { ...thread, place: { ...thread.place, task: NEW_TASK } }
+    // Alone on its canvas: a new canvas's, whose canvas then leaves the sidebar.
+    const alone = { ...thread, place: { ...thread.place, canvas: NEW_CANVAS } }
     const onTab = {
       ...at(onRoot("1-r1"), undefined, { ...NO_CARDS, cards: [alone] }),
-      tasks: {
-        ...TASKS,
-        index: { ...TASKS.index, canvases: new Map([[NEW_TASK, [alone]]]) },
+      canvases: {
+        ...CANVASES,
+        index: { ...CANVASES.index, cardsOn: new Map([[NEW_CANVAS, [alone]]]) },
       },
     } as IntentState
     expect(plan({ kind: "discard", card: F, at: column }, onTab)).toEqual([
@@ -438,7 +459,7 @@ describe("planIntent", () => {
           {
             move: {
               card: F,
-              from: { kind: "canvas", task: NEW_TASK },
+              from: { kind: "canvas", canvas: NEW_CANVAS },
               to: { kind: "trash" },
             },
             slot: null,
@@ -446,14 +467,14 @@ describe("planIntent", () => {
         ],
         actedAt: column,
         close: [
-          { kind: "list", act: { kind: "close", task: NEW_TASK } },
+          { kind: "list", act: { kind: "close", canvas: NEW_CANVAS } },
           {
             kind: "layout",
             moves: false,
-            action: { kind: "closeTask", task: NEW_TASK },
+            action: { kind: "closeCanvas", canvas: NEW_CANVAS },
           },
         ],
-        here: NEW_TASK,
+        here: NEW_CANVAS,
       },
     ])
   })
@@ -480,7 +501,7 @@ describe("planIntent", () => {
     expect(plan(column(act, CARD_C), at(onNothing))).toEqual([])
   })
 
-  test("a fold you ask for is your view of the task you are on, and moves; off a task, nothing", () => {
+  test("a fold you ask for is your view of the canvas you are on, and moves; off a canvas, nothing", () => {
     const moving = (change: object) => ({ ...onR1(change), moves: true })
     expect(plan({ kind: "fold", card: C, unfolded: true })).toEqual([
       moving({ kind: "fold", card: C, unfolded: true }),
@@ -488,16 +509,16 @@ describe("planIntent", () => {
     expect(
       plan({ kind: "fold", card: C, unfolded: false }, at(onNothing)),
     ).toEqual([])
-    expect(plan({ kind: "foldTask", unfolded: true })).toEqual([
-      moving({ kind: "foldTask", unfolded: true }),
+    expect(plan({ kind: "foldCanvas", unfolded: true })).toEqual([
+      moving({ kind: "foldCanvas", unfolded: true }),
     ])
-    expect(plan({ kind: "foldTask", unfolded: true }, at(onNothing))).toEqual(
+    expect(plan({ kind: "foldCanvas", unfolded: true }, at(onNothing))).toEqual(
       [],
     )
   })
 
   test("a note column is made at its spot on the canvas, and unfolded", () => {
-    const at = { kind: "canvas", task: R1_ID, after: C } as const
+    const at = { kind: "canvas", canvas: R1_ID, after: C } as const
     expect(
       plan({ kind: "addColumn", make: { kind: "note-column" }, at }),
     ).toEqual([
@@ -506,7 +527,7 @@ describe("planIntent", () => {
         move: {
           card: NEW_NOTE_COLUMN,
           from: null,
-          to: { kind: "canvas-at", task: R1_ID, after: C },
+          to: { kind: "canvas-at", canvas: R1_ID, after: C },
         },
         how: { actedAt: { kind: "column", key: NEW_NOTE_COLUMN }, slot: null },
         queuedBy: null,
@@ -522,12 +543,12 @@ describe("planIntent", () => {
         at: { ...at, after: null },
       })[0],
     ).toMatchObject({
-      move: { to: { kind: "canvas-at", task: R1_ID, after: null } },
+      move: { to: { kind: "canvas-at", canvas: R1_ID, after: null } },
     })
   })
 
   test("a thread column is a new root opened at its spot on the canvas, asking the agent as it was made to, taking focus", () => {
-    const at = { kind: "canvas", task: R1_ID, after: C } as const
+    const at = { kind: "canvas", canvas: R1_ID, after: C } as const
     const made = (asksAgent: boolean) =>
       plan({ kind: "addColumn", make: { kind: "thread", asksAgent }, at })
     expect(made(true)).toEqual([
@@ -538,7 +559,7 @@ describe("planIntent", () => {
           kind: "open-thread",
           thread: NEW_THREAD,
           root: NEW_ROOT,
-          task: R1_ID,
+          canvas: R1_ID,
           start: { kind: "new-root", after: C },
         },
       },
@@ -554,7 +575,7 @@ describe("planIntent", () => {
         intent: {
           kind: "card-width",
           card: C,
-          at: { kind: "canvas", task: R1_ID },
+          at: { kind: "canvas", canvas: R1_ID },
           width: 2,
         },
       },
@@ -562,25 +583,25 @@ describe("planIntent", () => {
     expect(plan({ kind: "cardWidth", card: F, width: 2 })).toEqual([])
   })
 
-  test("a move reorders the column's card on the canvas, for everyone; a branch's or a new tab's has nowhere to move", () => {
+  test("a move reorders the column's card on the canvas, for everyone; a branch's or a new canvas's has nowhere to move", () => {
     const move = (card: CardId, to: number): Intent => ({
       kind: "moveColumn",
       column: { kind: "card", card },
       to,
     })
-    const moveTask: Intent = {
+    const moveCanvas: Intent = {
       kind: "moveColumn",
-      // @ts-expect-error: the task column has no place on the canvas to move from
-      column: { kind: "task", task: R1_ID },
+      // @ts-expect-error: the canvas column has no place on the canvas to move from
+      column: { kind: "canvas", canvas: R1_ID },
       to: 0,
     }
-    expect(moveTask.kind).toBe("moveColumn")
+    expect(moveCanvas.kind).toBe("moveColumn")
     expect(plan(move(C, 0))).toEqual([
       {
         kind: "reorderCard",
         reorder: {
           card: C,
-          at: { kind: "canvas", task: R1_ID },
+          at: { kind: "canvas", canvas: R1_ID },
           after: null,
           before: TRUNK,
         },
@@ -651,7 +672,7 @@ describe("planIntent", () => {
             move: {
               card: NEW_THREAD,
               from: null,
-              to: { kind: "canvas-at", task: R1_ID, after: TRUNK },
+              to: { kind: "canvas-at", canvas: R1_ID, after: TRUNK },
             },
           },
         },
@@ -679,9 +700,9 @@ describe("planIntent", () => {
       ).toEqual(["showInventory", "refuse"])
       const nowhere = {
         ...R1,
-        tasks: {
-          ...TASKS,
-          index: { ...TASKS.index, taskOfCard: new Map() },
+        canvases: {
+          ...CANVASES,
+          index: { ...CANVASES.index, canvasOfCard: new Map() },
         },
       }
       expect(
@@ -716,7 +737,7 @@ describe("planIntent", () => {
         move: {
           card: LINKED,
           from: { kind: "inventory", holder: ME },
-          to: { kind: "canvas-at", task: R1_ID, after: TRUNK },
+          to: { kind: "canvas-at", canvas: R1_ID, after: TRUNK },
         },
       })
       expect(effects[1]).toMatchObject({ kind: "layout" })
@@ -726,14 +747,14 @@ describe("planIntent", () => {
       expect(
         plan({
           kind: "openLink",
-          link: linkOn(TASK_OF("1-r1")),
+          link: linkOn(ROOT_CANVAS("1-r1")),
           entry: entryId("3-b"),
         }),
       ).toEqual(plan({ kind: "openAt", entry: entryId("3-b") }))
       expect(
         plan({
           kind: "openLink",
-          link: linkOn(TASK_OF("8-r9")),
+          link: linkOn(ROOT_CANVAS("8-r9")),
           entry: entryId("9-far"),
         }),
       ).toEqual([
@@ -1003,39 +1024,39 @@ describe("planIntent", () => {
     ])
   })
 
-  test("rename and retitle are one request each, by task", () => {
-    const task = TASK_OF("1-r1")
+  test("rename and retitle are one request each, by canvas", () => {
+    const canvas = ROOT_CANVAS("1-r1")
     expect(
-      plan({ kind: "rename", of: { kind: "task", task }, title: "T" }),
+      plan({ kind: "rename", of: { kind: "canvas", canvas }, title: "T" }),
     ).toEqual([
       {
         kind: "request",
-        intent: { kind: "mark", of: { kind: "task", task }, title: "T" },
+        intent: { kind: "mark", of: { kind: "canvas", canvas }, title: "T" },
       },
     ])
-    expect(plan({ kind: "retitle", task })).toEqual([
-      { kind: "request", intent: { kind: "retitle", task } },
+    expect(plan({ kind: "retitle", canvas })).toEqual([
+      { kind: "request", intent: { kind: "retitle", canvas } },
     ])
   })
 })
 
-test("afterTaskMove: what follows a move runs only once the host accepts it; a refusal of its card's move is said on the board", () => {
+test("afterCanvasMove: what follows a move runs only once the host accepts it; a refusal of its card's move is said on the board", () => {
   const moved: Effect[] = [
     {
       kind: "layout",
       moves: false,
-      action: { kind: "closeTask", task: TASK_OF("1-r1") },
+      action: { kind: "closeCanvas", canvas: ROOT_CANVAS("1-r1") },
     },
   ]
-  expect(afterTaskMove({ kind: "moved" }, moved)).toBe(moved)
+  expect(afterCanvasMove({ kind: "moved" }, moved)).toBe(moved)
   expect(
-    afterTaskMove(
-      { kind: "refused", code: ERR.TASK_BUSY, message: "no" },
+    afterCanvasMove(
+      { kind: "refused", code: ERR.CANVAS_BUSY, message: "no" },
       moved,
     ),
   ).toEqual([])
   expect(
-    afterTaskMove(
+    afterCanvasMove(
       {
         kind: "unmoved",
         code: "moved",
@@ -1083,7 +1104,7 @@ describe("a page over the stage", () => {
   const leave: Effect = { kind: "page", to: null }
   const r2: Intent = {
     kind: "show",
-    here: { kind: "task", task: TASK_OF("5-r2") },
+    here: { kind: "canvas", canvas: ROOT_CANVAS("5-r2") },
   }
   test("opening and leaving a page are the page effect", () => {
     expect(plan({ kind: "page", to: "profile" })).toEqual([
@@ -1091,21 +1112,20 @@ describe("a page over the stage", () => {
     ])
     expect(plan({ kind: "page", to: null }, onPage)).toEqual([leave])
   })
-  test("showing a root, a new tab or the board leaves the page first, once", () => {
+  test("showing a root, a new canvas or the board leaves the page first, once", () => {
     expect(plan(r2, onPage)).toEqual([leave, ...plan(r2)])
-    const newTab: Intent = { kind: "newTab", asksAgent: true }
-    expect(plan(newTab, onPage)).toEqual([leave, ...plan(newTab)])
+    const newCanvas: Intent = { kind: "newCanvas" }
+    expect(plan(newCanvas, onPage)).toEqual([leave, ...plan(newCanvas)])
     const fromColumn = column({
-      kind: "newTab",
+      kind: "newCanvas",
       prefill: { text: "again", blank: false },
-      asksAgent: false,
     })
     expect(plan(fromColumn, onPage)).toEqual([leave, ...plan(fromColumn)])
     const board: Intent = { kind: "board", open: true, focus: true }
     expect(plan(board, onPage)).toEqual([leave, ...plan(board)])
     const inbox: Intent = {
       kind: "openLink",
-      link: linkOn(TASK_OF("5-r2")),
+      link: linkOn(ROOT_CANVAS("5-r2")),
       entry: entryId("9-unheld"),
     }
     expect(plan(inbox, onPage)[0]).toEqual(leave)
@@ -1127,12 +1147,12 @@ describe("a search over the root you are on", () => {
   const searching: IntentState = { ...R1, searching: true }
   const close: Effect = { kind: "search", act: { kind: "close" } }
   const openAt: Intent = { kind: "openAt", entry: entryId("3-b") }
-  test("a search act is the search effect; opening opens on the task you are on, and on no task does nothing", () => {
+  test("a search act is the search effect; opening opens on the canvas you are on, and on no canvas does nothing", () => {
     expect(plan({ kind: "search", act: { kind: "type", query: "x" } })).toEqual(
       [{ kind: "search", act: { kind: "type", query: "x" } }],
     )
     expect(plan({ kind: "search", act: { kind: "open" } })).toEqual([
-      { kind: "search", act: { kind: "open", task: R1_ID } },
+      { kind: "search", act: { kind: "open", canvas: R1_ID } },
     ])
     expect(
       plan({ kind: "search", act: { kind: "open" } }, at(onNothing)),
@@ -1145,17 +1165,17 @@ describe("a search over the root you are on", () => {
       { kind: "landed", entry: "3-b" },
     ])
   })
-  test("another task, a new tab, the board, a link or a new column close it too", () => {
+  test("another canvas, a new canvas, the board, a link or a new column close it too", () => {
     const r2: Intent = {
       kind: "show",
-      here: { kind: "task", task: TASK_OF("5-r2") },
+      here: { kind: "canvas", canvas: ROOT_CANVAS("5-r2") },
     }
     expect(plan(r2, searching)).toEqual([close, ...plan(r2)])
     const board: Intent = { kind: "board", open: true, focus: true }
     expect(plan(board, searching)).toEqual([close, ...plan(board)])
     const inbox: Intent = {
       kind: "openLink",
-      link: linkOn(TASK_OF("5-r2")),
+      link: linkOn(ROOT_CANVAS("5-r2")),
       entry: entryId("9-unheld"),
     }
     expect(plan(inbox, searching)[0]).toEqual(close)
@@ -1205,7 +1225,7 @@ describe("a press on a proposal", () => {
       ),
     ]),
   )
-  const R1_TASK = TASK_OF("1-r1")
+  const R1_CANVAS = ROOT_CANVAS("1-r1")
   const state = (cards: CardFacts = NO_CARDS, layout = onRoot("1-r1")) => ({
     ...at(layout, indexAsks(proposed), cards),
     index: proposed,
@@ -1231,7 +1251,7 @@ describe("a press on a proposal", () => {
           kind: "branch-out",
           how: "start",
           root: TEST_ROOT,
-          task: R1_TASK,
+          canvas: R1_CANVAS,
           proposal: RESULT,
           branches: [
             { thread: BRANCHES[0], row: 0, brief: "do one" },
@@ -1321,17 +1341,17 @@ describe("a press on a proposal", () => {
         clips: { ...NO_CLIPS, textOf: id => texts.get(id) ?? "" },
       },
     )
-    expect(effects.filter(e => e.kind === "chat")).toEqual([
+    expect(effects.filter(e => e.kind === "send")).toEqual([
       {
-        kind: "chat",
+        kind: "send",
         text: "@agent do one my way",
-        at: { kind: "branch", thread: mine, at: "3-b", task: R1_TASK },
+        at: { kind: "branch", thread: mine, at: "3-b", canvas: R1_CANVAS },
         card: cardIdFor("c-mine"),
       },
       {
-        kind: "chat",
+        kind: "send",
         text: "@agent do two",
-        at: { kind: "branch", thread: untouched, at: "3-b", task: R1_TASK },
+        at: { kind: "branch", thread: untouched, at: "3-b", canvas: R1_CANVAS },
         card: null,
       },
     ])

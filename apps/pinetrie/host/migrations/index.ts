@@ -11,20 +11,16 @@
 import type { Exchange, Store } from "@kyneta/exchange"
 import { PRODUCT_NAME } from "@pinetrie/core"
 import { SCHEMA_OF, type StoredKind, storedKind } from "../policy.ts"
-import { cardContent } from "./0009-card-content.ts"
-import { threadOrigin } from "./0011-thread-origin.ts"
-import { unstartedThreads } from "./0012-unstarted-threads.ts"
-import { taskCards } from "./0013-task-cards.ts"
-import { trashLeft } from "./0014-trash-left.ts"
-import { laneHistory } from "./0015-lane-history.ts"
-import { revisionPoint } from "./0016-revision-point.ts"
-import { staleDocuments } from "./0017-stale-documents.ts"
-import { dismissedReady } from "./0018-dismissed-ready.ts"
+import { canvasPlaces } from "./0019-canvas-places.ts"
+import { canvasOpen } from "./0020-canvas-open.ts"
+import { entryWords } from "./0021-entry-words.ts"
 
 /** What a migration reads with, and writes with once every read loaded. */
 export interface MigrationRun {
   readonly exchange: Exchange
   readonly docIds: readonly string[]
+  /** Every stored document's id, whatever its kind. */
+  readonly storedIds: readonly string[]
   /**
    * Wait for a document the migration has got (`exchange.get`) to load. A
    * read-only open leaves its stored schema hash as it was; a record that fails
@@ -48,19 +44,14 @@ export interface Migration {
 }
 
 /**
- * Every migration this build carries, oldest first: 0012-unstarted-threads and
- * 0013-task-cards (the places), and 0018-dismissed-ready (each person's
- * attention). A store opens through the one migration from its stored
- * hash, so 0012 moves 0013's data too. 0001-live-row, 0002-records, 0005-tasks'
- * places and sidebars, 0008-entry-thread and 0010-reference-fields ran on
- * Duane's store and were deleted; restore one from the revision that deleted it
- * for a store still on its hash.
+ * Every migration this build carries, oldest first: 0019-canvas-places (the
+ * places, and with them the session's card histories, traces and workflow,
+ * and every stack of moves) and 0020-canvas-open (each person's open list). A
+ * store opens through the one migration from its stored hash. Each one
+ * Duane's store ran before these was deleted; restore one from the revision
+ * that deleted it for a store still on its hash.
  */
-export const MIGRATIONS: readonly Migration[] = [
-  unstartedThreads,
-  taskCards,
-  dismissedReady,
-]
+export const MIGRATIONS: readonly Migration[] = [canvasPlaces, canvasOpen]
 
 /**
  * A one-time change to stored contents that keeps every schema's hash: a
@@ -81,20 +72,10 @@ export interface RecordMigration {
 
 /**
  * Every one-time record migration this build carries, oldest first:
- * 0009-card-content and 0011-thread-origin, 0014-trash-left (a trashed card
- * records the place it left), 0015-lane-history (a lane's record names its
- * history's kind) and 0016-revision-point (a turn's record names its point,
- * written whole). 0003-workflow-archive, 0004-threads, 0005-tasks'
- * records, 0006-note-columns and 0007-thread-origin ran on Duane's store and
- * were deleted.
+ * 0021-entry-words (the words each root's entries carry for pine·trie to read
+ * back). Each one Duane's store ran before it was deleted.
  */
-export const RECORD_MIGRATIONS: readonly RecordMigration[] = [
-  cardContent,
-  threadOrigin,
-  trashLeft,
-  laneHistory,
-  revisionPoint,
-]
+export const RECORD_MIGRATIONS: readonly RecordMigration[] = [entryWords]
 
 /**
  * A one-time deletion of stored documents no schema of ours opens, run on the
@@ -109,10 +90,10 @@ export interface StoreMigration {
 }
 
 /**
- * Every one-time store deletion this build carries, oldest first:
- * 0017-stale-documents (the `pineta.control` Lines and `pinetrie:cards`).
+ * Every one-time store deletion this build carries, oldest first: none.
+ * Each one Duane's store ran was deleted.
  */
-export const STORE_MIGRATIONS: readonly StoreMigration[] = [staleDocuments]
+export const STORE_MIGRATIONS: readonly StoreMigration[] = []
 
 /**
  * Delete what each store migration names. `backup` copies a file store,
@@ -289,12 +270,18 @@ export async function migrate(input: {
         writes.push({
           name: migration.name,
           docs: docIds.length,
-          write: await migration.run({ exchange, docIds, hydrated }),
+          write: await migration.run({
+            exchange,
+            docIds,
+            storedIds: input.storedIds,
+            hydrated,
+          }),
         })
     for (const migration of input.records) {
       const write = await migration.run({
         exchange,
         docIds: input.storedIds,
+        storedIds: input.storedIds,
         hydrated,
       })
       if (write !== null)

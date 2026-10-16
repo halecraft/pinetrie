@@ -1,5 +1,5 @@
 // web/margin — an entry's margin, open under it: its comments, each a note
-// anyone on the task may edit, and a control to add one. Shut, the margin is
+// anyone on the canvas may edit, and a control to add one. Shut, the margin is
 // its face, the count beside the entry (`MarginFace`). What it says is
 // `@pinetrie/interface`'s (`margin.ts`).
 

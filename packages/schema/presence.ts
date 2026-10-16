@@ -49,11 +49,13 @@ export const presenceSchema = (d: PresenceDecay) =>
     /** Keyed `${writer}:${columnKey}`: the end of the thread that column shows. */
     reading: Schema.record(Schema.string().nullable().decay(d.presenceMs)),
     /**
-     * Keyed as `reading`: the task the column is on, so the sidebar and the
-     * board name readers by task, and a window that does not hold the
+     * Keyed as `reading`: the canvas the column is on, so the sidebar and the
+     * board name readers by canvas, and a window that does not hold the
      * thread's root can still name it.
      */
-    readingTask: Schema.record(Schema.string().nullable().decay(d.presenceMs)),
+    readingCanvas: Schema.record(
+      Schema.string().nullable().decay(d.presenceMs),
+    ),
     /** Keyed by writer: the thread end whose composer they are typing in. */
     typing: Schema.record(Schema.string().nullable().decay(d.typingMs)),
     /**

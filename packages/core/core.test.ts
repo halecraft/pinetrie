@@ -9,7 +9,7 @@ import {
   type CardId,
   type CardPlace,
   type CardRecord,
-  type ChatAt,
+  canvasIdFor,
   cardIdOfKind,
   DISCARDED,
   emailLocalPart,
@@ -25,6 +25,7 @@ import {
   keyOfFields,
   kindOfCard,
   livePlaceOf,
+  type MessageAt,
   type MoveTarget,
   messageText,
   moveOf,
@@ -60,7 +61,6 @@ import {
   type ThreadId,
   type ThreadName,
   targetOfFields,
-  taskIdFor,
   threadIdFor,
   writerId,
   writerOfPrincipal,
@@ -70,7 +70,7 @@ import { cardIdFor } from "./fixtures.ts"
 
 const _TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 const TEST_THREAD = threadIdFor("e")
-const TEST_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
+const TEST_CANVAS = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 
 describe("who a principal is", () => {
   test("an email is trimmed and lower-cased", () => {
@@ -345,7 +345,7 @@ describe("address: mentions pick who a message is for", () => {
       invites: [],
     })
   })
-  test("@Ada alone in agent work is for Ada only", () => {
+  test("@Ada alone in an agent thread is for Ada only", () => {
     expect(who("@AdaLovelace look", true)).toEqual({
       compels: NOBODY,
       people: ["Ada Lovelace"],
@@ -445,7 +445,7 @@ describe("a card's place as flat fields", () => {
     { kind: "inventory", holder: ADA },
     {
       kind: "trash",
-      left: { kind: "canvas", task: TEST_TASK, order: "m", width: 2 },
+      left: { kind: "canvas", canvas: TEST_CANVAS, order: "m", width: 2 },
     },
     { kind: "trash", left: { kind: "inventory", holder: ADA } },
   ]
@@ -490,40 +490,40 @@ describe("a card's place as flat fields", () => {
     })
   })
 
-  test("a canvas card needs its task, its order and its width; its key is its task", () => {
-    const canvas = {
+  test("a canvas card needs its canvas, its order and its width; its key is its canvas", () => {
+    const canvasPlace = {
       kind: "canvas",
-      task: TEST_TASK,
+      canvas: TEST_CANVAS,
       order: "m",
       width: 2,
     } as const
-    const f = placeFields(canvas)
-    expect(f).toMatchObject({ kind: "canvas", task: TEST_TASK, width: "2" })
-    expect(placeOfFields(f)).toEqual(canvas)
+    const f = placeFields(canvasPlace)
+    expect(f).toMatchObject({ kind: "canvas", canvas: TEST_CANVAS, width: "2" })
+    expect(placeOfFields(f)).toEqual(canvasPlace)
     expect(placeOfFields({ ...f, width: "3" })).toBeUndefined()
-    expect(placeOfFields({ ...f, task: "r-x" })).toBeUndefined()
-    expect(keyOf(canvas)).toEqual({ kind: "canvas", task: TEST_TASK })
-    expect(keyOfFields(keyFieldsFrom(k => f[k]))).toEqual(keyOf(canvas))
+    expect(placeOfFields({ ...f, canvas: "r-x" })).toBeUndefined()
+    expect(keyOf(canvasPlace)).toEqual({ kind: "canvas", canvas: TEST_CANVAS })
+    expect(keyOfFields(keyFieldsFrom(k => f[k]))).toEqual(keyOf(canvasPlace))
   })
 
-  test("a key's fields on the wire are the table's: no width, no order, no task but a canvas's and a spot's, a task pin's or a task's notes", () => {
+  test("a key's fields on the wire are the table's: no width, no order, no canvas but a canvas's and a spot's, a canvas pin's or a canvas's notes", () => {
     const f = placeFields({
       kind: "canvas",
-      task: TEST_TASK,
+      canvas: TEST_CANVAS,
       order: "m",
       width: 2,
     })
     expect(keyFieldsOf(f)).not.toHaveProperty("width")
     expect(keyFieldsOf(f)).not.toHaveProperty("order")
-    expect(keyFieldsOf(f)).toHaveProperty("task", TEST_TASK)
+    expect(keyFieldsOf(f)).toHaveProperty("canvas", TEST_CANVAS)
     const note = placeFields({ kind: "note", column: NOTES, order: "m" })
     expect(keyFieldsOf(note)).not.toHaveProperty("order")
     expect(keyFieldsOf(note)).toHaveProperty("column", NOTES)
     const gone = placeFields({
       kind: "trash",
-      left: { kind: "canvas", task: TEST_TASK, order: "m", width: 1 },
+      left: { kind: "canvas", canvas: TEST_CANVAS, order: "m", width: 1 },
     })
-    expect(keyFieldsOf(gone)).not.toHaveProperty("task")
+    expect(keyFieldsOf(gone)).not.toHaveProperty("canvas")
   })
 
   test("a card's kind is its id's prefix: a bare uuidv7 is a text card", () => {
@@ -533,9 +533,9 @@ describe("a card's place as flat fields", () => {
     }
     expect(at(UUID)).toBe("text")
     expect(at(threadIdFor("x"))).toBe("thread")
-    // A task's id is its card's, any `isTaskId` takes.
-    expect(at(TEST_TASK)).toBe("task")
-    expect(at(taskIdFor("x"))).toBe("task")
+    // A canvas's id is its card's, any `isCanvasId` takes.
+    expect(at(TEST_CANVAS)).toBe("canvas")
+    expect(at(canvasIdFor("x"))).toBe("canvas")
     expect(at(`n-${UUID}`)).toBe("note-column")
     expect(at(`m-${UUID}`)).toBe("media")
     expect(at(`f-${UUID}`)).toBe("file")
@@ -554,9 +554,9 @@ describe("a card's place as flat fields", () => {
 
   test("placed: a card at a place its kind is ever in, and no record where it is never", () => {
     const by = writerId("ada@example.com")
-    const canvas = {
+    const canvasPlace = {
       kind: "canvas",
-      task: TEST_TASK,
+      canvas: TEST_CANVAS,
       order: "m",
       width: 1,
     } as const
@@ -565,7 +565,7 @@ describe("a card's place as flat fields", () => {
       kind: "note-column",
       id: NOTES,
       owner: by,
-      place: canvas,
+      place: canvasPlace,
       placer: by,
       content: NO_CONTENT,
     }
@@ -573,15 +573,17 @@ describe("a card's place as flat fields", () => {
       kind: "thread",
       id: TEST_THREAD,
       owner: by,
-      place: canvas,
+      place: canvasPlace,
       placer: by,
       content: NO_CONTENT,
     }
     expect(placed(thread, held)?.place).toEqual(held)
     expect(placed(column, held)).toBeUndefined()
-    expect(placed(column, { ...canvas, order: "n" })?.place).toMatchObject({
-      order: "n",
-    })
+    expect(placed(column, { ...canvasPlace, order: "n" })?.place).toMatchObject(
+      {
+        order: "n",
+      },
+    )
   })
 
   test("text that is no card's id parses as none", () => {
@@ -720,8 +722,8 @@ describe("moves, built once", () => {
       thread,
     })
     expect(
-      ownerOf({ kind: "task-pinned", task: TEST_TASK, order: "a" }),
-    ).toEqual({ kind: "task", task: TEST_TASK })
+      ownerOf({ kind: "canvas-pinned", canvas: TEST_CANVAS, order: "a" }),
+    ).toEqual({ kind: "canvas", canvas: TEST_CANVAS })
     expect(ownerOf({ kind: "inventory", holder: ADA })).toEqual({
       kind: "person",
       holder: ADA,
@@ -797,16 +799,16 @@ describe("threads, by construction", () => {
     // @ts-expect-error: a lane is named by a thread's id, never a string
     const lane: ThreadId = "t-x"
     // @ts-expect-error: a branch without the thread its column minted
-    const branch: ChatAt = { kind: "branch", at: null }
+    const branch: MessageAt = { kind: "branch", at: null }
     // @ts-expect-error: a send at an end names its thread
-    const end: ChatAt = { kind: "end", seen: entryId("e-1") }
+    const end: MessageAt = { kind: "end", seen: entryId("e-1") }
     expect([lane, branch.kind, end.kind]).toEqual(["t-x", "branch", "end"])
   })
 })
 
 test("every place writes only the fields its kind's row stores (`ROWS`)", () => {
   const thread = threadIdFor("01a0ffd2-0000-7000-8000-0000000000aa")
-  const task = taskIdFor("01a0ffd2-0000-7000-8000-0000000000ab")
+  const canvas = canvasIdFor("01a0ffd2-0000-7000-8000-0000000000ab")
   const places: readonly (CardPlace | MoveTarget)[] = [
     { kind: "composing", thread },
     { kind: "pinned", thread, order: "a" },
@@ -817,13 +819,13 @@ test("every place writes only the fields its kind's row stores (`ROWS`)", () => 
       by: writerId("a@x.io"),
       seen: "v",
     },
-    { kind: "canvas", task, order: "a", width: 2 },
-    { kind: "canvas-at", task, after: thread },
-    { kind: "task-pinned", task, order: "a" },
+    { kind: "canvas", canvas, order: "a", width: 2 },
+    { kind: "canvas-at", canvas, after: thread },
+    { kind: "canvas-pinned", canvas, order: "a" },
     { kind: "notes", near: "thread", thread },
-    { kind: "notes", near: "task", task },
+    { kind: "notes", near: "canvas", canvas },
     { kind: "inventory", holder: writerId("a@x.io") },
-    { kind: "trash", left: { kind: "canvas", task, order: "a", width: 1 } },
+    { kind: "trash", left: { kind: "canvas", canvas, order: "a", width: 1 } },
   ]
   for (const place of places) {
     const { kind, ...fields } = placeFields(place)
@@ -832,15 +834,15 @@ test("every place writes only the fields its kind's row stores (`ROWS`)", () => 
       .map(([f]) => f)
     expect(written.every(f => rowFieldsOf(kind)?.includes(f))).toBe(true)
   }
-  expect(rowFieldsOf("canvas-at")).toEqual(["task", "column"])
+  expect(rowFieldsOf("canvas-at")).toEqual(["canvas", "column"])
   expect(rowFieldsOf("nowhere")).toBeUndefined()
 })
 
-test("a notes target says by its tag which notes it is near, a thread's or a task's", () => {
+test("a notes target says by its tag which notes it is near, a thread's or a canvas's", () => {
   const thread = threadIdFor("01a0ffd2-0000-7000-8000-0000000000aa")
-  const task = taskIdFor("01a0ffd2-0000-7000-8000-0000000000ab")
+  const canvas = canvasIdFor("01a0ffd2-0000-7000-8000-0000000000ab")
   // @ts-expect-error: near a thread, it names the thread
-  const wrong: NotesTarget = { kind: "notes", near: "thread", task }
+  const wrong: NotesTarget = { kind: "notes", near: "thread", canvas }
   // @ts-expect-error: untagged, it is neither
   const bare: NotesTarget = { kind: "notes", thread }
   const near: NotesTarget = { kind: "notes", near: "thread", thread }
@@ -850,8 +852,8 @@ test("a notes target says by its tag which notes it is near, a thread's or a tas
     "thread",
   ])
   expect(
-    targetOfFields(placeFields({ kind: "notes", near: "task", task })),
-  ).toEqual({ kind: "notes", near: "task", task })
+    targetOfFields(placeFields({ kind: "notes", near: "canvas", canvas })),
+  ).toEqual({ kind: "notes", near: "canvas", canvas })
 })
 
 const UUID = "01a0ffd2-0000-7000-8000-00000000000a"
@@ -859,8 +861,8 @@ const NOTES = cardIdOfKind("note-column", UUID)
 
 describe("a history of moves' document", () => {
   const ADA_W = writerId("ada@x.io")
-  test("a task's and a person's outside any task read back as written; other ids name none", () => {
-    for (const scope of [historyScope(TEST_TASK), PERSON_HISTORY])
+  test("a canvas's and a person's outside any canvas read back as written; other ids name none", () => {
+    for (const scope of [historyScope(TEST_CANVAS), PERSON_HISTORY])
       expect(movesOfDocId(movesDocId(ADA_W, scope))).toEqual({
         writer: ADA_W,
         scope,

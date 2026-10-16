@@ -381,33 +381,47 @@ export async function readRaw(p: Page, n = 0): Promise<void> {
 export const connected = (p: Page, timeout = 20_000) =>
   p.waitForFunction(
     () =>
-      document.querySelector("#sidebar .add-agent") !== null &&
+      document.querySelector("#sidebar .add-canvas") !== null &&
       document.querySelector(".sync-note") === null,
     undefined,
     { timeout },
   )
-/** A task in the sidebar. */
-export const itemSel = (task: string) =>
-  `#sidebar .open-root[data-task="${task}"]`
-/** A task on the board: inside `#board`. */
-export const boardSel = (task: string) => `.thread-card[data-task="${task}"]`
+/**
+ * Type `text` into the box `box` after what it holds: a new canvas's
+ * `@agent `, so its first send asks the agent, and nothing once it is sent.
+ */
+export async function typeAfter(
+  p: Page,
+  box: string,
+  text: string,
+): Promise<void> {
+  await p.focus(box)
+  await p.keyboard.press("ControlOrMeta+End")
+  await p.keyboard.insertText(text)
+}
+/** A canvas in the sidebar. */
+export const itemSel = (canvas: string) =>
+  `#sidebar .open-root[data-canvas="${canvas}"]`
+/** A canvas on the board: inside `#board`. */
+export const boardSel = (canvas: string) =>
+  `.thread-card[data-canvas="${canvas}"]`
 /**
  * Step away from the root you are on, so its columns unmount: to a new tab,
- * a task of its own holding one thread not yet started, which
+ * a canvas of its own holding one thread not yet started, which
  * `stepBack` closes again. The sidebar has nothing else to step to that
  * every scenario holds.
  */
 export async function stepAway(p: Page): Promise<void> {
-  await p.click("#sidebar .add-agent")
+  await p.click("#sidebar .add-canvas")
   await p.waitForSelector(".column[data-card] .close", { timeout: 15_000 })
 }
 /**
- * Back on `task` from `stepAway`: the new tab's column closed, discarding
- * its thread and its task, then `task` shown.
+ * Back on `canvas` from `stepAway`: the new tab's column closed, discarding
+ * its thread and its canvas, then `canvas` shown.
  */
-export async function stepBack(p: Page, task: string): Promise<void> {
+export async function stepBack(p: Page, canvas: string): Promise<void> {
   await p.click(".column[data-card] .close")
-  await p.click(itemSel(task))
+  await p.click(itemSel(canvas))
 }
 /**
  * Open the board, unless it is open. A page with nothing in its list opens
@@ -421,8 +435,8 @@ export async function openBoard(p: Page): Promise<void> {
 /** The messages the rail on `p` accounts for: dots, and each stretch's count. */
 export const railCount = (p: Page) => p.evaluate(RAIL_MESSAGES)
 /**
- * Open task `r` from the board: select its item, which shows it
- * and puts it in the sidebar, and wait until you are on it. An archived task
+ * Open canvas `r` from the board: select its item, which shows it
+ * and puts it in the sidebar, and wait until you are on it. An archived canvas
  * is found in the archive's rows, by its label's search.
  */
 export const openFromBoard = async (p: Page, r: string) => {

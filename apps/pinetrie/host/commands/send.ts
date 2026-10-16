@@ -29,6 +29,7 @@ import {
   type RootView,
   readAccepted,
   readBases,
+  readCanvases,
   readLanes,
   readParticipantNames,
   readParticipants,
@@ -36,7 +37,6 @@ import {
   readProposedByLane,
   readQueueHolds,
   readRoots,
-  readTasks,
   readThreadName,
   readThreads,
   readTreeIndex,
@@ -44,17 +44,17 @@ import {
   worksOwn,
 } from "@pinetrie/reads"
 import {
-  type ChatDecision,
-  type ChatDetails,
   type Cleared,
   displayName,
-  encodeChat,
+  encodeMessage,
   hasLocation,
   type LinkedQuote,
   linkedQuotes,
+  type MessageDecision,
+  type MessageDetails,
   parseCommand,
   planBaseNews,
-  planChat,
+  planMessage,
   planShares,
   planThreadOpen,
   resolveCommand,
@@ -75,7 +75,7 @@ import { type Runs, startRun } from "../runs.ts"
 import type { Titles } from "../titles.ts"
 import type { LaneWork } from "../work/index.ts"
 
-export interface ChatDeps {
+export interface SendDeps {
   readonly basics: Basics
   readonly agent: Pick<Agent, "createThreadLane" | "lane">
   /** A message on a thread with no lane is written through the scribe. */
@@ -101,7 +101,7 @@ export interface ChatDeps {
   /** Every thread is named once recorded. */
   readonly names: Pick<Names, "ensure">
   /** A chat that asks or invites other threads' agents is relayed. */
-  readonly relays: Pick<Relays, "relayChat">
+  readonly relays: Pick<Relays, "relayMessage">
 }
 
 /**
@@ -111,7 +111,7 @@ export interface ChatDeps {
  * one without placing anyone.
  */
 function gatherShares(
-  blobs: ChatDeps["blobs"],
+  blobs: SendDeps["blobs"],
   named: readonly TextBlob[],
 ): {
   readonly stored: ReadonlyMap<Sha256, StoredShare>
@@ -161,8 +161,8 @@ const shareQuotes = (
         ],
   )
 
-/** What `executeChat` needs besides the decision: the facts the send was planned from. */
-export interface ChatContext {
+/** What `executeSend` needs besides the decision: the facts the send was planned from. */
+export interface SendContext {
   /** The root's documents the send was planned from. */
   readonly view: RootView
   readonly writer: WriterId
@@ -189,17 +189,17 @@ export const spendsCard = (sent: Outcome): boolean =>
   sent.kind === "appended" || sent.kind === "started"
 
 /**
- * Gather, `threadOfSend` and `planChat`, then `executeChat`. A message sent from
+ * Gather, `threadOfSend` and `planMessage`, then `executeSend`. A message sent from
  * a card carries its other writers as contributors ("Ada, with Bea"). It
  * spends nothing: whether the card goes is the caller's (`spendsCard`). It
  * takes only a send the gate cleared (`planGate`), so it checks no archive,
  * hold or lane kind of its own.
  */
-export async function sendChat(
-  deps: ChatDeps,
+export async function sendMessage(
+  deps: SendDeps,
   writer: WriterId,
   sendId: string,
-  chat: Cleared<Send>,
+  said: Cleared<Send>,
   /** This send has caught its lane up already (`catch-up-first`). */
   caughtUp = false,
 ): Promise<Outcome> {
@@ -207,35 +207,35 @@ export async function sendChat(
   const { docs, session, live } = deps.basics
 
   // A thread at the root starts a root, under the id its tab minted, in a new
-  // task: one the session already holds is another's, but for the task its
-  // thread was opened in, in that root. A branch elsewhere goes in a task the
+  // canvas: one the session already holds is another's, but for the canvas its
+  // thread was opened in, in that root. A branch elsewhere goes in a canvas the
   // session holds.
-  if (chat.at.kind === "branch") {
-    const known = readTasks(deps.basics.places).has(chat.at.task)
-    const opened = readThreads(session).get(chat.at.thread)?.root === chat.root
-    if (chat.at.at === null && readRoots(session).has(chat.root))
+  if (said.at.kind === "branch") {
+    const known = readCanvases(deps.basics.places).has(said.at.canvas)
+    const opened = readThreads(session).get(said.at.thread)?.root === said.root
+    if (said.at.at === null && readRoots(session).has(said.root))
       return {
         kind: "refused",
         code: ERR.ROOT_ID_IN_USE,
         message: "that root's id is in use",
       }
-    if (chat.at.at === null && known && !opened)
+    if (said.at.at === null && known && !opened)
       return {
         kind: "refused",
-        code: ERR.TASK_ID_IN_USE,
-        message: "that task's id is in use",
+        code: ERR.CANVAS_ID_IN_USE,
+        message: "that canvas's id is in use",
       }
-    if (chat.at.at !== null && !known)
+    if (said.at.at !== null && !known)
       return {
         kind: "refused",
         code: ERR.UNKNOWN_TARGET,
-        message: "no such task to start a thread in",
+        message: "no such canvas to start a thread in",
       }
   }
   // gather
   const view: RootView = {
-    root: chat.root,
-    doc: await docs.root(chat.root),
+    root: said.root,
+    doc: await docs.root(said.root),
     session,
     live,
   }
@@ -243,9 +243,9 @@ export async function sendChat(
   const names = readParticipantNames(session)
   const nameOf = (w: WriterId) => displayName(w, names.get(w))
   const contributors =
-    chat.card === null
+    said.card === null
       ? []
-      : (await cards.writers(chat.card.id)).filter(w => w !== writer)
+      : (await cards.writers(said.card.id)).filter(w => w !== writer)
 
   const placed = readPlaces(deps.basics.places)
   const blank = await cards.blankQueued(placed)
@@ -254,7 +254,7 @@ export async function sendChat(
   const thread = threadOfSend(
     index,
     readLanes(view, index, placed, readQueueHolds(session), blank),
-    { at: chat.at, me: writer },
+    { at: said.at, me: writer },
   )
   // A thread or entry this document does not hold has nowhere to go: refused
   // before anything is written, as pi would refuse a lane there.
@@ -274,11 +274,11 @@ export async function sendChat(
     }
   // A recorded thread's first send is a branch where its record says it begins:
   // any other branch naming it is another's.
-  const copied = readThreads(session).get(chat.at.thread)
+  const copied = readThreads(session).get(said.at.thread)
   if (
-    chat.at.kind === "branch" &&
+    said.at.kind === "branch" &&
     copied !== undefined &&
-    forkEntry(copied.origin) !== chat.at.at
+    forkEntry(copied.origin) !== said.at.at
   )
     return {
       kind: "refused",
@@ -289,10 +289,10 @@ export async function sendChat(
   // lane sees them: your working copy's, and a command's files.
   const own = worksOwn(view.session, {
     lane: thread.lane,
-    mode: planModeOf(chat.at),
+    mode: planModeOf(said.at),
   })
   // gather: the command its first word names, from its file as it is now
-  const typed = parseCommand(chat.text)
+  const typed = parseCommand(said.text)
   const source =
     typed === null ? null : resolveCommand(typed.name, deps.piSetup.commands())
   const command =
@@ -305,7 +305,7 @@ export async function sendChat(
           })
   // gather: what the store holds of each blob its text shares, and the
   // bytes of each that is not an image, for its quote
-  const named = textBlobs(chat.text)
+  const named = textBlobs(said.text)
   const held = gatherShares(blobs, named)
 
   // gather: the thread's base, for a lane with no work of its own to catch up
@@ -313,7 +313,7 @@ export async function sendChat(
   const lane = thread.lane.kind === "lane" ? thread.lane.name : null
   const bases = readBases(session)
 
-  // plan: a share no longer stored refuses the send before planChat decides
+  // plan: a share no longer stored refuses the send before planMessage decides
   // the rest
   const shares = planShares(named, held.stored)
   if (shares.kind === "refused") return shares
@@ -331,7 +331,7 @@ export async function sendChat(
           ),
           told: null,
         }).kind
-  const planned = planChat({
+  const planned = planMessage({
     news,
     caughtUp,
     command,
@@ -339,23 +339,23 @@ export async function sendChat(
     hostWorkingCopy: own ? (work.project?.root ?? null) : null,
     author: writer,
     authorName: nameOf(writer),
-    text: chat.text,
-    at: chat.at,
+    text: said.text,
+    at: said.at,
     thread,
-    mentions: chat.mentions,
+    mentions: said.mentions,
     participants: readParticipants(session, index),
     agents: agentCandidates(
       readReachableAgents({ places: deps.basics.places, session }),
-      chat.at.thread,
+      said.at.thread,
       threadMembers(index, thread.end.kind === "entry" ? thread.end.id : null),
     ),
-    asksAgent: chat.asksAgent,
+    asksAgent: said.asksAgent,
     sendId,
     contributors,
-    state: chat.state,
+    state: said.state,
   })
   if (planned.kind === "catch-up-first")
-    return catchUpFirst(deps, writer, sendId, chat, planned.thread)
+    return catchUpFirst(deps, writer, sendId, said, planned.thread)
   const begun =
     planned.kind === "appendToTree" || planned.kind === "createAndRun"
       ? planned
@@ -369,22 +369,22 @@ export async function sendChat(
       : planThreadOpen({
           thread: begun.thread,
           origin:
-            chat.at.kind === "branch" && chat.at.at !== null
-              ? { kind: "fork", at: chat.at.at, how: "branch" }
+            said.at.kind === "branch" && said.at.at !== null
+              ? { kind: "fork", at: said.at.at, how: "branch" }
               : ROOT_ORIGIN,
-          root: chat.root,
+          root: said.root,
           by: writer,
           now: deps.basics.now(),
           // A branch's card goes just after the thread it forks from.
           placement: {
             kind: "after",
-            task: begun.starts.task,
+            canvas: begun.starts.canvas,
             parent:
-              chat.at.kind === "branch" && chat.at.at !== null
-                ? threadAt(index, chat.at.at)
+              said.at.kind === "branch" && said.at.at !== null
+                ? threadAt(index, said.at.at)
                 : null,
           },
-          opens: readTasks(deps.basics.places).has(begun.starts.task)
+          opens: readCanvases(deps.basics.places).has(begun.starts.canvas)
             ? null
             : {
                 state: begun.starts.state,
@@ -402,17 +402,17 @@ export async function sendChat(
   // gather: the past its text links to, from the root it is in; then each
   // file it shares that the model reads as text
   const quotes = [
-    ...linkedQuotes(chat.text, address => {
+    ...linkedQuotes(said.text, address => {
       const message = index.entries[address.entry]?.message
       return message === undefined ? undefined : messageText(message)
     }),
     ...shareQuotes(shares.shared, held.texts, deps.quoteBytes),
   ]
-  const sent = await executeChat(deps, planned, {
+  const sent = await executeSend(deps, planned, {
     view,
     writer,
-    base: chat.base,
-    pinned: chat.pinned,
+    base: said.base,
+    pinned: said.pinned,
     start,
     quotes,
   })
@@ -424,7 +424,7 @@ export async function sendChat(
     (sent.kind === "appended" || sent.kind === "started") &&
     ((details.asks?.length ?? 0) > 0 || (details.invites?.length ?? 0) > 0)
   )
-    void deps.relays.relayChat(chat.at.thread, sendId)
+    void deps.relays.relayMessage(said.at.thread, sendId)
   return sent
 }
 
@@ -436,16 +436,16 @@ export async function sendChat(
  * follows either way.
  */
 async function catchUpFirst(
-  deps: ChatDeps,
+  deps: SendDeps,
   writer: WriterId,
   sendId: string,
-  chat: Cleared<Send>,
+  said: Cleared<Send>,
   lane: ThreadId,
 ): Promise<Outcome> {
   const prepared = await deps.work.prepareUpdate(
     deps.agent.lane(lane),
     writer,
-    chat.text,
+    said.text,
     "bring-up-to-date",
     "run",
   )
@@ -453,41 +453,41 @@ async function catchUpFirst(
     return startRun(deps, lane, {
       kind: "prompt",
       message: prepared.message,
-      pinnedSeen: chat.pinned,
+      pinnedSeen: said.pinned,
     })
   if (prepared.kind === "refused")
     deps.basics.log(
       `[host] ${readThreadName(deps.basics.session, lane)}: not caught up before its run: ${prepared.reason}`,
     )
-  return sendChat(deps, writer, sendId, chat, true)
+  return sendMessage(deps, writer, sendId, said, true)
 }
 
 /**
  * Carry out a chat's decision. `createAndRun` still checks its directory and
- * asks pi to create the lane, under the id `planChat` chose, here: both are
+ * asks pi to create the lane, under the id `planMessage` chose, here: both are
  * ports that may refuse.
  */
-export async function executeChat(
-  deps: ChatDeps,
-  planned: ChatDecision,
-  context: ChatContext,
+export async function executeSend(
+  deps: SendDeps,
+  planned: MessageDecision,
+  context: SendContext,
 ): Promise<Outcome> {
   const { agent, work } = deps
   const { log, now } = deps.basics
   const { view, writer } = context
   const { root } = view
-  const message = (details: ChatDetails) =>
-    encodeChat(details, now(), context.quotes)
-  // A thread opened by its first message: its record, its card on its task's
-  // canvas and a new task's record and board place first, so a reader that
-  // finds the message finds its thread's root and task.
+  const message = (details: MessageDetails) =>
+    encodeMessage(details, now(), context.quotes)
+  // A thread opened by its first message: its record, its card on its canvas's
+  // canvas and a new canvas's record and board place first, so a reader that
+  // finds the message finds its thread's root and canvas.
   const { start } = context
   if (start !== null) {
     await deps.records.writeValues(start.records)
     await deps.placesWriter.change({ kind: "move", by: writer }, open =>
       open.apply(start.steps),
     )
-    // A conversation's thread is named once its record is; a new lane's is
+    // A chat's thread is named once its record is; a new lane's is
     // named as its lane is made, which draws its banner.
     if (planned.kind === "appendToTree") void deps.names.ensure()
   }
@@ -497,7 +497,7 @@ export async function executeChat(
     case "busy":
       return planned
     case "catch-up-first":
-      // `sendChat` carries it out before it comes here.
+      // `sendMessage` carries it out before it comes here.
       return { kind: "failed", message: "a catch-up was not carried out" }
     case "appendToTree":
     case "appendToLane": {

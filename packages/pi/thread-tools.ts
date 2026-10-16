@@ -255,7 +255,7 @@ export function proposeTool() {
           title: Type.String({ description: "A few words naming the work" }),
           brief: Type.String({
             description:
-              "What the new thread's agent is asked to do; it also reads this conversation",
+              "What the new thread's agent is asked to do; it also reads this thread",
           }),
         }),
         { description: "One per new thread, in the order to show them" },

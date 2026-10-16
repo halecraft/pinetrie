@@ -1,6 +1,8 @@
 import {
+  type CanvasId,
   type CardCommand,
   type CardId,
+  canvasIdFor,
   cardIdOfKind,
   DISCARDED,
   ERR,
@@ -15,10 +17,8 @@ import {
   rootIdFor,
   runId,
   type Sha256,
-  type TaskId,
   type TextCard,
   type ThreadId,
-  taskIdFor,
   threadIdFor,
   type WriterId,
   workflowStateIdFor,
@@ -27,13 +27,13 @@ import {
 import { cardIdFor } from "@pinetrie/core/fixtures"
 import { PLACES_DOC_ID } from "@pinetrie/protocol/messages"
 import {
+  readCanvases,
   readCardHistories,
   readPlaces,
   readPlacesRev,
   readQueueHolds,
   readRoots,
   readRunning,
-  readTasks,
   readThreads,
   readTraces,
 } from "@pinetrie/reads"
@@ -56,13 +56,14 @@ import {
   writeLaneTip,
 } from "@pinetrie/schema/fixtures"
 import { describe, expect, test } from "vitest"
+import { canvasesNow } from "../canvases.ts"
 import {
   applyWrites,
   basics,
   NO_BLANK_CARDS,
   placesFor,
+  putCanvas,
   putNoteColumn,
-  putTask,
   putValue,
   record,
   row,
@@ -71,10 +72,9 @@ import {
   threadRow,
 } from "../fakes.ts"
 import { popNextQueuedCard } from "../queued-card-pop.ts"
-import { tasksNow } from "../tasks.ts"
 import { type CardCommandDeps, createCardCommands } from "./cards.ts"
 
-const TEST_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
+const TEST_CANVAS = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 
 const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 
@@ -83,12 +83,12 @@ const BEA = writerId("bea@x.io")
 const LANE = threadIdFor("0123456789abcdef")
 const E1 = entryId("e-1")
 const C1 = cardIdFor("c1")
-/** A note column on the lane's task's canvas (`putNoteColumn`). */
+/** A note column on the lane's canvas (`putNoteColumn`). */
 const NOTES = cardIdOfKind(
   "note-column",
   "01a0ffd2-0000-7000-8000-0000000000a1",
 )
-/** A note in it: a shared place, in the lane's task. */
+/** A note in it: a shared place, in the lane's canvas. */
 const atEnd = { kind: "note", column: NOTES, order: "a" } as const
 const noteKey = { kind: "note", column: NOTES } as const
 /** Pinned at the lane's end: a place a trace is left at (`TRACED`). */
@@ -113,7 +113,7 @@ const queuedKey = {
   seen: "",
 } as const
 
-/** The places' text cards: a task's thread card is the fixture's (`putTask`). */
+/** The places' text cards: a canvas's thread card is the fixture's (`putCanvas`). */
 const textsIn = (places: ReturnType<typeof setUp>["b"]["places"]) =>
   readPlaces(places).filter(isTextCard)
 
@@ -121,9 +121,9 @@ function setUp() {
   const b = basics()
   writeEntry(b.root, threadRow(E1, null, LANE))
   writeLaneTip(b.root, LANE, E1)
-  // The lane's thread's card, on the task a move's history is in.
-  putTask(b, LANE, TEST_TASK)
-  putNoteColumn(b, NOTES, TEST_TASK)
+  // The lane's thread's card, on the canvas a move's history is in.
+  putCanvas(b, LANE, TEST_CANVAS)
+  putNoteColumn(b, NOTES, TEST_CANVAS)
   // Each card's text as the host holds it.
   const texts = new Map<string, string>()
   const cards = record<CardCommandDeps["cards"]>({
@@ -142,7 +142,7 @@ function setUp() {
   const recorded: [string, string][] = []
   const histories = record<CardCommandDeps["histories"]>({
     gestureOf: async (writer, scope) => write => {
-      recorded.push([writer, scope.kind === "task" ? scope.task : "person"])
+      recorded.push([writer, scope.kind === "canvas" ? scope.canvas : "person"])
       return write()
     },
     step: async () => {
@@ -152,7 +152,7 @@ function setUp() {
     // The step an undo would try: the one it answers with.
     top: async () =>
       (undoing.kind === "none" ? undefined : undoing.step) as never,
-    unloadTask: async () => {},
+    unloadCanvas: async () => {},
   })
   const presence = newPresenceDoc()
   const { placesWriter, provenance } = placesFor(b, {
@@ -174,31 +174,32 @@ function setUp() {
     records: { writeValues: async writes => applyWrites(b, writes) },
     ensureNames: async () => {},
   })
-  // Each command gathers the task index once, as the dispatcher does.
+  // Each command gathers the canvas index once, as the dispatcher does.
   type Raw = typeof raw
   const commands = {
     ...raw,
-    move: (w: WriterId, m: Parameters<Raw["move"]>[1], h: TaskId | null) =>
-      raw.move(w, m, h, tasksNow(b)),
+    move: (w: WriterId, m: Parameters<Raw["move"]>[1], h: CanvasId | null) =>
+      raw.move(w, m, h, canvasesNow(b)),
     queueCard: (
       w: WriterId,
       m: QueueMove,
       h: QueueHoldChange,
       c: CardCommand | null,
-    ) => raw.queueCard(w, m, h, c, tasksNow(b)),
-    reorder: (w: WriterId, r: Reorder) => raw.reorder(w, r, tasksNow(b)),
-    unqueueAll: (w: WriterId, l: ThreadId) => raw.unqueueAll(w, l, tasksNow(b)),
-    undoMove: (w: WriterId, t: TaskId | null, d: MoveDirection) =>
-      raw.undoMove(w, historyScope(t), d, tasksNow(b)),
+    ) => raw.queueCard(w, m, h, c, canvasesNow(b)),
+    reorder: (w: WriterId, r: Reorder) => raw.reorder(w, r, canvasesNow(b)),
+    unqueueAll: (w: WriterId, l: ThreadId) =>
+      raw.unqueueAll(w, l, canvasesNow(b)),
+    undoMove: (w: WriterId, t: CanvasId | null, d: MoveDirection) =>
+      raw.undoMove(w, historyScope(t), d, canvasesNow(b)),
     spinOff: (
       w: WriterId,
       r: Parameters<Raw["spinOff"]>[1],
       start: Parameters<Raw["spinOff"]>[2],
-    ) => raw.spinOff(w, r, start, tasksNow(b)),
+    ) => raw.spinOff(w, r, start, canvasesNow(b)),
     copyThread: (w: WriterId, c: CopyThread) =>
-      raw.copyThread(w, c, tasksNow(b)),
+      raw.copyThread(w, c, canvasesNow(b)),
     paste: (w: WriterId, p: Parameters<Raw["paste"]>[1]) =>
-      raw.paste(w, p, tasksNow(b)),
+      raw.paste(w, p, canvasesNow(b)),
   }
   const undoes = (result: UndoResult, revert: () => void = () => {}) => {
     undoing = result
@@ -319,8 +320,8 @@ describe("moves on the documents' keeper: the next queued card's pop and an unqu
     })
   })
 
-  test("the host names a discard's history: the task you are on, or the task of the thread it leaves", async () => {
-    const elsewhere = taskIdFor("01a0ffd2-0000-7000-8000-0000000000ee")
+  test("the host names a discard's history: the canvas you are on, or the canvas of the thread it leaves", async () => {
+    const elsewhere = canvasIdFor("01a0ffd2-0000-7000-8000-0000000000ee")
     const gone = { kind: "trash" } as const
     const mine = { kind: "inventory", holder: ADA } as const
     const held = setUp()
@@ -340,57 +341,63 @@ describe("moves on the documents' keeper: the next queued card's pop and an unqu
       elsewhere,
     )
     expect(textsIn(atThread.b.places)[0]?.place).toMatchObject(gone)
-    expect(atThread.recorded).toEqual([[ADA, TEST_TASK]])
+    expect(atThread.recorded).toEqual([[ADA, TEST_CANVAS]])
   })
 
-  test("an unsent new tab's thread trashed: the task's card goes to your trash in the same step", async () => {
+  test("an unsent new canvas's thread trashed: the canvas's card goes to your trash in the same step", async () => {
     const { b, commands, recorded } = setUp()
     const TAB = threadIdFor("01a0ffd2-0000-7000-8000-0000000000f7")
-    const TAB_TASK = taskIdFor("01a0ffd2-0000-7000-8000-0000000000f8")
+    const TAB_CANVAS = canvasIdFor("01a0ffd2-0000-7000-8000-0000000000f8")
     // Its root is one the directory does not name: nothing is written in it.
-    putTask(b, TAB, TAB_TASK, rootIdFor("01a0ffd2-0000-7000-8000-0000000000f9"))
-    expect(readTasks(b.places).has(TAB_TASK)).toBe(true)
+    putCanvas(
+      b,
+      TAB,
+      TAB_CANVAS,
+      rootIdFor("01a0ffd2-0000-7000-8000-0000000000f9"),
+    )
+    expect(readCanvases(b.places).has(TAB_CANVAS)).toBe(true)
     await commands.move(
       ADA,
       [
         {
           card: TAB,
-          from: { kind: "canvas", task: TAB_TASK },
+          from: { kind: "canvas", canvas: TAB_CANVAS },
           to: { kind: "trash" },
         },
       ],
-      TAB_TASK,
+      TAB_CANVAS,
     )
     expect(readPlaces(b.places).find(c => c.id === TAB)?.place.kind).toBe(
       "trash",
     )
-    expect(readTasks(b.places).has(TAB_TASK)).toBe(false)
+    expect(readCanvases(b.places).has(TAB_CANVAS)).toBe(false)
     expect(
-      readPlaces(b.places).find(c => c.id === TAB_TASK)?.place,
+      readPlaces(b.places).find(c => c.id === TAB_CANVAS)?.place,
     ).toMatchObject({ kind: "trash", left: { kind: "board" } })
     expect(recorded).toEqual([[ADA, "person"]])
   })
 
-  test("a task's card moved on the board: between states in your history outside any task, a reorder in none", async () => {
+  test("a canvas's card moved on the board: between states in your history outside any canvas, a reorder in none", async () => {
     const { b, raw, recorded } = setUp()
     const at = (state: string) => workflowStateIdFor(state)
-    const card = readPlaces(b.places).find(c => c.id === TEST_TASK)
-    if (card?.kind !== "task") throw new Error("the test's task has its card")
+    const card = readPlaces(b.places).find(c => c.id === TEST_CANVAS)
+    if (card?.kind !== "canvas")
+      throw new Error("the test's canvas has its card")
     const moved = {
       ...card,
       place: { kind: "board", state: at("d"), order: "z" },
     } as const
-    const done = await raw.placeTask(ADA, {
+    const done = await raw.placeCanvas(ADA, {
       kind: "move",
       transition: "within",
       steps: [{ kind: "write", record: moved }],
     })
     expect(done.outcome).toEqual({ kind: "moved" })
-    expect(readPlaces(b.places).find(c => c.id === TEST_TASK)?.place).toEqual(
+    expect(readPlaces(b.places).find(c => c.id === TEST_CANVAS)?.place).toEqual(
       moved.place,
     )
     expect(recorded).toEqual([[ADA, "person"]])
-    await raw.placeTask(ADA, {
+    await raw.placeCanvas(ADA, {
       kind: "reorder",
       transition: "within",
       steps: [
@@ -403,7 +410,7 @@ describe("moves on the documents' keeper: the next queued card's pop and an unqu
     expect(recorded).toEqual([[ADA, "person"]])
   })
 
-  test("an undo or a redo that would move a task's card across the archive's edge is refused `archived`, nothing reverted", async () => {
+  test("an undo or a redo that would move a canvas's card across the archive's edge is refused `archived`, nothing reverted", async () => {
     const { b, commands, undoes } = setUp()
     const [doing, done] = [workflowStateIdFor("d"), workflowStateIdFor("x")]
     putValue(
@@ -416,7 +423,7 @@ describe("moves on the documents' keeper: the next queued card's pop and an unqu
     putValue(
       b,
       setRecord(CARD_HISTORY, {
-        card: TEST_TASK,
+        card: TEST_CANVAS,
         events: [
           {
             kind: "moved",
@@ -433,7 +440,9 @@ describe("moves on the documents' keeper: the next queued card's pop and an unqu
       {
         kind: "undone",
         step: {
-          parts: [{ docId: PLACES_DOC_ID, footprint: [["cards", TEST_TASK]] }],
+          parts: [
+            { docId: PLACES_DOC_ID, footprint: [["cards", TEST_CANVAS]] },
+          ],
         },
       },
       () => {
@@ -450,7 +459,7 @@ describe("moves on the documents' keeper: the next queued card's pop and an unqu
     expect(reverted).toBe(false)
   })
 
-  test("a discard from your inventory on no task is in your history outside any task, and undone there", async () => {
+  test("a discard from your inventory on no canvas is in your history outside any canvas, and undone there", async () => {
     const gone = { kind: "trash" } as const
     const mine = { kind: "inventory", holder: ADA } as const
     const { b, commands, put, recorded, histories } = setUp()
@@ -462,7 +471,7 @@ describe("moves on the documents' keeper: the next queued card's pop and an unqu
     expect(histories.calls.at(-1)?.args).toEqual([ADA, PERSON_HISTORY, "undo"])
   })
 
-  test("a discard keeps the card, gone, in the discarder's history of its task: no text is destroyed, and its placer gets a trace", async () => {
+  test("a discard keeps the card, gone, in the discarder's history of its canvas: no text is destroyed, and its placer gets a trace", async () => {
     const { b, cards, commands, put, recorded } = setUp()
     put({ placer: BEA, place: pinnedPlace })
     const gone = { kind: "trash" } as const
@@ -479,7 +488,7 @@ describe("moves on the documents' keeper: the next queued card's pop and an unqu
       { ...gone, left: pinnedPlace },
     ])
     expect(cards.calls).toEqual([])
-    expect(recorded).toEqual([[ADA, TEST_TASK]])
+    expect(recorded).toEqual([[ADA, TEST_CANVAS]])
     expect([...readTraces(b.session).values()]).toMatchObject([
       { for: BEA, by: ADA, from: pinnedKey },
     ])
@@ -487,8 +496,8 @@ describe("moves on the documents' keeper: the next queued card's pop and an unqu
 })
 
 describe("a thread's card taken, put and moved", () => {
-  const OTHER_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000d")
-  const canvas = { kind: "canvas", task: TEST_TASK } as const
+  const OTHER_CANVAS = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000d")
+  const onCanvas = { kind: "canvas", canvas: TEST_CANVAS } as const
   const bea = { kind: "inventory", holder: BEA } as const
 
   test("taken into an inventory, its run stops with the move, the taker's own stop", async () => {
@@ -496,7 +505,7 @@ describe("a thread's card taken, put and moved", () => {
     beginRun(b.live, LANE, runId("r-1"))
     const done = await commands.move(
       BEA,
-      [{ card: LANE, from: canvas, to: bea }],
+      [{ card: LANE, from: onCanvas, to: bea }],
       null,
     )
     expect(done.outcome).toEqual({ kind: "moved" })
@@ -506,7 +515,7 @@ describe("a thread's card taken, put and moved", () => {
 
   test("taken while idle, nothing is stopped; put on a canvas, its queue is drained", async () => {
     const { stops, drains, commands } = setUp()
-    await commands.move(BEA, [{ card: LANE, from: canvas, to: bea }], null)
+    await commands.move(BEA, [{ card: LANE, from: onCanvas, to: bea }], null)
     expect(stops).toEqual([])
     expect(drains).toEqual([])
     await commands.move(
@@ -515,7 +524,7 @@ describe("a thread's card taken, put and moved", () => {
         {
           card: LANE,
           from: bea,
-          to: { kind: "canvas-at", task: TEST_TASK, after: null },
+          to: { kind: "canvas-at", canvas: TEST_CANVAS, after: null },
         },
       ],
       null,
@@ -540,21 +549,21 @@ describe("a thread's card taken, put and moved", () => {
           { kind: "write", record: { ...card, place: bea } },
         ]),
     )
-    await commands.undoMove(BEA, TEST_TASK, "undo")
+    await commands.undoMove(BEA, TEST_CANVAS, "undo")
     expect(stops).toEqual([[LANE, BEA]])
   })
 
-  test("moved to another task while it runs, it keeps running", async () => {
+  test("moved to another canvas while it runs, it keeps running", async () => {
     const { b, stops, commands } = setUp()
-    putTask(b, threadIdFor("other"), OTHER_TASK)
+    putCanvas(b, threadIdFor("other"), OTHER_CANVAS)
     beginRun(b.live, LANE, runId("r-1"))
     const done = await commands.move(
       ADA,
       [
         {
           card: LANE,
-          from: canvas,
-          to: { kind: "canvas-at", task: OTHER_TASK, after: null },
+          from: onCanvas,
+          to: { kind: "canvas-at", canvas: OTHER_CANVAS, after: null },
         },
       ],
       null,
@@ -573,7 +582,7 @@ describe("a paste", () => {
     quote: "a".repeat(64) as Sha256,
   } as const
 
-  test("a reference pasted on a thread lands in its nearest notes, one step of the paster's history in its task", async () => {
+  test("a reference pasted on a thread lands in its nearest notes, one step of the paster's history in its canvas", async () => {
     const { b, commands, recorded } = setUp()
     const done = await commands.paste(BEA, {
       kind: "paste",
@@ -587,7 +596,7 @@ describe("a paste", () => {
       kind: "note",
       column: NOTES,
     })
-    expect(recorded).toEqual([[BEA, TEST_TASK]])
+    expect(recorded).toEqual([[BEA, TEST_CANVAS]])
   })
 
   test("a cut card, discarded, is pasted out of its cutter's trash into another place", async () => {
@@ -621,7 +630,7 @@ describe("a thread copied", () => {
     const { b, commands } = setUp()
     const done = await commands.copyThread(
       BEA,
-      copy({ kind: "canvas-at", task: TEST_TASK, after: LANE }),
+      copy({ kind: "canvas-at", canvas: TEST_CANVAS, after: LANE }),
     )
     expect(done.outcome).toEqual({ kind: "moved" })
     expect(readThreads(b.session).get(COPY)).toMatchObject({
@@ -629,19 +638,19 @@ describe("a thread copied", () => {
       by: BEA,
       origin: { kind: "fork", at: E1, how: "copy" },
     })
-    const canvas = readPlaces(b.places).filter(
-      c => c.place.kind === "canvas" && c.place.task === TEST_TASK,
+    const placed = readPlaces(b.places).filter(
+      c => c.place.kind === "canvas" && c.place.canvas === TEST_CANVAS,
     )
-    expect(canvas.map(c => c.id)).toEqual(expect.arrayContaining([LANE, COPY]))
+    expect(placed.map(c => c.id)).toEqual(expect.arrayContaining([LANE, COPY]))
   })
 
-  test("a copy is one step of its copier's history, in the task it lands in", async () => {
+  test("a copy is one step of its copier's history, in the canvas it lands in", async () => {
     const { commands, recorded } = setUp()
     await commands.copyThread(
       BEA,
-      copy({ kind: "canvas-at", task: TEST_TASK, after: LANE }),
+      copy({ kind: "canvas-at", canvas: TEST_CANVAS, after: LANE }),
     )
-    expect(recorded).toEqual([[BEA, TEST_TASK]])
+    expect(recorded).toEqual([[BEA, TEST_CANVAS]])
   })
 
   test("refused: an end not in its source; a thread someone else holds", async () => {
@@ -659,7 +668,7 @@ describe("a thread copied", () => {
       [
         {
           card: LANE,
-          from: { kind: "canvas", task: TEST_TASK },
+          from: { kind: "canvas", canvas: TEST_CANVAS },
           to: { kind: "inventory", holder: ADA },
         },
       ],
@@ -691,7 +700,7 @@ describe("queue-card", () => {
       by: ADA,
     })
     expect(drains).toEqual([LANE])
-    expect(recorded).toEqual([[ADA, TEST_TASK]])
+    expect(recorded).toEqual([[ADA, TEST_CANVAS]])
   })
 
   test("hold-if-idle holds an idle queue before the drain; a refused move changes no hold", async () => {
@@ -755,7 +764,7 @@ describe("moves' history", () => {
       ],
       null,
     )
-    expect(recorded).toEqual([[ADA, TEST_TASK]])
+    expect(recorded).toEqual([[ADA, TEST_CANVAS]])
   })
 
   test("several moves are one, refused whole: nothing written when one has moved", async () => {
@@ -798,14 +807,14 @@ describe("moves' history", () => {
           )
       },
     )
-    const done = await commands.undoMove(ADA, TEST_TASK, "undo")
+    const done = await commands.undoMove(ADA, TEST_CANVAS, "undo")
     expect(done).toEqual({
       outcome: { kind: "undone", cards: [{ card: C1, place: noteKey }] },
       rev: rev + 1,
     })
     expect(histories.calls.at(-1)?.args).toEqual([
       ADA,
-      historyScope(TEST_TASK),
+      historyScope(TEST_CANVAS),
       "undo",
     ])
   })
@@ -815,14 +824,16 @@ describe("moves' history", () => {
     put({ placer: BEA })
     const part = { docId: PLACES_DOC_ID, footprint: [["cards", C1]] }
     undoes({ kind: "refused", step: { parts: [part] }, stale: [part] })
-    expect((await commands.undoMove(ADA, TEST_TASK, "undo")).outcome).toEqual({
-      kind: "unmoved",
-      code: "moved",
-      place: noteKey,
-      by: BEA,
-    })
+    expect((await commands.undoMove(ADA, TEST_CANVAS, "undo")).outcome).toEqual(
+      {
+        kind: "unmoved",
+        code: "moved",
+        place: noteKey,
+        by: BEA,
+      },
+    )
     undoes({ kind: "none" })
-    expect(await commands.undoMove(ADA, TEST_TASK, "redo")).toEqual({
+    expect(await commands.undoMove(ADA, TEST_CANVAS, "redo")).toEqual({
       outcome: { kind: "nothing" },
       rev: null,
     })
@@ -858,7 +869,7 @@ describe("reorders and unqueue all", () => {
       outcome: { kind: "moved" },
       rev: readPlacesRev(b.places),
     })
-    expect(recorded).toEqual([[ADA, TEST_TASK]])
+    expect(recorded).toEqual([[ADA, TEST_CANVAS]])
     expect(drains).toEqual([])
     const order = textsIn(b.places).map(c => c.id)
     const queue = textsIn(b.places)
@@ -874,9 +885,9 @@ describe("reorders and unqueue all", () => {
     expect(queue).toEqual([cardIdFor("c2"), C1])
   })
 
-  test("a width writes only the card's width, in the sender's history of its task; the width it has, nothing", async () => {
+  test("a width writes only the card's width, in the sender's history of its canvas; the width it has, nothing", async () => {
     const { b, commands, recorded, drains } = setUp()
-    const at = { kind: "canvas", task: TEST_TASK } as const
+    const at = { kind: "canvas", canvas: TEST_CANVAS } as const
     const done = await commands.cardWidth(ADA, {
       kind: "card-width",
       card: LANE,
@@ -887,7 +898,7 @@ describe("reorders and unqueue all", () => {
       outcome: { kind: "moved" },
       rev: readPlacesRev(b.places),
     })
-    expect(recorded).toEqual([[ADA, TEST_TASK]])
+    expect(recorded).toEqual([[ADA, TEST_CANVAS]])
     expect(drains).toEqual([])
     const card = readPlaces(b.places).find(c => c.id === LANE)
     expect(card?.place).toMatchObject({ kind: "canvas", width: 2 })
@@ -925,13 +936,13 @@ describe("reorders and unqueue all", () => {
     const done = await commands.unqueueAll(ADA, LANE)
     expect(done.outcome).toEqual({ kind: "moved" })
     expect(textsIn(b.places).map(c => c.place.kind)).toEqual(["note", "note"])
-    expect(recorded).toEqual([[ADA, TEST_TASK]])
+    expect(recorded).toEqual([[ADA, TEST_CANVAS]])
   })
 })
 
 describe("a chat from a card that found its lane busy", () => {
-  const chat = {
-    kind: "chat",
+  const said = {
+    kind: "send",
     text: "@bob look",
     root: TEST_ROOT,
     at: { kind: "end", thread: LANE, seen: E1 },
@@ -947,7 +958,7 @@ describe("a chat from a card that found its lane busy", () => {
     const { b, drains, commands, put } = setUp()
     put()
     beginRun(b.live, LANE, runId("r-1"))
-    const done = await commands.queueBusy(ADA, chat)
+    const done = await commands.queueBusy(ADA, said)
     expect(done).toEqual({ outcome: { kind: "queued" }, rev: 4 })
     expect(textsIn(b.places)[0]?.place).toMatchObject({
       kind: "queued",
@@ -961,7 +972,7 @@ describe("a chat from a card that found its lane busy", () => {
   test("a card the host does not hold stays a busy answer", async () => {
     const { b, commands } = setUp()
     beginRun(b.live, LANE, runId("r-1"))
-    expect(await commands.queueBusy(ADA, chat)).toBeNull()
+    expect(await commands.queueBusy(ADA, said)).toBeNull()
   })
 })
 
@@ -977,8 +988,8 @@ test("setCommand: the command set, its place and placer kept", async () => {
   })
 })
 
-const sentChat = {
-  kind: "chat",
+const sentSend = {
+  kind: "send",
   text: "hi",
   root: TEST_ROOT,
   at: { kind: "end", thread: LANE, seen: E1 },
@@ -993,7 +1004,7 @@ const sentChat = {
 test("spend: the record goes, then its text; a card already gone answers the current rev", async () => {
   const { b, cards, commands, put } = setUp()
   put()
-  const sent = { sendId: "s-1", chat: sentChat }
+  const sent = { sendId: "s-1", send: sentSend }
   expect(await commands.spend(ADA, C1, sent)).toBe(4)
   expect(await commands.spend(ADA, C1, sent)).toBe(4)
   expect(textsIn(b.places)).toEqual([])
@@ -1055,7 +1066,7 @@ describe("every command that moves a card records it", () => {
       },
       () => void put(),
     )
-    await commands.undoMove(BEA, TEST_TASK, "undo")
+    await commands.undoMove(BEA, TEST_CANVAS, "undo")
     expect(eventsOf(b).at(-1)).toEqual(["undone", BEA, "note"])
     expect(tracesOf(b)).toEqual([])
   })
@@ -1079,7 +1090,7 @@ describe("every command that moves a card records it", () => {
       b.root,
       row(sent, E1, { role: "user", content: "hi", sendId: "s-1" }),
     )
-    await commands.spend(BEA, C1, { sendId: "s-1", chat: sentChat })
+    await commands.spend(BEA, C1, { sendId: "s-1", send: sentSend })
     expect(readCardHistories(b.session).has(C1)).toBe(false)
     expect(tracesOf(b)).toMatchObject([
       { for: ADA, by: BEA, to: null, message: sent },
@@ -1090,7 +1101,7 @@ describe("every command that moves a card records it", () => {
     const { b, commands, put } = setUp()
     put()
     beginRun(b.live, LANE, runId("r-1"))
-    await commands.queueBusy(ADA, { ...sentChat, card: { id: C1, seen: "" } })
+    await commands.queueBusy(ADA, { ...sentSend, card: { id: C1, seen: "" } })
     expect(eventsOf(b)).toEqual([["moved", ADA, "queued"]])
   })
 
@@ -1116,11 +1127,11 @@ describe("every command that moves a card records it", () => {
 describe("a card made a thread, and lifted back", () => {
   const THREAD = rootIdFor("01a0ffd2-0000-7000-8000-0000000000ff")
   const STARTS = threadIdFor("spun")
-  /** The task the thread was spun into: a new one. */
-  const SPUN_TASK = taskIdFor("01a0ffd2-0000-7000-8000-0000000000fe")
+  /** The canvas the thread was spun into: a new one. */
+  const SPUN_CANVAS = canvasIdFor("01a0ffd2-0000-7000-8000-0000000000fe")
   const spun = { kind: "trash" } as const
   const spinMove = { card: C1, from: atEnd, to: spun }
-  /** The board a new task lands on. */
+  /** The board a new canvas lands on. */
   const board = (b: ReturnType<typeof setUp>["b"]) =>
     putValue(
       b,
@@ -1133,7 +1144,7 @@ describe("a card made a thread, and lifted back", () => {
     move: spinMove,
     root: THREAD,
     thread: STARTS,
-    task: SPUN_TASK,
+    canvas: SPUN_CANVAS,
     state: null,
     here: null,
   }
@@ -1156,7 +1167,7 @@ describe("a card made a thread, and lifted back", () => {
         blobs: [],
       }),
     ])
-    putTask(b, STARTS, SPUN_TASK, THREAD)
+    putCanvas(b, STARTS, SPUN_CANVAS, THREAD)
     // Its record says it was spun from the card.
     putValue(
       b,
@@ -1173,7 +1184,7 @@ describe("a card made a thread, and lifted back", () => {
       writeEntry(
         doc,
         row(`t-${i + 1}`, i === 0 ? null : `t-${i}`, {
-          role: "chat",
+          role: "person",
           content: "x",
           writer: w,
         }),
@@ -1185,17 +1196,17 @@ describe("a card made a thread, and lifted back", () => {
     board(b)
     put()
     texts.set(C1, "  plan this @agent with @Bea ")
-    const chats: unknown[] = []
-    const done = await commands.spinOff(ADA, spinOff, async chat => {
-      chats.push(chat)
+    const sends: unknown[] = []
+    const done = await commands.spinOff(ADA, spinOff, async said => {
+      sends.push(said)
       return { kind: "appended", id: entryId("t-1") }
     })
     expect(done.outcome).toEqual({ kind: "appended", id: entryId("t-1") })
-    expect(chats).toMatchObject([
+    expect(sends).toMatchObject([
       {
         text: "plan this @agent with @Bea",
         root: THREAD,
-        at: { kind: "branch", thread: STARTS, at: null, task: SPUN_TASK },
+        at: { kind: "branch", thread: STARTS, at: null, canvas: SPUN_CANVAS },
         asksAgent: false,
         mentions: [{ kind: "person", name: "Bea" }],
         card: { id: C1 },
@@ -1206,16 +1217,16 @@ describe("a card made a thread, and lifted back", () => {
       ...spun,
       left: { kind: "note" },
     })
-    expect(recorded).toEqual([[ADA, TEST_TASK]])
+    expect(recorded).toEqual([[ADA, TEST_CANVAS]])
     expect(readThreads(b.session).get(STARTS)?.origin).toEqual({
       kind: "spun",
       card: C1,
     })
     expect(
       readPlaces(b.places).find(c => c.id === STARTS)?.place,
-    ).toMatchObject({ kind: "canvas", task: SPUN_TASK })
+    ).toMatchObject({ kind: "canvas", canvas: SPUN_CANVAS })
     expect(
-      readPlaces(b.places).find(c => c.id === SPUN_TASK)?.place,
+      readPlaces(b.places).find(c => c.id === SPUN_CANVAS)?.place,
     ).toMatchObject({ kind: "board", state: workflowStateIdFor("d") })
   })
 
@@ -1251,13 +1262,13 @@ describe("a card made a thread, and lifted back", () => {
     put({ place: { ...spun, left: { ...noteKey, order: "m" } } })
     await thread(b, [ADA])
     undoes(spunStep, () => put())
-    const done = await commands.undoMove(ADA, TEST_TASK, "undo")
+    const done = await commands.undoMove(ADA, TEST_CANVAS, "undo")
     expect(done.outcome).toEqual({
       kind: "undone",
       cards: [{ card: C1, place: noteKey }],
     })
     expect(readRoots(b.session).has(THREAD)).toBe(false)
-    expect(readPlaces(b.places).some(c => c.id === SPUN_TASK)).toBe(false)
+    expect(readPlaces(b.places).some(c => c.id === SPUN_CANVAS)).toBe(false)
     expect(readPlaces(b.places).some(c => c.id === STARTS)).toBe(false)
     expect(b.docs.loaded()).not.toContain(THREAD)
   })
@@ -1270,12 +1281,14 @@ describe("a card made a thread, and lifted back", () => {
     undoes(spunStep, () => {
       reverted = true
     })
-    expect((await commands.undoMove(ADA, TEST_TASK, "undo")).outcome).toEqual({
-      kind: "unmoved",
-      code: "replied",
-      place: null,
-      by: BEA,
-    })
+    expect((await commands.undoMove(ADA, TEST_CANVAS, "undo")).outcome).toEqual(
+      {
+        kind: "unmoved",
+        code: "replied",
+        place: null,
+        by: BEA,
+      },
+    )
     expect(reverted).toBe(false)
     expect(readRoots(b.session).has(THREAD)).toBe(true)
   })
@@ -1336,7 +1349,7 @@ describe("a press on a proposal", () => {
     kind: "branch-out",
     how: "start",
     root: TEST_ROOT,
-    task: TEST_TASK,
+    canvas: TEST_CANVAS,
     proposal: RESULT,
     branches: [
       { thread: FIRST, row: 0, brief: "do one" },
@@ -1353,13 +1366,13 @@ describe("a press on a proposal", () => {
     const done = await raw.branchOut(
       ADA,
       start,
-      tasksNow(b),
-      async chat => {
+      canvasesNow(b),
+      async said => {
         const cards = readPlaces(b.places)
         seenAtSend.push(
           cards.some(c => c.id === FIRST) && cards.some(c => c.id === SECOND),
         )
-        sent.push(chat.text)
+        sent.push(said.text)
         return { kind: "started", runId: runId("r") }
       },
       async fact => void facts.push(fact),
@@ -1383,7 +1396,7 @@ describe("a press on a proposal", () => {
     proposed(b)
     const refuse = async () =>
       ({ kind: "refused", code: "refused", message: "no" }) as const
-    await raw.branchOut(ADA, start, tasksNow(b), refuse, async () => {})
+    await raw.branchOut(ADA, start, canvasesNow(b), refuse, async () => {})
     expect(readPlaces(b.places).some(c => c.id === FIRST)).toBe(true)
     const again = await raw.branchOut(
       BEA,
@@ -1397,7 +1410,7 @@ describe("a press on a proposal", () => {
           },
         ],
       },
-      tasksNow(b),
+      canvasesNow(b),
       refuse,
       async () => {},
     )

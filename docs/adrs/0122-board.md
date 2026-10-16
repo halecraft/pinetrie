@@ -8,6 +8,9 @@
     ADR-0111 and ADR-0113 changed in it folded in.
 - **Amended by:**
   - ADR-0116: the board holds tasks, and the sidebar your open tasks.
+  - ADR-0158: a new session's states are Topics, Active and Archive; ＋ in the
+    sidebar or on a board column makes a canvas, with no ▾; a text card put on
+    a state starts a chat.
 
 Restates ADR-0112 as amended by ADR-0109, ADR-0111 and ADR-0113, and by
 ADR-0115 through ADR-0109; decides nothing new, and uses the glossary's

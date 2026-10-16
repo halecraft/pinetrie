@@ -1,35 +1,62 @@
-// interface/task-column-view — the task column: the task's own place on its
-// canvas, first, outside the order. It shows the task's title, renamed there;
-// its state on the board, changed there; who is here; the cards pinned to the
-// task; and the canvas list its agents are told. Its title and its state are
+// interface/canvas-column-view — the canvas column: the canvas's own column,
+// first, outside its order. It shows the canvas's title, renamed there; where
+// it is on the board, a topic or a task by its state, changed there; who is here; the cards pinned to the
+// canvas; and the canvas list its agents are told. Its title and its state are
 // the same intents the sidebar and the board send. Folded, it shows the title
-// and how many cards are pinned to the task. `TaskColumn`
-// (`packages/web/task-column.tsx`) draws it.
+// and how many cards are pinned to the canvas. `CanvasColumn`
+// (`packages/web/canvas-column.tsx`) draws it.
 
 import type {
+  CanvasId,
   CardHistoryRecord,
   CardId,
   CardRecord,
   MarkRecord,
   NoteColumnId,
   NoteColumnRecord,
-  TaskId,
   ThreadId,
   ThreadName,
   Workflow,
+  WorkflowStateId,
   WriterId,
 } from "@pinetrie/core"
-import { NEW_NOTES_TITLE, trashDeadline, trashedAt } from "@pinetrie/rules"
+import {
+  type CanvasRole,
+  canvasRole,
+  NEW_NOTES_TITLE,
+  trashDeadline,
+  trashedAt,
+} from "@pinetrie/rules"
 import { type ControlWords, who } from "./card-words.ts"
 import { agoWords, spanWords, until } from "./counts.ts"
 import { FOLD, UNFOLD, UNNAMED_THREAD } from "./folded-column-view.ts"
-import { NO_TEXT, type TaskSummary } from "./root-label.ts"
+import { type CanvasSummary, NO_TEXT } from "./root-label.ts"
 import type { Reader } from "./send.ts"
 import type { ThreadCardHead, ThreadMove } from "./thread-card.ts"
 
-/** The task column, as drawn. */
-export interface TaskColumnView {
-  readonly task: TaskId
+/** A canvas's state on the board, by name, and the role it gives the canvas. */
+export interface PlaceOnBoard {
+  readonly name: string
+  readonly role: CanvasRole
+}
+
+/** Where a canvas in `state` is on the board; null before it is placed, or its state is gone. */
+export function placeOnBoard(
+  workflow: Workflow | null,
+  state: WorkflowStateId | null,
+): PlaceOnBoard | null {
+  const found =
+    state === null || workflow === null
+      ? undefined
+      : [...workflow.open, workflow.archive].find(s => s.id === state)
+  return found === undefined || workflow === null
+    ? null
+    : { name: found.name, role: canvasRole(workflow, found.id) }
+}
+
+/** The canvas column, as drawn. */
+export interface CanvasColumnView {
+  readonly canvas: CanvasId
   readonly folded: boolean
   /** Its label: its title, else its first card's (`labelsOf`). */
   readonly label: string
@@ -37,17 +64,20 @@ export interface TaskColumnView {
   readonly titled: string | null
   /** The rename field's placeholder: its first message's line. */
   readonly placeholder: string
-  /** The state it is in on the board, by name; null before the host placed it. */
-  readonly state: string | null
+  /**
+   * Where it is on the board: its state's name, and what that makes it
+   * (`canvasRole`); null before the host placed it.
+   */
+  readonly place: PlaceOnBoard | null
   /** Move to ▸ each other state, as its thread card offers (`ThreadMove`). */
   readonly moves: readonly ThreadMove[]
-  /** Nothing may be changed here: an archived task's column. */
+  /** Nothing may be changed here: an archived canvas's column. */
   readonly readOnly: boolean
   /** Its canvas's trash (`canvasTrash`). */
   readonly trash: CanvasTrash
 }
 
-/** A task's canvas's trash, as its list draws it. */
+/** A canvas's trash, as its list draws it. */
 export interface CanvasTrash {
   /** The columns trashed from the canvas, newest first. */
   readonly rows: readonly TrashRow[]
@@ -55,7 +85,7 @@ export interface CanvasTrash {
   readonly keepMs: number
 }
 
-/** A column in the trash of a task's canvas, as its list draws it. */
+/** A column in the trash of a canvas, as its list draws it. */
 export interface TrashRow {
   readonly card: ThreadId | NoteColumnId
   /** The thread's name, or the note column's title. */
@@ -82,13 +112,13 @@ export const trashWarnMs = (keepMs: number): number =>
   Math.min(DAY_MS, keepMs / 4)
 
 /**
- * The columns trashed from `task`'s canvas: each thread or note column in a
+ * The columns trashed from `canvas`'s canvas: each thread or note column in a
  * trash whose `left` is that canvas, the newest discard first.
  */
 export function canvasTrash(input: {
   readonly cards: readonly CardRecord[]
   readonly histories: ReadonlyMap<CardId, CardHistoryRecord>
-  readonly task: TaskId
+  readonly canvas: CanvasId
   readonly now: number
   /** How long a trashed card is kept (`TRASH_KEEP_MS`). */
   readonly keepMs: number
@@ -99,7 +129,7 @@ export function canvasTrash(input: {
     if (
       c.place.kind !== "trash" ||
       c.place.left.kind !== "canvas" ||
-      c.place.left.task !== input.task
+      c.place.left.canvas !== input.canvas
     )
       return []
     const { now, keepMs } = input
@@ -163,67 +193,89 @@ export const RESTORE_WORDS = {
   title: "bring it back where it was, for everyone",
 } as const
 
-/** The task column of `task`, from its thread card's head and its title's record. */
-export function taskColumnView(input: {
-  readonly task: TaskId
+/** The canvas column of `canvas`, from its thread card's head and its title's record. */
+export function canvasColumnView(input: {
+  readonly canvas: CanvasId
   readonly folded: boolean
   readonly head: ThreadCardHead | undefined
   readonly mark: MarkRecord | undefined
-  readonly summary: TaskSummary | undefined
+  readonly summary: CanvasSummary | undefined
   readonly workflow: Workflow | null
   readonly archived: boolean
   /** Its canvas's trash (`canvasTrash`). */
   readonly trash: CanvasTrash
-}): TaskColumnView {
+}): CanvasColumnView {
   const { head, workflow } = input
-  const state =
-    head?.state === null || head?.state === undefined || workflow === null
-      ? null
-      : ([...workflow.open, workflow.archive].find(s => s.id === head.state)
-          ?.name ?? null)
+  const place = placeOnBoard(workflow, head?.state ?? null)
   return {
-    task: input.task,
+    canvas: input.canvas,
     folded: input.folded,
     label: head?.label ?? NO_TEXT,
     titled: input.mark?.title ?? null,
     placeholder: input.summary?.line ?? NO_TEXT,
-    state,
+    place,
     moves: input.archived ? [] : (head?.moves ?? []),
     readOnly: input.archived,
     trash: input.trash,
   }
 }
 
-/** The task column's ⇤, which folds it to a strip: a card column's, titled for the task. */
-export const FOLD_TASK: ControlWords = {
+/** The canvas column's ⇤, which folds it to a strip: a card column's, titled for the canvas. */
+export const FOLD_CANVAS: ControlWords = {
   ...FOLD,
-  title: "fold the task's column: only you see your folds",
+  title: "fold the canvas's column: only you see your folds",
 }
 
-/** The task column folded: its button, which unfolds it, a card column's strip's. */
-export const UNFOLD_TASK: ControlWords = {
+/** The canvas column folded: its button, which unfolds it, a card column's strip's. */
+export const UNFOLD_CANVAS: ControlWords = {
   ...UNFOLD,
   title:
-    "the task: its title, its state, who is here, its pins and what its agents are told",
+    "the canvas: its title, its state, who is here, its pins and what its agents are told",
 }
 
-/** The task column's rename, on its title. */
-export const RENAME_TASK_TITLE = "rename this task, for everyone"
+/** The canvas column's rename, on its title. */
+export const RENAME_CANVAS_TITLE = "rename this canvas, for everyone"
 
-/** How many cards are pinned to the task, as its folded column says it. */
+/** How many cards are pinned to the canvas, as its folded column says it. */
 export const pinnedCountWords = (n: number): string | null =>
   n === 0 ? null : `${n} pinned`
 
-/** The task column's pinned cards, empty: where a drop pins one. */
-export const TASK_PINS_EMPTY =
-  "drop a card here to pin it to the task: every thread's agent reads it"
+/** The canvas column's pinned cards, empty: where a drop pins one. */
+export const CANVAS_PINS_EMPTY =
+  "drop a card here to pin it to the canvas: every thread's agent reads it"
 
-/** The heading over the task's pinned cards. */
-export const TASK_PINS_HEADING = "pinned to the task"
+/** The heading over the canvas's pinned cards. */
+export const CANVAS_PINS_HEADING = "pinned to the canvas"
 
-/** The heading over the canvas list the task's agents are told. */
-export const TASK_LIST_HEADING = "what its agents are told of the canvas"
+/** The heading over the canvas list the canvas's agents are told. */
+export const CANVAS_LIST_HEADING = "what its agents are told of the canvas"
 
-/** What the state's line says: where the task is on the board. */
-export const boardStateWords = (state: string | null): string =>
-  state === null ? "not on the board yet" : `in ${state}`
+/** The canvas a role makes, as a person reads it. */
+const ROLE_NOUN = {
+  topic: "topic",
+  task: "task",
+  archived: "canvas",
+} as const satisfies Record<CanvasRole, string>
+
+/**
+ * What the state's line says, where the canvas is on the board and what that
+ * makes it, and its Move to ▸ menu's name.
+ */
+export function boardPlaceWords(place: PlaceOnBoard | null): {
+  readonly line: string
+  readonly moveLabel: string
+} {
+  if (place === null)
+    return {
+      line: "not on the board yet",
+      moveLabel: "move this canvas on the board",
+    }
+  const noun = ROLE_NOUN[place.role]
+  return {
+    line:
+      place.role === "archived"
+        ? `archived, in ${place.name}`
+        : `a ${noun}, in ${place.name}`,
+    moveLabel: `move this ${noun} on the board`,
+  }
+}

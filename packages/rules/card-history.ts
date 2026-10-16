@@ -51,10 +51,10 @@ const FieldsSchema = Type.Object({
   by: Str,
   seen: Str,
   holder: Str,
-  /** Absent from an event stored before tasks: read as "". */
-  task: Type.Optional(Str),
+  /** Absent from an event stored before canvases: read as "". */
+  canvas: Type.Optional(Str),
   width: Type.Optional(Str),
-  /** Absent from an event stored before tasks were cards: read as "". */
+  /** Absent from an event stored before canvases were cards: read as "". */
   state: Type.Optional(Str),
 })
 const OrNull = <T extends ReturnType<typeof Type.Object>>(t: T) =>
@@ -213,7 +213,7 @@ export const traceEnd = (
     : TRACED.pinned(from, index)
 
 /**
- * Out of a queue or a thread's or a task's pinned cards to a note: an
+ * Out of a queue or a thread's or a canvas's pinned cards to a note: an
  * unqueue or an unpin, to the nearest note column, which leaves
  * no trace.
  */
@@ -226,7 +226,7 @@ function movedBack(
     case "queued":
       return "unqueued"
     case "pinned":
-    case "task-pinned":
+    case "canvas-pinned":
       return "unpinned"
     default:
       return null
@@ -241,7 +241,7 @@ export function verbOf(from: PlaceKey | null, to: PlaceKey | null): Verb {
   if (back !== null) return back
   if (to.kind === "trash") return "discarded"
   if (to.kind === "queued") return "queued"
-  if (to.kind === "pinned" || to.kind === "task-pinned") return "pinned"
+  if (to.kind === "pinned" || to.kind === "canvas-pinned") return "pinned"
   if (to.kind === "inventory") return "took-into-inventory"
   if (from.kind === "inventory") return "put"
   return "moved"
@@ -443,7 +443,7 @@ export function trashedAt(
 
 /**
  * When a trashed card is deleted: `keepMs` after it was trashed, or `now`
- * for one with no history to tell. The sweep and the task column's list of
+ * for one with no history to tell. The sweep and the canvas column's list of
  * its trash both read it.
  */
 export function trashDeadline(

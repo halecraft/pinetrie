@@ -1,11 +1,11 @@
-import { entryId, taskIdFor, threadIdFor, writerId } from "@pinetrie/core"
+import { canvasIdFor, entryId, threadIdFor, writerId } from "@pinetrie/core"
 import { expect, test } from "vitest"
 import { tree } from "./fixtures.ts"
 import {
   peopleHere,
   peopleIn,
   readerHeading,
-  readersByTask,
+  readersByCanvas,
   toggleOpenMenu,
   withOpenMenus,
 } from "./here.ts"
@@ -14,49 +14,49 @@ const ADA = writerId("ada")
 const BEA = writerId("bea")
 const CY = writerId("cy")
 const index = tree({ "1-r1": null, "2-a": "1-r1", "3-r2": null })
-const [K1, K2, K3] = ["1", "2", "3"].map(taskIdFor) as [
-  ReturnType<typeof taskIdFor>,
-  ReturnType<typeof taskIdFor>,
-  ReturnType<typeof taskIdFor>,
+const [K1, K2, K3] = ["1", "2", "3"].map(canvasIdFor) as [
+  ReturnType<typeof canvasIdFor>,
+  ReturnType<typeof canvasIdFor>,
+  ReturnType<typeof canvasIdFor>,
 ]
-/** Each root's thread, each in a task of its own. */
+/** Each root's thread, each in a canvas of its own. */
 const facts = {
-  taskOfThread: new Map([
+  canvasOfThread: new Map([
     [threadIdFor("1-r1"), K1],
     [threadIdFor("3-r2"), K2],
   ]),
   reported: new Map(),
 }
 
-test("peopleHere groups each person's columns by the task each thread is in", () => {
+test("peopleHere groups each person's columns by the canvas each thread is in", () => {
   const readingAt = new Map([
     [entryId("2-a"), [BEA, CY]],
     [entryId("3-r2"), [BEA]],
     [entryId("9-missing"), [ADA]],
   ])
   expect(peopleHere(readingAt, index, [CY, BEA], facts)).toEqual([
-    { writer: CY, threads: [{ end: "2-a", task: K1 }] },
+    { writer: CY, threads: [{ end: "2-a", canvas: K1 }] },
     {
       writer: BEA,
       threads: [
-        { end: "2-a", task: K1 },
-        { end: "3-r2", task: K2 },
+        { end: "2-a", canvas: K1 },
+        { end: "3-r2", canvas: K2 },
       ],
     },
   ])
 })
 
-test("peopleHere names the task its reader reported for an end in a root not held", () => {
+test("peopleHere names the canvas its reader reported for an end in a root not held", () => {
   const readingAt = new Map([[entryId("8-far"), [BEA]]])
   expect(
     peopleHere(readingAt, index, [BEA], {
       ...facts,
       reported: new Map([[entryId("8-far"), K3]]),
     }),
-  ).toEqual([{ writer: BEA, threads: [{ end: "8-far", task: K3 }] }])
+  ).toEqual([{ writer: BEA, threads: [{ end: "8-far", canvas: K3 }] }])
 })
 
-test("readersByTask turns people around: each task with its readers, each once; peopleIn keeps a task's", () => {
+test("readersByCanvas turns people around: each canvas with its readers, each once; peopleIn keeps a canvas's", () => {
   const people = peopleHere(
     new Map([
       [entryId("2-a"), [BEA, CY]],
@@ -67,19 +67,19 @@ test("readersByTask turns people around: each task with its readers, each once; 
     [BEA, CY],
     facts,
   )
-  expect([...readersByTask(people)]).toEqual([
+  expect([...readersByCanvas(people)]).toEqual([
     [K1, [BEA, CY]],
     [K2, [BEA]],
   ])
   expect(peopleIn(people, new Set([K2]))).toEqual([
-    { writer: BEA, threads: [{ end: "3-r2", task: K2 }] },
+    { writer: BEA, threads: [{ end: "3-r2", canvas: K2 }] },
   ])
 })
 
 test("withOpenMenus keeps a person who left while their menu is open, where they were", () => {
-  const thread = (end: string, task: typeof K1) => ({
+  const thread = (end: string, canvas: typeof K1) => ({
     end: entryId(end),
-    task,
+    canvas,
   })
   const bea = { writer: BEA, threads: [thread("2-a", K1)] }
   const cy = { writer: CY, threads: [thread("3-r2", K2)] }

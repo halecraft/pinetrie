@@ -1,5 +1,5 @@
 // web/use-drag — the one drag engine: every drag that starts in the page,
-// a column's, a card's, a slot's, a task's, by the pointer. It decides
+// a column's, a card's, a slot's, a canvas's, by the pointer. It decides
 // nothing (`drag.ts` in `@pinetrie/interface` does): each frame it gathers
 // what the source is over and the element it read that from, asks
 // `dragVerdict` and `drawPlan`, and applies the plan to `style` and
@@ -11,9 +11,10 @@
 // threshold, so the one long frame of a drag falls before anything is seen
 // to move. Touch does not drag: a touch scrolls and taps.
 
-import { isTaskId, type TaskId, type WorkflowStateId } from "@pinetrie/core"
+import { type CanvasId, isCanvasId, type WorkflowStateId } from "@pinetrie/core"
 import {
   type Armed,
+  type CanvasOver,
   type CardOver,
   DRAG_HANDLE,
   DRAG_START,
@@ -42,7 +43,6 @@ import {
   rootTargetOfElement,
   sidebarSpotAt,
   sourceOfElement,
-  type TaskOver,
   targetOfElement,
 } from "@pinetrie/interface"
 import { type RefObject, useEffect } from "react"
@@ -52,13 +52,13 @@ import { useStable } from "./use-stable.ts"
 /** How long a cancelled drag springs back, in ms: none with reduced motion. */
 const settleMs = (): number => (reducedMotion() ? 0 : 160)
 
-/** What a task is dragged from: a board card or a row of the sidebar. */
+/** What a canvas is dragged from: a board card or a row of the sidebar. */
 const ROOT_ITEM = ".thread-card, .sidebar-item"
 
 /** What moves with a card's handle: its frame, its slot. */
 const CARD_ITEM = ".card-frame, .card-grid-cell"
 
-/** A group's places for a task's drop: its items, in order, and its end. */
+/** A group's places for a canvas's drop: its items, in order, and its end. */
 function placesOf(group: Element | null): {
   readonly items: readonly HTMLElement[]
   readonly end: HTMLElement
@@ -74,7 +74,7 @@ function placesOf(group: Element | null): {
   return { items: zones.filter(z => before(z) != null), end }
 }
 
-/** Where a task's drop at `y` lands in the group under the pointer: its zone, and its target. */
+/** Where a canvas's drop at `y` lands in the group under the pointer: its zone, and its target. */
 function rootLanding(
   under: Element | null,
   y: number,
@@ -99,19 +99,19 @@ function rootLanding(
   return target === null ? null : { el, target }
 }
 
-/** The task of the sidebar's row after `row`, among its rows; null at the end. */
-function nextRowTask(row: HTMLElement): TaskId | null {
+/** The canvas of the sidebar's row after `row`, among its rows; null at the end. */
+function nextRowCanvas(row: HTMLElement): CanvasId | null {
   const rows = [
     ...(row.parentElement?.querySelectorAll<HTMLElement>(
       ":scope > [data-put-sidebar]",
     ) ?? []),
   ]
   const next = rows[rows.indexOf(row) + 1]
-  return next === undefined ? null : taskOf(next.dataset.putSidebar)
+  return next === undefined ? null : parsedCanvas(next.dataset.putSidebar)
 }
 
-const taskOf = (id: string | undefined): TaskId | null =>
-  id !== undefined && isTaskId(id) ? id : null
+const parsedCanvas = (id: string | undefined): CanvasId | null =>
+  id !== undefined && isCanvasId(id) ? id : null
 
 /** Set a style property only when it changes. */
 const write = (
@@ -186,7 +186,7 @@ export function useDrag(input: {
 
     const setHover = (at: HoverOver, el: HTMLElement | null) => {
       const key =
-        at.kind === "task" ? at.task : at.kind === "board" ? "board" : ""
+        at.kind === "canvas" ? at.canvas : at.kind === "board" ? "board" : ""
       if (hover?.key === key) return
       if (hover !== null) window.clearTimeout(hover.timer)
       if (hovered !== null) delete hovered.dataset.hoverOpen
@@ -208,9 +208,9 @@ export function useDrag(input: {
     /** What the source is over now, and the element it was read from. */
     const gather = (p: Press): { at: DragAt; el: HTMLElement | null } => {
       const under = document.elementFromPoint(x, y)
-      if (p.source.kind === "task") {
+      if (p.source.kind === "canvas") {
         const lands = rootLanding(under, y, p.moving)
-        const over: TaskOver =
+        const over: CanvasOver =
           lands === null
             ? { kind: "none" }
             : { kind: "root", target: lands.target }
@@ -247,7 +247,7 @@ export function useDrag(input: {
       const target = zone === null ? null : targetOfElement(zone)
       if (zone === null || target === null)
         return { over: { kind: "none" }, el: null }
-      // A row of the sidebar: onto its task, or between it and a neighbour.
+      // A row of the sidebar: onto its canvas, or between it and a neighbour.
       if (target.kind === "sidebar" && target.before !== null) {
         const box = zone.getBoundingClientRect()
         return {
@@ -257,7 +257,7 @@ export function useDrag(input: {
               y,
               { top: box.top, height: box.height },
               target.before,
-              nextRowTask(zone),
+              nextRowCanvas(zone),
             ),
           },
           el: zone,
@@ -469,7 +469,7 @@ export function useDrag(input: {
       const at = column === null ? -1 : columns.indexOf(column)
       const moving =
         column ??
-        (source.kind === "task"
+        (source.kind === "canvas"
           ? handle.closest<HTMLElement>(ROOT_ITEM)
           : handle.closest<HTMLElement>(CARD_ITEM)) ??
         handle
@@ -487,7 +487,7 @@ export function useDrag(input: {
         document.body.append(face)
       }
       const item =
-        source.kind === "task" ? handle.closest<HTMLElement>(ROOT_ITEM) : null
+        source.kind === "canvas" ? handle.closest<HTMLElement>(ROOT_ITEM) : null
       const places = placesOf(item?.closest(ROOT_GROUP_ZONE) ?? null)
       return {
         source,

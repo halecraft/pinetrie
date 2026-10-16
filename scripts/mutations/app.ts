@@ -23,12 +23,12 @@ export const mutations: readonly Mutation[] = [
     suite: "host",
     scenario: "agents",
     expect:
-      "an ask of a member whose task was archived says why, and its root stays unloaded",
+      "an ask of a member whose canvas was archived says why, and its root stays unloaded",
   },
   // ── agents talking, the host suite's agents scenario ──
   {
     name: "a chat stores none of the agents it invites",
-    file: "packages/rules/chat.ts",
+    file: "packages/rules/message.ts",
     from: "    ...(invites.length === 0 ? {} : { invites }),\n",
     to: "",
     suite: "host",
@@ -39,8 +39,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a relayed run is not given what its agent heard",
     file: "apps/pinetrie/host/runs.ts",
-    from: "          const before = [start.heard ?? null, behind, ...task, pinned].filter(",
-    to: "          const before = [null, behind, ...task, pinned].filter(",
+    from: "          const before = [\n            start.heard ?? null,\n            behind,\n            ...canvas,\n            pinned,\n",
+    to: "          const before = [\n            null,\n            behind,\n            ...canvas,\n            pinned,\n",
     suite: "host",
     scenario: "agents",
     expect:
@@ -106,7 +106,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a lane's thread is sent a command's files at their host paths",
-    file: "apps/pinetrie/host/commands/chat.ts",
+    file: "apps/pinetrie/host/commands/send.ts",
     from: "deps.piSetup.expand(source, typed.args, own)",
     to: "deps.piSetup.expand(source, typed.args, false)",
     suite: "lanes",
@@ -116,7 +116,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a person's path to the working copy is stored as written",
-    file: "apps/pinetrie/host/commands/chat.ts",
+    file: "apps/pinetrie/host/commands/send.ts",
     from: "    hostWorkingCopy: own ? (work.project?.root ?? null) : null,",
     to: "    hostWorkingCopy: null,",
     suite: "lanes",
@@ -302,11 +302,11 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the model is not told who spoke",
-    file: "packages/rules/chat.ts",
+    file: "packages/rules/message.ts",
     from: "  `${d.authorName}: ${d.command?.expanded ?? d.text}`",
     to: "  d.command?.expanded ?? d.text",
     suite: "host",
-    scenario: "chat",
+    scenario: "send",
     expect: "the agent is given every speaker's messages, attributed",
   },
   {
@@ -577,14 +577,14 @@ export const mutations: readonly Mutation[] = [
     expect: "another window's card redraws the column and none of its messages",
   },
   {
-    name: "a new tab's rail is not styled as a rail, so the columns move",
+    name: "a new canvas's rail is not styled as a rail, so the columns move",
     file: "packages/web/rail.tsx",
     from: '    <nav aria-label="this thread\'s tree" className="rail">\n      <div\n        className="rail-tree"',
     to: '    <nav aria-label="this thread\'s tree" className="rail-new">\n      <div\n        className="rail-tree"',
     suite: "browser",
     scenario: "page",
     expect:
-      "the first message takes the new tab's hollow dot, and the columns stay put",
+      "the first message takes the new canvas's hollow dot, and the columns stay put",
   },
   {
     name: "the rail's tree sits against its left edge",
@@ -717,7 +717,7 @@ export const mutations: readonly Mutation[] = [
     name: "a new root takes the page to it",
     file: "packages/web/app.tsx",
     from: "    unstarted,\n    holders,\n  ])\n  // Every change is saved",
-    to: '    unstarted,\n    holders,\n  ])\n  const othersTasks = tasks.byId.size\n  useEffect(() => {\n    const newest = [...tasks.byId.keys()].at(-1)\n    if (newest !== undefined) dispatch({ kind: "show", here: { kind: "task", task: newest } })\n  }, [othersTasks])\n  // Every change is saved',
+    to: '    unstarted,\n    holders,\n  ])\n  const othersCanvases = canvases.byId.size\n  useEffect(() => {\n    const newest = [...canvases.byId.keys()].at(-1)\n    if (newest !== undefined) dispatch({ kind: "show", here: { kind: "canvas", canvas: newest } })\n  }, [othersCanvases])\n  // Every change is saved',
     suite: "browser",
     scenario: "page",
     expect:
@@ -804,24 +804,24 @@ export const mutations: readonly Mutation[] = [
       "the board opens over the columns, moves none of them, and a click outside closes it",
   },
   {
-    name: "a task's drag lands nowhere in the sidebar",
+    name: "a canvas's drag lands nowhere in the sidebar",
     file: "packages/web/use-drag.ts",
     from: "        const lands = rootLanding(under, y, p.moving)",
     to: '        const lands = under?.closest("#sidebar") ? null : rootLanding(under, y, p.moving)',
     suite: "browser",
     scenario: "page",
     expect:
-      "a task dragged over another's middle in the sidebar opens nothing, and drops above or below it",
+      "a canvas dragged over another's middle in the sidebar opens nothing, and drops above or below it",
   },
   {
-    name: "a task's landing measures the row it drags",
+    name: "a canvas's landing measures the row it drags",
     file: "packages/web/use-drag.ts",
     from: "      .filter(zone => zone !== dragged)",
     to: "      .filter(() => true)",
     suite: "browser",
     scenario: "page",
     expect:
-      "a task dragged over another's middle in the sidebar opens nothing, and drops above or below it",
+      "a canvas dragged over another's middle in the sidebar opens nothing, and drops above or below it",
   },
   {
     name: "a root's drag lands nowhere",
@@ -1204,8 +1204,8 @@ export const mutations: readonly Mutation[] = [
     // the strip reading the tree a frame late is what brings it back.
     name: "the strip reads the tree a frame behind the document",
     file: "packages/web/app.tsx",
-    from: '  const strip: StripView | null = useMemo(\n    () =>\n      active?.kind === "task"\n        ? taskStrip(layout, active.task, {\n            canvases,\n            unstarted,\n            holders,\n            index,\n            lanes,\n          })\n        : null,\n    [layout, active, canvases, unstarted, index, lanes, holders],\n  )\n',
-    to: '  const [behind, setBehind] = useState(index)\n  useEffect(() => {\n    const f = requestAnimationFrame(() => setBehind(index))\n    return () => cancelAnimationFrame(f)\n  }, [index])\n  const strip: StripView | null = useMemo(\n    () =>\n      active?.kind === "task"\n        ? taskStrip(layout, active.task, {\n            canvases,\n            unstarted,\n            holders,\n            index: behind,\n            lanes,\n          })\n        : null,\n    [layout, active, canvases, unstarted, behind, lanes, holders],\n  )\n',
+    from: '  const strip: StripView | null = useMemo(\n    () =>\n      active?.kind === "canvas"\n        ? canvasStrip(layout, active.canvas, {\n            cardsOn,\n            unstarted,\n            holders,\n            index,\n            lanes,\n          })\n        : null,\n    [layout, active, cardsOn, unstarted, index, lanes, holders],\n  )\n',
+    to: '  const [behind, setBehind] = useState(index)\n  useEffect(() => {\n    const f = requestAnimationFrame(() => setBehind(index))\n    return () => cancelAnimationFrame(f)\n  }, [index])\n  const strip: StripView | null = useMemo(\n    () =>\n      active?.kind === "canvas"\n        ? canvasStrip(layout, active.canvas, {\n            cardsOn,\n            unstarted,\n            holders,\n            index: behind,\n            lanes,\n          })\n        : null,\n    [layout, active, cardsOn, unstarted, behind, lanes, holders],\n  )\n',
     suite: "browser",
     scenario: "tools",
     expect: "no branch chip is painted in the agent's column while it works",
@@ -1637,10 +1637,10 @@ export const mutations: readonly Mutation[] = [
     expect: "a card emptied marks nothing, though its record stays",
   },
   {
-    name: "the marks are given no archived tasks",
+    name: "the marks are given no archived canvases",
     file: "packages/web/app.tsx",
-    from: "        archived: archivedTasks,\n        tasks: tasks.index,\n        index,\n      }),",
-    to: "        archived: new Set(),\n        tasks: tasks.index,\n        index,\n      }),",
+    from: "        archived: archivedCanvases,\n        canvases: canvases.index,\n        index,\n      }),",
+    to: "        archived: new Set(),\n        canvases: canvases.index,\n        index,\n      }),",
     suite: "browser",
     scenario: "page",
     expect: "an archived root holding your card marks its thread card, not ▦",
@@ -1648,18 +1648,18 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the dispatcher answers a move on the board without moving",
     file: "apps/pinetrie/host/commands/index.ts",
-    from: "        return handleTaskMove({ ...deps, moves: cardCommands }, writer, intent)",
-    to: '        return settled({ kind: "moved" })',
+    from: "        return handleCanvasMove(\n          { ...deps, moves: cardCommands },\n          writer,\n          intent,\n        )\n",
+    to: '        return settled({ kind: "moved" })\n',
     suite: "host",
     scenario: "board",
     expect:
       "a root moved to Done is archived for another client, and a chat into it is refused naming the mover",
   },
   {
-    name: "a new task lands in the first open state whatever its chat names",
-    file: "packages/rules/task.ts",
-    from: '    makeCard("task", task, boardEnd(workflow, cards, state), NO_CONTENT, by),',
-    to: '    makeCard("task", task, boardEnd(workflow, cards, null), NO_CONTENT, by),',
+    name: "a new canvas lands in the first open state whatever its chat names",
+    file: "packages/rules/canvas-index.ts",
+    from: "      boardEnd(workflow, cards, state),\n",
+    to: "      boardEnd(workflow, cards, null),\n",
     suite: "host",
     scenario: "board",
     expect:
@@ -1668,8 +1668,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a root moved out of Done keeps its place there",
     file: "apps/pinetrie/host/commands/board.ts",
-    from: "  const outcome = await deps.moves.placeTask(writer, moved)\n",
-    to: '  const outcome =\n    moved.transition === "archive"\n      ? await deps.moves.placeTask(writer, moved)\n      : settled({ kind: "moved" })\n',
+    from: "  const outcome = await deps.moves.placeCanvas(writer, moved)\n",
+    to: '  const outcome =\n    moved.transition === "archive"\n      ? await deps.moves.placeCanvas(writer, moved)\n      : settled({ kind: "moved" })\n',
     suite: "host",
     scenario: "board",
     expect:
@@ -1682,7 +1682,7 @@ export const mutations: readonly Mutation[] = [
     to: '        return settled({ kind: "marked" })',
     suite: "host",
     scenario: "board",
-    expect: "a task is titled, by its writer",
+    expect: "a canvas is titled, by its writer",
   },
   {
     name: "a column's reading is never written",
@@ -1718,7 +1718,7 @@ export const mutations: readonly Mutation[] = [
     from: "  const scribe = createScribe({ documents: docs, replicaId: newId(), blobs })",
     to: "  const scribe = createScribe({\n    documents: { ...docs, root: async () => newRootDoc() },\n    replicaId: newId(),\n    blobs,\n  })",
     suite: "host",
-    scenario: "chat",
+    scenario: "send",
     expect: "the thread reads the message, then the agent's reply",
   },
   {
@@ -1727,7 +1727,7 @@ export const mutations: readonly Mutation[] = [
     from: "    onStream: streamInto(basics),",
     to: "    onStream: () => {},",
     suite: "host",
-    scenario: "chat",
+    scenario: "send",
     expect: "the client saw live streaming updates",
   },
   {
@@ -2110,13 +2110,13 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a restore brings nothing back",
-    file: "packages/web/task-column.tsx",
+    file: "packages/web/canvas-column.tsx",
     from: '                      kind: "restore",',
     to: '                      kind: "foldList",',
     suite: "browser",
     scenario: "page",
     expect:
-      "Move to trash on a branch trashes it, the task's trash lists it, and restore brings it back with its text",
+      "Move to trash on a branch trashes it, the canvas's trash lists it, and restore brings it back with its text",
   },
   {
     name: "the host neither stores nor relays an inventory",
@@ -2139,8 +2139,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a session's undo of moves redoes",
     file: "packages/session/connect.ts",
-    from: '        kind: "undo-move",\n        task,\n        direction,',
-    to: '        kind: "undo-move",\n        task,\n        direction: "redo",',
+    from: '        kind: "undo-move",\n        canvas,\n        direction,',
+    to: '        kind: "undo-move",\n        canvas,\n        direction: "redo",',
     suite: "host",
     scenario: "cards",
     expect:
@@ -2159,8 +2159,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a starting host retires every history of moves",
     file: "apps/pinetrie/host/housekeeping.ts",
-    from: "    tasks: readTasks(places),\n    archived: readArchived(session, places),",
-    to: "    tasks: new Set(),\n    archived: readArchived(session, places),",
+    from: "    canvases: readCanvases(places),\n    archived: readArchived(session, places),",
+    to: "    canvases: new Set(),\n    archived: readArchived(session, places),",
     suite: "host",
     scenario: "cards",
     expect:
@@ -2207,7 +2207,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a retitle is answered without asking the model",
     file: "apps/pinetrie/host/commands/index.ts",
-    from: "        return settled(await deps.titles.asked(intent.task, writer))",
+    from: "        return settled(await deps.titles.asked(intent.canvas, writer))",
     to: '        return settled({ kind: "retitling" })',
     suite: "host",
     scenario: "titles",
@@ -2226,8 +2226,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "startHost runs read no pinned cards",
     file: "apps/pinetrie/host/index.ts",
-    from: "    readPinned,\n    readTaskContext,\n",
-    to: "    readPinned: async () => null,\n    readTaskContext,\n",
+    from: "    readPinned,\n    readCanvasContext,\n",
+    to: "    readPinned: async () => null,\n    readCanvasContext,\n",
     suite: "host",
     scenario: "cards",
     expect:
@@ -2474,11 +2474,11 @@ export const mutations: readonly Mutation[] = [
     name: "the rail draws the first root's tree alone",
     file: "packages/web/app.tsx",
     from: "        return entry === undefined ? [] : [{ root, entry }]\n",
-    to: '        return entry === undefined || root !== tasks.byId.get(hereTask ?? ("" as never))?.roots[0] ? [] : [{ root, entry }]\n',
+    to: '        return entry === undefined || root !== canvases.byId.get(hereCanvas ?? ("" as never))?.roots[0] ? [] : [{ root, entry }]\n',
     suite: "browser",
     scenario: "page",
     expect:
-      "a thread moved onto the canvas from another task's makes a canvas of two roots: its column, and its root's tree on the rail",
+      "a thread moved onto the canvas from another canvas's makes a canvas of two roots: its column, and its root's tree on the rail",
   },
   {
     name: "a column's ⋯ copies nothing",
@@ -2488,7 +2488,7 @@ export const mutations: readonly Mutation[] = [
     suite: "browser",
     scenario: "page",
     expect:
-      "Copy to this task makes a copy beside its source, its fork row naming what it was copied from",
+      "Copy to this canvas makes a copy beside its source, its fork row naming what it was copied from",
   },
   {
     name: "a column's Move to trash does nothing",
@@ -2498,7 +2498,7 @@ export const mutations: readonly Mutation[] = [
     suite: "browser",
     scenario: "page",
     expect:
-      "Move to trash on a branch trashes it, the task's trash lists it, and restore brings it back with its text",
+      "Move to trash on a branch trashes it, the canvas's trash lists it, and restore brings it back with its text",
   },
   // Out of the top layer, a box opened in a column's header is drawn in
   // `.column-head`'s stacking context, under the column's messages. Caught
@@ -2565,24 +2565,24 @@ export const mutations: readonly Mutation[] = [
       "a comment is a note in its message's margin, written where it opens; shut, the message shows how many it holds",
   },
   {
-    name: "an undo on no task undoes in a task's history",
+    name: "an undo on no canvas undoes in a canvas's history",
     file: "apps/pinetrie/host/commands/index.ts",
-    from: "          historyScope(intent.task),\n",
-    to: '          historyScope(intent.task ?? ("k-none" as TaskId)),\n',
+    from: "          historyScope(intent.canvas),\n",
+    to: '          historyScope(intent.canvas ?? ("k-none" as CanvasId)),\n',
     suite: "host",
     scenario: "board",
     expect:
-      "a move on the board is undone by its mover's undo key outside any task, the task back in its state",
+      "a move on the board is undone by its mover's undo key outside any canvas, the canvas back in its state",
   },
   {
-    name: "a closed new tab's task leaves outside the close's step",
+    name: "a closed new canvas leaves outside the close's step",
     file: "apps/pinetrie/host/commands/cards.ts",
     from: '    return carry(step, planned.drain, { kind: "move", by: writer }, gesture)\n',
     to: '    const out = await carry(planned.step, planned.drain, { kind: "move", by: writer }, gesture)\n    if (step.kind === "steps" && planned.step.kind === "steps")\n      await deps.placesWriter.change({ kind: "move", by: writer }, open =>\n        open.apply(step.steps.slice(planned.step.steps.length)),\n      )\n    return out\n',
     suite: "host",
     scenario: "board",
     expect:
-      "an unsent new tab closed is undone whole by its closer's undo key outside any task: its task and its thread back",
+      "an unsent new canvas closed is undone whole by its closer's undo key outside any canvas: its canvas and its thread back",
   },
   {
     name: "a copy writes no text",
@@ -2666,31 +2666,31 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a restored column lands at the canvas's end",
     file: "packages/rules/moves.ts",
-    from: '    ? { kind: "canvas", task: left.task, order: left.order }',
-    to: '    ? { kind: "canvas", task: left.task, order: "~" }',
+    from: '    ? { kind: "canvas", canvas: left.canvas, order: left.order }',
+    to: '    ? { kind: "canvas", canvas: left.canvas, order: "~" }',
     suite: "host",
     scenario: "cards",
     expect:
       "a thread's card trashed by one writer is restored by another, back on its canvas at its rank",
   },
   {
-    name: "the host opens a new root's thread as a new tab's",
+    name: "the host opens a new root's thread as a new canvas's",
     file: "apps/pinetrie/host/commands/cards.ts",
     from: "          : open.start\n",
-    to: '          : { kind: "new-task", state: null }\n',
+    to: '          : { kind: "new-canvas", state: null }\n',
     suite: "host",
     scenario: "cards",
     expect:
-      "a new root's thread opens in a task the session holds, just after the card it was made after, and its first send starts that root there",
+      "a new root's thread opens in a canvas the session holds, just after the card it was made after, and its first send starts that root there",
   },
   {
-    name: "＋ past the last column shows on a read-only task",
+    name: "＋ past the last column shows on a read-only canvas",
     file: "packages/web/strip.tsx",
     from: '      {endDrop !== null && (\n        <div className="canvas-end">\n',
-    to: '      {p.taskColumn !== null && (\n        <div className="canvas-end">\n',
+    to: '      {p.canvasColumn !== null && (\n        <div className="canvas-end">\n',
     suite: "browser",
     scenario: "page",
-    expect: "an archived task's canvas offers no ＋ to make a column",
+    expect: "an archived canvas offers no ＋ to make a column",
   },
   {
     name: "＋ past the last column makes its column first",
@@ -2700,17 +2700,17 @@ export const mutations: readonly Mutation[] = [
     suite: "browser",
     scenario: "page",
     expect:
-      "＋ past the last column makes a conversation at the canvas's end: a new root's thread in this task, its box focused",
+      "＋ past the last column makes a chat at the canvas's end: a new root's thread in this canvas, its box focused",
   },
   {
-    name: "a new tab's emptied task stays on the board",
+    name: "an emptied new canvas stays on the board",
     file: "apps/pinetrie/host/commands/cards.ts",
-    from: "              ...planTasksTrashed(cards, emptied, writer),\n",
+    from: "              ...planCanvasesTrashed(cards, emptied, writer),\n",
     to: "",
     suite: "browser",
     scenario: "page",
     expect:
-      "an unsent new tab closed with × takes its task away, and its thread's card to the trash, asking nothing",
+      "an unsent new canvas closed with × takes its canvas away, and its thread's card to the trash, asking nothing",
   },
   {
     name: "a strip's mark row is taller than the geometry a fold reads",
@@ -2727,7 +2727,7 @@ export const mutations: readonly Mutation[] = [
     from: "      report: r,\n      model: piSetup.model,\n",
     to: '      report: r,\n      model: { kind: "model", label: "none" },\n',
     suite: "host",
-    scenario: "chat",
+    scenario: "send",
     expect: "a host with no model starts, and its setup record says why",
   },
 ]

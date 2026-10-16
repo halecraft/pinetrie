@@ -35,13 +35,13 @@ decisions:
 
 | kind | decisions |
 |---|---|
-| `chat` | its `ChatAt` (ADR-0117), its root (ADR-0063), its card spent once sent (ADR-0048), the text versions the run waits for (S96: a text can reach the host after its record), its WIP base (ADR-0104), its workflow state (ADR-0122) |
+| `send` | its `MessageAt` (ADR-0117), its root (ADR-0063), its card spent once sent (ADR-0048), the text versions the run waits for (S96: a text can reach the host after its record), its WIP base (ADR-0104), its workflow state (ADR-0122) |
 | `picture` | ADR-0098 |
 | `carry-on` | ADR-0082 |
 | `queue-hold`, `reorder` | ADR-0048 (step 7), ADR-0116 |
-| `move` | ADR-0059; its sender's task names a discard's history (ADR-0116) |
+| `move` | ADR-0059; its sender's canvas names a discard's history (ADR-0116) |
 | `queue-card` | the one way into a queue, which decides its hold too (ADR-0113) |
-| `move-task`, `workflow` | ADR-0122, ADR-0126 |
+| `move-canvas`, `workflow` | ADR-0122, ADR-0126 |
 | `mark` | ADR-0045, ADR-0116 |
 | `card-width` | ADR-0116 |
 | `retitle` | ADR-0074 |
@@ -53,13 +53,13 @@ decisions:
 | `branch-out` | ADR-0157: Open carries rows, Start rows with their briefs, in `text`; rows strictly increasing, threads new and distinct, a brief non-blank on Start and absent on Open, so a decoded press keeps its proposal's order |
 | `copy-thread` | ADR-0117 |
 | `paste` | ADR-0132; it discards the card it replaces first (ADR-0133) |
-| `undo-move` | ADR-0066; `""` names your history outside any task (ADR-0126) |
+| `undo-move` | ADR-0066; `""` names your history outside any canvas (ADR-0126) |
 | `set-command` | ADR-0108 |
 | `traces-seen` | ADR-0048 |
 | `ssh-access` | ADR-0140; `mode` is the answer: `approve`, `refuse` or `revoke` |
 
-A new thread's, root's or task's id is in the shape a client mints
-(`parseNewThread`, `parseNewRoot`, `parseNewTask`; ADR-0057, ADR-0117). A
+A new thread's, root's or canvas's id is in the shape a client mints
+(`parseNewThread`, `parseNewRoot`, `parseNewCanvas`; ADR-0057, ADR-0117). A
 move is typed by its card's kind, and refused to or from a place that kind
 is never in (ADR-0117); a text card dropped at a spot on a canvas becomes a
 note column (`WRAPS`, ADR-0126). A reply's `rev` is the places document's
@@ -79,7 +79,7 @@ their writers though it never writes one.
   what is streaming and every root's document (ADR-0063), and the stacks of
   people's moves (ADR-0066).
 - **A person's own documents** (`PERSON_DOC_KINDS`): their inventory
-  (ADR-0059), what they have dealt with (ADR-0077), and the tasks they have
+  (ADR-0059), what they have dealt with (ADR-0077), and the canvases they have
   open (ADR-0122). Each is written only by that person's tabs, and shared
   with that person only.
 - Presence is ephemeral and never stored (ADR-0024); no policy here names

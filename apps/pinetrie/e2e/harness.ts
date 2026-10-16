@@ -14,12 +14,12 @@ import { NotAWriterError } from "@kyneta/exchange"
 import { subscribe } from "@kyneta/schema"
 import type { ConfigPlaces } from "@pinetrie/config"
 import {
-  type ArchivedTask,
+  type ArchivedCanvas,
   atEntry,
+  type CanvasId,
   type CardCommand,
   type CardId,
   type CardRecord,
-  type ChatMode,
   type EntryId,
   entryId,
   type JjAcceptedRecord,
@@ -30,7 +30,7 @@ import {
   type Position,
   ROOT,
   type RootId,
-  type TaskId,
+  type SendMode,
   type ThreadId,
   type TreeIndex,
   threadAt,
@@ -51,7 +51,7 @@ import {
   readThreads,
   readWorkflow,
 } from "@pinetrie/reads"
-import { archivedOf, indexTasks, NONE_BLANK } from "@pinetrie/rules"
+import { archivedOf, indexCanvases, NONE_BLANK } from "@pinetrie/rules"
 import {
   hasLaneRecord,
   type LiveDocHandle,
@@ -64,13 +64,13 @@ import {
   type StoredEntryRow,
 } from "@pinetrie/schema"
 import {
-  type ChatHow,
   type ConnectOptions,
-  chatAtOf,
+  columnMessageAt,
   connectSession,
+  newCanvasId,
   newCardId,
-  newTaskId,
   newThreadId,
+  type SendHow,
   type SessionClient,
 } from "@pinetrie/session"
 import {
@@ -85,43 +85,43 @@ export const at = (id: string | null): Position =>
   id === null ? ROOT : atEntry(entryId(id))
 
 /** How a scenario's client sends a message (`join`'s `chat`). */
-export type ScenarioHow = ChatHow & {
-  readonly mode?: ChatMode
+export type ScenarioHow = SendHow & {
+  readonly mode?: SendMode
   /** The thread it starts or continues; else a new one, or its entry's. */
   readonly thread?: ThreadId
   /**
-   * The task a thread it starts goes in; else a new one at the root, or the
-   * task of the thread its entry is in.
+   * The canvas a thread it starts goes in; else a new one at the root, or the
+   * canvas of the thread its entry is in.
    */
-  readonly task?: TaskId
+  readonly canvas?: CanvasId
 }
 
-/** The task of the thread `entry` is in, as `client` holds the places. */
-export function taskAt(
+/** The canvas of the thread `entry` is in, as `client` holds the places. */
+export function entryCanvas(
   client: Pick<SessionClient, "session" | "cards" | "roots" | "live">,
   entry: EntryId,
-): TaskId | undefined {
+): CanvasId | undefined {
   const thread = threadAt(treeOf(client), entry)
   if (thread === null) return undefined
-  return indexTasks(
+  return indexCanvases(
     client.cards.current(),
     readThreads(client.session),
-  ).taskOfThread.get(thread)
+  ).canvasOfThread.get(thread)
 }
 
-/** The board state `task`'s card is in, as `cards` say; undefined for none on the board. */
+/** The board state `canvas`'s card is in, as `cards` say; undefined for none on the board. */
 export const boardStateOf = (
   cards: readonly CardRecord[],
-  task: TaskId,
+  canvas: CanvasId,
 ): WorkflowStateId | undefined => {
-  const card = cards.find(c => c.id === task)
+  const card = cards.find(c => c.id === canvas)
   return card?.place.kind === "board" ? card.place.state : undefined
 }
 
-/** The tasks in the archive as `client` holds the board (`archivedOf`). */
+/** The canvases in the archive as `client` holds the board (`archivedOf`). */
 export const archivedFor = (
   client: Pick<SessionClient, "session" | "cards">,
-): ReadonlyMap<TaskId, ArchivedTask> => {
+): ReadonlyMap<CanvasId, ArchivedCanvas> => {
   const workflow = readWorkflow(client.session)
   return workflow === null
     ? new Map()
@@ -257,67 +257,67 @@ export const join = async (
     at.kind === "root"
       ? Promise.resolve(undefined)
       : rootHeldWithin(client, at.id, 10_000)
-  const { chat } = client
+  const { send: said } = client
   return Object.assign(client, {
     /**
      * A message as a column sends it, from where a scenario reads: a branch
      * (or a send at the root) starts a thread under a new id, or `thread`;
      * a reply continues the thread its entry is in, or `thread`.
      */
-    chat: async (
+    send: async (
       text: string,
       at: Position,
       how: ScenarioHow = {},
     ): Promise<Outcome> => {
       await holds(at)
-      const { mode, thread, task, ...rest } = how
+      const { mode, thread, canvas, ...rest } = how
       const branch = mode === "branch" || at.kind === "root"
       const resolved =
         thread ??
         (branch
           ? newThreadId()
           : (threadAt(treeOf(client), at.id) ?? newThreadId()))
-      // A thread's task comes with its card, which can reach this copy of
+      // A thread's canvas comes with its card, which can reach this copy of
       // the places after its first message reaches the tree.
-      if (task === undefined && at.kind === "entry")
-        await waitFor(() => taskAt(client, at.id) !== undefined, 5_000)
+      if (canvas === undefined && at.kind === "entry")
+        await waitFor(() => entryCanvas(client, at.id) !== undefined, 5_000)
       const into =
-        task ??
+        canvas ??
         (at.kind === "root"
-          ? newTaskId()
-          : (taskAt(client, at.id) ?? newTaskId()))
-      return chat(
+          ? newCanvasId()
+          : (entryCanvas(client, at.id) ?? newCanvasId()))
+      return said(
         text,
-        chatAtOf(branch ? "branch" : "reply", resolved, at, into),
+        columnMessageAt(branch ? "branch" : "reply", resolved, at, into),
         rest,
       )
     },
-    /** Title the task the thread `entry` is in, or clear it with null. */
+    /** Title the canvas the thread `entry` is in, or clear it with null. */
     mark: async (entry: EntryId, title: string | null) => {
       await holds({ kind: "entry", id: entry })
-      await waitFor(() => taskAt(client, entry) !== undefined, 5_000)
-      const task = taskAt(client, entry)
-      return task === undefined
-        ? NO_TASK
+      await waitFor(() => entryCanvas(client, entry) !== undefined, 5_000)
+      const canvas = entryCanvas(client, entry)
+      return canvas === undefined
+        ? NO_CANVAS
         : client.request({
             kind: "mark",
-            of: { kind: "task", task },
+            of: { kind: "canvas", canvas },
             title,
           })
     },
   })
 }
 
-/** A scenario's mark at an entry in no task: refused before anything is sent. */
-const NO_TASK: Outcome = {
+/** A scenario's mark at an entry in no canvas: refused before anything is sent. */
+const NO_CANVAS: Outcome = {
   kind: "refused",
   code: "unknown_target",
-  message: "no task holds that entry",
+  message: "no canvas holds that entry",
 }
 
 /** A session client whose `chat` sends as a column would (`join`). */
-export type ScenarioClient = Omit<SessionClient, "chat"> & {
-  readonly chat: (
+export type ScenarioClient = Omit<SessionClient, "send"> & {
+  readonly send: (
     text: string,
     at: Position,
     how?: ScenarioHow,
@@ -586,7 +586,7 @@ export const laneNamesOf = (
 
 /** `id` as `client` draws it now; a scenario that names a card expects it there. */
 function drawnCard(
-  client: Omit<SessionClient, "chat">,
+  client: Omit<SessionClient, "send">,
   id: CardId,
 ): CardRecord {
   const card = client.cards.current().find(c => c.id === id)
@@ -596,11 +596,11 @@ function drawnCard(
 }
 
 /**
- * Move the task holding the thread `entry` is in to the archive, or out of
+ * Move the canvas holding the thread `entry` is in to the archive, or out of
  * it to the first open one, as the board does: archive or
  * restore it. The state it is in is read from `client`'s copy of the board.
  */
-export function moveTaskTo(
+export function moveCanvasOnBoard(
   client: Pick<
     SessionClient,
     "session" | "request" | "cards" | "roots" | "live"
@@ -609,14 +609,14 @@ export function moveTaskTo(
   to: "archive" | "open",
 ): Promise<Outcome> {
   const workflow = readWorkflow(client.session)
-  const task = taskAt(client, entry)
+  const canvas = entryCanvas(client, entry)
   const first = workflow?.open[0]
-  if (workflow === null || task === undefined || first === undefined)
+  if (workflow === null || canvas === undefined || first === undefined)
     throw new Error(`no board place for ${entry}`)
-  const from = boardStateOf(client.cards.current(), task) ?? first.id
+  const from = boardStateOf(client.cards.current(), canvas) ?? first.id
   return client.request({
-    kind: "move-task",
-    task,
+    kind: "move-canvas",
+    canvas,
     from,
     to: to === "archive" ? workflow.archive.id : first.id,
     before: null,
@@ -629,7 +629,7 @@ export function moveTaskTo(
  * card.
  */
 export function queueCard(
-  client: Omit<SessionClient, "chat">,
+  client: Omit<SessionClient, "send">,
   id: CardId,
   lane: ThreadId,
 ): ReturnType<SessionClient["queueCard"]> {
@@ -643,7 +643,7 @@ export function queueCard(
 
 /** Take queued card `id` back below the line, as a column's unqueue does. */
 export function unqueueCard(
-  client: Omit<SessionClient, "chat">,
+  client: Omit<SessionClient, "send">,
   id: CardId,
 ): ReturnType<SessionClient["moveCard"]> {
   const card = drawnCard(client, id)
@@ -661,7 +661,7 @@ export function unqueueCard(
  * scenario's session reads and writes in any root, as a page holds the roots
  * of its tabs.
  */
-export function holdEvery(client: Omit<SessionClient, "chat">): () => void {
+export function holdEvery(client: Omit<SessionClient, "send">): () => void {
   const follow = () =>
     client.holdRoots(new Set(readRoots(client.session).keys()))
   follow()
@@ -720,18 +720,19 @@ export function threadHolding(
   return thread
 }
 
-/** The task the thread `entry` is in holds, as the host reads it. */
-export function taskHolding(
+/** The canvas the thread `entry` is in holds, as the host reads it. */
+export function canvasHolding(
   host: Parameters<typeof treeOf>[0] & Pick<RunningHost, "places">,
   entry: EntryId | null,
-): TaskId {
+): CanvasId {
   const thread = threadHolding(host, entry)
-  const task = indexTasks(
+  const canvas = indexCanvases(
     readPlaces(host.places),
     readThreads(host.session),
-  ).taskOfThread.get(thread)
-  if (task === undefined) throw new Error(`no task holds the thread ${thread}`)
-  return task
+  ).canvasOfThread.get(thread)
+  if (canvas === undefined)
+    throw new Error(`no canvas holds the thread ${thread}`)
+  return canvas
 }
 
 /**

@@ -1,7 +1,7 @@
 // interface/held-roots — which roots this tab asks its session to hold.
 //
-// A tab loads only what it shows: the roots of every thread in the tasks of
-// the sidebar and the task you are on, archived or not, and of each thread
+// A tab loads only what it shows: the roots of every thread in the canvases of
+// the sidebar and the canvas you are on, archived or not, and of each thread
 // in your inventory, whose slot and preview read it. Every other root is
 // read from the directory alone, the board's included.
 
@@ -13,8 +13,8 @@ import type {
   ThreadId,
   WriterId,
 } from "@pinetrie/core"
+import type { Canvases } from "./canvases.ts"
 import type { Layout } from "./layout.ts"
-import type { Tasks } from "./tasks.ts"
 
 /** Each root's root entry, by its id, from the directory; a root with no message has none. */
 export const rootEntriesOf = (
@@ -29,19 +29,19 @@ export const rootEntriesOf = (
 /** The roots to hold, for `layout` and the threads in your inventory. */
 export function planHeldRoots(input: {
   readonly layout: Pick<Layout, "open" | "active">
-  readonly tasks: Tasks
+  readonly canvases: Canvases
   /** The threads your inventory holds. */
   readonly inventory: readonly ThreadId[]
 }): ReadonlySet<RootId> {
   const { active } = input.layout
   const shown = [
     ...input.layout.open,
-    ...(active?.kind === "task" ? [active.task] : []),
+    ...(active?.kind === "canvas" ? [active.canvas] : []),
   ]
   return new Set([
-    ...shown.flatMap(task => input.tasks.byId.get(task)?.roots ?? []),
+    ...shown.flatMap(canvas => input.canvases.byId.get(canvas)?.roots ?? []),
     ...input.inventory.flatMap(
-      thread => input.tasks.index.rootOfThread.get(thread) ?? [],
+      thread => input.canvases.index.rootOfThread.get(thread) ?? [],
     ),
   ])
 }

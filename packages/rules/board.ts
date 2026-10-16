@@ -1,7 +1,8 @@
-// board — the team's workflow and each task's card on the board.
+// board — the team's workflow and each canvas's card on the board.
 
 import {
-  type ArchivedTask,
+  type ArchivedCanvas,
+  type CanvasId,
   type CardHistoryRecord,
   type CardId,
   type CardInPlace,
@@ -13,7 +14,6 @@ import {
   type PlaceRefusal,
   type Refusal,
   refused,
-  type TaskId,
   type ValueWrite,
   type Workflow,
   type WorkflowEdit,
@@ -64,18 +64,35 @@ export const WORKFLOW: RecordSpec<Workflow, typeof WORKFLOW_KEY, "session"> = {
     }),
 }
 
-/** A new session's workflow: Backlog and Doing, then Done, the archive. */
+/** A new session's workflow: Topics and Active, then Archive, the archive. */
 export const defaultWorkflow = (newId: () => string): Workflow => ({
   open: [
-    { id: workflowStateIdFor(newId()), name: "Backlog" },
-    { id: workflowStateIdFor(newId()), name: "Doing" },
+    { id: workflowStateIdFor(newId()), name: "Topics" },
+    { id: workflowStateIdFor(newId()), name: "Active" },
   ],
-  archive: { id: workflowStateIdFor(newId()), name: "Done" },
+  archive: { id: workflowStateIdFor(newId()), name: "Archive" },
 })
 
 /**
+ * What a canvas on the board is, by where it is: a topic in the first open
+ * state, there for teammates to find; a task in any later open state, its
+ * work tracked; archived in the archive. Never stored.
+ */
+export type CanvasRole = "topic" | "task" | "archived"
+
+/**
+ * The role of a canvas in `state`. A state the workflow no longer holds is
+ * read as the first open state, as `boardOf` places its canvases there.
+ */
+export function canvasRole(w: Workflow, state: WorkflowStateId): CanvasRole {
+  if (state === w.archive.id) return "archived"
+  const at = w.open.findIndex(s => s.id === state)
+  return at > 0 ? "task" : "topic"
+}
+
+/**
  * A store with no workflow gets the default one: a new store's first start.
- * Nothing else writes the first workflow, and no task is
+ * Nothing else writes the first workflow, and no canvas is
  * opened before there is one (`planThreadOpen`).
  */
 export const planWorkflowSeed = (
@@ -96,32 +113,33 @@ export const stateIn = (
   id: WorkflowStateId,
 ): WorkflowState | undefined => statesOf(w).find(s => s.id === id)
 
-/** A task's card on the board. */
+/** A canvas's card on the board. */
 export type BoardCard = CardInPlace<"board">
 
-/** Whether `c` is a task's card on the board. */
+/** Whether `c` is a canvas's card on the board. */
 export const isBoardCard = (c: CardRecord): c is BoardCard =>
   hasPlaceKind(c, "board")
 
 /**
- * The tasks on the board: each task whose card is there, not in a trash.
- * The set of tasks the session holds.
+ * The canvases on the board: each canvas whose card is there, not in a trash.
+ * The set of canvases the session holds.
  */
-export const boardTasks = (cards: readonly CardRecord[]): ReadonlySet<TaskId> =>
-  new Set(cards.filter(isBoardCard).map(c => c.id))
+export const boardCanvases = (
+  cards: readonly CardRecord[],
+): ReadonlySet<CanvasId> => new Set(cards.filter(isBoardCard).map(c => c.id))
 
-/** A column of the board: a state and its tasks, in order. */
+/** A column of the board: a state and its canvases, in order. */
 export interface BoardColumn {
   readonly state: WorkflowState
-  readonly tasks: readonly TaskId[]
+  readonly canvases: readonly CanvasId[]
 }
 
-/** Every task in its state, in order. */
+/** Every canvas in its state, in order. */
 export interface Board {
   readonly open: readonly BoardColumn[]
   readonly archive: BoardColumn
-  /** Each task's state. */
-  readonly stateOf: ReadonlyMap<TaskId, WorkflowStateId>
+  /** Each canvas's state. */
+  readonly stateOf: ReadonlyMap<CanvasId, WorkflowStateId>
 }
 
 /** The state a card on the board is read in: its own, or the first open state's when the workflow lacks it. */
@@ -149,7 +167,7 @@ function columnsOf(
 }
 
 /**
- * Every task's card on the board, in its state by rank, then by id; one in
+ * Every canvas's card on the board, in its state by rank, then by id; one in
  * a state the workflow lacks after them at the end of the first open state.
  */
 export function boardOf(
@@ -157,12 +175,12 @@ export function boardOf(
   cards: readonly CardRecord[],
 ): Board {
   const columns = columnsOf(workflow, cards)
-  const stateOf = new Map<TaskId, WorkflowStateId>()
+  const stateOf = new Map<CanvasId, WorkflowStateId>()
   for (const [state, list] of columns)
     for (const c of list) stateOf.set(c.id, state)
   const column = (state: WorkflowState): BoardColumn => ({
     state,
-    tasks: (columns.get(state.id) ?? []).map(c => c.id),
+    canvases: (columns.get(state.id) ?? []).map(c => c.id),
   })
   return {
     open: workflow.open.map(column),
@@ -172,7 +190,7 @@ export function boardOf(
 }
 
 /**
- * The tasks in the archive: archived, by whom and when: the
+ * The canvases in the archive: archived, by whom and when: the
  * newest event of its card's history that put it in the archive, which a
  * history always keeps (`HISTORY_EVENTS`); its placer at 0 for a card with
  * none.
@@ -181,16 +199,16 @@ export function archivedOf(
   workflow: Workflow,
   cards: readonly CardRecord[],
   histories: ReadonlyMap<CardId, CardHistoryRecord>,
-): ReadonlyMap<TaskId, ArchivedTask> {
+): ReadonlyMap<CanvasId, ArchivedCanvas> {
   const archive = workflow.archive.id
-  const out = new Map<TaskId, ArchivedTask>()
+  const out = new Map<CanvasId, ArchivedCanvas>()
   for (const c of cards) {
     if (!isBoardCard(c) || c.place.state !== archive) continue
     const into = histories
       .get(c.id)
       ?.events.findLast(e => e.to.kind === "board" && e.to.state === archive)
     out.set(c.id, {
-      task: c.id,
+      canvas: c.id,
       by: into?.by ?? c.placer,
       at: into?.at ?? 0,
     })
@@ -212,7 +230,7 @@ export function transitionOf(
   return "within"
 }
 
-/** A task moved on the board, as the host plans it. */
+/** A canvas moved on the board, as the host plans it. */
 export type BoardMove =
   | {
       readonly kind: "refused"
@@ -235,27 +253,27 @@ export type BoardMove =
     }
 
 /**
- * Decide a move of a task's card on the board. The
- * sender names the state it saw the task in; if the task has left it, the
+ * Decide a move of a canvas's card on the board. The
+ * sender names the state it saw the canvas in; if the canvas has left it, the
  * move is refused `moved`, the card as it is saying who moved it where.
- * `before` is the task it goes before in `to`, null (or a task no longer
+ * `before` is the canvas it goes before in `to`, null (or a canvas no longer
  * there) for its end. Within one state it is a reorder: its rank alone
  * changes, its placer stays. Between states its sender is its placer. A
  * card with no room between its neighbours renumbers the fewest of them
- * (`rankAfter`). Refused `gone` for a task with no card on the board, and
+ * (`rankAfter`). Refused `gone` for a canvas with no card on the board, and
  * `no-place` for a state the workflow lacks.
  */
 export function planBoardMove(input: {
-  readonly task: TaskId
+  readonly canvas: CanvasId
   readonly from: WorkflowStateId
   readonly to: WorkflowStateId
-  readonly before: TaskId | null
+  readonly before: CanvasId | null
   readonly sender: WriterId
   readonly workflow: Workflow
   readonly cards: readonly CardRecord[]
 }): BoardMove {
-  const { workflow, cards, task, to } = input
-  const now = cards.find(c => c.id === task)
+  const { workflow, cards, canvas, to } = input
+  const now = cards.find(c => c.id === canvas)
   if (now === undefined || !isBoardCard(now))
     return { kind: "refused", code: "gone", now: now ?? null }
   if (stateIn(workflow, to) === undefined)
@@ -263,13 +281,13 @@ export function planBoardMove(input: {
   const at = effectiveState(workflow, now)
   if (at !== input.from) return { kind: "refused", code: "moved", now }
   const column = columnsOf(workflow, cards).get(to) ?? []
-  const others = column.filter(c => c.id !== task)
+  const others = column.filter(c => c.id !== canvas)
   const before = others.findIndex(c => c.id === input.before)
   const index = input.before === null || before < 0 ? others.length : before
   // A card in a stale state is drawn in `to` but stored elsewhere: its
   // state is written, so it moves.
   const within = now.place.state === to
-  if (within && column[index]?.id === task) return { kind: "unchanged" }
+  if (within && column[index]?.id === canvas) return { kind: "unchanged" }
   const { order, respaced } = rankAfter(others, index - 1)
   const place: CardPlace = { kind: "board", state: to, order }
   return {
@@ -286,7 +304,7 @@ export function planBoardMove(input: {
 }
 
 /**
- * A new task's place on the board: the end of `state`, or of the first open
+ * A new canvas's place on the board: the end of `state`, or of the first open
  * state for none or one that is no open state.
  */
 export function boardEnd(
@@ -311,7 +329,7 @@ export type WorkflowPlan =
 
 /**
  * Decide a change to the workflow. Names are trimmed and may repeat. The
- * archive is renamed, never moved or removed; a state holding a task is
+ * archive is renamed, never moved or removed; a state holding a canvas is
  * not removed, nor the only open state.
  */
 export function planWorkflowEdit(
@@ -375,11 +393,11 @@ export function planWorkflowEdit(
       if (isArchive)
         return refused(ERR.STATE_ARCHIVE, `${archive.name} cannot be removed`)
       const held =
-        board.open.find(c => c.state.id === target.id)?.tasks.length ?? 0
+        board.open.find(c => c.state.id === target.id)?.canvases.length ?? 0
       if (held > 0)
         return refused(
           ERR.STATE_NOT_EMPTY,
-          `${target.name} holds ${held === 1 ? "a task" : `${held} tasks`}: move ${held === 1 ? "it" : "them"} first`,
+          `${target.name} holds ${held === 1 ? "a canvas" : `${held} canvases`}: move ${held === 1 ? "it" : "them"} first`,
         )
       if (open.length === 1)
         return refused(ERR.LAST_STATE, "the board needs one open state")

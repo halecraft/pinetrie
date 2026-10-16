@@ -1,15 +1,15 @@
 // session/chat — a chat as this client asks the host for it: how it is sent
-// (`ChatHow`), and what sending it does (`planChatRequest`).
+// (`SendHow`), and what sending it does (`planSendRequest`).
 
 import {
-  type ChatAt,
-  type ChatMode,
+  type CanvasId,
   type Intent,
+  type MessageAt,
   type Position,
   parseMentions,
   type RootId,
+  type SendMode,
   type SentCard,
-  type TaskId,
   type TextCard,
   type TextCardId,
   type ThreadId,
@@ -19,8 +19,8 @@ import type { Outcome } from "@pinetrie/protocol/codec"
 import { IN_COLUMN, type Pending, sendPendingOf } from "./card-moves.ts"
 
 /** How a chat is sent: from what column and card, and its send id. */
-export interface ChatHow {
-  /** A Start Agent column. */
+export interface SendHow {
+  /** A column that asks the agent with nothing typed (`asksAgent`). */
   readonly asksAgent?: boolean
   /** The send's id, when its sender names one. */
   readonly id?: string
@@ -33,7 +33,7 @@ export interface ChatHow {
   readonly pinned?: readonly TextCardId[]
   /** The column it is sent from, where a refusal of its card's move is said. */
   readonly column?: string
-  /** The root a new tab minted as it opened: where its first send starts. */
+  /** The root a new canvas minted as it opened: where its first send starts. */
   readonly root?: RootId
   /** The WIP bookmark a lane this send creates starts from; absent, accepted work. */
   readonly base?: string
@@ -45,33 +45,33 @@ export interface ChatHow {
 }
 
 /**
- * Where a send from a column goes (`ChatAt`): an unstarted thread's
- * starts it at its fork, or at the root for a new tab's, in `task`, the
- * task the column is on; any other continues its thread from the end it
+ * Where a send from a column goes (`MessageAt`): an unstarted thread's
+ * starts it at its fork, or at the root for a new canvas's, in `canvas`, the
+ * canvas the column is on; any other continues its thread from the end it
  * shows.
  */
-export const chatAtOf = (
-  mode: ChatMode,
+export const columnMessageAt = (
+  mode: SendMode,
   thread: ThreadId,
   at: Position,
-  task: TaskId,
-): ChatAt =>
+  canvas: CanvasId,
+): MessageAt =>
   mode === "reply" && at.kind === "entry"
     ? { kind: "end", thread, seen: at.id }
-    : { kind: "branch", thread, at: at.kind === "entry" ? at.id : null, task }
+    : { kind: "branch", thread, at: at.kind === "entry" ? at.id : null, canvas }
 
 /** A chat as the host is asked for it: `how`'s defaults filled in. */
-function chatIntent(input: {
+function sendIntent(input: {
   readonly text: string
-  readonly at: ChatAt
-  readonly how: ChatHow
+  readonly at: MessageAt
+  readonly how: SendHow
   readonly root: RootId
   readonly card: SentCard | null
   readonly pinned: readonly SentCard[]
-}): Extract<Intent, { kind: "chat" }> {
+}): Extract<Intent, { kind: "send" }> {
   const { text, how } = input
   return {
-    kind: "chat",
+    kind: "send",
     text,
     root: input.root,
     at: input.at,
@@ -85,8 +85,8 @@ function chatIntent(input: {
 }
 
 /** What sending a chat does: what the host is asked, under which id, and what is drawn meanwhile. */
-export interface ChatRequestPlan {
-  readonly intent: Extract<Intent, { kind: "chat" }>
+export interface SendRequestPlan {
+  readonly intent: Extract<Intent, { kind: "send" }>
   /** The request id, stored as the message's `sendId`. */
   readonly id: string
   /**
@@ -104,10 +104,10 @@ export interface ChatRequestPlan {
  * root (`RootDocs.rootFor`), so a refusal added here must move that minting
  * after the plan.
  */
-export function planChatRequest(input: {
+export function planSendRequest(input: {
   readonly text: string
-  readonly at: ChatAt
-  readonly how: ChatHow
+  readonly at: MessageAt
+  readonly how: SendHow
   readonly root: RootId
   /** The card `how.card` names as drawn, with its text's version now; null when none is drawn. */
   readonly card: {
@@ -118,11 +118,11 @@ export function planChatRequest(input: {
   readonly pinned: readonly SentCard[]
   /** The request id when `how.id` gives none. */
   readonly freshId: string
-}): ChatRequestPlan {
+}): SendRequestPlan {
   const { how, card } = input
   const id = how.id ?? input.freshId
   return {
-    intent: chatIntent({
+    intent: sendIntent({
       text: input.text,
       at: input.at,
       how,
@@ -140,10 +140,10 @@ export function planChatRequest(input: {
 
 /**
  * Whether a send's answer started a root: a thread at the root written, as
- * a conversation or a run. The session then puts the root in your
+ * a chat's message or a run. The session then puts the root in your
  * list, so a root you start is yours.
  */
-export const startsRoot = (at: ChatAt, outcome: Outcome): boolean =>
+export const startsRoot = (at: MessageAt, outcome: Outcome): boolean =>
   at.kind === "branch" &&
   at.at === null &&
   (outcome.kind === "appended" || outcome.kind === "started")

@@ -8,8 +8,8 @@ import {
   placed,
   type ThreadId,
 } from "@pinetrie/core"
+import type { CardOnCanvas } from "./canvas-index.ts"
 import { orderAfter, orderBetween, respace } from "./order.ts"
-import type { CanvasCard } from "./task.ts"
 
 /**
  * Where a branch of `parent` lands on `canvas`: the index of the
@@ -20,7 +20,7 @@ import type { CanvasCard } from "./task.ts"
  * move as its first send lands.
  */
 export function branchAfter(
-  canvas: readonly CanvasCard[],
+  canvas: readonly CardOnCanvas[],
   parent: ThreadId | null,
 ): number {
   const at = parent === null ? -1 : canvas.findIndex(c => c.id === parent)

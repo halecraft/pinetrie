@@ -1,7 +1,7 @@
 import {
+  type CanvasId,
+  canvasIdFor,
   type QueuedFact,
-  type TaskId,
-  taskIdFor,
   threadIdFor,
   workflowStateIdFor,
   writerId,
@@ -19,11 +19,11 @@ import { describe, expect, test } from "vitest"
 import {
   applyWrites,
   basics,
+  CANVAS_ID,
+  placeCanvas,
   placesFor,
-  placeTask,
-  putTask,
+  putCanvas,
   putValue,
-  TASK_ID,
 } from "./fakes.ts"
 import { createLater } from "./later.ts"
 
@@ -31,13 +31,13 @@ const [DOING, DONE] = [workflowStateIdFor("d"), workflowStateIdFor("x")]
 const ADA = writerId("ada@example.com")
 const HERE = threadIdFor("01a00000-0000-7000-8000-0000000000a1")
 const AWAY = threadIdFor("01a00000-0000-7000-8000-0000000000b2")
-const SHUT: TaskId = taskIdFor("01a00000-0000-7000-8000-0000000000d4")
+const SHUT: CanvasId = canvasIdFor("01a00000-0000-7000-8000-0000000000d4")
 
-/** HERE on an open task; AWAY on one Ada archived. */
+/** HERE on an open canvas; AWAY on one Ada archived. */
 function setUp() {
   const b = basics()
-  putTask(b, HERE)
-  putTask(b, AWAY, SHUT)
+  putCanvas(b, HERE)
+  putCanvas(b, AWAY, SHUT)
   putValue(
     b,
     setRecord(WORKFLOW, {
@@ -45,8 +45,8 @@ function setUp() {
       archive: { id: DONE, name: "Done" },
     }),
   )
-  placeTask(b, TASK_ID, DOING, ADA)
-  placeTask(b, SHUT, DONE, ADA)
+  placeCanvas(b, CANVAS_ID, DOING, ADA)
+  placeCanvas(b, SHUT, DONE, ADA)
   putValue(b, setRecord(PARTICIPANT, { writer: ADA, name: "Ada" }))
   const keeper = createKeeper()
   const written: unknown[] = []
@@ -77,7 +77,7 @@ const facts = (b: ReturnType<typeof basics>, lane: typeof HERE) =>
   queuedOn(readPlaces(b.places), lane).map(c => c.kind)
 
 describe("a late write of the host's", () => {
-  test("in an archived task writes nothing, plans nothing, and says why", async () => {
+  test("in an archived canvas writes nothing, plans nothing, and says why", async () => {
     const { b, later, written } = setUp()
     let planned = false
     await later.step({ kind: "thread", thread: AWAY }, "a digest", () => {
@@ -109,10 +109,10 @@ describe("a late write of the host's", () => {
     ])
   })
 
-  test("to an archived task, a title's, writes nothing", async () => {
+  test("to an archived canvas, a title's, writes nothing", async () => {
     const { later, written } = setUp()
-    await later.step({ kind: "task", task: SHUT }, "a title", () => ({
-      records: [setRecord(MARK, { task: SHUT, title: "x", by: ADA, at: 1 })],
+    await later.step({ kind: "canvas", canvas: SHUT }, "a title", () => ({
+      records: [setRecord(MARK, { canvas: SHUT, title: "x", by: ADA, at: 1 })],
     }))
     expect(written).toEqual([])
   })
@@ -146,8 +146,8 @@ describe("a late write of the host's", () => {
       held: { set: held, key: "a" },
     })
     expect(held.has("a")).toBe(true)
-    // Its task is archived while the model writes.
-    placeTask(b, TASK_ID, DONE, ADA, 2)
+    // Its canvas is archived while the model writes.
+    placeCanvas(b, CANVAS_ID, DONE, ADA, 2)
     answer.resolve("people: over to you")
     await done
     expect([facts(b, HERE), held.size]).toEqual([[], 0])

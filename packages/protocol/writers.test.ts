@@ -1,9 +1,9 @@
 import {
+  canvasIdFor,
   historyScope,
   movesDocId,
   rootDocId,
   rootIdFor,
-  taskIdFor,
   writerId,
 } from "@pinetrie/core"
 import { expect, test } from "vitest"
@@ -59,7 +59,7 @@ test("mayWrite: the host's documents are the host's; a person's is theirs, relay
     rootDocId(rootIdFor("01a0ffd2-4e7a-71c8-a970-306fa07d7f09")),
     movesDocId(
       ADA,
-      historyScope(taskIdFor("01a0ffd2-4e7a-71c8-a970-306fa07d7f09")),
+      historyScope(canvasIdFor("01a0ffd2-4e7a-71c8-a970-306fa07d7f09")),
     ),
   ]) {
     expect(mayWrite(doc, HOST_PRINCIPAL)).toBe(true)

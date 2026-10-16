@@ -12,7 +12,14 @@ import {
 } from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
 
-import { asPerson, col, launchBrowser, stepAway, stepBack } from "./page.ts"
+import {
+  asPerson,
+  col,
+  launchBrowser,
+  stepAway,
+  stepBack,
+  typeAfter,
+} from "./page.ts"
 
 export const scenario: Scenario = {
   run: ({ check }) => run(check),
@@ -46,7 +53,7 @@ async function run(check: Checks["check"]): Promise<void> {
           }).observe(document.body, { childList: true, subtree: true })
         })
         // Drawn before the first message is typed.
-        await bp.click("#sidebar .add-agent")
+        await bp.click("#sidebar .add-canvas")
         const drawn = await bp
           .waitForSelector(`${col(0)} .column-head .thread-icon[data-loaded]`, {
             timeout: 30_000,
@@ -131,13 +138,13 @@ async function run(check: Checks["check"]): Promise<void> {
         // The first send makes the thread's root, which the check below
         // returns to. That the lane keeps the reserved name is `page`'s check:
         // a scripted model draws one image for every name.
-        await bp.fill(`${col(0)} .composer .input`, "plan the parser")
+        await typeAfter(bp, `${col(0)} .composer .input`, "plan the parser")
         await bp.click(`${col(0)} .composer .send`)
         await bp.waitForSelector("#sidebar .open-root", { timeout: 15_000 })
 
-        // Back to its task, the column mounts again with its banner already there.
+        // Back to its canvas, the column mounts again with its banner already there.
         const root =
-          (await bp.getAttribute("#sidebar .open-root", "data-task")) ?? ""
+          (await bp.getAttribute("#sidebar .open-root", "data-canvas")) ?? ""
         await stepAway(bp)
         await stepBack(bp, root)
         const again = await bp

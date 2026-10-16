@@ -55,7 +55,7 @@ function MessageListView(p: MessageListProps) {
           closedBranches={node.branches.filter(b => !p.shown.has(b.rootId))}
           forkTracks={p.forks.get(node.id) ?? []}
           join={p.joins.get(node.id)}
-          crossTaskLink={p.crossTaskLinks.get(node.id)}
+          crossCanvasLink={p.crossCanvasLinks.get(node.id)}
           onLink={p.onLink}
           key={node.id}
           pinned={markers.get(node.id)}

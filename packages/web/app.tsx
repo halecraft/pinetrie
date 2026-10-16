@@ -24,17 +24,17 @@
 import { whenSettled } from "@kyneta/exchange"
 import { useDocStatus, useSelector } from "@kyneta/react"
 import {
-  type ArchivedTask,
+  type ArchivedCanvas,
   branchesByProposal,
+  type CanvasId,
   type CardId,
+  canvasPinnedInView,
   type EntryId,
   isPastAddress,
   parseAddress,
   pathIds,
-  type TaskId,
   type TextCard,
   type ThreadId,
-  taskPinnedInView,
   threadAt,
   type WorkflowState,
   type WorkflowStateId,
@@ -46,7 +46,13 @@ import {
   branchColors,
   type Clip,
   type Column as ColumnSpec,
+  canvasColumnView,
+  canvasesOnBoard,
+  canvasIcons,
+  canvasRail,
+  canvasStrip,
   canvasTrash,
+  canvasWork,
   claimFocus,
   clipboardCellView,
   clipFacts,
@@ -79,7 +85,7 @@ import {
   nameEffects,
   noteColumnsOf,
   openColumns,
-  openProposedByTask,
+  openProposedByCanvas,
   ownCards,
   type ProposalMemory,
   pageTitle,
@@ -121,12 +127,6 @@ import {
   summariesOf,
   type ThreadLink,
   type TypedLast,
-  taskColumnView,
-  taskIcons,
-  taskRail,
-  taskStrip,
-  tasksOf,
-  taskWork,
   threadAnchor,
   threadCardHeads,
   threadFace,
@@ -152,22 +152,22 @@ import {
 import {
   archivedOf,
   boardOf,
-  type CanvasCard,
+  type CardOnCanvas,
   canvasLines,
   canvasList,
+  canvasPinnedOf,
   reachableAgents,
   TRASH_KEEP_MS,
-  taskPinnedOf,
   unstartedThreads,
 } from "@pinetrie/rules"
 import {
   heldBy,
   intentsOf,
+  newCanvasId,
   newCardId,
   newNoteColumnId,
   newReferenceCardId,
   newRootId,
-  newTaskId,
   newThreadId,
   type SessionClient,
   settleSlots,
@@ -363,18 +363,18 @@ const PRESENCE_REFRESH_MS = 10_000
 /** No open states: the workflow has not arrived. */
 const NO_STATES: readonly WorkflowState[] = []
 
-/** No lines: no task's canvas list. */
+/** No lines: no canvas list. */
 const NO_LINES: readonly string[] = []
 
-/** No cards pinned to a task. */
+/** No cards pinned to a canvas. */
 const NO_PINS: readonly TextCard[] = []
 
-/** No cards: a task whose canvas has not arrived. */
-const NO_CANVAS: readonly CanvasCard[] = []
+/** No cards: a canvas whose canvas has not arrived. */
+const NO_CANVAS: readonly CardOnCanvas[] = []
 
-/** No task's state: the board has not arrived. */
-const NO_STATE_OF: ReadonlyMap<TaskId, WorkflowStateId> = new Map()
-const NO_ARCHIVED: ReadonlyMap<TaskId, ArchivedTask> = new Map()
+/** No canvas's state: the board has not arrived. */
+const NO_STATE_OF: ReadonlyMap<CanvasId, WorkflowStateId> = new Map()
+const NO_ARCHIVED: ReadonlyMap<CanvasId, ArchivedCanvas> = new Map()
 
 export function App({
   session,
@@ -449,10 +449,13 @@ export function App({
   const nameOf = useSelector(doc, readParticipantNames)
   const pictures = useSelector(doc, readParticipantPictures)
 
-  // Every task: its card on the board, its threads, from the
+  // Every canvas: its card on the board, its threads, from the
   // places, and their roots.
-  const tasks = useMemo(() => tasksOf({ cards, threads }), [cards, threads])
-  // The tasks in the archive, from the board's cards and their
+  const canvases = useMemo(
+    () => canvasesOnBoard({ cards, threads }),
+    [cards, threads],
+  )
+  // The canvases in the archive, from the board's cards and their
   // histories, the same map while it reads the same.
   const archived = useSameData(
     useMemo(
@@ -463,22 +466,22 @@ export function App({
       [workflow, cards, histories],
     ),
   )
-  const { taskOfThread, canvases, forkOf } = tasks.index
-  // What a column says of its threads' work, its forks the task index's.
+  const { canvasOfThread, cardsOn, forkOf } = canvases.index
+  // What a column says of its threads' work, its forks the canvas index's.
   const columnWork = useMemo(
     () => ({ ...workFacts, forks: forkOf }),
     [workFacts, forkOf],
   )
-  // Each task with a message, for the board, and each task's label: its
-  // title, else its first card's. Which tasks are in the sidebar
+  // Each canvas with a message, for the board, and each canvas's label: its
+  // title, else its first card's. Which canvases are in the sidebar
   // is yours (`openThreads`).
   const summaries = useMemo(
-    () => summariesOf(tasks, directory),
-    [tasks, directory],
+    () => summariesOf(canvases, directory),
+    [canvases, directory],
   )
   const labels = useMemo(
-    () => labelsOf({ tasks, marks, directory, lanes: workFacts.lanes }),
-    [tasks, marks, directory, workFacts.lanes],
+    () => labelsOf({ canvases, marks, directory, lanes: workFacts.lanes }),
+    [canvases, marks, directory, workFacts.lanes],
   )
   // Who a mention can name: the names, and every writer held or in the
   // directory, so one who wrote only in a root not held counts.
@@ -495,39 +498,39 @@ export function App({
   // Each root's root entry, held or not: where a lane running in a root this
   // tab does not hold rings it, and where its proposed changes' ⇡ goes.
   const rootEntries = useMemo(() => rootEntriesOf(directory), [directory])
-  // The tasks in the archive.
-  const archivedTasks = useMemo(() => new Set(archived.keys()), [archived])
-  // The sidebar: your own document; a task the session does not
+  // The canvases in the archive.
+  const archivedCanvases = useMemo(() => new Set(archived.keys()), [archived])
+  // The sidebar: your own document; a canvas the session does not
   // hold yet is left out until it does.
   const listIds = useSyncExternalStore(
-    session.openThreads.tasks.subscribe,
-    session.openThreads.tasks.current,
+    session.openThreads.canvases.subscribe,
+    session.openThreads.canvases.current,
   )
   const list = useMemo(
-    () => listIds.filter(task => tasks.byId.has(task)),
-    [listIds, tasks],
+    () => listIds.filter(canvas => canvases.byId.has(canvas)),
+    [listIds, canvases],
   )
-  // The board: each task's state.
+  // The board: each canvas's state.
   const board = useMemo(
     () => (workflow === null ? null : boardOf(workflow, cards)),
     [workflow, cards],
   )
-  const stateOf: ReadonlyMap<TaskId, WorkflowStateId> =
+  const stateOf: ReadonlyMap<CanvasId, WorkflowStateId> =
     board?.stateOf ?? NO_STATE_OF
   const laneRoots = useMemo(
     () => laneRootsOf(workFacts.lanes, rootEntries),
     [workFacts.lanes, rootEntries],
   )
-  // The agent's work in every thread, held or not, and so in every task:
-  // one map for the sidebar, the board and each task's ring.
+  // The agent's work in every thread, held or not, and so in every canvas:
+  // one map for the sidebar, the board and each canvas's ring.
   const work = useMemo(() => threadWork({ lanes, running }), [lanes, running])
-  const workOfTask = useMemo(
-    () => taskWork(work, taskOfThread),
-    [work, taskOfThread],
+  const workOfCanvas = useMemo(
+    () => canvasWork(work, canvasOfThread),
+    [work, canvasOfThread],
   )
-  // A task with no message has no label in `labels`.
-  const labelOf = (task: TaskId | null): string =>
-    task === null ? NO_TEXT : (labels.get(task) ?? NO_TEXT)
+  // A canvas with no message has no label in `labels`.
+  const labelOf = (canvas: CanvasId | null): string =>
+    canvas === null ? NO_TEXT : (labels.get(canvas) ?? NO_TEXT)
 
   const [stored, dispatch] = useReducer(
     layoutReducer,
@@ -541,7 +544,7 @@ export function App({
   // it, so an action reduces from it: React runs pending effects before it
   // handles the next event.
   // Each thread opened and not yet started: its column ends at
-  // its fork, or a new tab's at its root.
+  // its fork, or a new canvas's at its root.
   const unstarted = useMemo(
     () =>
       unstartedThreads(
@@ -563,13 +566,13 @@ export function App({
       resolveLayout(stored, {
         index,
         lanes,
-        archived: archivedTasks,
+        archived: archivedCanvases,
         list,
-        canvases,
+        cardsOn,
         unstarted,
         holders,
       }),
-    [stored, index, lanes, archivedTasks, list, canvases, unstarted, holders],
+    [stored, index, lanes, archivedCanvases, list, cardsOn, unstarted, holders],
   )
   useEffect(() => {
     if (layout !== stored)
@@ -577,9 +580,9 @@ export function App({
         kind: "resolve",
         index,
         lanes,
-        archived: archivedTasks,
+        archived: archivedCanvases,
         list,
-        canvases,
+        cardsOn,
         unstarted,
         holders,
       })
@@ -588,22 +591,22 @@ export function App({
     stored,
     index,
     lanes,
-    archivedTasks,
+    archivedCanvases,
     list,
-    canvases,
+    cardsOn,
     unstarted,
     holders,
   ])
   // Every change is saved, the document's too, so a restored column's anchor
   // is never older than the tree it was drawn from.
   useEffect(
-    () => stores.layout.save(storedLayout(layout, canvases)),
-    [stores, layout, canvases],
+    () => stores.layout.save(storedLayout(layout, cardsOn)),
+    [stores, layout, cardsOn],
   )
   // Restored anchors the document lacks are dropped once, when it has
   // settled, and the tab to show is chosen then: before, missing means not
   // yet arrived. `"populated"` comes with the first data, so it cannot tell.
-  // The roots of the sidebar's tasks and the stored task you were on are
+  // The roots of the sidebar's canvases and the stored canvas you were on are
   // held, and settled, first: their anchors are in no index before then.
   const [settled, setSettled] = useState(false)
   // biome-ignore lint/correctness/useExhaustiveDependencies: once, with the stored layout of that render
@@ -616,9 +619,9 @@ export function App({
         planHeldRoots({
           layout: {
             active: stored.active,
-            open: session.openThreads.tasks.current(),
+            open: session.openThreads.canvases.current(),
           },
-          tasks: tasksOf({
+          canvases: canvasesOnBoard({
             cards: session.cards.current(),
             threads: facts.threads,
           }),
@@ -644,9 +647,9 @@ export function App({
   useEffect(() => {
     if (settled)
       session.holdRoots(
-        planHeldRoots({ layout, tasks, inventory: heldThreads }),
+        planHeldRoots({ layout, canvases, inventory: heldThreads }),
       )
-  }, [settled, session, layout, tasks, heldThreads])
+  }, [settled, session, layout, canvases, heldThreads])
   // biome-ignore lint/correctness/useExhaustiveDependencies: once, at settle, with the index of that render
   useEffect(() => {
     if (settled)
@@ -654,22 +657,22 @@ export function App({
         kind: "prune",
         index,
         lanes,
-        archived: archivedTasks,
+        archived: archivedCanvases,
         list,
-        canvases,
+        cardsOn,
         unstarted,
         holders,
-        known: new Set(tasks.byId.keys()),
+        known: new Set(canvases.byId.keys()),
       })
   }, [settled])
-  // A task the session stops holding (a thread lifted back into its card)
+  // A canvas the session stops holding (a thread lifted back into its card)
   // is pruned as at settle: its columns go, and a page on it
-  // moves to the sidebar's last task.
-  const known = useRef<ReadonlySet<TaskId> | null>(null)
-  // biome-ignore lint/correctness/useExhaustiveDependencies: on the tasks changing, with the facts of that render
+  // moves to the sidebar's last canvas.
+  const known = useRef<ReadonlySet<CanvasId> | null>(null)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: on the canvases changing, with the facts of that render
   useEffect(() => {
     if (!settled) return
-    const now = new Set(tasks.byId.keys())
+    const now = new Set(canvases.byId.keys())
     const before = known.current
     known.current = now
     if (before !== null && [...before].some(t => !now.has(t)))
@@ -677,32 +680,32 @@ export function App({
         kind: "prune",
         index,
         lanes,
-        archived: archivedTasks,
+        archived: archivedCanvases,
         list,
-        canvases,
+        cardsOn,
         unstarted,
         holders,
         known: now,
       })
-  }, [settled, tasks])
+  }, [settled, canvases])
 
   const active = layout.active
-  // The task's strip: its task column, then every card on its
+  // The canvas's strip: its canvas column, then every card on its
   // canvas, in its order, folded or not, and your branches not yet sent.
   const strip: StripView | null = useMemo(
     () =>
-      active?.kind === "task"
-        ? taskStrip(layout, active.task, {
-            canvases,
+      active?.kind === "canvas"
+        ? canvasStrip(layout, active.canvas, {
+            cardsOn,
             unstarted,
             holders,
             index,
             lanes,
           })
         : null,
-    [layout, active, canvases, unstarted, index, lanes, holders],
+    [layout, active, cardsOn, unstarted, index, lanes, holders],
   )
-  // The task's thread columns drawn whole. Every projection below is keyed
+  // The canvas's thread columns drawn whole. Every projection below is keyed
   // on this one, so it keeps its identity while its data does: the strip is
   // rebuilt on every card's change, and another window's card redraws no
   // message list.
@@ -737,62 +740,66 @@ export function App({
       ),
     [index, columns],
   )
-  // The cards pinned to the task you are on.
-  const taskPins = useMemo(
+  // The cards pinned to the canvas you are on.
+  const canvasPins = useMemo(
     () =>
-      active?.kind === "task" ? taskPinnedOf(cards, active.task) : NO_PINS,
+      active?.kind === "canvas"
+        ? canvasPinnedOf(cards, active.canvas)
+        : NO_PINS,
     [active, cards],
   )
-  // The task's canvas, and its note columns.
-  const canvas = useMemo(
+  // The canvas, and its note columns.
+  const onCanvas = useMemo(
     () =>
-      active?.kind === "task" ? (canvases.get(active.task) ?? NO_CANVAS) : [],
-    [active, canvases],
+      active?.kind === "canvas"
+        ? (cardsOn.get(active.canvas) ?? NO_CANVAS)
+        : [],
+    [active, cardsOn],
   )
-  // Every named thread on an open task's canvas, whose agents a mention may
+  // Every named thread on an open canvas, whose agents a mention may
   // reach, as the host builds them.
   const inReach = useMemo(
     () =>
       reachableAgents({
-        canvases,
-        archived: archivedTasks,
+        cardsOn,
+        archived: archivedCanvases,
         names: workFacts.names,
       }),
-    [canvases, archivedTasks, workFacts.names],
+    [cardsOn, archivedCanvases, workFacts.names],
   )
   const noteViews = useMemo(
     () =>
       new Map(
-        noteColumnsOf({ canvas, cards, titles: noteTitles }).map(
+        noteColumnsOf({ onCanvas: onCanvas, cards, titles: noteTitles }).map(
           v => [v.column, v] as const,
         ),
       ),
-    [canvas, cards, noteTitles],
+    [onCanvas, cards, noteTitles],
   )
-  // The task you are on, which the sidebar's repair keeps while it is
+  // The canvas you are on, which the sidebar's repair keeps while it is
   // archived, and its threads' roots with their root entries, whose trees
   // the rail draws.
-  const hereTask = active?.kind === "task" ? active.task : null
+  const hereCanvas = active?.kind === "canvas" ? active.canvas : null
   const hereRoots = useMemo(
     () =>
-      (hereTask === null
+      (hereCanvas === null
         ? []
-        : (tasks.byId.get(hereTask)?.roots ?? [])
+        : (canvases.byId.get(hereCanvas)?.roots ?? [])
       ).flatMap(root => {
         const entry = rootEntries.get(root)
         return entry === undefined ? [] : [{ root, entry }]
       }),
-    [hereTask, tasks, rootEntries],
+    [hereCanvas, canvases, rootEntries],
   )
-  useEffect(() => session.openThreads.here(hereTask), [session, hereTask])
-  // The root whose colours the stage draws in: the task you are
+  useEffect(() => session.openThreads.here(hereCanvas), [session, hereCanvas])
+  // The root whose colours the stage draws in: the canvas you are
   // on's first root, or the root its first thread will start, which its
   // record names.
   const seedRoot =
-    hereTask === null
+    hereCanvas === null
       ? null
-      : (tasks.byId.get(hereTask)?.roots[0] ??
-        (tasks.byId.get(hereTask)?.threads ?? [])
+      : (canvases.byId.get(hereCanvas)?.roots[0] ??
+        (canvases.byId.get(hereCanvas)?.threads ?? [])
           .map(t => unstarted.get(t)?.root)
           .find(r => r !== undefined) ??
         null)
@@ -802,9 +809,9 @@ export function App({
   const threadEnds = useMemo(
     () =>
       new Map(
-        (hereTask === null
+        (hereCanvas === null
           ? []
-          : (tasks.byId.get(hereTask)?.threads ?? [])
+          : (canvases.byId.get(hereCanvas)?.threads ?? [])
         ).flatMap(thread => {
           const end =
             threadAnchor(index, lanes, thread) ?? unstarted.get(thread)?.fork
@@ -813,11 +820,11 @@ export function App({
             : [[thread, end] as const]
         }),
       ),
-    [hereTask, tasks, index, lanes, unstarted],
+    [hereCanvas, canvases, index, lanes, unstarted],
   )
-  const taskRailView = useMemo(
+  const canvasRailView = useMemo(
     () =>
-      taskRail({
+      canvasRail({
         index,
         active,
         roots: hereRoots,
@@ -827,19 +834,19 @@ export function App({
       }),
     [index, active, hereRoots, threadEnds, cards, session.writer, seed],
   )
-  const rail = taskRailView.rows
+  const rail = canvasRailView.rows
   const drawnStubs = useMemo(
     () =>
-      taskRailView.stubs.map(stub => ({
+      canvasRailView.stubs.map(stub => ({
         stub,
         ...railStubWords(
           stub,
           workFacts.names,
           { me: session.writer, nameOf },
-          task => labels.get(task) ?? NO_TEXT,
+          canvas => labels.get(canvas) ?? NO_TEXT,
         ),
       })),
-    [taskRailView, workFacts.names, session.writer, nameOf, labels],
+    [canvasRailView, workFacts.names, session.writer, nameOf, labels],
   )
   const order = useMemo(
     () => writerOrder(index, nameOf.keys()),
@@ -859,11 +866,11 @@ export function App({
         mine,
         filled,
         layout,
-        archived: archivedTasks,
-        tasks: tasks.index,
+        archived: archivedCanvases,
+        canvases: canvases.index,
         index,
       }),
-    [mine, filled, layout, archivedTasks, tasks, index],
+    [mine, filled, layout, archivedCanvases, canvases, index],
   )
   const yours = useMemo(
     () => ({ ends: unsent.ends, color: colorOf(session.writer) }),
@@ -886,27 +893,28 @@ export function App({
   // column on each write, the refresh and others' typing included.
   // Each part that shows presence reads it (`use-presence.ts`).
   //
-  // Each column of the task you are on reports its thread end
-  // (`planReading`), and its task, so a window that does not hold
+  // Each column of the canvas you are on reports its thread end
+  // (`planReading`), and its canvas, so a window that does not hold
   // the thread's root can name it. While the page is
   // visible the entries are refreshed, so they outlive their decay.
   const reported = useRef(new Map<string, string | null>())
-  const reportedTask = useRef<TaskId | null>(null)
+  const reportedCanvas = useRef<CanvasId | null>(null)
   useEffect(() => {
     const now = new Map(
       columns.map((c, i) => [c.key, views[i]?.tipId ?? null] as const),
     )
     const writes = planReading(reported.current, now)
-    for (const [key, end] of writes.set) session.setReading(key, end, hereTask)
+    for (const [key, end] of writes.set)
+      session.setReading(key, end, hereCanvas)
     for (const key of writes.clear) session.clearReading(key)
     reported.current = now
-    reportedTask.current = hereTask
-  }, [columns, views, session, hereTask])
+    reportedCanvas.current = hereCanvas
+  }, [columns, views, session, hereCanvas])
   useEffect(() => {
     const refresh = () => {
       if (document.visibilityState !== "visible") return
       for (const [key, end] of reported.current)
-        if (end !== null) session.setReading(key, end, reportedTask.current)
+        if (end !== null) session.setReading(key, end, reportedCanvas.current)
     }
     const timer = setInterval(refresh, PRESENCE_REFRESH_MS)
     document.addEventListener("visibilitychange", refresh)
@@ -937,9 +945,9 @@ export function App({
     [index, views],
   )
   const shown = useMemo(() => new Set(paths.flatMap(p => [...p])), [paths])
-  // The search of the task you are on, never stored. Its corpus,
+  // The search of the canvas you are on, never stored. Its corpus,
   // result and matches are built only while it applies, and from the
-  // deferred query, so typing stays quick on a long task.
+  // deferred query, so typing stays quick on a long canvas.
   const [searchState, setSearch] = useState<SearchState | null>(null)
   const search = searchOn(searchState, active)
   const searchQuery = useDeferredValue(search?.query ?? "")
@@ -973,7 +981,7 @@ export function App({
   )
   // The board lies over the columns, so a search there would find what no
   // one can see.
-  const searchable = active?.kind === "task" && !layout.board
+  const searchable = active?.kind === "canvas" && !layout.board
   const searchField = useRef<HTMLInputElement>(null)
   const searchToggle = useRef<HTMLButtonElement>(null)
   const view = useMemo(
@@ -1005,7 +1013,7 @@ export function App({
   )
   // Each thread column drawn whole, by its key: what the strip draws it from.
   const projected = useMemo(() => {
-    const slots = view.stage.kind === "task" ? view.stage.slots : []
+    const slots = view.stage.kind === "canvas" ? view.stage.slots : []
     return new Map(
       columns.flatMap((column, i) => {
         const columnView = views[i]
@@ -1031,8 +1039,9 @@ export function App({
     )
   }, [view.stage, columns, views, paths, search, matches, index, workFacts])
   const proposed = useMemo(
-    () => openProposedByTask(view.openProposed, workFacts.names, taskOfThread),
-    [view.openProposed, workFacts.names, taskOfThread],
+    () =>
+      openProposedByCanvas(view.openProposed, workFacts.names, canvasOfThread),
+    [view.openProposed, workFacts.names, canvasOfThread],
   )
 
   // Your inbox: the messages that mention you, and which you have seen.
@@ -1063,8 +1072,8 @@ export function App({
     owner: workFacts.project?.owner ?? null,
     running,
     lanes,
-    archived: archivedTasks,
-    taskOfThread,
+    archived: archivedCanvases,
+    canvasOfThread,
     work,
     layout,
     settled,
@@ -1082,11 +1091,11 @@ export function App({
       }),
     [workFacts.names, workFacts.banners, workFacts.icons],
   )
-  const taskIconsNow = useMemo(
-    () => taskIcons(tasks.index.threadsOf, iconFor),
-    [tasks, iconFor],
+  const canvasIconsNow = useMemo(
+    () => canvasIcons(canvases.index.threadsOf, iconFor),
+    [canvases, iconFor],
   )
-  // Every task card's header, once per task: the board and the sidebar
+  // Every canvas card's header, once per canvas: the board and the sidebar
   // draw the same one.
   const heads = useMemo(
     () =>
@@ -1095,9 +1104,9 @@ export function App({
         stateOf,
         labels,
         status: attention.status,
-        pips: unsent.tasks,
+        pips: unsent.canvases,
         proposed,
-        work: workOfTask,
+        work: workOfCanvas,
       }),
     [
       summaries,
@@ -1106,30 +1115,30 @@ export function App({
       stateOf,
       labels,
       attention.status,
-      unsent.tasks,
+      unsent.canvases,
       proposed,
-      workOfTask,
+      workOfCanvas,
     ],
   )
-  // The task column, from what the sidebar and the board read.
-  const taskColumn = useMemo(
+  // The canvas column, from what the sidebar and the board read.
+  const canvasColumn = useMemo(
     () =>
       strip === null
         ? null
-        : taskColumnView({
-            task: strip[0].task,
+        : canvasColumnView({
+            canvas: strip[0].canvas,
             folded: strip[0].folded,
-            head: heads.get(strip[0].task),
-            mark: marks.get(strip[0].task),
-            summary: summaries.get(strip[0].task),
+            head: heads.get(strip[0].canvas),
+            mark: marks.get(strip[0].canvas),
+            summary: summaries.get(strip[0].canvas),
             workflow,
-            archived: archivedTasks.has(strip[0].task),
+            archived: archivedCanvases.has(strip[0].canvas),
             // The time is read as the list is drawn: a day's change waits
             // for the next change to the cards.
             trash: canvasTrash({
               cards,
               histories,
-              task: strip[0].task,
+              canvas: strip[0].canvas,
               now: Date.now(),
               keepMs: TRASH_KEEP_MS,
               names: workFacts.names,
@@ -1142,14 +1151,14 @@ export function App({
       marks,
       summaries,
       workflow,
-      archivedTasks,
+      archivedCanvases,
       cards,
       histories,
       workFacts.names,
       noteTitles,
     ],
   )
-  // The canvas list the task's agents are told, read from no thread, and
+  // The canvas list the canvas's agents are told, read from no thread, and
   // what the agent of its first column last read of its pins.
   const told = useMemo(
     () =>
@@ -1157,9 +1166,9 @@ export function App({
         ? NO_LINES
         : canvasLines(
             canvasList({
-              task: strip[0].task,
-              title: labels.get(strip[0].task) ?? NO_TEXT,
-              canvas,
+              canvas: strip[0].canvas,
+              title: labels.get(strip[0].canvas) ?? NO_TEXT,
+              onCanvas: onCanvas,
               reading: null,
               names: workFacts.names,
               work,
@@ -1172,10 +1181,10 @@ export function App({
               nameOf: w => nameFor(nameOf, w),
             }),
           ),
-    [strip, labels, canvas, workFacts.names, work, noteViews, nameOf],
+    [strip, labels, onCanvas, workFacts.names, work, noteViews, nameOf],
   )
-  const taskPinsInView = useMemo(
-    () => taskPinnedInView(index, views[0]?.tipId ?? null),
+  const canvasPinsInView = useMemo(
+    () => canvasPinnedInView(index, views[0]?.tipId ?? null),
     [index, views],
   )
   const listView =
@@ -1187,9 +1196,10 @@ export function App({
           heads,
           summaries,
           marks,
-          archived: archivedTasks,
+          archived: archivedCanvases,
           arrivals: attention.arrivals,
-          icons: taskIconsNow,
+          icons: canvasIconsNow,
+          workflow,
         })
   const title = pageTitle(needsYou, listView?.selected ?? null, page)
   // The board's search and "mine": never stored, so a filter outlives
@@ -1468,7 +1478,7 @@ export function App({
         selected,
         composers: composers.current(),
       },
-      tasks,
+      canvases,
       listWidth,
       page,
       searching: searchOpen,
@@ -1485,7 +1495,7 @@ export function App({
       planIntent(intent, intentState(), {
         key: crypto.randomUUID(),
         root: newRootId(),
-        task: newTaskId(),
+        canvas: newCanvasId(),
         thread: newThreadId(),
         noteColumn: newNoteColumnId(),
         reference: newReferenceCardId(),
@@ -1549,17 +1559,17 @@ export function App({
     return () => document.removeEventListener("focusin", onFocus)
   }, [])
   // Every drag that starts in the page: a column's, a card's, a slot's, a
-  // task's (`use-drag.ts`).
+  // canvas's (`use-drag.ts`).
   useDrag({
     strip: stripEl,
     state: intentState,
     archive: workflow?.archive.id ?? null,
     onIntent,
   })
-  /** A task's drag from the sidebar: its id and state. */
-  const dragOf = (task: TaskId): RootDrag => ({
-    task,
-    state: stateOf.get(task) ?? null,
+  /** A canvas's drag from the sidebar: its id and state. */
+  const dragOf = (canvas: CanvasId): RootDrag => ({
+    canvas,
+    state: stateOf.get(canvas) ?? null,
   })
   const openAt = (entry: EntryId) => onIntent({ kind: "openAt", entry })
   /** Follow `link` to `entry`: a held thread's opens nothing. */
@@ -1620,7 +1630,7 @@ export function App({
   )
 
   const { stage } = view
-  const readers = { session, index, taskOfThread, order, nameOf, colorOf }
+  const readers = { session, index, canvasOfThread, order, nameOf, colorOf }
   const pip = <SignalMark color={colorOf(session.writer)} signal="unsent" />
   const reader = { me: session.writer, nameOf }
   /** Where a link to `thread` leads, as you follow it. */
@@ -1628,12 +1638,12 @@ export function App({
   const thread = threadRow({ index, labelOf, reader, onOpen: openLink })
   /**
    * A reader's thread, by the end they read at: a link to its thread, or,
-   * where this tab holds no tree with that end, to the task's first thread,
-   * which shows the task and the entry once it arrives; null for a task
+   * where this tab holds no tree with that end, to the canvas's first thread,
+   * which shows the canvas and the entry once it arrives; null for a canvas
    * with no thread on its canvas.
    */
-  const readerRow = (end: EntryId, task: TaskId) => {
-    const first = canvases.get(task)?.find(c => c.kind === "thread")
+  const readerRow = (end: EntryId, canvas: CanvasId) => {
+    const first = cardsOn.get(canvas)?.find(c => c.kind === "thread")
     const at =
       threadAt(index, end) ?? (first?.kind === "thread" ? first.id : null)
     return at === null ? null : thread(end, end, linkOf(at))
@@ -1651,7 +1661,7 @@ export function App({
               onIntent={onIntent}
               order={order}
               session={session}
-              taskOfThread={taskOfThread}
+              canvasOfThread={canvasOfThread}
               view={listView}
               width={listWidth}
             />
@@ -1718,7 +1728,7 @@ export function App({
                         )}
                         <div className="stage-row">
                           <div className="rail-side">
-                            {stage.kind === "task" && search === null && (
+                            {stage.kind === "canvas" && search === null && (
                               <div className="search-lead">
                                 <SearchToggle
                                   onIntent={onIntent}
@@ -1727,7 +1737,7 @@ export function App({
                                 />
                               </div>
                             )}
-                            {/* A task whose threads have no message yet, a new
+                            {/* A canvas whose threads have no message yet, a new
                             tab's, draws a hollow dot where its
                             first message will be. */}
                             {rail.length > 0 ? (
@@ -1761,7 +1771,7 @@ export function App({
                             )}
                           </div>
                           <Strip
-                            canvas={canvas}
+                            onCanvas={onCanvas}
                             noteViews={noteViews}
                             threadFaceOf={threadFaceOf}
                             threadTrackOf={threadTrackOf}
@@ -1779,9 +1789,9 @@ export function App({
                             }}
                             strip={strip}
                             stripRef={stripEl}
-                            taskColumn={taskColumn}
-                            taskPins={taskPins}
-                            taskPinsInView={taskPinsInView}
+                            canvasColumn={canvasColumn}
+                            canvasPins={canvasPins}
+                            canvasPinsInView={canvasPinsInView}
                             told={told}
                             thread={readerRow}
                             typing={typing}

@@ -22,7 +22,6 @@ export {
   type MoveHow,
   type SlotMove,
 } from "./card-moves.ts"
-export { type ChatHow, chatAtOf } from "./chat.ts"
 export {
   type ConnectOptions,
   connectSession,
@@ -30,11 +29,11 @@ export {
   type SessionClient,
 } from "./connect.ts"
 export {
+  newCanvasId,
   newCardId,
   newNoteColumnId,
   newReferenceCardId,
   newRootId,
-  newTaskId,
   newThreadId,
 } from "./ids.ts"
 export {
@@ -47,3 +46,4 @@ export {
   settleSlots,
 } from "./inventory.ts"
 export type { OpenThreads } from "./open-threads.ts"
+export { columnMessageAt, type SendHow } from "./send.ts"

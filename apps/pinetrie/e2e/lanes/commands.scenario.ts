@@ -45,7 +45,7 @@ async function commandsSection(
         },
       },
     ])
-    await h.user.chat("/fixture:skill:hello", ROOT, START_AGENT)
+    await h.user.send("/fixture:skill:hello", ROOT, START_AGENT)
     await h.idle()
     const skillDir = `/mnt/host${hello}`
     check(
@@ -89,7 +89,7 @@ async function commandsSection(
       },
       { text: "ran it" },
     ])
-    await h.user.chat(
+    await h.user.send(
       "@agent follow it",
       atEntry(entryId(h.laneWith("read it")?.tip ?? "")),
       {

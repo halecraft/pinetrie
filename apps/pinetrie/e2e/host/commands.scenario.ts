@@ -59,7 +59,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         },
       },
     ])
-    const sent = await cu.chat(
+    const sent = await cu.send(
       "/fixture:skill:hello the world",
       ROOT,
       START_CHAT,
@@ -98,7 +98,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         },
       },
     ])
-    await cu.chat("/fixture:greet Ada", ROOT, START_CHAT)
+    await cu.send("/fixture:greet Ada", ROOT, START_CHAT)
     await cidle()
     check(
       "a prompt command gives the model its template, with its arguments",

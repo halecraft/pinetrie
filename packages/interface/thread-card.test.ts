@@ -1,11 +1,11 @@
 import {
+  canvasIdFor,
   entryId,
-  taskIdFor,
   type Workflow,
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
-import { taskCard } from "@pinetrie/core/fixtures"
+import { canvasCard } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import { boardView } from "./board-view.ts"
 import { tree } from "./fixtures.ts"
@@ -18,7 +18,7 @@ import {
 } from "./thread-card.ts"
 
 const R1 = entryId("r1")
-const K1 = taskIdFor("01a0ffd2-0000-7000-8000-000000000001")
+const K1 = canvasIdFor("01a0ffd2-0000-7000-8000-000000000001")
 const [BACKLOG, DOING, DONE] = ["b", "d", "x"].map(workflowStateIdFor) as [
   ReturnType<typeof workflowStateIdFor>,
   ReturnType<typeof workflowStateIdFor>,
@@ -46,7 +46,7 @@ describe("threadCardHead", () => {
   test("its label, ⇡, your pip, and Move to ▸ each other state; into the archive refused while the agent works, naming the proposed changes it withdraws", () => {
     const head = threadCardHead(K1, facts())
     expect(head).toMatchObject({
-      task: K1,
+      canvas: K1,
       label: "Tab names",
       status: null,
       ready: ["amber-fox"],
@@ -58,8 +58,8 @@ describe("threadCardHead", () => {
       ["Done", true, "running", ["amber-fox"]],
     ])
     expect(head.moves[1]?.intent).toEqual({
-      kind: "moveTask",
-      task: K1,
+      kind: "moveCanvas",
+      canvas: K1,
       from: DOING,
       to: DONE,
       before: null,
@@ -67,7 +67,7 @@ describe("threadCardHead", () => {
     })
   })
 
-  test("a task with no signals of its threads has none; one with no place, no moves", () => {
+  test("a canvas with no signals of its threads has none; one with no place, no moves", () => {
     expect(
       threadCardHead(
         K1,
@@ -77,36 +77,37 @@ describe("threadCardHead", () => {
     expect(threadCardHead(K1, facts({ stateOf: new Map() })).moves).toEqual([])
   })
 
-  test("the board and the sidebar draw a task from the same header", () => {
+  test("the board and the sidebar draw a canvas from the same header", () => {
     const heads = threadCardHeads([K1], facts())
     const layout = resolveLayout(
       layoutReducer(initialLayout(), {
         kind: "show",
-        here: { kind: "task", task: K1 },
+        here: { kind: "canvas", canvas: K1 },
       }),
       {
         index: tree({ r1: null }),
         lanes: [],
         archived: new Set(),
         list: [K1],
-        canvases: new Map(),
+        cardsOn: new Map(),
         unstarted: new Map(),
         holders: new Map(),
       },
     )
     const sidebar = sidebarView({
       layout,
-      active: { kind: "task", task: K1 },
+      active: { kind: "canvas", canvas: K1 },
       heads,
       summaries: new Map(),
       marks: new Map(),
       archived: new Set(),
       arrivals: { arrived: new Map(), done: new Map() },
       icons: new Map(),
+      workflow: WORKFLOW,
     })
     const board = boardView({
       workflow: WORKFLOW,
-      cards: [taskCard(K1, "a", DOING)],
+      cards: [canvasCard(K1, "a", DOING)],
       summaries: new Map([[K1, { line: "", writers: [], newest: R1 }]]),
       heads,
       search: null,
@@ -114,7 +115,7 @@ describe("threadCardHead", () => {
     })
     const item = sidebar.items[0]
     const card = board.open.flatMap(c => c.items)[0]
-    expect(item?.kind === "task" ? item.head : null).toBe(heads.get(K1))
+    expect(item?.kind === "canvas" ? item.head : null).toBe(heads.get(K1))
     expect(card?.head).toBe(heads.get(K1))
   })
 })

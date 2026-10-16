@@ -8,6 +8,9 @@
     session holds, its card where a drop on the canvas would land.
   - ADR-0134: a column's ⋯ no longer adds a note column after it.
   - ADR-0116: the task column no longer has **+ note column**.
+- **Amended by:**
+  - ADR-0158: ＋ past a canvas's last column offers an agent thread, a chat or
+    a note column: the conversation is a chat.
 
 **Context.**
 

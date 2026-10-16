@@ -1,11 +1,11 @@
-import { taskIdFor, writerId } from "@pinetrie/core"
+import { canvasIdFor, writerId } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
 import { readingKey, seatKey } from "@pinetrie/schema"
 import { newPresenceDoc } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import {
   readReading,
-  readReadingTasks,
+  readReadingCanvases,
   readTyping,
   readTypingIn,
 } from "./index.ts"
@@ -49,22 +49,22 @@ test("a presence read keeps its array while its entries are the same, and not af
   expect(moved).toEqual([[writerId("ada@x.io"), "e2"]])
 })
 
-test("each followed end's task, as its column reported it, kept while unchanged", () => {
+test("each followed end's canvas, as its column reported it, kept while unchanged", () => {
   const ada = seatKey(writerId("ada@x.io"), "s1")
   const doc = newPresenceDoc()
-  const [k1, k9] = [taskIdFor("1"), taskIdFor("9")]
+  const [k1, k9] = [canvasIdFor("1"), canvasIdFor("9")]
   doc.reading.set(readingKey(ada, "c1"), "e1")
-  doc.readingTask.set(readingKey(ada, "c1"), k1)
+  doc.readingCanvas.set(readingKey(ada, "c1"), k1)
   doc.reading.set(readingKey(ada, "c2"), "e2")
-  doc.readingTask.set(readingKey(ada, "c2"), null)
+  doc.readingCanvas.set(readingKey(ada, "c2"), null)
   doc.reading.set(readingKey(ada, "c3"), "e3")
-  doc.readingTask.set(readingKey(ada, "c3"), "r-not-a-task")
-  const first = readReadingTasks(doc)
+  doc.readingCanvas.set(readingKey(ada, "c3"), "r-not-a-canvas")
+  const first = readReadingCanvases(doc)
   expect([...first]).toEqual([["e1", k1]])
-  doc.readingTask.set(readingKey(ada, "c1"), k1)
-  expect(readReadingTasks(doc)).toBe(first)
-  doc.readingTask.set(readingKey(ada, "c1"), k9)
-  expect([...readReadingTasks(doc)]).toEqual([["e1", k9]])
+  doc.readingCanvas.set(readingKey(ada, "c1"), k1)
+  expect(readReadingCanvases(doc)).toBe(first)
+  doc.readingCanvas.set(readingKey(ada, "c1"), k9)
+  expect([...readReadingCanvases(doc)]).toEqual([["e1", k9]])
 })
 
 test("the cards someone is typing in, from any seat, without decayed ones; the same set while unchanged", () => {

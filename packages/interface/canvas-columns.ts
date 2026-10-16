@@ -1,23 +1,23 @@
-// interface/canvas-columns — a task's columns, from its canvas.
+// interface/canvas-columns — a canvas's columns, from its canvas.
 //
 // The order is the canvas's alone, the same for everyone. What is yours, the
-// task's view (`TaskView`), holds maps and a flag and no list, so it has
+// canvas's view (`YourCanvasView`), holds maps and a flag and no list, so it has
 // nowhere to keep an order of its own.
 
 import {
+  type CanvasId,
   type CardId,
   type CardRecord,
   type CardWidth,
   type EntryId,
   type LaneView,
   type NoteColumnId,
-  type TaskId,
   type ThreadId,
   type TreeIndex,
   threadAt,
   type WriterId,
 } from "@pinetrie/core"
-import type { CanvasCard, ThreadOpening } from "@pinetrie/rules"
+import type { CardOnCanvas, ThreadOpening } from "@pinetrie/rules"
 import type { Density } from "./ask-words.ts"
 import {
   BOUND,
@@ -44,38 +44,38 @@ export interface CardView {
   readonly pending?: Pending
   /** What a thread you opened starts its composer with, unsent. */
   readonly prefill?: Prefill
-  /** A Start Agent column: its first message with no mention asks the agent. */
+  /** A column that asks the agent with nothing typed: its first message with no mention asks the agent. */
   readonly asksAgent?: true
 }
 
 /**
- * Your view of one task: maps and a flag, so no order can be kept in it.
- * The task column is no card, so its fold is apart.
+ * Your view of one canvas: maps and a flag, so no order can be kept in it.
+ * The canvas column is no card, so its fold is apart.
  */
-export interface TaskView {
+export interface YourCanvasView {
   /** Your view of each column, by its card (a thread card's id is its thread's). */
   readonly cards: ReadonlyMap<CardId, CardView>
-  /** The task column's fold. */
-  readonly task: { readonly unfolded: boolean }
+  /** The canvas column's fold. */
+  readonly canvas: { readonly unfolded: boolean }
 }
 
 /**
- * A task's view before you change it: only its first card unfolded, since a
- * task can hold many threads, and the task column folded.
+ * A canvas's view before you change it: only its first card unfolded, since a
+ * canvas can hold many threads, and the canvas column folded.
  */
-export const defaultView = (first: CardId | null): TaskView => ({
+export const defaultView = (first: CardId | null): YourCanvasView => ({
   cards: first === null ? new Map() : new Map([[first, { unfolded: true }]]),
-  task: { unfolded: false },
+  canvas: { unfolded: false },
 })
 
-/** The view of a task: as kept, else `defaultView` for its canvas. */
+/** The view of a canvas: as kept, else `defaultView` for its canvas. */
 export const viewOf = (
-  views: ReadonlyMap<string, TaskView>,
-  task: string,
-  canvas: readonly CanvasCard[],
-): TaskView => views.get(task) ?? defaultView(canvas[0]?.id ?? null)
+  views: ReadonlyMap<string, YourCanvasView>,
+  canvas: string,
+  cards: readonly CardOnCanvas[],
+): YourCanvasView => views.get(canvas) ?? defaultView(cards[0]?.id ?? null)
 
-/** One column of a task, as the strip draws it. */
+/** One column of a canvas, as the strip draws it. */
 export type CardColumn =
   | {
       readonly kind: "thread"
@@ -92,27 +92,30 @@ export type CardColumn =
     }
 
 /**
- * The task column: the task's own place on its canvas, drawn
+ * The canvas column: the canvas's own place on its canvas, drawn
  * before every card and outside the order. It is no card, so it has no
  * card's id, and nothing moves, reorders or widens it.
  */
-export interface TaskColumn {
-  readonly kind: "task"
-  readonly task: TaskId
+export interface CanvasColumn {
+  readonly kind: "canvas"
+  readonly canvas: CanvasId
   readonly folded: boolean
 }
 
-/** What a task's strip draws: its task column, first by type, then its cards' columns. */
-export type Strip = readonly [TaskColumn, ...CardColumn[]]
+/** What a canvas's strip draws: its canvas column, first by type, then its cards' columns. */
+export type Strip = readonly [CanvasColumn, ...CardColumn[]]
 
-/** `task`'s strip: its task column, folded as `view` says, then `columns`. */
+/** `canvas`'s strip: its canvas column, folded as `view` says, then `columns`. */
 export const stripOf = (
-  task: TaskId,
-  view: TaskView,
+  canvas: CanvasId,
+  view: YourCanvasView,
   columns: readonly CardColumn[],
-): Strip => [{ kind: "task", task, folded: !view.task.unfolded }, ...columns]
+): Strip => [
+  { kind: "canvas", canvas, folded: !view.canvas.unfolded },
+  ...columns,
+]
 
-/** A strip's card columns: all but its task column. */
+/** A strip's card columns: all but its canvas column. */
 export const stripCards = ([, ...cards]: Strip): readonly CardColumn[] => cards
 
 /** How a column is read, as your view of its card says. */
@@ -124,12 +127,12 @@ const readerOf = (
 })
 
 /**
- * A task's columns: each card of its canvas in its order. A thread whose
+ * A canvas's columns: each card of its canvas in its order. A thread whose
  * root this tab does not hold yet is left out.
  */
 export function canvasColumns(input: {
-  readonly canvas: readonly CanvasCard[]
-  readonly view: TaskView
+  readonly onCanvas: readonly CardOnCanvas[]
+  readonly view: YourCanvasView
   readonly index: TreeIndex
   readonly lanes: readonly LaneView[]
   /** Each thread opened and not yet started (`unstartedThreads`): where its column ends. */
@@ -137,20 +140,20 @@ export function canvasColumns(input: {
   /** Each thread someone else holds in their inventory, by its holder (`heldByOthers`). */
   readonly holders: ReadonlyMap<ThreadId, WriterId>
 }): readonly CardColumn[] {
-  const onCanvas = new Set<string>(input.canvas.map(c => c.id))
-  return input.canvas.flatMap(c => {
-    const drawn = cardColumn(c, input.view.cards.get(c.id), input, onCanvas)
+  const ids = new Set<string>(input.onCanvas.map(c => c.id))
+  return input.onCanvas.flatMap(c => {
+    const drawn = cardColumn(c, input.view.cards.get(c.id), input, ids)
     return drawn === null ? [] : [drawn]
   })
 }
 
 /**
  * A card's column; null for a thread whose root this tab does not hold. A
- * thread not yet started ends at its fork, or, a new tab's, at its root,
+ * thread not yet started ends at its fork, or, a new canvas's, at its root,
  * and its first send is a branch there.
  */
 function cardColumn(
-  c: CanvasCard,
+  c: CardOnCanvas,
   seen: CardView | undefined,
   facts: Pick<
     Parameters<typeof canvasColumns>[0],

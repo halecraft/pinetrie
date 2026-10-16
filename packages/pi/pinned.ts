@@ -2,7 +2,7 @@
 // compaction.
 //
 // pi compacts in the middle of a run, and a context entry summarised away
-// (a thread's pinned cards, a task's, the canvas list) would leave the model
+// (a thread's pinned cards, a canvas's, the canvas list) would leave the model
 // without it until a later run restated it. The `before_compaction` hook
 // (`agent.ts`) decides with `carryContext`, runs pi's own `compact()`, and
 // assembles with `withCarried`, so the compaction entry holds them and the

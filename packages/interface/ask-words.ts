@@ -27,7 +27,7 @@ export function askWords(
   nameOf: (writer: WriterId) => string,
 ): string {
   const line = firstLine(prompt.text, ASK_LINE)
-  if (prompt.role !== "chat") return line
+  if (prompt.role !== "person") return line
   const who =
     prompt.writer === undefined ? (prompt.author ?? "") : nameOf(prompt.writer)
   return who === "" ? `"${line}"` : `${who}: "${line}"`

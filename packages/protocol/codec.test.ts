@@ -3,6 +3,7 @@
 import assert from "node:assert/strict"
 import {
   type CardId,
+  canvasIdFor,
   cardIdOfKind,
   commitId,
   ERR,
@@ -16,7 +17,6 @@ import {
   runId,
   type Sha256,
   THE_AGENT,
-  taskIdFor,
   textCardId,
   threadIdFor,
   workflowStateIdFor,
@@ -40,9 +40,9 @@ import {
 import { Command } from "./line.ts"
 import { command, EMPTY_COMMAND, OUTCOME_KINDS, reply } from "./messages.ts"
 
-const NEW_TASK = taskIdFor("01a0ffd2-4e7a-71c8-a970-306fa07d7f0a")
+const NEW_CANVAS = canvasIdFor("01a0ffd2-4e7a-71c8-a970-306fa07d7f0a")
 const TEST_THREAD = threadIdFor("e")
-const TEST_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
+const TEST_CANVAS = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 const TEST_ROOT = rootIdFor("test-root")
 const NEW_ROOT = rootIdFor("01a0f9eb-86e1-77ad-a822-2a3067862240")
 
@@ -58,24 +58,24 @@ const refusalCode = (x: ReturnType<typeof decodeCommand>) =>
 
 test('decode: parentId "" is the root, where only a branch starts a thread', () => {
   const branch = decodeCommand({
-    kind: "chat",
+    kind: "send",
     text: "hi",
     parentId: "",
     root: NEW_ROOT,
     mode: "branch",
-    task: NEW_TASK,
+    canvas: NEW_CANVAS,
     lane: NEW_THREAD,
   })
-  assert.deepEqual(branch.kind === "chat" ? branch.at : null, {
+  assert.deepEqual(branch.kind === "send" ? branch.at : null, {
     kind: "branch",
     thread: NEW_THREAD,
     at: null,
-    task: NEW_TASK,
+    canvas: NEW_CANVAS,
   })
   assert.equal(
     refusalCode(
       decodeCommand({
-        kind: "chat",
+        kind: "send",
         text: "hi",
         parentId: "",
         mode: "reply",
@@ -88,14 +88,14 @@ test('decode: parentId "" is the root, where only a branch starts a thread', () 
 
 test("decode: a reply continues the thread it names, from the end its sender saw", () => {
   const reply = decodeCommand({
-    kind: "chat",
+    kind: "send",
     text: "hi",
     parentId: "e-1",
     root: TEST_ROOT,
     mode: "reply",
     lane: "t-abc",
   })
-  assert.deepEqual(reply.kind === "chat" ? reply.at : null, {
+  assert.deepEqual(reply.kind === "send" ? reply.at : null, {
     kind: "end",
     thread: threadIdFor("abc"),
     seen: entryId("e-1"),
@@ -105,17 +105,17 @@ test("decode: a reply continues the thread it names, from the end its sender saw
 test("decode: a chat names its root: a new one, minted, at the root; one it is in, at an entry", () => {
   const at = (parentId: string, root: string) =>
     decodeCommand({
-      kind: "chat",
+      kind: "send",
       text: "hi",
       parentId,
       root,
       mode: "branch",
-      task: NEW_TASK,
+      canvas: NEW_CANVAS,
       lane: NEW_THREAD,
     })
-  assert.equal(at("", NEW_ROOT).kind, "chat")
+  assert.equal(at("", NEW_ROOT).kind, "send")
   assert.equal(refusalCode(at("", TEST_ROOT)), ERR.UNKNOWN_TARGET)
-  assert.equal(at("e-1", TEST_ROOT).kind, "chat")
+  assert.equal(at("e-1", TEST_ROOT).kind, "send")
   assert.equal(refusalCode(at("e-1", "")), ERR.UNKNOWN_TARGET)
 })
 
@@ -123,7 +123,7 @@ test("decode: queue is the host's own mode, never a client's", () => {
   assert.equal(
     refusalCode(
       decodeCommand({
-        kind: "chat",
+        kind: "send",
         text: "hi",
         parentId: "e-1",
         mode: "queue",
@@ -150,7 +150,7 @@ test("decode: thread defaults are gone; a lane must be a thread's", () => {
   assert.equal(
     refusalCode(
       decodeCommand({
-        kind: "chat",
+        kind: "send",
         text: "hi",
         parentId: "e-1",
         mode: "reply",
@@ -163,11 +163,11 @@ test("decode: thread defaults are gone; a lane must be a thread's", () => {
 
 test("decode: a chat needs text and a known mode", () => {
   assert.equal(
-    refusalCode(decodeCommand({ kind: "chat", text: "  ", mode: "reply" })),
+    refusalCode(decodeCommand({ kind: "send", text: "  ", mode: "reply" })),
     ERR.EMPTY_MESSAGE,
   )
   assert.equal(
-    refusalCode(decodeCommand({ kind: "chat", text: "hi", mode: "shout" })),
+    refusalCode(decodeCommand({ kind: "send", text: "hi", mode: "shout" })),
     ERR.UNKNOWN_KIND,
   )
 })
@@ -193,10 +193,10 @@ const REFERENCE = cardIdOfKind(
 test("encodeIntent -> decodeCommand round-trips every intent", () => {
   const intents = [
     {
-      kind: "chat",
+      kind: "send",
       text: "hi @agent",
       root: NEW_ROOT,
-      at: { kind: "branch", thread: NEW_THREAD, at: null, task: NEW_TASK },
+      at: { kind: "branch", thread: NEW_THREAD, at: null, canvas: NEW_CANVAS },
       asksAgent: true,
       mentions: [{ kind: "agent", agent: THE_AGENT }],
       card: null,
@@ -205,7 +205,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       state: workflowStateIdFor("doing"),
     },
     {
-      kind: "chat",
+      kind: "send",
       text: "hi @bob",
       root: TEST_ROOT,
       at: { kind: "end", thread: threadIdFor("abc"), seen: entryId("e-5") },
@@ -223,14 +223,14 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       state: null,
     },
     {
-      kind: "chat",
+      kind: "send",
       text: "aside",
       root: TEST_ROOT,
       at: {
         kind: "branch",
         thread: NEW_THREAD,
         at: entryId("e-3"),
-        task: NEW_TASK,
+        canvas: NEW_CANVAS,
       },
       asksAgent: false,
       mentions: [],
@@ -245,18 +245,18 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
     { kind: "stop", lane: threadIdFor("abc") },
     { kind: "carry-on", lane: threadIdFor("abc") },
     {
-      kind: "move-task",
-      task: TEST_TASK,
+      kind: "move-canvas",
+      canvas: TEST_CANVAS,
       from: workflowStateIdFor("a"),
       to: workflowStateIdFor("b"),
       before: null,
     },
     {
-      kind: "move-task",
-      task: TEST_TASK,
+      kind: "move-canvas",
+      canvas: TEST_CANVAS,
       from: workflowStateIdFor("a"),
       to: workflowStateIdFor("a"),
-      before: NEW_TASK,
+      before: NEW_CANVAS,
     },
     {
       kind: "workflow",
@@ -273,10 +273,10 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
     },
     {
       kind: "mark",
-      of: { kind: "task", task: TEST_TASK },
+      of: { kind: "canvas", canvas: TEST_CANVAS },
       title: "Tab names",
     },
-    { kind: "mark", of: { kind: "task", task: TEST_TASK }, title: null },
+    { kind: "mark", of: { kind: "canvas", canvas: TEST_CANVAS }, title: null },
     {
       kind: "mark",
       of: {
@@ -288,7 +288,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       },
       title: "Ideas",
     },
-    { kind: "retitle", task: TEST_TASK },
+    { kind: "retitle", canvas: TEST_CANVAS },
     {
       kind: "proposed",
       lane: threadIdFor("abc"),
@@ -372,7 +372,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
           to: { kind: "trash" },
         },
       ],
-      here: TEST_TASK,
+      here: TEST_CANVAS,
     },
     {
       kind: "spin-off",
@@ -383,9 +383,9 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       },
       root: rootIdFor("01a0ffd2-0000-7000-8000-0000000000ff"),
       thread: NEW_THREAD,
-      task: NEW_TASK,
+      canvas: NEW_CANVAS,
       state: null,
-      here: TEST_TASK,
+      here: TEST_CANVAS,
     },
     {
       kind: "move",
@@ -416,7 +416,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       move: {
         card: threadIdFor("copy"),
         from: null,
-        to: { kind: "canvas-at", task: TEST_TASK, after: TEST_THREAD },
+        to: { kind: "canvas-at", canvas: TEST_CANVAS, after: TEST_THREAD },
       },
     },
     {
@@ -439,7 +439,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
         card: REFERENCE,
         from: { kind: "inventory", holder: writerId("ada@example.com") },
       },
-      here: TEST_TASK,
+      here: TEST_CANVAS,
     },
     {
       kind: "paste",
@@ -448,19 +448,19 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
         card: textCardId(cardIdFor("c7")),
         origin: { kind: "entry", thread: TEST_THREAD, entry: entryId("e-9") },
       },
-      to: { kind: "canvas-at", task: TEST_TASK, after: null },
+      to: { kind: "canvas-at", canvas: TEST_CANVAS, after: null },
       replacing: null,
       here: null,
     },
     {
       kind: "paste",
       paste: { kind: "uncut", card: cardIdFor("c7") },
-      to: { kind: "notes", near: "task", task: TEST_TASK },
+      to: { kind: "notes", near: "canvas", canvas: TEST_CANVAS },
       replacing: null,
       here: null,
     },
-    { kind: "undo-move", task: TEST_TASK, direction: "undo" },
-    { kind: "undo-move", task: TEST_TASK, direction: "redo" },
+    { kind: "undo-move", canvas: TEST_CANVAS, direction: "undo" },
+    { kind: "undo-move", canvas: TEST_CANVAS, direction: "redo" },
     {
       kind: "set-command",
       card: cardIdFor("c7"),
@@ -475,13 +475,13 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
     {
       kind: "card-width",
       card: threadIdFor("abc"),
-      at: { kind: "canvas", task: TEST_TASK },
+      at: { kind: "canvas", canvas: TEST_CANVAS },
       width: 2,
     },
     {
       kind: "card-width",
       card: threadIdFor("abc"),
-      at: { kind: "canvas", task: TEST_TASK },
+      at: { kind: "canvas", canvas: TEST_CANVAS },
       width: 1,
     },
     { kind: "queue-hold", lane: threadIdFor("abc"), held: true },
@@ -532,11 +532,11 @@ test("a picture names a stored image's hash, or none; anything else is refused",
 })
 
 test("a chat's malformed pinned cards are refused", () => {
-  const chat = (pinned: string) =>
+  const said = (pinned: string) =>
     decodeCommand(
       command({
         id: "c",
-        kind: "chat",
+        kind: "send",
         text: "hi",
         parentId: "e-1",
         root: TEST_ROOT,
@@ -551,8 +551,8 @@ test("a chat's malformed pinned cards are refused", () => {
     '[{"card":cardIdFor("c1")}]',
     '[{"card":"","seen":""}]',
   ])
-    assert.equal(chat(bad).kind, "refused")
-  assert.equal(chat("").kind, "chat")
+    assert.equal(said(bad).kind, "refused")
+  assert.equal(said("").kind, "send")
 })
 
 test("an acceptance that does not say which proposed changes it was shown, well formed, is refused", () => {
@@ -634,8 +634,8 @@ test("encodeOutcome -> decodeReply round-trips every outcome", () => {
       by: writerId("bea@example.com"),
     },
     { kind: "unmoved", code: "full", place: null, by: null },
-    { kind: "refused", code: ERR.TASK_ARCHIVED, message: "archived by Bea" },
-    { kind: "refused", code: ERR.TASK_BUSY, message: "busy" },
+    { kind: "refused", code: ERR.CANVAS_ARCHIVED, message: "archived by Bea" },
+    { kind: "refused", code: ERR.CANVAS_BUSY, message: "busy" },
     { kind: "failed", message: "writeValues is not in this port" },
   ]
   for (const outcome of outcomes) {
@@ -681,17 +681,20 @@ test("a move's target may be a spot on a canvas, after a card or first, and no p
     "01a0ffd2-0000-7000-8000-0000000000a1",
   )
   for (const after of [TEST_THREAD, null]) {
-    const to = { kind: "canvas-at", task: TEST_TASK, after } as const
+    const to = { kind: "canvas-at", canvas: TEST_CANVAS, after } as const
     const moves = decodeMoves(encodeMoves([{ card: made, from: null, to }]))
     assert.deepEqual(typeof moves === "string" ? moves : moves[0]?.to, to)
   }
   // A canvas's key is the canvas alone.
-  assert.deepEqual(decodeKey(encodeKey({ kind: "canvas", task: TEST_TASK })), {
-    kind: "canvas",
-    task: TEST_TASK,
-  })
+  assert.deepEqual(
+    decodeKey(encodeKey({ kind: "canvas", canvas: TEST_CANVAS })),
+    {
+      kind: "canvas",
+      canvas: TEST_CANVAS,
+    },
+  )
   assert.equal(
-    decodeKey(`{"kind":"canvas-at","task":"${TEST_TASK}","column":""}`),
+    decodeKey(`{"kind":"canvas-at","canvas":"${TEST_CANVAS}","column":""}`),
     undefined,
   )
   assert.equal(
@@ -700,7 +703,7 @@ test("a move's target may be a spot on a canvas, after a card or first, and no p
         {
           card: made,
           from: null,
-          to: { kind: "canvas-at", task: TEST_TASK, column: "not a card" },
+          to: { kind: "canvas-at", canvas: TEST_CANVAS, column: "not a card" },
         },
       ]),
     ),
@@ -708,14 +711,14 @@ test("a move's target may be a spot on a canvas, after a card or first, and no p
   )
 })
 
-test("a move's target may be back where a trashed card was, or a new task; neither is a place", () => {
+test("a move's target may be back where a trashed card was, or a new canvas; neither is a place", () => {
   const made = cardIdOfKind(
     "note-column",
     "01a0ffd2-0000-7000-8000-0000000000a1",
   )
   for (const to of [
     { kind: "back" },
-    { kind: "new-task", task: TEST_TASK },
+    { kind: "new-canvas", canvas: TEST_CANVAS },
   ] as const) {
     const moves = decodeMoves(
       encodeMoves([{ card: made, from: { kind: "trash" }, to }]),
@@ -726,7 +729,7 @@ test("a move's target may be back where a trashed card was, or a new task; neith
 })
 
 test("decode: a move is refused to or from a place its card's kind is never in", () => {
-  const canvas = { kind: "canvas", task: TEST_TASK } as const
+  const onCanvas = { kind: "canvas", canvas: TEST_CANVAS } as const
   const inventory = {
     kind: "inventory",
     holder: writerId("w-ada@x.io"),
@@ -739,19 +742,19 @@ test("decode: a move is refused to or from a place its card's kind is never in",
   const decoded = (card: CardId, from: PlaceKey | null, to: MoveTarget) =>
     typeof decodeMoves(encodeMoves([{ card, from, to }]))
   // A thread's card: between a canvas and an inventory, and nowhere else.
-  assert.equal(decoded(TEST_THREAD, canvas, inventory), "object")
+  assert.equal(decoded(TEST_THREAD, onCanvas, inventory), "object")
   assert.equal(
     decoded(TEST_THREAD, inventory, {
-      ...canvas,
+      ...onCanvas,
       kind: "canvas-at",
       after: null,
     }),
     "object",
   )
-  assert.equal(decoded(TEST_THREAD, canvas, queued), "string")
+  assert.equal(decoded(TEST_THREAD, onCanvas, queued), "string")
   assert.equal(decoded(TEST_THREAD, queued, inventory), "string")
   assert.equal(
-    decoded(TEST_THREAD, canvas, {
+    decoded(TEST_THREAD, onCanvas, {
       kind: "notes",
       near: "thread",
       thread: TEST_THREAD,
@@ -761,8 +764,8 @@ test("decode: a move is refused to or from a place its card's kind is never in",
   // A text card never onto a canvas by its key; at a spot there, the host
   // makes it a note column (`WRAPS`). A fact, at neither.
   assert.equal(decoded(cardIdFor("c1"), inventory, queued), "object")
-  assert.equal(decoded(cardIdFor("c1"), inventory, canvas), "string")
-  const spot = { ...canvas, kind: "canvas-at", after: null } as const
+  assert.equal(decoded(cardIdFor("c1"), inventory, onCanvas), "string")
+  const spot = { ...onCanvas, kind: "canvas-at", after: null } as const
   assert.equal(decoded(cardIdFor("c1"), inventory, spot), "object")
   assert.equal(
     decoded(
@@ -774,19 +777,23 @@ test("decode: a move is refused to or from a place its card's kind is never in",
   )
   const thread: MoveOf<"thread"> = {
     card: TEST_THREAD,
-    from: canvas,
+    from: onCanvas,
     to: inventory,
   }
   assert.ok(thread)
   const never: MoveOf<"thread"> = {
     card: TEST_THREAD,
-    from: canvas,
+    from: onCanvas,
     // @ts-expect-error: a thread's card is never queued
     to: queued,
   }
   assert.ok(never)
-  // @ts-expect-error: a text card is never on a canvas
-  const nor: MoveOf<"text"> = { card: cardIdFor("c1"), from: null, to: canvas }
+  const nor: MoveOf<"text"> = {
+    card: cardIdFor("c1"),
+    from: null,
+    // @ts-expect-error: a text card is never on a canvas
+    to: onCanvas,
+  }
   assert.ok(nor)
 })
 
@@ -863,17 +870,19 @@ test("decode: a copy names its source, the end it forks at, and its new thread's
   const moved = encodeMoves([
     {
       card: threadIdFor("copy"),
-      from: { kind: "canvas", task: TEST_TASK },
+      from: { kind: "canvas", canvas: TEST_CANVAS },
       to: { kind: "inventory", holder: writerId("w-ada@x.io") },
     },
   ])
   expect(refusalCode(wire({ moves: moved }))).toBe(ERR.UNKNOWN_TARGET)
 })
 
-test("decode: a mark names a task or a note column, never both or neither", () => {
+test("decode: a mark names a canvas or a note column, never both or neither", () => {
   const N = cardIdOfKind("note-column", "01a0ffd2-0000-7000-8000-0000000000a1")
   assert.equal(
-    refusalCode(decodeCommand({ kind: "mark", task: TEST_TASK, cardId: N })),
+    refusalCode(
+      decodeCommand({ kind: "mark", canvas: TEST_CANVAS, cardId: N }),
+    ),
     ERR.UNKNOWN_TARGET,
   )
   assert.equal(
@@ -941,7 +950,7 @@ test("decode: a malformed move, command, width or undo of moves is refused", () 
           to: unstarted,
         },
       ]),
-      here: "r-not-a-task",
+      here: "r-not-a-canvas",
     },
     {
       kind: "set-command",
@@ -949,11 +958,16 @@ test("decode: a malformed move, command, width or undo of moves is refused", () 
       mode: "pull",
     },
     { kind: "set-command", cardId: "" },
-    // A width names its card, the task it was seen on, and 1 or 2.
-    { kind: "card-width", cardId: "", task: TEST_TASK, mode: "2" },
-    { kind: "card-width", cardId: cardIdFor("c1"), task: "r-x", mode: "2" },
-    { kind: "card-width", cardId: cardIdFor("c1"), task: TEST_TASK, mode: "3" },
-    { kind: "undo-move", task: "r-x", mode: "undo" },
+    // A width names its card, the canvas it was seen on, and 1 or 2.
+    { kind: "card-width", cardId: "", canvas: TEST_CANVAS, mode: "2" },
+    { kind: "card-width", cardId: cardIdFor("c1"), canvas: "r-x", mode: "2" },
+    {
+      kind: "card-width",
+      cardId: cardIdFor("c1"),
+      canvas: TEST_CANVAS,
+      mode: "3",
+    },
+    { kind: "undo-move", canvas: "r-x", mode: "undo" },
     { kind: "undo-move", root: TEST_ROOT, mode: "sideways" },
     // `line` is no kind: setup and publish are commands of their own.
     { kind: "line", mode: "publish" },
@@ -981,7 +995,7 @@ test("decodeReply: an unrecognised code stays inside the ErrCode set", () => {
   assert.equal(out.kind === "refused" ? out.code : "", ERR.UNKNOWN_KIND)
 })
 
-test("decode: a spin-off names its move to the trash, a new root, thread and task, and a state or none", () => {
+test("decode: a spin-off names its move to the trash, a new root, thread and canvas, and a state or none", () => {
   const trash = { kind: "discarded" }
   const from = { kind: "inventory", holder: "ada@example.com" }
   const moves = (to: unknown) =>
@@ -991,7 +1005,7 @@ test("decode: a spin-off names its move to the trash, a new root, thread and tas
     moves: moves(trash),
     root: rootIdFor("01a0ffd2-0000-7000-8000-0000000000ff"),
     lane: NEW_THREAD,
-    task: NEW_TASK,
+    canvas: NEW_CANVAS,
   }
   assert.equal(decodeCommand(good).kind, "spin-off")
   for (const wire of [
@@ -999,25 +1013,25 @@ test("decode: a spin-off names its move to the trash, a new root, thread and tas
     { ...good, root: "" },
     { ...good, lane: "" },
     { ...good, state: "not a state" },
-    // A spin-off starts a new task, under the id its tab minted.
-    { ...good, task: "" },
+    // A spin-off starts a new canvas, under the id its tab minted.
+    { ...good, canvas: "" },
   ])
     assert.equal(decodeCommand(wire).kind, "refused")
 })
 
-test("decode: a thread opened names a new thread, its root, its task and how it starts", () => {
+test("decode: a thread opened names a new thread, its root, its canvas and how it starts", () => {
   const branch = encodeIntent("c", {
     kind: "open-thread",
     thread: NEW_THREAD,
     root: TEST_ROOT,
-    task: TEST_TASK,
+    canvas: TEST_CANVAS,
     start: { kind: "branch", at: entryId("e-1") },
   })
   assert.deepEqual(decodeCommand(branch), {
     kind: "open-thread",
     thread: NEW_THREAD,
     root: TEST_ROOT,
-    task: TEST_TASK,
+    canvas: TEST_CANVAS,
     start: { kind: "branch", at: "e-1" },
   })
   const newRoot = rootIdFor("01a0ffd2-0000-7000-8000-0000000000ff")
@@ -1025,49 +1039,49 @@ test("decode: a thread opened names a new thread, its root, its task and how it 
     kind: "open-thread",
     thread: NEW_THREAD,
     root: newRoot,
-    task: NEW_TASK,
-    start: { kind: "new-task", state: null },
+    canvas: NEW_CANVAS,
+    start: { kind: "new-canvas", state: null },
   })
   assert.deepEqual(decodeCommand(tab), {
     kind: "open-thread",
     thread: NEW_THREAD,
     root: newRoot,
-    task: NEW_TASK,
-    start: { kind: "new-task", state: null },
+    canvas: NEW_CANVAS,
+    start: { kind: "new-canvas", state: null },
   })
   const after = threadIdFor("01a0ffd2-0000-7000-8000-0000000000aa")
   const column = encodeIntent("c", {
     kind: "open-thread",
     thread: NEW_THREAD,
     root: newRoot,
-    task: TEST_TASK,
+    canvas: TEST_CANVAS,
     start: { kind: "new-root", after },
   })
   assert.deepEqual(decodeCommand(column), {
     kind: "open-thread",
     thread: NEW_THREAD,
     root: newRoot,
-    task: TEST_TASK,
+    canvas: TEST_CANVAS,
     start: { kind: "new-root", after },
   })
   assert.deepEqual(decodeCommand({ ...column, cardId: "" }), {
     kind: "open-thread",
     thread: NEW_THREAD,
     root: newRoot,
-    task: TEST_TASK,
+    canvas: TEST_CANVAS,
     start: { kind: "new-root", after: null },
   })
   for (const wire of [
     { ...branch, lane: "t-not-new" },
-    { ...branch, task: "r-x" },
+    { ...branch, canvas: "r-x" },
     { ...branch, parentId: "" },
     { ...branch, mode: "" },
     { ...tab, root: "r-x" },
-    { ...tab, task: "k-x" },
+    { ...tab, canvas: "k-x" },
     { ...tab, state: "not a state" },
-    // A new root's id is minted by its tab, in a task the session holds.
+    // A new root's id is minted by its tab, in a canvas the session holds.
     { ...column, root: TEST_ROOT },
-    { ...column, task: "r-x" },
+    { ...column, canvas: "r-x" },
     { ...column, cardId: "not a card" },
   ])
     assert.equal(decodeCommand(wire).kind, "refused")
@@ -1079,7 +1093,7 @@ test("decode: a press on a proposal keeps its rows in order, briefs on Start alo
     kind: "branch-out",
     how: "open",
     root: TEST_ROOT,
-    task: TEST_TASK,
+    canvas: TEST_CANVAS,
     proposal: entryId("e-1"),
     branches: [
       { thread: NEW_THREAD, row: 0 },
@@ -1090,7 +1104,7 @@ test("decode: a press on a proposal keeps its rows in order, briefs on Start alo
     kind: "branch-out",
     how: "open",
     root: TEST_ROOT,
-    task: TEST_TASK,
+    canvas: TEST_CANVAS,
     proposal: "e-1",
     branches: [
       { thread: NEW_THREAD, row: 0 },
@@ -1101,7 +1115,7 @@ test("decode: a press on a proposal keeps its rows in order, briefs on Start alo
     kind: "branch-out",
     how: "start",
     root: TEST_ROOT,
-    task: TEST_TASK,
+    canvas: TEST_CANVAS,
     proposal: entryId("e-1"),
     branches: [{ thread: NEW_THREAD, row: 1, brief: "do it" }],
   })
@@ -1109,7 +1123,7 @@ test("decode: a press on a proposal keeps its rows in order, briefs on Start alo
     kind: "branch-out",
     how: "start",
     root: TEST_ROOT,
-    task: TEST_TASK,
+    canvas: TEST_CANVAS,
     proposal: "e-1",
     branches: [{ thread: NEW_THREAD, row: 1, brief: "do it" }],
   })
@@ -1142,7 +1156,7 @@ test("decode: a press on a proposal keeps its rows in order, briefs on Start alo
     { ...start, text: rows([{ thread: NEW_THREAD, row: 0, brief: " " }]) },
     { ...open, mode: "send" },
     { ...open, parentId: "" },
-    { ...open, task: "r-x" },
+    { ...open, canvas: "r-x" },
   ])
     assert.equal(decodeCommand(wire).kind, "refused")
 })
@@ -1295,28 +1309,28 @@ test("decode: a note command is an unknown kind", () => {
 })
 
 test("decode: a chat's card is its id and its text's version, or none", () => {
-  const chat = (cardId: string) =>
+  const said = (cardId: string) =>
     decodeCommand({
-      kind: "chat",
+      kind: "send",
       text: "hi",
       mode: "branch",
-      task: NEW_TASK,
+      canvas: NEW_CANVAS,
       root: NEW_ROOT,
       lane: NEW_THREAD,
       cardId,
       seen: "v",
     })
-  const card = (i: ReturnType<typeof chat>) =>
-    "kind" in i && i.kind === "chat" ? i.card : "refused"
-  assert.deepEqual(card(chat(cardIdFor("c1"))), {
+  const card = (i: ReturnType<typeof said>) =>
+    "kind" in i && i.kind === "send" ? i.card : "refused"
+  assert.deepEqual(card(said(cardIdFor("c1"))), {
     id: cardIdFor("c1"),
     seen: "v",
   })
-  assert.equal(card(chat("")), null)
-  assert.equal(card(chat("  ")), null)
+  assert.equal(card(said("")), null)
+  assert.equal(card(said("  ")), null)
   // An id that is no text card's: a thread's, or no card's at all.
-  assert.equal(card(chat(NEW_THREAD)), "refused")
-  assert.equal(card(chat("c-1")), "refused")
+  assert.equal(card(said(NEW_THREAD)), "refused")
+  assert.equal(card(said("c-1")), "refused")
 })
 
 test("decode: a move, a reorder or a command names a card by an id parseCardId takes", () => {
@@ -1335,9 +1349,9 @@ test("decode: a move, a reorder or a command names a card by an id parseCardId t
   )
 })
 
-test("a move on the board names its task and its states; a workflow change, a known action and its state", () => {
-  const move = (text: string, task: string = TEST_TASK) =>
-    refusalCode(decodeCommand({ kind: "move-task", task, text }))
+test("a move on the board names its canvas and its states; a workflow change, a known action and its state", () => {
+  const move = (text: string, canvas: string = TEST_CANVAS) =>
+    refusalCode(decodeCommand({ kind: "move-canvas", canvas, text }))
   const states = { from: workflowStateIdFor("a"), to: workflowStateIdFor("b") }
   assert.equal(
     move(JSON.stringify({ ...states, before: null }), TEST_ROOT),
@@ -1359,66 +1373,73 @@ test("a move on the board names its task and its states; a workflow change, a kn
 })
 
 test("a chat's workflow state must be one", () => {
-  const chat = (state: string) =>
+  const said = (state: string) =>
     decodeCommand({
       ...EMPTY_COMMAND,
-      kind: "chat",
+      kind: "send",
       text: "hi",
       parentId: "",
       root: NEW_ROOT,
       mode: "branch",
-      task: NEW_TASK,
+      canvas: NEW_CANVAS,
       lane: NEW_THREAD,
       state,
     })
-  assert.equal(refusalCode(chat("doing")), ERR.UNKNOWN_STATE)
-  assert.equal(refusalCode(chat("")), "not refused: chat")
+  assert.equal(refusalCode(said("doing")), ERR.UNKNOWN_STATE)
+  assert.equal(refusalCode(said("")), "not refused: send")
 })
 
-test("a mark names its task; its title is trimmed, one line, at most 80 characters, blank clears", () => {
+test("a mark names its canvas; its title is trimmed, one line, at most 80 characters, blank clears", () => {
   assert.deepEqual(
-    decodeCommand({ kind: "mark", task: TEST_TASK, text: "  Tab names " }),
-    { kind: "mark", of: { kind: "task", task: TEST_TASK }, title: "Tab names" },
+    decodeCommand({ kind: "mark", canvas: TEST_CANVAS, text: "  Tab names " }),
+    {
+      kind: "mark",
+      of: { kind: "canvas", canvas: TEST_CANVAS },
+      title: "Tab names",
+    },
   )
-  assert.deepEqual(decodeCommand({ kind: "mark", task: TEST_TASK, text: "" }), {
-    kind: "mark",
-    of: { kind: "task", task: TEST_TASK },
-    title: null,
-  })
+  assert.deepEqual(
+    decodeCommand({ kind: "mark", canvas: TEST_CANVAS, text: "" }),
+    {
+      kind: "mark",
+      of: { kind: "canvas", canvas: TEST_CANVAS },
+      title: null,
+    },
+  )
   for (const text of ["two\nlines", "x".repeat(81)])
     assert.equal(
-      refusalCode(decodeCommand({ kind: "mark", task: TEST_TASK, text })),
+      refusalCode(decodeCommand({ kind: "mark", canvas: TEST_CANVAS, text })),
       ERR.INVALID_TITLE,
     )
   assert.equal(
-    refusalCode(decodeCommand({ kind: "mark", task: TEST_ROOT, text: "x" })),
+    refusalCode(decodeCommand({ kind: "mark", canvas: TEST_ROOT, text: "x" })),
     ERR.UNKNOWN_TARGET,
   )
 })
 
-test("a retitle names its task; anything else is refused", () => {
+test("a retitle names its canvas; anything else is refused", () => {
   assert.equal(
-    refusalCode(decodeCommand({ kind: "retitle", task: TEST_ROOT })),
+    refusalCode(decodeCommand({ kind: "retitle", canvas: TEST_ROOT })),
     ERR.UNKNOWN_TARGET,
   )
-  assert.deepEqual(decodeCommand({ kind: "retitle", task: TEST_TASK }), {
+  assert.deepEqual(decodeCommand({ kind: "retitle", canvas: TEST_CANVAS }), {
     kind: "retitle",
-    task: TEST_TASK,
+    canvas: TEST_CANVAS,
   })
 })
 
 test("decode: a branch's thread, and a reserved one, is a new thread's id, t- and a uuidv7", () => {
-  const chat = (lane: string) =>
+  const said = (lane: string) =>
     decodeCommand({
-      kind: "chat",
+      kind: "send",
       text: "hi",
       mode: "branch",
-      task: NEW_TASK,
+      canvas: NEW_CANVAS,
       root: NEW_ROOT,
       lane,
     })
   const reserve = (lane: string) => decodeCommand({ kind: "reserve", lane })
-  assert.equal(chat(NEW_THREAD).kind, "chat")
+  assert.equal(said(NEW_THREAD).kind, "send")
   for (const bad of [
     "",
     "t-abc",
@@ -1428,7 +1449,7 @@ test("decode: a branch's thread, and a reserved one, is a new thread's id, t- an
     `${NEW_THREAD};rm`,
     "t-01a0f9eb 86e1-77ad-a822-2a306786223f",
   ]) {
-    assert.equal(refusalCode(chat(bad)), ERR.UNKNOWN_TARGET, bad)
+    assert.equal(refusalCode(said(bad)), ERR.UNKNOWN_TARGET, bad)
     assert.equal(refusalCode(reserve(bad)), ERR.UNKNOWN_TARGET, bad)
   }
 })

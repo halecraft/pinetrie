@@ -53,7 +53,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     // 1. A new thread's banner is made as it is named, while its first run is
     //    still going.
     const planning = script.hold("plan the parser")
-    await bu.chat("@agent plan the parser", ROOT, START_AGENT)
+    await bu.send("@agent plan the parser", ROOT, START_AGENT)
     await waitFor(() => planning.reached, 10_000)
     const bannerOfFirst = () => {
       const [first] = lanesOf(bh, treeOf(bh), readPlaces(bh.places))
@@ -80,7 +80,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     // 2. The sweep keeps a banner nothing else shows.
     clock.advance(BLOB_GRACE_MS + 1)
     const reply = idOfIn(bh, "noted")
-    await bu.chat("@agent and the lexer", at(reply), { mode: "reply" })
+    await bu.send("@agent and the lexer", at(reply), { mode: "reply" })
     await bidle()
 
     // 3. `set_banner` sets a pasted image; the one it replaces is swept.
@@ -97,7 +97,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       },
       { text: "set it" },
     ])
-    await bu.chat(
+    await bu.send(
       `@agent use this as the banner ![red](/blob/${red.sha256})`,
       at(idOfIn(bh, "noted")),
       { mode: "reply" },
@@ -114,7 +114,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       now?.sha === red.sha256 && toolSaid.includes("The banner is set."),
     )
     clock.advance(BLOB_GRACE_MS + 1)
-    await bu.chat("@agent thanks", at(idOfIn(bh, "set it")), {
+    await bu.send("@agent thanks", at(idOfIn(bh, "set it")), {
       mode: "reply",
     })
     await bidle()

@@ -1,9 +1,9 @@
 import {
+  canvasIdFor,
   cardIdOfKind,
   NO_CONTENT,
   type ThreadId,
   type ThreadName,
-  taskIdFor,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -20,24 +20,26 @@ import {
   planCanvasFacts,
   planCanvasRead,
 } from "./canvas.ts"
+import { type CardOnCanvas, cardsOnCanvas } from "./canvas-index.ts"
+import { encodeCanvasPinned, planCanvasPinnedRead } from "./canvas-pinned.ts"
 import { CONTEXT, CONTEXT_KINDS, CONTEXT_RULES, contextOf } from "./context.ts"
 import { encodePinned, PINNED_RULE } from "./pinned.ts"
 import { planFactCard } from "./queue.ts"
-import { type CanvasCard, canvasOf } from "./task.ts"
-import { encodeTaskPinned, planTaskPinnedRead } from "./task-pinned.ts"
 
 const ADA = writerId("ada@x.io")
 const BEA = writerId("bea@x.io")
-const K = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
+const K = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 const [A, B] = [threadIdFor("a"), threadIdFor("b")]
 const N = cardIdOfKind("note-column", "01a0ffd2-0000-7000-8000-0000000000a1")
 
-const canvas = (ids: readonly (ThreadId | typeof N)[]): readonly CanvasCard[] =>
-  canvasOf(
+const cardsFor = (
+  ids: readonly (ThreadId | typeof N)[],
+): readonly CardOnCanvas[] =>
+  cardsOnCanvas(
     ids.map((id, i) => {
       const place = {
         kind: "canvas",
-        task: K,
+        canvas: K,
         order: String(i + 1).padStart(10, "0"),
         width: 1,
       } as const
@@ -64,9 +66,9 @@ const canvas = (ids: readonly (ThreadId | typeof N)[]): readonly CanvasCard[] =>
   )
 
 const facts = (over: Partial<CanvasFacts> = {}): CanvasFacts => ({
-  task: K,
+  canvas: K,
   title: "Fix the sync bug",
-  canvas: canvas([A, N, B]),
+  onCanvas: cardsFor([A, N, B]),
   reading: A,
   names: new Map([
     [A, "amber-fox" as ThreadName],
@@ -88,13 +90,13 @@ describe("the canvas list", () => {
       "thread calm-owl, running, put by Bea",
     ])
     expect(canvasContent(list)).toBe(
-      '<canvas task="Fix the sync bug">\n' +
+      '<canvas title="Fix the sync bug">\n' +
         "thread amber-fox (this thread), put by Ada\n" +
         'note column "Decisions", 4 notes, put by Bea\n' +
         "thread calm-owl, running, put by Bea\n" +
         "</canvas>",
     )
-    // Read from no thread, as the task column shows it, every thread's state.
+    // Read from no thread, as the canvas column shows it, every thread's state.
     expect(canvasList(facts({ reading: null })).lines[0]).toBe(
       "thread amber-fox, idle, put by Ada",
     )
@@ -104,7 +106,7 @@ describe("the canvas list", () => {
     const many = Array.from({ length: CANVAS_CAP + 12 }, (_, i) =>
       threadIdFor(`t${i}`),
     )
-    const list = canvasList(facts({ canvas: canvas(many) }))
+    const list = canvasList(facts({ onCanvas: cardsFor(many) }))
     expect(list.lines).toHaveLength(CANVAS_CAP)
     expect(list.more).toBe(12)
     expect(canvasLines(list).at(-1)).toBe("and 12 more")
@@ -114,7 +116,7 @@ describe("the canvas list", () => {
     const now = canvasList(facts())
     expect(planCanvasRead({ inView: null, now })).toBe(now)
     expect(planCanvasRead({ inView: { ...now }, now })).toBeNull()
-    const moved = canvasList(facts({ canvas: canvas([B, N, A]) }))
+    const moved = canvasList(facts({ onCanvas: cardsFor([B, N, A]) }))
     expect(planCanvasRead({ inView: now, now: moved })).toBe(moved)
     const renamed = { ...now, title: "Fix it" }
     expect(planCanvasRead({ inView: now, now: renamed })).toBe(renamed)
@@ -128,7 +130,7 @@ describe("the canvas list", () => {
   })
 })
 
-describe("the cards pinned to a task", () => {
+describe("the cards pinned to a canvas", () => {
   const read = (id: string, text: string) => ({
     id: threadIdFor(id),
     text,
@@ -136,31 +138,35 @@ describe("the cards pinned to a task", () => {
   })
   test("restated when they change; read as they are, nothing", () => {
     const now = [read("c1", "ship it")]
-    const first = planTaskPinnedRead({ inView: null, now, task: K })
-    expect(first).toEqual({ task: K, cards: now, retired: [] })
-    expect(planTaskPinnedRead({ inView: first, now, task: K })).toBeNull()
-    expect(planTaskPinnedRead({ inView: first, now: [], task: K })).toEqual({
-      task: K,
-      cards: [],
-      retired: [{ id: threadIdFor("c1"), line: "ship it" }],
-    })
+    const first = planCanvasPinnedRead({ inView: null, now, canvas: K })
+    expect(first).toEqual({ canvas: K, cards: now, retired: [] })
+    expect(planCanvasPinnedRead({ inView: first, now, canvas: K })).toBeNull()
+    expect(planCanvasPinnedRead({ inView: first, now: [], canvas: K })).toEqual(
+      {
+        canvas: K,
+        cards: [],
+        retired: [{ id: threadIdFor("c1"), line: "ship it" }],
+      },
+    )
     // Nothing pinned, nothing read before: nothing to say.
-    expect(planTaskPinnedRead({ inView: null, now: [], task: K })).toBeNull()
+    expect(
+      planCanvasPinnedRead({ inView: null, now: [], canvas: K }),
+    ).toBeNull()
   })
 
-  test("what another task's entry said no longer applies", () => {
+  test("what another canvas's entry said no longer applies", () => {
     const elsewhere = {
-      task: taskIdFor("k-other"),
+      canvas: canvasIdFor("k-other"),
       cards: [read("c9", "old")],
       retired: [],
     }
-    expect(planTaskPinnedRead({ inView: elsewhere, now: [], task: K })).toEqual(
-      {
-        task: K,
-        cards: [],
-        retired: [{ id: threadIdFor("c9"), line: "old" }],
-      },
-    )
+    expect(
+      planCanvasPinnedRead({ inView: elsewhere, now: [], canvas: K }),
+    ).toEqual({
+      canvas: K,
+      cards: [],
+      retired: [{ id: threadIdFor("c9"), line: "old" }],
+    })
   })
 })
 
@@ -170,8 +176,8 @@ describe("the context table", () => {
     () => "Ada",
     1,
   )
-  const taskPinned = encodeTaskPinned(
-    { task: K, cards: [read2("c2")], retired: [] },
+  const canvasPinned = encodeCanvasPinned(
+    { canvas: K, cards: [read2("c2")], retired: [] },
     () => "Ada",
     1,
   )
@@ -180,9 +186,9 @@ describe("the context table", () => {
   test("each kind is known by its decoder; every rule is in <rules> once", () => {
     const kindsOf = (message: unknown) =>
       CONTEXT_KINDS.filter(k => CONTEXT[k].decode(message) !== undefined)
-    expect([list, taskPinned, pinned].map(kindsOf)).toEqual([
+    expect([list, canvasPinned, pinned].map(kindsOf)).toEqual([
       ["canvas"],
-      ["task-pinned-cards"],
+      ["canvas-pinned-cards"],
       ["pinned-cards"],
     ])
     expect(kindsOf({ role: "user", content: "x" })).toEqual([])
@@ -198,7 +204,7 @@ describe("the context table", () => {
       canvas: { ...canvasList(facts()), title: "newer" },
       pinned: { lane: A, cards: [read2("c1")], retired: [] },
     })
-    expect(contextOf([taskPinned]).taskPinned?.task).toBe(K)
+    expect(contextOf([canvasPinned]).canvasPinned?.canvas).toBe(K)
     expect(contextOf([])).toEqual({})
   })
 })
@@ -208,8 +214,8 @@ function read2(id: string) {
 }
 
 describe("a canvas change during a run", () => {
-  const before = canvas([A, B])
-  const after = canvas([A, B, N])
+  const before = cardsFor([A, B])
+  const after = cardsFor([A, B, N])
   const facts = (over: Partial<Parameters<typeof planCanvasFacts>[0]> = {}) =>
     planCanvasFacts({
       before,
@@ -218,17 +224,17 @@ describe("a canvas change during a run", () => {
       threadsOf: new Map([[K, [A, B]]]),
       running: new Set([A]),
       titleOf: c => (c.id === N ? 'note column "Decisions"' : c.id),
-      taskTitleOf: t => (t === K ? "Here" : "Elsewhere"),
+      canvasTitleOf: t => (t === K ? "Here" : "Elsewhere"),
       ...over,
     })
 
-  test("a card added or taken is told to each running thread of its task, a steer", () => {
+  test("a card added or taken is told to each running thread of its canvas, a steer", () => {
     expect(facts()).toEqual([
       {
         kind: "steer",
         lane: A,
         fact: {
-          task: K,
+          canvas: K,
           by: BEA,
           title: 'note column "Decisions"',
           change: "added",
@@ -250,25 +256,25 @@ describe("a canvas change during a run", () => {
     expect(facts({ running: new Set([B]) })).toHaveLength(1)
     expect(facts({ running: new Set() })).toEqual([])
     expect(
-      facts({ after: canvas([N, B, A]), before: canvas([A, B, N]) }),
+      facts({ after: cardsFor([N, B, A]), before: cardsFor([A, B, N]) }),
     ).toEqual([])
     expect(facts({ by: null })).toEqual([])
-    const added = canvas([A, B])
+    const added = cardsFor([A, B])
     expect(
-      facts({ before: canvas([B]), after: added, running: new Set([A]) }),
+      facts({ before: cardsFor([B]), after: added, running: new Set([A]) }),
     ).toEqual([])
   })
 
-  test("a running thread moved to another task is told it moved; the tasks' threads are told it was taken and added", () => {
-    const L = taskIdFor("01a0ffd2-0000-7000-8000-0000000000f2")
+  test("a running thread moved to another canvas is told it moved; the canvases' threads are told it was taken and added", () => {
+    const L = canvasIdFor("01a0ffd2-0000-7000-8000-0000000000f2")
     const moved = [
-      ...canvas([B]),
-      ...canvas([A]).flatMap(c =>
-        c.kind === "thread" ? [{ ...c, place: { ...c.place, task: L } }] : [],
+      ...cardsFor([B]),
+      ...cardsFor([A]).flatMap(c =>
+        c.kind === "thread" ? [{ ...c, place: { ...c.place, canvas: L } }] : [],
       ),
     ]
     const steers = facts({
-      before: canvas([A, B]),
+      before: cardsFor([A, B]),
       after: moved,
       threadsOf: new Map([
         [K, [B]],
@@ -279,26 +285,26 @@ describe("a canvas change during a run", () => {
     expect(steers).toContainEqual({
       kind: "steer",
       lane: A,
-      fact: { task: L, by: BEA, title: "Elsewhere", change: "moved" },
+      fact: { canvas: L, by: BEA, title: "Elsewhere", change: "moved" },
     })
     expect(steers).toContainEqual({
       kind: "steer",
       lane: B,
-      fact: { task: K, by: BEA, title: A, change: "taken" },
+      fact: { canvas: K, by: BEA, title: A, change: "taken" },
     })
     expect(
       canvasFactLine({
-        task: L,
+        canvas: L,
         by: BEA,
         byName: "Bea",
         title: "Elsewhere",
         change: "moved",
       }),
-    ).toBe('Bea moved this thread to the task "Elsewhere"')
+    ).toBe('Bea moved this thread to the canvas "Elsewhere"')
     // Into an inventory it is taken, and told nothing: its run stops.
     const taken = facts({
-      before: canvas([A, B]),
-      after: canvas([B]),
+      before: cardsFor([A, B]),
+      after: cardsFor([B]),
       running: new Set([A]),
     })
     expect(taken).toEqual([])
@@ -316,7 +322,7 @@ describe("a canvas change during a run", () => {
 })
 
 test("a switch over a canvas card's kind that leaves one out does not compile", () => {
-  const kindOf = (c: CanvasCard): string => {
+  const kindOf = (c: CardOnCanvas): string => {
     switch (c.kind) {
       case "thread":
         return "thread"
@@ -325,5 +331,5 @@ test("a switch over a canvas card's kind that leaves one out does not compile", 
         return c satisfies never
     }
   }
-  expect(kindOf(canvas([A])[0] as CanvasCard)).toBe("thread")
+  expect(kindOf(cardsFor([A])[0] as CardOnCanvas)).toBe("thread")
 })

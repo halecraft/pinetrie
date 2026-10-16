@@ -91,7 +91,7 @@ async function run(check: Checks["check"]): Promise<void> {
       },
     ])
     const asked = `what colour is this? ![red](/blob/${red.sha256})`
-    await iu.chat(asked, ROOT, START_AGENT)
+    await iu.send(asked, ROOT, START_AGENT)
     await iidle()
 
     check(
@@ -105,7 +105,7 @@ async function run(check: Checks["check"]): Promise<void> {
     const replyId = idOfIn(ih, "a red one")
     const paused = script.hold("hold on")
     script.use([{ text: "held" }, { text: "a green one" }])
-    await iu.chat("@agent hold on", at(replyId), {
+    await iu.send("@agent hold on", at(replyId), {
       mode: "reply",
     })
     await waitFor(() => paused.reached, 10_000)
@@ -124,7 +124,7 @@ async function run(check: Checks["check"]): Promise<void> {
 
     // 5. An image the host does not store refuses the send.
     const missing = "9".repeat(64)
-    await iu.chat(`![gone](/blob/${missing})`, at(idOfIn(ih, "a green one")), {
+    await iu.send(`![gone](/blob/${missing})`, at(idOfIn(ih, "a green one")), {
       mode: "reply",
     })
 
@@ -151,7 +151,7 @@ async function run(check: Checks["check"]): Promise<void> {
     clock.advance(BLOB_GRACE_MS + 1)
     const iv = await join(ih, "ivy", "images")
     script.use([{ text: "swept" }])
-    await iv.chat("@agent anything", at(idOfIn(ih, "a green one")), {
+    await iv.send("@agent anything", at(idOfIn(ih, "a green one")), {
       mode: "reply",
     })
     await iidle()
@@ -173,7 +173,7 @@ async function run(check: Checks["check"]): Promise<void> {
         },
       },
     ])
-    await iv.chat("@agent and the first one?", at(idOfIn(ih, "swept")), {
+    await iv.send("@agent and the first one?", at(idOfIn(ih, "swept")), {
       mode: "reply",
     })
     await iidle()

@@ -19,28 +19,27 @@ import {
 } from "@pinetrie/protocol/codec"
 import { readRunning } from "@pinetrie/reads"
 import {
+  type CanvasIndex,
   type Cleared,
   PARTICIPANT,
   setRecord,
-  type TaskIndex,
 } from "@pinetrie/rules"
 import { failed, type HostKeeper } from "../basics.ts"
+import { canvasesNow } from "../canvases.ts"
 import type { ControlSender } from "../control.ts"
 import { queueFact } from "../facts.ts"
 import type { Names } from "../names.ts"
 import type { Places } from "../places.ts"
 import type { Provenance } from "../provenance.ts"
 import type { Records } from "../records.ts"
-import { tasksNow } from "../tasks.ts"
 import type { Titles } from "../titles.ts"
-import { type BoardDeps, handleTaskMove, handleWorkflow } from "./board.ts"
+import { type BoardDeps, handleCanvasMove, handleWorkflow } from "./board.ts"
 import {
   type CardCommandDeps,
   createCardCommands,
   type Settled,
   settled,
 } from "./cards.ts"
-import { type ChatDeps, sendChat, spendsCard } from "./chat.ts"
 import { clear } from "./gate.ts"
 import {
   actOnAccepted,
@@ -53,28 +52,29 @@ import {
 } from "./lane.ts"
 import { handleMark, type MarkDeps } from "./mark.ts"
 import { handlePicture, type PictureDeps } from "./picture.ts"
+import { type SendDeps, sendMessage, spendsCard } from "./send.ts"
 
 export interface CommandDeps {
-  readonly basics: ChatDeps["basics"]
-  readonly agent: ChatDeps["agent"] & LaneDeps["agent"]
-  readonly scribe: ChatDeps["scribe"]
+  readonly basics: SendDeps["basics"]
+  readonly agent: SendDeps["agent"] & LaneDeps["agent"]
+  readonly scribe: SendDeps["scribe"]
   readonly records: BoardDeps["records"] &
     MarkDeps["records"] &
     LaneDeps["records"] &
     Pick<Records, "writeValues">
-  readonly piSetup: ChatDeps["piSetup"]
-  readonly work: ChatDeps["work"] & BoardDeps["work"] & LaneDeps["work"]
-  readonly blobs: ChatDeps["blobs"] & PictureDeps["blobs"]
-  readonly quoteBytes: ChatDeps["quoteBytes"]
+  readonly piSetup: SendDeps["piSetup"]
+  readonly work: SendDeps["work"] & BoardDeps["work"] & LaneDeps["work"]
+  readonly blobs: SendDeps["blobs"] & PictureDeps["blobs"]
+  readonly quoteBytes: SendDeps["quoteBytes"]
   readonly fitImage: PictureDeps["fitImage"]
-  readonly cards: ChatDeps["cards"] &
+  readonly cards: SendDeps["cards"] &
     CardCommandDeps["cards"] &
     LaneDeps["cards"] &
     BoardDeps["cards"]
-  readonly start: ChatDeps["start"]
+  readonly start: SendDeps["start"]
   readonly cancel: LaneDeps["cancel"]
   readonly names: Pick<Names, "reserve" | "ensure">
-  readonly titles: ChatDeps["titles"] & Pick<Titles, "asked">
+  readonly titles: SendDeps["titles"] & Pick<Titles, "asked">
   readonly drain: CardCommandDeps["drain"]
   readonly histories: CardCommandDeps["histories"]
   /** The writer of the places. */
@@ -85,7 +85,7 @@ export interface CommandDeps {
   readonly keeper: Pick<HostKeeper, "run" | "track">
   /** The fact of an action on proposed changes is a late write. */
   readonly later: LaneDeps["later"]
-  readonly relays: ChatDeps["relays"]
+  readonly relays: SendDeps["relays"]
 }
 
 /** Where a command runs: a step on the documents' keeper, your repo's owner, or a board move's three parts. */
@@ -94,12 +94,12 @@ type CommandPlace = "documents" | "repo" | "board"
 /**
  * Where each kind of command runs. An action on proposed changes and a setup or
  * publish act on your repo only: they go straight to its owner, and hold no
- * other command. A move on the board is up to three parts (`handleTaskMove`).
+ * other command. A move on the board is up to three parts (`handleCanvasMove`).
  * Everything else is one step on the documents' keeper. A kind with no place
  * does not compile.
  */
 const COMMAND_PLACE = {
-  chat: "documents",
+  send: "documents",
   reserve: "documents",
   name: "documents",
   picture: "documents",
@@ -126,7 +126,7 @@ const COMMAND_PLACE = {
   proposed: "repo",
   setup: "repo",
   publish: "repo",
-  "move-task": "board",
+  "move-canvas": "board",
 } as const satisfies Record<Intent["kind"], CommandPlace>
 
 export const placeOfCommand = (intent: Intent): CommandPlace =>
@@ -147,12 +147,12 @@ export interface Commands {
   ): Promise<void>
   /**
    * A queued card the host popped, sent as its queuer's message: cleared
-   * through the gate, then `sendChat`, as a `chat` command goes.
+   * through the gate, then `sendMessage`, as a `chat` command goes.
    */
   sendPoppedQueuedCard(
     writer: WriterId,
     sendId: string,
-    chat: Send,
+    said: Send,
   ): Promise<Outcome>
 }
 
@@ -219,11 +219,11 @@ export function createCommands(deps: CommandDeps): Commands {
     intent: Intent,
     id: string,
   ): Promise<Settled> {
-    // gather: the task index once, for the gate and every card command
-    const tasks = tasksNow(deps.basics)
-    const gate = await clear(deps, intent, tasks)
+    // gather: the canvas index once, for the gate and every card command
+    const canvases = canvasesNow(deps.basics)
+    const gate = await clear(deps, intent, canvases)
     if (gate.kind !== "cleared") return settled(gate)
-    return carry(writer, gate.command, id, tasks)
+    return carry(writer, gate.command, id, canvases)
   }
 
   /** Carry out one command the gate cleared. */
@@ -231,19 +231,19 @@ export function createCommands(deps: CommandDeps): Commands {
     writer: WriterId,
     intent: Cleared<Intent>,
     id: string,
-    tasks: TaskIndex,
+    canvases: CanvasIndex,
   ): Promise<Settled> {
     switch (intent.kind) {
-      case "chat": {
+      case "send": {
         // The command's id is the send's id: its column finds its message by it.
         const sendId = id === "" ? newId() : id
-        const sent = await sendChat(deps, writer, sendId, intent)
+        const sent = await sendMessage(deps, writer, sendId, intent)
         const card = intent.card
         if (card === null) return settled(sent)
         if (spendsCard(sent))
           return settled(
             sent,
-            await cardCommands.spend(writer, card.id, { sendId, chat: intent }),
+            await cardCommands.spend(writer, card.id, { sendId, send: intent }),
           )
         if (sent.kind === "busy")
           return (
@@ -253,27 +253,27 @@ export function createCommands(deps: CommandDeps): Commands {
         return settled(sent)
       }
       case "move":
-        return cardCommands.move(writer, intent.moves, intent.here, tasks)
+        return cardCommands.move(writer, intent.moves, intent.here, canvases)
       case "copy-thread":
-        return cardCommands.copyThread(writer, intent, tasks)
+        return cardCommands.copyThread(writer, intent, canvases)
       case "open-thread":
         return cardCommands.openThread(writer, intent)
       case "branch-out":
         return cardCommands.branchOut(
           writer,
           intent,
-          tasks,
-          chat => send(writer, newId(), chat),
+          canvases,
+          said => send(writer, newId(), said),
           fact => queueFact(deps, fact),
         )
       case "paste":
-        return cardCommands.paste(writer, intent, tasks)
+        return cardCommands.paste(writer, intent, canvases)
       case "spin-off":
         return cardCommands.spinOff(
           writer,
           intent,
-          chat => send(writer, newId(), chat),
-          tasks,
+          said => send(writer, newId(), said),
+          canvases,
         )
       case "queue-card":
         return cardCommands.queueCard(
@@ -281,14 +281,14 @@ export function createCommands(deps: CommandDeps): Commands {
           intent.move,
           intent.hold,
           intent.command,
-          tasks,
+          canvases,
         )
       case "reorder":
-        return cardCommands.reorder(writer, intent.reorder, tasks)
+        return cardCommands.reorder(writer, intent.reorder, canvases)
       case "card-width":
         return cardCommands.cardWidth(writer, intent)
       case "unqueue-all":
-        return cardCommands.unqueueAll(writer, intent.lane, tasks)
+        return cardCommands.unqueueAll(writer, intent.lane, canvases)
       case "queue-hold":
         return settled(
           await handleQueueHold(deps, intent.lane, intent.held, writer),
@@ -296,9 +296,9 @@ export function createCommands(deps: CommandDeps): Commands {
       case "undo-move":
         return cardCommands.undoMove(
           writer,
-          historyScope(intent.task),
+          historyScope(intent.canvas),
           intent.direction,
-          tasks,
+          canvases,
         )
       case "set-command":
         return cardCommands.setCommand(writer, intent.card, intent.command)
@@ -317,14 +317,18 @@ export function createCommands(deps: CommandDeps): Commands {
         return settled(await handleCarryOn(deps, intent.lane, writer))
       case "ssh-access":
         return settled(await handleSshAccess(deps, writer, intent))
-      case "move-task":
-        return handleTaskMove({ ...deps, moves: cardCommands }, writer, intent)
+      case "move-canvas":
+        return handleCanvasMove(
+          { ...deps, moves: cardCommands },
+          writer,
+          intent,
+        )
       case "workflow":
         return settled(await handleWorkflow(deps, intent))
       case "mark":
         return settled(await handleMark(deps, writer, intent))
       case "retitle":
-        return settled(await deps.titles.asked(intent.task, writer))
+        return settled(await deps.titles.asked(intent.canvas, writer))
       case "proposed":
         return settled(await actOnProposedChanges(deps, intent, writer))
       case "setup":
@@ -347,11 +351,11 @@ export function createCommands(deps: CommandDeps): Commands {
   async function send(
     writer: WriterId,
     sendId: string,
-    chat: Send,
+    said: Send,
   ): Promise<Outcome> {
-    const gate = await clear(deps, chat, tasksNow(deps.basics))
+    const gate = await clear(deps, said, canvasesNow(deps.basics))
     return gate.kind === "cleared"
-      ? sendChat(deps, writer, sendId, gate.command)
+      ? sendMessage(deps, writer, sendId, gate.command)
       : gate
   }
 

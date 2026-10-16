@@ -23,7 +23,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a command does not compel the agent",
-    file: "packages/rules/chat.ts",
+    file: "packages/rules/message.ts",
     from: "    command: command !== null,\n",
     to: "    command: false,\n",
     command: vitest("packages/rules"),
@@ -31,7 +31,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "an unknown command is sent as text",
-    file: "packages/rules/chat.ts",
+    file: "packages/rules/message.ts",
     from: '  if (command !== null && "unknown" in command)',
     to: "  if (false)",
     command: vitest("packages/rules"),
@@ -71,7 +71,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "an unreadable command is sent as text",
-    file: "packages/rules/chat.ts",
+    file: "packages/rules/message.ts",
     from: '  if (command !== null && "unreadable" in command)',
     to: "  if (false)",
     command: vitest("packages/rules"),

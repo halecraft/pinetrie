@@ -1,10 +1,10 @@
 import { readdirSync } from "node:fs"
 import path from "node:path"
 import {
+  canvasIdFor,
   commitId,
   entryId,
   type ThreadName,
-  taskIdFor,
   textCardId,
   threadIdFor,
   writerId,
@@ -12,15 +12,15 @@ import {
 import { describe, expect, test } from "vitest"
 import { BEHIND } from "./behind.ts"
 import { CANVAS, CANVAS_FACT } from "./canvas.ts"
-import { renderableMessage } from "./chat.ts"
+import { CANVAS_PINNED } from "./canvas-pinned.ts"
 import { FACT } from "./fact.ts"
 import type { HistorySpec } from "./history.ts"
 import { LAND } from "./land.ts"
+import { renderableMessage } from "./message.ts"
 import { PINNED } from "./pinned.ts"
 import { ANSWER, HEARD, RELAY } from "./relay.ts"
 import { STACK } from "./stack.ts"
 import { CARRY_ON } from "./stop.ts"
-import { TASK_PINNED } from "./task-pinned.ts"
 import { UPDATE } from "./update.ts"
 
 /** Every kind of history message: a spec left out fails the first test. */
@@ -32,7 +32,7 @@ const MESSAGE_SPECS = [
   BEHIND,
   CARRY_ON,
   PINNED,
-  TASK_PINNED,
+  CANVAS_PINNED,
   CANVAS,
   CANVAS_FACT,
   HEARD,
@@ -95,19 +95,19 @@ const SAMPLES: Record<CustomType, unknown> = {
     cards: [{ id: textCardId("k-1"), text: "do it", by: ADA }],
     retired: [{ id: textCardId("k-0"), line: "old" }],
   },
-  "pinetrie.task-pinned": {
-    task: taskIdFor("t"),
+  "pinetrie.canvas-pinned": {
+    canvas: canvasIdFor("t"),
     cards: [{ id: textCardId("k-1"), text: "do it", by: ADA }],
     retired: [],
   },
   "pinetrie.canvas": {
-    task: taskIdFor("t"),
+    canvas: canvasIdFor("t"),
     title: "Fix the sync bug",
     lines: ["thread amber-fox (this thread), put by Ada"],
     more: 0,
   },
   "pinetrie.canvas-fact": {
-    task: taskIdFor("t"),
+    canvas: canvasIdFor("t"),
     by: ADA,
     byName: "Ada",
     title: "Decisions",
@@ -149,7 +149,7 @@ const ROLES: Record<CustomType, string> = {
   "pinetrie.behind": "behind",
   "pinetrie.carry-on": "carry-on",
   "pinetrie.pinned": "pinned",
-  "pinetrie.task-pinned": "task-pinned",
+  "pinetrie.canvas-pinned": "canvas-pinned",
   "pinetrie.canvas": "canvas",
   "pinetrie.canvas-fact": "fact",
   "pinetrie.heard": "heard",

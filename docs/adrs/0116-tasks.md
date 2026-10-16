@@ -27,6 +27,9 @@
   - ADR-0137: a folded strip shows its thread's mark, and its name at the
     header's size and colour, in its thread's colour.
   - ADR-0138: the task column no longer has **+ note column**.
+  - ADR-0158: the board's card is a canvas, not a task; topic and task are
+    words for where a canvas is on the board; the task column is the canvas
+    column, and its pinned cards are pinned to the canvas.
 
 **Context.**
 

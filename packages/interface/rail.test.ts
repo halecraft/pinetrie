@@ -16,7 +16,7 @@ import { compactRail, type RailItem, stretchSpan } from "./rail.ts"
  * sorts by age, so "2-…" is older than "3-…". Every entry is a chat message.
  */
 const tree = (parents: Record<string, string | null>) =>
-  fromParents(parents, id => ({ role: "chat", content: id, author: "A" }))
+  fromParents(parents, id => ({ role: "person", content: id, author: "A" }))
 
 // The plan's example: a trunk T1 -> T2 -> T3, a branch A off T1, a branch B off
 // T2. The trunk's continuation is older than each branch.
@@ -173,16 +173,20 @@ describe("compactRail", () => {
   test("a stretch counts the messages people wrote, and who, in order", () => {
     const ada = writerId("w-ada")
     const bea = writerId("w-bea")
-    const chat = (writer: typeof ada) => ({ role: "chat", author: "", writer })
+    const said = (writer: typeof ada) => ({
+      role: "person",
+      author: "",
+      writer,
+    })
     const agent = { role: "assistant", content: "ok" }
     const items = compact(
       entriesOf([
-        entry("01", null, chat(ada)),
-        entry("02", "01", chat(bea)),
+        entry("01", null, said(ada)),
+        entry("02", "01", said(bea)),
         entry("03", "02", agent),
-        entry("04", "03", chat(ada)),
+        entry("04", "03", said(ada)),
         entry("05", "04", agent),
-        entry("06", "05", chat(bea)),
+        entry("06", "05", said(bea)),
       ]),
       "01",
     )

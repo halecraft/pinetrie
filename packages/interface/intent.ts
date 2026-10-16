@@ -7,6 +7,7 @@
 
 import {
   agentAsk,
+  type CanvasId,
   type CardCommand,
   type CardId,
   type CardWidth,
@@ -22,7 +23,6 @@ import {
   type ProposedChangesAction,
   type QueueHoldChange,
   type RootId,
-  type TaskId,
   type TextCardId,
   type ThreadId,
   type ThreadStart,
@@ -56,7 +56,7 @@ import {
   planNewCard,
   planOpenTrace,
   planPin,
-  planPinToTask,
+  planPinToCanvas,
   planPut,
   planQueueReference,
   planRestore,
@@ -81,7 +81,7 @@ import {
 } from "./columns.ts"
 import {
   changeViewOf,
-  closeTaskEffects,
+  closeCanvasEffects,
   type Effect,
   foldViewOf,
   type IntentState,
@@ -89,7 +89,7 @@ import {
   list,
   planOpenAt,
   show,
-  showTask,
+  showCanvas,
 } from "./effects.ts"
 import type { NameStep } from "./identity.ts"
 import {
@@ -99,7 +99,7 @@ import {
   type ViewChange,
 } from "./layout.ts"
 import { otherWidth } from "./list-width.ts"
-import type { MessageAct } from "./message-tools.ts"
+import { AGENT_PREFILL, type MessageAct } from "./message-tools.ts"
 import type { PageName } from "./page.ts"
 import type { ProposalPress } from "./proposal-view.ts"
 import type { CanvasPut, PutTarget } from "./put-target.ts"
@@ -145,11 +145,11 @@ export type ColumnAct =
   | { readonly kind: "pin"; readonly card: CardId }
   /**
    * Unpin a card: a note in the note column nearest its thread, or, pinned
-   * to the task, nearest the task column.
+   * to the canvas, nearest the canvas column.
    */
   | { readonly kind: "unpin"; readonly card: CardId }
-  /** Pin a card to the task its column is in: every thread reads it. */
-  | { readonly kind: "pinToTask"; readonly card: CardId }
+  /** Pin a card to the canvas its column is in: every thread reads it. */
+  | { readonly kind: "pinToCanvas"; readonly card: CardId }
   /** Your message to the note column nearest its thread. */
   | { readonly kind: "toNote"; readonly card: CardId }
   /** Card `card`'s box takes focus once drawn: a new card handed to its list. */
@@ -256,15 +256,15 @@ export type Intent =
     }
   /** A thread you opened sent its first message: what it started with is spent. */
   | { readonly kind: "sentFirst"; readonly card: ThreadId }
-  /** Unfold a column of the task you are on, or fold it. */
+  /** Unfold a column of the canvas you are on, or fold it. */
   | {
       readonly kind: "fold"
       readonly card: CardId
       readonly unfolded: boolean
     }
-  /** Unfold the task column of the task you are on, or fold it. */
-  | { readonly kind: "foldTask"; readonly unfolded: boolean }
-  /** Make a column, as `make` says, at a spot on a task's canvas. */
+  /** Unfold the canvas column of the canvas you are on, or fold it. */
+  | { readonly kind: "foldCanvas"; readonly unfolded: boolean }
+  /** Make a column, as `make` says, at a spot on a canvas. */
   | {
       readonly kind: "addColumn"
       readonly make: NewColumn
@@ -286,37 +286,37 @@ export type Intent =
       readonly card: CardId
       readonly width: CardWidth
     }
-  /** Show a task, opening it in the sidebar, or nothing. */
+  /** Show a canvas, opening it in the sidebar, or nothing. */
   | { readonly kind: "show"; readonly here: Here }
   /**
-   * Open a new tab: a new task, its new root's first thread not
-   * yet started on its canvas, shown and in the sidebar.
+   * Open a new canvas, its new root's first thread not yet started on it,
+   * shown and in the sidebar. The thread's box starts with `prefill`, else
+   * `@agent ` (`AGENT_PREFILL`).
    */
   | {
-      readonly kind: "newTab"
-      readonly asksAgent: boolean
+      readonly kind: "newCanvas"
       readonly prefill?: Prefill
-      /** The workflow state its task lands in: the board column it came from. */
+      /** The workflow state its canvas lands in: the board column it came from. */
       readonly state?: WorkflowStateId
     }
-  /** Close a task of the sidebar for you: nothing shared is written. */
+  /** Close a canvas of the sidebar for you: nothing shared is written. */
   | { readonly kind: "close"; readonly here: Here }
-  /** Move a task of the sidebar before `before`, or to its end. */
+  /** Move a canvas of the sidebar before `before`, or to its end. */
   | {
       readonly kind: "moveInList"
-      readonly task: TaskId
-      readonly before: TaskId | null
+      readonly canvas: CanvasId
+      readonly before: CanvasId | null
     }
   /**
-   * Move a task on the board. Into the archive it is archived,
+   * Move a canvas on the board. Into the archive it is archived,
    * and closed for you once the host accepts; out of it, restored.
    */
   | {
-      readonly kind: "moveTask"
-      readonly task: TaskId
+      readonly kind: "moveCanvas"
+      readonly canvas: CanvasId
       readonly from: WorkflowStateId
       readonly to: WorkflowStateId
-      readonly before: TaskId | null
+      readonly before: CanvasId | null
       /** `to` is the archive. */
       readonly closes: boolean
     }
@@ -333,16 +333,16 @@ export type Intent =
   | { readonly kind: "foldList" }
   /** Show a page over the stage, or, with null, the stage. */
   | { readonly kind: "page"; readonly to: PageName | null }
-  /** Open, type in, clear or close the search of the task you are on. */
+  /** Open, type in, clear or close the search of the canvas you are on. */
   | { readonly kind: "search"; readonly act: SearchAsk }
-  /** Title a task or a note column, or clear its title with null. */
+  /** Title a canvas or a note column, or clear its title with null. */
   | {
       readonly kind: "rename"
       readonly of: MarkTarget
       readonly title: string | null
     }
-  /** Ask a model for the task's title. */
-  | { readonly kind: "retitle"; readonly task: TaskId }
+  /** Ask a model for the canvas's title. */
+  | { readonly kind: "retitle"; readonly canvas: CanvasId }
   /** What `lane` raised for you is not needed: it clears on every device. */
   | {
       readonly kind: "notNeeded"
@@ -353,7 +353,7 @@ export type Intent =
   | { readonly kind: "openAt"; readonly entry: EntryId }
   /**
    * Follow a link to entry `entry` of its thread: in
-   * its task, whose root this tab may not hold; in your
+   * its canvas, whose root this tab may not hold; in your
    * inventory, its preview; held by someone else, nothing. What the inbox,
    * a mention, a fork row and a rail's stub open.
    */
@@ -400,7 +400,7 @@ export type Intent =
     }
   | { readonly kind: "selectSlot"; readonly slot: number }
   /**
-   * Undo or redo your newest move in the task you are on, or, with the
+   * Undo or redo your newest move in the canvas you are on, or, with the
    * inventory panel focused, your newest swap.
    */
   | {
@@ -432,7 +432,7 @@ export function planIntent(
 /**
  * `effects`, after closing the search when they show something it covers:
  * a message revealed, a column opened or unfolded, or another
- * task, a new tab or the board. A message revealed is outlined last, so
+ * canvas, a new canvas or the board. A message revealed is outlined last, so
  * leaving shows where it landed.
  */
 function leavingSearch(
@@ -463,7 +463,7 @@ const opensOrShows = (action: LayoutAction): boolean =>
 
 /**
  * `effects`, after leaving the page shown over the stage when they show
- * something there (`showsStage`): a root, a new tab or the board would
+ * something there (`showsStage`): a root, a new canvas or the board would
  * otherwise open under the page, unseen.
  */
 function leavingPage(
@@ -487,23 +487,23 @@ function planOf(
       return planColumn(intent.column, intent.act, state, minted)
     case "moveColumn": {
       const active = state.layout.active
-      return active?.kind === "task"
-        ? planColumnMove(intent.column.card, intent.to, active.task, state)
+      return active?.kind === "canvas"
+        ? planColumnMove(intent.column.card, intent.to, active.canvas, state)
         : []
     }
     case "sentFirst":
-      return onTaskYouAreOn(state, { kind: "sent", card: intent.card })
+      return onCanvasYouAreOn(state, { kind: "sent", card: intent.card })
     case "fold":
-    case "foldTask": {
+    case "foldCanvas": {
       const active = state.layout.active
-      return active?.kind === "task"
+      return active?.kind === "canvas"
         ? [
             foldViewOf(
               state,
-              active.task,
+              active.canvas,
               intent.kind === "fold"
                 ? { kind: "fold", card: intent.card, unfolded: intent.unfolded }
-                : { kind: "foldTask", unfolded: intent.unfolded },
+                : { kind: "foldCanvas", unfolded: intent.unfolded },
             ),
           ]
         : []
@@ -514,8 +514,8 @@ function planOf(
       return planCopyThread(intent.source, intent.to, state, minted)
     // From the canvas its sender sees it on: the host refuses it moved since.
     case "cardWidth": {
-      const task = state.tasks.index.taskOfCard.get(intent.card)
-      return task === undefined
+      const canvas = state.canvases.index.canvasOfCard.get(intent.card)
+      return canvas === undefined
         ? []
         : [
             {
@@ -523,7 +523,7 @@ function planOf(
               intent: {
                 kind: "card-width",
                 card: intent.card,
-                at: { kind: "canvas", task },
+                at: { kind: "canvas", canvas },
                 width: intent.width,
               },
             },
@@ -531,40 +531,39 @@ function planOf(
     }
     case "show":
       return show(intent.here)
-    case "newTab":
+    case "newCanvas":
       return [
         ...openThreadColumn(
-          minted.task,
+          minted.canvas,
           minted.thread,
           minted.root,
-          { kind: "new-task", state: intent.state ?? null },
-          {
-            ...(intent.prefill === undefined
-              ? {}
-              : { prefill: intent.prefill }),
-            ...(intent.asksAgent ? { asksAgent: true } : {}),
-          },
+          { kind: "new-canvas", state: intent.state ?? null },
+          { prefill: intent.prefill ?? AGENT_PREFILL },
           state,
         ),
-        ...show({ kind: "task", task: minted.task }),
+        ...show({ kind: "canvas", canvas: minted.canvas }),
       ]
     case "close":
-      return intent.here.kind === "task" ? closeTask(intent.here.task) : []
+      return intent.here.kind === "canvas"
+        ? closeCanvas(intent.here.canvas)
+        : []
     case "moveInList":
-      return [list({ kind: "place", task: intent.task, before: intent.before })]
-    case "moveTask":
+      return [
+        list({ kind: "place", canvas: intent.canvas, before: intent.before }),
+      ]
+    case "moveCanvas":
       // Into the archive: it leaves the sidebar once the host accepts.
       return [
         {
-          kind: "moveTask",
+          kind: "moveCanvas",
           move: {
-            kind: "move-task",
-            task: intent.task,
+            kind: "move-canvas",
+            canvas: intent.canvas,
             from: intent.from,
             to: intent.to,
             before: intent.before,
           },
-          moved: intent.closes ? closeTask(intent.task) : [],
+          moved: intent.closes ? closeCanvas(intent.canvas) : [],
         },
       ]
     case "editWorkflow":
@@ -595,7 +594,7 @@ function planOf(
       ]
     case "retitle":
       return [
-        { kind: "request", intent: { kind: "retitle", task: intent.task } },
+        { kind: "request", intent: { kind: "retitle", canvas: intent.canvas } },
       ]
     case "notNeeded":
       return [{ kind: "notNeeded", lane: intent.lane, raised: intent.raised }]
@@ -646,20 +645,20 @@ function planOf(
   }
 }
 
-/** A change to your view of the task you are on; off a task, nothing. */
-const onTaskYouAreOn = (
+/** A change to your view of the canvas you are on; off a canvas, nothing. */
+const onCanvasYouAreOn = (
   state: IntentState,
   change: ViewChange,
 ): readonly Effect[] => {
   const active = state.layout.active
-  return active?.kind === "task"
-    ? [changeViewOf(state, active.task, change)]
+  return active?.kind === "canvas"
+    ? [changeViewOf(state, active.canvas, change)]
     : []
 }
 
 /**
  * A column's act, said in `column`. A reader's setting is your view of its
- * card; the task column has none.
+ * card; the canvas column has none.
  */
 function planColumn(
   column: ColumnKey,
@@ -668,12 +667,12 @@ function planColumn(
   minted: Minted,
 ): readonly Effect[] {
   const key = keyText(column)
-  const onTask = (change: ViewChange) => onTaskYouAreOn(state, change)
+  const onCanvas = (change: ViewChange) => onCanvasYouAreOn(state, change)
   /** A reader's setting, of a card's column. */
   const reading = (action: ReaderAction): readonly Effect[] => {
     if (column.kind !== "card") return []
     const { card } = column
-    return onTask(
+    return onCanvas(
       action.kind === "density"
         ? { kind: "density", card, density: action.density }
         : { kind: "details", card, open: action.open },
@@ -684,12 +683,8 @@ function planColumn(
       return planProposal(act.proposal, act.press, state, minted)
     case "openAt":
       return planOpenAt(act.entry, state)
-    case "newTab":
-      return planOf(
-        { kind: "newTab", asksAgent: act.asksAgent, prefill: act.prefill },
-        state,
-        minted,
-      )
+    case "newCanvas":
+      return planOf({ kind: "newCanvas", prefill: act.prefill }, state, minted)
     // A branch is keyed by the thread it minted, as its card is.
     case "branch":
       return planOpenBranch(
@@ -765,8 +760,8 @@ function planColumn(
       return planPin(act.card, key, state)
     case "unpin":
       return planUnpin(act.card, key, state)
-    case "pinToTask":
-      return planPinToTask(act.card, key, state)
+    case "pinToCanvas":
+      return planPinToCanvas(act.card, key, state)
     case "toNote":
       return planToNote(act.card, key, state)
     case "newCard":
@@ -826,7 +821,7 @@ function planColumn(
 }
 
 /**
- * Follow `link` to `entry` (`openOf`): in its task (`planOpenIn`); a thread
+ * Follow `link` to `entry` (`openOf`): in its canvas (`planOpenIn`); a thread
  * in your inventory, its preview there, read only; one someone else holds,
  * or with no card, nothing.
  */
@@ -837,8 +832,8 @@ export function planOpenLink(
 ): readonly Effect[] {
   const open = openOf(link, entry)
   switch (open.kind) {
-    case "task":
-      return planOpenIn(open.entry, open.task, state)
+    case "canvas":
+      return planOpenIn(open.entry, open.canvas, state)
     case "preview": {
       const slot = slotOf(state.cards.slots, open.thread)
       return slot === null
@@ -861,41 +856,41 @@ export function planOpenLink(
 }
 
 /**
- * Show `entry`, in task `task`. One this tab holds opens as
- * `planOpenAt`. Else the task is shown, which holds its roots, archived or
+ * Show `entry`, in canvas `canvas`. One this tab holds opens as
+ * `planOpenAt`. Else the canvas is shown, which holds its roots, archived or
  * not, and the entry is shown once it has arrived.
  */
 function planOpenIn(
   entry: EntryId,
-  task: TaskId,
+  canvas: CanvasId,
   state: IntentState,
 ): readonly Effect[] {
   if (state.index.entries[entry] !== undefined) return planOpenAt(entry, state)
-  return [...showTask(task), { kind: "openWhenHeld", entry }]
+  return [...showCanvas(canvas), { kind: "openWhenHeld", entry }]
 }
 
 /**
- * A column moved to index `to` of its task's canvas, for everyone: a reorder
+ * A column moved to index `to` of its canvas, for everyone: a reorder
  * of its card among the canvas's cards as drawn, which the host
  * orders and the undo key takes back. Nothing for a card on no
- * canvas of `task`, or one already at `to`.
+ * canvas of `canvas`, or one already at `to`.
  */
 export function planColumnMove(
   card: CardId,
   to: number,
-  task: TaskId,
-  state: Pick<IntentState, "tasks">,
+  canvas: CanvasId,
+  state: Pick<IntentState, "canvases">,
 ): readonly Effect[] {
-  const canvas = state.tasks.index.canvases.get(task) ?? []
-  const from = canvas.findIndex(c => c.id === card)
-  if (from < 0 || from === to || to < 0 || to >= canvas.length) return []
-  const rest = canvas.filter(c => c.id !== card)
+  const cards = state.canvases.index.cardsOn.get(canvas) ?? []
+  const from = cards.findIndex(c => c.id === card)
+  if (from < 0 || from === to || to < 0 || to >= cards.length) return []
+  const rest = cards.filter(c => c.id !== card)
   return [
     {
       kind: "reorderCard",
       reorder: {
         card,
-        at: { kind: "canvas", task },
+        at: { kind: "canvas", canvas },
         after: rest[to - 1]?.id ?? null,
         before: rest[to]?.id ?? null,
       },
@@ -916,7 +911,7 @@ function planAddColumn(
   state: IntentState,
   minted: Minted,
 ): readonly Effect[] {
-  const { task, after } = at
+  const { canvas, after } = at
   switch (make.kind) {
     case "note-column": {
       const column = minted.noteColumn
@@ -926,7 +921,7 @@ function planAddColumn(
           IN_COLUMN(column),
           false,
         ),
-        changeViewOf(state, task, {
+        changeViewOf(state, canvas, {
           kind: "fold",
           card: column,
           unfolded: true,
@@ -935,7 +930,7 @@ function planAddColumn(
     }
     case "thread":
       return openThreadColumn(
-        task,
+        canvas,
         minted.thread,
         minted.root,
         { kind: "new-root", after },
@@ -973,13 +968,13 @@ function planCopyThread(
 ): readonly Effect[] {
   const of = threadClip(source, clipFacts(state))
   if (of === null) return []
-  const task = state.tasks.index.taskOfCard.get(source)
+  const canvas = state.canvases.index.canvasOfCard.get(source)
   const target: PutTarget | null =
     to === "inventory"
       ? { kind: "inventory", slot: null }
-      : task === undefined
+      : canvas === undefined
         ? null
-        : { kind: "canvas", task, after: source }
+        : { kind: "canvas", canvas, after: source }
   return target === null
     ? []
     : planPut(
@@ -992,10 +987,10 @@ function planCopyThread(
 }
 
 /**
- * A branch at `at` opened on the task you are on: its thread
+ * A branch at `at` opened on the canvas you are on: its thread
  * `thread` written now, its card just after the thread `at` is in, and its
  * column unfolded with what it starts with, taking focus. Nothing off a
- * task, or for an entry in no root this tab holds.
+ * canvas, or for an entry in no root this tab holds.
  */
 function planOpenBranch(
   thread: ThreadId,
@@ -1006,10 +1001,10 @@ function planOpenBranch(
   const active = state.layout.active
   const parent = threadAt(state.index, at)
   const root =
-    parent === null ? undefined : state.tasks.index.rootOfThread.get(parent)
-  if (active?.kind !== "task" || root === undefined) return []
+    parent === null ? undefined : state.canvases.index.rootOfThread.get(parent)
+  if (active?.kind !== "canvas" || root === undefined) return []
   return openThreadColumn(
-    active.task,
+    active.canvas,
     thread,
     root,
     { kind: "branch", at },
@@ -1033,13 +1028,13 @@ function planProposal(
   minted: Minted,
 ): readonly Effect[] {
   const lane = threadAt(state.index, proposal)
-  const task =
-    lane === null ? undefined : state.tasks.index.taskOfThread.get(lane)
+  const canvas =
+    lane === null ? undefined : state.canvases.index.canvasOfThread.get(lane)
   const root =
-    lane === null ? undefined : state.tasks.index.rootOfThread.get(lane)
-  if (task === undefined || root === undefined) return []
+    lane === null ? undefined : state.canvases.index.rootOfThread.get(lane)
+  if (canvas === undefined || root === undefined) return []
   if (press.kind === "send") {
-    const view = state.layout.tasks.get(task)
+    const view = state.layout.canvases.get(canvas)
     const content = state.index.entries[proposal]?.message?.proposal
     return press.threads.flatMap(({ thread, row }): readonly Effect[] => {
       const card = yourCard(
@@ -1058,12 +1053,12 @@ function planProposal(
       if (text === "") return []
       return [
         {
-          kind: "chat",
+          kind: "send",
           text,
-          at: { kind: "branch", thread, at: press.fork, task },
+          at: { kind: "branch", thread, at: press.fork, canvas },
           card: card?.id ?? null,
         },
-        changeViewOf(state, task, { kind: "sent", card: thread }),
+        changeViewOf(state, canvas, { kind: "sent", card: thread }),
       ]
     })
   }
@@ -1075,7 +1070,7 @@ function planProposal(
     }),
   )
   if (rows === null) return []
-  const base = { kind: "branch-out", root, task, proposal } as const
+  const base = { kind: "branch-out", root, canvas, proposal } as const
   const opened = ({ thread, row }: (typeof rows)[number]) => ({ thread, row })
   const started = (r: (typeof rows)[number]) => ({
     ...opened(r),
@@ -1104,7 +1099,7 @@ function planProposal(
       },
     },
     ...rows.map(r =>
-      changeViewOf(state, task, {
+      changeViewOf(state, canvas, {
         kind: "opened",
         card: r.thread,
         ...(r.edited
@@ -1121,12 +1116,12 @@ type ColumnStarts = Omit<
 >
 
 /**
- * The thread `thread` of `root` opened on `task`'s canvas as `start` says,
+ * The thread `thread` of `root` opened on `canvas`'s canvas as `start` says,
  * written now, and its column, keyed by the thread as its card is, unfolded
  * with what it starts with and taking focus once.
  */
 function openThreadColumn(
-  task: TaskId,
+  canvas: CanvasId,
   thread: ThreadId,
   root: RootId,
   start: ThreadStart,
@@ -1137,22 +1132,22 @@ function openThreadColumn(
     { kind: "armFocus", key: { kind: "column", key: thread } },
     {
       kind: "request",
-      intent: { kind: "open-thread", thread, root, task, start },
+      intent: { kind: "open-thread", thread, root, canvas, start },
     },
-    changeViewOf(state, task, { kind: "opened", card: thread, ...starts }),
+    changeViewOf(state, canvas, { kind: "opened", card: thread, ...starts }),
   ]
 }
 
-const closeTask = closeTaskEffects
+const closeCanvas = closeCanvasEffects
 
 /**
  * After a move on the board is answered: `moved` runs only once
- * the host accepts. A task you move into the archive leaves the sidebar,
- * the one you are on too; only a task someone else archives stays while you
+ * the host accepts. A canvas you move into the archive leaves the sidebar,
+ * the one you are on too; only a canvas someone else archives stays while you
  * are on it (`resolveLayout`). A refusal of its card's move is
  * said on the board, naming who moved it first; any other changes nothing.
  */
-export function afterTaskMove(
+export function afterCanvasMove(
   outcome: Outcome,
   moved: readonly Effect[],
 ): readonly Effect[] {

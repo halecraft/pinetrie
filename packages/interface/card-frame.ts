@@ -56,7 +56,7 @@ export type CardMoveTo =
   /** A reference to it, queued on its thread; it stays. */
   | "reference"
   | "pinned"
-  | "task"
+  | "canvas"
   | "inventory"
   | { readonly kind: "thread"; readonly state: WorkflowState }
 
@@ -74,7 +74,7 @@ const MOVE_PLACES: Readonly<
   note: "note",
   queue: "queued",
   pinned: "pinned",
-  task: "task-pinned",
+  canvas: "canvas-pinned",
   inventory: "inventory",
   reference: null,
 }
@@ -156,9 +156,9 @@ const moveItems = (
           },
         ]
   const pin: CardMoveItem = { to: "pinned", act: { kind: "pin", card: id } }
-  const pinTask: CardMoveItem = {
-    to: "task",
-    act: { kind: "pinToTask", card: id },
+  const pinCanvas: CardMoveItem = {
+    to: "canvas",
+    act: { kind: "pinToCanvas", card: id },
   }
   const take: CardMoveItem = {
     to: "inventory",
@@ -176,14 +176,14 @@ const moveItems = (
         { to: "note", act: { kind: "toNote", card: id } },
         ...queue,
         pin,
-        pinTask,
+        pinCanvas,
         take,
         ...threads,
       ]
     // A note column is no thread's: a note has no message, queue or pinned
     // strip of its own to go to; a drag takes it there.
     case "note":
-      return [pinTask, take, ...threads]
+      return [pinCanvas, take, ...threads]
     case "queued":
       return [
         {
@@ -191,18 +191,18 @@ const moveItems = (
           act: { kind: "unqueue", card: id, lane: place.thread, by: place.by },
         },
         pin,
-        pinTask,
+        pinCanvas,
         take,
       ]
     case "pinned":
       return [
         { to: "note", act: { kind: "unpin", card: id } },
         ...queue,
-        pinTask,
+        pinCanvas,
         take,
       ]
-    // Unpinned from the task, it goes to the task's first note column.
-    case "task-pinned":
+    // Unpinned from the canvas, it goes to the canvas's first note column.
+    case "canvas-pinned":
       return [{ to: "note", act: { kind: "unpin", card: id } }, take]
     // A comment stays beside its entry: a reference to it tells the agent.
     case "margin":
@@ -251,7 +251,7 @@ const byOf = (card: CardRecord, me: WriterId): WriterId | null => {
     case "queued":
       return card.place.by
     case "pinned":
-    case "task-pinned":
+    case "canvas-pinned":
       return card.placer
     default:
       return card.owner === me ? null : card.owner
@@ -354,10 +354,10 @@ const MOVE: Readonly<Record<Exclude<CardMoveTo, object>, MoveWords>> = {
     label: "Move to pinned",
     title: "pin to the top of the column: the agent reads it on every run",
   },
-  task: {
-    label: "Pin to the task",
+  canvas: {
+    label: "Pin to the canvas",
     title:
-      "pin to the task's column: every thread of the task reads it on every run",
+      "pin to the canvas's column: every thread of the canvas reads it on every run",
   },
   note: {
     label: "Move to notes",
@@ -385,7 +385,7 @@ export const moveWords = (to: CardMoveTo): MoveWords =>
     ? MOVE[to]
     : {
         label: `Move to a new thread in ${to.state.name}`,
-        title: `a conversation of its own, its first message this card, in ${to.state.name} on the board`,
+        title: `a chat of its own, its first message this card, in ${to.state.name} on the board`,
       }
 
 /** A Move to ▸ item's key, and its `data-to`: a place, or `thread:` and a state. */

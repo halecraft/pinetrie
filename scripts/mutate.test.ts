@@ -88,13 +88,13 @@ describe("failingChecks: the lines that name a failing check", () => {
     const out = [
       "  PASS  the colour check",
       "  FAIL  the alignment check",
-      "   × planChat > a busy lane holds 3ms",
+      "   × planMessage > a busy lane holds 3ms",
       "AssertionError: expected 1 to be 2",
       " ✓ something else",
     ].join("\n")
     expect(failingChecks(out)).toEqual([
       "  FAIL  the alignment check",
-      "   × planChat > a busy lane holds 3ms",
+      "   × planMessage > a busy lane holds 3ms",
       "AssertionError: expected 1 to be 2",
     ])
   })

@@ -40,8 +40,8 @@ import {
 } from "@pinetrie/rules"
 import { readLaneTip } from "@pinetrie/schema"
 import type { Basics } from "../../basics.ts"
+import { canvasesNow } from "../../canvases.ts"
 import type { Records } from "../../records.ts"
-import { tasksNow } from "../../tasks.ts"
 
 /** What the documents say of a lane, for what your repo cannot say. */
 export interface ProposedChangesDocs {
@@ -105,13 +105,13 @@ export function createProposedChangesDeps(input: {
   const proposedDocs: ProposedChangesDocs = {
     nameOf,
     archived(lane) {
-      const task = tasksNow({
+      const canvas = canvasesNow({
         places: basics.places,
         session: doc,
-      }).taskOfThread.get(lane)
+      }).canvasOfThread.get(lane)
       return (
         archivedIn(
-          task === undefined ? [] : [task],
+          canvas === undefined ? [] : [canvas],
           readArchived(doc, basics.places),
         ) !== null
       )

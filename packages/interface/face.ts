@@ -28,9 +28,9 @@ import { bareThreadFace, type ThreadFace } from "./thread-face.ts"
 
 /**
  * The cards drawn by their kind's renderings: every one with a record but
- * a task's, which the board draws (`boardView`).
+ * a canvas's, which the board draws (`boardView`).
  */
-export type DrawnCard = Exclude<CardRecord, { readonly kind: "task" }>
+export type DrawnCard = Exclude<CardRecord, { readonly kind: "canvas" }>
 
 /** The kinds of card drawn by their renderings (`DrawnCard`). */
 export type DrawnKind = DrawnCard["kind"]
@@ -213,7 +213,7 @@ export type Detail = "face" | "normal" | "whole"
  * selected card normal in the preview, and whole when opened). An entry's
  * margin draws its comments normal under the entry while it is open, and a
  * face, their count, while it is shut (`detailOf`). The board draws its
- * task cards as faces. A discarded card is drawn nowhere; were it drawn,
+ * canvas cards as faces. A discarded card is drawn nowhere; were it drawn,
  * it would be a face.
  */
 export const DETAIL_ON: Readonly<Record<CardPlace["kind"], Detail>> = {
@@ -222,7 +222,7 @@ export const DETAIL_ON: Readonly<Record<CardPlace["kind"], Detail>> = {
   queued: "normal",
   note: "normal",
   margin: "normal",
-  "task-pinned": "normal",
+  "canvas-pinned": "normal",
   canvas: "whole",
   inventory: "face",
   board: "face",

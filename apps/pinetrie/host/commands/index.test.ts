@@ -25,15 +25,15 @@ import type { HostKey } from "../basics.ts"
 import {
   applyWrites,
   basics,
+  CANVAS_ID,
   NO_BLANK_CARDS,
+  placeCanvas,
   placesFor,
-  placeTask,
-  putTask,
+  putCanvas,
   putValue,
   ROOT_ID,
   record,
   seedPlaces,
-  TASK_ID,
   threadRow,
   writeDirectory,
 } from "../fakes.ts"
@@ -52,8 +52,8 @@ const THREAD = threadIdFor("root")
 
 /** The test's root in `state` on a board of Doing and Done. */
 const placeRoot = (b: ReturnType<typeof basics>, state: typeof DOING) => {
-  // The task THREAD is in, its card on the board.
-  putTask(b, THREAD, TASK_ID, undefined, state)
+  // The canvas THREAD is in, its card on the board.
+  putCanvas(b, THREAD, CANVAS_ID, undefined, state)
   putValue(
     b,
     setRecord(WORKFLOW, {
@@ -61,7 +61,7 @@ const placeRoot = (b: ReturnType<typeof basics>, state: typeof DOING) => {
       archive: { id: DONE, name: "Done" },
     }),
   )
-  placeTask(b, TASK_ID, state, ALICE)
+  placeCanvas(b, CANVAS_ID, state, ALICE)
 }
 
 function setUp(
@@ -95,7 +95,7 @@ function setUp(
     ...(writes ? { writeValues: async w => applyWrites(b, w) } : {}),
   })
   const commands = createCommands({
-    relays: { relayChat: async () => {} },
+    relays: { relayMessage: async () => {} },
     basics: b,
     agent: pi.port,
     scribe: pi.port,
@@ -131,10 +131,10 @@ function setUp(
   })
   const replies: Reply[] = []
   const sender = { send: (r: Reply) => void replies.push(r) }
-  const chat = (id: string) =>
+  const said = (id: string) =>
     ({
       id,
-      kind: "chat",
+      kind: "send",
       text: "hello",
       parentId: ROOT_ENTRY,
       root: ROOT_ID,
@@ -150,7 +150,7 @@ function setUp(
     commands,
     replies,
     sender,
-    chat,
+    send: said,
     drains,
     titles,
   }
@@ -161,9 +161,9 @@ test.each([
   ["a squash", { kind: "proposed", action: "squash" }, "repo"],
   ["a description again", { kind: "proposed", action: "describe" }, "repo"],
   ["a publish", { kind: "publish" }, "repo"],
-  ["a move on the board", { kind: "move-task" }, "board"],
+  ["a move on the board", { kind: "move-canvas" }, "board"],
   ["a workflow edit", { kind: "workflow" }, "documents"],
-  ["a chat", { kind: "chat" }, "documents"],
+  ["a chat", { kind: "send" }, "documents"],
   ["a move", { kind: "move" }, "documents"],
   ["a stop", { kind: "stop" }, "documents"],
 ] as const)("placeOfCommand: %s runs on %s", (_, intent, place) => {
@@ -173,7 +173,12 @@ test.each([
 test("a chat completes while an acceptance is held open on your repo's owner", async () => {
   const held =
     Promise.withResolvers<Awaited<ReturnType<ProposedChangesActs["act"]>>>()
-  const { commands, replies, sender, chat } = setUp({
+  const {
+    commands,
+    replies,
+    sender,
+    send: said,
+  } = setUp({
     destination: record<Destination>({
       proposed: record<ProposedChangesActs>({ act: () => held.promise }).port,
     }).port,
@@ -185,7 +190,7 @@ test("a chat completes while an acceptance is held open on your repo's owner", a
     mode: "accept",
     seen: JSON.stringify({ ledger: null, conflicted: false }),
   })
-  await commands.handle(sender, ALICE, chat(cardIdFor("c1")))
+  await commands.handle(sender, ALICE, said(cardIdFor("c1")))
   expect(replies.map(r => r.id)).toEqual([cardIdFor("c1")])
   held.resolve({
     kind: "done",
@@ -200,14 +205,20 @@ test("a chat completes while an acceptance is held open on your repo's owner", a
 
 test("a move into Done holds the keeper only for its place and its unload: a command waits on neither its teardown, and one into the root is refused meanwhile; its reply comes after it all", async () => {
   const teardown = Promise.withResolvers<void>()
-  const { b, commands, replies, sender, chat } = setUp({
+  const {
+    b,
+    commands,
+    replies,
+    sender,
+    send: said,
+  } = setUp({
     destination: null,
     teardown: () => teardown.promise,
   })
   const archive = commands.handle(sender, ALICE, {
     id: "a-1",
-    kind: "move-task",
-    task: TASK_ID,
+    kind: "move-canvas",
+    canvas: CANVAS_ID,
     text: JSON.stringify({ from: DOING, to: DONE, before: null }),
   })
   await new Promise(r => setTimeout(r, 5))
@@ -216,7 +227,7 @@ test("a move into Done holds the keeper only for its place and its unload: a com
     kind: "name",
     text: "Alice",
   })
-  await commands.handle(sender, ALICE, chat(cardIdFor("c1")))
+  await commands.handle(sender, ALICE, said(cardIdFor("c1")))
   expect(replies.map(r => [r.id, r.outcome])).toEqual([
     ["n-1", "named"],
     [cardIdFor("c1"), "refused"],
@@ -228,9 +239,9 @@ test("a move into Done holds the keeper only for its place and its unload: a com
 })
 
 test("a chat in an archived root is refused, and the agent is never called", async () => {
-  const { b, pi, commands, replies, sender, chat } = setUp()
+  const { b, pi, commands, replies, sender, send: said } = setUp()
   placeRoot(b, DONE)
-  await commands.handle(sender, ALICE, chat(cardIdFor("c1")))
+  await commands.handle(sender, ALICE, said(cardIdFor("c1")))
   expect(replies[0]).toMatchObject({
     id: cardIdFor("c1"),
     outcome: "refused",
@@ -240,8 +251,8 @@ test("a chat in an archived root is refused, and the agent is never called", asy
 })
 
 test("the command's id is the send's id", async () => {
-  const { pi, commands, replies, sender, chat } = setUp()
-  await commands.handle(sender, ALICE, chat(cardIdFor("c2")))
+  const { pi, commands, replies, sender, send: said } = setUp()
+  await commands.handle(sender, ALICE, said(cardIdFor("c2")))
   expect(replies[0]).toMatchObject({
     id: cardIdFor("c2"),
     outcome: "appended",
@@ -252,7 +263,7 @@ test("the command's id is the send's id", async () => {
 })
 
 test("a chat command spends its card once written, record then text, answering with its rev; a refused one leaves it", async () => {
-  const { b, cards, commands, replies, sender, chat } = setUp()
+  const { b, cards, commands, replies, sender, send: said } = setUp()
   for (const id of [cardIdFor("cc1"), cardIdFor("cc2")])
     seedPlaces(b.places, [
       {
@@ -271,12 +282,12 @@ test("a chat command spends its card once written, record then text, answering w
       },
     ])
   await commands.handle(sender, ALICE, {
-    ...chat(cardIdFor("c4")),
+    ...said(cardIdFor("c4")),
     cardId: cardIdFor("cc1"),
   })
-  // Refused by `sendChat` itself: an image the host does not store.
+  // Refused by `sendMessage` itself: an image the host does not store.
   await commands.handle(sender, ALICE, {
-    ...chat(cardIdFor("c5")),
+    ...said(cardIdFor("c5")),
     text: `look ![a](/blob/${"b".repeat(64)})`,
     cardId: cardIdFor("cc2"),
   })
@@ -286,7 +297,7 @@ test("a chat command spends its card once written, record then text, answering w
   ])
   expect(readPlaces(b.places).map(c => c.id)).toEqual([
     cardIdFor("cc2"),
-    TASK_ID,
+    CANVAS_ID,
     THREAD,
   ])
   expect(
@@ -298,7 +309,7 @@ test("a popped queued card in an archived root is refused, and the agent is neve
   const { b, pi, commands } = setUp()
   placeRoot(b, DONE)
   const out = await commands.sendPoppedQueuedCard(ALICE, "s-1", {
-    kind: "chat",
+    kind: "send",
     text: "from the queue",
     root: ROOT_ID,
     at: { kind: "queue", thread: THREAD },
@@ -309,12 +320,12 @@ test("a popped queued card in an archived root is refused, and the agent is neve
     base: null,
     state: null,
   })
-  expect(out).toMatchObject({ kind: "refused", code: ERR.TASK_ARCHIVED })
+  expect(out).toMatchObject({ kind: "refused", code: ERR.CANVAS_ARCHIVED })
   expect(pi.calls).toEqual([])
 })
 
 test("nothing runs in a thread in an inventory", async () => {
-  const { b, pi, commands, replies, sender, chat } = setUp()
+  const { b, pi, commands, replies, sender, send: said } = setUp()
   const taken = readPlaces(b.places).find(c => c.id === THREAD)
   if (taken?.kind !== "thread") throw new Error("no thread card")
   seedPlaces(b.places, [
@@ -323,12 +334,12 @@ test("nothing runs in a thread in an inventory", async () => {
       record: { ...taken, place: { kind: "inventory", holder: ALICE } },
     },
   ])
-  await commands.handle(sender, ALICE, chat(cardIdFor("c1")))
+  await commands.handle(sender, ALICE, said(cardIdFor("c1")))
   await commands.handle(sender, ALICE, {
-    ...chat(cardIdFor("c2")),
+    ...said(cardIdFor("c2")),
     mode: "branch",
     lane: NEW,
-    task: TASK_ID,
+    canvas: CANVAS_ID,
   })
   await commands.handle(sender, ALICE, {
     id: "co-1",
@@ -345,7 +356,7 @@ test("nothing runs in a thread in an inventory", async () => {
     Array(4).fill(["refused", HELD_WORDS]),
   )
   const popped = await commands.sendPoppedQueuedCard(ALICE, "s-1", {
-    kind: "chat",
+    kind: "send",
     text: "from the queue",
     root: ROOT_ID,
     at: { kind: "queue", thread: THREAD },
@@ -365,7 +376,14 @@ test("nothing runs in a thread in an inventory", async () => {
 })
 
 test("nothing runs on a lane of another kind than the project's; a held one is refused as held", async () => {
-  const { b, pi, commands, replies, sender, chat } = setUp({
+  const {
+    b,
+    pi,
+    commands,
+    replies,
+    sender,
+    send: said,
+  } = setUp({
     project: { root: "/p", kind: "jj", owner: null },
   })
   putValue(
@@ -383,9 +401,9 @@ test("nothing runs on a lane of another kind than the project's; a held one is r
     lane: THREAD,
     history: "folder",
   })
-  await commands.handle(sender, ALICE, chat(cardIdFor("c1")))
+  await commands.handle(sender, ALICE, said(cardIdFor("c1")))
   const popped = await commands.sendPoppedQueuedCard(ALICE, "s-1", {
-    kind: "chat",
+    kind: "send",
     text: "from the queue",
     root: ROOT_ID,
     at: { kind: "queue", thread: THREAD },
@@ -404,7 +422,7 @@ test("nothing runs on a lane of another kind than the project's; a held one is r
       record: { ...taken, place: { kind: "inventory", holder: ALICE } },
     },
   ])
-  await commands.handle(sender, ALICE, chat(cardIdFor("c2")))
+  await commands.handle(sender, ALICE, said(cardIdFor("c2")))
   expect(replies.map(r => [r.outcome, r.errorMessage])).toEqual([
     ["refused", words],
     ["refused", HELD_WORDS],
@@ -418,8 +436,8 @@ test("nothing runs on a lane of another kind than the project's; a held one is r
 })
 
 test("a seat whose principal names nobody is refused whatever it sends", async () => {
-  const { pi, commands, replies, sender, chat } = setUp()
-  await commands.handle(sender, undefined, chat(cardIdFor("c3")))
+  const { pi, commands, replies, sender, send: said } = setUp()
+  await commands.handle(sender, undefined, said(cardIdFor("c3")))
   expect(replies[0]).toMatchObject({ outcome: "refused" })
   expect(pi.calls).toEqual([])
 })
@@ -456,15 +474,15 @@ test("a reservation is answered reserved, and refused for a lane pi holds", asyn
   ])
 })
 
-test("a retitle asks for its task's title as its sender, and answers retitling", async () => {
+test("a retitle asks for its canvas's title as its sender, and answers retitling", async () => {
   const { commands, replies, sender, titles } = setUp()
   await commands.handle(sender, ALICE, {
     id: cardIdFor("c6"),
     kind: "retitle",
-    task: TASK_ID,
+    canvas: CANVAS_ID,
   } as never)
   expect(titles.calls.map(c => [c.method, ...c.args])).toEqual([
-    ["asked", TASK_ID, ALICE],
+    ["asked", CANVAS_ID, ALICE],
   ])
   expect(replies.map(r => [r.id, r.outcome])).toEqual([
     [cardIdFor("c6"), "retitling"],

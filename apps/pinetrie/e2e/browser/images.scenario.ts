@@ -24,6 +24,7 @@ import {
   PANE_VIEWPORT,
   readRaw,
   twoFrames,
+  typeAfter,
 } from "./page.ts"
 
 export const scenario: Scenario = {
@@ -48,10 +49,10 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       await asPerson(qp, "quinn@browser.test", "Quinn")
       try {
         await pp.goto(imageHost.httpUrl, { waitUntil: "domcontentloaded" })
-        await pp.click("#sidebar .add-agent")
+        await pp.click("#sidebar .add-canvas")
         const box = `${col(0)} .composer .input`
         const sendButton = `${col(0)} .composer .send`
-        await pp.fill(box, "what colour is this?")
+        await typeAfter(pp, box, "what colour is this?")
         // Uploads are held a moment, so the composer is seen waiting for one.
         let release = () => {}
         const held = new Promise<void>(resolve => {
@@ -107,7 +108,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           .waitForFunction(
             ([sel, md]) =>
               (document.querySelector(sel) as HTMLTextAreaElement | null)
-                ?.value === `what colour is this?\n${md}`,
+                ?.value === `@agent what colour is this?\n${md}`,
             [box, markdown] as const,
             { timeout: 10_000 },
           )
@@ -518,12 +519,12 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       await asPerson(ip, "ida@browser.test", "Ida")
       try {
         await ip.goto(imageHost.httpUrl, { waitUntil: "domcontentloaded" })
-        await ip.click("#sidebar .add-agent")
+        await ip.click("#sidebar .add-canvas")
         // Sends `text` and waits for the scripted `reply` in column 0, then
         // for the host to go idle. Idle alone is not enough: until the host
         // has taken the send and started its run, it is idle too.
         const say = async (text: string, reply: string) => {
-          await ip.fill(`${col(0)} .composer .input`, text)
+          await typeAfter(ip, `${col(0)} .composer .input`, text)
           await ip.click(`${col(0)} .composer .send`)
           await readRaw(ip)
           await ip

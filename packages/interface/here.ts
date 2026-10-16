@@ -1,12 +1,12 @@
 // interface/here — who else is in the session, for the board and the sidebar.
 //
-// Presence is thread-level: each column of the task a person is on reports
+// Presence is thread-level: each column of the canvas a person is on reports
 // the end of its thread. `peopleHere` groups those by person, where
 // `readingAt` groups them by thread end; "never you" is `readingAt`'s.
 
 import {
+  type CanvasId,
   type EntryId,
-  type TaskId,
   type ThreadId,
   type TreeIndex,
   threadAt,
@@ -15,18 +15,18 @@ import {
 
 export interface PersonHere {
   readonly writer: WriterId
-  /** Each thread end they read, with its task. */
+  /** Each thread end they read, with its canvas. */
   readonly threads: readonly {
     readonly end: EntryId
-    readonly task: TaskId
+    readonly canvas: CanvasId
   }[]
 }
 
 /**
  * `readingAt` (thread end -> the others there, you left out)
  * grouped by person, in `order` (`writerOrder`, so every window agrees).
- * An end's task is its thread's (`threadAt`, `taskOfThread`), else what its
- * reader reported (`readReadingTasks`), for a root this window does not
+ * An end's canvas is its thread's (`threadAt`, `canvasOfThread`), else what its
+ * reader reported (`readReadingCanvases`), for a root this window does not
  * hold. An end with neither, not arrived yet, is left out.
  */
 export function peopleHere(
@@ -34,20 +34,20 @@ export function peopleHere(
   index: TreeIndex,
   order: readonly WriterId[],
   facts: {
-    readonly taskOfThread: ReadonlyMap<ThreadId, TaskId>
-    readonly reported: ReadonlyMap<EntryId, TaskId>
+    readonly canvasOfThread: ReadonlyMap<ThreadId, CanvasId>
+    readonly reported: ReadonlyMap<EntryId, CanvasId>
   },
 ): readonly PersonHere[] {
-  const threads = new Map<WriterId, { end: EntryId; task: TaskId }[]>()
+  const threads = new Map<WriterId, { end: EntryId; canvas: CanvasId }[]>()
   for (const [end, writers] of readingAt) {
     const thread = threadAt(index, end)
-    const task =
-      (thread === null ? undefined : facts.taskOfThread.get(thread)) ??
+    const canvas =
+      (thread === null ? undefined : facts.canvasOfThread.get(thread)) ??
       facts.reported.get(end)
-    if (task === undefined) continue
+    if (canvas === undefined) continue
     for (const w of writers) {
       const theirs = threads.get(w) ?? []
-      theirs.push({ end, task })
+      theirs.push({ end, canvas })
       threads.set(w, theirs)
     }
   }
@@ -65,30 +65,30 @@ export const readerHeading = (name: string, gone: boolean): string =>
   gone ? `${name} has left` : `${name} is in`
 
 /**
- * The people reading in `tasks`, each with only their threads there: a
+ * The people reading in `canvases`, each with only their threads there: a
  * board item's readers, or a board state's. A person reading
  * elsewhere only is left out.
  */
 export function peopleIn(
   people: readonly PersonHere[],
-  tasks: ReadonlySet<TaskId>,
+  canvases: ReadonlySet<CanvasId>,
 ): readonly PersonHere[] {
   return people.flatMap(p => {
-    const threads = p.threads.filter(t => tasks.has(t.task))
+    const threads = p.threads.filter(t => canvases.has(t.canvas))
     return threads.length === 0 ? [] : [{ ...p, threads }]
   })
 }
 
-/** Each task's readers, for the sidebar's avatars: `people` turned around. */
-export function readersByTask(
+/** Each canvas's readers, for the sidebar's avatars: `people` turned around. */
+export function readersByCanvas(
   people: readonly PersonHere[],
-): ReadonlyMap<TaskId, readonly WriterId[]> {
-  const readers = new Map<TaskId, WriterId[]>()
+): ReadonlyMap<CanvasId, readonly WriterId[]> {
+  const readers = new Map<CanvasId, WriterId[]>()
   for (const { writer, threads } of people)
-    for (const { task } of threads) {
-      const at = readers.get(task) ?? []
+    for (const { canvas } of threads) {
+      const at = readers.get(canvas) ?? []
       if (!at.includes(writer)) at.push(writer)
-      readers.set(task, at)
+      readers.set(canvas, at)
     }
   return readers
 }

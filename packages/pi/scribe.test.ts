@@ -6,7 +6,7 @@ import {
   type StorageBackedSession,
 } from "@earendil-works/pi-agent-core"
 import { atEntry, NOBODY, ROOT, threadIdFor, writerId } from "@pinetrie/core"
-import { encodeChat } from "@pinetrie/rules"
+import { encodeMessage } from "@pinetrie/rules"
 import { newRootDoc } from "@pinetrie/schema/fixtures"
 import { describe, expect, test } from "vitest"
 import { newId, type Stack } from "./agent.ts"
@@ -15,8 +15,8 @@ import { createScribe, scribeInside } from "./scribe.ts"
 import { scriptedModel } from "./scripted.ts"
 import { startPi } from "./start-pi.ts"
 
-const chat = (text: string) =>
-  encodeChat(
+const said = (text: string) =>
+  encodeMessage(
     {
       author: writerId("ada@x.io"),
       authorName: "Ada",
@@ -43,7 +43,7 @@ describe("one session per document", () => {
     ).toMatchObject({ kind: "created" })
     const talk = threadIdFor(newId())
     const appended = await pi.scribe.appendToTree(
-      chat("hello"),
+      said("hello"),
       { root: ONE_ROOT, at: ROOT },
       talk,
     )
@@ -101,16 +101,16 @@ describe("one session per document", () => {
       threadIdFor(newId()),
     )
     if (made.kind !== "created") throw new Error("no lane")
-    expect(await pi.agent.lane(made.lane).run(chat("one"), [])).toEqual({
+    expect(await pi.agent.lane(made.lane).run(said("one"), [])).toEqual({
       kind: "ok",
     })
     await pi.scribe.release(ONE_ROOT)
     await pi.scribe.appendToTree(
-      chat("between"),
+      said("between"),
       { root: ONE_ROOT, at: ROOT },
       threadIdFor(newId()),
     )
-    expect(await pi.agent.lane(made.lane).run(chat("two"), [])).toEqual({
+    expect(await pi.agent.lane(made.lane).run(said("two"), [])).toEqual({
       kind: "ok",
     })
     await pi.close()
@@ -122,7 +122,7 @@ test("a closed scribe refuses every append, in a root it never opened too", asyn
   await scribe.close()
   await expect(
     scribe.appendToTree(
-      chat("late"),
+      said("late"),
       { root: ONE_ROOT, at: ROOT },
       threadIdFor("late"),
     ),

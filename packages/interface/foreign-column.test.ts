@@ -65,7 +65,7 @@ describe("a column of another kind", () => {
     ).toBeNull()
   })
 
-  test("is read-only, saying why, after a hold and a task's archive", () => {
+  test("is read-only, saying why, after a hold and a canvas's archive", () => {
     const foreign: ForeignLane = {
       kind: "foreign",
       lane: LANE,
@@ -74,16 +74,16 @@ describe("a column of another kind", () => {
     const reader = { me: ADA, nameOf: new Map() }
     const archived = { label: "archived by Bea", action: null }
     expect(
-      columnReadOnly({ task: null, heldBy: null, foreign, reader }),
+      columnReadOnly({ canvas: null, heldBy: null, foreign, reader }),
     ).toEqual({ label: foreignWords(foreign), action: null })
     expect(
-      columnReadOnly({ task: archived, heldBy: null, foreign, reader }),
+      columnReadOnly({ canvas: archived, heldBy: null, foreign, reader }),
     ).toBe(archived)
     expect(
-      columnReadOnly({ task: archived, heldBy: ADA, foreign, reader }),
+      columnReadOnly({ canvas: archived, heldBy: ADA, foreign, reader }),
     ).toEqual({ label: "you have it", action: null })
     expect(
-      columnReadOnly({ task: null, heldBy: null, foreign: null, reader }),
+      columnReadOnly({ canvas: null, heldBy: null, foreign: null, reader }),
     ).toBeNull()
   })
 })

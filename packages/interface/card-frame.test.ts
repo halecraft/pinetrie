@@ -1,12 +1,12 @@
 import {
   atEntry,
   type CardRecord,
+  canvasIdFor,
   cardIdOfKind,
   entryId,
   type Sha256,
   type TextCard,
   type TextPlace,
-  taskIdFor,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -20,7 +20,7 @@ import {
   moveWords,
 } from "./card-frame.ts"
 
-const TEST_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
+const TEST_CANVAS = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 
 const ME = writerId("ada@x.test")
 const BEA = writerId("bea@x.test")
@@ -75,33 +75,33 @@ const queue = {
 } as const
 const pin = { kind: "pin", card: C1 } as const
 const take = { kind: "takeIntoInventory", card: C1 } as const
-const pinTask = { kind: "pinToTask", card: C1 } as const
+const pinCanvas = { kind: "pinToCanvas", card: C1 } as const
 
 describe("cardFrame", () => {
   test.each<[string, TextPlace, CardTone, readonly unknown[]]>([
     [
-      "your message: the notes, the queue, pinned, the task, your inventory",
+      "your message: the notes, the queue, pinned, the canvas, your inventory",
       composing,
       "composing",
       [
         { to: "note", act: { kind: "toNote", card: C1 } },
         { to: "queue", act: queue },
         { to: "pinned", act: pin },
-        { to: "task", act: pinTask },
+        { to: "canvas", act: pinCanvas },
         { to: "inventory", act: take },
       ],
     ],
     [
-      "a note: the task, your inventory, its note column being no thread's",
+      "a note: the canvas, your inventory, its note column being no thread's",
       note,
       "note",
       [
-        { to: "task", act: pinTask },
+        { to: "canvas", act: pinCanvas },
         { to: "inventory", act: take },
       ],
     ],
     [
-      "queued: the notes, pinned, the task, your inventory",
+      "queued: the notes, pinned, the canvas, your inventory",
       queued,
       "queued",
       [
@@ -110,24 +110,24 @@ describe("cardFrame", () => {
           act: { kind: "unqueue", card: C1, lane: LANE, by: BEA },
         },
         { to: "pinned", act: pin },
-        { to: "task", act: pinTask },
+        { to: "canvas", act: pinCanvas },
         { to: "inventory", act: take },
       ],
     ],
     [
-      "pinned: the notes, the queue, the task, your inventory",
+      "pinned: the notes, the queue, the canvas, your inventory",
       pinned,
       "pinned",
       [
         { to: "note", act: { kind: "unpin", card: C1 } },
         { to: "queue", act: queue },
-        { to: "task", act: pinTask },
+        { to: "canvas", act: pinCanvas },
         { to: "inventory", act: take },
       ],
     ],
     [
-      "pinned to the task: the notes, your inventory",
-      { kind: "task-pinned", task: TEST_TASK, order: "a" },
+      "pinned to the canvas: the notes, your inventory",
+      { kind: "canvas-pinned", canvas: TEST_CANVAS, order: "a" },
       "pinned",
       [
         { to: "note", act: { kind: "unpin", card: C1 } },
@@ -164,12 +164,12 @@ describe("cardFrame", () => {
   test("no queue where the column has none to queue on", () => {
     const facts = { ...FACTS, queueOn: null }
     expect(cardFrame(card(note), "note", facts).moves.map(m => m.to)).toEqual([
-      "task",
+      "canvas",
       "inventory",
     ])
     expect(
       cardFrame(card(pinned), "pinned", facts).moves.map(m => m.to),
-    ).toEqual(["note", "task", "inventory"])
+    ).toEqual(["note", "canvas", "inventory"])
   })
 
   test.each<[string, CardTone, "put" | "send" | null]>([

@@ -23,6 +23,7 @@ import {
 } from "@pinetrie/interface"
 import { SCRIPTED_DESCRIPTION } from "@pinetrie/pi"
 import {
+  readCanvases,
   readMarks,
   readNames,
   readNoteColumns,
@@ -31,28 +32,27 @@ import {
   readQueueHolds,
   readReading,
   readRoots,
-  readTasks,
   readThreads,
   readTyping,
   readWorkflow,
 } from "@pinetrie/reads"
-import { canvasOf, indexTasks, titleOf } from "@pinetrie/rules"
+import { cardsOnCanvas, indexCanvases, titleOf } from "@pinetrie/rules"
 import { COPIED } from "@pinetrie/web/copy"
 import { IDENTITY_KEY } from "@pinetrie/web/storage-keys"
 import type { Page } from "@playwright/test"
 import type { Checks } from "../checks.ts"
 import {
   boardStateOf,
+  canvasHolding,
   composeAt,
   entriesOf,
   idleNow,
   join,
   lanesOf,
-  moveTaskTo,
+  moveCanvasOnBoard,
   queueCard,
   startSuiteHost,
   suiteModel,
-  taskHolding,
   threadHolding,
   treeOf,
   waitFor,
@@ -80,6 +80,7 @@ import {
   storedName,
   TO_NOBODY,
   twoFrames,
+  typeAfter,
   waitForListWidth,
   waitForQuiet,
 } from "./page.ts"
@@ -97,19 +98,19 @@ async function run(check: Checks["check"]): Promise<void> {
       log: (m: string) => console.log("    [host]", m),
     })
     console.log(`  host              : ${host.httpUrl}\n`)
-    /** The task the thread `root` starts is in: what the sidebar and the board name it by. */
-    // Read while the host holds the root, and kept: an archived task's
+    /** The canvas the thread `root` starts is in: what the sidebar and the board name it by. */
+    // Read while the host holds the root, and kept: an archived canvas's
     // root is let go.
-    const tasksOf = new Map<string, string>()
-    const taskOf = (root: string): string => {
-      const known = tasksOf.get(root)
+    const canvasByRoot = new Map<string, string>()
+    const rootCanvas = (root: string): string => {
+      const known = canvasByRoot.get(root)
       if (known !== undefined) return known
       try {
-        const task = taskHolding(host, entryId(root))
-        tasksOf.set(root, task)
-        return task
+        const canvas = canvasHolding(host, entryId(root))
+        canvasByRoot.set(root, canvas)
+        return canvas
       } catch {
-        return "no-task"
+        return "no-canvas"
       }
     }
     /**
@@ -237,6 +238,11 @@ async function run(check: Checks["check"]): Promise<void> {
         await page.fill(`${col(n)} .composer .input`, text)
         await page.click(`${col(n)} .composer .send`)
       }
+      /** Send `text` after what column `n`'s box holds: a new canvas's `@agent `. */
+      const sendAfter = async (n: number, text: string) => {
+        await typeAfter(page, `${col(n)} .composer .input`, text)
+        await page.click(`${col(n)} .composer .send`)
+      }
       const idle = () => waitFor(() => idleNow(host))
       /** Where the caret is in column `n`'s box, or null if it is not focused. */
       const caretIn = (n: number) =>
@@ -266,12 +272,12 @@ async function run(check: Checks["check"]): Promise<void> {
         () => readParticipantNames(host.session).get(ME) === "Ada",
         15_000,
       )
-      await page.waitForSelector("#sidebar .add-agent", { timeout: 15_000 })
-      await page.click("#sidebar .add-agent")
+      await page.waitForSelector("#sidebar .add-canvas", { timeout: 15_000 })
+      await page.click("#sidebar .add-canvas")
       await page.waitForSelector(`${col(0)} .composer`, { timeout: 15_000 })
       check(
-        "＋ agent's new tab is ready to type in: its box has focus",
-        (await caretIn(0)) === 0,
+        "＋ canvas is ready to type in: its box has focus, after @agent",
+        (await caretIn(0)) === "@agent ".length,
       )
       {
         const surface = await page.evaluate(() => {
@@ -374,7 +380,7 @@ async function run(check: Checks["check"]): Promise<void> {
       // Whether a reply streams live is checked on the scripted host below, where
       // its pace is set: a live model's one-line reply can open and close its
       // stream between two of the page's renders.
-      await send(0, "Say exactly: BROWSER-OK")
+      await sendAfter(0, "Say exactly: BROWSER-OK")
       // Structure, not the model's words: a reply appeared, in this column. What
       // the model says is `e2e:live`'s to check.
       await idle()
@@ -408,7 +414,7 @@ async function run(check: Checks["check"]): Promise<void> {
       )
       check(
         "the column reads Ada's asked message, then the agent",
-        roles.join(",") === "chat asked:Ada,assistant:agent",
+        roles.join(",") === "person asked:Ada,assistant:agent",
         `${roles.join(", ")}`,
       )
       const filledLeft = await stripLeft()
@@ -423,7 +429,7 @@ async function run(check: Checks["check"]): Promise<void> {
             )
       })
       check(
-        "the first message takes the new tab's hollow dot, and the columns stay put",
+        "the first message takes the new canvas's hollow dot, and the columns stay put",
         filledLeft === emptyLeft &&
           (await page.locator(".rail-start").count()) === 0,
         `${emptyLeft}px → ${filledLeft}px`,
@@ -461,7 +467,7 @@ async function run(check: Checks["check"]): Promise<void> {
       await other.request({ kind: "name", name: "Bea" })
       // A fork on purpose, at the agent's reply: `branch`. A branch starts as a
       // conversation, so it is appended with no run.
-      await other.chat("an aside", atEntry(entryId(replyId)), {
+      await other.send("an aside", atEntry(entryId(replyId)), {
         mode: "branch",
       })
       await page.waitForSelector(`${atReply} .open-branch`, { timeout: 15_000 })
@@ -932,7 +938,7 @@ async function run(check: Checks["check"]): Promise<void> {
       await label(0)
       // Her reply is paused, so her run shows for as long as the checks look.
       const beasTurn = script.hold("Bea's turn")
-      await other.chat("@agent Bea's turn", atEntry(entryId(await tipOf0())))
+      await other.send("@agent Bea's turn", atEntry(entryId(await tipOf0())))
       // The send button once it says `words`: its label and its title.
       const queueButton = (words: ButtonWords) =>
         page
@@ -1204,7 +1210,7 @@ async function run(check: Checks["check"]): Promise<void> {
           JSON.stringify(e).includes("just a note"),
         )?.id ?? ""
       const pulse = script.hold("say exactly: PULSE")
-      await other.chat(
+      await other.send(
         "@agent say exactly: PULSE",
         atEntry(entryId(forAdaId)),
         {
@@ -1232,7 +1238,7 @@ async function run(check: Checks["check"]): Promise<void> {
       // item shows a still ring: nothing in the footer, and nothing in your
       // list, animates.
       const held = script.hold("say exactly: HELD")
-      await other.chat("@agent say exactly: HELD", atEntry(entryId(forAdaId)), {
+      await other.send("@agent say exactly: HELD", atEntry(entryId(forAdaId)), {
         mode: "branch",
       })
       const working = await page
@@ -1367,7 +1373,7 @@ async function run(check: Checks["check"]): Promise<void> {
       const renamed = await page
         .waitForFunction(
           () =>
-            [...document.querySelectorAll(".msg.chat .role")].some(
+            [...document.querySelectorAll(".msg.person .role")].some(
               n => n.textContent === "Ada Lovelace (Ada)",
             ),
           undefined,
@@ -1406,20 +1412,20 @@ async function run(check: Checks["check"]): Promise<void> {
       await adaElsewhere.close()
       check("a rename on another device is kept on this one", followed >= 0)
 
-      // ── ＋ agent: a new tab, an agent thread at the root, and stepping down ──
+      // ── ＋ canvas: an agent thread at the root, and stepping down ──
       const firstRoot = treeOf(host).roots[0] ?? ""
-      // A new tab holds one column, so the thread's columns count from 0.
+      // A new canvas holds one column, so the thread's columns count from 0.
       const before = 0
-      await page.click("#sidebar .add-agent")
+      await page.click("#sidebar .add-canvas")
       const agentCol = col(before)
       await page.waitForSelector(`${agentCol} .composer`, { timeout: 15_000 })
-      await send(before, "say exactly: DOWN-ONE")
+      await sendAfter(before, "say exactly: DOWN-ONE")
       await page.waitForSelector(`${agentCol} .msg.assistant`, {
         timeout: 60_000,
       })
       await idle()
       // → at the agent thread's end opens a branch with @agent typed; deleting
-      // it steps down to a conversation continuing from there.
+      // it steps down to a chat continuing from there.
       const end = `${agentCol} .msg.assistant`
       await page.hover(end)
       await page.click(`${end} > .tools > .branch`)
@@ -1463,13 +1469,13 @@ async function run(check: Checks["check"]): Promise<void> {
           () => false,
         )
       check("× on a branch's column takes it off the canvas", asideClosed)
-      // ＋ past the last column: its ▾'s conversation makes a column at the
-      // canvas's end, a new root's thread in this task, ready to type in.
+      // ＋ past the last column: its ▾'s chat makes a column at the canvas's
+      // end, a new root's thread in this canvas, ready to type in.
       await page.focus("#strip > .canvas-end .add-menu")
       await page.keyboard.press("ArrowDown")
       await page
         .waitForFunction(
-          () => document.activeElement?.classList.contains("add-conversation"),
+          () => document.activeElement?.classList.contains("add-chat"),
           undefined,
           { timeout: 5_000 },
         )
@@ -1488,7 +1494,8 @@ async function run(check: Checks["check"]): Promise<void> {
       )?.place
       const madeLast =
         agentPlace?.kind === "canvas" &&
-        canvasOf(readPlaces(host.places), agentPlace.task).at(-1)?.id === made
+        cardsOnCanvas(readPlaces(host.places), agentPlace.canvas).at(-1)?.id ===
+          made
       const recordOf = (card: string) =>
         [...readThreads(host.session).values()].find(r => r.thread === card)
       const madeRecord = recordOf(made)
@@ -1496,7 +1503,7 @@ async function run(check: Checks["check"]): Promise<void> {
       const madeLabel = await label(before + 2)
       const madeCaret = await caretIn(before + 2)
       check(
-        "＋ past the last column makes a conversation at the canvas's end: a new root's thread in this task, its box focused",
+        "＋ past the last column makes a chat at the canvas's end: a new root's thread in this canvas, its box focused",
         madeLast &&
           madeRecord?.origin.kind === "root" &&
           agentRecord !== undefined &&
@@ -1652,7 +1659,7 @@ async function run(check: Checks["check"]): Promise<void> {
       )
       // Pasted on the thread's column, it lands in the thread's notes as a
       // text card holding it, keeping the range it came from. With no note
-      // column on the task yet, one is made for it, beside the columns.
+      // column on the canvas yet, one is made for it, beside the columns.
       const columnsBeforePaste = await page.locator(".column").count()
       await page.click(`${still} > .text`, { position: { x: 2, y: 2 } })
       await page.keyboard.press("ControlOrMeta+v")
@@ -1673,7 +1680,7 @@ async function run(check: Checks["check"]): Promise<void> {
         `pasted in ${pasted} ms`,
       )
       // A paste is one step of your history: the undo key takes it back,
-      // so no note of yours is left to mark the task.
+      // so no note of yours is left to mark the canvas.
       await page.keyboard.press("ControlOrMeta+z")
       await waitFor(
         () =>
@@ -1743,21 +1750,21 @@ async function run(check: Checks["check"]): Promise<void> {
         undefined,
         { timeout: 15_000 },
       )
-      // A task dragged over another in the sidebar only reorders. Held over
-      // the other's middle past the hold that opens a task for a card's drag,
+      // A canvas dragged over another in the sidebar only reorders. Held over
+      // the other's middle past the hold that opens a canvas for a card's drag,
       // it shows no ring and opens nothing; released past that middle, it
-      // lands on the other side. The other is never the task you are on, so
+      // lands on the other side. The other is never the canvas you are on, so
       // opening it would show. It is pressed off its centre, on the side away
       // from where it goes: the dragged row's own box follows the pointer,
       // and measured among the places it would shift its landing by one.
       {
         const order = await page.$$eval("#sidebar .open-root", ts =>
-          ts.map(t => t.getAttribute("data-task") ?? ""),
+          ts.map(t => t.getAttribute("data-canvas") ?? ""),
         )
         const current = () =>
           page
             .$eval('#sidebar .open-root[aria-current="true"]', n =>
-              n.getAttribute("data-task"),
+              n.getAttribute("data-canvas"),
             )
             .catch(() => null)
         const here = await current()
@@ -1779,7 +1786,7 @@ async function run(check: Checks["check"]): Promise<void> {
           await page.mouse.move(x, over.y + over.height / 2, { steps: 8 })
           // A hold that will open anything rings its target in the same move,
           // and only the ring's timer opens it: no ring now, nothing opens
-          // later. That a task's drag opens nothing is `drawPlan`'s, proven
+          // later. That a canvas's drag opens nothing is `drawPlan`'s, proven
           // by its unit test.
           await twoFrames(page)
           ringed = (await page.$("[data-hover-open]")) !== null
@@ -1796,7 +1803,7 @@ async function run(check: Checks["check"]): Promise<void> {
           .waitForFunction(
             o =>
               [...document.querySelectorAll("#sidebar .open-root")]
-                .map(n => n.getAttribute("data-task"))
+                .map(n => n.getAttribute("data-canvas"))
                 .join() === o,
             swapped,
             { timeout: 10_000 },
@@ -1806,7 +1813,7 @@ async function run(check: Checks["check"]): Promise<void> {
             () => false,
           )
         check(
-          "a task dragged over another's middle in the sidebar opens nothing, and drops above or below it",
+          "a canvas dragged over another's middle in the sidebar opens nothing, and drops above or below it",
           order.length >= 2 && !ringed && stayed && after,
           `ringed ${ringed}, stayed ${stayed}, swapped ${after}`,
         )
@@ -1817,7 +1824,7 @@ async function run(check: Checks["check"]): Promise<void> {
       {
         const listOf = (p: Page) =>
           p.$$eval("#sidebar .open-root", ts =>
-            ts.map(t => t.getAttribute("data-task") ?? ""),
+            ts.map(t => t.getAttribute("data-canvas") ?? ""),
           )
         const mine = await listOf(page)
         const device = await browser.newPage()
@@ -1830,7 +1837,7 @@ async function run(check: Checks["check"]): Promise<void> {
             .waitForFunction(
               order =>
                 [...document.querySelectorAll("#sidebar .open-root")]
-                  .map(n => n.getAttribute("data-task"))
+                  .map(n => n.getAttribute("data-canvas"))
                   .join() === order,
               mine.join(),
               { timeout: 15_000 },
@@ -1846,18 +1853,17 @@ async function run(check: Checks["check"]): Promise<void> {
           `${theirs.length} of ${mine.length}`,
         )
       }
-      // A root's first message has no parent: its edit is a new tab, an agent's
-      // since the message asked the agent.
-      const first = `${agentCol} ${msg("say exactly: DOWN-ONE")}`
+      // A root's first message has no parent: its edit is a new canvas.
+      const first = `${agentCol} ${msg("@agent say exactly: DOWN-ONE")}`
       await page.hover(first)
-      await page.click(`${first} > .tools > .edit-new-tab`)
-      // A new tab is a task of its own from the start.
+      await page.click(`${first} > .tools > .edit-new-canvas`)
+      // A new canvas is one from the start.
       await page.waitForSelector(`${col(0)}[data-card] .composer`, {
         timeout: 15_000,
       })
       await page.click(`${col(0)} .close`)
       const agentRoot = treeOf(host).roots.at(-1) ?? ""
-      await page.click(itemSel(taskOf(agentRoot)))
+      await page.click(itemSel(rootCanvas(agentRoot)))
       await page.waitForFunction(
         () => document.querySelectorAll(".column").length === 2,
         undefined,
@@ -1869,13 +1875,13 @@ async function run(check: Checks["check"]): Promise<void> {
       const selectedRoot = (p: Page) =>
         p
           .$eval('#sidebar [aria-current="true"]', n =>
-            n.getAttribute("data-task"),
+            n.getAttribute("data-canvas"),
           )
           .catch(() => null)
       const messagesIn = (root: string) =>
         projectRail(treeOf(host), entryId(root)).length
-      // 1. Which tree a root's rail draws is `taskRail`'s, proven by its unit test.
-      await page.click(itemSel(taskOf(firstRoot)))
+      // 1. Which tree a root's rail draws is `canvasRail`'s, proven by its unit test.
+      await page.click(itemSel(rootCanvas(firstRoot)))
       await page
         .waitForFunction(
           `(${RAIL_MESSAGES})() === ${messagesIn(firstRoot)}`,
@@ -1889,21 +1895,21 @@ async function run(check: Checks["check"]): Promise<void> {
       // 2. A root someone else starts is not added to the sidebar.
       const api = await join(host, "tabs", "browser")
       await api.request({ kind: "name", name: "Bea" })
-      const third = await api.chat("a third thread", ROOT, { mode: "branch" })
+      const third = await api.send("a third thread", ROOT, { mode: "branch" })
       const thirdRoot = third.kind === "appended" ? third.id : entryId("")
       await countIsHosts(page)
       check(
         "a root another writer starts is not added to the sidebar, and the page stays where it is",
         thirdRoot !== "" &&
-          (await page.locator(itemSel(taskOf(thirdRoot))).count()) === 0 &&
-          (await selectedRoot(page)) === taskOf(firstRoot),
+          (await page.locator(itemSel(rootCanvas(thirdRoot))).count()) === 0 &&
+          (await selectedRoot(page)) === rootCanvas(firstRoot),
       )
       // Any root can be moved on the board: another item's ⋯ shows while it is hovered.
       const otherMenu = page.locator(
-        `${itemSel(taskOf(downRoot))} ~ .open-more .open-menu`,
+        `${itemSel(rootCanvas(downRoot))} ~ .open-more .open-menu`,
       )
       const hiddenAtRest = !(await otherMenu.isVisible())
-      await page.hover(itemSel(taskOf(downRoot)))
+      await page.hover(itemSel(rootCanvas(downRoot)))
       const shownOnHover = await otherMenu.isVisible()
       await page.mouse.move(0, 0)
       check(
@@ -1975,7 +1981,7 @@ async function run(check: Checks["check"]): Promise<void> {
       // tree changes and every column's list draws again: only the messages'
       // own memo keeps them.
       await componentRenders(page)
-      await api.chat("meanwhile, elsewhere", atEntry(entryId(downRoot)), {
+      await api.send("meanwhile, elsewhere", atEntry(entryId(downRoot)), {
         mode: "branch",
       })
       await countIsHosts(page)
@@ -1990,7 +1996,7 @@ async function run(check: Checks["check"]): Promise<void> {
       )
 
       // 3. Closing a root is yours: × writes nothing shared, and reopening brings its columns back.
-      await page.click(itemSel(taskOf(downRoot)))
+      await page.click(itemSel(rootCanvas(downRoot)))
       await page.waitForFunction(
         () => document.querySelectorAll(".column").length >= 2,
         undefined,
@@ -2001,18 +2007,19 @@ async function run(check: Checks["check"]): Promise<void> {
       )
       // × closes the root for you and writes nothing shared (`planIntent`'s unit test).
       // × shows while its item is hovered or focused.
-      await page.hover(itemSel(taskOf(downRoot)))
-      await page.click(`${itemSel(taskOf(downRoot))} ~ .open-close`)
+      await page.hover(itemSel(rootCanvas(downRoot)))
+      await page.click(`${itemSel(rootCanvas(downRoot))} ~ .open-close`)
       await page
         .waitForFunction(
           r =>
-            document.querySelector(`#sidebar .open-root[data-task="${r}"]`) ===
-            null,
-          taskOf(downRoot),
+            document.querySelector(
+              `#sidebar .open-root[data-canvas="${r}"]`,
+            ) === null,
+          rootCanvas(downRoot),
           { timeout: 15_000 },
         )
         .catch(() => null)
-      await openFromBoard(page, taskOf(downRoot))
+      await openFromBoard(page, rootCanvas(downRoot))
       await page
         .waitForFunction(
           n => document.querySelectorAll(".column").length === n,
@@ -2023,7 +2030,7 @@ async function run(check: Checks["check"]): Promise<void> {
       await page.$$eval(".column", cs =>
         cs.map(c => c.getAttribute("data-key") ?? ""),
       )
-      await page.click(itemSel(taskOf(firstRoot)))
+      await page.click(itemSel(rootCanvas(firstRoot)))
 
       // 4. Another window, another person: the board shows them on the root
       // they read, never yourself, and takes you to them.
@@ -2045,9 +2052,9 @@ async function run(check: Checks["check"]): Promise<void> {
           () => true,
           () => false,
         )
-        await openFromBoard(tb, taskOf(thirdRoot))
+        await openFromBoard(tb, rootCanvas(thirdRoot))
         await openBoard(page)
-        const reader = `#board ${boardSel(taskOf(thirdRoot))} .reader-trigger`
+        const reader = `#board ${boardSel(rootCanvas(thirdRoot))} .reader-trigger`
         const avatar = await page
           .waitForSelector(reader, { timeout: 15_000 })
           .then(
@@ -2066,7 +2073,7 @@ async function run(check: Checks["check"]): Promise<void> {
         const toThem = await chooseFromMenu(page, reader, ".here-thread")
         const followed = await page
           .waitForSelector(
-            `${itemSel(taskOf(thirdRoot))}[aria-current="true"]`,
+            `${itemSel(rootCanvas(thirdRoot))}[aria-current="true"]`,
             {
               timeout: 15_000,
             },
@@ -2080,7 +2087,7 @@ async function run(check: Checks["check"]): Promise<void> {
           toThem && followed && (await shows("a third thread")),
         )
         const onThird = await page
-          .waitForSelector(`${itemSel(taskOf(thirdRoot))} .avatar`, {
+          .waitForSelector(`${itemSel(rootCanvas(thirdRoot))} .avatar`, {
             timeout: 15_000,
           })
           .then(
@@ -2091,7 +2098,7 @@ async function run(check: Checks["check"]): Promise<void> {
         // only you close it, by Escape though the row that held focus has
         // gone, and then their avatar leaves the item. The board stays.
         await openBoard(page)
-        const tabby = `#board ${boardSel(taskOf(thirdRoot))} .reader-trigger`
+        const tabby = `#board ${boardSel(rootCanvas(thirdRoot))} .reader-trigger`
         const heldOpen = await page
           .click(tabby, { timeout: 15_000 })
           .then(() =>
@@ -2103,7 +2110,7 @@ async function run(check: Checks["check"]): Promise<void> {
             () => true,
             () => false,
           )
-        await openFromBoard(tb, taskOf(firstRoot))
+        await openFromBoard(tb, rootCanvas(firstRoot))
         const saysLeft = await page
           .waitForFunction(
             text =>
@@ -2141,12 +2148,12 @@ async function run(check: Checks["check"]): Promise<void> {
           .waitForFunction(
             ([from, to]) =>
               document.querySelector(
-                `#sidebar .open-root[data-task="${from}"] .avatar`,
+                `#sidebar .open-root[data-canvas="${from}"] .avatar`,
               ) === null &&
               document.querySelector(
-                `#sidebar .open-root[data-task="${to}"] .avatar`,
+                `#sidebar .open-root[data-canvas="${to}"] .avatar`,
               ) !== null,
-            [taskOf(thirdRoot), taskOf(firstRoot)] as const,
+            [rootCanvas(thirdRoot), rootCanvas(firstRoot)] as const,
             { timeout: 15_000 },
           )
           .then(
@@ -2162,13 +2169,15 @@ async function run(check: Checks["check"]): Promise<void> {
         // board shows it, Escape keeps the old one, and clearing it brings
         // back the first line. The page is on the third root.
         const tabLabel = (p: Page, r: string) =>
-          p.textContent(`${itemSel(taskOf(r))} .open-label`).catch(() => null)
+          p
+            .textContent(`${itemSel(rootCanvas(r))} .open-label`)
+            .catch(() => null)
         const labelIs = (p: Page, r: string, want: string) =>
           p
             .waitForFunction(
               ([sel, text]) =>
                 document.querySelector(sel)?.textContent === text,
-              [`${itemSel(taskOf(r))} .open-label`, want] as const,
+              [`${itemSel(rootCanvas(r))} .open-label`, want] as const,
               { timeout: 15_000 },
             )
             .then(
@@ -2188,8 +2197,8 @@ async function run(check: Checks["check"]): Promise<void> {
         const renamed = await rename(TITLE, "Enter")
         const mine = await labelIs(page, thirdRoot, TITLE)
         const refocused = await page.evaluate(
-          r => document.activeElement?.getAttribute("data-task") === r,
-          taskOf(thirdRoot),
+          r => document.activeElement?.getAttribute("data-canvas") === r,
+          rootCanvas(thirdRoot),
         )
         const theirs = await labelIs(tb, thirdRoot, TITLE)
         check(
@@ -2202,15 +2211,15 @@ async function run(check: Checks["check"]): Promise<void> {
           .waitForFunction(
             ([sel, text]) => document.querySelector(sel)?.textContent === text,
             [
-              `#board ${boardSel(taskOf(thirdRoot))} .board-label`,
+              `#board ${boardSel(rootCanvas(thirdRoot))} .board-label`,
               TITLE,
             ] as const,
             { timeout: 15_000 },
           )
           .catch(() => null)
-        await tb.click(itemSel(taskOf(firstRoot)))
-        const thirdTask = taskHolding(host, thirdRoot)
-        const setAt = readMarks(host.session).get(thirdTask)?.at
+        await tb.click(itemSel(rootCanvas(firstRoot)))
+        const thirdCanvas = canvasHolding(host, thirdRoot)
+        const setAt = readMarks(host.session).get(thirdCanvas)?.at
         await rename("not this", "Escape")
         // Long enough for a rename sent by mistake to come back.
         await waitFor(() => false, 1_000)
@@ -2218,7 +2227,7 @@ async function run(check: Checks["check"]): Promise<void> {
           "Escape leaves a root's title as it was, and sends nothing",
           (await labelIs(page, thirdRoot, TITLE)) &&
             (await page.locator(".open-title-input").count()) === 0 &&
-            readMarks(host.session).get(thirdTask)?.at === setAt,
+            readMarks(host.session).get(thirdCanvas)?.at === setAt,
         )
         await rename("", "Enter")
 
@@ -2246,19 +2255,20 @@ async function run(check: Checks["check"]): Promise<void> {
           await openBoard(tb)
           await page
             .dragAndDrop(
-              `#board ${boardSel(taskOf(firstRoot))} .board-open`,
+              `#board ${boardSel(rootCanvas(firstRoot))} .board-open`,
               column,
             )
             .catch(() => null)
           const theirs = await tb
-            .waitForSelector(`${column} ${boardSel(taskOf(firstRoot))}`, {
+            .waitForSelector(`${column} ${boardSel(rootCanvas(firstRoot))}`, {
               timeout: 15_000,
             })
             .then(
               () => true,
               () => false,
             )
-          const id = firstRoot === "" ? undefined : taskHolding(host, firstRoot)
+          const id =
+            firstRoot === "" ? undefined : canvasHolding(host, firstRoot)
           check(
             "dragging a thread card to another state moves it for the other window",
             theirs &&
@@ -2336,52 +2346,47 @@ async function run(check: Checks["check"]): Promise<void> {
             await page.click("#bottom .board-toggle")
         }
 
-        // 5. ＋'s menu, by keyboard; an unsent new tab closes without a trace.
+        // 5. ＋ canvas, by keyboard: its box starts with @agent, and deleting
+        // it sends to people only; an unsent canvas closes without a trace.
 
-        await page.focus("#sidebar .add-menu")
-        await page.keyboard.press("ArrowDown")
-        const focused = await page
-          .waitForFunction(
-            () =>
-              document.activeElement?.classList.contains("add-conversation"),
-            undefined,
-            { timeout: 5_000 },
-          )
-          .then(
-            () => true,
-            () => false,
-          )
-        const tasksBefore = readTasks(host.places).size
+        const noMenu = (await page.$("#sidebar .add-menu")) === null
+        await page.focus("#sidebar .add-canvas")
+        const canvasesBefore = readCanvases(host.places).size
         await page.keyboard.press("Enter")
         await page.waitForSelector(`${col(0)}[data-card] .composer`, {
           timeout: 15_000,
         })
-        const convo = await label(0)
+        const typed = await page.inputValue(`${col(0)} .composer .input`)
+        const caret = await caretIn(0)
+        await page.fill(`${col(0)} .composer .input`, "")
+        const chat = await label(0)
         const opened = await waitFor(
-          () => readTasks(host.places).size === tasksBefore + 1,
+          () => readCanvases(host.places).size === canvasesBefore + 1,
           5_000,
         )
         const tab = (await page.getAttribute(col(0), "data-card")) ?? ""
         check(
-          "＋'s conversation, chosen by keyboard, opens a new tab that only sends",
-          focused &&
-            convo === TO_NOBODY &&
+          "＋ canvas opens a canvas whose box starts with @agent; deleting it sends to people only",
+          noMenu &&
+            typed === "@agent " &&
+            caret === typed.length &&
+            chat === TO_NOBODY &&
             opened >= 0 &&
             (await page.$('#sidebar .open-root[aria-current="true"]')) !==
               null &&
             readPlaces(host.places).find(c => c.id === tab)?.place.kind ===
               "canvas",
-          `"${convo}", ${opened}`,
+          `${noMenu}, "${typed}", ${caret}, "${chat}", ${opened}`,
         )
-        // Closed unsent, by ×, asking nothing: its task goes too.
+        // Closed unsent, by ×, asking nothing: its canvas goes too.
         await page.fill(`${col(0)} .composer .input`, "never sent")
         await page.click(`${col(0)} .close`)
         const gone = await waitFor(
-          () => readTasks(host.places).size === tasksBefore,
+          () => readCanvases(host.places).size === canvasesBefore,
           10_000,
         )
         check(
-          "an unsent new tab closed with × takes its task away, and its thread's card to the trash, asking nothing",
+          "an unsent new canvas closed with × takes its canvas away, and its thread's card to the trash, asking nothing",
           gone >= 0 &&
             readPlaces(host.places).find(c => c.id === tab)?.place.kind ===
               "trash",
@@ -2400,7 +2405,7 @@ async function run(check: Checks["check"]): Promise<void> {
         // The page's handle, from its name as it is now (it was renamed above).
         const handle = `@${handleOf(await shownName(page))}`
         const before = await unseen()
-        const mention = await api.chat(
+        const mention = await api.send(
           `${handle} a look at this?`,
           atEntry(entryId(downRoot)),
         )
@@ -2504,7 +2509,7 @@ async function run(check: Checks["check"]): Promise<void> {
         )
         // A mention on screen is seen at once (`seenNow`, proven by its unit
         // test). The menu check below starts from this message.
-        await api.chat(`${handle} and here`, atEntry(entryId(mentionId)))
+        await api.send(`${handle} and here`, atEntry(entryId(mentionId)))
         await shows(`${handle} and here`)
         // A menu stays open while an entry arrives: the column following its end
         // scrolls, and only a scroll that moves the trigger closes a popover.
@@ -2532,7 +2537,7 @@ async function run(check: Checks["check"]): Promise<void> {
           )
         })
         const arriving = "arriving while a menu is open"
-        await api.chat(
+        await api.send(
           `${arriving}\n\n${"a paragraph to fill the column\n\n".repeat(12)}`,
           atEntry(entryId(hereId)),
         )
@@ -2554,12 +2559,12 @@ async function run(check: Checks["check"]): Promise<void> {
         await page.keyboard.press("Escape")
         // Seen is kept per device: across a reload, and a mention made meanwhile counts.
         // The reload keeps the root you were on and its columns.
-        await page.click(itemSel(taskOf(firstRoot)))
+        await page.click(itemSel(rootCanvas(firstRoot)))
         const keysOf = () =>
           page.$$eval(".column", cs => cs.map(c => c.getAttribute("data-key")))
         const columnsBefore = await keysOf()
         const reloading = page.reload({ waitUntil: "domcontentloaded" })
-        await api.chat(
+        await api.send(
           `${handle} while you were away`,
           atEntry(entryId(mentionId)),
         )
@@ -2598,7 +2603,7 @@ async function run(check: Checks["check"]): Promise<void> {
           "a reload keeps the root you were on, and its open columns, in order",
           columnsBefore.length >= 1 &&
             columnsBack &&
-            (await selectedRoot(page)) === taskOf(firstRoot),
+            (await selectedRoot(page)) === rootCanvas(firstRoot),
           `${(await keysOf()).length} of ${columnsBefore.length}`,
         )
         // Two tabs of one device share it: mark all seen in one clears the other.
@@ -2636,13 +2641,13 @@ async function run(check: Checks["check"]): Promise<void> {
         // 7. Moved to Done, a root is archived and leaves every list: the
         // window that moved it closes it, and the page someone else is on
         // reads it.
-        await page.click(itemSel(taskOf(thirdRoot)))
+        await page.click(itemSel(rootCanvas(thirdRoot)))
         await page.waitForSelector(`${col(0)} .composer .send`, {
           timeout: 15_000,
         })
         // tb opens the third root again, so it has an item there to lose, and
         // moves it to Done from there.
-        await openFromBoard(tb, taskOf(thirdRoot))
+        await openFromBoard(tb, rootCanvas(thirdRoot))
         await page.fill(`${col(0)} .composer .input`, "typed, not sent")
         const menuSeen =
           (await seeInMenu(page, OWN_MENU, ".move-to.closes")) !== null
@@ -2675,9 +2680,9 @@ async function run(check: Checks["check"]): Promise<void> {
           .waitForFunction(
             r =>
               document.querySelector(
-                `#sidebar .open-root[data-task="${r}"]`,
+                `#sidebar .open-root[data-canvas="${r}"]`,
               ) === null,
-            taskOf(thirdRoot),
+            rootCanvas(thirdRoot),
             { timeout: 15_000 },
           )
           .then(
@@ -2695,7 +2700,7 @@ async function run(check: Checks["check"]): Promise<void> {
           `"${banner}", its typed text kept, no tools that write, and copy (${tools}, ${copyStays})`,
         )
         check(
-          "an archived task's canvas offers no ＋ to make a column",
+          "an archived canvas offers no ＋ to make a column",
           (await page.$("#strip .column")) !== null &&
             (await page.$("#strip > .canvas-end")) === null,
         )
@@ -2707,7 +2712,7 @@ async function run(check: Checks["check"]): Promise<void> {
         check(
           "restoring it in place brings back the composer with its text, and adds it to no other window's list",
           (await page.inputValue(input)) === "typed, not sent" &&
-            (await tb.locator(itemSel(taskOf(thirdRoot))).count()) === 0,
+            (await tb.locator(itemSel(rootCanvas(thirdRoot))).count()) === 0,
         )
 
         // Moved to Done again, here, it leaves the sidebar; the board brings it back.
@@ -2717,9 +2722,9 @@ async function run(check: Checks["check"]): Promise<void> {
           .waitForFunction(
             r =>
               document.querySelector(
-                `#sidebar .open-root[data-task="${r}"]`,
+                `#sidebar .open-root[data-canvas="${r}"]`,
               ) === null,
-            taskOf(thirdRoot),
+            rootCanvas(thirdRoot),
             { timeout: 15_000 },
           )
           .then(
@@ -2728,10 +2733,10 @@ async function run(check: Checks["check"]): Promise<void> {
           )
         await openBoard(page)
         await page.waitForSelector(
-          `#board .board-archive ${boardSel(taskOf(thirdRoot))}`,
+          `#board .board-archive ${boardSel(rootCanvas(thirdRoot))}`,
           { timeout: 15_000 },
         )
-        await openFromBoard(page, taskOf(thirdRoot))
+        await openFromBoard(page, rootCanvas(thirdRoot))
         await page.waitForSelector(`${col(0)} .msg`, { timeout: 15_000 })
         await page.hover(`${col(0)} .msg`)
         const openedWrites = await page
@@ -2762,8 +2767,9 @@ async function run(check: Checks["check"]): Promise<void> {
         check(
           "Restore on an archived root you opened keeps it in the sidebar, and not in the other window's",
           restored &&
-            (await page.locator(itemSel(taskOf(thirdRoot))).count()) === 1 &&
-            (await tb.locator(itemSel(taskOf(thirdRoot))).count()) === 0,
+            (await page.locator(itemSel(rootCanvas(thirdRoot))).count()) ===
+              1 &&
+            (await tb.locator(itemSel(rootCanvas(thirdRoot))).count()) === 0,
         )
         // The other window, on nothing, reports no thread: it leaves nothing
         // behind, once its deletions have reached this page.
@@ -2827,7 +2833,7 @@ async function run(check: Checks["check"]): Promise<void> {
           const ids: string[] = []
           for (let n = 0; n < 30; n++) {
             const at = ids.at(-1)
-            const r = await writer.chat(
+            const r = await writer.send(
               `Message ${n} of a long thread.\nIts second line.\nIts third line.`,
               at === undefined ? ROOT : atEntry(entryId(at)),
               at === undefined ? { mode: "branch" } : {},
@@ -2837,7 +2843,7 @@ async function run(check: Checks["check"]): Promise<void> {
           const longRoot = ids[0] ?? ""
           const forkId = ids.at(-2) ?? ""
           await lp.goto(host.httpUrl, { waitUntil: "domcontentloaded" })
-          await openFromBoard(lp, taskOf(longRoot))
+          await openFromBoard(lp, rootCanvas(longRoot))
           await lp.waitForSelector(
             `${col(0)} .msg[data-entry="${ids.at(-1)}"]`,
             {
@@ -2846,7 +2852,7 @@ async function run(check: Checks["check"]): Promise<void> {
           )
           // Below its last message, so the branch does not move column 0 on.
           const fork = `${col(0)} .msg[data-entry="${forkId}"]`
-          const aside = await writer.chat(
+          const aside = await writer.send(
             "a late aside",
             atEntry(entryId(forkId)),
             { mode: "branch" },
@@ -2855,7 +2861,7 @@ async function run(check: Checks["check"]): Promise<void> {
           await lp.click(`${fork} .open-branch`)
           await lp.waitForSelector(`${col(1)} .msg`, { timeout: 15_000 })
           await stepAway(lp)
-          await stepBack(lp, taskOf(longRoot))
+          await stepBack(lp, rootCanvas(longRoot))
           await lp.waitForSelector(`${col(1)} .msg`, { timeout: 15_000 })
           await twoFrames(lp)
           const returned = await lp.evaluate(
@@ -2919,14 +2925,14 @@ async function run(check: Checks["check"]): Promise<void> {
             let at = tip ?? forkId
             const kinds: string[] = []
             for (let n = 0; n < 10; n++) {
-              const r = await writer.chat(
+              const r = await writer.send(
                 `Branch message ${n}.\nIts second line.\nIts third line.`,
                 atEntry(entryId(at)),
               )
               kinds.push(r.kind)
               if (r.kind === "appended") at = r.id
             }
-            await stepBack(lp, taskOf(longRoot))
+            await stepBack(lp, rootCanvas(longRoot))
             const arrived = await lp
               .waitForSelector(`${col(1)} .msg[data-entry="${at}"]`, {
                 timeout: 15_000,
@@ -3170,7 +3176,7 @@ async function run(check: Checks["check"]): Promise<void> {
               )
             const left = await where()
             await stepAway(lp)
-            await stepBack(lp, taskOf(longRoot))
+            await stepBack(lp, rootCanvas(longRoot))
             await lp.waitForSelector(`${col(0)} .msg`, { timeout: 15_000 })
             await twoFrames(lp)
             const back =
@@ -3225,7 +3231,7 @@ async function run(check: Checks["check"]): Promise<void> {
       await page.evaluate(() => ({
         avatars: [...document.querySelectorAll(".avatar")].map(
           a =>
-            `${a.closest("[data-task], .column-head")?.className}:${a.getAttribute("data-writer")}`,
+            `${a.closest("[data-canvas], .column-head")?.className}:${a.getAttribute("data-writer")}`,
         ),
         rings: [...document.querySelectorAll(".rail-dot[data-here]")].map(d =>
           d.getAttribute("title"),
@@ -3336,18 +3342,18 @@ async function run(check: Checks["check"]): Promise<void> {
         // A's replica has everything the host has, and has drawn it, before the
         // cards below look for the column's last message in A's window.
         await countIsHosts(page)
-        const shownTask = await page
+        const shownCanvas = await page
           .$eval('#sidebar [aria-current="true"]', n =>
-            n.getAttribute("data-task"),
+            n.getAttribute("data-canvas"),
           )
           .catch(() => null)
         // Its first root's newest message.
         const threads = readThreads(host.session)
         const shownRoot = [...threads.values()].find(
           t =>
-            indexTasks(readPlaces(host.places), threads).taskOfThread.get(
+            indexCanvases(readPlaces(host.places), threads).canvasOfThread.get(
               t.thread,
-            ) === shownTask,
+            ) === shownCanvas,
         )?.root
         const newest =
           shownRoot === undefined
@@ -3435,9 +3441,9 @@ async function run(check: Checks["check"]): Promise<void> {
         const here =
           (await page.getAttribute(
             '#sidebar [aria-current="true"]',
-            "data-task",
+            "data-canvas",
           )) ?? ""
-        await page.click(itemSel(taskOf(downRoot)))
+        await page.click(itemSel(rootCanvas(downRoot)))
         await page.click(itemSel(here))
         check(
           "what you type is still there after switching tabs",
@@ -3445,7 +3451,7 @@ async function run(check: Checks["check"]): Promise<void> {
           `${await boxValue(page, box)}`,
         )
         // A card in another root, typed before this one's last word.
-        await page.click(itemSel(taskOf(downRoot)))
+        await page.click(itemSel(rootCanvas(downRoot)))
         await page.click(box)
         await page.keyboard.press("End")
         await page.keyboard.type(" elsewhere")
@@ -3468,7 +3474,7 @@ async function run(check: Checks["check"]): Promise<void> {
         )
         // Cmd+Z in the other root's box undoes its card, though this root's
         // typing is newer.
-        await page.click(itemSel(taskOf(downRoot)))
+        await page.click(itemSel(rootCanvas(downRoot)))
         await page.focus(box)
         await page.keyboard.press("ControlOrMeta+z")
         const thereUndone = await page
@@ -3506,7 +3512,7 @@ async function run(check: Checks["check"]): Promise<void> {
           .$eval(`${sentCard} .role`, n => n.textContent ?? "")
           .catch(() => "")
         const emptied = await hasValue(page, box, "")
-        await page.click(itemSel(taskOf(downRoot)))
+        await page.click(itemSel(rootCanvas(downRoot)))
         await page.click(itemSel(here))
         check(
           "a sent card leaves the box empty, and a tab switch does not bring it back",
@@ -3561,7 +3567,7 @@ async function run(check: Checks["check"]): Promise<void> {
         await page.keyboard.press("End")
         await page.keyboard.type("a fresh thought")
         const unstartedText = await boxValue(page, unstartedBox)
-        await page.click(itemSel(taskOf(downRoot)))
+        await page.click(itemSel(rootCanvas(downRoot)))
         await page.click(itemSel(here))
         const unstartedKept = await hasValue(page, unstartedBox, unstartedText)
         check(
@@ -3616,12 +3622,12 @@ async function run(check: Checks["check"]): Promise<void> {
             )
         await page.click(box)
         await page.keyboard.type("where was I")
-        await page.click(itemSel(taskOf(downRoot)))
+        await page.click(itemSel(rootCanvas(downRoot)))
         const tabMarked = await pipIn(page, itemSel(here))
         const otherBare =
           (await page
             .locator(
-              `${itemSel(taskOf(downRoot))} .signal[data-signal="unsent"]`,
+              `${itemSel(rootCanvas(downRoot))} .signal[data-signal="unsent"]`,
             )
             .count()) === 0
         await page.click(itemSel(here))
@@ -3678,8 +3684,9 @@ async function run(check: Checks["check"]): Promise<void> {
         await chooseFromMenu(page, OWN_MENU, ".move-to.closes")
         await page.waitForFunction(
           r =>
-            document.querySelector(`#sidebar .open-root[data-task="${r}"]`) ===
-            null,
+            document.querySelector(
+              `#sidebar .open-root[data-canvas="${r}"]`,
+            ) === null,
           here,
           { timeout: 15_000 },
         )
@@ -3714,7 +3721,7 @@ async function run(check: Checks["check"]): Promise<void> {
 
       // Your inventory, in the DOWN thread's tab: its agent
       // thread and the conversation below it.
-      await page.click(itemSel(taskOf(downRoot)))
+      await page.click(itemSel(rootCanvas(downRoot)))
       await page.waitForFunction(
         () => document.querySelectorAll(".column").length >= 2,
         undefined,
@@ -3862,7 +3869,7 @@ async function run(check: Checks["check"]): Promise<void> {
           c =>
             c.id === wrapColumn ||
             c.place.kind !== "canvas" ||
-            c.place.task !== columnPlace.task ||
+            c.place.canvas !== columnPlace.canvas ||
             c.place.order < columnPlace.order,
         )
       await page.evaluate(() =>
@@ -3919,7 +3926,7 @@ async function run(check: Checks["check"]): Promise<void> {
       )
       const into = spunInto()
       const thread =
-        into?.entry == null ? undefined : taskHolding(host, into.entry)
+        into?.entry == null ? undefined : canvasHolding(host, into.entry)
       const landed =
         thread === undefined
           ? undefined
@@ -4021,7 +4028,7 @@ async function run(check: Checks["check"]): Promise<void> {
       await waitFor(() => placeOf(parked)?.kind === "trash", 5_000)
       const columnsBefore = await page.locator(".column").count()
       // Move to trash, from its ⋯, on an unstarted branch with text trashes
-      // it; the task column's trash lists it, and restore brings it back,
+      // it; the canvas column's trash lists it, and restore brings it back,
       // its text with it.
       const branchable = page
         .locator(
@@ -4059,21 +4066,21 @@ async function run(check: Checks["check"]): Promise<void> {
             () => false,
           )
       const closedFresh = await columnsAre(columnsBefore)
-      // The inventory, docked in the middle, covers the task column: its
+      // The inventory, docked in the middle, covers the canvas column: its
       // controls are pressed from the keyboard.
       const press = async (sel: string) => {
         await page.focus(sel, { timeout: 10_000 })
         await page.keyboard.press("Enter")
       }
-      if ((await page.$(".task-column.folded-column")) !== null)
-        await press(".task-column.folded-column .folded-title")
-      const trashRow = `.task-trash .trash-row[data-card="${branchCard}"]`
-      await press(".task-trash summary").catch(() => {})
+      if ((await page.$(".canvas-column.folded-column")) !== null)
+        await press(".canvas-column.folded-column .folded-title")
+      const trashRow = `.canvas-trash .trash-row[data-card="${branchCard}"]`
+      await press(".canvas-trash summary").catch(() => {})
       const listed = await appears(trashRow)
       await press(`${trashRow} .trash-restore`).catch(() => {})
       const restored = await columnsAre(columnsBefore + 1)
       check(
-        "Move to trash on a branch trashes it, the task's trash lists it, and restore brings it back with its text",
+        "Move to trash on a branch trashes it, the canvas's trash lists it, and restore brings it back with its text",
         trashed &&
           closedFresh &&
           listed &&
@@ -4145,7 +4152,7 @@ async function run(check: Checks["check"]): Promise<void> {
           sel => {
             const marker = document.querySelector(sel)
             return (
-              marker?.nextElementSibling?.matches(".msg.chat") === true &&
+              marker?.nextElementSibling?.matches(".msg.person") === true &&
               (marker.nextElementSibling.textContent ?? "").includes(
                 "with the pinned card",
               )
@@ -4401,7 +4408,7 @@ async function run(check: Checks["check"]): Promise<void> {
           { card: traced, from: keyOf(tracedFrom), to: pinTo },
           { actedAt: { kind: "column", key: "k-api" }, slot: null },
         )
-      await stepBack(page, taskOf(downRoot))
+      await stepBack(page, rootCanvas(downRoot))
       const traceRow = `${col(1)} .trace`
       const drawnTrace = await appears(traceRow)
       const traceText = (await page.textContent(traceRow).catch(() => "")) ?? ""
@@ -4541,14 +4548,14 @@ async function run(check: Checks["check"]): Promise<void> {
       // ── threads as cards ───────────────────────────────
       // A thread of another root, moved onto the canvas you are on: the
       // canvas holds two roots, and the rail draws each one's tree.
-      const here = taskHolding(host, entryId(downRoot))
-      const far = await api.chat("a root of another task", ROOT, {
+      const here = canvasHolding(host, entryId(downRoot))
+      const far = await api.send("a root of another canvas", ROOT, {
         mode: "branch",
       })
       const farEntry = far.kind === "appended" ? far.id : entryId("none")
       await waitFor(() => {
         try {
-          return taskHolding(host, farEntry) !== undefined
+          return canvasHolding(host, farEntry) !== undefined
         } catch {
           return false
         }
@@ -4557,8 +4564,8 @@ async function run(check: Checks["check"]): Promise<void> {
       await api.moveCard(
         {
           card: farThread,
-          from: { kind: "canvas", task: taskHolding(host, farEntry) },
-          to: { kind: "canvas-at", task: here, after: null },
+          from: { kind: "canvas", canvas: canvasHolding(host, farEntry) },
+          to: { kind: "canvas-at", canvas: here, after: null },
         },
         { actedAt: { kind: "column", key: "k-api" }, slot: null },
       )
@@ -4576,7 +4583,7 @@ async function run(check: Checks["check"]): Promise<void> {
           () => false,
         )
       check(
-        "a thread moved onto the canvas from another task's makes a canvas of two roots: its column, and its root's tree on the rail",
+        "a thread moved onto the canvas from another canvas's makes a canvas of two roots: its column, and its root's tree on the rail",
         twoRoots,
       )
       // A column's ⋯ is in the top layer: `.column-head` isolates for its
@@ -4646,7 +4653,7 @@ async function run(check: Checks["check"]): Promise<void> {
         layered?.under === true && layered.onTop,
         JSON.stringify(layered),
       )
-      // Copy to this task: a new thread forked at its source's end, its
+      // Copy to this canvas: a new thread forked at its source's end, its
       // card beside its source, its fork row naming where it came from.
       const copiesBefore = new Set(
         [...readThreads(host.session)].flatMap(([t, r]) =>
@@ -4696,7 +4703,7 @@ async function run(check: Checks["check"]): Promise<void> {
           () => false,
         )
       check(
-        "Copy to this task makes a copy beside its source, its fork row naming what it was copied from",
+        "Copy to this canvas makes a copy beside its source, its fork row naming what it was copied from",
         copy !== "" && copiedRow,
         copy,
       )
@@ -4705,19 +4712,19 @@ async function run(check: Checks["check"]): Promise<void> {
       // way to the last of the sidebar.
       check(
         "a reload keeps the root you were on",
-        (await selectedRoot(page)) === taskOf(downRoot),
+        (await selectedRoot(page)) === rootCanvas(downRoot),
       )
-      await moveTaskTo(api, entryId(downRoot), "archive")
+      await moveCanvasOnBoard(api, entryId(downRoot), "archive")
       await page.reload({ waitUntil: "domcontentloaded" })
       await page
         .waitForFunction(
           r => {
             const on = document
               .querySelector('#sidebar [aria-current="true"]')
-              ?.getAttribute("data-task")
+              ?.getAttribute("data-canvas")
             return on != null && on !== r
           },
-          taskOf(downRoot),
+          rootCanvas(downRoot),
           { timeout: 20_000 },
         )
         .then(

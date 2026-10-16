@@ -1,15 +1,15 @@
 import {
+  type CanvasId,
   type CardId,
   type CardRecord,
+  canvasIdFor,
   cardIdOfKind,
   type EntryLike,
   NO_CONTENT,
   rootIdFor,
-  type TaskId,
   type TextCard,
   type ThreadId,
   type TreeIndex,
-  taskIdFor,
   textCardId,
   threadIdFor,
   writerId,
@@ -17,7 +17,7 @@ import {
 import { threadCardOf } from "@pinetrie/rules/fixtures"
 import { describe, expect, test } from "vitest"
 import { LEVELS, type Status } from "./attention.ts"
-import { entry, indexOf, tasksWith } from "./fixtures.ts"
+import { canvasesWith, entry, indexOf } from "./fixtures.ts"
 import { initialLayout, type Layout } from "./layout.ts"
 import {
   elsewhereWords,
@@ -42,7 +42,7 @@ const EVERY_SIGNAL: Record<Signal, true> = {
 const SIGNALS = Object.keys(EVERY_SIGNAL) as Signal[]
 
 const _TEST_THREAD = threadIdFor("e")
-const _TEST_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
+const _TEST_CANVAS = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 
 const _TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 /** A root this tab does not hold: its root entry is f1. */
@@ -85,9 +85,9 @@ const atUnstarted = (id: string, thread: ThreadId): TextCard => ({
   place: { kind: "composing", thread },
   content: { command: null, unsent: null, origin: null },
 })
-/** Each root's task, one a root: e1's, g1's and the far f1's. */
-const K = (root: string) => taskIdFor(root)
-/** A note column on g1's task's canvas. */
+/** Each root's canvas, one a root: e1's, g1's and the far f1's. */
+const K = (root: string) => canvasIdFor(root)
+/** A note column on g1's canvas. */
 const NOTES = cardIdOfKind(
   "note-column",
   "01a0ffd2-0000-7000-8000-0000000000a1",
@@ -97,7 +97,7 @@ const FAR_THREAD = threadIdFor("far")
 /** A branch not yet started on e1's canvas, and one on g1's. */
 const BRANCH = threadIdFor("01a0ffd2-0000-7000-8000-0000000000f1")
 const G_BRANCH = threadIdFor("01a0ffd2-0000-7000-8000-0000000000f2")
-const tasks = tasksWith({
+const canvases = canvasesWith({
   known: ["e1", "g1", "f1"].map(K),
   cards: [
     ...(
@@ -111,8 +111,8 @@ const tasks = tasksWith({
     ).map(
       ([thread, r], i) =>
         ({
-          ...threadCardOf({ thread, task: K(r), by: ADA, cards: [] }),
-          place: { kind: "canvas", task: K(r), order: `a${i}`, width: 1 },
+          ...threadCardOf({ thread, canvas: K(r), by: ADA, cards: [] }),
+          place: { kind: "canvas", canvas: K(r), order: `a${i}`, width: 1 },
         }) as CardRecord,
     ),
     {
@@ -120,29 +120,29 @@ const tasks = tasksWith({
       id: NOTES,
       owner: ADA,
       placer: ADA,
-      place: { kind: "canvas", task: K("g1"), order: "z", width: 1 },
+      place: { kind: "canvas", canvas: K("g1"), order: "z", width: 1 },
       content: NO_CONTENT,
     },
   ],
   threads: new Map(),
 }).index
-/** e1's task open; g1's closed. */
+/** e1's canvas open; g1's closed. */
 const layout: Layout = { ...initialLayout(), open: [K("e1")] }
 const marks = (
   cards: readonly CardRecord[],
   filled: readonly string[] = cards.map(c => c.id),
-  over: { layout?: Layout; index?: TreeIndex; archived?: Set<TaskId> } = {},
+  over: { layout?: Layout; index?: TreeIndex; archived?: Set<CanvasId> } = {},
 ) =>
   unsentSignals({
     mine: ownCards(ADA, cards),
     filled: new Set(filled.map(textCardId)),
     layout: over.layout ?? layout,
     archived: over.archived ?? new Set(),
-    tasks,
+    canvases,
     index: over.index ?? tree(),
   })
 const sets = (m: ReturnType<typeof marks>) => ({
-  tasks: [...m.tasks],
+  canvases: [...m.canvases],
   ends: [...m.ends],
   elsewhere: m.elsewhere,
 })
@@ -189,22 +189,22 @@ test("withFilled: the same set unless the card flips", () => {
 })
 
 describe("unsentSignals", () => {
-  test("your message marks its task and its thread's end", () => {
+  test("your message marks its canvas and its thread's end", () => {
     expect(sets(marks([atEnd("c", "e2")]))).toEqual({
-      tasks: [K("e1")],
+      canvases: [K("e1")],
       ends: ["e2"],
       elsewhere: false,
     })
   })
 
-  test("a note you own marks its note column's task, and no thread's end", () => {
+  test("a note you own marks its note column's canvas, and no thread's end", () => {
     const note: CardRecord = {
       ...atEnd("c", "e2"),
       place: { kind: "note", column: NOTES, order: "a" },
     }
-    // g1's task is closed: ▦ is marked.
+    // g1's canvas is closed: ▦ is marked.
     expect(sets(marks([note]))).toEqual({
-      tasks: [K("g1")],
+      canvases: [K("g1")],
       ends: [],
       elsewhere: true,
     })
@@ -221,15 +221,15 @@ describe("unsentSignals", () => {
       },
     }
     expect(sets(marks([pinned]))).toEqual({
-      tasks: [],
+      canvases: [],
       ends: [],
       elsewhere: false,
     })
   })
 
-  test("your message in a root this tab does not hold marks its thread's task, with no end", () => {
+  test("your message in a root this tab does not hold marks its thread's canvas, with no end", () => {
     const m = marks([atEnd("c", "f2")])
-    expect(sets(m).tasks).toEqual([K("f1")])
+    expect(sets(m).canvases).toEqual([K("f1")])
     expect(sets(m).ends).toEqual([])
     expect(m.elsewhere).toBe(true)
   })
@@ -241,9 +241,9 @@ describe("unsentSignals", () => {
     ]).toEqual(["e3"])
   })
 
-  test("your message at a thread not yet started marks its task, with no end", () => {
+  test("your message at a thread not yet started marks its canvas, with no end", () => {
     expect(sets(marks([atUnstarted("c", BRANCH)]))).toEqual({
-      tasks: [K("e1")],
+      canvases: [K("e1")],
       ends: [],
       elsewhere: false,
     })
@@ -251,18 +251,18 @@ describe("unsentSignals", () => {
 
   test("your message at a thread on no canvas marks nothing", () => {
     expect(
-      sets(marks([atUnstarted("c", threadIdFor("elsewhere"))])).tasks,
+      sets(marks([atUnstarted("c", threadIdFor("elsewhere"))])).canvases,
     ).toEqual([])
   })
 
   test("only your cards, only with text, only where their place still is", () => {
-    const none = { tasks: [], ends: [], elsewhere: false }
+    const none = { canvases: [], ends: [], elsewhere: false }
     expect(sets(marks([atEnd("c", "e2", BEA)]))).toEqual(none)
     expect(sets(marks([atEnd("c", "e2")], []))).toEqual(none)
     expect(sets(marks([atEnd("c", "gone")]))).toEqual(none)
   })
 
-  test("elsewhere: a marked task you closed", () => {
+  test("elsewhere: a marked canvas you closed", () => {
     expect(marks([atEnd("c", "g1")]).elsewhere).toBe(true)
     expect(marks([atUnstarted("c", G_BRANCH)]).elsewhere).toBe(true)
     const closed = { ...layout, open: [] }
@@ -271,11 +271,11 @@ describe("unsentSignals", () => {
     )
   })
 
-  test("an archived task marks its row, never ▦", () => {
+  test("an archived canvas marks its row, never ▦", () => {
     const m = marks([atEnd("c", "g1")], ["c"], {
       archived: new Set([K("g1")]),
     })
-    expect([...m.tasks]).toEqual([K("g1")])
+    expect([...m.canvases]).toEqual([K("g1")])
     expect(m.elsewhere).toBe(false)
   })
 })

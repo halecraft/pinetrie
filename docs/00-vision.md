@@ -29,11 +29,11 @@ Branches are not one thing. Cost and machinery follow from *capability*:
 
 | Kind | Context | Tools | Workspace | Merge |
 |---|---|---|---|---|
-| **conversation** | its path | none | none | fold-in (optional) |
-| **agent's thread** | its path | full | a lane of its own | fold-in **+** its proposed changes |
+| **chat** | its path | none | none | fold-in (optional) |
+| **agent thread** | its path | full | a lane of its own | fold-in **+** its proposed changes |
 
-A conversation is people talking in the tree, with no agent asked there;
-it costs nothing. An agent's thread has a lane (ADR-0032, ADR-0034): a
+A chat is people talking in the tree, with no agent asked there;
+it costs nothing. An agent thread has a lane (ADR-0032, ADR-0034): a
 Linux container on its own disk, holding its own copy of your repo, and a
 branch clones its parent's disk at the turn it branched from. Its file
 changes come back as proposed changes, which you review and accept; a
@@ -86,24 +86,24 @@ answer. `@agent` compels the agent; `@alice` addresses Alice, and leaves the
 agent out.
 
 A thread's mode is whether the agent works in it. Where it does, it answers
-every message that names no one else; in a **conversation** it answers when
+every message that names no one else; in a **chat** it answers when
 mentioned. Nothing sets the mode: it is whether the agent has been asked there
 (ADR-0021). Each step up in cost is deliberate: a message costs nothing, asking
-the agent spends time and money, and a lane spends disk. So a thread
-begins with a choice, **＋ agent** or a conversation, and a branch starts as
-a conversation.
+the agent spends time and money, and a lane spends disk. So a new canvas's
+thread begins with `@agent ` typed, which a person deletes to make it a
+chat, and a branch from a chat starts as a chat (ADR-0158).
 
 The composer says what will happen **before** sending: whether the agent will
 reply, or who the message is for. Writing together is a separate choice
-from who must answer: a note, in a note column on the task's canvas, is
-read by everyone in the task and by no agent (ADR-0116).
+from who must answer: a note, in a note column on the canvas, is
+read by everyone in the canvas and by no agent (ADR-0116).
 
 ## Scope
 
 **Built:** a browser client over Kyneta against one pi host; the tree,
 drawn as a rail beside columns; threads of people and agents running at
 once, each agent's in a lane of its own; their proposed changes, reviewed
-and accepted into accepted work; a team's board of tasks, live across devices.
+and accepted into accepted work; a team's board of canvases, live across devices.
 
 **Out:** replacing pi's TUI. Hosted, authenticated teams are designed for
 and not shipped: today the invite key decides who gets in.

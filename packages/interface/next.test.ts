@@ -32,7 +32,7 @@ const BEA = writerId("bea@x.io")
 /** A prompt and its reply, stopped or answered; stopped, its stop's fact names `by`. */
 const index = (stopped: boolean, by: WriterId | null = null) =>
   indexOf([
-    entry("1", null, { role: "chat", content: "go" }),
+    entry("1", null, { role: "person", content: "go" }),
     entry("2", "1", {
       role: "assistant",
       content: [{ type: "text", text: "half" }],

@@ -1,5 +1,5 @@
 // interface/message-tools — which tools a message offers: copy, comment, edit
-// (or new tab), and `→`. Nothing is taken from the past: a message is copied,
+// (or new canvas), and `→`. Nothing is taken from the past: a message is copied,
 // and kept from the clipboard cell. `Column` gathers the facts, and `Message`
 // draws the result. Each tool but copy is the `MessageAct` it sends, which
 // reaches `App` as its column's intent (`intent.ts`).
@@ -40,16 +40,18 @@ export interface MessageTools {
   readonly copy: boolean
   /** Comment on it: a note in its margin, where the column can be written. */
   readonly comment: boolean
-  /** Send it again: a sibling at its parent, or a root's first message in a new tab. */
-  readonly edit: Extract<MessageAct, { kind: "branch" | "newTab" }> | undefined
+  /** Send it again: a sibling at its parent, or a root's first message on a new canvas. */
+  readonly edit:
+    | Extract<MessageAct, { kind: "branch" | "newCanvas" }>
+    | undefined
   /** `→`: a branch at the message. */
   readonly branch: Extract<MessageAct, { kind: "branch" }> | undefined
 }
 
 /**
- * What a branch's composer starts with: `@agent ` in agent work, so going on
- * with the agent is already typed, and deleting it makes the branch a
- * conversation. Nothing in a conversation.
+ * What a branch's composer starts with: `@agent ` in an agent thread, so going
+ * on with the agent is already typed, and deleting it makes the branch a chat.
+ * Nothing in a chat.
  */
 export const branchPrefill = (lane: ThreadLane): Prefill | undefined =>
   lane.kind === "lane" ? AGENT_PREFILL : undefined
@@ -57,11 +59,7 @@ export const branchPrefill = (lane: ThreadLane): Prefill | undefined =>
 /** What a reader asked of a message. */
 export type MessageAct =
   | { readonly kind: "branch"; readonly branch: OpenBranch }
-  | {
-      readonly kind: "newTab"
-      readonly prefill: Prefill
-      readonly asksAgent: boolean
-    }
+  | { readonly kind: "newCanvas"; readonly prefill: Prefill }
   /** Show an entry: a closed branch's first message. */
   | { readonly kind: "openAt"; readonly entry: EntryId }
   /**
@@ -99,9 +97,9 @@ export function messageTools(
   return {
     copy,
     comment: true,
-    edit: node.role === "chat" ? editOf(node, at.parentId) : undefined,
-    // Below a conversation's last message, a branch would be the same as
-    // replying. Agent work follows its lane, so there a branch at the end is
+    edit: node.role === "person" ? editOf(node, at.parentId) : undefined,
+    // Below a chat's last message, a branch would be the same as
+    // replying. An agent thread follows its lane, so there a branch at the end is
     // a thread of its own.
     branch:
       at.isLast && at.lane.kind !== "lane"
@@ -115,32 +113,26 @@ export function messageTools(
 
 /**
  * A person's message sent again, changed or not: a sibling at its parent, or,
- * for a root's first message, a new tab. It asks the agent exactly when the
- * original did. A branch asks only through a mention (`agentByDefault`), so a
- * message its thread's default compelled gets `@agent ` in front.
+ * for a root's first message, a new canvas. It asks the agent exactly when the
+ * original did. A branch or a new canvas asks only through a mention
+ * (`agentByDefault`), so a message its thread's default compelled gets
+ * `@agent ` in front.
  */
 function editOf(
   node: TranscriptMessage,
   parentId: EntryId | null,
 ): MessageTools["edit"] {
-  const compelled = node.compelled === true
-  if (parentId === null)
-    return {
-      kind: "newTab",
-      asksAgent: compelled,
-      prefill: { text: node.text, blank: false },
-    }
   const named = parseMentions(node.text).some(m => m.kind === "agent")
-  return {
-    kind: "branch",
-    branch: {
-      at: parentId,
-      prefill: {
-        text: compelled && !named ? `${AGENT_PREFIX}${node.text}` : node.text,
-        blank: false,
-      },
-    },
+  const prefill = {
+    text:
+      node.compelled === true && !named
+        ? `${AGENT_PREFIX}${node.text}`
+        : node.text,
+    blank: false,
   }
+  return parentId === null
+    ? { kind: "newCanvas", prefill }
+    : { kind: "branch", branch: { at: parentId, prefill } }
 }
 
 /**

@@ -10,7 +10,7 @@ import { readCardHistories, readPlaces, readRecords } from "@pinetrie/reads"
 import {
   BUDGET,
   encodeAnswer,
-  encodeChat,
+  encodeMessage,
   encodeRelayMessage,
   newBudget,
 } from "@pinetrie/rules"
@@ -18,10 +18,10 @@ import { describe, expect, test } from "vitest"
 import { createBudgets, promptBudget } from "./budgets.ts"
 import {
   applyWrites,
-  archiveTask,
+  archiveCanvas,
   basics,
   placesFor,
-  putTask,
+  putCanvas,
 } from "./fakes.ts"
 import { createLater } from "./later.ts"
 
@@ -76,7 +76,7 @@ describe("the budget a run spends is read from its prompt", () => {
       )
     expect(promptBudget(entryId("p"), answer(true)).spends).toBe(true)
     expect(promptBudget(entryId("p"), answer(false)).spends).toBe(false)
-    const chat = encodeChat(
+    const said = encodeMessage(
       {
         author: ada,
         authorName: "Ada",
@@ -86,7 +86,7 @@ describe("the budget a run spends is read from its prompt", () => {
       },
       1,
     )
-    expect(promptBudget(entryId("p"), chat)).toEqual({
+    expect(promptBudget(entryId("p"), said)).toEqual({
       key: entryId("p"),
       spends: false,
       by: ada,
@@ -94,10 +94,10 @@ describe("the budget a run spends is read from its prompt", () => {
   })
 })
 
-/** Ada's budget on `here`'s thread, on an open task, through a real late writer. */
+/** Ada's budget on `here`'s thread, on an open canvas, through a real late writer. */
 function overBudget() {
   const b = basics()
-  putTask(b, here)
+  putCanvas(b, here)
   applyWrites(b, [
     newBudget({ message: budget, thread: here, by: ada, limit: 10 }),
   ])
@@ -142,9 +142,9 @@ test("a budget gone over queues its fact, with its making in its history", async
   expect(drained).toEqual([here])
 })
 
-test("a budget gone over after its thread's task was archived records the budget, and tells nobody", async () => {
+test("a budget gone over after its thread's canvas was archived records the budget, and tells nobody", async () => {
   const { b, keeper, budgets } = overBudget()
-  archiveTask(b)
+  archiveCanvas(b)
   budgets.spendFrom(budget, 20)
   await keeper.idle()
   expect(readPlaces(b.places).filter(c => c.kind === "fact")).toEqual([])

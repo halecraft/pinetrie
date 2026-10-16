@@ -18,12 +18,17 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
-import { canvasOf, notesNear, planReorder, rankOfDrop } from "@pinetrie/rules"
+import {
+  cardsOnCanvas,
+  notesNear,
+  planReorder,
+  rankOfDrop,
+} from "@pinetrie/rules"
 import type { Intents } from "./inventory.ts"
 
 /**
  * Where you were looking when you acted: a column, by key, the inventory,
- * or the board (a task's card moved there). A refusal is drawn
+ * or the board (a canvas's card moved there). A refusal is drawn
  * there (`CardNotice`).
  */
 export type ActedAt =
@@ -33,7 +38,7 @@ export type ActedAt =
 
 export const AT_INVENTORY: ActedAt = { kind: "inventory" }
 
-/** The board, where a task's move was made. */
+/** The board, where a canvas's move was made. */
 export const AT_BOARD: ActedAt = { kind: "board" }
 
 /** Column `key`, where a move was made. */
@@ -347,7 +352,7 @@ export function drawnPlace(
     case "queued":
       return { ...key, order: LAST_ORDER, by: me }
     case "pinned":
-    case "task-pinned":
+    case "canvas-pinned":
     case "note":
     case "margin":
     case "board":
@@ -363,14 +368,14 @@ export function drawnPlace(
     // A restore, back where it was, at its old rank.
     case "back":
       return now?.place.kind === "trash" ? now.place.left : undefined
-    case "new-task":
-      return { kind: "canvas", task: key.task, order: LAST_ORDER, width: 1 }
+    case "new-canvas":
+      return { kind: "canvas", canvas: key.canvas, order: LAST_ORDER, width: 1 }
     // Drawn at the rank the host would give it there.
     case "canvas-at":
       return {
         kind: "canvas",
-        task: key.task,
-        order: rankOfDrop(canvasOf(cards, key.task), key.after).order,
+        canvas: key.canvas,
+        order: rankOfDrop(cardsOnCanvas(cards, key.canvas), key.after).order,
         width: 1,
       }
     case "notes": {

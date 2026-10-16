@@ -26,7 +26,7 @@ wires them.
 | `shutdown.ts` | the order a host stops in (`planShutdown`): the agent, then the scribe, among its steps |
 | `runs.ts` | a run from its start to its end (`createRuns`, `planRunEnd`), a Stop before pi starts (`cancel`), and the agent's `onStream` (`streamInto`); a run asks base news what it is told first, and its lane's stop has base news forget what was steered |
 | `pinned.ts` | what a run reads of its thread's pinned cards (ADR-0048 step 5, S92): `readPinned` gathers, waits a bounded time for the sender's text (`waitFor`), and plans the cards entry |
-| `canvas.ts` | what a run is told of its thread's task (ADR-0116): `readTaskContext`, the canvas list and the cards pinned to the task, each written only when it differs from the newest of its kind on the lane's path, so an unchanged task keeps the prompt's cache (S92); `runs.ts` writes them between base news and the thread's pinned cards |
+| `canvas.ts` | what a run is told of its thread's canvas (ADR-0116): `readCanvasContext`, the canvas list and the cards pinned to the canvas, each written only when it differs from the newest of its kind on the lane's path, so an unchanged canvas keeps the prompt's cache (S92); `runs.ts` writes them between base news and the thread's pinned cards |
 | `canvas-news.ts` | a card added to a running thread's canvas or taken from it, steered into its lane as a fact line (`planCanvasFacts`), heard from `Provenance.onChanged`; never a queued fact card, which would wait for the run's end |
 | `base-news.ts` | what a thread is told of its base's new work (ADR-0080): `atStart`, a chat's run's behind entry; `baseChanged`, a steer into a running lane, at most once per base commit (`told`), heard from lane work's `onBaseChanged`; `runEnded` forgets what was steered. Made after the agent, whose lanes it steers |
 | `split-call.ts` | `split_proposed_changes` (ADR-0080): a split card queued on the thread, popped when its run ends: pi calls it only during a run, so its step is queued before the run's end queues the drain, which the keeper runs after it |
@@ -41,7 +41,7 @@ wires them.
 | `seats.ts` | each connected seat's person (ADR-0037), written once as a `pinetrie.seat` record (started after `recover`), and unloading the histories of moves of a person with no seat left |
 | `startup.ts` | `recover`: what a starting host does before it takes a command |
 | `control.ts` | the command Line of each client seat (ADR-0007), and who its writer is: the principal its connection named, an email, so no command field can claim to be someone else (ADR-0037). The host is no writer: writers are the connected clients, and own no lanes, which belong to threads (ADR-0120) |
-| `commands/` | one module per command: `chat`, `board` (a move on the board, a change to its states: ADR-0122), `mark` (ADR-0045, ADR-0116), `lane` (stop, carry on, hold or release a queue, proposed changes: each finds its lane through `laneAt`), `cards` (a move, a reorder, unqueue all, an undo of moves, a command, a busy chat's card queued, a sent card spent, a paste, a thread's copy: ADR-0059, ADR-0066, ADR-0132); `index.ts` decodes, decides where it runs (`placeOfCommand`), clears it through the gate, and routes; every send, a `chat` command's, a popped queued card's (`sendPoppedQueuedCard`) or a spin-off's, is cleared too. `gate.ts`: `clear`, the gate's shell over `planGate` (`@pinetrie/rules`) |
+| `commands/` | one module per command: `send`, `board` (a move on the board, a change to its states: ADR-0122), `mark` (ADR-0045, ADR-0116), `lane` (stop, carry on, hold or release a queue, proposed changes: each finds its lane through `laneAt`), `cards` (a move, a reorder, unqueue all, an undo of moves, a command, a busy chat's card queued, a sent card spent, a paste, a thread's copy: ADR-0059, ADR-0066, ADR-0132); `index.ts` decodes, decides where it runs (`placeOfCommand`), clears it through the gate, and routes; every send, a `chat` command's, a popped queued card's (`sendPoppedQueuedCard`) or a spin-off's, is cleared too. `gate.ts`: `clear`, the gate's shell over `planGate` (`@pinetrie/rules`) |
 | `http.ts` | the HTTP server: admission, the page (Vite or the built one), the websocket, blobs, proposed changes read, invites |
 | `responses.ts` | every answer the host writes itself, as a pure `HttpAnswer` |
 | `routes.ts` | what a request or an upgrade gets, pure: admission first (`planRequest`, `planUpgrade`), then which requests are the host's (`route`) |
@@ -54,7 +54,7 @@ wires them.
 | `names.ts` | every thread's name (ADR-0039, ADR-0117): `ensure` for the lanes pi holds and the threads recorded, `reserve` for a thread a column opened before its first message (ADR-0057), on one queue |
 | `banners.ts` | each thread's column banner (ADR-0050, ADR-0053): made as the thread is named, at reservation or creation, set by `set_banner`; every step a late one |
 | `digests.ts` | each ask's digest (ADR-0106, ADR-0075), unless the config turns them off (ADR-0071); a live digest waits for someone reading the thread (presence, ADR-0024); every step a late one, and `writePendingVerdict`, the verdict a stopping run writes before its end |
-| `relays.ts` | another thread's agent asked (ADR-0128): `ask` and `leave` (the tools' hooks), `relayChat` (a person's chat that asks or invites), `relayCard` (an ask card popped), `deliver` (a relay into a thread, for these and the round) |
+| `relays.ts` | another thread's agent asked (ADR-0128): `ask` and `leave` (the tools' hooks), `relayMessage` (a person's chat that asks or invites), `relayCard` (an ask card popped), `deliver` (a relay into a thread, for these and the round) |
 | `answers.ts` | what a relayed run sends back once it has ended (ADR-0128): its answer, the answers held for a busy asker, and the round, each a late step (`Answers.ended`, from `runs.onEnded`) |
 | `threads-now.ts` | a thread as it is now, for the relays, the answers and the late steps: its reach, its tree, end and lane (`thread`, which opens only a live thread's root), and the names a message uses |
 | `budgets.ts` | what agents talking spend (ADR-0128): the budget a run spends, read from its prompt (`promptBudget`), counted per request, written when it goes over and at a run's end, and the gate before each request |
@@ -181,11 +181,11 @@ same for every run (`packages/pi/TECHNICAL.md`, S85).
   `docOfLane`, which answer only for a loaded root; an async one asks
   `root` or `laneDoc`.
 - **A starting host opens the roots `planLoads` names**: every root in the
-  directory with a thread on the canvas of a task outside the archive, or
-  in an inventory (`rootsHeld`, ADR-0116), before `recover`. A busy task
+  directory with a thread on the canvas of a canvas outside the archive, or
+  in an inventory (`rootsHeld`, ADR-0116), before `recover`. A busy canvas
   cannot be archived, so these hold every lane a crash could have
-  interrupted. Which tasks are archived is the board's (`readArchived`,
-  ADR-0122). Archiving `unload`s the task's roots nothing else holds
+  interrupted. Which canvases are archived is the board's (`readArchived`,
+  ADR-0122). Archiving `unload`s the canvas's roots nothing else holds
   (`work/archive.ts`); restoring opens them.
   `unload` first runs its `onReleasing` listeners: the scribe's `release`
   closes the agent's harness over the root, then the root's pi session
@@ -218,12 +218,12 @@ same for every run (`packages/pi/TECHNICAL.md`, S85).
   Line is stored too but not compacted: Kyneta cannot compact a replica of
   a document another peer writes, which its pruning should do upstream
   (S25). A card's text is Yjs, which Kyneta cannot compact live (S24).
-- **A command names its root and its task** (`Command.root`,
-  `Command.task`, ADR-0063, ADR-0116): a chat writes in its root, and a
-  chat at the root starts it, under the root and task ids the sender's tab
-  minted, refused `root_id_in_use` or `task_id_in_use` when the session
-  holds either already; a branch elsewhere names a task the session holds.
-  The host's `TaskIndex` is `tasksNow(basics)` (`tasks.ts`), from the
+- **A command names its root and its canvas** (`Command.root`,
+  `Command.canvas`, ADR-0063, ADR-0116): a chat writes in its root, and a
+  chat at the root starts it, under the root and canvas ids the sender's tab
+  minted, refused `root_id_in_use` or `canvas_id_in_use` when the session
+  holds either already; a branch elsewhere names a canvas the session holds.
+  The host's `CanvasIndex` is `canvasesNow(basics)` (`canvases.ts`), from the
   places and the threads' records, built once per command by the
   dispatcher (`commands/index.ts`), which hands it to the gate and
   every card command; a drain, a title and proposed changes each build their own,
@@ -239,10 +239,8 @@ until the next compaction (S120), and the host compacts at startup. So
   deleted: each `StoreMigration` (`STORE_MIGRATIONS`) names, from every
   stored id, the documents nothing writes any more, and they are deleted
   from the store, after one `backup`. Each is one-time, like a
-  `RecordMigration`. Registered now: `0017-stale-documents`, the Lines of
-  the `pineta.control` topic from before the rename, which the deletion of
-  Lines no longer matches, and `pinetrie:cards`, the cards document
-  ADR-0059 replaced.
+  `RecordMigration`. None is registered now: `0017-stale-documents` ran,
+  and was deleted.
 - **`readStored`** reads each document's stored schema hash through the
   `Store` (`listDocIds`, `currentMeta`). **`planStoredOpen`** compares each with the hash of the schema its
   kind opens with (`storedKind` and `SCHEMA_OF`, `policy.ts`, which `resolve`
@@ -262,16 +260,23 @@ until the next compaction (S120), and the host compacts at startup. So
 - **One file per migration**, deleted once Duane's store has passed it; a
   store still on its hash is then refused. A change that moves no data is a
   migration with no `run`: registering it is the acknowledgement.
-- **`0018-dismissed-ready` is the one migration of a person's document**
-  (ADR-0153): each attention document's `dismissedOffers` is copied to
-  `dismissedReady`, under the same lane. It is the host's only write to a
-  person's document, made before any tab opens it. A Yjs document keys each
-  field by an identity hash, not its name, so the old field is read from a
-  snapshot opened under the old schema (`AttentionDocBeforeReady`,
-  `@pinetrie/schema`). A document the Exchange loaded from a store already
-  read the old data under the new name in a probe, where one made from a
-  snapshot (`createDoc`) did not; the copy writes only what the new field
-  lacks, so either way it is right.
+- **Each stored schema's hash is pinned** (`migrations/index.test.ts`):
+  a change to one fails that test until a migration from the old hash is
+  registered, so no schema changes by accident.
+- **Registered now, from ADR-0158's rename:** `0019-canvas-places` (the
+  places, from their hash while rows named a canvas): each row's `canvas`
+  becomes `canvas` and a card pinned to a canvas, trashed or not, is pinned to
+  its canvas; each undelivered fact names its canvas; each card-history
+  event and trace in the session names its places the same way; a state
+  still named Backlog, Doing or Done becomes Topics, Active or Archive; and
+  every stack of moves is retired (`MigrationRun.storedIds`), since a whole
+  undo would restore a row of the old shape. And `0020-canvas-open` (each
+  person's open list, its `canvases` now `canvases`). A Yjs document keys each
+  field by an identity hash, not its name, so each reads the old field from
+  a snapshot opened under the old schema (`PlacesDocBeforeCanvas`,
+  `OpenDocBeforeCanvas`, `@pinetrie/schema`): a probe showed the current
+  schema reads a stored row's `canvas` as nothing. `0018-dismissed-ready`,
+  the one earlier write to a person's document, ran, and was deleted.
 - **None with no `run` is registered now:** `0001-live-row`, `0002-records` (ADR-0095),
   `0005-tasks`' places and sidebars (ADR-0116) and `0008-entry-thread`
   (every root's rows given the thread column, a context entry in the
@@ -284,24 +289,22 @@ until the next compaction (S120), and the host compacts at startup. So
   second start finds nothing to do. It writes under the document's current
   schema, so its hash stays. The backup is taken after the reads, before
   the first write. Each is deleted, with its mutations, once Duane's store
-  has run it. Registered now: `0009-card-content` (ADR-0126): each
-  place at a thread loses the `at` its row and its history events kept,
-  and each fact stored on a text card's id moves to an `x-` fact card's,
-  with its history; and `0014-trash-left` (ADR-0134): each place row of the
-  old trash shape (`discarded`, with `holder` and `task`) is deleted, since
-  it says too little to rebuild where the card was, and is at most a week
-  old; and `0015-lane-history` (ADR-0150): each lane record's `work` (`{
-  kind: "own" }` or null) becomes `history` (`"jj"` or null), since every
-  project served before folder projects was jj; and `0016-revision-point`
-  (ADR-0150): each turn record's `commit` becomes `point`, the same string,
-  and the record is written whole (`snapshot`, `paths`, `conflicts`,
-  `disk` and a disk's `shared`, absent in records written before each
-  existed, become none), so `REVISION` decodes one shape. A migration that only
+  has run it. Registered now: `0021-entry-words` (ADR-0158): every root's
+  stored entries are read raw, by `customType`, and those in an old shape
+  are written whole: a person's message is stored as `pinetrie.message`
+  (was `pinetrie.chat`), the cards pinned to a canvas as
+  `pinetrie.canvas-pinned` (was `pinetrie.canvas-pinned`), and a canvas list,
+  a canvas's news, those pinned cards and an undelivered fact name their
+  canvas in `details`. An entry's `content`, the text the model read, its
+  id and its parent are never rewritten, so a thread's history and its
+  prompt cache are as they were. `0009-card-content`, `0011-thread-origin`,
+  `0014-trash-left`, `0015-lane-history` and `0016-revision-point` ran, and
+  were deleted. A migration that only
   reshapes one namespace's records, record by record, is a pure rewrite
   over `rewriteRecords` (`migrations/rewrite.ts`), which reads every
   document the namespace lives in before it writes any. `0003-workflow-archive` (the
   workflow's `closed` state renamed `archive`), `0004-threads` (each thread
-  named in its first message, ADR-0117), `0005-tasks`' records (a task per
+  named in its first message, ADR-0117), `0005-tasks`' records (a canvas per
   root, ADR-0116), `0006-note-columns` (each thread's notes moved from
   its notes board's cells into a note column beside it, ADR-0116) and
   `0007-thread-origin` (each thread record's `fork` replaced by its
@@ -342,7 +345,7 @@ until the next compaction (S120), and the host compacts at startup. So
   its `BLOB_GRACE_MS`. A suite moves the clock instead of waiting out the
   grace (`suiteClock`, `clockedStore`).
 - **A message's links are quoted for the model** (`linkedQuotes`,
-  `withQuotes`): `sendChat` gathers each past referent its text links to
+  `withQuotes`): `sendMessage` gathers each past referent its text links to
   from the root it is in, and the chat's content quotes it under the text,
   frozen as sent.
 - **A message's shares are gathered with it** (`gatherShares`, ADR-0151):
@@ -529,7 +532,7 @@ any refresh they queued.
     `shares.ts`): the host's slot first; then a directory no slot holds as
     wanted goes in an extra slot, swept first; ports are written when they
     changed. The state it reads is `createShares`', changed only in one
-    queue, a new lease's reset among its tasks. Nothing
+    queue, a new lease's reset among its canvases. Nothing
     changed, nothing is done: in a project whose accepted work moves often
     this path runs often. A widening the VM has no slot for is said once,
     and not asked again while the same directories are what is new; a lane
@@ -589,7 +592,7 @@ rejects `shutdown()`.
 - **Every command, and every send made for one, is cleared by one gate**
   (`commands/gate.ts`'s `clear`, over `planGate`, `@pinetrie/rules`:
   ADR-0029, ADR-0124, ADR-0150). It gathers the places, the archive, the
-  lane records and the project's kind, and plans: a task the command
+  lane records and the project's kind, and plans: a canvas the command
   writes in archived (`writesIn`); then, read only when the plan asks for
   them (`read`), the roots a branch forks in, so a command the archive
   refuses opens none; then a thread someone holds or trashed, "put it on
@@ -597,7 +600,7 @@ rejects `shutdown()`.
   than the project's (`ERR.FOREIGN_LANE`). The refusal is worded in rules
   (`gateRefusal`). The dispatcher clears each decoded command once and
   carries out the `Cleared<Intent>`; a popped queued card and a spin-off's
-  first message are cleared as `Send`s (`send`). `sendChat` takes only a
+  first message are cleared as `Send`s (`send`). `sendMessage` takes only a
   `Cleared<Send>`, so a send nobody cleared does not compile
   (`commands/types.test.ts`). The drain asks the hold and the lane's kind
   before it pops (`away`: held, or `LaneWork.runnable` refusing), so their
@@ -627,26 +630,26 @@ rejects `shutdown()`.
 - **A copy** (`copyThread`, `commands/cards.ts`): `planCopy` over the
   source's record and tree; the copy's `THREAD` record first, then its card,
   then its name (`names.ensure`). Its first send is a branch at its fork:
-  `sendChat` refuses a branch naming a recorded thread anywhere else, and
+  `sendMessage` refuses a branch naming a recorded thread anywhere else, and
   writes no record or card for it.
 - **A thread is opened before its first send** (ADR-0126, `open-thread`
   below), so its first send writes only its entry; a branch at the root in
-  a task the session holds is refused unless its thread was opened there,
-  in that root: a new tab's, or a new root's made past a canvas's last
+  a canvas the session holds is refused unless its thread was opened there,
+  in that root: a new canvas's, or a new root's made past a canvas's last
   column (ADR-0138). A branch naming a thread no column opened (a script's) is
-  opened with its send (ADR-0116, ADR-0117): `planChat`'s decision names
+  opened with its send (ADR-0116, ADR-0117): `planMessage`'s decision names
   the thread it writes in (`thread`), and for a branch what its card needs
-  (`starts`), and `sendChat`, after its last await, plans its opening
+  (`starts`), and `sendMessage`, after its last await, plans its opening
   (`planThreadOpen`): the thread's record, its card just after the thread
-  it forks from on its task's canvas, and for a new task its card on the
+  it forks from on its canvas, and for a new canvas its card on the
   board (ADR-0126), at the end of the state the chat names
   (`Command.state`, a board column's ＋), else of the first open state.
-  `executeChat` writes that before the message and reads nothing for it.
+  `executeSend` writes that before the message and reads nothing for it.
 - **A move on the board** (`commands/board.ts`): `planBoardMove` over the
-  workflow and the places; a move within open states writes the task's
-  card (`placeTask`, the card commands': a move in its mover's history
-  outside any task, a reorder in none, with its card's history) and
-  answers `moved`; one that crosses the archive's edge gathers the task's
+  workflow and the places; a move within open states writes the canvas's
+  card (`placeCanvas`, the card commands': a move in its mover's history
+  outside any canvas, a reorder in none, with its card's history) and
+  answers `moved`; one that crosses the archive's edge gathers the canvas's
   roots' documents (`docs.root` loads an unloaded one, S86) and
   `planArchive`s the crossing first. A refusal is a card move's,
   `unmoved`, saying where the card is and who put it there. An undo of
@@ -656,9 +659,9 @@ rejects `shutdown()`.
   on: one disk left behind is waste, while a teardown stopped there would
   leave every lane after it, its history and its snapshots. **A change to the states** (`handleWorkflow`) is one
   keeper step, `planWorkflowEdit` over the workflow and the board.
-- **A message sent from a card spends it** (ADR-0048): `sendChat` names the
+- **A message sent from a card spends it** (ADR-0048): `sendMessage` names the
   card's other writers as contributors, through the card port, and spends
-  nothing. The dispatcher's `chat` case spends the card when the answer
+  nothing. The dispatcher's `send` case spends the card when the answer
   takes its text (`spendsCard`: `appended` or `started`): the record goes,
   then the text, and the reply carries the places' `rev`, its trace naming
   the message the send wrote (found by the send's id). A popped card's
@@ -666,9 +669,9 @@ rejects `shutdown()`.
   one written back keeps it. The command's text is what is sent: the text
   its sender saw.
 - **A chat carries its sender's pinned versions** (`pinned`, each card
-  pinned at the sender's thread end with its text version): `executeChat`
+  pinned at the sender's thread end with its text version): `executeSend`
   passes them to `start` for a `run` or `createAndRun`, and the run waits
-  for them. A popped queued card's chat (`chatOfPoppedQueuedCard`), in
+  for them. A popped queued card's chat (`sendOfPoppedQueuedCard`), in
   its thread's root (its `THREAD` record's: a queued place names no root;
   `failed` with none), carries none: its thread's
   cards were edited long before.
@@ -717,8 +720,8 @@ rejects `shutdown()`.
 - **`move` and `set-command` are handoffs** (`commands/cards.ts`): gather
   the places and whether the lane runs, plan (`planMoveCommand` over
   several moves, `planSetCommand`), then write. A discard's history is the
-  host's to name (ADR-0066, ADR-0116): `Discards` is the tasks now and the
-  `here` the `move` carries, the task its sender is on. A move's list is accepted
+  host's to name (ADR-0066, ADR-0116): `Discards` is the canvases now and the
+  `here` the `move` carries, the canvas its sender is on. A move's list is accepted
   whole or refused by its first refusal (`planMoves`): a keep's cards are
   one command. An accepted move answers `moved` with its `rev`; a refusal
   answers `unmoved` with its code, where the card is now, who put it there,
@@ -733,8 +736,8 @@ rejects `shutdown()`.
   carries Kyneta's revert through `revert`, in one change with the threads
   it lifts (`deleteRoot`). A spin-off's thread card and its card's move to
   the trash are one change, its sender's. A thread's card placed by its
-  first send (`executeChat`) is its sender's change, so `canvas-news.ts`
-  tells the task's running threads, as for an opened or copied thread. The
+  first send (`executeSend`) is its sender's change, so `canvas-news.ts`
+  tells the canvas's running threads, as for an opened or copied thread. The
   drain makes each pop one change of the host's (`queued-card-pop.ts`), with
   `popNextQueuedCard` still synchronous (S69). The presence the close reads
   is `readReading`'s pairs: a placer with a column open at the card's end
@@ -750,8 +753,8 @@ rejects `shutdown()`.
   never fitted at all.
 - **`traces-seen` deletes the sender's own traces**, ignoring any other
   id, and answers `seen`. A client sends it for the traces a column drew.
-- **`undo-move` undoes or redoes the sender's newest move in a task, or,
-  naming none, in their history outside any task** (§ Moves' history). It answers `undone` with each card it moved and its
+- **`undo-move` undoes or redoes the sender's newest move in a canvas, or,
+  naming none, in their history outside any canvas** (§ Moves' history). It answers `undone` with each card it moved and its
   place now, `unmoved` (shaped as a refused move) when someone moved a card
   since, or `nothing`. An undo first reads the cards its step moves
   (`MoveHistories.top`, S139): one a thread's record says it was spun from
@@ -760,32 +763,32 @@ rejects `shutdown()`.
   no lane and no other card; else it answers `unmoved` `replied`, naming
   who wrote second, and reverts nothing. A lift deletes the thread after
   the revert (`deleteRoot`, `planRootDelete`): its directory record, its
-  thread's, its task's record, board place and title, any card in it or on
-  the task's canvas, its document (`HostDocuments.destroy`, which tells
-  every peer), and the task's stacks, unloaded for the startup sweep to
+  thread's, its canvas's record, board place and title, any card in it or on
+  the canvas, its document (`HostDocuments.destroy`, which tells
+  every peer), and the canvas's stacks, unloaded for the startup sweep to
   retire. A redo after a lift moves the card back to the trash, its thread
   deleted: a discard.
 - **`spin-off` makes a text card a thread** (ADR-0111, ADR-0126,
   `spinOff`), in one keeper step: the card's text loaded whole,
   `planSpinOff` (refused for a blank card, a root or thread id in use, or
   as `planMove` refuses the move), then the thread's records (its own,
-  spun from the card, and its new task's), a chat at the root of the new
-  root its tab minted (`sendChat`, cleared as every send is, never asking
+  spun from the card, and its new canvas's), a chat at the root of the new
+  root its tab minted (`sendMessage`, cleared as every send is, never asking
   the agent, the card's writers its contributors), then, once the chat took the card's text, the
-  thread's card on its task's canvas and the card's move to its sender's
-  trash, in the history of the task it leaves, or from an inventory the
-  new task's; a chat that took nothing deletes the records again. The
+  thread's card on its canvas and the card's move to its sender's
+  trash, in the history of the canvas it leaves, or from an inventory the
+  new canvas's; a chat that took nothing deletes the records again. The
   answer is the chat's: `appended`, with the first message's id.
 - **`open-thread` opens a thread before its first entry** (ADR-0126,
   `openThread`), in one keeper step: a branch's root's tree loaded (a new
-  root has none: a new tab's, or one in a task the session holds, ADR-0138),
+  root has none: a new canvas's, or one in a canvas the session holds, ADR-0138),
   `planOpenThread`, then its record, its card and the canvas re-ranked for
-  it (and a new tab's task's card on the board), then its name
-  (`names.ensure`). No entry is written. A move that takes a new tab's only
-  thread to a trash before its first send sends its emptied task's card
-  to the closer's trash in the same step (`emptiedTasks`,
-  `planTasksTrashed`), in their history outside any task, so the undo key
-  on no task brings both back.
+  it (and a new canvas's card on the board), then its name
+  (`names.ensure`). No entry is written. A move that takes a new canvas's only
+  thread to a trash before its first send sends its emptied canvas's card
+  to the closer's trash in the same step (`emptiedCanvases`,
+  `planCanvasesTrashed`), in their history outside any canvas, so the undo key
+  on no canvas brings both back.
 - **`branch-out` is a press on an agent's proposal** (ADR-0157,
   `branchOut`), in one keeper step: the root's tree and asks, the thread
   records and whether the proposing lane runs (its `runningAsk`, the
@@ -823,17 +826,17 @@ rejects `shutdown()`.
 
 ## Moves' history (`move-history.ts`, ADR-0066)
 
-- **One Kyneta undo stack per person and task**, `moves:<writer>:<TaskId>`
-  (ADR-0116), and one per person outside any task, `moves:<writer>`
+- **One Kyneta undo stack per person and canvas**, `moves:<writer>:<CanvasId>`
+  (ADR-0116), and one per person outside any canvas, `moves:<writer>`
   (ADR-0126): a `MoveHistoryScope`. Key `moves`, scope the places document, made on first use
   and kept in the store. Kyneta undoes only its own runtime's writes, and
   only the host writes `places`, so the stacks are the host's: `policy.ts`
   shares them with no one and rejects one a client announces, and
   `writersPolicy` gives them to the host alone.
-- **Which history a move enters is the host's** (`historyOf`): the task the
+- **Which history a move enters is the host's** (`historyOf`): the canvas the
   card goes to, else the one it leaves, read from its record; a discard's,
-  the task it leaves, else, from an inventory, the task its sender is on
-  (`here`), else, on none, its sender's history outside any task; a
+  the canvas it leaves, else, from an inventory, the canvas its sender is on
+  (`here`), else, on none, its sender's history outside any canvas; a
   creation or a removal enters none. `move` writes inside that
   stack's `gesture`. The host's own writes (a queued card's pop, a spend,
   an unsent card, a thread's card as it opens, the sweep) are outside every
@@ -845,15 +848,15 @@ rejects `shutdown()`.
 - **`rev` is raised after an undo too** (`OpenChange.revert`), apart from
   the revert, which Kyneta writes itself, and only when one of the cards it
   reverts changed.
-- **Retired 7 days after their task is archived** (`planHistorySweep`,
+- **Retired 7 days after their canvas is archived** (`planHistorySweep`,
   `ARCHIVED_HISTORY_MS`), at startup and after each run's end; and at
-  startup only, those of a task the session does not hold (a new tab's,
-  deleted as it closed unsent). A person's history outside any task is
+  startup only, those of a canvas the session does not hold (a new canvas's,
+  deleted as it closed unsent). A person's history outside any canvas is
   never retired. The stored ids come from the store's listing by `moves:`;
   `retire` destroys a stack loaded or not (S91).
 - **Unloaded when nobody can use them:** a person's when their last seat
-  leaves (the seats step, `idleWriters`), a task's when it is archived
-  (`unloadTask`). The next move loads one again (S91).
+  leaves (the seats step, `idleWriters`), a canvas's when it is archived
+  (`unloadCanvas`). The next move loads one again (S91).
 - **Shutdown disposes them, then flushes,** so a stack's open step is
   stored before the Exchange stops.
 
@@ -890,7 +893,7 @@ rejects `shutdown()`.
   writers as contributors. A card with no text starts no run.
 - **A card the host could not send goes back below the line, whole**
   (`planUnsent`): a note in the note column nearest its thread, made in the
-  same step when its task has none (ADR-0116), saying why, and never queued
+  same step when its canvas has none (ADR-0116), saying why, and never queued
   again, or the next drain would fail the same way (S69, answer 5). With
   nowhere to go (a thread in a full inventory, or one with no card) it
   stays queued, saying why, and the host holds the queue first
@@ -926,13 +929,13 @@ rejects `shutdown()`.
   leaves the queue (`givenUp`), and its end drains the lane again. `runs.start` marks a lane
   running at once (a `begin`), so a drain behind a started run pops
   nothing.
-- **`executeChat` still checks where a new lane begins and asks pi for the
+- **`executeSend` still checks where a new lane begins and asks pi for the
   lane.** Both are ports that may refuse, not facts to gather. The begin is
   checked first (`checkBegin`), so a refused send creates no lane.
-- **The new lane's id is its thread's** (ADR-0117): `planChat` names it from
+- **The new lane's id is its thread's** (ADR-0117): `planMessage` names it from
   where the send goes, and neither the host nor pi makes one. A thread's
   first message is preceded by its `THREAD` record, written in
-  `executeChat`.
+  `executeSend`.
 - **`reserve` is answered `reserved`** whether it named the id or the id
   had a name already, so a column may send it again; an id pi holds is
   refused `lane_id_in_use`.
@@ -979,9 +982,9 @@ rejects `shutdown()`.
   the cards already queued. The client draws it as a quiet row, and nobody
   moves it.
 - **A chat on a thread with no work of its own is caught up first**
-  (ADR-0080): `planChat`'s `catch-up-first` runs `prepareUpdate` with a run
+  (ADR-0080): `planMessage`'s `catch-up-first` runs `prepareUpdate` with a run
   to follow (`follows: "run"`), then sends the chat with `caughtUp`, so it
-  does not loop (`catchUpFirst`, `commands/chat.ts`).
+  does not loop (`catchUpFirst`, `commands/send.ts`).
 - **Resume is `carry-on`** (ADR-0082): `handleCarryOn` starts a run whose
   prompt is `planCarryOn`'s carry-on message, or answers its refusal. It is
   one step on the documents' keeper, as a split is, so a second press finds
@@ -989,18 +992,18 @@ rejects `shutdown()`.
 
 ## Late writes (`later.ts`)
 
-An archived task is read-only, and a command is refused there by the gate
+An archived canvas is read-only, and a command is refused there by the gate
 (`planGate`). The host's own writes that it decides before a gap and makes
 after it are refused by `Later`'s: a model request's answer, a step a run's
 end queues, an action on proposed changes' fact, a budget a round's request spent. A
 root record written through `Records` after an archive let its root go
 opened it again for good, and one written after `docs.destroy` made the
-document again (S198); a fact queued in an archived task left it holding
+document again (S198); a fact queued in an archived canvas left it holding
 queued cards, which `planArchive` refuses.
 
 - **`Later.step(scope, what, plan)` is the one way to write late.** Its
   step gathers the places and the archive, asks `lateAway` of the thread or
-  the task (a title's) it writes into, and on a refusal logs `[host]
+  the canvas (a title's) it writes into, and on a refusal logs `[host]
   <thread>: <what> not written: <why>` (`awayWords`) and stops. Else
   `plan` reads the documents as they are now and returns a `LateWrite`,
   which `Later` carries out: its records (`Records`), then each fact,
@@ -1035,21 +1038,21 @@ queued cards, which `planArchive` refuses.
 - **Exempt, each with its reason** (the list is closed):
   - commands, and the sends made for one: `planGate`, through `clear`;
   - the archive's own steps (`commands/board.ts`): they write about the
-    archived task on purpose, its pending verdicts among them (below);
+    archived canvas on purpose, its pending verdicts among them (below);
   - upkeep: the directory's refresh and rebuild, the sweeps
     (`housekeeping.ts`, the trash, holds, histories, provenance), names,
     seats, the compaction, startup;
-  - what happens inside a running lane, whose task cannot be archived
+  - what happens inside a running lane, whose canvas cannot be archived
     (`planArchive` refuses `running`): `budgets`' `stopNow` in pi's gate,
     `split-call.ts`, `canvas-news.ts`, `base-news.ts`,
     `writePendingVerdict`, `runs.ts`;
   - a budget's own record (`BUDGET`), written when it goes over whatever
-    became of its thread, so a restored task's agents cannot spend it
+    became of its thread, so a restored canvas's agents cannot spend it
     again;
   - the drain: a popped card's send is cleared by `planGate` (`writesIn`'s
     `queue` case), its `away` is `holdingOf`, and no fact is queued in an
-    archived task;
-  - `relays.ts`' `ask`, `leave`, `relayChat`, `relayCard` and `deliver`:
+    archived canvas;
+  - `relays.ts`' `ask`, `leave`, `relayMessage`, `relayCard` and `deliver`:
     each reads both threads' reach and refuses with `unreachableRefusal`
     in the step that writes;
   - proposed changes' description (`describe.ts`, for either kind of project):
@@ -1065,7 +1068,7 @@ queued cards, which `planArchive` refuses.
 - **An archive settles what it cuts off.** A run's end the gate refuses
   would leave its verdict `pending` in the archive for good, so the
   archive's record step writes `unclassified` over each pending verdict of
-  the task's threads (`planArchive`'s `verdicts`, `unclassifiedPending`),
+  the canvas's threads (`planArchive`'s `verdicts`, `unclassifiedPending`),
   as a starting host does.
 
 ## Digests and verdicts (`digests.ts`, ADR-0106, ADR-0077)
@@ -1119,19 +1122,19 @@ queued cards, which `planArchive` refuses.
   starts the run with the heard entry first (`RunStart.heard`), or makes an
   ask card on a busy lane and asks for its drain. Every step is one keeper
   step; the `ask` hook's too, as `split-call.ts` is.
-- **Whose agents a send may name is every open task's named threads**
+- **Whose agents a send may name is every open canvas's named threads**
   (`readReachableAgents`, over `reachableAgents`), wherever it is sent, so
   a branch's first message, whose thread has no card yet, names them too.
 - **Reach is read before any root is opened.** Each step gathers both
   threads' `threadReach` from the session and the places, and refuses one
   out of reach (`unreachableRefusal`) before `threadsNow`, which opens a
-  root only for a live thread (`threads-now.ts`): an archived task's root
+  root only for a live thread (`threads-now.ts`): an archived canvas's root
   stays let go.
   `planRelay` and `planAnswer` take the reaches too, so an ask card whose
   asker was archived since is refused, and an answer for it becomes an
   `undelivered` fact in the answering thread.
-- **A person's chat is relayed after it is written** (`relayChat`, queued
-  by `sendChat`, not awaited inside its step): it finds the chat by its
+- **A person's chat is relayed after it is written** (`relayMessage`, queued
+  by `sendMessage`, not awaited inside its step): it finds the chat by its
   send's id, sets its budget, and relays each member it asks.
 - **The run's end sends the answer** (`answers.ts`' `ended`, from
   `runs.onEnded`, before the settle), each a late step on the answering
@@ -1180,11 +1183,11 @@ queued cards, which `planArchive` refuses.
   outside the queue (`Later.outside`), then planned in a step of its own,
   only while `bannerStillWanted`. A thread its gate refuses gets none
   (`set_banner` answers `no_thread`). A thread named for a column before
-  its first message is opened in no task, and takes one. A missing
+  its first message is opened in no canvas, and takes one. A missing
   `column-banner` skill is logged.
 - **A thread is due one as it is named for its lane** (`createNames`'
   `onNamed`): as a column about to create its lane asks for its name
-  (ADR-0057), or as a lane is created. A conversation's thread is named and
+  (ADR-0057), or as a lane is created. A chat's thread is named and
   draws none. It is due again at each run's end, which draws only when it still has none: the
   retry for a failed one. `recover` does not: choosing `drawn` must not
   draw one for every thread that ever ran. Banners are made before
@@ -1199,21 +1202,21 @@ queued cards, which `planArchive` refuses.
 
 ## Titles (`titles.ts`, ADR-0074)
 
-- **Planned inside the command that asks**: `executeChat`'s `createAndRun`
+- **Planned inside the command that asks**: `executeSend`'s `createAndRun`
   calls `laneStarted` after `prepareLane`, so the new lane's record is
   among the root's, and a `retitle` command calls `asked`. Both are steps
   on the documents' keeper already, so `titles.ts` gathers and plans
   (`planTitling`) without a step of its own, and only the request goes out.
-- **The prompt is given, not read**: the run writes it after `executeChat`
+- **The prompt is given, not read**: the run writes it after `executeSend`
   returns, so `laneStarted` takes its author and text from the chat's
-  details. The title is settled as the task's mark (ADR-0116), keyed by
-  the task, so nothing waits for the root's first entry.
-- **The answer is planned again**: it is a late write on the task, so an
-  archived task takes nothing, and an unasked title gives way to any mark
+  details. The title is settled as the canvas's mark (ADR-0116), keyed by
+  the canvas, so nothing waits for the root's first entry.
+- **The answer is planned again**: it is a late write on the canvas, so an
+  archived canvas takes nothing, and an unasked title gives way to any mark
   written meanwhile (`titleStillWanted`). `planMark` writes it, so an unchanged title writes
   nothing.
 - **Only an unasked request is `held`**: a person's Auto-update goes out
-  even while an unasked one is out for the same task.
+  even while an unasked one is out for the same canvas.
 - A missing `tab-title` skill, or a reply `titleOf` refuses, is logged, and
   nothing is written.
 
@@ -1631,7 +1634,7 @@ adapter's.
     run's end compacts; stale command Lines are deleted at start; it serves
     only after `recover`;
   - `http.ts`: the request and upgrade handlers carry out a plan's refusal;
-  - `packages/rules/chat.ts`'s `attributed`: the model is told who spoke, which
+  - `packages/rules/message.ts`'s `attributed`: the model is told who spoke, which
     shows that pi's conversion sends `content`;
 - **Tests in subdirectories run**: `vitest.config.mjs` includes
   `apps/*/host/**/*.test.ts`.

@@ -61,7 +61,7 @@ async function run(check: Checks["check"]): Promise<void> {
     log: () => {},
   })
   const asker = await join(live, "asker", "live")
-  await asker.chat(PROMPT, ROOT, START_AGENT)
+  await asker.send(PROMPT, ROOT, START_AGENT)
   await waitFor(() => idleNow(live), 120_000)
   const [lane] = laneNamesOf(live)
   const last = projectTranscript(
@@ -80,7 +80,7 @@ async function run(check: Checks["check"]): Promise<void> {
     body: new Uint8Array(RED_PNG),
   })
   const red = (await uploaded.json()) as ImageRef
-  const shown = await asker.chat(
+  const shown = await asker.send(
     `What colour is this image? Answer in one word. ![square](/blob/${red.sha256})`,
     ROOT,
     START_AGENT,
@@ -113,7 +113,7 @@ async function run(check: Checks["check"]): Promise<void> {
     log: line => bannerLog.push(line),
   })
   const painter = await join(drawing, "painter", "live")
-  await painter.chat(
+  await painter.send(
     "Name three birds of spring marshes, in one line.",
     ROOT,
     START_AGENT,

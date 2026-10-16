@@ -77,7 +77,7 @@ export interface Digests {
  * `lane`'s run that `prompt` started is stopping: its verdict is pending.
  * Written before the run's end closes it (`planRunEnd`), so no reader sees
  * the lane stopped beside the last run's verdict. Not a late write: the lane
- * still runs, so its task cannot be archived.
+ * still runs, so its canvas cannot be archived.
  */
 export const writePendingVerdict =
   (deps: {

@@ -1,5 +1,6 @@
 import {
   type CardRecord,
+  canvasIdFor,
   entryId,
   type Gated,
   livePlaceOf,
@@ -7,7 +8,6 @@ import {
   rootIdFor,
   type SendAt,
   snapshotId,
-  taskIdFor,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -33,10 +33,10 @@ const heldAt = (
 
 const T = threadIdFor("t")
 const ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
-const TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
+const CANVAS = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 const BEA = writerId("bea@x.io")
-const chat = (at: SendAt): Gated => ({
-  kind: "chat",
+const said = (at: SendAt): Gated => ({
+  kind: "send",
   text: "x",
   root: ROOT,
   at,
@@ -52,22 +52,27 @@ describe("runsIn: what each command runs or writes a message in", () => {
   test.each([
     [
       "a send at a thread's end: the thread",
-      chat({ kind: "end", thread: T, seen: entryId("e") }),
+      said({ kind: "end", thread: T, seen: entryId("e") }),
       [{ kind: "thread", thread: T }],
     ],
     [
       "a branch: the entry it forks at, in its root",
-      chat({
+      said({
         kind: "branch",
         thread: threadIdFor("n"),
         at: entryId("e"),
-        task: TASK,
+        canvas: CANVAS,
       }),
       [{ kind: "entry", root: ROOT, entry: "e", starts: threadIdFor("n") }],
     ],
     [
       "a new root: nothing",
-      chat({ kind: "branch", thread: threadIdFor("n"), at: null, task: TASK }),
+      said({
+        kind: "branch",
+        thread: threadIdFor("n"),
+        at: null,
+        canvas: CANVAS,
+      }),
       [],
     ],
     [
@@ -92,7 +97,7 @@ describe("runsIn: what each command runs or writes a message in", () => {
     ],
     [
       "a popped send: its thread",
-      chat({ kind: "queue", thread: T }),
+      said({ kind: "queue", thread: T }),
       [{ kind: "thread", thread: T }],
     ],
     ["a stop: nothing", { kind: "stop", lane: T }, []],
@@ -191,7 +196,7 @@ test("takenIn: the threads a change puts in an inventory that were not in one", 
     id: T,
     owner: BEA,
     placer: BEA,
-    place: { kind: "canvas", task: TASK, order: "1", width: 1 },
+    place: { kind: "canvas", canvas: CANVAS, order: "1", width: 1 },
     content: NO_CONTENT,
   }
   const held: CardRecord = { ...on, place: { kind: "inventory", holder: BEA } }
@@ -206,7 +211,7 @@ test("a trashed thread is held by nobody, but its discard stops its run and a co
     id: T,
     owner: BEA,
     placer: BEA,
-    place: { kind: "canvas", task: TASK, order: "1", width: 1 },
+    place: { kind: "canvas", canvas: CANVAS, order: "1", width: 1 },
     content: NO_CONTENT,
   }
   const trashed: CardRecord = {

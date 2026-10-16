@@ -123,7 +123,7 @@ export function threadPreview(
     end === null
       ? []
       : projectSpine(index, end).spine.flatMap((node): PreviewRow[] =>
-          node.role === "chat"
+          node.role === "person"
             ? [{ id: node.id, who: node.author ?? "someone", text: node.text }]
             : node.role === "assistant" && node.text.trim() !== ""
               ? [{ id: node.id, who: "agent", text: node.text }]

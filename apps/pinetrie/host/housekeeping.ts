@@ -23,13 +23,13 @@ import {
 import {
   planSweep,
   readArchived,
+  readCanvases,
   readCardHistories,
   readLaneRecords,
   readPlaces,
   readQueueHolds,
   readReferencedBlobs,
   readRevisions,
-  readTasks,
   readThreads,
   readTreeIndex,
 } from "@pinetrie/reads"
@@ -143,7 +143,7 @@ export async function sweepHistories(input: {
   // plan
   const retired = planHistorySweep({
     stored,
-    tasks: readTasks(places),
+    canvases: readCanvases(places),
     archived: readArchived(session, places),
     now: now(),
     startup: input.startup,
@@ -174,12 +174,12 @@ export async function sweepHolds(input: {
     whereIs: lane => {
       const card = cards.find(c => c.id === lane)
       return card?.place.kind === "canvas"
-        ? card.place.task
+        ? card.place.canvas
         : card?.place.kind === "inventory"
           ? "inventory"
           : null
     },
-    archived: task => archived.has(task),
+    archived: canvas => archived.has(canvas),
   })
   // execute
   if (swept.length === 0) return

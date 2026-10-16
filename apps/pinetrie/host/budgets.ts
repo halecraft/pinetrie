@@ -141,7 +141,7 @@ export function createBudgets(deps: {
   /**
    * The record crossed its limit: written, and its thread told. The record is
    * the budget's own count, written whatever became of its thread, so a
-   * restored task's agents cannot spend it again; telling the thread is a
+   * restored canvas's agents cannot spend it again; telling the thread is a
    * late write, since a round's request can cross it after its run ended.
    */
   function wentOver(over: BudgetRecord): void {

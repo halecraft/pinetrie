@@ -136,7 +136,7 @@ async function sshSection(check: Checks["check"], lanes: LaneHosts) {
   const owner = await join(h.host, "owner", "ssh")
   try {
     h.script.use([{ text: "made" }])
-    await h.user.chat("@agent make a lane", ROOT, START_AGENT)
+    await h.user.send("@agent make a lane", ROOT, START_AGENT)
     await h.idle()
     const lane = h.laneWith("made")?.name
     if (lane === undefined) throw new Error("no lane was made")

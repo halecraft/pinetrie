@@ -1,14 +1,14 @@
 import { createInMemoryStore, Exchange, whenHydrated } from "@kyneta/exchange"
 import {
+  type CanvasId,
   type CardRecord,
+  canvasIdFor,
   historyScope,
   type MoveHistoryScope,
   movesDocId,
   PERSON_HISTORY,
   rootIdFor,
-  type TaskId,
   type TextCard,
-  taskIdFor,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -24,11 +24,11 @@ const TEST_THREAD = threadIdFor("e")
 
 const ADA = writerId("ada@x.io")
 const BEA = writerId("bea@x.io")
-/** Two tasks, each with its own history; their cards in one root. */
-const R1 = taskIdFor("01a0ffd2-0000-7000-8000-00000000000a")
-const R2 = taskIdFor("01a0ffd2-0000-7000-8000-00000000000b")
+/** Two canvases, each with its own history; their cards in one root. */
+const R1 = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000a")
+const R2 = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000b")
 const _ROOT_ID = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
-const atEnd = (_task: TaskId) =>
+const atEnd = (_canvas: CanvasId) =>
   ({
     kind: "pinned",
     thread: TEST_THREAD,
@@ -42,7 +42,7 @@ async function setUp() {
   const places = exchange.get(PLACES_DOC_ID, PlacesDoc)
   await whenHydrated(places)
   const histories = createMoveHistories(exchange)
-  const card = (id: string, root: TaskId): TextCard => ({
+  const card = (id: string, root: CanvasId): TextCard => ({
     kind: "text",
     id: cardIdFor(id),
     owner: ADA,
@@ -56,7 +56,7 @@ async function setUp() {
   /** `writer` moves `c` to `place`, as one step of their history in `root`. */
   const move = async (
     writer: typeof ADA,
-    root: TaskId | MoveHistoryScope,
+    root: CanvasId | MoveHistoryScope,
     c: TextCard,
     place: TextCard["place"],
   ) =>
@@ -75,7 +75,7 @@ async function setUp() {
   return { store, exchange, histories, card, seed, move, placeOf, recordOf }
 }
 
-test("a move is one step of its writer's history in its task, and undoes whole after rev was raised", async () => {
+test("a move is one step of its writer's history in its canvas, and undoes whole after rev was raised", async () => {
   const { histories, card, seed, move, placeOf } = await setUp()
   const a = card("a", R1)
   seed(a)
@@ -91,7 +91,7 @@ test("a move is one step of its writer's history in its task, and undoes whole a
   histories.dispose()
 })
 
-test("another task's history, and another writer's, are untouched by an undo", async () => {
+test("another canvas's history, and another writer's, are untouched by an undo", async () => {
   const { histories, card, seed, move, placeOf } = await setUp()
   const [a, b, c] = [card("a", R1), card("b", R2), card("c", R1)]
   for (const x of [a, b, c]) seed(x)
@@ -112,7 +112,7 @@ test("another task's history, and another writer's, are untouched by an undo", a
   histories.dispose()
 })
 
-test("a person's history outside any task is a stack of its own, which a task's undo leaves", async () => {
+test("a person's history outside any canvas is a stack of its own, which a canvas's undo leaves", async () => {
   const { histories, card, seed, move, placeOf } = await setUp()
   const [a, b] = [card("a", R1), card("b", R1)]
   for (const x of [a, b]) seed(x)

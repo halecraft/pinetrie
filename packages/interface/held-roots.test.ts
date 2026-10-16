@@ -1,15 +1,15 @@
 import {
+  canvasIdFor,
   entryId,
   type RootRecord,
   rootIdFor,
   type ThreadId,
-  taskIdFor,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import { threadCardOf } from "@pinetrie/rules/fixtures"
 import { describe, expect, test } from "vitest"
-import { tasksWith } from "./fixtures.ts"
+import { canvasesWith } from "./fixtures.ts"
 import { planHeldRoots } from "./held-roots.ts"
 
 const record = (n: string): RootRecord => ({
@@ -27,14 +27,14 @@ const record = (n: string): RootRecord => ({
 const _directory = new Map(
   ["1", "2", "3", "4"].map(n => [rootIdFor(`r${n}`), record(n)] as const),
 )
-/** Task `k-<n>` holds the thread `t-<n>`, in root `r<n>`. */
-const K = (n: string) => taskIdFor(n)
-const tasks = tasksWith({
+/** Canvas `k-<n>` holds the thread `t-<n>`, in root `r<n>`. */
+const K = (n: string) => canvasIdFor(n)
+const canvases = canvasesWith({
   known: ["1", "2", "3", "4"].map(K),
   cards: ["1", "2", "3", "4"].map(n =>
     threadCardOf({
       thread: threadIdFor(n),
-      task: K(n),
+      canvas: K(n),
       by: writerId("a"),
       cards: [],
     }),
@@ -63,27 +63,27 @@ describe("planHeldRoots", () => {
     expect(
       held({
         layout: { open: [], active: null },
-        tasks,
+        canvases,
         inventory: [threadIdFor("3")],
       }),
     ).toEqual([rootIdFor("r3")])
   })
 
-  test("the roots of the sidebar's tasks and the one you are on, and no other", () => {
+  test("the roots of the sidebar's canvases and the one you are on, and no other", () => {
     expect(
       held({
         layout: {
           open: [K("1"), K("2")],
-          active: { kind: "task", task: K("3") },
+          active: { kind: "canvas", canvas: K("3") },
         },
-        tasks,
+        canvases,
       }),
     ).toEqual([rootIdFor("r1"), rootIdFor("r2"), rootIdFor("r3")])
   })
 
-  test("a task the session does not hold holds no root", () => {
-    expect(held({ layout: { open: [K("9")], active: null }, tasks })).toEqual(
-      [],
-    )
+  test("a canvas the session does not hold holds no root", () => {
+    expect(
+      held({ layout: { open: [K("9")], active: null }, canvases }),
+    ).toEqual([])
   })
 })

@@ -37,6 +37,7 @@ import {
   newGate,
 } from "../gate.ts"
 import {
+  canvasHolding,
   committedProject,
   FIXTURE_PACKAGES,
   idleNow,
@@ -46,7 +47,6 @@ import {
   SUITE_CONFIG,
   setUpAccepted,
   suitePlaces,
-  taskHolding,
   treeOf,
   waitFor,
 } from "../harness.ts"
@@ -74,6 +74,7 @@ import {
   stepAway,
   stepBack,
   twoFrames,
+  typeAfter,
 } from "./page.ts"
 
 export const scenario: Scenario = {
@@ -104,9 +105,9 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       await asPerson(ap, "asa@browser.test", "Asa")
       try {
         await ap.goto(askHost.httpUrl, { waitUntil: "domcontentloaded" })
-        await ap.click("#sidebar .add-agent")
+        await ap.click("#sidebar .add-canvas")
         const say = async (text: string) => {
-          await ap.fill(`${col(0)} .composer .input`, text)
+          await typeAfter(ap, `${col(0)} .composer .input`, text)
           await ap.click(`${col(0)} .composer .send`)
         }
         const idle = () => waitFor(() => idleNow(askHost))
@@ -114,7 +115,8 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           const index = treeOf(askHost)
           return (
             Object.values(index.entries).find(
-              e => messageText(e.message) === text,
+              // The first ask keeps the new canvas's `@agent `.
+              e => messageText(e.message).replace(/^@agent /, "") === text,
             )?.id ?? ""
           )
         }
@@ -323,7 +325,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           treeOf(askHost),
           readPlaces(askHost.places),
         )[0]
-        await bo.chat(
+        await bo.send(
           "@agent anything new?",
           atEntry(entryId(lane?.tip ?? "")),
           {
@@ -518,7 +520,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       await asPerson(pp, "pia@browser.test", "Pia")
       try {
         await pp.goto(proposeHost.httpUrl, { waitUntil: "domcontentloaded" })
-        await pp.click("#sidebar .add-agent")
+        await pp.click("#sidebar .add-canvas")
         script.use([
           {
             tool: "propose_branches",
@@ -532,7 +534,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           },
           { text: "three things" },
         ])
-        await pp.fill(`${col(0)} .composer .input`, "split it")
+        await typeAfter(pp, `${col(0)} .composer .input`, "split it")
         await pp.click(`${col(0)} .composer .send`)
         await waitFor(() => idleNow(proposeHost))
         const card = `${col(0)} .proposal`
@@ -602,7 +604,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         const started = () => {
           const index = treeOf(proposeHost)
           return Object.values(index.entries)
-            .filter(e => e.message?.role === "chat")
+            .filter(e => e.message?.role === "person")
             .map(e => messageText(e.message))
             .filter(t => t.startsWith("@agent do"))
             .sort()
@@ -645,9 +647,9 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       await asPerson(tp, "tools@browser.test", "Tess")
       try {
         await tp.goto(toolHost.httpUrl, { waitUntil: "domcontentloaded" })
-        await tp.click("#sidebar .add-agent")
+        await tp.click("#sidebar .add-canvas")
         const say = async (text: string) => {
-          await tp.fill(`${col(0)} .composer .input`, text)
+          await typeAfter(tp, `${col(0)} .composer .input`, text)
           await tp.click(`${col(0)} .composer .send`)
           await readRaw(tp)
         }
@@ -671,7 +673,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           ).trim()
         const inWork = (...args: string[]) =>
           command("jj", ["--no-pager", "-R", work, ...args])
-        await tp.fill(`${col(0)} .composer .input`, "what is in notes?")
+        await typeAfter(tp, `${col(0)} .composer .input`, "what is in notes?")
         {
           const noLine = (await tp.$(startLine)) === null
           await inWork("new", "--no-edit", "pinetrie-accepted", "-m", "wip e2e")
@@ -726,7 +728,9 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           { text: "Let me look.", tool: "read", args: { path: "notes.txt" } },
           { text: "It says MANGO. The file holds one line, and nothing else." },
         ])
-        await say("what is in notes?")
+        // Sent as typed above, after the new canvas's `@agent `.
+        await tp.click(`${col(0)} .composer .send`)
+        await readRaw(tp)
         const streamed = await tp
           .waitForFunction(
             c => {
@@ -996,7 +1000,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           const root =
             (await tp.getAttribute(
               '#sidebar .open-root[aria-current="true"]',
-              "data-task",
+              "data-canvas",
             )) ?? ""
           /** Away to a new tab and back, recording every bash row's state as it mounts and changes. */
           const away = async () => {
@@ -1988,12 +1992,12 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
               .getAttribute("data-entry")) ?? ""
           const lines = (n: number) =>
             `Branch message ${n}.\nIts second line.\nIts third line.`
-          const first = await aligner.chat(lines(0), atEntry(entryId(forkId)), {
+          const first = await aligner.send(lines(0), atEntry(entryId(forkId)), {
             mode: "branch",
           })
           let tip = first.kind === "appended" ? first.id : null
           for (let n = 1; n <= 12 && tip !== null; n++) {
-            const next = await aligner.chat(lines(n), atEntry(tip))
+            const next = await aligner.send(lines(n), atEntry(tip))
             tip = next.kind === "appended" ? next.id : null
           }
           const fork = `${col(0)} .msg[data-entry="${forkId}"]`
@@ -2018,7 +2022,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           const more =
             tip === null
               ? null
-              : await aligner.chat("one more below", atEntry(tip))
+              : await aligner.send("one more below", atEntry(tip))
           await tp
             .waitForSelector(
               `${col(1)} .msg[data-entry="${more?.kind === "appended" ? more.id : "none"}"]`,
@@ -2045,18 +2049,18 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         const starter = await join(toolHost, "starter", "browser")
         try {
           script.use([{ text: LONG }])
-          await starter.chat("@agent a long one elsewhere", ROOT, {
+          await starter.send("@agent a long one elsewhere", ROOT, {
             mode: "branch",
           })
           const newRoot = treeOf(toolHost).roots.at(-1) ?? ""
           await appears("#bottom .state-working")
-          const newTask = taskHolding(toolHost, entryId(newRoot))
+          const newCanvas = canvasHolding(toolHost, entryId(newRoot))
           await openBoard(tp)
-          const ringed = `#board ${boardSel(newTask)}:has(.signal[data-signal="running"]) .board-open`
+          const ringed = `#board ${boardSel(newCanvas)}:has(.signal[data-signal="running"]) .board-open`
           await appears(ringed)
           await tp.click(ringed)
           await appears(
-            `#sidebar .open-root[data-task="${newTask}"][aria-current="true"]`,
+            `#sidebar .open-root[data-canvas="${newCanvas}"][aria-current="true"]`,
           )
           await seeInMenu(tp, OWN_MENU, ".move-to.closes")
 
@@ -2067,7 +2071,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
 
         // ── the rail draws a long loop as one capsule ────────────────────────
         await tp.keyboard.press("Escape")
-        await tp.click("#sidebar .add-agent")
+        await tp.click("#sidebar .add-canvas")
         script.use([
           ...Array.from({ length: 30 }, () => ({
             tool: "read" as const,
@@ -2134,7 +2138,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
             for (let k = 1; k <= n; k++) {
               // A branch starts a thread of its own; the rest
               // continue it.
-              const r = await railer.chat(
+              const r = await railer.send(
                 say3(`${name} ${k}`),
                 atEntry(entryId(tip)),
                 k === 1 && branch ? { mode: "branch" } : undefined,
@@ -2144,10 +2148,10 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
             }
             return tip
           }
-          const start = await railer.chat(say3("Trunk 0"), ROOT, {
+          const start = await railer.send(say3("Trunk 0"), ROOT, {
             mode: "branch",
           })
-          // The trunk is the first thread, which the task's first column
+          // The trunk is the first thread, which the canvas's first column
           // follows; the branches at its end are threads of their own, each
           // on a track of its own, the older, Later, first.
           const trunk =
@@ -2161,7 +2165,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           const railRoot =
             start.kind === "appended" ? start.id : entryId("none")
           // Another writer's root is not in the sidebar: open it from the board.
-          await openFromBoard(tp, taskHolding(toolHost, railRoot))
+          await openFromBoard(tp, canvasHolding(toolHost, railRoot))
           await tp.waitForSelector(
             `${col(0)} .msg[data-entry="${aside === null ? "none" : (trunk ?? "none")}"]`,
             { timeout: 15_000 },

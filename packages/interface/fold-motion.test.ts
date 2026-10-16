@@ -1,4 +1,4 @@
-import { taskIdFor } from "@pinetrie/core"
+import { canvasIdFor } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import {
@@ -154,13 +154,13 @@ describe("planFoldMotion", () => {
 })
 
 describe("foldOf", () => {
-  const task = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
+  const canvas = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000c")
   const card = cardIdFor("c1")
-  test("a card's fold or the task column's, with which way; nothing for another action", () => {
+  test("a card's fold or the canvas column's, with which way; nothing for another action", () => {
     expect(
       foldOf({
         kind: "view",
-        task,
+        canvas,
         first: null,
         change: { kind: "fold", card, unfolded: false },
       }),
@@ -168,19 +168,19 @@ describe("foldOf", () => {
     expect(
       foldOf({
         kind: "view",
-        task,
+        canvas,
         first: null,
-        change: { kind: "foldTask", unfolded: true },
+        change: { kind: "foldCanvas", unfolded: true },
       }),
-    ).toEqual({ column: { kind: "task", task }, unfolded: true })
+    ).toEqual({ column: { kind: "canvas", canvas }, unfolded: true })
     expect(
       foldOf({
         kind: "view",
-        task,
+        canvas,
         first: null,
         change: { kind: "details", card, open: true },
       }),
     ).toBeNull()
-    expect(foldOf({ kind: "closeTask", task })).toBeNull()
+    expect(foldOf({ kind: "closeCanvas", canvas })).toBeNull()
   })
 })

@@ -18,7 +18,7 @@ import {
   type BannerAnswer,
   type BannerAsk,
   DEFAULT_ICON_MODEL,
-  encodeChat,
+  encodeMessage,
 } from "@pinetrie/rules"
 import { type RootDocHandle, readEntries, rowMessage } from "@pinetrie/schema"
 import { newRootDoc } from "@pinetrie/schema/fixtures"
@@ -96,7 +96,7 @@ describe("banners in a harness", () => {
   })
 
   const prompt = (text: string) =>
-    encodeChat(
+    encodeMessage(
       {
         author: writerId("ada"),
         authorName: "Ada",

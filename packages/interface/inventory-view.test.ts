@@ -115,7 +115,7 @@ test("a thread's card is drawn by its face: its name, its first line, where it e
   const T = threadIdFor("t")
   const index = indexTree(
     fromParents({ "1-r": null, "2-a": "1-r" }, id => ({
-      role: "chat",
+      role: "person",
       content: "",
       details: { author: ADA, authorName: "Ada", text: `said ${id}` },
     })),
@@ -170,17 +170,17 @@ test("a thread's face reads its first message, not the context entry its first r
   const B = threadIdFor("b")
   const index = indexTree(
     entriesOf([
-      entry("1-r", null, { role: "chat", content: "plan" }, { thread: T }),
+      entry("1-r", null, { role: "person", content: "plan" }, { thread: T }),
       entry(
         "2-cb",
         "1-r",
-        { role: "canvas", content: "<canvas task>" },
+        { role: "canvas", content: "<canvas>" },
         { thread: B },
       ),
       entry(
         "3-b",
         "2-cb",
-        { role: "chat", content: "an aside" },
+        { role: "person", content: "an aside" },
         { thread: B },
       ),
       entry("4-a", "3-b", { role: "assistant", content: "ok" }, { thread: B }),
@@ -199,7 +199,7 @@ test("a thread's face reads its first message, not the context entry its first r
 test("a thread's preview is its path from its root, read only", () => {
   const index = indexTree(
     fromParents({ "1-r": null, "2-a": "1-r", "3-b": "1-r" }, id => ({
-      role: "chat",
+      role: "person",
       content: id,
       details: { author: ADA, authorName: "Ada", text: id },
     })),

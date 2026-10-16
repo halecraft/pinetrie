@@ -1,6 +1,8 @@
 import {
-  type ArchivedTask,
+  type ArchivedCanvas,
+  type CanvasId,
   type CardRecord,
+  canvasIdFor,
   cardIdOfKind,
   type EntryLike,
   ERR,
@@ -14,8 +16,6 @@ import {
   rootIdFor,
   type Send,
   snapshotId,
-  type TaskId,
-  taskIdFor,
   textCardId,
   threadIdFor,
   workflowStateIdFor,
@@ -24,13 +24,13 @@ import {
 import { cardIdFor, FIXTURE_THREAD } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import { archivedIn, planArchive, planLanesGone, writesIn } from "./archive.ts"
+import { indexCanvases } from "./canvas-index.ts"
 import { threadCardOf } from "./fixtures.ts"
-import { indexTasks } from "./task.ts"
 
 const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 const OTHER_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000b")
-const TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000a")
-const OTHER_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000b")
+const CANVAS = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000a")
+const OTHER_CANVAS = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000b")
 
 const BEA = writerId("p-bea")
 
@@ -48,7 +48,11 @@ const index = indexTree(
   ),
 )
 
-const archived = (task: TaskId): ArchivedTask => ({ task, by: BEA, at: 1 })
+const archived = (canvas: CanvasId): ArchivedCanvas => ({
+  canvas,
+  by: BEA,
+  at: 1,
+})
 
 const lane = (name: string, over: Partial<LaneView> = {}): LaneView => ({
   name: threadIdFor(name),
@@ -61,7 +65,7 @@ const lane = (name: string, over: Partial<LaneView> = {}): LaneView => ({
   ...over,
 })
 
-/** The task's thread: `mine`; `theirs`, below, is another task's, in the same root. */
+/** The canvas's thread: `mine`; `theirs`, below, is another canvas's, in the same root. */
 const MINE = threadIdFor("mine")
 
 const plan = (
@@ -89,7 +93,7 @@ describe("planArchive", () => {
       verdicts: [],
     })
   })
-  test("archiving settles its threads' pending verdicts as unclassified; another task's stay pending", () => {
+  test("archiving settles its threads' pending verdicts as unclassified; another canvas's stay pending", () => {
     const verdict = (name: string, kind: "pending" | "unclassified") => ({
       lane: threadIdFor(name),
       ask: entryId("a"),
@@ -112,23 +116,23 @@ describe("planArchive", () => {
   test("refuses while an agent of its threads works, or cards wait there, held or not", () => {
     expect(plan({ lanes: [lane("mine", { running: true })] })).toEqual({
       kind: "refused",
-      code: ERR.TASK_BUSY,
+      code: ERR.CANVAS_BUSY,
       message: "an agent is working here",
     })
     expect(plan({ lanes: [lane("mine", { waiting: 1 })] })).toEqual({
       kind: "refused",
-      code: ERR.TASK_BUSY,
+      code: ERR.CANVAS_BUSY,
       message: "cards are queued here",
     })
     expect(
       plan({ lanes: [lane("mine", { waiting: 1, heldBy: BEA })] }),
     ).toEqual({
       kind: "refused",
-      code: ERR.TASK_BUSY,
+      code: ERR.CANVAS_BUSY,
       message: "cards are queued here",
     })
   })
-  test("work in another task's thread does not stop it, even in the same root; restoring is never busy", () => {
+  test("work in another canvas's thread does not stop it, even in the same root; restoring is never busy", () => {
     expect(plan({ lanes: [lane("theirs", { running: true })] }).kind).toBe(
       "cross",
     )
@@ -181,7 +185,7 @@ describe("planArchive", () => {
       })
     })
     test("archive keeps the snapshot nearest each thread's end, a copy's files", () => {
-      // A conversation thread from `a`, which A's turn there recorded.
+      // A chat from `a`, which A's turn there recorded.
       const T = threadIdFor("talk")
       const forked = indexTree(
         Object.fromEntries(
@@ -217,11 +221,11 @@ const NOTES_X = cardIdOfKind(
   "01a0ffd2-0000-7000-8000-0000000000a1",
 )
 
-describe("writesIn: the tasks a command writes in", () => {
-  // LANE_X's card is on OTHER_TASK's canvas, T_B's on TASK's.
+describe("writesIn: the canvases a command writes in", () => {
+  // LANE_X's card is on OTHER_CANVAS, T_B's on CANVAS.
   const cards: CardRecord[] = [
-    threadCardOf({ thread: LANE_X, task: OTHER_TASK, by: BEA, cards: [] }),
-    threadCardOf({ thread: T_B, task: TASK, by: BEA, cards: [] }),
+    threadCardOf({ thread: LANE_X, canvas: OTHER_CANVAS, by: BEA, cards: [] }),
+    threadCardOf({ thread: T_B, canvas: CANVAS, by: BEA, cards: [] }),
     {
       kind: "text",
       id: cardIdFor("c106"),
@@ -238,22 +242,22 @@ describe("writesIn: the tasks a command writes in", () => {
       id: NOTES_X,
       owner: BEA,
       placer: BEA,
-      place: { kind: "canvas", task: OTHER_TASK, order: "z", width: 1 },
+      place: { kind: "canvas", canvas: OTHER_CANVAS, order: "z", width: 1 },
       content: NO_CONTENT,
     },
   ]
-  const tasks = indexTasks(cards, new Map())
-  const at = (intent: Gated) => writesIn(intent, tasks, cards)
-  const chat = (p: Send) => p
+  const canvases = indexCanvases(cards, new Map())
+  const at = (intent: Gated) => writesIn(intent, canvases, cards)
+  const said = (p: Send) => p
   const atB = {
     kind: "composing",
     thread: T_B,
   } as const
   test.each([
     [
-      "a chat at a thread's end: the thread's task",
-      chat({
-        kind: "chat",
+      "a chat at a thread's end: the thread's canvas",
+      said({
+        kind: "send",
         text: "x",
         root: TEST_ROOT,
         at: { kind: "end", thread: T_B, seen: entryId("b") },
@@ -264,19 +268,19 @@ describe("writesIn: the tasks a command writes in", () => {
         base: null,
         state: null,
       }),
-      [TASK],
+      [CANVAS],
     ],
     [
-      "a branch: the task its card goes in",
-      chat({
-        kind: "chat",
+      "a branch: the canvas its card goes in",
+      said({
+        kind: "send",
         text: "x",
         root: OTHER_ROOT,
         at: {
           kind: "branch",
           thread: threadIdFor("new"),
           at: null,
-          task: OTHER_TASK,
+          canvas: OTHER_CANVAS,
         },
         asksAgent: false,
         mentions: [],
@@ -285,12 +289,12 @@ describe("writesIn: the tasks a command writes in", () => {
         base: null,
         state: null,
       }),
-      [OTHER_TASK],
+      [OTHER_CANVAS],
     ],
     [
-      "a popped send: its thread's task",
-      chat({
-        kind: "chat",
+      "a popped send: its thread's canvas",
+      said({
+        kind: "send",
         text: "x",
         root: TEST_ROOT,
         at: { kind: "queue", thread: T_B },
@@ -301,27 +305,27 @@ describe("writesIn: the tasks a command writes in", () => {
         base: null,
         state: null,
       }),
-      [TASK],
+      [CANVAS],
     ],
     ["a name", { kind: "name", name: "Ada" }, []],
     ["a stop", { kind: "stop", lane: LANE_X }, []],
     [
-      "a carry-on: its lane's task",
+      "a carry-on: its lane's canvas",
       { kind: "carry-on", lane: LANE_X },
-      [OTHER_TASK],
+      [OTHER_CANVAS],
     ],
     [
-      "a queue's hold: its lane's task",
+      "a queue's hold: its lane's canvas",
       { kind: "queue-hold", lane: LANE_X, held: true },
-      [OTHER_TASK],
+      [OTHER_CANVAS],
     ],
     [
-      "unqueue all: its lane's task",
+      "unqueue all: its lane's canvas",
       { kind: "unqueue-all", lane: LANE_X },
-      [OTHER_TASK],
+      [OTHER_CANVAS],
     ],
     [
-      "a reorder: the task of the place it names",
+      "a reorder: the canvas of the place it names",
       {
         kind: "reorder",
         reorder: {
@@ -335,11 +339,11 @@ describe("writesIn: the tasks a command writes in", () => {
           before: cardIdFor("c2"),
         },
       },
-      [OTHER_TASK],
+      [OTHER_CANVAS],
     ],
     ["a reservation", { kind: "reserve", lane: threadIdFor("x") }, []],
     [
-      "a copy: the task its card lands in, never its source's, which may be archived",
+      "a copy: the canvas its card lands in, never its source's, which may be archived",
       {
         kind: "copy-thread",
         source: LANE_X,
@@ -347,16 +351,16 @@ describe("writesIn: the tasks a command writes in", () => {
         move: {
           card: threadIdFor("copy"),
           from: null,
-          to: { kind: "canvas-at", task: TASK, after: null },
+          to: { kind: "canvas-at", canvas: CANVAS, after: null },
         },
       },
-      [TASK],
+      [CANVAS],
     ],
     [
-      "a move on the board: none, so an archived task can be restored",
+      "a move on the board: none, so an archived canvas can be restored",
       {
-        kind: "move-task",
-        task: TASK,
+        kind: "move-canvas",
+        canvas: CANVAS,
         from: workflowStateIdFor("a"),
         to: workflowStateIdFor("b"),
         before: null,
@@ -372,22 +376,26 @@ describe("writesIn: the tasks a command writes in", () => {
       [],
     ],
     [
-      "a mark: its task",
-      { kind: "mark", of: { kind: "task", task: TASK }, title: "Tab names" },
-      [TASK],
+      "a mark: its canvas",
+      {
+        kind: "mark",
+        of: { kind: "canvas", canvas: CANVAS },
+        title: "Tab names",
+      },
+      [CANVAS],
     ],
     [
-      "a note column's title: its column's task",
+      "a note column's title: its column's canvas",
       {
         kind: "mark",
         of: { kind: "note-column", column: NOTES_X },
         title: "Ideas",
       },
-      [OTHER_TASK],
+      [OTHER_CANVAS],
     ],
-    ["a retitle: its task", { kind: "retitle", task: TASK }, [TASK]],
+    ["a retitle: its canvas", { kind: "retitle", canvas: CANVAS }, [CANVAS]],
     [
-      "proposed changes: its lane's task",
+      "proposed changes: its lane's canvas",
       {
         kind: "proposed",
         lane: LANE_X,
@@ -395,19 +403,19 @@ describe("writesIn: the tasks a command writes in", () => {
         to: null,
         seen: null,
       },
-      [OTHER_TASK],
+      [OTHER_CANVAS],
     ],
     [
-      "a card made at a thread: its task",
+      "a card made at a thread: its canvas",
       {
         kind: "move",
         moves: [{ card: textCardId("c"), from: null, to: atB }],
         here: null,
       },
-      [TASK],
+      [CANVAS],
     ],
     [
-      "a move out of a task, into an inventory: the task it leaves",
+      "a move out of a canvas, into an inventory: the canvas it leaves",
       {
         kind: "move",
         moves: [
@@ -419,41 +427,47 @@ describe("writesIn: the tasks a command writes in", () => {
         ],
         here: null,
       },
-      [TASK],
+      [CANVAS],
     ],
     [
-      "a thread opened: the task its card lands in",
+      "a thread opened: the canvas its card lands in",
       {
         kind: "open-thread",
         thread: threadIdFor("new"),
         root: TEST_ROOT,
-        task: OTHER_TASK,
+        canvas: OTHER_CANVAS,
         start: { kind: "new-root", after: null },
       },
-      [OTHER_TASK],
+      [OTHER_CANVAS],
     ],
     [
-      "an undo of moves outside any task: none",
-      { kind: "undo-move", task: null, direction: "undo" },
+      "an undo of moves outside any canvas: none",
+      { kind: "undo-move", canvas: null, direction: "undo" },
       [],
     ],
     [
-      "an undo of moves: its task",
-      { kind: "undo-move", task: OTHER_TASK, direction: "undo" },
-      [OTHER_TASK],
+      "an undo of moves: its canvas",
+      { kind: "undo-move", canvas: OTHER_CANVAS, direction: "undo" },
+      [OTHER_CANVAS],
     ],
-  ] satisfies [string, Gated, readonly TaskId[]][])("%s", (_, intent, want) => {
+  ] satisfies [
+    string,
+    Gated,
+    readonly CanvasId[],
+  ][])("%s", (_, intent, want) => {
     expect(at(intent)).toEqual(want)
   })
 })
 
 describe("archivedIn", () => {
-  const archive = new Map([[TASK, archived(TASK)]])
-  test("a written task that is archived refuses, by who archived it", () => {
-    expect(archivedIn([OTHER_TASK, TASK], archive)).toEqual(archived(TASK))
+  const archive = new Map([[CANVAS, archived(CANVAS)]])
+  test("a written canvas that is archived refuses, by who archived it", () => {
+    expect(archivedIn([OTHER_CANVAS, CANVAS], archive)).toEqual(
+      archived(CANVAS),
+    )
   })
-  test("tasks not archived, and none, do not", () => {
-    expect(archivedIn([OTHER_TASK], archive)).toBeNull()
+  test("canvases not archived, and none, do not", () => {
+    expect(archivedIn([OTHER_CANVAS], archive)).toBeNull()
     expect(archivedIn([], archive)).toBeNull()
   })
 })

@@ -38,12 +38,12 @@ import {
   type WriterId,
   wrapperKind,
 } from "@pinetrie/core"
+import { cardsOnCanvas, planCanvasOpening } from "./canvas-index.ts"
 import { marginEnd } from "./margin.ts"
 import { makeNoteColumn, noteAt, toNotes } from "./notes.ts"
 import { orderAfter } from "./order.ts"
-import { inventoryFull, isPinned, queuedOn, taskPinnedOf } from "./queue.ts"
+import { canvasPinnedOf, inventoryFull, isPinned, queuedOn } from "./queue.ts"
 import { rankAfter, rankOfDrop } from "./rank.ts"
-import { canvasOf, planTaskOpening } from "./task.ts"
 
 // ── handoffs ───────────────────────────────────────────────────
 
@@ -83,7 +83,7 @@ function placeAt(
     case "canvas":
       return {
         kind: "canvas",
-        task: key.task,
+        canvas: key.canvas,
         order: key.order,
         width: now?.place.kind === "canvas" ? now.place.width : 1,
       }
@@ -95,11 +95,11 @@ function placeAt(
       }
     case "pinned":
       return { ...key, order: orderAfter(cards.filter(isPinned)) }
-    // After the task's other pinned cards.
-    case "task-pinned":
+    // After the canvas's other pinned cards.
+    case "canvas-pinned":
       return {
         ...key,
-        order: orderAfter(taskPinnedOf(cards, key.task)),
+        order: orderAfter(canvasPinnedOf(cards, key.canvas)),
       }
     case "note":
       return noteAt(
@@ -265,7 +265,7 @@ export const RESTORE: FromTrash = { kind: "restore" }
  * unless the card is in a trash; an uncut, unless the sender trashed it
  * (its placer: the first paste after a cut). A restore goes back to the
  * place the card left, a canvas card at the rank it had there; refused
- * `left-gone` when what that place is on (a task, a note column, a thread)
+ * `left-gone` when what that place is on (a canvas, a note column, a thread)
  * is itself trashed or has no record, `left-taken` for your message's
  * place where you have written a newer one, and `not-yours` for someone
  * else's message. Then it is a handoff as any move is.
@@ -285,7 +285,7 @@ export function planFromTrash(
     return handoff(cards, now, { card, from: DISCARDED, to: why.to }, sender)
   }
   const { left } = now.place
-  // A task's card goes back by the board's own move, or by an undo.
+  // A canvas's card goes back by the board's own move, or by an undo.
   if (left.kind === "board") return { kind: "refused", code: "no-place", now }
   const refusal = refuseBack(cards, now, left, sender)
   if (refusal !== null) return { kind: "refused", code: refusal, now }
@@ -323,12 +323,12 @@ function refuseBack(
     : null
 }
 
-/** Whether `to` is the place `left`: a canvas by its task, whatever its rank. */
+/** Whether `to` is the place `left`: a canvas by its canvas, whatever its rank. */
 const isBack = (left: LivePlace, to: ResolvedTarget): boolean =>
   left.kind !== "board" &&
   sameKey(
     keyOf(left),
-    to.kind === "canvas" ? { kind: "canvas", task: to.task } : to,
+    to.kind === "canvas" ? { kind: "canvas", canvas: to.canvas } : to,
   )
 
 /** Where a restore sends a card: the place it left, a canvas at its old rank. */
@@ -336,7 +336,7 @@ const backTo = (
   left: Exclude<LivePlace, { readonly kind: "board" }>,
 ): ResolvedTarget =>
   left.kind === "canvas"
-    ? { kind: "canvas", task: left.task, order: left.order }
+    ? { kind: "canvas", canvas: left.canvas, order: left.order }
     : keyOf(left)
 
 /** `planMove`'s and `planFromTrash`'s checks once each has found the card where it may leave. */
@@ -482,10 +482,10 @@ export function pastedCard(
  *   column made at that rank, written first.
  *
  * A move into an entry's margin is refused `no-place` unless the
- * margin names the thread its entry is in (`entryThreads`): a margin's task
+ * margin names the thread its entry is in (`entryThreads`): a margin's canvas
  * is read from its thread, so one naming another would put a comment in
- * the wrong task. A move onto the board is refused `no-place`: only the
- * board's own move places a task's card.
+ * the wrong canvas. A move onto the board is refused `no-place`: only the
+ * board's own move places a canvas's card.
  */
 export function planMoveTargets(input: {
   readonly cards: readonly CardRecord[]
@@ -495,7 +495,7 @@ export function planMoveTargets(input: {
   readonly newColumn: () => NoteColumnId
   /** The thread of each entry a move's margin names, as its root's index says; absent for one not found. */
   readonly entryThreads: ReadonlyMap<EntryId, ThreadId>
-  /** The board's states, for a new task a move makes; null refuses one. */
+  /** The board's states, for a new canvas a move makes; null refuses one. */
   readonly workflow?: Workflow | null
 }):
   | {
@@ -589,10 +589,10 @@ export function planMoveTargets(input: {
         moves.push({ ...move, to: backTo(card.place.left) })
         break
       }
-      // A new task made by the mover, the card first on its canvas.
-      case "new-task": {
-        const made = planTaskOpening(
-          to.task,
+      // A new canvas made by the mover, the card first on its canvas.
+      case "new-canvas": {
+        const made = planCanvasOpening(
+          to.canvas,
           input.sender,
           { workflow: input.workflow ?? null, state: null },
           now,
@@ -606,12 +606,14 @@ export function planMoveTargets(input: {
         now = afterSteps(now, [made])
         moves.push({
           ...move,
-          to: rankOnCanvas(now, move.card, { kind: "canvas", task: to.task })
-            .to,
+          to: rankOnCanvas(now, move.card, {
+            kind: "canvas",
+            canvas: to.canvas,
+          }).to,
         })
         break
       }
-      // No person's move takes a task's card (`KINDS`): the board's own
+      // No person's move takes a canvas's card (`KINDS`): the board's own
       // move places it (`planBoardMove`).
       case "board":
         return {
@@ -636,13 +638,13 @@ export function rankOnCanvas(
   card: CardId,
   to: CanvasKey | CanvasTarget,
 ): { readonly to: RankedCanvas; readonly first: readonly PlaceStep[] } {
-  const canvas = canvasOf(cards, to.task).filter(c => c.id !== card)
+  const here = cardsOnCanvas(cards, to.canvas).filter(c => c.id !== card)
   const ranked =
     to.kind === "canvas-at"
-      ? rankOfDrop(canvas, to.after)
-      : rankAfter(canvas, canvas.length - 1)
+      ? rankOfDrop(here, to.after)
+      : rankAfter(here, here.length - 1)
   return {
-    to: { kind: "canvas", task: to.task, order: ranked.order },
+    to: { kind: "canvas", canvas: to.canvas, order: ranked.order },
     first: ranked.respaced.map(
       (record): PlaceStep => ({ kind: "write", record }),
     ),

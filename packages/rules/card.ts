@@ -55,11 +55,11 @@ const StoredCard = Type.Object({
   unsent: Type.String(),
   placer: Type.String({ minLength: 1 }),
   holder: Type.String(),
-  /** A canvas or trashed card's task; absent before tasks. */
-  task: Type.Optional(Type.String()),
-  /** A canvas card's width; absent before tasks. */
+  /** A canvas or trashed card's canvas; absent before canvases. */
+  canvas: Type.Optional(Type.String()),
+  /** A canvas card's width; absent before canvases. */
   width: Type.Optional(Type.String()),
-  /** A task's card's workflow state; absent before tasks were cards. */
+  /** A canvas's card's workflow state; absent before canvases were cards. */
   state: Type.Optional(Type.String()),
   /** A reference's address, printed; absent before references. */
   address: Type.Optional(Type.String()),
@@ -85,7 +85,7 @@ interface StoredCardFields {
   readonly unsent: string
   readonly placer: string
   readonly holder: string
-  readonly task: string
+  readonly canvas: string
   readonly width: string
   readonly state: string
   readonly address: string
@@ -158,7 +158,7 @@ export const CARD_CODEC: { readonly [K in PlacedKind]: ContentCodec<K> } = {
     },
   },
   thread: { columns: [], encode: () => ({}), decode: () => NO_CONTENT },
-  task: { columns: [], encode: () => ({}), decode: () => NO_CONTENT },
+  canvas: { columns: [], encode: () => ({}), decode: () => NO_CONTENT },
   "note-column": { columns: [], encode: () => ({}), decode: () => NO_CONTENT },
   fact: {
     columns: ["fact"],
@@ -264,7 +264,7 @@ export const decodeCard = (
         return decodeOfKind(of.kind, of.id, row, place, fields)
       case "thread":
         return decodeOfKind(of.kind, of.id, row, place, fields)
-      case "task":
+      case "canvas":
         return decodeOfKind(of.kind, of.id, row, place, fields)
       case "note-column":
         return decodeOfKind(of.kind, of.id, row, place, fields)

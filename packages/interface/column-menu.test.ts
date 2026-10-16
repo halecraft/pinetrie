@@ -21,12 +21,12 @@ test("a column's ⋯ makes its card wide, or narrow again, for everyone", () => 
   })
 })
 
-test("a thread's ⋯ copies it here or into your inventory, and takes it; it lists no tasks", () => {
+test("a thread's ⋯ copies it here or into your inventory, and takes it; it lists no canvases", () => {
   const card = threadIdFor("a")
   const sections = menuOf(card)
   expect(sections.map(s => s.key)).toEqual(["canvas", "thread", "trash"])
   expect(sections[1]?.items.map(i => [i.label, i.intent])).toEqual([
-    ["Copy to this task", { kind: "copyThread", source: card, to: "here" }],
+    ["Copy to this canvas", { kind: "copyThread", source: card, to: "here" }],
     [
       "Copy to your inventory",
       { kind: "copyThread", source: card, to: "inventory" },

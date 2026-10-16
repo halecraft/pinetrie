@@ -7,11 +7,11 @@ const ADA = writerId("ada")
 const BEA = writerId("bea")
 const CAT = writerId("cat")
 const DAN = writerId("dan")
-const chat = (id: string, writer: ReturnType<typeof writerId>) =>
-  entry(id, null, { role: "chat", content: "hi", writer })
+const said = (id: string, writer: ReturnType<typeof writerId>) =>
+  entry(id, null, { role: "person", content: "hi", writer })
 
 test("writerOrder: by first message, then those only named", () => {
-  const index = indexOf([chat("2", ADA), chat("1", BEA), chat("3", BEA)])
+  const index = indexOf([said("2", ADA), said("1", BEA), said("3", BEA)])
   expect(writerOrder(index, [DAN, CAT, ADA])).toEqual([BEA, ADA, CAT, DAN])
 })
 

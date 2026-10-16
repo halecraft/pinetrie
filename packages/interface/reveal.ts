@@ -14,7 +14,7 @@ import {
   type IntentState,
   layout,
   planOpenAt,
-  showTask,
+  showCanvas,
 } from "./effects.ts"
 import { planOpen } from "./layout.ts"
 
@@ -24,7 +24,7 @@ const at = (key: string): ActedAt => ({ kind: "column", key })
  * The effects that show `place`, and where a refusal there is said: your
  * inventory's panel; a thread's end, or a comment's entry, as `openAt` shows an
  * entry; a note column, unfolded; your message at a thread not yet started, its
- * card, unfolded in its task; a task's card, the board. A queued `card` is
+ * card, unfolded in its canvas; a canvas's card, the board. A queued `card` is
  * scrolled to in its column's dock, which scrolls apart from the thread.
  */
 export function revealOf(
@@ -38,15 +38,15 @@ export function revealOf(
         effects: [{ kind: "showInventory", brief: false }],
         actedAt: AT_INVENTORY,
       }
-    // A card on a canvas: its column, unfolded in its task.
+    // A card on a canvas: its column, unfolded in its canvas.
     case "canvas":
       return {
         effects:
           card === null
-            ? showTask(place.task)
+            ? showCanvas(place.canvas)
             : [
-                ...showTask(place.task),
-                changeViewOf(state, place.task, {
+                ...showCanvas(place.canvas),
+                changeViewOf(state, place.canvas, {
                   kind: "fold",
                   card,
                   unfolded: true,
@@ -54,16 +54,16 @@ export function revealOf(
               ],
         actedAt: AT_INVENTORY,
       }
-    // A note: its note column, unfolded in its task.
+    // A note: its note column, unfolded in its canvas.
     case "note": {
-      const task = state.tasks.index.taskOfCard.get(place.column)
+      const canvas = state.canvases.index.canvasOfCard.get(place.column)
       return {
         effects:
-          task === undefined
+          canvas === undefined
             ? []
             : [
-                ...showTask(task),
-                changeViewOf(state, task, {
+                ...showCanvas(canvas),
+                changeViewOf(state, canvas, {
                   kind: "fold",
                   card: place.column,
                   unfolded: true,
@@ -72,16 +72,19 @@ export function revealOf(
         actedAt: at(place.column),
       }
     }
-    // Pinned to a task: its task column, unfolded.
-    case "task-pinned":
+    // Pinned to a canvas: its canvas column, unfolded.
+    case "canvas-pinned":
       return {
         effects: [
-          ...showTask(place.task),
-          changeViewOf(state, place.task, { kind: "foldTask", unfolded: true }),
+          ...showCanvas(place.canvas),
+          changeViewOf(state, place.canvas, {
+            kind: "foldCanvas",
+            unfolded: true,
+          }),
         ],
-        actedAt: at(place.task),
+        actedAt: at(place.canvas),
       }
-    // A task's card on the board: the board, open.
+    // A canvas's card on the board: the board, open.
     case "board":
       return {
         effects: [layout({ kind: "board", open: true })],
@@ -101,16 +104,16 @@ export function revealOf(
             ? place.entry
             : null
           : placeEnd(place, state.index)
-      // A thread this tab holds no entry of: its card, unfolded in its task.
+      // A thread this tab holds no entry of: its card, unfolded in its canvas.
       if (end === null) {
-        const task = state.tasks.index.taskOfCard.get(place.thread)
+        const canvas = state.canvases.index.canvasOfCard.get(place.thread)
         return {
           effects:
-            task === undefined
+            canvas === undefined
               ? []
               : [
-                  ...showTask(task),
-                  changeViewOf(state, task, {
+                  ...showCanvas(canvas),
+                  changeViewOf(state, canvas, {
                     kind: "fold",
                     card: place.thread,
                     unfolded: true,
@@ -123,7 +126,7 @@ export function revealOf(
         state.layout,
         state.index,
         end,
-        state.tasks.index,
+        state.canvases.index,
         state.cards.lanes,
         heldByOthers(state.cards.cards, state.cards.me),
       )

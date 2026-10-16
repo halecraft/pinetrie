@@ -195,7 +195,7 @@ export const scenario: Scenario = {
       JSON.stringify(r13),
     )
     check(
-      "a tagged task's exec with another run's number stays in its run",
+      "a tagged canvas's exec with another run's number stays in its run",
       created("14", "/w/r14/n.txt") === 1 && events.every(e => e.run !== "15"),
       JSON.stringify(events.filter(e => e.run === "14" || e.run === "15")),
     )

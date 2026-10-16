@@ -1,13 +1,14 @@
 // proposal — an agent's proposal of branches: its shape, read once for the
 // tool's arguments and the stored result alike, and the plan for a press of
 // Start or Open. The draft an opened branch's composer starts with is
-// `task.ts`' (`proposalDraft`), beside the threads not yet started.
+// `canvas.ts`' (`proposalDraft`), beside the threads not yet started.
 
 import {
   type AskIndex,
   agentAsk,
   type BranchedFact,
   type BranchOut,
+  type CanvasId,
   type CardRecord,
   type EntryId,
   type NonEmpty,
@@ -19,7 +20,6 @@ import {
   proposalState,
   type Send,
   type StartedRow,
-  type TaskId,
   type ThreadId,
   type ThreadRecord,
   type TreeIndex,
@@ -103,7 +103,7 @@ export type BranchOutPlan =
 
 /**
  * A press on the proposal at `press.proposal`, by `sender`. Refused while
- * its run runs, once any branch names it, for a row past its end, for a task
+ * its run runs, once any branch names it, for a row past its end, for a canvas
  * that is not the proposing thread's, or as a branch's opening is. Each
  * branch opens after the one before it, the first after the proposing
  * thread: opened one by one after the parent, they would land reversed.
@@ -118,10 +118,10 @@ export function planBranchOut(input: {
   readonly sender: WriterId
   readonly cards: readonly CardRecord[]
   readonly threads: ReadonlyMap<ThreadId, ThreadRecord>
-  /** Each thread's task (`TaskIndex.taskOfThread`). */
-  readonly taskOfThread: ReadonlyMap<ThreadId, TaskId>
-  /** Every task the session holds. */
-  readonly tasks: ReadonlySet<TaskId>
+  /** Each thread's canvas (`CanvasIndex.canvasOfThread`). */
+  readonly canvasOfThread: ReadonlyMap<ThreadId, CanvasId>
+  /** Every canvas the session holds. */
+  readonly canvases: ReadonlySet<CanvasId>
   readonly now: number
 }):
   | BranchOutPlan
@@ -139,7 +139,7 @@ export function planBranchOut(input: {
     return { kind: "refused", why: "no-proposal" }
   if (state.kind !== "ready") return { kind: "refused", why: state.kind }
   const lane = threadAt(index, press.proposal)
-  if (lane === null || input.taskOfThread.get(lane) !== press.task)
+  if (lane === null || input.canvasOfThread.get(lane) !== press.canvas)
     return { kind: "refused", why: "unknown" }
   const last = press.branches.at(-1)
   if (last === undefined || last.row >= proposal.branches.length)
@@ -152,7 +152,7 @@ export function planBranchOut(input: {
     const opened = planBranchOpen({
       thread: b.thread,
       root: press.root,
-      task: press.task,
+      canvas: press.canvas,
       at: state.fork,
       after,
       proposal: { entry: press.proposal, row: b.row },
@@ -160,7 +160,7 @@ export function planBranchOut(input: {
       sender: input.sender,
       cards,
       threads: input.threads,
-      tasks: input.tasks,
+      canvases: input.canvases,
       now: input.now,
     })
     if (opened.kind === "refused") return opened
@@ -183,14 +183,14 @@ export function planBranchOut(input: {
   const send = (b: StartedRow): Send => {
     const text = agentAsk(b.brief)
     return {
-      kind: "chat",
+      kind: "send",
       text,
       root: press.root,
       at: {
         kind: "branch",
         thread: b.thread,
         at: state.fork,
-        task: press.task,
+        canvas: press.canvas,
       },
       asksAgent: false,
       mentions: parseMentions(text),

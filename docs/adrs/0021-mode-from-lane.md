@@ -19,6 +19,7 @@
     asked.
   - ADR-0128: a mention can name another thread's agent, by its thread's name;
     its first mention in a thread invites it, and later ones ask it.
+  - ADR-0158: a thread nobody's agent works in is a chat, not a conversation.
 
 **Context.** ADR-0018 stored a default at an entry (`pinetrie.thread`): below a
 *working session* entry the agent answers every message, below a

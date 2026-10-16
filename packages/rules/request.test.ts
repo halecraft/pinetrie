@@ -24,8 +24,8 @@ describe("transcriptLines", () => {
   test("people and the agent, by speaker; nothing else", () => {
     expect(
       transcriptLines([
-        message("chat", "hello", "ana"),
-        message("chat", "anyone?"),
+        message("person", "hello", "ana"),
+        message("person", "anyone?"),
         message("user", "run it"),
         message("assistant", "done"),
         message("toolResult", "ok"),

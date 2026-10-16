@@ -1,5 +1,6 @@
 import {
   atEntry,
+  canvasIdFor,
   type EntryLike,
   entryId,
   indexTree,
@@ -9,7 +10,6 @@ import {
   rootIdFor,
   THE_AGENT,
   type TreeIndex,
-  taskIdFor,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -43,21 +43,21 @@ const indexOf = (...entries: EntryLike[]): TreeIndex =>
   indexTree(Object.fromEntries(entries.map(e => [e.id, e])))
 
 // A root that began as a chat, then a branch off its first message.
-const chat = indexOf(
+const said = indexOf(
   at("c0000000-0000-7000-8000-000000000000", null, {
-    role: "chat",
+    role: "person",
     author: "Ada",
     content: "the rail",
   }),
   at(
     "c0000000-0000-7000-8000-000000000001",
     "c0000000-0000-7000-8000-000000000000",
-    { role: "chat", author: "Bea", content: "too tall" },
+    { role: "person", author: "Bea", content: "too tall" },
   ),
   at(
     "c0000000-0000-7000-8000-000000000002",
     "c0000000-0000-7000-8000-000000000000",
-    { role: "chat", author: "Bea", content: "newest" },
+    { role: "person", author: "Bea", content: "newest" },
   ),
 )
 const lane = (l: typeof L1, root = R): LaneRecord => ({
@@ -98,7 +98,7 @@ describe("planTitling", () => {
   test("a lane joining a chat: the messages above it, then its prompt", () => {
     expect(
       plan({
-        index: chat,
+        index: said,
         trigger: {
           ...started,
           at: atEntry(entryId("c0000000-0000-7000-8000-000000000001")),
@@ -117,13 +117,13 @@ describe("planTitling", () => {
   test("nothing when off, titled already, or asked already", () => {
     expect(plan({ enabled: false })).toEqual({ kind: "skip" })
     expect(plan({ inFlight: true })).toEqual({ kind: "skip" })
-    expect(plan({ index: chat, marked: true })).toEqual({ kind: "skip" })
+    expect(plan({ index: said, marked: true })).toEqual({ kind: "skip" })
   })
 
   test("asked: the path to the newest message, whatever is stored, as the person", () => {
     expect(
       plan({
-        index: chat,
+        index: said,
         marked: true,
         lanes: [lane(L2), lane(L1)],
         enabled: false,
@@ -179,7 +179,7 @@ describe("titleOf", () => {
 
 test("titleStillWanted: an asked one always; an unasked one only over no mark", () => {
   const mark: MarkRecord = {
-    task: taskIdFor("01a0ffd2-0000-7000-8000-00000000000c"),
+    canvas: canvasIdFor("01a0ffd2-0000-7000-8000-00000000000c"),
     title: "Rail",
     by: ADA,
     at: 1,

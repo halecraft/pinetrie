@@ -1,21 +1,22 @@
-// web/strip — the columns of the task you are on: the task
+// web/strip — the columns of the canvas you are on: the canvas
 // column first, then each card of the canvas in its order, folded to a
 // strip or drawn whole (a thread's column, a note column), a branch not yet
-// sent among them. What is drawn is decided in `@pinetrie/interface` (`taskStrip`);
+// sent among them. What is drawn is decided in `@pinetrie/interface` (`canvasStrip`);
 // this draws it. A column's header is its drag handle (`use-drag.ts`).
 
 import type {
+  CanvasId,
+  CanvasPinnedView,
   CardId,
   EntryId,
   ForeignLane,
   NoteColumnId,
-  TaskId,
-  TaskPinnedView,
   TextCard,
   ThreadId,
   WriterId,
 } from "@pinetrie/core"
 import {
+  type CanvasColumnView,
   type CanvasPut,
   type CardColumn,
   type ColumnMatches,
@@ -34,26 +35,25 @@ import {
   type Stage,
   type Strip as StripView,
   stripCards,
-  type TaskColumnView,
   type ThreadFace,
 } from "@pinetrie/interface"
-import type { CanvasCard } from "@pinetrie/rules"
+import type { CardOnCanvas } from "@pinetrie/rules"
 import type { ReactElement, RefObject } from "react"
 import { useMemo } from "react"
 import { AddButton } from "./add-button.tsx"
+import { CanvasColumn } from "./canvas-column.tsx"
 import { Column, type ColumnProps } from "./column.tsx"
 import { FoldedColumn } from "./folded-column.tsx"
 import type { MenuItem } from "./menu.tsx"
 import { NoteColumn } from "./note-column.tsx"
 import type { ReadersProps } from "./root-signals.tsx"
-import { TaskColumn } from "./task-column.tsx"
 
-/** What every thread column shares, whichever task or tab draws it. */
+/** What every thread column shares, whichever canvas or tab draws it. */
 export type SharedColumnProps = Omit<
   ColumnProps,
   | "column"
   | "columnKey"
-  | "task"
+  | "canvas"
   | "count"
   | "onTyping"
   | "path"
@@ -84,19 +84,19 @@ interface Projected {
 
 export function Strip(p: {
   stripRef: RefObject<HTMLDivElement | null>
-  stage: Extract<Stage, { kind: "task" | "new" }>
-  /** The task's strip; null off a task. */
+  stage: Extract<Stage, { kind: "canvas" | "new" }>
+  /** The canvas's strip; null off a canvas. */
   strip: StripView | null
   /** Each thread column drawn whole, by its key (`openColumns`). */
   projected: ReadonlyMap<string, Projected>
-  /** The task's canvas, for each card's place in it. */
-  canvas: readonly CanvasCard[]
-  /** The task column, as drawn; null off a task. */
-  taskColumn: TaskColumnView | null
-  taskPins: readonly TextCard[]
-  /** What the agent of the task's first column last read of its pins. */
-  taskPinsInView: TaskPinnedView | null
-  /** The canvas list the task's agents are told, its lines. */
+  /** The canvas, for each card's place in it. */
+  onCanvas: readonly CardOnCanvas[]
+  /** The canvas column, as drawn; null off a canvas. */
+  canvasColumn: CanvasColumnView | null
+  canvasPins: readonly TextCard[]
+  /** What the agent of the canvas's first column last read of its pins. */
+  canvasPinsInView: CanvasPinnedView | null
+  /** The canvas list the canvas's agents are told, its lines. */
   told: readonly string[]
   noteViews: ReadonlyMap<NoteColumnId, NoteColumnView>
   /** A thread's face, which its column draws when folded. */
@@ -106,18 +106,18 @@ export function Strip(p: {
   shared: SharedColumnProps
   reader: Reader
   readers: ReadersProps
-  thread: (end: EntryId, task: TaskId) => MenuItem | null
+  thread: (end: EntryId, canvas: CanvasId) => MenuItem | null
   onIntent: (intent: Intent) => void
   /** This window is typing at `end` (null for none), in `card`. */
   typing: (end: EntryId | null, card: CardId | null) => void
 }) {
   const { stage } = p
   const readOnly: ReadOnly | null =
-    stage.kind === "task" ? stage.readOnly : null
+    stage.kind === "canvas" ? stage.readOnly : null
   // Each card's place on the canvas: what Alt+arrows move it from.
   const positions = useMemo(
-    () => new Map<string, number>(p.canvas.map((c, i) => [c.id, i])),
-    [p.canvas],
+    () => new Map<string, number>(p.onCanvas.map((c, i) => [c.id, i])),
+    [p.onCanvas],
   )
   const threadColumn = (
     item: Extract<CardColumn, { kind: "thread" }>,
@@ -125,7 +125,7 @@ export function Strip(p: {
   ): ReactElement | null => {
     const projected = p.projected.get(column.key)
     if (projected === undefined) return null
-    const task = stage.kind === "task" ? stage.task : null
+    const canvas = stage.kind === "canvas" ? stage.canvas : null
     return (
       <Column
         {...p.shared}
@@ -141,12 +141,12 @@ export function Strip(p: {
             : (positions.get(item.card) ?? -1)
         }
         readOnly={columnReadOnly({
-          task: readOnly,
+          canvas: readOnly,
           heldBy: projected.heldBy,
           foreign: projected.foreign,
           reader: p.reader,
         })}
-        task={task}
+        canvas={canvas}
         track={projected.track}
         view={projected.view}
         matches={projected.matches}
@@ -158,10 +158,10 @@ export function Strip(p: {
   // just after a folded column, or past the last, where `.canvas-end`
   // leaves room for it. Past the last is where ＋ makes a column too.
   const canvasDrop = (after: CardId | null): CanvasPut | null =>
-    stage.kind === "task" && readOnly === null
-      ? { kind: "canvas", task: stage.task, after }
+    stage.kind === "canvas" && readOnly === null
+      ? { kind: "canvas", canvas: stage.canvas, after }
       : null
-  const endDrop = canvasDrop(p.canvas.at(-1)?.id ?? null)
+  const endDrop = canvasDrop(p.onCanvas.at(-1)?.id ?? null)
   const cardColumn = (item: CardColumn): ReactElement | null => {
     const folded =
       detailOf("canvas", item.folded) === "face"
@@ -214,19 +214,19 @@ export function Strip(p: {
       id="strip"
       ref={p.stripRef}
     >
-      {p.taskColumn !== null && (
-        <TaskColumn
+      {p.canvasColumn !== null && (
+        <CanvasColumn
           onIntent={p.onIntent}
           onTyping={card => p.typing(null, card)}
-          pins={p.taskPins}
-          pinsInView={p.taskPinsInView}
+          pins={p.canvasPins}
+          pinsInView={p.canvasPinsInView}
           readOnly={readOnly}
           reader={p.reader}
           readers={p.readers}
           session={p.shared.session}
           thread={p.thread}
           told={p.told}
-          view={p.taskColumn}
+          view={p.canvasColumn}
         />
       )}
       {p.strip !== null && stripCards(p.strip).map(cardColumn)}

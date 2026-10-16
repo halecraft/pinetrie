@@ -1,5 +1,5 @@
-// e2e/host/agents — another task's thread's agent invited, asked by this
-// thread's agent, and its answer waking the asker; then its task archived,
+// e2e/host/agents — another canvas's thread's agent invited, asked by this
+// thread's agent, and its answer waking the asker; then its canvas archived,
 // which refuses the next ask; then a budget spent, which wakes nobody.
 
 import {
@@ -22,10 +22,10 @@ import type { Checks } from "../checks.ts"
 import {
   at,
   boardStateOf,
+  canvasHolding,
   START_AGENT,
   SUITE_CONFIG,
   suitePlaces,
-  taskHolding,
   treeOf,
 } from "../harness.ts"
 import type { LaneHosts, SectionHost } from "../lane-hosts.ts"
@@ -49,17 +49,17 @@ const placesWith = (budget: number) =>
   suitePlaces({ user: { ...SUITE_CONFIG, agents: { budget } } })
 
 /**
- * Two agent threads, A and B, each started at the root, so each is a task
- * of its own: every check below crosses tasks and root
+ * Two agent threads, A and B, each started at the root, so each is a canvas
+ * of its own: every check below crosses canvases and root
  * documents. B's name.
  */
 async function twoThreads(section: SectionHost) {
   const { user, idle, host } = section
   const threadsNow = () => [...treeOf(host).endOf.keys()]
-  await user.chat("@agent you are A", ROOT, START_AGENT)
+  await user.send("@agent you are A", ROOT, START_AGENT)
   await idle()
   const [a] = threadsNow()
-  await user.chat("@agent you are B", ROOT, START_AGENT)
+  await user.send("@agent you are B", ROOT, START_AGENT)
   await idle()
   const b = threadsNow().find(t => t !== a)
   if (a === undefined || b === undefined) throw new Error("two threads start")
@@ -90,7 +90,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       const { a, b, bName } = await twoThreads(section)
       const end = threadEnd(treeOf(host), a)
       script.use([{ tool: "ask", args: { to: bName, text: "queue or not?" } }])
-      await user.chat(`Please talk to @${bName} about queues`, at(end), {
+      await user.send(`Please talk to @${bName} about queues`, at(end), {
         thread: a,
       })
       await idle()
@@ -125,24 +125,24 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         JSON.stringify(budget ?? null),
       )
 
-      // B's task archived: its root is let go, and A's ask of it is
+      // B's canvas archived: its root is let go, and A's ask of it is
       // refused with why, never opening that root again.
       const done = readWorkflow(host.session)?.archive
-      const bTask = taskHolding(host, threadEnd(treeOf(host), b))
+      const bCanvas = canvasHolding(host, threadEnd(treeOf(host), b))
       const bRoot = readThreads(host.session).get(b)?.root
-      const state = boardStateOf(readPlaces(host.places), bTask)
+      const state = boardStateOf(readPlaces(host.places), bCanvas)
       if (done === undefined || state === undefined || bRoot === undefined)
-        throw new Error("B's task is on the board")
+        throw new Error("B's canvas is on the board")
       await user.request({
-        kind: "move-task",
-        task: bTask,
+        kind: "move-canvas",
+        canvas: bCanvas,
         from: state,
         to: done.id,
         before: null,
       })
       await idle()
       script.use([{ tool: "ask", args: { to: bName, text: "and now?" } }])
-      await user.chat("@agent ask it again", at(threadEnd(treeOf(host), a)), {
+      await user.send("@agent ask it again", at(threadEnd(treeOf(host), a)), {
         thread: a,
       })
       await idle()
@@ -154,7 +154,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           : [],
       )
       check(
-        "an ask of a member whose task was archived says why, and its root stays unloaded",
+        "an ask of a member whose canvas was archived says why, and its root stays unloaded",
         refused.length > 0 && host.docs.view(bRoot) === null,
         `${refused.at(-1) ?? "no refusal"} · loaded ${host.docs.view(bRoot) !== null}`,
       )
@@ -179,7 +179,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       const { a, bName } = await twoThreads(section)
       const end = threadEnd(treeOf(host), a)
       script.use([{ tool: "ask", args: { to: bName, text: "queue or not?" } }])
-      await user.chat(`Please talk to @${bName} about queues`, at(end), {
+      await user.send(`Please talk to @${bName} about queues`, at(end), {
         thread: a,
       })
       await idle()

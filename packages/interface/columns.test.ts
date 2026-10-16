@@ -7,7 +7,7 @@ import {
   threadAnchor,
   unstartedOf,
 } from "./columns.ts"
-import { TEST_TASK, threadOfEntry, tree } from "./fixtures.ts"
+import { TEST_CANVAS, threadOfEntry, tree } from "./fixtures.ts"
 
 const lane = (tip: string, name: ReturnType<typeof threadIdFor>): LaneView => ({
   name,
@@ -34,7 +34,7 @@ test("threadAnchor: a thread's end, never a newer branch; with no entry yet, its
 test("keyText: a column's key as the page draws it, whatever its kind", () => {
   const T = threadIdFor("t")
   expect(keyText({ kind: "card", card: T })).toBe(T)
-  expect(keyText({ kind: "task", task: TEST_TASK })).toBe(TEST_TASK)
+  expect(keyText({ kind: "canvas", canvas: TEST_CANVAS })).toBe(TEST_CANVAS)
 })
 
 test("a thread not yet started closes with ×; a started one does not", () => {

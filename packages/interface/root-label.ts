@@ -1,7 +1,8 @@
-// interface/root-label — what a task is called on screen, and the rename
+// interface/root-label — what a canvas is called on screen, and the rename
 // field's submit.
 
 import {
+  type CanvasId,
   type EntryId,
   type LaneRecord,
   type MarkRecord,
@@ -9,11 +10,10 @@ import {
   parseTitle,
   type RootId,
   type RootRecord,
-  type TaskId,
   type ThreadId,
   type WriterId,
 } from "@pinetrie/core"
-import type { Tasks } from "./tasks.ts"
+import type { Canvases } from "./canvases.ts"
 
 export { NO_TEXT }
 
@@ -41,8 +41,8 @@ export const messageCount = (
 export const messageCountTitle = ({ held, total }: MessageCount): string =>
   `${held} in the threads this tab has loaded, of ${total} in the session`
 
-/** What a task's card shows of its threads' roots, from the directory. */
-export interface TaskSummary {
+/** What a canvas's card shows of its threads' roots, from the directory. */
+export interface CanvasSummary {
   /** Its first root's first message's first line: its label while it has no title. */
   readonly line: string
   /** Everyone who wrote a chat in its roots, in order of first message, each root in turn. */
@@ -52,16 +52,16 @@ export interface TaskSummary {
 }
 
 /**
- * Every task with a message, as the sidebar and the board read it: from the
- * directory, not the tree, so a root this tab does not hold counts too. A task
+ * Every canvas with a message, as the sidebar and the board read it: from the
+ * directory, not the tree, so a root this tab does not hold counts too. A canvas
  * whose first root has no message yet is left out.
  */
 export function summariesOf(
-  tasks: Tasks,
+  canvases: Canvases,
   directory: ReadonlyMap<RootId, RootRecord>,
-): ReadonlyMap<TaskId, TaskSummary> {
-  const out = new Map<TaskId, TaskSummary>()
-  for (const t of tasks.byId.values()) {
+): ReadonlyMap<CanvasId, CanvasSummary> {
+  const out = new Map<CanvasId, CanvasSummary>()
+  for (const t of canvases.byId.values()) {
     const records = t.roots.flatMap(r => directory.get(r) ?? [])
     const first = records[0]
     if (first === undefined || first.first === null) continue
@@ -72,35 +72,35 @@ export function summariesOf(
       const latest = r.newest ?? r.first
       if (latest !== null && latest > newest) newest = latest
     }
-    out.set(t.task, { line: first.firstLine, writers, newest })
+    out.set(t.canvas, { line: first.firstLine, writers, newest })
   }
   return out
 }
 
-/** What an untitled task no agent has worked in is called. */
+/** What an untitled canvas no agent has worked in is called. */
 export const CHAT_LABEL = "Chat"
 
 /**
- * Every task's label: its title; else its first card's: for a thread no lane
+ * Every canvas's label: its title; else its first card's: for a thread no lane
  * works in (only people have written there) `CHAT_LABEL`, else its root's first
  * line. `App` builds it once per change, and the sidebar, the board and your
  * inbox look labels up in it.
  */
 export function labelsOf(input: {
-  readonly tasks: Tasks
-  readonly marks: ReadonlyMap<TaskId, MarkRecord>
+  readonly canvases: Canvases
+  readonly marks: ReadonlyMap<CanvasId, MarkRecord>
   readonly directory: ReadonlyMap<RootId, RootRecord>
   readonly lanes: ReadonlyMap<ThreadId, LaneRecord>
-}): ReadonlyMap<TaskId, string> {
+}): ReadonlyMap<CanvasId, string> {
   const worked = new Set([...input.lanes.values()].map(l => l.root))
   return new Map(
-    [...input.tasks.byId.values()].map(t => {
-      const title = input.marks.get(t.task)?.title
-      if (title !== undefined) return [t.task, title] as const
+    [...input.canvases.byId.values()].map(t => {
+      const title = input.marks.get(t.canvas)?.title
+      if (title !== undefined) return [t.canvas, title] as const
       const root = t.roots[0]
       const record = root === undefined ? undefined : input.directory.get(root)
       return [
-        t.task,
+        t.canvas,
         record === undefined
           ? NO_TEXT
           : worked.has(record.root)
@@ -116,7 +116,7 @@ export type TitlePlan =
   | { readonly kind: "unchanged" }
   | { readonly kind: "send"; readonly title: string | null }
 
-/** The rename field's submit. `stored` is the task's title, null when it has none. */
+/** The rename field's submit. `stored` is the canvas's title, null when it has none. */
 export function planTitle(typed: string, stored: string | null): TitlePlan {
   const input = parseTitle(typed)
   switch (input.kind) {

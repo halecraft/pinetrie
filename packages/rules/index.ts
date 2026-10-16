@@ -48,10 +48,10 @@ export {
 export {
   type ArchiveTeardown,
   archivedIn,
+  CANVAS_BUSY_REASON,
   type Crossing,
   planArchive,
   planLanesGone,
-  TASK_BUSY_REASON,
 } from "./archive.ts"
 export {
   answerOf,
@@ -109,9 +109,12 @@ export {
   type BoardCard,
   type BoardColumn,
   type BoardMove,
+  boardCanvases,
   boardEnd,
   boardOf,
-  boardTasks,
+  type CanvasRole,
+  canvasRole,
+  defaultWorkflow,
   isBoardCard,
   planBoardMove,
   planWorkflowEdit,
@@ -157,6 +160,37 @@ export {
   planCanvasRead,
 } from "./canvas.ts"
 export {
+  type CanvasIndex,
+  type CanvasOpening,
+  type CardOnCanvas,
+  canvasOfCard,
+  canvasOfPlace,
+  canvasOfTarget,
+  cardsOnCanvas,
+  indexCanvases,
+  isCardOnCanvas,
+  isLivePlace,
+  isOnCanvas,
+  type KindOnCanvas,
+  NO_CANVAS_INDEX,
+  planCanvasOpening,
+  planThreadOpen,
+  rootOfPlace,
+  rootsHeld,
+  type ThreadOpen,
+  type ThreadOpening,
+  type ThreadPlacement,
+  unstartedThreads,
+} from "./canvas-index.ts"
+export {
+  CANVAS_PINNED_TYPE,
+  type CanvasPinnedMessage,
+  canvasPinnedContent,
+  decodeCanvasPinned,
+  encodeCanvasPinned,
+  planCanvasPinnedRead,
+} from "./canvas-pinned.ts"
+export {
   cardEnd,
   decodeCard,
   encodeCard,
@@ -193,26 +227,6 @@ export {
   incomingWords,
   mergedFrom,
 } from "./catch-up-from.ts"
-export {
-  addressChat,
-  agentByDefault,
-  CHAT_TYPE,
-  type ChatDecision,
-  type ChatDetails,
-  type ChatMessage,
-  chatImageShas,
-  type Delivery,
-  decodeChat,
-  encodeChat,
-  type PromptMessage,
-  planChat,
-  planDelivery,
-  promptAuthor,
-  renderableMessage,
-  settleRun,
-  type ThreadStarts,
-  withChatImages,
-} from "./chat.ts"
 export {
   COMMANDS,
   COMMANDS_KEY,
@@ -336,6 +350,26 @@ export {
 export { type MarginCard, marginCards, marginCounts } from "./margin.ts"
 export { MARK, planMark } from "./mark.ts"
 export {
+  addressMessage,
+  agentByDefault,
+  type Delivery,
+  decodeMessage,
+  encodeMessage,
+  MESSAGE_TYPE,
+  type MessageDecision,
+  type MessageDetails,
+  messageImageShas,
+  type PersonMessage,
+  type PromptMessage,
+  planDelivery,
+  planMessage,
+  promptAuthor,
+  renderableMessage,
+  settleRun,
+  type ThreadStarts,
+  withMessageImages,
+} from "./message.ts"
+export {
   cardsOfParts,
   crossesArchive,
   type Discards,
@@ -437,7 +471,9 @@ export {
 } from "./proposed.ts"
 export {
   blankQueued,
+  type CanvasPinnedCard,
   type CarryPlan,
+  canvasPinnedOf,
   isQueuedMessage,
   isQueuedText,
   type NextQueuedCardPopStep,
@@ -452,8 +488,6 @@ export {
   type QueuedMessage,
   type QueuedText,
   queuedOn,
-  type TaskPinnedCard,
-  taskPinnedOf,
 } from "./queue.ts"
 export {
   planHoldSweep,
@@ -521,9 +555,9 @@ export {
   reviewUrl,
 } from "./review.ts"
 export {
-  emptiedTasks,
+  emptiedCanvases,
+  planCanvasesTrashed,
   planRootDelete,
-  planTasksTrashed,
   type RootDelete,
 } from "./root.ts"
 export { ROOT } from "./roots.ts"
@@ -598,37 +632,6 @@ export {
   planStop,
   stopperOf,
 } from "./stop.ts"
-export {
-  type CanvasCard,
-  type CanvasKind,
-  canvasOf,
-  indexTasks,
-  isCanvasCard,
-  isLivePlace,
-  isOnCanvas,
-  NO_TASK_INDEX,
-  planTaskOpening,
-  planThreadOpen,
-  rootOfPlace,
-  rootsHeld,
-  type TaskIndex,
-  type TaskOpening,
-  type ThreadOpen,
-  type ThreadOpening,
-  type ThreadPlacement,
-  taskOfCard,
-  taskOfPlace,
-  taskOfTarget,
-  unstartedThreads,
-} from "./task.ts"
-export {
-  decodeTaskPinned,
-  encodeTaskPinned,
-  planTaskPinnedRead,
-  TASK_PINNED_TYPE,
-  type TaskPinnedMessage,
-  taskPinnedContent,
-} from "./task-pinned.ts"
 export { THREAD } from "./thread.ts"
 export {
   planTitling,

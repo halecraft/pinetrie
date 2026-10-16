@@ -18,7 +18,7 @@ import {
   ACCEPTED as ACCEPTED_RECORD,
   BASE,
   catchUpRefusal,
-  encodeChat,
+  encodeMessage,
   encodeUpdate,
   type Floor,
   type PromptBudget,
@@ -70,7 +70,7 @@ const LANE = threadIdFor("0123456789abcdef")
 describe("reasonOf", () => {
   test("a revision's reason is its message, attributed to its author or the agent; else its first line", () => {
     const doc = newRootDoc()
-    const ada = encodeChat(
+    const ada = encodeMessage(
       {
         author: writerId("ada@example.com"),
         authorName: "Ada",
@@ -433,7 +433,7 @@ describe("askedAboutConflict", () => {
   const updatesWith = (
     conflicted: readonly string[],
     own = true,
-    role = "chat",
+    role = "person",
   ) => {
     const b = basics()
     writeEntry(b.root, row("p-1", null, { role, content: "go" }))
@@ -460,7 +460,7 @@ describe("askedAboutConflict", () => {
   }
 
   test("taken while jj finds a conflict in the lane's copy, whatever started the run", async () => {
-    for (const role of ["chat", "land", "stack"])
+    for (const role of ["person", "land", "stack"])
       expect(
         await updatesWith(["a.txt"], true, role).updates.askedAboutConflict(
           LANE,
@@ -493,7 +493,7 @@ describe("catchUpInRun", () => {
     })
     writeEntry(
       b.root,
-      row("p-1", null, { role: "chat", content: "go", writer: ADA }),
+      row("p-1", null, { role: "person", content: "go", writer: ADA }),
     )
     writeEntry(
       b.root,

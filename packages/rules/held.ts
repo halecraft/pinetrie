@@ -92,7 +92,7 @@ export type RunAt =
 export function runsIn(command: Gated): readonly RunAt[] {
   const thread = (t: ThreadId): RunAt => ({ kind: "thread", thread: t })
   switch (command.kind) {
-    case "chat":
+    case "send":
       return command.at.kind !== "branch"
         ? [thread(command.at.thread)]
         : command.at.at === null
@@ -132,7 +132,7 @@ export function runsIn(command: Gated): readonly RunAt[] {
     case "ssh-access":
     case "name":
     case "picture":
-    case "move-task":
+    case "move-canvas":
     case "workflow":
     case "mark":
     case "retitle":

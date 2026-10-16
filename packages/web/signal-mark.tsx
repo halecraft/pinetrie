@@ -1,5 +1,5 @@
 // web/signal-mark — a signal's mark: every signal, the unsent pip in your
-// colour on a tab, a rail dot or ▦, and a status's before a task's label. One
+// colour on a tab, a rail dot or ▦, and a status's before a canvas's label. One
 // element, so the browser suite finds every mark by `.signal[data-signal]`, and
 // `signalWords` words each.
 

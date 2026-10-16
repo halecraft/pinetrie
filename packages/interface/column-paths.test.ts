@@ -22,7 +22,7 @@ import { entriesOf, entry, fromParents, threadOfEntry } from "./fixtures.ts"
  * sorts by age, so "2-…" is older than "3-…". Every entry is a chat message.
  */
 const tree = (parents: Record<string, string | null>) =>
-  fromParents(parents, id => ({ role: "chat", content: id, author: "A" }))
+  fromParents(parents, id => ({ role: "person", content: id, author: "A" }))
 
 // An example: a trunk T1 -> T2 -> T3, a branch A off T1, a branch B off
 // T2. The trunk's continuation is older than each branch.
@@ -143,7 +143,7 @@ describe("projectColumns", () => {
       "2-t2",
       [],
     ])
-    // A new tab's thread, at the root: nothing at all, and no fork.
+    // A new canvas's thread, at the root: nothing at all, and no fork.
     const [, root] = projectColumns(i, [
       { anchor: entryId("3-t3") },
       { anchor: null },
@@ -159,17 +159,17 @@ describe("a branch whose first entry is a context entry no column draws", () => 
   const B = threadIdFor("b")
   const canvas = (id: string, parent: string, thread: ThreadId) =>
     entry(id, parent, { role: "canvas", content: "<canvas>" }, { thread })
-  const chat = (id: string, parent: string | null, thread: ThreadId) =>
-    entry(id, parent, { role: "chat", content: id, author: "A" }, { thread })
+  const said = (id: string, parent: string | null, thread: ThreadId) =>
+    entry(id, parent, { role: "person", content: id, author: "A" }, { thread })
   const i = indexTree(
     entriesOf([
-      chat("1-t1", null, T),
-      chat("2-t2", "1-t1", T),
+      said("1-t1", null, T),
+      said("2-t2", "1-t1", T),
       canvas("3-cb", "2-t2", B),
-      chat("4-b1", "3-cb", B),
+      said("4-b1", "3-cb", B),
       canvas("5-ct", "2-t2", T),
-      chat("6-t3", "5-ct", T),
-      chat("7-t4", "6-t3", T),
+      said("6-t3", "5-ct", T),
+      said("7-t4", "6-t3", T),
     ]),
   )
   test("the trunk's column runs to its own end, with only the branch as a closed branch", () => {

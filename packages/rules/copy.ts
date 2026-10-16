@@ -12,9 +12,9 @@ import {
   type ValueWrite,
   type WriterId,
 } from "@pinetrie/core"
+import { planThreadOpen } from "./canvas-index.ts"
 import { holdingOf } from "./held.ts"
 import type { PlaceStep } from "./moves.ts"
-import { planThreadOpen } from "./task.ts"
 
 /** A copy as its copier asks for it: the source, the end they saw, and where its card goes. */
 export type CopyThread = Omit<Extract<Intent, { kind: "copy-thread" }>, "kind">
@@ -74,7 +74,7 @@ export function planCopy(input: {
     return { kind: "refused", why: "held" }
   // Onto a canvas, ranked where it was dropped; or into an inventory.
   const { to } = move
-  if (to.kind === "trash" || to.kind === "back" || to.kind === "new-task")
+  if (to.kind === "trash" || to.kind === "back" || to.kind === "new-canvas")
     return { kind: "refused", why: "no-place" }
   const opened = planThreadOpen({
     thread: move.card,

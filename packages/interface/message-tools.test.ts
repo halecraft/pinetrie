@@ -29,10 +29,10 @@ const agentWork: ThreadLane = {
 }
 const conversation: ThreadLane = { kind: "none" }
 
-const chat = (text: string, compelled: boolean): TranscriptMessage => ({
+const said = (text: string, compelled: boolean): TranscriptMessage => ({
   id: entryId("5-m"),
   thread: FIXTURE_THREAD,
-  role: "chat",
+  role: "person",
   text,
   compelled,
 })
@@ -56,12 +56,12 @@ const editText = (edit: MessageTools["edit"]): string | undefined =>
 describe("edit", () => {
   // Messages as their threads' defaults and mentions made them.
   const cases: readonly TranscriptMessage[] = [
-    chat("just us", false),
-    chat("fix the test", true),
-    chat("@agent fix the test", true),
-    chat("@ada have a look", false),
-    chat("/pkg:review the diff", true),
-    chat("ask @agent, then @ada", true),
+    said("just us", false),
+    said("fix the test", true),
+    said("@agent fix the test", true),
+    said("@ada have a look", false),
+    said("/pkg:review the diff", true),
+    said("ask @agent, then @ada", true),
   ]
 
   test("an edit asks the agent exactly when the original did", () => {
@@ -78,31 +78,31 @@ describe("edit", () => {
   })
 
   test("is a branch at the parent, its text as sent, content that sends unchanged", () => {
-    expect(tools(chat("just us", false)).edit).toEqual({
+    expect(tools(said("just us", false)).edit).toEqual({
       kind: "branch",
       branch: { at: "4-p", prefill: { text: "just us", blank: false } },
     })
-    expect(editText(tools(chat("fix the test", true)).edit)).toBe(
+    expect(editText(tools(said("fix the test", true)).edit)).toBe(
       "@agent fix the test",
     )
   })
 
   test("never doubles @agent, and leaves a command as typed", () => {
-    expect(editText(tools(chat("@agent fix it", true)).edit)).toBe(
+    expect(editText(tools(said("@agent fix it", true)).edit)).toBe(
       "@agent fix it",
     )
-    expect(editText(tools(chat("/pkg:review", false)).edit)).toBe("/pkg:review")
+    expect(editText(tools(said("/pkg:review", false)).edit)).toBe("/pkg:review")
   })
 
-  test("a root's first message opens a new tab, asking the agent when it did", () => {
-    expect(tools(chat("start here", true), { parentId: null }).edit).toEqual({
-      kind: "newTab",
-      asksAgent: true,
+  test("a root's first message opens a new canvas, with @agent in front when it asked the agent", () => {
+    expect(tools(said("start here", true), { parentId: null }).edit).toEqual({
+      kind: "newCanvas",
+      prefill: { text: "@agent start here", blank: false },
+    })
+    expect(tools(said("start here", false), { parentId: null }).edit).toEqual({
+      kind: "newCanvas",
       prefill: { text: "start here", blank: false },
     })
-    expect(
-      tools(chat("start here", false), { parentId: null }).edit,
-    ).toMatchObject({ kind: "newTab", asksAgent: false })
   })
 
   test("only a person's message", () => {
@@ -116,29 +116,29 @@ describe("edit", () => {
 })
 
 describe("→", () => {
-  test("a branch at the message, with @agent typed in agent work", () => {
-    expect(tools(chat("x", false)).branch).toEqual({
+  test("a branch at the message, with @agent typed in an agent thread", () => {
+    expect(tools(said("x", false)).branch).toEqual({
       kind: "branch",
       branch: { at: "5-m", prefill: { text: "@agent ", blank: true } },
     })
-    expect(tools(chat("x", false), { lane: conversation }).branch).toEqual({
+    expect(tools(said("x", false), { lane: conversation }).branch).toEqual({
       kind: "branch",
       branch: { at: "5-m", prefill: undefined },
     })
   })
 
-  test("hidden at a conversation's last message, shown at agent work's", () => {
+  test("hidden at a chat's last message, shown at an agent thread's", () => {
     expect(
-      tools(chat("x", false), { isLast: true, lane: conversation }).branch,
+      tools(said("x", false), { isLast: true, lane: conversation }).branch,
     ).toBeUndefined()
-    expect(tools(chat("x", false), { isLast: true }).branch).toBeDefined()
+    expect(tools(said("x", false), { isLast: true }).branch).toBeDefined()
   })
 })
 
 describe("copy", () => {
   test("offered for a message with text or tool calls, and none with neither", () => {
     const call = { id: "c", name: "bash", subject: "ls" }
-    expect(tools(chat("x", false)).copy).toBe(true)
+    expect(tools(said("x", false)).copy).toBe(true)
     expect(
       tools({
         id: entryId("5-m"),
@@ -161,7 +161,7 @@ describe("copy", () => {
 })
 
 test("a column that can't be written proposed changes only copy", () => {
-  expect(tools(chat("x", true), { writable: false })).toEqual({
+  expect(tools(said("x", true), { writable: false })).toEqual({
     copy: true,
     comment: false,
     edit: undefined,
@@ -169,7 +169,7 @@ test("a column that can't be written proposed changes only copy", () => {
   })
 })
 
-test("branchPrefill: @agent, blank, in agent work; nothing in a conversation", () => {
+test("branchPrefill: @agent, blank, in an agent thread; nothing in a chat", () => {
   expect(branchPrefill(agentWork)).toEqual({ text: "@agent ", blank: true })
   expect(branchPrefill(conversation)).toBeUndefined()
 })

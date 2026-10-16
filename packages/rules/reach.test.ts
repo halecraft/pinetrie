@@ -1,16 +1,17 @@
 import {
-  type ArchivedTask,
+  type ArchivedCanvas,
   type CardPlace,
   type CardRecord,
+  canvasIdFor,
   type LivePlace,
   rootIdFor,
   type ThreadName,
   type ThreadRecord,
-  taskIdFor,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
+import { indexCanvases, rootsHeld } from "./canvas-index.ts"
 import { threadCardOf } from "./fixtures.ts"
 import {
   awayWords,
@@ -19,29 +20,28 @@ import {
   reachWords,
   threadReach,
 } from "./reach.ts"
-import { indexTasks, rootsHeld } from "./task.ts"
 
 const ada = writerId("ada@example.com")
 const bea = writerId("bea@example.com")
-const open = taskIdFor("01a00000-0000-7000-8000-0000000000a1")
-const done = taskIdFor("01a00000-0000-7000-8000-0000000000a2")
+const open = canvasIdFor("01a00000-0000-7000-8000-0000000000a1")
+const done = canvasIdFor("01a00000-0000-7000-8000-0000000000a2")
 const fox = threadIdFor("fox")
 const owl = threadIdFor("owl")
 const elk = threadIdFor("elk")
 const unnamed = threadIdFor("unnamed")
 const cards: CardRecord[] = []
-for (const [thread, task] of [
+for (const [thread, canvas] of [
   [fox, open],
   [unnamed, open],
   [owl, done],
 ] as const)
-  cards.push(threadCardOf({ thread, task, by: ada, cards }))
+  cards.push(threadCardOf({ thread, canvas, by: ada, cards }))
 const held: CardRecord = {
-  ...threadCardOf({ thread: elk, task: open, by: ada, cards }),
+  ...threadCardOf({ thread: elk, canvas: open, by: ada, cards }),
   place: { kind: "inventory", holder: bea, slot: 0 },
 } as CardRecord
 const all = [...cards, held]
-const record: ArchivedTask = { task: done, by: ada, at: 1 }
+const record: ArchivedCanvas = { canvas: done, by: ada, at: 1 }
 const archived = new Map([[done, record]])
 const names = new Map([
   [fox, "amber-fox" as ThreadName],
@@ -52,47 +52,54 @@ const names = new Map([
 describe("where a thread is", () => {
   test("open, archived with its record, held by whom, or gone", () => {
     const at = (t: typeof fox) => threadReach(t, { cards: all, archived })
-    expect(at(fox)).toEqual({ kind: "open", task: open })
-    expect(at(owl)).toEqual({ kind: "archived", task: done, record })
+    expect(at(fox)).toEqual({ kind: "open", canvas: open })
+    expect(at(owl)).toEqual({ kind: "archived", canvas: done, record })
     expect(at(elk)).toEqual({ kind: "held", by: bea })
     expect(at(threadIdFor("none"))).toEqual({ kind: "gone" })
   })
   test("each away reach in words, a sentence and a few", () => {
     const nameOf = (w: typeof ada) => (w === ada ? "Ada" : "Bea")
     expect(
-      reachWords("slate-owl", { kind: "archived", task: done, record }, nameOf),
-    ).toBe("slate-owl's task was archived by Ada")
+      reachWords(
+        "slate-owl",
+        { kind: "archived", canvas: done, record },
+        nameOf,
+      ),
+    ).toBe("slate-owl's canvas was archived by Ada")
     expect(reachWords("jolly-elk", { kind: "held", by: bea }, nameOf)).toBe(
       "Bea has jolly-elk",
     )
     expect(reachWords("x", { kind: "gone" }, nameOf)).toBe(
-      "x is no longer on any task",
+      "x is no longer on any canvas",
     )
     expect(awayWords({ kind: "held", by: bea }, nameOf)).toBe("Bea has it")
   })
-  test("in reach: named threads of open tasks; not an archived task's, an inventory's, or an unnamed one", () => {
-    const { canvases } = indexTasks(all, new Map())
+  test("in reach: named threads of open canvases; not an archived canvas's, an inventory's, or an unnamed one", () => {
+    const { cardsOn } = indexCanvases(all, new Map())
     expect(
-      reachableAgents({ canvases, archived, names }).map(a => a.name),
+      reachableAgents({ cardsOn, archived, names }).map(a => a.name),
     ).toEqual(["amber-fox"])
   })
 })
 
 describe("a late write of the host's", () => {
-  const canvasOf = (task: typeof open): LivePlace => {
+  const placeOnCanvas = (canvas: typeof open): LivePlace => {
     const place = cards.find(c => c.id === fox)?.place
     if (place?.kind !== "canvas") throw new Error("fox is on a canvas")
-    return { ...place, task }
+    return { ...place, canvas }
   }
   const inventory: LivePlace = { kind: "inventory", holder: bea }
   const places: Readonly<Record<string, CardPlace | null>> = {
-    "an open canvas": canvasOf(open),
-    "an archived canvas": canvasOf(done),
+    "an open canvas": placeOnCanvas(open),
+    "an archived canvas": placeOnCanvas(done),
     "an inventory": inventory,
-    "the trash, from an open canvas": { kind: "trash", left: canvasOf(open) },
+    "the trash, from an open canvas": {
+      kind: "trash",
+      left: placeOnCanvas(open),
+    },
     "the trash, from an archived canvas": {
       kind: "trash",
-      left: canvasOf(done),
+      left: placeOnCanvas(done),
     },
     "the trash, from an inventory": { kind: "trash", left: inventory },
     "no card": null,
@@ -126,7 +133,7 @@ describe("a late write of the host's", () => {
     )
     expect(away(null)).toBe("gone")
   })
-  test("lands in a thread not opened yet, which is in no task", () => {
+  test("lands in a thread not opened yet, which is in no canvas", () => {
     expect(
       lateAway(
         { kind: "thread", thread: fox },
@@ -134,12 +141,18 @@ describe("a late write of the host's", () => {
       ),
     ).toBeNull()
   })
-  test("to an archived task is refused, with who archived it", () => {
+  test("to an archived canvas is refused, with who archived it", () => {
     expect(
-      lateAway({ kind: "task", task: done }, { cards: [], archived, opened }),
-    ).toEqual({ kind: "archived", task: done, record })
+      lateAway(
+        { kind: "canvas", canvas: done },
+        { cards: [], archived, opened },
+      ),
+    ).toEqual({ kind: "archived", canvas: done, record })
     expect(
-      lateAway({ kind: "task", task: open }, { cards: [], archived, opened }),
+      lateAway(
+        { kind: "canvas", canvas: open },
+        { cards: [], archived, opened },
+      ),
     ).toBeNull()
   })
   test("lands only in a thread whose root is held, wherever its card is", () => {

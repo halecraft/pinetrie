@@ -9,7 +9,7 @@ import {
 } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
-import { renderableMessage } from "./chat.ts"
+import { renderableMessage } from "./message.ts"
 import {
   decodePinned,
   encodePinned,

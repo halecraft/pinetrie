@@ -1,26 +1,26 @@
 import {
   type CardId,
+  canvasIdFor,
   entryId,
   indexTree,
   livePlaceOf,
   rootIdFor,
   type ThreadRecord,
-  taskIdFor,
   threadIdFor,
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
-import { fromParents, taskCard, threadOfEntry } from "@pinetrie/core/fixtures"
+import { canvasCard, fromParents, threadOfEntry } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
+import { rootsHeld, unstartedThreads } from "./canvas-index.ts"
 import { threadCardOf } from "./fixtures.ts"
 import { planOpenThread } from "./open.ts"
-import { emptiedTasks, planTasksTrashed } from "./root.ts"
-import { rootsHeld, unstartedThreads } from "./task.ts"
+import { emptiedCanvases, planCanvasesTrashed } from "./root.ts"
 
 const ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 const NEW_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000b")
-const TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
-const NEW_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000d")
+const CANVAS = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000c")
+const NEW_CANVAS = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000d")
 const ADA = writerId("ada@x.io")
 // r -> a -> b: thread `r`; c, a branch at a, starts thread `c`.
 const index = indexTree(fromParents({ r: null, a: "r", b: "a", c: "a" }))
@@ -33,7 +33,7 @@ const record = (thread: typeof R, root = ROOT): ThreadRecord => ({
   createdAt: 1,
   origin: { kind: "root" },
 })
-const onCanvas = threadCardOf({ thread: R, task: TASK, by: ADA, cards: [] })
+const onCanvas = threadCardOf({ thread: R, canvas: CANVAS, by: ADA, cards: [] })
 const STATE = workflowStateIdFor("d")
 const WORKFLOW = {
   open: [{ id: STATE, name: "Doing" }],
@@ -45,24 +45,24 @@ const plan = (
   over: Partial<Parameters<typeof planOpenThread>[0]> = {},
 ) =>
   planOpenThread({
-    open: { thread: NEW, root: ROOT, task: TASK, ...open },
+    open: { thread: NEW, root: ROOT, canvas: CANVAS, ...open },
     start: BRANCH,
     sender: ADA,
     cards: [onCanvas],
     threads: new Map([[R, record(R)]]),
     roots: new Set([ROOT]),
-    tasks: new Set([TASK]),
+    canvases: new Set([CANVAS]),
     workflow: WORKFLOW,
     now: 7,
     ...over,
   })
 const newTab = (state: typeof STATE | null = null) =>
-  ({ start: { kind: "new-task", state } }) as const
+  ({ start: { kind: "new-canvas", state } }) as const
 const newRoot = (after: CardId | null) =>
   ({ start: { kind: "new-root", after } }) as const
 
 describe("planOpenThread", () => {
-  test("a branch: its record forks at its entry, its card just after the thread it forks from, and no task is written", () => {
+  test("a branch: its record forks at its entry, its card just after the thread it forks from, and no canvas is written", () => {
     const opened = plan()
     expect(opened.kind).toBe("open")
     if (opened.kind !== "open") return
@@ -83,7 +83,7 @@ describe("planOpenThread", () => {
       record: {
         kind: "thread",
         id: NEW,
-        place: { kind: "canvas", task: TASK, width: 1 },
+        place: { kind: "canvas", canvas: CANVAS, width: 1 },
       },
     })
   })
@@ -102,8 +102,8 @@ describe("planOpenThread", () => {
     ).not.toHaveProperty("proposal")
   })
 
-  test("a new tab: a new root's first thread, in a new task whose card ends its state", () => {
-    const opened = plan({ root: NEW_ROOT, task: NEW_TASK }, newTab(STATE))
+  test("a new canvas: a new root's first thread, in a new canvas whose card ends its state", () => {
+    const opened = plan({ root: NEW_ROOT, canvas: NEW_CANVAS }, newTab(STATE))
     expect(
       opened.kind === "open" && opened.records.map(r => r.namespace),
     ).toEqual(["pinetrie.thread"])
@@ -112,24 +112,27 @@ describe("planOpenThread", () => {
     })
     expect(opened.kind === "open" && opened.steps[0]).toMatchObject({
       record: {
-        kind: "task",
-        id: NEW_TASK,
+        kind: "canvas",
+        id: NEW_CANVAS,
         owner: ADA,
         place: { kind: "board", state: STATE },
       },
     })
     expect(opened.kind === "open" && opened.steps.at(-1)).toMatchObject({
-      record: { id: NEW, place: { kind: "canvas", task: NEW_TASK } },
+      record: { id: NEW, place: { kind: "canvas", canvas: NEW_CANVAS } },
     })
   })
 
-  test("a new tab before the board has states is refused", () => {
+  test("a new canvas before the board has states is refused", () => {
     expect(
-      plan({ root: NEW_ROOT, task: NEW_TASK }, { ...newTab(), workflow: null }),
+      plan(
+        { root: NEW_ROOT, canvas: NEW_CANVAS },
+        { ...newTab(), workflow: null },
+      ),
     ).toEqual({ kind: "refused", why: "no-place" })
   })
 
-  test("a new root in a task the session holds: its card where a drop after `after` lands, and no task is written", () => {
+  test("a new root in a canvas the session holds: its card where a drop after `after` lands, and no canvas is written", () => {
     const ranked = (after: CardId | null) => {
       const opened = plan({ root: NEW_ROOT }, newRoot(after))
       if (opened.kind !== "open") throw new Error(opened.why)
@@ -140,7 +143,7 @@ describe("planOpenThread", () => {
       const [made] = opened.steps
       if (made?.kind !== "write" || made.record.place.kind !== "canvas")
         throw new Error("not made on a canvas")
-      expect(made.record.place.task).toBe(TASK)
+      expect(made.record.place.canvas).toBe(CANVAS)
       return made.record.place.order
     }
     const existing =
@@ -158,13 +161,25 @@ describe("planOpenThread", () => {
       plan({}, { start: { ...BRANCH, at: entryId("x") } }),
       "unknown",
     ],
-    ["its task is not the session's", plan({ task: NEW_TASK }), "unknown"],
-    ["a new tab's root is in use", plan({ task: NEW_TASK }, newTab()), "taken"],
-    ["a new tab's task is in use", plan({ root: NEW_ROOT }, newTab()), "taken"],
+    [
+      "its canvas is not the session's",
+      plan({ canvas: NEW_CANVAS }),
+      "unknown",
+    ],
+    [
+      "a new canvas's root is in use",
+      plan({ canvas: NEW_CANVAS }, newTab()),
+      "taken",
+    ],
+    [
+      "a new canvas's id is in use",
+      plan({ root: NEW_ROOT }, newTab()),
+      "taken",
+    ],
     ["a new root is in use", plan({}, newRoot(null)), "taken"],
     [
-      "a new root's task is not the session's",
-      plan({ root: NEW_ROOT, task: NEW_TASK }, newRoot(null)),
+      "a new root's canvas is not the session's",
+      plan({ root: NEW_ROOT, canvas: NEW_CANVAS }, newRoot(null)),
       "unknown",
     ],
   ] as const)("refused: %s", (_, planned, why) => {
@@ -207,24 +222,31 @@ describe("unstartedThreads", () => {
   })
 })
 
-describe("closing a new tab before its first send", () => {
-  const tab = threadCardOf({ thread: NEW, task: NEW_TASK, by: ADA, cards: [] })
+describe("closing a new canvas before its first send", () => {
+  const tab = threadCardOf({
+    thread: NEW,
+    canvas: NEW_CANVAS,
+    by: ADA,
+    cards: [],
+  })
   const trashed = {
     ...tab,
     place: { kind: "trash", left: livePlaceOf(tab.place) },
   } as const
   const threads = new Map([[NEW, record(NEW, NEW_ROOT)]])
-  test("its thread trashed, the empty task's card goes to the closer's trash, remembering the task", () => {
+  test("its thread trashed, the empty canvas's card goes to the closer's trash, remembering the canvas", () => {
     expect(
-      emptiedTasks({
+      emptiedCanvases({
         before: [tab],
         after: [trashed],
         threads,
         started: new Set([ROOT]),
       }),
-    ).toEqual([NEW_TASK])
-    const card = taskCard(NEW_TASK)
-    expect(planTasksTrashed([card, taskCard(TASK)], [NEW_TASK], ADA)).toEqual([
+    ).toEqual([NEW_CANVAS])
+    const card = canvasCard(NEW_CANVAS)
+    expect(
+      planCanvasesTrashed([card, canvasCard(CANVAS)], [NEW_CANVAS], ADA),
+    ).toEqual([
       {
         kind: "write",
         record: {
@@ -235,10 +257,10 @@ describe("closing a new tab before its first send", () => {
       },
     ])
   })
-  test("never a task that holds another card, nor one whose root has started, nor a branch's", () => {
+  test("never a canvas that holds another card, nor one whose root has started, nor a branch's", () => {
     const other = threadCardOf({
       thread: R,
-      task: NEW_TASK,
+      canvas: NEW_CANVAS,
       by: ADA,
       cards: [tab],
     })
@@ -259,7 +281,7 @@ describe("closing a new tab before its first send", () => {
     ]
     for (const over of cases)
       expect(
-        emptiedTasks({
+        emptiedCanvases({
           before: [tab],
           after: [trashed],
           threads,
@@ -271,7 +293,12 @@ describe("closing a new tab before its first send", () => {
 })
 
 test("rootsHeld: a root with a thread on an open canvas or in an inventory", () => {
-  const tab = threadCardOf({ thread: NEW, task: NEW_TASK, by: ADA, cards: [] })
+  const tab = threadCardOf({
+    thread: NEW,
+    canvas: NEW_CANVAS,
+    by: ADA,
+    cards: [],
+  })
   const threads = new Map([
     [R, record(R)],
     [NEW, record(NEW, NEW_ROOT)],
@@ -283,6 +310,6 @@ test("rootsHeld: a root with a thread on an open canvas or in an inventory", () 
     rootsHeld([onCanvas, tab], threads, new Set(), new Set([ROOT, NEW_ROOT])),
   ).toEqual(new Set([ROOT, NEW_ROOT]))
   expect(
-    rootsHeld([onCanvas, tab], threads, new Set([TASK]), new Set([ROOT])),
+    rootsHeld([onCanvas, tab], threads, new Set([CANVAS]), new Set([ROOT])),
   ).toEqual(new Set())
 })

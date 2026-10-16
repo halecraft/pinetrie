@@ -1,6 +1,7 @@
 import {
   type BranchOut,
   branchesByProposal,
+  canvasIdFor,
   entryId,
   indexAsks,
   indexTree,
@@ -9,18 +10,17 @@ import {
   rootIdFor,
   type ThreadId,
   type ThreadRecord,
-  taskIdFor,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import { entriesOf, entry } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
+import { cardsOnCanvas, proposalDraft } from "./canvas-index.ts"
 import { threadCardOf } from "./fixtures.ts"
 import { decodeProposal, parseProposal, planBranchOut } from "./proposal.ts"
-import { canvasOf, proposalDraft } from "./task.ts"
 
 const ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
-const TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
+const CANVAS = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 const ADA = writerId("ada@x.io")
 const BEA = writerId("bea@x.io")
 const P = threadIdFor("01a0ffd2-0000-7000-8000-0000000000a0")
@@ -39,7 +39,7 @@ const RESULT = entryId("3-r")
 const FORK = entryId("4-a")
 const index = indexTree(
   entriesOf([
-    entry("1-p", null, { role: "chat", content: "split it" }, { thread: P }),
+    entry("1-p", null, { role: "person", content: "split it" }, { thread: P }),
     entry(
       "2-a",
       "1-p",
@@ -79,10 +79,15 @@ const record = (
   createdAt: 1,
   origin,
 })
-const proposing = threadCardOf({ thread: P, task: TASK, by: ADA, cards: [] })
+const proposing = threadCardOf({
+  thread: P,
+  canvas: CANVAS,
+  by: ADA,
+  cards: [],
+})
 const older = threadCardOf({
   thread: OLDER,
-  task: TASK,
+  canvas: CANVAS,
   by: ADA,
   cards: [proposing],
 })
@@ -100,7 +105,7 @@ const rows = (how: "open" | "start", ...pressed: number[]): BranchOut => {
   const base = {
     kind: "branch-out",
     root: ROOT,
-    task: TASK,
+    canvas: CANVAS,
     proposal: RESULT,
   } as const
   return how === "open"
@@ -129,11 +134,11 @@ const plan = (
     sender: ADA,
     cards: [proposing, older],
     threads: THREADS,
-    taskOfThread: new Map([
-      [P, TASK],
-      [OLDER, TASK],
+    canvasOfThread: new Map([
+      [P, CANVAS],
+      [OLDER, CANVAS],
     ]),
-    tasks: new Set([TASK]),
+    canvases: new Set([CANVAS]),
     now: 7,
     ...over,
   })
@@ -178,14 +183,14 @@ describe("planBranchOut", () => {
     const cards = opened.opening.steps.flatMap(s =>
       s.kind === "write" ? [s.record] : [],
     )
-    const canvas = canvasOf(
+    const here = cardsOnCanvas(
       [
         ...[proposing, older].filter(c => !cards.some(m => m.id === c.id)),
         ...cards,
       ],
-      TASK,
+      CANVAS,
     ).map(c => c.id)
-    expect(canvas).toEqual([P, ...NEW, OLDER])
+    expect(here).toEqual([P, ...NEW, OLDER])
   })
 
   test("lands them in order at the canvas's end when the proposing thread is not on it", () => {
@@ -194,7 +199,7 @@ describe("planBranchOut", () => {
     const made = opened.opening.steps.flatMap(s =>
       s.kind === "write" ? [s.record] : [],
     )
-    expect(canvasOf([older, ...made], TASK).map(c => c.id)).toEqual([
+    expect(cardsOnCanvas([older, ...made], CANVAS).map(c => c.id)).toEqual([
       OLDER,
       NEW[0],
       NEW[1],
@@ -233,10 +238,10 @@ describe("planBranchOut", () => {
     if (!("sends" in started)) throw new Error("no sends")
     expect(started.sends).toMatchObject([
       {
-        kind: "chat",
+        kind: "send",
         text: "@agent do one",
         root: ROOT,
-        at: { kind: "branch", thread: NEW[0], at: FORK, task: TASK },
+        at: { kind: "branch", thread: NEW[0], at: FORK, canvas: CANVAS },
         mentions: [{ kind: "agent" }],
         card: null,
       },
@@ -281,11 +286,11 @@ describe("planBranchOut", () => {
     expect(plan(rows("open", 3))).toEqual({ kind: "refused", why: "no-row" })
   })
 
-  test("refuses a task that is not the proposing thread's", () => {
+  test("refuses a canvas that is not the proposing thread's", () => {
     expect(
       plan({
         ...rows("open", 0),
-        task: taskIdFor("01a0ffd2-0000-7000-8000-00000000000e"),
+        canvas: canvasIdFor("01a0ffd2-0000-7000-8000-00000000000e"),
       }),
     ).toEqual({
       kind: "refused",
@@ -315,7 +320,7 @@ describe("proposalDraft", () => {
         entry(
           "5-c",
           "4-a",
-          { role: "chat", content: "@agent do two" },
+          { role: "person", content: "@agent do two" },
           {
             thread: NEW[0] ?? P,
           },

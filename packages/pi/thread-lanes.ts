@@ -17,12 +17,12 @@ import type {
   BehindMessage,
   CanvasFactMessage,
   CanvasMessage,
-  ChatMessage,
+  CanvasPinnedMessage,
   FactMessage,
   HeardMessage,
+  PersonMessage,
   PinnedMessage,
   PromptMessage,
-  TaskPinnedMessage,
   UpdateMessage,
 } from "@pinetrie/rules"
 import {
@@ -109,7 +109,7 @@ export type BeforePrompt =
   | HeardMessage
   | BehindMessage
   | PinnedMessage
-  | TaskPinnedMessage
+  | CanvasPinnedMessage
   | CanvasMessage
 
 /**
@@ -127,7 +127,7 @@ export interface ThreadLaneHandle {
    * proposed changes did.
    */
   append(
-    message: ChatMessage | UpdateMessage | FactMessage | AnswerMessage,
+    message: PersonMessage | UpdateMessage | FactMessage | AnswerMessage,
   ): Promise<AppendOutcome>
   /**
    * Run one turn with `message` as the prompt itself. `before` goes in first,
@@ -140,7 +140,7 @@ export interface ThreadLaneHandle {
   ): Promise<WriteOutcome>
   /**
    * Tell a running lane something that changed while it runs: its base has
-   * new work, a card was added to or taken from its task, or an agent it
+   * new work, a card was added to or taken from its canvas, or an agent it
    * asked answered. pi places the message after the tool results of the
    * turn in flight, at its next boundary, appended, so the prompt cache
    * holds. A steer that arrives after the run's last tool call makes one

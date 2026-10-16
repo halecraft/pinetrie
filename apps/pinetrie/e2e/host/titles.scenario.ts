@@ -8,9 +8,9 @@ import { TITLE_REQUEST_HEAD } from "@pinetrie/rules"
 import type { Checks } from "../checks.ts"
 import {
   at,
+  canvasHolding,
   START_AGENT,
   suitePlaces,
-  taskHolding,
   waitFor,
 } from "../harness.ts"
 import type { LaneHosts } from "../lane-hosts.ts"
@@ -49,12 +49,12 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     places,
   })
   const record = () => [...readRoots(th.session).values()][0]
-  // The root's task's title: the one task the scenario opens.
+  // The root's canvas's title: the one canvas the scenario opens.
   const title = () => [...readMarks(th.session).values()][0]?.title ?? null
 
   // 1. The first message to the agent titles its root while the run goes.
   const planning = script.hold("plan the parser")
-  await tu.chat("@agent plan the parser", ROOT, START_AGENT)
+  await tu.send("@agent plan the parser", ROOT, START_AGENT)
   await waitFor(() => planning.reached, 10_000)
   const early = (await waitFor(() => title() === "Parser plan", 10_000)) >= 0
   planning.finish()
@@ -70,13 +70,13 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
   if (entry === null) throw new Error("the root has no entry")
   await tu.mark(entry, "Mine")
   await waitFor(() => title() === "Mine", 10_000)
-  await tu.chat("@agent now the lexer", at(idOfIn(th, "noted")), {
+  await tu.send("@agent now the lexer", at(idOfIn(th, "noted")), {
     mode: "reply",
   })
   await idle()
   const answer = await tu.request({
     kind: "retitle",
-    task: taskHolding(th, entry),
+    canvas: canvasHolding(th, entry),
   })
   const replaced = (await waitFor(() => title() === "Lexer work", 10_000)) >= 0
   check(

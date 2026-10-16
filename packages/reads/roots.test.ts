@@ -10,7 +10,7 @@ import {
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
-import { encodeChat, PARTICIPANT } from "@pinetrie/rules"
+import { encodeMessage, PARTICIPANT } from "@pinetrie/rules"
 import {
   applyRecordWrites,
   type RecordsDocHandle,
@@ -66,8 +66,8 @@ const row = (
   thread,
   payload: { message },
 })
-const chat = (text: string, author = ADA) =>
-  encodeChat(
+const said = (text: string, author = ADA) =>
+  encodeMessage(
     { author, authorName: "Someone", text, compels: NOBODY, sendId: "s" },
     1,
   )
@@ -85,8 +85,8 @@ function rootWith(...rows: StoredEntryRow[]): RootDocHandle {
 describe("readRootRecord", () => {
   test("its first line, writers, messages and newest, its mentions unresolved, and its images", () => {
     const doc = rootWith(
-      row("e1", null, chat("plan the rail\nwith care")),
-      row("e2", "e1", chat("@bea look")),
+      row("e1", null, said("plan the rail\nwith care")),
+      row("e2", "e1", said("@bea look")),
       row("e3", "e2", {
         role: "toolResult",
         content: [
@@ -116,11 +116,11 @@ describe("readRootRecord", () => {
     // e1 (Bea) ─ e2 (agent) ─ e3 (Ada) ─ e4 (agent)   lane A
     //                     └─ e5 (Cy)                    lane B
     const doc = rootWith(
-      row("e1", null, chat("plan", BEA)),
+      row("e1", null, said("plan", BEA)),
       row("e2", "e1", agent("ok")),
-      row("e3", "e2", chat("and tests", ADA)),
+      row("e3", "e2", said("and tests", ADA)),
       row("e4", "e3", agent("done")),
-      row("e5", "e2", chat("another way", CY)),
+      row("e5", "e2", said("another way", CY)),
     )
     const a = threadIdFor("a")
     const b = threadIdFor("b")
@@ -138,9 +138,9 @@ describe("readRootRecord", () => {
   test("a mention names the thread it is in, which the inbox opens it in", () => {
     const [t, u] = [threadIdFor("t"), threadIdFor("u")]
     const doc = rootWith(
-      row("e1", null, chat("plan"), t),
-      row("e2", "e1", chat("@bea look"), t),
-      row("e3", "e1", chat("@bea elsewhere"), u),
+      row("e1", null, said("plan"), t),
+      row("e2", "e1", said("@bea look"), t),
+      row("e3", "e1", said("@bea elsewhere"), u),
     )
     expect(readRootRecord(ROOT, doc).mentions).toEqual([
       { id: "e2", by: ADA, text: "@bea look", thread: t },
@@ -185,13 +185,13 @@ test("readParticipantPictures: each writer's picture, the same map while none ch
 })
 
 test("readHeldIndex: several roots read as one tree, kept while none changes", () => {
-  const a = rootWith(row("a1", null, chat("a")))
-  const b = rootWith(row("b1", null, chat("b")))
+  const a = rootWith(row("a1", null, said("a")))
+  const b = rootWith(row("b1", null, said("b")))
   const both = readHeldIndex([a, b])
   expect([...both.roots].sort()).toEqual(["a1", "b1"])
   expect(readHeldIndex([a, b])).toBe(both)
   expect(readHeldIndex([a])).toBe(readTreeIndex(a))
-  writeEntry(b, row("b2", "b1", chat("more")))
+  writeEntry(b, row("b2", "b1", said("more")))
   expect(readHeldIndex([a, b])).not.toBe(both)
 })
 

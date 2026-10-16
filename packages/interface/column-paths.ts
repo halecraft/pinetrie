@@ -14,7 +14,7 @@ import {
 export interface ColumnSpec {
   /**
    * Where the column's path ends: its thread's end, or an unstarted
-   * thread's fork; null only for a new tab's thread, at the root.
+   * thread's fork; null only for a new canvas's thread, at the root.
    */
   readonly anchor: EntryId | null
   /**

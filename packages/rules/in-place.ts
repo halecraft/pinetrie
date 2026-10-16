@@ -15,13 +15,13 @@ import {
   type ReorderRefusal,
   sameKey,
 } from "@pinetrie/core"
+import { cardsOnCanvas } from "./canvas-index.ts"
 import { byOrder, isOrdered, orderOf } from "./card.ts"
 import { marginCards } from "./margin.ts"
 import type { MoveStep, PlaceStep } from "./moves.ts"
 import { notesIn } from "./notes.ts"
 import { orderBetween, respace } from "./order.ts"
-import { isPinned, queuedOn, taskPinnedOf } from "./queue.ts"
-import { canvasOf } from "./task.ts"
+import { canvasPinnedOf, isPinned, queuedOn } from "./queue.ts"
 
 // ── reorders ─────────────────────────────────────────────
 
@@ -51,12 +51,12 @@ interface ReorderRule<K extends ReorderAt["kind"]> {
  *   the session's (`placeAt`). A thread's pinned cards are found through
  *   the tree, which this does not read, so other threads' may sit between
  *   two pinned neighbours: they need not be adjacent here.
- * - A task's pinned cards: its own, the neighbours next to each
+ * - A canvas's pinned cards: its own, the neighbours next to each
  *   other.
  * - A note column: its notes, the neighbours next to each other.
  * - An entry's margin: its comments, the neighbours next to each
  *   other.
- * - A canvas: its task's cards (`canvasOf`), the neighbours next to each
+ * - A canvas: its canvas's cards (`cardsOnCanvas`), the neighbours next to each
  *   other.
  */
 export const REORDERS: { readonly [K in ReorderAt["kind"]]: ReorderRule<K> } = {
@@ -70,8 +70,8 @@ export const REORDERS: { readonly [K in ReorderAt["kind"]]: ReorderRule<K> } = {
     adjacent: false,
     passesFacts: true,
   },
-  "task-pinned": {
-    siblings: (cards, at) => taskPinnedOf(cards, at.task),
+  "canvas-pinned": {
+    siblings: (cards, at) => canvasPinnedOf(cards, at.canvas),
     adjacent: true,
     passesFacts: true,
   },
@@ -86,7 +86,7 @@ export const REORDERS: { readonly [K in ReorderAt["kind"]]: ReorderRule<K> } = {
     passesFacts: true,
   },
   canvas: {
-    siblings: (cards, at) => canvasOf(cards, at.task),
+    siblings: (cards, at) => cardsOnCanvas(cards, at.canvas),
     adjacent: true,
     passesFacts: true,
   },

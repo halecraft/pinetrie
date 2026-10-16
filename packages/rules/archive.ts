@@ -1,10 +1,11 @@
-// archive — what crossing the archive's edge does, and the tasks a command
-// writes in, which the gate (`gate.ts`) keeps out of an archived task.
+// archive — what crossing the archive's edge does, and the canvases a command
+// writes in, which the gate (`gate.ts`) keeps out of an archived canvas.
 
 import {
   type AgentWork,
-  type ArchivedTask,
+  type ArchivedCanvas,
   atEntry,
+  type CanvasId,
   type CardId,
   type CardRecord,
   type EntryId,
@@ -19,14 +20,17 @@ import {
   type RootId,
   refused,
   type SnapshotId,
-  type TaskId,
   type ThreadId,
   type TreeIndex,
   threadEnd,
   threadsWork,
   type VerdictRecord,
 } from "@pinetrie/core"
-import { type TaskIndex, taskOfCard, taskOfTarget } from "./task.ts"
+import {
+  type CanvasIndex,
+  canvasOfCard,
+  canvasOfTarget,
+} from "./canvas-index.ts"
 import { unclassifiedPending } from "./verdict.ts"
 import { planRetention } from "./work.ts"
 
@@ -34,7 +38,7 @@ import { planRetention } from "./work.ts"
 export type Crossing = "archive" | "restore"
 
 /**
- * What archiving or restoring does off the documents' keeper, after the task's
+ * What archiving or restoring does off the documents' keeper, after the canvas's
  * place is written: lanes to forget and remove (their containers
  * and disks), their refs in your repo moved (null deletes, on archiving), and
  * snapshots to delete. Empty on a host without lanes of their own.
@@ -57,26 +61,26 @@ type ArchivePlan =
       /** On the keeper again, after the teardown: the roots to let go of. */
       readonly unload: readonly RootId[]
       /**
-       * With the place, on archiving: each of the task's threads' verdicts
+       * With the place, on archiving: each of the canvas's threads' verdicts
        * still pending, `unclassified`. Its run's end, a late write, is
        * refused from now on, and would have been the one to write it.
        */
       readonly verdicts: readonly VerdictRecord[]
     }
 
-/** Why a task cannot be archived now, as the board and the host both say it. */
-export const TASK_BUSY_REASON = {
+/** Why a canvas cannot be archived now, as the board and the host both say it. */
+export const CANVAS_BUSY_REASON = {
   running: "an agent is working here",
   waiting: "cards are queued here",
   held: "cards are queued here",
 } as const satisfies Record<AgentWork, string>
 
 /**
- * Decide what crossing the archive's edge does for a task. A task an agent
+ * Decide what crossing the archive's edge does for a canvas. A canvas an agent
  * of its threads works in, or where cards are queued, is not archived:
  * stopping the run or holding the queue would do work nobody asked for, so
  * the person chooses. Restoring is never busy. Archiving lets go
- * of the roots no task outside the archive, and no inventory, still holds a
+ * of the roots no canvas outside the archive, and no inventory, still holds a
  * thread of (`stillHeld`).
  */
 export function planArchive(input: {
@@ -84,7 +88,7 @@ export function planArchive(input: {
   readonly threads: readonly ThreadId[]
   readonly lanes: readonly LaneView[]
   /**
-   * The task's lanes of their own, by their records, with each one's tip
+   * The canvas's lanes of their own, by their records, with each one's tip
    * and its root's tree; empty on a host without lanes of their own.
    */
   readonly own: readonly {
@@ -96,9 +100,9 @@ export function planArchive(input: {
   readonly revisions: ReadonlyMap<EntryId, RevisionRecord>
   /** Its roots' trees, whose every thread's end keeps its snapshot. */
   readonly trees: readonly TreeIndex[]
-  /** The roots of the task's threads. */
+  /** The roots of the canvas's threads. */
   readonly roots: readonly RootId[]
-  /** The roots a thread outside this task, in no archived task, is in. */
+  /** The roots a thread outside this canvas, in no archived canvas, is in. */
   readonly stillHeld: ReadonlySet<RootId>
   /** Every thread's verdict, by its lane. */
   readonly verdicts: ReadonlyMap<ThreadId, VerdictRecord>
@@ -106,7 +110,7 @@ export function planArchive(input: {
   const { crossing } = input
   const busy = threadsWork(input.lanes, new Set(input.threads))
   if (crossing === "archive" && busy !== undefined)
-    return refused(ERR.TASK_BUSY, TASK_BUSY_REASON[busy])
+    return refused(ERR.CANVAS_BUSY, CANVAS_BUSY_REASON[busy])
   return {
     kind: "cross",
     teardown: planTeardown(crossing, input),
@@ -153,10 +157,10 @@ function planTeardown(
 }
 
 /**
- * Lanes that will not run again, an archived task's or a deleted thread's: each
+ * Lanes that will not run again, an archived canvas's or a deleted thread's: each
  * forgotten, its ref deleted (which withdraws its proposed changes), and every
  * snapshot of it but its newest and the one nearest each thread's end in
- * `trees`, whatever task that thread is in (`planRetention`), so a copy from
+ * `trees`, whatever canvas that thread is in (`planRetention`), so a copy from
  * the archive finds its files.
  */
 export function planLanesGone(
@@ -177,117 +181,129 @@ export function planLanesGone(
 }
 
 /**
- * The tasks a command or a send writes in, none for a name, a
+ * The canvases a command or a send writes in, none for a name, a
  * picture, a stop, a move on the board or a change to its states, a
  * reservation, a card's command, or traces seen. A send at a thread's end,
- * or popped from its queue, writes in the thread's task, a branch in the
- * task it lands in; proposed changes,
+ * or popped from its queue, writes in the thread's canvas, a branch in the
+ * canvas it lands in; proposed changes,
  * a carry-on and a queue's hold in their lane's thread's; a card's move in
- * the task each card leaves as well as the one it goes to, so nothing moves
- * out of an archived task; an undo of moves, a mark and a retitle in their
+ * the canvas each card leaves as well as the one it goes to, so nothing moves
+ * out of an archived canvas; an undo of moves, a mark and a retitle in their
  * own.
  */
 export function writesIn(
   intent: Gated,
-  tasks: TaskIndex,
+  canvases: CanvasIndex,
   cards: readonly CardRecord[],
-): readonly TaskId[] {
-  const tasksOf = {
-    thread: (t: ThreadId) => tasks.taskOfThread.get(t) ?? null,
-    place: (to: MoveTarget) => taskOfTarget(tasks, to),
-    card: (id: CardId) => taskOfCard(tasks, cards, id),
+): readonly CanvasId[] {
+  const canvasLookup = {
+    thread: (t: ThreadId) => canvases.canvasOfThread.get(t) ?? null,
+    place: (to: MoveTarget) => canvasOfTarget(canvases, to),
+    card: (id: CardId) => canvasOfCard(canvases, cards, id),
   }
-  const only = (...tasks: readonly (TaskId | null)[]): readonly TaskId[] =>
-    tasks.filter((t, i): t is TaskId => t !== null && tasks.indexOf(t) === i)
+  const only = (
+    ...canvases: readonly (CanvasId | null)[]
+  ): readonly CanvasId[] =>
+    canvases.filter(
+      (t, i): t is CanvasId => t !== null && canvases.indexOf(t) === i,
+    )
   switch (intent.kind) {
-    case "chat":
+    case "send":
       return only(
         intent.at.kind === "branch"
-          ? intent.at.task
-          : tasksOf.thread(intent.at.thread),
+          ? intent.at.canvas
+          : canvasLookup.thread(intent.at.thread),
       )
-    // An action on proposed changes acts at its lane's tip: an archived task's
+    // An action on proposed changes acts at its lane's tip: an archived canvas's
     // lanes offer no work out. A carry-on writes its message there.
     case "proposed":
     case "carry-on":
     // A queue's hold, and its cards unqueued, are its lane's thread's.
     case "queue-hold":
     case "unqueue-all":
-      return only(tasksOf.thread(intent.lane))
-    // A card queued writes in its queue's task, and leaves its own.
+      return only(canvasLookup.thread(intent.lane))
+    // A card queued writes in its queue's canvas, and leaves its own.
     case "queue-card":
-      return only(tasksOf.place(intent.move.to), tasksOf.card(intent.move.card))
-    // A thread opened writes in the task its card lands in, as a
+      return only(
+        canvasLookup.place(intent.move.to),
+        canvasLookup.card(intent.move.card),
+      )
+    // A thread opened writes in the canvas its card lands in, as a
     // proposal's branches do.
     case "open-thread":
     case "branch-out":
-      return only(intent.task)
-    // A spin-off writes a new task, in no archive, and the card leaves its
+      return only(intent.canvas)
+    // A spin-off writes a new canvas, in no archive, and the card leaves its
     // own for the history its trash place names.
     case "spin-off":
-      return only(tasksOf.card(intent.move.card), tasksOf.place(intent.move.to))
-    // A copy writes in the task its card lands in alone: an archived
+      return only(
+        canvasLookup.card(intent.move.card),
+        canvasLookup.place(intent.move.to),
+      )
+    // A copy writes in the canvas its card lands in alone: an archived
     // thread is copied, since archiving freezes its end, not its history.
     case "copy-thread":
-      return only(tasksOf.place(intent.move.to))
+      return only(canvasLookup.place(intent.move.to))
     // A paste writes where it lands, and discards the card it replaces
     // where that is (an edit as text's reference, a slot's card).
     case "paste":
       return only(
-        tasksOf.place(intent.to),
-        intent.replacing === null ? null : tasksOf.card(intent.replacing.card),
+        canvasLookup.place(intent.to),
+        intent.replacing === null
+          ? null
+          : canvasLookup.card(intent.replacing.card),
       )
     // A reorder stays in the place it names.
     case "reorder":
-      return only(tasksOf.place(intent.reorder.at))
+      return only(canvasLookup.place(intent.reorder.at))
     // A width is drawn on the canvas it names.
     case "card-width":
-      return only(intent.at.task)
-    // A note column's title writes in its column's task.
+      return only(intent.at.canvas)
+    // A note column's title writes in its column's canvas.
     case "mark":
-      return intent.of.kind === "task"
-        ? [intent.of.task]
-        : only(tasksOf.card(intent.of.column))
+      return intent.of.kind === "canvas"
+        ? [intent.of.canvas]
+        : only(canvasLookup.card(intent.of.column))
     case "retitle":
-      return [intent.task]
+      return [intent.canvas]
     case "undo-move":
-      return intent.task === null ? [] : [intent.task]
+      return intent.canvas === null ? [] : [intent.canvas]
     case "move":
       return only(
         ...intent.moves.flatMap(m => [
-          tasksOf.place(m.to),
-          tasksOf.card(m.card),
+          canvasLookup.place(m.to),
+          canvasLookup.card(m.card),
         ]),
       )
     case "name":
     case "picture":
     case "stop":
     // The board is the session's: a move into or out of the archive writes
-    // in no task, so an archived task can be restored.
-    case "move-task":
+    // in no canvas, so an archived canvas can be restored.
+    case "move-canvas":
     case "workflow":
     case "reserve":
-    // Accepted work is your repo's, in no task.
+    // Accepted work is your repo's, in no canvas.
     case "setup":
     case "publish":
     // A command acts only when its card is popped, its send cleared then.
     case "set-command":
-    // Traces are the session's, in no task.
+    // Traces are the session's, in no canvas.
     case "traces-seen":
-    // An answer to a lane's ssh writes its access record, in no task: the
-    // owner can take back what an archived task's lane holds.
+    // An answer to a lane's ssh writes its access record, in no canvas: the
+    // owner can take back what an archived canvas's lane holds.
     case "ssh-access":
       return []
   }
 }
 
-/** The archived task among the `written` tasks, which makes it read-only, or null. */
+/** The archived canvas among the `written` canvases, which makes it read-only, or null. */
 export function archivedIn(
-  written: readonly TaskId[],
-  archived: ReadonlyMap<TaskId, ArchivedTask>,
-): ArchivedTask | null {
-  for (const task of written) {
-    const found = archived.get(task)
+  written: readonly CanvasId[],
+  archived: ReadonlyMap<CanvasId, ArchivedCanvas>,
+): ArchivedCanvas | null {
+  for (const canvas of written) {
+    const found = archived.get(canvas)
     if (found !== undefined) return found
   }
   return null

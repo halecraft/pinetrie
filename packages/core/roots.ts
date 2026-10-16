@@ -74,9 +74,9 @@ export const laneWork = (lane: LaneView): AgentWork =>
   lane.running ? "running" : lane.heldBy !== null ? "held" : "waiting"
 
 /**
- * The agent's work among `threads`' lanes: a task's, whatever roots its threads
- * are in. Running wins over waiting, and waiting over held; undefined when
- * none is busy. The one rule for when a task cannot be archived.
+ * The agent's work among `threads`' lanes: a canvas's, whatever roots its
+ * threads are in. Running wins over waiting, and waiting over held; undefined
+ * when none is busy. The one rule for when a canvas cannot be archived.
  */
 export function threadsWork(
   lanes: readonly LaneView[],

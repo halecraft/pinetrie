@@ -22,7 +22,7 @@ function runningWithProposed() {
   putLane(b, LANE, entryId("p-1"))
   writeEntry(
     b.root,
-    row("p-1", null, { role: "chat", content: "go", writer: ADA }),
+    row("p-1", null, { role: "person", content: "go", writer: ADA }),
   )
   writeLaneTip(b.root, LANE, entryId("p-1"))
   beginRun(b.live, LANE, runId("r-1"))

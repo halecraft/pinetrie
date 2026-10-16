@@ -1,16 +1,16 @@
 import {
   type AgentWork,
+  type CanvasId,
   type CardRecord,
+  canvasIdFor,
   entryId,
-  type TaskId,
-  taskIdFor,
   threadIdFor,
   type Workflow,
   type WriterId,
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
-import { taskCard } from "@pinetrie/core/fixtures"
+import { canvasCard } from "@pinetrie/core/fixtures"
 import { boardOf, orderKeys } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
 import type { Status } from "./attention.ts"
@@ -23,6 +23,7 @@ import {
   type BoardViewInput,
   boardKeyAct,
   boardView,
+  canvasesWords,
   clickClosesBoard,
   filterTitle,
   filterWords,
@@ -34,10 +35,9 @@ import {
   searchedText,
   searchWords,
   stateWords,
-  tasksWords,
 } from "./board-view.ts"
 import type { KeyLike } from "./page-keys.ts"
-import type { TaskSummary } from "./root-label.ts"
+import type { CanvasSummary } from "./root-label.ts"
 import { threadCardHeads } from "./thread-card.ts"
 
 const ADA = writerId("ada@x.io")
@@ -54,31 +54,31 @@ const WORKFLOW: Workflow = {
   ],
   archive: { id: DONE, name: "Done" },
 }
-/** Task `n`, holding task `n`'s threads. */
+/** Canvas `n`, holding canvas `n`'s threads. */
 const ID = (n: number) =>
-  taskIdFor(`01a0ffd2-0000-7000-8000-${String(n).padStart(12, "0")}`)
-/** Task `n` as the facts and the expectations name it. */
+  canvasIdFor(`01a0ffd2-0000-7000-8000-${String(n).padStart(12, "0")}`)
+/** Canvas `n` as the facts and the expectations name it. */
 const E = ID
 const keys = orderKeys(4)
 const place = (n: number, state: typeof DOING, rank = 0): CardRecord =>
-  taskCard(ID(n), keys[rank] ?? "", state, ADA)
+  canvasCard(ID(n), keys[rank] ?? "", state, ADA)
 const summary = (
   n: number,
   writers: WriterId[],
   newest: string,
   line = "",
-): readonly [TaskId, TaskSummary] => [
+): readonly [CanvasId, CanvasSummary] => [
   E(n),
   { line, writers, newest: entryId(newest) },
 ]
 // r1, r2 in Doing (r2 first); r3 in Backlog; r4, r5 in Done (r5 newer).
 /** What the board is read from, its thread cards' facts among them. */
 type Facts = Omit<BoardViewInput, "heads"> & {
-  readonly labels: ReadonlyMap<TaskId, string>
-  readonly status: ReadonlyMap<TaskId, Status>
-  readonly cardRoots: ReadonlySet<TaskId>
-  readonly ready: ReadonlyMap<TaskId, readonly string[]>
-  readonly work: ReadonlyMap<TaskId, AgentWork>
+  readonly labels: ReadonlyMap<CanvasId, string>
+  readonly status: ReadonlyMap<CanvasId, Status>
+  readonly cardRoots: ReadonlySet<CanvasId>
+  readonly ready: ReadonlyMap<CanvasId, readonly string[]>
+  readonly work: ReadonlyMap<CanvasId, AgentWork>
 }
 const input = (over: Partial<Facts> = {}): BoardViewInput => {
   const f: Facts = {
@@ -132,7 +132,7 @@ describe("boardView", () => {
   test("each open state a column, in order, by rank; the archive apart; the strip says each", () => {
     const view = boardView(input())
     expect(
-      view.open.map(c => [c.state.name, c.items.map(t => t.task)]),
+      view.open.map(c => [c.state.name, c.items.map(t => t.canvas)]),
     ).toEqual([
       ["Backlog", [E(3)]],
       ["Doing", [E(2), E(1)]],
@@ -145,11 +145,11 @@ describe("boardView", () => {
     ])
   })
 
-  test("a task with no message yet is on no column: a new tab's joins with its first send", () => {
+  test("a canvas with no message yet is on no column: a new canvas's joins with its first send", () => {
     const view = boardView(
       input({ cards: [...input().cards, place(6, BACKLOG, 1)] }),
     )
-    expect(view.open[0]?.items.map(t => t.task)).toEqual([E(3)])
+    expect(view.open[0]?.items.map(t => t.canvas)).toEqual([E(3)])
   })
 
   test("a titled card's body is its first line; an untitled card, or one titled by it, has none", () => {
@@ -160,25 +160,21 @@ describe("boardView", () => {
     ])
   })
 
-  test("an item holds your card exactly when its task does; ＋ on a column lands in its state", () => {
+  test("an item holds your card exactly when its canvas does; ＋ on a column lands in its state", () => {
     const view = boardView(input({ cardRoots: new Set([E(1)]) }))
     const doing = view.open[1]
     expect(doing?.items.map(t => t.pip)).toEqual([false, true])
-    expect(doing?.add.main.intent).toEqual({
-      kind: "newTab",
-      asksAgent: true,
-      state: DOING,
-    })
+    expect(doing?.add.main.intent).toEqual({ kind: "newCanvas", state: DOING })
   })
 
-  test("a column's mark and the strip's are its tasks' highest; the archive has none", () => {
+  test("a column's mark and the strip's are its canvases' highest; the archive has none", () => {
     const item = {
       lane: threadIdFor("a"),
       end: entryId("e-1"),
       level: "needsYou" as const,
       raised: { kind: "ready" as const, source: "c" },
     }
-    const status = new Map<TaskId, Status>([
+    const status = new Map<CanvasId, Status>([
       [E(1), { kind: "needsYou", item }],
       [E(3), { kind: "working" }],
       [E(4), { kind: "needsYou", item }],
@@ -189,7 +185,7 @@ describe("boardView", () => {
   })
 
   test("a column counts its items working and ready, not threads; an item's ⇡ names its threads", () => {
-    const status = new Map<TaskId, Status>([
+    const status = new Map<CanvasId, Status>([
       [E(1), { kind: "working" }],
       [E(3), { kind: "working" }],
       [E(4), { kind: "working" }],
@@ -216,8 +212,8 @@ describe("boardView", () => {
 
   test("stateWords and readyWords: what a state's ◌ and ⇡ and an item's ⇡ say", () => {
     expect(stateWords({ working: 1, ready: 2 })).toEqual({
-      working: "the agent is working in 1 task",
-      ready: "2 tasks with changes ready to accept",
+      working: "the agent is working in 1 canvas",
+      ready: "2 canvases with changes ready to accept",
     })
     expect(readyWords(["amber-fox", "cozy-mallard"])).toBe(
       "ready to accept: amber-fox, cozy-mallard",
@@ -232,8 +228,8 @@ describe("boardView", () => {
       ["Done", true, "running"],
     ])
     expect(first?.moves[1]?.intent).toEqual({
-      kind: "moveTask",
-      task: ID(2),
+      kind: "moveCanvas",
+      canvas: ID(2),
       from: DOING,
       to: DONE,
       before: null,
@@ -245,16 +241,16 @@ describe("boardView", () => {
     const [first, second] = boardView(input()).open[1]?.items ?? []
     expect(first?.up).toBeNull()
     expect(first?.down).toEqual({
-      kind: "moveTask",
-      task: ID(2),
+      kind: "moveCanvas",
+      canvas: ID(2),
       from: DOING,
       to: DOING,
       before: null,
       closes: false,
     })
     expect(second?.up).toEqual({
-      kind: "moveTask",
-      task: ID(1),
+      kind: "moveCanvas",
+      canvas: ID(1),
       from: DOING,
       to: DOING,
       before: ID(2),
@@ -277,10 +273,10 @@ describe("boardView", () => {
     expect(doing?.right).toBeNull()
     expect(backlog?.addBefore).toEqual({ left: BACKLOG, right: DOING })
     expect(doing?.addBefore).toEqual({ left: DOING, right: null })
-    expect(backlog?.remove.why).toBe("holds a task: move it first")
+    expect(backlog?.remove.why).toBe("holds a canvas: move it first")
     expect(removeWords(0, 1)).toBe("the board needs one open state")
     expect(removeWords(0, 2)).toBeNull()
-    expect(removeWords(3, 2)).toBe("holds 3 tasks: move them first")
+    expect(removeWords(3, 2)).toBe("holds 3 canvases: move them first")
   })
 })
 
@@ -305,32 +301,32 @@ describe("the board's search", () => {
   const kept = (over: Partial<BoardViewInput>) => {
     const view = boardView(input({ labels, ...over }))
     return [
-      ...view.open.map(c => c.items.map(t => t.task)),
-      view.archive.rows.map(t => t.task),
+      ...view.open.map(c => c.items.map(t => t.canvas)),
+      view.archive.rows.map(t => t.canvas),
     ]
   }
   const find = (query: string, mine = false) => ({
     search: parseSearch(query, mine),
   })
-  test("with none, every task shows, the archive's newest first, and every count is of all", () => {
+  test("with none, every canvas shows, the archive's newest first, and every count is of all", () => {
     expect(kept({})).toEqual([[E(3)], [E(2), E(1)], [E(5), E(4)]])
     const view = boardView(input())
     expect(view.shown).toEqual({ kind: "all", total: 5 })
     expect(view.open.map(c => c.count.kind)).toEqual(["all", "all"])
   })
-  test("it keeps the tasks whose label holds every word, in any order and case", () => {
+  test("it keeps the canvases whose label holds every word, in any order and case", () => {
     expect(kept(find("SEARCH"))).toEqual([[E(3)], [E(1)], [E(5)]])
     expect(kept(find(" design  board "))).toEqual([[], [E(1)], []])
     expect(kept(find("board nothing"))).toEqual([[], [], []])
     expect(kept(find("sqlite"))).toEqual([[], [], [E(4)]])
   })
-  test("mine keeps the tasks you wrote in, in every state", () => {
+  test("mine keeps the canvases you wrote in, in every state", () => {
     expect(kept(find("", true))).toEqual([[E(3)], [E(1)], [E(4)]])
     expect(kept({ ...find("", true), me: BEA })).toEqual([[], [E(2)], [E(5)]])
     expect(kept(find("palette", true))).toEqual([[], [], []])
   })
-  test("a filtered head counts what it shows; its mark, Remove and the strip count every task", () => {
-    const status = new Map<TaskId, Status>([
+  test("a filtered head counts what it shows; its mark, Remove and the strip count every canvas", () => {
+    const status = new Map<CanvasId, Status>([
       [E(1), { kind: "working" }],
       [E(2), { kind: "working" }],
     ])
@@ -350,23 +346,27 @@ describe("the board's search", () => {
       kept: 1,
       total: 5,
     })
-    expect(doing?.items.map(t => t.task)).toEqual([E(1)])
+    expect(doing?.items.map(t => t.canvas)).toEqual([E(1)])
     expect(doing?.count).toEqual({ kind: "kept", kept: 1, total: 2 })
-    expect(doing?.signals).toEqual({ working: 1, ready: 0, tasks: [E(1)] })
+    expect(doing?.signals).toEqual({ working: 1, ready: 0, canvases: [E(1)] })
     expect(doing?.mark).toBe("needsYou")
     expect(doing?.remove.why).not.toBeNull()
     expect(view.open[0]?.items).toEqual([])
     expect(view.open[0]?.remove.why).not.toBeNull()
     expect(view.archive.count).toEqual({ kind: "kept", kept: 0, total: 2 })
     expect(
-      view.strip.map(s => [s.count, s.signals.ready, s.signals.tasks.length]),
+      view.strip.map(s => [
+        s.count,
+        s.signals.ready,
+        s.signals.canvases.length,
+      ]),
     ).toEqual([
       [1, 0, 1],
       [2, 1, 2],
       [2, 0, 0],
     ])
   })
-  test("Move up and Move down step among the items shown, and only shown tasks have cards", () => {
+  test("Move up and Move down step among the items shown, and only shown canvases have cards", () => {
     const view = boardView(input({ labels, ...find("board") }))
     const [only, ...rest] = view.open[1]?.items ?? []
     expect([only?.up, only?.down, rest]).toEqual([null, null, []])
@@ -375,7 +375,7 @@ describe("the board's search", () => {
     const item = (n: number) =>
       ({
         ...boardView(input()).archive.rows[0],
-        task: ID(n),
+        canvas: ID(n),
         label: `r${n}`,
         writers: [],
       }) as never
@@ -449,34 +449,34 @@ describe("board words", () => {
   ) => ({ kind: "filtered" as const, search: { words, mine }, kept, total })
   // Named by the words, so a mutant that changes them fails its own test.
   const said: readonly (readonly [string, string])[] = [
-    [tasksWords(1), "1 task"],
-    [tasksWords(41), "41 tasks"],
+    [canvasesWords(1), "1 canvas"],
+    [canvasesWords(41), "41 canvases"],
     [keptWords({ kind: "kept", kept: 12, total: 96 }), "12 of 96"],
     [keptWords({ kind: "kept", kept: 96, total: 96 }), "96 of 96"],
     [keptWords({ kind: "all", total: 96 }), "96"],
-    [searchWords(1), "search 1 task…"],
-    [searchWords(140), "search 140 tasks…"],
+    [searchWords(1), "search 1 canvas…"],
+    [searchWords(140), "search 140 canvases…"],
     [
       filterWords(filtered(["parser"], true, 14, 140)),
-      'Filtered by "parser" and mine: 14 of 140 tasks',
+      'Filtered by "parser" and mine: 14 of 140 canvases',
     ],
     [
       filterWords(filtered(["parser", "plan"], false, 1, 140)),
-      'Filtered by "parser plan": 1 of 140 tasks',
+      'Filtered by "parser plan": 1 of 140 canvases',
     ],
     [
       filterWords(filtered([], true, 3, 140)),
-      "Filtered to tasks you wrote in: 3 of 140 tasks",
+      "Filtered to canvases you wrote in: 3 of 140 canvases",
     ],
     [
       filterWords(filtered(["parser"], false, 0, 140)),
-      'No tasks match "parser"',
+      'No canvases match "parser"',
     ],
     [
       filterWords(filtered(["parser"], true, 0, 140)),
-      'No tasks you wrote in match "parser"',
+      'No canvases you wrote in match "parser"',
     ],
-    [filterWords(filtered([], true, 0, 1)), "You wrote in none of 1 task"],
+    [filterWords(filtered([], true, 0, 1)), "You wrote in none of 1 canvas"],
     [
       filterTitle({ words: ["parser"], mine: true }),
       'filtered: "parser", mine',

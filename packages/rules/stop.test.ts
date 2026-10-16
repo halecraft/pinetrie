@@ -14,8 +14,8 @@ import {
 } from "@pinetrie/core"
 import { cardIdFor, FIXTURE_THREAD } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
-import { renderableMessage } from "./chat.ts"
 import { encodeFact } from "./fact.ts"
+import { renderableMessage } from "./message.ts"
 import { orderAfter } from "./order.ts"
 import { type QueuedCard, queuedOn } from "./queue.ts"
 import {
@@ -233,7 +233,7 @@ describe("carrying on", () => {
       facts: { index, asks: indexAsks(index) },
     }
   }
-  const ask: AgentMessageLike = { role: "chat", content: "fix it" }
+  const ask: AgentMessageLike = { role: "person", content: "fix it" }
   const aborted: AgentMessageLike = {
     role: "assistant",
     content: [{ type: "text", text: "half a reply" }],
@@ -308,7 +308,7 @@ describe("carrying on", () => {
   test("an answered ask, or a message after the stop, refuses", () => {
     const answered = { ...aborted, stopReason: "stop" }
     expect(state(over([ask, answered]))).toEqual(refusedWith(ERR.REFUSED))
-    const after = { role: "chat", content: "to Bea only" }
+    const after = { role: "person", content: "to Bea only" }
     expect(state(over([ask, aborted, after]))).toEqual(refusedWith(ERR.REFUSED))
   })
   test("planCarryOn: a run whose prompt names who resumed, read back as its line", () => {

@@ -2,7 +2,8 @@
 // step answers, and when a history retires.
 
 import {
-  type ArchivedTask,
+  type ArchivedCanvas,
+  type CanvasId,
   type CardHistoryRecord,
   type CardId,
   type CardPlace,
@@ -17,50 +18,53 @@ import {
   movesOfDocId,
   type PlaceKey,
   parseCardId,
-  type TaskId,
   type Workflow,
 } from "@pinetrie/core"
 import { transitionOf } from "./board.ts"
+import {
+  type CanvasIndex,
+  canvasOfPlace,
+  canvasOfTarget,
+} from "./canvas-index.ts"
 import type { MoveStep } from "./moves.ts"
-import { type TaskIndex, taskOfPlace, taskOfTarget } from "./task.ts"
 
 // ── moves' history ─────────────────────────────────────────────
 
 /**
- * What names a discard's history, the host's to decide: the tasks, and the
- * task the sender is on, for a card that leaves no task.
+ * What names a discard's history, the host's to decide: the canvases, and the
+ * canvas the sender is on, for a card that leaves no canvas.
  */
 export interface Discards {
-  readonly tasks: TaskIndex
-  readonly here: TaskId | null
+  readonly canvases: CanvasIndex
+  readonly here: CanvasId | null
 }
 
 /**
- * The history a card leaving `from` for gone is in: the task it leaves,
- * else, from an inventory, the task its sender is on.
+ * The history a card leaving `from` for gone is in: the canvas it leaves,
+ * else, from an inventory, the canvas its sender is on.
  */
 export const discardHistory = (
   from: CardPlace,
   discards: Discards,
-): TaskId | null => taskOfPlace(discards.tasks, from) ?? discards.here
+): CanvasId | null => canvasOfPlace(discards.canvases, from) ?? discards.here
 
 /**
  * The history of the sender's moves `moves` enter, or null for none.
  * A creation enters one when its
  * command's `cause` is a paste (a card pasted, a thread copied), or when it
- * is a note column made for a note: the task it lands in, or with none the
- * sender's history outside any task (a slot). A creation a move makes (a
- * composer's new card, an empty note) enters none. Otherwise the task the
- * card goes to, when it goes to one, else the task it leaves, read from its
+ * is a note column made for a note: the canvas it lands in, or with none the
+ * sender's history outside any canvas (a slot). A creation a move makes (a
+ * composer's new card, an empty note) enters none. Otherwise the canvas the
+ * card goes to, when it goes to one, else the canvas it leaves, read from its
  * record, since the host accepts a move only from where the card is. So a
  * take into the inventory is recorded where it left, a put where it went, a
- * drag across tasks where it went, and a discard in the task it leaves
+ * drag across canvases where it went, and a discard in the canvas it leaves
  * (`discardHistory`), which the page does not name, or, leaving
- * no task, in its sender's history outside any task. Of several, the first
+ * no canvas, in its sender's history outside any canvas. Of several, the first
  * that names a history names the step's: a paste's discard of the card it
  * replaces, when there is one. A place at a thread, or a thread's nearest
- * notes, is in its thread's task, a spot on a canvas in its canvas's
- * (`taskOfTarget`).
+ * notes, is in its thread's canvas, a spot on a canvas in its canvas's
+ * (`canvasOfTarget`).
  */
 export function historyOf(
   moves: readonly Move[],
@@ -68,50 +72,50 @@ export function historyOf(
   discards: Discards,
   cause: "move" | "paste",
 ): MoveHistoryScope | null {
-  const taskOf = (to: CardPlace | MoveTarget) =>
-    taskOfTarget(discards.tasks, to)
+  const targetCanvas = (to: CardPlace | MoveTarget) =>
+    canvasOfTarget(discards.canvases, to)
   for (const move of moves) {
     if (move.from === null) {
-      if (cause === "paste") return historyScope(taskOf(move.to))
-      const task = isNoteColumnId(move.card) ? taskOf(move.to) : null
-      return task === null ? null : historyScope(task)
+      if (cause === "paste") return historyScope(targetCanvas(move.to))
+      const canvas = isNoteColumnId(move.card) ? targetCanvas(move.to) : null
+      return canvas === null ? null : historyScope(canvas)
     }
     const from = cards.find(c => c.id === move.card)?.place
     if (from === undefined) continue
     if (move.to.kind === "trash")
       return historyScope(discardHistory(from, discards))
-    const task = taskOf(move.to) ?? taskOf(from)
-    if (task !== null) return historyScope(task)
+    const canvas = targetCanvas(move.to) ?? targetCanvas(from)
+    if (canvas !== null) return historyScope(canvas)
   }
   return null
 }
 
-/** How long an archived task's histories are kept. */
+/** How long an archived canvas's histories are kept. */
 const ARCHIVED_HISTORY_MS = 7 * 24 * 60 * 60 * 1000
 
 /**
- * The histories of moves to retire: those of a task archived
+ * The histories of moves to retire: those of a canvas archived
  * `ARCHIVED_HISTORY_MS` ago or longer; and, at startup only, those of a
- * task the session does not hold (a new tab that never sent, or a task
- * gone). An id that names no task is left: a person's history outside any
- * task (`moves:<writer>`), or a document no history names. After a run's end that second
- * rule would retire the history of a new tab open now. `stored` is every
+ * canvas the session does not hold (a new canvas that never sent, or a canvas
+ * gone). An id that names no canvas is left: a person's history outside any
+ * canvas (`moves:<writer>`), or a document no history names. After a run's end that second
+ * rule would retire the history of a new canvas open now. `stored` is every
  * stored `moves:` document.
  */
 export function planHistorySweep(input: {
   readonly stored: readonly string[]
-  readonly tasks: ReadonlySet<TaskId>
-  readonly archived: ReadonlyMap<TaskId, ArchivedTask>
+  readonly canvases: ReadonlySet<CanvasId>
+  readonly archived: ReadonlyMap<CanvasId, ArchivedCanvas>
   readonly now: number
   readonly startup: boolean
 }): readonly string[] {
   return input.stored.filter(docId => {
     const of = movesOfDocId(docId)
-    // A person's history outside any task is kept: no task retires it.
+    // A person's history outside any canvas is kept: no canvas retires it.
     if (of === undefined || of.scope.kind === "person") return false
-    const { task } = of.scope
-    if (!input.tasks.has(task)) return input.startup
-    const archived = input.archived.get(task)
+    const { canvas } = of.scope
+    if (!input.canvases.has(canvas)) return input.startup
+    const archived = input.archived.get(canvas)
     return (
       archived !== undefined && input.now - archived.at >= ARCHIVED_HISTORY_MS
     )
@@ -120,8 +124,8 @@ export function planHistorySweep(input: {
 
 /**
  * Whether an undo or a redo of a step that wrote `cards` would move a
- * task's card across the archive's edge: the newest event of a
- * task's card among them, the step's own while nobody moved it since, went
+ * canvas's card across the archive's edge: the newest event of a
+ * canvas's card among them, the step's own while nobody moved it since, went
  * into or out of the archive. Such an undo is refused `archived`: the
  * board's move gathers what crossing the edge needs.
  */
@@ -132,7 +136,7 @@ export function crossesArchive(
 ): boolean {
   if (workflow === null) return false
   return cards.some(card => {
-    if (kindOfCard(card) !== "task") return false
+    if (kindOfCard(card) !== "canvas") return false
     const last = histories.get(card)?.events.at(-1)
     return (
       last?.from?.kind === "board" &&

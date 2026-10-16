@@ -24,7 +24,7 @@ import type { LaneHosts } from "../lane-hosts.ts"
  * host pops it at once.
  */
 export const bringUpToDate = (
-  session: Omit<SessionClient, "chat">,
+  session: Omit<SessionClient, "send">,
   lane: ThreadId,
   tip: string | null,
   text: string,
@@ -37,7 +37,7 @@ export const bringUpToDate = (
  * made in the queue cannot.
  */
 export async function queueCommand(
-  session: Omit<SessionClient, "chat">,
+  session: Omit<SessionClient, "send">,
   lane: ThreadId,
   tip: string | null,
   text: string,

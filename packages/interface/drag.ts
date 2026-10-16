@@ -6,11 +6,11 @@
 // (`putLanding`).
 
 import {
+  type CanvasId,
   type CardId,
-  isTaskId,
+  isCanvasId,
   isWorkflowStateId,
   parseCardId,
-  type TaskId,
   type WorkflowStateId,
 } from "@pinetrie/core"
 import { type Landing, type PutHow, putLanding } from "./card-intents.ts"
@@ -23,18 +23,18 @@ import { planRootDrop, type RootDrag, type RootTarget } from "./root-target.ts"
 /** A card dragged: a column's, a frame's, a slot's. */
 export type CardSource = { readonly kind: "card"; readonly card: CardId }
 
-/** A task dragged: a board card, a sidebar row. */
-export type TaskSource = { readonly kind: "task"; readonly drag: RootDrag }
+/** A canvas dragged: a board card, a sidebar row. */
+export type CanvasSource = { readonly kind: "canvas"; readonly drag: RootDrag }
 
 /** What a drag carries. */
-export type DragSource = CardSource | TaskSource
+export type DragSource = CardSource | CanvasSource
 
 const DRAG_CARD = "data-drag-card"
-const DRAG_TASK = "data-drag-task"
+const DRAG_CANVAS = "data-drag-canvas"
 const DRAG_STATE = "data-drag-state"
 
 /** What a handle a drag starts from matches. */
-export const DRAG_HANDLE = `[${DRAG_CARD}],[${DRAG_TASK}]`
+export const DRAG_HANDLE = `[${DRAG_CARD}],[${DRAG_CANVAS}]`
 
 /** The attributes that mark an element as a handle for `source`, spread on it by the page. */
 export function dragProps(
@@ -43,7 +43,7 @@ export function dragProps(
   return source.kind === "card"
     ? { [DRAG_CARD]: source.card }
     : {
-        [DRAG_TASK]: source.drag.task,
+        [DRAG_CANVAS]: source.drag.canvas,
         [DRAG_STATE]: source.drag.state ?? "",
       }
 }
@@ -54,12 +54,12 @@ export function sourceOfElement(el: {
 }): DragSource | null {
   const card = parseCardId(el.getAttribute(DRAG_CARD) ?? "")
   if (card !== undefined) return { kind: "card", card }
-  const task = el.getAttribute(DRAG_TASK)
-  if (task === null || !isTaskId(task)) return null
+  const canvas = el.getAttribute(DRAG_CANVAS)
+  if (canvas === null || !isCanvasId(canvas)) return null
   const state = el.getAttribute(DRAG_STATE) ?? ""
   return {
-    kind: "task",
-    drag: { task, state: isWorkflowStateId(state) ? state : null },
+    kind: "canvas",
+    drag: { canvas, state: isWorkflowStateId(state) ? state : null },
   }
 }
 
@@ -83,19 +83,19 @@ export type CardOver =
   | { readonly kind: "board" }
   | { readonly kind: "none" }
 
-/** What a task's drag can be over: a place among tasks, or nothing. */
-export type TaskOver =
+/** What a canvas's drag can be over: a place among canvases, or nothing. */
+export type CanvasOver =
   | { readonly kind: "root"; readonly target: RootTarget }
   | { readonly kind: "none" }
 
 /**
- * A drag this frame: its source, and what that source is over. A task's
- * drag cannot be over a card's drop zone, nor a card's over a task's place,
+ * A drag this frame: its source, and what that source is over. A canvas's
+ * drag cannot be over a card's drop zone, nor a card's over a canvas's place,
  * so no planner can mistake one for the other. It is a `DragSource` too.
  */
 export type DragAt =
   | (CardSource & { readonly over: CardOver })
-  | (TaskSource & { readonly over: TaskOver })
+  | (CanvasSource & { readonly over: CanvasOver })
 
 /** What a drop there would do. */
 export type DragVerdict =
@@ -110,13 +110,13 @@ export type DragVerdict =
   | { readonly kind: "root"; readonly intent: Intent }
   | { readonly kind: "nothing" }
 
-/** What the press found, besides its source: the column's index, a task's place just after it. */
+/** What the press found, besides its source: the column's index, a canvas's place just after it. */
 export interface DragFrom {
   /** The dragged column's index among the strip's card columns; null for no column. */
   readonly column: number | null
-  /** A task's place just after it, where its drop moves nothing; null when not known. */
+  /** A canvas's place just after it, where its drop moves nothing; null when not known. */
   readonly home: RootTarget | null
-  /** The board's archive state, for a task's drop; null before the board has states. */
+  /** The board's archive state, for a canvas's drop; null before the board has states. */
   readonly archive: WorkflowStateId | null
 }
 
@@ -129,7 +129,7 @@ export function dragVerdict(
   how: PutHow,
   state: IntentState,
 ): DragVerdict {
-  if (at.kind === "task") {
+  if (at.kind === "canvas") {
     const { over } = at
     if (over.kind === "none" || from.archive === null) return NOTHING
     const intent = planRootDrop(at.drag, over.target, from.archive, from.home)
@@ -160,7 +160,7 @@ export function dragVerdict(
 
 /**
  * The intents a drop sends: the ones a key or a menu would. A reorder is
- * `moveColumn`, a landing a `put`, a task's drop its own; each runs its
+ * `moveColumn`, a landing a `put`, a canvas's drop its own; each runs its
  * own planner, so a drop does what the put key or Move up does. The
  * verdict holds all a drop needs besides its source.
  */
@@ -198,29 +198,29 @@ export function dropIntents(
   }
 }
 
-/** How long a card's drag held onto a task in the sidebar, or over ▦, waits before opening it. */
+/** How long a card's drag held onto a canvas in the sidebar, or over ▦, waits before opening it. */
 export const ITEM_HOVER_MS = 600
 
 /** What a card's drag is held over that opens after `ITEM_HOVER_MS`. */
 export type HoverOver =
-  | { readonly kind: "task"; readonly task: TaskId }
+  | { readonly kind: "canvas"; readonly canvas: CanvasId }
   | { readonly kind: "board" }
   | { readonly kind: "none" }
 
 const NO_HOVER: HoverOver = { kind: "none" }
 
 /**
- * What holding the drag where it is opens: the sidebar task a card is onto
- * (a row's middle, `sidebarSpotAt`), or the board from ▦. A task's drag
- * lands only between tasks, never onto one, so it opens nothing.
+ * What holding the drag where it is opens: the sidebar canvas a card is onto
+ * (a row's middle, `sidebarSpotAt`), or the board from ▦. A canvas's drag
+ * lands only between canvases, never onto one, so it opens nothing.
  */
 function heldOpens(at: DragAt): HoverOver {
-  if (at.kind === "task") return NO_HOVER
+  if (at.kind === "canvas") return NO_HOVER
   const { over } = at
   switch (over.kind) {
     case "put":
-      return over.target.kind === "task"
-        ? { kind: "task", task: over.target.task }
+      return over.target.kind === "item"
+        ? { kind: "canvas", canvas: over.target.canvas }
         : NO_HOVER
     case "board":
       return { kind: "board" }
@@ -230,11 +230,11 @@ function heldOpens(at: DragAt): HoverOver {
   }
 }
 
-/** What being held over `over` opens: a task in the sidebar, or the board. */
+/** What being held over `over` opens: a canvas in the sidebar, or the board. */
 export function hoverOpens(over: HoverOver): Intent | null {
   switch (over.kind) {
-    case "task":
-      return { kind: "show", here: { kind: "task", task: over.task } }
+    case "canvas":
+      return { kind: "show", here: { kind: "canvas", canvas: over.canvas } }
     case "board":
       return { kind: "board", open: true, focus: false }
     case "none":
@@ -244,20 +244,20 @@ export function hoverOpens(over: HoverOver): Intent | null {
 
 /**
  * A row of the sidebar the pointer is over, for a card's drag: onto its
- * task in the middle half, between it and the one above in its top
+ * canvas in the middle half, between it and the one above in its top
  * quarter, and between it and the one below in its bottom quarter. A
- * task's drag has no put target (`TaskOver`), so it never reads one.
+ * canvas's drag has no put target (`CanvasOver`), so it never reads one.
  */
 export function sidebarSpotAt(
   y: number,
   row: { readonly top: number; readonly height: number },
-  task: TaskId,
-  next: TaskId | null,
+  canvas: CanvasId,
+  next: CanvasId | null,
 ): PutTarget {
   const at = (y - row.top) / row.height
-  if (at < 0.25) return { kind: "sidebar", before: task }
+  if (at < 0.25) return { kind: "sidebar", before: canvas }
   if (at > 0.75) return { kind: "sidebar", before: next }
-  return { kind: "task", task }
+  return { kind: "item", canvas }
 }
 
 /** A point on the page. */
@@ -284,7 +284,7 @@ export interface Armed {
 }
 
 /**
- * How a verdict is marked on its target: a task's landing as `root`
+ * How a verdict is marked on its target: a canvas's landing as `root`
  * (`data-root-drop`), any other as what it would do (`data-drag-verdict`).
  */
 export type DropMark = "root" | "move" | "copy" | "replace" | "refused"

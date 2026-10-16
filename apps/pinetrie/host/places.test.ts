@@ -1,12 +1,12 @@
 import {
   type CardRecord,
+  canvasIdFor,
   entryId,
   makeCard,
   NO_CONTENT,
   rootIdFor,
   type TextCard,
   type TextPlace,
-  taskIdFor,
   textCardId,
   threadIdFor,
   writerId,
@@ -30,7 +30,7 @@ import {
   basics,
   deferred,
   placesFor,
-  putTask,
+  putCanvas,
   seedPlaces,
   threadRow,
 } from "./fakes.ts"
@@ -126,7 +126,7 @@ describe("planClose", () => {
       LANE,
       {
         kind: "canvas",
-        task: taskIdFor("01a0ffd2-0000-7000-8000-0000000000aa"),
+        canvas: canvasIdFor("01a0ffd2-0000-7000-8000-0000000000aa"),
         order: "a",
         width: 1,
       },
@@ -286,11 +286,11 @@ describe("the writer", () => {
     writeLaneTip(b.root, LANE, E1)
     // A thread's root is its record's: LANE's is loaded, AWAY's is not.
     const AWAY = threadIdFor("fedcba9876543210")
-    putTask(b, LANE)
-    putTask(
+    putCanvas(b, LANE)
+    putCanvas(
       b,
       AWAY,
-      taskIdFor("01a0ffd2-0000-7000-8000-0000000000bc"),
+      canvasIdFor("01a0ffd2-0000-7000-8000-0000000000bc"),
       rootIdFor("01a0ffd2-0000-7000-8000-0000000000bb"),
     )
     const here = card(cardIdFor("here"), {

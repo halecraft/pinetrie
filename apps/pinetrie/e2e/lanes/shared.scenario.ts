@@ -71,7 +71,7 @@ async function sharedSection(
       { tool: "bash", args: { command: "echo lane > shared.txt" } },
       { text: "planned" },
     ])
-    await h.user.chat("write a plan", ROOT, START_AGENT)
+    await h.user.send("write a plan", ROOT, START_AGENT)
     await h.idle()
     const plan = path.join(dir, ".plans", "a.md")
     const owner = existsSync(plan) ? statSync(plan).uid : null
@@ -86,7 +86,7 @@ async function sharedSection(
       { tool: "bash", args: { command: "cat .plans/a.md" } },
       { text: "read" },
     ])
-    await h.user.chat("read the plan", ROOT, START_AGENT)
+    await h.user.send("read the plan", ROOT, START_AGENT)
     check(
       "another lane reads it",
       (await h.results("read the plan")).at(-1)?.includes("the plan") === true,
@@ -119,8 +119,8 @@ async function sharedSection(
       { text: "raced" },
     ])
     await Promise.all([
-      h.user.chat("lane a: write the race", ROOT, START_AGENT),
-      h.user.chat("lane b: write the race", ROOT, START_AGENT),
+      h.user.send("lane a: write the race", ROOT, START_AGENT),
+      h.user.send("lane b: write the race", ROOT, START_AGENT),
     ])
     await h.idle()
     const raced = [...rootRecordsOf(h.host, readRevisions).values()].flatMap(
@@ -148,7 +148,7 @@ async function sharedSection(
       { tool: "read", args: { path: ".plans/mine.md" } },
       { text: "read it" },
     ])
-    await h.user.chat("read mine", ROOT, START_AGENT)
+    await h.user.send("read mine", ROOT, START_AGENT)
     await h.idle()
     writeFileSync(mine, "yours, changed\n")
     await waitFor(() => versionsOfMine().length === 2, 30_000)
@@ -160,7 +160,7 @@ async function sharedSection(
       },
       { text: "wrote it" },
     ])
-    await h.user.chat("write mine", atEntry(entryId(reader?.tip ?? "")), {
+    await h.user.send("write mine", atEntry(entryId(reader?.tip ?? "")), {
       thread: reader?.name,
     })
     await h.idle()
@@ -190,7 +190,7 @@ async function sharedSection(
       { tool: "bash", args: { command: "cat .plans/later.md" } },
       { text: "branched" },
     ])
-    await h.user.chat(
+    await h.user.send(
       "@agent look from a branch",
       atEntry(entryId(writer?.tip ?? "")),
       BRANCH,
@@ -244,7 +244,7 @@ async function sharedSection(
       },
       { text: "noted" },
     ])
-    await h.user.chat("take a note", atEntry(entryId(writer?.tip ?? "")), {
+    await h.user.send("take a note", atEntry(entryId(writer?.tip ?? "")), {
       thread: writer?.name,
     })
     const noted = (await h.results("take a note")).at(-1) ?? ""

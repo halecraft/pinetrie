@@ -4,6 +4,7 @@ import { cardIdFor } from "@pinetrie/core/fixtures"
 
 import {
   type BaseRecord,
+  canvasIdFor,
   commitId,
   entryId,
   type JjProposedChangesRecord,
@@ -17,7 +18,6 @@ import {
   snapshotId,
   type ThreadId,
   type ThreadName,
-  taskIdFor,
   threadIdFor,
   workflowStateIdFor,
   writerId,
@@ -107,7 +107,7 @@ const sample = <R, K extends string>(
   keyField: (keyof R & string) | null,
 ): Sample => [name, spec as RecordSpec<unknown, string>, record, keyField]
 
-const TEST_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
+const TEST_CANVAS = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 const TEST_THREAD = threadIdFor("e")
 const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 
@@ -143,8 +143,8 @@ const SAMPLES: readonly Sample[] = [
   sample(
     "mark",
     MARK,
-    { task: TEST_TASK, title: "Plans", by: ADA, at: 1 },
-    "task",
+    { canvas: TEST_CANVAS, title: "Plans", by: ADA, at: 1 },
+    "canvas",
   ),
   sample(
     "digest",
@@ -554,7 +554,7 @@ test("planKindSweep deletes the proposed changes, accepted work and bases of the
   expect(swept("folder")).toEqual([["pinetrie.proposed", L]])
 })
 
-test("planUndeclaredSweep deletes a record stored outside its spec's home: a root's mark, from before tasks", () => {
+test("planUndeclaredSweep deletes a record stored outside its spec's home: a root's mark, from before canvases", () => {
   const root = rootIdFor("r-1")
   expect(
     planUndeclaredSweep([

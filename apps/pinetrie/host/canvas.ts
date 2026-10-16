@@ -1,17 +1,17 @@
-// host/canvas — what a run is told of its thread's task: the task's canvas
-// list, and the cards pinned to the task. Each is written only when it differs
+// host/canvas — what a run is told of its thread's canvas: the canvas
+// list, and the cards pinned to the canvas. Each is written only when it differs
 // from the newest of its kind on the lane's path (`canvasInView`,
-// `taskPinnedInView`), so an unchanged task keeps the prompt's cache. Gather
-// the facts, plan with the rules (`planCanvasRead`, `planTaskPinnedRead`),
+// `canvasPinnedInView`), so an unchanged canvas keeps the prompt's cache. Gather
+// the facts, plan with the rules (`planCanvasRead`, `planCanvasPinnedRead`),
 // encode; `runs.ts` writes them before the run's prompt.
 
 import {
   type AgentWork,
+  type CanvasId,
   canvasInView,
+  canvasPinnedInView,
   type NoteColumnId,
-  type TaskId,
   type ThreadId,
-  taskPinnedInView,
   type WriterId,
 } from "@pinetrie/core"
 import {
@@ -25,84 +25,87 @@ import {
   readTreeIndex,
 } from "@pinetrie/reads"
 import {
+  type CanvasIndex,
   type CanvasMessage,
+  type CanvasPinnedMessage,
   canvasList,
+  canvasPinnedOf,
   displayName,
   encodeCanvas,
-  encodeTaskPinned,
+  encodeCanvasPinned,
   NEW_NOTES_TITLE,
   notesIn,
   pinnedReads,
+  planCanvasPinnedRead,
   planCanvasRead,
-  planTaskPinnedRead,
-  type TaskIndex,
-  type TaskPinnedMessage,
-  taskPinnedOf,
 } from "@pinetrie/rules"
 import { readLaneTip } from "@pinetrie/schema"
 import type { Basics } from "./basics.ts"
+import { canvasesNow } from "./canvases.ts"
 import type { CardPort } from "./cards.ts"
-import { tasksNow } from "./tasks.ts"
 
-/** What a run on a lane is told of its task first, in the order it is written. */
-export type TaskContext = readonly (CanvasMessage | TaskPinnedMessage)[]
+/** What a run on a lane is told of its canvas first, in the order it is written. */
+export type CanvasContext = readonly (CanvasMessage | CanvasPinnedMessage)[]
 
 /**
- * The title a task is told by: its title, else its first thread's root's first
+ * The title a canvas is told by: its title, else its first thread's root's first
  * line.
  */
-export const taskTitle = (
-  task: TaskId,
-  tasks: TaskIndex,
-  titles: ReadonlyMap<TaskId, { readonly title: string }>,
+export const canvasTitle = (
+  canvas: CanvasId,
+  canvases: CanvasIndex,
+  titles: ReadonlyMap<CanvasId, { readonly title: string }>,
   firstLines: ReadonlyMap<string, { readonly firstLine: string }>,
 ): string => {
-  const root = tasks.rootsOf.get(task)?.[0]
+  const root = canvases.rootsOf.get(canvas)?.[0]
   return (
-    titles.get(task)?.title ??
+    titles.get(canvas)?.title ??
     (root === undefined ? "" : (firstLines.get(root)?.firstLine ?? ""))
   )
 }
 
-export function createTaskContext(deps: {
+export function createCanvasContext(deps: {
   readonly basics: Pick<Basics, "docs" | "places" | "session" | "live" | "now">
   readonly cards: Pick<CardPort, "hydrate" | "textNow">
 }) {
   const { docs, places, session, live, now } = deps.basics
 
   /**
-   * The canvas entry and the task's cards entry a run on `lane` starts with,
+   * The canvas entry and the canvas's cards entry a run on `lane` starts with,
    * each only when what the model reads differs; none for a lane whose
-   * thread is in no task.
+   * thread is in no canvas.
    */
-  async function readTaskContext(lane: ThreadId): Promise<TaskContext> {
+  async function readCanvasContext(lane: ThreadId): Promise<CanvasContext> {
     // gather
-    const tasks = tasksNow({ places, session })
-    const task = tasks.taskOfThread.get(lane)
+    const canvases = canvasesNow({ places, session })
+    const canvas = canvases.canvasOfThread.get(lane)
     const doc = docs.docOfLane(lane)
     const tip = doc === null ? null : readLaneTip(doc, lane)
-    if (task === undefined || doc === null || tip === null) return []
+    if (canvas === undefined || doc === null || tip === null) return []
     const cards = readPlaces(places)
-    const pins = taskPinnedOf(cards, task)
+    const pins = canvasPinnedOf(cards, canvas)
     await deps.cards.hydrate(pins.map(c => c.id))
     const index = readTreeIndex(doc)
     const names = readParticipantNames(session)
     const nameOf = (w: WriterId) => displayName(w, names.get(w))
-    const canvas = tasks.canvases.get(task) ?? []
+    const here = canvases.cardsOn.get(canvas) ?? []
     const work = new Map<ThreadId, AgentWork>(
       readRunningLanes(session, live).map(r => [r.lane, "running"] as const),
     )
     const noteColumns = readNoteColumns(session)
-    const noteIds = canvas.flatMap(c =>
-      c.kind === "note-column" ? [c.id] : [],
-    )
+    const noteIds = here.flatMap(c => (c.kind === "note-column" ? [c.id] : []))
     // plan
     const listed = planCanvasRead({
       inView: canvasInView(index, tip),
       now: canvasList({
-        task,
-        title: taskTitle(task, tasks, readMarks(session), readRoots(session)),
         canvas,
+        title: canvasTitle(
+          canvas,
+          canvases,
+          readMarks(session),
+          readRoots(session),
+        ),
+        onCanvas: here,
         reading: lane,
         names: readNames(session),
         work,
@@ -118,17 +121,17 @@ export function createTaskContext(deps: {
         nameOf,
       }),
     })
-    const pinned = planTaskPinnedRead({
-      inView: taskPinnedInView(index, tip),
+    const pinned = planCanvasPinnedRead({
+      inView: canvasPinnedInView(index, tip),
       now: pinnedReads(pins, deps.cards.textNow),
-      task,
+      canvas,
     })
     // encode
     return [
       ...(listed === null ? [] : [encodeCanvas(listed, now())]),
-      ...(pinned === null ? [] : [encodeTaskPinned(pinned, nameOf, now())]),
+      ...(pinned === null ? [] : [encodeCanvasPinned(pinned, nameOf, now())]),
     ]
   }
 
-  return { readTaskContext }
+  return { readCanvasContext }
 }

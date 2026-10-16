@@ -1,15 +1,15 @@
 import {
+  canvasIdFor,
   entryId,
   type LaneRecord,
   type RootRecord,
   rootIdFor,
-  taskIdFor,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import { threadCardOf } from "@pinetrie/rules/fixtures"
 import { describe, expect, test } from "vitest"
-import { tasksWith } from "./fixtures.ts"
+import { canvasesWith } from "./fixtures.ts"
 import {
   CHAT_LABEL,
   initialsOf,
@@ -45,8 +45,8 @@ const directory = new Map(
   ].map(r => [r.root, r] as const),
 )
 
-/** Each root's task, one a root, its thread `t-<n>`; task 1 titled. */
-const K = (n: string) => taskIdFor(n)
+/** Each root's canvas, one a root, its thread `t-<n>`; canvas 1 titled. */
+const K = (n: string) => canvasIdFor(n)
 const thread = (n: string) => threadIdFor(`thread-${n}`)
 const threads = new Map(
   ["1", "2", "3"].map(n => [
@@ -60,12 +60,12 @@ const threads = new Map(
     },
   ]),
 )
-const tasks = tasksWith({
+const canvases = canvasesWith({
   known: ["1", "2", "3"].map(K),
   cards: ["1", "2", "3"].map(n =>
     threadCardOf({
       thread: thread(n),
-      task: K(n),
+      canvas: K(n),
       by: writerId("p-ada"),
       cards: [],
     }),
@@ -73,7 +73,10 @@ const tasks = tasksWith({
   threads,
 })
 const marks = new Map([
-  [K("1"), { task: K("1"), title: "Tab names", by: writerId("p-ada"), at: 1 }],
+  [
+    K("1"),
+    { canvas: K("1"), title: "Tab names", by: writerId("p-ada"), at: 1 },
+  ],
 ])
 
 describe("labels and summaries, from the directory", () => {
@@ -92,16 +95,16 @@ describe("labels and summaries, from the directory", () => {
   }
   const worked = new Map([laneIn("1"), laneIn("2")])
 
-  test("a titled task is called by its title, another by its first root's first line; a task whose root has no message yet by neither", () => {
-    const labels = labelsOf({ tasks, marks, directory, lanes: worked })
+  test("a titled canvas is called by its title, another by its first root's first line; a canvas whose root has no message yet by neither", () => {
+    const labels = labelsOf({ canvases, marks, directory, lanes: worked })
     expect(labels.get(K("1"))).toBe("Tab names")
     expect(labels.get(K("2"))).toBe("Plan the release")
     expect(labels.get(K("3"))).toBe(CHAT_LABEL)
   })
 
-  test("an untitled task no lane works in is a chat; a title still names it", () => {
+  test("an untitled canvas no lane works in is a chat; a title still names it", () => {
     const labels = labelsOf({
-      tasks,
+      canvases,
       marks,
       directory,
       lanes: new Map([laneIn("3")]),
@@ -127,8 +130,8 @@ describe("labels and summaries, from the directory", () => {
     expect(messageCountTitle(count)).toBe(words)
   })
 
-  test("summaries: each task whose first root has a message, its first line, writers and newest message", () => {
-    expect(summariesOf(tasks, directory)).toEqual(
+  test("summaries: each canvas whose first root has a message, its first line, writers and newest message", () => {
+    expect(summariesOf(canvases, directory)).toEqual(
       new Map([
         [
           K("1"),
@@ -150,13 +153,13 @@ describe("labels and summaries, from the directory", () => {
     )
   })
 
-  test("summaries: a task over two roots reads its first root's line, every root's writers and the newest message", () => {
-    const two = tasksWith({
+  test("summaries: a canvas over two roots reads its first root's line, every root's writers and the newest message", () => {
+    const two = canvasesWith({
       known: [K("1")],
       cards: ["1", "2"].map((n, i) =>
         threadCardOf({
           thread: thread(n),
-          task: K("1"),
+          canvas: K("1"),
           by: writerId("p-ada"),
           cards:
             i === 0
@@ -164,7 +167,7 @@ describe("labels and summaries, from the directory", () => {
               : [
                   threadCardOf({
                     thread: thread("1"),
-                    task: K("1"),
+                    canvas: K("1"),
                     by: writerId("p-ada"),
                     cards: [],
                   }),

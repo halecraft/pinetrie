@@ -41,7 +41,7 @@ import {
   idleNow,
   join,
   lanesOf,
-  moveTaskTo,
+  moveCanvasOnBoard,
   readJjAccepted,
   readJjProposedByLane,
   rootRecordsOf,
@@ -159,8 +159,8 @@ async function mainSection(
       { text: "noted" },
     ])
     await Promise.all([
-      wu.chat("lane one: who are you?", ROOT, START_AGENT),
-      wu.chat("lane two: who are you?", ROOT, START_AGENT),
+      wu.send("lane one: who are you?", ROOT, START_AGENT),
+      wu.send("lane two: who are you?", ROOT, START_AGENT),
     ])
     await idle()
     const one = laneWith("lane one: who are you?")
@@ -208,7 +208,7 @@ async function mainSection(
       { text: "checked" },
     ])
     const asked = `check the boundary, and ${project}/shared.txt`
-    await wu.chat(asked, at(tipOf("lane one: who are you?")), {
+    await wu.send(asked, at(tipOf("lane one: who are you?")), {
       thread: one?.name,
     })
     await idle()
@@ -285,7 +285,7 @@ async function mainSection(
       },
       { text: "set up" },
     ])
-    await wu.chat(
+    await wu.send(
       "set up deps",
       at(tipOf("check the boundary, and /mnt/host-working-copy/shared.txt")),
       {
@@ -305,18 +305,18 @@ async function mainSection(
       { tool: "bash", args: { command: "echo parent-later > shared.txt" } },
       { text: "parent moved on" },
     ])
-    await wu.chat("move on", at(setUp), { thread: one?.name })
+    await wu.send("move on", at(setUp), { thread: one?.name })
     await idle()
     script.use([
       { tool: "bash", args: { command: "echo branch > shared.txt" } },
       { text: "branched" },
     ])
-    await wu.chat("@agent branch here", at(setUp), BRANCH)
+    await wu.send("@agent branch here", at(setUp), BRANCH)
     await idle()
     const branch = laneWith("@agent branch here")
     // Checked on a fresh branch of the same turn, before it writes.
     script.use([{ text: "just looking" }])
-    await wu.chat("@agent look only", at(setUp), BRANCH)
+    await wu.send("@agent look only", at(setUp), BRANCH)
     await idle()
     const looker = laneWith("@agent look only")
     check(
@@ -339,7 +339,7 @@ async function mainSection(
       { tool: "bash", args: { command: "echo deeper >> shared.txt" } },
       { text: "deeper" },
     ])
-    await wu.chat("@agent go deeper", at(idOf("branched")), BRANCH)
+    await wu.send("@agent go deeper", at(idOf("branched")), BRANCH)
     await idle()
     const deeper = laneWith("@agent go deeper")
     check(
@@ -380,7 +380,7 @@ async function mainSection(
       },
       { text: "tried" },
     ])
-    await wu.chat("try to rewrite", at(tipOf("@agent go deeper")), {
+    await wu.send("try to rewrite", at(tipOf("@agent go deeper")), {
       thread: deeper?.name,
     })
     await idle()
@@ -416,7 +416,7 @@ async function mainSection(
       },
       { text: "committed it" },
     ])
-    await wu.chat("commit it yourself", ROOT, START_AGENT)
+    await wu.send("commit it yourself", ROOT, START_AGENT)
     await idle()
     const committer = laneWith("commit it yourself")
     const committerProposed =
@@ -442,7 +442,7 @@ async function mainSection(
       (await waitFor(hasMine, 30_000)) >= 0,
     )
     script.use([{ text: "just looking" }])
-    await wu.chat("@agent look at mine", at(idOf("committed it")), BRANCH)
+    await wu.send("@agent look at mine", at(idOf("committed it")), BRANCH)
     await idle()
     const atMine = laneWith("@agent look at mine")
     check(
@@ -462,13 +462,13 @@ async function mainSection(
       },
       { text: "wrote big" },
     ])
-    await wu.chat("write something big", at(tipOf("try to rewrite")), {
+    await wu.send("write something big", at(tipOf("try to rewrite")), {
       thread: deeper?.name,
     })
     // At once, while the snapshot may still be running.
     await waitFor(() => idOf("wrote big") !== null, 60_000)
     script.use([{ text: "have a look" }])
-    await wu.chat("@agent branch at once", at(idOf("wrote big")), BRANCH)
+    await wu.send("@agent branch at once", at(idOf("wrote big")), BRANCH)
     await idle()
     const atOnce = laneWith("@agent branch at once")
     check(
@@ -489,7 +489,7 @@ async function mainSection(
       { tool: "bash", args: { command: "sleep 78.2 & sleep 78.2" } },
       { text: "never" },
     ])
-    await wu.chat("sleep a while", at(tipOf("have a look")), {
+    await wu.send("sleep a while", at(tipOf("have a look")), {
       thread: atOnce?.name,
     })
     // The second command is running: stop it, as a person does.
@@ -524,7 +524,7 @@ async function mainSection(
       },
       { text: "edited" },
     ])
-    await wu.chat("edit line two", at(tipOf("lane two: who are you?")), {
+    await wu.send("edit line two", at(tipOf("lane two: who are you?")), {
       thread: two?.name,
     })
     await idle()
@@ -828,7 +828,7 @@ async function mainSection(
       { tool: "bash", args: { command: "echo after > after.txt" } },
       { text: "more" },
     ])
-    await wu.chat(
+    await wu.send(
       "one more",
       at(two === undefined ? null : laneTip(two.name)),
       {
@@ -919,7 +919,7 @@ async function mainSection(
     check(
       "a card that brings the thread up to date writes the update in the thread, then sends its text",
       afterUpdate[0]?.startsWith("update:") === true &&
-        afterUpdate[1] === "chat:check yours still fits" &&
+        afterUpdate[1] === "person:check yours still fits" &&
         afterUpdate[2] === "assistant:it fits",
       `${JSON.stringify(afterUpdate)}`,
     )
@@ -1005,7 +1005,7 @@ async function mainSection(
       },
       { text: "seen" },
     ])
-    await wu.chat("read my files", ROOT, START_AGENT)
+    await wu.send("read my files", ROOT, START_AGENT)
     await idle()
     const seenUnsaved = toolResults(laneWith("read my files")?.name)
     check(
@@ -1052,7 +1052,7 @@ async function mainSection(
         { tool: "bash", args: { command: `echo ${file} > ${file}` } },
         { text: "wrote" },
       ])
-      await wu.chat(
+      await wu.send(
         text,
         at(two === undefined ? null : laneTip(two.name)),
         BRANCH,
@@ -1085,7 +1085,7 @@ async function mainSection(
       { tool: "bash", args: { command: "echo more > more.txt" } },
       { text: "more" },
     ])
-    await wu.chat(
+    await wu.send(
       "still more",
       at(lane2 === undefined ? null : laneTip(lane2)),
       {
@@ -1164,7 +1164,8 @@ async function mainSection(
             "commit_id",
           )) !== "",
       )
-    if (rootOne !== null) await moveTaskTo(wu, entryId(rootOne), "archive")
+    if (rootOne !== null)
+      await moveCanvasOnBoard(wu, entryId(rootOne), "archive")
     await wh.quiet()
     const kept = await filterAsync(
       before,
@@ -1195,7 +1196,7 @@ async function mainSection(
         ),
       `${JSON.stringify({ proposed: proposedInRootOne, left })}`,
     )
-    if (rootOne !== null) await moveTaskTo(wu, entryId(rootOne), "open")
+    if (rootOne !== null) await moveCanvasOnBoard(wu, entryId(rootOne), "open")
     const rebuilt = await waitFor(
       async () =>
         proposedInRootOne.length > 0 &&
@@ -1214,7 +1215,7 @@ async function mainSection(
       { tool: "bash", args: { command: "cat shared.txt" } },
       { text: "back" },
     ])
-    await wu.chat("still there?", at(tipOf("move on")), { thread: one?.name })
+    await wu.send("still there?", at(tipOf("move on")), { thread: one?.name })
     await idle()
     check(
       "after restoring, a lane runs again on its newest snapshot",
@@ -1234,7 +1235,7 @@ async function mainSection(
       { tool: "bash", args: { command: "echo still" } },
       { text: "retired" },
     ])
-    await wu.chat("are you there?", at(two?.tip ?? null), { thread: two?.name })
+    await wu.send("are you there?", at(two?.tip ?? null), { thread: two?.name })
     await idle()
     check(
       "a lane with no disk and no snapshot is retired, and its tools say to branch from it",
@@ -1263,7 +1264,7 @@ async function mainSection(
       },
       { text: "changed" },
     ])
-    await wu.chat("@agent change the lane config", ROOT, START_AGENT)
+    await wu.send("@agent change the lane config", ROOT, START_AGENT)
     await idle()
     const configured = laneWith("@agent change the lane config")?.name
     const note = toolResults(configured).at(-1) ?? ""
@@ -1277,7 +1278,7 @@ async function mainSection(
       },
       { text: "looked" },
     ])
-    await wu.chat(
+    await wu.send(
       "@agent what are you granted now?",
       at(tipOf("@agent change the lane config")),
       { thread: configured },

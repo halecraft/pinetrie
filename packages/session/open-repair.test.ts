@@ -1,4 +1,4 @@
-import { taskIdFor } from "@pinetrie/core"
+import { canvasIdFor } from "@pinetrie/core"
 import { orderKeys } from "@pinetrie/rules"
 import { readOpenKeys } from "@pinetrie/schema"
 import { newOpenDoc } from "@pinetrie/schema/fixtures"
@@ -6,7 +6,7 @@ import { expect, test } from "vitest"
 import { orderOpen, placeInList, planOpenRepair } from "./open-repair.ts"
 
 const R = (n: number) =>
-  taskIdFor(`01a0ffd2-0000-7000-8000-${String(n).padStart(12, "0")}`)
+  canvasIdFor(`01a0ffd2-0000-7000-8000-${String(n).padStart(12, "0")}`)
 const [K1, K2, K3] = orderKeys(3) as [string, string, string]
 const keys = new Map([
   [R(1), K1],
@@ -20,7 +20,7 @@ const after = (writes: ReturnType<typeof placeInList>) => {
   return orderOpen(next)
 }
 
-test("placeInList: at the end, before a task, and moved; where it already is writes nothing", () => {
+test("placeInList: at the end, before a canvas, and moved; where it already is writes nothing", () => {
   expect(after(placeInList(keys, R(4), null))).toEqual([R(1), R(2), R(3), R(4)])
   expect(after(placeInList(keys, R(4), R(2)))).toEqual([R(1), R(4), R(2), R(3)])
   expect(after(placeInList(keys, R(3), R(1)))).toEqual([R(3), R(1), R(2)])
@@ -28,11 +28,11 @@ test("placeInList: at the end, before a task, and moved; where it already is wri
   expect(placeInList(keys, R(3), null).set.size).toBe(0)
 })
 
-test("placeInList: a task before one no longer listed goes to the end", () => {
+test("placeInList: a canvas before one no longer listed goes to the end", () => {
   expect(after(placeInList(keys, R(4), R(9)))).toEqual([R(1), R(2), R(3), R(4)])
 })
 
-test("planOpenRepair: archived tasks leave, but the one you are on; nothing archived writes nothing", () => {
+test("planOpenRepair: archived canvases leave, but the one you are on; nothing archived writes nothing", () => {
   expect(planOpenRepair(keys, new Set([R(1), R(2)]), R(2))).toEqual({
     set: new Map(),
     delete: [R(1)],
@@ -40,11 +40,11 @@ test("planOpenRepair: archived tasks leave, but the one you are on; nothing arch
   expect(planOpenRepair(keys, new Set(), null).delete).toEqual([])
 })
 
-test("readOpenKeys orders by key, then id, and leaves out a key that is no task", () => {
+test("readOpenKeys orders by key, then id, and leaves out a key that is no canvas", () => {
   const doc = newOpenDoc()
-  doc.tasks.set(R(2), K1)
-  doc.tasks.set(R(1), K1)
-  doc.tasks.set(R(3), K2)
-  doc.tasks.set("main", K1)
+  doc.canvases.set(R(2), K1)
+  doc.canvases.set(R(1), K1)
+  doc.canvases.set(R(3), K2)
+  doc.canvases.set("main", K1)
   expect(orderOpen(readOpenKeys(doc))).toEqual([R(1), R(2), R(3)])
 })

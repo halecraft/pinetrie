@@ -1,11 +1,11 @@
 import {
   atEntry,
   type CardRecord,
-  type ChatAt,
+  canvasIdFor,
   entryId,
+  type MessageAt,
   ROOT,
   runId,
-  taskIdFor,
   textCardId,
   threadIdFor,
   writerId,
@@ -13,14 +13,14 @@ import {
 import { cardIdFor } from "@pinetrie/core/fixtures"
 import { expect, test } from "vitest"
 import { IN_COLUMN, sendPendingOf } from "./card-moves.ts"
-import { chatAtOf, planChatRequest, startsRoot } from "./chat.ts"
 import { TEST_ROOT } from "./fixtures.ts"
+import { columnMessageAt, planSendRequest, startsRoot } from "./send.ts"
 
 const TEST_THREAD = threadIdFor("e")
-const TEST_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
+const TEST_CANVAS = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 
 const at = atEntry(entryId("e-1"))
-const END: ChatAt = {
+const END: MessageAt = {
   kind: "end",
   thread: threadIdFor("x"),
   seen: entryId("e-1"),
@@ -37,9 +37,9 @@ const card: CardRecord = {
 
 test("a chat fills in what its column left out, and carries each card's version as this client has it", () => {
   const thread = threadIdFor("x")
-  const end: ChatAt = { kind: "end", thread, seen: entryId("e-1") }
+  const end: MessageAt = { kind: "end", thread, seen: entryId("e-1") }
   expect(
-    planChatRequest({
+    planSendRequest({
       text: "hi @bea",
       at: end,
       how: {},
@@ -49,7 +49,7 @@ test("a chat fills in what its column left out, and carries each card's version 
       freshId: "f-1",
     }).intent,
   ).toMatchObject({
-    kind: "chat",
+    kind: "send",
     root: TEST_ROOT,
     at: end,
     asksAgent: false,
@@ -61,14 +61,14 @@ test("a chat fills in what its column left out, and carries each card's version 
     { id: textCardId("p-1"), seen: "v-p-1" },
     { id: textCardId("p-2"), seen: "v-p-2" },
   ]
-  const branch: ChatAt = {
+  const branch: MessageAt = {
     kind: "branch",
     thread,
     at: entryId("e-1"),
-    task: TEST_TASK,
+    canvas: TEST_CANVAS,
   }
   expect(
-    planChatRequest({
+    planSendRequest({
       text: "go",
       at: branch,
       how: {
@@ -90,29 +90,29 @@ test("a chat fills in what its column left out, and carries each card's version 
   })
 })
 
-test("chatAtOf: a reply continues its thread from the end it shows; a branch, or a send at the root, starts it", () => {
+test("columnMessageAt: a reply continues its thread from the end it shows; a branch, or a send at the root, starts it", () => {
   const thread = threadIdFor("x")
-  expect(chatAtOf("reply", thread, at, TEST_TASK)).toEqual({
+  expect(columnMessageAt("reply", thread, at, TEST_CANVAS)).toEqual({
     kind: "end",
     thread,
     seen: "e-1",
   })
-  expect(chatAtOf("branch", thread, at, TEST_TASK)).toEqual({
+  expect(columnMessageAt("branch", thread, at, TEST_CANVAS)).toEqual({
     kind: "branch",
     thread,
     at: "e-1",
-    task: TEST_TASK,
+    canvas: TEST_CANVAS,
   })
-  expect(chatAtOf("reply", thread, ROOT, TEST_TASK)).toEqual({
+  expect(columnMessageAt("reply", thread, ROOT, TEST_CANVAS)).toEqual({
     kind: "branch",
     thread,
     at: null,
-    task: TEST_TASK,
+    canvas: TEST_CANVAS,
   })
 })
 
 test("a send with no card is not drawn; one from a card draws the card out of its composer, under the send's id", () => {
-  const plain = planChatRequest({
+  const plain = planSendRequest({
     text: "hi",
     at: END,
     how: { id: "s-1" },
@@ -122,7 +122,7 @@ test("a send with no card is not drawn; one from a card draws the card out of it
     freshId: "f-1",
   })
   expect([plain.id, plain.pending]).toEqual(["s-1", null])
-  const fromCard = planChatRequest({
+  const fromCard = planSendRequest({
     text: "hi",
     at: END,
     how: { card: card.id, column: "col-1" },
@@ -137,12 +137,12 @@ test("a send with no card is not drawn; one from a card draws the card out of it
   )
 })
 
-test("startsRoot: a thread at the root written, as a conversation or a run; nothing else", () => {
-  const atRoot: ChatAt = {
+test("startsRoot: a thread at the root written, as a chat or a run; nothing else", () => {
+  const atRoot: MessageAt = {
     kind: "branch",
     thread: threadIdFor("x"),
     at: null,
-    task: TEST_TASK,
+    canvas: TEST_CANVAS,
   }
   expect(startsRoot(atRoot, { kind: "appended", id: entryId("e-1") })).toBe(
     true,

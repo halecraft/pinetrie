@@ -18,7 +18,12 @@
 // Escape clears the filter before it closes the board. What it shows is
 // `boardView`'s.
 
-import type { EntryId, TaskId, WorkflowStateId, WriterId } from "@pinetrie/core"
+import type {
+  CanvasId,
+  EntryId,
+  WorkflowStateId,
+  WriterId,
+} from "@pinetrie/core"
 import {
   addStateIntent,
   type BoardSide,
@@ -26,6 +31,7 @@ import {
   boardKeyAct,
   CLEAR_FILTER,
   type Count,
+  canvasesWords,
   clickClosesBoard,
   dragProps,
   dropProps,
@@ -49,9 +55,8 @@ import {
   signalOfLevel,
   stateWords,
   type ThreadCard,
-  tasksWords,
 } from "@pinetrie/interface"
-import { TASK_BUSY_REASON } from "@pinetrie/rules"
+import { CANVAS_BUSY_REASON } from "@pinetrie/rules"
 import type { CardNotice } from "@pinetrie/session"
 import { type RefObject, useEffect, useRef, useState } from "react"
 import { AddButton } from "./add-button.tsx"
@@ -280,8 +285,8 @@ function StateSignalMarks({
   const words = stateWords(signals)
   return (
     <>
-      {signals.tasks.length > 0 && (
-        <Readers {...readers} tasks={signals.tasks} />
+      {signals.canvases.length > 0 && (
+        <Readers {...readers} canvases={signals.canvases} />
       )}
       {mark !== null && <SignalMark signal={signalOfLevel(mark)} />}
       {signals.working > 0 && (
@@ -318,7 +323,7 @@ export function Board({
   searchRef: RefObject<HTMLInputElement | null>
   readers: ReadersProps
   /** A thread as a row of a reader's menu, which opens it. */
-  thread: (end: EntryId, task: TaskId) => MenuItem | null
+  thread: (end: EntryId, canvas: CanvasId) => MenuItem | null
   pip: React.ReactNode
   /** Your refused moves on the board, said above its states. */
   notices: readonly CardNotice[]
@@ -388,16 +393,16 @@ export function Board({
       </div>
     ) : null
   // An open column's item is a place to drop before; an archive row is not,
-  // since the archive shows its tasks by activity, not by place.
+  // since the archive shows its canvases by activity, not by place.
   const item = (t: ThreadCard, place: boolean) => (
     <ItemCard
       drop={
         place
-          ? rootDropProps({ kind: "state", state: t.state, before: t.task })
+          ? rootDropProps({ kind: "state", state: t.state, before: t.canvas })
           : {}
       }
       item={t}
-      key={t.task}
+      key={t.canvas}
       onIntent={onIntent}
       pip={pip}
       readers={readers}
@@ -408,7 +413,7 @@ export function Board({
     <span
       className="board-count"
       data-kept={count.kind === "kept" || undefined}
-      title={tasksWords(count.total)}
+      title={canvasesWords(count.total)}
     >
       {keptWords(count)}
     </span>
@@ -583,16 +588,16 @@ function ItemCard({
   drop: Readonly<Record<string, string>>
   onIntent: (intent: Intent) => void
   readers: ReadersProps
-  thread: (end: EntryId, task: TaskId) => MenuItem | null
+  thread: (end: EntryId, canvas: CanvasId) => MenuItem | null
   pip: React.ReactNode
 }) {
   return (
-    <div className="thread-card" data-task={item.task} {...drop}>
+    <div className="thread-card" data-canvas={item.canvas} {...drop}>
       <button
         className="board-open"
         {...dragProps({
-          kind: "task",
-          drag: { task: item.task, state: item.state },
+          kind: "canvas",
+          drag: { canvas: item.canvas, state: item.state },
         })}
         onClick={() => onIntent(item.show)}
         title={item.label}
@@ -608,7 +613,7 @@ function ItemCard({
       {item.body !== null && <span className="board-body">{item.body}</span>}
       <span className="board-meta">
         <Writers nameOf={readers.nameOf} writers={item.writers} />
-        <ReaderMenus {...readers} task={item.task} thread={thread} />
+        <ReaderMenus {...readers} canvas={item.canvas} thread={thread} />
       </span>
       <Menu
         className="item-more"
@@ -660,7 +665,7 @@ function ItemCard({
                 <>
                   Move to {m.name}
                   {m.busy !== null && (
-                    <span className="why"> · {TASK_BUSY_REASON[m.busy]}</span>
+                    <span className="why"> · {CANVAS_BUSY_REASON[m.busy]}</span>
                   )}
                 </>
               ),

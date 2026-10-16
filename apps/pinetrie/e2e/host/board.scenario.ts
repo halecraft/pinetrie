@@ -5,7 +5,7 @@
 // command to it, a new root lands where its chat says, and the records reach
 // another client.
 
-import { DISCARDED, entryId, ROOT, type TaskId } from "@pinetrie/core"
+import { type CanvasId, DISCARDED, entryId, ROOT } from "@pinetrie/core"
 import { scriptedModel } from "@pinetrie/pi"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import {
@@ -14,14 +14,14 @@ import {
   readPlaces,
   readWorkflow,
 } from "@pinetrie/reads"
-import { newRootId, newTaskId, newThreadId } from "@pinetrie/session"
+import { newCanvasId, newRootId, newThreadId } from "@pinetrie/session"
 import type { Checks } from "../checks.ts"
 import {
   archivedFor,
   boardStateOf,
+  canvasHolding,
   join,
   START_CHAT,
-  taskHolding,
   waitFor,
   withHost,
 } from "../harness.ts"
@@ -46,21 +46,21 @@ async function run(check: Checks["check"]): Promise<void> {
         throw new Error("a new host writes the default workflow")
 
       const r1 = appended(
-        await ada.chat("first root", ROOT, { ...START_CHAT, state: doing.id }),
+        await ada.send("first root", ROOT, { ...START_CHAT, state: doing.id }),
       )
-      const r2 = appended(await ada.chat("second root", ROOT, START_CHAT))
-      // Each root's task, which its first message opened.
-      const idOf = (entry: string): TaskId | "" => {
+      const r2 = appended(await ada.send("second root", ROOT, START_CHAT))
+      // Each root's canvas, which its first message opened.
+      const idOf = (entry: string): CanvasId | "" => {
         try {
-          return taskHolding(host, entryId(entry))
+          return canvasHolding(host, entryId(entry))
         } catch {
           return ""
         }
       }
       await waitFor(() => idOf(r1) !== "" && idOf(r2) !== "", 10_000)
       const [id1, id2] = [
-        taskHolding(host, entryId(r1)),
-        taskHolding(host, entryId(r2)),
+        canvasHolding(host, entryId(r1)),
+        canvasHolding(host, entryId(r2)),
       ]
       const cards = readPlaces(host.places)
       const states = [boardStateOf(cards, id1), boardStateOf(cards, id2)]
@@ -71,14 +71,14 @@ async function run(check: Checks["check"]): Promise<void> {
       )
 
       const closed = await ada.request({
-        kind: "move-task",
-        task: id1,
+        kind: "move-canvas",
+        canvas: id1,
         from: doing.id,
         to: done.id,
         before: null,
       })
       const seen = await waitFor(() => archivedFor(bea).has(id1), 10_000)
-      const refused = await bea.chat("too late", { kind: "entry", id: r1 })
+      const refused = await bea.send("too late", { kind: "entry", id: r1 })
       check(
         "a root moved to Done is archived for another client, and a chat into it is refused naming the mover",
         closed.kind === "moved" &&
@@ -90,20 +90,20 @@ async function run(check: Checks["check"]): Promise<void> {
       )
 
       const late = await bea.request({
-        kind: "move-task",
-        task: id1,
+        kind: "move-canvas",
+        canvas: id1,
         from: doing.id,
         to: backlog.id,
         before: null,
       })
       const reopened = await bea.request({
-        kind: "move-task",
-        task: id1,
+        kind: "move-canvas",
+        canvas: id1,
         from: done.id,
         to: backlog.id,
         before: null,
       })
-      const accepted = await bea.chat("back again", { kind: "entry", id: r1 })
+      const accepted = await bea.send("back again", { kind: "entry", id: r1 })
       check(
         "a move from a state the root has left is refused naming who moved it; moved out of Done, it takes writes again",
         late.kind === "unmoved" &&
@@ -119,57 +119,63 @@ async function run(check: Checks["check"]): Promise<void> {
       const titled = await bea.mark(entryId(r2), "Tab names")
       const mark = readMarks(host.session).get(id2)
       check(
-        "a task is titled, by its writer",
+        "a canvas is titled, by its writer",
         titled.kind === "marked" &&
           mark?.title === "Tab names" &&
           mark.by === bea.writer,
         titled.kind,
       )
-      // A task is a card: a move on the board is its mover's,
-      // undone by their undo key outside any task.
+      // A canvas is a card: a move on the board is its mover's,
+      // undone by their undo key outside any canvas.
       const forward = await ada.request({
-        kind: "move-task",
-        task: id2,
+        kind: "move-canvas",
+        canvas: id2,
         from: backlog.id,
         to: doing.id,
         before: null,
       })
       const back = await ada.undoMoves(null, "undo")
       check(
-        "a move on the board is undone by its mover's undo key outside any task, the task back in its state",
+        "a move on the board is undone by its mover's undo key outside any canvas, the canvas back in its state",
         forward.kind === "moved" &&
           back.kind === "undone" &&
           boardStateOf(readPlaces(host.places), id2) === backlog.id,
         `${forward.kind} ${back.kind}`,
       )
 
-      // A new tab closed unsent goes to its closer's trash with its task,
-      // and the undo key outside any task brings both back.
+      // A new tab closed unsent goes to its closer's trash with its canvas,
+      // and the undo key outside any canvas brings both back.
       const tab = newThreadId()
-      const tabTask = newTaskId()
+      const tabCanvas = newCanvasId()
       const opened = await ada.request({
         kind: "open-thread",
         thread: tab,
         root: newRootId(),
-        task: tabTask,
-        start: { kind: "new-task", state: null },
+        canvas: tabCanvas,
+        start: { kind: "new-canvas", state: null },
       })
       const shut = await ada.moveCard(
-        { card: tab, from: { kind: "canvas", task: tabTask }, to: DISCARDED },
+        {
+          card: tab,
+          from: { kind: "canvas", canvas: tabCanvas },
+          to: DISCARDED,
+        },
         undefined,
         null,
-        tabTask,
+        tabCanvas,
       )
-      const trashed = readPlaces(host.places).find(c => c.id === tabTask)?.place
+      const trashed = readPlaces(host.places).find(
+        c => c.id === tabCanvas,
+      )?.place
       const undone = await ada.undoMoves(null, "undo")
       const now = readPlaces(host.places)
       check(
-        "an unsent new tab closed is undone whole by its closer's undo key outside any task: its task and its thread back",
+        "an unsent new canvas closed is undone whole by its closer's undo key outside any canvas: its canvas and its thread back",
         opened.kind === "moved" &&
           shut.kind === "accepted" &&
           trashed?.kind === "trash" &&
           undone.kind === "undone" &&
-          boardStateOf(now, tabTask) === backlog.id &&
+          boardStateOf(now, tabCanvas) === backlog.id &&
           now.find(c => c.id === tab)?.place.kind === "canvas",
         `${opened.kind} ${shut.kind} ${trashed?.kind} ${undone.kind}`,
       )

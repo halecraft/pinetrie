@@ -19,9 +19,9 @@ export interface PresenceSeat {
   readonly handle: PresenceDocHandle
   /**
    * This seat's column `columnKey` follows the thread ending at `end`, on
-   * `task` (null: not yet known, or a new tab's).
+   * `canvas` (null: not yet known, or a new canvas's).
    */
-  setReading(columnKey: string, end: string, task: string | null): void
+  setReading(columnKey: string, end: string, canvas: string | null): void
   /** The column closed: its entry is deleted, not left to decay. */
   clearReading(columnKey: string): void
   /**
@@ -43,11 +43,11 @@ export function presenceSeat(
   const mine = seatKey(me, exchange.peerId)
   return {
     handle: presence,
-    setReading(columnKey, end, task) {
+    setReading(columnKey, end, canvas) {
       const key = readingKey(mine, columnKey)
       batch(presence, d => {
         d.reading.set(key, end)
-        d.readingTask.set(key, task)
+        d.readingCanvas.set(key, canvas)
       })
     },
     clearReading(columnKey) {
@@ -55,7 +55,7 @@ export function presenceSeat(
       if (presence.reading()[key] !== undefined)
         batch(presence, d => {
           d.reading.delete(key)
-          d.readingTask.delete(key)
+          d.readingCanvas.delete(key)
         })
     },
     setTyping(end, card) {

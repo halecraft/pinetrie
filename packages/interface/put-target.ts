@@ -9,10 +9,11 @@
 
 import {
   type BackTarget,
+  type CanvasId,
   type CanvasTarget,
   type CardId,
+  isCanvasId,
   isNoteColumnId,
-  isTaskId,
   isWorkflowStateId,
   keyOf,
   type NoteColumnId,
@@ -21,7 +22,6 @@ import {
   pinnedOf,
   sameKey,
   type TargetOf,
-  type TaskId,
   type TextPlace,
   type WorkflowStateId,
   type WriterId,
@@ -38,20 +38,20 @@ export type PutTarget =
   /** A note column: a note at its end. */
   | { readonly kind: "notes"; readonly column: NoteColumnId }
   /**
-   * A spot on a task's canvas, just after `after` (first for null), where
+   * A spot on a canvas, just after `after` (first for null), where
    * no column takes a drop: a folded column, or the canvas past its last.
    * A thread's card or a note column lands there; a text card or a
    * reference in a note column made for it there (`WRAPS`).
    */
   | {
       readonly kind: "canvas"
-      readonly task: TaskId
+      readonly canvas: CanvasId
       readonly after: CardId | null
     }
   /** The pinned strip at the top of a thread's column. */
   | { readonly kind: "pinned"; readonly key: string }
-  /** The cards pinned to a task, in its task column. */
-  | { readonly kind: "taskPinned"; readonly task: TaskId }
+  /** The cards pinned to a canvas, in its canvas column. */
+  | { readonly kind: "canvasPinned"; readonly canvas: CanvasId }
   /**
    * Your inventory: a slot aimed at (a drop on it, a paste on it), or, with
    * null, none (a take, keep): the selected slot if empty, else the first
@@ -61,19 +61,19 @@ export type PutTarget =
   /** A workflow state, on the board or the footer's strip: a new thread there. */
   | { readonly kind: "state"; readonly state: WorkflowStateId }
   /**
-   * A place in the sidebar, before a task or at its end: a new task there,
+   * A place in the sidebar, before a canvas or at its end: a new canvas there,
    * a thread spun from a text card, or holding a column dropped there.
    */
-  | { readonly kind: "sidebar"; readonly before: TaskId | null }
-  /** A task in the sidebar, onto it: a column moves to the end of its canvas. */
-  | { readonly kind: "task"; readonly task: TaskId }
+  | { readonly kind: "sidebar"; readonly before: CanvasId | null }
+  /** A canvas in the sidebar, onto it: a column moves to the end of its canvas. */
+  | { readonly kind: "item"; readonly canvas: CanvasId }
   /**
    * The text box that has focus: a paste there types its text, or a link to
    * what it names, at the caret. Nothing is put or dropped into one.
    */
   | { readonly kind: "text-box" }
 
-/** A spot on a task's canvas: where a drop past a column, or a column ＋ makes, lands. */
+/** A spot on a canvas: where a drop past a column, or a column ＋ makes, lands. */
 export type CanvasPut = Extract<PutTarget, { readonly kind: "canvas" }>
 
 /** The attribute a column's drop zone carries: its key. */
@@ -82,26 +82,26 @@ const PUT_COLUMN = "data-put-column"
 const PUT_COMPOSER = "data-put-composer"
 /** The attribute a column's pinned strip carries: its column's key. */
 const PUT_PINNED = "data-put-pinned"
-/** The attribute a task column's pinned cards carry: its task. */
-const PUT_TASK_PINNED = "data-put-task-pinned"
+/** The attribute a canvas column's pinned cards carry: its canvas. */
+const PUT_CANVAS_PINNED = "data-put-canvas-pinned"
 /** The attribute a slot carries: its index. */
 const PUT_SLOT = "data-put-slot"
 /** The attribute a note column carries: its id. */
 const PUT_NOTES = "data-put-notes"
-/** The attribute a spot on a canvas carries: its task. */
+/** The attribute a spot on a canvas carries: its canvas. */
 const PUT_CANVAS = "data-put-canvas"
 /** Beside `PUT_CANVAS`: the card the spot is after, absent for first. */
 const PUT_AFTER = "data-put-after"
 /** The attribute a workflow state carries, on the board and the footer's strip: its id. */
 const PUT_STATE = "data-put-state"
-/** The attribute a place in the sidebar carries: the task it goes before, or `end`. */
+/** The attribute a place in the sidebar carries: the canvas it goes before, or `end`. */
 const PUT_SIDEBAR = "data-put-sidebar"
 const END = "end"
-/** The attribute a task's row in the sidebar carries, a drop onto it: its id. */
-const PUT_TASK = "data-put-task"
+/** The attribute an item of the sidebar carries, a drop onto it: its id. */
+const PUT_ITEM = "data-put-item"
 
 /** What an element a drop may land on matches: any mark. */
-export const DROP_ZONE = `[${PUT_COLUMN}],[${PUT_COMPOSER}],[${PUT_PINNED}],[${PUT_TASK_PINNED}],[${PUT_SLOT}],[${PUT_NOTES}],[${PUT_CANVAS}],[${PUT_STATE}],[${PUT_SIDEBAR}],[${PUT_TASK}]`
+export const DROP_ZONE = `[${PUT_COLUMN}],[${PUT_COMPOSER}],[${PUT_PINNED}],[${PUT_CANVAS_PINNED}],[${PUT_SLOT}],[${PUT_NOTES}],[${PUT_CANVAS}],[${PUT_STATE}],[${PUT_SIDEBAR}],[${PUT_ITEM}]`
 
 /** The attributes that mark an element as `target`, spread onto it by the page. */
 export function dropProps(target: PutTarget): Readonly<Record<string, string>> {
@@ -112,22 +112,22 @@ export function dropProps(target: PutTarget): Readonly<Record<string, string>> {
       return { [PUT_COMPOSER]: target.key }
     case "pinned":
       return { [PUT_PINNED]: target.key }
-    case "taskPinned":
-      return { [PUT_TASK_PINNED]: target.task }
+    case "canvasPinned":
+      return { [PUT_CANVAS_PINNED]: target.canvas }
     case "inventory":
       return target.slot === null ? {} : { [PUT_SLOT]: String(target.slot) }
     case "notes":
       return { [PUT_NOTES]: target.column }
     case "canvas":
       return target.after === null
-        ? { [PUT_CANVAS]: target.task }
-        : { [PUT_CANVAS]: target.task, [PUT_AFTER]: target.after }
+        ? { [PUT_CANVAS]: target.canvas }
+        : { [PUT_CANVAS]: target.canvas, [PUT_AFTER]: target.after }
     case "state":
       return { [PUT_STATE]: target.state }
     case "sidebar":
       return { [PUT_SIDEBAR]: target.before ?? END }
-    case "task":
-      return { [PUT_TASK]: target.task }
+    case "item":
+      return { [PUT_ITEM]: target.canvas }
     // A text box is pasted into alone: no drop lands there.
     case "text-box":
       return {}
@@ -145,27 +145,28 @@ export function targetOfElement(el: {
     return { kind: "composer", key: composer }
   const pinned = el.getAttribute(PUT_PINNED)
   if (pinned !== null && pinned !== "") return { kind: "pinned", key: pinned }
-  const task = el.getAttribute(PUT_TASK_PINNED)
-  if (task !== null && isTaskId(task)) return { kind: "taskPinned", task }
+  const canvas = el.getAttribute(PUT_CANVAS_PINNED)
+  if (canvas !== null && isCanvasId(canvas))
+    return { kind: "canvasPinned", canvas }
   const state = el.getAttribute(PUT_STATE)
   if (state !== null && isWorkflowStateId(state))
     return { kind: "state", state }
-  const onto = el.getAttribute(PUT_TASK)
-  if (onto !== null && isTaskId(onto)) return { kind: "task", task: onto }
+  const onto = el.getAttribute(PUT_ITEM)
+  if (onto !== null && isCanvasId(onto)) return { kind: "item", canvas: onto }
   const before = el.getAttribute(PUT_SIDEBAR)
   if (before === END) return { kind: "sidebar", before: null }
-  if (before !== null && isTaskId(before)) return { kind: "sidebar", before }
+  if (before !== null && isCanvasId(before)) return { kind: "sidebar", before }
   const notes = el.getAttribute(PUT_NOTES)
   if (notes !== null && isNoteColumnId(notes))
     return { kind: "notes", column: notes }
-  const canvas = el.getAttribute(PUT_CANVAS)
-  if (canvas !== null && isTaskId(canvas)) {
+  const id = el.getAttribute(PUT_CANVAS)
+  if (id !== null && isCanvasId(id)) {
     const after = el.getAttribute(PUT_AFTER)
-    if (after === null) return { kind: "canvas", task: canvas, after: null }
+    if (after === null) return { kind: "canvas", canvas: id, after: null }
     const card = parseCardId(after)
     return card === undefined
       ? null
-      : { kind: "canvas", task: canvas, after: card }
+      : { kind: "canvas", canvas: id, after: card }
   }
   const slot = el.getAttribute(PUT_SLOT)
   if (slot === null || !/^\d+$/.test(slot)) return null
@@ -203,7 +204,7 @@ export const intoMessage = (target: PutTarget): boolean =>
 /**
  * The place `target` names: the note column nearest a column's thread
  * (`noteOf`), a note column's end, its composer's place, the same thread
- * end pinned (`pinnedOf`), a task's pinned cards, or your inventory; null
+ * end pinned (`pinnedOf`), a canvas's pinned cards, or your inventory; null
  * for a column no composer publishes; and for a state or the sidebar, which name a new thread, not a place
  * (`planSpinOff`); and for a spot on a canvas, which the host ranks.
  */
@@ -214,14 +215,14 @@ export function placeOfTarget(
 ): Exclude<TargetOf<"text">, CanvasTarget | BackTarget> | null {
   if (target.kind === "inventory") return { kind: "inventory", holder: me }
   if (target.kind === "notes") return { kind: "note", column: target.column }
-  if (target.kind === "taskPinned")
-    return { kind: "task-pinned", task: target.task }
+  if (target.kind === "canvasPinned")
+    return { kind: "canvas-pinned", canvas: target.canvas }
   if (
     target.kind === "state" ||
     target.kind === "sidebar" ||
-    target.kind === "task" ||
+    target.kind === "canvas" ||
     target.kind === "text-box" ||
-    target.kind === "canvas"
+    target.kind === "item"
   )
     return null
   const place = places.get(target.key)?.place

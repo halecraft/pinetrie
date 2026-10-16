@@ -1,14 +1,14 @@
 import {
   type BannerRecord,
   blobUrl,
+  type CanvasId,
+  canvasIdFor,
   entryId,
   type IconsRecord,
   type MarkRecord,
   type Sha256,
-  type TaskId,
   type ThreadId,
   type ThreadName,
-  taskIdFor,
   threadIdFor,
   type Workflow,
   workflowStateIdFor,
@@ -25,25 +25,25 @@ import {
   layoutReducer,
   resolveLayout,
 } from "./layout.ts"
-import { taskSlot } from "./palette.ts"
+import { canvasSlot } from "./palette.ts"
 import {
+  canvasIcons,
   dropsWords,
   listKey,
-  openProposedByTask,
+  openProposedByCanvas,
   pageTitle,
   type SidebarViewInput,
   sidebarView,
-  taskIcons,
 } from "./sidebar-view.ts"
 import type { UnsentSignals } from "./signals.ts"
 import { type ThreadCardFacts, threadCardHeads } from "./thread-card.ts"
 import { builtInIconUrl, type IconLookup, threadIcon } from "./thread-icon.ts"
 
-/** Each root's task, one a root: `K("r1")` holds root r1's threads. */
-const K = (root: string) => taskIdFor(root)
-const R1: Here = { kind: "task", task: K("r1") }
-const R2: Here = { kind: "task", task: K("r2") }
-const R3: Here = { kind: "task", task: K("r3") }
+/** Each root's canvas, one a root: `K("r1")` holds root r1's threads. */
+const K = (root: string) => canvasIdFor(root)
+const R1: Here = { kind: "canvas", canvas: K("r1") }
+const R2: Here = { kind: "canvas", canvas: K("r2") }
+const R3: Here = { kind: "canvas", canvas: K("r3") }
 const reduce = (l: Layout, ...actions: Parameters<typeof layoutReducer>[1][]) =>
   actions.reduce(layoutReducer, l)
 // The sidebar: r1, r2, r3; you are on r1.
@@ -54,18 +54,18 @@ const layout = resolveLayout(
     lanes: [],
     archived: new Set(),
     list: [K("r1"), K("r2"), K("r3")],
-    canvases: new Map(),
+    cardsOn: new Map(),
     unstarted: new Map(),
     holders: new Map(),
   },
 )
 const none: UnsentSignals = {
-  tasks: new Set(),
+  canvases: new Set(),
   ends: new Set(),
   elsewhere: false,
 }
 const mark: MarkRecord = {
-  task: K("r1"),
+  canvas: K("r1"),
   title: "Tab names",
   by: writerId("a@x.test"),
   at: 1,
@@ -85,8 +85,8 @@ const WORKFLOW: Workflow = {
 /** What the sidebar's items are read from, its thread cards' facts among them. */
 type Facts = Omit<SidebarViewInput, "heads"> &
   Omit<ThreadCardFacts, "pips"> & {
-    readonly shown: readonly TaskId[]
-    /** Your unsent text: each task's pip. */
+    readonly shown: readonly CanvasId[]
+    /** Your unsent text: each canvas's pip. */
     readonly unsent: UnsentSignals
   }
 const input = (over: Partial<Facts> = {}): SidebarViewInput => {
@@ -121,12 +121,13 @@ const input = (over: Partial<Facts> = {}): SidebarViewInput => {
   return {
     layout: f.layout,
     active: f.active,
-    heads: threadCardHeads(f.shown, { ...f, pips: f.unsent.tasks }),
+    heads: threadCardHeads(f.shown, { ...f, pips: f.unsent.canvases }),
     summaries: f.summaries,
     marks: f.marks,
     archived: f.archived,
     arrivals: f.arrivals,
     icons: f.icons,
+    workflow: f.workflow,
   }
 }
 const items = (over: Partial<Facts> = {}) => sidebarView(input(over)).items
@@ -134,17 +135,17 @@ const kinds = (
   r:
     | (typeof items extends (...a: never) => infer T ? T : never)[number]
     | undefined,
-) => (r?.kind === "task" ? r.menu.map(i => i.kind) : null)
+) => (r?.kind === "canvas" ? r.menu.map(i => i.kind) : null)
 
 describe("sidebarView", () => {
-  test("your tasks, in listOf's order", () => {
-    expect(items().map(t => t.kind)).toEqual(["task", "task", "task"])
+  test("your canvases, in listOf's order", () => {
+    expect(items().map(t => t.kind)).toEqual(["canvas", "canvas", "canvas"])
     expect(items().map(t => t.selected)).toEqual([true, false, false])
   })
 
   test("a root is labelled, and its rename field starts from its title", () => {
     expect(items()[0]).toMatchObject({
-      kind: "task",
+      kind: "canvas",
       label: "Tab names",
       line: "first",
       title: "Tab names",
@@ -162,24 +163,24 @@ describe("sidebarView", () => {
 
   test("Auto-update title asks for the root's own", () => {
     const [r1] = items()
-    expect(r1?.kind === "task" && r1.menu[1]).toEqual({
+    expect(r1?.kind === "canvas" && r1.menu[1]).toEqual({
       kind: "retitle",
-      intent: { kind: "retitle", task: K("r1") },
+      intent: { kind: "retitle", canvas: K("r1") },
     })
   })
 
   test("Move to ▸ offers every state but its own, each a move on the board for everyone", () => {
     const [r1] = items()
     const moves =
-      r1?.kind === "task" ? r1.menu.filter(i => i.kind === "moveTo") : []
+      r1?.kind === "canvas" ? r1.menu.filter(i => i.kind === "moveTo") : []
     expect(moves.map(m => m.kind === "moveTo" && [m.name, m.closes])).toEqual([
       ["Backlog", false],
       ["Done", true],
     ])
     expect(moves[1]).toMatchObject({
       intent: {
-        kind: "moveTask",
-        task: K("r1"),
+        kind: "moveCanvas",
+        canvas: K("r1"),
         from: DOING,
         to: DONE,
         before: null,
@@ -191,7 +192,7 @@ describe("sidebarView", () => {
   test("Move to Done is refused while the agent works in the root", () => {
     const [r1] = items({ work: new Map([[K("r1"), "running"]]) })
     const done =
-      r1?.kind === "task"
+      r1?.kind === "canvas"
         ? r1.menu.find(i => i.kind === "moveTo" && i.closes)
         : null
     expect(done).toMatchObject({ busy: "running", drops: [] })
@@ -201,7 +202,7 @@ describe("sidebarView", () => {
     const amber = "amber-fox" as ThreadName
     const [r1, r2] = items({ proposed: new Map([[K("r1"), [amber]]]) })
     const done = (r: typeof r1) =>
-      r?.kind === "task"
+      r?.kind === "canvas"
         ? r.menu.find(i => i.kind === "moveTo" && i.closes)
         : null
     expect(done(r1)).toMatchObject({ drops: [amber] })
@@ -212,14 +213,14 @@ describe("sidebarView", () => {
     expect(dropsWords([])).toBe(null)
   })
 
-  test("openProposedByTask: each open proposed changes' thread, under its task; one the host has not named yet by its id's end; one in no task left out", () => {
+  test("openProposedByCanvas: each open proposed changes' thread, under its canvas; one the host has not named yet by its id's end; one in no canvas left out", () => {
     const lane = (n: string) => n as ThreadId
     const names = new Map([
       [lane("l1"), "amber-fox" as ThreadName],
       [lane("l2"), "cozy-mallard" as ThreadName],
     ])
     expect(
-      openProposedByTask(
+      openProposedByCanvas(
         [
           { lane: lane("l1") },
           { lane: lane("l2") },
@@ -242,7 +243,7 @@ describe("sidebarView", () => {
   })
 
   test("a pip on each item holding a card of yours", () => {
-    const unsent = { ...none, tasks: new Set([K("r2")]) }
+    const unsent = { ...none, canvases: new Set([K("r2")]) }
     expect(items({ unsent }).map(t => t.pip)).toEqual([false, true, false])
     expect(items().map(t => t.pip)).toEqual([false, false, false])
   })
@@ -254,7 +255,7 @@ describe("sidebarView", () => {
       level: "needsYou",
       raised: { kind: "ready", source: cardIdFor("c1") },
     }
-    const status = new Map<TaskId, Status>([
+    const status = new Map<CanvasId, Status>([
       [K("r1"), { kind: "working" }],
       [K("r2"), { kind: "needsYou", item }],
     ])
@@ -276,14 +277,14 @@ describe("sidebarView", () => {
     const [raised] = items({
       status: new Map([[K("r1"), { kind: "worthARead", item }]]),
     })
-    expect(raised?.kind === "task" && raised.menu[0]).toEqual({
+    expect(raised?.kind === "canvas" && raised.menu[0]).toEqual({
       kind: "notNeeded",
       intent: { kind: "notNeeded", lane: item.lane, raised: item.raised },
     })
     const [working] = items({
       status: new Map([[K("r1"), { kind: "working" }]]),
     })
-    expect(working?.kind === "task" && working.menu[0]).toEqual({
+    expect(working?.kind === "canvas" && working.menu[0]).toEqual({
       kind: "rename",
     })
   })
@@ -294,24 +295,29 @@ describe("sidebarView", () => {
   })
 })
 
-test("＋'s main action starts agent work; its menu, a conversation", () => {
+test("＋ makes a canvas at the end of the first open state, with no menu", () => {
   const { add } = sidebarView(input())
-  expect([add.main, ...add.more].map(i => i.intent)).toEqual([
-    { kind: "newTab", asksAgent: true },
-    { kind: "newTab", asksAgent: false },
-  ])
+  expect(add.main.intent).toEqual({ kind: "newCanvas" })
+  expect(add.main.title).toContain("at the end of Backlog")
+  expect(add.more).toBeNull()
+})
+
+test("an item's hover names its label and where it is on the board", () => {
+  const [r1, , r3] = items()
+  expect(r1?.hover).toBe(`${r1?.label} · a task, in Doing`)
+  expect(r3?.hover).toBe(`${r3?.label} · a topic, in Backlog`)
 })
 
 test("selected is the item you are on, and each item has its own key", () => {
   const view = sidebarView(input({ active: R2 }))
-  expect(view.selected).toMatchObject({ kind: "task", task: K("r2") })
+  expect(view.selected).toMatchObject({ kind: "canvas", canvas: K("r2") })
   expect(view.items.map(listKey)).toEqual([
-    `task:${K("r1")}`,
-    `task:${K("r2")}`,
-    `task:${K("r3")}`,
+    `canvas:${K("r1")}`,
+    `canvas:${K("r2")}`,
+    `canvas:${K("r3")}`,
   ])
   expect(sidebarView(input({ active: R3 })).selected).toMatchObject({
-    task: K("r3"),
+    canvas: K("r3"),
   })
 })
 
@@ -333,25 +339,25 @@ describe("pageTitle", () => {
 
 describe("icons", () => {
   const ICON = { kind: "built-in", url: builtInIconUrl("fox") } as const
-  test("a task with an icon draws it; one without, its initials on a colour its id seeds", () => {
+  test("a canvas with an icon draws it; one without, its initials on a colour its id seeds", () => {
     const [r1, r2, r3] = items({
       icons: new Map([[K("r2"), ICON]]),
     })
     expect(r1?.icon).toEqual({
       kind: "initials",
       letters: "TN",
-      slot: taskSlot(K("r1")),
+      slot: canvasSlot(K("r1")),
     })
     expect(r2?.icon).toEqual({ kind: "icon", icon: ICON })
     expect(r3?.icon).toEqual({
       kind: "initials",
       letters: "NT",
-      slot: taskSlot(K("r3")),
+      slot: canvasSlot(K("r3")),
     })
   })
 })
 
-describe("taskIcons", () => {
+describe("canvasIcons", () => {
   const thread = (n: number) =>
     threadIdFor(`01a0ffd2-0000-7000-8000-00000000000${n}`)
   const banner = (t: ThreadId, c: string): [ThreadId, BannerRecord] => [
@@ -372,8 +378,8 @@ describe("taskIcons", () => {
     url: blobUrl(c.repeat(64) as Sha256),
   })
 
-  test("a task takes the icon of its earliest thread with one, whatever its canvas order", () => {
-    const icons = taskIcons(
+  test("a canvas takes the icon of its earliest thread with one, whatever its canvas order", () => {
+    const icons = canvasIcons(
       new Map([
         [K("r1"), [late, early]],
         [K("r2"), [other]],
@@ -384,7 +390,7 @@ describe("taskIcons", () => {
   })
 
   test("a thread with no icon gives way to a later one", () => {
-    const icons = taskIcons(
+    const icons = canvasIcons(
       new Map([[K("r1"), [early, late]]]),
       lookup(new Map([banner(late, "2"), banner(other, "3")])),
     )
@@ -395,7 +401,7 @@ describe("taskIcons", () => {
     const names = new Map([[late, "amber-fox" as ThreadName]])
     const builtIn = { source: "built-in" } as const
     expect(
-      taskIcons(
+      canvasIcons(
         new Map([[K("r1"), [late, early]]]),
         lookup(new Map(), names, builtIn),
       ),
@@ -403,7 +409,7 @@ describe("taskIcons", () => {
       new Map([[K("r1"), { kind: "built-in", url: builtInIconUrl("fox") }]]),
     )
     expect(
-      taskIcons(
+      canvasIcons(
         new Map([[K("r1"), [early]]]),
         lookup(new Map(), names, builtIn),
       ),

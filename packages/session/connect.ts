@@ -15,17 +15,18 @@ import { WebsocketClientTransport } from "@kyneta/websocket-transport/browser"
 import {
   type AcceptedAction,
   type AccessAnswer,
+  type CanvasId,
   type CardCommand,
   type CardId,
   type CardPlace,
   type CardRecord,
-  type ChatAt,
   DISCARDED,
   type EntryId,
   type Intent,
   isTextCard,
   isTextCardId,
   keyOf,
+  type MessageAt,
   type MoveDirection,
   type MoveTarget,
   type Paste,
@@ -35,7 +36,6 @@ import {
   type Reorder,
   type Replacing,
   type RootId,
-  type TaskId,
   type TextCard,
   type TextCardId,
   type ThreadId,
@@ -106,13 +106,13 @@ import {
   stampSeen,
 } from "./card-moves.ts"
 import { cardTexts } from "./card-texts.ts"
-import { type ChatHow, planChatRequest, startsRoot } from "./chat.ts"
 import { hostLine } from "./host-line.ts"
 import { heldBy, type Slots, swapWrites } from "./inventory.ts"
 import { inventorySlots } from "./inventory-slots.ts"
 import { type OpenThreads, openThreads } from "./open-threads.ts"
 import { presenceSeat } from "./presence-seat.ts"
 import { NO_ROOT, rootDocs } from "./root-docs.ts"
+import { planSendRequest, type SendHow, startsRoot } from "./send.ts"
 import { type Readable, readable, select, snapshotStore } from "./store.ts"
 
 /**
@@ -183,8 +183,8 @@ export interface SessionClient {
    */
   readonly cards: Readable<readonly CardRecord[]>
   /**
-   * Once this client's copy of the places has settled: what a task holds
-   * is there, so the roots of the sidebar's tasks can be held.
+   * Once this client's copy of the places has settled: what a canvas holds
+   * is there, so the roots of the sidebar's canvases can be held.
    */
   placesSettled(): Promise<void>
   /**
@@ -197,9 +197,9 @@ export interface SessionClient {
   undoFor(id: TextCardId): CardUndo
   /**
    * This window's column `columnKey` shows the thread ending at `end`, on
-   * the task `task` (null: not yet known).
+   * the canvas `canvas` (null: not yet known).
    */
-  setReading(columnKey: string, end: string, task: string | null): void
+  setReading(columnKey: string, end: string, canvas: string | null): void
   /** The column closed: its entry is deleted, not left to decay. */
   clearReading(columnKey: string): void
   /**
@@ -212,7 +212,7 @@ export interface SessionClient {
    * (only a `branch` starts at the root). It runs the agent only if the agent
    * is its addressee (`address`).
    */
-  chat(text: string, at: ChatAt, how?: ChatHow): Promise<Outcome>
+  send(text: string, at: MessageAt, how?: SendHow): Promise<Outcome>
   /**
    * Ask the host for anything this tab does not track and that needs no
    * root found: a name, a stop, a reservation, an archive or a restore, a
@@ -246,7 +246,7 @@ export interface SessionClient {
       readonly paste: Paste
       readonly to: MoveTarget
       readonly replacing: Replacing | null
-      readonly here: TaskId | null
+      readonly here: CanvasId | null
       /** A pasted text card's text; "" for any other paste. */
       readonly text: string
     },
@@ -259,14 +259,14 @@ export interface SessionClient {
    * accepts, before the answer is recorded, so the repair never sees the
    * card held without its slot. `queuedBy`, for an unqueue, is who queued
    * the card: if the host popped it first, the refusal says it was sent, as
-   * theirs. `here`, the task this tab is on, names the history of a
+   * theirs. `here`, the canvas this tab is on, names the history of a
    * discard from your inventory. Resolves with the host's answer.
    */
   moveCard(
     move: TypedMove,
     how?: MoveHow,
     queuedBy?: WriterId | null,
-    here?: TaskId | null,
+    here?: CanvasId | null,
   ): Promise<MoveAnswer>
   /**
    * Ask the host to queue a card: `move` into a queue, sent with
@@ -296,13 +296,13 @@ export interface SessionClient {
   moveCards(
     moves: readonly [SlotMove, ...SlotMove[]],
     actedAt: ActedAt,
-    here?: TaskId | null,
+    here?: CanvasId | null,
   ): Promise<MoveAnswer>
   /**
-   * Undo or redo your newest move in `task`, or outside any task for none:
+   * Undo or redo your newest move in `canvas`, or outside any canvas for none:
    * the host's history of your moves there, from any of your tabs.
    */
-  undoMoves(task: TaskId | null, direction: MoveDirection): Promise<Outcome>
+  undoMoves(canvas: CanvasId | null, direction: MoveDirection): Promise<Outcome>
   /**
    * Swap two slots of your inventory, in one write, as one step of this
    * tab's swaps; no host is asked.
@@ -368,7 +368,7 @@ export type HostRequest = Exclude<
   Intent,
   {
     kind:
-      | "chat"
+      | "send"
       | "move"
       | "reorder"
       | "undo-move"
@@ -559,7 +559,7 @@ export async function connectSession(
     how: MoveHow,
     queuedBy: WriterId | null,
     draft: CardRecord | null,
-    here: TaskId | null,
+    here: CanvasId | null,
   ): Promise<MoveAnswer> {
     return tracked(
       { kind: "move", moves: [move], here },
@@ -596,7 +596,7 @@ export async function connectSession(
         redo: options => undo.redo({ ...options, docs }),
       }
     },
-    chat(text, at, how = {}) {
+    send(text, at, how = {}) {
       // gather: the root (minted and held for a send at the root), the card
       // as drawn, and each card's text version as this client has it.
       const root = roots.rootFor(at, how.root)
@@ -608,7 +608,7 @@ export async function connectSession(
               .current()
               .filter(isTextCard)
               .find(c => c.id === how.card)
-      const plan = planChatRequest({
+      const plan = planSendRequest({
         text,
         at,
         how,
@@ -623,9 +623,9 @@ export async function connectSession(
           ? line.request(plan.intent, plan.id)
           : tracked(plan.intent, [plan.pending], null)
       return sent.then(({ outcome }) => {
-        // A task you start is in the sidebar.
+        // A canvas you start is in the sidebar.
         if (at.kind === "branch" && startsRoot(at, outcome))
-          open.ensure(at.task)
+          open.ensure(at.canvas)
         return outcome
       })
     },
@@ -727,10 +727,10 @@ export async function connectSession(
         null,
       ).then(r => r.answer)
     },
-    async undoMoves(task, direction) {
+    async undoMoves(canvas, direction) {
       const { outcome, rev } = await line.request({
         kind: "undo-move",
-        task,
+        canvas,
         direction,
       })
       // Drawn as the host left it: wait for this tab's copy to hold the undo.

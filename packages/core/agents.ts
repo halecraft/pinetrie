@@ -74,22 +74,22 @@ export const lastHeardEntry = (
 export function isRoundAnswered(
   index: TreeIndex,
   tip: EntryId | null,
-  chat: EntryId,
+  said: EntryId,
 ): boolean {
-  const asked = index.entries[chat]?.message?.asks ?? []
+  const asked = index.entries[said]?.message?.asks ?? []
   if (asked.length === 0) return false
   const answered = new Set<ThreadId>()
   for (const id of ancestry(index, tip).path) {
-    if (id === chat) break
+    if (id === said) break
     const answer = index.entries[id]?.message?.answer
-    if (answer?.source === chat) answered.add(answer.from)
+    if (answer?.source === said) answered.add(answer.from)
   }
   return asked.every(t => answered.has(t))
 }
 
 /**
  * The other threads' agents a message in `here` may name: every thread in
- * `canvas` (every open task's named threads, `reachableAgents` in rules) but
+ * `canvas` (every open canvas's named threads, `reachableAgents` in rules) but
  * `here`, each a member when `members` (`threadMembers` of its path) holds it.
  * The host and the composer both build them so, so the button's promise and the
  * host's decision agree.

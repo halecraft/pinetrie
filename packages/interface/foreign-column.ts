@@ -67,18 +67,18 @@ export const foreignWords = (lane: ForeignLane): string =>
 
 /**
  * What a thread column says in place of its composer: who holds the thread a
- * branch forks in, else its task's archive, else a lane of another kind;
+ * branch forks in, else its canvas's archive, else a lane of another kind;
  * null when it may be written in.
  */
 export function columnReadOnly(input: {
-  readonly task: ReadOnly | null
+  readonly canvas: ReadOnly | null
   readonly heldBy: WriterId | null
   readonly foreign: ForeignLane | null
   readonly reader: Reader
 }): ReadOnly | null {
   if (input.heldBy !== null)
     return { label: heldWords(input.heldBy, input.reader), action: null }
-  if (input.task !== null) return input.task
+  if (input.canvas !== null) return input.canvas
   return input.foreign === null
     ? null
     : { label: foreignWords(input.foreign), action: null }

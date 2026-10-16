@@ -2,8 +2,8 @@
 // and `BoardStrip` (`board.tsx`) draw it.
 
 import type {
+  CanvasId,
   CardRecord,
-  TaskId,
   Workflow,
   WorkflowState,
   WorkflowStateId,
@@ -14,13 +14,13 @@ import { type Level, markOf } from "./attention.ts"
 import { count } from "./counts.ts"
 import type { Intent } from "./intent.ts"
 import type { KeyLike } from "./page-keys.ts"
-import { NO_TEXT, type TaskSummary } from "./root-label.ts"
+import { type CanvasSummary, NO_TEXT } from "./root-label.ts"
 import { stepsIn } from "./root-target.ts"
-import { newTabButton, type StartButton } from "./start-button.ts"
+import { newCanvasButton, type StartButton } from "./start-button.ts"
 import type { ThreadCardHead } from "./thread-card.ts"
 
 /**
- * A task on the board, its card: its header, the one the
+ * A canvas on the board, its card: its header, the one the
  * sidebar draws too (`ThreadCardHead`), spread here and kept whole as
  * `head`, with what only the board adds.
  */
@@ -28,7 +28,7 @@ export interface ThreadCard extends Omit<ThreadCardHead, "state"> {
   readonly head: ThreadCardHead
   /** The state it is in: what its drag carries. */
   readonly state: WorkflowStateId
-  /** Everyone who wrote a chat in it (`TaskSummary.writers`). */
+  /** Everyone who wrote a chat in it (`CanvasSummary.writers`). */
   readonly writers: readonly WriterId[]
   /** Its body: its first line, under a title that differs from it; null for none. */
   readonly body: string | null
@@ -45,16 +45,16 @@ export type Count =
 
 /** What a workflow state shows of its roots' work, beyond their count. */
 export interface StateSignals {
-  /** Its tasks the agent works in (`Status` working, a pending verdict among them): ◌. */
+  /** Its canvases the agent works in (`Status` working, a pending verdict among them): ◌. */
   readonly working: number
-  /** Its tasks with changes ready to accept: ⇡. */
+  /** Its canvases with changes ready to accept: ⇡. */
   readonly ready: number
-  /** The tasks whose readers' avatars it shows. */
-  readonly tasks: readonly TaskId[]
+  /** The canvases whose readers' avatars it shows. */
+  readonly canvases: readonly CanvasId[]
 }
 
 /** The archive's: it shows none. */
-const NO_SIGNALS: StateSignals = { working: 0, ready: 0, tasks: [] }
+const NO_SIGNALS: StateSignals = { working: 0, ready: 0, canvases: [] }
 
 /** An open state's column. */
 export interface BoardColumnView {
@@ -66,7 +66,7 @@ export interface BoardColumnView {
   readonly mark: Level | null
   /** Over the roots the search keeps, as its cards show them. */
   readonly signals: StateSignals
-  /** ＋ here: a new tab whose task lands in this state. */
+  /** ＋ canvas here: a new canvas that lands in this state. */
   readonly add: StartButton
   /** One place left or right among the open states; null at an end. */
   readonly left: Intent | null
@@ -126,12 +126,12 @@ export const ARCHIVE_RECENT = 8
 
 export interface BoardViewInput {
   readonly workflow: Workflow
-  /** Every card: the board's are each task's. */
+  /** Every card: the board's are each canvas's. */
   readonly cards: readonly CardRecord[]
-  /** Each task with a message (`summariesOf`): its first line is a titled card's body. */
-  readonly summaries: ReadonlyMap<TaskId, TaskSummary>
-  /** Each task's thread card header (`threadCardHeads`), which the sidebar reads too. */
-  readonly heads: ReadonlyMap<TaskId, ThreadCardHead>
+  /** Each canvas with a message (`summariesOf`): its first line is a titled card's body. */
+  readonly summaries: ReadonlyMap<CanvasId, CanvasSummary>
+  /** Each canvas's thread card header (`threadCardHeads`), which the sidebar reads too. */
+  readonly heads: ReadonlyMap<CanvasId, ThreadCardHead>
   /** The board's filter (`parseSearch`), or null for none. */
   readonly search: BoardSearch | null
   readonly me: WriterId
@@ -142,16 +142,16 @@ const bodyOf = (label: string, line: string | undefined): string | null =>
   line === undefined || line === "" || line === label ? null : line
 
 /**
- * The board as drawn: each task with a message (`summaries`), so a new
- * tab's task joins it with its first send.
+ * The board as drawn: each canvas with a message (`summaries`), so a new
+ * tab's canvas joins it with its first send.
  */
 export function boardView(input: BoardViewInput): BoardView {
   const { workflow, search, summaries } = input
   const board = boardOf(workflow, input.cards)
   const keeps = search === null ? null : boardFilter(search, input.me)
-  const headOf = (task: TaskId): ThreadCardHead =>
-    input.heads.get(task) ?? {
-      task,
+  const headOf = (canvas: CanvasId): ThreadCardHead =>
+    input.heads.get(canvas) ?? {
+      canvas,
       label: NO_TEXT,
       status: null,
       ready: [],
@@ -159,75 +159,76 @@ export function boardView(input: BoardViewInput): BoardView {
       state: null,
       moves: [],
     }
-  const writersOf = (task: TaskId) => summaries.get(task)?.writers ?? []
+  const writersOf = (canvas: CanvasId) => summaries.get(canvas)?.writers ?? []
   /** A move within `state`, before `before` there, or to its end. */
   const within = (
-    task: TaskId,
+    canvas: CanvasId,
     state: WorkflowStateId,
-    before: TaskId | null,
+    before: CanvasId | null,
   ): Intent => ({
-    kind: "moveTask",
-    task,
+    kind: "moveCanvas",
+    canvas,
     from: state,
     to: state,
     before,
     closes: false,
   })
-  /** The signals of `tasks`, from each one's status and proposed changes. */
-  const stateSignals = (tasks: readonly TaskId[]): StateSignals => ({
-    working: tasks.filter(t => headOf(t).status?.kind === "working").length,
-    ready: tasks.filter(t => headOf(t).ready.length > 0).length,
-    tasks,
+  /** The signals of `canvases`, from each one's status and proposed changes. */
+  const stateSignals = (canvases: readonly CanvasId[]): StateSignals => ({
+    working: canvases.filter(t => headOf(t).status?.kind === "working").length,
+    ready: canvases.filter(t => headOf(t).ready.length > 0).length,
+    canvases,
   })
   const status = new Map(
     [...input.heads.values()].flatMap(head =>
-      head.status === null ? [] : [[head.task, head.status] as const],
+      head.status === null ? [] : [[head.canvas, head.status] as const],
     ),
   )
-  /** A kept task's card, whose Move up and Move down step among the tasks `isShown` keeps. */
+  /** A kept canvas's card, whose Move up and Move down step among the canvases `isShown` keeps. */
   const cardOf = (
-    task: TaskId,
+    canvas: CanvasId,
     state: WorkflowStateId,
-    column: readonly TaskId[],
-    isShown: (task: TaskId) => boolean,
+    column: readonly CanvasId[],
+    isShown: (canvas: CanvasId) => boolean,
   ): ThreadCard => {
-    const steps = stepsIn(column, task, isShown)
-    const head = headOf(task)
+    const steps = stepsIn(column, canvas, isShown)
+    const head = headOf(canvas)
     return {
       ...head,
       head,
       state,
-      writers: writersOf(task),
-      body: bodyOf(head.label, summaries.get(task)?.line),
-      show: { kind: "show", here: { kind: "task", task } },
-      up: steps.up === null ? null : within(task, state, steps.up.before),
-      down: steps.down === null ? null : within(task, state, steps.down.before),
+      writers: writersOf(canvas),
+      body: bodyOf(head.label, summaries.get(canvas)?.line),
+      show: { kind: "show", here: { kind: "canvas", canvas } },
+      up: steps.up === null ? null : within(canvas, state, steps.up.before),
+      down:
+        steps.down === null ? null : within(canvas, state, steps.down.before),
     }
   }
   /**
-   * A state's tasks: every one with a message, which its mark, Remove and
+   * A state's canvases: every one with a message, which its mark, Remove and
    * the strip count, and a card for each the search keeps, which is drawn.
    */
-  const tasksOf = (column: {
-    tasks: readonly TaskId[]
+  const stateCanvases = (column: {
+    canvases: readonly CanvasId[]
     state: WorkflowState
   }): {
-    all: readonly TaskId[]
+    all: readonly CanvasId[]
     cards: readonly ThreadCard[]
     count: Count
   } => {
-    const all = column.tasks.filter(task => summaries.has(task))
+    const all = column.canvases.filter(canvas => summaries.has(canvas))
     const kept =
       keeps === null
         ? all
-        : all.filter(task =>
-            keeps({ label: headOf(task).label, writers: writersOf(task) }),
+        : all.filter(canvas =>
+            keeps({ label: headOf(canvas).label, writers: writersOf(canvas) }),
           )
     const shown = new Set(kept)
     return {
       all,
-      cards: kept.map(task =>
-        cardOf(task, column.state.id, column.tasks, t => shown.has(t)),
+      cards: kept.map(canvas =>
+        cardOf(canvas, column.state.id, column.canvases, t => shown.has(t)),
       ),
       count:
         keeps === null
@@ -236,7 +237,7 @@ export function boardView(input: BoardViewInput): BoardView {
     }
   }
   const columns = board.open.map((column, i) => {
-    const { all, cards, count } = tasksOf(column)
+    const { all, cards, count } = stateCanvases(column)
     const { state } = column
     const before = (to: WorkflowStateId | null): Intent => ({
       kind: "editWorkflow",
@@ -251,8 +252,8 @@ export function boardView(input: BoardViewInput): BoardView {
       items: cards,
       count,
       mark,
-      signals: stateSignals(cards.map(t => t.task)),
-      add: newTabButton(state.id),
+      signals: stateSignals(cards.map(t => t.canvas)),
+      add: newCanvasButton({ from: "board", landsIn: state }),
       left: previous === undefined ? null : before(previous.state.id),
       right: next === undefined ? null : before(afterNext?.state.id ?? null),
       addBefore: { left: state.id, right: next?.state.id ?? null },
@@ -274,7 +275,7 @@ export function boardView(input: BoardViewInput): BoardView {
     }
     return { view, strip }
   })
-  const archiveRoots = tasksOf(board.archive)
+  const archiveRoots = stateCanvases(board.archive)
   const archive: ArchiveView = {
     state: board.archive.state,
     count: archiveRoots.count,
@@ -331,7 +332,7 @@ export const searchedText = (label: string): string =>
   label.replace(ADDRESS_LINK, "$1")
 
 /**
- * What `search` keeps: the tasks whose label (`labelsOf`, so a title is
+ * What `search` keeps: the canvases whose label (`labelsOf`, so a title is
  * found) holds every word, in any order, and with `mine`, those `me` wrote a
  * chat in. Labels, not messages: a search of every message would hold every
  * root's document.
@@ -350,16 +351,16 @@ function boardFilter(
 }
 
 /**
- * The archive's rows, of the tasks the search kept: newest activity
+ * The archive's rows, of the canvases the search kept: newest activity
  * first, and with no words to search (none, or "mine" alone) only the most
  * recent few.
  */
 export function archiveRows(input: {
   readonly items: readonly ThreadCard[]
-  readonly summaries: ReadonlyMap<TaskId, TaskSummary>
+  readonly summaries: ReadonlyMap<CanvasId, CanvasSummary>
   readonly search: BoardSearch | null
 }): readonly ThreadCard[] {
-  const newest = (t: ThreadCard) => input.summaries.get(t.task)?.newest ?? ""
+  const newest = (t: ThreadCard) => input.summaries.get(t.canvas)?.newest ?? ""
   const sorted = input.items.toSorted((a, b) =>
     newest(a) < newest(b) ? 1 : newest(a) > newest(b) ? -1 : 0,
   )
@@ -401,9 +402,12 @@ export function boardKeyAct(
 }
 
 /** Why an open state cannot be removed, or null when it can. */
-export function removeWords(tasks: number, openStates: number): string | null {
-  if (tasks > 0)
-    return `holds ${tasks === 1 ? "a task" : `${tasks} tasks`}: move ${tasks === 1 ? "it" : "them"} first`
+export function removeWords(
+  canvases: number,
+  openStates: number,
+): string | null {
+  if (canvases > 0)
+    return `holds ${canvases === 1 ? "a canvas" : `${canvases} canvases`}: move ${canvases === 1 ? "it" : "them"} first`
   if (openStates === 1) return "the board needs one open state"
   return null
 }
@@ -444,24 +448,25 @@ export const addStateIntent = (
 export const stateWords = (
   signals: Pick<StateSignals, "working" | "ready">,
 ): { readonly working: string; readonly ready: string } => ({
-  working: `the agent is working in ${tasksWords(signals.working)}`,
-  ready: `${tasksWords(signals.ready)} with changes ready to accept`,
+  working: `the agent is working in ${canvasesWords(signals.working)}`,
+  ready: `${canvasesWords(signals.ready)} with changes ready to accept`,
 })
 
 /** A thread card's ⇡: the threads it names. */
 export const readyWords = (threads: readonly string[]): string =>
   `ready to accept: ${threads.join(", ")}`
 
-/** A number of tasks: a state's count's title, and the filter's. */
-export const tasksWords = (n: number): string => count(n, "task", "tasks")
+/** A number of canvases: a state's count's title, and the filter's. */
+export const canvasesWords = (n: number): string =>
+  count(n, "canvas", "canvases")
 
-/** A state's count in its head: "12 of 96" while a filter keeps some of its tasks. */
+/** A state's count in its head: "12 of 96" while a filter keeps some of its canvases. */
 export const keptWords = (count: Count): string =>
   count.kind === "kept" ? `${count.kept} of ${count.total}` : `${count.total}`
 
 /** The search's placeholder. */
 export const searchWords = (total: number): string =>
-  `search ${tasksWords(total)}…`
+  `search ${canvasesWords(total)}…`
 
 /** The words searched for, quoted as the banner and ▦'s title say them. */
 const quoted = (search: BoardSearch): string => `"${search.words.join(" ")}"`
@@ -474,10 +479,10 @@ export function filterWords(
   const words = search.words.length > 0
   if (kept === 0)
     return words
-      ? `No tasks${search.mine ? " you wrote in" : ""} match ${quoted(search)}`
-      : `You wrote in none of ${tasksWords(total)}`
-  const of = `${kept} of ${tasksWords(total)}`
-  if (!words) return `Filtered to tasks you wrote in: ${of}`
+      ? `No canvases${search.mine ? " you wrote in" : ""} match ${quoted(search)}`
+      : `You wrote in none of ${canvasesWords(total)}`
+  const of = `${kept} of ${canvasesWords(total)}`
+  if (!words) return `Filtered to canvases you wrote in: ${of}`
   return `Filtered by ${quoted(search)}${search.mine ? " and mine" : ""}: ${of}`
 }
 

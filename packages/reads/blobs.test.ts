@@ -1,5 +1,5 @@
 import { NOBODY, type Sha256, threadIdFor, writerId } from "@pinetrie/core"
-import { encodeChat } from "@pinetrie/rules"
+import { encodeMessage } from "@pinetrie/rules"
 import { expect, test } from "vitest"
 import { planSweep, referencedBlobs } from "./index.ts"
 
@@ -15,12 +15,12 @@ const details = (shas: readonly Sha256[]) => ({
   images: shas.map(image),
 })
 
-test("referencedBlobs: chats, tool results, typed texts and banners each keep theirs", () => {
+test("referencedBlobs: sends, tool results, typed texts and banners each keep theirs", () => {
   const referenced = referencedBlobs({
     messages: [
-      encodeChat(details([sha("a")]), 1),
+      encodeMessage(details([sha("a")]), 1),
       { role: "user", content: `![](/blob/${sha("f")})` },
-      encodeChat(details([]), 2),
+      encodeMessage(details([]), 2),
       {
         role: "toolResult",
         toolCallId: "c1",
@@ -50,7 +50,7 @@ test("referencedBlobs: a chat's shares keep their originals and fitted copies; a
   const original = { ...image(sha("a")), width: 4000 }
   const referenced = referencedBlobs({
     messages: [
-      encodeChat(
+      encodeMessage(
         {
           ...details([sha("b")]),
           shared: [

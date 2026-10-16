@@ -74,7 +74,7 @@ type TitlingPlan =
 export function planTitling(input: {
   readonly index: TreeIndex
   readonly root: RootId
-  /** Whether the task has a title already. */
+  /** Whether the canvas has a title already. */
   readonly marked: boolean
   /** Every lane's record: which lanes work in `root`. */
   readonly lanes: Iterable<LaneRecord>
@@ -107,7 +107,7 @@ export function planTitling(input: {
     lines: [
       ...transcriptLines(above),
       transcriptLine({
-        role: "chat",
+        role: "person",
         author: trigger.prompt.author,
         text: trigger.prompt.text,
       }),

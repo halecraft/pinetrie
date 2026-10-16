@@ -2,66 +2,66 @@
 // answer there, or for a link to open it.
 
 import type {
-  ArchivedTask,
+  ArchivedCanvas,
   Away,
+  CanvasId,
   CardRecord,
   Reach,
-  TaskId,
   ThreadId,
   ThreadName,
   WriterId,
 } from "@pinetrie/core"
-import { type CanvasCard, isLivePlace } from "./task.ts"
+import { type CardOnCanvas, isLivePlace } from "./canvas-index.ts"
 
 /** `thread`'s reach now, from its card's place and the archive. */
 export function threadReach(
   thread: ThreadId,
   facts: {
     readonly cards: readonly CardRecord[]
-    readonly archived: ReadonlyMap<TaskId, ArchivedTask>
+    readonly archived: ReadonlyMap<CanvasId, ArchivedCanvas>
   },
 ): Reach {
   const place = facts.cards.find(c => c.id === thread)?.place
   if (place?.kind === "inventory") return { kind: "held", by: place.holder }
   if (place?.kind === "trash" && place.left.kind === "canvas")
-    return { kind: "trashed", task: place.left.task }
+    return { kind: "trashed", canvas: place.left.canvas }
   if (place?.kind !== "canvas") return { kind: "gone" }
-  const record = facts.archived.get(place.task)
+  const record = facts.archived.get(place.canvas)
   return record === undefined
-    ? { kind: "open", task: place.task }
-    : { kind: "archived", task: place.task, record }
+    ? { kind: "open", canvas: place.canvas }
+    : { kind: "archived", canvas: place.canvas, record }
 }
 
-/** Where a late write of the host's goes: a thread, or a task (a title's). */
+/** Where a late write of the host's goes: a thread, or a canvas (a title's). */
 export type LateScope =
   | { readonly kind: "thread"; readonly thread: ThreadId }
-  | { readonly kind: "task"; readonly task: TaskId }
+  | { readonly kind: "canvas"; readonly canvas: CanvasId }
 
 /**
  * Why a write the host decided before a gap may not land now, or null when
  * it may. A thread takes it when its card is at a live place
  * (`isLivePlace`), the rule its root is held by, so a write let through
  * finds its root loaded; otherwise its `threadReach` says why. That is not
- * `threadReach`'s own answer: it calls a thread trashed in an archived task
+ * `threadReach`'s own answer: it calls a thread trashed in an archived canvas
  * `trashed`, and one trashed from an inventory `gone`. A thread not opened
- * yet (named for a column before its first message) is in no task and has
- * no root, so it takes one too: its banner, drawn as it is named. A task
+ * yet (named for a column before its first message) is in no canvas and has
+ * no root, so it takes one too: its banner, drawn as it is named. A canvas
  * takes it unless it is archived.
  */
 export function lateAway(
   scope: LateScope,
   facts: {
     readonly cards: readonly CardRecord[]
-    readonly archived: ReadonlyMap<TaskId, ArchivedTask>
+    readonly archived: ReadonlyMap<CanvasId, ArchivedCanvas>
     /** The threads opened: each with its record (`THREAD`). */
     readonly opened: { readonly has: (thread: ThreadId) => boolean }
   },
 ): Away | null {
-  if (scope.kind === "task") {
-    const record = facts.archived.get(scope.task)
+  if (scope.kind === "canvas") {
+    const record = facts.archived.get(scope.canvas)
     return record === undefined
       ? null
-      : { kind: "archived", task: scope.task, record }
+      : { kind: "archived", canvas: scope.canvas, record }
   }
   const card = facts.cards.find(c => c.id === scope.thread)
   if (card === undefined && !facts.opened.has(scope.thread)) return null
@@ -71,26 +71,26 @@ export function lateAway(
 }
 
 /**
- * Every named thread on an open task's canvas, in each canvas's order: the
+ * Every named thread on an open canvas, in each canvas's order: the
  * other threads' agents a message may name (`agentCandidates`, core). The
  * host and the page build their candidates from it alike.
  */
 export function reachableAgents(input: {
-  readonly canvases: ReadonlyMap<TaskId, readonly CanvasCard[]>
-  readonly archived: { readonly has: (task: TaskId) => boolean }
+  readonly cardsOn: ReadonlyMap<CanvasId, readonly CardOnCanvas[]>
+  readonly archived: { readonly has: (canvas: CanvasId) => boolean }
   readonly names: ReadonlyMap<ThreadId, ThreadName>
 }): readonly {
   readonly thread: ThreadId
   readonly name: ThreadName
-  readonly task: TaskId
+  readonly canvas: CanvasId
 }[] {
-  return [...input.canvases].flatMap(([task, cards]) =>
-    input.archived.has(task)
+  return [...input.cardsOn].flatMap(([canvas, cards]) =>
+    input.archived.has(canvas)
       ? []
       : cards.flatMap(c => {
           if (c.kind !== "thread") return []
           const name = input.names.get(c.id)
-          return name === undefined ? [] : [{ thread: c.id, name, task }]
+          return name === undefined ? [] : [{ thread: c.id, name, canvas }]
         }),
   )
 }
@@ -103,13 +103,13 @@ export function reachWords(
 ): string {
   switch (reach.kind) {
     case "archived":
-      return `${name}'s task was archived by ${nameOf(reach.record.by)}`
+      return `${name}'s canvas was archived by ${nameOf(reach.record.by)}`
     case "held":
       return `${nameOf(reach.by)} has ${name}`
     case "trashed":
       return `${name} is in the trash`
     case "gone":
-      return `${name} is no longer on any task`
+      return `${name} is no longer on any canvas`
   }
 }
 

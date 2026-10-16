@@ -47,22 +47,22 @@ const SB = snapshotId("6-pb")
 // tracked files (its result r1), then m2, whose calls changed only ignored
 // files. Its revision records: the prompt (the disk it started with), m1 (a
 // commit and a snapshot) and m2 (a snapshot only).
-// Below m1: a conversation (x1), and lane B's prompt pb with its answer mb.
+// Below m1: a chat (x1), and lane B's prompt pb with its answer mb.
 // Below mb: lane D, working directly, with its prompt pd and answer md.
 const entries = entriesOf([
-  at("1-p1", null, "chat"),
+  at("1-p1", null, "person"),
   at("2-m1", "1-p1", "assistant", {
     content: [{ type: "toolCall", id: "call-1", name: "write" }],
   }),
   at("3-r1", "2-m1", "toolResult", { toolCallId: "call-1" }),
   at("4-m2", "3-r1", "assistant"),
-  at("5-x1", "3-r1", "chat"),
-  at("6-pb", "3-r1", "chat"),
+  at("5-x1", "3-r1", "person"),
+  at("6-pb", "3-r1", "person"),
   at("7-mb", "6-pb", "assistant"),
-  at("8-pd", "7-mb", "chat"),
+  at("8-pd", "7-mb", "person"),
   at("9-md", "8-pd", "assistant"),
   at("a-ld", "9-md", "land"),
-  at("b-pe", "9-md", "chat"),
+  at("b-pe", "9-md", "person"),
 ])
 const index = indexTree(entries)
 const revisions: ReadonlyMap<EntryId, RevisionRecord> = new Map(
@@ -168,7 +168,7 @@ describe("nearestRevision: the lane, commit and disk above an entry", () => {
       snapshotLane: A,
     })
   })
-  test("a conversation below a lane's message belongs to that lane", () => {
+  test("a chat below a lane's message belongs to that lane", () => {
     expect(near("5-x1")).toEqual({
       lane: A,
       point: C2,
@@ -229,7 +229,7 @@ describe("nearestRevision: the lane, commit and disk above an entry", () => {
       snapshotLane: null,
     })
   })
-  test("nothing above the root, or a conversation no run has reached", () => {
+  test("nothing above the root, or a chat no run has reached", () => {
     const none = {
       lane: null,
       point: null,

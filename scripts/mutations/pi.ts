@@ -732,8 +732,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the cards go at the end of each request",
     file: "packages/pi/agent.ts",
-    from: "  return convertToLlm(withChatImages(messages, found))",
-    to: '  const cards = (m: AgentMessage) => (m as { customType?: string }).customType === "pinetrie.pinned"\n  return convertToLlm(withChatImages([...messages.filter(m => !cards(m)), ...messages.filter(cards)], found))',
+    from: "  return convertToLlm(withMessageImages(messages, found))",
+    to: '  const cards = (m: AgentMessage) => (m as { customType?: string }).customType === "pinetrie.pinned"\n  return convertToLlm(withMessageImages([...messages.filter(m => !cards(m)), ...messages.filter(cards)], found))',
     command: unit,
     expect: "an edited card keeps the cache",
   },

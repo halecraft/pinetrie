@@ -1,6 +1,6 @@
 // interface/page-keys — the page's own keys, wherever focus is: take into
 // the inventory, put, undo and redo moves, and fold the sidebar, and open and
-// close a search of the thread's task. A grid's own keys are `grid-keys.ts`'s.
+// close a search of the thread's canvas. A grid's own keys are `grid-keys.ts`'s.
 // One table, from a key and where focus is to an intent or nothing.
 //
 // Take into the inventory is Ctrl+Shift+I and put Ctrl+Shift+O, with Ctrl on a

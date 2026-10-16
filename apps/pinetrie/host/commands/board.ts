@@ -1,17 +1,18 @@
-// host/commands/board — move a task on the board, or change its workflow
+// host/commands/board — move a canvas on the board, or change its workflow
 // states.
 //
 // A move runs in up to three parts. On the documents' keeper: gather the
-// workflow and the places, plan the task card's move (`planBoardMove`); if it
-// crosses the archive's edge, gather the documents of the task's roots and plan
-// the crossing (`planArchive`); then write the card (`placeTask`), from which
-// moment the archive gate refuses writes into the archived task. Off the
+// workflow and the places, plan the canvas card's move (`planBoardMove`); if it
+// crosses the archive's edge, gather the documents of the canvas's roots and plan
+// the crossing (`planArchive`); then write the card (`placeCanvas`), from which
+// moment the archive gate refuses writes into the archived canvas. Off the
 // keeper: the crossing's teardown (its lanes' containers, their refs in your
 // repo through the owner, snapshots). Then, on archiving, the roots nothing
 // else holds unloaded on the keeper again. The sender's reply comes after all
 // of it.
 
 import {
+  type CanvasId,
   type EntryId,
   ERR,
   type Intent,
@@ -19,7 +20,6 @@ import {
   type RevisionRecord,
   type RootId,
   refused,
-  type TaskId,
   type WriterId,
 } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
@@ -50,9 +50,9 @@ import {
 } from "@pinetrie/rules"
 import { readLaneTip } from "@pinetrie/schema"
 import type { Basics, HostKeeper } from "../basics.ts"
+import { canvasesNow } from "../canvases.ts"
 import type { CardPort } from "../cards.ts"
 import type { Records } from "../records.ts"
-import { tasksNow } from "../tasks.ts"
 import type { LaneWork } from "../work/index.ts"
 import { type CardCommands, type Settled, settled } from "./cards.ts"
 
@@ -66,8 +66,8 @@ export interface BoardDeps {
   readonly keeper: Pick<HostKeeper, "run" | "track">
   /** Which queued cards are blank: they leave a lane idle. */
   readonly cards: Pick<CardPort, "blankQueued">
-  /** The task's card written, with its history (`placeTask`). */
-  readonly moves: Pick<CardCommands, "placeTask">
+  /** The canvas's card written, with its history (`placeCanvas`). */
+  readonly moves: Pick<CardCommands, "placeCanvas">
 }
 
 /** What the keeper's first step decided: the answer, and what follows it. */
@@ -80,10 +80,10 @@ type Recorded =
       readonly unload: readonly RootId[]
     }
 
-export async function handleTaskMove(
+export async function handleCanvasMove(
   deps: BoardDeps,
   writer: WriterId,
-  intent: Extract<Intent, { kind: "move-task" }>,
+  intent: Extract<Intent, { kind: "move-canvas" }>,
 ): Promise<Settled> {
   const recorded = await deps.keeper.run(() => record(deps, writer, intent))
   if (recorded.kind === "done") return recorded.outcome
@@ -97,11 +97,11 @@ export async function handleTaskMove(
   return recorded.outcome
 }
 
-/** Gather, plan, and write the task's card: the first part, on the keeper. */
+/** Gather, plan, and write the canvas's card: the first part, on the keeper. */
 async function record(
   deps: BoardDeps,
   writer: WriterId,
-  intent: Extract<Intent, { kind: "move-task" }>,
+  intent: Extract<Intent, { kind: "move-canvas" }>,
 ): Promise<Recorded> {
   const { session, places } = deps.basics
   // gather: the board
@@ -111,7 +111,7 @@ async function record(
   const cards = readPlaces(places)
   // plan the move (pure)
   const moved = planBoardMove({
-    task: intent.task,
+    canvas: intent.canvas,
     from: intent.from,
     to: intent.to,
     before: intent.before,
@@ -134,12 +134,15 @@ async function record(
     }
   if (moved.kind === "unchanged") return done({ kind: "moved" })
   if (moved.transition === "within")
-    return { kind: "done", outcome: await deps.moves.placeTask(writer, moved) }
+    return {
+      kind: "done",
+      outcome: await deps.moves.placeCanvas(writer, moved),
+    }
   // gather what crossing the archive's edge needs, and plan it (pure)
-  const crossed = await planCrossing(deps, intent.task, moved.transition)
+  const crossed = await planCrossing(deps, intent.canvas, moved.transition)
   if (crossed.kind === "refused") return done(crossed)
   // execute
-  const outcome = await deps.moves.placeTask(writer, moved)
+  const outcome = await deps.moves.placeCanvas(writer, moved)
   if (crossed.verdicts.length > 0)
     await deps.records.writeValues(
       crossed.verdicts.map(v => setRecord(VERDICT, v)),
@@ -153,21 +156,21 @@ async function record(
 }
 
 /**
- * The documents of the task's roots, opened if they are not, and `planArchive`
- * over them: the task's threads' lanes, its lanes of their own with their tips,
- * their revisions, and which of its roots another task or an inventory still
+ * The documents of the canvas's roots, opened if they are not, and `planArchive`
+ * over them: the canvas's threads' lanes, its lanes of their own with their tips,
+ * their revisions, and which of its roots another canvas or an inventory still
  * holds.
  */
 async function planCrossing(
   deps: BoardDeps,
-  task: TaskId,
+  canvas: CanvasId,
   crossing: Crossing,
 ): Promise<ReturnType<typeof planArchive>> {
   const { session, docs, live, places } = deps.basics
   const cards = readPlaces(places)
-  const tasks = tasksNow(deps.basics)
-  const threads = tasks.threadsOf.get(task) ?? []
-  const roots = tasks.rootsOf.get(task) ?? []
+  const canvases = canvasesNow(deps.basics)
+  const threads = canvases.threadsOf.get(canvas) ?? []
+  const roots = canvases.rootsOf.get(canvas) ?? []
   const blank = await deps.cards.blankQueued(cards)
   const records = readLaneRecords(session)
   const holds = readQueueHolds(session)
@@ -188,9 +191,9 @@ async function planCrossing(
           own.push({ lane, tip: readLaneTip(doc, lane), index })
       }
   }
-  // The roots another live task or an inventory holds a thread of, this
+  // The roots another live canvas or an inventory holds a thread of, this
   // one counted as archived.
-  const archived = new Set([...readArchived(session, places).keys(), task])
+  const archived = new Set([...readArchived(session, places).keys(), canvas])
   return planArchive({
     crossing,
     threads,

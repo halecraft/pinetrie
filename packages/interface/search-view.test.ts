@@ -29,19 +29,19 @@ const index = indexOf([
   entry(
     "1",
     null,
-    { role: "chat", content: "Fix the rail", writer: ada, author: "Ada" },
+    { role: "person", content: "Fix the rail", writer: ada, author: "Ada" },
     { timestamp: 0 },
   ),
   entry("2", "1", said("looking at the rail"), { timestamp: HOUR }),
   entry("3", "2", said("done"), { timestamp: 2 * HOUR }),
   entry("4", "3", {
-    role: "chat",
+    role: "person",
     content: "thanks, rail fixed",
     writer: ada,
     author: "Ada",
   }),
   entry("5", "1", {
-    role: "chat",
+    role: "person",
     content: "and the rail colours?",
     writer: ada,
     author: "Ada",

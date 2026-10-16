@@ -1,4 +1,4 @@
-// interface/search — finding a phrase in the task you are on: the query, the
+// interface/search — finding a phrase in the canvas you are on: the query, the
 // matcher, a match's snippet, and the search's own state.
 //
 // A match starts at a word's start, and every word but the last is whole;
@@ -8,41 +8,41 @@
 // in "éraile". The edges here are Unicode classes instead.
 
 import {
+  type CanvasId,
   type EntryId,
   messageAt,
   type RailRow,
-  type TaskId,
   type TreeIndex,
 } from "@pinetrie/core"
 import type { Here } from "./layout.ts"
 
-/** The search of the task you are on; null while the bar is closed. Never stored. */
+/** The search of the canvas you are on; null while the bar is closed. Never stored. */
 export interface SearchState {
-  readonly task: TaskId
+  readonly canvas: CanvasId
   readonly query: string
   /** When it opened: the match rows' "3 h ago" are from then. */
   readonly since: number
 }
 
 export type SearchAct =
-  /** Starts empty; a search open on `task` already is kept as it is. */
-  | { readonly kind: "open"; readonly task: TaskId }
+  /** Starts empty; a search open on `canvas` already is kept as it is. */
+  | { readonly kind: "open"; readonly canvas: CanvasId }
   | { readonly kind: "type"; readonly query: string }
   | { readonly kind: "clear" }
   | { readonly kind: "close" }
 
-/** A search act as a reader asks it: `open` on whatever task they are on. */
+/** A search act as a reader asks it: `open` on whatever canvas they are on. */
 export type SearchAsk =
   | { readonly kind: "open" }
   | Exclude<SearchAct, { readonly kind: "open" }>
 
-/** The act `ask` is on `here`; opening needs a task, so on none it is none. */
+/** The act `ask` is on `here`; opening needs a canvas, so on none it is none. */
 export function searchActOn(
   ask: SearchAsk,
   here: Here | null,
 ): SearchAct | null {
   if (ask.kind !== "open") return ask
-  return here?.kind === "task" ? { kind: "open", task: here.task } : null
+  return here?.kind === "canvas" ? { kind: "open", canvas: here.canvas } : null
 }
 
 /** `now` is the shell's, read as the act is performed; only `open` keeps it. */
@@ -53,9 +53,9 @@ export function searchReducer(
 ): SearchState | null {
   switch (act.kind) {
     case "open":
-      return s !== null && s.task === act.task
+      return s !== null && s.canvas === act.canvas
         ? s
-        : { task: act.task, query: "", since: now }
+        : { canvas: act.canvas, query: "", since: now }
     case "type":
       return s === null || s.query === act.query
         ? s
@@ -67,12 +67,12 @@ export function searchReducer(
   }
 }
 
-/** The search that applies on `here`: none when it was opened on another task. */
+/** The search that applies on `here`: none when it was opened on another canvas. */
 export const searchOn = (
   s: SearchState | null,
   here: Here | null,
 ): SearchState | null =>
-  s !== null && here?.kind === "task" && here.task === s.task ? s : null
+  s !== null && here?.kind === "canvas" && here.canvas === s.canvas ? s : null
 
 /** A query's words, in order, matched as one phrase. */
 export interface Query {
@@ -127,7 +127,7 @@ export interface SearchText {
 }
 
 /**
- * Every message on a task's rail, with its text as a reader sees it (`messageAt`):
+ * Every message on a canvas's rail, with its text as a reader sees it (`messageAt`):
  * people's, the agent's, the host's one-line messages. Tool calls and their
  * results are not searched.
  */

@@ -1,7 +1,7 @@
 // interface/signals — what a mark says: one family of signals, each worded once
 // (`signalWords`), and the unsent signal: where your unsent cards are, on the
-// sidebar's tasks, on the rail at a thread's end, on the board's items, and on
-// ▦ for a task not in the sidebar. An archived task's work is done, so it
+// sidebar's canvases, on the rail at a thread's end, on the board's items, and on
+// ▦ for a canvas not in the sidebar. An archived canvas's work is done, so it
 // lights only its own item on the board, never ▦. They answer "where was I?",
 // so they count only the cards you own: who contributed to a card waits on
 // Kyneta naming the writers whose text still stands. A card counts while it
@@ -11,18 +11,18 @@
 // `attentionOf`, beside verdicts and ready proposed changes.
 
 import type {
+  CanvasId,
   CardId,
   CardRecord,
   EntryId,
-  TaskId,
   TreeIndex,
   WriterId,
 } from "@pinetrie/core"
 import {
+  type CanvasIndex,
+  canvasOfPlace,
   isOnCanvas,
   placeEnd,
-  type TaskIndex,
-  taskOfPlace,
 } from "@pinetrie/rules"
 import type { Level, Status } from "./attention.ts"
 import { needsCard } from "./card-state.ts"
@@ -57,12 +57,12 @@ export const signalWords = (signal: Signal): string => SIGNAL_WORDS[signal]
 export const signalOfLevel = (level: Level): Signal =>
   level === "needsYou" ? "needs-you" : "worth-a-read"
 
-/** ▦'s mark's title: what the tasks not in the sidebar raise. */
+/** ▦'s mark's title: what the canvases not in the sidebar raise. */
 export const elsewhereWords = (level: Level): string =>
   `a thread not in the sidebar: ${signalWords(signalOfLevel(level))}`
 
 /**
- * The signal a thread's or a task's status draws: running while its agent
+ * The signal a thread's or a canvas's status draws: running while its agent
  * works, its level's when something is raised, done while a run you follow that
  * ended asking nothing still fades (`moving`), else none.
  */
@@ -109,12 +109,12 @@ export function withFilled(
 
 /** Where your unsent cards are: the marks that answer "where was I?". */
 export interface UnsentSignals {
-  /** Tasks holding a card of yours: their items in the sidebar and on the board. */
-  readonly tasks: ReadonlySet<TaskId>
+  /** Canvases holding a card of yours: their items in the sidebar and on the board. */
+  readonly canvases: ReadonlySet<CanvasId>
   /** Thread ends holding your message: dots on the rail. */
   readonly ends: ReadonlySet<EntryId>
   /**
-   * A task in `tasks` is not in the sidebar and not archived: ▦ is marked.
+   * A canvas in `canvases` is not in the sidebar and not archived: ▦ is marked.
    */
   readonly elsewhere: boolean
 }
@@ -125,42 +125,42 @@ export function unsentSignals(input: {
   /** Cards that hold text (`holdsText`), by id. */
   readonly filled: ReadonlySet<CardId>
   readonly layout: Layout
-  /** Tasks in the archive. */
-  readonly archived: ReadonlySet<TaskId>
-  /** Every task: a card at a thread marks the thread's task. */
-  readonly tasks: TaskIndex
+  /** Canvases in the archive. */
+  readonly archived: ReadonlySet<CanvasId>
+  /** Every canvas: a card at a thread marks the thread's canvas. */
+  readonly canvases: CanvasIndex
   readonly index: TreeIndex
 }): UnsentSignals {
-  const tasks = new Set<TaskId>()
+  const canvases = new Set<CanvasId>()
   const ends = new Set<EntryId>()
   for (const card of input.mine) {
     if (!input.filled.has(card.id)) continue
     switch (card.place.kind) {
       case "composing": {
         // A trashed thread's message is in the trash with it.
-        if (!isOnCanvas(input.tasks, card.place.thread)) break
+        if (!isOnCanvas(input.canvases, card.place.thread)) break
         // A thread in a root this tab does not hold has no end here, and
-        // still marks its task.
+        // still marks its canvas.
         const end = placeEnd(card.place, input.index)
         if (end !== null) ends.add(end)
-        const task = taskOfPlace(input.tasks, card.place)
-        if (task !== null) tasks.add(task)
+        const canvas = canvasOfPlace(input.canvases, card.place)
+        if (canvas !== null) canvases.add(canvas)
         break
       }
-      // A note marks its note column's task.
+      // A note marks its note column's canvas.
       case "note": {
-        if (!isOnCanvas(input.tasks, card.place.column)) break
-        const task = taskOfPlace(input.tasks, card.place)
-        if (task !== null) tasks.add(task)
+        if (!isOnCanvas(input.canvases, card.place.column)) break
+        const canvas = canvasOfPlace(input.canvases, card.place)
+        if (canvas !== null) canvases.add(canvas)
         break
       }
-      // The inventory is no tab, a pinned card is a thread's or a task's
+      // The inventory is no tab, a pinned card is a thread's or a canvas's
       // direction, not unsent work, a comment is shared, and a canvas or the
       // board holds no text card.
       case "queued":
       case "margin":
       case "pinned":
-      case "task-pinned":
+      case "canvas-pinned":
       case "inventory":
       case "canvas":
       case "board":
@@ -171,8 +171,8 @@ export function unsentSignals(input: {
     }
   }
   return {
-    tasks,
+    canvases,
     ends,
-    elsewhere: unlisted(input.layout, input.archived, tasks).length > 0,
+    elsewhere: unlisted(input.layout, input.archived, canvases).length > 0,
   }
 }

@@ -1,5 +1,6 @@
 import {
   type BlobRef,
+  canvasIdFor,
   commitId,
   ERR,
   type ErrCode,
@@ -14,7 +15,6 @@ import {
   type Send,
   type SentCard,
   type Sha256,
-  taskIdFor,
   threadIdFor,
   type ValueWrite,
   type WriterId,
@@ -27,10 +27,10 @@ import { readPlaces } from "@pinetrie/reads"
 import {
   ACCEPTED,
   BASE,
-  CHAT_TYPE,
-  type ChatDetails,
-  type ChatMessage,
+  MESSAGE_TYPE,
+  type MessageDetails,
   PARTICIPANT,
+  type PersonMessage,
   PROJECT,
   planThreadOpen,
   setRecord,
@@ -41,31 +41,31 @@ import { beginRun, writeEntry, writeLaneTip } from "@pinetrie/schema/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   basics,
+  CANVAS_ID,
   clearedSend,
   methods,
   NO_BLANK_CARDS,
   placesFor,
+  putCanvas,
   putLane,
-  putTask,
   putValue,
   ROOT_ID,
   RUNS_ANY,
   record,
   row,
-  TASK_ID,
   threadRow,
   writeDirectory,
 } from "../fakes.ts"
 import type { PlacesChange } from "../provenance.ts"
-import { type ChatDeps, executeChat, sendChat, spendsCard } from "./chat.ts"
+import { executeSend, type SendDeps, sendMessage, spendsCard } from "./send.ts"
 
-/** A new tab's task: in no store yet. */
-const NEW_TASK = taskIdFor("01a0ffd2-0000-7000-8000-0000000000bb")
+/** A new canvas: in no store yet. */
+const NEW_CANVAS = canvasIdFor("01a0ffd2-0000-7000-8000-0000000000bb")
 
 const ALICE = writerId("alice@example.com")
 const LANE = threadIdFor("0123456789abcdef")
 const NEW = threadIdFor("01a0f9eb-86e1-77ad-a822-2a306786223f")
-const details: ChatDetails = {
+const details: MessageDetails = {
   author: ALICE,
   authorName: "Alice",
   text: "@agent go",
@@ -74,7 +74,7 @@ const details: ChatDetails = {
 }
 
 /** The agent, the scribe and the setup in one record, so the order of their calls shows. */
-type FakePi = ChatDeps["agent"] & ChatDeps["scribe"] & ChatDeps["piSetup"]
+type FakePi = SendDeps["agent"] & SendDeps["scribe"] & SendDeps["piSetup"]
 
 function setUp(begin: ErrCode | null = null) {
   const b = basics()
@@ -82,7 +82,7 @@ function setUp(begin: ErrCode | null = null) {
   const pi = record<FakePi>({
     createThreadLane: async () => ({ kind: "created", lane: LANE }),
   })
-  const work = record<ChatDeps["work"]>({
+  const work = record<SendDeps["work"]>({
     ...RUNS_ANY,
     project: null,
     checkBegin: async () => begin,
@@ -90,19 +90,19 @@ function setUp(begin: ErrCode | null = null) {
   })
   const started: string[] = []
   const seen: (readonly SentCard[])[] = []
-  const titles = record<ChatDeps["titles"]>({ laneStarted: async () => {} })
-  const deps: ChatDeps = {
-    relays: { relayChat: async () => {} },
-    names: record<ChatDeps["names"]>({ ensure: async () => {} }).port,
+  const titles = record<SendDeps["titles"]>({ laneStarted: async () => {} })
+  const deps: SendDeps = {
+    relays: { relayMessage: async () => {} },
+    names: record<SendDeps["names"]>({ ensure: async () => {} }).port,
     basics: b,
     placesWriter,
     agent: pi.port,
     scribe: pi.port,
     piSetup: pi.port,
     work: work.port,
-    blobs: record<ChatDeps["blobs"]>().port,
+    blobs: record<SendDeps["blobs"]>().port,
     quoteBytes: 32 * 1024,
-    cards: record<ChatDeps["cards"]>({
+    cards: record<SendDeps["cards"]>({
       blankQueued: NO_BLANK_CARDS.blankQueued,
     }).port,
     start: (lane, start) => {
@@ -111,7 +111,7 @@ function setUp(begin: ErrCode | null = null) {
       return runId("r-1")
     },
     titles: titles.port,
-    records: record<ChatDeps["records"]>({ writeValues: async () => {} }).port,
+    records: record<SendDeps["records"]>({ writeValues: async () => {} }).port,
   }
   const context = {
     view: { root: ROOT_ID, doc: b.root, session: b.session, live: b.live },
@@ -124,10 +124,10 @@ function setUp(begin: ErrCode | null = null) {
   return { b, pi, work, started, seen, titles, deps, context, provenance }
 }
 
-describe("executeChat", () => {
+describe("executeSend", () => {
   test("createAndRun creates the lane, prepares it, may title its root, and runs there", async () => {
     const { pi, work, started, titles, deps, context } = setUp()
-    const out = await executeChat(
+    const out = await executeSend(
       deps,
       { kind: "createAndRun", at: ROOT, thread: LANE, details, starts: null },
       context,
@@ -157,7 +157,7 @@ describe("executeChat", () => {
   test("a run carries the sender's pinned versions, for it to wait for", async () => {
     const { seen, deps, context } = setUp()
     const pinned = [{ id: cardIdFor("c1"), seen: "v-1" }]
-    await executeChat(
+    await executeSend(
       deps,
       { kind: "run", thread: LANE, details },
       {
@@ -165,7 +165,7 @@ describe("executeChat", () => {
         pinned,
       },
     )
-    await executeChat(
+    await executeSend(
       deps,
       { kind: "createAndRun", at: ROOT, thread: LANE, details, starts: null },
       { ...context, pinned },
@@ -183,12 +183,12 @@ describe("executeChat", () => {
       root: ROOT_ID,
       by: ALICE,
       now: 0,
-      placement: { kind: "after", task: TASK_ID, parent: null },
+      placement: { kind: "after", canvas: CANVAS_ID, parent: null },
       opens: null,
       cards: readPlaces(b.places),
     })
     if (opened.kind !== "open") throw new Error("the thread opens")
-    await executeChat(
+    await executeSend(
       deps,
       { kind: "run", thread: LANE, details },
       { ...context, start: opened },
@@ -200,7 +200,7 @@ describe("executeChat", () => {
 
   test("createAndRun from a base that cannot begin refuses, and never creates the lane", async () => {
     const { pi, started, deps, context } = setUp(ERR.BAD_BASE)
-    const out = await executeChat(
+    const out = await executeSend(
       deps,
       { kind: "createAndRun", at: ROOT, thread: LANE, details, starts: null },
       { ...context, base: "wip/gone" },
@@ -212,21 +212,21 @@ describe("executeChat", () => {
 
   test("busy writes nothing and answers busy: the sender's client queues its card", async () => {
     const { pi, work, started, deps, context } = setUp()
-    const out = await executeChat(deps, { kind: "busy" }, context)
+    const out = await executeSend(deps, { kind: "busy" }, context)
     expect(out).toEqual({ kind: "busy" })
     expect([pi.calls, work.calls, started]).toEqual([[], [], []])
   })
 })
 
-/** `sendChat` of `chat`, cleared through the gate first, as every send is. */
+/** `sendMessage` of `chat`, cleared through the gate first, as every send is. */
 const sendCleared = (
-  deps: ChatDeps,
+  deps: SendDeps,
   writer: WriterId,
   sendId: string,
-  chat: Send,
-) => sendChat(deps, writer, sendId, clearedSend(chat))
+  said: Send,
+) => sendMessage(deps, writer, sendId, clearedSend(said))
 
-describe("sendChat", () => {
+describe("sendMessage", () => {
   const E1 = entryId("e-1")
   const BEA = writerId("bea@example.com")
   const SHA = "a".repeat(64) as Sha256
@@ -281,8 +281,8 @@ describe("sendChat", () => {
     ],
   ])
   // E1 starts thread LANE: a lane by that name is the thread's.
-  const chat = (text: string, asksAgent = false): Send => ({
-    kind: "chat",
+  const said = (text: string, asksAgent = false): Send => ({
+    kind: "send",
     text,
     root: ROOT_ID,
     at: { kind: "end", thread: LANE, seen: E1 },
@@ -295,16 +295,16 @@ describe("sendChat", () => {
   })
   function setUp(
     project: ProjectRecord | null = null,
-    prepareUpdate: ChatDeps["work"]["prepareUpdate"] = async () => {
+    prepareUpdate: SendDeps["work"]["prepareUpdate"] = async () => {
       throw new Error("no update here")
     },
   ) {
     const b = basics()
     writeEntry(b.root, threadRow(E1, null, LANE))
-    // The thread's task, which a branch from it is put in.
-    putTask(b, LANE)
+    // The thread's canvas, which a branch from it is put in.
+    putCanvas(b, LANE)
     if (project !== null) putValue(b, setRecord(PROJECT, project))
-    const cards = record<ChatDeps["cards"]>({
+    const cards = record<SendDeps["cards"]>({
       writers: async () => [ALICE, BEA],
       blankQueued: NO_BLANK_CARDS.blankQueued,
     })
@@ -315,18 +315,18 @@ describe("sendChat", () => {
       // A catch-up is handed the lane's handle (`prepareUpdate`).
       lane: name => record<ThreadLaneHandle>({ name }).port,
     })
-    const started: ChatMessage[] = []
+    const started: PersonMessage[] = []
     const seen: (readonly SentCard[])[] = []
-    const records = record<ChatDeps["records"]>({ writeValues: async () => {} })
-    const names = record<ChatDeps["names"]>({ ensure: async () => {} })
-    const deps: ChatDeps = {
-      relays: { relayChat: async () => {} },
+    const records = record<SendDeps["records"]>({ writeValues: async () => {} })
+    const names = record<SendDeps["names"]>({ ensure: async () => {} })
+    const deps: SendDeps = {
+      relays: { relayMessage: async () => {} },
       basics: b,
       placesWriter: placesFor(b).placesWriter,
       agent: pi.port,
       scribe: pi.port,
       piSetup: pi.port,
-      work: record<ChatDeps["work"]>({
+      work: record<SendDeps["work"]>({
         ...RUNS_ANY,
         project,
         checkBegin: async () => null,
@@ -347,13 +347,13 @@ describe("sendChat", () => {
       quoteBytes: 16,
       cards: cards.port,
       start: (_lane, s) => {
-        if (s.kind === "prompt" && s.message.customType === CHAT_TYPE) {
-          started.push(s.message as ChatMessage)
+        if (s.kind === "prompt" && s.message.customType === MESSAGE_TYPE) {
+          started.push(s.message as PersonMessage)
           seen.push(s.pinnedSeen)
         }
         return runId("r-1")
       },
-      titles: record<ChatDeps["titles"]>({ laneStarted: async () => {} }).port,
+      titles: record<SendDeps["titles"]>({ laneStarted: async () => {} }).port,
       records: records.port,
       names: names.port,
     }
@@ -364,19 +364,19 @@ describe("sendChat", () => {
     const { b, pi, started, deps } = setUp()
     writeDirectory(b)
     const out = await sendCleared(deps, ALICE, "s-1", {
-      ...chat("do it", true),
-      at: { kind: "branch", thread: NEW, at: null, task: NEW_TASK },
+      ...said("do it", true),
+      at: { kind: "branch", thread: NEW, at: null, canvas: NEW_CANVAS },
     })
     expect(out).toMatchObject({ kind: "refused", code: ERR.ROOT_ID_IN_USE })
     expect([pi.calls, started]).toEqual([[], []])
   })
 
-  test("a new tab's first send, its thread and task opened as it opened, writes its entry alone", async () => {
+  test("a new canvas's first send, its thread and canvas opened as it opened, writes its entry alone", async () => {
     const { b, pi, records, deps } = setUp()
-    putTask(b, NEW, NEW_TASK)
+    putCanvas(b, NEW, NEW_CANVAS)
     const first = {
-      ...chat("do it", true),
-      at: { kind: "branch", thread: NEW, at: null, task: NEW_TASK },
+      ...said("do it", true),
+      at: { kind: "branch", thread: NEW, at: null, canvas: NEW_CANVAS },
     } as const
     expect(await sendCleared(deps, ALICE, "s-1", first)).toEqual({
       kind: "started",
@@ -386,19 +386,19 @@ describe("sendChat", () => {
       pi.calls.filter(c => c.method === "createThreadLane").map(c => c.args[1]),
     ).toEqual([NEW])
     expect(records.calls).toEqual([])
-    // Another thread at the root, in that task: its id is in use.
+    // Another thread at the root, in that canvas: its id is in use.
     const other = threadIdFor("01a0f9eb-86e1-77ad-a822-2a3067862240")
     expect(
       await sendCleared(deps, ALICE, "s-2", {
         ...first,
         at: { ...first.at, thread: other },
       }),
-    ).toMatchObject({ kind: "refused", code: ERR.TASK_ID_IN_USE })
+    ).toMatchObject({ kind: "refused", code: ERR.CANVAS_ID_IN_USE })
   })
 
-  test("a Start Agent column's message, naming nobody, starts a run", async () => {
+  test("a column that asks the agent's message, naming nobody, starts a run", async () => {
     const { started, deps } = setUp()
-    const out = await sendCleared(deps, ALICE, "s-1", chat("do it", true))
+    const out = await sendCleared(deps, ALICE, "s-1", said("do it", true))
     expect(out).toEqual({ kind: "started", runId: "r-1" })
     expect(started).toHaveLength(1)
   })
@@ -406,16 +406,16 @@ describe("sendChat", () => {
   test("the chat command's pinned versions reach its run", async () => {
     const { seen, deps } = setUp()
     const pinned = [{ id: cardIdFor("c1"), seen: "v-1" }]
-    await sendCleared(deps, ALICE, "s-1", { ...chat("do it", true), pinned })
+    await sendCleared(deps, ALICE, "s-1", { ...said("do it", true), pinned })
     expect(seen).toEqual([pinned])
   })
 
   test("a new lane is named by its thread's id", async () => {
     const { pi, deps } = setUp()
-    await sendCleared(deps, ALICE, "s-1", chat("do it", true))
+    await sendCleared(deps, ALICE, "s-1", said("do it", true))
     await sendCleared(deps, ALICE, "s-2", {
-      ...chat("do it", true),
-      at: { kind: "branch", thread: NEW, at: E1, task: TASK_ID },
+      ...said("do it", true),
+      at: { kind: "branch", thread: NEW, at: E1, canvas: CANVAS_ID },
     })
     expect(
       pi.calls.filter(c => c.method === "createThreadLane").map(c => c.args[1]),
@@ -425,10 +425,10 @@ describe("sendChat", () => {
   test("each message is appended in its thread; a branch's record is written with its first, then named", async () => {
     const { pi, records, names, deps } = setUp()
     await sendCleared(deps, ALICE, "s-1", {
-      ...chat("aside"),
-      at: { kind: "branch", thread: NEW, at: E1, task: TASK_ID },
+      ...said("aside"),
+      at: { kind: "branch", thread: NEW, at: E1, canvas: CANVAS_ID },
     })
-    await sendCleared(deps, ALICE, "s-2", chat("on"))
+    await sendCleared(deps, ALICE, "s-2", said("on"))
     const appended = pi.calls
       .filter(c => c.method === "appendToTree")
       .map(c => c.args[2])
@@ -447,7 +447,7 @@ describe("sendChat", () => {
     expect(names.calls.map(c => c.method)).toEqual(["ensure"])
   })
 
-  test("a thread's start, its card and a new task's card, is written before its send", async () => {
+  test("a thread's start, its card and a new canvas's card, is written before its send", async () => {
     const { b, records, deps } = setUp()
     const doing = workflowStateIdFor("d")
     putValue(
@@ -458,15 +458,15 @@ describe("sendChat", () => {
       }),
     )
     await sendCleared(deps, ALICE, "s-1", {
-      ...chat("a new task"),
-      at: { kind: "branch", thread: NEW, at: null, task: NEW_TASK },
+      ...said("a new canvas"),
+      at: { kind: "branch", thread: NEW, at: null, canvas: NEW_CANVAS },
     })
     expect(readPlaces(b.places).find(c => c.id === NEW)?.place).toMatchObject({
       kind: "canvas",
-      task: NEW_TASK,
+      canvas: NEW_CANVAS,
       width: 1,
     })
-    expect(readPlaces(b.places).find(c => c.id === NEW_TASK)?.place).toEqual({
+    expect(readPlaces(b.places).find(c => c.id === NEW_CANVAS)?.place).toEqual({
       kind: "board",
       state: doing,
       order: expect.any(String),
@@ -478,8 +478,8 @@ describe("sendChat", () => {
   test("a branch naming a thread that has started is refused, and nothing is written", async () => {
     const { pi, deps } = setUp()
     const out = await sendCleared(deps, ALICE, "s-1", {
-      ...chat("again"),
-      at: { kind: "branch", thread: LANE, at: E1, task: TASK_ID },
+      ...said("again"),
+      at: { kind: "branch", thread: LANE, at: E1, canvas: CANVAS_ID },
     })
     expect(out).toMatchObject({ kind: "refused", code: ERR.THREAD_TAKEN })
     expect(pi.calls.filter(c => c.method === "appendToTree")).toEqual([])
@@ -500,8 +500,8 @@ describe("sendChat", () => {
     )
     const before = readPlaces(b.places)
     const sent = await sendCleared(deps, ALICE, "s-1", {
-      ...chat("go on"),
-      at: { kind: "branch", thread: COPY, at: E1, task: TASK_ID },
+      ...said("go on"),
+      at: { kind: "branch", thread: COPY, at: E1, canvas: CANVAS_ID },
     })
     expect(sent.kind).toBe("appended")
     const appended = pi.calls
@@ -513,8 +513,13 @@ describe("sendChat", () => {
     // Anywhere but its fork, its id is another's.
     writeEntry(b.root, threadRow(entryId("e-0"), E1, LANE))
     const elsewhere = await sendCleared(deps, ALICE, "s-2", {
-      ...chat("again"),
-      at: { kind: "branch", thread: COPY, at: entryId("e-0"), task: TASK_ID },
+      ...said("again"),
+      at: {
+        kind: "branch",
+        thread: COPY,
+        at: entryId("e-0"),
+        canvas: CANVAS_ID,
+      },
     })
     expect(elsewhere).toMatchObject({
       kind: "refused",
@@ -528,7 +533,7 @@ describe("sendChat", () => {
       deps,
       ALICE,
       "s-1",
-      chat(
+      said(
         `look ![a](/blob/${SHA}) ![big](/blob/${BIG}) [z.zip](/blob/${ZIP})`,
       ),
     )
@@ -566,7 +571,7 @@ describe("sendChat", () => {
       deps,
       ALICE,
       "s-1",
-      chat(
+      said(
         `see [n.md](/blob/${NOTES}) [l.log](/blob/${LOG}) [z.zip](/blob/${ZIP})`,
       ),
     )
@@ -582,7 +587,7 @@ describe("sendChat", () => {
 
   test("in a thread that works in its own copy, your working copy's paths are stored as the lane sees them", async () => {
     const { started, deps } = setUp({ root: "/proj", kind: "jj", owner: null })
-    await sendCleared(deps, ALICE, "s-1", chat("@agent read /proj/a.txt"))
+    await sendCleared(deps, ALICE, "s-1", said("@agent read /proj/a.txt"))
     expect(started[0]?.details.text).toBe(
       "@agent read /mnt/host-working-copy/a.txt",
     )
@@ -631,7 +636,7 @@ describe("sendChat", () => {
         }),
       )
     }
-    const ask = (): Send => chat("@agent go on")
+    const ask = (): Send => said("@agent go on")
 
     test("the update first, keeping the lane up; then the chat runs after it, once", async () => {
       const updates: unknown[][] = []
@@ -702,7 +707,7 @@ describe("sendChat", () => {
 
   test("a conflict names who holds the thread, as a writer", async () => {
     const { b, deps } = setUp()
-    const out = await executeChat(
+    const out = await executeSend(
       deps,
       { kind: "conflict", by: BEA },
       {
@@ -720,7 +725,7 @@ describe("sendChat", () => {
   test("a message sent from a card carries its other writers, and spends nothing itself", async () => {
     const { pi, cards, deps } = setUp()
     const out = await sendCleared(deps, ALICE, "s-1", {
-      ...chat("from the card"),
+      ...said("from the card"),
       card: {
         id: cardIdFor("c1"),
         seen: "",
@@ -756,7 +761,7 @@ describe("sendChat", () => {
     const missing = "b".repeat(64)
     // Refused before it is planned: an image the host does not store.
     const early = await sendCleared(deps, ALICE, "s-1", {
-      ...chat(`look ![a](/blob/${missing})`),
+      ...said(`look ![a](/blob/${missing})`),
       card: {
         id: cardIdFor("c1"),
         seen: "",
@@ -773,7 +778,7 @@ describe("sendChat", () => {
       ALICE,
       "s-2",
       {
-        ...chat("from the card"),
+        ...said("from the card"),
         card: {
           id: cardIdFor("c1"),
           seen: "",
@@ -789,7 +794,7 @@ describe("sendChat", () => {
     beginRun(b.live, LANE, runId("r-0"))
     putValue(b, setRecord(PARTICIPANT, { writer: BEA, name: "Bea" }))
     const out = await sendCleared(deps, ALICE, "s-1", {
-      ...chat("@bea when it is done"),
+      ...said("@bea when it is done"),
       card: {
         id: cardIdFor("c1"),
         seen: "",
@@ -801,11 +806,11 @@ describe("sendChat", () => {
 
   test("a message with no card names no one else", async () => {
     const { pi, cards, deps } = setUp()
-    await sendCleared(deps, ALICE, "s-1", chat("plain"))
+    await sendCleared(deps, ALICE, "s-1", said("plain"))
     expect(cards.calls.filter(c => c.method === "writers")).toEqual([])
     const appended = pi.calls.find(c => c.method === "appendToTree")
     expect(
-      (appended?.args[0] as { details: ChatDetails }).details.contributors,
+      (appended?.args[0] as { details: MessageDetails }).details.contributors,
     ).toBeUndefined()
   })
 })

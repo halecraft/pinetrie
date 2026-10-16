@@ -123,7 +123,7 @@ export interface ContentOf {
     readonly quote: Sha256
   }
   readonly thread: Readonly<Record<string, never>>
-  readonly task: Readonly<Record<string, never>>
+  readonly canvas: Readonly<Record<string, never>>
   readonly "note-column": Readonly<Record<string, never>>
   readonly fact: { readonly fact: QueuedFact }
   readonly ask: { readonly relay: RelayDetails }
@@ -159,10 +159,10 @@ export type TextCard = Card<"text">
 export type ThreadCard = Card<"thread">
 
 /**
- * A task's card: its id is its task's, it has no text, and it is on the board,
+ * A canvas's card: its id is its canvas's, it has no text, and it is on the board,
  * in a workflow state, until the host trashes it.
  */
-export type TaskCard = Card<"task">
+export type CanvasCard = Card<"canvas">
 
 /** A note column's card, on a canvas alone. */
 export type NoteColumnCard = Card<"note-column">
@@ -209,7 +209,7 @@ export function textSourceOf(card: CardRecord): TextSource {
     case "ask":
       return { kind: "ask", relay: card.content.relay }
     case "thread":
-    case "task":
+    case "canvas":
     case "note-column":
       return { kind: "none" }
   }

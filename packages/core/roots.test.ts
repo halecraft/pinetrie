@@ -16,18 +16,18 @@ const ADA = writerId("ada")
 const BEA = writerId("bea")
 
 /** A chat by `writer` at `parent`; "c" entries are not messages. */
-const chat = (id: string, parentId: string | null, writer: WriterId) =>
-  entry(id, parentId, { role: "chat", content: id, author: "A", writer })
+const said = (id: string, parentId: string | null, writer: WriterId) =>
+  entry(id, parentId, { role: "person", content: id, author: "A", writer })
 
 // Two roots: r1 (Bea replies, then Ada branches) and r2 (a compaction only
 // between two messages); and a root with no message at all.
 const entries = entriesOf([
-  chat("1-r1", null, ADA),
-  chat("2-a", "1-r1", BEA),
-  chat("4-b", "1-r1", ADA),
-  chat("3-r2", null, BEA),
+  said("1-r1", null, ADA),
+  said("2-a", "1-r1", BEA),
+  said("4-b", "1-r1", ADA),
+  said("3-r2", null, BEA),
   entry("5-c", "3-r2", undefined, { type: "compaction" }),
-  chat("6-d", "5-c", BEA),
+  said("6-d", "5-c", BEA),
   entry("0-empty", null, undefined, { type: "compaction" }),
 ])
 const index = indexTree(entries)

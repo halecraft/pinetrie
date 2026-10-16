@@ -9,7 +9,7 @@ import type {
   WriterId,
 } from "@pinetrie/core"
 import type {
-  CrossTaskLink,
+  CrossCanvasLink,
   LaneJoin,
   MessageAct,
   MessageTools,
@@ -36,13 +36,13 @@ export interface MessageProps {
   nameOf: ReadonlyMap<WriterId, string>
   /** Which tools it offers (`messageTools`). */
   tools: MessageTools
-  /** What the reader asked of it: a branch, a new tab, a closed branch. */
+  /** What the reader asked of it: a branch, a new canvas, a closed branch. */
   onAct: (act: MessageAct) => void
   /** A lane starts here: a divider above the message names it. */
   join: LaneJoin | undefined
-  /** Another task's thread it came from, and where that is. */
-  crossTaskLink: CrossTaskLink | undefined
-  /** Open `crossTaskLink`'s thread, as a fork row's link opens. */
+  /** Another canvas's thread it came from, and where that is. */
+  crossCanvasLink: CrossCanvasLink | undefined
+  /** Open `crossCanvasLink`'s thread, as a fork row's link opens. */
   onLink: (link: ThreadLink, at: EntryId) => void
   /** The pinned cards its run read, when it is a run's prompt (`pinnedMarkers`). */
   pinned: PinnedMarker | undefined
@@ -65,7 +65,7 @@ const MESSAGE_PROPS = {
   rows: "identity",
   tools: "value",
   join: "value",
-  crossTaskLink: "value",
+  crossCanvasLink: "value",
   onLink: "identity",
   pinned: "value",
   forkTracks: "value",

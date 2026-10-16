@@ -6,42 +6,42 @@
 import {
   type AcceptedRecord,
   type AgentCandidate,
+  type CanvasId,
   type CardCommand,
-  type ChatMode,
   parseMentions,
   type QueueHoldChange,
   type Recipients,
+  type SendMode,
   type SetupRecord,
   sendWaits,
-  type TaskId,
   type ThreadId,
   type ThreadLane,
   type WriterId,
 } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import {
-  addressChat,
+  addressMessage,
   agentByDefault,
   displayName,
   parseCommand,
 } from "@pinetrie/rules"
-import type { ChatHow } from "@pinetrie/session"
+import type { SendHow } from "@pinetrie/session"
 import type { Prefill } from "./columns.ts"
 import { UPLOADING } from "./paste.ts"
 import { noModelWords } from "./setup-words.ts"
 
 /** What every send from one column carries, whichever card it is sent from. */
-export type ColumnHow = Pick<ChatHow, "base" | "root" | "pinned"> & {
+export type ColumnHow = Pick<SendHow, "base" | "root" | "pinned"> & {
   readonly asksAgent: boolean
   readonly column: string
   /** The column's thread: the one a unstarted column's first send starts. */
   readonly thread: ThreadId
   /**
-   * The task the column is on, where a thread its send starts goes; a new
+   * The canvas the column is on, where a thread its send starts goes; a new
    * tab's, minted as it opened. Null before it is known: nothing is sent
    * meanwhile.
    */
-  readonly task: TaskId | null
+  readonly canvas: CanvasId | null
 }
 
 /**
@@ -151,13 +151,13 @@ export function sendable(
  * the host to queue the card and sends no chat: the host pops it when its
  * lane is free.
  */
-export type ComposerMode = ChatMode | "queue"
+export type ComposerMode = SendMode | "queue"
 
 export interface SendPlan {
   readonly mode: ComposerMode
   /** The send creates a lane: the chip then says where it works. */
   readonly createsLane: boolean
-  /** Who it is for: `addressChat`'s answer, unchanged. */
+  /** Who it is for: `addressMessage`'s answer, unchanged. */
   readonly to: Recipients
   /** Where a queued send would wait: the button's in `queue` mode, and a conflict's. */
   readonly queue: QueuePlace
@@ -195,7 +195,7 @@ export const noModelLine = (setup: SetupRecord | null): string | null =>
 
 /**
  * What a composer's next send does, decided as the host will decide it: who
- * the message is for is `addressChat`, which `@pinetrie/rules`' `planChat`
+ * the message is for is `addressMessage`, which `@pinetrie/rules`' `planMessage`
  * runs too, over the thread `threadOf` gives.
  *
  * - A unstarted column sends `branch`. Elsewhere, a send to a busy lane, plain or
@@ -212,7 +212,7 @@ export function planSend(input: {
   readonly lane: ThreadLane
   readonly asksAgent: boolean
   readonly participants: readonly string[]
-  /** Other threads' agents on open tasks' canvases. */
+  /** Other threads' agents on open canvases. */
   readonly agents: readonly AgentCandidate[]
   readonly reader: Reader
   /** The card's command, or null. */
@@ -226,7 +226,7 @@ export function planSend(input: {
     lane,
     asksAgent: input.asksAgent,
   } as const
-  const to = addressChat({
+  const to = addressMessage({
     ...how,
     mentions: parseMentions(input.text),
     participants: input.participants,

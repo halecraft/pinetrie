@@ -19,7 +19,10 @@ import { compactRail, railLandmarks } from "./rail.ts"
 import { workStats } from "./work-stats.ts"
 
 type Message = NonNullable<EntryLike["message"]>
-const chat = (text = "hi"): Message => ({ role: "chat", content: text })
+const personMessage = (text = "hi"): Message => ({
+  role: "person",
+  content: text,
+})
 const said = (text: string, extra: Partial<Message> = {}): Message => ({
   role: "assistant",
   content: [{ type: "text", text }],
@@ -41,13 +44,13 @@ const build = (rows: readonly EntryLike[]): TreeIndex =>
 
 describe("workStats", () => {
   const index = build([
-    entry("1-p", null, chat(), { timestamp: 100 }),
+    entry("1-p", null, personMessage(), { timestamp: 100 }),
     entry("2-a", "1-p", calls("c1"), { timestamp: 110 }),
     entry("3-r", "2-a", result("c1", "x", true), { timestamp: 150 }),
     entry("4-a", "3-r", calls("c2"), { timestamp: 160 }),
     entry("5-r", "4-a", result("c2"), { timestamp: 170 }),
     entry("6-a", "5-r", said("done"), { timestamp: 200 }),
-    entry("7-q", "6-a", chat("thanks"), { timestamp: 300 }),
+    entry("7-q", "6-a", personMessage("thanks"), { timestamp: 300 }),
   ])
   const rev = (
     entry: string,
@@ -136,20 +139,26 @@ describe("workStats", () => {
 describe("compactRail and asks", () => {
   test("a long ask is a dot and a capsule; its next prompt starts again", () => {
     const rows: EntryLike[] = [
-      entry("01", null, chat()),
+      entry("01", null, personMessage()),
       entry("02", "01", said("ok")),
-      entry("03", "02", chat()),
+      entry("03", "02", personMessage()),
       entry("04", "03", said("ok")),
-      entry("05", "04", chat("the long one")),
+      entry("05", "04", personMessage("the long one")),
     ]
     let parent = "05"
     for (const id of ["06", "07", "08", "09"]) {
       rows.push(entry(id, parent, said(id)))
       parent = id
     }
-    rows.push(entry("10", parent, chat("next")), entry("11", "10", said("ok")))
-    rows.push(entry("12", "11", chat("more")), entry("13", "12", said("ok")))
-    rows.push(entry("14", "13", chat("end")))
+    rows.push(
+      entry("10", parent, personMessage("next")),
+      entry("11", "10", said("ok")),
+    )
+    rows.push(
+      entry("12", "11", personMessage("more")),
+      entry("13", "12", said("ok")),
+    )
+    rows.push(entry("14", "13", personMessage("end")))
     const index = build(rows)
     const items = compactRail(
       index,
@@ -173,7 +182,7 @@ describe("compactRail and asks", () => {
     expect(items[3]).toMatchObject({ kind: "stretch", ask: "05" })
   })
   test("a long ask with a base's news steered in is one capsule, counted as its fold", () => {
-    const rows: EntryLike[] = [entry("01", null, chat("the long one"))]
+    const rows: EntryLike[] = [entry("01", null, personMessage("the long one"))]
     let parent = "01"
     for (const id of ["02", "03", "04", "05", "06"]) {
       rows.push(
@@ -185,7 +194,7 @@ describe("compactRail and asks", () => {
       )
       parent = id
     }
-    rows.push(entry("07", parent, chat("next")))
+    rows.push(entry("07", parent, personMessage("next")))
     const index = build(rows)
     const asks = indexAsks(index)
     const items = compactRail(
@@ -206,15 +215,15 @@ describe("compactRail and asks", () => {
     expect(stats).toEqual(askStats(index, asks, entryId("01"), new Map()))
   })
   test("short exchanges still merge across their asks", () => {
-    const rows: EntryLike[] = [entry("00", null, chat())]
+    const rows: EntryLike[] = [entry("00", null, personMessage())]
     let parent = "00"
     for (let k = 1; k <= 10; k += 1) {
       const q = `${String(2 * k).padStart(2, "0")}`
       const a = `${String(2 * k + 1).padStart(2, "0")}`
-      rows.push(entry(q, parent, chat()), entry(a, q, said("ok")))
+      rows.push(entry(q, parent, personMessage()), entry(a, q, said("ok")))
       parent = a
     }
-    rows.push(entry("99", parent, chat()))
+    rows.push(entry("99", parent, personMessage()))
     const index = build(rows)
     const items = compactRail(
       index,
@@ -250,14 +259,14 @@ function* shapes(n: number): Generator<(number | null)[]> {
 }
 
 /** Every assignment of a role to entries after the first, which is a chat. */
-function* roles(n: number): Generator<("chat" | "agent" | "update")[]> {
-  const all = ["chat", "agent", "update"] as const
+function* roles(n: number): Generator<("person" | "agent" | "update")[]> {
+  const all = ["person", "agent", "update"] as const
   const total = 3 ** (n - 1)
   for (let k = 0; k < total; k += 1) {
-    const out: ("chat" | "agent" | "update")[] = ["chat"]
+    const out: ("person" | "agent" | "update")[] = ["person"]
     let x = k
     for (let i = 1; i < n; i += 1) {
-      out.push(all[x % 3] ?? "chat")
+      out.push(all[x % 3] ?? "person")
       x = Math.floor(x / 3)
     }
     yield out
@@ -292,7 +301,7 @@ test("over every tree of 6 entries, the column's folds agree with the rail's cap
               ? said("x")
               : role[i] === "update"
                 ? { role: "update", content: "u" }
-                : chat(),
+                : personMessage(),
           ),
         ),
       )

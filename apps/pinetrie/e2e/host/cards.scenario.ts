@@ -28,7 +28,7 @@ import {
   readTraces,
   readTypingIn,
 } from "@pinetrie/reads"
-import { canvasOf, HELD_WORDS, yourCard } from "@pinetrie/rules"
+import { cardsOnCanvas, HELD_WORDS, yourCard } from "@pinetrie/rules"
 import { cardDocId, InventoryDoc, PlacesDoc } from "@pinetrie/schema"
 import {
   LAST_ORDER,
@@ -41,6 +41,7 @@ import { openStore } from "../../host/store.ts"
 import type { Checks } from "../checks.ts"
 import {
   at,
+  canvasHolding,
   idleNow,
   join,
   laneNamesOf,
@@ -49,7 +50,6 @@ import {
   refusedWrite,
   START_AGENT,
   startSuiteHost,
-  taskHolding,
   threadHolding,
   tipIn,
   treeOf,
@@ -106,7 +106,7 @@ async function run(check: Checks["check"]): Promise<void> {
         order: LAST_ORDER,
       }) as const
     const newCard = (
-      who: Omit<SessionClient, "chat">,
+      who: Omit<SessionClient, "send">,
       end: EntryId | null,
       text: string,
       place: "composing" | "pinned" = "composing",
@@ -124,7 +124,7 @@ async function run(check: Checks["check"]): Promise<void> {
     }
 
     script.use([{ text: "Ready." }])
-    await ada.chat("@agent start", ROOT, START_AGENT)
+    await ada.send("@agent start", ROOT, START_AGENT)
     await cIdle()
     const end = tipOf()
 
@@ -143,8 +143,8 @@ async function run(check: Checks["check"]): Promise<void> {
       () => ada.cardText(c1).text() === typed && ch.cardText(c1) === typed,
       5_000,
     )
-    await bea.chat("@Ada one", at(end), { mode: "reply" })
-    await bea.chat("@Ada two", at(tipOf()), { mode: "reply" })
+    await bea.send("@Ada one", at(end), { mode: "reply" })
+    await bea.send("@Ada two", at(tipOf()), { mode: "reply" })
     await cIdle()
     const grown = tipOf()
     const idx = treeOf(ch)
@@ -162,7 +162,7 @@ async function run(check: Checks["check"]): Promise<void> {
     // 2. Ada sends it: at the new end, with Bea as contributor; the card is spent.
     script.use([{ text: "Tests it is." }])
     const SEND1 = crypto.randomUUID()
-    await ada.chat(typed, at(grown), { id: SEND1, card: c1 })
+    await ada.send(typed, at(grown), { id: SEND1, card: c1 })
     await cIdle()
     await ch.quiet()
 
@@ -183,7 +183,7 @@ async function run(check: Checks["check"]): Promise<void> {
     await ada.undoFor(kept).undo()
     const own = await waitFor(() => ch.cardText(kept) === "kept", 5_000)
     const othersLeft = onHost(spentCard) !== undefined
-    await ada.chat("@Bea spent", at(tipOf()), { card: spentCard })
+    await ada.send("@Bea spent", at(tipOf()), { card: spentCard })
     const dropped = await waitFor(
       () => !ada.exchange.has(cardDocId(spentCard)),
       5_000,
@@ -215,12 +215,12 @@ async function run(check: Checks["check"]): Promise<void> {
     // 3. A compelled send to a busy lane is a conflict, and the card stays.
     script.use([{ text: "A long answer." }, { text: "later" }])
     const longOne = script.hold("@agent a long one")
-    await bea.chat("@agent a long one", at(tipOf()), { mode: "reply" })
+    await bea.send("@agent a long one", at(tipOf()), { mode: "reply" })
     await waitFor(() => longOne.reached, 10_000)
     const busyEnd = tipOf()
     const c2 = newCard(ada, busyEnd, "@agent me too")
     await waitFor(() => ch.cardText(c2) === "@agent me too", 5_000)
-    await ada.chat("@agent me too", at(busyEnd), { card: c2 })
+    await ada.send("@agent me too", at(busyEnd), { card: c2 })
 
     // 4. The busy lane's queue. Bea sends Ada's card
     // there: the host queues it in the same step, as Bea's. Ada edits it while
@@ -233,7 +233,7 @@ async function run(check: Checks["check"]): Promise<void> {
         bea.cards.current().some(c => c.id === c3),
       5_000,
     )
-    const busy = await bea.chat("@Ada the plan", at(busyEnd), { card: c3 })
+    const busy = await bea.send("@Ada the plan", at(busyEnd), { card: c3 })
     await waitFor(() => onHost(c3)?.place.kind === "queued", 5_000)
     await waitFor(() => ada.cardText(c3).text() === "@Ada the plan", 5_000)
     ada.cardText(c3).text.insert(13, " is ready")
@@ -254,7 +254,7 @@ async function run(check: Checks["check"]): Promise<void> {
     const index3 = treeOf(ch)
     const sent3 = Object.values(index3.entries).find(
       e =>
-        e.message?.role === "chat" &&
+        e.message?.role === "person" &&
         e.message.content === "@Ada the plan is ready",
     )?.message
     check(
@@ -267,7 +267,7 @@ async function run(check: Checks["check"]): Promise<void> {
     )
     const neverSent = !Object.values(index3.entries).some(
       e =>
-        e.message?.role === "chat" && e.message.content === "@Bea never mind",
+        e.message?.role === "person" && e.message.content === "@Bea never mind",
     )
     check(
       "an unqueued card is not sent, and is below the line again for everyone",
@@ -287,7 +287,7 @@ async function run(check: Checks["check"]): Promise<void> {
       () =>
         Object.values(treeOf(ch).entries).some(
           e =>
-            e.message?.role === "chat" &&
+            e.message?.role === "person" &&
             e.message.content === "@Bea while it is quiet",
         ),
       5_000,
@@ -316,7 +316,8 @@ async function run(check: Checks["check"]): Promise<void> {
     )
     await ch.quiet()
     const sent7 = Object.values(treeOf(ch).entries).some(
-      e => e.message?.role === "chat" && e.message.content === "@Bea too quick",
+      e =>
+        e.message?.role === "person" && e.message.content === "@Bea too quick",
     )
     check(
       "an unqueue the pop got to first is refused as gone, and its client says it was sent",
@@ -342,7 +343,7 @@ async function run(check: Checks["check"]): Promise<void> {
         onHost(c8) === undefined &&
         Object.values(treeOf(ch).entries).some(
           e =>
-            e.message?.role === "chat" &&
+            e.message?.role === "person" &&
             e.message.content === "@Bea wait for me",
         ),
       10_000,
@@ -384,10 +385,10 @@ async function run(check: Checks["check"]): Promise<void> {
         },
       },
     ])
-    await ada.chat("@agent go on", at(pinEnd), { pinned: [pin] })
+    await ada.send("@agent go on", at(pinEnd), { pinned: [pin] })
     await cIdle()
     const prompt = Object.values(treeOf(ch).entries).find(
-      e => e.message?.role === "chat" && e.message.content === "@agent go on",
+      e => e.message?.role === "person" && e.message.content === "@agent go on",
     )
     const parent =
       prompt?.parentId == null ? undefined : treeOf(ch).entries[prompt.parentId]
@@ -435,7 +436,7 @@ async function run(check: Checks["check"]): Promise<void> {
       },
       "typed just before the send",
     )
-    await adaLate.chat("@agent and now", at(editEnd), { pinned: [pin, late] })
+    await adaLate.send("@agent and now", at(editEnd), { pinned: [pin, late] })
     await cIdle()
     const lastCards =
       readCards.findLast(t => t.startsWith("<pinned-cards>")) ?? ""
@@ -472,7 +473,7 @@ async function run(check: Checks["check"]): Promise<void> {
       { card: away, from: pinnedAt(traceEnd), to: beas },
       byBea,
     )
-    ada.setReading("k-ada", traceEnd ?? "", taskHolding(ch, traceEnd))
+    ada.setReading("k-ada", traceEnd ?? "", canvasHolding(ch, traceEnd))
     await waitFor(
       () =>
         readReading(ch.presence).some(
@@ -531,7 +532,7 @@ async function run(check: Checks["check"]): Promise<void> {
         unsent: "",
         placer: mallory.writer,
         holder: "",
-        task: "",
+        canvas: "",
         width: "",
         state: "",
         address: "",
@@ -601,9 +602,9 @@ async function run(check: Checks["check"]): Promise<void> {
     // Ada's second session undoes, in this root, the take into the inventory
     // her first session made here; her take in another root stays. An undo after Bea moved the
     // card is refused, naming Bea. A keep of three cards is one move.
-    // A history is a task's.
-    const here = taskHolding(ch, tipOf())
-    const other = await ada.chat("a root of its own", ROOT, { mode: "branch" })
+    // A history is a canvas's.
+    const here = canvasHolding(ch, tipOf())
+    const other = await ada.send("a root of its own", ROOT, { mode: "branch" })
     const otherEnd = other.kind === "appended" ? other.id : null
     const takeIntoInventory = (
       card: TextCardId,
@@ -621,7 +622,7 @@ async function run(check: Checks["check"]): Promise<void> {
     const undoneHere = await ada2.undoMoves(here, "undo")
     const a1Back = onHost(a1)?.place.kind === "composing"
     const b1Stays = onHost(b1)?.place.kind === "inventory"
-    // Pinned at the thread's end: a place in its task's history.
+    // Pinned at the thread's end: a place in its canvas's history.
     const parked = {
       kind: "pinned",
       thread: threadHolding(ch, tipOf()),
@@ -710,7 +711,7 @@ async function run(check: Checks["check"]): Promise<void> {
       {
         card: onCanvas,
         from: drafting(tipOf()),
-        to: { kind: "canvas-at", task: here, after: null },
+        to: { kind: "canvas-at", canvas: here, after: null },
       },
       { actedAt: { kind: "inventory" }, slot: null },
     )
@@ -723,14 +724,14 @@ async function run(check: Checks["check"]): Promise<void> {
       "a text card dropped on a canvas lands in a note column made for it there, and one undo removes the column and returns the card",
       drop.kind === "accepted" &&
         wrapper?.place.kind === "canvas" &&
-        wrapper.place.task === here &&
+        wrapper.place.canvas === here &&
         dropUndone.kind === "undone" &&
         onHost(wrapper.id) === undefined &&
         onHost(onCanvas)?.place.kind === "composing",
       `${drop.kind}; ${landed?.kind}, ${wrapper?.place.kind}; ${dropUndone.kind}, ${onHost(onCanvas)?.place.kind}`,
     )
     // ＋ past the last column: a new root's first thread opened in this
-    // task, its card just after the card it was made after; its first send
+    // canvas, its card just after the card it was made after; its first send
     // starts that root here.
     const main = threadHolding(ch, tipOf())
     const fresh = newThreadId()
@@ -739,19 +740,19 @@ async function run(check: Checks["check"]): Promise<void> {
       kind: "open-thread",
       thread: fresh,
       root: freshRoot,
-      task: here,
+      canvas: here,
       start: { kind: "new-root", after: main },
     })
     await waitFor(() => onHost(fresh) !== undefined, 5_000)
-    const canvasNow = canvasOf(readPlaces(ch.places), here).map(c => c.id)
-    const freshFirst = await ada.chat("a fresh start", at(null), {
+    const canvasNow = cardsOnCanvas(readPlaces(ch.places), here).map(c => c.id)
+    const freshFirst = await ada.send("a fresh start", at(null), {
       mode: "branch",
       thread: fresh,
-      task: here,
+      canvas: here,
       root: freshRoot,
     })
     check(
-      "a new root's thread opens in a task the session holds, just after the card it was made after, and its first send starts that root there",
+      "a new root's thread opens in a canvas the session holds, just after the card it was made after, and its first send starts that root there",
       freshOpened.kind === "moved" &&
         canvasNow.indexOf(fresh) === canvasNow.indexOf(main) + 1 &&
         freshFirst.kind === "appended" &&
@@ -760,7 +761,7 @@ async function run(check: Checks["check"]): Promise<void> {
       `${freshOpened.kind}; ${canvasNow.indexOf(main)} ${canvasNow.indexOf(fresh)}; ${freshFirst.kind}`,
     )
     // A paste: a text card pasted at the thread lands in its
-    // notes, one step of Ada's history in this task, which an undo takes
+    // notes, one step of Ada's history in this canvas, which an undo takes
     // away. A cut is a discard, then the paste of that very card out of
     // her trash; an undo puts it back there.
     const notesNear = {
@@ -828,7 +829,7 @@ async function run(check: Checks["check"]): Promise<void> {
       await ada.moveCard(
         {
           card: columnThread,
-          from: { kind: "canvas", task: wasOn.task },
+          from: { kind: "canvas", canvas: wasOn.canvas },
           to: DISCARDED,
         },
         { actedAt: { kind: "inventory" }, slot: null },
@@ -899,7 +900,7 @@ async function run(check: Checks["check"]): Promise<void> {
     await waitFor(() => ch.cardText(c4) === "@Bea over to you", 5_000)
     await ada.close()
     const SEND4 = crypto.randomUUID()
-    const sent4 = await bea.chat("@Bea over to you", at(tipOf()), {
+    const sent4 = await bea.send("@Bea over to you", at(tipOf()), {
       id: SEND4,
       card: c4,
     })
@@ -936,7 +937,7 @@ async function run(check: Checks["check"]): Promise<void> {
     await bea.request({ kind: "queue-hold", lane, held: true })
     const c9 = newCard(bea, tipOf(), "@Ada after the restart")
     await waitFor(() => ch.cardText(c9) === "@Ada after the restart", 5_000)
-    const heldSend = await bea.chat("@Ada after the restart", at(tipOf()), {
+    const heldSend = await bea.send("@Ada after the restart", at(tipOf()), {
       card: c9,
     })
     await ch.quiet()
@@ -978,7 +979,7 @@ async function run(check: Checks["check"]): Promise<void> {
         onHost(c9) === undefined &&
         Object.values(treeOf(ch).entries).some(
           e =>
-            e.message?.role === "chat" &&
+            e.message?.role === "person" &&
             e.message.content === "@Ada after the restart",
         ),
       5_000,
@@ -995,13 +996,13 @@ async function run(check: Checks["check"]): Promise<void> {
     const took = await eve.moveCard(
       {
         card: lane,
-        from: { kind: "canvas", task: here },
+        from: { kind: "canvas", canvas: here },
         to: { kind: "inventory", holder: eve.writer },
       },
       { actedAt: { kind: "column", key: "k-take" }, slot: 0 },
     )
     await waitFor(() => onHost(lane)?.place.kind === "inventory", 5_000)
-    const heldSend2 = await eve.chat("@Ada while it is away", at(tipNow), {
+    const heldSend2 = await eve.send("@Ada while it is away", at(tipNow), {
       mode: "reply",
       thread: lane,
     })
@@ -1013,14 +1014,14 @@ async function run(check: Checks["check"]): Promise<void> {
       move: {
         card: COPY,
         from: null,
-        to: { kind: "canvas-at", task: here, after: null },
+        to: { kind: "canvas-at", canvas: here, after: null },
       },
     })
     await waitFor(() => onHost(COPY) !== undefined, 5_000)
-    const firstOfCopy = await eve.chat("the copy's first", at(tipNow), {
+    const firstOfCopy = await eve.send("the copy's first", at(tipNow), {
       mode: "branch",
       thread: COPY,
-      task: here,
+      canvas: here,
     })
     const copyRecord = readThreads(ch.session).get(COPY)
     const copyFirst = treeOf(ch).firstOf.get(COPY)
@@ -1040,12 +1041,12 @@ async function run(check: Checks["check"]): Promise<void> {
       {
         card: lane,
         from: { kind: "inventory", holder: eve.writer },
-        to: { kind: "canvas-at", task: here, after: null },
+        to: { kind: "canvas-at", canvas: here, after: null },
       },
       { actedAt: { kind: "inventory" }, slot: null },
     )
     await waitFor(() => onHost(lane)?.place.kind === "canvas", 5_000)
-    const sentBack = await eve.chat("@Ada back on the canvas", at(tipNow), {
+    const sentBack = await eve.send("@Ada back on the canvas", at(tipNow), {
       mode: "reply",
       thread: lane,
     })

@@ -20,8 +20,8 @@ const here = threadIdFor("here")
 const ada = writerId("ada@example.com")
 const build = (rows: readonly EntryLike[]): TreeIndex =>
   indexTree(entriesOf(rows))
-const chat = (extra: Partial<Message> = {}): Message => ({
-  role: "chat",
+const personMessage = (extra: Partial<Message> = {}): Message => ({
+  role: "person",
   content: "hi",
   ...extra,
 })
@@ -46,8 +46,8 @@ const answer = (from: typeof fox, source: string): Message => ({
 
 describe("threadMembers", () => {
   const index = build([
-    entry("1", null, chat({ invites: [fox] })),
-    entry("2", "1", chat({ invites: [owl, fox] })),
+    entry("1", null, personMessage({ invites: [fox] })),
+    entry("2", "1", personMessage({ invites: [owl, fox] })),
     entry("3", "2", { role: "fact", content: "", member: { gone: fox } }),
     entry("b", "1", said("a branch before owl was invited")),
   ])
@@ -94,7 +94,7 @@ describe("lastHeardEntry", () => {
 
 describe("isRoundAnswered", () => {
   const index = build([
-    entry("q", null, chat({ asks: [fox, owl] })),
+    entry("q", null, personMessage({ asks: [fox, owl] })),
     entry("1", "q", answer(fox, "q")),
     entry("2", "1", answer(owl, "other")),
     entry("3", "2", answer(owl, "q")),

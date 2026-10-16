@@ -43,7 +43,7 @@ const target: ReviewTarget = {
 const node = (id: string, text: string): SpineNode => ({
   id: entryId(id),
   thread: FIXTURE_THREAD,
-  role: "chat",
+  role: "person",
   text,
   branches: [],
 })
@@ -188,7 +188,7 @@ describe("paneView", () => {
 
 describe("askReviewTarget", () => {
   const index = indexOf([
-    entry("p", null, { role: "chat", content: "do it" }),
+    entry("p", null, { role: "person", content: "do it" }),
     entry("a", "p", {
       role: "assistant",
       content: [{ type: "text", text: "done" }],

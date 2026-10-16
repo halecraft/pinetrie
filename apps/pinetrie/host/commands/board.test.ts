@@ -14,21 +14,21 @@ import { beginRun, writeEntry, writeLaneTip } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import {
   basics,
+  CANVAS_ID,
   methods,
   NO_BLANK_CARDS,
+  putCanvas,
   putLane,
-  putTask,
   putValue,
   record,
   row,
-  TASK_ID,
   writeDirectory,
   writesOf,
 } from "../fakes.ts"
-import { type BoardDeps, handleTaskMove, handleWorkflow } from "./board.ts"
+import { type BoardDeps, handleCanvasMove, handleWorkflow } from "./board.ts"
 import { settled } from "./cards.ts"
 
-/** The task's one thread. */
+/** The canvas's one thread. */
 const THREAD_1 = threadIdFor("0123456789abcdef")
 
 const [DOING, DONE] = [workflowStateIdFor("d"), workflowStateIdFor("x")]
@@ -38,13 +38,13 @@ const WORKFLOW_NOW: Workflow = {
 }
 const ADA = writerId("ada@example.com")
 
-/** A task of one root with one message, in Doing, on a board with Doing and Done. */
+/** A canvas of one root with one message, in Doing, on a board with Doing and Done. */
 function setUp() {
   const b = basics()
   const root = entryId("e-1")
   writeEntry(b.root, row(root, null))
   writeDirectory(b)
-  putTask(b, THREAD_1, TASK_ID, undefined, DOING)
+  putCanvas(b, THREAD_1, CANVAS_ID, undefined, DOING)
   putValue(b, setRecord(WORKFLOW, WORKFLOW_NOW))
   const records = record<BoardDeps["records"]>({ writeValues: async () => {} })
   const work = record<BoardDeps["work"]>({
@@ -52,7 +52,7 @@ function setUp() {
     teardown: async () => {},
   })
   const moves = record<BoardDeps["moves"]>({
-    placeTask: async () => settled({ kind: "moved" }, 1),
+    placeCanvas: async () => settled({ kind: "moved" }, 1),
   })
   const deps: BoardDeps = {
     basics: b,
@@ -66,32 +66,32 @@ function setUp() {
 }
 
 const toDone = {
-  kind: "move-task",
-  task: TASK_ID,
+  kind: "move-canvas",
+  canvas: CANVAS_ID,
   from: DOING,
   to: DONE,
   before: null,
 } as const
 
-test("a task an agent of its threads works in is not archived, and nothing is written", async () => {
+test("a canvas an agent of its threads works in is not archived, and nothing is written", async () => {
   const { b, root, records, moves, deps } = setUp()
   const lane = THREAD_1
   putLane(b, lane, root)
   writeLaneTip(b.root, lane, root)
   beginRun(b.live, lane, runId("r-1"))
-  const out = await handleTaskMove(deps, ADA, toDone)
-  expect(out.outcome).toMatchObject({ kind: "refused", code: ERR.TASK_BUSY })
+  const out = await handleCanvasMove(deps, ADA, toDone)
+  expect(out.outcome).toMatchObject({ kind: "refused", code: ERR.CANVAS_BUSY })
   expect(records.calls).toEqual([])
   expect(moves.calls).toEqual([])
 })
 
-test("an idle task moved to Done: its card's move written, then torn down and unloaded", async () => {
+test("an idle canvas moved to Done: its card's move written, then torn down and unloaded", async () => {
   const { moves, work, deps } = setUp()
-  const out = await handleTaskMove(deps, ADA, toDone)
+  const out = await handleCanvasMove(deps, ADA, toDone)
   expect(out.outcome).toEqual({ kind: "moved" })
   expect(moves.calls).toMatchObject([
     {
-      method: "placeTask",
+      method: "placeCanvas",
       args: [
         ADA,
         {
@@ -100,7 +100,7 @@ test("an idle task moved to Done: its card's move written, then torn down and un
           steps: [
             {
               record: {
-                id: TASK_ID,
+                id: CANVAS_ID,
                 place: { kind: "board", state: DONE },
               },
             },
@@ -112,19 +112,19 @@ test("an idle task moved to Done: its card's move written, then torn down and un
   expect(methods(work.calls)).toEqual(["teardown"])
 })
 
-test("an idle task moved to Done with its last run's verdict pending leaves it unclassified", async () => {
+test("an idle canvas moved to Done with its last run's verdict pending leaves it unclassified", async () => {
   const { b, records, deps } = setUp()
   const pending = pendingVerdict(THREAD_1, entryId("e-1"), entryId("e-1"))
   putValue(b, setRecord(VERDICT, pending))
-  await handleTaskMove(deps, ADA, toDone)
+  await handleCanvasMove(deps, ADA, toDone)
   expect(writesOf(records.calls)).toEqual([
     setRecord(VERDICT, { ...pending, verdict: { kind: "unclassified" } }),
   ])
 })
 
-test("a move from a state the task has left is refused `moved`, saying where it is and who put it there", async () => {
+test("a move from a state the canvas has left is refused `moved`, saying where it is and who put it there", async () => {
   const { moves, deps } = setUp()
-  const out = await handleTaskMove(deps, ADA, { ...toDone, from: DONE })
+  const out = await handleCanvasMove(deps, ADA, { ...toDone, from: DONE })
   expect(out.outcome).toMatchObject({
     kind: "unmoved",
     code: "moved",
@@ -143,11 +143,11 @@ test("a move within open states writes only its card, and opens no root", async 
       open: [...WORKFLOW_NOW.open, { id: review, name: "Review" }],
     }),
   )
-  const out = await handleTaskMove(deps, ADA, { ...toDone, to: review })
+  const out = await handleCanvasMove(deps, ADA, { ...toDone, to: review })
   expect(out.outcome).toEqual({ kind: "moved" })
-  expect(methods(moves.calls)).toEqual(["placeTask"])
+  expect(methods(moves.calls)).toEqual(["placeCanvas"])
   expect(work.calls).toEqual([])
-  expect(readPlaces(b.places).some(c => c.id === TASK_ID)).toBe(true)
+  expect(readPlaces(b.places).some(c => c.id === CANVAS_ID)).toBe(true)
 })
 
 test("a workflow edit writes the workflow; a refusal writes nothing", async () => {

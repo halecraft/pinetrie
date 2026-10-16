@@ -187,7 +187,7 @@ readers need, as the stream row's, lives here. It still imports no pi.
 wins per field. Its records are flat, and every key starts with its seat's
 `seatKey`, `${writer}:${seat}` (ADR-0037): `reading` is keyed
 `readingKey(seatKey, columnKey)` (every column of the tab a person is on
-reports its thread's end), and so is `readingTask` (the task it is on,
+reports its thread's end), and so is `readingCanvas` (the canvas it is on,
 ADR-0116, which also names it for a window that does not hold the
 thread's root, ADR-0063); `typing` (a
 thread end) and `typingIn` (the card typed in: the host pops no queued card
@@ -250,8 +250,9 @@ document.
 `PlacesDoc` holds every card's record, keyed by card id: `yjs.bind` of a
 record of flat string rows (`owner`, `kind`, `root`, `at`, `lane`,
 `column`, `order`, `by`, `seen`, `command`, `unsent`, `placer`,
-`holder`, `task`, `width`, "" for none; `task` and `width` from migration
-`0005-tasks`, ADR-0116), decoded in `@pinetrie/rules` (`decodeCard`),
+`holder`, `canvas`, `width`, "" for none; `width` from migration
+`0005-tasks`, ADR-0116, and `canvas`, named `task` until `0019-canvas-places`,
+ADR-0158), decoded in `@pinetrie/rules` (`decodeCard`),
 and `rev`. Its id is `pinetrie:card-places` (`PLACES_DOC_ID`). Only the host
 writes it, each write one change of its writer (`apps/pinetrie/host/places.ts`).
 
@@ -278,8 +279,8 @@ would refuse each whole undo of a move (S82).
   is a file card's), its row is a `queued` one, and its fact is JSON in
   `fact`. An ask card's relay is JSON in its own `relay` (ADR-0128). Record migration `0009-card-content` moved each fact stored on a
   text card's bare id to a new `x-` id, with its history.
-- **A canvas row** (`canvas`, ADR-0116) names its task, its rank in
-  `order` and its width (`"1"` or `"2"`): a thread's card on its task's
+- **A canvas row** (`canvas`, ADR-0116) names its canvas, its rank in
+  `order` and its width (`"1"` or `"2"`): a thread's card on its canvas's
   canvas: a thread not yet started's too (ADR-0126).
 - **A pinned row carries `lane` and `order`**, as a queued one does, and
   no `by` or `seen`. A card's place among others is a rank in its own
@@ -323,12 +324,12 @@ would refuse each whole undo of a move (S82).
   place's own row, its kind prefixed `discarded-` (`discarded-note`,
   `discarded-canvas`, `discarded-drafting`, …), so no field was added and
   the schema's hash held. Who trashed it is the row's `placer`. A row of
-  the old shape, `discarded` with `holder` and `task`, does not decode:
+  the old shape, `discarded` with `holder` and `canvas`, does not decode:
   record migration `0014-trash-left` deletes them. A card spun into a
   thread is in a trash too; its thread's record names it (`origin`
   `spun`).
 - **The row has no `root`** (ADR-0126): only a fresh card's row named one,
-  and a branch or a new tab is a thread card now. Migration
+  and a branch or a new canvas's thread is a thread card now. Migration
   `0012-unstarted-threads` dropped it with its data moved: each fresh
   column became its thread opened, a spun card a discarded one, an ask's
   relay moved from `fact` to `relay`.
@@ -378,17 +379,15 @@ panel draws a slot whose card is not held as empty.
   (`readStep`).
 - `dismissed` and `dismissedReady`: per lane, the ask whose verdict, and
   the `ledger.source` whose ready proposed changes, was marked "not needed".
-  `dismissedReady` was `dismissedOffers` (ADR-0153). `AttentionDocBeforeReady`
-  is the schema before the rename, kept only for the host's
-  `0018-dismissed-ready` migration, and deleted with it.
+  `dismissedReady` was named for offers before ADR-0153.
 - A key that is no lane name is left out when read.
 
-`OpenDoc` is the tasks the person has open, their list (ADR-0122,
-ADR-0116): `{ tasks }`, each task's `TaskId` to an order key, read by
-`readOpenKeys` (a key that is no task is left out) and ordered by
+`OpenDoc` is the canvases the person has open, their list (ADR-0122,
+ADR-0116): `{ canvases }`, each canvas's `CanvasId` to an order key, read by
+`readOpenKeys` (a key that is no canvas is left out) and ordered by
 `orderOpen` (by key, then id, in `packages/session/open-repair.ts`). A
-record, not a list: two devices reordering at once merge per task, and a
-list could hold a task twice.
+record, not a list: two devices reordering at once merge per canvas, and a
+list could hold a canvas twice.
 
 ## A document per root (ADR-0063)
 

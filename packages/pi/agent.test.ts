@@ -22,8 +22,8 @@ import { cardIdFor } from "@pinetrie/core/fixtures"
 import {
   BEHIND_TYPE,
   encodeBehind,
-  encodeChat,
   encodeHeard,
+  encodeMessage,
   encodePinned,
   encodeRelayMessage,
   LANE,
@@ -118,7 +118,7 @@ describe("createThreadLane", () => {
     const agent = await over(newRootDoc())
     const lane = agent.lane(threadIdFor(newId()))
     const unknown = { kind: "refused", code: ERR.UNKNOWN_TARGET }
-    const message = encodeChat(
+    const message = encodeMessage(
       {
         author: writerId("ada"),
         authorName: "Ada",
@@ -137,8 +137,8 @@ describe("createThreadLane", () => {
 
 describe("a pi session per root", () => {
   const OTHER = rootIdFor("01a0ffd2-0000-7000-8000-00000000000b")
-  const chat = (text: string) =>
-    encodeChat(
+  const said = (text: string) =>
+    encodeMessage(
       {
         author: writerId("ada@x.io"),
         authorName: "Ada",
@@ -194,7 +194,7 @@ describe("a pi session per root", () => {
           createdAt: 1,
         }),
       ])
-      expect(await first.agent.lane(lane).run(chat(`in ${root}`), [])).toEqual({
+      expect(await first.agent.lane(lane).run(said(`in ${root}`), [])).toEqual({
         kind: "ok",
       })
     }
@@ -213,7 +213,7 @@ describe("a pi session per root", () => {
       model: { kind: "scripted", script },
     })
     for (const lane of lanes)
-      expect(await second.agent.lane(lane).run(chat("again"), [])).toEqual({
+      expect(await second.agent.lane(lane).run(said("again"), [])).toEqual({
         kind: "ok",
       })
     expect(await second.agent.interrupted([ONE_ROOT, OTHER])).toEqual([])
@@ -224,7 +224,7 @@ describe("a pi session per root", () => {
 describe("pinned cards: what the model reads", () => {
   const ADA = writerId("ada@x.io")
   const asked = (text: string) =>
-    encodeChat(
+    encodeMessage(
       {
         author: ADA,
         authorName: "Ada",
@@ -293,7 +293,7 @@ describe("pinned cards: what the model reads", () => {
     const cards = rows(doc).find(r => messageOf(r)?.customType === PINNED_TYPE)
     const prompt = rows(doc).find(r => r.parentId === cards?.id)
     expect(messageOf(prompt ?? { payload: null })?.customType).toBe(
-      "pinetrie.chat",
+      "pinetrie.message",
     )
     expect(seen.at(-2)).toBe(pinned.content)
     expect(seen.at(-1)).toBe("Ada: go")
@@ -335,7 +335,7 @@ describe("pinned cards: what the model reads", () => {
     const prompt = rows(doc).find(r => r.parentId === cards?.id)
     expect(
       [cards, prompt].map(r => messageOf(r ?? { payload: null })?.customType),
-    ).toEqual([PINNED_TYPE, "pinetrie.chat"])
+    ).toEqual([PINNED_TYPE, "pinetrie.message"])
     expect(seen.slice(-3)).toEqual([
       behind.content,
       pinned.content,
@@ -459,7 +459,7 @@ describe("pinned cards: what the model reads", () => {
 describe("agents talking", () => {
   const ADA = writerId("ada@x.io")
   const asked = (text: string) =>
-    encodeChat(
+    encodeMessage(
       {
         author: ADA,
         authorName: "Ada",

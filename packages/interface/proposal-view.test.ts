@@ -37,7 +37,7 @@ const on = (id: string, parent: string | null, m: Message) =>
   entry(id, parent, m, { thread: P })
 const index = indexTree(
   entriesOf([
-    on("1-p", null, { role: "chat", content: "split it" }),
+    on("1-p", null, { role: "person", content: "split it" }),
     on("2-a", "1-p", {
       role: "assistant",
       content: [{ type: "toolCall", id: "c1", name: "propose_branches" }],

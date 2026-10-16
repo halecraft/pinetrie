@@ -44,13 +44,13 @@ module but `fixtures.ts`, which tests import as `@pinetrie/core/fixtures`.
   anything is written (ADR-0057): by its column, or one per row by a press
   on a proposal (ADR-0157). It names its lane too (ADR-0117,
   ADR-0120): a container and its volume are named after it, so a new one is
-  checked strictly (`parseNewThread`). A task's id is its card's (ADR-0116,
+  checked strictly (`parseNewThread`). A canvas's id is its card's (ADR-0116,
   ADR-0126); a root's names its document, not its root entry (ADR-0063); a
   workflow state's survives a rename (ADR-0122). A file card's is reserved
   (ADR-0118); a fact's, a reference's (ADR-0126) and an ask's (ADR-0128) are
   minted where the card is made.
-- A history of moves is per person and task, or the person's outside any
-  task (ADR-0066, ADR-0116, ADR-0126).
+- A history of moves is per person and canvas, or the person's outside any
+  canvas (ADR-0066, ADR-0116, ADR-0126).
 - `KINDS` holds one row per kind of card: its id's prefix, the places it is
   ever in (ADR-0116, ADR-0117, ADR-0126, ADR-0128), whether it is reordered
   there, and where its words are read.
@@ -115,7 +115,7 @@ module but `fixtures.ts`, which tests import as `@pinetrie/core/fixtures`.
   (ADR-0042); a reference card's quote is a blob too (ADR-0126). A blob is
   an image, text or opaque (`BlobKind`, from its stored tag, `kindOfMime`),
   and a message's shares (`Share`) name each one's original and the image
-  copy it shows (ADR-0151). `ImageRef` is stored in chats as it is, so a
+  copy it shows (ADR-0151). `ImageRef` is stored in sends as it is, so a
   blob's size is the store's `size`, never a field of the ref.
 - `TOOL_IDS` is every lane's tool list, the same in every run, `set_banner`
   included under any icon source (ADR-0143), `propose_branches` last
@@ -126,7 +126,7 @@ module but `fixtures.ts`, which tests import as `@pinetrie/core/fixtures`.
 
 ## Records (`index.ts`)
 
-- A `Send` is a chat the host sends: a `chat` intent's, or a popped
+- A `Send` is a person's message the host sends: a `send` intent's, or a popped
   queued card's (`SendAt`'s `queue`). `Gated`, an intent or a send, is
   what the host's gate decides on (`planGate`, `@pinetrie/rules`); it is
   core's so that `runsIn` and `writesIn` take it without importing the
@@ -134,7 +134,7 @@ module but `fixtures.ts`, which tests import as `@pinetrie/core/fixtures`.
 - Each host record is one spec, and pi only carries its writes (ADR-0062);
   a record lives in the session's document or a root's (ADR-0063).
 - The board's workflow states and the archive (ADR-0122, ADR-0029); a
-  task's title (ADR-0045, ADR-0116) and one a model gives (ADR-0074); a
+  canvas's title (ADR-0045, ADR-0116) and one a model gives (ADR-0074); a
   person's picture (ADR-0098); a column's banner (ADR-0050), and the host's
   icon source, `IconsRecord` (ADR-0143); the commands a pi skill or prompt
   makes (ADR-0036).

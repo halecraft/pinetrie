@@ -47,11 +47,11 @@ const StoredCard = Schema.struct.json({
   placer: Schema.string(),
   /** Whose inventory or trash holds it. */
   holder: Schema.string(),
-  /** A canvas card's, or a trashed card's, task. */
-  task: Schema.string(),
+  /** A canvas card's, or a trashed card's, canvas. */
+  canvas: Schema.string(),
   /** A canvas card's width: `1` or `2` columns. */
   width: Schema.string(),
-  /** A task's card's workflow state on the board. */
+  /** A canvas's card's workflow state on the board. */
   state: Schema.string(),
   /** A reference's address, printed (`printAddress`). */
   address: Schema.string(),
@@ -78,6 +78,47 @@ export const PlacesDoc = yjs.bind(placesSchema)
 /** The places document, as the Exchange gives it. */
 export type PlacesDocHandle =
   typeof PlacesDoc extends BoundSchema<infer S, infer N> ? DocRef<S, N> : never
+
+/** The fields a row had while it named a task: `task` where `canvas` is now. */
+const BEFORE_CANVAS_FIELDS = [
+  "owner",
+  "kind",
+  "at",
+  "lane",
+  "column",
+  "order",
+  "by",
+  "seen",
+  "command",
+  "fact",
+  "relay",
+  "unsent",
+  "placer",
+  "holder",
+  "task",
+  "width",
+  "state",
+  "address",
+  "quote",
+  "origin",
+] as const
+
+/**
+ * The schema before rows named a canvas: its hash is what a stored document
+ * written under it carries, and the host's `0019-canvas-places` migration
+ * reads each row's `task` through it, since the current schema drops it.
+ * Delete with that migration.
+ */
+export const PlacesDocBeforeCanvas = yjs.bind(
+  Schema.struct({
+    rev: Schema.number(),
+    cards: Schema.record(
+      Schema.struct.json(
+        Object.fromEntries(BEFORE_CANVAS_FIELDS.map(f => [f, Schema.string()])),
+      ),
+    ),
+  }),
+)
 
 const CARD_PREFIX = "card:"
 

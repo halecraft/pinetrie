@@ -87,13 +87,13 @@ test("one seat's command held open holds no other seat's", async () => {
     done.push(`${writer} ${wire.id}`)
   })
   send("seat-1", ["slow", "after"])
-  send("seat-2", ["chat"])
+  send("seat-2", ["send"])
   await new Promise(r => setTimeout(r, 20))
-  expect(done).toEqual(["w-bea@example.com chat"])
+  expect(done).toEqual(["w-bea@example.com send"])
   held.resolve()
   await new Promise(r => setTimeout(r, 20))
   expect(done).toEqual([
-    "w-bea@example.com chat",
+    "w-bea@example.com send",
     "w-ada@example.com slow",
     "w-ada@example.com after",
   ])

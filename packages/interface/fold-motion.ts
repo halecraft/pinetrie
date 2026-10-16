@@ -117,9 +117,9 @@ export function foldOf(action: LayoutAction): ColumnMotion | null {
         column: { kind: "card", card: change.card },
         unfolded: change.unfolded,
       }
-    case "foldTask":
+    case "foldCanvas":
       return {
-        column: { kind: "task", task: action.task },
+        column: { kind: "canvas", canvas: action.canvas },
         unfolded: change.unfolded,
       }
     default:

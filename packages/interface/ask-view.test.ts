@@ -19,8 +19,8 @@ import {
 import { entry, indexOf } from "./fixtures.ts"
 
 type Message = NonNullable<EntryLike["message"]>
-const chat: Message = {
-  role: "chat",
+const personMessage: Message = {
+  role: "person",
   content: "Fix it",
   writer: writerId("ada"),
 }
@@ -29,7 +29,7 @@ const said = (text: string): Message => ({
   content: [{ type: "text", text }],
 })
 const index = indexOf([
-  entry("1-p", null, chat),
+  entry("1-p", null, personMessage),
   entry("2-a", "1-p", said("looking")),
   entry("3-a", "2-a", {
     role: "assistant",
@@ -44,7 +44,7 @@ const index = indexOf([
   }),
   entry("4-r", "3-a", { role: "toolResult", toolCallId: "c1", content: "ok" }),
   entry("5-a", "4-r", said("done")),
-  entry("6-q", "5-a", chat),
+  entry("6-q", "5-a", personMessage),
 ])
 const asks = indexAsks(index)
 const path = [
@@ -74,13 +74,13 @@ test("columnRows: an ask's work is one row, its prompt and what follows rows of 
 
 test("columnRows: a base's news steered into a run is drawn in its ask's row", () => {
   const steered = indexOf([
-    entry("1-p", null, chat),
+    entry("1-p", null, personMessage),
     entry("2-a", "1-p", said("looking")),
     entry("3-a", "2-a", said("still looking")),
     entry("4-b", "3-a", { role: "behind", content: "↓ new work" }),
     entry("5-a", "4-b", said("more")),
     entry("6-a", "5-a", said("done")),
-    entry("7-q", "6-a", chat),
+    entry("7-q", "6-a", personMessage),
     entry("8-b", "7-q", { role: "behind", content: "↓ newer work" }),
   ])
   const ids = ["1-p", "2-a", "3-a", "4-b", "5-a", "6-a", "7-q", "8-b"]
@@ -223,7 +223,7 @@ describe("askView", () => {
   })
   test("a stop names who stopped it", () => {
     const stopped = indexOf([
-      entry("1-p", null, chat),
+      entry("1-p", null, personMessage),
       entry("2-a", "1-p", { ...said("wo"), stopReason: "aborted" }),
       entry("3-f", "2-a", {
         role: "fact",

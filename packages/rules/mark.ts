@@ -1,7 +1,8 @@
-// mark — a task's title, and the one plan for titling a task or a note column.
+// mark — a canvas's title, and the one plan for titling a canvas or a note column.
 
 import {
   type AgentId,
+  type CanvasId,
   ERR,
   type MarkRecord,
   type MarkTarget,
@@ -9,13 +10,12 @@ import {
   type NoteColumnRecord,
   type Refusal,
   refused,
-  type TaskId,
   THE_AGENT,
   type ValueWrite,
   type WriterId,
 } from "@pinetrie/core"
 import { Type } from "typebox"
-import { decodeAt, taskKey } from "./decode.ts"
+import { decodeAt, parseCanvasKey } from "./decode.ts"
 import { NOTE_COLUMN } from "./note-column.ts"
 import { deleteRecord, type RecordSpec, setRecord } from "./records.ts"
 
@@ -27,15 +27,15 @@ const MarkSchema = Type.Object({
   at: Type.Number(),
 })
 
-/** Each task's title, at the task's id. */
-export const MARK: RecordSpec<MarkRecord, TaskId, "session"> = {
+/** Each canvas's title, at the canvas's id. */
+export const MARK: RecordSpec<MarkRecord, CanvasId, "session"> = {
   namespace: "pinetrie.mark",
   home: "session",
-  keyOf: r => r.task,
-  encode: ({ task, ...contents }) => contents,
+  keyOf: r => r.canvas,
+  encode: ({ canvas, ...contents }) => contents,
   decode: (contents, key) =>
-    decodeAt(MarkSchema, contents, taskKey(key), (r, task) => ({
-      task,
+    decodeAt(MarkSchema, contents, parseCanvasKey(key), (r, canvas) => ({
+      canvas,
       title: r.title,
       // A writer id always starts `w-` (`writerId`), so neither is read as the other.
       by: r.by as WriterId | AgentId,
@@ -53,8 +53,8 @@ type MarkPlan =
   | { readonly kind: "writes"; readonly writes: readonly ValueWrite[] }
 
 /**
- * Decide a mark: set a task's or a note column's
- * title, or clear it with null. Each title is in its own record: a task's in
+ * Decide a mark: set a canvas's or a note column's
+ * title, or clear it with null. Each title is in its own record: a canvas's in
  * `MARK`, a note column's in `NOTE_COLUMN`, which only a person sets.
  */
 export function planMark(input: {
@@ -62,27 +62,27 @@ export function planMark(input: {
   readonly title: string | null
   readonly by: WriterId | AgentId
   readonly now: number
-  /** Every task the session holds. */
-  readonly tasks: ReadonlySet<TaskId>
-  readonly marks: ReadonlyMap<TaskId, MarkRecord>
+  /** Every canvas the session holds. */
+  readonly canvases: ReadonlySet<CanvasId>
+  readonly marks: ReadonlyMap<CanvasId, MarkRecord>
   /** Every note column on a canvas. */
   readonly columns: ReadonlySet<NoteColumnId>
   readonly columnTitles: ReadonlyMap<NoteColumnId, NoteColumnRecord>
 }): MarkPlan {
   const { of, title, by, now } = input
   switch (of.kind) {
-    case "task": {
-      const { task } = of
-      if (!input.tasks.has(task))
-        return refused(ERR.UNKNOWN_TARGET, "no such task to title")
-      const stored = input.marks.get(task)?.title ?? null
+    case "canvas": {
+      const { canvas } = of
+      if (!input.canvases.has(canvas))
+        return refused(ERR.UNKNOWN_TARGET, "no such canvas to title")
+      const stored = input.marks.get(canvas)?.title ?? null
       if (stored === title) return { kind: "unchanged" }
       return {
         kind: "writes",
         writes: [
           title === null
-            ? deleteRecord(MARK, task)
-            : setRecord(MARK, { task, title, by, at: now }),
+            ? deleteRecord(MARK, canvas)
+            : setRecord(MARK, { canvas, title, by, at: now }),
         ],
       }
     }

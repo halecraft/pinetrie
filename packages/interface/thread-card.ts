@@ -1,11 +1,11 @@
-// interface/thread-card — what a task's card shows in its header: a task on the
-// board, or in the sidebar, is one card, its header built once per task
+// interface/thread-card — what a canvas's card shows in its header: a canvas on the
+// board, or in the sidebar, is one card, its header built once per canvas
 // (`threadCardHeads`) and read by both views. Its signals are its threads'
 // together, whatever roots they are in. Neutral: never in the thread's colour.
 
 import type {
   AgentWork,
-  TaskId,
+  CanvasId,
   Workflow,
   WorkflowStateId,
 } from "@pinetrie/core"
@@ -16,9 +16,9 @@ import { NO_TEXT } from "./root-label.ts"
 /** A move to another workflow state, as a thread card's ⋯ offers it. */
 export interface ThreadMove {
   readonly name: string
-  /** To the archive: it archives the task. */
+  /** To the archive: it archives the canvas. */
   readonly closes: boolean
-  /** Why it is refused now (`TASK_BUSY_REASON`'s key, `@pinetrie/rules`), into the archive only. */
+  /** Why it is refused now (`CANVAS_BUSY_REASON`'s key, `@pinetrie/rules`), into the archive only. */
   readonly busy: AgentWork | null
   /** Into the archive, the threads whose proposed changes it withdraws. */
   readonly drops: readonly string[]
@@ -27,13 +27,13 @@ export interface ThreadMove {
 
 /** A thread card's header: its signals, and its ⋯'s Move to ▸. */
 export interface ThreadCardHead {
-  readonly task: TaskId
+  readonly canvas: CanvasId
   readonly label: string
-  /** What its mark draws (`taskStatus`), or null for none. */
+  /** What its mark draws (`canvasStatus`), or null for none. */
   readonly status: Status | null
-  /** Its threads with changes ready to accept (`openProposedByTask`): ⇡, for everyone. */
+  /** Its threads with changes ready to accept (`openProposedByCanvas`): ⇡, for everyone. */
   readonly ready: readonly string[]
-  /** An unsent card of yours is in it (`UnsentSignals.tasks`): your pip. */
+  /** An unsent card of yours is in it (`UnsentSignals.canvases`): your pip. */
   readonly pip: boolean
   /** The state it is in on the board; null before the host placed it. */
   readonly state: WorkflowStateId | null
@@ -45,39 +45,39 @@ export interface ThreadCardHead {
 export interface ThreadCardFacts {
   /** The board's states, or null before the host wrote them. */
   readonly workflow: Workflow | null
-  /** Each task's state on the board (`boardOf`). */
-  readonly stateOf: ReadonlyMap<TaskId, WorkflowStateId>
-  /** Each task's label (`labelsOf`). */
-  readonly labels: ReadonlyMap<TaskId, string>
-  /** Each task's status (`taskStatus`). */
-  readonly status: ReadonlyMap<TaskId, Status>
-  /** Tasks holding an unsent card of yours (`UnsentSignals.tasks`). */
-  readonly pips: ReadonlySet<TaskId>
-  /** The threads with open proposed changes, by task (`openProposedByTask`). */
-  readonly proposed: ReadonlyMap<TaskId, readonly string[]>
-  /** The agent's work in each task, held or not (`taskWork`). */
-  readonly work: ReadonlyMap<TaskId, AgentWork>
+  /** Each canvas's state on the board (`boardOf`). */
+  readonly stateOf: ReadonlyMap<CanvasId, WorkflowStateId>
+  /** Each canvas's label (`labelsOf`). */
+  readonly labels: ReadonlyMap<CanvasId, string>
+  /** Each canvas's status (`canvasStatus`). */
+  readonly status: ReadonlyMap<CanvasId, Status>
+  /** Canvases holding an unsent card of yours (`UnsentSignals.canvases`). */
+  readonly pips: ReadonlySet<CanvasId>
+  /** The threads with open proposed changes, by canvas (`openProposedByCanvas`). */
+  readonly proposed: ReadonlyMap<CanvasId, readonly string[]>
+  /** The agent's work in each canvas, held or not (`canvasWork`). */
+  readonly work: ReadonlyMap<CanvasId, AgentWork>
 }
 
 export function threadCardHead(
-  task: TaskId,
+  canvas: CanvasId,
   facts: ThreadCardFacts,
 ): ThreadCardHead {
-  const state = facts.stateOf.get(task) ?? null
+  const state = facts.stateOf.get(canvas) ?? null
   return {
-    task,
-    label: facts.labels.get(task) ?? NO_TEXT,
-    status: facts.status.get(task) ?? null,
-    ready: facts.proposed.get(task) ?? [],
-    pip: facts.pips.has(task),
+    canvas,
+    label: facts.labels.get(canvas) ?? NO_TEXT,
+    status: facts.status.get(canvas) ?? null,
+    ready: facts.proposed.get(canvas) ?? [],
+    pip: facts.pips.has(canvas),
     state,
-    moves: movesOf(task, state, facts),
+    moves: movesOf(canvas, state, facts),
   }
 }
 
 /** "Move to ▸" each state but `from`. */
 function movesOf(
-  task: TaskId,
+  canvas: CanvasId,
   from: WorkflowStateId | null,
   facts: ThreadCardFacts,
 ): readonly ThreadMove[] {
@@ -90,11 +90,11 @@ function movesOf(
       {
         name: to.name,
         closes,
-        busy: closes ? (facts.work.get(task) ?? null) : null,
-        drops: closes ? (facts.proposed.get(task) ?? []) : [],
+        busy: closes ? (facts.work.get(canvas) ?? null) : null,
+        drops: closes ? (facts.proposed.get(canvas) ?? []) : [],
         intent: {
-          kind: "moveTask",
-          task,
+          kind: "moveCanvas",
+          canvas,
           from,
           to: to.id,
           before: null,
@@ -105,12 +105,13 @@ function movesOf(
   })
 }
 
-/** Every task's header, once: what the board and the sidebar both read. */
+/** Every canvas's header, once: what the board and the sidebar both read. */
 export function threadCardHeads(
-  tasks: Iterable<TaskId>,
+  canvases: Iterable<CanvasId>,
   facts: ThreadCardFacts,
-): ReadonlyMap<TaskId, ThreadCardHead> {
-  const heads = new Map<TaskId, ThreadCardHead>()
-  for (const task of tasks) heads.set(task, threadCardHead(task, facts))
+): ReadonlyMap<CanvasId, ThreadCardHead> {
+  const heads = new Map<CanvasId, ThreadCardHead>()
+  for (const canvas of canvases)
+    heads.set(canvas, threadCardHead(canvas, facts))
   return heads
 }

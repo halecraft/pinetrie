@@ -1,5 +1,5 @@
 // margin — the cards beside an entry: comments on it, shared by everyone in
-// its task and never read by the agent.
+// its canvas and never read by the agent.
 
 import {
   type CardInPlace,

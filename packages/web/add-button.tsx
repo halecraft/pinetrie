@@ -1,5 +1,5 @@
-// web/add-button — ＋, a split button: its main action, and the rest in its
-// ▾. What it starts and its words are its `StartButton`'s
+// web/add-button — ＋: its main action, and the rest in its ▾ when it has
+// any. What it starts and its words are its `StartButton`'s
 // (`start-button.ts`, `@pinetrie/interface`): at the sidebar's foot, on each
 // board column, and past a canvas's last column.
 
@@ -16,7 +16,7 @@ export function AddButton({
   folded?: boolean
   onIntent: (intent: Intent) => void
 }) {
-  const { main } = add
+  const { main, more } = add
   return (
     <span className={folded ? "add-root folded" : "add-root"}>
       <button
@@ -28,24 +28,26 @@ export function AddButton({
       >
         {folded ? "＋" : `＋ ${main.label}`}
       </button>
-      <Menu
-        className="add-more"
-        sections={[
-          {
-            key: "add",
-            items: add.more.map(item => ({
-              key: item.key,
-              className: `add-${item.key}`,
-              title: item.title,
-              label: item.label,
-              onChoose: () => onIntent(item.intent),
-            })),
-          },
-        ]}
-        label={add.moreLabel}
-        trigger="▾"
-        triggerClassName="add-menu"
-      />
+      {more !== null && (
+        <Menu
+          className="add-more"
+          sections={[
+            {
+              key: "add",
+              items: more.items.map(item => ({
+                key: item.key,
+                className: `add-${item.key}`,
+                title: item.title,
+                label: item.label,
+                onChoose: () => onIntent(item.intent),
+              })),
+            },
+          ]}
+          label={more.label}
+          trigger="▾"
+          triggerClassName="add-menu"
+        />
+      )}
     </span>
   )
 }

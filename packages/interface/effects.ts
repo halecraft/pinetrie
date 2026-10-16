@@ -5,12 +5,13 @@
 import type {
   Address,
   AskIndex,
+  CanvasId,
   CardCommand,
   CardId,
   CardRecord,
-  ChatAt,
   EntryId,
   LaneView,
+  MessageAt,
   MoveDirection,
   MoveTarget,
   ProposedChangesAction,
@@ -20,7 +21,6 @@ import type {
   Reorder,
   Replacing,
   Sha256,
-  TaskId,
   TextCard,
   TextCardId,
   ThreadId,
@@ -38,6 +38,7 @@ import type {
 } from "@pinetrie/session"
 import type { Raised } from "./attention.ts"
 import { heldByOthers } from "./canvas-columns.ts"
+import type { Canvases } from "./canvases.ts"
 import type { Quote } from "./card-intents.ts"
 import type { Clip } from "./clip.ts"
 import type { FocusKey } from "./focus-claim.ts"
@@ -53,7 +54,6 @@ import type { ListWidth } from "./list-width.ts"
 import type { PageName } from "./page.ts"
 import type { ComposerPlaces } from "./put-target.ts"
 import type { SearchAct } from "./search.ts"
-import type { Tasks } from "./tasks.ts"
 
 export type Effect =
   | {
@@ -84,20 +84,20 @@ export type Effect =
   | { readonly kind: "list"; readonly act: ListAct }
   /**
    * Make a card a thread; `afterSpinOff` decides from its
-   * answer what follows: for the sidebar, the new task placed and shown.
+   * answer what follows: for the sidebar, the new canvas placed and shown.
    */
   | {
       readonly kind: "spinOff"
       readonly request: Extract<HostRequest, { kind: "spin-off" }>
-      readonly sidebar: { readonly before: TaskId | null } | null
+      readonly sidebar: { readonly before: CanvasId | null } | null
     }
   /**
-   * Move a task on the board; `afterTaskMove` decides from its answer
+   * Move a canvas on the board; `afterCanvasMove` decides from its answer
    * whether `moved` runs.
    */
   | {
-      readonly kind: "moveTask"
-      readonly move: Extract<HostRequest, { kind: "move-task" }>
+      readonly kind: "moveCanvas"
+      readonly move: Extract<HostRequest, { kind: "move-canvas" }>
       readonly moved: readonly Effect[]
     }
   /**
@@ -105,9 +105,9 @@ export type Effect =
    * from its card when you typed one, else its text.
    */
   | {
-      readonly kind: "chat"
+      readonly kind: "send"
       readonly text: string
-      readonly at: ChatAt
+      readonly at: MessageAt
       readonly card: TextCardId | null
     }
   | {
@@ -128,8 +128,8 @@ export type Effect =
       readonly to: MoveTarget
       readonly replacing: Replacing | null
       readonly how: MoveHow
-      /** The task you are on: a discard's history from your inventory. */
-      readonly here: TaskId | null
+      /** The canvas you are on: a discard's history from your inventory. */
+      readonly here: CanvasId | null
     }
   /** What the clipboard cell shows: the copy this tab just made. */
   | { readonly kind: "clipboardCell"; readonly clip: Clip }
@@ -144,8 +144,8 @@ export type Effect =
       readonly queuedBy: WriterId | null
       /** Whether the card animates to where it lands (`ports.fly`). */
       readonly fly: boolean
-      /** The task you are on, for a discard: its history, from your inventory. */
-      readonly here: TaskId | null
+      /** The canvas you are on, for a discard: its history, from your inventory. */
+      readonly here: CanvasId | null
     }
   /**
    * A card queued, and its queue's hold changed with it. A move
@@ -180,15 +180,15 @@ export type Effect =
       readonly actedAt: ActedAt
       readonly close: readonly Effect[]
       /** As `moveCard`'s. */
-      readonly here: TaskId | null
+      readonly here: CanvasId | null
     }
   /**
-   * Undo or redo your newest move in `task`, or outside any task for none,
+   * Undo or redo your newest move in `canvas`, or outside any canvas for none,
    * on the host.
    */
   | {
       readonly kind: "undoMoves"
-      readonly task: TaskId | null
+      readonly canvas: CanvasId | null
       readonly direction: MoveDirection
     }
   /** Undo or redo this tab's newest swap in your inventory. */
@@ -223,16 +223,16 @@ export type Effect =
   | { readonly kind: "forgetIdentity" }
   | { readonly kind: "reload" }
 
-/** A change to the sidebar, by task: your document's key. */
+/** A change to the sidebar, by canvas: your document's key. */
 export type ListAct =
   /** At its end, unless it is in the sidebar already. */
-  | { readonly kind: "ensure"; readonly task: TaskId }
+  | { readonly kind: "ensure"; readonly canvas: CanvasId }
   | {
       readonly kind: "place"
-      readonly task: TaskId
-      readonly before: TaskId | null
+      readonly canvas: CanvasId
+      readonly before: CanvasId | null
     }
-  | { readonly kind: "close"; readonly task: TaskId }
+  | { readonly kind: "close"; readonly canvas: CanvasId }
 
 export interface IntentState {
   readonly layout: Layout
@@ -241,10 +241,10 @@ export interface IntentState {
   readonly asks: AskIndex
   readonly cards: CardFacts
   /**
-   * Every task: an entry opens in the task its thread is in, and
-   * a task's columns are its canvas's.
+   * Every canvas: an entry opens in the canvas its thread is in, and
+   * a canvas's columns are its canvas's.
    */
-  readonly tasks: Tasks
+  readonly canvases: Canvases
   /** What the sidebar shows now (`shownWidth`). */
   readonly listWidth: ListWidth
   /** The page over the stage, if any. */
@@ -306,52 +306,52 @@ export const layout = (action: LayoutAction): Effect => ({
 })
 export const list = (act: ListAct): Effect => ({ kind: "list", act })
 
-/** `task` leaves the sidebar, and if you are on it, its neighbour is shown. */
-export const closeTaskEffects = (task: TaskId): readonly Effect[] => [
-  list({ kind: "close", task }),
-  layout({ kind: "closeTask", task }),
+/** `canvas` leaves the sidebar, and if you are on it, its neighbour is shown. */
+export const closeCanvasEffects = (canvas: CanvasId): readonly Effect[] => [
+  list({ kind: "close", canvas }),
+  layout({ kind: "closeCanvas", canvas }),
 ]
 
-/** Show `here`; a task shown is opened in the sidebar, at its end if it was not there. */
+/** Show `here`; a canvas shown is opened in the sidebar, at its end if it was not there. */
 export function show(here: Here): readonly Effect[] {
   const shown = layout({ kind: "show", here })
-  return here.kind === "task"
-    ? [shown, list({ kind: "ensure", task: here.task })]
+  return here.kind === "canvas"
+    ? [shown, list({ kind: "ensure", canvas: here.canvas })]
     : [shown]
 }
-export const showTask = (task: TaskId): readonly Effect[] =>
-  show({ kind: "task", task })
+export const showCanvas = (canvas: CanvasId): readonly Effect[] =>
+  show({ kind: "canvas", canvas })
 
-/** A change to your view of `task`: a view made by it starts from the task's canvas (`defaultView`). */
+/** A change to your view of `canvas`: a view made by it starts from the canvas (`defaultView`). */
 const viewAction = (
-  state: Pick<IntentState, "tasks">,
-  task: TaskId,
+  state: Pick<IntentState, "canvases">,
+  canvas: CanvasId,
   change: ViewChange,
 ): LayoutAction => ({
   kind: "view",
-  task,
-  first: state.tasks.index.canvases.get(task)?.[0]?.id ?? null,
+  canvas,
+  first: state.canvases.index.cardsOn.get(canvas)?.[0]?.id ?? null,
   change,
 })
 
-/** A change to your view of `task` (`ViewChange`), as an effect. */
+/** A change to your view of `canvas` (`ViewChange`), as an effect. */
 export const changeViewOf = (
-  state: Pick<IntentState, "tasks">,
-  task: TaskId,
+  state: Pick<IntentState, "canvases">,
+  canvas: CanvasId,
   change: ViewChange,
-): Effect => layout(viewAction(state, task, change))
+): Effect => layout(viewAction(state, canvas, change))
 
 /**
- * A fold or unfold of a column of `task` that the reader asked for: as
+ * A fold or unfold of a column of `canvas` that the reader asked for: as
  * `changeViewOf`, and the column moves as it folds.
  */
 export const foldViewOf = (
-  state: Pick<IntentState, "tasks">,
-  task: TaskId,
-  change: Extract<ViewChange, { kind: "fold" | "foldTask" }>,
+  state: Pick<IntentState, "canvases">,
+  canvas: CanvasId,
+  change: Extract<ViewChange, { kind: "fold" | "foldCanvas" }>,
 ): Effect => ({
   kind: "layout",
-  action: viewAction(state, task, change),
+  action: viewAction(state, canvas, change),
   moves: true,
 })
 
@@ -366,7 +366,7 @@ export function planOpenAt(id: EntryId, state: IntentState): readonly Effect[] {
     state.layout,
     state.index,
     id,
-    state.tasks.index,
+    state.canvases.index,
     state.cards.lanes,
     heldByOthers(state.cards.cards, state.cards.me),
   )
@@ -376,13 +376,17 @@ export function planOpenAt(id: EntryId, state: IntentState): readonly Effect[] {
     ask === undefined ? [] : [{ kind: "openFold", ask }]
   switch (plan.kind) {
     case "scroll":
-      return [...fold, { kind: "reveal", entry: id }, ...showTask(plan.task)]
+      return [
+        ...fold,
+        { kind: "reveal", entry: id },
+        ...showCanvas(plan.canvas),
+      ]
     case "unfold":
       return [
         ...fold,
         { kind: "reveal", entry: id },
-        ...showTask(plan.task),
-        changeViewOf(state, plan.task, {
+        ...showCanvas(plan.canvas),
+        changeViewOf(state, plan.canvas, {
           kind: "fold",
           card: plan.card,
           unfolded: true,

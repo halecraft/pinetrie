@@ -3,11 +3,12 @@
 //
 // Each move says where it was made, so a refusal is said there. Which
 // history a move enters is the host's to decide (`historyOf`); an undo names
-// only the task you are on.
+// only the canvas you are on.
 
 import {
   type Address,
   BACK,
+  type CanvasId,
   type CanvasTarget,
   type CardId,
   type CardRecord,
@@ -37,7 +38,6 @@ import {
   type Sha256,
   sameKey,
   type TargetOf,
-  type TaskId,
   type TextCard,
   type TextCardId,
   type ThreadCard,
@@ -47,7 +47,7 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
-import { addressLink, taskOfPlace } from "@pinetrie/rules"
+import { addressLink, canvasOfPlace } from "@pinetrie/rules"
 import {
   type ActedAt,
   AT_INVENTORY,
@@ -67,7 +67,7 @@ import { type Discardable, isDiscardable } from "./discardable.ts"
 import {
   type CardFacts,
   changeViewOf,
-  closeTaskEffects,
+  closeCanvasEffects,
   type Effect,
   type IntentState,
   planOpenAt,
@@ -81,18 +81,18 @@ import {
   placeOfTarget,
 } from "./put-target.ts"
 import { revealOf } from "./reveal.ts"
-import { newTaskEffects, planSpinOff } from "./spin-off.ts"
+import { newCanvasEffects, planSpinOff } from "./spin-off.ts"
 
 /**
  * A move to send; `fly`: whether its card animates to where it lands;
- * `here`, for a discard, the task you are on.
+ * `here`, for a discard, the canvas you are on.
  */
 export const moveCard = (
   move: TypedMove,
   how: MoveHow,
   fly: boolean,
   queuedBy: WriterId | null = null,
-  here: TaskId | null = null,
+  here: CanvasId | null = null,
 ): Effect => ({ kind: "moveCard", move, how, queuedBy, fly, here })
 
 /**
@@ -271,7 +271,7 @@ export const clipFacts = (state: IntentState): ClipFacts => ({
  *   text as itself and anything else as a link; on a surface, text as a
  *   text card keeping its origin, the past as a reference, a text card as
  *   a text card with its text, a reference as a reference, a thread as its
- *   copy, a note column or a task as a reference to it where one may be.
+ *   copy, a note column or a canvas as a reference to it where one may be.
  *   A cut card still in your trash is moved out of it instead.
  * - **The past** only ever copies: a drop of it with `move` copies.
  * - **A slot**: aimed and empty, the card lands there; aimed and
@@ -417,7 +417,7 @@ function clipLanding(
         case "thread":
           return { kind: "thread", source: of.card, end: of.end, to: target }
         case "note-column":
-        case "task":
+        case "canvas":
           return {
             kind: "reference",
             address: { kind: "card", card: of.card },
@@ -525,7 +525,7 @@ function effectsOfLanding(
           ],
           actedAt: AT_INVENTORY,
           close: [],
-          here: taskOfTab(state),
+          here: canvasOfTab(state),
         },
       ]
     }
@@ -564,7 +564,7 @@ function effectsOfLanding(
               ? null
               : { card: replacing.id, from: keyOf(replacing.place) },
           how,
-          here: taskOfTab(state),
+          here: canvasOfTab(state),
         },
       ]
     }
@@ -622,7 +622,7 @@ function putCard(
   minted: Minted,
 ): readonly Effect[] {
   if (target.kind === "state") return planSpinOff(now.id, target, minted, state)
-  // Between tasks in the sidebar: a text card spins a new task off; a
+  // Between canvases in the sidebar: a text card spins a new canvas off; a
   // column makes one holding it, placed there, and you stay where you are.
   if (target.kind === "sidebar") {
     if (now.kind !== "thread" && now.kind !== "note-column")
@@ -632,13 +632,13 @@ function putCard(
         kind: "moveCards",
         moves: [
           {
-            move: moveOf(now, { kind: "new-task", task: minted.task }),
+            move: moveOf(now, { kind: "new-canvas", canvas: minted.canvas }),
             slot: null,
           },
         ],
         actedAt: AT_INVENTORY,
-        close: newTaskEffects(minted.task, target.before, false),
-        here: minted.task,
+        close: newCanvasEffects(minted.canvas, target.before, false),
+        here: minted.canvas,
       },
     ]
   }
@@ -648,9 +648,9 @@ function putCard(
   if (now.kind === "thread" || now.kind === "note-column")
     return putOnCanvas(now, target, state)
   if (now.kind !== "text" && now.kind !== "reference") return []
-  // A text card or a reference on a canvas, or onto a task in the sidebar,
+  // A text card or a reference on a canvas, or onto a canvas in the sidebar,
   // lands in a note column made for it (`WRAPS`).
-  if (target.kind === "canvas" || target.kind === "task") {
+  if (target.kind === "canvas" || target.kind === "item") {
     const spot = spotOnCanvas(target, state)
     return spot === null
       ? []
@@ -681,15 +681,15 @@ function putCard(
 }
 
 /**
- * Where a put's refusal is said: the column it was put on; a task's pins,
- * its task column's; a note column, its own; elsewhere, the inventory.
+ * Where a put's refusal is said: the column it was put on; a canvas's pins,
+ * its canvas column's; a note column, its own; elsewhere, the inventory.
  */
 const actedAtOf = (target: PutTarget): ActedAt => {
   switch (target.kind) {
     case "notes":
       return atColumn(target.column)
-    case "taskPinned":
-      return atColumn(target.task)
+    case "canvasPinned":
+      return atColumn(target.canvas)
     case "column":
     case "composer":
     case "pinned":
@@ -697,7 +697,7 @@ const actedAtOf = (target: PutTarget): ActedAt => {
     case "inventory":
     case "state":
     case "sidebar":
-    case "task":
+    case "item":
     case "text-box":
     case "canvas":
       return AT_INVENTORY
@@ -707,14 +707,14 @@ const actedAtOf = (target: PutTarget): ActedAt => {
 /** A spot on a canvas a put names, as the target the host ranks (`canvas-at`). */
 export const canvasSpot = (target: CanvasPut): CanvasTarget => ({
   kind: "canvas-at",
-  task: target.task,
+  canvas: target.canvas,
   after: target.after,
 })
 
 /**
  * A card that lives on a canvas, put from your inventory: on the
- * canvas of the task you are on, just after the column it was put on, or
- * first on a task's pinned cards' column, or at the spot on a canvas it was
+ * canvas of the canvas you are on, just after the column it was put on, or
+ * first on a canvas's pinned cards' column, or at the spot on a canvas it was
  * dropped on; unfolded, so you see it land.
  * Nothing on the canvas it is on already, where a reorder moves it, nor on
  * a state or the sidebar, which make a thread from a text card alone.
@@ -726,14 +726,14 @@ function putOnCanvas(
 ): readonly Effect[] {
   const spot = spotOnCanvas(target, state)
   if (spot === null) return []
-  if (now.place.kind === "canvas" && now.place.task === spot.task) return []
+  if (now.place.kind === "canvas" && now.place.canvas === spot.canvas) return []
   return [
     moveCard(
       moveOf(now, { kind: "canvas-at", ...spot }),
       { actedAt: AT_INVENTORY, slot: null },
       false,
     ),
-    changeViewOf(state, spot.task, {
+    changeViewOf(state, spot.canvas, {
       kind: "fold",
       card: now.id,
       unfolded: true,
@@ -743,33 +743,34 @@ function putOnCanvas(
 
 /**
  * The spot on a canvas `target` names for a card that lives on one: the
- * spot itself; first on a task's pinned cards' column; just after a column
- * or a note column on the task you are on. Null for any other target.
+ * spot itself; first on a canvas's pinned cards' column; just after a column
+ * or a note column on the canvas you are on. Null for any other target.
  */
 function spotOnCanvas(
   target: PutTarget,
   state: IntentState,
-): { readonly task: TaskId; readonly after: CardId | null } | null {
-  const here = taskOfTab(state)
+): { readonly canvas: CanvasId; readonly after: CardId | null } | null {
+  const here = canvasOfTab(state)
   switch (target.kind) {
     case "canvas":
-      return { task: target.task, after: target.after }
-    case "taskPinned":
-      return { task: target.task, after: null }
-    // Onto a task in the sidebar: at the end of its canvas.
-    case "task":
+      return { canvas: target.canvas, after: target.after }
+    case "canvasPinned":
+      return { canvas: target.canvas, after: null }
+    // Onto a canvas in the sidebar: at the end of its canvas.
+    case "item":
       return {
-        task: target.task,
-        after: state.tasks.index.canvases.get(target.task)?.at(-1)?.id ?? null,
+        canvas: target.canvas,
+        after:
+          state.canvases.index.cardsOn.get(target.canvas)?.at(-1)?.id ?? null,
       }
     case "notes":
-      return here === null ? null : { task: here, after: target.column }
+      return here === null ? null : { canvas: here, after: target.column }
     case "column":
     case "composer":
     case "pinned":
       return here === null
         ? null
-        : { task: here, after: parseCardId(target.key) ?? null }
+        : { canvas: here, after: parseCardId(target.key) ?? null }
     default:
       return null
   }
@@ -806,7 +807,7 @@ function putInMessage(
         moves: [into, { move: away, slot: null }],
         actedAt,
         close: [],
-        here: taskOfTab(state),
+        here: canvasOfTab(state),
       },
     ]
   }
@@ -918,7 +919,7 @@ export function planEditAsText(
         slot:
           now.place.kind === "inventory" ? slotOf(facts.slots, now.id) : null,
       },
-      here: taskOfTab(state),
+      here: canvasOfTab(state),
     },
   ]
 }
@@ -958,7 +959,7 @@ export function planQueueReference(
           to: { kind: "queued", thread: act.thread, seen: "" },
           replacing: null,
           how,
-          here: taskOfTab(state),
+          here: canvasOfTab(state),
         },
       ]
 }
@@ -981,8 +982,8 @@ export function planPin(
 }
 
 /**
- * Unpin `card`: to the note column nearest its thread; pinned to the task,
- * to the one nearest the task column.
+ * Unpin `card`: to the note column nearest its thread; pinned to the canvas,
+ * to the one nearest the canvas column.
  */
 export function planUnpin(
   card: CardId,
@@ -992,10 +993,14 @@ export function planUnpin(
   const now = textCardOf(state.cards, card)
   if (now?.place.kind === "pinned")
     return [moveCard(moveOf(now, noteOf(now.place)), IN_COLUMN(key), true)]
-  if (now?.place.kind === "task-pinned")
+  if (now?.place.kind === "canvas-pinned")
     return [
       moveCard(
-        moveOf(now, { kind: "notes", near: "task", task: now.place.task }),
+        moveOf(now, {
+          kind: "notes",
+          near: "canvas",
+          canvas: now.place.canvas,
+        }),
         IN_COLUMN(key),
         true,
       ),
@@ -1004,26 +1009,26 @@ export function planUnpin(
 }
 
 /**
- * Pin `card` to the task it is in, else the task you are on:
+ * Pin `card` to the canvas it is in, else the canvas you are on:
  * every thread of it reads the card on every run. A move like any other,
  * which the undo key takes back.
  */
-export function planPinToTask(
+export function planPinToCanvas(
   card: CardId,
   key: string,
   state: IntentState,
 ): readonly Effect[] {
   const now = textCardOf(state.cards, card)
-  if (now === undefined || now.place.kind === "task-pinned") return []
+  if (now === undefined || now.place.kind === "canvas-pinned") return []
   const active = state.layout.active
-  const task =
-    taskOfPlace(state.tasks.index, now.place) ??
-    (active?.kind === "task" ? active.task : null)
-  return task === null
+  const canvas =
+    canvasOfPlace(state.canvases.index, now.place) ??
+    (active?.kind === "canvas" ? active.canvas : null)
+  return canvas === null
     ? []
     : [
         moveCard(
-          moveOf(now, { kind: "task-pinned", task }),
+          moveOf(now, { kind: "canvas-pinned", canvas }),
           IN_COLUMN(key),
           true,
         ),
@@ -1045,29 +1050,31 @@ export function planDiscard(
   const move = moveOf(now, DISCARDED)
   const emptied = emptiedNewTab(now, state)
   if (emptied === null)
-    return [moveCard(move, how, false, null, taskOfTab(state))]
-  // The only thread of a new tab, not yet started: the task leaves your
+    return [moveCard(move, how, false, null, canvasOfTab(state))]
+  // The only thread of a new canvas, not yet started: the canvas leaves your
   // sidebar too, once the host accepts, as the host trashes its card.
   return [
     {
       kind: "moveCards",
       moves: [{ move, slot: null }],
       actedAt: how.actedAt,
-      close: closeTaskEffects(emptied),
+      close: closeCanvasEffects(emptied),
       here: emptied,
     },
   ]
 }
 
 /**
- * The task a discard of `card` empties, when it is a new tab's: a thread
+ * The canvas a discard of `card` empties, when it is a new canvas's: a thread
  * not yet started, the only card on its canvas. Null for any other card.
  */
-function emptiedNewTab(card: CardRecord, state: IntentState): TaskId | null {
+function emptiedNewTab(card: CardRecord, state: IntentState): CanvasId | null {
   if (card.kind !== "thread" || card.place.kind !== "canvas") return null
   if (state.index.firstOf.has(card.id)) return null
-  const { task } = card.place
-  return (state.tasks.index.canvases.get(task) ?? []).length === 1 ? task : null
+  const { canvas } = card.place
+  return (state.canvases.index.cardsOn.get(canvas) ?? []).length === 1
+    ? canvas
+    : null
 }
 
 /**
@@ -1100,17 +1107,17 @@ export const afterKeep = (
 ): readonly Effect[] => (answer.kind === "accepted" ? close : [])
 
 /**
- * The task an undo of moves acts in, and a discard's history: the task you
+ * The canvas an undo of moves acts in, and a discard's history: the canvas you
  * are on. None on nothing.
  */
-export function taskOfTab(state: IntentState): TaskId | null {
+export function canvasOfTab(state: IntentState): CanvasId | null {
   const active = state.layout.active
-  return active?.kind === "task" ? active.task : null
+  return active?.kind === "canvas" ? active.canvas : null
 }
 
 /**
- * Undo or redo your newest move in the task you are on, or, on none, in
- * your history outside any task, which the host does whole or refuses;
+ * Undo or redo your newest move in the canvas you are on, or, on none, in
+ * your history outside any canvas, which the host does whole or refuses;
  * with the inventory panel focused, this tab's
  * newest swap.
  */
@@ -1120,7 +1127,7 @@ export function planUndoMove(
   state: IntentState,
 ): readonly Effect[] {
   if (inPanel) return [{ kind: "undoSwap", direction }]
-  return [{ kind: "undoMoves", task: taskOfTab(state), direction }]
+  return [{ kind: "undoMoves", canvas: canvasOfTab(state), direction }]
 }
 
 /**

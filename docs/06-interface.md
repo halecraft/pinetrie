@@ -42,12 +42,12 @@ This document says what the interface is now. It draws E and T directly.
 │ Release notes││ ├──● ││ agent: OK              ││ an aside              │
 │ Q3 planning ·││ │  │ ││ Ada                    ││ agent: …      ●green  │
 │              ││ │  ● ││ Ada: @Bea have a look →││ Bea                   │
-│ ＋ agent ▾   ││ ◉    ││ Ada: @agent … ◉replying││   what about X?       │
+│ ＋ canvas    ││ ◉    ││ Ada: @agent … ◉replying││   what about X?       │
 │              ││      ││ ┌──────────────────────┐││ ┌───────────────────┐ │
 │              ││      ││ │ send to agent…  send │││ │ reply in thread…  │ │
 │              ││      ││ └──────────────────────┘││ └───────────────────┘ │
 ├──────────────┤└──────┘└────────────────────────┘└───────────────────────┘
-│(A) Ada ✉2 ▣1│ ▦ Board · Backlog 3 · Doing 3 ◌2 ⇡1 (B)(C) · Done 41  publish
+│(A) Ada ✉2 ▣1│ ▦ Board · Topics 3 · Active 3 ◌2 ⇡1 (B)(C) · Archive 41  publish
 └──────────────┴──────────────────────────────────────────────────────────────
 ```
 
@@ -56,33 +56,33 @@ search's bar while you search (below). The page's
 one row of chrome is the footer, and it splits where the sidebar's edge does:
 under the sidebar, what is yours; to the right, what is everyone's (ADR-0122).
 
-### The sidebar: the tasks you have open (ADR-0030, ADR-0045, ADR-0077, ADR-0122)
+### The sidebar: the canvases you have open (ADR-0030, ADR-0045, ADR-0077, ADR-0122)
 
-Down the left edge: the tasks you have open, in your order, then ＋. It is darker than the page, and the task you are on is the page's
+Down the left edge: the canvases you have open, in your order, then ＋. It is darker than the page, and the canvas you are on is the page's
 colour, with a light edge on its left, and opens into the rail and columns
 beside it (ADR-0081, turned sideways).
 
-- **The task you are on shows its canvas**: its rail, and its columns
+- **The canvas you are on shows its canvas**: its rail, and its columns
   (ADR-0116, below).
 - **The sidebar is yours, on every device of yours**: your own document, which
-  only your tabs write. Top to bottom is your order. Opening a task adds it at
+  only your tabs write. Top to bottom is your order. Opening a canvas adds it at
   the bottom; drag an item to reorder: dragged over another, it goes above
-  or below it, never into it, and opens nothing. **×** closes a task for you and
-  writes nothing shared; opening it again brings its columns back. A task
-  you start joins the sidebar; a task someone else starts does not, and
+  or below it, never into it, and opens nothing. **×** closes a canvas for you and
+  writes nothing shared; opening it again brings its columns back. A canvas
+  you start joins the sidebar; a canvas someone else starts does not, and
   reaches you through the board or your inbox.
-- **An item's label** is the task's title, else its first root's first
-  message's first line, wrapped to two lines before it is cut; a task only
+- **An item's label** is the canvas's title, else its first root's first
+  message's first line, wrapped to two lines before it is cut; a canvas only
   people have written in, untitled, is **Chat**. When the agent is first
-  asked in a task with no title, a model titles it in one to three words
+  asked in a canvas with no title, a model titles it in one to three words
   (ADR-0074).
   **Rename** in the item's `⋯` turns the label into a field: Enter or
   leaving it saves the title for everyone, Escape cancels, and an empty title
   brings back the first line. **Auto-update title**, beside it, asks the
   model again from what was said in the thread, and replaces the title for
-  everyone. A title is a mark on the task (ADR-0045), and names the task
+  everyone. A title is a mark on the canvas (ADR-0045), and names the canvas
   wherever it is shown: the sidebar, the board, your inbox.
-- **An item shows what happens in its task while you are elsewhere**
+- **An item shows what happens in its canvas while you are elsewhere**
   (ADR-0077), before its label: a still blue ring while the agent works
   there, cards wait to be sent to it, or it is finishing its summary, which
   needs nothing from you (cards behind a held queue wait for a person, and
@@ -95,36 +95,36 @@ beside it (ADR-0081, turned sideways).
   ready to accept clears when it is accepted, or with **Not needed** in the item's
   `⋯`. A page that loads draws every mark still: only a change you see
   moves. After the label, small avatars of the others reading there, and a
-  small dot in your colour when the task holds something you typed and have
+  small dot in your colour when the canvas holds something you typed and have
   not sent.
-- **Move to ▸** in an item's `⋯` moves the task on the board, for everyone
+- **Move to ▸** in an item's `⋯` moves the canvas on the board, for everyone
   (below). Moved to the archive, it is archived: the item says so
   ("archive: read-only for everyone until moved out"), is disabled while
-  the agent works in that task or cards are queued there, with the reason,
+  the agent works in that canvas or cards are queued there, with the reason,
   and names the threads whose proposed changes it withdraws from your repo ("work not
   accepted goes: amber-fox"); moving it out builds them again
-  (ADR-0061). **×** is for putting a task away yourself.
+  (ADR-0061). **×** is for putting a canvas away yourself.
 - **Archiving closes it for you** once the host accepts it, as **×** does,
   showing its neighbour below, else above, else nothing.
-- **If someone else archives the task you are on**, it stays while you are
+- **If someone else archives the canvas you are on**, it stays while you are
   there, read-only, saying who archived it, with **Restore**. It leaves your
   list when you switch away.
 - **`⋯` and ×** show while an item is hovered or focused, the one you are on
   too, over the label's end.
-- **＋ agent**, at the foot of the sidebar, is a split button with
-  **conversation** in its menu: a conversation at the root is the rarer
-  start, so it is the one behind the menu. What each does is under
-  "Starting" below. A board column has its own ＋, which lands the new task
-  in that column's state.
+- **＋ canvas**, at the foot of the sidebar, makes a canvas, with no menu
+  (ADR-0158): its first thread opens with `@agent ` typed, so its first
+  message decides whether it is a chat. What it does is under "Starting"
+  below. A board column has its own ＋ canvas, which lands the new canvas in
+  that column's state.
 - **The sidebar folds to icons** (ADR-0088), about 3rem wide, from **«** at
   its foot or Ctrl+Shift+L; **»** shows its titles again. Which you chose is
   this browser tab's, and a new tab starts from your latest. Until you
   choose, a window under 56rem shows icons. Nothing folds it by itself.
-  - **An item's icon** is the icon of its task's earliest thread that has
-    one (ADR-0143), else two initials on a colour seeded by the task's id
+  - **An item's icon** is the icon of its canvas's earliest thread that has
+    one (ADR-0143), else two initials on a colour seeded by the canvas's id
     (ADR-0089): "Kanban outside click" is **KO**, "Sidebar" is **SI**.
     Under built-in icons every named thread has one, so initials show only
-    for a task whose threads have no names yet.
+    for a canvas whose threads have no names yet.
   - **Its signals stay on it:** the blue ring round it while the agent
     works, the amber dot and the fading ✓ on its top-right corner, your
     dot on its bottom-right. Hovering or focusing it shows its label and
@@ -161,7 +161,7 @@ While the page syncs, "syncing…" leads its right end.
   amber badge counts what the threads you follow need from you (a run that
   ended asking something, failing, or that no one could tell; work ready to
   accept) plus the mentions you have not seen; the page's title carries the
-  same count, before the task you are on: "(2) Fix the sync bug · pine·trie".
+  same count, before the canvas you are on: "(2) Fix the sync bug · pine·trie".
   Its sections, each shown only with rows: **Needs you** (each thread's
   reason, in amber), **Ready to accept** (threads you follow with open
   proposed changes), **Worth a read** (listed, not counted) and **Mentions of you**.
@@ -173,7 +173,7 @@ While the page syncs, "syncing…" leads its right end.
   with who, the thread, and the start of the message. A row opens that
   thread in the sidebar, with a column on the message, archived or not. The
   badge counts the mentions you have not seen. One is seen when you open it
-  from the inbox, when it is drawn in a column of the task you are on, or
+  from the inbox, when it is drawn in a column of the canvas you are on, or
   when you **mark all seen**. A seen mention stays in the inbox; a filter
   shows only the unseen.
 - **The inbox is yours**, the same on every device of yours (ADR-0077). You
@@ -182,13 +182,13 @@ While the page syncs, "syncing…" leads its right end.
   when it holds cards, titled "your inventory: 1 card"; in the account menu
   while the sidebar is folded.
 - **The board's strip**: ▦ **Board**, then each workflow state's name and
-  count, avatars of the people reading in its tasks, an amber dot when a
-  task there needs you, and, only when there are any, **◌n**, its tasks the
-  agent works in, and **⇡n**, its tasks with changes ready to accept (ADR-0091).
+  count, avatars of the people reading in its canvases, an amber dot when a
+  canvas there needs you, and, only when there are any, **◌n**, its canvases the
+  agent works in, and **⇡n**, its canvases with changes ready to accept (ADR-0091).
   Those two are facts for everyone: never a badge, never moving. While the
   board is open, the board's search and **mine** take the states' place,
   since each column's head shows the same (ADR-0115). ▦ carries
-  the highest mark of the tasks not in the sidebar, a dot in your colour
+  the highest mark of the canvases not in the sidebar, a dot in your colour
   when one of them holds something you typed, and a blue ⌕ while a filter
   is on and the board is closed; its title is the session's
   message count, "2 in the threads this tab has loaded, of 4 in the
@@ -231,18 +231,18 @@ While the page syncs, "syncing…" leads its right end.
   (ADR-0102).
 - **A menu you opened stays open until you close it.** The footer's and the
   board's avatars and counts come from live data, but when what one stands
-  for goes while its menu is open (a person leaves the task, the last thing
+  for goes while its menu is open (a person leaves the canvas, the last thing
   in a section of your inbox is dealt with), the menu says so ("Bea has
   left", "Nothing left to accept.") and its trigger stays until you close it
   (principle 6). Escape closes a menu open on the board, and then the board.
-- **Nothing opens a task by itself.** A mention is a notification: you
+- **Nothing opens a canvas by itself.** A mention is a notification: you
   choose to open it.
 
 ### Pages (ADR-0098)
 
 A page covers the stage: the sidebar and the footer stay, and the
 stage stays as you left it under the page. It opens with **← back** and
-its title. Back, the browser's Back, and choosing a task, a new tab, ＋, ▦
+its title. Back, the browser's Back, and choosing a canvas, a new canvas, ＋, ▦
 or a row of your inbox all return to the stage. The page is in the
 URL (`#profile`), so a reload stays on it; the window's title names it,
 "(2) Profile · pine·trie". While a page shows, the card and undo keys do
@@ -292,49 +292,55 @@ footer's edge: it moves none of them. ▦ again, Escape (once a filter is
 cleared), or a click outside it and its strip closes it, and so does choosing something to work in. Whether it is open is this browser
 tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
 
-- **Every task is in one workflow state.** Each open state is a column of
-  the board, in order; the archive is last. A new session has
-  **Backlog**, **Doing** and **Done**.
-- **A task card** (ADR-0111, ADR-0126) is a task, on the board and in the
+- **Every canvas on the board is in one workflow state.** Each open state
+  is a column of the board, in order; the archive is last. A new session
+  has **Topics**, **Active** and **Archive** (ADR-0158).
+- **Where a canvas is says what it is** (ADR-0158): in the first open state
+  a **topic**, there so teammates find it; in any later open state a
+  **task**, its work tracked; in the archive, archived. Nothing is stored:
+  Topics is the first state by convention, so a team that reorders its
+  states changes which canvases are topics. The canvas column says it
+  ("a topic, in Topics"), and so does a sidebar item's hover.
+- **A canvas card** (ADR-0111, ADR-0126) is a canvas, on the board and in the
   sidebar alike: its header, the same in both, shows its label, its status
-  (with the agent's ring in any task, opened in this browser tab or not), a
+  (with the agent's ring in any canvas, opened in this browser tab or not), a
   blue **⇡** for everyone when a thread of it has changes ready to accept (its
   title names the threads; the thread's followers have it in their inbox),
   and a dot in your colour when it holds something you typed. On the board,
-  a titled task's first line is its body, and its foot shows who wrote in
+  a titled canvas's first line is its body, and its foot shows who wrote in
   it and the others reading there: each reader's avatar is a menu of the
   threads they read there, a row of which opens that thread in the sidebar.
-  Selecting the item opens the task in the sidebar and shows it.
-- **Anyone moves a task, for everyone**: drag an item to another column, or
+  Selecting the item opens the canvas in the sidebar and shows it.
+- **Anyone moves a canvas, for everyone**: drag an item to another column, or
   before another item, or use its `⋯`'s **Move to ▸**, **Move up** and
   **Move down**. Dropped on your
-  list, it opens there. Nothing moves a task by itself: proposed changes ready, or a
-  run that needs you, is a mark, never a move. A move from a state the task
+  list, it opens there. Nothing moves a canvas by itself: proposed changes ready, or a
+  run that needs you, is a mark, never a move. A move from a state the canvas
   has left is refused, naming who moved it and where ("not moved: Bea moved
-  it to Doing first").
+  it to Active first").
 - **A column's head** shows the state's name, its count, the readers'
-  avatars of its tasks, its highest mark, and, only when there are any,
+  avatars of its canvases, its highest mark, and, only when there are any,
   **◌n** and **⇡n**, as the strip's button does (ADR-0115).
 - **One search for the whole board** (ADR-0109, ADR-0115), in the footer's
-  strip while the board is open, with **mine** (the tasks you wrote in),
-  filters every state in place: a task is kept when its label holds every
+  strip while the board is open, with **mine** (the canvases you wrote in),
+  filters every state in place: a canvas is kept when its label holds every
   word typed, in any order (labels, not every message, which would load
   every root, ADR-0063). The states keep their places and the items their
   order. While a filter is on, each head's count says how many it shows
   ("12 of 96"), its ◌, ⇡ and readers count those, and the count and the
   field's border are blue; its mark, Remove's refusal and the strip count
-  every task. A banner at the board's foot names the filter ("Filtered by
-  "parser" and mine: 14 of 140 tasks") with **Clear**, which lifts the words
+  every canvas. A banner at the board's foot names the filter ("Filtered by
+  "parser" and mine: 14 of 140 canvases") with **Clear**, which lifts the words
   and mine; the field's **×** clears only the words. Move up and Move down
   step among the items shown. Opening the board with ▦ or a state's button
   focuses the field; the board opening by itself does not. `/` focuses it
   while the board is open; Escape clears the filter before it closes the
   board. The filter outlives closing the board, not a reload.
-- **A task in the archive is archived** (ADR-0029): it is read-only for
+- **A canvas in the archive is archived** (ADR-0029): it is read-only for
   everyone until it is moved out, the host lets go of it, and its threads'
   proposed changes leave your repo. Its column, as wide as the others and marked ✓,
-  shows a count and its most recent tasks, or every task the search keeps,
-  newest first. An archived task opened from it
+  shows a count and its most recent canvases, or every canvas the search keeps,
+  newest first. An archived canvas opened from it
   is read-only, with **Restore** in its composer's place, which moves it to
   the first open state; it leaves the sidebar when you switch away unless you
   restore it.
@@ -349,27 +355,27 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   field (Enter or leaving it saves; Escape keeps the old name); its `⋯`
   moves it left or right, adds a state left or right of it (a name field
   stands where it will go), or removes it, which is refused, with the
-  reason, while it holds a task or is the only open state. Adding a state is
+  reason, while it holds a canvas or is the only open state. Adding a state is
   rare, so it takes no room on the board. The archive can be renamed, never moved or
   removed.
-- **A backlog item is a task with a conversation**: an idea not started is
-  a task whose thread no agent works in (ADR-0021); people discuss it below its first message, and
-  asking `@agent` in it starts the work.
+- **A topic is often a chat**: an idea not started is a canvas in Topics
+  whose thread no agent works in (ADR-0021, ADR-0158); people discuss it
+  below its first message, and asking `@agent` in it starts the work.
 - **A text card becomes a thread** (ADR-0111): dropped on an open state, in
-  the board's column or the footer's strip, or among the sidebar's tasks,
-  it starts a task there with a conversation whose first message is its text, by
+  the board's column or the footer's strip, or among the sidebar's canvases,
+  it starts a canvas there with a chat whose first message is its text, by
   you; a note's and your message's ⋯ have **Move to a new thread in
-  Backlog** (and each open state) for the keyboard. Dropped in the
-  sidebar, the new task opens there for you. It never asks the agent,
+  Topics** (and each open state) for the keyboard. Dropped in the
+  sidebar, the new canvas opens there for you. It never asks the agent,
   even with `@agent` in it. While a card is dragged, those places are
   outlined, and a card held over ▦ opens the board. The undo key lifts the
   thread back into the card, where it was, while the thread holds that
   first message alone; once someone replied, it says "not lifted back: Bea
   replied". A blank card starts nothing.
 
-### Columns: the task's canvas (ADR-0116)
+### Columns: the canvas (ADR-0116)
 
-- **A task opens on its canvas**: every card on it, as columns, in an order
+- **A canvas opens on its canvas**: every card on it, as columns, in an order
   everyone shares. A thread card's column is its thread's path; a note
   column's is its notes. Each is **folded** for you until you open it: a
   narrow strip in its place, which a click unfolds. Folding (**⇤**, at
@@ -381,15 +387,15 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   rest of the column fades and the columns after it close up; unfolding
   turns it back. Only a fold you ask for moves; under reduced motion,
   nothing does.
-- **The task column comes first**, folded the same way: the task's title,
+- **The canvas column comes first**, folded the same way: the canvas's title,
   which anyone renames there, **Move to ▸** among the board's states, who is
-  reading, the cards pinned to the task, and the canvas list its agents
+  reading, the cards pinned to the canvas, and the canvas list its agents
   are told.
 - **＋ past the last column makes a column** (ADR-0138), for everyone, on a
-  task you may change, and nowhere else: **＋** an agent thread, its **▾** a
-  conversation or a note column. It lands where a drop there would, at the
+  canvas you may change, and nowhere else: **＋** an agent thread, its **▾** a
+  chat or a note column. It lands where a drop there would, at the
   canvas's end; a thread made there starts a new root, with no history of
-  its own, unfolded for you and ready to type in. On a read-only task it is
+  its own, unfolded for you and ready to type in. On a read-only canvas it is
   not drawn.
 - **A thread's column is one path**, from its root to its thread's end,
   read top to bottom. Its composer sends at its last message.
@@ -401,7 +407,7 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
 - **A column's header says who works in it and where it came from**
   (ADR-0040). Its first row names the agent working there, `✦ amber-fox` in
   the column's colour. While the composer's next send would start one, the
-  agent to come is named already (ADR-0057), with `✦ new agent` only until its name arrives. A conversation
+  agent to come is named already (ADR-0057), with `✦ new agent` only until its name arrives. A chat
   shows nothing there, since a message goes to people. Before the agent's name
   is its icon (ADR-0143): its banner, drawn from its name (ADR-0053) or
   pasted, under any icon
@@ -412,8 +418,8 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   that forks, names the fork, `↰ Ada: “Say exactly…”`, and clicking it brings
   the fork point into view. A copy names its source instead, "↰ copied from
   amber-fox · Fix the sync bug", and a thread whose parent thread is in
-  another task names that, "↰ from amber-fox · Fix the sync bug": clicking
-  either opens that task at the fork. Where someone holds the source in
+  another canvas names that, "↰ from amber-fox · Fix the sync bug": clicking
+  either opens that canvas at the fork. Where someone holds the source in
   their inventory, the row says "Bea has it" and opens nothing. A thread that started from a WIP says so, "on
   wip/search", or "wip/search is gone" once it is (ADR-0104); one on the
   line says nothing.
@@ -460,7 +466,7 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   anywhere in a column outside a text box, Alt+← and Alt+→ move it one
   place, and it is scrolled into view.
 - **Every drag in the page is one kind of drag** (ADR-0134): a column's, a
-  card's, a slot's, a task's, by the mouse or a pen. What is dragged follows
+  card's, a slot's, a canvas's, by the mouse or a pen. What is dragged follows
   the pointer, its header raised and leaning with its speed; along the strip
   the other columns slide apart to open the gap it would land in, and off
   the strip a column shrinks to its card face. What a drop there would do
@@ -469,16 +475,16 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   nothing lands, springs it back. With reduced motion the same states show
   without moving. Touch does not drag yet: a touch scrolls and taps. Files
   dragged in from your desktop still drop on a picture field.
-- **A thread is a card** (ADR-0117, ADR-0124): one place, on a task's canvas
+- **A thread is a card** (ADR-0117, ADR-0124): one place, on a canvas
   or in someone's inventory. A thread column's ⋯ has **Copy to this
-  task**, **Copy to your inventory** and **Move to your inventory**, and
-  lists no tasks (ADR-0127); its header dragged onto a slot takes it too.
-  Dragged onto a task in the sidebar, a column moves to the end of that
-  task's canvas, for everyone, and a running thread keeps running; you stay
-  where you are. Dragged between two tasks there, it makes a new task
+  canvas**, **Copy to your inventory** and **Move to your inventory**, and
+  lists no canvases (ADR-0127); its header dragged onto a slot takes it too.
+  Dragged onto a canvas in the sidebar, a column moves to the end of that
+  canvas, for everyone, and a running thread keeps running; you stay
+  where you are. Dragged between two canvases there, it makes a new canvas
   holding it, placed there in your sidebar (ADR-0134). Held over the
-  middle of a task there, a column or a card opens that task; held
-  between tasks, nothing opens (ADR-0134). Taken
+  middle of a canvas there, a column or a card opens that canvas; held
+  between canvases, nothing opens (ADR-0134). Taken
   into an inventory, its run stops at once, the taker's own stop ("Bea
   stopped it"); nothing is sent in it there, nor branched from its entries
   ("put it on a canvas first"), and its queue waits, held. Put on a canvas
@@ -499,16 +505,16 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   thread, running or not, sent or not, and a note column with its notes.
   A running thread's run stops, as a take's does ("Ada stopped it"). The
   cards at a thread's end, your message among them, stay with the thread,
-  in the trash with it. A new tab's only thread, not yet sent, takes its
-  task out of your sidebar too. The undo key brings any of it back.
-- **A task's trash is the task's**: the task column lists the columns
+  in the trash with it. A new canvas's only thread, not yet sent, takes its
+  canvas out of your sidebar too. The undo key brings any of it back.
+- **A canvas's trash is the canvas's**: the canvas column lists the columns
   trashed from its canvas, newest first, each its title over who trashed
   it and when ("Bea · 2 d ago"). One quiet line under the heading says how
   long they are kept ("kept for a week after it is trashed, then
   deleted"); a row says nothing of deletion until its last day, when it
-  reads "deleted in 5 h" in the warning colour. Anyone on the task
+  reads "deleted in 5 h" in the warning colour. Anyone on the canvas
   **restore**s one, back where it
-  was, at its rank. An archived task's list is read only. A restore whose
+  was, at its rank. An archived canvas's list is read only. A restore whose
   place is gone (a note whose column was trashed after it) or taken (your
   message where you have written a newer one) is refused, saying so.
   Nothing is sent in a trashed thread ("restore it first"); a link to it
@@ -725,10 +731,10 @@ the tree.
 ### The rail: a root's tree, compactly
 
 - **A forest on a canvas of several roots** (ADR-0116, ADR-0117): one tree
-  for each root a thread of the task is in, each cut to the paths leading
-  to the task's threads, in its root's own colours. A fork from those paths
+  for each root a thread of the canvas is in, each cut to the paths leading
+  to the canvas's threads, in its root's own colours. A fork from those paths
   to a thread elsewhere is a stub, `↳ amber-fox`, titled where it is: a
-  click opens that task, or your inventory's preview; one someone else
+  click opens that canvas, or your inventory's preview; one someone else
   holds says "Bea has it" and opens nothing.
 - A strip beside the sidebar draws every branch of a tree as a line,
   and every message as a dot, except for uneventful stretches (below). A row
@@ -739,7 +745,7 @@ the tree.
   takes a colour the root's id picks from twelve, and each later branch
   steps on round them, so roots don't all start alike, and neighbouring
   branches are far apart. The tree is centred in the rail.
-- **A new tab has a rail too**: a hollow dot where its first message will be, until its task has one.
+- **A new canvas has a rail too**: a hollow dot where its first message will be, until its canvas has one.
   It is as wide as the rail it becomes, so the columns do not move when the
   first message lands.
 - **A column wears its rail track's colour**, so you can see which branches are
@@ -773,15 +779,15 @@ the tree.
 
 The rail is E; the column is T. Seeing both at once is the product.
 
-### Search: a task's rail, each column its own matches (ADR-0101)
+### Search: a canvas's rail, each column its own matches (ADR-0101)
 
-- **🔍 at the rail's top searches the task you are on**, titled "search this
+- **🔍 at the rail's top searches the canvas you are on**, titled "search this
   tree · /"; `/` outside a text box does the same. It opens a bar across the
   top of the rail and the columns, in a tint and a shadow of its own, which
   pushes them down. The 🔍 leads the bar, pressed, where it sat, titled
-  "close search · Esc". A new tab has no 🔍, and while the board is open
+  "close search · Esc". A new canvas has no 🔍, and while the board is open
   over the columns, `/` is the board's own search's (ADR-0115), which finds
-  tasks by their labels; this one finds words in one task's messages.
+  canvases by their labels; this one finds words in one canvas's messages.
 - **It finds a phrase, as you type it**: the words you type, in order, with
   any space between them, in any case. A match starts where a word starts,
   and every word but the last is whole; the last, which you may still be
@@ -789,7 +795,7 @@ The rail is E; the column is T. Seeing both at once is the product.
   finds "column" and "columns"; "rail" finds "the rail.", "rails" and
   "rail-view", never "trail"; "fix the col" finds "fix the column", never
   "fixes the column". It looks in every
-  message on the task's rail, as written: people's, the agent's, and pine·trie's own
+  message on the canvas's rail, as written: people's, the agent's, and pine·trie's own
   lines. It does not look in tool calls or their output. A reply still being
   written is found once it is a message.
 - **Until you type, nothing changes.** With the field empty, the columns and
@@ -815,7 +821,7 @@ The rail is E; the column is T. Seeing both at once is the product.
 - **Showing a message leaves the search.** Pressing a match closes the search,
   shows the message in its column, its ask's fold opened, and outlines it
   briefly in the column's colour. A pick on the rail, a dimmed one included,
-  a mention from your inbox, or going to another task, a new tab or the
+  a mention from your inbox, or going to another canvas, a new canvas or the
   board leaves it too.
 - **A search is this tab's**, never stored, and writes nothing. A column under
   a search does not mark its thread read: no one is reading it.
@@ -824,22 +830,22 @@ The rail is E; the column is T. Seeing both at once is the product.
 
 - A message the agent was asked shows as asked (a margin bar), and a divider
   marks **where each agent joined**, by name: `✦ amber-fox joined`, or
-  `✦ copper-owl, from amber-fox` in a branch of agent work. Everything above
+  `✦ copper-owl, from amber-fox` in a branch of an agent thread. Everything above
   it is now that agent's context.
-- **What is on the canvas, as the agent was told it**: a run in a task is
+- **What is on the canvas, as the agent was told it**: a run in a canvas is
   told the list of the canvas's cards, 50 at most, when it differs from the
-  last the thread was told; "the agent was told the task's canvas: 4 cards"
+  last the thread was told; "the agent was told the canvas: 4 cards"
   sits above its prompt and opens to the list. A card added or taken while
   the agent works reaches it as it works, never as a message queued.
 
 ### Who a message is for (ADR-0021)
 
 - **A thread's mode is whether the agent works in it**, which is whether it has
-  a lane. In agent work, a message that names no one asks the agent; in a
-  conversation, only `@agent` does. Nothing is set or stored, so there is no
+  a lane. In an agent thread, a message that names no one asks the agent;
+  in a chat, only `@agent` does (ADR-0158 names the two). Nothing is set or stored, so there is no
   rule to mark and no mode to toggle.
 - **Mentions pick who a message is for.** `@agent` asks the agent. A message
-  naming only people goes to them, in agent work too. A handle that names no
+  naming only people goes to them, in an agent thread too. A handle that names no
   participant (`@types/node`) is ignored. A person's handle is their name as
   shown, in lower case, keeping only letters and digits (in any script), `_`
   and `-`: `@adalovelace`, `@josé`, `@日本`. Someone who set no name is shown,
@@ -856,14 +862,14 @@ The rail is E; the column is T. Seeing both at once is the product.
   full, a `@` in code or inside a word (`ada@example.com`), offers nothing,
   so Enter sends.
 - **Another thread's agent can be brought in** (ADR-0128). A
-  mention can name the agent of a thread on any open task's canvas by its
+  mention can name the agent of a thread on any open canvas by its
   thread's name (`@amber-fox`); a person's name may not be a thread's. A
   mention in an inline code span or a fenced block is no mention, of an
   agent or a person.
   - **The first mention invites it**: it becomes a **member** of the
     thread, and the message goes where it would have gone without that
-    mention, so "Please talk to @amber-fox" in agent work asks the thread's
-    own agent. Where that is nobody, as in a conversation, the agents it
+    mention, so "Please talk to @amber-fox" in an agent thread asks the
+    thread's own agent. Where that is nobody, as in a chat, the agents it
     invites are asked. A member's mention asks it, and leaves the thread's
     own agent out, as a person's mention does.
   - **Members are read from the thread's path**: a branch has the members
@@ -879,9 +885,9 @@ The rail is E; the column is T. Seeing both at once is the product.
     a "heard in sable-meadow: 3 messages" line, then the ask, spoken by its
     asker. Its last message comes back as an answer, spoken by its thread's
     name; an answer to an agent's ask runs that agent again, and nothing
-    else does. A row from a thread on another task names that task beside
+    else does. A row from a thread on another canvas names that canvas beside
     its speaker ("· Sync bug"), and opens it. An answer for a thread whose
-    task was archived, or which was taken, since it asked is not sent: the
+    canvas was archived, or which was taken, since it asked is not sent: the
     answering thread says so. An ask for a busy agent waits in its dock as an ask card,
     which a held queue holds.
   - **A budget of tokens** (200k unless the user config's `agents.budget`
@@ -896,7 +902,7 @@ The rail is E; the column is T. Seeing both at once is the product.
 - **The send button says what the message will do**: "send", "send to Ada"
   ("send to Ada +2" for three), "send to agent", or, while the agent is busy,
   "queue up next", "queue after Bea" or "queue after yours", naming who
-  queued the last card already waiting. It uses the host's own decision (`addressChat`,
+  queued the last card already waiting. It uses the host's own decision (`addressMessage`,
   over the column's thread), so it cannot promise a reply that will not come. When the
   send starts a thread and you have WIP bookmarks, a line left of the
   button says what its copy **starts from** ("starts from accepted work ▾"),
@@ -912,44 +918,43 @@ The rail is E; the column is T. Seeing both at once is the product.
     alone;
   - the **composer** says "Bea is typing…".
 
-  Presence is thread-level: every column of the task you are on reports the
-  thread it shows. Columns of other tasks report nothing, so a task's
+  Presence is thread-level: every column of the canvas you are on reports the
+  thread it shows. Columns of other canvases report nothing, so a canvas's
   avatars, in the sidebar and on the board, are the people looking at it now.
   Which message someone has on screen waits until thread-level proves too
   coarse.
 
 ### Starting, branching, and stepping down
 
-- **At the root, two ways to start**, because there is no context yet: a person
-  declares a purpose. Both are on ＋, at the foot of the sidebar and on each
-  board column, and past a canvas's last column, where they make a column
-  of the task you are on instead (ADR-0138). **＋ agent** opens a new tab
-  whose column asks the agent unless a message names someone, so its first
-  message creates the lane.
-  **Conversation**, in its menu, opens a new tab whose column is a
-  conversation.
-- **A new tab is a task from the moment it opens** (ADR-0126): its thread,
-  not yet started, is a card on its canvas, and the task is in your sidebar
+- **＋ canvas starts at the root** (ADR-0158), at the foot of the sidebar
+  and on each board column: a new canvas whose one thread opens with
+  `@agent ` typed, as a branch from an agent thread does. Enter after your
+  message asks the agent and makes its lane; deleting `@agent ` makes the
+  thread a chat. No choice is asked before the first message. Past a
+  canvas's last column, ＋ makes a column of the canvas you are on instead
+  (ADR-0138): an agent thread, its ▾ a chat or a note column.
+- **A new canvas is one from the moment it opens** (ADR-0126): its thread,
+  not yet started, is a card on its canvas, and the canvas is in your sidebar
   at once, placed at the end of the first open state from your list's ＋,
   of its own state from a board column's (ADR-0122). Its first send makes
   the root, and the board shows it from then: others find it there.
-  Closing it unsent with × sends the task to your trash with its thread,
-  and the undo key, on no task, brings both back.
+  Closing it unsent with × sends the canvas to your trash with its thread,
+  and the undo key, on no canvas, brings both back.
 - **An empty session** shows the board, with nothing in it, and ＋.
 - **A page with nothing in the sidebar** (a first visit, or a list you
-  emptied) opens on the board, which shows every task to open: nothing opens
-  a task by itself (ADR-0030).
+  emptied) opens on the board, which shows every canvas to open: nothing opens
+  a canvas by itself (ADR-0030).
 - **`→` in a message's right margin opens a branch** as a column to its right,
   empty until something is sent there. What it opens appears to the right, so
-  the button sits on that side. A branch starts as a conversation; `@agent`
-  there makes it agent work. **A branch from agent work starts with `@agent `
-  typed**, so going on with the agent is one Enter away; alone it sends
-  nothing, and deleting it makes the branch a conversation.
+  the button sits on that side. A branch starts as a chat; `@agent` there
+  makes it an agent thread. **A branch from an agent thread starts with
+  `@agent ` typed**, so going on with the agent is one Enter away; alone it
+  sends nothing, and deleting it makes the branch a chat.
 - **At an agent thread's end, `→` opens a branch too**, the same as on any
   other message: with `@agent ` kept, the agent's work forks there; with it
-  deleted, a conversation steps back down from the end, reading everything
+  deleted, a chat steps back down from the end, reading everything
   above. The agent thread's column keeps following its lane. At a
-  conversation's end `→` is hidden, since it would be the same as replying.
+  chat's end `→` is hidden, since it would be the same as replying.
 - Every one of these only opens a column. Nothing is written until the first
   send, and closing the column first leaves no trace.
 - **An agent can propose branches** (ADR-0157): its `propose_branches`
@@ -1023,7 +1028,7 @@ The rail is E; the column is T. Seeing both at once is the product.
   outlined instead, with how long it has run beside its tag ("12s",
   "1m 05s"), and accepted work hides: the wait is the machine's, not the
   model's. A quicker command changes neither.
-- **A task shown again draws its tool rows as they were left** (ADR-0123):
+- **A canvas shown again draws its tool rows as they were left** (ADR-0123):
   a running command's row outlined, a row whose detail you opened or folded
   the same way.
 - **A file dropped on a card, pasted into its box, or chosen with "share a
@@ -1067,8 +1072,9 @@ The rail is E; the column is T. Seeing both at once is the product.
   stays. It asks the agent exactly when the original did, so a message its
   thread's default sent to the agent starts with `@agent`. Anyone's message
   can be edited, and the edit is the editor's. On a root's first message,
-  which has no parent, the tool is *new tab*: a new tab holding its text, an
-  agent's when the message asked the agent. An agent's reply offers no edit:
+  which has no parent, the tool is *new canvas*: a new canvas holding its
+  text, with `@agent ` in front when the message asked the agent and named
+  it nowhere (ADR-0158). An agent's reply offers no edit:
   that would be a reply the agent never gave.
 
 ### A card's frame (ADR-0111)
@@ -1104,13 +1110,13 @@ The rail is E; the column is T. Seeing both at once is the product.
 - **What you type in a composer is your message**, a card on its thread
   that only you see. The first keystroke worth keeping (anything but a
   branch's `@agent `) makes it. It belongs to the thread, not the column:
-  switching tasks, reloading, closing and reopening the column, or the
+  switching canvases, reloading, closing and reopening the column, or the
   host restarting, you find it where you left it, and it follows the
   thread as the thread grows, a thread not yet started's too (ADR-0126). Others writing at the
   thread's end show above it as "Bea is writing…".
 - **A note is a card in a note column** (ADR-0116), which everyone in the
-  task sees and anyone can type in; no agent reads it. A **note column** is
-  a column of the task's: a title ("Notes" until someone renames it, from
+  canvas sees and anyone can type in; no agent reads it. A **note column** is
+  a column of the canvas's: a title ("Notes" until someone renames it, from
   its header, for everyone) and its notes one under another, each folded to
   its first line until you click into it, headed "Ada's note · with Bea".
   ↑ and ↓ on a note, or Alt+↑/↓ in its box, move it in the column, as a
@@ -1123,7 +1129,7 @@ The rail is E; the column is T. Seeing both at once is the product.
   folds as a thread's column does. ＋ past the last column makes an empty
   one there.
 - **A card leaving a thread's queue or pinned strip goes to the note column
-  nearest the thread**, in the task's order, the one after it on a tie;
+  nearest the thread**, in the canvas's order, the one after it on a tie;
   with none, a note column titled "Notes" is made just after the thread.
   So does your message's **Move to notes**, a card the host could not send,
   and a card put or dropped on a thread's column. A card dropped on a note
@@ -1135,10 +1141,10 @@ The rail is E; the column is T. Seeing both at once is the product.
   new branch, a message with text takes a card only from your inventory
   ("not moved: your message here holds text").
 - **Marks say where you left something unsent** (ADR-0048): a small dot in
-  your colour on its task's item in the sidebar, and on the rail at its
-  thread's end, whether or not that thread's column is open. A task you
-  closed is marked on ▦ and its task card; an archived task only on its
-  task card, since its work is done. A note you own marks its task, not a
+  your colour on its canvas's item in the sidebar, and on the rail at its
+  thread's end, whether or not that thread's column is open. A canvas you
+  closed is marked on ▦ and its canvas card; an archived canvas only on its
+  canvas card, since its work is done. A note you own marks its canvas, not a
   thread's end. Only your own message and the notes you own count, and only while they hold text: emptied, sent or
   discarded, the dot goes. A bare `@agent ` is nothing typed.
 - **Sending spends the card.** The box stays as it was until the host
@@ -1200,7 +1206,7 @@ The rail is E; the column is T. Seeing both at once is the product.
 
 - **A pinned card says what a thread is for**, and the agent reads it on
   every run. It sits in a strip at the top of the thread's column, under the
-  header, and stays there as the messages scroll. A new tab or a new branch
+  header, and stays there as the messages scroll. A new canvas or a new branch
   has none until its first message is sent.
 - **Move to pinned**, in your message's, a note's or a queued card's ⋯,
   pins it; so does dropping a card on the strip: while you drag a card, a
@@ -1230,9 +1236,9 @@ The rail is E; the column is T. Seeing both at once is the product.
   keep a direction, take a copy of the card into your inventory and pin it
   in the branch.
 - **Pinned cards are not unsent work:** they mark no item in the sidebar and no rail dot.
-- **Pinned to the task**, a card is read by every thread's agent in the
-  task, after the thread's own. **Pin to the task** in a card's ⋯ puts it
-  in the task column; unpinned, it goes to the nearest note column. A run
+- **Pinned to the canvas**, a card is read by every thread's agent in the
+  canvas, after the thread's own. **Pin to the canvas** in a card's ⋯ puts it
+  in the canvas column; unpinned, it goes to the nearest note column. A run
   that read them says so above its prompt, as for a thread's.
 
 ### History and traces (ADR-0048 step 6)
@@ -1301,7 +1307,7 @@ The rail is E; the column is T. Seeing both at once is the product.
     link to it; on a column, a note column or a slot, a selection or text
     from another app as a text card keeping where it came from, a message
     or a block as a reference, a card as a copy of it (a thread's copy at
-    its end as you copied it, a note column or a task as a reference to
+    its end as you copied it, a note column or a canvas as a reference to
     it). The first paste after a cut moves the cut card itself out of your
     trash. Cmd+Shift+V pastes the text alone, where the browser gives a
     paste for it.
@@ -1321,7 +1327,7 @@ The rail is E; the column is T. Seeing both at once is the product.
   card does. The agent reads each linked message, table or quote under the
   message that links it.
 - **Comments** (ADR-0126): a message's **comment** opens its margin under
-  it with a new note focused. Everyone on the task reads it; the agent does
+  it with a new note focused. Everyone on the canvas reads it; the agent does
   not. Shut, the message shows how many comments it has (💬 2); a press
   opens them, **+ comment** adds one, **shut** closes them. A comment's ⋯
   has **Queue a reference**, which queues the comment on its thread, under
@@ -1335,21 +1341,21 @@ The rail is E; the column is T. Seeing both at once is the product.
   in: Ctrl+Shift+O, the panel's **put** button, or a drag out
   of the panel onto a column: a note in the note column nearest its thread,
   or, onto a note column, at its end. Dropped on a
-  composer, it becomes your message there. Held over a task in the sidebar,
+  composer, it becomes your message there. Held over a canvas in the sidebar,
   or over ▦, a drag opens it while a ring around it fills. The open card's **×** discards it; the undo key brings
   it back.
 - **Undo a move** with Cmd+Z (Ctrl+Z elsewhere) while no box has focus;
   Cmd+Shift+Z, Ctrl+Shift+Z or Ctrl+Y redo it (ADR-0066). It undoes your
-  newest move in the task you are on, from any of your tabs, after a reload
+  newest move in the canvas you are on, from any of your tabs, after a reload
   or a restart too. As it acts it shows where the card went back: the
   panel, the thread's column, or, for a thread not yet started, its card's
   column unfolded. If anyone moved the card since, it is refused, saying
   who, and nothing moves. Closing a branch is undone whole, its card and
-  your message back; a new tab's task, closed empty, is gone for good.
-  Sends are final; a paste, **Copy to this task**, **Copy to your
+  your message back; a new canvas, closed empty, is gone for good.
+  Sends are final; a paste, **Copy to this canvas**, **Copy to your
   inventory**, **Edit as text** and **Queue a reference** are each undone
-  whole, and a copy to the clipboard changes nothing to undo. On no task, the undo key undoes your moves
-  outside any task: a discard from your inventory. An archived task's moves cannot be
+  whole, and a copy to the clipboard changes nothing to undo. On no canvas, the undo key undoes your moves
+  outside any canvas: a discard from your inventory. An archived canvas's moves cannot be
   undone, and are forgotten 7 days after it was archived.
 - **Undo a swap** with the same keys while the panel has focus: this tab's
   newest swap goes back, unless those slots have changed since.
@@ -1366,12 +1372,14 @@ The rail is E; the column is T. Seeing both at once is the product.
 | "make this a conversation" in a bar | nothing: a thread's mode is whether the agent works in it (ADR-0021) |
 | "⑂ 1 branch · 2 messages" with a hidden list | the rail, and a coloured fork dot in the column |
 | "switch to this path" (`navigate`) | nothing: sending attaches where you are reading |
-| every tree in one rail, one after another | one task at a time, with its own rail (ADR-0029, ADR-0116) |
+| every tree in one rail, one after another | one canvas at a time, with its own rail (ADR-0029, ADR-0116) |
 | a column on another root, with no stripe and no fork dot | a column from another root has its root's tree on the rail beside the others (ADR-0116) |
-| the rail's `+`, and Start Chat and Start Agent in place of a composer | ＋: agent, or conversation |
+| the rail's `+`, and Start Chat and Start Agent in place of a composer | ＋ canvas (ADR-0158) |
+| ＋ agent, with conversation in its menu, at the sidebar's foot | ＋ canvas, its thread's box starting with `@agent ` (ADR-0158) |
+| the task, the task column, Backlog, Doing and Done | the canvas, a topic or a task by its state, the canvas column, Topics, Active and Archive (ADR-0158) |
 | a tab bar shared by everyone, with no close for yourself | the sidebar, yours on every device, with **×** (ADR-0030, ADR-0122) |
-| a new root by anyone appearing as a tab | the board shows its task, and who is in it; you open it (ADR-0122) |
-| the Archive tab, and the header's people | the board: every task in a workflow state, Done the archive (ADR-0122) |
+| a new root by anyone appearing as a tab | the board shows its canvas, and who is in it; you open it (ADR-0122) |
+| the Archive tab, and the header's people | the board: every canvas in a workflow state, Done the archive (ADR-0122) |
 | Cmd+C taking a reference into your inventory; a message's **take**; a table's or an image's ❝ | Cmd+C copies to the clipboard alone; keep, from the clipboard cell (ADR-0132) |
 | Cmd+X taking a card into your inventory | Cmd+X cuts it: a copy, then a discard (ADR-0132) |
 | a reference staying in your hand when put, and the put key in a text box | every card leaves your hand when put; Cmd+V types a link (ADR-0132) |
@@ -1391,25 +1399,25 @@ board's records (ADR-0122); a card's text is its own document (ADR-0048).
 - **The rail** is the tree itself, from `parentId`, drawn in id order, which is
   creation order (uuidv7).
 - **A thread's mode** is its lane; **names** are `pinetrie.participant` values.
-- **A root** is a root of the tree index (an orphan counts as one); a task's
+- **A root** is a root of the tree index (an orphan counts as one); a canvas's
   canvas holds threads of one root or several (ADR-0116). **Your list** is
-  your own document (`open:<you>`, ADR-0122), each task's id to an order
-  key, written only by your tabs: the tasks in it that are not archived,
-  plus the task you are on.
+  your own document (`open:<you>`, ADR-0122), each canvas's id to an order
+  key, written only by your tabs: the canvases in it that are not archived,
+  plus the canvas you are on.
 - **The board and the footer** read presence (people, and the thread each
-  is in) and the lanes (the agent's running threads). **Mentions of you** are the chats whose
+  is in) and the lanes (the agent's running threads). **Mentions of you** are the sends whose
   mentions `address` resolves to you. **What you have seen** is kept in your
   attention document (`attention:<you>`, ADR-0077), on every device of
   yours: an entry id (`mentionsSince`), at or before which every mention is
   seen, and the ids of later ones you have seen.
 - **The board** is the team's (ADR-0122, ADR-0126): a host-written
   workflow (`pinetrie.workflow`, the open states in order, then the
-  archive), and each task's card on it, in a state at a rank there; who
-  moved it there and when is its card's history. A task in the archive is
+  archive), and each canvas's card on it, in a state at a rank there; who
+  moved it there and when is its card's history. A canvas in the archive is
   archived; the host refuses commands that would write in it (ADR-0029).
-  A move on the board is undone by its mover's undo key on no task, unless
+  A move on the board is undone by its mover's undo key on no canvas, unless
   it crossed the archive's edge: archiving and restoring are the board's.
-- **Which task you are on, each task's view (which of its columns you
+- **Which canvas you are on, each canvas's view (which of its columns you
   unfolded, how each reads, what a thread you opened starts with) and
   whether the board is open** are view state, kept in the browser per
   browser tab, with
@@ -1426,7 +1434,7 @@ board's records (ADR-0122); a card's text is its own document (ADR-0048).
   its first line, under a title); and who is in a note column now, which
   needs a presence field of its own.
 - **Narrow screens**: the stacked sequence described above, with the sidebar
-  collapsed to each task's icon (ADR-0088, ADR-0143) and the footer to ▦,
+  collapsed to each canvas's icon (ADR-0088, ADR-0143) and the footer to ▦,
   what needs you and you (ADR-0122); built after the wide layout works. The
   column's pane is its first step (ADR-0078): over a narrow window it covers
   the page, and ← goes back to the thread. Below 56rem the sidebar narrows and
@@ -1435,7 +1443,7 @@ board's records (ADR-0122); a card's text is its own document (ADR-0048).
   each thread is kept, in your attention document (ADR-0077), and a column
   draws its "since you were here" line from it. Still to do: unread marks on
   the sidebar's items, a "3 new" count on ▦, and a "what's happening" panel
-  listing tasks by activity, from the same marks.
+  listing canvases by activity, from the same marks.
 - **The inbox, grown:** **done** to take a handled mention off it; browser or
   system notifications, which need permission. (How runs end, work ready,
   and one inbox per person on every device came with ADR-0077 and

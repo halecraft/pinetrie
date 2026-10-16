@@ -12,12 +12,13 @@ import {
   ancestry,
   atEntry,
   baseKnown,
-  type ChatAt,
+  canvasIdFor,
   conflictAskedAt,
   type EntryLike,
   entryId,
   firstMessageOf,
   indexTree,
+  type MessageAt,
   messageAt,
   messageImages,
   newestOnPath,
@@ -35,7 +36,6 @@ import {
   type ThreadId,
   TOOL_IDS,
   tailEdit,
-  taskIdFor,
   textCardId,
   threadAt,
   threadEnd,
@@ -53,7 +53,7 @@ import {
  * sorts by age, so "2-…" is older than "3-…". Every entry is a chat message.
  */
 const tree = (parents: Record<string, string | null>) =>
-  fromParents(parents, id => ({ role: "chat", content: id, author: "A" }))
+  fromParents(parents, id => ({ role: "person", content: id, author: "A" }))
 
 // A trunk T1 -> T2 -> T3, a branch A off T1, a branch B off T2. The trunk's
 // continuation is older than each branch.
@@ -106,7 +106,7 @@ describe("writersOf", () => {
   test("each writer once, in order of their first message", () => {
     const ada = writerId("w-ada")
     const bea = writerId("w-bea")
-    const by = (writer: typeof ada) => ({ role: "chat", author: "", writer })
+    const by = (writer: typeof ada) => ({ role: "person", author: "", writer })
     const i = indexTree(
       entriesOf([
         entry("1-a", null, by(bea)),
@@ -193,7 +193,7 @@ describe("projectRail", () => {
         entry(
           "9-after",
           "8-c",
-          { role: "chat", content: "9-after" },
+          { role: "person", content: "9-after" },
           { thread: trunk },
         ),
       ]),
@@ -238,7 +238,7 @@ describe("threads: where each starts and ends, and where a send lands", () => {
       id,
       parentId,
       {
-        role: "chat",
+        role: "person",
         content: id,
         writer: writerId(extra.writer),
         compelled: extra.compelled,
@@ -264,16 +264,16 @@ describe("threads: where each starts and ends, and where a send lands", () => {
     lastWaiting: null,
     heldBy: null,
   })
-  const end = (seen: string, thread: ThreadId = Q): ChatAt => ({
+  const end = (seen: string, thread: ThreadId = Q): MessageAt => ({
     kind: "end",
     thread,
     seen: entryId(seen),
   })
-  const branch = (thread: string, from: string | null): ChatAt => ({
+  const branch = (thread: string, from: string | null): MessageAt => ({
     kind: "branch",
     thread: threadIdFor(thread),
     at: from === null ? null : entryId(from),
-    task: taskIdFor("01a0ffd2-0000-7000-8000-00000000000c"),
+    canvas: canvasIdFor("01a0ffd2-0000-7000-8000-00000000000c"),
   })
 
   test("threadEnd: the thread's entry with no child in its own thread, past a newer branch", () => {
@@ -296,14 +296,14 @@ describe("threads: where each starts and ends, and where a send lands", () => {
     // later q's next run wrote its own canvas entry, then its prompt and
     // reply. The canvas entries carry no message a column draws.
     const B = threadIdFor("b")
-    const canvas = (id: string, parentId: string, thread: ThreadId) =>
+    const canvasEntry = (id: string, parentId: string, thread: ThreadId) =>
       entry(id, parentId, { role: "canvas", content: "<canvas>" }, { thread })
     const i = indexTree({
       ...entries,
       ...entriesOf([
-        canvas("5-cb", "4-mine", B),
+        canvasEntry("5-cb", "4-mine", B),
         say("6-b", "5-cb", { writer: "bo", compelled: true, thread: "b" }),
-        canvas("7-cq", "4-mine", Q),
+        canvasEntry("7-cq", "4-mine", Q),
         say("8-next", "7-cq", { writer: "wu", compelled: true }),
         entry(
           "9-a",
@@ -699,12 +699,12 @@ describe("pinned cards in the tree", () => {
   }
   // 1-q -> 2-cards(first) -> 3-p1 -> 4-r1 -> 5-cards(second) -> 6-p2 -> 7-r2
   const list = [
-    entry("1-q", null, { role: "chat", content: "q", author: "A" }),
+    entry("1-q", null, { role: "person", content: "q", author: "A" }),
     cards("2-cards", "1-q", first),
-    entry("3-p1", "2-cards", { role: "chat", content: "p1", author: "A" }),
+    entry("3-p1", "2-cards", { role: "person", content: "p1", author: "A" }),
     entry("4-r1", "3-p1", { role: "assistant", content: "r1" }),
     cards("5-cards", "4-r1", second),
-    entry("6-p2", "5-cards", { role: "chat", content: "p2", author: "A" }),
+    entry("6-p2", "5-cards", { role: "person", content: "p2", author: "A" }),
     entry("7-r2", "6-p2", { role: "assistant", content: "r2" }),
   ]
   const index = indexTree(entriesOf(list))
@@ -742,13 +742,13 @@ describe("pinned cards in the tree", () => {
       carried: { pinned: first },
     }
     const after = entry("9-p3", "8-c", {
-      role: "chat",
+      role: "person",
       content: "p3",
       author: "A",
     })
     const bare = entry("8-d", "7-r2", undefined, { type: "compaction" })
     const afterBare = entry("9-q", "8-d", {
-      role: "chat",
+      role: "person",
       content: "q",
       author: "A",
     })
@@ -764,7 +764,7 @@ describe("pinned cards in the tree", () => {
     const branch = indexTree(
       entriesOf([
         ...list,
-        entry("8-b", "3-p1", { role: "chat", content: "b", author: "A" }),
+        entry("8-b", "3-p1", { role: "person", content: "b", author: "A" }),
       ]),
     )
     expect(pinnedInView(branch, entryId("8-b"))?.lane).toBe(OTHER)
@@ -780,12 +780,12 @@ describe("conflictAskedAt", () => {
       { timestamp: at },
     )
   const list = [
-    entry("1-p", null, { role: "chat", content: "p", author: "A" }),
+    entry("1-p", null, { role: "person", content: "p", author: "A" }),
     asked("2-a", "1-p", 20),
     entry("3-c", "2-a", undefined, { type: "compaction" }),
     entry("4-r", "3-c", { role: "toolResult", content: "No conflict." }),
     asked("5-a", "4-r", 50),
-    entry("6-q", "5-a", { role: "chat", content: "q", author: "A" }),
+    entry("6-q", "5-a", { role: "person", content: "q", author: "A" }),
   ]
   const index = indexTree(entriesOf(list))
 
@@ -802,9 +802,9 @@ describe("conflictAskedAt", () => {
 
 describe("newestOnPath", () => {
   const list = [
-    entry("1-a", null, { role: "chat", content: "a", author: "A" }),
+    entry("1-a", null, { role: "person", content: "a", author: "A" }),
     entry("2-c", "1-a", undefined, { type: "compaction" }),
-    entry("3-b", "2-c", { role: "chat", content: "b", author: "B" }),
+    entry("3-b", "2-c", { role: "person", content: "b", author: "B" }),
   ]
   const index = indexTree(entriesOf(list))
   const author = (e: EntryLike) => e.message?.author
@@ -827,7 +827,7 @@ describe("one-line messages (LINE_ROLES)", () => {
   test("a host's fact and its base's news show as their one line; a pinned entry does not", () => {
     const index = indexTree(
       entriesOf([
-        entry("1-p", null, { role: "chat", content: "p", author: "A" }),
+        entry("1-p", null, { role: "person", content: "p", author: "A" }),
         entry("2-f", "1-p", { role: "fact", content: "✓ added" }),
         entry("3-b", "2-f", { role: "behind", content: "↓ new work" }),
         entry("4-c", "3-b", { role: "pinned", content: "" }),
@@ -836,7 +836,7 @@ describe("one-line messages (LINE_ROLES)", () => {
     expect(
       projectTranscript(index, entryId("4-c")).map(m => [m.role, m.text]),
     ).toEqual([
-      ["chat", "p"],
+      ["person", "p"],
       ["fact", "✓ added"],
       ["behind", "↓ new work"],
     ])
@@ -846,7 +846,7 @@ describe("one-line messages (LINE_ROLES)", () => {
 describe("baseKnown", () => {
   const C = (s: string) => s as never
   const list = [
-    entry("1-p", null, { role: "chat", content: "p", author: "A" }),
+    entry("1-p", null, { role: "person", content: "p", author: "A" }),
     entry("2-u", "1-p", { role: "update", content: "u", merged: [C("l1")] }),
     entry("3-b", "2-u", {
       role: "behind",
@@ -865,7 +865,7 @@ describe("baseKnown", () => {
       merged: [C("l3")],
     }),
     entry("5-c", "4-r", undefined, { type: "compaction" }),
-    entry("6-q", "5-c", { role: "chat", content: "q", author: "A" }),
+    entry("6-q", "5-c", { role: "person", content: "q", author: "A" }),
   ]
   const index = indexTree(entriesOf(list))
 
@@ -884,7 +884,7 @@ describe("baseKnown", () => {
 describe("a turn's tail", () => {
   const C = (s: string) => s as never
   const list = [
-    entry("1-p", null, { role: "chat", content: "p", author: "A" }),
+    entry("1-p", null, { role: "person", content: "p", author: "A" }),
     entry("2-a", "1-p", { role: "assistant", content: "calls" }),
     entry("3-r", "2-a", {
       role: "toolResult",
@@ -917,7 +917,7 @@ describe("a turn's tail", () => {
 test("messageAt: the host's own messages show as their line; other roles are none", () => {
   const index = indexTree(
     entriesOf([
-      entry("1-p", null, { role: "chat", content: "hi", author: "A" }),
+      entry("1-p", null, { role: "person", content: "hi", author: "A" }),
       entry("2-c", "1-p", { role: "carry-on", content: "↻ resumed by Ada" }),
       entry("3-x", "2-c", { role: "custom", content: "raw" }),
     ]),

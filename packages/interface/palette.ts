@@ -4,7 +4,7 @@
 // root's branches spread round the palette. Every client takes the same slots;
 // each draws a slot in its own colours (the page's are `colors.ts`).
 
-import type { RootId, TaskId } from "@pinetrie/core"
+import type { CanvasId, RootId } from "@pinetrie/core"
 import { PENDING_TRACK } from "./column-paths.ts"
 
 /** How many colours a client draws the tracks in. */
@@ -32,8 +32,8 @@ export const trackSlot = (seed: number, track: number): ColorSlot =>
   track === PENDING_TRACK ? "pending" : (seed + STRIDE * track) % SLOTS
 
 /**
- * A task's slot: what its initials are drawn on, seeded by its id as a root's
+ * A canvas's slot: what its initials are drawn on, seeded by its id as a root's
  * trunk is by its root's.
  */
-export const taskSlot = (task: TaskId): ColorSlot =>
-  trackSlot(stringHash(task) % SLOTS, 0)
+export const canvasSlot = (canvas: CanvasId): ColorSlot =>
+  trackSlot(stringHash(canvas) % SLOTS, 0)

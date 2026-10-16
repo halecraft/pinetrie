@@ -1,10 +1,10 @@
-// web/note-column — a note column on a task's canvas: its title,
+// web/note-column — a note column on a canvas: its title,
 // which anyone renames, and its notes, one under another, each folded to its
 // first line and opened while it holds the focus. ↑ and ↓ on a note, or
 // Alt+↑/↓ in its box, move it in the column, as a queued card moves in its
 // queue. A drop anywhere on the column makes the card a note at its end;
 // so does writing in the box under its notes (`NewCardBox`), which holds the
-// note it makes until focus leaves it. A column of its task's canvas, at
+// note it makes until focus leaves it. A column of its canvas, at
 // its rank there (`canvasColumns`); its header is a drag handle, as a thread
 // column's is, its ⋯ folds it, and × trashes it with its notes.
 

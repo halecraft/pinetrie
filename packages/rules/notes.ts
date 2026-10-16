@@ -2,6 +2,7 @@
 // goes, and a note's place at its column's end.
 
 import {
+  type CanvasId,
   type CanvasPlace,
   type CardPlace,
   type CardRecord,
@@ -9,17 +10,16 @@ import {
   NO_CONTENT,
   type NoteColumnId,
   type NotesTarget,
-  type TaskId,
   type TextCard,
   type TextPlace,
   type ThreadId,
   type WriterId,
 } from "@pinetrie/core"
+import { type CardOnCanvas, cardsOnCanvas } from "./canvas-index.ts"
 import { byOrder } from "./card.ts"
 import { afterSteps, type PlaceStep, planMake } from "./moves.ts"
 import { orderAfter } from "./order.ts"
 import { rankAfter } from "./rank.ts"
-import { type CanvasCard, canvasOf } from "./task.ts"
 
 // ── note columns ────────────────────────────────────────────────
 
@@ -46,24 +46,24 @@ export const NEW_NOTES_TITLE = "Notes"
 
 /**
  * Where a card leaving a queue or pinned cards goes, from
- * `canvas`, the cards of its task in order: the note column nearest the
- * card of `from`, the thread whose they were, or, with null, the task
- * column, which stands before every card (a card pinned to the task); the
+ * `canvas`, the cards of its canvas in order: the note column nearest the
+ * card of `from`, the thread whose they were, or, with null, the canvas
+ * column, which stands before every card (a card pinned to the canvas); the
  * one after on a tie. With none, a new one goes just after that card
  * (`make`, after canvas index `after`, -1 for first). `none` when the thread
  * is not on `canvas`.
  */
 export function nearestNoteColumn(
-  canvas: readonly CanvasCard[],
+  here: readonly CardOnCanvas[],
   from: ThreadId | null,
 ):
   | { readonly kind: "column"; readonly column: NoteColumnId }
   | { readonly kind: "make"; readonly after: number }
   | { readonly kind: "none" } {
-  const at = from === null ? -1 : canvas.findIndex(c => c.id === from)
+  const at = from === null ? -1 : here.findIndex(c => c.id === from)
   if (from !== null && at < 0) return { kind: "none" }
   // Scanning left to right, a tie goes to the later: the one after.
-  const nearest = canvas.reduce<{
+  const nearest = here.reduce<{
     readonly column: NoteColumnId
     readonly distance: number
   } | null>((best, c, i) => {
@@ -79,7 +79,7 @@ export function nearestNoteColumn(
 
 /**
  * Where a card's nearest notes are, decided and not yet written:
- * a note column of its task; one to make there, at `order`, the canvas
+ * a note column of its canvas; one to make there, at `order`, the canvas
  * cards `renumbered` to fit it; or, for a thread whose card is in an
  * inventory, that inventory.
  */
@@ -87,15 +87,15 @@ export type NotesNear =
   | { readonly kind: "column"; readonly column: NoteColumnId }
   | {
       readonly kind: "make"
-      readonly task: TaskId
+      readonly canvas: CanvasId
       readonly order: string
       readonly renumbered: readonly CardRecord[]
     }
   | { readonly kind: "inventory"; readonly holder: WriterId }
 
 /**
- * Where the notes nearest `to` are (`nearestNoteColumn` over its task's
- * canvas): a thread's, or a task's own; null for a thread with no card.
+ * Where the notes nearest `to` are (`nearestNoteColumn` over its canvas's
+ * canvas): a thread's, or a canvas's own; null for a thread with no card.
  * Decides, mints nothing.
  */
 export function notesNear(
@@ -106,15 +106,15 @@ export function notesNear(
   const card = from === null ? undefined : cards.find(c => c.id === from)
   if (card?.place.kind === "inventory")
     return { kind: "inventory", holder: card.place.holder }
-  const task =
-    to.near === "task"
-      ? to.task
+  const canvas =
+    to.near === "canvas"
+      ? to.canvas
       : card?.place.kind === "canvas"
-        ? card.place.task
+        ? card.place.canvas
         : null
-  if (task === null) return null
-  const canvas = canvasOf(cards, task)
-  const near = nearestNoteColumn(canvas, from)
+  if (canvas === null) return null
+  const here = cardsOnCanvas(cards, canvas)
+  const near = nearestNoteColumn(here, from)
   switch (near.kind) {
     case "none":
       return null
@@ -122,10 +122,10 @@ export function notesNear(
       return { kind: "column", column: near.column }
     case "make": {
       // With no room there, the crowded cards are given new ranks.
-      const ranked = rankAfter(canvas, near.after)
+      const ranked = rankAfter(here, near.after)
       return {
         kind: "make",
-        task,
+        canvas,
         order: ranked.order,
         renumbered: ranked.respaced,
       }
@@ -134,7 +134,7 @@ export function notesNear(
 }
 
 /**
- * A card sent to the notes nearest `to` (a thread's, or a task's own), as a
+ * A card sent to the notes nearest `to` (a thread's, or a canvas's own), as a
  * place, and the writes that go first: a note column made for it (its id
  * `newColumn`'s, owned and placed by `by`), and the canvas cards renumbered
  * to fit it. The one step every write to notes takes: a move's, an unsent
@@ -165,7 +165,7 @@ export function toNotes(input: {
       const made = makeNoteColumn(
         afterSteps(input.cards, renumbered),
         input.newColumn(),
-        { kind: "canvas", task: near.task, order: near.order, width: 1 },
+        { kind: "canvas", canvas: near.canvas, order: near.order, width: 1 },
         input.by,
       )
       if (made === null) return null

@@ -29,8 +29,8 @@ import {
   methods,
   NO_BLANK_CARDS,
   placesFor,
+  putCanvas,
   putLane,
-  putTask,
   putValue,
   RUNS_ANY,
   record,
@@ -248,7 +248,7 @@ test("the owner's answer to a lane's ssh is written; anyone else's is refused", 
 test("proposed changes' fact is queued after the reply, as a card at the thread's end, and the lane's drain asked for", async () => {
   const b = basics()
   const lane = threadIdFor("0123456789abcdef")
-  putTask(b, lane)
+  putCanvas(b, lane)
   putLane(b, lane, entryId("e-2"))
   writeEntry(b.root, row(entryId("e-2"), null))
   writeLaneTip(b.root, lane, entryId("e-2"))

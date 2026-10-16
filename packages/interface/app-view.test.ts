@@ -1,5 +1,6 @@
 import {
-  type ArchivedTask,
+  type ArchivedCanvas,
+  canvasIdFor,
   entryId,
   indexTree,
   type LaneView,
@@ -7,7 +8,6 @@ import {
   type ProposedChangesRecord,
   rootIdFor,
   type ThreadId,
-  taskIdFor,
   threadIdFor,
   type Workflow,
   workflowStateIdFor,
@@ -18,10 +18,10 @@ import { describe, expect, test } from "vitest"
 import {
   type AppViewInput,
   appView,
+  canvasRail,
+  canvasWork,
   NO_RAIL,
   readOnlyWords,
-  taskRail,
-  taskWork,
   threadWork,
 } from "./app-view.ts"
 import { PENDING_TRACK } from "./column-paths.ts"
@@ -32,8 +32,8 @@ import { threadLink } from "./thread-link.ts"
 
 const ADA = writerId("ada@x.test")
 const nameOf = new Map([[ADA, "Ada"]])
-const K = taskIdFor("01a0ffd2-0000-7000-8000-00000000000a")
-const archived: ArchivedTask = { task: K, by: ADA, at: 1 }
+const K = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000a")
+const archived: ArchivedCanvas = { canvas: K, by: ADA, at: 1 }
 const WORKFLOW: Workflow = {
   open: [
     { id: workflowStateIdFor("b"), name: "Backlog" },
@@ -49,7 +49,7 @@ const columns = (...keys: string[]): Column[] =>
     mode: BOUND,
   }))
 const input = (over: Partial<AppViewInput>): AppViewInput => ({
-  active: { kind: "task", task: K },
+  active: { kind: "canvas", canvas: K },
   columns: columns("a"),
   tracks: [3],
   archived: new Map(),
@@ -69,7 +69,7 @@ describe("appView's stage", () => {
     expect(stage({ active: { kind: "nothing" } }).kind).toBe("nothing")
   })
 
-  test("in a task, only a thread not yet started closes: a card's column folds", () => {
+  test("in a canvas, only a thread not yet started closes: a card's column folds", () => {
     const [a, b] = columns("a", "b")
     const unstarted: Column = {
       ...(b as Column),
@@ -80,21 +80,21 @@ describe("appView's stage", () => {
       },
     }
     const two = stage({ columns: [a as Column, unstarted], tracks: [3] })
-    expect(two.kind === "task" && two.slots).toEqual([
+    expect(two.kind === "canvas" && two.slots).toEqual([
       { key: "a", track: 3 },
       { key: "b", track: PENDING_TRACK },
     ])
   })
 
-  test("an archived task is read-only, with Restore to the first open state; one not archived is not", () => {
+  test("an archived canvas is read-only, with Restore to the first open state; one not archived is not", () => {
     const here = stage({ archived: new Map([[K, archived]]) })
-    expect(here.kind === "task" && here.readOnly).toEqual({
+    expect(here.kind === "canvas" && here.readOnly).toEqual({
       label: "archived by Ada",
       action: {
         title: "Restore",
         intent: {
-          kind: "moveTask",
-          task: K,
+          kind: "moveCanvas",
+          canvas: K,
           from: WORKFLOW.archive.id,
           to: WORKFLOW.open[0]?.id,
           before: null,
@@ -102,7 +102,7 @@ describe("appView's stage", () => {
         },
       },
     })
-    expect(stage({}).kind === "task" && stage({})).toMatchObject({
+    expect(stage({}).kind === "canvas" && stage({})).toMatchObject({
       readOnly: null,
     })
   })
@@ -166,7 +166,7 @@ test("the header's proposed changes are the open ones: a held lane's at its tip,
   ])
 })
 
-test("a task's rail is a tree per root of its threads, cut to their paths, a fork elsewhere a stub", () => {
+test("a canvas's rail is a tree per root of its threads, cut to their paths, a fork elsewhere a stub", () => {
   // 1-r1 -> 2-a -> 3-b; 4-c, a branch at 2-a, is another thread; 5-r2 -> 6-d.
   const index = tree({
     "1-r1": null,
@@ -177,7 +177,7 @@ test("a task's rail is a tree per root of its threads, cut to their paths, a for
     "6-d": "5-r2",
   })
   const ids = (rows: readonly { readonly id: string }[]) => rows.map(r => r.id)
-  const task = { kind: "task", task: K } as const
+  const canvas = { kind: "canvas", canvas: K } as const
   const [R1, R2] = [
     rootIdFor("01a0ffd2-0000-7000-8000-0000000000a1"),
     rootIdFor("01a0ffd2-0000-7000-8000-0000000000a2"),
@@ -187,7 +187,7 @@ test("a task's rail is a tree per root of its threads, cut to their paths, a for
     { root: R2, entry: entryId("5-r2") },
   ]
   const C = threadOfEntry("4-c")
-  const elsewhere = taskIdFor("01a0ffd2-0000-7000-8000-0000000000ee")
+  const elsewhere = canvasIdFor("01a0ffd2-0000-7000-8000-0000000000ee")
   const linkOf = (thread: ThreadId) =>
     threadLink(
       thread,
@@ -197,15 +197,15 @@ test("a task's rail is a tree per root of its threads, cut to their paths, a for
           id: C,
           owner: ADA,
           placer: ADA,
-          place: { kind: "canvas", task: elsewhere, order: "1", width: 1 },
+          place: { kind: "canvas", canvas: elsewhere, order: "1", width: 1 },
           content: NO_CONTENT,
         },
       ],
       ADA,
     )
-  const rail = taskRail({
+  const rail = canvasRail({
     index,
-    active: task,
+    active: canvas,
     roots,
     ends: new Map([
       [threadOfEntry("1-r1"), entryId("3-b")],
@@ -220,7 +220,7 @@ test("a task's rail is a tree per root of its threads, cut to their paths, a for
       from: "2-a",
       at: "4-c",
       thread: C,
-      link: { kind: "open", task: elsewhere },
+      link: { kind: "open", canvas: elsewhere },
     },
   ])
   // Each tree in its root's palette under the page's seed.
@@ -233,7 +233,7 @@ test("a task's rail is a tree per root of its threads, cut to their paths, a for
     trackSlot(rootSeed(R2), 0),
   ])
   expect(
-    taskRail({
+    canvasRail({
       index,
       active: { kind: "nothing" },
       roots,
@@ -249,21 +249,21 @@ test("a rail stub opens at its branch's first message, below a context entry", (
   const B = threadIdFor("b")
   const index = indexTree(
     entriesOf([
-      entry("1-r", null, { role: "chat", content: "1-r" }, { thread: T }),
+      entry("1-r", null, { role: "person", content: "1-r" }, { thread: T }),
       entry(
         "2-cb",
         "1-r",
         { role: "canvas", content: "<canvas>" },
         { thread: B },
       ),
-      entry("3-b", "2-cb", { role: "chat", content: "3-b" }, { thread: B }),
+      entry("3-b", "2-cb", { role: "person", content: "3-b" }, { thread: B }),
     ]),
   )
   const R = rootIdFor("01a0ffd2-0000-7000-8000-0000000000a1")
-  const elsewhere = taskIdFor("01a0ffd2-0000-7000-8000-0000000000ee")
-  const rail = taskRail({
+  const elsewhere = canvasIdFor("01a0ffd2-0000-7000-8000-0000000000ee")
+  const rail = canvasRail({
     index,
-    active: { kind: "task", task: K },
+    active: { kind: "canvas", canvas: K },
     roots: [{ root: R, entry: entryId("1-r") }],
     ends: new Map([[T, entryId("1-r")]]),
     linkOf: thread =>
@@ -275,7 +275,7 @@ test("a rail stub opens at its branch's first message, below a context entry", (
             id: B,
             owner: ADA,
             placer: ADA,
-            place: { kind: "canvas", task: elsewhere, order: "1", width: 1 },
+            place: { kind: "canvas", canvas: elsewhere, order: "1", width: 1 },
             content: NO_CONTENT,
           },
         ],
@@ -286,7 +286,7 @@ test("a rail stub opens at its branch's first message, below a context entry", (
   expect(rail.stubs).toMatchObject([{ from: "1-r", at: "3-b", thread: B }])
 })
 
-test("threadWork and taskWork: a thread's work by its lanes, a task's the most of its threads'", () => {
+test("threadWork and canvasWork: a thread's work by its lanes, a canvas's the most of its threads'", () => {
   const [a, b, c, d] = ["a", "b", "c", "d"].map(threadIdFor) as [
     ThreadId,
     ThreadId,
@@ -318,9 +318,9 @@ test("threadWork and taskWork: a thread's work by its lanes, a task's the most o
       [d, "running"],
     ]),
   )
-  const K2 = taskIdFor("01a0ffd2-0000-7000-8000-00000000000b")
+  const K2 = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000b")
   expect(
-    taskWork(
+    canvasWork(
       // The most first, so a later, lesser thread cannot win by coming last.
       new Map([
         [c, "waiting"],

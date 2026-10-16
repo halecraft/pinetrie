@@ -1,13 +1,13 @@
 // interface/columns — a thread's column as the page draws it.
 
 import {
+  type CanvasId,
   type CardId,
   type EntryId,
   type LaneView,
   type NoteColumnId,
   type ReferenceCardId,
   type RootId,
-  type TaskId,
   type TextCardId,
   type ThreadId,
   type TreeIndex,
@@ -37,14 +37,14 @@ export interface Pending {
 }
 
 /**
- * What the shell mints for one intent: a key, the root and the task a new
+ * What the shell mints for one intent: a key, the root and the canvas a new
  * tab opens, the thread a column opens, the threads a press on a proposal
  * opens, and a note column made on a canvas.
  */
 export interface Minted {
   readonly key: string
   readonly root: RootId
-  readonly task: TaskId
+  readonly canvas: CanvasId
   readonly thread: ThreadId
   readonly noteColumn: NoteColumnId
   /** A reference a paste makes where it lands. */
@@ -61,7 +61,7 @@ export interface Column {
   /**
    * Where the column's path ends: its thread's end (`threadEnd`), or an
    * unstarted thread's fork. Null only for an unstarted new root's thread: a
-   * new tab's, or one ＋ made past a canvas's last column.
+   * new canvas's, or one ＋ made past a canvas's last column.
    */
   readonly anchor: EntryId | null
   /**
@@ -69,7 +69,7 @@ export interface Column {
    * (`laneOf`). A column opens its thread before its first send.
    */
   readonly thread: ThreadId
-  /** A Start Agent column: a message with no mention asks the agent. */
+  /** A column that asks the agent with nothing typed: a message with no mention asks the agent. */
   readonly asksAgent?: true
   /**
    * Its own thread, when the thread it forks from is on no column of its
@@ -95,7 +95,7 @@ export interface Column {
 }
 
 /**
- * A thread not yet started: its card is on its task's canvas,
+ * A thread not yet started: its card is on its canvas,
  * shared, and its first send writes its first entry, a branch at `fork`, or
  * a new root's first for null, in `root`. `held`: the thread it forks from,
  * when someone else holds it: its entries are left out, the
@@ -135,22 +135,22 @@ export const branchesAt = (column: Pick<Column, "mode">): boolean =>
 /**
  * Which column something is said or done in, by kind, carried
  * in an intent so what each kind allows is the type's: a card's column on
- * the canvas moves, and folds or, unstarted, closes; the task column holds the
- * task's pins. `keyText` is its key as the page draws it.
+ * the canvas moves, and folds or, unstarted, closes; the canvas column holds the
+ * canvas's pins. `keyText` is its key as the page draws it.
  */
 export type ColumnKey =
   | { readonly kind: "card"; readonly card: CardId }
-  | { readonly kind: "task"; readonly task: TaskId }
+  | { readonly kind: "canvas"; readonly canvas: CanvasId }
 
 /** A card's column on the canvas: it folds and moves. */
 export type CardKey = Extract<ColumnKey, { kind: "card" }>
 
 /**
- * A column's key as text: a card's id, a task's id. It holds no `:`, as no
+ * A column's key as text: a card's id, a canvas's id. It holds no `:`, as no
  * key may (`readingKey`).
  */
 export const keyText = (key: ColumnKey): string =>
-  key.kind === "card" ? key.card : key.task
+  key.kind === "card" ? key.card : key.canvas
 
 /**
  * A reader's setting: how much of each ask a column

@@ -20,7 +20,7 @@ const Command = Schema.struct({
   text: Schema.string(),
   parentId: Schema.string(),
   root: Schema.string(),
-  task: Schema.string(),
+  canvas: Schema.string(),
   here: Schema.string(),
   mode: Schema.string(),
   lane: Schema.string(),

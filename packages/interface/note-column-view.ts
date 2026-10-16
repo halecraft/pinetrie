@@ -1,11 +1,11 @@
-// interface/note-column-view — a task's note columns as the page draws them:
+// interface/note-column-view — a canvas's note columns as the page draws them:
 // each a title and its notes in one order, a column of the canvas at its rank
 // there (`canvasColumns`). `NoteColumn` (`packages/web/note-column.tsx`) draws
 // one.
 
 import type { CardRecord, NoteColumnId, NoteColumnRecord } from "@pinetrie/core"
 import {
-  type CanvasCard,
+  type CardOnCanvas,
   NEW_NOTES_TITLE,
   type NoteCard,
   notesIn,
@@ -24,11 +24,11 @@ export interface NoteColumnView {
 
 /** `canvas`'s note columns, in its order, each with its notes from `cards`. */
 export function noteColumnsOf(input: {
-  readonly canvas: readonly CanvasCard[]
+  readonly onCanvas: readonly CardOnCanvas[]
   readonly cards: readonly CardRecord[]
   readonly titles: ReadonlyMap<NoteColumnId, NoteColumnRecord>
 }): readonly NoteColumnView[] {
-  return input.canvas.flatMap(c => {
+  return input.onCanvas.flatMap(c => {
     if (c.kind !== "note-column") return []
     const titled = input.titles.get(c.id)?.title ?? null
     return [

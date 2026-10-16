@@ -6,15 +6,17 @@ import { createInMemoryStore, Exchange } from "@kyneta/exchange"
 import { batch, json, Schema } from "@kyneta/schema"
 import { LIVE_DOC_ID } from "@pinetrie/protocol/messages"
 import { afterEach, describe, expect, test } from "vitest"
-import type { StoredKind } from "../policy.ts"
+import { SCHEMA_OF, type StoredKind } from "../policy.ts"
 import { openStore } from "../store.ts"
 import {
+  deleteStored,
   type Migration,
   migrate,
   planOpen,
   planStoredOpen,
   type RecordMigration,
   readStored,
+  type StoreMigration,
 } from "./index.ts"
 
 const hashes: Record<StoredKind, string> = {
@@ -48,6 +50,26 @@ const plan = (
     migrations,
   })
 
+// A changed hash here is a changed stored schema: it needs a migration from
+// the old hash (`MIGRATIONS`), or the store it was written under is refused.
+describe("the stored schemas", () => {
+  test("each stored document's schema is the one its migrations lead to", () => {
+    const now = Object.fromEntries(
+      Object.entries(SCHEMA_OF).map(([k, v]) => [k, v.schemaHash]),
+    )
+    expect(now).toEqual({
+      session: "0223893f102c08dc9c7b6f976f712a842a",
+      live: "028e3f891b8953894c3667be8ca55a5946",
+      places: "0283794d78e992727e2e933fa029b70753",
+      root: "02065b897f9f33229f2318be54d33c6e76",
+      text: "02cd0629243854b7d6f39abbc4ace6f345",
+      inventory: "02d94dfca6ca2d2c5f9bb328f45759aa5b",
+      attention: "024af7116f828237ae36a7acf7d388c385",
+      open: "0234911a0091f81a8124b5fbfa5d339b44",
+    })
+  })
+})
+
 describe("planOpen", () => {
   test("a store whose hashes are this build's opens as it is", () => {
     expect(
@@ -65,7 +87,7 @@ describe("planOpen", () => {
   })
 
   test("a migration from a stored hash runs on each document of its kind there, in the registry's order", () => {
-    const taskMove: Migration = {
+    const canvasMove: Migration = {
       name: "2",
       kind: "root",
       from: "h-old",
@@ -80,13 +102,13 @@ describe("planOpen", () => {
           "root:r-1": "h-old",
           "root:r-3": "h-root",
         },
-        [live, taskMove],
+        [live, canvasMove],
       ),
     ).toEqual({
       kind: "open",
       run: [
         { migration: live, docIds: ["pinetrie:live"] },
-        { migration: taskMove, docIds: ["root:r-1", "root:r-2"] },
+        { migration: canvasMove, docIds: ["root:r-1", "root:r-2"] },
       ],
       unknown: [],
     })
@@ -294,4 +316,50 @@ describe("migrate", () => {
     expect(first.keys).toEqual(["k1", "k2", "k3", "k4", "renamed"])
     expect((await start()).lines).toEqual([])
   })
+})
+
+test("deleteStored deletes what each migration dooms, once, after one copy", async () => {
+  const stored = new Set([
+    "line:old:b→a",
+    "line:old:a→b",
+    "pinetrie:session",
+    "root:r-1",
+  ])
+  const store = {
+    async *listDocIds() {
+      yield* [...stored]
+    },
+    delete: async (id: string) => void stored.delete(id),
+  }
+  const lines: StoreMigration = {
+    name: "old-lines",
+    doomed: ids => ids.filter(id => id.startsWith("line:old:")),
+  }
+  const roots: StoreMigration = {
+    name: "roots",
+    doomed: ids => ids.filter(id => id.startsWith("root:")),
+  }
+  const copies: string[] = []
+  const logged: string[] = []
+  const run = () =>
+    deleteStored({
+      store,
+      migrations: [lines, roots],
+      backup: name => {
+        copies.push(name)
+        return `db.before-${name}`
+      },
+      log: line => logged.push(line),
+    })
+  await run()
+  expect([...stored]).toEqual(["pinetrie:session"])
+  expect(copies).toEqual(["old-lines"])
+  expect(logged).toEqual([
+    "[host] store copied to db.before-old-lines",
+    "[host] old-lines: 2 document(s) deleted",
+    "[host] roots: 1 document(s) deleted",
+  ])
+  await run()
+  expect(copies).toEqual(["old-lines"])
+  expect(logged).toHaveLength(3)
 })

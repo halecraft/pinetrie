@@ -39,7 +39,7 @@ export interface Provenance {
   /**
    * Call `listener` after each change to the places, with the cards it
    * touched before and after it, the places after it, and its cause: what
-   * tells a running thread its task's canvas changed (`canvas-news.ts`).
+   * tells a running thread its canvas changed (`canvas-news.ts`).
    * Never awaited.
    */
   onChanged(listener: (change: PlacesChange) => void): void

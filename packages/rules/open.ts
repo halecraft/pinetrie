@@ -1,15 +1,15 @@
 // open — a thread opened before its first send: as its column opens, a branch
-// at an entry, a new tab's new root in a new task, or a new root in a task the
+// at an entry, a new canvas's new root, or a new root in a canvas the
 // session holds; or one branch of a proposal's press (`planBranchOpen`).
 
 import {
+  type CanvasId,
   type CardRecord,
   type EntryId,
   type Intent,
   type MoveRefusal,
   type ProposalBranch,
   type RootId,
-  type TaskId,
   type ThreadId,
   type ThreadRecord,
   type ThreadStart,
@@ -18,7 +18,7 @@ import {
   type Workflow,
   type WriterId,
 } from "@pinetrie/core"
-import { planThreadOpen, type ThreadOpen } from "./task.ts"
+import { planThreadOpen, type ThreadOpen } from "./canvas-index.ts"
 
 /** A thread's opening as its column asks for it. */
 export type OpenThread = Omit<Extract<Intent, { kind: "open-thread" }>, "kind">
@@ -33,9 +33,9 @@ export type OpenPlan =
   | {
       readonly kind: "refused"
       /**
-       * `unknown`: a branch's entry is not in its root, or a task that should
+       * `unknown`: a branch's entry is not in its root, or a canvas that should
        * be the session's is not; `taken`: the thread's id names a thread
-       * already, or a new root or a new tab's task is in use; or its card's
+       * already, or a new root or a new canvas's id is in use; or its card's
        * make refused.
        */
       readonly why: "unknown" | "taken" | MoveRefusal
@@ -43,10 +43,10 @@ export type OpenPlan =
 
 /**
  * A thread opened by `sender`, refused unless its id is new. A branch at
- * an entry of its root's tree, in a task the session holds, its card just
- * after the thread the entry is in (`planBranchOpen`); a new tab's, a new
- * root's first thread in a new task, which lands on the board in its state;
- * or a new root's first thread in a task the session holds, its card where a
+ * an entry of its root's tree, in a canvas the session holds, its card just
+ * after the thread the entry is in (`planBranchOpen`); a new canvas's, a new
+ * root's first thread in a new canvas, which lands on the board in its state;
+ * or a new root's first thread in a canvas the session holds, its card where a
  * card dropped after `after` would land (`rankOnCanvas`).
  */
 export function planOpenThread(input: {
@@ -57,8 +57,8 @@ export function planOpenThread(input: {
   readonly threads: ReadonlyMap<ThreadId, ThreadRecord>
   /** Every root the directory names. */
   readonly roots: ReadonlySet<RootId>
-  /** Every task the session holds. */
-  readonly tasks: ReadonlySet<TaskId>
+  /** Every canvas the session holds. */
+  readonly canvases: ReadonlySet<CanvasId>
   readonly workflow: Workflow | null
   readonly now: number
 }): OpenPlan {
@@ -67,7 +67,7 @@ export function planOpenThread(input: {
     return planBranchOpen({
       thread: open.thread,
       root: open.root,
-      task: open.task,
+      canvas: open.canvas,
       at: start.at,
       after: null,
       proposal: null,
@@ -75,7 +75,7 @@ export function planOpenThread(input: {
       sender: input.sender,
       cards: input.cards,
       threads: input.threads,
-      tasks: input.tasks,
+      canvases: input.canvases,
       now: input.now,
     })
   if (isTaken(open.thread, input.cards, input.threads, null))
@@ -87,16 +87,16 @@ export function planOpenThread(input: {
     now: input.now,
     cards: input.cards,
   }
-  const held = input.tasks.has(open.task)
+  const held = input.canvases.has(open.canvas)
   switch (start.kind) {
-    case "new-task":
+    case "new-canvas":
       if (input.roots.has(open.root) || held)
         return { kind: "refused", why: "taken" }
       return settled(
         planThreadOpen({
           ...base,
           origin: { kind: "root" },
-          placement: { kind: "after", task: open.task, parent: null },
+          placement: { kind: "after", canvas: open.canvas, parent: null },
           opens: { state: start.state, workflow: input.workflow },
         }),
       )
@@ -109,7 +109,7 @@ export function planOpenThread(input: {
           origin: { kind: "root" },
           placement: {
             kind: "spot",
-            to: { kind: "canvas-at", task: open.task, after: start.after },
+            to: { kind: "canvas-at", canvas: open.canvas, after: start.after },
           },
           opens: null,
         }),
@@ -130,7 +130,7 @@ const isTaken = (
 
 /**
  * A branch at `at` opened by `sender`, refused unless its id is new, `at`
- * is in its root's tree and the task is the session's. Its card goes just
+ * is in its root's tree and the canvas is the session's. Its card goes just
  * after `after`'s, or with null after the thread `at` is in; a proposal's
  * press names the branch before, so its branches keep the proposal's order.
  * A branch from a proposal records it in its origin.
@@ -138,7 +138,7 @@ const isTaken = (
 export function planBranchOpen(input: {
   readonly thread: ThreadId
   readonly root: RootId
-  readonly task: TaskId
+  readonly canvas: CanvasId
   readonly at: EntryId
   readonly after: ThreadId | null
   readonly proposal: ProposalBranch | null
@@ -147,15 +147,15 @@ export function planBranchOpen(input: {
   readonly sender: WriterId
   readonly cards: readonly CardRecord[]
   readonly threads: ReadonlyMap<ThreadId, ThreadRecord>
-  /** Every task the session holds. */
-  readonly tasks: ReadonlySet<TaskId>
+  /** Every canvas the session holds. */
+  readonly canvases: ReadonlySet<CanvasId>
   readonly now: number
 }): OpenPlan {
   const { thread, at, index } = input
   if (isTaken(thread, input.cards, input.threads, index))
     return { kind: "refused", why: "taken" }
   const parent = threadAt(index, at)
-  if (parent === null || !input.tasks.has(input.task))
+  if (parent === null || !input.canvases.has(input.canvas))
     return { kind: "refused", why: "unknown" }
   return settled(
     planThreadOpen({
@@ -170,7 +170,7 @@ export function planBranchOpen(input: {
           : { kind: "fork", at, how: "branch", proposal: input.proposal },
       placement: {
         kind: "after",
-        task: input.task,
+        canvas: input.canvas,
         parent: input.after ?? parent,
       },
       opens: null,

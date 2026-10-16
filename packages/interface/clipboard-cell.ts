@@ -63,5 +63,5 @@ const CARD_WORDS: Readonly<Record<CardClip["kind"], string>> = {
   reference: "a reference",
   thread: "a thread",
   "note-column": "a note column",
-  task: "a task",
+  canvas: "a canvas",
 }

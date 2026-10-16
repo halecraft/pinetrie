@@ -4,10 +4,11 @@ import { useSelector } from "@kyneta/react"
 import {
   type AccessAnswer,
   type AgentRun,
-  type ArchivedTask,
+  type ArchivedCanvas,
   type AskIndex,
   agentCandidates,
   atEntry,
+  type CanvasId,
   type CardId,
   type CardRecord,
   type CardWidth,
@@ -25,7 +26,6 @@ import {
   ROOT,
   type SeatRecord,
   type StreamRecord,
-  type TaskId,
   type TextCardId,
   type ThreadId,
   type ThreadLane,
@@ -54,7 +54,7 @@ import {
   columnProposals,
   columnView,
   composerPlace,
-  crossTaskLinks,
+  crossCanvasLinks,
   DENSITIES,
   type Density,
   densityWords,
@@ -163,8 +163,8 @@ export interface ColumnProps {
   session: SessionClient
   /** The column as drawn: its thread, and whether it has started. */
   column: ColumnSpec
-  /** The task it is on; null before it is known. */
-  task: TaskId | null
+  /** The canvas it is on; null before it is known. */
+  canvas: CanvasId | null
   /**
    * Which column it is: its thread's card on the canvas, which
    * folds and moves, and, its thread not yet started, closes.
@@ -176,8 +176,8 @@ export interface ColumnProps {
   drawnAt: number
   /** How many columns wide its card is drawn; 1 with no card. */
   width: CardWidth
-  /** A task's label: what a fork row names a source's task by. */
-  labelOf: (task: TaskId) => string
+  /** A canvas's label: what a fork row names a source's canvas by. */
+  labelOf: (canvas: CanvasId) => string
   view: ColumnView
   index: TreeIndex
   /** This column's colour track: `--track` on the column (`useTrackColors`). */
@@ -189,13 +189,13 @@ export interface ColumnProps {
   nameOf: ReadonlyMap<WriterId, string>
   /** Everyone who can be mentioned (`readParticipants`). */
   participants: readonly string[]
-  /** Every named thread on an open task's canvas, whose agents a mention may reach. */
+  /** Every named thread on an open canvas, whose agents a mention may reach. */
   inReach: readonly {
     readonly thread: ThreadId
     readonly name: ThreadName
   }[]
-  /** The tasks in the archive: a member there is away. */
-  archived: ReadonlyMap<TaskId, ArchivedTask>
+  /** The canvases in the archive: a member there is away. */
+  archived: ReadonlyMap<CanvasId, ArchivedCanvas>
   /** Each person's colour (`presenceColors`). */
   colorOf: (writer: WriterId) => string
   /** This window is typing in this column, in the card its box shows. */
@@ -325,7 +325,7 @@ export function Column(p: ColumnProps) {
     p.onIntent({ kind: "column", column: p.columnKey, act })
   })
 
-  // A linked thread opened: a fork row's, or a row from another task's.
+  // A linked thread opened: a fork row's, or a row from another canvas's.
   const openLink = useStable((link: ThreadLink, at: EntryId) =>
     p.onIntent({ kind: "openLink", link, entry: at }),
   )
@@ -633,12 +633,12 @@ export function Column(p: ColumnProps) {
   )
   const origins = useMemo(
     () => ({
-      task: p.task,
+      canvas: p.canvas,
       linkOf: (t: ThreadId) => threadLink(t, p.cards, p.session.writer),
       labelOf: p.labelOf,
       reader: { me: p.session.writer, nameOf: p.nameOf },
     }),
-    [p.task, p.cards, p.session.writer, p.labelOf, p.nameOf],
+    [p.canvas, p.cards, p.session.writer, p.labelOf, p.nameOf],
   )
   const shows = columnView({
     acting:
@@ -693,7 +693,7 @@ export function Column(p: ColumnProps) {
     column: p.column.key,
     asksAgent: p.column.asksAgent === true,
     thread,
-    task: p.task,
+    canvas: p.canvas,
     ...(opening?.root === undefined ? {} : { root: opening.root }),
     ...(pinned.length === 0 ? {} : { pinned: pinned.map(c => c.id) }),
   }
@@ -729,16 +729,16 @@ export function Column(p: ColumnProps) {
       p.work.budgets,
     ],
   )
-  // Where each row from another task's thread is.
-  const crossTasks = useMemo(
+  // Where each row from another canvas's thread is.
+  const crossCanvases = useMemo(
     () =>
-      crossTaskLinks(view.nodes, {
+      crossCanvasLinks(view.nodes, {
         cards: p.cards,
         reader: { me: p.session.writer, nameOf: p.nameOf },
-        here: p.task,
+        here: p.canvas,
         labelOf: p.labelOf,
       }),
-    [view.nodes, p.cards, p.session.writer, p.nameOf, p.task, p.labelOf],
+    [view.nodes, p.cards, p.session.writer, p.nameOf, p.canvas, p.labelOf],
   )
   // Other threads' agents a message here may name.
   const agents = useMemo(
@@ -1131,7 +1131,7 @@ export function Column(p: ColumnProps) {
                     forks={p.forks}
                     index={index}
                     joins={shows.joins}
-                    crossTaskLinks={crossTasks}
+                    crossCanvasLinks={crossCanvases}
                     onLink={openLink}
                     lane={lane}
                     nameOf={p.nameOf}
@@ -1336,8 +1336,7 @@ function Reply({ doc, stream }: { doc: LiveDocHandle; stream: StreamRecord }) {
 
 /**
  * Who works in the column: its lane's name, which opens or closes the
- * thread's details; a lane about to start; or nothing, in a
- * conversation. Its mark pulses while the lane runs. The name's chevron is
+ * thread's details; a lane about to start; or nothing, in a chat. Its mark pulses while the lane runs. The name's chevron is
  * CSS, so its text is the mark and the name alone.
  */
 function Identity({
@@ -1458,7 +1457,7 @@ function ThreadDetailsPanel({
 
 /**
  * Where the column forks, leading back to it: the message it forks from;
- * or a copy's source, or a parent thread in another task, by its link,
+ * or a copy's source, or a parent thread in another canvas, by its link,
  * which opens nothing where someone else holds it.
  */
 function Origin({

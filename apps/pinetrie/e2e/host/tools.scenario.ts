@@ -95,7 +95,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       { text: "Let me look.", tool: "read", args: { path: "notes.txt" } },
       { text: "It says MANGO." },
     ])
-    await u.chat("what is in notes?", ROOT, START_AGENT)
+    await u.send("what is in notes?", ROOT, START_AGENT)
     await tidle()
 
     // 2. Write a file, then edit it: the disk changes.
@@ -111,7 +111,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       { text: "done" },
     ])
     const lane = tlane()
-    await u.chat("make new.txt", at(lane?.tip ?? null), { thread: lane?.name })
+    await u.send("make new.txt", at(lane?.tip ?? null), { thread: lane?.name })
     await tidle()
     // In its lane's own copy: the project is the person's working copy,
     // which no lane writes.
@@ -137,7 +137,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     ])
     watched.length = 0
     const l3 = tlane()
-    await u.chat("run it", at(l3?.tip ?? null), { thread: l3?.name })
+    await u.send("run it", at(l3?.tip ?? null), { thread: l3?.name })
     const liveTexts = () =>
       watched
         .flat()
@@ -199,7 +199,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     ])
     watched.length = 0
     const l4 = tlane()
-    await u.chat("look again", at(l4?.tip ?? null), { thread: l4?.name })
+    await u.send("look again", at(l4?.tip ?? null), { thread: l4?.name })
     await tidle()
 
     // 5. Stop ends a running command; a message for the busy thread is
@@ -212,12 +212,12 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       { text: "after" },
     ])
     const l5 = tlane()
-    await u.chat("sleep", at(l5?.tip ?? null), { thread: l5?.name })
+    await u.send("sleep", at(l5?.tip ?? null), { thread: l5?.name })
     await waitFor(
       () => readStreams(th.live).some(s => s.kind === "tool"),
       10_000,
     )
-    const waiting = await bob.chat("@Uma noted", at(tlane()?.tip ?? null), {
+    const waiting = await bob.send("@Uma noted", at(tlane()?.tip ?? null), {
       thread: l5?.name,
     })
     const stopped =
@@ -382,7 +382,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     const u2 = await join(th, "uma", "tools")
     script.use([{ text: "back again" }])
     const l7 = tlane()
-    await u2.chat("still there?", at(l7?.tip ?? null), {
+    await u2.send("still there?", at(l7?.tip ?? null), {
       thread: l7?.name,
     })
     await tidle()

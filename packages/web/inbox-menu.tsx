@@ -4,10 +4,10 @@
 // (`threadRow`) is here too: the board's readers' menus use it.
 
 import {
+  type CanvasId,
   type EntryId,
   firstLine,
   messageText,
-  type TaskId,
   type ThreadId,
   type ThreadName,
   type TreeIndex,
@@ -37,13 +37,13 @@ import type { InboxSeen } from "./use-inbox.ts"
 
 /**
  * A thread as a menu row: its lane's name when it has one, where its link leads
- * (its task's label, or who has it), and the start of the message at `end`;
+ * (its canvas's label, or who has it), and the start of the message at `end`;
  * choosing it follows the link (`onOpen`), which a thread someone else holds
  * does not let it.
  */
 export function threadRow(input: {
   readonly index: TreeIndex
-  readonly labelOf: (task: TaskId | null) => string
+  readonly labelOf: (canvas: CanvasId | null) => string
   readonly reader: Reader
   readonly onOpen: (id: EntryId, link: ThreadLink) => void
 }) {
@@ -83,7 +83,7 @@ export interface InboxMenuProps {
   readonly names: ReadonlyMap<ThreadId, ThreadName>
   /** Where each thread's link leads (`threadLink`): a raised item or a mention opens there. */
   readonly linkOf: (thread: ThreadId) => ThreadLink
-  readonly labelOf: (task: TaskId | null) => string
+  readonly labelOf: (canvas: CanvasId | null) => string
   readonly reader: Reader
   readonly onOpen: (id: EntryId, link: ThreadLink) => void
   readonly onIntent: (intent: Intent) => void
@@ -195,7 +195,7 @@ export function useInboxMenu({
       ),
       onChoose: () => {
         inbox.markSeen(m.id)
-        // A mention opens in the task its thread is in, or not at all where
+        // A mention opens in the canvas its thread is in, or not at all where
         // someone else holds it.
         onOpen(m.id, link)
       },

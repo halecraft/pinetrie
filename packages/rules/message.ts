@@ -1,4 +1,4 @@
-// chat — a human message in the conversation tree, and who it is for.
+// message — a person's message in the conversation tree, and who it is for.
 
 import {
   type AgentCandidate,
@@ -6,6 +6,7 @@ import {
   type AgentMessageLike,
   address,
   CATCH_UP_TOOL,
+  type CanvasId,
   CONFLICT_TOOL,
   type CommandRef,
   ERR,
@@ -29,7 +30,6 @@ import {
   type Sha256,
   type Share,
   sendWaits,
-  type TaskId,
   TEXT_MIME,
   THE_AGENT,
   type ThreadId,
@@ -40,6 +40,7 @@ import {
 import { type Static, Type } from "typebox"
 import { type BaseNews, behindLine, decodeBehind } from "./behind.ts"
 import { canvasFactLine, decodeCanvas, decodeCanvasFact } from "./canvas.ts"
+import { decodeCanvasPinned } from "./canvas-pinned.ts"
 import { decodeWith, ThreadIdSchema } from "./decode.ts"
 import { decodeFact, factLine } from "./fact.ts"
 import { decodeLand, type LandMessage, landLine } from "./land.ts"
@@ -57,11 +58,10 @@ import {
 import { fittedLine } from "./shares.ts"
 import { decodeStack, type StackMessage, stackLine } from "./stack.ts"
 import { type CarryOnMessage, carryOnLine, decodeCarryOn } from "./stop.ts"
-import { decodeTaskPinned } from "./task-pinned.ts"
 import { decodeUpdate, updateLine } from "./update.ts"
 import { showHostWorkingCopy } from "./work.ts"
 
-export const CHAT_TYPE = "pinetrie.chat"
+export const MESSAGE_TYPE = "pinetrie.message"
 
 const ResponderSchema = Type.Union([
   Type.Object({ kind: Type.Literal("none") }),
@@ -125,9 +125,9 @@ const DetailsSchema = Type.Object({
   invites: Type.Optional(Type.Array(ThreadIdSchema)),
 })
 
-const ChatSchema = Type.Object({
+const MessageSchema = Type.Object({
   role: Type.Literal("custom"),
-  customType: Type.Literal(CHAT_TYPE),
+  customType: Type.Literal(MESSAGE_TYPE),
   details: DetailsSchema,
 })
 
@@ -136,7 +136,7 @@ const ChatSchema = Type.Object({
  * in too also names them, in `contributors`, so it reads "Ada,
  * with Bea". The model reads only the sender's name.
  */
-export interface ChatDetails {
+export interface MessageDetails {
   readonly author: WriterId
   readonly authorName: string
   readonly text: string
@@ -160,12 +160,12 @@ export interface ChatDetails {
 }
 
 /** The pi `CustomMessage` a chat is stored as. */
-export interface ChatMessage {
+export interface PersonMessage {
   readonly role: "custom"
-  readonly customType: typeof CHAT_TYPE
+  readonly customType: typeof MESSAGE_TYPE
   readonly content: string
   readonly display: true
-  readonly details: ChatDetails
+  readonly details: MessageDetails
   readonly timestamp: number
 }
 
@@ -175,7 +175,7 @@ export interface ChatMessage {
  * from another thread, or an answer that wakes its asker.
  */
 export type PromptMessage =
-  | ChatMessage
+  | PersonMessage
   | LandMessage
   | StackMessage
   | CarryOnMessage
@@ -188,7 +188,7 @@ export type PromptMessage =
  * conversion carries attribution into context and a rename later cannot
  * rewrite what the agent already saw.
  */
-export const attributed = (d: ChatDetails): string =>
+export const attributed = (d: MessageDetails): string =>
   `${d.authorName}: ${d.command?.expanded ?? d.text}`
 
 /**
@@ -196,13 +196,13 @@ export const attributed = (d: ChatDetails): string =>
  * past referent it links to quoted under it (`withQuotes`),
  * frozen as it was sent, as the past never changes.
  */
-export const encodeChat = (
-  details: ChatDetails,
+export const encodeMessage = (
+  details: MessageDetails,
   timestamp: number,
   quotes: readonly LinkedQuote[] = [],
-): ChatMessage => ({
+): PersonMessage => ({
   role: "custom",
-  customType: CHAT_TYPE,
+  customType: MESSAGE_TYPE,
   content: withQuotes(attributed(details), quotes),
   display: true,
   details,
@@ -217,10 +217,10 @@ interface ImagePart {
 }
 
 /** The blobs every chat among `messages` shows, each once. */
-export function chatImageShas(messages: readonly unknown[]): Sha256[] {
+export function messageImageShas(messages: readonly unknown[]): Sha256[] {
   const shas = new Set<Sha256>()
   for (const message of messages)
-    for (const image of decodeChat(message)?.images ?? [])
+    for (const image of decodeMessage(message)?.images ?? [])
       shas.add(image.sha256)
   return [...shas]
 }
@@ -231,7 +231,7 @@ export function chatImageShas(messages: readonly unknown[]): Sha256[] {
  * base64 from `blobs`. A blob `blobs` lacks is named as text in its place.
  * Every other message is returned as it is.
  */
-export function withChatImages<M>(
+export function withMessageImages<M>(
   messages: readonly M[],
   blobs: ReadonlyMap<
     Sha256,
@@ -239,24 +239,24 @@ export function withChatImages<M>(
   >,
 ): M[] {
   return messages.map(message => {
-    const chat = decodeChat(message)
-    if (chat?.images === undefined || chat.images.length === 0) return message
+    const said = decodeMessage(message)
+    if (said?.images === undefined || said.images.length === 0) return message
     const text = (message as { content: unknown }).content
     const parts: ({ type: "text"; text: string } | ImagePart)[] = [
       {
         type: "text",
-        text: typeof text === "string" ? text : attributed(chat),
+        text: typeof text === "string" ? text : attributed(said),
       },
     ]
     const fittedLines = new Map(
-      (chat.shared ?? []).flatMap(share => {
+      (said.shared ?? []).flatMap(share => {
         const line = fittedLine(share)
         return share.shown === null || line === null
           ? []
           : [[share.shown.sha256, line] as const]
       }),
     )
-    for (const image of chat.images) {
+    for (const image of said.images) {
       const blob = blobs.get(image.sha256)
       const line = fittedLines.get(image.sha256)
       if (line !== undefined) parts.push({ type: "text", text: line })
@@ -274,12 +274,12 @@ export function withChatImages<M>(
 }
 
 /**
- * Details that matched `DetailsSchema` -> `ChatDetails`, branding the ids. The
+ * Details that matched `DetailsSchema` -> `MessageDetails`, branding the ids. The
  * one conversion of a chat in the tree.
  */
 export const detailsFromStored = (
   d: Static<typeof DetailsSchema>,
-): ChatDetails => ({
+): MessageDetails => ({
   author: d.author as WriterId,
   authorName: d.authorName,
   text: d.text,
@@ -316,8 +316,10 @@ export const detailsFromStored = (
 })
 
 /** A stored message -> its chat details, or undefined if it is not a chat. */
-export const decodeChat = (message: unknown): ChatDetails | undefined =>
-  decodeWith(ChatSchema, message, ({ details }) => detailsFromStored(details))
+export const decodeMessage = (message: unknown): MessageDetails | undefined =>
+  decodeWith(MessageSchema, message, ({ details }) =>
+    detailsFromStored(details),
+  )
 
 /**
  * What a tool result of the host's tools says as a fact, from its
@@ -363,7 +365,7 @@ function toolResultFacts(
  * with its author; a land, update, stack or carry-on message becomes role
  * `land`, `update`, `stack` or `carry-on` with its one line, as a fact becomes
  * role `fact` and a base's news role `behind`; a cards entry becomes role
- * `pinned` with the cards it read, a task's cards entry role `task-pinned`, and
+ * `pinned` with the cards it read, a canvas's cards entry role `canvas-pinned`, and
  * a canvas entry role `canvas` with the list it told; an ask relayed from
  * another thread, an answer and what an asked agent heard become roles `relay`,
  * `answer` and `heard` with their details; a host tool's result keeps its role
@@ -419,9 +421,9 @@ export function renderableMessage(message: unknown): AgentMessageLike {
   // Not a message: the column draws a marker above the prompt it came with.
   const pinned = decodePinned(message)
   if (pinned !== undefined) return { role: "pinned", content: "", pinned }
-  const taskPinned = decodeTaskPinned(message)
-  if (taskPinned !== undefined)
-    return { role: "task-pinned", content: "", taskPinned }
+  const canvasPinned = decodeCanvasPinned(message)
+  if (canvasPinned !== undefined)
+    return { role: "canvas-pinned", content: "", canvasPinned }
   const canvas = decodeCanvas(message)
   if (canvas !== undefined) return { role: "canvas", content: "", canvas }
   const canvasFact = decodeCanvasFact(message)
@@ -430,24 +432,24 @@ export function renderableMessage(message: unknown): AgentMessageLike {
   const result = toolResultFacts(message)
   if (result !== undefined)
     return { ...(message as AgentMessageLike), ...result }
-  const chat = decodeChat(message)
-  return chat === undefined
+  const said = decodeMessage(message)
+  return said === undefined
     ? (message as AgentMessageLike)
     : {
-        role: "chat",
-        content: chat.text,
-        author: chat.authorName,
-        compelled: chat.compels.kind === "agent",
-        writer: chat.author,
-        sendId: chat.sendId,
-        ...(chat.contributors === undefined
+        role: "person",
+        content: said.text,
+        author: said.authorName,
+        compelled: said.compels.kind === "agent",
+        writer: said.author,
+        sendId: said.sendId,
+        ...(said.contributors === undefined
           ? {}
-          : { contributors: chat.contributors }),
-        ...(chat.command === undefined ? {} : { command: chat.command.name }),
-        ...(chat.images === undefined ? {} : { images: chat.images }),
-        ...(chat.shared === undefined ? {} : { shared: chat.shared }),
-        ...(chat.asks === undefined ? {} : { asks: chat.asks }),
-        ...(chat.invites === undefined ? {} : { invites: chat.invites }),
+          : { contributors: said.contributors }),
+        ...(said.command === undefined ? {} : { command: said.command.name }),
+        ...(said.images === undefined ? {} : { images: said.images }),
+        ...(said.shared === undefined ? {} : { shared: said.shared }),
+        ...(said.asks === undefined ? {} : { asks: said.asks }),
+        ...(said.invites === undefined ? {} : { invites: said.invites }),
       }
 }
 
@@ -458,8 +460,8 @@ export function renderableMessage(message: unknown): AgentMessageLike {
  * anything else.
  */
 export function promptAuthor(message: unknown): WriterId | null {
-  const chat = decodeChat(message)
-  if (chat !== undefined) return chat.author
+  const said = decodeMessage(message)
+  if (said !== undefined) return said.author
   return (
     decodeLand(message)?.by ??
     decodeStack(message)?.by ??
@@ -481,15 +483,15 @@ export const settleRun = (
 
 /**
  * What a send that starts a thread needs for its card:
- * the task its card goes on, and the board state a new task lands in, null
+ * the canvas its card goes on, and the board state a new canvas lands in, null
  * for the first open one. The thread is the decision's own.
  */
 export interface ThreadStarts {
-  readonly task: TaskId
+  readonly canvas: CanvasId
   readonly state: WorkflowStateId | null
 }
 
-export type ChatDecision =
+export type MessageDecision =
   /**
    * No lane at this thread: append with no lane, parented at exactly
    * `parent`, in `thread`; first, on a branch, what its card `starts`.
@@ -498,20 +500,20 @@ export type ChatDecision =
       readonly kind: "appendToTree"
       readonly thread: ThreadId
       readonly parent: Position
-      readonly details: ChatDetails
+      readonly details: MessageDetails
       readonly starts: ThreadStarts | null
     }
   /** The thread's lane is idle: append through it. */
   | {
       readonly kind: "appendToLane"
       readonly thread: ThreadId
-      readonly details: ChatDetails
+      readonly details: MessageDetails
     }
   /** The thread's lane is idle and the agent is compelled: run. */
   | {
       readonly kind: "run"
       readonly thread: ThreadId
-      readonly details: ChatDetails
+      readonly details: MessageDetails
     }
   /**
    * The agent is compelled here for the first time: create the thread's lane
@@ -522,7 +524,7 @@ export type ChatDecision =
       readonly kind: "createAndRun"
       readonly at: Position
       readonly thread: ThreadId
-      readonly details: ChatDetails
+      readonly details: MessageDetails
       readonly starts: ThreadStarts | null
     }
   /**
@@ -543,9 +545,10 @@ export type ChatDecision =
 
 /**
  * Whether a message with no mention asks the agent: in a thread with a lane,
- * or from a Start Agent column. A branch is a new thread, with no lane of its
- * own yet, so only a Start Agent column makes it ask. A branch from
- * agent work asks through the `@agent ` its composer starts with.
+ * or from a column that asks the agent with nothing typed. A branch is a new
+ * thread, with no lane of its own yet, so only such a column makes it ask. A
+ * branch from an agent thread, and a new canvas, ask through the `@agent `
+ * their composer starts with.
  */
 export const agentByDefault = (send: {
   readonly mode: PlanMode
@@ -557,14 +560,14 @@ export const agentByDefault = (send: {
 /**
  * Who a chat is for, as the host decides it and the composer foresees it:
  * its mentions, else the thread's default (the agent
- * where the thread has a lane or the column is a Start Agent column). A
+ * where the thread has a lane or the column asks the agent with nothing typed). A
  * command is for the agent, as `@agent` is, whoever else it names. The people
  * it names are kept either way: the composer shows them.
  */
-export function addressChat(input: {
+export function addressMessage(input: {
   readonly mentions: readonly Mention[]
   readonly participants: readonly string[]
-  /** Other threads' agents on open tasks' canvases. */
+  /** Other threads' agents on open canvases. */
   readonly agents: readonly AgentCandidate[]
   readonly mode: PlanMode
   readonly lane: ThreadLane
@@ -584,7 +587,7 @@ export function addressChat(input: {
 
 /**
  * Where a message into a thread goes, by its lane's state: the one table a
- * person's chat (`planChat`), a relayed ask and an answer (`relay.ts`) are all
+ * person's chat (`planMessage`), a relayed ask and an answer (`relay.ts`) are all
  * planned with.
  *
  * - No lane: appended with no lane, or, compelled, the lane is created and
@@ -634,7 +637,7 @@ export function planDelivery(input: {
  * Decide what a human message does. The host gathers every input inside
  * one serial step, so each decision names exactly where to write.
  *
- * - Who it is for is `addressChat`, which the composer runs too.
+ * - Who it is for is `addressMessage`, which the composer runs too.
  * - A `branch` starts its thread at its fork and never continues a lane:
  *   plain, it is appended there with no lane; compelled, it creates the
  *   thread's lane there. What its card needs comes with it (`starts`).
@@ -653,7 +656,7 @@ export function planDelivery(input: {
  * - A run on a lane whose work changes no file, and whose base has new work,
  *   catches the lane up first (`catch-up-first`), once per send.
  */
-export function planChat(input: {
+export function planMessage(input: {
   readonly author: WriterId
   readonly authorName: string
   readonly text: string
@@ -667,7 +670,7 @@ export function planChat(input: {
   readonly mentions: readonly Mention[]
   /** Every participant's display name (`participants`). */
   readonly participants: readonly string[]
-  /** Other threads' agents on open tasks' canvases. */
+  /** Other threads' agents on open canvases. */
   readonly agents: readonly AgentCandidate[]
   readonly asksAgent: boolean
   readonly sendId: string
@@ -701,9 +704,9 @@ export function planChat(input: {
    */
   readonly news: BaseNews["kind"]
   readonly caughtUp: boolean
-  /** The board state a branch's new task lands in; null for the first open one. */
+  /** The board state a branch's new canvas lands in; null for the first open one. */
   readonly state: WorkflowStateId | null
-}): ChatDecision {
+}): MessageDecision {
   const { lane, end, race } = input.thread
   const { at } = input
   const mode = planModeOf(at)
@@ -716,7 +719,7 @@ export function planChat(input: {
       ERR.UNKNOWN_COMMAND,
       `the file of /${command.unreadable} could not be read`,
     )
-  const { compels, asks, invites } = addressChat({
+  const { compels, asks, invites } = addressMessage({
     mentions: input.mentions,
     participants: input.participants,
     agents: input.agents,
@@ -725,7 +728,7 @@ export function planChat(input: {
     asksAgent: input.asksAgent,
     command: command !== null,
   })
-  const details: ChatDetails = {
+  const details: MessageDetails = {
     author: input.author,
     authorName: input.authorName,
     text:
@@ -750,7 +753,7 @@ export function planChat(input: {
   const compelled = compels.kind === "agent"
 
   if (branch) {
-    const starts = { task: at.task, state: input.state }
+    const starts = { canvas: at.canvas, state: input.state }
     const thread = at.thread
     return compelled
       ? { kind: "createAndRun", at: end, thread, details, starts }

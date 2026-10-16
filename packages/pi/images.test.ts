@@ -12,7 +12,7 @@ import {
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
-import { encodeChat } from "@pinetrie/rules"
+import { encodeMessage } from "@pinetrie/rules"
 import { newRootDoc } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import { newId } from "./agent.ts"
@@ -153,7 +153,7 @@ test("the model reads a chat's text, then its image's bytes, from the store", as
   if (made.kind !== "created") throw new Error("no lane")
   const text = `what colour? ![red](/blob/${sha})`
   await agent.lane(made.lane).run(
-    encodeChat(
+    encodeMessage(
       {
         author: writerId("ada@example.com"),
         authorName: "Ada",

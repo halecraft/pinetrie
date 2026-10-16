@@ -1,5 +1,7 @@
 import {
+  type CanvasId,
   type CardRecord,
+  canvasIdFor,
   type EntryLike,
   ERR,
   entryId,
@@ -9,28 +11,26 @@ import {
   rootIdFor,
   type Send,
   type SendAt,
-  type TaskId,
   type ThreadId,
-  taskIdFor,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
+import { indexCanvases } from "./canvas-index.ts"
 import { threadCardOf } from "./fixtures.ts"
 import { type GateFacts, type GateRoot, gateRefusal, planGate } from "./gate.ts"
 import { HELD_WORDS, TRASHED_WORDS } from "./held.ts"
-import { indexTasks } from "./task.ts"
 
 const T = threadIdFor("t")
 const NEW = threadIdFor("new")
 const ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
-const TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000a")
-const OTHER = taskIdFor("01a0ffd2-0000-7000-8000-00000000000b")
+const CANVAS = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000a")
+const OTHER = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000b")
 const BEA = writerId("bea@x.io")
 const E = entryId("e")
 
 const send = (at: SendAt): Send => ({
-  kind: "chat",
+  kind: "send",
   text: "x",
   root: ROOT,
   at,
@@ -43,10 +43,10 @@ const send = (at: SendAt): Send => ({
 })
 const atEnd = send({ kind: "end", thread: T, seen: E })
 const popped = send({ kind: "queue", thread: T })
-const branch = (task: TaskId = OTHER) =>
-  send({ kind: "branch", thread: NEW, at: E, task })
+const branch = (canvas: CanvasId = OTHER) =>
+  send({ kind: "branch", thread: NEW, at: E, canvas })
 
-const onCanvas = threadCardOf({ thread: T, task: TASK, by: BEA, cards: [] })
+const onCanvas = threadCardOf({ thread: T, canvas: CANVAS, by: BEA, cards: [] })
 const inInventory: CardRecord = {
   ...onCanvas,
   place: { kind: "inventory", holder: BEA },
@@ -58,7 +58,7 @@ const inTrash: CardRecord = {
   placer: BEA,
   place: {
     kind: "trash",
-    left: { kind: "canvas", task: TASK, order: "1", width: 1 },
+    left: { kind: "canvas", canvas: CANVAS, order: "1", width: 1 },
   },
   content: NO_CONTENT,
 }
@@ -88,7 +88,7 @@ const lane = (history: "jj" | "folder"): LaneRecord => ({
 const facts = (over: Partial<GateFacts> = {}): GateFacts => {
   const cards = over.cards ?? [onCanvas]
   return {
-    tasks: indexTasks(cards, new Map()),
+    canvases: indexCanvases(cards, new Map()),
     cards,
     archived: new Map(),
     lanes: new Map(),
@@ -97,28 +97,28 @@ const facts = (over: Partial<GateFacts> = {}): GateFacts => {
     ...over,
   }
 }
-const archivedTask = (task: TaskId) =>
-  new Map([[task, { task, by: BEA, at: 1 }]])
+const archivedCanvas = (canvas: CanvasId) =>
+  new Map([[canvas, { canvas, by: BEA, at: 1 }]])
 
 describe("planGate", () => {
-  test("a send in a free thread in no archived task is cleared, as given", () => {
+  test("a send in a free thread in no archived canvas is cleared, as given", () => {
     const plan = planGate(atEnd, facts())
     expect(plan.kind).toBe("cleared")
     if (plan.kind === "cleared") expect(plan.command).toBe(atEnd)
   })
 
-  test("a send at an archived task's thread, or popped from its queue, is refused archived", () => {
-    const archived = archivedTask(TASK)
+  test("a send at an archived canvas's thread, or popped from its queue, is refused archived", () => {
+    const archived = archivedCanvas(CANVAS)
     for (const command of [atEnd, popped])
       expect(planGate(command, facts({ archived }))).toEqual({
         kind: "archived",
-        task: { task: TASK, by: BEA, at: 1 },
+        canvas: { canvas: CANVAS, by: BEA, at: 1 },
       })
   })
 
-  test("a branch into an archived task is refused before any root is read", () => {
+  test("a branch into an archived canvas is refused before any root is read", () => {
     expect(
-      planGate(branch(OTHER), facts({ archived: archivedTask(OTHER) })).kind,
+      planGate(branch(OTHER), facts({ archived: archivedCanvas(OTHER) })).kind,
     ).toBe("archived")
   })
 
@@ -138,12 +138,12 @@ describe("planGate", () => {
 
   test("a copy's first send, at its record's fork, answers to the copy's holder", () => {
     const cards = [inInventory]
-    const tasks = {
-      ...indexTasks(cards, new Map()),
+    const canvases = {
+      ...indexCanvases(cards, new Map()),
       forkOf: new Map([[NEW, { kind: "fork", at: E, how: "copy" } as const]]),
     }
     const roots = new Map([[ROOT, root]])
-    expect(planGate(branch(), facts({ cards, tasks, roots })).kind).toBe(
+    expect(planGate(branch(), facts({ cards, canvases, roots })).kind).toBe(
       "cleared",
     )
   })
@@ -173,13 +173,13 @@ test("gateRefusal: an archive names its archiver, a hold and a trash say what to
   const nameOf = (w: string) => (w === BEA ? "Bea" : "?")
   expect(
     gateRefusal(
-      { kind: "archived", task: { task: TASK, by: BEA, at: 1 } },
+      { kind: "archived", canvas: { canvas: CANVAS, by: BEA, at: 1 } },
       nameOf,
     ),
   ).toEqual({
     kind: "refused",
-    code: ERR.TASK_ARCHIVED,
-    message: "archived by Bea: restore the task first",
+    code: ERR.CANVAS_ARCHIVED,
+    message: "archived by Bea: restore the canvas first",
   })
   expect(
     gateRefusal(

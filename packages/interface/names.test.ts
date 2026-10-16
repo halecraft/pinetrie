@@ -32,12 +32,12 @@ describe("speakerWords: who a message is from, as its column names it", () => {
   test.each<[string, Parameters<typeof speakerWords>[0], string]>([
     [
       "a person, by their name now",
-      { role: "chat", writer: ADA, author: "ada" },
+      { role: "person", writer: ADA, author: "ada" },
       "Ada (ada)",
     ],
     [
       "with those who wrote it with them",
-      { role: "chat", writer: ADA, author: "Ada", contributors: [BEA] },
+      { role: "person", writer: ADA, author: "Ada", contributors: [BEA] },
       "Ada, with bea",
     ],
     ["the agent", { role: "assistant" }, "agent"],

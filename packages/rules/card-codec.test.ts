@@ -1,5 +1,6 @@
 import {
   type CardRecord,
+  canvasIdFor,
   cardIdOfKind,
   entryId,
   makeCard,
@@ -7,7 +8,6 @@ import {
   type PlacedKind,
   type RelayDetails,
   type Sha256,
-  taskIdFor,
   threadIdFor,
   workflowStateIdFor,
   writerId,
@@ -17,7 +17,7 @@ import { CARD_CODEC, decodeCard, encodeCard } from "./card.ts"
 
 const ada = writerId("ada@example.com")
 const lane = threadIdFor("01a0ffd2-0000-7000-8000-0000000000f1")
-const task = taskIdFor("01a0ffd2-0000-7000-8000-0000000000f2")
+const canvas = canvasIdFor("01a0ffd2-0000-7000-8000-0000000000f2")
 const uuid = (n: string) => `01a0ffd2-0000-7000-8000-0000000000${n}`
 const queued = {
   kind: "queued",
@@ -63,13 +63,13 @@ const EACH: { readonly [K in PlacedKind]: CardRecord } = {
   thread: makeCard(
     "thread",
     lane,
-    { kind: "canvas", task, order: "m", width: 1 },
+    { kind: "canvas", canvas, order: "m", width: 1 },
     NO_CONTENT,
     ada,
   ),
-  task: makeCard(
-    "task",
-    task,
+  canvas: makeCard(
+    "canvas",
+    canvas,
     { kind: "board", state: workflowStateIdFor("todo"), order: "m" },
     NO_CONTENT,
     ada,
@@ -77,7 +77,7 @@ const EACH: { readonly [K in PlacedKind]: CardRecord } = {
   "note-column": makeCard(
     "note-column",
     cardIdOfKind("note-column", uuid("a3")),
-    { kind: "canvas", task, order: "n", width: 1 },
+    { kind: "canvas", canvas, order: "n", width: 1 },
     NO_CONTENT,
     ada,
   ),

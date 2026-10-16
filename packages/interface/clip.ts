@@ -10,6 +10,7 @@
 
 import {
   type Address,
+  type CanvasId,
   type CardRecord,
   type EntryId,
   entryId,
@@ -25,7 +26,6 @@ import {
   printAddress,
   type ReferenceCardId,
   type Sha256,
-  type TaskId,
   type TextCardId,
   type ThreadId,
   type TreeIndex,
@@ -71,7 +71,7 @@ export type CardClip =
       readonly card: NoteColumnId
       readonly text: string
     }
-  | { readonly kind: "task"; readonly card: TaskId; readonly text: string }
+  | { readonly kind: "canvas"; readonly card: CanvasId; readonly text: string }
 
 /** What a copy holds. Each holds its own text, so a paste needs nothing else. */
 export type Clip =
@@ -148,7 +148,7 @@ const linkTo = (address: Address): string =>
 /**
  * `card`'s clip by its kind: a text card's text; a reference's
  * address and quote blob, its text the quote if fetched, else its link; a
- * thread's end as this tab holds it; a note column's or a task's link.
+ * thread's end as this tab holds it; a note column's or a canvas's link.
  * Null for a kind nobody copies (a fact, an ask), or a thread with no end
  * here.
  */
@@ -172,9 +172,9 @@ export function cardClip(card: CardRecord, facts: ClipFacts): CardClip | null {
         card: card.id,
         text: linkTo({ kind: "card", card: card.id }),
       }
-    case "task":
+    case "canvas":
       return {
-        kind: "task",
+        kind: "canvas",
         card: card.id,
         text: linkTo({ kind: "card", card: card.id }),
       }
@@ -485,9 +485,9 @@ function cardClipOfJson(value: unknown): CardClip | undefined {
       return card.kind === "note-column"
         ? { kind: "note-column", card: card.id, text }
         : undefined
-    case "task":
-      return card.kind === "task"
-        ? { kind: "task", card: card.id, text }
+    case "canvas":
+      return card.kind === "canvas"
+        ? { kind: "canvas", card: card.id, text }
         : undefined
     default:
       return undefined

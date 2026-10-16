@@ -25,9 +25,9 @@ import {
 import {
   type BannerAnswer,
   type BannerAsk,
-  chatImageShas,
+  messageImageShas,
   type RequestTokens,
-  withChatImages,
+  withMessageImages,
 } from "@pinetrie/rules"
 import { type RootDocHandle, readLaneTip } from "@pinetrie/schema"
 import { PINETRIE_COMPACTION } from "./compaction.ts"
@@ -127,7 +127,7 @@ function providerMessages(
   blobs: Pick<BlobStore, "get">,
 ): ReturnType<typeof convertToLlm> {
   const found = new Map(
-    chatImageShas(messages).flatMap(sha => {
+    messageImageShas(messages).flatMap(sha => {
       const blob = blobs.get(sha)
       // A chat's images alone: a quote's markdown is no image.
       return blob === undefined || !isImageMime(blob.mimeType)
@@ -143,7 +143,7 @@ function providerMessages(
           ]
     }),
   )
-  return convertToLlm(withChatImages(messages, found))
+  return convertToLlm(withMessageImages(messages, found))
 }
 
 /** The pi stack over one root's session. */

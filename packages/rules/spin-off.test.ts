@@ -2,38 +2,38 @@ import {
   type CardHistoryRecord,
   type CardId,
   type CardRecord,
+  canvasIdFor,
   cardIdOfKind,
   type LaneRecord,
   NO_CONTENT,
   rootIdFor,
   type TextCard,
-  taskIdFor,
   threadIdFor,
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
-import { cardIdFor, taskCard } from "@pinetrie/core/fixtures"
+import { canvasCard, cardIdFor } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
+import { type CanvasIndex, NO_CANVAS_INDEX } from "./canvas-index.ts"
 import { threadCardOf } from "./fixtures.ts"
 import { planRootDelete } from "./root.ts"
 import { planLiftRoot, planSpinOff, type SpunThread } from "./spin-off.ts"
-import { NO_TASK_INDEX, type TaskIndex } from "./task.ts"
 
 const TEST_THREAD = threadIdFor("e")
-const TEST_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
-const NEW_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000d")
+const TEST_CANVAS = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000c")
+const NEW_CANVAS = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000d")
 const _ROOT_A = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 const THREAD = rootIdFor("01a0ffd2-0000-7000-8000-0000000000ff")
 const STARTS = threadIdFor("spun")
 const ADA = writerId("p-ada")
 const BEA = writerId("p-bea")
 const C1 = cardIdFor("c1")
-const canvasKey = { kind: "canvas", task: NEW_TASK } as const
+const canvasKey = { kind: "canvas", canvas: NEW_CANVAS } as const
 const SPIN_WORKFLOW = {
   open: [{ id: workflowStateIdFor("d"), name: "Doing" }],
   archive: { id: workflowStateIdFor("x"), name: "Done" },
 }
-/** Your message at the thread: a card at a thread, in its task. */
+/** Your message at the thread: a card at a thread, in its canvas. */
 const note = {
   kind: "composing",
   thread: TEST_THREAD,
@@ -56,7 +56,7 @@ describe("planSpinOff", () => {
       text?: string
       roots?: Set<typeof THREAD>
       sender?: typeof ADA
-      tasks?: TaskIndex
+      canvases?: CanvasIndex
     } = {},
   ) =>
     planSpinOff({
@@ -65,12 +65,12 @@ describe("planSpinOff", () => {
         move: { card: C1, from: note, to: spun },
         root: THREAD,
         thread: STARTS,
-        task: NEW_TASK,
+        canvas: NEW_CANVAS,
         state: null,
-        here: TEST_TASK,
+        here: TEST_CANVAS,
       },
       sender: over.sender ?? ADA,
-      tasks: over.tasks ?? NO_TASK_INDEX,
+      canvases: over.canvases ?? NO_CANVAS_INDEX,
       text: over.text ?? " plan it @agent ",
       roots: over.roots ?? new Set(),
       threads: new Set(),
@@ -94,14 +94,14 @@ describe("planSpinOff", () => {
     const opened = planned.kind === "spin" ? planned.open : null
     expect(opened?.records.map(r => r.namespace)).toEqual(["pinetrie.thread"])
     expect(opened?.steps[0]).toMatchObject({
-      record: { kind: "task", id: NEW_TASK, place: { kind: "board" } },
+      record: { kind: "canvas", id: NEW_CANVAS, place: { kind: "board" } },
     })
     expect(
       opened?.records.find(r => r.namespace === "pinetrie.thread"),
     ).toMatchObject({ value: { origin: { kind: "spun", card: C1 } } })
     expect(opened?.steps.at(-1)).toMatchObject({
       kind: "write",
-      record: { id: STARTS, place: { kind: "canvas", task: NEW_TASK } },
+      record: { id: STARTS, place: { kind: "canvas", canvas: NEW_CANVAS } },
     })
   })
 
@@ -138,10 +138,10 @@ describe("planLiftRoot", () => {
     known,
     writers,
   })
-  /** The spun thread's card, alone on the task the spin-off made. */
+  /** The spun thread's card, alone on the canvas the spin-off made. */
   const spunCard = threadCardOf({
     thread: STARTS,
-    task: NEW_TASK,
+    canvas: NEW_CANVAS,
     by: ADA,
     cards: [],
   })
@@ -230,7 +230,7 @@ describe("planLiftRoot", () => {
                 {
                   kind: "moved",
                   by: BEA,
-                  from: { kind: "canvas", task: TEST_TASK },
+                  from: { kind: "canvas", canvas: TEST_CANVAS },
                   to: canvasKey,
                   at: 2,
                 },
@@ -242,7 +242,7 @@ describe("planLiftRoot", () => {
       { kind: "replied", by: null },
     ],
     [
-      "another card on its task's canvas: refused",
+      "another card on its canvas: refused",
       thread([ADA]),
       {
         cards: [
@@ -256,7 +256,7 @@ describe("planLiftRoot", () => {
             ),
             owner: BEA,
             placer: BEA,
-            place: { kind: "canvas", task: NEW_TASK, order: "9", width: 1 },
+            place: { kind: "canvas", canvas: NEW_CANVAS, order: "9", width: 1 },
             content: NO_CONTENT,
           },
         ],
@@ -264,7 +264,7 @@ describe("planLiftRoot", () => {
       { kind: "replied", by: null },
     ],
     [
-      "a card pinned to its task: refused",
+      "a card pinned to its canvas: refused",
       thread([ADA]),
       {
         cards: [
@@ -272,7 +272,7 @@ describe("planLiftRoot", () => {
           spunCard,
           card({
             id: cardIdFor("c3"),
-            place: { kind: "task-pinned", task: NEW_TASK, order: "a" },
+            place: { kind: "canvas-pinned", canvas: NEW_CANVAS, order: "a" },
           }),
         ],
       },
@@ -318,22 +318,22 @@ describe("planLiftRoot", () => {
   })
 })
 
-test("planRootDelete: the root's records, its task's cards and title, its document and stacks", () => {
+test("planRootDelete: the root's records, its canvas's cards and title, its document and stacks", () => {
   const inThread = card({
     id: cardIdFor("c2"),
     place: { ...note, thread: STARTS },
   })
   const onCanvas = threadCardOf({
     thread: STARTS,
-    task: TEST_TASK,
+    canvas: TEST_CANVAS,
     by: ADA,
     cards: [],
   })
   const plan = planRootDelete(
     THREAD,
     STARTS,
-    TEST_TASK,
-    [card(), inThread, onCanvas, taskCard(TEST_TASK)],
+    TEST_CANVAS,
+    [card(), inThread, onCanvas, canvasCard(TEST_CANVAS)],
     new Map([[STARTS, THREAD]]),
   )
   expect(plan.values.map(v => v.namespace)).toEqual([
@@ -344,8 +344,8 @@ test("planRootDelete: the root's records, its task's cards and title, its docume
   expect(plan.cards).toEqual([
     { kind: "remove", id: cardIdFor("c2") },
     { kind: "remove", id: STARTS },
-    { kind: "remove", id: TEST_TASK },
+    { kind: "remove", id: TEST_CANVAS },
   ])
   expect(plan.doc).toBe(`root:${THREAD}`)
-  expect(plan.histories).toBe(TEST_TASK)
+  expect(plan.histories).toBe(TEST_CANVAS)
 })

@@ -3,11 +3,11 @@
 // it, and other packages' tests as `@pinetrie/core/fixtures`; production code
 // never imports it.
 
-import { makeCard, NO_CONTENT, type TaskCard } from "./cards.ts"
+import { type CanvasCard, makeCard, NO_CONTENT } from "./cards.ts"
 import {
+  type CanvasId,
   type EntryId,
   entryId,
-  type TaskId,
   type TextCardId,
   type ThreadId,
   textCardId,
@@ -32,20 +32,20 @@ export function cardIdFor(name: string): TextCardId {
   return textCardId(`01a0ffd2-0000-7000-8000-${tail}`)
 }
 
-/** The board state a fixture's task is in when its test names none. */
+/** The board state a fixture's canvas is in when its test names none. */
 export const FIXTURE_STATE = workflowStateIdFor("fixture")
 
 /**
- * A task's card on the board, at `order` in `state`, made by `by`: what makes a
- * task one the session holds.
+ * A canvas's card on the board, at `order` in `state`, made by `by`: what makes a
+ * canvas one the session holds.
  */
-export const taskCard = (
-  task: TaskId,
+export const canvasCard = (
+  canvas: CanvasId,
   order = "a",
   state: WorkflowStateId = FIXTURE_STATE,
   by: WriterId = writerId("ada@x.io"),
-): TaskCard =>
-  makeCard("task", task, { kind: "board", state, order }, NO_CONTENT, by)
+): CanvasCard =>
+  makeCard("canvas", canvas, { kind: "board", state, order }, NO_CONTENT, by)
 
 /** The thread a fixture's entry is in when its test names none. */
 export const FIXTURE_THREAD = threadIdFor("fixture")

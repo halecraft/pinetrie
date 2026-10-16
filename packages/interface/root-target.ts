@@ -1,6 +1,6 @@
-// interface/root-target — where a task moves to, by drag or by key.
+// interface/root-target — where a canvas moves to, by drag or by key.
 //
-// A task is dragged from the board or from the sidebar. A drop names a target
+// A canvas is dragged from the board or from the sidebar. A drop names a target
 // by the attributes the page marks it with (`rootDropProps`), and
 // `planRootDrop` turns it into an intent: on the board, the one a board
 // item's Move to ▸, Move up or Move down (`stepsIn`) sends; on the sidebar, a
@@ -8,17 +8,17 @@
 // lands is `landingIn`'s.
 
 import {
-  isTaskId,
+  type CanvasId,
+  isCanvasId,
   isWorkflowStateId,
-  type TaskId,
   type WorkflowStateId,
 } from "@pinetrie/core"
 import type { Intent } from "./intent.ts"
 import { gapAt } from "./reorder.ts"
 
-/** A task being dragged: which, and the state it is in. */
+/** A canvas being dragged: which, and the state it is in. */
 export interface RootDrag {
-  readonly task: TaskId
+  readonly canvas: CanvasId
   readonly state: WorkflowStateId | null
 }
 
@@ -27,15 +27,15 @@ export type RootTarget =
   | {
       readonly kind: "state"
       readonly state: WorkflowStateId
-      readonly before: TaskId | null
+      readonly before: CanvasId | null
     }
   /** The sidebar: before `before`, or at its end. */
-  | { readonly kind: "list"; readonly before: TaskId | null }
+  | { readonly kind: "list"; readonly before: CanvasId | null }
 
 const ROOT_STATE = "data-root-state"
 const ROOT_BEFORE = "data-root-before"
 const LIST_BEFORE = "data-list-before"
-/** What a list's end carries, where there is no task to go before. */
+/** What a list's end carries, where there is no canvas to go before. */
 const END = "end"
 
 const ROOT_GROUP = "data-root-group"
@@ -73,13 +73,13 @@ export function rootTargetOfElement(el: {
     return {
       kind: "state",
       state,
-      before: before !== null && isTaskId(before) ? before : null,
+      before: before !== null && isCanvasId(before) ? before : null,
     }
   }
   const list = el.getAttribute(LIST_BEFORE)
   if (list === null || list === "") return null
   if (list === END) return { kind: "list", before: null }
-  return isTaskId(list) ? { kind: "list", before: list } : null
+  return isCanvasId(list) ? { kind: "list", before: list } : null
 }
 
 export const sameTarget = (a: RootTarget, b: RootTarget): boolean =>
@@ -145,7 +145,7 @@ export function stepsIn<T>(
 /**
  * What a drop of `drag` on `target` asks: a move on the board, for a state
  * other than its own or a place in it; a place in the sidebar. Null when it
- * would do nothing: a task dropped before itself, or on `home`, the place
+ * would do nothing: a canvas dropped before itself, or on `home`, the place
  * just after it where it was dragged from (null when not known).
  */
 export function planRootDrop(
@@ -156,13 +156,13 @@ export function planRootDrop(
 ): Intent | null {
   if (home !== null && sameTarget(target, home)) return null
   if (target.kind === "list")
-    return target.before === drag.task
+    return target.before === drag.canvas
       ? null
-      : { kind: "moveInList", task: drag.task, before: target.before }
-  if (drag.state === null || target.before === drag.task) return null
+      : { kind: "moveInList", canvas: drag.canvas, before: target.before }
+  if (drag.state === null || target.before === drag.canvas) return null
   return {
-    kind: "moveTask",
-    task: drag.task,
+    kind: "moveCanvas",
+    canvas: drag.canvas,
     from: drag.state,
     to: target.state,
     before: target.before,

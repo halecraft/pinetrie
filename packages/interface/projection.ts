@@ -15,6 +15,7 @@
 import {
   type AgentRun,
   type AskIndex,
+  type CanvasId,
   type CardHistoryRecord,
   type CardId,
   type CardRecord,
@@ -27,7 +28,6 @@ import {
   type NoteColumnRecord,
   type RootId,
   type SeatRecord,
-  type TaskId,
   type ThreadId,
   type ThreadRecord,
   type TraceRecord,
@@ -101,8 +101,8 @@ export interface SessionFacts {
   readonly seats: readonly SeatRecord[]
   /** The board's workflow states, or null before the host wrote them. */
   readonly workflow: Workflow | null
-  /** Each task's title: its label. */
-  readonly marks: ReadonlyMap<TaskId, MarkRecord>
+  /** Each canvas's title: its label. */
+  readonly marks: ReadonlyMap<CanvasId, MarkRecord>
   /** Each titled note column's title. */
   readonly noteColumns: ReadonlyMap<NoteColumnId, NoteColumnRecord>
   /** Every thread, by id: each one's root. */
@@ -112,7 +112,7 @@ export interface SessionFacts {
   readonly histories: ReadonlyMap<CardId, CardHistoryRecord>
   /** Every trace, by id: each column draws its reader's own. */
   readonly traces: ReadonlyMap<string, TraceRecord>
-  /** What a column says of its threads' work; its forks are the page's `TaskIndex`'. */
+  /** What a column says of its threads' work; its forks are the page's `CanvasIndex`'. */
   readonly workFacts: Omit<WorkFacts, "forks">
 }
 

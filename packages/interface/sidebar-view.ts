@@ -2,28 +2,39 @@
 // to icons: `Sidebar` (`sidebar.tsx`) draws it, and each click sends the
 // intent it names.
 
-import type { MarkRecord, TaskId, ThreadId, ThreadName } from "@pinetrie/core"
+import type {
+  CanvasId,
+  MarkRecord,
+  ThreadId,
+  ThreadName,
+  Workflow,
+} from "@pinetrie/core"
 import { PRODUCT_NAME } from "@pinetrie/core"
 import { threadNameOf } from "@pinetrie/rules"
 import type { Moments, Status } from "./attention.ts"
+import {
+  boardPlaceWords,
+  type PlaceOnBoard,
+  placeOnBoard,
+} from "./canvas-column-view.ts"
 import type { Intent } from "./intent.ts"
 import { type Here, type Layout, listOf, sameHere } from "./layout.ts"
 import { type PageName, pageWords } from "./page.ts"
-import { type ColorSlot, taskSlot } from "./palette.ts"
-import { initialsOf, NO_TEXT, type TaskSummary } from "./root-label.ts"
-import { newTabButton, type StartButton } from "./start-button.ts"
+import { type ColorSlot, canvasSlot } from "./palette.ts"
+import { type CanvasSummary, initialsOf, NO_TEXT } from "./root-label.ts"
+import { newCanvasButton, type StartButton } from "./start-button.ts"
 import type { ThreadCardHead, ThreadMove } from "./thread-card.ts"
 import type { IconLookup, ThreadIcon } from "./thread-icon.ts"
 
-/** What a task's ⋯ in the sidebar offers. */
+/** What a canvas's ⋯ in the sidebar offers. */
 export type ItemMenuItem =
   | { readonly kind: "rename" }
-  /** What the task raises is not needed. */
+  /** What the canvas raises is not needed. */
   | { readonly kind: "notNeeded"; readonly intent: Intent }
-  /** Ask a model for a title from the task's first thread. */
+  /** Ask a model for a title from the canvas's first thread. */
   | { readonly kind: "retitle"; readonly intent: Intent }
   /**
-   * Move the task on the board to another workflow state, its thread card's
+   * Move the canvas on the board to another workflow state, its thread card's
    * (`ThreadMove`). Into the archive it is archived: refused while its agent
    * works there (`busy`), and it withdraws the proposed changes of its threads
    * named in `drops`.
@@ -31,8 +42,8 @@ export type ItemMenuItem =
   | ({ readonly kind: "moveTo" } & ThreadMove)
 
 /**
- * What an item draws while the sidebar is folded: the icon of the task's
- * earliest thread with one (`taskIcons`), else its initials on a colour
+ * What an item draws while the sidebar is folded: the icon of the canvas's
+ * earliest thread with one (`canvasIcons`), else its initials on a colour
  * seeded by its id.
  */
 export type ItemIcon =
@@ -46,6 +57,8 @@ export type ItemIcon =
 interface ItemCommon {
   /** What the item says, and what the window's title names (`pageTitle`). */
   readonly label: string
+  /** Its hover's words: its label, and where it is on the board. */
+  readonly hover: string
   readonly icon: ItemIcon
   readonly selected: boolean
   readonly show: Intent
@@ -55,15 +68,15 @@ interface ItemCommon {
 }
 
 export type ItemView = ItemCommon & {
-  readonly kind: "task"
-  readonly task: TaskId
+  readonly kind: "canvas"
+  readonly canvas: CanvasId
   /** Its thread card's header, the board's too (`threadCardHead`). */
   readonly head: ThreadCardHead
   /** Its first line: the rename field's placeholder. */
   readonly line: string
   /** Its stored title, or null: what the rename field starts with. */
   readonly title: string | null
-  /** What its mark draws (`taskStatus`), or null for none. */
+  /** What its mark draws (`canvasStatus`), or null for none. */
   readonly status: Status | null
   /**
    * When its status last rose to needs you as you watched, or null: the
@@ -72,9 +85,9 @@ export type ItemView = ItemCommon & {
   readonly arrived: number | null
   /** When its agent last stopped with a run you follow done, or null: a ✓ fades. */
   readonly done: number | null
-  /** Only the task you are on can be archived and still in the sidebar. */
+  /** Only the canvas you are on can be archived and still in the sidebar. */
   readonly archived: boolean
-  /** On every task not archived, the one you are on or not. */
+  /** On every canvas not archived, the one you are on or not. */
   readonly menu: readonly ItemMenuItem[]
 }
 
@@ -83,24 +96,26 @@ export interface SidebarView {
   readonly items: readonly ItemView[]
   /** The item you are on, or null when the list lacks it. */
   readonly selected: ItemView | null
-  /** ＋: a new tab, agent work its main action. */
+  /** ＋ canvas: a new canvas, with no ▾. */
   readonly add: StartButton
 }
 
 export interface SidebarViewInput {
   readonly layout: Layout
   readonly active: Here
-  /** Each task's thread card header (`threadCardHeads`), which the board reads too. */
-  readonly heads: ReadonlyMap<TaskId, ThreadCardHead>
-  /** Each task's summary (`summariesOf`): the rename field's placeholder. */
-  readonly summaries: ReadonlyMap<TaskId, TaskSummary>
-  readonly marks: ReadonlyMap<TaskId, MarkRecord>
-  /** Tasks in the archive. */
-  readonly archived: ReadonlySet<TaskId>
-  /** When each task's mark last arrived as you watched (`useAttention`). */
+  /** Each canvas's thread card header (`threadCardHeads`), which the board reads too. */
+  readonly heads: ReadonlyMap<CanvasId, ThreadCardHead>
+  /** Each canvas's summary (`summariesOf`): the rename field's placeholder. */
+  readonly summaries: ReadonlyMap<CanvasId, CanvasSummary>
+  readonly marks: ReadonlyMap<CanvasId, MarkRecord>
+  /** Canvases in the archive. */
+  readonly archived: ReadonlySet<CanvasId>
+  /** When each canvas's mark last arrived as you watched (`useAttention`). */
   readonly arrivals: Moments
-  /** Each task's icon (`taskIcons`). */
-  readonly icons: ReadonlyMap<TaskId, ThreadIcon>
+  /** Each canvas's icon (`canvasIcons`). */
+  readonly icons: ReadonlyMap<CanvasId, ThreadIcon>
+  /** The board's states, where ＋ lands a new canvas; null before they arrive. */
+  readonly workflow: Workflow | null
 }
 
 export function sidebarView(input: SidebarViewInput): SidebarView {
@@ -109,40 +124,48 @@ export function sidebarView(input: SidebarViewInput): SidebarView {
   return {
     items,
     selected: items.find(t => t.selected) ?? null,
-    add: newTabButton(null),
+    add: newCanvasButton({
+      from: "sidebar",
+      landsIn: input.workflow?.open[0] ?? null,
+    }),
   }
 }
 
 function itemView(
-  here: Extract<Here, { kind: "task" }>,
+  here: Extract<Here, { kind: "canvas" }>,
   input: SidebarViewInput,
 ): ItemView {
-  const { task } = here
-  const archived = input.archived.has(task)
-  const head = input.heads.get(task) ?? noHead(task)
+  const { canvas } = here
+  const archived = input.archived.has(canvas)
+  const head = input.heads.get(canvas) ?? noHead(canvas)
   return {
     selected: sameHere(here, input.active),
     show: { kind: "show", here },
     close: { kind: "close", here },
-    kind: "task",
-    task,
+    kind: "canvas",
+    canvas,
     head,
     label: head.label,
+    hover: hoverWords(head.label, placeOnBoard(input.workflow, head.state)),
     icon: itemIcon(head, input),
-    line: input.summaries.get(task)?.line ?? NO_TEXT,
-    title: input.marks.get(task)?.title ?? null,
+    line: input.summaries.get(canvas)?.line ?? NO_TEXT,
+    title: input.marks.get(canvas)?.title ?? null,
     status: head.status,
-    arrived: input.arrivals.arrived.get(task) ?? null,
-    done: input.arrivals.done.get(task) ?? null,
+    arrived: input.arrivals.arrived.get(canvas) ?? null,
+    done: input.arrivals.done.get(canvas) ?? null,
     archived,
-    menu: archived ? [] : menuOf(task, head),
+    menu: archived ? [] : menuOf(canvas, head),
     pip: head.pip,
   }
 }
 
-/** A task the heads lack: drawn with no signals, as a task not yet in the session. */
-const noHead = (task: TaskId): ThreadCardHead => ({
-  task,
+/** An item's hover: its label, then where it is on the board, when it is on it. */
+const hoverWords = (label: string, place: PlaceOnBoard | null): string =>
+  place === null ? label : `${label} · ${boardPlaceWords(place).line}`
+
+/** A canvas the heads lack: drawn with no signals, as a canvas not yet in the session. */
+const noHead = (canvas: CanvasId): ThreadCardHead => ({
+  canvas,
   label: NO_TEXT,
   status: null,
   ready: [],
@@ -152,35 +175,38 @@ const noHead = (task: TaskId): ThreadCardHead => ({
 })
 
 function itemIcon(head: ThreadCardHead, input: SidebarViewInput): ItemIcon {
-  const icon = input.icons.get(head.task)
+  const icon = input.icons.get(head.canvas)
   if (icon !== undefined) return { kind: "icon", icon }
   return {
     kind: "initials",
     letters: initialsOf(head.label),
-    slot: taskSlot(head.task),
+    slot: canvasSlot(head.canvas),
   }
 }
 
 /**
- * Each task's icon: that of its earliest thread with one (`threadIcon`). A
+ * Each canvas's icon: that of its earliest thread with one (`threadIcon`). A
  * thread's id is `t-` and a uuidv7, so ids sort by creation.
  */
-export function taskIcons(
-  threadsOf: ReadonlyMap<TaskId, readonly ThreadId[]>,
+export function canvasIcons(
+  threadsOf: ReadonlyMap<CanvasId, readonly ThreadId[]>,
   iconFor: IconLookup,
-): ReadonlyMap<TaskId, ThreadIcon> {
-  const icons = new Map<TaskId, ThreadIcon>()
-  for (const [task, threads] of threadsOf)
+): ReadonlyMap<CanvasId, ThreadIcon> {
+  const icons = new Map<CanvasId, ThreadIcon>()
+  for (const [canvas, threads] of threadsOf)
     for (const thread of [...threads].sort()) {
       const icon = iconFor(thread)
       if (icon === null) continue
-      icons.set(task, icon)
+      icons.set(canvas, icon)
       break
     }
   return icons
 }
 
-function menuOf(task: TaskId, head: ThreadCardHead): readonly ItemMenuItem[] {
+function menuOf(
+  canvas: CanvasId,
+  head: ThreadCardHead,
+): readonly ItemMenuItem[] {
   const { status } = head
   return [
     ...(status === null || status.kind === "working"
@@ -196,17 +222,17 @@ function menuOf(task: TaskId, head: ThreadCardHead): readonly ItemMenuItem[] {
           } as const,
         ]),
     { kind: "rename" },
-    { kind: "retitle", intent: { kind: "retitle", task } },
+    { kind: "retitle", intent: { kind: "retitle", canvas } },
     ...head.moves.map(m => ({ kind: "moveTo", ...m }) as const),
   ]
 }
 
 /** An item's key in the sidebar: its React key, and what the list scrolls to. */
-export const listKey = (item: ItemView): string => `task:${item.task}`
+export const listKey = (item: ItemView): string => `canvas:${item.canvas}`
 
 /**
  * The window's title: what needs you (`inboxCount`, your inbox's badge), then
- * the page over the stage, else the task you are on. `here` is null on nothing,
+ * the page over the stage, else the canvas you are on. `here` is null on nothing,
  * and before anything is chosen.
  */
 export const pageTitle = (
@@ -221,32 +247,38 @@ export const pageTitle = (
 }
 
 /**
- * The threads with open proposed changes, by their task, each as people read it
- * (`threadNameOf`), named or not: what archiving that task withdraws, and what
+ * The threads with open proposed changes, by their canvas, each as people read it
+ * (`threadNameOf`), named or not: what archiving that canvas withdraws, and what
  * a thread card's ⇡ names. `openProposed` are the open proposed changes
- * (`appView`'s); one whose thread is in no task is left out.
+ * (`appView`'s); one whose thread is in no canvas is left out.
  */
-export function openProposedByTask(
+export function openProposedByCanvas(
   openProposed: readonly { readonly lane: ThreadId }[],
   names: ReadonlyMap<ThreadId, ThreadName>,
-  taskOfThread: ReadonlyMap<ThreadId, TaskId>,
-): ReadonlyMap<TaskId, readonly string[]> {
-  const byTask = new Map<TaskId, string[]>()
+  canvasOfThread: ReadonlyMap<ThreadId, CanvasId>,
+): ReadonlyMap<CanvasId, readonly string[]> {
+  const byCanvas = new Map<CanvasId, string[]>()
   for (const { lane } of openProposed) {
-    const task = taskOfThread.get(lane)
-    if (task !== undefined)
-      byTask.set(task, [...(byTask.get(task) ?? []), threadNameOf(names, lane)])
+    const canvas = canvasOfThread.get(lane)
+    if (canvas !== undefined)
+      byCanvas.set(canvas, [
+        ...(byCanvas.get(canvas) ?? []),
+        threadNameOf(names, lane),
+      ])
   }
-  return byTask
+  return byCanvas
 }
 
-/** What archiving a task does to its threads' proposed changes, beside its item. */
+/** What archiving a canvas does to its threads' proposed changes, beside its item. */
 export const dropsWords = (drops: readonly string[]): string | null =>
   drops.length === 0 ? null : `work not accepted goes: ${drops.join(", ")}`
 
-/** What a task's rename field sends, once planned (`planTitle`). */
-export const renameIntent = (task: TaskId, title: string | null): Intent => ({
+/** What a canvas's rename field sends, once planned (`planTitle`). */
+export const renameIntent = (
+  canvas: CanvasId,
+  title: string | null,
+): Intent => ({
   kind: "rename",
-  of: { kind: "task", task },
+  of: { kind: "canvas", canvas },
   title,
 })

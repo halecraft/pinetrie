@@ -67,7 +67,7 @@ const props = (over: Partial<MessageListProps> = {}): MessageListProps => ({
   view,
   lane: lane(),
   joins: joins(),
-  crossTaskLinks: new Map(),
+  crossCanvasLinks: new Map(),
   landmarks: [entryId("e1")],
   density: "story",
   releasedTip: null,

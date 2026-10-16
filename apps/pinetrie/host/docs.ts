@@ -71,7 +71,7 @@ export interface HostDocuments {
 
 /**
  * What a starting host says it opened: `opened` of the directory's `total`
- * roots; every other root is in archived tasks alone (`planLoads`).
+ * roots; every other root is in archived canvases alone (`planLoads`).
  */
 export const rootsOpenedWords = (counts: {
   readonly opened: number
@@ -84,11 +84,11 @@ export const rootsOpenedWords = (counts: {
 }
 
 /**
- * The roots a starting host opens: every root with a thread in a task outside
+ * The roots a starting host opens: every root with a thread in a canvas outside
  * the archive, or in an inventory (`rootsHeld`), from the threads' records,
  * whatever the directory holds: a root whose directory record is stale is
  * opened all the same, and the directory rewrites it as it starts to follow
- * the root. A busy task cannot be
+ * the root. A busy canvas cannot be
  * archived (`planArchive`), so these hold every lane a crash could have
  * interrupted. In order, by id.
  */

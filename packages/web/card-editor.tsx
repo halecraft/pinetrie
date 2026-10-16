@@ -71,7 +71,7 @@ import {
 import { type QueuedText, writersOfClients } from "@pinetrie/rules"
 import { textClients } from "@pinetrie/schema"
 import {
-  chatAtOf,
+  columnMessageAt,
   IN_COLUMN,
   newCardId,
   type SessionClient,
@@ -127,8 +127,8 @@ export function CardEditor(p: {
   /** The thread's lane (`laneOf`): whether the agent is busy there. */
   lane: ThreadLane
   /**
-   * What every send from this column carries: its thread, whether it is a Start
-   * Agent column, and a new tab's root.
+   * What every send from this column carries: its thread, whether it asks the
+   * agent with nothing typed, and a new canvas's root.
    */
   how: ColumnHow
   /** A unstarted column: its first message starts the thread (`branch`). */
@@ -273,18 +273,18 @@ export function CardEditor(p: {
       setStatus("")
       return
     }
-    const { thread, task, ...how } = p.how
-    // A column's task is known once its card is on a canvas; until then
+    const { thread, canvas, ...how } = p.how
+    // A column's canvas is known once its card is on a canvas; until then
     // nothing is sent.
-    if (task === null) {
+    if (canvas === null) {
       step({ kind: "settled", spent: false })
       return
     }
     setStatus("sending…")
     const id = p.onSend()
-    const outcome = await session.chat(
+    const outcome = await session.send(
       message,
-      chatAtOf(as, thread, p.at, task),
+      columnMessageAt(as, thread, p.at, canvas),
       {
         ...how,
         ...(id === undefined ? {} : { id }),
@@ -682,7 +682,7 @@ const keyOfBox = (e: KeyboardEvent<HTMLTextAreaElement>) => ({
 })
 
 /**
- * A note in a note column: its text, which anyone in the task may edit, and
+ * A note in a note column: its text, which anyone in the canvas may edit, and
  * whose it is, with ↑ and ↓ that move it in its column (as Alt+↑/↓ in its box
  * do). It has no send: Enter is a new line, and its ⋯ takes it into your
  * inventory or makes it a thread; a drag takes it anywhere else.
@@ -911,7 +911,7 @@ export function PinnedCardEditor(p: {
   queueOn: CardFrameFacts["queueOn"]
   reader: Reader
   readOnly: ReadOnly | null
-  /** What a command catches up with; null away from a thread: a task's pin. */
+  /** What a command catches up with; null away from a thread: a canvas's pin. */
   catchUps: CatchUps | null
   onAct: (act: ColumnAct) => void
   onTyping: (card: CardId) => void

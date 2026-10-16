@@ -13,10 +13,9 @@
 import {
   atEntry,
   CARD_COMMANDS,
+  type CanvasId,
   type CardCommand,
   type CardId,
-  type ChatAt,
-  type ChatMode,
   type CommitId,
   commitId,
   DISCARDED,
@@ -25,12 +24,12 @@ import {
   type ErrCode,
   entryId,
   type Intent,
+  isCanvasId,
   isNoteColumnId,
   isReferenceCardId,
   isReorderAt,
   isRootId,
   isSha256,
-  isTaskId,
   isTextCardId,
   isThreadId,
   isWorkflowStateId,
@@ -40,6 +39,7 @@ import {
   kindOfCard,
   MAX_TITLE,
   type MarkTarget,
+  type MessageAt,
   MOVE_DIRECTIONS,
   type Move,
   type MoveDirection,
@@ -59,8 +59,8 @@ import {
   parseAddress,
   parseCardId,
   parseMentions,
+  parseNewCanvas,
   parseNewRoot,
-  parseNewTask,
   parseNewThread,
   parseTextCardId,
   parseTitle,
@@ -74,9 +74,9 @@ import {
   type RunId,
   refused,
   runId,
+  type SendMode,
   type SentCard,
   type StartedRow,
-  type TaskId,
   type ThreadId,
   type ThreadStart,
   type TypedMove,
@@ -133,7 +133,7 @@ export type Outcome =
   | { readonly kind: "stopped" }
   /** The workflow's states changed, or already were as asked. */
   | { readonly kind: "workflow-changed" }
-  /** A task's or a note column's title is set or cleared; also when it already was. */
+  /** A canvas's or a note column's title is set or cleared; also when it already was. */
   | { readonly kind: "marked" }
   /** A model is asked for a root's title, which arrives as its mark. */
   | { readonly kind: "retitling" }
@@ -169,12 +169,12 @@ export type WireCommand = { readonly [K in keyof Command]?: unknown }
 
 const text = (v: unknown): string => (typeof v === "string" ? v.trim() : "")
 
-/** A command's sender's task: null for "", undefined for one that is no task's id. */
+/** A command's sender's canvas: null for "", undefined for one that is no canvas's id. */
 const hereOf = (
   wire: { readonly here?: unknown } | null | undefined,
-): TaskId | null | undefined => {
+): CanvasId | null | undefined => {
   const here = text(wire?.here)
-  return here === "" ? null : isTaskId(here) ? here : undefined
+  return here === "" ? null : isCanvasId(here) ? here : undefined
 }
 
 /**
@@ -235,7 +235,7 @@ export function decodeCommand(
       ? refused(ERR.UNKNOWN_TARGET, reorder)
       : { kind, reorder }
   }
-  if (kind === "chat") {
+  if (kind === "send") {
     const body = text(wire?.text)
     if (body === "") return refused(ERR.EMPTY_MESSAGE, "message text is empty")
     const mode = text(wire?.mode)
@@ -275,17 +275,17 @@ export function decodeCommand(
           : undefined
     if (root === undefined)
       return refused(ERR.UNKNOWN_TARGET, `not a root: ${rootText}`)
-    const chatAt = chatAtFromWire(mode, thread, at, text(wire?.task))
-    if (chatAt === undefined)
-      return refused(ERR.UNKNOWN_TARGET, `not a task: ${text(wire?.task)}`)
+    const messageAt = messageAtFromWire(mode, thread, at, text(wire?.canvas))
+    if (messageAt === undefined)
+      return refused(ERR.UNKNOWN_TARGET, `not a canvas: ${text(wire?.canvas)}`)
     const card = cardFromWire(text(wire?.cardId), text(wire?.seen))
     if (card === undefined)
       return refused(ERR.UNKNOWN_TARGET, "a chat's card is no text card")
     return {
-      kind: "chat",
+      kind: "send",
       text: body,
       root,
-      at: chatAt,
+      at: messageAt,
       asksAgent: wire?.asksAgent === true,
       mentions: parseMentions(body),
       card,
@@ -303,7 +303,7 @@ export function decodeCommand(
       return refused(ERR.UNKNOWN_TARGET, "a card is queued by queue-card")
     const here = hereOf(wire)
     return here === undefined
-      ? refused(ERR.UNKNOWN_TARGET, "its sender's task is not a task")
+      ? refused(ERR.UNKNOWN_TARGET, "its sender's canvas is not a canvas")
       : { kind: "move", moves, here }
   }
   if (kind === "queue-card") {
@@ -350,18 +350,18 @@ export function decodeCommand(
     const state = text(wire?.state)
     if (state !== "" && !isWorkflowStateId(state))
       return refused(ERR.UNKNOWN_TARGET, `not a workflow state: ${state}`)
-    const task = parseNewTask(text(wire?.task))
-    if (task === undefined)
-      return refused(ERR.UNKNOWN_TARGET, "a spin-off names a new task")
+    const canvas = parseNewCanvas(text(wire?.canvas))
+    if (canvas === undefined)
+      return refused(ERR.UNKNOWN_TARGET, "a spin-off names a new canvas")
     const here = hereOf(wire)
     if (here === undefined)
-      return refused(ERR.UNKNOWN_TARGET, "its sender's task is not a task")
+      return refused(ERR.UNKNOWN_TARGET, "its sender's canvas is not a canvas")
     return {
       kind,
       move,
       root,
       thread,
-      task,
+      canvas,
       state: state === "" ? null : state,
       here,
     }
@@ -371,17 +371,18 @@ export function decodeCommand(
     if (thread === undefined) return notNewLane(text(wire?.lane))
     const start = threadStartOfWire(wire, at)
     if (start.kind === "refused") return start
-    // A branch is in the root and the task its column is on; a new root's
-    // id is minted by its tab, and so is a new tab's task.
+    // A branch is in the root and the canvas its column is on; a new root's
+    // id is minted by its tab, and so is a new canvas's id.
     const rootText = text(wire?.root)
     const root = start.kind === "branch" ? rootText : parseNewRoot(rootText)
     if (root === undefined || !isRootId(root))
       return refused(ERR.UNKNOWN_TARGET, `not a root: ${rootText}`)
-    const taskText = text(wire?.task)
-    const task = start.kind === "new-task" ? parseNewTask(taskText) : taskText
-    if (task === undefined || !isTaskId(task))
-      return refused(ERR.UNKNOWN_TARGET, `not a task: ${taskText}`)
-    return { kind, thread, root, task, start }
+    const canvasText = text(wire?.canvas)
+    const canvas =
+      start.kind === "new-canvas" ? parseNewCanvas(canvasText) : canvasText
+    if (canvas === undefined || !isCanvasId(canvas))
+      return refused(ERR.UNKNOWN_TARGET, `not a canvas: ${canvasText}`)
+    return { kind, thread, root, canvas, start }
   }
   if (kind === "branch-out") {
     if (at.kind !== "entry")
@@ -392,15 +393,15 @@ export function decodeCommand(
     const rootText = text(wire?.root)
     if (!isRootId(rootText))
       return refused(ERR.UNKNOWN_TARGET, `not a root: ${rootText}`)
-    const taskText = text(wire?.task)
-    if (!isTaskId(taskText))
-      return refused(ERR.UNKNOWN_TARGET, `not a task: ${taskText}`)
+    const canvasText = text(wire?.canvas)
+    if (!isCanvasId(canvasText))
+      return refused(ERR.UNKNOWN_TARGET, `not a canvas: ${canvasText}`)
     const rows = pressedRowsFromWire(text(wire?.text), how)
     if (typeof rows === "string") return refused(ERR.UNKNOWN_TARGET, rows)
     const base = {
       kind,
       root: rootText,
-      task: taskText,
+      canvas: canvasText,
       proposal: at.id,
     } as const
     return rows.how === "open"
@@ -452,7 +453,7 @@ export function decodeCommand(
       )
     const here = hereOf(wire)
     if (here === undefined)
-      return refused(ERR.UNKNOWN_TARGET, "its sender's task is not a task")
+      return refused(ERR.UNKNOWN_TARGET, "its sender's canvas is not a canvas")
     const replacing =
       replaced?.from == null
         ? null
@@ -462,28 +463,28 @@ export function decodeCommand(
     return { kind, paste, to: main.to, replacing, here }
   }
   if (kind === "undo-move") {
-    // "" names the sender's history outside any task.
-    const task = text(wire?.task)
-    if (task !== "" && !isTaskId(task))
-      return refused(ERR.UNKNOWN_TARGET, `not a task: ${task}`)
+    // "" names the sender's history outside any canvas.
+    const canvas = text(wire?.canvas)
+    if (canvas !== "" && !isCanvasId(canvas))
+      return refused(ERR.UNKNOWN_TARGET, `not a canvas: ${canvas}`)
     const direction = text(wire?.mode)
     return isMoveDirection(direction)
-      ? { kind, task: task === "" ? null : task, direction }
+      ? { kind, canvas: canvas === "" ? null : canvas, direction }
       : refused(ERR.UNKNOWN_KIND, `unknown undo direction: ${direction}`)
   }
   if (kind === "card-width") {
     const card = parseCardId(text(wire?.cardId))
     if (card === undefined)
       return refused(ERR.UNKNOWN_TARGET, "a width must name its card")
-    const task = text(wire?.task)
-    if (!isTaskId(task))
-      return refused(ERR.UNKNOWN_TARGET, `not a task: ${task}`)
+    const canvas = text(wire?.canvas)
+    if (!isCanvasId(canvas))
+      return refused(ERR.UNKNOWN_TARGET, `not a canvas: ${canvas}`)
     const width = text(wire?.mode)
     return width === "1" || width === "2"
       ? {
           kind,
           card,
-          at: { kind: "canvas", task },
+          at: { kind: "canvas", canvas },
           width: width === "1" ? 1 : 2,
         }
       : refused(ERR.UNKNOWN_KIND, `a card is 1 or 2 columns wide, not ${width}`)
@@ -537,14 +538,14 @@ export function decodeCommand(
         )
       : { kind, lane, action, to: to === "" ? null : to, seen }
   }
-  if (kind === "move-task") {
-    const task = text(wire?.task)
-    if (!isTaskId(task))
-      return refused(ERR.UNKNOWN_TARGET, `not a task: ${task}`)
-    const move = taskMoveFromWire(text(wire?.text))
+  if (kind === "move-canvas") {
+    const canvas = text(wire?.canvas)
+    if (!isCanvasId(canvas))
+      return refused(ERR.UNKNOWN_TARGET, `not a canvas: ${canvas}`)
+    const move = canvasMoveFromWire(text(wire?.text))
     return move === null
       ? refused(ERR.UNKNOWN_STATE, "a move on the board names its states")
-      : { kind: "move-task", task, ...move }
+      : { kind: "move-canvas", canvas, ...move }
   }
   if (kind === "workflow") {
     const action = text(wire?.mode)
@@ -570,20 +571,20 @@ export function decodeCommand(
     }
   }
   if (kind === "mark") {
-    const task = text(wire?.task)
+    const canvas = text(wire?.canvas)
     const column = text(wire?.cardId)
     const of: MarkTarget | undefined =
       column === ""
-        ? isTaskId(task)
-          ? { kind: "task", task }
+        ? isCanvasId(canvas)
+          ? { kind: "canvas", canvas }
           : undefined
-        : isNoteColumnId(column) && task === ""
+        : isNoteColumnId(column) && canvas === ""
           ? { kind: "note-column", column }
           : undefined
     if (of === undefined)
       return refused(
         ERR.UNKNOWN_TARGET,
-        `not a task or a note column: ${task}${column}`,
+        `not a canvas or a note column: ${canvas}${column}`,
       )
     const title = parseTitle(text(wire?.text))
     switch (title.kind) {
@@ -599,37 +600,37 @@ export function decodeCommand(
     }
   }
   if (kind === "retitle") {
-    const task = text(wire?.task)
-    return isTaskId(task)
-      ? { kind: "retitle", task }
-      : refused(ERR.UNKNOWN_TARGET, `not a task: ${task}`)
+    const canvas = text(wire?.canvas)
+    return isCanvasId(canvas)
+      ? { kind: "retitle", canvas }
+      : refused(ERR.UNKNOWN_TARGET, `not a canvas: ${canvas}`)
   }
   return refused(ERR.UNKNOWN_KIND, `unsupported command kind: ${String(kind)}`)
 }
 
 /**
  * Where a chat goes, from its mode and position: a reply at the end of the
- * thread it saw there; a branch at its fork, its card in the task named,
+ * thread it saw there; a branch at its fork, its card in the canvas named,
  * which at the root is a new one its tab minted. Undefined for a
- * branch with no task. A reply at the root was refused before this.
+ * branch with no canvas. A reply at the root was refused before this.
  */
-function chatAtFromWire(
-  mode: ChatMode,
+function messageAtFromWire(
+  mode: SendMode,
   thread: ThreadId,
   at: Position,
-  taskText: string,
-): ChatAt | undefined {
+  canvasText: string,
+): MessageAt | undefined {
   if (mode === "reply" && at.kind === "entry")
     return { kind: "end", thread, seen: at.id }
-  const task =
+  const canvas =
     at.kind === "root"
-      ? parseNewTask(taskText)
-      : isTaskId(taskText)
-        ? taskText
+      ? parseNewCanvas(canvasText)
+      : isCanvasId(canvasText)
+        ? canvasText
         : undefined
-  return task === undefined
+  return canvas === undefined
     ? undefined
-    : { kind: "branch", thread, at: at.kind === "root" ? null : at.id, task }
+    : { kind: "branch", thread, at: at.kind === "root" ? null : at.id, canvas }
 }
 
 const notNewLane = (lane: string): Refusal =>
@@ -637,7 +638,7 @@ const notNewLane = (lane: string): Refusal =>
 
 /**
  * An opened thread's start on the wire: its kind in `mode`, a branch's
- * entry in `parentId`, a new tab's workflow state in `state` ("" for the
+ * entry in `parentId`, a new canvas's workflow state in `state` ("" for the
  * first open one), a new root's card it goes after in `cardId` ("" for
  * first).
  */
@@ -645,7 +646,7 @@ const threadStartWire = (start: ThreadStart) => {
   switch (start.kind) {
     case "branch":
       return { mode: start.kind, parentId: start.at }
-    case "new-task":
+    case "new-canvas":
       return { mode: start.kind, state: start.state ?? "" }
     case "new-root":
       return { mode: start.kind, cardId: start.after ?? "" }
@@ -662,7 +663,7 @@ function threadStartOfWire(
       return at.kind === "entry"
         ? { kind: mode, at: at.id }
         : refused(ERR.UNKNOWN_TARGET, "a branch names the entry it forks at")
-    case "new-task": {
+    case "new-canvas": {
       const state = text(wire?.state)
       if (state !== "" && !isWorkflowStateId(state))
         return refused(ERR.UNKNOWN_STATE, `not a workflow state: ${state}`)
@@ -1024,17 +1025,17 @@ const isWorkflowAction = (a: string): a is WorkflowAction =>
  * A move on the board's states, as the wire carries it in `text`: JSON
  * `{ from, to, before }`, `before` a root or null. Null when malformed.
  */
-export function taskMoveFromWire(s: string): {
+export function canvasMoveFromWire(s: string): {
   readonly from: WorkflowStateId
   readonly to: WorkflowStateId
-  readonly before: TaskId | null
+  readonly before: CanvasId | null
 } | null {
   const raw = parsed(s)
   if (typeof raw !== "object" || raw === null) return null
   const { from, to, before } = raw as Record<string, unknown>
   if (typeof from !== "string" || !isWorkflowStateId(from)) return null
   if (typeof to !== "string" || !isWorkflowStateId(to)) return null
-  if (before !== null && (typeof before !== "string" || !isTaskId(before)))
+  if (before !== null && (typeof before !== "string" || !isCanvasId(before)))
     return null
   return { from, to, before }
 }
@@ -1042,15 +1043,15 @@ export function taskMoveFromWire(s: string): {
 /** Intent -> the flat wire command. The client's half of `decodeCommand`. */
 export function encodeIntent(id: string, intent: Intent): Command {
   switch (intent.kind) {
-    case "chat":
+    case "send":
       return command({
         id,
-        kind: "chat",
+        kind: "send",
         text: intent.text,
         parentId:
           intent.at.kind === "end" ? intent.at.seen : (intent.at.at ?? ""),
         root: intent.root,
-        task: intent.at.kind === "branch" ? intent.at.task : "",
+        canvas: intent.at.kind === "branch" ? intent.at.canvas : "",
         mode: modeOf(intent.at),
         lane: intent.at.thread,
         asksAgent: intent.asksAgent,
@@ -1089,11 +1090,11 @@ export function encodeIntent(id: string, intent: Intent): Command {
         cardId: intent.reorder.card,
         moves: encodeReorder(intent.reorder),
       })
-    case "move-task":
+    case "move-canvas":
       return command({
         id,
-        kind: "move-task",
-        task: intent.task,
+        kind: "move-canvas",
+        canvas: intent.canvas,
         text: JSON.stringify({
           from: intent.from,
           to: intent.to,
@@ -1113,13 +1114,13 @@ export function encodeIntent(id: string, intent: Intent): Command {
       return command({
         id,
         kind: "mark",
-        ...(intent.of.kind === "task"
-          ? { task: intent.of.task }
+        ...(intent.of.kind === "canvas"
+          ? { canvas: intent.of.canvas }
           : { cardId: intent.of.column }),
         text: intent.title ?? "",
       })
     case "retitle":
-      return command({ id, kind: "retitle", task: intent.task })
+      return command({ id, kind: "retitle", canvas: intent.canvas })
     case "proposed":
       return command({
         id,
@@ -1156,7 +1157,7 @@ export function encodeIntent(id: string, intent: Intent): Command {
         moves: encodeMoves([intent.move]),
         root: intent.root,
         lane: intent.thread,
-        task: intent.task,
+        canvas: intent.canvas,
         state: intent.state ?? "",
         here: intent.here ?? "",
       })
@@ -1166,7 +1167,7 @@ export function encodeIntent(id: string, intent: Intent): Command {
         kind: "open-thread",
         lane: intent.thread,
         root: intent.root,
-        task: intent.task,
+        canvas: intent.canvas,
         ...threadStartWire(intent.start),
       })
     case "branch-out":
@@ -1175,7 +1176,7 @@ export function encodeIntent(id: string, intent: Intent): Command {
         kind: "branch-out",
         mode: intent.how,
         root: intent.root,
-        task: intent.task,
+        canvas: intent.canvas,
         parentId: intent.proposal,
         text: JSON.stringify(intent.branches),
       })
@@ -1216,7 +1217,7 @@ export function encodeIntent(id: string, intent: Intent): Command {
       return command({
         id,
         kind: "undo-move",
-        task: intent.task ?? "",
+        canvas: intent.canvas ?? "",
         mode: intent.direction,
       })
     case "card-width":
@@ -1224,7 +1225,7 @@ export function encodeIntent(id: string, intent: Intent): Command {
         id,
         kind: "card-width",
         cardId: intent.card,
-        task: intent.at.task,
+        canvas: intent.at.canvas,
         mode: String(intent.width),
       })
     case "set-command":

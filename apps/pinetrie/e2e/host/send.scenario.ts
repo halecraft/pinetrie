@@ -1,9 +1,9 @@
-// e2e/host/chat — one host and its clients over real websockets: a first turn
+// e2e/host/send — one host and its clients over real websockets: a first turn
 // on pi's agent, its reply streamed to the clients, and a conversation the
 // agent is asked into, which it reads with every speaker named. Which thread
 // a message joins, who it is for, and when a lane is busy are decided by
 // pure functions and unit-tested (`@pinetrie/rules`' `chat.test.ts`,
-// `@pinetrie/core`, the host's `commands/chat.test.ts`, `queue.test.ts`).
+// `@pinetrie/core`, the host's `commands/send.test.ts`, `queue.test.ts`).
 // Last, a host whose config names no model starts, and says why.
 
 import { subscribe } from "@kyneta/schema"
@@ -39,7 +39,7 @@ async function run(check: Checks["check"]): Promise<void> {
       /** The path to `tip`, as "role:text" (chat as "Name:text"). */
       const shape = (tip: EntryId | null) =>
         projectTranscript(tree(), tip).map(m =>
-          m.role === "chat" ? `${m.author}:${m.text}` : m.role,
+          m.role === "person" ? `${m.author}:${m.text}` : m.role,
         )
 
       // Every reply stream's text at each change of the host's document, so
@@ -49,8 +49,8 @@ async function run(check: Checks["check"]): Promise<void> {
         for (const s of readStreams(host.live))
           if (s.kind === "reply") samples.push(s.text)
       })
-      const client = await join(host, "e2e-client", "chat")
-      await client.chat("hello", ROOT, START_AGENT)
+      const client = await join(host, "e2e-client", "send")
+      await client.send("hello", ROOT, START_AGENT)
       await idle()
       unsample()
       const lane = lanesOf(host, tree(), readPlaces(host.places))[0]
@@ -71,19 +71,19 @@ async function run(check: Checks["check"]): Promise<void> {
       // A conversation, then @agent in it: the run reads every speaker,
       // attributed. The reply echoes what the model was given before the
       // prompt.
-      const alice = await join(host, "alice", "chat")
-      const bob = await join(host, "bob", "chat")
+      const alice = await join(host, "alice", "send")
+      const bob = await join(host, "bob", "send")
       await Promise.all([
         alice.request({ kind: "name", name: "Alice" }),
         bob.request({ kind: "name", name: "Bob" }),
       ])
-      const plum = await alice.chat("the secret word is PLUM", ROOT, START_CHAT)
-      const one = await bob.chat(
+      const plum = await alice.send("the secret word is PLUM", ROOT, START_CHAT)
+      const one = await bob.send(
         "one",
         at(plum.kind === "appended" ? plum.id : null),
       )
       script.use([{ reply: context => context.slice(0, -1).join("\n") }])
-      await bob.chat(
+      await bob.send(
         "@agent who told us a secret word?",
         at(one.kind === "appended" ? one.id : null),
       )

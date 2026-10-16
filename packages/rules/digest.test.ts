@@ -266,9 +266,9 @@ describe("planDigest", () => {
   const index = indexTree(
     Object.fromEntries(
       [
-        at("p-0", null, { role: "chat", author: "Ada", content: "first" }),
+        at("p-0", null, { role: "person", author: "Ada", content: "first" }),
         at("w-0", "p-0", { role: "assistant", content: "did first" }),
-        at("p-1", "w-0", { role: "chat", author: "Bea", content: "second" }),
+        at("p-1", "w-0", { role: "person", author: "Bea", content: "second" }),
         at("w-1", "p-1", { role: "assistant", content: "reading" }),
         at("w-2", "w-1", { role: "assistant", content: "editing" }),
         at("w-3", "w-2", { role: "assistant", content: "did second" }),
@@ -276,7 +276,7 @@ describe("planDigest", () => {
         at("w-4", "p-2", { role: "assistant", content: "rebasing" }),
         at("w-5", "w-4", { role: "assistant", content: "testing" }),
         at("w-6", "w-5", { role: "assistant", content: "landed" }),
-        at("p-3", "w-6", { role: "chat", author: "Ada", content: "thanks" }),
+        at("p-3", "w-6", { role: "person", author: "Ada", content: "thanks" }),
       ].map(e => [e.id, e]),
     ),
   )

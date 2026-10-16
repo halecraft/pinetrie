@@ -12,13 +12,13 @@ import {
   readTreeIndex,
 } from "@pinetrie/reads"
 import {
+  type CanvasIndex,
   type Cleared,
   displayName,
   type GateFacts,
   type GateRoot,
   gateRefusal,
   planGate,
-  type TaskIndex,
 } from "@pinetrie/rules"
 import type { Basics } from "../basics.ts"
 import type { LaneWork } from "../work/index.ts"
@@ -35,7 +35,7 @@ export interface GateDeps {
 export async function clear<C extends Gated>(
   deps: GateDeps,
   command: C,
-  tasks: TaskIndex,
+  canvases: CanvasIndex,
 ): Promise<
   | { readonly kind: "cleared"; readonly command: Cleared<C> }
   | Extract<Outcome, { readonly kind: "refused" }>
@@ -43,7 +43,7 @@ export async function clear<C extends Gated>(
   const { session, places, docs } = deps.basics
   // gather
   const facts: GateFacts = {
-    tasks,
+    canvases,
     cards: readPlaces(places),
     archived: readArchived(session, places),
     lanes: readLaneRecords(session),

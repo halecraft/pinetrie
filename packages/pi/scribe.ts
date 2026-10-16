@@ -1,5 +1,5 @@
 // pi/scribe — the host's writes into a root's tree, through pi: a
-// conversation thread's messages. The scribe writes what the host decided,
+// chat's messages. The scribe writes what the host decided,
 // and decides nothing.
 //
 // It holds one pi session per document, and nothing else may open one: two
@@ -20,7 +20,7 @@ import {
   type Spot,
   type ThreadId,
 } from "@pinetrie/core"
-import type { AnswerMessage, ChatMessage, FactMessage } from "@pinetrie/rules"
+import type { AnswerMessage, FactMessage, PersonMessage } from "@pinetrie/rules"
 import type { RootDocHandle } from "@pinetrie/schema"
 import type { AgentDocuments, Stack } from "./agent.ts"
 import { sealed } from "./inside.ts"
@@ -33,12 +33,12 @@ const CTX = BACKGROUND_CONTEXT
 /** Every member is a closure: it may be passed on its own. */
 export interface Scribe {
   /**
-   * Append at exactly `spot`, with no lane: a conversation thread, the entry
+   * Append at exactly `spot`, with no lane: a chat, the entry
    * in `thread`. The host's serial executor guarantees
    * nothing was written there since it planned, so no re-read is needed here.
    */
   appendToTree(
-    message: ChatMessage | AnswerMessage | FactMessage,
+    message: PersonMessage | AnswerMessage | FactMessage,
     spot: Spot,
     thread: ThreadId,
   ): Promise<AppendOutcome>

@@ -1,4 +1,4 @@
-// web/folded-strip — what a folded column draws, a card's column or the task
+// web/folded-strip — what a folded column draws, a card's column or the canvas
 // column: its unfold mark, its mark, its name on its side, its detail, all
 // one button that unfolds it. The name and mark are where a fold's turn
 // lands (`data-fold-name`, `data-fold-mark`): a column's header turned on

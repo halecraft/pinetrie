@@ -97,8 +97,9 @@ import {
 } from "./basics.ts"
 import { memoryBlobs } from "./blobs.ts"
 import { createBudgets } from "./budgets.ts"
-import { createTaskContext } from "./canvas.ts"
+import { createCanvasContext } from "./canvas.ts"
 import { createCanvasNews } from "./canvas-news.ts"
+import { canvasesNow } from "./canvases.ts"
 import { startCards } from "./cards.ts"
 import { createCommands } from "./commands/index.ts"
 import { startControl } from "./control.ts"
@@ -138,9 +139,9 @@ import { hostPolicy, resolveDoc, SCHEMA_OF } from "./policy.ts"
 import { projectAdapter } from "./project.ts"
 import { createProvenance } from "./provenance.ts"
 import {
-  chatOfPoppedQueuedCard,
   createWaits,
   drain as drainQueue,
+  sendOfPoppedQueuedCard,
   untilNotTyped,
 } from "./queued-card-pop.ts"
 import { createRecords, type Records } from "./records.ts"
@@ -164,7 +165,6 @@ import { createSplitCall } from "./split-call.ts"
 import { recover } from "./startup.ts"
 import { agentReadyLine, reportLines, startupLaps } from "./startup-lines.ts"
 import { openStore } from "./store.ts"
-import { tasksNow } from "./tasks.ts"
 import { createTitles } from "./titles.ts"
 import { startLaneWork } from "./work/index.ts"
 import { findProject } from "./work/runtime.ts"
@@ -470,10 +470,11 @@ export async function startHost({
   // Before a root's document goes, what holds it lets go: the scribe closes the
   // agent's harness over it, then its session.
   docs.onReleasing(root => scribe.release(root))
-  // So do the stacks of moves of the tasks holding its threads.
+  // So do the stacks of moves of the canvases holding its threads.
   docs.onReleasing(async root => {
-    const tasks = tasksNow({ places, session }).tasksOfRoot.get(root) ?? []
-    for (const task of tasks) await histories.unloadTask(task)
+    const canvases =
+      canvasesNow({ places, session }).canvasesOfRoot.get(root) ?? []
+    for (const canvas of canvases) await histories.unloadCanvas(canvas)
   })
   const projectRoot = found?.project.root ?? project?.dir ?? null
   // The project, opened, and the config settled with accepted work's copy:
@@ -684,19 +685,19 @@ export async function startHost({
   // announce a changed base, and a running lane is steered.
   const baseNews = createBaseNews({ basics, agent, keeper })
   work.onBaseChanged(lane => baseNews.baseChanged(lane))
-  // A card added to or taken from a task, told to its running threads.
+  // A card added to or taken from a canvas, told to its running threads.
   const canvasNews = createCanvasNews({ basics, agent, keeper })
   provenance.onChanged(change => canvasNews.changed(change))
   // Commands are received only from `startControl`, after `recover`.
   const listener = Control.listen(exchange)
   const { readPinned } = createPinned({ basics, cards: cardPort })
-  const { readTaskContext } = createTaskContext({ basics, cards: cardPort })
+  const { readCanvasContext } = createCanvasContext({ basics, cards: cardPort })
   const runs = createRuns({
     basics,
     agent,
     work,
     readPinned,
-    readTaskContext,
+    readCanvasContext,
     baseNews,
     pending: writePendingVerdict({ basics, records }),
   })
@@ -776,7 +777,7 @@ export async function startHost({
             : commands.sendPoppedQueuedCard(
                 popped.card.place.by,
                 newId(),
-                chatOfPoppedQueuedCard(popped, root),
+                sendOfPoppedQueuedCard(popped, root),
               )
         },
         presence,

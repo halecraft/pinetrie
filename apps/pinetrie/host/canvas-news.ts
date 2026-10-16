@@ -1,5 +1,5 @@
 // host/canvas-news — a running thread is told when a card is added to its
-// task's canvas or taken from it, and when its own card moves to another task:
+// canvas or taken from it, and when its own card moves to another canvas:
 // a fact line steered after the turn in flight, as base news is
 // (`base-news.ts`), never a queued fact card, which the drain would pop only
 // after the run. Reorders, widths and titles wait for the next run's canvas
@@ -22,21 +22,21 @@ import {
   readThreads,
 } from "@pinetrie/reads"
 import {
-  type CanvasCard,
+  type CardOnCanvas,
   displayName,
   encodeCanvasFact,
-  indexTasks,
+  indexCanvases,
   NEW_NOTES_TITLE,
   planCanvasFacts,
 } from "@pinetrie/rules"
 import { type Basics, failed, type HostKeeper } from "./basics.ts"
-import { taskTitle } from "./canvas.ts"
+import { canvasTitle } from "./canvas.ts"
 import type { PlacesChange } from "./provenance.ts"
 
 /** A card's title as the canvas list names it. */
 const titleOf =
   (basics: Pick<Basics, "session">) =>
-  (card: CanvasCard): string => {
+  (card: CardOnCanvas): string => {
     switch (card.kind) {
       case "thread":
         return readNames(basics.session).get(card.id) ?? "a thread"
@@ -61,18 +61,18 @@ export function createCanvasNews(deps: {
         readRunningLanes(basics.session, basics.live).map(r => r.lane),
       )
       if (running.size === 0) return
-      const tasks = indexTasks(change.places, readThreads(basics.session))
+      const canvases = indexCanvases(change.places, readThreads(basics.session))
       const steers = planCanvasFacts({
         before: change.before,
         after: change.after,
         by: change.cause.kind === "host" ? null : change.cause.by,
-        threadsOf: tasks.threadsOf,
+        threadsOf: canvases.threadsOf,
         running,
         titleOf: titleOf(basics),
-        taskTitleOf: task =>
-          taskTitle(
-            task,
-            tasks,
+        canvasTitleOf: canvas =>
+          canvasTitle(
+            canvas,
+            canvases,
             readMarks(basics.session),
             readRoots(basics.session),
           ),

@@ -10,7 +10,7 @@
 
 import type { Mutation, SuiteMutation } from "./mutate.ts"
 
-/** A scenario, as `<suite directory>/<file stem>`: `host/chat`. */
+/** A scenario, as `<suite directory>/<file stem>`: `host/send`. */
 export type ScenarioKey = string
 
 export interface ProofGaps {

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest"
 import {
+  type CanvasId,
   type CardKind,
   cardIdOfKind,
   type FactCardId,
@@ -14,7 +15,6 @@ import {
   parseCardId,
   type RelayDetails,
   type Sha256,
-  type TaskId,
   type ThreadId,
   textCardId,
   textSourceOf,
@@ -65,7 +65,7 @@ describe("KINDS", () => {
   test("a spot on a canvas is a target of each kind a canvas takes, and of each WRAPS makes a container for; of no other", () => {
     const spot = {
       kind: "canvas-at",
-      task: "k-1" as TaskId,
+      canvas: "k-1" as CanvasId,
       after: null,
     } as const
     for (const kind of Object.keys(KINDS) as CardKind[])
@@ -115,8 +115,8 @@ test("a card's words are where its kind says (`KINDS`' text): textSourceOf agree
     ),
     makeCard("thread", thread, place, NO_CONTENT, ADA),
     makeCard(
-      "task",
-      `k-${UUID}` as TaskId,
+      "canvas",
+      `k-${UUID}` as CanvasId,
       { kind: "board", state: workflowStateIdFor("open"), order: "a" },
       NO_CONTENT,
       ADA,
@@ -124,7 +124,7 @@ test("a card's words are where its kind says (`KINDS`' text): textSourceOf agree
     makeCard(
       "note-column",
       `n-${UUID}` as NoteColumnId,
-      { kind: "canvas", task: `k-${UUID}` as TaskId, order: "a", width: 1 },
+      { kind: "canvas", canvas: `k-${UUID}` as CanvasId, order: "a", width: 1 },
       NO_CONTENT,
       ADA,
     ),

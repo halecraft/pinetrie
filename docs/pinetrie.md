@@ -41,11 +41,11 @@ Full statement: `docs/00-vision.md`.
 
 ### Two kinds of thread
 
-A **conversation** is people talking in the tree, with no tools and no
-lane. An **agent's thread** has a lane of its own (ADR-0032, ADR-0034): a
+A **chat** is people talking in the tree, with no tools and no
+lane. An **agent thread** has a lane of its own (ADR-0032, ADR-0034): a
 Linux container on its own disk, with its own copy of your repo, and a
 branch clones its parent's disk. Whether a thread is one or the other is
-whether the agent has been asked there (ADR-0021).
+whether the agent has been asked there (ADR-0021, ADR-0158).
 
 ### Merge is three problems
 
@@ -249,18 +249,18 @@ parameter properties, or decorators.
 
 ## 6. What is built, and what is next
 
-**The interface is the sidebar of tasks down the left, and the task you
-are on, its canvas drawn as a rail beside columns** (`docs/06-interface.md`,
+**The interface is the sidebar of canvases down the left, and the canvas you
+are on, drawn as a rail beside columns** (`docs/06-interface.md`,
 `packages/interface/TECHNICAL.md`, ADR-0116, ADR-0122), over a footer showing
 who is here, what needs you and the board, which slides up over the columns
-with every task in its workflow state: each
-column is a card on the task's canvas, a thread's one path on its own
+with every canvas in its workflow state: each
+column is a card on the canvas, a thread's one path on its own
 scroll; a branch opens beside its parent in its rail track's colour, and
-the rail draws the tree of each root the task's threads are in, with each
+the rail draws the tree of each root the canvas's threads are in, with each
 uneventful stretch drawn as one capsule (ADR-0031), a long ask's work a
 capsule of its own (ADR-0106).
 Views are pure functions over one `indexTree` (`packages/core/tree.ts`,
-`roots.ts`); which task you are on and your view of each task's canvas are
+`roots.ts`); which canvas you are on and your view of each canvas are
 a reducer in `packages/interface/layout.ts`, the sidebar is your `open:`
 document (`packages/session/open-threads.ts`), and the inbox is
 `packages/interface/inbox.ts`.
@@ -289,10 +289,10 @@ drawn from the render's own facts. A column at its end does not get shorter
 while the agent works: a floor takes up a shrink. The browser suite checks
 this frame by frame at 20× CPU throttle.
 
-**A task can be renamed** (ADR-0045, ADR-0116): its title is a
+**A canvas can be renamed** (ADR-0045, ADR-0116): its title is a
 host-written `pinetrie.mark` value, set from its item's `⋯` in the sidebar
-or its task column, the last write winning, and deleted when cleared. It is
-the task's label everywhere it is named, the board's search included.
+or its canvas column, the last write winning, and deleted when cleared. It is
+the canvas's label everywhere it is named, the board's search included.
 
 **Your config** (ADR-0146). pine·trie reads only its own files, each a
 `pinetrie.json`, from the broadest to the most specific:
@@ -421,7 +421,7 @@ under it in story, or nothing when the agent's last message says it all.
 thread once you have written on it (`RootRecord.threads`). At each run's end
 the same request asks a model for a verdict, digests on or off: needs you,
 worth a read, or done, with a one-line reason (`pinetrie.verdict`, one per
-lane); a failed or stopped run's verdict is its facts. A task's item in
+lane); a failed or stopped run's verdict is its facts. A canvas's item in
 the sidebar says what its threads need of you: a still ring while the agent works, an amber
 dot that pulses as it arrives when something needs you (a question, an
 error, work ready to add), a dim one when something is worth a read, a ✓
@@ -432,7 +432,7 @@ needed", and the mentions you have seen.
 
 **The rail outlines what each column shows** (ADR-0058), in the column's
 colour, and scrolls to keep the outline of the column you move in view. A
-column of a task shown again comes back where you left it, by message: the
+column of a canvas shown again comes back where you left it, by message: the
 same measurement (`packages/interface/viewport.ts`). Spots last the page's
 life; keeping them for a person across devices is the next step.
 

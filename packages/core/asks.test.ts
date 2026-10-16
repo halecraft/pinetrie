@@ -21,7 +21,10 @@ import {
 } from "./index.ts"
 
 type Message = NonNullable<EntryLike["message"]>
-const chat = (text = "hi"): Message => ({ role: "chat", content: text })
+const personMessage = (text = "hi"): Message => ({
+  role: "person",
+  content: text,
+})
 const said = (text: string, extra: Partial<Message> = {}): Message => ({
   role: "assistant",
   content: [{ type: "text", text }],
@@ -43,11 +46,11 @@ const build = (rows: readonly EntryLike[]): TreeIndex =>
 
 describe("indexAsks", () => {
   const index = build([
-    entry("1-p", null, chat()),
+    entry("1-p", null, personMessage()),
     entry("2-a", "1-p", calls("c1")),
     entry("3-r", "2-a", result("c1")),
     entry("4-a", "3-r", said("done")),
-    entry("5-q", "4-a", chat("for people only")),
+    entry("5-q", "4-a", personMessage("for people only")),
     entry("6-l", "5-q", { role: "land", content: "resolving" }),
     entry("7-a", "6-l", said("resolved")),
   ])
@@ -70,7 +73,7 @@ test("a base's news steered in between a run's entries is steered into it; one a
   const behind = (to: string): Message => ({ role: "behind", content: to })
   const index = build([
     entry("1-b", null, behind("before the prompt")),
-    entry("2-p", "1-b", chat()),
+    entry("2-p", "1-b", personMessage()),
     entry("3-a", "2-p", calls("c1")),
     entry("4-r", "3-a", result("c1")),
     entry("5-b", "4-r", behind("mid-run")),
@@ -87,7 +90,7 @@ test("a base's news steered in between a run's entries is steered into it; one a
 
 test("a carry-on message starts an ask of its own; the stopped ask before it stays stopped", () => {
   const index = build([
-    entry("1-p", null, chat()),
+    entry("1-p", null, personMessage()),
     entry("2-a", "1-p", said("word wo", { stopReason: "aborted" })),
     entry("3-c", "2-a", { role: "carry-on", content: "↻ resumed by Ada" }),
     entry("4-a", "3-c", said("done", { stopReason: "stop" })),
@@ -109,7 +112,7 @@ test("a carry-on message starts an ask of its own; the stopped ask before it sta
 test("isLongAsk: a run of LONG_ASK agent messages, not one fewer", () => {
   const rows = (n: number) =>
     build([
-      entry("0-p", null, chat()),
+      entry("0-p", null, personMessage()),
       ...Array.from({ length: n }, (_, i) =>
         entry(`${i + 1}-a`, `${i === 0 ? "0-p" : `${i}-a`}`, said(`step ${i}`)),
       ),
@@ -127,7 +130,7 @@ test("a stop's fact names who stopped its ask, and is drawn in it: the first pre
     stopped: { prompt: entryId("1-p"), by: writerId(by) },
   })
   const index = build([
-    entry("1-p", null, chat()),
+    entry("1-p", null, personMessage()),
     entry("2-a", "1-p", said("word wo", { stopReason: "aborted" })),
     entry("3-f", "2-a", stopFact("bea")),
     entry("4-f", "3-f", stopFact("cal")),
@@ -145,7 +148,7 @@ test("a stop's fact names who stopped its ask, and is drawn in it: the first pre
 
 describe("askOutcome and lastWord, over each way a run ends", () => {
   const ask = (rows: readonly EntryLike[]) => {
-    const index = build([entry("1-p", null, chat()), ...rows])
+    const index = build([entry("1-p", null, personMessage()), ...rows])
     const asks = indexAsks(index)
     const p = entryId("1-p")
     return {
@@ -219,7 +222,7 @@ describe("askOutcome and lastWord, over each way a run ends", () => {
     expect(a.outcome({ by: bea, at: 1 })).toEqual({ kind: "answered" })
   })
   test("running is running", () => {
-    const index = build([entry("1-p", null, chat())])
+    const index = build([entry("1-p", null, personMessage())])
     expect(
       askOutcome(index, indexAsks(index), entryId("1-p"), { running: true }),
     ).toEqual({ kind: "running" })
@@ -228,7 +231,7 @@ describe("askOutcome and lastWord, over each way a run ends", () => {
 
 describe("askSpan", () => {
   const index = build([
-    entry("1-p", null, chat()),
+    entry("1-p", null, personMessage()),
     entry("2-a", "1-p", calls("c1")),
     entry("3-r", "2-a", result("c1")),
     entry("4-a", "3-r", said("done")),

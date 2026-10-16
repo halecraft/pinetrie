@@ -1,16 +1,16 @@
 // web/use-attention — what needs you, and where: the shell over `attention.ts`.
 // It reads your attention document, decides each thread's status and so each
-// task's, and keeps what changed as you watched long enough for its mark to
+// canvas's, and keeps what changed as you watched long enough for its mark to
 // move (`moving`). The decisions are `attention.ts`'s.
 
 import {
   type AgentWork,
+  type CanvasId,
   isBusy,
   type LaneView,
   laneWork,
   type RootId,
   type RootRecord,
-  type TaskId,
   type ThreadId,
   type VerdictRecord,
   type WriterId,
@@ -18,6 +18,7 @@ import {
 import {
   arrivals,
   attentionOf,
+  canvasStatus,
   doneThreads,
   type Item,
   type Layout,
@@ -27,7 +28,6 @@ import {
   type OpenProposedChanges,
   type SshAsk,
   type Status,
-  taskStatus,
   threadStatus,
   threadWriters,
   unlisted,
@@ -44,9 +44,9 @@ import {
 export interface AttentionView {
   /** Everything raised for you (`attentionOf`). */
   readonly items: readonly Item[]
-  /** Each task's (`taskStatus`). */
-  readonly status: ReadonlyMap<TaskId, Status>
-  /** ▦'s: the highest status of tasks not in the sidebar (`markOf`). */
+  /** Each canvas's (`canvasStatus`). */
+  readonly status: ReadonlyMap<CanvasId, Status>
+  /** ▦'s: the highest status of canvases not in the sidebar (`markOf`). */
   readonly elsewhere: Level | null
   readonly arrivals: Moments
 }
@@ -67,10 +67,10 @@ export function useAttention(input: {
   readonly running: readonly { readonly lane: ThreadId }[]
   /** The held roots' lanes, with their queues. */
   readonly lanes: readonly LaneView[]
-  /** The archived tasks: their threads raise nothing. */
-  readonly archived: ReadonlySet<TaskId>
-  /** Each thread's task: a task's status is its threads'. */
-  readonly taskOfThread: ReadonlyMap<ThreadId, TaskId>
+  /** The archived canvases: their threads raise nothing. */
+  readonly archived: ReadonlySet<CanvasId>
+  /** Each thread's canvas: a canvas's status is its threads'. */
+  readonly canvasOfThread: ReadonlyMap<ThreadId, CanvasId>
   /** Threads whose agent works, held or not (`threadWork`). */
   readonly work: ReadonlyMap<ThreadId, AgentWork>
   readonly layout: Pick<Layout, "open">
@@ -97,15 +97,15 @@ export function useAttention(input: {
       ]),
     [input.running, input.lanes],
   )
-  // The threads of archived tasks, which raise nothing.
+  // The threads of archived canvases, which raise nothing.
   const archived = useMemo(
     () =>
       new Set(
-        [...input.taskOfThread].flatMap(([thread, task]) =>
-          input.archived.has(task) ? [thread] : [],
+        [...input.canvasOfThread].flatMap(([thread, canvas]) =>
+          input.archived.has(canvas) ? [thread] : [],
         ),
       ),
-    [input.taskOfThread, input.archived],
+    [input.canvasOfThread, input.archived],
   )
   const { items, done } = useMemo(() => {
     const facts = {
@@ -120,7 +120,7 @@ export function useAttention(input: {
       archived,
     }
     const ended = new Set(
-      [...doneThreads(facts)].flatMap(t => input.taskOfThread.get(t) ?? []),
+      [...doneThreads(facts)].flatMap(t => input.canvasOfThread.get(t) ?? []),
     )
     return { items: attentionOf(facts), done: ended }
   }, [
@@ -133,15 +133,15 @@ export function useAttention(input: {
     person,
     busy,
     archived,
-    input.taskOfThread,
+    input.canvasOfThread,
   ])
   const status = useMemo(
     () =>
-      taskStatus(
+      canvasStatus(
         threadStatus({ items, work: input.work, verdicts: input.verdicts }),
-        input.taskOfThread,
+        input.canvasOfThread,
       ),
-    [items, input.work, input.verdicts, input.taskOfThread],
+    [items, input.work, input.verdicts, input.canvasOfThread],
   )
   const elsewhere = useMemo(
     () => markOf(status, unlisted(input.layout, input.archived, status.keys())),
@@ -156,17 +156,17 @@ export function useAttention(input: {
 }
 
 /**
- * When each task's mark last arrived, as you watched. Until `ready`, every
+ * When each canvas's mark last arrived, as you watched. Until `ready`, every
  * change is data arriving, so the first status after it is the baseline: a
  * page that loads draws every mark still. Nothing is dropped when a mark
  * stops moving (`moving`).
  */
 function useArrivals(
-  status: ReadonlyMap<TaskId, Status>,
-  done: ReadonlySet<TaskId>,
+  status: ReadonlyMap<CanvasId, Status>,
+  done: ReadonlySet<CanvasId>,
   ready: boolean,
 ): Moments {
-  const before = useRef<ReadonlyMap<TaskId, Status> | null>(null)
+  const before = useRef<ReadonlyMap<CanvasId, Status> | null>(null)
   const [kept, setKept] = useState<Moments>(NO_MOMENTS)
   useEffect(() => {
     if (!ready) {

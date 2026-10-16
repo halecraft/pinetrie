@@ -4,11 +4,11 @@
 import { type Send, threadIdFor, writerId } from "@pinetrie/core"
 import { expect, test } from "vitest"
 import { ROOT_ID } from "../fakes.ts"
-import { type ChatDeps, sendChat } from "./chat.ts"
+import { type SendDeps, sendMessage } from "./send.ts"
 
 test("a send the gate did not clear does not compile", () => {
   const unchecked: Send = {
-    kind: "chat",
+    kind: "send",
     text: "x",
     root: ROOT_ID,
     at: { kind: "queue", thread: threadIdFor("t") },
@@ -19,9 +19,9 @@ test("a send the gate did not clear does not compile", () => {
     base: null,
     state: null,
   }
-  const deps = {} as ChatDeps
+  const deps = {} as SendDeps
   const call = () =>
     // @ts-expect-error: only `planGate` makes the `Cleared<Send>` it takes
-    sendChat(deps, writerId("ada@x.io"), "s-1", unchecked)
+    sendMessage(deps, writerId("ada@x.io"), "s-1", unchecked)
   expect(call).toBeTypeOf("function")
 })

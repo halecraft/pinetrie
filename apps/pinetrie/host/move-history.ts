@@ -1,9 +1,9 @@
-// host/move-history — each person's history of moves, per task, and one outside
-// any task.
+// host/move-history — each person's history of moves, per canvas, and one outside
+// any canvas.
 //
 // Kyneta undoes only the writes its own runtime made, and the host is the one
 // writer of the places document, so the stacks live here: one per writer and
-// task, `moves:<writer>:<task>`, and one per writer outside any task,
+// canvas, `moves:<writer>:<canvas>`, and one per writer outside any canvas,
 // `moves:<writer>` (`MoveHistoryScope`), kept in the host's store, so a
 // person's tabs share it and it outlives a restart. Every undo is whole or
 // refused (`whole: true`): without it, a step someone else's move broke would
@@ -19,11 +19,11 @@ import {
   type UndoStack,
 } from "@kyneta/exchange"
 import {
+  type CanvasId,
   type MoveDirection,
   type MoveHistoryScope,
   movesDocId,
   movesOfDocId,
-  type TaskId,
   type WriterId,
 } from "@pinetrie/core"
 import { PLACES_DOC_ID } from "@pinetrie/protocol/messages"
@@ -51,8 +51,8 @@ export interface MoveHistories {
   loaded(): readonly WriterId[]
   /** Unload every stack of these writers: their last seat left. */
   unloadWriters(writers: readonly WriterId[]): Promise<void>
-  /** Unload every stack in `task`: it was archived, or deleted. */
-  unloadTask(task: TaskId): Promise<void>
+  /** Unload every stack in `canvas`: it was archived, or deleted. */
+  unloadCanvas(canvas: CanvasId): Promise<void>
   /** Destroy these stack documents, loaded or not. */
   retire(docIds: readonly string[]): Promise<void>
   dispose(): void
@@ -120,9 +120,9 @@ export function createMoveHistories(exchange: Exchange): MoveHistories {
     unloadWriters(writers) {
       return unload(held(of => writers.includes(of.writer)))
     },
-    unloadTask(task) {
+    unloadCanvas(canvas) {
       return unload(
-        held(of => of.scope.kind === "task" && of.scope.task === task),
+        held(of => of.scope.kind === "canvas" && of.scope.canvas === canvas),
       )
     },
     async retire(docIds) {

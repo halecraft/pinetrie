@@ -55,7 +55,7 @@ async function imagesSection(
       },
       { text: "done" },
     ])
-    await alpine.user.chat("use every tool", ROOT, START_AGENT)
+    await alpine.user.send("use every tool", ROOT, START_AGENT)
     const ran = await alpine.results("use every tool")
     check(
       "a lane on Alpine, with musl and no Node, runs pi's four tools",
@@ -92,7 +92,7 @@ async function imagesSection(
       { tool: "bash", args: { command: "echo hello" } },
       { text: "done" },
     ])
-    await bare.user.chat("say hello", ROOT, START_AGENT)
+    await bare.user.send("say hello", ROOT, START_AGENT)
     const refused = (await bare.results("say hello")).join("\n")
     check(
       "an image with no git cannot host a lane, and says so",
@@ -120,7 +120,7 @@ async function imagesSection(
       },
       { text: "done" },
     ])
-    await pinetrie.user.chat("open a browser", ROOT, START_AGENT)
+    await pinetrie.user.send("open a browser", ROOT, START_AGENT)
     const launched = (await pinetrie.results("open a browser")).join("\n")
     check(
       "on the default image, pinetrie's Playwright launches Chromium",
@@ -145,7 +145,7 @@ async function imagesSection(
           },
           { text: "done" },
         ])
-        return host.user.chat(`make ${dir}`, ROOT, START_AGENT)
+        return host.user.send(`make ${dir}`, ROOT, START_AGENT)
       }
       await Promise.all([made(pinetrie, "first"), made(other, "second")])
       // Each turn's record is written once its host is idle.

@@ -19,7 +19,7 @@ export type Discardable = Extract<
 /**
  * Whether you, `me`, may discard `card`: a kind that may be in a trash
  * (`PLACES_OF`: a thread, sent or not, and a note column too) and that a
- * person moves (a task's card is the host's to trash), not in a trash
+ * person moves (a canvas's card is the host's to trash), not in a trash
  * already, nor in someone else's inventory.
  */
 export const isDiscardable = (

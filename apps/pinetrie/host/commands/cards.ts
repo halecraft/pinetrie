@@ -15,6 +15,7 @@
 import {
   type BranchOut,
   branchesByProposal,
+  type CanvasId,
   type CardCommand,
   type CardId,
   cardIdOfKind,
@@ -40,7 +41,6 @@ import {
   type RootId,
   type Send,
   type SentCard,
-  type TaskId,
   type TextCardId,
   type ThreadId,
   type TreeIndex,
@@ -53,6 +53,7 @@ import {
 import type { Outcome } from "@pinetrie/protocol/codec"
 import { PLACES_DOC_ID } from "@pinetrie/protocol/messages"
 import {
+  readCanvases,
   readCardHistories,
   readLaneRecords,
   readLanes,
@@ -60,7 +61,6 @@ import {
   readQueueHolds,
   readRoots,
   readRunning,
-  readTasks,
   readThreads,
   readTreeIndex,
   readWorkflow,
@@ -69,12 +69,14 @@ import {
   afterSteps,
   type BoardMove,
   type BranchOutRefusal,
+  type CanvasIndex,
   type Cause,
   type CopyPlan,
   type CopyThread,
+  canvasOfPlace,
   cardsOfParts,
   crossesArchive,
-  emptiedTasks,
+  emptiedCanvases,
   type GatheredStart,
   historyOf,
   type LiftPlan,
@@ -85,6 +87,7 @@ import {
   type OpenPlan,
   type OpenThread,
   planBranchOut,
+  planCanvasesTrashed,
   planCopy,
   planLiftRoot,
   planMoveCommand,
@@ -97,24 +100,21 @@ import {
   planRootDelete,
   planSetCommand,
   planSpinOff,
-  planTasksTrashed,
   planUnqueueAll,
   planWidth,
   type ReorderStep,
   type SpinOff,
   type SpunThread,
-  type TaskIndex,
-  taskOfPlace,
   undoAnswer,
 } from "@pinetrie/rules"
 import type { Basics } from "../basics.ts"
+import { canvasesNow } from "../canvases.ts"
 import type { CardPort } from "../cards.ts"
 import type { MoveHistories } from "../move-history.ts"
 import type { Gesture, OpenChange, Places } from "../places.ts"
 import type { Provenance } from "../provenance.ts"
 import type { Records } from "../records.ts"
-import { tasksNow } from "../tasks.ts"
-import { spendsCard } from "./chat.ts"
+import { spendsCard } from "./send.ts"
 
 /**
  * A command's outcome, and the places document's `rev` after its step when the
@@ -143,7 +143,7 @@ export interface CardCommandDeps {
   readonly drain: (lane: ThreadId) => void
   readonly histories: Pick<
     MoveHistories,
-    "gestureOf" | "step" | "top" | "unloadTask"
+    "gestureOf" | "step" | "top" | "unloadCanvas"
   >
   /** The writer of the places: every move is a change, under its cause. */
   readonly placesWriter: Places
@@ -253,7 +253,7 @@ export function createCardCommands(deps: CardCommandDeps) {
    */
   async function liftOf(
     lifting: readonly CardId[],
-    tasks: TaskIndex,
+    canvases: CanvasIndex,
   ): Promise<LiftPlan> {
     const known = readRoots(session)
     const spun: SpunThread[] = []
@@ -273,7 +273,7 @@ export function createCardCommands(deps: CardCommandDeps) {
       spun,
       cards: readPlaces(places),
       lanes: [...readLaneRecords(session).values()],
-      rootOfThread: tasks.rootOfThread,
+      rootOfThread: canvases.rootOfThread,
       histories: readCardHistories(session),
     })
   }
@@ -284,8 +284,8 @@ export function createCardCommands(deps: CardCommandDeps) {
 
   /**
    * Delete a thread lifted back into its card (`planRootDelete`): its
-   * directory record, its thread's, the task it was spun into, any card
-   * still in either, its document, and the task's stacks of moves, which
+   * directory record, its thread's, the canvas it was spun into, any card
+   * still in either, its document, and the canvas's stacks of moves, which
    * the startup sweep retires.
    */
   async function deleteRoot(
@@ -295,15 +295,21 @@ export function createCardCommands(deps: CardCommandDeps) {
   ): Promise<void> {
     const cards = readPlaces(places)
     // Read after the undo wrote: the command's gathered index is older.
-    const tasks = tasksNow(deps.basics)
-    const task = tasks.taskOfThread.get(thread)
-    if (task === undefined) return
-    const plan = planRootDelete(root, thread, task, cards, tasks.rootOfThread)
+    const canvases = canvasesNow(deps.basics)
+    const canvas = canvases.canvasOfThread.get(thread)
+    if (canvas === undefined) return
+    const plan = planRootDelete(
+      root,
+      thread,
+      canvas,
+      cards,
+      canvases.rootOfThread,
+    )
     await deps.records.writeValues(plan.values)
     // The cards' texts go as the undo's change closes, after their records.
     open.apply(plan.cards)
     await docs.destroy(root)
-    await deps.histories.unloadTask(plan.histories)
+    await deps.histories.unloadCanvas(plan.histories)
   }
 
   /**
@@ -311,9 +317,9 @@ export function createCardCommands(deps: CardCommandDeps) {
    */
   async function sentMessage(sent: {
     readonly sendId: string
-    readonly chat: Send
+    readonly send: Send
   }): Promise<EntryId | null> {
-    const index = readTreeIndex(await docs.root(sent.chat.root))
+    const index = readTreeIndex(await docs.root(sent.send.root))
     return index.bySend.get(sent.sendId) ?? null
   }
 
@@ -325,15 +331,15 @@ export function createCardCommands(deps: CardCommandDeps) {
   async function move(
     writer: WriterId,
     moves: readonly Move[],
-    here: TaskId | null,
-    tasks: TaskIndex,
+    here: CanvasId | null,
+    canvases: CanvasIndex,
   ): Promise<Settled> {
     // gather. `Discards` names a discard's history (`historyOf`).
-    const discards = { tasks, here }
+    const discards = { canvases, here }
     const entryThreads = await marginEntryThreads(moves)
     const cards = readPlaces(places)
     // plan: each move to a thread's notes to its nearest note column, made
-    // first where its task has none, then the moves
+    // first where its canvas has none, then the moves
     const planned = planMoveRequest(
       cards,
       moves,
@@ -343,12 +349,12 @@ export function createCardCommands(deps: CardCommandDeps) {
       entryThreads,
       readWorkflow(session),
     )
-    // A new tab closed before its first send leaves its task empty: its
+    // A new canvas closed before its first send leaves its canvas empty: its
     // card goes to the trash in the same step, its closer its placer, in
-    // their history outside any task, since the task leaves their view.
+    // their history outside any canvas, since the canvas leaves their view.
     const emptied =
       planned.step.kind === "steps"
-        ? emptiedTasks({
+        ? emptiedCanvases({
             before: cards,
             after: afterSteps(cards, planned.step.steps),
             threads: readThreads(session),
@@ -361,7 +367,7 @@ export function createCardCommands(deps: CardCommandDeps) {
             kind: "steps",
             steps: [
               ...planned.step.steps,
-              ...planTasksTrashed(cards, emptied, writer),
+              ...planCanvasesTrashed(cards, emptied, writer),
             ],
           }
         : planned.step
@@ -389,14 +395,14 @@ export function createCardCommands(deps: CardCommandDeps) {
     queued: QueueMove,
     hold: QueueHoldChange,
     command: CardCommand | null,
-    tasks: TaskIndex,
+    canvases: CanvasIndex,
   ): Promise<Settled> {
     // gather: the history's stack, loaded before the places are read
-    // A queueing discards nothing: its history is the queue's task.
+    // A queueing discards nothing: its history is the queue's canvas.
     const scope = historyOf(
       [queued],
       readPlaces(places),
-      { tasks, here: null },
+      { canvases, here: null },
       "move",
     )
     const gesture =
@@ -423,20 +429,20 @@ export function createCardCommands(deps: CardCommandDeps) {
 
     /**
      * A queued or pinned card moved among its neighbours, as one step of the
-     * sender's history of moves in its task, so the page can undo it. It
+     * sender's history of moves in its canvas, so the page can undo it. It
      * changes no lane's turn, so it drains nothing.
      */
     async reorder(
       writer: WriterId,
       reorder: Reorder,
-      tasks: TaskIndex,
+      canvases: CanvasIndex,
     ): Promise<Settled> {
       // gather: the history's stack, loaded before the places are read
-      const task = taskOfPlace(tasks, reorder.at)
+      const canvas = canvasOfPlace(canvases, reorder.at)
       const gesture =
-        task === null
+        canvas === null
           ? undefined
-          : await deps.histories.gestureOf(writer, historyScope(task))
+          : await deps.histories.gestureOf(writer, historyScope(canvas))
       // plan
       const step = planReorder(readPlaces(places), reorder)
       // execute
@@ -445,7 +451,7 @@ export function createCardCommands(deps: CardCommandDeps) {
 
     /**
      * A card drawn one column wide or two on its canvas, as one step of the
-     * sender's history of moves in its task, as a reorder is. The width it has
+     * sender's history of moves in its canvas, as a reorder is. The width it has
      * already writes nothing.
      */
     async cardWidth(
@@ -455,7 +461,7 @@ export function createCardCommands(deps: CardCommandDeps) {
       // gather: the history's stack, loaded before the places are read
       const gesture = await deps.histories.gestureOf(
         writer,
-        historyScope(change.at.task),
+        historyScope(change.at.canvas),
       )
       // plan
       const step = planWidth(readPlaces(places), change)
@@ -473,24 +479,24 @@ export function createCardCommands(deps: CardCommandDeps) {
     unqueueAll(
       writer: WriterId,
       lane: ThreadId,
-      tasks: TaskIndex,
+      canvases: CanvasIndex,
     ): Promise<Settled> {
       const moves = planUnqueueAll(readPlaces(places), lane)
       return moves.length === 0
         ? Promise.resolve(settled({ kind: "nothing" }))
-        : move(writer, moves, null, tasks)
+        : move(writer, moves, null, canvases)
     },
 
     /**
-     * Undo or redo the sender's newest move in `scope`, a task's history or
-     * theirs outside any task, whole or refused. Kyneta writes the revert, then
+     * Undo or redo the sender's newest move in `scope`, a canvas's history or
+     * theirs outside any canvas, whole or refused. Kyneta writes the revert, then
      * `rev` is raised apart from it.
      */
     async undoMove(
       writer: WriterId,
       scope: MoveHistoryScope,
       direction: MoveDirection,
-      tasks: TaskIndex,
+      canvases: CanvasIndex,
     ): Promise<Settled> {
       // gather and plan: no undo crosses the archive's edge, and one that
       // lifts a thread back into its card happens only while the thread
@@ -508,7 +514,8 @@ export function createCardCommands(deps: CardCommandDeps) {
         const card = readPlaces(places).find(c => c.id === touched[0]) ?? null
         return unmoved({ kind: "refused", code: "archived", now: card })
       }
-      const lift = direction === "undo" ? await liftOf(touched, tasks) : NO_LIFT
+      const lift =
+        direction === "undo" ? await liftOf(touched, canvases) : NO_LIFT
       if (lift.kind === "replied") return notLifted(lift.by)
       // execute: Kyneta writes the revert, in one change with the threads
       // it lifts
@@ -544,16 +551,16 @@ export function createCardCommands(deps: CardCommandDeps) {
     /**
      * A text card made a thread, in one step of the keeper: planned
      * (`planSpinOff`), then the thread's records (its own, spun from the card,
-     * and its new task's), its first message, the card's text, sent by `start`
-     * (through the gate, as every send is), then its card on its task's
+     * and its new canvas's), its first message, the card's text, sent by `start`
+     * (through the gate, as every send is), then its card on its canvas's
      * canvas and the card's move to the trash, in its history's step. A send that took nothing deletes the records again.
      * The answer is the thread's start, its first message's id among it.
      */
     async spinOff(
       writer: WriterId,
       request: SpinOff,
-      start: (chat: Send) => Promise<Outcome>,
-      tasks: TaskIndex,
+      start: (said: Send) => Promise<Outcome>,
+      canvases: CanvasIndex,
     ): Promise<Settled> {
       const { move } = request
       const card = move.card
@@ -563,7 +570,7 @@ export function createCardCommands(deps: CardCommandDeps) {
       // gather: the card's text, loaded whole, and the history's stack
       await deps.cards.hydrate([card])
       const text = deps.cards.textNow(card)
-      const discards = { tasks, here: request.here }
+      const discards = { canvases, here: request.here }
       const scope = historyOf([move], readPlaces(places), discards, "move")
       const gesture =
         scope === null
@@ -575,7 +582,7 @@ export function createCardCommands(deps: CardCommandDeps) {
         cards,
         request,
         sender: writer,
-        tasks,
+        canvases,
         text,
         roots: new Set(readRoots(session).keys()),
         threads: new Set(readThreads(session).keys()),
@@ -609,14 +616,14 @@ export function createCardCommands(deps: CardCommandDeps) {
       // the card's move; a send that took nothing takes its records back
       await deps.records.writeValues(plan.open.records)
       const sent = await start({
-        kind: "chat",
+        kind: "send",
         text: plan.text,
         root: plan.root,
         at: {
           kind: "branch",
           thread: plan.thread,
           at: null,
-          task: request.task,
+          canvas: request.canvas,
         },
         asksAgent: false,
         mentions: plan.mentions,
@@ -643,12 +650,12 @@ export function createCardCommands(deps: CardCommandDeps) {
     },
 
     /**
-     * A task's card moved on the board (`planBoardMove`'s writes): between
-     * states, one step of its sender's history outside any task; within one, a
+     * A canvas's card moved on the board (`planBoardMove`'s writes): between
+     * states, one step of its sender's history outside any canvas; within one, a
      * reorder, in none. Its card's history and traces are written as any
      * move's.
      */
-    async placeTask(
+    async placeCanvas(
       writer: WriterId,
       move: Extract<BoardMove, { kind: "move" | "reorder" }>,
     ): Promise<Settled> {
@@ -667,7 +674,7 @@ export function createCardCommands(deps: CardCommandDeps) {
     /**
      * A thread opened as its column opens, in one step of the keeper: planned
      * (`planOpenThread`) from its root's tree for a branch, then its record
-     * (and a new tab's task's), its card on its task's canvas and the canvas
+     * (and a new canvas's), its card on its canvas and the canvas
      * re-ranked for it, then its name. No entry is written: its first send is a
      * branch at its fork, or a new root.
      */
@@ -688,7 +695,7 @@ export function createCardCommands(deps: CardCommandDeps) {
         cards: readPlaces(places),
         threads: readThreads(session),
         roots: new Set(readRoots(session).keys()),
-        tasks: readTasks(places),
+        canvases: readCanvases(places),
         workflow: readWorkflow(session),
         now: deps.basics.now(),
       })
@@ -707,8 +714,8 @@ export function createCardCommands(deps: CardCommandDeps) {
     async branchOut(
       writer: WriterId,
       press: BranchOut,
-      tasks: TaskIndex,
-      start: (chat: Send) => Promise<Outcome>,
+      canvases: CanvasIndex,
+      start: (said: Send) => Promise<Outcome>,
       queueFact: (fact: QueuedFact) => Promise<void>,
     ): Promise<Settled> {
       // gather
@@ -729,8 +736,8 @@ export function createCardCommands(deps: CardCommandDeps) {
         sender: writer,
         cards: readPlaces(places),
         threads,
-        taskOfThread: tasks.taskOfThread,
-        tasks: readTasks(places),
+        canvasOfThread: canvases.canvasOfThread,
+        canvases: readCanvases(places),
         now: deps.basics.now(),
       })
       if ("kind" in plan) return settled(branchOutRefusal(plan.why))
@@ -751,18 +758,18 @@ export function createCardCommands(deps: CardCommandDeps) {
     /**
      * A paste: the card it replaces discarded, then a card made from a copy
      * where its target resolves to (a thread's nearest notes, made where its
-     * task has none; a margin checked against its entry's thread), or a cut
+     * canvas has none; a margin checked against its entry's thread), or a cut
      * card out of a trash by its cutter (`planPaste`). One step of the sender's
-     * history in the task it lands in, so the undo key takes it back. Queued on
+     * history in the canvas it lands in, so the undo key takes it back. Queued on
      * an idle thread, it is drained.
      */
     async paste(
       writer: WriterId,
       pasted: Extract<Intent, { kind: "paste" }>,
-      tasks: TaskIndex,
+      canvases: CanvasIndex,
     ): Promise<Settled> {
       // gather: the history's stack, loaded before the places are read
-      const discards = { tasks, here: pasted.here }
+      const discards = { canvases, here: pasted.here }
       const main = {
         card: pasted.paste.card,
         from: pasted.paste.kind === "uncut" ? DISCARDED : null,
@@ -815,20 +822,20 @@ export function createCardCommands(deps: CardCommandDeps) {
      * source's record and tree, then the copy's record, its card and the canvas
      * re-ranked for it, then its name. No entry is written: its first send
      * branches at its fork. As a paste is, it is one step of the copier's
-     * history in the task it lands in, or outside any task in an inventory, so
+     * history in the canvas it lands in, or outside any canvas in an inventory, so
      * the undo key takes it back; an undo leaves the copy's record, with no
      * card and no entry.
      */
     async copyThread(
       writer: WriterId,
       copy: CopyThread,
-      tasks: TaskIndex,
+      canvases: CanvasIndex,
     ): Promise<Settled> {
       // gather: the history's stack, loaded before the places are read
       const scope = historyOf(
         [copy.move],
         readPlaces(places),
-        { tasks, here: null },
+        { canvases, here: null },
         "paste",
       )
       const gesture =
@@ -882,7 +889,7 @@ export function createCardCommands(deps: CardCommandDeps) {
     async spend(
       writer: WriterId,
       card: TextCardId,
-      sent: { readonly sendId: string; readonly chat: Send },
+      sent: { readonly sendId: string; readonly send: Send },
     ): Promise<number> {
       const message = await sentMessage(sent)
       const held = readPlaces(places).some(c => c.id === card)
@@ -906,18 +913,18 @@ export function createCardCommands(deps: CardCommandDeps) {
      */
     async queueBusy(
       writer: WriterId,
-      chat: Send & { card: SentCard },
+      said: Send & { card: SentCard },
     ): Promise<Settled | null> {
-      const doc = await docs.root(chat.root)
+      const doc = await docs.root(said.root)
       const index = readTreeIndex(doc)
       const cards = readPlaces(places)
       const blank = await deps.cards.blankQueued(cards)
       const thread = threadOfSend(
         index,
         readLanes({ doc, live }, index, cards, readQueueHolds(session), blank),
-        { at: chat.at, me: writer },
+        { at: said.at, me: writer },
       )
-      const now = cards.find(c => c.id === chat.card.id)
+      const now = cards.find(c => c.id === said.card.id)
       if (
         thread.kind !== "thread" ||
         thread.lane.kind !== "lane" ||
@@ -930,7 +937,7 @@ export function createCardCommands(deps: CardCommandDeps) {
           moveOf(now, {
             kind: "queued",
             thread: thread.lane.name,
-            seen: chat.card.seen,
+            seen: said.card.seen,
           }),
         ],
         writer,
@@ -975,7 +982,7 @@ function openRefusal(
       return {
         kind: "refused",
         code: ERR.UNKNOWN_TARGET,
-        message: "no such entry, or no such task, to branch in",
+        message: "no such entry, or no such canvas, to branch in",
       }
     case "taken":
       return {

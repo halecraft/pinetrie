@@ -120,7 +120,7 @@ async function folderSection(
       { tool: "write", args: { path: "b.txt", content: "lane's\n" } },
       { text: "wrote" },
     ])
-    await wu.chat("@agent write b", ROOT, START_AGENT)
+    await wu.send("@agent write b", ROOT, START_AGENT)
     await idle()
     const lane = laneWith("@agent write b")?.name
     if (lane === undefined) throw new Error("no lane")
@@ -170,7 +170,7 @@ async function folderSection(
       { tool: "bash", args: { command: "cat c.txt" } },
       { text: "caught up" },
     ])
-    await wu.chat("@agent catch up", at(laneTip(lane)), { thread: lane })
+    await wu.send("@agent catch up", at(laneTip(lane)), { thread: lane })
     await idle()
     check(
       "a clean catch-up merges accepted work's newest state into the lane",
@@ -183,12 +183,12 @@ async function folderSection(
       { tool: "write", args: { path: "a.txt", content: "one\nlane\nthree\n" } },
       { text: "edited" },
     ])
-    await wu.chat("@agent edit a", at(laneTip(lane)), { thread: lane })
+    await wu.send("@agent edit a", at(laneTip(lane)), { thread: lane })
     await idle()
     writeFileSync(path.join(dir, "a.txt"), "one\nyours\nthree\n")
     await waitFor(() => newestOf() !== moved, 60_000)
     script.use([{ tool: CATCH_UP_TOOL, args: {} }, { text: "conflicted" }])
-    await wu.chat("@agent catch up again", at(laneTip(lane)), { thread: lane })
+    await wu.send("@agent catch up again", at(laneTip(lane)), { thread: lane })
     await idle()
     const theirs = await inLane(
       lane,
@@ -207,7 +207,7 @@ async function folderSection(
       },
       { text: "resolved" },
     ])
-    await wu.chat("@agent resolve", at(laneTip(lane)), { thread: lane })
+    await wu.send("@agent resolve", at(laneTip(lane)), { thread: lane })
     await idle()
     const resolved = toolResults(lane).at(-1) ?? ""
     check(
@@ -229,7 +229,7 @@ async function folderSection(
     await command("jj", ["git", "init", "--colocate"], { cwd: dir })
     wh = await start()
     wu = await join(wh, "uma", "folder")
-    const refusal = await wu.chat("@agent again", at(tipBefore), {
+    const refusal = await wu.send("@agent again", at(tipBefore), {
       thread: lane,
     })
     check(

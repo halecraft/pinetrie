@@ -13,10 +13,10 @@ import {
 } from "@pinetrie/core"
 import { scriptedModel } from "@pinetrie/pi"
 import { readPlaces, readThreads } from "@pinetrie/reads"
-import { canvasOf } from "@pinetrie/rules"
+import { cardsOnCanvas } from "@pinetrie/rules"
 import { newThreadId } from "@pinetrie/session"
 import type { Checks } from "../checks.ts"
-import { START_AGENT, taskHolding, treeOf, waitFor } from "../harness.ts"
+import { canvasHolding, START_AGENT, treeOf, waitFor } from "../harness.ts"
 import { inLane, type LaneHosts } from "../lane-hosts.ts"
 import type { Scenario } from "../scenario.ts"
 
@@ -46,7 +46,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       { tool: PROPOSE_TOOL, args: { branches: BRANCHES } },
       { text: "three things" },
     ])
-    await user.chat("@agent split it", ROOT, START_AGENT)
+    await user.send("@agent split it", ROOT, START_AGENT)
     await idle()
     const tree = treeOf(host)
     const result = Object.values(tree.entries).find(
@@ -57,7 +57,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       parent === null ? undefined : readThreads(host.session).get(parent)?.root
     if (result === undefined || parent === null || root === undefined)
       throw new Error("no proposal")
-    const task = taskHolding(host, result)
+    const canvas = canvasHolding(host, result)
     const threads: ThreadId[] = BRANCHES.map(() => newThreadId())
     const [t0, t1, t2] = threads
     if (t0 === undefined || t1 === undefined || t2 === undefined)
@@ -66,7 +66,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       kind: "branch-out",
       how: "start",
       root,
-      task,
+      canvas,
       proposal: result,
       branches: [
         { thread: t0, row: 0, brief: "do one" },
@@ -76,11 +76,11 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     })
     await idle()
     const after = treeOf(host)
-    const canvas = canvasOf(readPlaces(host.places), task).map(c => c.id)
-    const at = canvas.indexOf(parent)
+    const ids = cardsOnCanvas(readPlaces(host.places), canvas).map(c => c.id)
+    const at = ids.indexOf(parent)
     const prompts = threads.map(t => {
       const said = projectTranscript(after, threadEnd(after, t))
-      return said.find(m => m.thread === t && m.role === "chat")
+      return said.find(m => m.thread === t && m.role === "person")
     })
     const files = await Promise.all(
       threads.map(t => inLane(t, "cat parent.txt").catch(e => `ERR ${e}`)),
@@ -88,7 +88,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     check(
       "Start opens each branch right after the proposing thread in the proposal's order, each a lane of its own asked its brief by the presser",
       pressed.kind === "moved" &&
-        canvas.slice(at + 1, at + 4).join() === threads.join() &&
+        ids.slice(at + 1, at + 4).join() === threads.join() &&
         prompts.every(
           (m, i) =>
             m?.writer === user.writer &&
@@ -96,7 +96,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
             m.text === `@agent ${BRANCHES[i]?.brief}`,
         ) &&
         files.every(f => f === "from parent\n"),
-      `${pressed.kind}; canvas ${canvas.slice(at, at + 4).join()}; prompts ${prompts.map(m => m?.text).join(" | ")}; files ${JSON.stringify(files)}`,
+      `${pressed.kind}; canvas ${ids.slice(at, at + 4).join()}; prompts ${prompts.map(m => m?.text).join(" | ")}; files ${JSON.stringify(files)}`,
     )
 
     // The fact reaches the proposing thread once it is idle.

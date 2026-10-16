@@ -41,7 +41,7 @@ import {
   applyWrites,
   basics,
   placesFor,
-  putTask,
+  putCanvas,
   putValue,
   ROOT_ID,
   RUNS_ANY,
@@ -50,7 +50,6 @@ import {
   seedPlaces,
 } from "./fakes.ts"
 import {
-  chatOfPoppedQueuedCard,
   createWaits,
   drain,
   givenUp,
@@ -59,6 +58,7 @@ import {
   type PoppedText,
   popNextQueuedCard,
   type QueuedCardPopDeps,
+  sendOfPoppedQueuedCard,
   untilNotTyped,
 } from "./queued-card-pop.ts"
 
@@ -215,7 +215,7 @@ describe("popNextQueuedCard", () => {
   })
 })
 
-test("chatOfPoppedQueuedCard: the queuer's message, in the queue's mode, from the card", () => {
+test("sendOfPoppedQueuedCard: the queuer's message, in the queue's mode, from the card", () => {
   const cards = newPlacesDoc()
   queue(cards, cardIdFor("c1"), "a")
   const popped = poppedOf(
@@ -228,9 +228,9 @@ test("chatOfPoppedQueuedCard: the queuer's message, in the queue's mode, from th
     ),
   )
   expect(
-    popped === null ? null : chatOfPoppedQueuedCard(popped, ROOT_ID),
+    popped === null ? null : sendOfPoppedQueuedCard(popped, ROOT_ID),
   ).toMatchObject({
-    kind: "chat",
+    kind: "send",
     root: ROOT_ID,
     text: "@agent go",
     at: { kind: "queue", thread: LANE },
@@ -239,7 +239,7 @@ test("chatOfPoppedQueuedCard: the queuer's message, in the queue's mode, from th
   })
 })
 
-/** The places' text cards: the lane's thread card is the fixture's (`putTask`). */
+/** The places' text cards: the lane's thread card is the fixture's (`putCanvas`). */
 const textsIn = (places: Parameters<typeof readPlaces>[0]) =>
   readPlaces(places).filter(isTextCard)
 
@@ -252,8 +252,8 @@ function setUp(
   behind: readonly string[] = [],
 ) {
   const b = basics()
-  // The lane's thread on a task's canvas: an unsent card goes to its notes.
-  putTask(b, LANE)
+  // The lane's thread on a canvas: an unsent card goes to its notes.
+  putCanvas(b, LANE)
   const presence = newPresenceDoc()
   const events: string[] = []
   const appended: unknown[] = []

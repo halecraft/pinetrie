@@ -20,7 +20,7 @@ describe("askWords", () => {
     [
       "a person's message names them as they are named now",
       {
-        role: "chat",
+        role: "person",
         text: "Fix the rail\nplease",
         writer: ada,
         author: "old",
@@ -29,7 +29,7 @@ describe("askWords", () => {
     ],
     [
       "a long first line is cut",
-      { role: "chat", text: "x".repeat(60), writer: bea },
+      { role: "person", text: "x".repeat(60), writer: bea },
       `Bea: "${"x".repeat(48)}…"`,
     ],
     [
@@ -187,7 +187,7 @@ describe("foldWords", () => {
 
 test("askLine: a prompt by a person, by the host, and none", () => {
   const index = indexOf([
-    entry("1", null, { role: "chat", content: "Fix the rail", writer: ada }),
+    entry("1", null, { role: "person", content: "Fix the rail", writer: ada }),
     entry("2", "1", { role: "land", content: "✓ catching up" }),
   ])
   expect(askLine(index, entryId("1"), nameOf)).toBe('Ada: "Fix the rail"')

@@ -3,6 +3,7 @@
 
 import {
   type AskCardId,
+  type CanvasId,
   type CardId,
   type CardInPlace,
   type CardPlace,
@@ -20,7 +21,6 @@ import {
   noteOf,
   type QueuedFact,
   type RelayDetails,
-  type TaskId,
   type TextCard,
   type TextCardId,
   type ThreadId,
@@ -75,22 +75,22 @@ export const isPinned = (
   readonly place: Extract<CardPlace, { kind: "pinned" }>
 } => c.place.kind === "pinned"
 
-/** A card pinned to a task, with its place narrowed. */
-export type TaskPinnedCard = TextCard & {
-  readonly place: Extract<CardPlace, { kind: "task-pinned" }>
+/** A card pinned to a canvas, with its place narrowed. */
+export type CanvasPinnedCard = TextCard & {
+  readonly place: Extract<CardPlace, { kind: "canvas-pinned" }>
 }
 
-/** The cards pinned to `task`, in the order they were pinned: by `order`, then id. */
-export const taskPinnedOf = (
+/** The cards pinned to `canvas`, in the order they were pinned: by `order`, then id. */
+export const canvasPinnedOf = (
   cards: readonly CardRecord[],
-  task: TaskId,
-): readonly TaskPinnedCard[] =>
+  canvas: CanvasId,
+): readonly CanvasPinnedCard[] =>
   cards
     .filter(
-      (c): c is TaskPinnedCard =>
+      (c): c is CanvasPinnedCard =>
         c.kind === "text" &&
-        c.place.kind === "task-pinned" &&
-        c.place.task === task,
+        c.place.kind === "canvas-pinned" &&
+        c.place.canvas === canvas,
     )
     .sort(byOrder)
 
@@ -230,7 +230,7 @@ export const planUnqueueAll = (
 /**
  * A popped card the host could not send, written back saying why, its
  * command and placer kept, since the host's own write is nobody's move: a
- * note in the column nearest its thread, made in this step when its task
+ * note in the column nearest its thread, made in this step when its canvas
  * has none (`nearestNoteColumn`); for a thread in an inventory, in that
  * inventory. Never queued again, or the next drain would pop it
  * and fail the same way (answer 5). Where it cannot go (that

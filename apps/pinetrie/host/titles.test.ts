@@ -1,8 +1,8 @@
 import {
+  canvasIdFor,
   entryId,
   ROOT,
   THE_AGENT,
-  taskIdFor,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -14,17 +14,17 @@ import { writeEntry } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import {
   applyWrites,
-  archiveTask,
+  archiveCanvas,
   basics,
+  CANVAS_ID,
   deferred,
   placesFor,
+  putCanvas,
   putLane,
-  putTask,
   putValue,
   ROOT_ID,
   record,
   row,
-  TASK_ID,
   writeDirectory,
 } from "./fakes.ts"
 import { createLater } from "./later.ts"
@@ -46,8 +46,8 @@ function setUp(
   over: { readonly enabled?: boolean; readonly reply?: string | null } = {},
 ) {
   const b = basics()
-  // L1's thread opened the task.
-  putTask(b, L1)
+  // L1's thread opened the canvas.
+  putCanvas(b, L1)
   const reply = deferred<string | null>()
   // The setup and the scribe in one record, so the order of their calls shows.
   const pi = record<
@@ -74,11 +74,11 @@ function setUp(
     enabled: over.enabled ?? true,
     piSetup: pi.port,
   })
-  const title = () => readMarks(b.session).get(TASK_ID)
+  const title = () => readMarks(b.session).get(CANVAS_ID)
   return { b, pi, keeper, titles, reply, title }
 }
 
-test("a new root's first lane: its task titled by the agent", async () => {
+test("a new root's first lane: its canvas titled by the agent", async () => {
   const { b, pi, keeper, titles, reply, title } = setUp()
   putLane(b, L1)
   await keeper.run(() => titles.laneStarted(started))
@@ -109,7 +109,10 @@ test("a mark written while the title was asked wins over it", async () => {
   putLane(b, L1)
   writeEntry(b.root, row(E1, null))
   await keeper.run(() => titles.laneStarted(started))
-  putValue(b, setRecord(MARK, { task: TASK_ID, title: "Mine", by: ADA, at: 1 }))
+  putValue(
+    b,
+    setRecord(MARK, { canvas: CANVAS_ID, title: "Mine", by: ADA, at: 1 }),
+  )
   reply.resolve("Rail layout")
   await keeper.idle()
   expect(title()?.title).toBe("Mine")
@@ -118,8 +121,11 @@ test("a mark written while the title was asked wins over it", async () => {
 test("asked: answers at once, and its title replaces a person's, as theirs", async () => {
   const { b, keeper, titles, reply, title } = setUp()
   writeEntry(b.root, row(E1, null))
-  putValue(b, setRecord(MARK, { task: TASK_ID, title: "Mine", by: ADA, at: 1 }))
-  const answer = await keeper.run(() => titles.asked(TASK_ID, ADA))
+  putValue(
+    b,
+    setRecord(MARK, { canvas: CANVAS_ID, title: "Mine", by: ADA, at: 1 }),
+  )
+  const answer = await keeper.run(() => titles.asked(CANVAS_ID, ADA))
   expect(answer).toEqual({ kind: "retitling" })
   reply.resolve("Rail layout")
   await keeper.idle()
@@ -129,7 +135,7 @@ test("asked: answers at once, and its title replaces a person's, as theirs", asy
 test("asked, with no message yet: refused, and nothing asked", async () => {
   const { pi, keeper, titles } = setUp()
   const answer = await keeper.run(() =>
-    titles.asked(taskIdFor("01a0ffd2-0000-7000-8000-0000000000ee"), ADA),
+    titles.asked(canvasIdFor("01a0ffd2-0000-7000-8000-0000000000ee"), ADA),
   )
   expect(answer.kind).toBe("refused")
   expect(pi.calls).toEqual([])
@@ -138,7 +144,7 @@ test("asked, with no message yet: refused, and nothing asked", async () => {
 test("a reply that is not a title, or a root archived meanwhile, writes nothing", async () => {
   const wordy = setUp({ reply: "Here is a title for the thread: Rail" })
   writeEntry(wordy.b.root, row(E1, null))
-  await wordy.keeper.run(() => wordy.titles.asked(TASK_ID, ADA))
+  await wordy.keeper.run(() => wordy.titles.asked(CANVAS_ID, ADA))
   await wordy.keeper.idle()
   expect(wordy.title()).toBeUndefined()
   expect(wordy.b.lines.join("\n")).toContain("the model's title is not one")
@@ -146,8 +152,8 @@ test("a reply that is not a title, or a root archived meanwhile, writes nothing"
   const archived = setUp()
   writeEntry(archived.b.root, row(E1, null))
   writeDirectory(archived.b)
-  await archived.keeper.run(() => archived.titles.asked(TASK_ID, ADA))
-  archiveTask(archived.b)
+  await archived.keeper.run(() => archived.titles.asked(CANVAS_ID, ADA))
+  archiveCanvas(archived.b)
   archived.reply.resolve("Rail layout")
   await archived.keeper.idle()
   expect(archived.title()).toBeUndefined()

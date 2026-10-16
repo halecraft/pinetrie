@@ -1,11 +1,12 @@
 // gate — what a person's command, or a send made for one, may do now: refused
-// in an archived task, in a thread someone holds or trashed, or where a run
+// in an archived canvas, in a thread someone holds or trashed, or where a run
 // would start on a lane of another kind. A pass is a value only `planGate`
 // makes, so a send nobody checked does not compile.
 
 import {
-  type ArchivedTask,
+  type ArchivedCanvas,
   atEntry,
+  type CanvasId,
   type CardRecord,
   type EntryId,
   ERR,
@@ -18,13 +19,13 @@ import {
   type RevisionRecord,
   type RootId,
   refused,
-  type TaskId,
   type ThreadId,
   type TreeIndex,
   threadAt,
   type WriterId,
 } from "@pinetrie/core"
 import { archivedIn, writesIn } from "./archive.ts"
+import type { CanvasIndex } from "./canvas-index.ts"
 import {
   foreignIn,
   foreignRefusal,
@@ -34,7 +35,6 @@ import {
   type ThreadHolding,
   threadsOf,
 } from "./held.ts"
-import type { TaskIndex } from "./task.ts"
 
 declare const clearedBrand: unique symbol
 /**
@@ -51,9 +51,9 @@ export interface GateRoot {
 }
 
 export interface GateFacts {
-  readonly tasks: TaskIndex
+  readonly canvases: CanvasIndex
   readonly cards: readonly CardRecord[]
-  readonly archived: ReadonlyMap<TaskId, ArchivedTask>
+  readonly archived: ReadonlyMap<CanvasId, ArchivedCanvas>
   readonly lanes: ReadonlyMap<ThreadId, LaneRecord>
   /** The project's kind; null for a host with no tools, which refuses no lane. */
   readonly kind: ProjectKind | null
@@ -63,7 +63,7 @@ export interface GateFacts {
 
 /** The gate's refusals, before they are worded (`gateRefusal`). */
 export type GateRefusal =
-  | { readonly kind: "archived"; readonly task: ArchivedTask }
+  | { readonly kind: "archived"; readonly canvas: ArchivedCanvas }
   | {
       readonly kind: "held"
       readonly thread: ThreadId
@@ -88,11 +88,11 @@ export function planGate<C extends Gated>(
   command: C,
   facts: GateFacts,
 ): GatePlan<C> {
-  const task = archivedIn(
-    writesIn(command, facts.tasks, facts.cards),
+  const canvas = archivedIn(
+    writesIn(command, facts.canvases, facts.cards),
     facts.archived,
   )
-  if (task !== null) return { kind: "archived", task }
+  if (canvas !== null) return { kind: "archived", canvas }
   const at = runsIn(command)
   const unread = [
     ...new Set(
@@ -109,7 +109,7 @@ export function planGate<C extends Gated>(
         const read = facts.roots.get(root)
         return read === undefined ? null : threadAt(read.index, entry)
       },
-      facts.tasks.forkOf,
+      facts.canvases.forkOf,
     ),
     facts.cards,
   )
@@ -136,8 +136,8 @@ export function gateRefusal(
   switch (refusal.kind) {
     case "archived":
       return refused(
-        ERR.TASK_ARCHIVED,
-        `archived by ${nameOf(refusal.task.by)}: restore the task first`,
+        ERR.CANVAS_ARCHIVED,
+        `archived by ${nameOf(refusal.canvas.by)}: restore the canvas first`,
       )
     case "held":
       return refused(ERR.REFUSED, holdingWords(refusal.holding))

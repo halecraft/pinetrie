@@ -1,15 +1,15 @@
 import {
+  canvasIdFor,
   entryId,
   type Reach,
   type RelayDetails,
   type ThreadLane,
   type TranscriptMessage,
-  taskIdFor,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
-import { planDelivery } from "./chat.ts"
+import { planDelivery } from "./message.ts"
 import { planAnswer, planRelay, relayRefusalText } from "./relay.ts"
 
 const here = threadIdFor("here")
@@ -25,12 +25,12 @@ const idle: ThreadLane = {
   lastWaiting: null,
   heldBy: null,
 }
-const OPEN: Reach = { kind: "open", task: taskIdFor("t") }
+const OPEN: Reach = { kind: "open", canvas: canvasIdFor("t") }
 const BEA = writerId("bea@example.com")
 const ARCHIVED: Reach = {
   kind: "archived",
-  task: taskIdFor("t"),
-  record: { task: taskIdFor("t"), by: BEA, at: 1 },
+  canvas: canvasIdFor("t"),
+  record: { canvas: canvasIdFor("t"), by: BEA, at: 1 },
 }
 const said = (
   id: string,
@@ -45,7 +45,7 @@ const said = (
   ...more,
 })
 const path: readonly TranscriptMessage[] = [
-  said("1", "chat", "please talk to @amber-fox", { author: "Ada" }),
+  said("1", "person", "please talk to @amber-fox", { author: "Ada" }),
   said("2", "assistant", "I will ask it"),
   said("3", "answer", "fox said so", { author: "amber-fox", from: fox }),
   said("4", "assistant", "and now"),
@@ -196,7 +196,7 @@ describe("planAnswer", () => {
   })
 })
 
-describe("planDelivery: one table for chats, relays and answers", () => {
+describe("planDelivery: one table for sends, relays and answers", () => {
   const go = (lane: ThreadLane, compelled: boolean, steers = false) =>
     planDelivery({ lane, compelled, mode: "queue", race: null, steers })
   test("an idle lane runs or appends; no lane appends to the tree or is made", () => {

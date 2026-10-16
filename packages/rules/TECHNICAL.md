@@ -24,7 +24,7 @@ Where a rule lives, as `@pinetrie/core` and `@pinetrie/jj` state it too:
 > `@pinetrie/web`'s (ADR-0093).
 
 So `planStop` is here beside `STOP`, and `agentByDefault` beside
-`addressChat`; `address`, `parseMentions` and `moveOf`, which know no
+`addressMessage`; `address`, `parseMentions` and `moveOf`, which know no
 record, are core's; the trailer format and the proposed changes' facts and decisions
 are core's (`trailers.ts`, `proposed.ts`), since `@pinetrie/jj` reads them.
 
@@ -39,7 +39,7 @@ follow this list. A name only this package uses is imported from its module.
 - `config.ts`: `modelRef`, the parser a model setting's kind wraps; the
   config's files are `@pinetrie/config`'s, and the host declares every
   setting. `request.ts`: what fits a model request's budget.
-- `chat.ts`, `participant.ts`, `shares.ts`, `commands.ts`: a person's
+- `message.ts`, `participant.ts`, `shares.ts`, `commands.ts`: a person's
   message, who is in the session, the files a message shares, and `/`
   commands (`pinetrie.commands`).
 - `history.ts`: the history message builder (`historyMessage`), whose spec
@@ -123,9 +123,9 @@ cannot reach the wrong document and needs no guard at run time.
 
 - **`ROOT`** (`roots.ts`): a root's directory record, keyed by its `RootId`:
   its root entry, first line, title, counts, writers, each thread's writers
-  on its path (`threads`, its followers, ADR-0077), the chats that name
+  on its path (`threads`, its followers, ADR-0077), the sends that name
   someone, and its images. The host writes it from `readRootRecord`.
-  Each mention names its thread (`threadAt`), so the inbox reads its task.
+  Each mention names its thread (`threadAt`), so the inbox reads its canvas.
   `ROOT` is `derived`: built from the root's document alone, so a record
   that does not decode in this build's shape is rebuilt at a host's start
   (`host/directory.ts`, `planRebuild`), never migrated. The host refreshes
@@ -138,7 +138,7 @@ cannot reach the wrong document and needs no guard at run time.
 - **`LANE`** is written for every lane as it is created, naming its root;
   `work` is null for a lane with no work of its own.
 - **`WORKFLOW`** (`board.ts`, ADR-0122): the session's workflow states, a
-  singleton. A task is a card on the board (ADR-0126): no record says
+  singleton. A canvas is a card on the board (ADR-0126): no record says
   where it is, who opened it or when; its card and its card's history do.
 - **`ACCESS`** (`access.ts`, ADR-0140): a lane's ssh identities, keyed by
   lane, in the session: its use of its owner's (waiting, approved,
@@ -159,10 +159,10 @@ cannot reach the wrong document and needs no guard at run time.
   each path a merge into a lane left conflicted, keyed by its lane and
   then its path (`conflictKey`; a lane's id holds no `:`, so the first
   ends it), with the states of its base, ours and theirs.
-- **The archive gate** reads the tasks a command writes in (`writesIn`) and
+- **The archive gate** reads the canvases a command writes in (`writesIn`) and
   looks each up among the archived (`archivedIn`, over `archivedOf`): a
-  command carries its tasks, or its places and cards, which the
-  `TaskIndex` maps to tasks, so no root's document is opened to check.
+  command carries its canvases, or its places and cards, which the
+  `CanvasIndex` maps to canvases, so no root's document is opened to check.
 
 Each host record is one `RecordSpec<R, K>`: its `namespace`, `keyOf`,
 `encode` and `decode`, exported beside its type (`MARK` in `mark.ts`,
@@ -203,14 +203,14 @@ retired or rehomed record type leaves nothing behind.
   `ICONS_KEY`, `WORKFLOW_KEY`), and
   `decode` refuses any other.
 
-# Chat (`chat.ts`)
+# A person's message (`message.ts`)
 
 A human message is a pi `CustomMessage`, `customType: "pinetrie.chat"`
 (ADR-0018), not a custom entry, so the host can append one to a lane without
 a run (S19).
 `content` is the attributed text the model reads ("Alice: …"); `details` hold
 the author (a `WriterId`, from the transport), the display name as written, the
-text, and the `Responder` it compels. `encodeChat` and the total `decodeChat`
+text, and the `Responder` it compels. `encodeMessage` and the total `decodeMessage`
 are the only code that builds or reads the shape.
 
 - **Mentions are read once** (`mentionSpans`, core): what is sent
@@ -224,7 +224,8 @@ are the only code that builds or reads the shape.
 - **Who a message is for is `address`** (`@pinetrie/core`, ADR-0021): `@agent`
   asks the agent; a message naming only participants is for them; with no
   mention that resolves, the thread decides (`agentByDefault`: the agent where
-  the thread has a lane or the column is a Start Agent column, and never by a
+  the thread has a lane or the column asks the agent with nothing typed
+  (`asksAgent`, ＋'s agent thread past a canvas's last column), and never by a
   lane's default for a `branch`, which is a new thread). A handle resolves
   by `mentionTargets`, which the composer's list is drawn from, so it offers
   only what a send would reach: a handle names one target, another thread's
@@ -237,12 +238,12 @@ are the only code that builds or reads the shape.
   either way is `@josé`. An unknown handle (`@types/node`) is ignored, so it
   never silences the agent; `normalizeName` refuses a name with no handle, or
   the handle `agent`.
-- **`addressChat` is the one rule for who a chat is for:** `address` with
+- **`addressMessage` is the one rule for who a chat is for:** `address` with
   `agentByDefault`, and a command for the agent whoever else it names
-  (ADR-0036), keeping the people it names. `planChat` runs it on the host, and
+  (ADR-0036), keeping the people it names. `planMessage` runs it on the host, and
   the composer's `planSend` (`packages/interface/send.ts`) runs it before a send,
   so the button's promise and the host's decision cannot drift apart.
-- **`planChat` decides what a message does** (ADR-0120), over the thread
+- **`planMessage` decides what a message does** (ADR-0120), over the thread
   `threadOfSend` (core) gives for where it goes (`SendAt`), and names
   exactly where to write:
 
@@ -255,7 +256,7 @@ are the only code that builds or reads the shape.
 
   `busy` writes nothing, since a lane is never written while it runs (S21):
   the dispatcher queues the chat's card in the same step, and answers `queued` (ADR-0059).
-  `queue` is the host's own mode (`PlanMode`; a client sends a `ChatMode`), for a card it pops, which heads the queue
+  `queue` is the host's own mode (`PlanMode`; a client sends a `SendMode`), for a card it pops, which heads the queue
   it is in: so only a run makes the lane busy, and a race does not count.
   | `branch` | plain: `appendToTree` at its fork; compelled: `createAndRun` at its fork | the same: a branch never continues a lane | the same |
 
@@ -268,7 +269,7 @@ are the only code that builds or reads the shape.
   chosen; pi makes none. A branch naming a thread that has an entry or a
   lane is `taken` (core), refused before planning.
 - **Every entry names its thread** (ADR-0125), in its row's `thread`
-  column, from the commit that writes it. Every `ChatDecision` that writes
+  column, from the commit that writes it. Every `MessageDecision` that writes
   names its thread once, as `thread`: the one the send continues, or the
   one a branch starts. A chat stores no `starts`. The host writes the
   thread's record (`THREAD`, `thread.ts`: its root, who started it, when,
@@ -276,15 +277,16 @@ are the only code that builds or reads the shape.
 - **Each chat stores its send's id** (`sendId`, the command's id), so the
   column that sent it finds it exactly (`TreeIndex.bySend`).
   `detailsFromStored` is the one conversion of stored details.
-- **`renderableMessage`** turns a stored chat into role `chat` with its author
+- **`renderableMessage`** turns a stored person's message (`MESSAGE_TYPE`,
+  `pinetrie.message`) into role `person` with its author
   and whether it compelled the agent, for `core`'s projections, which only
   admit the role and so need no schema library.
 - **A chat's images are references** (ADR-0042). `details.images` lists an
   `ImageRef` (hash, type, size) for each `/blob/` image its text shows, in
   order: the host fills it when the message is sent. `content` stays the attributed text, so no image's bytes are stored.
-  `withChatImages` is what the model reads: each chat with images gets
+  `withMessageImages` is what the model reads: each chat with images gets
   `[text, ...image parts]`, from base64 the caller gathered
-  (`chatImageShas` says which), with a missing blob named as text.
+  (`messageImageShas` says which), with a missing blob named as text.
   `packages/pi` runs it in pi's `toProviderMessages`. It takes base64, not
   bytes, because this package ships to the browser.
 - **Names are labels, never identities** (`participant.ts`). The name is copied
@@ -317,7 +319,7 @@ are the only code that builds or reads the shape.
   quote's fence is one backtick longer than the longest run in the file
   (`fenceFor`), so no file can close it. `withQuotes` heads it `Shared:`.
 - **A fitted image is read with a line before it** (`fittedLine`, in
-  `withChatImages`): the original's size and the scale back to it.
+  `withMessageImages`): the original's size and the scale back to it.
 - **`isUtf8Text` and `hasLocation` read bytes**: text is valid UTF-8 with
   no NUL, its byte-order mark kept; a location is a GPS latitude in any
   embedded EXIF TIFF structure, which JPEG, PNG, WebP and HEIC each embed as
@@ -345,15 +347,15 @@ are the only code that builds or reads the shape.
   exact match.
 - **A command message** keeps `details.text` as typed and `details.command`
   (`CommandRef`: name, kind, file, hash, expansion). `attributed` reads the
-  expansion, so the model reads what the command meant when it was sent. `planChat` makes a command compel
+  expansion, so the model reads what the command meant when it was sent. `planMessage` makes a command compel
   the agent, and refuses an unknown one (`ERR.UNKNOWN_COMMAND`).
 - **`pinetrie.commands`** is a host-written record of every command's summary,
   for the composer's completion. `setIfChanged` is how the host writes a
   record at start only when it changed.
 
-# Runs and startup (`chat.ts`, `startup.ts`)
+# Runs and startup (`message.ts`, `startup.ts`)
 
-- **`settleRun`** (`chat.ts`): a compelled message pi refuses to run is kept,
+- **`settleRun`** (`message.ts`): a compelled message pi refuses to run is kept,
   appended with no reply, rather than lost; the author already heard
   `started`.
 - **`planStartup`** (`startup.ts`): a starting host resumes every lane a
@@ -392,7 +394,7 @@ which are swept.
 - **What may be where is read from `PLACES_OF`, never listed by hand.**
   `hasPlaceKind(card, place)` (a `CardInPlace<P>`: every kind `KINDS` puts
   at `P`, its place narrowed) is how the queue (`queuedOn`), the canvas
-  (`isCanvasCard`) and a margin (`marginCards`) find their cards;
+  (`isCardOnCanvas`) and a margin (`marginCards`) find their cards;
   `cardFitsPlace(card, place)` is whether its kind is ever there (the
   page's take and put into an inventory); and
   `isMovable(card)` is `KINDS`' `moves`. A kind added to a place's row is
@@ -440,7 +442,7 @@ which are swept.
   place is (`refuseInto`). Its sender is a person, or `"host"` for the
   kinds no person moves (a fact), refused only by a full inventory. A
   person's creation (`planMove` with no `from`), a thread's card as it
-  opens (`planThreadOpen`: a branch, a new tab, a copy, a spin-off, or a
+  opens (`planThreadOpen`: a branch, a new canvas's thread, a copy, a spin-off, or a
   branch's first send that names no thread opened yet), a note column made
   for a note (`toNotes`), a fact's card (`planFactCard`) and a split's card
   (`planSplitCall`) all go through it, each made by the person it names. A refusal of the host's own make is a value the host's
@@ -464,7 +466,7 @@ which are swept.
   in `lane`), and resolve to its end (`placeEnd`, `threadEnd`): every entry
   names its thread (ADR-0125). Their rows keep no `at` (migration
   `0009-card-content` cleared the old ones); the row's `at` field is a
-  comment's entry. A canvas card has its task, rank and width; a card in a
+  comment's entry. A canvas card has its canvas, rank and width; a card in a
   trash is stored as the place it left, its row's kind that place's
   prefixed `discarded-` (`discarded-note`, `discarded-canvas`, …), so no
   field was added; a queued card has its `order` and `by`, and `seen`, its text's version as its queuer had it (S96), which
@@ -497,7 +499,7 @@ which are swept.
   host resolves it to a place before planning (`planMoveRequest`, below),
   and `planMove` takes a `ResolvedMove`, so an unresolved one does not
   compile. No `from` creates the card, its sender its owner: a text card,
-  or a note column on a canvas (`n-` id), which is then in its task's
+  or a note column on a canvas (`n-` id), which is then in its canvas's
   history. Where each kind of card may be is one table, core's
   `PLACES_OF`, which `fitsPlace`, `placed` and each record's place type
   (`PlaceOf`) read. Nobody removes a card:
@@ -509,11 +511,11 @@ which are swept.
   move. Nothing else decides where it is: whose trash it is, who sees it,
   where a restore goes and which history it is in follow from `left`
   (`ownerOf`, `livePlaceOf`, core). Its history (`historyOf`, over
-  `Discards`) is the task it left (`taskOfPlace`), or for a card in an
-  inventory the task its sender is on (`here`, which a `move` carries),
-  or, on none, its sender's history outside any task. A spin-off's `here`
-  is the task its sender will be on: the new one for a drop in the
-  sidebar, else the tab's. A queueing passes no task here (`here` null),
+  `Discards`) is the canvas it left (`canvasOfPlace`), or for a card in an
+  inventory the canvas its sender is on (`here`, which a `move` carries),
+  or, on none, its sender's history outside any canvas. A spin-off's `here`
+  is the canvas its sender will be on: the new one for a drop in the
+  sidebar, else the tab's. A queueing passes no canvas here (`here` null),
   since its target is a queue. A card in a trash keeps its record and text, is drawn
   nowhere (every read of a place names the kinds it draws), and moves only
   by an undo or `planFromTrash`: `planMove` refuses any other handoff from
@@ -545,10 +547,10 @@ which are swept.
   `exists`, `full`, `not-yours`, `no-place` (a place the card's kind is
   never in, or a kind no person moves: every move of a fact is refused so,
   with no check of its own), a restore's `left-gone` and `left-taken`, and
-  an undo's `replied`. A move to `new-task` makes a task (`planTaskOpening`,
-  `task.ts`, by the mover, at the end of the board's first state; `no-place`
+  an undo's `replied`. A move to `new-canvas` makes a canvas (`planCanvasOpening`,
+  `canvas-index.ts`, by the mover, at the end of the board's first state; `no-place`
   before the board has states) and puts the card first on its canvas, one
-  step in the new task's history.
+  step in the new canvas's history.
 - **A reorder is a card's action in place, not a move** (`planReorder`,
   ADR-0048 step 7). It names the card, its place's key, and the two cards
   it goes between as its sender saw them; the host checks them against the
@@ -557,7 +559,7 @@ which are swept.
   `REORDER_PLACES` (`ReorderAt`, `isReorderAt`, which the codec and
   `reorderOf` read too), and `REORDERS` has a row for each, so a place a
   reorder may be at cannot lack its siblings: the lane's queue, its note
-  column's notes, its task's pinned cards, its task's canvas, or every
+  column's notes, its canvas's pinned cards, its canvas, or every
   pinned card in the session (pinned keys are the session's). Only `order`
   changes: `placer`, `by`, `seen` and `unsent` stay, so it changes nobody's
   trace and adds no history event. Its refusals are its own
@@ -590,25 +592,25 @@ which are swept.
   whole too (ADR-0066). `planMoveCommand` is that and the lanes to drain:
   each one a card ends queued on, when it is not running.
 - **Which history a move enters is `historyOf`'s** (ADR-0066), a
-  `MoveHistoryScope` (core): a task's, or a person's outside any task.
+  `MoveHistoryScope` (core): a canvas's, or a person's outside any canvas.
   A creation enters one when its command's cause is a paste (a paste, a
   thread's copy, ADR-0132) or it is a note column made for a note: the
-  task it lands in, or with none (a slot) its sender's history outside any
-  task, so the undo key takes it back. A creation a move makes (a
+  canvas it lands in, or with none (a slot) its sender's history outside any
+  canvas, so the undo key takes it back. A creation a move makes (a
   composer's new card, an empty note) and a send, which is no move, enter
-  none. Otherwise the task the card goes to, when it goes to one,
-  else the task it leaves, read from its record, since a move is accepted
-  only from there; a discard's is `discardHistory`'s task, or with none its
-  sender's history outside any task (ADR-0126). A place is in a task by
-  `taskOfPlace`, so no tree is read. An inventory is in no task.
+  none. Otherwise the canvas the card goes to, when it goes to one,
+  else the canvas it leaves, read from its record, since a move is accepted
+  only from there; a discard's is `discardHistory`'s canvas, or with none its
+  sender's history outside any canvas (ADR-0126). A place is in a canvas by
+  `canvasOfPlace`, so no tree is read. An inventory is in no canvas.
 - **`undoAnswer`** reads what a whole undo did: the cards its step wrote,
   from their footprints in the places document (`["cards", <id>]`), each
   with its place now; or, refused, the first card it could not undo as it is
   now, `moved` (its placer names who) or `gone`; or `nothing`.
-- **`planHistorySweep`** gives the histories of moves to retire: a task's
+- **`planHistorySweep`** gives the histories of moves to retire: a canvas's
   `ARCHIVED_HISTORY_MS` (7 days) after it was archived, and, at startup
-  only, those of a task the session does not hold. A person's history
-  outside any task (`moves:<writer>`) is kept, and an id that names no
+  only, those of a canvas the session does not hold. A person's history
+  outside any canvas (`moves:<writer>`) is kept, and an id that names no
   history is left: the histories once kept by root were retired by
   migration `0005-tasks`, since deleted.
 - **A card at a thread's end is resolved, never stored as an end**: your
@@ -627,11 +629,11 @@ which are swept.
   does not make someone else's move fail.
 - **A card leaving a thread's queue or pinned strip goes to the note
   column nearest the thread** (`nearestNoteColumn`, pure): in the canvas of
-  the thread's task, the note column fewest places from the thread's card,
+  the thread's canvas, the note column fewest places from the thread's card,
   the one after it on a tie; with none, one made just after the thread's
   card (`orderBetween`, or `respace` with no room), untitled, read as
   `NEW_NOTES_TITLE`. `notesNear` decides which, minting nothing: a
-  column, one to make (its task, rank and the canvas cards renumbered
+  column, one to make (its canvas, rank and the canvas cards renumbered
   around it), or, for a thread whose card is in an inventory, that
   inventory (ADR-0117). `toNotes` turns that into a place and the steps to
   write first, minting a column's id (`newColumn`, `n-` and a uuidv7 on
@@ -647,8 +649,8 @@ which are swept.
   `at` and its thread in `lane`. It is a text card's and a reference's
   place, and a reorder place (`REORDERS`: the entry's comments,
   `marginCards`, the neighbours next to each other); a move or a make puts
-  a card at its end (`marginEnd`). Its task is its thread's
-  (`taskOfPlace`), so it is found without a tree; the host checks that
+  a card at its end (`marginEnd`). Its canvas is its thread's
+  (`canvasOfPlace`), so it is found without a tree; the host checks that
   thread against the entry's own before it plans (`planMoveTargets`'
   `entryThreads`, read from the entry's root by `marginEntryThreads` in
   `commands/cards.ts`), and refuses one naming another, `no-place`.
@@ -661,7 +663,7 @@ which are swept.
   (`rankOnCanvas`), a note column made at that rank by the mover
   (`makeNoteColumn`, through `planMake`, as `toNotes` makes one), and the
   card moved in as its first note. Both are one `planMoveRequest` write, so
-  one gesture: the mover's history in that task (`historyOf`) undoes both.
+  one gesture: the mover's history in that canvas (`historyOf`) undoes both.
   The page draws the card where it was until the host writes the column,
   as it does for a column `toNotes` would make. A reference or a text card
   pasted on a spot (`paste`) resolves the same way, its column made in the
@@ -673,9 +675,9 @@ which are swept.
   by until someone moves it.
 - **A note column's title** is its own record (`NOTE_COLUMN`, keyed by its
   id: title, who set it, when), absent while untitled. `mark` sets it as it
-  sets a task's (`planMark` over a `MarkTarget`): last write wins, null
+  sets a canvas's (`planMark` over a `MarkTarget`): last write wins, null
   clears it, the agent never sets one, and a column on no canvas is refused
-  `UNKNOWN_TARGET`. The archive gate reads a note column's task from its
+  `UNKNOWN_TARGET`. The archive gate reads a note column's canvas from its
   card (`writesIn`).
 - **A pinned card** (ADR-0048 step 5) is at a thread's end with an `order`.
   Pinning moves your message or a queued card to pinned at the same
@@ -745,13 +747,13 @@ not `pinetrie:live`, so it lasts until a release, across a restart.
 
 - **`planSpinOff`** checks a spin-off before anything is written: its move
   must be a text card's to its sender's trash; the new root's and thread's
-  ids, which the request names with its new task, must be free; the card's
+  ids, which the request names with its new canvas, must be free; the card's
   text, trimmed, not blank; and the move as `planMove` decides it, so a
   card someone moved first, or one in another's inventory, is refused as
   any move is. It returns the thread's opening (`planThreadOpen`: its
-  record, `origin` `spun` from the card, its new task's record and board
-  place, its card on that task's canvas), its first message (the text, its
-  mentions without the agent: a conversation root has no lane) and the
+  record, `origin` `spun` from the card, its new canvas's record and board
+  place, its card on that canvas), its first message (the text, its
+  mentions without the agent: a chat has no lane) and the
   card's write. The host writes the records, sends the message, and only
   once the send took the card writes the thread's card and the card's move
   to the trash, in its history's step; a send that took nothing deletes
@@ -766,24 +768,24 @@ not `pinetrie:live`, so it lasts until a release, across a restart.
   root by `rootOfPlace`. Its thread's card must also be where the spin-off
   put it (ADR-0124): on a canvas, never moved since (its card history holds
   its making alone), with no other card on that canvas and none pinned to
-  the task, so an undo restores exactly what was there or does nothing. A
+  the canvas, so an undo restores exactly what was there or does nothing. A
   thread already gone lifts nothing; `delete` names each root and its
   thread, read before the undo reverts the card.
 - **`planRootDelete`** (`root.ts`) is what deleting a lifted thread
   writes: its directory record (`ROOT`), its thread's (`THREAD`), and its
-  task's title (`MARK`), every card still in the root or on the task's
-  canvas removed, the task's own card with them, its document named
-  for destruction, and the task for its stacks to be unloaded;
+  canvas's title (`MARK`), every card still in the root or on the canvas's
+  canvas removed, the canvas's own card with them, its document named
+  for destruction, and the canvas for its stacks to be unloaded;
   `planHistorySweep` retires those stacks at the next start, as for any
-  task the session lacks.
-- **`emptiedTasks`** (`root.ts`): the tasks a step leaves empty that were
-  a new tab's: a thread card that left its canvas for a trash, its thread a
+  canvas the session lacks.
+- **`emptiedCanvases`** (`root.ts`): the canvases a step leaves empty that were
+  a new canvas's: a thread card that left its canvas for a trash, its thread a
   new root's not yet started (its root one the directory does not name),
-  and nothing left whose owner is the task (`ownerOf`). The host sends
-  each one's card to the trash in the same step (`planTasksTrashed`, its
+  and nothing left whose owner is the canvas (`ownerOf`). The host sends
+  each one's card to the trash in the same step (`planCanvasesTrashed`, its
   board place as `left`, its closer the placer), in their history outside any
-  task, since the task leaves their view: the undo key on no task brings
-  the task and its thread back (ADR-0126).
+  canvas, since the canvas leaves their view: the undo key on no canvas brings
+  the canvas and its thread back (ADR-0126).
 - **The history's verb is `discarded`** (`verbOf`): the spin-off's card is
   in its sender's trash, as any discard's is.
 
@@ -844,7 +846,7 @@ contents: Yjs derives it from the peer, which this package cannot.
   `yjsClientId`, which this package does not import.
 - **`writersOfClients(clientIds, seats)`**: the people behind a text's `clientID`s,
   each once, in the order their seats were first seen. A card sent by one
-  person names the others this way, in `ChatDetails.contributors`: "Ada, with
+  person names the others this way, in `MessageDetails.contributors`: "Ada, with
   Bea". The model reads only the sender's name.
 - **`planSeatSweep`**: seat records no stored text names. A store-less client
   is a new seat on every load, so without it the records would grow with every
@@ -852,65 +854,65 @@ contents: Yjs derives it from the peer, which this package cannot.
   A seat stored under its `clientID` before ADR-0062 reads with that text as
   its `peer`, which is its address, so the delete finds it.
 
-# Tasks (`task.ts`, ADR-0116)
+# Canvases (`canvas-index.ts`, ADR-0116)
 
-A task is a card on the board (`board.ts`, ADR-0126), its id its
-`TaskId`, its owner who opened it; what it holds is where the places
-document puts each card: a `canvas` place names the task, a rank and a
+A canvas is a card on the board (`board.ts`, ADR-0126), its id its
+`CanvasId`, its owner who opened it; what it holds is where the places
+document puts each card: a `canvas` place names the canvas, a rank and a
 width, so a card has one place by construction.
 
-- **One `TaskIndex`** (`indexTasks(cards, threads)`): each task's canvas in
-  order, each canvas card's task (`taskOfCard`), each thread's task
-  (`taskOfThread`), each task's threads and roots, each root's tasks, each
-  recorded thread's root (`rootOfThread`). The host (`tasksNow`, once per
-  command, `commands/index.ts`) and the page (`tasksOf`) both read it, so
+- **One `CanvasIndex`** (`indexCanvases(cards, threads)`): each canvas in
+  order, each canvas card's canvas (`canvasOfCard`), each thread's canvas
+  (`canvasOfThread`), each canvas's threads and roots, each root's canvases, each
+  recorded thread's root (`rootOfThread`). The host (`canvasesNow`, once per
+  command, `commands/index.ts`) and the page (`canvasesOnBoard`) both read it, so
   they cannot disagree on where something is. A note is in its note
-  column's task (`taskOfCard`).
-- **A trashed card is in the task its `left` is in.** The index records a
-  trashed thread's or note column's task in `taskOfThread` and
-  `taskOfCard`, never in `canvases`: so its own cards keep their task (their
+  column's canvas (`canvasOfCard`).
+- **A trashed card is in the canvas its `left` is in.** The index records a
+  trashed thread's or note column's canvas in `canvasOfThread` and
+  `canvasOfCard`, never in `canvases`: so its own cards keep their canvas (their
   history, the archive gate) while nothing trashed is drawn, and
-  `taskOfPlace` of any place is its owner's task (`ownerOf`).
-  A reader that means "on the canvas" reads `canvases` (`canvasOf`,
-  `isOnCanvas`), never `taskOfThread`. `rootsHeld` holds a trashed
+  `canvasOfPlace` of any place is its owner's canvas (`ownerOf`).
+  A reader that means "on the canvas" reads `canvases` (`cardsOnCanvas`,
+  `isOnCanvas`), never `canvasOfThread`. `rootsHeld` holds a trashed
   thread's root, so a restart within the week keeps its messages loaded for
   a restore or a link.
-- **One way to make a task** (`planTaskOpening`): its card by the host,
+- **One way to make a canvas** (`planCanvasOpening`): its card by the host,
   its opener its owner, at the end of its state on the board (`boardEnd`);
-  `no-place` before the board has states. A thread opening in a new tab's
-  task (`planThreadOpen`) and a card dropped between tasks (`new-task`)
+  `no-place` before the board has states. A thread opening in a new canvas's
+  canvas (`planThreadOpen`) and a card dropped between canvases (`new-canvas`)
   both use it.
 - **A place at a thread names its thread and no root** (composing, pinned,
-  queued; the thread in the row's `lane`). Its task is its
-  thread's (`taskOfPlace`), and its root its thread's record's
+  queued; the thread in the row's `lane`). Its canvas is its
+  thread's (`canvasOfPlace`), and its root its thread's record's
   (`rootOfPlace`): one field per fact, so the two cannot disagree.
 - **A thread opens before its first entry** (`planThreadOpen`, ADR-0126):
   its record, which says how it began (`ThreadOrigin`: a root's first
   thread, spun from a card or not, or a fork at an entry, a branch or a
   copy, whose source is the thread its entry is in), its card where its
-  `ThreadPlacement` says (on a task's canvas just after the thread it forks
+  `ThreadPlacement` says (on a canvas just after the thread it forks
   from, `branchAfter` and `rankAfter`, else at its end; where it was
-  dropped, `rankOnCanvas`; or in an inventory), and for a task the session
-  does not hold (`TaskOpening`, a new tab's) the task's card, made by the
+  dropped, `rankOnCanvas`; or in an inventory), and for a canvas the session
+  does not hold (`CanvasOpening`, a new canvas's) the canvas's card, made by the
   host with its opener its owner, at the end of its state (`boardEnd`);
   refused `no-place` before the board has states. The one planner for a
   thread as its column opens (`planOpenThread`, `open.ts`), by its
-  `ThreadStart`: a branch, a new tab's new root in a new task, or a new
-  root in a task the session holds, placed as a drop after its `after`
+  `ThreadStart`: a branch, a new canvas's new root, or a new
+  root in a canvas the session holds, placed as a drop after its `after`
   would be (`spot`, ADR-0138); refused `taken` for an id in use or a new
-  tab's task the session holds, `unknown` for a branch's entry its root
-  lacks or a task the session should hold and lacks. A branch's root's
+  tab's canvas the session holds, `unknown` for a branch's entry its root
+  lacks or a canvas the session should hold and lacks. A branch's root's
   tree is planned from only as part of its start (`GatheredStart`), so
   nothing else gathers one. Also a copy (`planCopy`) and a spin-off
   (`planSpinOff`). A
   first send to a thread opened writes only its entry; a branch's first
   send that names no thread opened yet (a script's) opens it with the send
-  (`sendChat`), as its column would have, and `executeChat` writes that
+  (`sendMessage`), as its column would have, and `executeSend` writes that
   before the message.
 - **`unstartedThreads`**: each thread opened and not yet started, and where
   its column ends: no entry of it in the tree, and either its fork in the
   tree (its root held here), or its root one the directory does not name
-  yet (a new tab's, or a new root's in a task already held). The page draws its card's column from it.
+  yet (a new canvas's, or a new root's in a canvas already held). The page draws its card's column from it.
   For a branch opened from a proposal by the reader, it carries the
   composer's start, `proposalDraft`: the row's brief asked of the agent
   (core's `agentAsk`), read from the proposal by row, never stored, and
@@ -922,13 +924,13 @@ width, so a card has one place by construction.
   (`planBranchOut`).
 - **`rootsHeld`**: the roots with a thread at a live place
   (`isLivePlace`: the card, unwrapped from the trash, on the canvas of a
-  task outside the archive, or in an inventory): what a starting host
+  canvas outside the archive, or in an inventory): what a starting host
   loads, and what archiving keeps. A root the directory does not name has
-  no document yet (an unstarted new tab's, ADR-0063) and is not held. The
+  no document yet (an unstarted new canvas's, ADR-0063) and is not held. The
   directory names a root by any record of it, one that decodes in this
   build's shape or not (`readStartedRoots`, `@pinetrie/reads`): `ROOT` is
   derived and changes shape with no migration, and a stale record read as
-  none left an open task's root unloaded after startup, and the lanes a
+  none left an open canvas's root unloaded after startup, and the lanes a
   crash interrupted in it unresumed (S199).
 - **`forkOf`**: each forked thread's fork (`ThreadFork`), a branch's or a
   copy's, from its record's `origin`: where its column ends before its
@@ -973,8 +975,8 @@ trash, have no agent and no runner. Where its card leaves it is
   through the one stop command (`handleStop`, `planStop`), so it is a fact
   in the thread.
 - **A moved thread is told** (`canvas.ts`, `planCanvasFacts`): a running
-  thread whose card moved from one task's canvas to another's is steered
-  "Bea moved this thread to the task …"; the tasks' other running threads
+  thread whose card moved from one canvas to another's is steered
+  "Bea moved this thread to the canvas …"; the canvases' other running threads
   are told it was taken and added.
 - **`planCopy`**: a copy of `source` at `end`, refused unless `end` is in
   the source (`threadAt`), the copy's id is new, and nobody else holds the
@@ -986,7 +988,7 @@ trash, have no agent and no runner. Where its card leaves it is
   inventory, a full one). It lands on a canvas by **`rankOnCanvas`**, as a
   move's drop does. No entry is written: its first send is a branch at its
   fork, which the gate lets through by the copy's own holding
-  (`threadsOf`'s fork rule) and `sendChat` writes in the thread whose
+  (`threadsOf`'s fork rule) and `sendMessage` writes in the thread whose
   record names that fork (`forkEntry`), with no second record or card.
 
 # The gate (`gate.ts`)
@@ -997,7 +999,7 @@ not gated here: they ask `threadReach` (`reach.ts`).
 
 - **One pass, one maker.** `planGate` is the only maker of a
   `Cleared<C>`, as `planCopyReady` is of core's `ReadyCopy`; the host's
-  `sendChat` takes only a `Cleared<Send>`, and its dispatcher carries out
+  `sendMessage` takes only a `Cleared<Send>`, and its dispatcher carries out
   only a `Cleared<Intent>`. What the gate decides on is core's `Gated`, a
   command or a `Send`.
 - **The order is the plan's.** The archive first (`writesIn`,
@@ -1007,7 +1009,7 @@ not gated here: they ask `threadReach` (`reach.ts`).
   read (`threadsOf` reads a missing tree as no thread); then a thread held
   or trashed (`threadsOf`, `heldIn`); then a lane of another kind
   (`foreignIn`).
-- **Its words are its own** (`gateRefusal`): `task_archived` naming the
+- **Its words are its own** (`gateRefusal`): `canvas_archived` naming the
   archiver through a `nameOf`, as `reachWords` takes one; `holdingWords`;
   `foreignRefusal`. The host words none.
 - **A pass proves the check ran, nothing more.** It does not say the facts
@@ -1018,48 +1020,54 @@ not gated here: they ask `threadReach` (`reach.ts`).
 
 # The board (`board.ts`, ADR-0122)
 
-Every task is in one workflow state. The workflow is a host-written
+Every canvas on the board is in one workflow state. A new session's are
+Topics, Active and Archive (`defaultWorkflow`, ADR-0158). The workflow is a host-written
 singleton (`WORKFLOW`): the open states in board order, then the closed
-state, always there and always last. A task is a card (`KINDS.task`,
-ADR-0126), its id its `TaskId`, placed `{ kind: "board", state, order }`
+state, always there and always last. A canvas is a card (`KINDS.canvas`,
+ADR-0126), its id its `CanvasId`, placed `{ kind: "board", state, order }`
 (the row's `state` and `order`): the places document is the one record of
 where it is, and its card's history of who moved it there and when. The
 board is the team's: everyone in the session shares it.
 
-- **The tasks the session holds are the cards on the board**
-  (`boardTasks`): a task's card in a trash (a new tab closed unsent) is on
+- **What a canvas on the board is, is its state** (`canvasRole`,
+  ADR-0158): a topic in the first open state, a task in a later one,
+  archived in the archive; a state the workflow lacks is read as the first,
+  as `boardOf` places its canvases there. Never stored, so reordering the
+  states changes the role and nothing else.
+- **The canvases the session holds are the cards on the board**
+  (`boardCanvases`): a canvas's card in a trash (a new canvas closed unsent) is on
   no board and in no list until the undo key brings it back.
-- **The board is total** (`boardOf`): every task's card on it, in its
+- **The board is total** (`boardOf`): every canvas's card on it, in its
   state, by rank, then by id; one in a state the workflow no longer holds
-  at the end of the first open state, so a stale place never hides a task.
-- **Archived is derived, never stored** (`archivedOf`): the tasks whose
+  at the end of the first open state, so a stale place never hides a canvas.
+- **Archived is derived, never stored** (`archivedOf`): the canvases whose
   card is in the archive, with who moved them there and when
-  (`ArchivedTask`), read from the newest event of each card's history that
+  (`ArchivedCanvas`), read from the newest event of each card's history that
   put it there, which a history always keeps; its placer at 0 for a card
   with none. Every reader of the archive reads it (`readArchived`).
-- **No person's move takes a task's card** (`KINDS.task.moves` false: a
+- **No person's move takes a canvas's card** (`KINDS.canvas.moves` false: a
   move onto the board is refused `no-place`): `planBoardMove` decides the
-  board's own move. The sender names the state it saw the task in; one
+  board's own move. The sender names the state it saw the canvas in; one
   that has left it is refused `moved`, the card as it is saying where and
-  who put it there. `before` is the task it goes before, or the end.
+  who put it there. `before` is the canvas it goes before, or the end.
   Within one state it is a reorder: its rank alone, its placer kept, so no
   history step and no event; between states, a move, its sender its
   placer. With no room between its neighbours the fewest are renumbered
   (`rankAfter`), each keeping who put it there. The host carries it as any
-  card's write (`placeTask`), a move in its mover's history outside any
-  task.
+  card's write (`placeCanvas`), a move in its mover's history outside any
+  canvas.
 - **No undo crosses the archive's edge** (`crossesArchive`,
-  `move-history.ts`): an undo or a redo of a step whose task's card last
+  `move-history.ts`): an undo or a redo of a step whose canvas's card last
   went into or out of the archive is refused `archived`; the board
   gathers what crossing it needs.
 - **`transitionOf` says whether a move crosses the archive's edge**:
-  `within`, `close` or `reopen`. The host gathers the task's roots'
+  `within`, `close` or `reopen`. The host gathers the canvas's roots'
   documents only to cross it (`apps/pinetrie/host/commands/board.ts`).
 - **`planWorkflowEdit`**: add (before a state, or after every open one),
   rename (trimmed; names may repeat), move, remove. The archive is
-  renamed only; a state holding a task is not removed, nor the only open
+  renamed only; a state holding a canvas is not removed, nor the only open
   state.
-- **`boardEnd`** places a new task's card at the end of the state its
+- **`boardEnd`** places a new canvas's card at the end of the state its
   chat names, or of the first open state when it names none, one gone, or
   the closed one.
 - **Order keys are `order.ts`'s**, shared with cards' queues and pins:
@@ -1068,48 +1076,48 @@ board is the team's: everyone in the session shares it.
 
 # The archive (`archive.ts`, ADR-0029, ADR-0122, ADR-0116)
 
-A task put aside for everyone: one in the archive. Moving it there or out
-writes only its card's place: entries are immutable (ADR-0004), so a task is hidden
+A canvas put aside for everyone: one in the archive. Moving it there or out
+writes only its card's place: entries are immutable (ADR-0004), so a canvas is hidden
 and made read-only, never removed.
 
 - **`planLanesGone`**: what lanes that will not run again lose, an
-  archived task's or a thread the trash sweep deleted: each forgotten, its
+  archived canvas's or a thread the trash sweep deleted: each forgotten, its
   ref deleted (which withdraws its proposed changes), and every snapshot but its
   newest and the one nearest each thread's end in the trees given. An
   archive's teardown and the trash sweep both ask it.
 - **`planArchive` decides what crossing the edge does**, pure, for a
-  `Crossing` (`close` or `reopen`). Closing is refused `task_busy` while
-  any lane of the task's threads runs or has cards queued (`threadsWork`).
-  `TASK_BUSY_REASON` is the one wording, which your list's and the board's
+  `Crossing` (`close` or `reopen`). Closing is refused `canvas_busy` while
+  any lane of the canvas's threads runs or has cards queued (`threadsWork`).
+  `CANVAS_BUSY_REASON` is the one wording, which your list's and the board's
   Move to ▸ show too. Reopening is never busy.
 - **A crossing is planned whole, in three parts** (ADR-0065): the place,
   written on the documents' keeper; the `teardown`, carried out off it
-  (the task's threads' own lanes to forget and remove, their refs in your
+  (the canvas's threads' own lanes to forget and remove, their refs in your
   repo, null on close and each tip's nearest revision's commit on reopen,
   and `planRetention`'s snapshots); and `unload`, for a close, on the
-  keeper again: the task's roots no task outside the archive, and no
+  keeper again: the canvas's roots no canvas outside the archive, and no
   inventory, still holds a thread of (`stillHeld`). The host passes its
   lanes of their own (`own`, each with its root's index) and the revision
   records, so no part decides anything when it runs.
 - **An archive settles its threads' pending verdicts** (`verdicts`,
   `unclassifiedPending`, `verdict.ts`): the run's end that would write one
-  is a late write, which an archived task refuses, so the archive writes
+  is a late write, which an archived canvas refuses, so the archive writes
   `unclassified` with its place, as a starting host does for a request it
   lost (`planStartup`).
-- **The gate keys on the tasks a command writes in** (ADR-0063). `writesIn`
-  names them for every intent (a chat's thread's task or a branch's, a
+- **The gate keys on the canvases a command writes in** (ADR-0063). `writesIn`
+  names them for every intent (a chat's thread's canvas or a branch's, a
   mark's, a retitle's, an undo of moves', proposed changes' lane's, a queue hold's
-  and an unqueue all's lane's, a reorder's place's, and for a move the task
+  and an unqueue all's lane's, a reorder's place's, and for a move the canvas
   each card goes to and the one it leaves), or none for one that writes in
-  no task (a name, a stop, a move on the board or a change to its states,
-  a reservation, a command on a card, traces seen), so an archived task can
-  always be restored, and nothing moves out of one (`task_archived`,
-  "restore the task first"). `archivedIn` finds an archived one by its
-  `TaskId`. One rule, the gate's first (`planGate`), for every command and
-  every send, a popped queued card's among them (its thread's task),
+  no canvas (a name, a stop, a move on the board or a change to its states,
+  a reservation, a command on a card, traces seen), so an archived canvas can
+  always be restored, and nothing moves out of one (`canvas_archived`,
+  "restore the canvas first"). `archivedIn` finds an archived one by its
+  `CanvasId`. One rule, the gate's first (`planGate`), for every command and
+  every send, a popped queued card's among them (its thread's canvas),
   worded by `gateRefusal`.
 - **Yjs writes are not refused for archiving.** A card's text in an archived
-  task stays writable to the host's policy (a refused write cannot be
+  canvas stays writable to the host's policy (a refused write cannot be
   recovered from, S28); the composer there is read-only.
 - **Every planner refuses with core's `Refusal`** (`refused(code, message)`),
   the shape the codec decodes to and the host answers as its `Outcome`
@@ -1117,20 +1125,20 @@ and made read-only, never removed.
 
 # Marks (`mark.ts`, ADR-0045, ADR-0116)
 
-A task's title. The record is a host-written `pinetrie.mark` value in the
-session, keyed by the task's id, so a task has at most one by
+A canvas's title. The record is a host-written `pinetrie.mark` value in the
+session, keyed by the canvas's id, so a canvas has at most one by
 construction. A mark once kept in a root's document, on its root entry, is
 deleted at startup (`planUndeclaredSweep`: stored outside its spec's
 home).
 
-- **`planMark` decides**, pure: a task the session does not hold is
-  refused `unknown_target`; the title already stored, or clearing a task
+- **`planMark` decides**, pure: a canvas the session does not hold is
+  refused `unknown_target`; the title already stored, or clearing a canvas
   with none, is `unchanged` and writes nothing; otherwise `write`, or
   `remove` for a cleared title. The last write wins: nobody types a title
   together, so it is session JSON, not a text (ADR-0023).
 - **Clearing deletes the record.** A stored empty title would read as chosen.
-- **A mark in an archived task is refused by the archive's gate:**
-  `writesIn` names a mark's task, so `planMark` has no check of its own.
+- **A mark in an archived canvas is refused by the archive's gate:**
+  `writesIn` names a mark's canvas, so `planMark` has no check of its own.
 - **`by` is a writer, or the agent for a title it made unasked**
   (ADR-0074). A writer id always starts `w-`, so the two never collide, and
   nothing decides by it.
@@ -1271,16 +1279,16 @@ The commands are `pinetrie.commands`'.
 
 # Titles (`title.ts`, ADR-0074)
 
-A model's few words for a task, written as its mark (`MARK`, ADR-0116),
+A model's few words for a canvas, written as its mark (`MARK`, ADR-0116),
 so Rename edits it and every place a title shows reads it. Titling still
-reads a root's tree: Phase 2 holds one root a task.
+reads a root's tree: Phase 2 holds one root a canvas.
 
 - **`TitleConfig`**: `titles.enabled` (on unless a layer turns it off, as
   digests are) and `titles.model` (null for the run's), as the host settles
   them.
 - **`planTitling` is the decision and the request's lines.** Unasked (a
   lane just created, `trigger.kind` `lane`): only for the root's first lane
-  (no other lane record names the root), with titles on, the task unmarked
+  (no other lane record names the root), with titles on, the canvas unmarked
   (`marked`), and none in flight; the lines are the path to where the lane
   starts and its prompt, which the tree does not hold yet. Asked: always,
   from the path to the root's newest message; refused for a root with no
@@ -1290,7 +1298,7 @@ reads a root's tree: Phase 2 holds one root a task.
   thread began usually says what it is for, then the newest that fit
   (`fitNewest`).
 - **`titleOf` refuses rather than cuts**: more than `TITLE_WORDS` words, or
-  what `parseTitle` refuses, is null, and the task keeps its label. It
+  what `parseTitle` refuses, is null, and the canvas keeps its label. It
   unwraps quotes and trailing punctuation with `bareLine` (`request.ts`),
   as a digest's headline is.
 - **`titleStillWanted`**: an asked title is always written; an unasked one
@@ -1492,11 +1500,11 @@ Host-written records, each a `RecordSpec` (above) with a total decoder:
   rewrites it at start.
 - **`planRetention`** keeps every snapshot of an open root, and each lane's
   newest when the root is archived, and the one nearest each thread's end
-  in its roots (`keep`, from `planArchive`'s `trees`), whatever task the
+  in its roots (`keep`, from `planArchive`'s `trees`), whatever canvas the
   thread is in, which a copy from the archive clones (ADR-0124); the base
   snapshot is never deleted.
 - **`showHostWorkingCopy`** shows a path under your working copy's root as the same
-  path under `/mnt/host-working-copy`, whole path prefixes only. `planChat` applies it to a
+  path under `/mnt/host-working-copy`, whole path prefixes only. `planMessage` applies it to a
   message's text when its thread works, or will work, in its own copy, so
   people and the model read the same stored text (ADR-0034).
 
@@ -1783,7 +1791,7 @@ commit-message request `request.ts` (`describeRequest`).
   pairs and takes the next free one, wrapping. The hash spreads ids that
   differ only near their end, as uuidv7s made a minute apart do.
 - **`planNames`** names every thread that has none, a lane's or a
-  conversation's (ADR-0117), oldest first, each avoiding the stored names and
+  chat's (ADR-0117), oldest first, each avoiding the stored names and
   those planned before it. The host runs it through one queue, at start and
   before a new lane's first run, so two threads never plan the same name.
 - **`planReserve`** names a thread a column opened before it has a message
@@ -1853,10 +1861,10 @@ and the total `decodePinned` are the only code that builds or reads it, and
 - **`PINNED_RULE`** is the line every agent thread's `<rules>` holds
   (`packages/pi`).
 
-# What a run is told of its task (`canvas.ts`, `task-pinned.ts`, `context.ts`, ADR-0116)
+# What a run is told of its canvas (`canvas.ts`, `canvas-pinned.ts`, `context.ts`, ADR-0116)
 
 - **`CONTEXT` is the table of context entries**, one row per kind (the
-  canvas list, the task's pinned cards, the thread's pinned cards) with
+  canvas list, the canvas's pinned cards, the thread's pinned cards) with
   its decoder, its rule and what `ContextInView` carries of it, in the
   order a run writes them before its prompt: the thread's pinned cards
   last, so its entry stays the prompt's parent. `contextOf` reads a
@@ -1872,8 +1880,8 @@ and the total `decodePinned` are the only code that builds or reads it, and
   into the lane after the turn in flight, as base news is (S103) (`planCanvasFacts`, `encodeCanvasFact`), never a queued fact
   card, which the drain would pop only after the run. Reorders and widths
   wait for the next run's list.
-- **Cards pinned to the task** (`task-pinned` places, `taskPinnedOf`) are
-  an entry of their own (`pinetrie.task-pinned`), compared as a thread's
+- **Cards pinned to the canvas** (`canvas-pinned` places, `canvasPinnedOf`) are
+  an entry of their own (`pinetrie.canvas-pinned`), compared as a thread's
   pinned cards are, so a thread's cards entry keeps its shape.
 
 # History messages (`history.ts`)
@@ -1885,10 +1893,13 @@ reads, `details` what pine·trie reads back.
 - **History stores the code's own values.** A message's `details` are the
   code's type as it is now, and `historyMessage(customType, schema)` gives
   each kind its `encode` and `decode`: encoding stores the value, and
-  decoding is the schema's check alone. History is never rewritten, so a
-  message stored before its shape changed does not decode: the column
+  decoding is the schema's check alone. A shape change is not migrated by
+  default, so a message stored before it does not decode: the column
   leaves it out (core's `renderableMessage` drops a `custom` message it was
-  not given a role for), and the model still reads its `content`. Its
+  not given a role for), and the model still reads its `content`. When a
+  stored word changes, a record migration renames `customType` and
+  `details` in every root, raw, and never `content` (the host's
+  `0021-entry-words`, `apps/pinetrie/host/TECHNICAL.md`). Its
   `merged` or `behind.to` no longer counts either, so a lane may hear its
   base's news once more (`baseKnown`), and a branch read its parent as
   ahead (`parentNow`) until the parent commits again.
@@ -1950,7 +1961,7 @@ the tip it must match, and the bookmark to leave on it.
   `tell` (a behind entry, `pinetrie.behind`, before the run's prompt and its
   cards entry, or a steer into a running lane, S103), `catch-up` (a lane whose
   work changes no file, `BaseRecord.work`, is caught up quietly before a
-  chat's run: `planChat`'s `catch-up-first`), or `nothing`. What the thread
+  chat's run: `planMessage`'s `catch-up-first`), or `nothing`. What the thread
   already heard of or merged is read from the tree (`baseKnown`, core), so
   a commit is told once, and again only past a compaction.
 - **`planCatchUpCall`** decides `catch_up` from the documents before
@@ -1999,7 +2010,7 @@ them, or opens and starts them.
   after their parent, N branches would land reversed (S218 item 2). Each
   made card is added to the cards the next row plans against. It refuses a
   run still running, a spent proposal, a row past the proposal's end, and a
-  task that is not the proposing thread's; the codec has already made the
+  canvas that is not the proposing thread's; the codec has already made the
   rows strictly increasing and the threads distinct.
 - **Start's message is built here, from the brief** (`agentAsk`, its
   mentions parsed as `planSpinOff` parses its own), so every Start branch
@@ -2065,7 +2076,7 @@ Gotchas:
 
 Another thread's agent, invited into a thread, is asked there and answers
 from its own thread. Who a message invites and asks is `address`
-(`@pinetrie/core`), and the chat stores both (`ChatDetails.asks`,
+(`@pinetrie/core`), and the chat stores both (`MessageDetails.asks`,
 `invites`, absent when none); members, what an agent has heard and whether
 a round is done are read from the path (`threadMembers`, `lastHeardEntry`,
 `isRoundAnswered`, core). Nothing about them is stored beside the entries.
@@ -2079,8 +2090,8 @@ a round is done are read from the path (`threadMembers`, `lastHeardEntry`,
   asking thread, a prompt when it `wakes` its asker. Both are prompts
   (`PROMPT_ROLES`), so each is an ask; `transcriptLines` speaks them by
   asker and by thread.
-- **`planDelivery`** (`chat.ts`) is the one table of where a message into a
-  thread goes by its lane's state; `planChat` and the host's relays and
+- **`planDelivery`** (`message.ts`) is the one table of where a message into a
+  thread goes by its lane's state; `planMessage` and the host's relays and
   answers plan with it. Only an answer that wakes `steers` into a running
   lane; one that wakes nobody waits for the run's end.
 - **`planRelay`** hears the asking thread's path after the newest entry
@@ -2112,9 +2123,9 @@ a round is done are read from the path (`threadMembers`, `lastHeardEntry`,
   holds no queue (`planStop`).
 - **A late write's gate** (`reach.ts`, `lateAway`): what the host decided
   before a gap lands only in a thread at a live place (`isLivePlace`,
-  `task.ts`), the rule a root is held by, so a write let through finds its
+  `canvas-index.ts`), the rule a root is held by, so a write let through finds its
   root loaded; a thread not opened yet (named for a column before its
-  first message) is in no task and takes one; a task scope (a title's)
+  first message) is in no canvas and takes one; a canvas scope (a title's)
   takes one unless it is archived. A refusal is an `Away`, worded by
   `awayWords`. Three readings of whether a thread can take work, each for
   its own question: `holdingOf` (`held.ts`), whether a person's command or
@@ -2125,11 +2136,11 @@ a round is done are read from the path (`threadMembers`, `lastHeardEntry`,
   thread's agent may reach it, and how a refusal is worded (only `open`
   takes one). They differ on two trash places (S199): `threadReach` calls
   a thread trashed from an archived canvas `trashed`, and one trashed from
-  an inventory `gone`, since `Reach.trashed` names a task. One reader the
+  an inventory `gone`, since `Reach.trashed` names a canvas. One reader the
   three derive from is not built.
 - **Reach** (`reach.ts`): `threadReach` is the one reader of where a
   thread is (open, archived with its record, held by whom, gone), and
-  `reachableAgents` every named thread on an open task's canvas.
+  `reachableAgents` every named thread on an open canvas.
   `reachWords` and `awayWords` say why one is out of reach.
   `unreachableRefusal` refuses an ask whose either thread is out of reach,
   first in `planRelay`; `planAnswer` makes an answer to an asker out of

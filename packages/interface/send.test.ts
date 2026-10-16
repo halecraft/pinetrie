@@ -73,7 +73,7 @@ describe("settleSend", () => {
       settleSend(
         {
           kind: "refused",
-          code: ERR.TASK_ARCHIVED,
+          code: ERR.CANVAS_ARCHIVED,
           message: "archived by Bea",
         },
         "hi",
@@ -189,7 +189,7 @@ describe("planSend: what the send does, as the host will decide", () => {
     })
     expect(plan("hi").command).toBe(null)
   })
-  test("in a conversation, a message is sent, to whoever it names", () => {
+  test("in a chat, a message is sent, to whoever it names", () => {
     expect(plan("hi")).toEqual({
       mode: "reply",
       createsLane: false,
@@ -221,7 +221,7 @@ describe("planSend: what the send does, as the host will decide", () => {
       createsLane: true,
     })
   })
-  test("in agent work, a message naming no one asks the agent", () => {
+  test("in an agent thread, a message naming no one asks the agent", () => {
     expect(plan("hi", { lane: lane() })).toMatchObject({
       mode: "reply",
       to: AGENT,

@@ -43,7 +43,7 @@ export function speakerWords(
   nameOf: ReadonlyMap<WriterId, string>,
 ): string {
   const role = message.role ?? "unknown"
-  if (role === "chat")
+  if (role === "person")
     return withContributors(
       speakerLabel(nameOf, message.writer, message.author ?? ""),
       (message.contributors ?? []).map(w => displayName(w, nameOf.get(w))),

@@ -1,10 +1,10 @@
 import {
   type CardPlace,
+  canvasIdFor,
   cardIdOfKind,
   NO_CONTENT,
   type NoteColumnCard,
   type TextCard,
-  taskIdFor,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -28,7 +28,7 @@ import { builtInIconUrl, threadIcon } from "./thread-icon.ts"
 
 const ADA = writerId("ada@x.test")
 const BEA = writerId("bea@x.test")
-const TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
+const CANVAS = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 const T = threadIdFor("t")
 const N = cardIdOfKind("note-column", "01a0ffd2-0000-7000-8000-0000000000aa")
 const C = cardIdFor("c1")
@@ -54,7 +54,7 @@ const notes: NoteColumnCard = {
   id: N,
   owner: ADA,
   placer: ADA,
-  place: { kind: "canvas", task: TASK, order: "a", width: 1 },
+  place: { kind: "canvas", canvas: CANVAS, order: "a", width: 1 },
   content: NO_CONTENT,
 }
 const threadFaceOfT: ThreadFace = threadFace({
@@ -153,7 +153,7 @@ describe("faceOf", () => {
   })
 })
 
-test("a thread's face carries its icon, a conversation's with no lane included", () => {
+test("a thread's face carries its icon, a chat's with no lane included", () => {
   const names = new Map([[T, "amber-fox" as never]])
   const face = threadFace({
     thread: T,

@@ -1,11 +1,11 @@
 import {
+  type CanvasId,
+  canvasIdFor,
   entryId,
   type RootId,
   rootIdFor,
-  type TaskId,
   type ThreadId,
   type ThreadName,
-  taskIdFor,
   threadIdFor,
   workflowStateIdFor,
   writerId,
@@ -15,13 +15,13 @@ import { describe, expect, test } from "vitest"
 import type { Budgets } from "./budgets.ts"
 import {
   basics,
+  CANVAS_ID,
+  placeCanvas,
   placesFor,
-  placeTask,
-  putTask,
+  putCanvas,
   putValue,
   RUNS_ANY,
   record,
-  TASK_ID,
 } from "./fakes.ts"
 import { createRelays, readReachableAgents } from "./relays.ts"
 
@@ -30,19 +30,21 @@ const ADA = writerId("ada@example.com")
 const HERE = threadIdFor("01a00000-0000-7000-8000-0000000000a1")
 const FOX = threadIdFor("01a00000-0000-7000-8000-0000000000b2")
 const OWL = threadIdFor("01a00000-0000-7000-8000-0000000000c3")
-const OTHER: TaskId = taskIdFor("01a00000-0000-7000-8000-0000000000d4")
-const GONE_TASK: TaskId = taskIdFor("01a00000-0000-7000-8000-0000000000e5")
+const OTHER: CanvasId = canvasIdFor("01a00000-0000-7000-8000-0000000000d4")
+const GONE_CANVAS: CanvasId = canvasIdFor(
+  "01a00000-0000-7000-8000-0000000000e5",
+)
 const OTHER_ROOT: RootId = rootIdFor("01a00000-0000-7000-8000-0000000000f6")
 
 /**
- * HERE on the test's task; FOX on another open task, in a root of its own;
- * OWL on a task Ada archived, in that same other root.
+ * HERE on the test's canvas; FOX on another open canvas, in a root of its own;
+ * OWL on a canvas Ada archived, in that same other root.
  */
 function setUp() {
   const b = basics()
-  putTask(b, HERE)
-  putTask(b, FOX, OTHER, OTHER_ROOT)
-  putTask(b, OWL, GONE_TASK, OTHER_ROOT)
+  putCanvas(b, HERE)
+  putCanvas(b, FOX, OTHER, OTHER_ROOT)
+  putCanvas(b, OWL, GONE_CANVAS, OTHER_ROOT)
   putValue(
     b,
     setRecord(WORKFLOW, {
@@ -50,12 +52,12 @@ function setUp() {
       archive: { id: DONE, name: "Done" },
     }),
   )
-  for (const [task, state] of [
-    [TASK_ID, DOING],
+  for (const [canvas, state] of [
+    [CANVAS_ID, DOING],
     [OTHER, DOING],
-    [GONE_TASK, DONE],
+    [GONE_CANVAS, DONE],
   ] as const)
-    placeTask(b, task, state, ADA)
+    placeCanvas(b, canvas, state, ADA)
   for (const [lane, name] of [
     [HERE, "sable-meadow"],
     [FOX, "amber-fox"],
@@ -97,7 +99,7 @@ function setUp() {
 }
 
 describe("other threads' agents in reach", () => {
-  test("every named thread on an open task, and none on an archived one", () => {
+  test("every named thread on an open canvas, and none on an archived one", () => {
     const { b } = setUp()
     expect(readReachableAgents(b).map(t => t.name)).toEqual([
       "sable-meadow",
@@ -110,7 +112,7 @@ describe("other threads' agents in reach", () => {
     const answer = await relays.ask(HERE, "slate-owl", "anything?")
     expect(answer).toMatchObject({
       isError: true,
-      text: "slate-owl's task was archived by Ada: it cannot be asked.",
+      text: "slate-owl's canvas was archived by Ada: it cannot be asked.",
     })
     expect(opened).not.toContain(OTHER_ROOT)
   })

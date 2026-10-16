@@ -59,7 +59,7 @@ export type FoldedMark =
   | { readonly kind: "thread"; readonly icon: HeadIcon | null }
   | { readonly kind: "none" }
 
-/** A strip with no mark: a note column's, the task column's. */
+/** A strip with no mark: a note column's, the canvas column's. */
 export const NO_MARK: FoldedMark = { kind: "none" }
 
 export const foldedMark = (face: FoldedFace): FoldedMark =>

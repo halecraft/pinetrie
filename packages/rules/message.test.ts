@@ -4,6 +4,7 @@ import {
   atEntry,
   CATCH_UP_TOOL,
   CONFLICT_TOOL,
+  canvasIdFor,
   commitId,
   ERR,
   entryId,
@@ -18,7 +19,6 @@ import {
   type Sha256,
   THE_AGENT,
   type ThreadLane,
-  taskIdFor,
   textCardId,
   threadIdFor,
   type WorkflowStateId,
@@ -27,16 +27,15 @@ import {
 } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
-import { detailsFromStored } from "./chat.ts"
 import {
-  addressChat,
-  chatImageShas,
-  decodeChat,
-  encodeChat,
+  addressMessage,
+  decodeMessage,
+  encodeMessage,
   type Floor,
+  messageImageShas,
   participants,
   pendingVerdict,
-  planChat,
+  planMessage,
   planResolution,
   planStack,
   planStartup,
@@ -44,8 +43,9 @@ import {
   renderableMessage,
   resolutionFloor,
   settleRun,
-  withChatImages,
+  withMessageImages,
 } from "./index.ts"
+import { detailsFromStored } from "./message.ts"
 
 /** A resolution's floor with room to spare. */
 function floor(): Floor {
@@ -83,8 +83,8 @@ const NONE: ThreadLane = { kind: "none" }
 const NEW = threadIdFor("new")
 const ASK = parseMentions("@agent please")
 
-type PlanInput = Omit<Parameters<typeof planChat>[0], "thread" | "at"> &
-  Parameters<typeof planChat>[0]["thread"] & {
+type PlanInput = Omit<Parameters<typeof planMessage>[0], "thread" | "at"> &
+  Parameters<typeof planMessage>[0]["thread"] & {
     /** How the send goes: at the end of thread `LANE`, a branch starting `NEW`, or a queued card's pop on `LANE`. */
     readonly mode: PlanMode
     /** What the sender saw, or a branch's fork: a branch lands there. */
@@ -123,25 +123,25 @@ const plan = (over: Partial<PlanInput>) => {
             kind: "branch",
             thread: NEW,
             at: at.kind === "entry" ? at.id : null,
-            task: taskIdFor("01a0ffd2-0000-7000-8000-00000000000c"),
+            canvas: canvasIdFor("01a0ffd2-0000-7000-8000-00000000000c"),
           }
         : { kind: "end", thread: LANE, seen: at.kind === "entry" ? at.id : E1 }
-  return planChat({
+  return planMessage({
     ...rest,
     at: sendAt,
     // A branch lands where it forks (`threadOfSend`).
     thread: { end: mode === "branch" ? at : end, race, lane: l },
   })
 }
-const kind = (d: ReturnType<typeof planChat>) => d.kind
-const textOf = (d: ReturnType<typeof planChat>) =>
+const kind = (d: ReturnType<typeof planMessage>) => d.kind
+const textOf = (d: ReturnType<typeof planMessage>) =>
   "details" in d ? d.details.text : undefined
 
-describe("addressChat: who a chat is for, host and composer alike", () => {
+describe("addressMessage: who a chat is for, host and composer alike", () => {
   const to = (
-    over: Partial<Parameters<typeof addressChat>[0]> = {},
-  ): ReturnType<typeof addressChat> =>
-    addressChat({
+    over: Partial<Parameters<typeof addressMessage>[0]> = {},
+  ): ReturnType<typeof addressMessage> =>
+    addressMessage({
       mentions: [],
       participants: ["Alice", "Bo"],
       agents: [],
@@ -165,14 +165,14 @@ describe("addressChat: who a chat is for, host and composer alike", () => {
       invites: [],
     })
   })
-  test("no mention asks the agent in agent work, and nobody in a branch", () => {
+  test("no mention asks the agent in an agent thread, and nobody in a branch", () => {
     expect(to({ lane: lane() }).compels).toEqual(AGENT)
     expect(to({ lane: lane(), mode: "branch" }).compels).toEqual(NOBODY)
     expect(to({ mode: "branch", asksAgent: true }).compels).toEqual(AGENT)
   })
 })
 
-describe("planChat: a command", () => {
+describe("planMessage: a command", () => {
   const command = {
     name: "duane:skill:plan",
     kind: "skill" as const,
@@ -185,7 +185,7 @@ describe("planChat: a command", () => {
     const d = plan({ text: "/duane:skill:plan make it so", command })
     const details = "details" in d ? d.details : undefined
     expect(details?.text).toBe("/duane:skill:plan make it so")
-    expect(details === undefined ? "" : encodeChat(details, 1).content).toBe(
+    expect(details === undefined ? "" : encodeMessage(details, 1).content).toBe(
       `Alice: ${command.expanded}`,
     )
   })
@@ -201,7 +201,7 @@ describe("planChat: a command", () => {
     expect(
       sent === undefined
         ? ""
-        : encodeChat(detailsFromStored(sent as never), 1).content,
+        : encodeMessage(detailsFromStored(sent as never), 1).content,
     ).toContain(command.expanded)
   })
   test("a command whose file cannot be read is refused, saying so", () => {
@@ -221,7 +221,7 @@ describe("planChat: a command", () => {
   })
 })
 
-describe("planChat: paths to your working copy, in a thread with its own copy", () => {
+describe("planMessage: paths to your working copy, in a thread with its own copy", () => {
   const text = "look at /home/p/src/a.ts, not /home/p2/b"
   test("are stored as the lane sees them, under /mnt/host-working-copy", () => {
     expect(textOf(plan({ text, hostWorkingCopy: "/home/p" }))).toBe(
@@ -233,7 +233,7 @@ describe("planChat: paths to your working copy, in a thread with its own copy", 
   })
 })
 
-describe("planChat: plain messages never conflict", () => {
+describe("planMessage: plain messages never conflict", () => {
   // In a thread with a lane, a plain message is one naming only people.
   const TO_BO = parseMentions("@bo look")
   test("no lane: appended at the thread's end, with no lane", () => {
@@ -275,7 +275,7 @@ describe("planChat: plain messages never conflict", () => {
   })
 })
 
-describe("planChat: a compelled message", () => {
+describe("planMessage: a compelled message", () => {
   test("no lane: creates the thread's lane at the end and runs", () => {
     expect(plan({ mentions: ASK, end: atEntry(E2) })).toMatchObject({
       kind: "createAndRun",
@@ -301,12 +301,12 @@ describe("planChat: a compelled message", () => {
       "starts" in (plan({ mode: "branch" }) as { details: object }).details,
     ).toBe(false)
   })
-  test("a branch's decision carries its card's task and board state, in one value; no other does", () => {
+  test("a branch's decision carries its card's canvas and board state, in one value; no other does", () => {
     const startsOf = (d: ReturnType<typeof plan>) =>
       d.kind === "appendToTree" || d.kind === "createAndRun" ? d.starts : d.kind
     const state = "s-doing" as WorkflowStateId
     const want = {
-      task: taskIdFor("01a0ffd2-0000-7000-8000-00000000000c"),
+      canvas: canvasIdFor("01a0ffd2-0000-7000-8000-00000000000c"),
       state,
     }
     expect(startsOf(plan({ mode: "branch", state }))).toEqual(want)
@@ -316,7 +316,7 @@ describe("planChat: a compelled message", () => {
     expect(startsOf(plan({}))).toBeNull()
     expect(startsOf(plan({ mentions: ASK }))).toBeNull()
   })
-  test("a thread with a lane, or a Start Agent column, compels without a mention", () => {
+  test("a thread with a lane, or a column that asks the agent, compels without a mention", () => {
     expect(kind(plan({ lane: lane() }))).toBe("run")
     expect(kind(plan({ asksAgent: true }))).toBe("createAndRun")
     expect(kind(plan({ asksAgent: true, mode: "branch" }))).toBe("createAndRun")
@@ -375,7 +375,7 @@ describe("planChat: a compelled message", () => {
   })
 })
 
-describe("planChat: branch", () => {
+describe("planMessage: branch", () => {
   test("plain: appended at the branch point with no lane; compelled: always a new lane there", () => {
     expect(plan({ mode: "branch", at: atEntry(E2) })).toMatchObject({
       kind: "appendToTree",
@@ -421,10 +421,10 @@ const details = {
   sendId: "s-1",
 }
 
-test("encodeChat: the model reads the speaker; details keep the author's words", () => {
-  const m = encodeChat(details, 1)
+test("encodeMessage: the model reads the speaker; details keep the author's words", () => {
+  const m = encodeMessage(details, 1)
   assert.equal(m.content, "Alice: the plum")
-  assert.deepEqual(decodeChat(m), details)
+  assert.deepEqual(decodeMessage(m), details)
 })
 
 const IMG = {
@@ -437,13 +437,13 @@ const OTHER = { ...IMG, sha256: "b".repeat(64) as Sha256 }
 
 test("a chat's images round-trip in its details; one stored without them decodes as before", () => {
   const withImages = { ...details, images: [IMG, OTHER] }
-  const m = encodeChat(withImages, 1)
+  const m = encodeMessage(withImages, 1)
   assert.equal(m.content, "Alice: the plum")
-  assert.deepEqual(decodeChat(m), withImages)
-  assert.equal(decodeChat(encodeChat(details, 1))?.images, undefined)
+  assert.deepEqual(decodeMessage(m), withImages)
+  assert.equal(decodeMessage(encodeMessage(details, 1))?.images, undefined)
   // A malformed image makes the whole chat undecodable, as any bad field does.
   assert.equal(
-    decodeChat({
+    decodeMessage({
       ...m,
       details: { ...withImages, images: [{ ...IMG, sha256: "x" }] },
     }),
@@ -451,7 +451,7 @@ test("a chat's images round-trip in its details; one stored without them decodes
   )
 })
 
-test("planChat copies the shares it is given into the details, and none as absent", () => {
+test("planMessage copies the shares it is given into the details, and none as absent", () => {
   const share = {
     name: "plum.png",
     original: IMG,
@@ -463,31 +463,32 @@ test("planChat copies the shares it is given into the details, and none as absen
   assert.ok("details" in withShares)
   assert.deepEqual(withShares.details.images, [IMG])
   assert.deepEqual(withShares.details.shared, [share])
-  assert.deepEqual(decodeChat(encodeChat(withShares.details, 1))?.shared, [
-    share,
-  ])
+  assert.deepEqual(
+    decodeMessage(encodeMessage(withShares.details, 1))?.shared,
+    [share],
+  )
   const without = plan({})
   assert.ok("details" in without)
   assert.equal(without.details.images, undefined)
   assert.equal(without.details.shared, undefined)
 })
 
-test("chatImageShas: every chat's images, each once; other messages have none", () => {
+test("messageImageShas: every chat's images, each once; other messages have none", () => {
   const messages = [
-    encodeChat({ ...details, images: [IMG, OTHER] }, 1),
+    encodeMessage({ ...details, images: [IMG, OTHER] }, 1),
     { role: "user", content: "hi" },
-    encodeChat({ ...details, images: [OTHER] }, 2),
-    encodeChat(details, 3),
+    encodeMessage({ ...details, images: [OTHER] }, 2),
+    encodeMessage(details, 3),
   ]
-  assert.deepEqual(chatImageShas(messages), [IMG.sha256, OTHER.sha256])
+  assert.deepEqual(messageImageShas(messages), [IMG.sha256, OTHER.sha256])
 })
 
-test("withChatImages: a chat's text, then its images in order; a missing one named; others untouched", () => {
-  const chat = encodeChat({ ...details, images: [IMG, OTHER] }, 1)
-  const plain = encodeChat(details, 2)
+test("withMessageImages: a chat's text, then its images in order; a missing one named; others untouched", () => {
+  const personMessage = encodeMessage({ ...details, images: [IMG, OTHER] }, 1)
+  const plain = encodeMessage(details, 2)
   const user = { role: "user", content: "hi" }
-  const [attached, same, alsoSame] = withChatImages(
-    [chat, plain, user],
+  const [attached, same, alsoSame] = withMessageImages(
+    [personMessage, plain, user],
     new Map([[IMG.sha256, { data: "AAAA", mimeType: "image/png" as const }]]),
   )
   assert.deepEqual((attached as { content: unknown }).content, [
@@ -495,15 +496,15 @@ test("withChatImages: a chat's text, then its images in order; a missing one nam
     { type: "image", data: "AAAA", mimeType: "image/png" },
     { type: "text", text: `[image ${OTHER.sha256} is no longer stored]` },
   ])
-  assert.deepEqual(decodeChat(attached), decodeChat(chat))
+  assert.deepEqual(decodeMessage(attached), decodeMessage(personMessage))
   assert.equal(same, plain)
   assert.equal(alsoSame, user)
 })
 
-test("withChatImages: a fitted image's part follows the line that maps it back to its original", () => {
+test("withMessageImages: a fitted image's part follows the line that maps it back to its original", () => {
   const fitted = { ...OTHER, width: 2, height: 1 }
   const original = { ...IMG, width: 8, height: 4 }
-  const chat = encodeChat(
+  const personMessage = encodeMessage(
     {
       ...details,
       images: [fitted],
@@ -519,8 +520,8 @@ test("withChatImages: a fitted image's part follows the line that maps it back t
     },
     1,
   )
-  const [attached] = withChatImages(
-    [chat],
+  const [attached] = withMessageImages(
+    [personMessage],
     new Map([
       [fitted.sha256, { data: "AAAA", mimeType: "image/png" as const }],
     ]),
@@ -535,18 +536,18 @@ test("withChatImages: a fitted image's part follows the line that maps it back t
   ])
 })
 
-test("decodeChat is total: a malformed or foreign message is not a chat", () => {
+test("decodeMessage is total: a malformed or foreign message is not a chat", () => {
   assert.equal(
-    decodeChat({ role: "custom", customType: "pinetrie.chat" }),
+    decodeMessage({ role: "custom", customType: "pinetrie.chat" }),
     undefined,
   )
-  assert.equal(decodeChat({ role: "user", content: "hi" }), undefined)
-  assert.equal(decodeChat(undefined), undefined)
+  assert.equal(decodeMessage({ role: "user", content: "hi" }), undefined)
+  assert.equal(decodeMessage(undefined), undefined)
 })
 
 test("renderableMessage: a chat renders as role chat with its author", () => {
-  assert.deepEqual(renderableMessage(encodeChat(details, 1)), {
-    role: "chat",
+  assert.deepEqual(renderableMessage(encodeMessage(details, 1)), {
+    role: "person",
     content: "the plum",
     author: "Alice",
     compelled: false,
@@ -705,7 +706,7 @@ describe("promptAuthor", () => {
   test("a chat's author, a land or stack message's by; none for anything else", () => {
     expect(
       promptAuthor(
-        encodeChat(
+        encodeMessage(
           {
             author: ADA,
             authorName: "Ada",
@@ -746,7 +747,7 @@ describe("promptAuthor", () => {
   })
 })
 
-describe("planChat: a lane with no work of its own catches up first", () => {
+describe("planMessage: a lane with no work of its own catches up first", () => {
   const ask = { mentions: ASK, text: "@agent please", lane: lane() }
   test("a run on a lane whose news is catch-up catches it up first, once per send", () => {
     expect(plan({ ...ask, news: "catch-up" })).toEqual({

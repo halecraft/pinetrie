@@ -1,11 +1,11 @@
 import {
   atEntry,
   type CardRecord,
+  canvasIdFor,
   cardIdOfKind,
   entryId,
   rootIdFor,
   type Sha256,
-  taskIdFor,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -26,8 +26,8 @@ const BEA = writerId("bea@x.io")
 const L = threadIdFor("1")
 const _ROOT_A = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 const _ROOT_B = rootIdFor("01a0ffd2-0000-7000-8000-00000000000b")
-const TASK_A = taskIdFor("01a0ffd2-0000-7000-8000-00000000000a")
-const TASK_B = taskIdFor("01a0ffd2-0000-7000-8000-00000000000b")
+const CANVAS_A = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000a")
+const CANVAS_B = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000b")
 const held = new Map([[L, { lane: L, by: ADA, at: 1 }]])
 
 describe("planQueueHold", () => {
@@ -123,7 +123,7 @@ describe("holdOnStop", () => {
   })
 })
 
-test("planHoldSweep: a hold whose thread has no card, or whose task is archived, goes", () => {
+test("planHoldSweep: a hold whose thread has no card, or whose canvas is archived, goes", () => {
   const L2 = threadIdFor("2")
   const L3 = threadIdFor("3")
   const L4 = threadIdFor("4")
@@ -138,13 +138,13 @@ test("planHoldSweep: a hold whose thread has no card, or whose task is archived,
       holds,
       whereIs: lane =>
         lane === L
-          ? TASK_A
+          ? CANVAS_A
           : lane === L2
-            ? TASK_B
+            ? CANVAS_B
             : lane === L4
               ? "inventory"
               : null,
-      archived: task => task === TASK_B,
+      archived: canvas => canvas === CANVAS_B,
     }),
   ).toEqual([L2, L3])
 })

@@ -24,11 +24,11 @@ import {
 import { expect, test } from "vitest"
 import { createDigests, writePendingVerdict } from "./digests.ts"
 import {
-  archiveTask,
+  archiveCanvas,
   basics,
   methods,
   placesFor,
-  putTask,
+  putCanvas,
   putValue,
   ROOT_ID,
   record,
@@ -85,8 +85,8 @@ function running(
     complete: async () => ({ text: await answer, tokens: 0 }),
     writeValues: async () => {},
   })
-  // The thread on an open task's canvas, so its late writes land.
-  putTask(b, lane)
+  // The thread on an open canvas, so its late writes land.
+  putCanvas(b, lane)
   const keeper = createKeeper()
   const later = createLater({
     basics: b,
@@ -177,14 +177,14 @@ test("a live digest that comes back after the final one is dropped", async () =>
 test.each([
   {
     left: "a plain message appended",
-    rows: [row(entryId("e-5"), "e-4", { role: "chat", content: "fyi" })],
+    rows: [row(entryId("e-5"), "e-4", { role: "person", content: "fyi" })],
     tip: entryId("e-5"),
     next: false,
   },
   {
     left: "the next run started",
     rows: [
-      row(entryId("e-5"), "e-4", { role: "chat", content: "next" }),
+      row(entryId("e-5"), "e-4", { role: "person", content: "next" }),
       row(entryId("e-6"), "e-5", { role: "assistant", content: "starting" }),
     ],
     tip: entryId("e-6"),
@@ -266,7 +266,7 @@ test.each([
 test("a short ask is not asked about", async () => {
   const { b, pi, keeper, digests } = running()
   const short = entryId("e-7")
-  writeEntry(b.root, row(short, "e-4", { role: "chat", content: "and?" }))
+  writeEntry(b.root, row(short, "e-4", { role: "person", content: "and?" }))
   writeEntry(
     b.root,
     row(entryId("e-8"), "e-7", { role: "assistant", content: "done" }),
@@ -415,7 +415,7 @@ test("the scripted model answers a run's end with a verdict and a digest, so the
   })
 })
 
-test("a run's end answered after its task was archived writes nothing and opens no root", async () => {
+test("a run's end answered after its canvas was archived writes nothing and opens no root", async () => {
   const answer = Promise.withResolvers<string | null>()
   const { b, pi, keeper, digests } = await stopping(answer.promise)
   const opened: unknown[] = []
@@ -426,8 +426,8 @@ test("a run's end answered after its task was archived writes nothing and opens 
   }
   await digests.ended(ROOT_ID, lane, entryId("e-1"), failed)
   const written = writesOf(pi.calls).length
-  // Its task is archived while the model writes.
-  archiveTask(b)
+  // Its canvas is archived while the model writes.
+  archiveCanvas(b)
   answer.resolve("done\nFixed the rail.\n- `rail.tsx` draws it")
   await keeper.idle()
   expect([writesOf(pi.calls).length, opened]).toEqual([written, []])

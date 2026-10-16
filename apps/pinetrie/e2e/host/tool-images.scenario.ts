@@ -96,7 +96,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       { tool: "read", args: { path: "shot.png" } },
       { text: "a red square" },
     ])
-    await tu.chat("what is in shot.png?", ROOT, START_AGENT)
+    await tu.send("what is in shot.png?", ROOT, START_AGENT)
     await tidle()
     const call = readCall()
     const served = await fetch(`${th.httpUrl}blob/${red}`)
@@ -129,7 +129,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     const tv = section.user
     script.use([{ text: "still red" }])
     const tip = lanesOf(th, treeOf(th), readPlaces(th.places))[0]
-    await tv.chat("@agent and now?", at(tip?.tip ?? null), {
+    await tv.send("@agent and now?", at(tip?.tip ?? null), {
       thread: tip?.name,
     })
     await tidle()

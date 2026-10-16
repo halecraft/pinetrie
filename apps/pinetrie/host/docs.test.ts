@@ -25,7 +25,7 @@ import {
   rootsOpenedWords,
   startingLoads,
 } from "./docs.ts"
-import { basics, putTask, ROOT_ID, threadRow } from "./fakes.ts"
+import { basics, putCanvas, ROOT_ID, threadRow } from "./fakes.ts"
 import { createRecords } from "./records.ts"
 
 test("planLoads: every root something still holds a thread of, whatever the directory holds", () => {
@@ -102,7 +102,7 @@ test("a root's releasing listeners run in order, before its document is let go",
   expect(heard).toEqual([`first ${a}`, `second ${a}`, `unload ${rootDocId(a)}`])
 })
 
-test("a starting host opens an open task's root whose directory record is in an older shape, and keeps it open", async () => {
+test("a starting host opens an open canvas's root whose directory record is in an older shape, and keeps it open", async () => {
   const b = basics()
   const exchange = new Exchange({
     principal: "pinetrie-host",
@@ -115,7 +115,7 @@ test("a starting host opens an open task's root whose directory record is in an 
     places: b.places,
   })
   const thread = threadIdFor("01a0ffd2-0000-7000-8000-0000000000b2")
-  putTask(b, thread)
+  putCanvas(b, thread)
   writeEntry(await docs.root(ROOT_ID), threadRow("e-1", null, thread))
   applyRecordWrites(b.session, [
     {

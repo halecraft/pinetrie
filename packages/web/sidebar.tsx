@@ -8,7 +8,7 @@
 // else starts is not added here. An item holding an unsent card of yours
 // carries a pip (`unsentSignals`), and before its label, its status.
 
-import type { TaskId, ThreadId, TreeIndex, WriterId } from "@pinetrie/core"
+import type { CanvasId, ThreadId, TreeIndex, WriterId } from "@pinetrie/core"
 import {
   dragProps,
   dropProps,
@@ -25,7 +25,7 @@ import {
   rootGroupProps,
   type SidebarView,
 } from "@pinetrie/interface"
-import { TASK_BUSY_REASON } from "@pinetrie/rules"
+import { CANVAS_BUSY_REASON } from "@pinetrie/rules"
 import type { SessionClient } from "@pinetrie/session"
 import {
   type KeyboardEvent,
@@ -62,7 +62,7 @@ export function Sidebar({
   onIntent,
   session,
   index,
-  taskOfThread,
+  canvasOfThread,
   order,
   nameOf,
   colorOf,
@@ -73,28 +73,28 @@ export function Sidebar({
   /** Full, or folded to icons. */
   width: ListWidth
   onIntent: (intent: Intent) => void
-  /** Whose presence an item shows: others reading in its task. */
+  /** Whose presence an item shows: others reading in its canvas. */
   session: SessionClient
   index: TreeIndex
-  taskOfThread: ReadonlyMap<ThreadId, TaskId>
+  canvasOfThread: ReadonlyMap<ThreadId, CanvasId>
   /** Everyone, in the order every window agrees on (`writerOrder`). */
   order: readonly WriterId[]
   nameOf: ReadonlyMap<WriterId, string>
   colorOf: (writer: WriterId) => string
-  /** A task's drag. */
-  dragOf: (task: TaskId) => RootDrag
+  /** A canvas's drag. */
+  dragOf: (canvas: CanvasId) => RootDrag
 }) {
   const pip = <SignalMark color={colorOf(session.writer)} signal="unsent" />
-  // The task whose item is a title field now. Never stored.
-  const [renaming, setRenaming] = useState<TaskId | null>(null)
-  // The task whose item takes focus once its field has gone.
-  const [refocus, setRefocus] = useState<TaskId | null>(null)
+  // The canvas whose item is a title field now. Never stored.
+  const [renaming, setRenaming] = useState<CanvasId | null>(null)
+  // The canvas whose item takes focus once its field has gone.
+  const [refocus, setRefocus] = useState<CanvasId | null>(null)
   const nav = useRef<HTMLElement>(null)
   useEffect(() => {
     if (refocus === null) return
     nav.current
       ?.querySelector<HTMLElement>(
-        `.open-root[data-task="${CSS.escape(refocus)}"]`,
+        `.open-root[data-canvas="${CSS.escape(refocus)}"]`,
       )
       ?.focus()
     setRefocus(null)
@@ -107,7 +107,7 @@ export function Sidebar({
       ?.querySelector(".sidebar-item[data-selected]")
       ?.scrollIntoView({ block: "nearest" })
   }, [here])
-  const readers = { session, index, taskOfThread, order, nameOf, colorOf }
+  const readers = { session, index, canvasOfThread, order, nameOf, colorOf }
   return (
     <nav aria-label="your threads" id="sidebar" ref={nav}>
       {/* biome-ignore lint/a11y/noStaticElementInteractions: Up and Down move focus between the buttons inside */}
@@ -121,26 +121,26 @@ export function Sidebar({
                 key={key}
                 nameOf={nameOf}
                 onIntent={onIntent}
-                onRename={task => setRenaming(task)}
+                onRename={canvas => setRenaming(canvas)}
                 pip={pip}
                 readers={readers}
                 rename={
-                  renaming === item.task
+                  renaming === item.canvas
                     ? {
                         onEnd: focusItem => {
                           setRenaming(null)
-                          if (focusItem) setRefocus(item.task)
+                          if (focusItem) setRefocus(item.canvas)
                         },
                         onSend: title =>
-                          onIntent(renameIntent(item.task, title)),
+                          onIntent(renameIntent(item.canvas, title)),
                       }
                     : null
                 }
-                drag={dragProps({ kind: "task", drag: dragOf(item.task) })}
+                drag={dragProps({ kind: "canvas", drag: dragOf(item.canvas) })}
               />
             )
-          const { task } = item
-          if (renaming === task)
+          const { canvas } = item
+          if (renaming === canvas)
             return (
               <span
                 className="sidebar-item"
@@ -150,9 +150,9 @@ export function Sidebar({
                 <TitleField
                   onEnd={focusItem => {
                     setRenaming(null)
-                    if (focusItem) setRefocus(task)
+                    if (focusItem) setRefocus(canvas)
                   }}
-                  onSend={title => onIntent(renameIntent(task, title))}
+                  onSend={title => onIntent(renameIntent(canvas, title))}
                   placeholder={item.line}
                   stored={item.title}
                 />
@@ -163,18 +163,18 @@ export function Sidebar({
               className="sidebar-item"
               data-selected={item.selected || undefined}
               key={key}
-              {...rootDropProps({ kind: "list", before: task })}
-              {...dropProps({ kind: "sidebar", before: task })}
+              {...rootDropProps({ kind: "list", before: canvas })}
+              {...dropProps({ kind: "sidebar", before: canvas })}
             >
               <button
                 aria-current={item.selected || undefined}
                 className={["open-root", item.archived ? "archived" : ""]
                   .filter(c => c !== "")
                   .join(" ")}
-                data-task={task}
-                {...dragProps({ kind: "task", drag: dragOf(task) })}
+                data-canvas={canvas}
+                {...dragProps({ kind: "canvas", drag: dragOf(canvas) })}
                 onClick={() => onIntent(item.show)}
-                title={item.label}
+                title={item.hover}
                 type="button"
               >
                 <ThreadHead
@@ -185,7 +185,7 @@ export function Sidebar({
                   nameOf={nameOf}
                   pip={pip}
                 />
-                <Readers {...readers} tasks={[item.task]} />
+                <Readers {...readers} canvases={[item.canvas]} />
               </button>
               {item.menu.length > 0 && (
                 <Menu
@@ -194,7 +194,7 @@ export function Sidebar({
                     {
                       key: "root",
                       items: item.menu.map(m =>
-                        menuItem(m, () => setRenaming(task), onIntent),
+                        menuItem(m, () => setRenaming(canvas), onIntent),
                       ),
                     },
                   ]}
@@ -289,7 +289,7 @@ function FoldedItem({
 }: {
   item: SidebarView["items"][number]
   onIntent: (intent: Intent) => void
-  onRename: (task: TaskId) => void
+  onRename: (canvas: CanvasId) => void
   /** While this root is renamed, what its field does; else null. */
   rename: {
     readonly onSend: (title: string | null) => void
@@ -318,32 +318,32 @@ function FoldedItem({
     key: "close",
     className: "open-close-item",
     title:
-      item.kind === "task"
+      item.kind === "canvas"
         ? "close for you; open it again from the board"
         : "close this new thread; nothing has been written",
     label: "Close",
     onChoose: () => onIntent(item.close),
   }
   const items =
-    item.kind === "task"
+    item.kind === "canvas"
       ? [
           ...item.menu.map(m =>
-            menuItem(m, () => onRename(item.task), onIntent),
+            menuItem(m, () => onRename(item.canvas), onIntent),
           ),
           close,
         ]
       : [close]
-  const task = item.kind === "task" ? item.task : undefined
+  const canvas = item.kind === "canvas" ? item.canvas : undefined
   return (
     <span
       className="sidebar-item"
       data-selected={item.selected || undefined}
       ref={wrap}
-      {...(task === undefined
+      {...(canvas === undefined
         ? {}
         : {
-            ...rootDropProps({ kind: "list", before: task }),
-            ...dropProps({ kind: "sidebar", before: task }),
+            ...rootDropProps({ kind: "list", before: canvas }),
+            ...dropProps({ kind: "sidebar", before: canvas }),
           })}
     >
       <Menu
@@ -354,7 +354,7 @@ function FoldedItem({
         trigger={
           <span className="open-icon">
             <IconFace icon={item.icon} />
-            {item.kind === "task" && (
+            {item.kind === "canvas" && (
               <RootStatus
                 arrived={item.arrived}
                 done={item.done}
@@ -368,7 +368,7 @@ function FoldedItem({
         triggerClassName={item.archived ? "open-root archived" : "open-root"}
         triggerProps={{
           "aria-current": item.selected || undefined,
-          "data-task": item.task,
+          "data-canvas": item.canvas,
           ...drag,
           onBlur: () => setTip(false),
           onClick: () => onIntent(item.show),
@@ -384,10 +384,10 @@ function FoldedItem({
           style={{ left: at.right + 6, top: at.top }}
         >
           <span className="open-tip-label">{item.label}</span>
-          {task !== undefined && <Readers {...readers} tasks={[task]} />}
+          {canvas !== undefined && <Readers {...readers} canvases={[canvas]} />}
         </span>
       )}
-      {at !== null && rename !== null && item.kind === "task" && (
+      {at !== null && rename !== null && item.kind === "canvas" && (
         <span
           className="open-rename"
           style={{ left: at.right + 6, top: at.top }}
@@ -448,7 +448,7 @@ function menuItem(
           <>
             Move to {item.name}
             {item.busy !== null && (
-              <span className="why"> · {TASK_BUSY_REASON[item.busy]}</span>
+              <span className="why"> · {CANVAS_BUSY_REASON[item.busy]}</span>
             )}
             {drops !== null && <span className="why drops"> · {drops}</span>}
           </>

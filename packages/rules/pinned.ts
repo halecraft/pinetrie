@@ -20,11 +20,11 @@ export const PINNED_TYPE = "pinetrie.pinned"
 
 /**
  * The line every agent thread's `<rules>` holds for pinned cards, a
- * thread's and a task's. Constant, so the system prompt stays the
+ * thread's and a canvas's. Constant, so the system prompt stays the
  * same between runs and an edited card keeps the cache.
  */
 export const PINNED_RULE =
-  "The team pins cards to say what it wants: from this thread in `<pinned-cards>` blocks, from the whole task in `<task-pinned-cards>` blocks. The latest of each is what holds."
+  "The team pins cards to say what it wants: from this thread in `<pinned-cards>` blocks, from the whole canvas in `<canvas-pinned-cards>` blocks. The latest of each is what holds."
 
 const PinnedDetailsSchema = Type.Object({
   lane: ThreadIdSchema,
@@ -58,7 +58,10 @@ export const decodePinned = (message: unknown): PinnedView | undefined =>
  * to trust: `</card>` becomes `<\/card>`, and the block's own the same.
  */
 export const neutral = (text: string): string =>
-  text.replace(/<\/(card|pinned-cards|task-pinned-cards|canvas)\b/gi, "<\\/$1")
+  text.replace(
+    /<\/(card|pinned-cards|canvas-pinned-cards|canvas)\b/gi,
+    "<\\/$1",
+  )
 
 export const attribute = (name: string): string =>
   name.replaceAll("&", "&amp;").replaceAll('"', "&quot;")

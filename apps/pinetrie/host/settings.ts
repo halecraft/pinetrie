@@ -154,7 +154,7 @@ export const SETTINGS = defineTable({
   }),
   "titles.enabled": pick(flag(), {
     fallback: true,
-    describe: "whether a model titles a task by itself",
+    describe: "whether a model titles a canvas by itself",
     order: ["system", "user", "local"],
   }),
   "titles.model": pick(model, {

@@ -40,22 +40,6 @@ export const AttentionDoc = yjs.bind(
   }),
 )
 
-/**
- * The schema before `dismissedReady` was named: its hash is what a stored
- * document written under it carries, and the host's `0018-dismissed-ready`
- * migration reads `dismissedOffers` through it. Delete with that migration.
- */
-export const AttentionDocBeforeReady = yjs.bind(
-  Schema.struct({
-    since: Schema.string(),
-    mentionsSince: Schema.string(),
-    read: Schema.record(Schema.string()),
-    dismissed: Schema.record(Schema.string()),
-    dismissedOffers: Schema.record(Schema.string()),
-    seen: Schema.record(Schema.boolean()),
-  }),
-)
-
 /** An attention document, as the Exchange gives it. */
 export type AttentionDocHandle =
   typeof AttentionDoc extends BoundSchema<infer S, infer N>

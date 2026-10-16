@@ -1,12 +1,12 @@
 import {
   type CardRecord,
+  canvasIdFor,
   entryId,
   INVENTORY_SLOTS,
   indexTree,
   NO_CONTENT,
   rootIdFor,
   type ThreadRecord,
-  taskIdFor,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -16,7 +16,7 @@ import { type CopyThread, planCopy } from "./copy.ts"
 import { threadCardOf } from "./fixtures.ts"
 
 const ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
-const TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
+const CANVAS = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 const ADA = writerId("ada@x.io")
 const BEA = writerId("bea@x.io")
 // r -> a -> b: thread `r` ends at b; c, a branch at a, starts thread `c`.
@@ -33,7 +33,7 @@ const record = (thread: typeof SOURCE): ThreadRecord => ({
 const threads = new Map([[SOURCE, record(SOURCE)]])
 const onCanvas = threadCardOf({
   thread: SOURCE,
-  task: TASK,
+  canvas: CANVAS,
   by: ADA,
   cards: [],
 })
@@ -43,7 +43,7 @@ const copy = (over: Partial<CopyThread> = {}): CopyThread => ({
   move: {
     card: COPY,
     from: null,
-    to: { kind: "canvas-at", task: TASK, after: SOURCE },
+    to: { kind: "canvas-at", canvas: CANVAS, after: SOURCE },
   },
   ...over,
 })
@@ -79,7 +79,7 @@ describe("planCopy", () => {
         id: COPY,
         owner: ADA,
         placer: ADA,
-        place: { kind: "canvas", task: TASK, width: 1 },
+        place: { kind: "canvas", canvas: CANVAS, width: 1 },
         content: NO_CONTENT,
       },
     })
@@ -109,7 +109,7 @@ describe("planCopy", () => {
         move: {
           card: SOURCE,
           from: null,
-          to: { kind: "canvas-at", task: TASK, after: null },
+          to: { kind: "canvas-at", canvas: CANVAS, after: null },
         },
       }),
     ).toEqual({ kind: "refused", why: "taken" })

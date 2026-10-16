@@ -90,7 +90,7 @@ export interface StoredRecords {
 /**
  * Deletes for every record whose namespace no spec declares, or
  * that is stored outside its spec's home: a renamed, retired or rehomed
- * record type (a mark, once a root's, now a task's in the session)
+ * record type (a mark, once a root's, now a canvas's in the session)
  * leaves nothing behind once a host starts.
  */
 export const planUndeclaredSweep = (

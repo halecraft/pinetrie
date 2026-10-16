@@ -34,9 +34,9 @@ export interface HeadEnd {
   readonly button: HeadButton | null
 }
 
-/** The title of × and of Move to trash: the card goes to the task's trash, for everyone. */
+/** The title of × and of Move to trash: the card goes to the canvas's trash, for everyone. */
 const TRASH_COLUMN =
-  "trash this column, for everyone: anyone on the task restores it from the task's trash"
+  "trash this column, for everyone: anyone on the canvas restores it from the canvas's trash"
 
 /** × on a thread not yet started: the ⋯'s Move to trash, in one click. */
 const CLOSE: ControlWords = {
@@ -78,8 +78,8 @@ export function columnHeadEnd(input: {
 }
 
 /**
- * What a column's ⋯ offers, all of it everyone's. It lists no task: a
- * thread reaches another task through your inventory. It ends in Move to
+ * What a column's ⋯ offers, all of it everyone's. It lists no canvas: a
+ * thread reaches another canvas through your inventory. It ends in Move to
  * trash on every column, even where × repeats it, so it reads the same on
  * each.
  */
@@ -126,7 +126,7 @@ function columnMenu(input: {
       items: [
         {
           key: "copy",
-          label: "Copy to this task",
+          label: "Copy to this canvas",
           title: "a new thread forked at this one's end, just after it",
           intent: { kind: "copyThread", source, to: "here" },
         },

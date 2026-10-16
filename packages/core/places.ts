@@ -13,14 +13,15 @@ import type {
 } from "./cards.ts"
 import {
   type AskCardId,
+  type CanvasId,
   type CardId,
   type CardKind,
   type EntryId,
   entryId,
   type FactCardId,
   type FileCardId,
+  isCanvasId,
   isNoteColumnId,
-  isTaskId,
   isThreadId,
   isWorkflowStateId,
   kindOfCard,
@@ -28,7 +29,6 @@ import {
   type NoteColumnId,
   parseCardId,
   type ReferenceCardId,
-  type TaskId,
   type TextCardId,
   type ThreadId,
   type WorkflowStateId,
@@ -41,17 +41,17 @@ import { KINDS } from "./kinds.ts"
  * composer at a thread's end, which only you see; kept as its thread, and
  * resolved to the thread's end (`placeEnd`) whenever it is needed, so it
  * follows its thread as the thread grows. Note: in a note column, at its
- * rank there, shared by everyone in the task. Pinned: at the top of a
+ * rank there, shared by everyone in the canvas. Pinned: at the top of a
  * thread's column, kept and resolved the same way; the agent reads it on
  * every run. Queued: above the line, waiting for its thread's lane, until
  * the host pops it or someone unqueues it. Margin: beside an entry, a
- * comment on it, shared by everyone in the task and never read by the
- * agent; it names the entry's thread too, so its task is found without
- * reading a tree. Canvas: a thread card or a note column in a task, at its
+ * comment on it, shared by everyone in the canvas and never read by the
+ * agent; it names the entry's thread too, so its canvas is found without
+ * reading a tree. Canvas: a thread card or a note column in a canvas, at its
  * rank there: the only record of where it is, so a card has one place by
  * construction; a thread not yet started is a thread card there too.
  * Inventory: in its holder's inventory; which slot holds it is the
- * holder's own document (`InventoryDoc`), not the host's. Board: a task's
+ * holder's own document (`InventoryDoc`), not the host's. Board: a canvas's
  * card, in a workflow state of the team's board, at its rank there.
  */
 export type LivePlace =
@@ -77,10 +77,10 @@ export type LivePlace =
       readonly order: string
     }
   | {
-      readonly kind: "task-pinned"
-      /** The task it is pinned to: every thread of it reads it. */
-      readonly task: TaskId
-      /** Sorts the task's pinned cards, in the order they were pinned. */
+      readonly kind: "canvas-pinned"
+      /** The canvas it is pinned to: every thread of it reads it. */
+      readonly canvas: CanvasId
+      /** Sorts the canvas's pinned cards, in the order they were pinned. */
       readonly order: string
     }
   | {
@@ -101,15 +101,15 @@ export type LivePlace =
       readonly kind: "margin"
       /** The entry it comments on. */
       readonly entry: EntryId
-      /** The entry's thread: its task's, read without a tree. */
+      /** The entry's thread: its canvas's, read without a tree. */
       readonly thread: ThreadId
       /** Its rank among the entry's comments: an order key, the host's to give. */
       readonly order: string
     }
   | {
       readonly kind: "canvas"
-      readonly task: TaskId
-      /** Its rank on the task's canvas: an order key, the host's to give. */
+      readonly canvas: CanvasId
+      /** Its rank on the canvas: an order key, the host's to give. */
       readonly order: string
       readonly width: CardWidth
     }
@@ -139,12 +139,12 @@ export const livePlaceOf = (place: CardPlace): LivePlace =>
   place.kind === "trash" ? place.left : place
 
 /**
- * Who a surface belongs to: a task (its canvas, its pinned cards), a note
+ * Who a surface belongs to: a canvas (its canvas, its pinned cards), a note
  * column (its notes), a thread (its dock and its entries' margins), a
  * person (their inventory) or the team (its board).
  */
 export type SurfaceOwner =
-  | { readonly kind: "task"; readonly task: TaskId }
+  | { readonly kind: "canvas"; readonly canvas: CanvasId }
   | { readonly kind: "note-column"; readonly column: NoteColumnId }
   | { readonly kind: "thread"; readonly thread: ThreadId }
   | { readonly kind: "person"; readonly holder: WriterId }
@@ -159,8 +159,8 @@ export function ownerOf(
 ): SurfaceOwner {
   switch (place.kind) {
     case "canvas":
-    case "task-pinned":
-      return { kind: "task", task: place.task }
+    case "canvas-pinned":
+      return { kind: "canvas", canvas: place.canvas }
     case "note":
       return { kind: "note-column", column: place.column }
     case "composing":
@@ -175,10 +175,10 @@ export function ownerOf(
   }
 }
 
-/** The card a surface owner is, if it is one: a task's, a note column's or a thread's id. */
+/** The card a surface owner is, if it is one: a canvas's, a note column's or a thread's id. */
 export const ownerCard = (owner: SurfaceOwner): CardId | null =>
-  owner.kind === "task"
-    ? owner.task
+  owner.kind === "canvas"
+    ? owner.canvas
     : owner.kind === "note-column"
       ? owner.column
       : owner.kind === "thread"
@@ -225,9 +225,9 @@ export type ListKey = Extract<
 
 /**
  * A move's target alone, never where a card is: the note column nearest
- * `thread`'s card in its task, or nearest `task`'s own column, which stands
+ * `thread`'s card in its canvas, or nearest `canvas`'s own column, which stands
  * before every card (`nearestNoteColumn`). The host resolves it before it plans
- * the move, making a column when the task has none.
+ * the move, making a column when the canvas has none.
  */
 export type NotesTarget =
   | {
@@ -235,10 +235,14 @@ export type NotesTarget =
       readonly near: "thread"
       readonly thread: ThreadId
     }
-  | { readonly kind: "notes"; readonly near: "task"; readonly task: TaskId }
+  | {
+      readonly kind: "notes"
+      readonly near: "canvas"
+      readonly canvas: CanvasId
+    }
 
 /**
- * A drop on a canvas: a move's target alone, never where a card is: `task`'s
+ * A drop on a canvas: a move's target alone, never where a card is: `canvas`'s
  * canvas just after the card `after`, null for before every card. The host
  * ranks it there before it plans the move (`planMoveTargets`); an `after` no
  * longer on that canvas lands it at the end, a hint and not a compare-and-set.
@@ -246,7 +250,7 @@ export type NotesTarget =
  */
 export interface CanvasTarget {
   readonly kind: "canvas-at"
-  readonly task: TaskId
+  readonly canvas: CanvasId
   readonly after: CardId | null
 }
 
@@ -256,7 +260,7 @@ export type MoveTarget =
   | NotesTarget
   | CanvasTarget
   | BackTarget
-  | NewTaskTarget
+  | NewCanvasTarget
 
 /**
  * Back to where a trashed card was: a restore. The host resolves it to the
@@ -271,19 +275,19 @@ export interface BackTarget {
 export const BACK: BackTarget = { kind: "back" }
 
 /**
- * A new task, made by the mover at the end of the board's first state,
- * with the card first on its canvas: a column dropped between two tasks in
- * the sidebar. `task` is the new task's id, minted by the page.
+ * A new canvas, made by the mover at the end of the board's first state,
+ * with the card first on its canvas: a column dropped between two canvases in
+ * the sidebar. `canvas` is the new canvas's id, minted by the page.
  */
-export interface NewTaskTarget {
-  readonly kind: "new-task"
-  readonly task: TaskId
+export interface NewCanvasTarget {
+  readonly kind: "new-canvas"
+  readonly canvas: CanvasId
 }
 
 /** A canvas's key with the rank a drop was given there (`CanvasTarget`, resolved). */
 export interface RankedCanvas {
   readonly kind: "canvas"
-  readonly task: TaskId
+  readonly canvas: CanvasId
   readonly order: string
 }
 
@@ -299,14 +303,14 @@ export function keyOf(place: CardPlace): PlaceKey {
       return { kind: "note", column: place.column }
     case "pinned":
       return { kind: "pinned", thread: place.thread }
-    case "task-pinned":
-      return { kind: "task-pinned", task: place.task }
+    case "canvas-pinned":
+      return { kind: "canvas-pinned", canvas: place.canvas }
     case "queued":
       return { kind: "queued", thread: place.thread, seen: place.seen }
     case "margin":
       return { kind: "margin", entry: place.entry, thread: place.thread }
     case "canvas":
-      return { kind: "canvas", task: place.task }
+      return { kind: "canvas", canvas: place.canvas }
     case "inventory":
       return place
     case "board":
@@ -330,15 +334,15 @@ export function sameKey(a: PlaceKey, b: PlaceKey): boolean {
       return b.kind === "note" && a.column === b.column
     case "pinned":
       return b.kind === "pinned" && a.thread === b.thread
-    case "task-pinned":
-      return b.kind === "task-pinned" && a.task === b.task
+    case "canvas-pinned":
+      return b.kind === "canvas-pinned" && a.canvas === b.canvas
     case "queued":
       return b.kind === "queued" && a.thread === b.thread
     // An entry names its thread, so the entry alone says which margin.
     case "margin":
       return b.kind === "margin" && a.entry === b.entry
     case "canvas":
-      return b.kind === "canvas" && a.task === b.task
+      return b.kind === "canvas" && a.canvas === b.canvas
     case "inventory":
       return b.kind === "inventory" && a.holder === b.holder
     case "board":
@@ -387,7 +391,7 @@ export interface Move<To extends MoveTarget = MoveTarget> {
 /**
  * Where a move the host plans sends a card: a place's key, but a canvas's
  * with the rank it was given there (`RankedCanvas`), so no card lands on a
- * canvas unranked. No person's move takes a task's card (`KINDS`), so a
+ * canvas unranked. No person's move takes a canvas's card (`KINDS`), so a
  * board's key is never one.
  */
 export type ResolvedTarget =
@@ -401,7 +405,7 @@ export type ResolvedTarget =
  */
 export type ResolvedMove = Move<ResolvedTarget>
 
-/** A canvas's key: where a card on a task's canvas is, its rank and width left out. */
+/** A canvas's key: where a card on a canvas is, its rank and width left out. */
 export type CanvasKey = Extract<PlaceKey, { readonly kind: "canvas" }>
 
 /** A queue's key: where a card is queued, its text's version as its queuer had it. */
@@ -412,15 +416,15 @@ export type QueueMove = Move<QueuedKey>
 
 /**
  * The places a reorder moves a card among: a queue, a thread's pinned cards, a
- * task's pinned cards, a note column, an entry's margin, or a task's canvas.
- * Each has its rule in `@pinetrie/rules`' `REORDERS`. A task's card is
+ * canvas's pinned cards, a note column, an entry's margin, or a canvas.
+ * Each has its rule in `@pinetrie/rules`' `REORDERS`. A canvas's card is
  * reordered on the board by the board's own move (`planBoardMove`), which may
  * cross the archive's edge.
  */
 export const REORDER_PLACES = [
   "queued",
   "pinned",
-  "task-pinned",
+  "canvas-pinned",
   "note",
   "margin",
   "canvas",
@@ -488,7 +492,7 @@ export function moveOf(
 ): TypedMove
 export function moveOf(
   card: ThreadCard | NoteColumnCard,
-  to: NewTaskTarget,
+  to: NewCanvasTarget,
 ): TypedMove
 export function moveOf(
   card: TextCard | ReferenceCard,
@@ -556,7 +560,7 @@ export type MoveRefusal =
    */
   | "replied"
   /**
-   * An undo or a redo that would move a task's card across the archive's edge:
+   * An undo or a redo that would move a canvas's card across the archive's edge:
    * archiving and restoring are done on the board, which gathers what crossing
    * it needs.
    */
@@ -568,7 +572,7 @@ export type MoveRefusal =
   | "no-place"
   /**
    * A restore whose place is gone: what that place is on (a note column, a
-   * thread, a task) is itself trashed, or has no record.
+   * thread, a canvas) is itself trashed, or has no record.
    */
   | "left-gone"
   /** A restore of your message where you have written a newer one. */
@@ -608,11 +612,11 @@ export interface PlaceFields {
   readonly by: string
   readonly seen: string
   readonly holder: string
-  /** A canvas card's task, or one a card is pinned to. */
-  readonly task: string
+  /** A canvas card's canvas, or one a card is pinned to. */
+  readonly canvas: string
   /** A canvas card's width, `1` or `2`. */
   readonly width: string
-  /** A task card's workflow state. */
+  /** A canvas card's workflow state. */
   readonly state: string
 }
 
@@ -639,10 +643,10 @@ const PLACE_FIELDS = {
   by: { key: "never" },
   seen: { key: "always" },
   holder: { key: "always" },
-  // A trash key names no task: the host names a discard's history.
-  task: {
+  // A trash key names no canvas: the host names a discard's history.
+  canvas: {
     key: "for",
-    kinds: ["canvas", "canvas-at", "task-pinned", "notes", "new-task"],
+    kinds: ["canvas", "canvas-at", "canvas-pinned", "notes", "new-canvas"],
   },
   width: { key: "never" },
   state: { key: "always" },
@@ -693,26 +697,26 @@ export const keyFieldsFrom = (
  *
  * - your message is stored as `drafting`, a thread's id in `lane` (a lane is
  *   named by its thread), its root the thread's;
- * - a thread's nearest notes, its id in `lane`; a task's, its id in `task`;
+ * - a thread's nearest notes, its id in `lane`; a canvas's, its id in `canvas`;
  * - a spot on a canvas, the card it goes after in `column` ("" for first);
  * - a comment, its entry in `at` and the entry's thread in `lane`;
  * - a trash's key as `discarded`, every field "" (a card in a trash is
  *   stored as the place it left, its kind `discarded-` and that place's
  *   stored kind: `trashedFields`);
- * - a task's card on the board, its workflow state in `state`.
+ * - a canvas's card on the board, its workflow state in `state`.
  */
 const ROWS = {
   drafting: ["lane"],
   note: ["column", "order"],
-  notes: ["lane", "task"],
-  "task-pinned": ["task", "order"],
-  "canvas-at": ["task", "column"],
+  notes: ["lane", "canvas"],
+  "canvas-pinned": ["canvas", "order"],
+  "canvas-at": ["canvas", "column"],
   back: [],
-  "new-task": ["task"],
+  "new-canvas": ["canvas"],
   pinned: ["lane", "order"],
   queued: ["lane", "order", "by", "seen"],
   margin: ["at", "lane", "order"],
-  canvas: ["task", "order", "width"],
+  canvas: ["canvas", "order", "width"],
   inventory: ["holder"],
   discarded: [],
   board: ["state", "order"],
@@ -765,19 +769,22 @@ export function placeFields(place: CardPlace | MoveTarget): PlaceFields {
       })
     case "notes":
       return place.near === "thread"
-        ? row("notes", { lane: place.thread, task: "" })
-        : row("notes", { lane: "", task: place.task })
-    case "task-pinned":
-      return row("task-pinned", {
-        task: place.task,
+        ? row("notes", { lane: place.thread, canvas: "" })
+        : row("notes", { lane: "", canvas: place.canvas })
+    case "canvas-pinned":
+      return row("canvas-pinned", {
+        canvas: place.canvas,
         order: "order" in place ? place.order : "",
       })
     case "canvas-at":
-      return row("canvas-at", { task: place.task, column: place.after ?? "" })
+      return row("canvas-at", {
+        canvas: place.canvas,
+        column: place.after ?? "",
+      })
     case "back":
       return row("back", {})
-    case "new-task":
-      return row("new-task", { task: place.task })
+    case "new-canvas":
+      return row("new-canvas", { canvas: place.canvas })
     case "pinned":
       return row("pinned", {
         lane: place.thread,
@@ -798,7 +805,7 @@ export function placeFields(place: CardPlace | MoveTarget): PlaceFields {
       })
     case "canvas":
       return row("canvas", {
-        task: place.task,
+        canvas: place.canvas,
         order: "order" in place ? place.order : "",
         width: "width" in place ? String(place.width) : "",
       })
@@ -836,7 +843,7 @@ const atThread = (r: {
 /**
  * Flat strings -> a place; undefined for one that is malformed. A card at a
  * thread's end, pinned or queued names its thread alone. A canvas card
- * needs its `TaskId`. An inventory's holder is never "". A trashed card's
+ * needs its `CanvasId`. An inventory's holder is never "". A trashed card's
  * row is the place it left, read the same way. A pinned card needs its order, and a
  * canvas card its order and width. A queued card needs its order and who
  * queued it. A note needs its column and its order. A target's row is no
@@ -858,22 +865,22 @@ function livePlaceOfFields(f: PlaceFields): LivePlace | undefined {
     case "notes":
     case "canvas-at":
     case "back":
-    case "new-task":
+    case "new-canvas":
       return undefined
     case "canvas": {
       const width = widthOf(r.width)
-      return !isTaskId(r.task) || r.order === "" || width === undefined
+      return !isCanvasId(r.canvas) || r.order === "" || width === undefined
         ? undefined
-        : { kind: "canvas", task: r.task, order: r.order, width }
+        : { kind: "canvas", canvas: r.canvas, order: r.order, width }
     }
     case "note":
       return !isNoteColumnId(r.column) || r.order === ""
         ? undefined
         : { kind: "note", column: r.column, order: r.order }
-    case "task-pinned":
-      return !isTaskId(r.task) || r.order === ""
+    case "canvas-pinned":
+      return !isCanvasId(r.canvas) || r.order === ""
         ? undefined
-        : { kind: "task-pinned", task: r.task, order: r.order }
+        : { kind: "canvas-pinned", canvas: r.canvas, order: r.order }
     case "inventory":
       return r.holder === ""
         ? undefined
@@ -931,14 +938,16 @@ export function keyOfFields(f: PlaceFields): PlaceKey | undefined {
       return at === undefined ? undefined : { kind: "pinned", ...at }
     }
     case "canvas":
-      return isTaskId(r.task) ? { kind: "canvas", task: r.task } : undefined
+      return isCanvasId(r.canvas)
+        ? { kind: "canvas", canvas: r.canvas }
+        : undefined
     case "note":
       return isNoteColumnId(r.column)
         ? { kind: "note", column: r.column }
         : undefined
-    case "task-pinned":
-      return isTaskId(r.task)
-        ? { kind: "task-pinned", task: r.task }
+    case "canvas-pinned":
+      return isCanvasId(r.canvas)
+        ? { kind: "canvas-pinned", canvas: r.canvas }
         : undefined
     case "discarded":
       return { kind: "trash" }
@@ -973,22 +982,24 @@ export function targetOfFields(f: PlaceFields): MoveTarget | undefined {
     case "notes":
       return isThreadId(r.lane)
         ? { kind: "notes", near: "thread", thread: r.lane }
-        : isTaskId(r.task)
-          ? { kind: "notes", near: "task", task: r.task }
+        : isCanvasId(r.canvas)
+          ? { kind: "notes", near: "canvas", canvas: r.canvas }
           : undefined
     case "canvas-at": {
-      if (!isTaskId(r.task)) return undefined
+      if (!isCanvasId(r.canvas)) return undefined
       if (r.column === "")
-        return { kind: "canvas-at", task: r.task, after: null }
+        return { kind: "canvas-at", canvas: r.canvas, after: null }
       const after = parseCardId(r.column)
       return after === undefined
         ? undefined
-        : { kind: "canvas-at", task: r.task, after }
+        : { kind: "canvas-at", canvas: r.canvas, after }
     }
     case "back":
       return BACK
-    case "new-task":
-      return isTaskId(r.task) ? { kind: "new-task", task: r.task } : undefined
+    case "new-canvas":
+      return isCanvasId(r.canvas)
+        ? { kind: "new-canvas", canvas: r.canvas }
+        : undefined
     default:
       return keyOfFields(f)
   }
@@ -1003,7 +1014,7 @@ export const PLACES_OF: {
 } = {
   text: KINDS.text.places,
   thread: KINDS.thread.places,
-  task: KINDS.task.places,
+  canvas: KINDS.canvas.places,
   "note-column": KINDS["note-column"].places,
   fact: KINDS.fact.places,
   reference: KINDS.reference.places,
@@ -1021,7 +1032,7 @@ export type PlaceOf<K extends CardKind> = Extract<
 /** The places a text card is ever in. */
 export type TextPlace = PlaceOf<"text">
 
-/** A canvas card's place: a task and a rank there. */
+/** A canvas card's place: a canvas and a rank there. */
 export type CanvasPlace = Extract<CardPlace, { readonly kind: "canvas" }>
 
 /** The kinds of card ever at a place of `P` (`PLACES_OF`). */
@@ -1094,7 +1105,7 @@ export const placeOfKind = <K extends CardKind>(
 export type IdOf<K extends CardKind> = {
   readonly text: TextCardId
   readonly thread: ThreadId
-  readonly task: TaskId
+  readonly canvas: CanvasId
   readonly "note-column": NoteColumnId
   readonly fact: FactCardId
   readonly reference: ReferenceCardId
@@ -1118,9 +1129,9 @@ const TARGET_PLACES = {
   "canvas-at": "canvas",
   // Only a card a trash takes is ever in one to come back from.
   back: "trash",
-  "new-task": "canvas",
+  "new-canvas": "canvas",
 } as const satisfies Record<
-  (NotesTarget | CanvasTarget | BackTarget | NewTaskTarget)["kind"],
+  (NotesTarget | CanvasTarget | BackTarget | NewCanvasTarget)["kind"],
   CardPlace["kind"]
 >
 
@@ -1163,7 +1174,7 @@ type TargetKindOf<K extends CardKind> =
 export type TargetOf<K extends CardKind> =
   | KeyOf<K>
   | Extract<
-      NotesTarget | CanvasTarget | BackTarget | NewTaskTarget,
+      NotesTarget | CanvasTarget | BackTarget | NewCanvasTarget,
       { readonly kind: TargetKindOf<K> }
     >
 
@@ -1198,7 +1209,7 @@ const placeKindOfTarget = (to: MoveTarget): CardPlace["kind"] => {
     case "notes":
     case "canvas-at":
     case "back":
-    case "new-task":
+    case "new-canvas":
       return TARGET_PLACES[to.kind]
     default:
       return to.kind
@@ -1234,8 +1245,8 @@ export function placed(
       return fits("text", place) ? { ...card, place } : undefined
     case "thread":
       return fits("thread", place) ? { ...card, place } : undefined
-    case "task":
-      return fits("task", place) ? { ...card, place } : undefined
+    case "canvas":
+      return fits("canvas", place) ? { ...card, place } : undefined
     case "note-column":
       return fits("note-column", place) ? { ...card, place } : undefined
     case "fact":

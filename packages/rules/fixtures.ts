@@ -2,20 +2,20 @@
 // Production code never imports it.
 
 import {
+  type CanvasId,
   type CardRecord,
   ROOT_ORIGIN,
   rootIdFor,
-  type TaskId,
   type ThreadCard,
   type ThreadId,
   type WriterId,
 } from "@pinetrie/core"
-import { planThreadOpen } from "./task.ts"
+import { planThreadOpen } from "./canvas-index.ts"
 
-/** A thread's card as it first lands on `task`'s canvas: at its end. */
+/** A thread's card as it first lands on `canvas`'s canvas: at its end. */
 export function threadCardOf(input: {
   readonly thread: ThreadId
-  readonly task: TaskId
+  readonly canvas: CanvasId
   readonly by: WriterId
   readonly cards: readonly CardRecord[]
 }): ThreadCard {
@@ -25,7 +25,7 @@ export function threadCardOf(input: {
     root: rootIdFor("01a0ffd2-0000-7000-8000-0000000000f0"),
     by: input.by,
     now: 0,
-    placement: { kind: "after", task: input.task, parent: null },
+    placement: { kind: "after", canvas: input.canvas, parent: null },
     opens: null,
     cards: input.cards,
   })

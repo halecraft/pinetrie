@@ -95,7 +95,7 @@ export const mutations: readonly Mutation[] = [
     to: "    ? undefined\n",
     command: ["pnpm", "exec", "vitest", "run", "packages/core"],
     expect:
-      "a task's and a person's outside any task read back as written; other ids name none",
+      "a canvas's and a person's outside any canvas read back as written; other ids name none",
   },
   {
     name: "a mention in code counts",
@@ -414,7 +414,7 @@ export const mutations: readonly Mutation[] = [
     expect: "is for Ada only",
   },
   {
-    name: "naming people still asks the agent in agent work",
+    name: "naming people still asks the agent in an agent thread",
     file: core,
     from: "      : people.length > 0 || asks.length > 0 || !input.agentByDefault",
     to: "      : asks.length > 0 || !input.agentByDefault",
@@ -424,8 +424,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a plain remark counts as a race",
     file: tree,
-    from: '      m?.role === "chat" &&\n      m.compelled === true &&',
-    to: '      m?.role === "chat" &&',
+    from: '      m?.role === "person" &&\n      m.compelled === true &&',
+    to: '      m?.role === "person" &&',
     command: unit,
     expect: "are not a race",
   },
@@ -524,10 +524,10 @@ export const mutations: readonly Mutation[] = [
     name: "a thread opened as a new root may name a root in use",
     file: "packages/protocol/codec.ts",
     from: '    const root = start.kind === "branch" ? rootText : parseNewRoot(rootText)\n',
-    to: '    const root = start.kind !== "new-task" ? rootText : parseNewRoot(rootText)\n',
+    to: '    const root = start.kind !== "new-canvas" ? rootText : parseNewRoot(rootText)\n',
     command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
     expect:
-      "decode: a thread opened names a new thread, its root, its task and how it starts",
+      "decode: a thread opened names a new thread, its root, its canvas and how it starts",
   },
   {
     name: "a reply may start at the root",
@@ -673,7 +673,7 @@ export const mutations: readonly Mutation[] = [
     from: '      case "invalid":\n        return refused(',
     to: '      case "invalid":\n        return { kind: "mark", entry: entryId(entry), title: text(wire?.text) }\n        return refused(',
     command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
-    expect: "a mark names its task",
+    expect: "a mark names its canvas",
   },
   {
     name: "every message compels the agent",
@@ -808,12 +808,12 @@ export const mutations: readonly Mutation[] = [
       "an acceptance that does not say which proposed changes it was shown, well formed, is refused",
   },
   {
-    name: "a retitle may name anything as its task",
+    name: "a retitle may name anything as its canvas",
     file: "packages/protocol/codec.ts",
-    from: '    return isTaskId(task)\n      ? { kind: "retitle", task }',
-    to: '    return true\n      ? { kind: "retitle", task: task as TaskId }',
+    from: '    return isCanvasId(canvas)\n      ? { kind: "retitle", canvas }',
+    to: '    return true\n      ? { kind: "retitle", canvas: canvas as CanvasId }',
     command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
-    expect: "a retitle names its task; anything else is refused",
+    expect: "a retitle names its canvas; anything else is refused",
   },
   {
     name: "a fork's parent is the nearest lane, not the commit's",
@@ -977,7 +977,7 @@ export const mutations: readonly Mutation[] = [
     expect: "an id that is no uuidv7 has none",
   },
   {
-    name: "a move loses its sender's task on the wire",
+    name: "a move loses its sender's canvas on the wire",
     file: "packages/protocol/codec.ts",
     from: '        moves: encodeMoves(intent.moves),\n        here: intent.here ?? "",',
     to: '        moves: encodeMoves(intent.moves),\n        here: "",',
@@ -985,23 +985,23 @@ export const mutations: readonly Mutation[] = [
     expect: "encodeIntent -> decodeCommand round-trips every intent",
   },
   {
-    name: "a gone key carries a task on the wire",
+    name: "a gone key carries a canvas on the wire",
     file: "packages/core/places.ts",
-    from: '    kinds: ["canvas", "canvas-at", "task-pinned", "notes", "new-task"],',
-    to: '    kinds: ["canvas", "canvas-at", "task-pinned", "notes", "new-task", "discarded-canvas"],',
+    from: '    kinds: ["canvas", "canvas-at", "canvas-pinned", "notes", "new-canvas"],',
+    to: '    kinds: ["canvas", "canvas-at", "canvas-pinned", "notes", "new-canvas", "discarded-canvas"],',
     command: unit,
-    expect: "no task but a canvas's and a spot's",
+    expect: "no canvas but a canvas's and a spot's",
   },
   {
-    name: "the Line drops a command's task",
+    name: "the Line drops a command's canvas",
     file: "packages/protocol/line.ts",
-    from: "  task: Schema.string(),\n",
+    from: "  canvas: Schema.string(),\n",
     to: "",
     command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
     expect: "the Line carries every field of a command and of a reply",
   },
   {
-    name: "the Line drops a command's sender's task",
+    name: "the Line drops a command's sender's canvas",
     file: "packages/protocol/line.ts",
     from: "  here: Schema.string(),\n",
     to: "",
@@ -1009,7 +1009,7 @@ export const mutations: readonly Mutation[] = [
     expect: "the Line carries every field of a command and of a reply",
   },
   {
-    name: "a spin-off loses its sender's task on the wire",
+    name: "a spin-off loses its sender's canvas on the wire",
     file: "packages/protocol/codec.ts",
     from: '        state: intent.state ?? "",\n        here: intent.here ?? "",',
     to: '        state: intent.state ?? "",\n        here: "",',
@@ -1034,13 +1034,13 @@ export const mutations: readonly Mutation[] = [
     expect: "placed: a card at a place its kind is ever in",
   },
   {
-    name: "a mark may name a task and a note column",
+    name: "a mark may name a canvas and a note column",
     file: "packages/protocol/codec.ts",
-    from: '        : isNoteColumnId(column) && task === ""',
+    from: '        : isNoteColumnId(column) && canvas === ""',
     to: "        : isNoteColumnId(column)",
     command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
     expect:
-      "decode: a mark names a task or a note column, never both or neither",
+      "decode: a mark names a canvas or a note column, never both or neither",
   },
   {
     name: "a reorder is anywhere a card is",
@@ -1053,16 +1053,16 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a spot on a canvas forgets the card it goes after",
     file: places,
-    from: '      return row("canvas-at", { task: place.task, column: place.after ?? "" })',
-    to: '      return row("canvas-at", { task: place.task, column: "" })',
+    from: '        column: place.after ?? "",\n      })\n    case "back":',
+    to: '        column: "",\n      })\n    case "back":',
     command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
     expect: "a move's target may be a spot on a canvas",
   },
   {
     name: "a row is written with a field its kind does not store",
     file: places,
-    from: '      return row("canvas-at", { task: place.task, column: place.after ?? "" })',
-    to: '      return row("canvas-at", { task: place.task, column: place.after ?? "", order: "" })',
+    from: '        column: place.after ?? "",\n      })\n    case "back":',
+    to: '        column: place.after ?? "",\n        order: "",\n      })\n    case "back":',
     // tsc names no failing check (`failingChecks`): with typecheck clean,
     // any error is the mutant's.
     command: ["pnpm", "exec", "tsc", "--noEmit"],
@@ -1070,8 +1070,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a row is read for a field its kind does not store",
     file: places,
-    from: "      if (!isTaskId(r.task)) return undefined",
-    to: '      if (!isTaskId(r.task) || r.order !== "") return undefined',
+    from: "      if (!isCanvasId(r.canvas)) return undefined",
+    to: '      if (!isCanvasId(r.canvas) || r.order !== "") return undefined',
     command: ["pnpm", "exec", "tsc", "--noEmit"],
   },
   {
@@ -1185,9 +1185,9 @@ export const mutations: readonly Mutation[] = [
       "a margin place round-trips, and needs its entry, its thread and its order",
   },
   {
-    name: "a task's id parses as no card",
+    name: "a canvas's id parses as no card",
     file: "packages/core/ids.ts",
-    from: "  if (isTaskId(id)) return id\n",
+    from: "  if (isCanvasId(id)) return id\n",
     to: "",
     command: unit,
     expect: "a card's kind is its id's prefix",

@@ -19,7 +19,7 @@ import {
 import {
   BEHIND_TYPE,
   encodeBehind,
-  encodeChat,
+  encodeMessage,
   PINNED_RULE,
 } from "@pinetrie/rules"
 import { readEntries, rowMessage } from "@pinetrie/schema"
@@ -292,7 +292,7 @@ describe("lanes in a harness", () => {
 
   const ADA = writerId("ada")
   const prompt = (text: string) =>
-    encodeChat(
+    encodeMessage(
       {
         author: ADA,
         authorName: "Ada",
@@ -718,7 +718,7 @@ describe("lanes in a harness", () => {
       return m.customType ?? m.role
     })
     expect(roles).toEqual([
-      "pinetrie.chat",
+      "pinetrie.message",
       "assistant",
       "toolResult",
       BEHIND_TYPE,

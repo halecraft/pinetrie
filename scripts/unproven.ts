@@ -19,7 +19,7 @@ export const UNPROVEN: Readonly<Record<string, readonly string[]>> = {
   "browser/page": [
     "a first visit asks for your email and name, and refuses what is not an email",
     "no page errors during load",
-    "＋ agent's new tab is ready to type in: its box has focus",
+    "＋ canvas is ready to type in: its box has focus, after @agent",
     "the column reads Ada's asked message, then the agent",
     "the branch opened as a second column, to the right of its parent",
     "scrolling one column does not scroll another",
@@ -33,7 +33,7 @@ export const UNPROVEN: Readonly<Record<string, readonly string[]>> = {
     "choosing a reader's thread on a thread card opens it in the sidebar",
     "another window shows on the root it is on in the sidebar, and leaves it when it switches",
     "Escape leaves a root's title as it was, and sends nothing",
-    "＋'s conversation, chosen by keyboard, opens a new tab that only sends",
+    "＋ canvas opens a canvas whose box starts with @agent; deleting it sends to people only",
     "two tabs of one device share the inbox: mark all seen in one clears the other",
     "a root's ⋯ in the sidebar opens a menu drawn in full",
     "restoring it in place brings back the composer with its text, and adds it to no other window's list",

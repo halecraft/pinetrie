@@ -1,30 +1,34 @@
 import {
   type CardRecord,
+  canvasIdFor,
   cardIdOfKind,
   NO_CONTENT,
-  taskIdFor,
   textCardId,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
-import { type CanvasCard, canvasOf, NEW_NOTES_TITLE } from "@pinetrie/rules"
+import {
+  type CardOnCanvas,
+  cardsOnCanvas,
+  NEW_NOTES_TITLE,
+} from "@pinetrie/rules"
 import { expect, test } from "vitest"
 import { noteColumnsOf } from "./note-column-view.ts"
 
 const ADA = writerId("ada@x.io")
-const TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
+const CANVAS = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 const [A, B] = [threadIdFor("a"), threadIdFor("b")]
 const [N1, N2] = [
   cardIdOfKind("note-column", "01a0ffd2-0000-7000-8000-0000000000a1"),
   cardIdOfKind("note-column", "01a0ffd2-0000-7000-8000-0000000000a2"),
 ]
-const canvas = (...ids: (typeof A | typeof N1)[]): readonly CanvasCard[] =>
-  canvasOf(
+const cardsFor = (...ids: (typeof A | typeof N1)[]): readonly CardOnCanvas[] =>
+  cardsOnCanvas(
     ids.map((id, i): CardRecord => {
       const place = {
         kind: "canvas",
-        task: TASK,
+        canvas: CANVAS,
         order: String(i).padStart(10, "0"),
         width: 1,
       } as const
@@ -46,7 +50,7 @@ const canvas = (...ids: (typeof A | typeof N1)[]): readonly CanvasCard[] =>
             content: NO_CONTENT,
           }
     }),
-    TASK,
+    CANVAS,
   )
 
 test("noteColumnsOf: each note column in the canvas's order, its title or Notes, its notes in order", () => {
@@ -61,7 +65,7 @@ test("noteColumnsOf: each note column in the canvas's order, its title or Notes,
   const n1 = note(cardIdFor("c1"), N1, "b")
   const n2 = note(cardIdFor("c2"), N1, "a")
   const views = noteColumnsOf({
-    canvas: canvas(A, N2, N1),
+    onCanvas: cardsFor(A, N2, N1),
     cards: [n1, n2],
     titles: new Map([[N1, { column: N1, title: "Ideas", by: ADA, at: 1 }]]),
   })

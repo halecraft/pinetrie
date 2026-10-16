@@ -140,7 +140,7 @@ export function reasonOf(index: TreeIndex, description: string): string {
   const message = entry === null ? undefined : index.entries[entry]?.message
   if (message === undefined) return firstLine(description, 200)
   const who =
-    message.role === "chat" ? `${message.author ?? "someone"}: ` : "agent: "
+    message.role === "person" ? `${message.author ?? "someone"}: ` : "agent: "
   return `${who}${firstLine(messageText(message), 400)}`
 }
 

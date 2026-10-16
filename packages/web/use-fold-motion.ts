@@ -40,8 +40,8 @@ function columnIn(
   folded: boolean,
 ): HTMLElement | null {
   const el =
-    column.kind === "task"
-      ? strip.querySelector<HTMLElement>(":scope > .task-column")
+    column.kind === "canvas"
+      ? strip.querySelector<HTMLElement>(":scope > .canvas-column")
       : strip.querySelector<HTMLElement>(
           `:scope > [data-card="${CSS.escape(column.card)}"]`,
         )

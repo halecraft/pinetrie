@@ -15,6 +15,7 @@ import { type ImageRef, isImageMime, isSha256, type Share } from "./images.ts"
 import {
   type AnswerDetails,
   atEntry,
+  type CanvasId,
   type CardId,
   type CatchUpFrom,
   type EntryId,
@@ -24,7 +25,6 @@ import {
   type Proposal,
   type RelayDetails,
   type SendAt,
-  type TaskId,
   type ThreadId,
   type WriterId,
 } from "./index.ts"
@@ -87,10 +87,10 @@ export interface PinnedView {
   }[]
 }
 
-/** The cards pinned to a task a run read: a task's cards entry, decoded. */
-export interface TaskPinnedView {
-  /** The task they are pinned to. */
-  readonly task: TaskId
+/** The cards pinned to a canvas a run read: a canvas's cards entry, decoded. */
+export interface CanvasPinnedView {
+  /** The canvas they are pinned to. */
+  readonly canvas: CanvasId
   /** Every card pinned to it at the run's start, in order. */
   readonly cards: readonly PinnedCardRead[]
   /** Cards the model had read that are no longer pinned, with their first line. */
@@ -101,13 +101,13 @@ export interface TaskPinnedView {
 }
 
 /**
- * The task's cards a run was told of: a canvas entry's details, decoded. One
+ * The canvas's cards a run was told of: a canvas entry's details, decoded. One
  * line per card in the canvas's order, at most a cap of them, and how many more
  * there are.
  */
 export interface CanvasView {
-  readonly task: TaskId
-  /** The task's title, as told. */
+  readonly canvas: CanvasId
+  /** The canvas's title, as told. */
   readonly title: string
   readonly lines: readonly string[]
   /** How many cards the list left out past its cap. */
@@ -120,7 +120,7 @@ export interface CanvasView {
  */
 export interface ContextInView {
   readonly pinned?: PinnedView
-  readonly taskPinned?: TaskPinnedView
+  readonly canvasPinned?: CanvasPinnedView
   readonly canvas?: CanvasView
 }
 
@@ -154,9 +154,9 @@ export interface AgentMessageLike {
   readonly errorMessage?: string
   /** Role `pinned` only: the cards a run read. */
   readonly pinned?: PinnedView
-  /** Role `task-pinned` only: the cards pinned to the task a run read. */
-  readonly taskPinned?: TaskPinnedView
-  /** Role `canvas` only: the task's cards a run was told of. */
+  /** Role `canvas-pinned` only: the cards pinned to the canvas a run read. */
+  readonly canvasPinned?: CanvasPinnedView
+  /** Role `canvas` only: the canvas's cards a run was told of. */
   readonly canvas?: CanvasView
   /**
    * Roles `update` and `land`, and a `catch_up` tool result: the states merged
@@ -344,7 +344,7 @@ export function messageImages(
 function renderableMessage(entry: EntryLike): TranscriptMessage | null {
   if (entry.type !== "message") return null
   const role = entry.message?.role ?? "unknown"
-  if (role === "chat") {
+  if (role === "person") {
     return {
       id: entry.id,
       thread: entry.thread,
@@ -523,7 +523,7 @@ export const turnMerged = (index: TreeIndex, tip: EntryId): boolean =>
  * its parent.
  */
 const PROMPT_ROLES: ReadonlySet<string> = new Set([
-  "chat",
+  "person",
   "user",
   "land",
   "stack",
@@ -594,19 +594,19 @@ export const pinnedInView = (
     e => e.carried?.pinned ?? null,
   )
 
-/** The cards pinned to the task the model reads on a run from `tip`, as `pinnedInView` finds a thread's. */
-export const taskPinnedInView = (
+/** The cards pinned to the canvas the model reads on a run from `tip`, as `pinnedInView` finds a thread's. */
+export const canvasPinnedInView = (
   index: TreeIndex,
   tip: EntryId | null,
-): TaskPinnedView | null =>
+): CanvasPinnedView | null =>
   newestOnPath(
     index,
     tip,
-    e => e.message?.taskPinned,
-    e => e.carried?.taskPinned ?? null,
+    e => e.message?.canvasPinned,
+    e => e.carried?.canvasPinned ?? null,
   )
 
-/** The task's cards the model was last told of on a run from `tip`, as `pinnedInView` finds pinned cards. */
+/** The canvas's cards the model was last told of on a run from `tip`, as `pinnedInView` finds pinned cards. */
 export const canvasInView = (
   index: TreeIndex,
   tip: EntryId | null,
@@ -1172,7 +1172,7 @@ function raceAlong(
     if (id === at) break
     const m = index.entries[id]?.message
     if (
-      m?.role === "chat" &&
+      m?.role === "person" &&
       m.compelled === true &&
       m.writer !== undefined &&
       m.writer !== me &&

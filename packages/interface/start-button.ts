@@ -1,11 +1,11 @@
-// interface/start-button — ＋, a split button, as values: at the sidebar's
-// foot and each board column's a new tab, agent work its main action and a
-// conversation in its ▾; past a canvas's last column a new column of any
-// kind a canvas holds, an agent thread its main action. Their words are
-// worded here once, whichever ＋ draws them.
+// interface/start-button — ＋, as values: at the sidebar's foot and each
+// board column's, a new canvas and nothing more; past a canvas's last column,
+// a split button making a new column of any kind a canvas holds, an agent
+// thread its main action. Their words are worded here once, whichever ＋
+// draws them.
 
-import type { WorkflowStateId } from "@pinetrie/core"
-import type { CanvasKind } from "@pinetrie/rules"
+import type { WorkflowState } from "@pinetrie/core"
+import type { KindOnCanvas } from "@pinetrie/rules"
 import type { Intent } from "./intent.ts"
 import type { CanvasPut } from "./put-target.ts"
 
@@ -19,15 +19,17 @@ export interface StartItem {
   readonly intent: Intent
 }
 
-/** A split button: its main action, and the rest in its ▾. */
+/** ＋: its main action, and the rest in its ▾, which it has only with something in it. */
 export interface StartButton {
   readonly main: StartItem
-  readonly more: readonly StartItem[]
-  /** The ▾'s accessible name. */
-  readonly moreLabel: string
+  readonly more: {
+    readonly items: readonly [StartItem, ...StartItem[]]
+    /** The ▾'s accessible name. */
+    readonly label: string
+  } | null
 }
 
-/** What each kind of canvas card is made as. A `CanvasKind` it lacks fails to compile at `Makes[K]`. */
+/** What each kind of canvas card is made as. A `KindOnCanvas` it lacks fails to compile at `Makes[K]`. */
 interface Makes {
   readonly thread: { readonly asksAgent: boolean }
   readonly "note-column": Record<never, never>
@@ -35,17 +37,17 @@ interface Makes {
 
 /** A column ＋ makes, one of a kind a canvas holds. */
 export type NewColumn = {
-  readonly [K in CanvasKind]: { readonly kind: K } & Makes[K]
-}[CanvasKind]
+  readonly [K in KindOnCanvas]: { readonly kind: K } & Makes[K]
+}[KindOnCanvas]
 
-type NewColumnOf<K extends CanvasKind> = Extract<
+type NewColumnOf<K extends KindOnCanvas> = Extract<
   NewColumn,
   { readonly kind: K }
 >
 
 /** Each kind a canvas holds, at least once, each column under its own kind. */
 export type NewColumnTable = {
-  readonly [K in CanvasKind]: readonly [NewColumnOf<K>, ...NewColumnOf<K>[]]
+  readonly [K in KindOnCanvas]: readonly [NewColumnOf<K>, ...NewColumnOf<K>[]]
 }
 
 /** What ＋ past a canvas's last column offers, by kind, in the ▾'s order. */
@@ -57,7 +59,7 @@ const NEW_COLUMNS = {
   "note-column": [{ kind: "note-column" }],
 } as const satisfies NewColumnTable
 
-/** Agent work: the main action of every ＋, the first thread the table offers. */
+/** An agent thread: the main action of ＋ past a canvas's last column, the first thread the table offers. */
 const AGENT: NewColumn = NEW_COLUMNS.thread[0]
 
 /** What `make` is called on ＋, whichever ＋ starts it. */
@@ -73,11 +75,11 @@ function startWords(make: NewColumn): Omit<StartItem, "intent"> {
               "a new thread where the agent answers every message that names no one",
           }
         : {
-            key: "conversation",
-            label: "conversation",
-            name: "new conversation",
+            key: "chat",
+            label: "chat",
+            name: "new chat",
             title:
-              "a new conversation: the agent answers only when @agent is mentioned",
+              "a new chat: the agent answers only when @agent is mentioned",
           }
     case "note-column":
       return {
@@ -95,21 +97,33 @@ const item = (make: NewColumn, intent: Intent): StartItem => ({
 })
 
 /**
- * ＋ at the sidebar's foot (`state` null) or a board column's: a new tab,
- * landing in that column's state, as agent work or a conversation.
+ * Where ＋ that makes a canvas is: the sidebar's foot, whose canvas lands at
+ * the end of the first open state (null before the board has arrived), or a
+ * board column, whose canvas lands at the end of its state.
  */
-export function newTabButton(state: WorkflowStateId | null): StartButton {
-  const tab = (make: NewColumnOf<"thread">): StartItem =>
-    item(make, {
-      kind: "newTab",
-      asksAgent: make.asksAgent,
-      ...(state === null ? {} : { state }),
-    })
-  const [main, ...more] = NEW_COLUMNS.thread
+export type CanvasStart =
+  | { readonly from: "sidebar"; readonly landsIn: WorkflowState | null }
+  | { readonly from: "board"; readonly landsIn: WorkflowState }
+
+/**
+ * ＋ at the sidebar's foot or a board column's: a new canvas, with no ▾. Its
+ * first thread starts with `@agent ` typed, so its first message decides
+ * whether it is a chat.
+ */
+export function newCanvasButton(start: CanvasStart): StartButton {
+  const { landsIn } = start
   return {
-    main: tab(main),
-    more: more.map(tab),
-    moreLabel: "other ways to start",
+    main: {
+      key: "canvas",
+      label: "canvas",
+      name: "new canvas",
+      title: `a new canvas${landsIn === null ? "" : ` at the end of ${landsIn.name}`}: its first thread starts with @agent typed`,
+      intent: {
+        kind: "newCanvas",
+        ...(start.from === "board" ? { state: start.landsIn.id } : {}),
+      },
+    },
+    more: null,
   }
 }
 
@@ -117,10 +131,15 @@ export function newTabButton(state: WorkflowStateId | null): StartButton {
 export function newColumnButton(at: CanvasPut): StartButton {
   const make = (m: NewColumn): StartItem =>
     item(m, { kind: "addColumn", make: m, at })
-  const all: readonly NewColumn[] = Object.values(NEW_COLUMNS).flat()
+  const [first, ...rest] = Object.values(NEW_COLUMNS)
+    .flat()
+    .filter((m: NewColumn) => m !== AGENT)
+    .map(make)
   return {
     main: make(AGENT),
-    more: all.filter(m => m !== AGENT).map(make),
-    moreLabel: "other kinds of column",
+    more:
+      first === undefined
+        ? null
+        : { items: [first, ...rest], label: "other kinds of column" },
   }
 }

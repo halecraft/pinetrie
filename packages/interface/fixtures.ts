@@ -4,7 +4,9 @@
 // it as `@pinetrie/interface/fixtures`.
 
 import {
+  type CanvasId,
   type CardRecord,
+  canvasIdFor,
   cardIdOfKind,
   type EntryId,
   type EntryLike,
@@ -12,20 +14,18 @@ import {
   NO_CONTENT,
   rootIdFor,
   rootOf,
-  type TaskId,
   type ThreadCard,
   type ThreadId,
   type ThreadRecord,
   type TreeIndex,
-  taskIdFor,
   textCardId,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import {
+  canvasCard,
   entriesOf,
   entry,
-  taskCard,
   withThreads,
 } from "@pinetrie/core/fixtures"
 import type { ClipLookups } from "./effects.ts"
@@ -39,7 +39,7 @@ export {
   withThreads,
 } from "@pinetrie/core/fixtures"
 
-import { type Tasks, tasksOf } from "./tasks.ts"
+import { type Canvases, canvasesOnBoard } from "./canvases.ts"
 
 /**
  * The index of `list`, keyed by each entry's own id as the reads key them,
@@ -59,7 +59,7 @@ export const tree = (
   indexOf(
     Object.entries(parents).map(([id, parentId]) =>
       entry(id, parentId, {
-        role: "chat",
+        role: "person",
         content: id,
         ...(sends[id] === undefined ? {} : { sendId: sends[id] }),
       }),
@@ -68,7 +68,7 @@ export const tree = (
 
 /** The root a test's places and entries are in. */
 export const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
-/** A root a new tab minted as it opened, in the shape the host accepts. */
+/** A root a new canvas minted as it opened, in the shape the host accepts. */
 export const NEW_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000b")
 /** A thread a column minted as it opened, in the shape the host accepts. */
 export const NEW_THREAD = threadIdFor("01a0ffd2-0000-7000-8000-0000000000aa")
@@ -109,35 +109,35 @@ export const NO_FOCUS: Focus = {
   zone: null,
 }
 
-/** The task a new tab's first send starts, in `parseNewTask`'s shape. */
-export const NEW_TASK = taskIdFor("01a0ffd2-0000-7000-8000-0000000000bb")
+/** The canvas a new canvas's first send starts, in `parseNewCanvas`'s shape. */
+export const NEW_CANVAS = canvasIdFor("01a0ffd2-0000-7000-8000-0000000000bb")
 
-/** A task the fixtures' threads are in. */
-export const TEST_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
+/** A canvas the fixtures' threads are in. */
+export const TEST_CANVAS = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 
 /**
- * The page's tasks for a test: each task holding every thread of
+ * The page's canvases for a test: each canvas holding every thread of
  * `index` whose first entry is under the root entry named with it, each a
  * thread card on its canvas in thread order, its root `TEST_ROOT`.
  */
-export function tasksFor(
+export function canvasesFor(
   index: TreeIndex,
-  ...pairs: readonly (readonly [TaskId, EntryId])[]
-): Tasks {
+  ...pairs: readonly (readonly [CanvasId, EntryId])[]
+): Canvases {
   const cards: ThreadCard[] = []
   const threads = new Map<ThreadId, ThreadRecord>()
   for (const [thread, first] of [...index.firstOf].sort(([a], [b]) =>
     a < b ? -1 : a > b ? 1 : 0,
   )) {
     const root = rootOf(index, first)
-    const task = pairs.find(([, entry]) => entry === root)?.[0]
-    if (task === undefined) continue
+    const canvas = pairs.find(([, entry]) => entry === root)?.[0]
+    if (canvas === undefined) continue
     cards.push({
       kind: "thread",
       id: thread,
       owner: TEST_WRITER,
       placer: TEST_WRITER,
-      place: { kind: "canvas", task, order: `a${cards.length}`, width: 1 },
+      place: { kind: "canvas", canvas, order: `a${cards.length}`, width: 1 },
       content: NO_CONTENT,
     })
     threads.set(thread, {
@@ -148,23 +148,26 @@ export function tasksFor(
       origin: { kind: "root" },
     })
   }
-  return tasksOf({
-    cards: [...pairs.map(([task], i) => taskCard(task, `a${i}`)), ...cards],
+  return canvasesOnBoard({
+    cards: [
+      ...pairs.map(([canvas], i) => canvasCard(canvas, `a${i}`)),
+      ...cards,
+    ],
     threads,
   })
 }
 
 /**
- * The page's tasks for a test, each of `known` a task whose card is on
+ * The page's canvases for a test, each of `known` a canvas whose card is on
  * the board, beside `cards`.
  */
-export const tasksWith = (input: {
-  readonly known: readonly TaskId[]
+export const canvasesWith = (input: {
+  readonly known: readonly CanvasId[]
   readonly cards: readonly CardRecord[]
   readonly threads: ReadonlyMap<ThreadId, ThreadRecord>
-}): Tasks =>
-  tasksOf({
-    cards: [...input.known.map(task => taskCard(task)), ...input.cards],
+}): Canvases =>
+  canvasesOnBoard({
+    cards: [...input.known.map(canvas => canvasCard(canvas)), ...input.cards],
     threads: input.threads,
   })
 

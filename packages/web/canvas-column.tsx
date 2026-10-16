@@ -1,41 +1,41 @@
-// web/task-column — the task column: the task's own place on its canvas,
+// web/canvas-column — the canvas column: the canvas's own place on its canvas,
 // drawn before every card and outside the order, so nothing moves it. Its
 // title is renamed in place, its state changed from its Move to ▸, the same
 // intents the sidebar and the board send; who is here is the board's
 // readers. Folded, it is a `FoldedStrip` with its title, and no mark. What it
-// says is `taskColumnView`'s.
+// says is `canvasColumnView`'s.
 
 import type {
+  CanvasId,
+  CanvasPinnedView,
   CardId,
   EntryId,
-  TaskId,
-  TaskPinnedView,
   TextCard,
 } from "@pinetrie/core"
 import {
-  boardStateWords,
+  boardPlaceWords,
+  CANVAS_LIST_HEADING,
+  CANVAS_PINS_EMPTY,
+  CANVAS_PINS_HEADING,
+  type CanvasColumnView,
   type ColumnAct,
   dropProps,
   dropsWords,
-  FOLD_TASK,
+  FOLD_CANVAS,
   type Intent,
   NO_MARK,
   pinnedCountWords,
-  RENAME_TASK_TITLE,
+  RENAME_CANVAS_TITLE,
   RESTORE_WORDS,
   type Reader,
   type ReadOnly,
   renameIntent,
-  TASK_LIST_HEADING,
-  TASK_PINS_EMPTY,
-  TASK_PINS_HEADING,
-  type TaskColumnView,
   trashHeading,
   trashKeepWords,
   trashWords,
-  UNFOLD_TASK,
+  UNFOLD_CANVAS,
 } from "@pinetrie/interface"
-import { TASK_BUSY_REASON } from "@pinetrie/rules"
+import { CANVAS_BUSY_REASON } from "@pinetrie/rules"
 import type { SessionClient } from "@pinetrie/session"
 import { useState } from "react"
 import { PinnedCardEditor } from "./card-editor.tsx"
@@ -44,87 +44,92 @@ import { Menu, type MenuItem } from "./menu.tsx"
 import { ReaderMenus, type ReadersProps } from "./root-signals.tsx"
 import { TitleField } from "./title-field.tsx"
 
-export function TaskColumn(p: {
+export function CanvasColumn(p: {
   session: SessionClient
-  view: TaskColumnView
-  /** The cards pinned to the task, in order (`taskPinnedOf`). */
+  view: CanvasColumnView
+  /** The cards pinned to the canvas, in order (`canvasPinnedOf`). */
   pins: readonly TextCard[]
   /**
-   * What the agent of the task's first column last read of them
-   * (`taskPinnedInView`), as a thread's pins are read; null for nothing yet.
+   * What the agent of the canvas's first column last read of them
+   * (`canvasPinnedInView`), as a thread's pins are read; null for nothing yet.
    */
-  pinsInView: TaskPinnedView | null
-  /** The canvas list the task's agents are told (`canvasList`), its lines. */
+  pinsInView: CanvasPinnedView | null
+  /** The canvas list the canvas's agents are told (`canvasList`), its lines. */
   told: readonly string[]
   reader: Reader
   readOnly: ReadOnly | null
   onTyping: (card: CardId) => void
   readers: ReadersProps
   /** A reader's menu row: one of their threads, which opens it. */
-  thread: (end: EntryId, task: TaskId) => MenuItem | null
+  thread: (end: EntryId, canvas: CanvasId) => MenuItem | null
   onIntent: (intent: Intent) => void
 }) {
   const { view } = p
+  const placeWords = boardPlaceWords(view.place)
   const [renaming, setRenaming] = useState(false)
-  const fold = (unfolded: boolean) => p.onIntent({ kind: "foldTask", unfolded })
-  // A pin's acts are said in the task column, by its task's id.
+  const fold = (unfolded: boolean) =>
+    p.onIntent({ kind: "foldCanvas", unfolded })
+  // A pin's acts are said in the canvas column, by its canvas's id.
   const act = (a: ColumnAct) =>
     p.onIntent({
       kind: "column",
-      column: { kind: "task", task: view.task },
+      column: { kind: "canvas", canvas: view.canvas },
       act: a,
     })
   if (view.folded)
     return (
-      <section className="task-column folded-column" data-task={view.task}>
+      <section
+        className="canvas-column folded-column"
+        data-canvas={view.canvas}
+      >
         <FoldedStrip
           detail={pinnedCountWords(p.pins.length)}
           mark={NO_MARK}
           name={view.label}
           onUnfold={() => fold(true)}
-          unfold={UNFOLD_TASK}
+          unfold={UNFOLD_CANVAS}
         />
       </section>
     )
   return (
-    <section className="task-column" data-task={view.task}>
-      <header className="task-column-head">
+    <section className="canvas-column" data-canvas={view.canvas}>
+      <header className="canvas-column-head">
         {renaming && !view.readOnly ? (
           <TitleField
-            label="title for this task"
+            label="title for this canvas"
             onEnd={() => setRenaming(false)}
-            onSend={title => p.onIntent(renameIntent(view.task, title))}
+            onSend={title => p.onIntent(renameIntent(view.canvas, title))}
             placeholder={view.placeholder}
             stored={view.titled}
           />
         ) : (
           <button
-            className="task-column-title"
+            className="canvas-column-title"
             disabled={view.readOnly}
             onClick={() => setRenaming(true)}
-            title={RENAME_TASK_TITLE}
+            title={RENAME_CANVAS_TITLE}
             type="button"
           >
             <span data-fold-name="">{view.label}</span>
           </button>
         )}
         <button
-          aria-label={FOLD_TASK.title}
-          className={FOLD_TASK.className}
+          aria-label={FOLD_CANVAS.title}
+          className={FOLD_CANVAS.className}
           onClick={() => fold(false)}
-          title={FOLD_TASK.title}
+          title={FOLD_CANVAS.title}
           type="button"
         >
-          {FOLD_TASK.label}
+          {FOLD_CANVAS.label}
         </button>
       </header>
-      <div className="task-column-body">
-        <div className="task-state">
-          <span className="task-state-name">{boardStateWords(view.state)}</span>
+      <div className="canvas-column-body">
+        <div className="canvas-state">
+          <span className="canvas-state-name">{placeWords.line}</span>
           {view.moves.length > 0 && (
             <Menu
-              className="task-state-menu"
-              label="move this task on the board"
+              className="canvas-state-menu"
+              label={placeWords.moveLabel}
               sections={[
                 {
                   key: "moves",
@@ -143,7 +148,7 @@ export function TaskColumn(p: {
                           {m.busy !== null && (
                             <span className="why">
                               {" "}
-                              · {TASK_BUSY_REASON[m.busy]}
+                              · {CANVAS_BUSY_REASON[m.busy]}
                             </span>
                           )}
                           {drops !== null && (
@@ -157,20 +162,20 @@ export function TaskColumn(p: {
                 },
               ]}
               trigger="Move to ▸"
-              triggerClassName="task-state-move"
+              triggerClassName="canvas-state-move"
             />
           )}
         </div>
         <div
-          className="task-pins"
+          className="canvas-pins"
           data-empty={p.pins.length === 0 || undefined}
           {...(view.readOnly
             ? {}
-            : dropProps({ kind: "taskPinned", task: view.task }))}
+            : dropProps({ kind: "canvasPinned", canvas: view.canvas }))}
         >
-          <span className="task-pins-heading">{TASK_PINS_HEADING}</span>
+          <span className="canvas-pins-heading">{CANVAS_PINS_HEADING}</span>
           {p.pins.length === 0 && (
-            <span className="pinned-empty">{TASK_PINS_EMPTY}</span>
+            <span className="pinned-empty">{CANVAS_PINS_EMPTY}</span>
           )}
           {p.pins.map(c => (
             <PinnedCardEditor
@@ -188,16 +193,16 @@ export function TaskColumn(p: {
             />
           ))}
         </div>
-        <details className="task-told">
-          <summary>{TASK_LIST_HEADING}</summary>
+        <details className="canvas-told">
+          <summary>{CANVAS_LIST_HEADING}</summary>
           {p.told.map(line => (
-            <div className="task-told-line" key={line}>
+            <div className="canvas-told-line" key={line}>
               {line}
             </div>
           ))}
         </details>
         {view.trash.rows.length > 0 && (
-          <details className="task-trash">
+          <details className="canvas-trash">
             <summary>{trashHeading(view.trash.rows.length)}</summary>
             <p className="trash-keep">{trashKeepWords(view.trash.keepMs)}</p>
             {view.trash.rows.map(row => (
@@ -215,7 +220,7 @@ export function TaskColumn(p: {
                     p.onIntent({
                       kind: "restore",
                       card: row.card,
-                      at: { kind: "column", key: view.task },
+                      at: { kind: "column", key: view.canvas },
                     })
                   }
                   title={RESTORE_WORDS.title}
@@ -228,8 +233,8 @@ export function TaskColumn(p: {
             ))}
           </details>
         )}
-        <div className="task-here">
-          <ReaderMenus {...p.readers} task={view.task} thread={p.thread} />
+        <div className="canvas-here">
+          <ReaderMenus {...p.readers} canvas={view.canvas} thread={p.thread} />
         </div>
       </div>
     </section>

@@ -11,11 +11,12 @@ import {
   type AccessRecord,
   type AgentMessageLike,
   type AgentRun,
-  type ArchivedTask,
+  type ArchivedCanvas,
   agentActivity,
   ancestry,
   type BannerRecord,
   type BaseRecord,
+  type CanvasId,
   type CardHistoryRecord,
   type CardId,
   type CardRecord,
@@ -28,8 +29,8 @@ import {
   firstLineOf,
   type IconsRecord,
   indexTree,
+  isCanvasId,
   isRootId,
-  isTaskId,
   isThreadId,
   type LaneRecord,
   type LaneView,
@@ -54,7 +55,6 @@ import {
   type SharedLineage,
   type SnapshotId,
   summarizeRoots,
-  type TaskId,
   type ThreadId,
   type ThreadLane,
   type ThreadName,
@@ -75,14 +75,14 @@ import {
   BASE,
   BUDGET,
   type BudgetRecord,
-  boardTasks,
+  boardCanvases,
   CARD_HISTORY,
   COMMANDS,
   COMMANDS_KEY,
   contextOf,
   DIGEST,
   decodeCard,
-  decodeChat,
+  decodeMessage,
   FILES_LOST,
   type FilesLostRecord,
   type Home,
@@ -319,7 +319,7 @@ export function readRunAuthor(
 function askerOf(index: TreeIndex, tip: EntryId | null): WriterId | undefined {
   const prompt = promptOf(index, tip)
   const message = prompt === null ? undefined : index.entries[prompt]?.message
-  return message?.role === "chat" ? message.writer : undefined
+  return message?.role === "person" ? message.writer : undefined
 }
 
 /**
@@ -537,17 +537,17 @@ const presenceField = (
 /** One entry per open column: its writer, and the thread end it follows. */
 export const readReading = presenceField(doc => doc.reading())
 /**
- * Each followed thread end's task, from the column that reports it: what a
+ * Each followed thread end's canvas, from the column that reports it: what a
  * window that does not hold the thread's root names it by. Kept while unchanged, as `presenceField`'s reads are.
  */
-export const readReadingTasks = keptWhileSame(
-  (doc: PresenceDocHandle): ReadonlyMap<EntryId, TaskId> => {
-    const tasks = doc.readingTask()
-    const now = new Map<EntryId, TaskId>()
+export const readReadingCanvases = keptWhileSame(
+  (doc: PresenceDocHandle): ReadonlyMap<EntryId, CanvasId> => {
+    const canvases = doc.readingCanvas()
+    const now = new Map<EntryId, CanvasId>()
     for (const [key, end] of Object.entries(doc.reading())) {
-      const task = tasks[key]
-      if (end !== null && typeof task === "string" && isTaskId(task))
-        now.set(entryId(end), task)
+      const canvas = canvases[key]
+      if (end !== null && typeof canvas === "string" && isCanvasId(canvas))
+        now.set(entryId(end), canvas)
     }
     return now
   },
@@ -645,14 +645,14 @@ export const readPlacesRev = (places: PlacesDocHandle): number => places.rev()
 export const readWorkflow = (doc: SessionDocHandle): Workflow | null =>
   readRecords(doc, WORKFLOW).get(WORKFLOW_KEY) ?? null
 
-/** Every task the session holds: each one whose card is on the board. */
-export const readTasks = (places: PlacesDocHandle): ReadonlySet<TaskId> =>
-  boardTasks(readPlaces(places))
+/** Every canvas the session holds: each one whose card is on the board. */
+export const readCanvases = (places: PlacesDocHandle): ReadonlySet<CanvasId> =>
+  boardCanvases(readPlaces(places))
 
 /**
- * The tasks in the archive, archived, by id, from the
+ * The canvases in the archive, archived, by id, from the
  * board's cards and their histories (`archivedOf`); none before a host
- * wrote the workflow. The same map while the same tasks are archived by the
+ * wrote the workflow. The same map while the same canvases are archived by the
  * same writers at the same times: every write to the session's values
  * wakes it, the directory's included.
  */
@@ -660,7 +660,7 @@ export const readArchived = keptWhileSame(
   (
     doc: SessionDocHandle,
     places: PlacesDocHandle,
-  ): ReadonlyMap<TaskId, ArchivedTask> => {
+  ): ReadonlyMap<CanvasId, ArchivedCanvas> => {
     const workflow = readWorkflow(doc)
     return workflow === null
       ? new Map()
@@ -674,10 +674,10 @@ export const readArchived = keptWhileSame(
     }),
 )
 
-/** Every task's title (`pinetrie.mark`), by task. */
+/** Every canvas's title (`pinetrie.mark`), by canvas. */
 export const readMarks = (
   doc: SessionDocHandle,
-): ReadonlyMap<TaskId, MarkRecord> => readRecords(doc, MARK)
+): ReadonlyMap<CanvasId, MarkRecord> => readRecords(doc, MARK)
 
 /** Each titled note column's title (`pinetrie.note-column`), by id. */
 export const readNoteColumns = (
@@ -821,9 +821,9 @@ export function referencedBlobs(facts: {
   const shas = new Set<Sha256>()
   for (const banner of facts.banners) shas.add(banner.sha)
   for (const message of facts.messages) {
-    const chat = decodeChat(message)
-    for (const image of chat?.images ?? []) shas.add(image.sha256)
-    for (const share of chat?.shared ?? []) {
+    const said = decodeMessage(message)
+    for (const image of said?.images ?? []) shas.add(image.sha256)
+    for (const share of said?.shared ?? []) {
       shas.add(share.original.sha256)
       if (share.shown !== null) shas.add(share.shown.sha256)
     }
@@ -862,7 +862,7 @@ export const readReferencedBlobs = (
  * A root's directory record, read from its document: its first
  * message and that message's first line, its messages, newest
  * entry and writers (`summarizeRoots`), each thread's writers on its path,
- * its chats that name someone, and every image it shows. What
+ * its sends that name someone, and every image it shows. What
  * the host writes as `pinetrie.root`.
  */
 export function readRootRecord(root: RootId, doc: RootDocHandle): RootRecord {
@@ -872,7 +872,7 @@ export function readRootRecord(root: RootId, doc: RootDocHandle): RootRecord {
   const first = summary?.first ?? null
   const mentions = Object.values(index.entries).flatMap(e => {
     const m = e.message
-    if (m?.role !== "chat" || m.writer === undefined) return []
+    if (m?.role !== "person" || m.writer === undefined) return []
     const text = messageText(m)
     return parseMentions(text).length === 0
       ? []

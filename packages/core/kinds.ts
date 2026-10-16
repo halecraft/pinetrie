@@ -32,9 +32,9 @@ export interface KindSpec {
  *
  * - a text card, anywhere but a canvas;
  * - a thread's card, on a canvas or in an inventory;
- * - a task's card, on the board, in a workflow state: the host places it
+ * - a canvas's card, on the board, in a workflow state: the host places it
  *   (a board move is its own command, which crosses the archive's edge),
- *   so no person's move takes it, and only the host trashes it (a new tab
+ *   so no person's move takes it, and only the host trashes it (a new canvas
  *   closed unsent); no reorder moves it either, since the board's own move
  *   ranks it within its state (`planBoardMove`);
  * - a note column, on a canvas;
@@ -62,7 +62,7 @@ export const KINDS = {
       "composing",
       "note",
       "pinned",
-      "task-pinned",
+      "canvas-pinned",
       "queued",
       "margin",
       "trash",
@@ -79,7 +79,7 @@ export const KINDS = {
     reordered: true,
     text: "none",
   },
-  task: {
+  canvas: {
     prefix: "k-",
     places: ["board", "trash"],
     moves: false,

@@ -1,9 +1,9 @@
 import {
+  type CanvasId,
+  canvasIdFor,
   entryId,
   type RelayDetails,
   runId,
-  type TaskId,
-  taskIdFor,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -17,12 +17,12 @@ import { createAnswers } from "./answers.ts"
 import type { Budgets } from "./budgets.ts"
 import {
   applyWrites,
-  archiveTask,
+  archiveCanvas,
   basics,
   fakeLane,
   placesFor,
+  putCanvas,
   putLane,
-  putTask,
   RUNS_ANY,
   record,
   row,
@@ -32,16 +32,16 @@ import { createLater } from "./later.ts"
 const ADA = writerId("ada@example.com")
 const ASKER = threadIdFor("01a00000-0000-7000-8000-0000000000a1")
 const ANSWERER = threadIdFor("01a00000-0000-7000-8000-0000000000b2")
-const ASKERS: TaskId = taskIdFor("01a00000-0000-7000-8000-0000000000d4")
+const ASKERS: CanvasId = canvasIdFor("01a00000-0000-7000-8000-0000000000d4")
 
 /**
  * Ada asked ANSWERER from ASKER, whose own run is still going; ANSWERER's
- * run, the relay's, has answered. Each thread on a task of its own.
+ * run, the relay's, has answered. Each thread on a canvas of its own.
  */
 function setUp() {
   const b = basics()
-  putTask(b, ASKER, ASKERS)
-  putTask(b, ANSWERER)
+  putCanvas(b, ASKER, ASKERS)
+  putCanvas(b, ANSWERER)
   writeEntry(b.root, row(entryId("a-1"), null, undefined, ASKER))
   putLane(b, ASKER, entryId("a-1"))
   beginRun(b.live, ASKER, runId("r-asker"))
@@ -106,7 +106,7 @@ test("an answer held for an asker archived meanwhile is the answering thread's u
   await answers.ended(ANSWERER, entryId("e-1"))
   await keeper.idle()
   expect(asker.calls).toEqual([])
-  archiveTask(b, ASKERS)
+  archiveCanvas(b, ASKERS)
   await answers.ended(ASKER, null)
   await keeper.idle()
   const queued = queuedOn(readPlaces(b.places), ANSWERER)

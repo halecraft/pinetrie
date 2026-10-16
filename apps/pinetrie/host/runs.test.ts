@@ -12,7 +12,7 @@ import type { Agent } from "@pinetrie/pi"
 import {
   encodeBehind,
   encodeCanvas,
-  encodeChat,
+  encodeMessage,
   encodePinned,
   planStack,
 } from "@pinetrie/rules"
@@ -22,25 +22,25 @@ import { describe, expect, test } from "vitest"
 import type { BaseNews } from "./base-news.ts"
 import {
   basics,
+  CANVAS_ID,
   deferred,
   fakeLane,
   methods,
   record,
   row,
   runnableFor,
-  TASK_ID,
 } from "./fakes.ts"
 import {
   createRuns,
   planRunEnd,
+  type ReadCanvasContext,
   type ReadPinned,
-  type ReadTaskContext,
   streamInto,
 } from "./runs.ts"
 import type { LaneWork } from "./work/index.ts"
 
 const LANE = threadIdFor("0123456789abcdef")
-const chat = encodeChat(
+const said = encodeMessage(
   {
     author: writerId("alice@example.com"),
     authorName: "Alice",
@@ -53,7 +53,7 @@ const chat = encodeChat(
 
 describe("planRunEnd", () => {
   test("endRun comes before laneStopped, and ended is last, for every role", () => {
-    for (const role of [undefined, "chat", "land", "stack"]) {
+    for (const role of [undefined, "person", "land", "stack"]) {
       const steps = planRunEnd(role)
       expect(steps.indexOf("endRun")).toBeLessThan(steps.indexOf("laneStopped"))
       expect(steps.at(-1)).toBe("ended")
@@ -61,7 +61,7 @@ describe("planRunEnd", () => {
   })
 
   test("a stack prompt adds splitEnded before endRun; a land prompt ends as any run", () => {
-    expect(planRunEnd("land")).toEqual(planRunEnd("chat"))
+    expect(planRunEnd("land")).toEqual(planRunEnd("person"))
     expect(planRunEnd("stack")).toEqual([
       "splitEnded",
       "verdictPending",
@@ -73,7 +73,7 @@ describe("planRunEnd", () => {
   })
 
   test("the verdict is pending before endRun, for every role", () => {
-    for (const role of [undefined, "chat", "land", "stack"]) {
+    for (const role of [undefined, "person", "land", "stack"]) {
       const steps = planRunEnd(role)
       expect(steps.indexOf("verdictPending")).toBeGreaterThanOrEqual(0)
       expect(steps.indexOf("verdictPending")).toBeLessThan(
@@ -88,7 +88,7 @@ function setUp(
   splitEnded: LaneWork["splitEnded"] = async () => null,
   readPinned: ReadPinned = async () => null,
   atStart: BaseNews["atStart"] = async () => null,
-  readTaskContext: ReadTaskContext = async () => [],
+  readCanvasContext: ReadCanvasContext = async () => [],
 ) {
   const b = basics()
   const work = record<Pick<LaneWork, "beforeRun" | "runEnded" | "splitEnded">>({
@@ -104,7 +104,7 @@ function setUp(
     agent: agent.port,
     work: work.port,
     readPinned,
-    readTaskContext,
+    readCanvasContext,
     baseNews: { atStart, runEnded: () => {} },
     pending: async (l, prompt) => {
       pending.push({ prompt, running: readActiveRun(b.live, l) !== undefined })
@@ -139,7 +139,7 @@ describe("a run's end", () => {
     const { b, lane, runs, ended } = setUp()
     runs.start(runnableFor(LANE), {
       kind: "prompt",
-      message: chat,
+      message: said,
       pinnedSeen: [],
     })
     streamInto(b)({ kind: "text", lane: LANE, delta: "hello" })
@@ -157,12 +157,12 @@ describe("a run's end", () => {
     const { b, lane, runs, pending, ended } = setUp()
     runs.start(runnableFor(LANE), {
       kind: "prompt",
-      message: chat,
+      message: said,
       pinnedSeen: [],
     })
     writeEntry(
       b.root,
-      row(entryId("p-1"), null, { role: "chat", content: "hi" }),
+      row(entryId("p-1"), null, { role: "person", content: "hi" }),
     )
     writeLaneTip(b.root, LANE, entryId("p-1"))
     lane.finish({ kind: "ok" })
@@ -174,12 +174,12 @@ describe("a run's end", () => {
     const { b, lane, runs, ended } = setUp()
     runs.start(runnableFor(LANE), {
       kind: "prompt",
-      message: chat,
+      message: said,
       pinnedSeen: [],
     })
     writeEntry(
       b.root,
-      row(entryId("p-1"), null, { role: "chat", content: "hi" }),
+      row(entryId("p-1"), null, { role: "person", content: "hi" }),
     )
     writeEntry(
       b.root,
@@ -196,7 +196,7 @@ describe("a run's end", () => {
     })
     runs.start(runnableFor(LANE), {
       kind: "prompt",
-      message: chat,
+      message: said,
       pinnedSeen: [],
     })
     writeEntry(
@@ -216,14 +216,14 @@ describe("a run's end", () => {
     const { runs, ended } = setUp(lane)
     runs.start(runnableFor(LANE), {
       kind: "prompt",
-      message: chat,
+      message: said,
       pinnedSeen: [],
     })
     lane.finish({ kind: "refused", code: ERR.REFUSED })
     await ended
     expect(
       lane.calls.filter(c => c.method === "append").map(c => c.args[0]),
-    ).toEqual([chat])
+    ).toEqual([said])
   })
 })
 
@@ -263,18 +263,18 @@ describe("a run's pinned cards", () => {
     const seen = [{ id: cardIdFor("c1"), seen: "v-1" }]
     runs.start(runnableFor(LANE), {
       kind: "prompt",
-      message: chat,
+      message: said,
       pinnedSeen: seen,
     })
     lane.finish({ kind: "ok" })
     await ended
     expect(asked).toEqual([[LANE, seen]])
     expect(lane.calls.filter(c => c.method === "run").map(c => c.args)).toEqual(
-      [[chat, [pinned]]],
+      [[said, [pinned]]],
     )
   })
 
-  test("a chat's run is told its base's news first, then its task, before its cards entry", async () => {
+  test("a chat's run is told its base's news first, then its canvas, before its cards entry", async () => {
     const behind = encodeBehind(
       {
         from: { kind: "accepted" },
@@ -286,8 +286,13 @@ describe("a run's pinned cards", () => {
       1,
     )
     const asked: string[] = []
-    const canvas = encodeCanvas(
-      { task: TASK_ID, title: "T", lines: ["thread a (this thread)"], more: 0 },
+    const canvasEntry = encodeCanvas(
+      {
+        canvas: CANVAS_ID,
+        title: "T",
+        lines: ["thread a (this thread)"],
+        more: 0,
+      },
       1,
     )
     const { lane, runs, ended } = setUp(
@@ -298,18 +303,18 @@ describe("a run's pinned cards", () => {
         asked.push(l)
         return behind
       },
-      async () => [canvas],
+      async () => [canvasEntry],
     )
     runs.start(runnableFor(LANE), {
       kind: "prompt",
-      message: chat,
+      message: said,
       pinnedSeen: [],
     })
     lane.finish({ kind: "ok" })
     await ended
     expect(asked).toEqual([LANE])
     expect(lane.calls.filter(c => c.method === "run").map(c => c.args)).toEqual(
-      [[chat, [behind, canvas, pinned]]],
+      [[said, [behind, canvasEntry, pinned]]],
     )
   })
 
@@ -371,13 +376,13 @@ describe("a run's pinned cards", () => {
     )
     runs.start(runnableFor(LANE), {
       kind: "prompt",
-      message: chat,
+      message: said,
       pinnedSeen: [],
     })
     expect(runs.cancel(LANE)).toBe(true)
     expect((await ended).running).toBe(false)
     expect(methods(lane.calls)).toEqual(["append"])
-    expect(lane.calls[0]?.args).toEqual([chat])
+    expect(lane.calls[0]?.args).toEqual([said])
     expect(runs.cancel(LANE)).toBe(false)
   })
 
@@ -409,7 +414,7 @@ describe("a run's pinned cards", () => {
     const { lane, runs, ended } = setUp()
     runs.start(runnableFor(LANE), {
       kind: "prompt",
-      message: chat,
+      message: said,
       pinnedSeen: [],
     })
     await untilRun(lane)
@@ -431,7 +436,7 @@ test("a run's end forgets the lane's base news as the lane stops, before ended",
       splitEnded: async () => null,
     },
     readPinned: async () => null,
-    readTaskContext: async () => [],
+    readCanvasContext: async () => [],
     baseNews: {
       atStart: async () => null,
       runEnded: l => order.push(`news ${l}`),
@@ -445,7 +450,7 @@ test("a run's end forgets the lane's base news as the lane stops, before ended",
   })
   runs.start(runnableFor(LANE), {
     kind: "prompt",
-    message: chat,
+    message: said,
     pinnedSeen: [],
   })
   lane.finish({ kind: "ok" })

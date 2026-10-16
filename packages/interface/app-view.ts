@@ -8,8 +8,9 @@
 import {
   type AccessRecord,
   type AgentWork,
-  type ArchivedTask,
+  type ArchivedCanvas,
   ancestry,
+  type CanvasId,
   type EntryId,
   firstMessageOf,
   isBusy,
@@ -21,7 +22,6 @@ import {
   projectRail,
   type RailRow,
   type RootId,
-  type TaskId,
   type ThreadId,
   type ThreadName,
   type TreeIndex,
@@ -48,7 +48,7 @@ export interface ReadOnly {
   readonly action: { readonly title: string; readonly intent: Intent } | null
 }
 
-/** One thread column drawn whole, of the task you are on or of a new tab. */
+/** One thread column drawn whole, of the canvas you are on or of a new canvas. */
 export interface ColumnSlot {
   readonly key: string
   readonly track: number
@@ -57,11 +57,11 @@ export interface ColumnSlot {
 export type Stage =
   /** Before the first `prune`: nothing is chosen yet. */
   | { readonly kind: "connecting" }
-  /** No task: the board, and ＋. */
+  /** No canvas: the board, and ＋. */
   | { readonly kind: "nothing" }
   | {
-      readonly kind: "task"
-      readonly task: TaskId
+      readonly kind: "canvas"
+      readonly canvas: CanvasId
       readonly readOnly: ReadOnly | null
       readonly slots: readonly ColumnSlot[]
     }
@@ -69,11 +69,11 @@ export type Stage =
 /** Facts `App` already holds; nothing here is projected again. */
 export interface AppViewInput {
   readonly active: Here | null
-  /** The task's thread columns drawn whole (`openColumns`). */
+  /** The canvas's thread columns drawn whole (`openColumns`). */
   readonly columns: readonly Column[]
   /** `branchColors(tracks, views).track`, memoised by `App`. */
   readonly tracks: readonly number[]
-  readonly archived: ReadonlyMap<TaskId, ArchivedTask>
+  readonly archived: ReadonlyMap<CanvasId, ArchivedCanvas>
   readonly workflow: Workflow | null
   readonly nameOf: ReadonlyMap<WriterId, string>
   readonly proposedByLane: ReadonlyMap<ThreadId, ProposedChangesRecord>
@@ -100,7 +100,7 @@ export const laneRootsOf = (
 /**
  * The agent's work in each thread, held by this tab or not: each held
  * lane's that is busy (`laneWork`), and every lane running in the session,
- * running winning. What refuses a task's move to the
+ * running winning. What refuses a canvas's move to the
  * archive, and, but for `held`, what rings it in the sidebar and on the
  * board (`threadStatus`).
  */
@@ -118,17 +118,17 @@ export function threadWork(input: {
 }
 
 /**
- * Each task's work: the most among its threads', running over
- * waiting over held. A thread in no task counts for none.
+ * Each canvas's work: the most among its threads', running over
+ * waiting over held. A thread in no canvas counts for none.
  */
-export function taskWork(
+export function canvasWork(
   threads: ReadonlyMap<ThreadId, AgentWork>,
-  taskOfThread: ReadonlyMap<ThreadId, TaskId>,
-): ReadonlyMap<TaskId, AgentWork> {
-  const out = new Map<TaskId, AgentWork>()
+  canvasOfThread: ReadonlyMap<ThreadId, CanvasId>,
+): ReadonlyMap<CanvasId, AgentWork> {
+  const out = new Map<CanvasId, AgentWork>()
   for (const [thread, work] of threads) {
-    const task = taskOfThread.get(thread)
-    if (task !== undefined) out.set(task, moreWork(out.get(task), work))
+    const canvas = canvasOfThread.get(thread)
+    if (canvas !== undefined) out.set(canvas, moreWork(out.get(canvas), work))
   }
   return out
 }
@@ -192,11 +192,11 @@ function stageOf(input: AppViewInput): Stage {
   switch (active.kind) {
     case "nothing":
       return { kind: "nothing" }
-    case "task": {
-      const archived = input.archived.get(active.task)
+    case "canvas": {
+      const archived = input.archived.get(active.canvas)
       return {
-        kind: "task",
-        task: active.task,
+        kind: "canvas",
+        canvas: active.canvas,
         readOnly:
           archived === undefined
             ? null
@@ -233,42 +233,42 @@ export interface RailStub {
   /** The thread's first entry. */
   readonly at: EntryId
   readonly thread: ThreadId
-  /** Where it is: another task's canvas, your inventory, someone else's. */
+  /** Where it is: another canvas, your inventory, someone else's. */
   readonly link: ThreadLink
 }
 
-/** What the rail draws for the task you are on. */
-export interface TaskRail {
+/** What the rail draws for the canvas you are on. */
+export interface CanvasRail {
   readonly rows: readonly RailRow[]
   readonly stubs: readonly RailStub[]
 }
 
-/** No rail: off a task. */
-export const NO_RAIL: TaskRail = { rows: [], stubs: [] }
+/** No rail: off a canvas. */
+export const NO_RAIL: CanvasRail = { rows: [], stubs: [] }
 
 /**
- * The rail of the task you are on, a forest: one tree
- * for each root a thread of the task is in, in canvas order, each cut to
+ * The rail of the canvas you are on, a forest: one tree
+ * for each root a thread of the canvas is in, in canvas order, each cut to
  * the paths that lead to its threads' ends (`ends`); each fork from those
  * paths to a thread elsewhere a stub naming where it is (`linkOf`). Each
  * tree is drawn in its root's palette: its tracks are shifted so the
  * page's seed (`seed`) gives each one the slot its root's seed would
  * (`trackSlot`), so its columns and fork dots, which take their rows'
- * tracks, agree. None off a task.
+ * tracks, agree. None off a canvas.
  */
-export function taskRail(input: {
+export function canvasRail(input: {
   readonly index: TreeIndex
   readonly active: Here | null
-  /** The task's roots and their root entries, in canvas order. */
+  /** The canvas's roots and their root entries, in canvas order. */
   readonly roots: readonly { readonly root: RootId; readonly entry: EntryId }[]
   /** Where each thread on the canvas ends (`threadAnchor`, a copy's fork). */
   readonly ends: ReadonlyMap<ThreadId, EntryId>
   readonly linkOf: (thread: ThreadId) => ThreadLink
   /** The page's seed (`rootSeed` of its first root). */
   readonly seed: number
-}): TaskRail {
+}): CanvasRail {
   const { index, active } = input
-  if (active?.kind !== "task") return NO_RAIL
+  if (active?.kind !== "canvas") return NO_RAIL
   // Every entry on a path to a thread's end, the ends' own included.
   const keep = new Set<EntryId>()
   for (const end of input.ends.values())
@@ -305,7 +305,7 @@ export const railStubWords = (
   stub: RailStub,
   names: ReadonlyMap<ThreadId, ThreadName>,
   reader: Reader,
-  labelOf: (task: TaskId) => string,
+  labelOf: (canvas: CanvasId) => string,
 ): { readonly label: string; readonly title: string } => ({
   label: `↳ ${names.get(stub.thread) ?? "a thread"}`,
   title: linkWords(stub.link, reader, labelOf),
@@ -319,11 +319,11 @@ const shiftOf = (seed: number, own: number): number =>
   (((STRIDE * (own - seed)) % SLOTS) + SLOTS) % SLOTS
 
 /**
- * What an archived task's column says and offers: who moved it to
+ * What an archived canvas's column says and offers: who moved it to
  * the archive, and Restore, which moves it to the first open state.
  */
 export function readOnlyWords(
-  archived: ArchivedTask,
+  archived: ArchivedCanvas,
   workflow: Workflow | null,
   nameOf: ReadonlyMap<WriterId, string>,
 ): ReadOnly {
@@ -336,8 +336,8 @@ export function readOnlyWords(
         : {
             title: "Restore",
             intent: {
-              kind: "moveTask",
-              task: archived.task,
+              kind: "moveCanvas",
+              canvas: archived.canvas,
               from: workflow.archive.id,
               to: to.id,
               before: null,

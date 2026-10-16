@@ -1,10 +1,10 @@
 import {
+  canvasIdFor,
   cardIdOfKind,
   ERR,
   type MarkRecord,
   type NoteColumnRecord,
   THE_AGENT,
-  taskIdFor,
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
@@ -14,12 +14,12 @@ import { deleteRecord, recordsOf, setRecord } from "./records.ts"
 
 const ADA = writerId("p-ada")
 const BEA = writerId("p-bea")
-const K1 = taskIdFor("01a0ffd2-0000-7000-8000-000000000001")
-const K2 = taskIdFor("01a0ffd2-0000-7000-8000-000000000002")
+const K1 = canvasIdFor("01a0ffd2-0000-7000-8000-000000000001")
+const K2 = canvasIdFor("01a0ffd2-0000-7000-8000-000000000002")
 const N1 = cardIdOfKind("note-column", "01a0ffd2-0000-7000-8000-000000000003")
 
 const mark = (title: string): MarkRecord => ({
-  task: K1,
+  canvas: K1,
   title,
   by: BEA,
   at: 1,
@@ -35,11 +35,11 @@ const plan = (
   over: Partial<Parameters<typeof planMark>[0]> = {},
 ): ReturnType<typeof planMark> =>
   planMark({
-    of: { kind: "task", task: K1 },
+    of: { kind: "canvas", canvas: K1 },
     title: "Tab names",
     by: ADA,
     now: 5,
-    tasks: new Set([K1, K2]),
+    canvases: new Set([K1, K2]),
     marks: new Map(),
     columns: new Set([N1]),
     columnTitles: new Map(),
@@ -47,15 +47,15 @@ const plan = (
   })
 
 describe("the records", () => {
-  test("a task's title round-trips at its task; a malformed one is dropped", () => {
+  test("a canvas's title round-trips at its canvas; a malformed one is dropped", () => {
     const r = mark("Tab names")
     expect(MARK.home).toBe("session")
-    expect(MARK.decode(MARK.encode(r), r.task)).toEqual(r)
-    expect(MARK.decode({ ...r, title: "" }, r.task)).toBeUndefined()
+    expect(MARK.decode(MARK.encode(r), r.canvas)).toEqual(r)
+    expect(MARK.decode({ ...r, title: "" }, r.canvas)).toBeUndefined()
     expect(MARK.decode(r, "r1")).toBeUndefined()
     expect(
       recordsOf(MARK, [
-        { key: r.task, value: r },
+        { key: r.canvas, value: r },
         { key: K2, value: { nope: 1 } },
       ]).get(K1),
     ).toEqual(r)
@@ -72,11 +72,11 @@ describe("the records", () => {
 })
 
 describe("planMark", () => {
-  test("titles a task, by its writer, at now", () => {
+  test("titles a canvas, by its writer, at now", () => {
     expect(plan()).toEqual({
       kind: "writes",
       writes: [
-        setRecord(MARK, { task: K1, title: "Tab names", by: ADA, at: 5 }),
+        setRecord(MARK, { canvas: K1, title: "Tab names", by: ADA, at: 5 }),
       ],
     })
   })
@@ -84,7 +84,7 @@ describe("planMark", () => {
     expect(plan({ marks: new Map([[K1, mark("Old")]]) })).toEqual({
       kind: "writes",
       writes: [
-        setRecord(MARK, { task: K1, title: "Tab names", by: ADA, at: 5 }),
+        setRecord(MARK, { canvas: K1, title: "Tab names", by: ADA, at: 5 }),
       ],
     })
   })
@@ -99,15 +99,15 @@ describe("planMark", () => {
       writes: [deleteRecord(MARK, K1)],
     })
   })
-  test("clearing a task with no title writes nothing", () => {
+  test("clearing a canvas with no title writes nothing", () => {
     expect(plan({ title: null })).toEqual({ kind: "unchanged" })
   })
-  test("a task the session does not hold is refused", () => {
+  test("a canvas the session does not hold is refused", () => {
     expect(
       plan({
         of: {
-          kind: "task",
-          task: taskIdFor("01a0ffd2-0000-7000-8000-000000000009"),
+          kind: "canvas",
+          canvas: canvasIdFor("01a0ffd2-0000-7000-8000-000000000009"),
         },
       }),
     ).toMatchObject({ kind: "refused", code: ERR.UNKNOWN_TARGET })

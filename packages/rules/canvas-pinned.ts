@@ -1,21 +1,21 @@
-// task-pinned — the cards pinned to a task that a run reads.
+// canvas-pinned — the cards pinned to a canvas that a run reads.
 
 import {
+  type CanvasId,
+  type CanvasPinnedView,
   firstLine,
   type PinnedCardRead,
-  type TaskId,
-  type TaskPinnedView,
   type WriterId,
 } from "@pinetrie/core"
 import { Type } from "typebox"
-import { CardIdSchema, List, TaskIdSchema, WriterIdSchema } from "./decode.ts"
+import { CanvasIdSchema, CardIdSchema, List, WriterIdSchema } from "./decode.ts"
 import { type HistoryMessage, historyMessage } from "./history.ts"
 import { attribute, neutral, pinnedDiff, RETIRED_LINE } from "./pinned.ts"
 
-export const TASK_PINNED_TYPE = "pinetrie.task-pinned"
+export const CANVAS_PINNED_TYPE = "pinetrie.canvas-pinned"
 
-const TaskPinnedDetailsSchema = Type.Object({
-  task: TaskIdSchema,
+const CanvasPinnedDetailsSchema = Type.Object({
+  canvas: CanvasIdSchema,
   cards: List(
     Type.Object({
       id: CardIdSchema,
@@ -31,32 +31,32 @@ const TaskPinnedDetailsSchema = Type.Object({
   ),
 })
 
-/** The column draws its own marker for a task's cards entry, not pi's message. */
-export const TASK_PINNED = historyMessage(
-  TASK_PINNED_TYPE,
-  TaskPinnedDetailsSchema,
+/** The column draws its own marker for a canvas's cards entry, not pi's message. */
+export const CANVAS_PINNED = historyMessage(
+  CANVAS_PINNED_TYPE,
+  CanvasPinnedDetailsSchema,
   false,
 )
 
-/** The pi `CustomMessage` a task's cards entry is stored as. */
-export type TaskPinnedMessage = HistoryMessage<
-  typeof TASK_PINNED_TYPE,
-  TaskPinnedView
+/** The pi `CustomMessage` a canvas's cards entry is stored as. */
+export type CanvasPinnedMessage = HistoryMessage<
+  typeof CANVAS_PINNED_TYPE,
+  CanvasPinnedView
 >
 
-/** A stored message -> the task's cards it says a run read, or undefined. */
-export const decodeTaskPinned = (
+/** A stored message -> the canvas's cards it says a run read, or undefined. */
+export const decodeCanvasPinned = (
   message: unknown,
-): TaskPinnedView | undefined => TASK_PINNED.decode(message)
+): CanvasPinnedView | undefined => CANVAS_PINNED.decode(message)
 
 /** What the model reads of `view`, each card named by its owner's display name. */
-export function taskPinnedContent(
-  view: TaskPinnedView,
+export function canvasPinnedContent(
+  view: CanvasPinnedView,
   nameOf: (writer: WriterId) => string,
 ): string {
   const cards =
     view.cards.length === 0
-      ? "There are no cards pinned to the task now.\n"
+      ? "There are no cards pinned to the canvas now.\n"
       : view.cards
           .map(
             c =>
@@ -67,44 +67,44 @@ export function taskPinnedContent(
     .map(r => `No longer applies: "${neutral(r.line)}"\n`)
     .join("")
   return (
-    "<task-pinned-cards>\n" +
-    "The cards pinned to the whole task, as they are now. They replace any earlier task-pinned cards.\n\n" +
+    "<canvas-pinned-cards>\n" +
+    "The cards pinned to the whole canvas, as they are now. They replace any earlier canvas-pinned cards.\n\n" +
     cards +
     (retired === "" ? "" : `\n${retired}`) +
-    "</task-pinned-cards>"
+    "</canvas-pinned-cards>"
   )
 }
 
-/** The task's cards entry for `view`. */
-export const encodeTaskPinned = (
-  view: TaskPinnedView,
+/** The canvas's cards entry for `view`. */
+export const encodeCanvasPinned = (
+  view: CanvasPinnedView,
   nameOf: (writer: WriterId) => string,
   timestamp: number,
-): TaskPinnedMessage =>
-  TASK_PINNED.encode(
+): CanvasPinnedMessage =>
+  CANVAS_PINNED.encode(
     {
-      task: view.task,
+      canvas: view.canvas,
       cards: view.cards.map(c => ({ id: c.id, text: c.text, by: c.by })),
       retired: view.retired.map(r => ({ id: r.id, line: r.line })),
     },
-    taskPinnedContent(view, nameOf),
+    canvasPinnedContent(view, nameOf),
     timestamp,
   )
 
 /**
- * The cards pinned to `task` a run reads, or null when the model already
+ * The cards pinned to `canvas` a run reads, or null when the model already
  * reads them as they are: every card read, none retired, the same order.
- * Cards read for another task (a thread moved since) are all
+ * Cards read for another canvas (a thread moved since) are all
  * retired.
  */
-export function planTaskPinnedRead(input: {
-  readonly inView: TaskPinnedView | null
+export function planCanvasPinnedRead(input: {
+  readonly inView: CanvasPinnedView | null
   readonly now: readonly PinnedCardRead[]
-  readonly task: TaskId
-}): TaskPinnedView | null {
-  const inView = input.inView?.task === input.task ? input.inView : null
+  readonly canvas: CanvasId
+}): CanvasPinnedView | null {
+  const inView = input.inView?.canvas === input.canvas ? input.inView : null
   const diff = pinnedDiff(inView, input.now)
-  // What another task's entry said no longer applies here.
+  // What another canvas's entry said no longer applies here.
   const elsewhere =
     input.inView !== null && inView === null
       ? input.inView.cards.map(c => ({
@@ -126,7 +126,7 @@ export function planTaskPinnedRead(input: {
   )
     return null
   return {
-    task: input.task,
+    canvas: input.canvas,
     cards: input.now,
     retired: [...diff.retired, ...elsewhere],
   }

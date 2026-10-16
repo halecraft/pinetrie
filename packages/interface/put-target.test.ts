@@ -1,9 +1,9 @@
 import {
   atEntry,
+  canvasIdFor,
   cardIdOfKind,
   entryId,
   rootIdFor,
-  taskIdFor,
   threadIdFor,
   workflowStateIdFor,
   writerId,
@@ -23,7 +23,7 @@ import {
   targetOfFocus,
 } from "./put-target.ts"
 
-const TEST_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
+const TEST_CANVAS = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 
 const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 const NEW_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000b")
@@ -73,12 +73,12 @@ describe("one landing rule: every input has full fidelity", () => {
       ),
     },
     { kind: "state", state: workflowStateIdFor("s-1") },
-    { kind: "sidebar", before: TEST_TASK },
+    { kind: "sidebar", before: TEST_CANVAS },
     { kind: "sidebar", before: null },
-    { kind: "taskPinned", task: TEST_TASK },
-    { kind: "canvas", task: TEST_TASK, after: LANE },
-    { kind: "canvas", task: TEST_TASK, after: null },
-    { kind: "task", task: TEST_TASK },
+    { kind: "canvasPinned", canvas: TEST_CANVAS },
+    { kind: "canvas", canvas: TEST_CANVAS, after: LANE },
+    { kind: "canvas", canvas: TEST_CANVAS, after: null },
+    { kind: "item", canvas: TEST_CANVAS },
   ] satisfies PutTarget[]
   /** A kind of target missing from `targets` fails to compile; a text box is never marked. */
   const everyKind: [
@@ -139,10 +139,10 @@ describe("one landing rule: every input has full fidelity", () => {
     })
   })
 
-  test("a task column's pins land pinned to the task", () => {
+  test("a canvas column's pins land pinned to the canvas", () => {
     expect(
       placeOfTarget(targets[12] as PutTarget, store.current(), ME),
-    ).toEqual({ kind: "task-pinned", task: TEST_TASK })
+    ).toEqual({ kind: "canvas-pinned", canvas: TEST_CANVAS })
   })
 
   test("a composer takes a put as your message; a column, at its notes", () => {

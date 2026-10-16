@@ -1,6 +1,6 @@
 // host/relays — another thread's agent asked.
 //
-// An ask, a person's (`relayChat`) or an agent's (`ask`, its tool's hook),
+// An ask, a person's (`relayMessage`) or an agent's (`ask`, its tool's hook),
 // is relayed into the asked thread: what it has not heard of the asking
 // thread first, then the ask as its run's prompt; a busy agent gets an ask
 // card instead, which its drain relays (`relayCard`). What the relayed run
@@ -38,10 +38,10 @@ import {
 } from "@pinetrie/rules"
 import type { Basics, HostKeeper } from "./basics.ts"
 import type { Budgets } from "./budgets.ts"
+import { canvasesNow } from "./canvases.ts"
 import { queueFact as queueFactIn } from "./facts.ts"
 import type { Places } from "./places.ts"
 import type { Runs } from "./runs.ts"
-import { tasksNow } from "./tasks.ts"
 import { threadsNow } from "./threads-now.ts"
 import type { LaneWork } from "./work/index.ts"
 
@@ -53,14 +53,14 @@ const said = (text: string, isError = false): ToolAnswer => ({
 })
 
 /**
- * Every named thread on an open task's canvas: whose agents a message may name,
+ * Every named thread on an open canvas: whose agents a message may name,
  * wherever it is sent. `agentCandidates` leaves its own thread out.
  */
 export function readReachableAgents(
   docs: Pick<Basics, "places" | "session">,
 ): readonly { readonly thread: ThreadId; readonly name: ThreadName }[] {
   return reachableAgents({
-    canvases: tasksNow(docs).canvases,
+    cardsOn: canvasesNow(docs).cardsOn,
     archived: readArchived(docs.session, docs.places),
     names: readNames(docs.session),
   })
@@ -72,7 +72,7 @@ export interface Relays {
   /** `leave` was called in `lane`'s run: leave the thread named `thread`. */
   leave(lane: ThreadId, thread: string): Promise<ToolAnswer>
   /** A person's chat, sent with `sendId` in `thread`, asked or invited members. */
-  relayChat(thread: ThreadId, sendId: string): Promise<void>
+  relayMessage(thread: ThreadId, sendId: string): Promise<void>
   /** An ask card popped on `lane`: relay it now. */
   relayCard(lane: ThreadId, relay: RelayDetails): Promise<"ran" | "next">
   /**
@@ -296,18 +296,23 @@ export function createRelays(deps: {
     })
   }
 
-  async function relayChat(thread: ThreadId, sendId: string): Promise<void> {
+  async function relayMessage(thread: ThreadId, sendId: string): Promise<void> {
     await deps.keeper.run(async () => {
       const from = await threads.thread(thread)
       if (from === null) return
       const source = from.index.bySend.get(sendId)
-      const chat =
+      const personMessage =
         source === undefined ? undefined : from.index.entries[source]?.message
-      const author = chat?.writer
-      if (source === undefined || chat === undefined || author === undefined)
+      const author = personMessage?.writer
+      if (
+        source === undefined ||
+        personMessage === undefined ||
+        author === undefined
+      )
         return
-      const asks = chat.asks ?? []
-      if (asks.length === 0 && (chat.invites ?? []).length === 0) return
+      const asks = personMessage.asks ?? []
+      if (asks.length === 0 && (personMessage.invites ?? []).length === 0)
+        return
       await budgets.ensure(source, thread, author)
       // What came after the chat is not heard with it: its path ends there.
       for (const to of asks) {
@@ -317,8 +322,8 @@ export function createRelays(deps: {
           {
             source,
             asker: { kind: "person", writer: author },
-            askerName: chat.author ?? "",
-            text: messageText(chat),
+            askerName: personMessage.author ?? "",
+            text: messageText(personMessage),
             budget: source,
             by: author,
           },
@@ -344,5 +349,5 @@ export function createRelays(deps: {
     return delivered.kind === "ran" ? "ran" : "next"
   }
 
-  return { ask, leave, relayChat, relayCard, deliver: deliverRelay }
+  return { ask, leave, relayMessage, relayCard, deliver: deliverRelay }
 }

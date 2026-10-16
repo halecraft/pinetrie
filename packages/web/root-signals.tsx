@@ -6,8 +6,8 @@
 // a presence write redraws it and not the list or the board.
 
 import type {
+  CanvasId,
   EntryId,
-  TaskId,
   ThreadId,
   TreeIndex,
   WriterId,
@@ -19,7 +19,7 @@ import {
   peopleHere,
   peopleIn,
   readerHeading,
-  readersByTask,
+  readersByCanvas,
   type Status,
   signalWords,
   statusSignal,
@@ -31,7 +31,7 @@ import { useMemo, useState } from "react"
 import { Menu, type MenuItem } from "./menu.tsx"
 import { Avatar, Avatars, nameFor } from "./presence.tsx"
 import { SignalMark } from "./signal-mark.tsx"
-import { useReadingAt, useReadingTasks } from "./use-presence.ts"
+import { useReadingAt, useReadingCanvases } from "./use-presence.ts"
 
 /**
  * A root's status, before its label: a still ring while its agent works, its
@@ -68,8 +68,8 @@ export function RootStatus({
 export interface ReadersProps {
   session: SessionClient
   index: TreeIndex
-  /** Each thread's task: a reader is in the task their thread is in. */
-  taskOfThread: ReadonlyMap<ThreadId, TaskId>
+  /** Each thread's canvas: a reader is in the canvas their thread is in. */
+  canvasOfThread: ReadonlyMap<ThreadId, CanvasId>
   /** Everyone, in the order every window agrees on (`writerOrder`). */
   order: readonly WriterId[]
   nameOf: ReadonlyMap<WriterId, string>
@@ -79,44 +79,44 @@ export interface ReadersProps {
 /** The people reading now, grouped by person (`peopleHere`). */
 function usePeople(p: ReadersProps) {
   const reading = useReadingAt(p.session.presence, p.session.writer)
-  const reported = useReadingTasks(p.session.presence)
+  const reported = useReadingCanvases(p.session.presence)
   return useMemo(
     () =>
       peopleHere(reading, p.index, p.order, {
-        taskOfThread: p.taskOfThread,
+        canvasOfThread: p.canvasOfThread,
         reported,
       }),
-    [reading, p.index, p.order, p.taskOfThread, reported],
+    [reading, p.index, p.order, p.canvasOfThread, reported],
   )
 }
 
-/** The others reading in any of `tasks`, as avatars: a list item's, or a board state's. */
-export function Readers(p: ReadersProps & { tasks: readonly TaskId[] }) {
+/** The others reading in any of `canvases`, as avatars: a list item's, or a board state's. */
+export function Readers(p: ReadersProps & { canvases: readonly CanvasId[] }) {
   const people = usePeople(p)
-  const byTask = useMemo(() => readersByTask(people), [people])
+  const byCanvas = useMemo(() => readersByCanvas(people), [people])
   const writers: WriterId[] = []
-  for (const task of p.tasks)
-    for (const w of byTask.get(task) ?? [])
+  for (const canvas of p.canvases)
+    for (const w of byCanvas.get(canvas) ?? [])
       if (!writers.includes(w)) writers.push(w)
   return <Avatars colorOf={p.colorOf} nameOf={p.nameOf} writers={writers} />
 }
 
 /**
- * The others reading in `task`, each a menu of the threads they read there,
+ * The others reading in `canvas`, each a menu of the threads they read there,
  * a row of which opens it (`thread`). A person who leaves while you have
  * their menu open stays, marked gone, until you close it (`withOpenMenus`).
  */
 export function ReaderMenus(
   p: ReadersProps & {
-    task: TaskId
-    thread: (end: EntryId, task: TaskId) => MenuItem | null
+    canvas: CanvasId
+    thread: (end: EntryId, canvas: CanvasId) => MenuItem | null
   },
 ) {
   const [openMenus, setOpenMenus] = useState<OpenMenus>(new Map())
   const people = usePeople(p)
   const here = useMemo(
-    () => peopleIn(people, new Set([p.task])),
-    [people, p.task],
+    () => peopleIn(people, new Set([p.canvas])),
+    [people, p.canvas],
   )
   return (
     <span className="readers">
@@ -133,7 +133,9 @@ export function ReaderMenus(
             {
               key: "threads",
               heading: readerHeading(nameFor(p.nameOf, person.writer), gone),
-              items: person.threads.flatMap(t => p.thread(t.end, t.task) ?? []),
+              items: person.threads.flatMap(
+                t => p.thread(t.end, t.canvas) ?? [],
+              ),
             },
           ]}
           title={nameFor(p.nameOf, person.writer)}

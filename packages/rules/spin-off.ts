@@ -15,14 +15,14 @@ import {
   type ThreadId,
   type WriterId,
 } from "@pinetrie/core"
-import { type MoveStep, planMove } from "./moves.ts"
 import {
+  type CanvasIndex,
+  type CanvasOpening,
   planThreadOpen,
   rootOfPlace,
-  type TaskIndex,
-  type TaskOpening,
   type ThreadOpen,
-} from "./task.ts"
+} from "./canvas-index.ts"
+import { type MoveStep, planMove } from "./moves.ts"
 
 /** A spin-off as its sender asks for it. */
 export type SpinOff = Omit<Extract<Intent, { kind: "spin-off" }>, "kind">
@@ -30,15 +30,15 @@ export type SpinOff = Omit<Extract<Intent, { kind: "spin-off" }>, "kind">
 /** What a spin-off writes: the thread's opening, its first message, then the card's move. */
 export interface SpinOffPlan {
   readonly kind: "spin"
-  /** The new conversation root. */
+  /** The new chat's root. */
   readonly root: RootId
   /** The thread its first message starts. */
   readonly thread: ThreadId
-  /** Its record, its task's, and its card on its task's canvas (`planThreadOpen`). */
+  /** Its record, its canvas's, and its card on its canvas (`planThreadOpen`). */
   readonly open: Extract<ThreadOpen, { kind: "open" }>
   /** Its first message: the card's text, by the sender. */
   readonly text: string
-  /** The people it names; never the agent: a conversation root has no lane. */
+  /** The people it names; never the agent: a chat has no lane. */
   readonly mentions: readonly Mention[]
   /** The card's move to its sender's trash. */
   readonly step: Extract<MoveStep, { kind: "write" }>
@@ -55,22 +55,22 @@ export type SpinOffRefusal =
  * A spin-off, planned: refused when the move is not a text card's to the
  * trash, when the root's or the thread's id is in use, when the card holds
  * no text, or as `planMove` refuses the card's move (someone moved it
- * first, it is not yours). Otherwise the thread's opening in its new task,
+ * first, it is not yours). Otherwise the thread's opening in its new canvas,
  * its first message, and the card's move.
  */
 export function planSpinOff(input: {
   readonly cards: readonly CardRecord[]
   readonly request: SpinOff
   readonly sender: WriterId
-  readonly tasks: TaskIndex
+  readonly canvases: CanvasIndex
   /** The card's text, as the host holds it. */
   readonly text: string
   /** Every root the directory names. */
   readonly roots: ReadonlySet<RootId>
   /** Every thread recorded. */
   readonly threads: ReadonlySet<ThreadId>
-  /** Where its new task lands on the board. */
-  readonly opens: TaskOpening
+  /** Where its new canvas lands on the board. */
+  readonly opens: CanvasOpening
   readonly now: number
 }): SpinOffPlan | SpinOffRefusal {
   const { move, root, thread } = input.request
@@ -90,7 +90,7 @@ export function planSpinOff(input: {
     root,
     by: input.sender,
     now: input.now,
-    placement: { kind: "after", task: input.request.task, parent: null },
+    placement: { kind: "after", canvas: input.request.canvas, parent: null },
     opens: { ...input.opens, state: input.request.state },
     cards: input.cards,
   })
@@ -140,8 +140,8 @@ export type LiftPlan =
  * record names a card the step moves) may lift those threads back:
  * each must hold its first message alone, with no lane and no card in it
  * but those the undo moves (`lifting`), and its card must still be where
- * the spin-off put it, alone on its task's canvas with nothing pinned to
- * the task: an undo restores exactly what was there, or does
+ * the spin-off put it, alone on its canvas with nothing pinned to
+ * the canvas: an undo restores exactly what was there, or does
  * nothing. A thread the directory no longer names has nothing to lift.
  * Refused `replied`, naming who wrote second, when any holds more.
  */
@@ -150,7 +150,7 @@ export function planLiftRoot(input: {
   readonly spun: readonly SpunThread[]
   readonly cards: readonly CardRecord[]
   readonly lanes: readonly LaneRecord[]
-  /** Each recorded thread's root (`TaskIndex`): a card at a thread names no root. */
+  /** Each recorded thread's root (`CanvasIndex`): a card at a thread names no root. */
   readonly rootOfThread: ReadonlyMap<ThreadId, RootId>
   /** Each card's history: a thread's card that moved since it was made has more than one event. */
   readonly histories: ReadonlyMap<CardId, CardHistoryRecord>
@@ -167,7 +167,7 @@ export function planLiftRoot(input: {
         rootOfPlace(c.place, input.rootOfThread) === spun.root,
     )
     const lane = input.lanes.some(l => l.root === spun.root)
-    if (others || lane || !aloneInItsTask(input, spun.thread))
+    if (others || lane || !aloneInItsCanvas(input, spun.thread))
       return { kind: "replied", by: null }
     deleting.push({ root: spun.root, thread: spun.thread })
   }
@@ -175,22 +175,22 @@ export function planLiftRoot(input: {
 }
 
 /**
- * Whether a spun thread's card is where the spin-off put it: on a task's
+ * Whether a spun thread's card is where the spin-off put it: on a canvas's
  * canvas, never moved since (its history holds its making alone), with no
- * other card on that canvas and none pinned to the task.
+ * other card on that canvas and none pinned to the canvas.
  */
-function aloneInItsTask(
+function aloneInItsCanvas(
   input: Pick<Parameters<typeof planLiftRoot>[0], "cards" | "histories">,
   thread: ThreadId,
 ): boolean {
   const card = input.cards.find(c => c.id === thread)
   if (card?.place.kind !== "canvas") return false
   if ((input.histories.get(thread)?.events.length ?? 0) > 1) return false
-  const { task } = card.place
+  const { canvas } = card.place
   return !input.cards.some(
     c =>
       c.id !== thread &&
-      (c.place.kind === "canvas" || c.place.kind === "task-pinned") &&
-      c.place.task === task,
+      (c.place.kind === "canvas" || c.place.kind === "canvas-pinned") &&
+      c.place.canvas === canvas,
   )
 }

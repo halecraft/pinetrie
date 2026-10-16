@@ -23,7 +23,7 @@ export interface Focus {
    */
   readonly page: boolean
   /**
-   * Where search stands: "unavailable" with no tree shown (a new tab, the
+   * Where search stands: "unavailable" with no tree shown (a new canvas, the
    * board), "focused" while open with focus in the bar, a match list or
    * nowhere.
    */

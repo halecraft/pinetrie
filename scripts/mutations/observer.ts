@@ -79,7 +79,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     ...kernel,
-    name: "a run's new tasks are not counted live",
+    name: "a run's new canvases are not counted live",
     file: bpf,
     from: "  live_add(&t.run, 1);\n  return 0;\n}\n\n// A wait status",
     to: "  return 0;\n}\n\n// A wait status",
@@ -138,7 +138,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     ...kernel,
-    name: "an event's lane is the PID namespace its task is in now",
+    name: "an event's lane is the PID namespace its canvas is in now",
     file: bpf,
     from: "  e->run = *run;\n",
     to: "  e->run = *run;\n  e->run.lane = pid_namespace_of((struct task_struct *)bpf_get_current_task());\n",
@@ -174,15 +174,15 @@ export const mutations: readonly Mutation[] = [
   },
   {
     ...kernel,
-    name: "a tagged task's exec looks for another run",
+    name: "a tagged canvas's exec looks for another run",
     file: bpf,
     from: "  if (bpf_map_lookup_elem(&tags, &tid)) return 0;\n",
     to: "",
-    expect: "a tagged task's exec with another run's number stays in its run",
+    expect: "a tagged canvas's exec with another run's number stays in its run",
   },
   {
     ...kernel,
-    name: "an event's lane is the cgroup its task is in now",
+    name: "an event's lane is the cgroup its canvas is in now",
     file: bpf,
     from: "  e->run = *run;\n",
     to: "  e->run = *run;\n  e->run.lane = bpf_get_current_cgroup_id();\n",

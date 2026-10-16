@@ -1,11 +1,11 @@
 import {
   atEntry,
   type CardRecord,
+  canvasIdFor,
   cardIdOfKind,
   entryId,
   NO_CONTENT,
   type TextCard,
-  taskIdFor,
   textCardId,
   threadIdFor,
   writerId,
@@ -31,7 +31,7 @@ import {
   withPending,
 } from "./card-moves.ts"
 
-const _TEST_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
+const _TEST_CANVAS = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 
 const ME = writerId("ada@x.io")
 const BEA = writerId("bea@x.io")
@@ -452,13 +452,13 @@ describe("records, moves and cards, in one step", () => {
 })
 
 describe("drawnPlace", () => {
-  const task = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
+  const canvas = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000c")
   const thread: CardRecord = {
     kind: "thread",
     id: LANE,
     owner: ME,
     placer: ME,
-    place: { kind: "canvas", task, order: "0000000100", width: 1 },
+    place: { kind: "canvas", canvas, order: "0000000100", width: 1 },
     content: NO_CONTENT,
   }
   const column = cardIdOfKind(
@@ -470,7 +470,7 @@ describe("drawnPlace", () => {
     id: column,
     owner: ME,
     placer: ME,
-    place: { kind: "canvas", task, order: "0000000200", width: 1 },
+    place: { kind: "canvas", canvas, order: "0000000200", width: 1 },
     content: NO_CONTENT,
   }
   test("a thread's nearest notes are drawn in the column the host would choose, or nowhere yet", () => {
@@ -484,7 +484,7 @@ describe("drawnPlace", () => {
     expect(drawnPlace(to, ME, [])).toBeUndefined()
   })
   test("a spot on a canvas is drawn at the rank the host would give it, between its neighbours", () => {
-    const drawn = drawnPlace({ kind: "canvas-at", task, after: LANE }, ME, [
+    const drawn = drawnPlace({ kind: "canvas-at", canvas, after: LANE }, ME, [
       thread,
       notes,
     ])

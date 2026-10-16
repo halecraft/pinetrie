@@ -3,19 +3,19 @@
 // dropped, never thrown, and cannot break every client's render.
 
 import {
+  CANVAS_PATTERN,
+  type CanvasId,
   type CardId,
   type CommitId,
   type EntryId,
   entryId,
+  isCanvasId,
   isNoteColumnId,
   isRootId,
-  isTaskId,
   isThreadId,
   type NoteColumnId,
   type PointId,
   type RootId,
-  TASK_PATTERN,
-  type TaskId,
   THREAD_PATTERN,
   type ThreadId,
   type ThreadName,
@@ -72,8 +72,8 @@ export const threadKey = (key: string): ThreadId | undefined =>
 export const rootKey = (key: string): RootId | undefined =>
   isRootId(key) ? key : undefined
 
-export const taskKey = (key: string): TaskId | undefined =>
-  isTaskId(key) ? key : undefined
+export const parseCanvasKey = (key: string): CanvasId | undefined =>
+  isCanvasId(key) ? key : undefined
 
 export const noteColumnKey = (key: string): NoteColumnId | undefined =>
   isNoteColumnId(key) ? key : undefined
@@ -102,9 +102,9 @@ export const ThreadIdSchema = Type.Unsafe<ThreadId>(
   Type.String({ pattern: THREAD_PATTERN }),
 )
 
-/** A task's id as stored (`TASK_PATTERN`). */
-export const TaskIdSchema = Type.Unsafe<TaskId>(
-  Type.String({ pattern: TASK_PATTERN }),
+/** A canvas's id as stored (`CANVAS_PATTERN`). */
+export const CanvasIdSchema = Type.Unsafe<CanvasId>(
+  Type.String({ pattern: CANVAS_PATTERN }),
 )
 
 /** Who wrote something, as stored: never empty. */

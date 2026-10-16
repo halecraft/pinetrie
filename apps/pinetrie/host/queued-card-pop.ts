@@ -142,11 +142,11 @@ export function popNextQueuedCard(
  * A popped card's text as its queuer's message, in the queue's own mode, in
  * `root`, its thread's (`THREAD`).
  */
-export const chatOfPoppedQueuedCard = (
+export const sendOfPoppedQueuedCard = (
   popped: PoppedMessage,
   root: RootId,
 ): Send => ({
-  kind: "chat",
+  kind: "send",
   text: popped.text,
   root,
   at: { kind: "queue", thread: popped.card.place.thread },
@@ -177,7 +177,7 @@ export interface QueuedCardPopDeps {
   readonly agent: Pick<Agent, "lane">
   readonly work: Pick<LaneWork, "prepareUpdate" | "prepareSplit" | "runnable">
   readonly start: Runs["start"]
-  /** Send a popped card's text as its queuer's message, through the gate and `sendChat`. */
+  /** Send a popped card's text as its queuer's message, through the gate and `sendMessage`. */
   readonly send: (popped: PoppedMessage) => Promise<Outcome>
   /** Where a queued reference's quote is read. */
   readonly blobs: Pick<BlobStore, "get">
@@ -198,7 +198,7 @@ export interface QueuedCardPopDeps {
     relay: RelayDetails,
   ) => Promise<"ran" | "next">
   /**
-   * Append a fact to a thread with no lane, at its end: a conversation an agent
+   * Append a fact to a thread with no lane, at its end: a chat an agent
    * was asked from. False when it could not be.
    */
   readonly appendLaneless: (

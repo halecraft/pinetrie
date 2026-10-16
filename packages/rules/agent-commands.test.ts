@@ -180,7 +180,7 @@ describe("planSplitCall", () => {
       proposed: open,
       cards: [],
       lane: LANE,
-      prompt: "chat",
+      prompt: "person",
       running: true,
       by: ADA,
       id: textCardId("s-1"),
@@ -202,7 +202,7 @@ describe("planSplitCall", () => {
   }
 
   test("a split card queued by the person behind the run, with no text, from any run", () => {
-    for (const prompt of ["chat", "land"])
+    for (const prompt of ["person", "land"])
       expect(split({ prompt })).toMatchObject({
         kind: "queue",
         step: {

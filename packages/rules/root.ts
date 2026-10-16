@@ -1,13 +1,13 @@
-// root — deleting a conversation root a card was spun into, with the task it
+// root — deleting a chat's root a card was spun into, with the canvas it
 // was spun into.
 
 import {
+  type CanvasId,
   type CardRecord,
   livePlaceOf,
   ownerOf,
   type RootId,
   rootDocId,
-  type TaskId,
   type ThreadId,
   type ThreadRecord,
   type ValueWrite,
@@ -21,54 +21,54 @@ import { ROOT } from "./roots.ts"
 import { THREAD } from "./thread.ts"
 
 /**
- * The tasks a step leaves empty that were a new tab's: a thread
- * card that left `task`'s canvas for a trash, its thread a new root's not
+ * The canvases a step leaves empty that were a new canvas's: a thread
+ * card that left `canvas`'s canvas for a trash, its thread a new root's not
  * yet started (its root one the directory does not name, `started`), and
- * nothing left on that canvas or pinned to the task. Closing an unsent new
- * tab sends its task's card to the trash too (`planTasksTrashed`).
+ * nothing left on that canvas or pinned to the canvas. Closing an unsent new
+ * tab sends its canvas's card to the trash too (`planCanvasesTrashed`).
  */
-export function emptiedTasks(input: {
+export function emptiedCanvases(input: {
   readonly before: readonly CardRecord[]
   readonly after: readonly CardRecord[]
   readonly threads: ReadonlyMap<ThreadId, ThreadRecord>
   readonly started: ReadonlySet<RootId>
-}): readonly TaskId[] {
+}): readonly CanvasId[] {
   const now = new Map(input.after.map(c => [c.id, c] as const))
-  const out: TaskId[] = []
+  const out: CanvasId[] = []
   for (const c of input.before) {
     if (c.kind !== "thread" || c.place.kind !== "canvas") continue
-    const { task } = c.place
+    const { canvas } = c.place
     const record = input.threads.get(c.id)
     if (
       now.get(c.id)?.place.kind !== "trash" ||
       record?.origin.kind !== "root" ||
       input.started.has(record.root) ||
-      out.includes(task)
+      out.includes(canvas)
     )
       continue
     const holds = input.after.some(d => {
       if (d.place.kind === "trash") return false
       const owner = ownerOf(d.place)
-      return owner.kind === "task" && owner.task === task
+      return owner.kind === "canvas" && owner.canvas === canvas
     })
-    if (!holds) out.push(task)
+    if (!holds) out.push(canvas)
   }
   return out
 }
 
 /**
- * Each of `tasks`' cards from the board to the trash, remembering where it
+ * Each of `canvases`' cards from the board to the trash, remembering where it
  * was there, its closer its placer: written in the close's step, so the
- * undo key brings the task back with its thread. A task with no card on
+ * undo key brings the canvas back with its thread. A canvas with no card on
  * the board is left.
  */
-export function planTasksTrashed(
+export function planCanvasesTrashed(
   cards: readonly CardRecord[],
-  tasks: readonly TaskId[],
+  canvases: readonly CanvasId[],
   closer: WriterId,
 ): readonly PlaceStep[] {
   return cards.flatMap((c): PlaceStep[] =>
-    isBoardCard(c) && tasks.includes(c.id)
+    isBoardCard(c) && canvases.includes(c.id)
       ? [
           {
             kind: "write",
@@ -85,25 +85,25 @@ export function planTasksTrashed(
 
 /** What deleting a root writes, and what it lets go. */
 export interface RootDelete {
-  /** Its directory record, its thread's, and its task's title. */
+  /** Its directory record, its thread's, and its canvas's title. */
   readonly values: readonly ValueWrite[]
-  /** Every card still in it, a new tab's, say, its task's canvas and the task's card. */
+  /** Every card still in it, a new canvas's, say, its canvas and the canvas's card. */
   readonly cards: readonly PlaceStep[]
   /** Its document, destroyed: its tree, and the records kept in it. */
   readonly doc: string
-  /** The task whose stacks of moves are unloaded; the startup sweep retires them. */
-  readonly histories: TaskId
+  /** The canvas whose stacks of moves are unloaded; the startup sweep retires them. */
+  readonly histories: CanvasId
 }
 
 /**
- * Delete `root`, its one thread, and the task it was spun into: their
- * records, the task's title, the document and every card in either, the
- * task's own included.
+ * Delete `root`, its one thread, and the canvas it was spun into: their
+ * records, the canvas's title, the document and every card in either, the
+ * canvas's own included.
  */
 export function planRootDelete(
   root: RootId,
   thread: ThreadId,
-  task: TaskId,
+  canvas: CanvasId,
   cards: readonly CardRecord[],
   rootOfThread: ReadonlyMap<ThreadId, RootId>,
 ): RootDelete {
@@ -111,18 +111,18 @@ export function planRootDelete(
     values: [
       deleteRecord(ROOT, root),
       deleteRecord(THREAD, thread),
-      deleteRecord(MARK, task),
+      deleteRecord(MARK, canvas),
     ],
     cards: cards
       .filter(c => {
-        if (c.id === task) return true
+        if (c.id === canvas) return true
         const owner = ownerOf(livePlaceOf(c.place))
-        return owner.kind === "task"
-          ? owner.task === task
+        return owner.kind === "canvas"
+          ? owner.canvas === canvas
           : owner.kind === "thread" && rootOfThread.get(owner.thread) === root
       })
       .map(c => ({ kind: "remove", id: c.id })),
     doc: rootDocId(root),
-    histories: task,
+    histories: canvas,
   }
 }

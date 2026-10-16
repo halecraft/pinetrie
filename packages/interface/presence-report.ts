@@ -11,7 +11,7 @@ export type Reported = ReadonlyMap<string, string | null>
  * The presence writes that move `reported` to `now`. A column whose end is
  * new is set; a column no longer reported is cleared, so switching tabs
  * clears the last tab's columns, as closing a column does. A column with no
- * message yet (a new tab) shows no thread: it is never set, and one whose
+ * message yet (a new canvas) shows no thread: it is never set, and one whose
  * end turned null is left as it was.
  */
 export function planReading(

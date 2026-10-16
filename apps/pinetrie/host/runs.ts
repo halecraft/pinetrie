@@ -19,9 +19,9 @@ import {
 import type { Agent } from "@pinetrie/pi"
 import { readLatestPrompt } from "@pinetrie/reads"
 import {
-  CHAT_TYPE,
   foreignRefusal,
   type HeardMessage,
+  MESSAGE_TYPE,
   type PinnedMessage,
   type PromptMessage,
   planEndRun,
@@ -38,7 +38,7 @@ import {
 } from "@pinetrie/schema"
 import type { BaseNews } from "./base-news.ts"
 import { type Basics, failed } from "./basics.ts"
-import type { TaskContext } from "./canvas.ts"
+import type { CanvasContext } from "./canvas.ts"
 import type { LaneWork } from "./work/index.ts"
 
 export type RunStart =
@@ -65,8 +65,8 @@ export type ReadPinned = (
   signal: AbortSignal,
 ) => Promise<PinnedMessage | null>
 
-/** What a run on `lane` is told of its task first (`canvas.ts`). */
-export type ReadTaskContext = (lane: ThreadId) => Promise<TaskContext>
+/** What a run on `lane` is told of its canvas first (`canvas.ts`). */
+export type ReadCanvasContext = (lane: ThreadId) => Promise<CanvasContext>
 
 export interface Runs {
   /**
@@ -155,13 +155,13 @@ export function createRuns(deps: {
   readonly agent: Pick<Agent, "lane">
   readonly work: Pick<LaneWork, "beforeRun" | "runEnded" | "splitEnded">
   readonly readPinned: ReadPinned
-  readonly readTaskContext: ReadTaskContext
+  readonly readCanvasContext: ReadCanvasContext
   /** What a chat's run is told first of its base's new work, and forgetting what was steered once the lane stops. */
   readonly baseNews: Pick<BaseNews, "atStart" | "runEnded">
   /** Write `lane`'s run's verdict as pending (`Digests.pending`). */
   readonly pending: (lane: ThreadId, prompt: EntryId) => Promise<void>
 }): Runs {
-  const { basics, agent, work, readPinned, readTaskContext, baseNews } = deps
+  const { basics, agent, work, readPinned, readCanvasContext, baseNews } = deps
   const { docs, live, log } = basics
   let ended: (lane: ThreadId, prompt: EntryId | null) => void = () => {}
   /**
@@ -213,12 +213,12 @@ export function createRuns(deps: {
       applyLiveOps(live, [{ kind: "begin", lane, run: id }])
       const handle = agent.lane(lane)
       // A chat's message, which is kept if its run never happens.
-      const chat =
-        start.kind === "prompt" && start.message.customType === CHAT_TYPE
+      const said =
+        start.kind === "prompt" && start.message.customType === MESSAGE_TYPE
           ? start.message
           : null
       const stop = new AbortController()
-      if (chat !== null) waiting.set(lane, stop)
+      if (said !== null) waiting.set(lane, stop)
       void (async () => {
         try {
           work.beforeRun(lane)
@@ -235,37 +235,40 @@ export function createRuns(deps: {
             return null
           })
           if (waiting.get(lane) === stop) waiting.delete(lane)
-          if (chat !== null && stop.signal.aborted) {
+          if (said !== null && stop.signal.aborted) {
             log(`[host] run ${id.slice(-8)} stopped before it started`)
-            await handle.append(chat)
+            await handle.append(said)
             return
           }
           // A chat's run is told its base's new work first; a resolution or a
           // split has a prompt of its own.
           const behind =
-            chat === null
+            said === null
               ? null
               : await baseNews.atStart(lane).catch(error => {
                   failed(basics, "the base's news")(error)
                   return null
                 })
-          // What the run is told of its task, read after the pinned cards'
+          // What the run is told of its canvas, read after the pinned cards'
           // wait, so it is as late as the run's start.
-          const task = await readTaskContext(lane).catch(error => {
-            failed(basics, "the task's context")(error)
+          const canvas = await readCanvasContext(lane).catch(error => {
+            failed(basics, "the canvas's context")(error)
             return []
           })
           // The cards entry stays the prompt's parent; what an asked agent
           // heard goes first.
-          const before = [start.heard ?? null, behind, ...task, pinned].filter(
-            m => m !== null,
-          )
+          const before = [
+            start.heard ?? null,
+            behind,
+            ...canvas,
+            pinned,
+          ].filter(m => m !== null)
           const ran = await handle.run(start.message, before)
-          if (chat !== null && settleRun(ran) === "keep") {
+          if (said !== null && settleRun(ran) === "keep") {
             // The reply was already `started`, so the author cannot be told;
             // at least their message is not lost.
             log(`[host] run ${id.slice(-8)} REFUSED: kept as a message`)
-            await handle.append(chat)
+            await handle.append(said)
           }
         } catch (error) {
           failed(basics, "run")(error)

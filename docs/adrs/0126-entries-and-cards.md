@@ -34,6 +34,8 @@
     session holds, its card where a drop on the canvas would land.
   - ADR-0151: the blobs hold any file, sorted by their bytes into images, text
     and opaque files; a reference's quote is a text blob like any other.
+  - ADR-0158: the card kind `task` is `canvas`; a topic and a task are a
+    canvas by its place, as a note is a text card by its place.
 
 **Context.**
 

@@ -1,33 +1,33 @@
-// interface/layout — which task you are on, the sidebar, and your view of
-// each task's canvas.
+// interface/layout — which canvas you are on, the sidebar, and your view of
+// each canvas.
 //
-// The task you are on shows its rail and its columns: one per card on its
+// The canvas you are on shows its rail and its columns: one per card on its
 // canvas, in the canvas's order (`canvasColumns`), which is everyone's. The
-// sidebar is the tasks you have open, in your order: it is your own document,
+// sidebar is the canvases you have open, in your order: it is your own document,
 // the same on every device (`openThreads`, `@pinetrie/session`), and comes in
 // here as a fact, so the layout draws it but never stores it. The layout keeps
-// your view of each task you have opened (`TaskView`: which columns are
+// your view of each canvas you have opened (`YourCanvasView`: which columns are
 // unfolded, how each is read, what a thread you opened starts with). A branch
-// or a new tab is a thread card on its task's canvas from the moment it opens,
-// so it is a column like any other, and a new tab is its own task. Which task
+// or a new canvas's thread is a thread card on its canvas from the moment it opens,
+// so it is a column like any other, and a new canvas is its own. Which canvas
 // you are on, the views and whether the board is open are this browser tab's
 // view state, never written to the document; they are stored per browser tab in
 // the form at the end of this file.
 
 import {
+  type CanvasId,
   type CardId,
   type EntryId,
-  isTaskId,
+  isCanvasId,
   type LaneView,
   parseCardId,
   pathIds,
-  type TaskId,
   type ThreadId,
   type TreeIndex,
   threadAt,
   type WriterId,
 } from "@pinetrie/core"
-import type { CanvasCard, TaskIndex, ThreadOpening } from "@pinetrie/rules"
+import type { CanvasIndex, CardOnCanvas, ThreadOpening } from "@pinetrie/rules"
 import { type Static, Type } from "typebox"
 import { Value } from "typebox/value"
 import type { Density } from "./ask-words.ts"
@@ -38,16 +38,16 @@ import {
   openColumns,
   type Strip,
   stripOf,
-  type TaskView,
   viewOf,
+  type YourCanvasView,
 } from "./canvas-columns.ts"
 import { projectColumns } from "./column-paths.ts"
 import type { Pending, Prefill } from "./columns.ts"
 
-/** What the stage shows: a task of the sidebar, or nothing. */
+/** What the stage shows: a canvas of the sidebar, or nothing. */
 export type Here =
   | { readonly kind: "nothing" }
-  | { readonly kind: "task"; readonly task: TaskId }
+  | { readonly kind: "canvas"; readonly canvas: CanvasId }
 
 export const NOTHING: Here = { kind: "nothing" }
 
@@ -58,27 +58,27 @@ export interface Layout {
    */
   readonly active: Here | null
   /**
-   * The sidebar as drawn: your open tasks in your order (`LayoutFacts.list`),
-   * less the archived ones but the task you are on, and the task you are on
+   * The sidebar as drawn: your open canvases in your order (`LayoutFacts.list`),
+   * less the archived ones but the canvas you are on, and the canvas you are on
    * wherever the list lacks it. Derived by `resolveLayout`, never stored.
    */
-  readonly open: readonly TaskId[]
+  readonly open: readonly CanvasId[]
   /**
-   * Your view of each task you have changed one of (`TaskView`), kept when
-   * it leaves the sidebar so opening it again brings it back. A task with
+   * Your view of each canvas you have changed one of (`YourCanvasView`), kept when
+   * it leaves the sidebar so opening it again brings it back. A canvas with
    * none is drawn as `defaultView` says.
    */
-  readonly tasks: ReadonlyMap<TaskId, TaskView>
+  readonly canvases: ReadonlyMap<CanvasId, YourCanvasView>
   /** Whether the board is open over the columns. */
   readonly board: boolean
 }
 
-/** A change to your view of one task (`TaskView`). */
+/** A change to your view of one canvas (`YourCanvasView`). */
 export type ViewChange =
   /** Unfold a column, or fold it to a strip with its title. */
   | { readonly kind: "fold"; readonly card: CardId; readonly unfolded: boolean }
-  /** Unfold the task column, or fold it. */
-  | { readonly kind: "foldTask"; readonly unfolded: boolean }
+  /** Unfold the canvas column, or fold it. */
+  | { readonly kind: "foldCanvas"; readonly unfolded: boolean }
   /** How much of each ask a column draws. */
   | {
       readonly kind: "density"
@@ -98,7 +98,7 @@ export type ViewChange =
       readonly pending?: Pending
       /** What its composer starts with, unsent. */
       readonly prefill?: Prefill
-      /** A Start Agent column: its first message with no mention asks the agent. */
+      /** A column that asks the agent with nothing typed: its first message with no mention asks the agent. */
       readonly asksAgent?: true
     }
   /** A thread you opened sent its first message: what it started with is spent. */
@@ -107,17 +107,17 @@ export type ViewChange =
 export type LayoutAction =
   | { readonly kind: "show"; readonly here: Here }
   /**
-   * A task leaves the sidebar (its document is written apart): if you are on
+   * A canvas leaves the sidebar (its document is written apart): if you are on
    * it, show its neighbour. Your view of it is kept.
    */
-  | { readonly kind: "closeTask"; readonly task: TaskId }
+  | { readonly kind: "closeCanvas"; readonly canvas: CanvasId }
   /**
-   * A change to your view of `task`. `first` is its canvas's first card,
+   * A change to your view of `canvas`. `first` is its canvas's first card,
    * which a view made by this change starts with unfolded (`defaultView`).
    */
   | {
       readonly kind: "view"
-      readonly task: TaskId
+      readonly canvas: CanvasId
       readonly first: CardId | null
       readonly change: ViewChange
     }
@@ -125,17 +125,17 @@ export type LayoutAction =
   | { readonly kind: "board"; readonly open: boolean }
   /** Store what `resolveLayout` draws for these facts. */
   | ({ readonly kind: "resolve" } & LayoutFacts)
-  /** Once, after the documents settle: the tasks the session lacks go, and `active` is chosen. */
+  /** Once, after the documents settle: the canvases the session lacks go, and `active` is chosen. */
   | ({
       readonly kind: "prune"
-      /** Every task the session holds. */
-      readonly known: ReadonlySet<TaskId>
+      /** Every canvas the session holds. */
+      readonly known: ReadonlySet<CanvasId>
     } & LayoutFacts)
 
-/** What a task's columns are drawn from: its canvas and the tree, one moment's. */
+/** What a canvas's columns are drawn from: its canvas and the tree, one moment's. */
 export interface CanvasFacts {
-  /** Each task's canvas, in order (`TaskIndex.canvases`). */
-  readonly canvases: ReadonlyMap<TaskId, readonly CanvasCard[]>
+  /** Each canvas, in order (`CanvasIndex.cardsOn`). */
+  readonly cardsOn: ReadonlyMap<CanvasId, readonly CardOnCanvas[]>
   /** Each thread opened and not yet started (`unstartedThreads`). */
   readonly unstarted: ReadonlyMap<ThreadId, ThreadOpening>
   /** Each thread someone else holds, by its holder (`heldByOthers`). */
@@ -146,37 +146,37 @@ export interface CanvasFacts {
 
 /** The document facts a layout follows: one moment's, read together. */
 export interface LayoutFacts extends CanvasFacts {
-  /** The tasks in the archive. */
-  readonly archived: ReadonlySet<TaskId>
+  /** The canvases in the archive. */
+  readonly archived: ReadonlySet<CanvasId>
   /** The sidebar (`openThreads`). */
-  readonly list: readonly TaskId[]
+  readonly list: readonly CanvasId[]
 }
 
 export const initialLayout = (): Layout => ({
   active: null,
   open: [],
-  tasks: new Map(),
+  canvases: new Map(),
   board: false,
 })
 
 export const sameHere = (a: Here | null, b: Here): boolean =>
   a !== null &&
   a.kind === b.kind &&
-  (a.kind !== "task" || b.kind !== "task" || a.task === b.task)
+  (a.kind !== "canvas" || b.kind !== "canvas" || a.canvas === b.canvas)
 
-/** `views` with `task`'s view as `view`. */
+/** `views` with `canvas`'s view as `view`. */
 const withView = (
-  views: ReadonlyMap<TaskId, TaskView>,
-  task: TaskId,
-  view: TaskView,
-): ReadonlyMap<TaskId, TaskView> => new Map(views).set(task, view)
+  views: ReadonlyMap<CanvasId, YourCanvasView>,
+  canvas: CanvasId,
+  view: YourCanvasView,
+): ReadonlyMap<CanvasId, YourCanvasView> => new Map(views).set(canvas, view)
 
 /** `view` with the card `card`'s view changed by `change`. */
 const withCard = (
-  view: TaskView,
+  view: YourCanvasView,
   card: CardId,
   change: (seen: CardView) => CardView,
-): TaskView => {
+): YourCanvasView => {
   const was = view.cards.get(card) ?? {}
   const next = change(was)
   if (sameCardView(was, next)) return view
@@ -205,16 +205,19 @@ const set = <K extends keyof CardView>(
 }
 
 /** `view` changed by `change`; the same view when nothing changes. */
-export function changeView(view: TaskView, change: ViewChange): TaskView {
+export function changeView(
+  view: YourCanvasView,
+  change: ViewChange,
+): YourCanvasView {
   switch (change.kind) {
     case "fold":
       return withCard(view, change.card, c =>
         set(c, "unfolded", change.unfolded ? true : undefined),
       )
-    case "foldTask":
-      return view.task.unfolded === change.unfolded
+    case "foldCanvas":
+      return view.canvas.unfolded === change.unfolded
         ? view
-        : { ...view, task: { unfolded: change.unfolded } }
+        : { ...view, canvas: { unfolded: change.unfolded } }
     case "density":
       return withCard(view, change.card, c => set(c, "density", change.density))
     case "details":
@@ -238,21 +241,21 @@ export function changeView(view: TaskView, change: ViewChange): TaskView {
 }
 
 /**
- * The sidebar as drawn: the archived tasks leave it, but the task you are on,
+ * The sidebar as drawn: the archived canvases leave it, but the canvas you are on,
  * which stays where it is, or comes at the end where the list lacks it:
  * another device's repair may have taken it out (`planOpenRepair`).
  */
 function drawnList(
-  list: readonly TaskId[],
-  archived: ReadonlySet<TaskId>,
+  list: readonly CanvasId[],
+  archived: ReadonlySet<CanvasId>,
   active: Here | null,
-): readonly TaskId[] {
-  const here = active?.kind === "task" ? active.task : null
+): readonly CanvasId[] {
+  const here = active?.kind === "canvas" ? active.canvas : null
   const kept = list.filter(t => !archived.has(t) || t === here)
   return here === null || kept.includes(here) ? kept : [...kept, here]
 }
 
-const sameList = (a: readonly TaskId[], b: readonly TaskId[]): boolean =>
+const sameList = (a: readonly CanvasId[], b: readonly CanvasId[]): boolean =>
   a.length === b.length && a.every((t, i) => b[i] === t)
 
 /**
@@ -267,7 +270,7 @@ export function afterClosing(layout: Layout, closed: Here): Here {
 }
 
 /**
- * Whether `action` shows something in the stage: a task or the board. A
+ * Whether `action` shows something in the stage: a canvas or the board. A
  * page over the stage is left for it.
  */
 export function showsStage(action: LayoutAction): boolean {
@@ -290,17 +293,18 @@ export function layoutReducer(state: Layout, action: LayoutAction): Layout {
         ? state
         : { ...state, active: action.here, board }
     }
-    case "closeTask": {
-      const here: Here = { kind: "task", task: action.task }
+    case "closeCanvas": {
+      const here: Here = { kind: "canvas", canvas: action.canvas }
       if (!sameHere(state.active, here)) return state
       return { ...state, active: afterClosing(state, here) }
     }
     case "view": {
-      const before = state.tasks.get(action.task) ?? defaultView(action.first)
+      const before =
+        state.canvases.get(action.canvas) ?? defaultView(action.first)
       const after = changeView(before, action.change)
-      return after === before && state.tasks.has(action.task)
+      return after === before && state.canvases.has(action.canvas)
         ? state
-        : { ...state, tasks: withView(state.tasks, action.task, after) }
+        : { ...state, canvases: withView(state.canvases, action.canvas, after) }
     }
     case "board":
       return state.board === action.open
@@ -325,103 +329,103 @@ export function resolveLayout(stored: Layout, facts: LayoutFacts): Layout {
 }
 
 /**
- * Once the documents have settled: tasks the session lacks go (`known`), and
+ * Once the documents have settled: canvases the session lacks go (`known`), and
  * what to show is chosen. The view of a card no longer on the canvas goes
- * as the layout is stored (`storedLayout`). A task you were on that is
- * gone or archived gives way to the last task of the sidebar, else nothing,
- * and with nothing the board opens: nothing opens a task by itself.
+ * as the layout is stored (`storedLayout`). A canvas you were on that is
+ * gone or archived gives way to the last canvas of the sidebar, else nothing,
+ * and with nothing the board opens: nothing opens a canvas by itself.
  */
 function pruneLayout(
   state: Layout,
   facts: LayoutFacts,
-  known: ReadonlySet<TaskId>,
+  known: ReadonlySet<CanvasId>,
 ): Layout {
-  let tasks = state.tasks
-  for (const task of state.tasks.keys()) {
-    if (known.has(task)) continue
-    const next = new Map(tasks)
-    next.delete(task)
-    tasks = next
+  let canvases = state.canvases
+  for (const canvas of state.canvases.keys()) {
+    if (known.has(canvas)) continue
+    const next = new Map(canvases)
+    next.delete(canvas)
+    canvases = next
   }
   const list = facts.list.filter(t => known.has(t) && !facts.archived.has(t))
   const active = state.active
-  // An archived task you were on is left at a reload.
+  // An archived canvas you were on is left at a reload.
   const stays =
     active !== null &&
     (active.kind === "nothing" ||
-      (active.kind === "task" &&
-        known.has(active.task) &&
-        !facts.archived.has(active.task)))
-  if (tasks === state.tasks && stays) return state
+      (active.kind === "canvas" &&
+        known.has(active.canvas) &&
+        !facts.archived.has(active.canvas)))
+  if (canvases === state.canvases && stays) return state
   const last = list.at(-1)
   const fallback: Here =
-    last === undefined ? NOTHING : { kind: "task", task: last }
+    last === undefined ? NOTHING : { kind: "canvas", canvas: last }
   const shown = stays ? active : fallback
   return {
     ...state,
-    tasks,
+    canvases,
     active: shown,
     board: state.board || shown.kind === "nothing",
   }
 }
 
 /**
- * `layout` as it is stored: without the view of a card not on its task's
- * canvas. Only a task whose canvas holds a card is read: an empty one may not
+ * `layout` as it is stored: without the view of a card not on its canvas's
+ * canvas. Only a canvas whose canvas holds a card is read: an empty one may not
  * have arrived. The same layout when nothing goes.
  */
 export function storedLayout(
   layout: Layout,
-  canvases: ReadonlyMap<TaskId, readonly CanvasCard[]>,
+  cardsOn: ReadonlyMap<CanvasId, readonly CardOnCanvas[]>,
 ): Layout {
-  let tasks = layout.tasks
-  for (const [task, view] of layout.tasks) {
-    const canvas = canvases.get(task) ?? []
-    if (canvas.length === 0) continue
+  let canvases = layout.canvases
+  for (const [canvas, view] of layout.canvases) {
+    const here = cardsOn.get(canvas) ?? []
+    if (here.length === 0) continue
     const cards = new Map(
-      [...view.cards].filter(([card]) => canvas.some(c => c.id === card)),
+      [...view.cards].filter(([card]) => here.some(c => c.id === card)),
     )
     if (cards.size !== view.cards.size)
-      tasks = withView(tasks, task, { ...view, cards })
+      canvases = withView(canvases, canvas, { ...view, cards })
   }
-  return tasks === layout.tasks ? layout : { ...layout, tasks }
+  return canvases === layout.canvases ? layout : { ...layout, canvases }
 }
 
 /**
- * The sidebar as drawn: what the sidebar shows. An archived task you are on
+ * The sidebar as drawn: what the sidebar shows. An archived canvas you are on
  * is still in `open` (`resolveLayout` keeps it), so it keeps its place.
  */
 export function listOf(
   layout: Layout,
-): readonly Extract<Here, { kind: "task" }>[] {
-  return layout.open.map(task => ({ kind: "task", task }) as const)
+): readonly Extract<Here, { kind: "canvas" }>[] {
+  return layout.open.map(canvas => ({ kind: "canvas", canvas }) as const)
 }
 
 /**
- * The tasks among `tasks` not in the sidebar and not archived: what ▦ marks for
- * them. An archived task's work is done, so it marks only its own row on the
+ * The canvases among `canvases` not in the sidebar and not archived: what ▦ marks for
+ * them. An archived canvas's work is done, so it marks only its own row on the
  * board.
  */
 export const unlisted = (
   layout: Pick<Layout, "open">,
-  archived: ReadonlySet<TaskId>,
-  tasks: Iterable<TaskId>,
-): readonly TaskId[] =>
-  [...tasks].filter(t => !layout.open.includes(t) && !archived.has(t))
+  archived: ReadonlySet<CanvasId>,
+  canvases: Iterable<CanvasId>,
+): readonly CanvasId[] =>
+  [...canvases].filter(t => !layout.open.includes(t) && !archived.has(t))
 
 /**
- * A task's columns as drawn (`canvasColumns`), from your view of it, or the
+ * A canvas's columns as drawn (`canvasColumns`), from your view of it, or the
  * default one (`defaultView`).
  */
-export const taskColumns = (
-  layout: Pick<Layout, "tasks">,
-  task: TaskId,
+export const drawnColumns = (
+  layout: Pick<Layout, "canvases">,
+  canvas: CanvasId,
   facts: CanvasFacts,
 ) => {
-  const canvas = facts.canvases.get(task) ?? []
+  const here = facts.cardsOn.get(canvas) ?? []
   return canvasColumns({
-    canvas,
-    view: viewOf(layout.tasks, task, canvas),
+    onCanvas: here,
+    view: viewOf(layout.canvases, canvas, here),
     index: facts.index,
     lanes: facts.lanes,
     unstarted: facts.unstarted,
@@ -429,52 +433,52 @@ export const taskColumns = (
   })
 }
 
-/** A task's strip as drawn: its task column, then its columns (`taskColumns`). */
-export const taskStrip = (
-  layout: Pick<Layout, "tasks">,
-  task: TaskId,
+/** A canvas's strip as drawn: its canvas column, then its columns (`drawnColumns`). */
+export const canvasStrip = (
+  layout: Pick<Layout, "canvases">,
+  canvas: CanvasId,
   facts: CanvasFacts,
 ): Strip =>
   stripOf(
-    task,
-    viewOf(layout.tasks, task, facts.canvases.get(task) ?? []),
-    taskColumns(layout, task, facts),
+    canvas,
+    viewOf(layout.canvases, canvas, facts.cardsOn.get(canvas) ?? []),
+    drawnColumns(layout, canvas, facts),
   )
 
 /** What showing an entry means, for the shell to carry out. */
 export type OpenPlan =
-  /** Column `key` of `task` already shows it: show the task and scroll there. */
-  | { readonly kind: "scroll"; readonly task: TaskId; readonly key: string }
-  /** Show `task`, unfold its thread's card `card`, and scroll there. */
+  /** Column `key` of `canvas` already shows it: show the canvas and scroll there. */
+  | { readonly kind: "scroll"; readonly canvas: CanvasId; readonly key: string }
+  /** Show `canvas`, unfold its thread's card `card`, and scroll there. */
   | {
       readonly kind: "unfold"
-      readonly task: TaskId
+      readonly canvas: CanvasId
       readonly card: ThreadId
     }
 
 /**
- * Show entry `id`, wherever it is, in the task its thread is in
- * (`threadAt`, then `taskOfThread`): an archived task opens as any other,
+ * Show entry `id`, wherever it is, in the canvas its thread is in
+ * (`threadAt`, then `canvasOfThread`): an archived canvas opens as any other,
  * read only (`appView`). A message on a shared stretch of paths is drawn
  * once, in the leftmost unfolded column showing it, so every such column's
  * path is searched; with none, its thread's own column is unfolded. Null
- * for an entry the index lacks, or one in no task.
+ * for an entry the index lacks, or one in no canvas.
  */
 export function planOpen(
   layout: Layout,
   index: TreeIndex,
   id: EntryId,
-  tasks: Pick<TaskIndex, "taskOfThread" | "canvases">,
+  canvases: Pick<CanvasIndex, "canvasOfThread" | "cardsOn">,
   lanes: readonly LaneView[],
   holders: ReadonlyMap<ThreadId, WriterId>,
 ): OpenPlan | null {
   const thread = threadAt(index, id)
   if (thread === null || index.entries[id] === undefined) return null
-  const task = tasks.taskOfThread.get(thread)
-  if (task === undefined) return null
+  const canvas = canvases.canvasOfThread.get(thread)
+  if (canvas === undefined) return null
   const columns = openColumns(
-    taskColumns(layout, task, {
-      canvases: tasks.canvases,
+    drawnColumns(layout, canvas, {
+      cardsOn: canvases.cardsOn,
       // An entry shown is in a started thread.
       unstarted: new Map(),
       holders,
@@ -490,15 +494,15 @@ export function planOpen(
     v => v.tipId !== null && pathIds(index, v.tipId).has(id),
   )
   const key = columns[showing]?.key
-  if (key !== undefined) return { kind: "scroll", task, key }
-  return { kind: "unfold", task, card: thread }
+  if (key !== undefined) return { kind: "scroll", canvas, key }
+  return { kind: "unfold", canvas, card: thread }
 }
 
 // ── stored form ────────────────────────────────────────────────
 //
 // Kept per browser tab through `tab-state.ts`. Built field by field both ways,
 // so a field the schema does not name is never stored or restored. A thread
-// you opened keeps its `prefill` and Start Agent; its `pending` is not
+// you opened keeps its `prefill` and `asksAgent`; its `pending` is not
 // kept: restoring it would send its message again. The reader's settings,
 // `density` and `details`, are kept so a reload shows the column as it was
 // left.
@@ -522,32 +526,34 @@ const StoredCardView = Type.Object({
   asksAgent: Type.Optional(Type.Literal(true)),
 })
 
-/** A task's view as stored: records by id, so no order can be kept. */
-const StoredTaskView = Type.Object({
+/** A canvas's view as stored: records by id, so no order can be kept. */
+const StoredYourCanvasView = Type.Object({
   cards: Type.Record(Type.String(), StoredCardView),
-  task: Type.Object({ unfolded: Type.Boolean() }),
+  canvas: Type.Object({ unfolded: Type.Boolean() }),
 })
 
 const StoredHere = Type.Union([
   Type.Object({ kind: Type.Literal("nothing") }),
-  Type.Object({ kind: Type.Literal("task"), task: Type.String() }),
+  Type.Object({ kind: Type.Literal("canvas"), canvas: Type.String() }),
 ])
 
 /**
  * `v` changes when the shape does; an older layout is dropped, not migrated.
- * `v: 9`: a thread you opened is a card, so no task view keeps branches of its
- * own, and no new tab is kept apart from its task.
+ * `v: 9`: a thread you opened is a card, so no canvas view keeps branches of its
+ * own, and no new canvas's thread is kept apart from it.
  */
 const StoredLayout = Type.Object({
   v: Type.Literal(9),
   active: Type.Union([StoredHere, Type.Null()]),
-  tasks: Type.Record(Type.String(), StoredTaskView),
+  canvases: Type.Record(Type.String(), StoredYourCanvasView),
   board: Type.Boolean(),
 })
 
 const storedPrefill = (p: Prefill) => ({ text: p.text, blank: p.blank })
 
-const toStoredView = (view: TaskView): Static<typeof StoredTaskView> => ({
+const toStoredView = (
+  view: YourCanvasView,
+): Static<typeof StoredYourCanvasView> => ({
   cards: Object.fromEntries(
     [...view.cards].map(([card, v]) => [
       card,
@@ -562,13 +568,13 @@ const toStoredView = (view: TaskView): Static<typeof StoredTaskView> => ({
       },
     ]),
   ),
-  task: { unfolded: view.task.unfolded },
+  canvas: { unfolded: view.canvas.unfolded },
 })
 
-/** A stored task view, or undefined when a key is no card's. */
+/** A stored canvas view, or undefined when a key is no card's. */
 const fromStoredView = (
-  s: Static<typeof StoredTaskView>,
-): TaskView | undefined => {
+  s: Static<typeof StoredYourCanvasView>,
+): YourCanvasView | undefined => {
   const cards = new Map<CardId, CardView>()
   for (const [key, v] of Object.entries(s.cards)) {
     const card = parseCardId(key)
@@ -581,14 +587,14 @@ const fromStoredView = (
       ...(v.asksAgent ? { asksAgent: true } : {}),
     })
   }
-  return { cards, task: { unfolded: s.task.unfolded } }
+  return { cards, canvas: { unfolded: s.canvas.unfolded } }
 }
 
 export const encodeLayout = (layout: Layout): Static<typeof StoredLayout> => ({
   v: 9,
   active: layout.active,
-  tasks: Object.fromEntries(
-    [...layout.tasks].map(([task, view]) => [task, toStoredView(view)]),
+  canvases: Object.fromEntries(
+    [...layout.canvases].map(([canvas, view]) => [canvas, toStoredView(view)]),
   ),
   board: layout.board,
 })
@@ -599,21 +605,21 @@ export const encodeLayout = (layout: Layout): Static<typeof StoredLayout> => ({
  */
 export function decodeLayout(raw: unknown): Layout | undefined {
   if (!Value.Check(StoredLayout, raw)) return undefined
-  const tasks = new Map<TaskId, TaskView>()
-  for (const [task, stored] of Object.entries(raw.tasks)) {
+  const canvases = new Map<CanvasId, YourCanvasView>()
+  for (const [canvas, stored] of Object.entries(raw.canvases)) {
     const view = fromStoredView(stored)
-    if (view === undefined || !isTaskId(task)) return undefined
-    tasks.set(task, view)
+    if (view === undefined || !isCanvasId(canvas)) return undefined
+    canvases.set(canvas, view)
   }
   const { active } = raw
-  if (active?.kind === "task" && !isTaskId(active.task)) return undefined
+  if (active?.kind === "canvas" && !isCanvasId(active.canvas)) return undefined
   return {
     active:
-      active?.kind === "task"
-        ? { kind: "task", task: active.task as TaskId }
+      active?.kind === "canvas"
+        ? { kind: "canvas", canvas: active.canvas as CanvasId }
         : active,
     open: [],
-    tasks,
+    canvases,
     board: raw.board,
   }
 }

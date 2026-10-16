@@ -22,7 +22,7 @@ export interface InboxItem {
   readonly id: EntryId
   /** The root it is in. */
   readonly root: RootId
-  /** The thread it is in, whose task it opens in. */
+  /** The thread it is in, whose canvas it opens in. */
   readonly thread: ThreadId
   readonly by: WriterId
   readonly text: string
@@ -30,8 +30,8 @@ export interface InboxItem {
 
 /**
  * Every chat that names you, newest first: its mentions resolve (`address`)
- * to your display name. Your own messages never mention you. Only chats
- * count, as `RootRecord.mentions` holds only chats: `address` decides who
+ * to your display name. Your own messages never mention you. Only sends
+ * count, as `RootRecord.mentions` holds only sends: `address` decides who
  * a person's message is for.
  */
 export function mentionsOf(input: {

@@ -1,11 +1,11 @@
 import {
   addressUrl,
   type CardRecord,
+  canvasIdFor,
   cardIdOfKind,
   entryId,
   rootIdFor,
   type Sha256,
-  taskIdFor,
   textCardId,
   threadIdFor,
   workflowStateIdFor,
@@ -16,10 +16,10 @@ import type { Outcome } from "@pinetrie/protocol/codec"
 import type { MoveAnswer, MoveHow } from "@pinetrie/session"
 import { expect, test, vi } from "vitest"
 import type { Effect } from "./effects.ts"
-import { NEW_TASK } from "./fixtures.ts"
+import { NEW_CANVAS } from "./fixtures.ts"
 import { type AppPorts, perform } from "./perform.ts"
 
-const TEST_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
+const TEST_CANVAS = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 
 const SHA = "a".repeat(64) as Sha256
 const accepted: MoveAnswer = { kind: "accepted", rev: 1 }
@@ -30,7 +30,7 @@ const ports = () => {
     dispatch: vi.fn(),
     session: {
       request: vi.fn(async (): Promise<Outcome> => answer),
-      chat: vi.fn(async (): Promise<Outcome> => answer),
+      send: vi.fn(async (): Promise<Outcome> => answer),
       proposed: vi.fn(async (): Promise<Outcome> => answer),
       createCard: vi.fn(async () => accepted),
       // Every card's text, as the comment queued below has it.
@@ -48,7 +48,7 @@ const ports = () => {
       refuse: vi.fn(),
       acted: vi.fn(),
       openThreads: {
-        tasks: { current: () => [], subscribe: () => () => {} },
+        canvases: { current: () => [], subscribe: () => () => {} },
         open: vi.fn(),
         ensure: vi.fn(),
         close: vi.fn(),
@@ -159,22 +159,22 @@ test.each<Row>([
     args: ["a"],
   },
   {
-    effect: { kind: "list", act: { kind: "ensure", task: TEST_TASK } },
+    effect: { kind: "list", act: { kind: "ensure", canvas: TEST_CANVAS } },
     port: p => p.session.openThreads.ensure,
-    args: [TEST_TASK],
+    args: [TEST_CANVAS],
   },
   {
     effect: {
       kind: "list",
-      act: { kind: "place", task: TEST_TASK, before: null },
+      act: { kind: "place", canvas: TEST_CANVAS, before: null },
     },
     port: p => p.session.openThreads.open,
-    args: [TEST_TASK, null],
+    args: [TEST_CANVAS, null],
   },
   {
-    effect: { kind: "list", act: { kind: "close", task: TEST_TASK } },
+    effect: { kind: "list", act: { kind: "close", canvas: TEST_CANVAS } },
     port: p => p.session.openThreads.close,
-    args: [TEST_TASK],
+    args: [TEST_CANVAS],
   },
   {
     effect: { kind: "armFocus", key: { kind: "board" } },
@@ -210,10 +210,10 @@ test.each<Row>([
       how,
       queuedBy: ada,
       fly: false,
-      here: TEST_TASK,
+      here: TEST_CANVAS,
     },
     port: p => p.session.moveCard,
-    args: [move, how, ada, TEST_TASK],
+    args: [move, how, ada, TEST_CANVAS],
   },
   {
     effect: {
@@ -238,9 +238,9 @@ test.each<Row>([
     args: ["redo"],
   },
   {
-    effect: { kind: "undoMoves", task: TEST_TASK, direction: "undo" },
+    effect: { kind: "undoMoves", canvas: TEST_CANVAS, direction: "undo" },
     port: p => p.session.undoMoves,
-    args: [TEST_TASK, "undo"],
+    args: [TEST_CANVAS, "undo"],
   },
   {
     effect: { kind: "showInventory", brief: true },
@@ -270,14 +270,14 @@ test("a keep is one move of every card, and closes its column only once accepted
     moves,
     actedAt,
     close: [close],
-    here: TEST_TASK,
+    here: TEST_CANVAS,
   }
   const p = ports()
   perform([keep], p)
   expect(p.session.moveCards).toHaveBeenCalledExactlyOnceWith(
     moves,
     actedAt,
-    TEST_TASK,
+    TEST_CANVAS,
   )
   await vi.waitFor(() => expect(p.dispatch).toHaveBeenCalledWith(show))
   const q = ports()
@@ -294,7 +294,7 @@ test("an undo of moves plans what its answer shows, afresh", async () => {
   const p = ports()
   const outcome: Outcome = { kind: "undone", cards: [] }
   p.session.undoMoves.mockImplementationOnce(async () => outcome)
-  perform([{ kind: "undoMoves", task: TEST_TASK, direction: "undo" }], p)
+  perform([{ kind: "undoMoves", canvas: TEST_CANVAS, direction: "undo" }], p)
   await vi.waitFor(() =>
     expect(p.intent).toHaveBeenCalledWith({ kind: "undoAnswered", outcome }),
   )
@@ -302,15 +302,15 @@ test("an undo of moves plans what its answer shows, afresh", async () => {
 
 test("a move on the board runs what follows it only once the host accepts it; a refusal is said there", async () => {
   const request = {
-    kind: "move-task",
-    task: TEST_TASK,
+    kind: "move-canvas",
+    canvas: TEST_CANVAS,
     from: workflowStateIdFor("d"),
     to: workflowStateIdFor("x"),
     before: null,
   } as const
-  const closed = { kind: "closeTask", task: TEST_TASK } as const
+  const closed = { kind: "closeCanvas", canvas: TEST_CANVAS } as const
   const effect: Effect = {
-    kind: "moveTask",
+    kind: "moveCanvas",
     move: request,
     moved: [{ kind: "layout", moves: false, action: closed }],
   }
@@ -350,9 +350,9 @@ test("a spin-off into the sidebar places and shows its thread only once the host
     },
     root: rootIdFor("01a0ffd2-0000-7000-8000-0000000000ff"),
     thread: threadIdFor("01a0ffd2-0000-7000-8000-0000000000f5"),
-    task: NEW_TASK,
+    canvas: NEW_CANVAS,
     state: null,
-    here: NEW_TASK,
+    here: NEW_CANVAS,
   } as const
   const effect: Effect = {
     kind: "spinOff",
@@ -367,7 +367,7 @@ test("a spin-off into the sidebar places and shows its thread only once the host
   perform([effect], p)
   expect(p.session.request).toHaveBeenCalledWith(request)
   await vi.waitFor(() =>
-    expect(p.session.openThreads.open).toHaveBeenCalledWith(NEW_TASK, null),
+    expect(p.session.openThreads.open).toHaveBeenCalledWith(NEW_CANVAS, null),
   )
 })
 
@@ -455,11 +455,11 @@ test("a move flies only when its plan says so", () => {
 })
 
 test("a fold that moves goes through the fold's port, whose commit lands it; one that does not lands at once", () => {
-  const task = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
+  const canvas = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000c")
   const card = cardIdFor("c1")
   const action = {
     kind: "view",
-    task,
+    canvas,
     first: null,
     change: { kind: "fold", card, unfolded: false },
   } as const

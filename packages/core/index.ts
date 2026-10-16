@@ -5,11 +5,11 @@
 import type { CardCommand } from "./cards.ts"
 import {
   type AgentId,
+  type CanvasId,
   type CardId,
   type EntryId,
   type NoteColumnId,
   type RootId,
-  type TaskId,
   type TextCardId,
   THE_AGENT,
   type ThreadId,
@@ -42,7 +42,7 @@ import type {
 import type { ConfigWidening, TurnShared } from "./runs.ts"
 import { isThreadNameHandle } from "./thread-names.ts"
 
-// --- records of threads and tasks -----------------------------------------
+// --- records of threads and canvases -----------------------------------------
 
 /**
  * A thread as the host records it, keyed by its id in the session
@@ -129,8 +129,8 @@ export type BranchOut =
       readonly kind: "branch-out"
       readonly how: "open"
       readonly root: RootId
-      /** The proposing thread's task, where the branches land. */
-      readonly task: TaskId
+      /** The proposing thread's canvas, where the branches land. */
+      readonly canvas: CanvasId
       readonly proposal: EntryId
       readonly branches: NonEmpty<OpenedRow>
     }
@@ -138,7 +138,7 @@ export type BranchOut =
       readonly kind: "branch-out"
       readonly how: "start"
       readonly root: RootId
-      readonly task: TaskId
+      readonly canvas: CanvasId
       readonly proposal: EntryId
       readonly branches: NonEmpty<StartedRow>
     }
@@ -170,21 +170,21 @@ export const ERR = {
   /** A display name is empty or too long. */
   INVALID_NAME: "invalid_name",
   /**
-   * A write in a task in the archive, or a move out of one: restore the task
+   * A write in a canvas in the archive, or a move out of one: restore the canvas
    * first. The message names who moved it there.
    */
-  TASK_ARCHIVED: "task_archived",
-  /** Moving a task into the archive while an agent of its works or cards are queued. */
-  TASK_BUSY: "task_busy",
+  CANVAS_ARCHIVED: "canvas_archived",
+  /** Moving a canvas into the archive while an agent of its works or cards are queued. */
+  CANVAS_BUSY: "canvas_busy",
   /** A workflow state the session's workflow does not hold. */
   UNKNOWN_STATE: "unknown_state",
-  /** Removing a workflow state that still holds a task. */
+  /** Removing a workflow state that still holds a canvas. */
   STATE_NOT_EMPTY: "state_not_empty",
   /** Moving or removing the archive. */
   STATE_ARCHIVE: "state_archive",
   /** A workflow state named with nothing but spaces. */
   EMPTY_NAME: "empty_name",
-  /** Removing the only open workflow state: a new task needs one to land in. */
+  /** Removing the only open workflow state: a new canvas needs one to land in. */
   LAST_STATE: "last_state",
   /** A lane pi holds an operation open on: after a crash, until it resumes. */
   BUSY: "busy",
@@ -210,8 +210,8 @@ export const ERR = {
   LANE_ID_IN_USE: "lane_id_in_use",
   /** A branch naming a thread that has started already. */
   THREAD_TAKEN: "thread_taken",
-  /** A new task's id that names a task the session already holds. */
-  TASK_ID_IN_USE: "task_id_in_use",
+  /** A new canvas's id that names a canvas the session already holds. */
+  CANVAS_ID_IN_USE: "canvas_id_in_use",
   /** A new root's id that names a root the session already holds. */
   ROOT_ID_IN_USE: "root_id_in_use",
   /** Proposed changes accepted, or a publish, before accepted work is set up. */
@@ -305,19 +305,19 @@ export type ValueWrite =
  *   this way, and a branch never continues an existing lane: a compelled one is
  *   a new line of work.
  */
-export type ChatMode = "reply" | "branch"
+export type SendMode = "reply" | "branch"
 
 /**
  * Where a message goes. A send at a thread's `end` names the thread and the
  * entry its sender saw as its end; the host finds the end (`threadEnd`). A
  * `branch` names the new thread the sender's column minted, where it forks (an
- * entry, or null for a thread at the root), and the task its card goes in: a
- * new one the sender's tab minted for a new root, else the task its column is
+ * entry, or null for a thread at the root), and the canvas its card goes in: a
+ * new one the sender's tab minted for a new root, else the canvas its column is
  * on. So no send can land anywhere but a thread's end without starting a
  * thread, no thread's end ever gets two continuations, and no thread starts
  * without a place.
  */
-export type ChatAt =
+export type MessageAt =
   | {
       readonly kind: "end"
       readonly thread: ThreadId
@@ -327,11 +327,11 @@ export type ChatAt =
       readonly kind: "branch"
       readonly thread: ThreadId
       readonly at: EntryId | null
-      readonly task: TaskId
+      readonly canvas: CanvasId
     }
 
 /** A send's mode, from where it goes. */
-export const modeOf = (at: ChatAt): ChatMode =>
+export const modeOf = (at: MessageAt): SendMode =>
   at.kind === "end" ? "reply" : "branch"
 
 /**
@@ -340,18 +340,18 @@ export const modeOf = (at: ChatAt): ChatMode =>
  * makes the lane busy, and a race does not count. A client never sends it: it
  * queues a card instead.
  */
-export type PlanMode = ChatMode | "queue"
+export type PlanMode = SendMode | "queue"
 
 /**
- * Where the host sends a message: where a client's goes (`ChatAt`), or the
+ * Where the host sends a message: where a client's goes (`MessageAt`), or the
  * end of the thread whose queued card it pops.
  */
 export type SendAt =
-  | ChatAt
+  | MessageAt
   | { readonly kind: "queue"; readonly thread: ThreadId }
 
 /** A chat the host sends: a `chat` command's, or a popped queued card's. */
-export type Send = Omit<Extract<Intent, { readonly kind: "chat" }>, "at"> & {
+export type Send = Omit<Extract<Intent, { readonly kind: "send" }>, "at"> & {
   readonly at: SendAt
 }
 
@@ -364,34 +364,34 @@ export const planModeOf = (at: SendAt): PlanMode =>
 
 /**
  * How an opened thread starts. A branch at `at` in its root, its card just
- * after the thread `at` is in. A new tab's: a new root's first thread in a
- * new task, which lands in `state` (the first open state for null). A new
- * root's first thread in a task the session holds, its card just after
+ * after the thread `at` is in. A new canvas's: a new root's first thread in a
+ * new canvas, which lands in `state` (the first open state for null). A new
+ * root's first thread in a canvas the session holds, its card just after
  * `after` (first for null; at the end when `after` has left the canvas).
  */
 export type ThreadStart =
   | { readonly kind: "branch"; readonly at: EntryId }
-  | { readonly kind: "new-task"; readonly state: WorkflowStateId | null }
+  | { readonly kind: "new-canvas"; readonly state: WorkflowStateId | null }
   | { readonly kind: "new-root"; readonly after: CardId | null }
 
 /**
  * A command whose SHAPE is already known to be valid. The protocol codec
  * produces it; it owns every shape rule, so this type cannot express a
- * malformed command. What it then does is decided by `planChat` and the
+ * malformed command. What it then does is decided by `planMessage` and the
  * other planners in `@pinetrie/rules`, over what the host gathers.
  */
 export type Intent =
   /** A human message; `mentions` are parsed from `text` once, at the codec. */
   | {
-      readonly kind: "chat"
+      readonly kind: "send"
       readonly text: string
       /**
        * The root it is written in: a new one the sender's tab minted for a
        * thread at the root.
        */
       readonly root: RootId
-      readonly at: ChatAt
-      /** A Start Agent column: with no mention, the agent is asked. */
+      readonly at: MessageAt
+      /** A column that asks the agent with nothing typed: with no mention, the agent is asked. */
       readonly asksAgent: boolean
       readonly mentions: readonly Mention[]
       /**
@@ -456,41 +456,41 @@ export type Intent =
   /** Take every message card queued on a thread back below the line. */
   | { readonly kind: "unqueue-all"; readonly lane: ThreadId }
   /**
-   * Make a text card a thread: a new conversation root, `root`, its thread
-   * `thread`, whose first message is the card's text, in a new task, `task`, in
+   * Make a text card a thread: a new chat's root, `root`, its thread
+   * `thread`, whose first message is the card's text, in a new canvas, `canvas`, in
    * `state`, or the first open state for null; the card goes to the trash, in
-   * the history `here` names when it leaves no task.
+   * the history `here` names when it leaves no canvas.
    */
   | {
       readonly kind: "spin-off"
       readonly move: Move<Extract<PlaceKey, { readonly kind: "trash" }>>
       readonly root: RootId
       readonly thread: ThreadId
-      readonly task: TaskId
+      readonly canvas: CanvasId
       readonly state: WorkflowStateId | null
       /**
-       * The task its sender will be on, which names the move's history for a
-       * card from an inventory: the new task for a drop in the sidebar, else
+       * The canvas its sender will be on, which names the move's history for a
+       * card from an inventory: the new canvas for a drop in the sidebar, else
        * the one they are on.
        */
-      readonly here: TaskId | null
+      readonly here: CanvasId | null
     }
   /**
-   * Move a task on the board: from the state its sender saw it in, to `to`,
+   * Move a canvas on the board: from the state its sender saw it in, to `to`,
    * before `before` there, or at its end. Into the archive it archives the
-   * task, and out of it restores the task.
+   * canvas, and out of it restores the canvas.
    */
   | {
-      readonly kind: "move-task"
-      readonly task: TaskId
+      readonly kind: "move-canvas"
+      readonly canvas: CanvasId
       readonly from: WorkflowStateId
       readonly to: WorkflowStateId
-      readonly before: TaskId | null
+      readonly before: CanvasId | null
     }
   /** Change the session's workflow states. */
   | { readonly kind: "workflow"; readonly edit: WorkflowEdit }
   /**
-   * Title a task or a note column, or clear its title with null: one gesture,
+   * Title a canvas or a note column, or clear its title with null: one gesture,
    * each title in its own record.
    */
   | {
@@ -498,8 +498,8 @@ export type Intent =
       readonly of: MarkTarget
       readonly title: string | null
     }
-  /** Ask a model for a task's title, from its first thread's messages. */
-  | { readonly kind: "retitle"; readonly task: TaskId }
+  /** Ask a model for a canvas's title, from its first thread's messages. */
+  | { readonly kind: "retitle"; readonly canvas: CanvasId }
   /**
    * Act on a lane's proposed changes in your repo. An acceptance names its
    * destination bookmark, null for the default, and what it was shown (`seen`);
@@ -516,24 +516,24 @@ export type Intent =
   | { readonly kind: AcceptedAction }
   /**
    * Move cards, create one, or remove one: one move, or a keep's several,
-   * accepted whole or refused. The host records it in a task's history of the
-   * sender's moves (`historyOf`); `here`, the task its sender is on, is a
+   * accepted whole or refused. The host records it in a canvas's history of the
+   * sender's moves (`historyOf`); `here`, the canvas its sender is on, is a
    * discard's from an inventory.
    */
   | {
       readonly kind: "move"
       readonly moves: readonly TypedMove[]
-      readonly here: TaskId | null
+      readonly here: CanvasId | null
     }
   /**
    * Open a thread before its first entry, as its column opens: its record, and
-   * its card on `task`'s canvas, as `start` says.
+   * its card on `canvas`'s canvas, as `start` says.
    */
   | {
       readonly kind: "open-thread"
       readonly thread: ThreadId
       readonly root: RootId
-      readonly task: TaskId
+      readonly canvas: CanvasId
       readonly start: ThreadStart
     }
   /**
@@ -558,7 +558,7 @@ export type Intent =
   /**
    * Paste: make a card from a copy, or move a cut card out of a trash by its
    * cutter, where `to` sends it, after discarding the card it replaces. One
-   * step of the sender's history, in the task it lands in; `here`, the task its
+   * step of the sender's history, in the canvas it lands in; `here`, the canvas its
    * sender is on, names a discard's from an inventory.
    */
   | {
@@ -566,7 +566,7 @@ export type Intent =
       readonly paste: Paste
       readonly to: MoveTarget
       readonly replacing: Replacing | null
-      readonly here: TaskId | null
+      readonly here: CanvasId | null
     }
   /**
    * Move a queued or pinned card among its neighbours, recorded in its root's
@@ -575,7 +575,7 @@ export type Intent =
   | { readonly kind: "reorder"; readonly reorder: Reorder }
   /**
    * Draw a card on a canvas one column wide or two, from where its sender saw
-   * it (`at`): a compare-and-set, as a reorder is, recorded in the task's
+   * it (`at`): a compare-and-set, as a reorder is, recorded in the canvas's
    * history of the sender's moves.
    */
   | {
@@ -585,12 +585,12 @@ export type Intent =
       readonly width: CardWidth
     }
   /**
-   * Undo or redo the sender's newest move in `task`, or, with none, in their
-   * history outside any task.
+   * Undo or redo the sender's newest move in `canvas`, or, with none, in their
+   * history outside any canvas.
    */
   | {
       readonly kind: "undo-move"
-      readonly task: TaskId | null
+      readonly canvas: CanvasId | null
       readonly direction: MoveDirection
     }
   /** Set a card's command, or clear it with null. */
@@ -663,12 +663,12 @@ export const WORKFLOW_ACTIONS: readonly WorkflowAction[] = [
 ]
 
 /**
- * A task in the archive, derived from its place and never stored: who
- * moved it there, and when. Its readers ask only whether a task is archived,
+ * A canvas in the archive, derived from its place and never stored: who
+ * moved it there, and when. Its readers ask only whether a canvas is archived,
  * and by whom.
  */
-export interface ArchivedTask {
-  readonly task: TaskId
+export interface ArchivedCanvas {
+  readonly canvas: CanvasId
   readonly by: WriterId
   readonly at: number
 }
@@ -700,7 +700,7 @@ export interface RootRecord {
    */
   readonly threads: Readonly<Record<ThreadId, readonly WriterId[]>>
   /**
-   * Its chats that name someone (`@`), for the inbox to resolve, each with the
+   * Its sends that name someone (`@`), for the inbox to resolve, each with the
    * thread it is in, which the inbox opens it in.
    */
   readonly mentions: readonly {
@@ -716,11 +716,11 @@ export interface RootRecord {
 // --- marks ------------------------------------------------------------------
 
 /**
- * A task's title: a host-written `pinetrie.mark` value in the session, keyed by
- * the task's id, so a task has at most one.
+ * A canvas's title: a host-written `pinetrie.mark` value in the session, keyed by
+ * the canvas's id, so a canvas has at most one.
  */
 export interface MarkRecord {
-  readonly task: TaskId
+  readonly canvas: CanvasId
   readonly title: string
   /** The person who set it, or the agent for a title it made unasked. */
   readonly by: WriterId | AgentId
@@ -728,9 +728,9 @@ export interface MarkRecord {
   readonly at: number
 }
 
-/** What a title names: a task, or a note column. */
+/** What a title names: a canvas, or a note column. */
 export type MarkTarget =
-  | { readonly kind: "task"; readonly task: TaskId }
+  | { readonly kind: "canvas"; readonly canvas: CanvasId }
   | { readonly kind: "note-column"; readonly column: NoteColumnId }
 
 /**
@@ -803,18 +803,18 @@ export interface UnansweredFact {
 
 /** Where a thread is: `threadReach` (`@pinetrie/rules`) reads it. */
 export type Reach =
-  | { readonly kind: "open"; readonly task: TaskId }
+  | { readonly kind: "open"; readonly canvas: CanvasId }
   | {
       readonly kind: "archived"
-      readonly task: TaskId
-      readonly record: ArchivedTask
+      readonly canvas: CanvasId
+      readonly record: ArchivedCanvas
     }
   | { readonly kind: "held"; readonly by: WriterId }
-  /** In the trash of `task`'s canvas, until it is restored or deleted. */
-  | { readonly kind: "trashed"; readonly task: TaskId }
+  /** In the trash of `canvas`'s canvas, until it is restored or deleted. */
+  | { readonly kind: "trashed"; readonly canvas: CanvasId }
   | { readonly kind: "gone" }
 
-/** A thread out of reach: its task archived, held in an inventory, trashed, or gone. */
+/** A thread out of reach: its canvas archived, held in an inventory, trashed, or gone. */
 export type Away = Exclude<Reach, { readonly kind: "open" }>
 
 /**
@@ -2146,7 +2146,7 @@ export interface HeardDetails {
 }
 
 /**
- * Another thread's agent a mention may reach: a thread on the open task's
+ * Another thread's agent a mention may reach: a thread on the open canvas's
  * canvas other than the one written in, by its name. `member` says whether it
  * was invited into the thread written in already.
  */
@@ -2206,19 +2206,19 @@ export function mentionTargets(
  * compels this thread's agent. Otherwise a message naming participants or
  * asking members is for them, and the agent is left out; an invite alone leaves
  * the message where it would have gone. Otherwise the thread decides: the agent
- * where it is the default (a thread with a lane, or a Start Agent column),
+ * where it is the default (a thread with a lane, or a column that asks the agent with nothing typed),
  * nobody where it is not. A message that then compels nobody, names no one and
  * asks no member asks the agents it invites, since nobody else would answer.
  *
  * A handle that names no participant and no candidate is ignored, so
- * `@types/node` in agent work still asks the agent. The composer and the host
+ * `@types/node` in an agent thread still asks the agent. The composer and the host
  * both call it.
  */
 export function address(input: {
   readonly mentions: readonly Mention[]
   /** Every participant's display name, as shown. */
   readonly participants: readonly string[]
-  /** Other threads' agents on open tasks' canvases. */
+  /** Other threads' agents on open canvases. */
   readonly agents: readonly AgentCandidate[]
   readonly agentByDefault: boolean
 }): Recipients {

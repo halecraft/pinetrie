@@ -1,9 +1,9 @@
 import {
+  canvasIdFor,
   historyScope,
   movesDocId,
   rootDocId,
   rootIdFor,
-  taskIdFor,
   writerId,
 } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
@@ -118,7 +118,7 @@ test.each([
 test("a stack of moves is the host's: shared with no one, taken from no one, refused from a client", () => {
   const MOVES = movesDocId(
     writerId("ada@x.io"),
-    historyScope(taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")),
+    historyScope(canvasIdFor("01a0ffd2-0000-7000-8000-00000000000c")),
   )
   const peer = {
     peerId: "seat-a",
@@ -152,7 +152,7 @@ test("storedKind: each stored document's kind, by which its schema is checked at
     storedKind(
       movesDocId(
         writerId("ada@x.io"),
-        historyScope(taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")),
+        historyScope(canvasIdFor("01a0ffd2-0000-7000-8000-00000000000c")),
       ),
     ),
   ).toBe("kyneta")

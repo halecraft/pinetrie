@@ -1,9 +1,9 @@
 import {
+  type CanvasId,
+  canvasIdFor,
   type EntryId,
   entryId,
-  type TaskId,
   type ThreadId,
-  taskIdFor,
   threadIdFor,
   type Verdict,
   type VerdictRecord,
@@ -18,13 +18,13 @@ import {
   arrivals,
   attentionOf,
   attentionWords,
+  canvasStatus,
   doneThreads,
   follows,
   highest,
   levelOf,
   markOf,
   type Status,
-  taskStatus,
   threadStatus,
 } from "./attention.ts"
 
@@ -34,8 +34,8 @@ const A = threadIdFor("a")
 const B = threadIdFor("b")
 const R1 = entryId("r1")
 const R2 = entryId("r2")
-const K1 = taskIdFor("1")
-const _K2 = taskIdFor("2")
+const K1 = canvasIdFor("1")
+const _K2 = canvasIdFor("2")
 
 const said = (s: "needsYou" | "worthARead" | "done"): Verdict => ({
   kind: "said",
@@ -187,7 +187,7 @@ describe("attentionOf", () => {
     ).toHaveLength(1)
   })
 
-  test("a busy lane, or a thread of an archived task, raises nothing", () => {
+  test("a busy lane, or a thread of an archived canvas, raises nothing", () => {
     expect(attentionOf(input({ busy: new Set([A]) }))).toEqual([])
     expect(attentionOf(input({ archived: new Set([A]) }))).toEqual([])
   })
@@ -228,7 +228,7 @@ describe("attentionOf", () => {
   })
 })
 
-describe("threadStatus and taskStatus", () => {
+describe("threadStatus and canvasStatus", () => {
   const facts = { work: new Map(), verdicts: new Map() }
   test("working wins, and a pending verdict is working; else the highest item", () => {
     const items = attentionOf(
@@ -267,7 +267,7 @@ describe("threadStatus and taskStatus", () => {
     expect(threadStatus({ ...facts, items: [] }).size).toBe(0)
   })
 
-  test("a task's status is its threads' together: working wins, else the highest", () => {
+  test("a canvas's status is its threads' together: working wins, else the highest", () => {
     const [item] = attentionOf(input())
     if (item === undefined) throw new Error("no item")
     const C = threadIdFor("c")
@@ -277,8 +277,8 @@ describe("threadStatus and taskStatus", () => {
       [B, { kind: "needsYou", item }],
       [A, { kind: "worthARead", item }],
     ])
-    const of = (taskOf: [ThreadId, TaskId][]) =>
-      taskStatus(threads, new Map(taskOf))
+    const of = (canvasOf: [ThreadId, CanvasId][]) =>
+      canvasStatus(threads, new Map(canvasOf))
     expect(
       of([
         [A, K1],
@@ -367,15 +367,15 @@ test("attentionWords: each reason, as a value worded once", () => {
   )
 })
 
-test("markOf: the highest level among the tasks it covers; working raises nothing", () => {
+test("markOf: the highest level among the canvases it covers; working raises nothing", () => {
   const item = (level: "needsYou" | "worthARead") => ({
     lane: threadIdFor("m"),
     end: entryId("e"),
     level,
     raised: { kind: "ready" as const, source: "c" },
   })
-  const [a, b, c] = [taskIdFor("a"), taskIdFor("b"), taskIdFor("c")]
-  const status = new Map<TaskId, Status>([
+  const [a, b, c] = [canvasIdFor("a"), canvasIdFor("b"), canvasIdFor("c")]
+  const status = new Map<CanvasId, Status>([
     [a, { kind: "working" }],
     [b, { kind: "worthARead", item: item("worthARead") }],
     [c, { kind: "needsYou", item: item("needsYou") }],

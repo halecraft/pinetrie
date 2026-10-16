@@ -7,37 +7,37 @@
 // (`planOpenLink`) takes nothing else, so no link reaches a held thread.
 
 import type {
-  ArchivedTask,
+  ArchivedCanvas,
+  CanvasId,
   CardRecord,
   EntryId,
-  TaskId,
   ThreadId,
   WriterId,
 } from "@pinetrie/core"
 import { displayName, threadReach } from "@pinetrie/rules"
 import type { Reader } from "./send.ts"
 
-const NO_ARCHIVE: ReadonlyMap<TaskId, ArchivedTask> = new Map()
+const NO_ARCHIVE: ReadonlyMap<CanvasId, ArchivedCanvas> = new Map()
 
 declare const threadLinkBrand: unique symbol
 
 /** Where a link to `thread` leads, made only by `threadLink`. */
 export type ThreadLink = (
   | {
-      /** On a task's canvas: it opens that task. */
+      /** On a canvas: it opens that canvas. */
       readonly kind: "open"
       readonly thread: ThreadId
-      readonly task: TaskId
+      readonly canvas: CanvasId
     }
   /** In your inventory: it opens the thread's preview there. */
   | { readonly kind: "mine"; readonly thread: ThreadId }
   /** In someone else's inventory: it opens nothing. */
   | { readonly kind: "held"; readonly thread: ThreadId; readonly by: WriterId }
-  /** In the trash of `task`'s canvas: following it restores it. */
+  /** In the trash of `canvas`'s canvas: following it restores it. */
   | {
       readonly kind: "trashed"
       readonly thread: ThreadId
-      readonly task: TaskId
+      readonly canvas: CanvasId
     }
   /** With no card: deleted from the trash, lifted back into the card it was spun from, or never placed. */
   | { readonly kind: "gone"; readonly thread: ThreadId }
@@ -49,18 +49,18 @@ export function threadLink(
   cards: readonly CardRecord[],
   me: WriterId,
 ): ThreadLink {
-  // An archived task's thread opens its task too, read only: no archive is
+  // An archived canvas's thread opens its canvas too, read only: no archive is
   // read here, so every canvas is `open`.
   const reach = threadReach(thread, { cards, archived: NO_ARCHIVE })
   const link =
     reach.kind === "open" || reach.kind === "archived"
-      ? { kind: "open" as const, thread, task: reach.task }
+      ? { kind: "open" as const, thread, canvas: reach.canvas }
       : reach.kind === "held"
         ? reach.by === me
           ? { kind: "mine" as const, thread }
           : { kind: "held" as const, thread, by: reach.by }
         : reach.kind === "trashed"
-          ? { kind: "trashed" as const, thread, task: reach.task }
+          ? { kind: "trashed" as const, thread, canvas: reach.canvas }
           : { kind: "gone" as const, thread }
   return link as ThreadLink
 }
@@ -70,17 +70,17 @@ export const heldWords = (by: WriterId, reader: Reader): string =>
   `${by === reader.me ? "you have" : `${displayName(by, reader.nameOf.get(by))} has`} it`
 
 /**
- * Where a link leads, in words: its task's label, "in your inventory",
+ * Where a link leads, in words: its canvas's label, "in your inventory",
  * "Bea has it", "in the trash", or "deleted".
  */
 export function linkWords(
   link: ThreadLink,
   reader: Reader,
-  labelOf: (task: TaskId) => string,
+  labelOf: (canvas: CanvasId) => string,
 ): string {
   switch (link.kind) {
     case "open":
-      return labelOf(link.task)
+      return labelOf(link.canvas)
     case "mine":
       return "in your inventory"
     case "held":
@@ -98,7 +98,11 @@ export const opens = (link: ThreadLink): boolean =>
 
 /** What following a link to `entry` in its thread asks of the page. */
 export type LinkOpen =
-  | { readonly kind: "task"; readonly task: TaskId; readonly entry: EntryId }
+  | {
+      readonly kind: "canvas"
+      readonly canvas: CanvasId
+      readonly entry: EntryId
+    }
   | { readonly kind: "preview"; readonly thread: ThreadId }
   | { readonly kind: "restore"; readonly thread: ThreadId }
   | { readonly kind: "nothing" }
@@ -107,7 +111,7 @@ export type LinkOpen =
 export function openOf(link: ThreadLink, entry: EntryId): LinkOpen {
   switch (link.kind) {
     case "open":
-      return { kind: "task", task: link.task, entry }
+      return { kind: "canvas", canvas: link.canvas, entry }
     case "mine":
       return { kind: "preview", thread: link.thread }
     case "trashed":
@@ -118,18 +122,18 @@ export function openOf(link: ThreadLink, entry: EntryId): LinkOpen {
   }
 }
 
-/** Where a row's other thread is, when it is not this task's. */
-export interface CrossTaskLink {
+/** Where a row's other thread is, when it is not this canvas's. */
+export interface CrossCanvasLink {
   readonly link: ThreadLink
   readonly words: string
 }
 
 /**
  * Each ask, answer and heard row from another thread, by its entry, with
- * where that thread is: its task's label, or who has it. A thread on the
- * column's own task (`here`) adds nothing to its name, and has none.
+ * where that thread is: its canvas's label, or who has it. A thread on the
+ * column's own canvas (`here`) adds nothing to its name, and has none.
  */
-export function crossTaskLinks(
+export function crossCanvasLinks(
   nodes: readonly {
     readonly id: EntryId
     readonly role: string
@@ -138,15 +142,15 @@ export function crossTaskLinks(
   facts: {
     readonly cards: readonly CardRecord[]
     readonly reader: Reader
-    readonly here: TaskId | null
-    readonly labelOf: (task: TaskId) => string
+    readonly here: CanvasId | null
+    readonly labelOf: (canvas: CanvasId) => string
   },
-): ReadonlyMap<EntryId, CrossTaskLink> {
-  const out = new Map<EntryId, CrossTaskLink>()
+): ReadonlyMap<EntryId, CrossCanvasLink> {
+  const out = new Map<EntryId, CrossCanvasLink>()
   for (const node of nodes) {
     if (node.from === undefined) continue
     const link = threadLink(node.from, facts.cards, facts.reader.me)
-    if (link.kind === "open" && link.task === facts.here) continue
+    if (link.kind === "open" && link.canvas === facts.here) continue
     out.set(node.id, {
       link,
       words: linkWords(link, facts.reader, facts.labelOf),

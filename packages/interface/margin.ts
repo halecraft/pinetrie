@@ -11,7 +11,7 @@ import { plural } from "./counts.ts"
 export const COMMENT = {
   label: "comment",
   title:
-    "comment on this message: a note beside it, for everyone on the task; the agent does not read it",
+    "comment on this message: a note beside it, for everyone on the canvas; the agent does not read it",
 } as const
 
 /** A shut margin's face: how many comments it holds. */

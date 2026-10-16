@@ -14,6 +14,9 @@ export { type AgentsRow, agentsRow, agentsWords } from "./agents-view.ts"
 export { placement } from "./align.ts"
 export {
   appView,
+  type CanvasRail,
+  canvasRail,
+  canvasWork,
   laneRootsOf,
   NO_RAIL,
   type OpenProposedChanges,
@@ -22,9 +25,6 @@ export {
   railStubWords,
   type SshAsk,
   type Stage,
-  type TaskRail,
-  taskRail,
-  taskWork,
   threadWork,
 } from "./app-view.ts"
 export {
@@ -67,6 +67,7 @@ export {
   arrivals,
   attentionOf,
   attentionWords,
+  canvasStatus,
   doneThreads,
   type Item,
   type Level,
@@ -74,7 +75,6 @@ export {
   markOf,
   moving,
   type Status,
-  taskStatus,
   threadStatus,
   threadWriters,
 } from "./attention.ts"
@@ -89,6 +89,7 @@ export {
   boardView,
   CLEAR_FILTER,
   type Count,
+  canvasesWords,
   clickClosesBoard,
   filterTitle,
   filterWords,
@@ -101,9 +102,29 @@ export {
   searchWords,
   stateWords,
   type ThreadCard,
-  tasksWords,
 } from "./board-view.ts"
 export {
+  boardPlaceWords,
+  CANVAS_LIST_HEADING,
+  CANVAS_PINS_EMPTY,
+  CANVAS_PINS_HEADING,
+  type CanvasColumnView,
+  type CanvasTrash,
+  canvasColumnView,
+  canvasTrash,
+  FOLD_CANVAS,
+  type PlaceOnBoard,
+  pinnedCountWords,
+  RENAME_CANVAS_TITLE,
+  RESTORE_WORDS,
+  type TrashRow,
+  trashHeading,
+  trashKeepWords,
+  trashWords,
+  UNFOLD_CANVAS,
+} from "./canvas-column-view.ts"
+export {
+  type CanvasColumn,
   type CardColumn,
   type CardView,
   defaultView,
@@ -111,9 +132,13 @@ export {
   openColumns,
   type Strip,
   stripCards,
-  type TaskColumn,
-  type TaskView,
+  type YourCanvasView,
 } from "./canvas-columns.ts"
+export {
+  type Canvases,
+  type CanvasThreads,
+  canvasesOnBoard,
+} from "./canvases.ts"
 export {
   type CardFrameFacts,
   type CardFrameView,
@@ -146,6 +171,7 @@ export {
   CLEAR_COMMAND,
   type ControlWords,
   canvasMarkerWords,
+  canvasPinnedMarkerWords,
   DISCARD_CARD,
   DISCARD_CARD_TITLE,
   HISTORY_TITLE,
@@ -167,7 +193,6 @@ export {
   pinnedMarkerWords,
   retiredWords,
   sizeWords,
-  taskPinnedMarkerWords,
   traceWords,
   writtenWords,
 } from "./card-words.ts"
@@ -252,6 +277,7 @@ export { copyText } from "./copy-text.ts"
 export { plural } from "./counts.ts"
 export {
   type Armed,
+  type CanvasOver,
   type CardOver,
   DRAG_HANDLE,
   DRAG_START,
@@ -273,7 +299,6 @@ export {
   type Point,
   sidebarSpotAt,
   sourceOfElement,
-  type TaskOver,
 } from "./drag.ts"
 export type { Effect, IntentState } from "./effects.ts"
 export {
@@ -337,7 +362,7 @@ export {
   peopleHere,
   peopleIn,
   readerHeading,
-  readersByTask,
+  readersByCanvas,
   toggleOpenMenu,
   withOpenMenus,
 } from "./here.ts"
@@ -381,15 +406,15 @@ export {
 } from "./inventory-dock.ts"
 export { type CardPreview, inventoryView } from "./inventory-view.ts"
 export {
+  canvasStrip,
   decodeLayout,
+  drawnColumns,
   encodeLayout,
   initialLayout,
   type Layout,
   layoutReducer,
   resolveLayout,
   storedLayout,
-  taskColumns,
-  taskStrip,
   unlisted,
 } from "./layout.ts"
 export { leftLine } from "./left.ts"
@@ -634,16 +659,16 @@ export {
   setupPageWords,
 } from "./setup-words.ts"
 export {
+  canvasIcons,
   dropsWords,
   type ItemIcon,
   type ItemMenuItem,
   listKey,
-  openProposedByTask,
+  openProposedByCanvas,
   pageTitle,
   renameIntent,
   type SidebarView,
   sidebarView,
-  taskIcons,
 } from "./sidebar-view.ts"
 export {
   elsewhereWords,
@@ -657,36 +682,13 @@ export {
   withFilled,
 } from "./signals.ts"
 export {
+  type CanvasStart,
   type NewColumn,
+  newCanvasButton,
   newColumnButton,
-  newTabButton,
   type StartButton,
   type StartItem,
 } from "./start-button.ts"
-export {
-  boardStateWords,
-  type CanvasTrash,
-  canvasTrash,
-  FOLD_TASK,
-  pinnedCountWords,
-  RENAME_TASK_TITLE,
-  RESTORE_WORDS,
-  TASK_LIST_HEADING,
-  TASK_PINS_EMPTY,
-  TASK_PINS_HEADING,
-  type TaskColumnView,
-  type TrashRow,
-  taskColumnView,
-  trashHeading,
-  trashKeepWords,
-  trashWords,
-  UNFOLD_TASK,
-} from "./task-column-view.ts"
-export {
-  type Tasks,
-  type TaskThreads,
-  tasksOf,
-} from "./tasks.ts"
 export {
   type ThreadCardHead,
   type ThreadMove,
@@ -708,8 +710,8 @@ export {
   threadIcon,
 } from "./thread-icon.ts"
 export {
-  type CrossTaskLink,
-  crossTaskLinks,
+  type CrossCanvasLink,
+  crossCanvasLinks,
   heldWords,
   type LinkOpen,
   linkWords,

@@ -15,6 +15,7 @@ import {
   callMark,
   callStatus,
   canvasMarkerWords,
+  canvasPinnedMarkerWords,
   copyText,
   joinWords,
   type MessageAct,
@@ -33,7 +34,6 @@ import {
   type ScreenMemory,
   showsText,
   speakerWords,
-  taskPinnedMarkerWords,
   toolBody,
 } from "@pinetrie/interface"
 import { canvasLines } from "@pinetrie/rules"
@@ -81,16 +81,16 @@ function MessageView(p: MessageProps) {
           ))}
         </details>
       )}
-      {p.pinned?.taskPinned !== undefined && (
-        <details className="context-read task-pinned-read">
-          <summary>{taskPinnedMarkerWords(p.pinned.taskPinned)}</summary>
-          {p.pinned.taskPinned.cards.map(c => (
+      {p.pinned?.canvasPinned !== undefined && (
+        <details className="context-read canvas-pinned-read">
+          <summary>{canvasPinnedMarkerWords(p.pinned.canvasPinned)}</summary>
+          {p.pinned.canvasPinned.cards.map(c => (
             <div className="pinned-read-card" key={c.id}>
               <span className="pinned-read-by">{nameFor(p.nameOf, c.by)}</span>
               <div className="pinned-read-text">{c.text}</div>
             </div>
           ))}
-          {p.pinned.taskPinned.retired.map(r => (
+          {p.pinned.canvasPinned.retired.map(r => (
             <div className="pinned-read-retired" key={r.id}>
               {retiredWords(r.line)}
             </div>
@@ -118,20 +118,20 @@ function MessageView(p: MessageProps) {
         )}
       <div className={classes.join(" ")} data-entry={node.id}>
         <span className="role">{speaker}</span>
-        {p.crossTaskLink !== undefined && (
-          // Another task's thread it came from, opened as a fork row's link is;
+        {p.crossCanvasLink !== undefined && (
+          // Another canvas's thread it came from, opened as a fork row's link is;
           // held elsewhere, it opens nothing.
           <button
-            className="cross-task-link"
-            disabled={!opens(p.crossTaskLink.link)}
+            className="cross-canvas-link"
+            disabled={!opens(p.crossCanvasLink.link)}
             onClick={() =>
-              p.crossTaskLink !== undefined &&
-              p.onLink(p.crossTaskLink.link, node.id)
+              p.crossCanvasLink !== undefined &&
+              p.onLink(p.crossCanvasLink.link, node.id)
             }
             title="show that thread"
             type="button"
           >
-            · {p.crossTaskLink.words}
+            · {p.crossCanvasLink.words}
           </button>
         )}
         {node.command !== undefined && (
@@ -252,14 +252,14 @@ function Tools({
           edit
         </button>
       )}
-      {edit?.kind === "newTab" && (
+      {edit?.kind === "newCanvas" && (
         <button
-          className="edit-new-tab"
+          className="edit-new-canvas"
           onClick={() => onAct(edit)}
-          title="a new tab starting with this message's text"
+          title="a new canvas starting with this message's text"
           type="button"
         >
-          new tab
+          new canvas
         </button>
       )}
       {branch !== undefined && (

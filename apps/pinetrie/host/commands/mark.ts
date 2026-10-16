@@ -1,13 +1,13 @@
-// host/commands/mark — a task's or a note column's title: gather, `planMark`,
+// host/commands/mark — a canvas's or a note column's title: gather, `planMark`,
 // execute.
 
 import { type Intent, isNoteColumnId, type WriterId } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import {
+  readCanvases,
   readMarks,
   readNoteColumns,
   readPlaces,
-  readTasks,
 } from "@pinetrie/reads"
 import { planMark } from "@pinetrie/rules"
 import type { Basics } from "../basics.ts"
@@ -25,14 +25,14 @@ export async function handleMark(
 ): Promise<Outcome> {
   const { records } = deps
   const { session, places, now } = deps.basics
-  // plan (pure), over the session's tasks and titles, and the note columns
+  // plan (pure), over the session's canvases and titles, and the note columns
   // on a canvas
   const planned = planMark({
     of: intent.of,
     title: intent.title,
     by: writer,
     now: now(),
-    tasks: readTasks(places),
+    canvases: readCanvases(places),
     marks: readMarks(session),
     columns: new Set(
       readPlaces(places).flatMap(c =>

@@ -7,7 +7,7 @@ import {
 } from "@pinetrie/core"
 import { createKeeper } from "@pinetrie/keeper"
 import { readRoots } from "@pinetrie/reads"
-import { encodeChat, setRecord, THREAD } from "@pinetrie/rules"
+import { encodeMessage, setRecord, THREAD } from "@pinetrie/rules"
 import { writeEntry } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import type { HostKey } from "./basics.ts"
@@ -25,8 +25,8 @@ import {
 import type { Records } from "./records.ts"
 import { createSettle } from "./settle.ts"
 
-const chat = (text: string) =>
-  encodeChat(
+const said = (text: string) =>
+  encodeMessage(
     {
       author: writerId("ada@x.io"),
       authorName: "Ada",
@@ -52,8 +52,8 @@ test("a root's record follows its document: a new entry refreshes it, once per b
   // The refresh as the directory starts is over before the root changes.
   await keeper.idle()
   const before = writesOf(records.calls).length
-  writeEntry(b.root, row("e1", null, chat("plan the rail")))
-  writeEntry(b.root, row("e2", "e1", chat("and the tabs")))
+  writeEntry(b.root, row("e1", null, said("plan the rail")))
+  writeEntry(b.root, row("e2", "e1", said("and the tabs")))
   await keeper.idle()
   expect(writesOf(records.calls)).toHaveLength(before + 1)
   expect(readRoots(b.session).get(ROOT_ID)).toMatchObject({
@@ -65,7 +65,7 @@ test("a root's record follows its document: a new entry refreshes it, once per b
 
 test("a change the record does not show writes nothing", async () => {
   const { b, keeper, records } = setUp()
-  writeEntry(b.root, row("e1", null, chat("plan")))
+  writeEntry(b.root, row("e1", null, said("plan")))
   await keeper.idle()
   const before = records.calls.length
   b.root.values.set("x", { namespace: "pi.op.state", key: "x", value: 1 })
@@ -94,7 +94,7 @@ test("a compaction queued while refreshes and drains wait runs after all of them
   const gate = deferred<void>()
   void keeper.run(() => gate.promise)
   void settle([lane])
-  writeEntry(b.root, row("e1", null, chat("plan")))
+  writeEntry(b.root, row("e1", null, said("plan")))
   gate.resolve()
   await keeper.idle()
   expect(done).toEqual(["drain", "compact at e1"])
@@ -129,7 +129,7 @@ test("five changes to one root before its refresh starts read and write it once"
   for (let i = 1; i <= 5; i += 1)
     writeEntry(
       b.root,
-      row(`e${i}`, i === 1 ? null : `e${i - 1}`, chat(`step ${i}`)),
+      row(`e${i}`, i === 1 ? null : `e${i - 1}`, said(`step ${i}`)),
     )
   gate.resolve()
   await keeper.idle()
@@ -143,7 +143,7 @@ test("the roots held when the directory starts are refreshed, and an unchanged r
   const records = record<Pick<Records, "writeValues">>({
     writeValues: async writes => applyWrites(b, writes),
   })
-  writeEntry(b.root, row("e1", null, chat("plan")))
+  writeEntry(b.root, row("e1", null, said("plan")))
   const start = () =>
     startDirectory({ basics: b, keeper, records: records.port })
   start()

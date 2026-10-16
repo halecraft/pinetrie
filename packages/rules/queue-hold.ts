@@ -2,12 +2,12 @@
 // hold a Stop leaves, and the holds the host sweeps.
 
 import type {
+  CanvasId,
   CardCommand,
   CardRecord,
   QueueHold,
   QueueHoldChange,
   QueueMove,
-  TaskId,
   ThreadId,
   ValueWrite,
   WriterId,
@@ -145,15 +145,15 @@ export function holdOnStop(input: {
 
 /**
  * The holds to delete: each whose lane's thread has no card, or whose card
- * is in an archived task. A thread in an inventory keeps its
+ * is in an archived canvas. A thread in an inventory keeps its
  * hold. Archiving is refused while cards are queued, so a hold swept holds
  * nothing.
  */
 export function planHoldSweep(input: {
   readonly holds: ReadonlyMap<ThreadId, QueueHold>
-  /** Where a lane's thread's card is: a task, an inventory, or nowhere. */
-  readonly whereIs: (lane: ThreadId) => TaskId | "inventory" | null
-  readonly archived: (task: TaskId) => boolean
+  /** Where a lane's thread's card is: a canvas, an inventory, or nowhere. */
+  readonly whereIs: (lane: ThreadId) => CanvasId | "inventory" | null
+  readonly archived: (canvas: CanvasId) => boolean
 }): readonly ThreadId[] {
   return [...input.holds.keys()].filter(lane => {
     const where = input.whereIs(lane)

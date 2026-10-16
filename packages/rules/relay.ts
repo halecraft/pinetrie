@@ -350,7 +350,7 @@ export type AnswerPlan =
  * - A stopped or failed run sends no answer, and wakes nobody: the asking
  *   thread is told it went unanswered.
  * - Nothing is sent to a thread that asked and has since gone out of reach:
- *   its task archived, or taken into an inventory. The answering
+ *   its canvas archived, or taken into an inventory. The answering
  *   thread is told instead.
  */
 export function planAnswer(input: {

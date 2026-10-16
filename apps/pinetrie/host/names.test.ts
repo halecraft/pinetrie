@@ -79,7 +79,7 @@ test("a reservation is named on the same queue as new lanes, and starts its bann
   expect(await names.reserve(other)).toBe("held")
 })
 
-test("a conversation thread is named as a lane is, and draws no banner: every thread has a name", async () => {
+test("a chat is named as a lane is, and draws no banner: every thread has a name", async () => {
   const b = basics()
   const thread = threadIdFor("conversation")
   applyWrites(b, [

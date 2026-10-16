@@ -40,7 +40,7 @@ const props = (
     }),
     onAct: ACT,
     join: undefined,
-    crossTaskLink: undefined,
+    crossCanvasLink: undefined,
     onLink: LINK,
     pinned: undefined,
     forkTracks: [],

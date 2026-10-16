@@ -52,6 +52,7 @@ async function storeWith(
     rewriteRecords({ name: "test", namespace: NS, home, rewrite: rename }).run({
       exchange,
       docIds: [SESSION_DOC_ID, rootDocId(ROOT), "pinetrie:places"],
+      storedIds: [SESSION_DOC_ID, rootDocId(ROOT), "pinetrie:places"],
       hydrated: id => exchange.whenHydrated(id),
     })
   return {

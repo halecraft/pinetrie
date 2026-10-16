@@ -1,9 +1,9 @@
 import {
   type CardRecord,
+  canvasIdFor,
   cardIdOfKind,
   entryId,
   NO_CONTENT,
-  taskIdFor,
   threadIdFor,
   type Workflow,
   workflowStateIdFor,
@@ -11,20 +11,20 @@ import {
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
+  boardPlaceWords,
+  canvasColumnView,
+  canvasTrash,
+  pinnedCountWords,
+  trashKeepWords,
+  trashWords,
+} from "./canvas-column-view.ts"
+import {
   type CardColumn,
   defaultView,
   type Strip,
   stripOf,
 } from "./canvas-columns.ts"
 import { NO_TEXT } from "./root-label.ts"
-import {
-  boardStateWords,
-  canvasTrash,
-  pinnedCountWords,
-  taskColumnView,
-  trashKeepWords,
-  trashWords,
-} from "./task-column-view.ts"
 import { threadCardHead } from "./thread-card.ts"
 
 const HOUR = 60 * 60 * 1000
@@ -32,7 +32,7 @@ const DAY = 24 * HOUR
 const WEEK = 7 * DAY
 
 const ADA = writerId("ada@x.io")
-const K = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
+const K = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 const [B, D, X] = ["b", "d", "x"].map(workflowStateIdFor) as [
   ReturnType<typeof workflowStateIdFor>,
   ReturnType<typeof workflowStateIdFor>,
@@ -55,13 +55,13 @@ const head = threadCardHead(K, {
   work: new Map(),
 })
 
-describe("taskColumnView", () => {
+describe("canvasColumnView", () => {
   test("its title, stored or not, its state by name, and Move to ▸ its thread card's", () => {
-    const view = taskColumnView({
-      task: K,
+    const view = canvasColumnView({
+      canvas: K,
       folded: false,
       head,
-      mark: { task: K, title: "Fix the sync bug", by: ADA, at: 1 },
+      mark: { canvas: K, title: "Fix the sync bug", by: ADA, at: 1 },
       summary: {
         line: "the sync drops a write",
         writers: [],
@@ -75,7 +75,7 @@ describe("taskColumnView", () => {
       label: "Fix the sync bug",
       titled: "Fix the sync bug",
       placeholder: "the sync drops a write",
-      state: "Doing",
+      place: { name: "Doing", role: "task" },
       readOnly: false,
     })
     expect(view.moves.map(m => m.name)).toEqual(["Backlog", "Done"])
@@ -83,8 +83,8 @@ describe("taskColumnView", () => {
   })
 
   test("before the host placed it, with no title, and archived: read only, nothing to move", () => {
-    const view = taskColumnView({
-      task: K,
+    const view = canvasColumnView({
+      canvas: K,
       folded: true,
       head: undefined,
       mark: undefined,
@@ -97,15 +97,15 @@ describe("taskColumnView", () => {
       folded: true,
       label: NO_TEXT,
       titled: null,
-      state: null,
+      place: null,
       moves: [],
       readOnly: true,
     })
 
     // Archived, it offers no move: Restore is the column's own (`readOnlyWords`).
     expect(
-      taskColumnView({
-        task: K,
+      canvasColumnView({
+        canvas: K,
         folded: false,
         head,
         mark: undefined,
@@ -118,16 +118,26 @@ describe("taskColumnView", () => {
   })
 
   test("its words", () => {
-    expect(boardStateWords("Doing")).toBe("in Doing")
-    expect(boardStateWords(null)).toBe("not on the board yet")
+    expect(boardPlaceWords({ name: "Topics", role: "topic" })).toEqual({
+      line: "a topic, in Topics",
+      moveLabel: "move this topic on the board",
+    })
+    expect(boardPlaceWords({ name: "Active", role: "task" }).line).toBe(
+      "a task, in Active",
+    )
+    expect(boardPlaceWords({ name: "Done", role: "archived" })).toEqual({
+      line: "archived, in Done",
+      moveLabel: "move this canvas on the board",
+    })
+    expect(boardPlaceWords(null).line).toBe("not on the board yet")
     expect(pinnedCountWords(0)).toBeNull()
     expect(pinnedCountWords(2)).toBe("2 pinned")
   })
 })
 
-test("a strip's task column is first, folded by default, and no card's column", () => {
+test("a strip's canvas column is first, folded by default, and no card's column", () => {
   const strip = stripOf(K, defaultView(null), [])
-  expect(strip[0]).toEqual({ kind: "task", task: K, folded: true })
+  expect(strip[0]).toEqual({ kind: "canvas", canvas: K, folded: true })
   const card = {
     kind: "notes",
     card: "n-x",
@@ -136,19 +146,19 @@ test("a strip's task column is first, folded by default, and no card's column", 
   } as unknown as CardColumn
   // @ts-expect-error: a card's column is never first
   const cardFirst: Strip = [card]
-  // @ts-expect-error: and the task column is never among the cards
-  const taskAmong: readonly CardColumn[] = [strip[0]]
-  expect([cardFirst, taskAmong]).toHaveLength(2)
+  // @ts-expect-error: and the canvas column is never among the cards
+  const canvasAmong: readonly CardColumn[] = [strip[0]]
+  expect([cardFirst, canvasAmong]).toHaveLength(2)
 })
 
 test("canvasTrash: the columns trashed from this canvas, newest first, with who trashed them and when", () => {
   const BEA = writerId("bea@x.io")
-  const other = taskIdFor("01a0ffd2-0000-7000-8000-0000000000dd")
+  const other = canvasIdFor("01a0ffd2-0000-7000-8000-0000000000dd")
   const T1 = threadIdFor("old")
   const T2 = threadIdFor("new")
   const N = cardIdOfKind("note-column", "01a0ffd2-0000-7000-8000-0000000000a1")
-  const left = (task = K) =>
-    ({ kind: "canvas", task, order: "a", width: 1 }) as const
+  const left = (canvas = K) =>
+    ({ kind: "canvas", canvas, order: "a", width: 1 }) as const
   const cards: CardRecord[] = [
     {
       kind: "thread",
@@ -196,7 +206,7 @@ test("canvasTrash: the columns trashed from this canvas, newest first, with who 
       [T1, { card: T1, events: [event(0)] }],
       [T2, { card: T2, events: [event(3 * DAY)] }],
     ]),
-    task: K,
+    canvas: K,
     now: 4 * DAY,
     keepMs: WEEK,
     names: new Map([[T2, "amber-fox" as never]]),
@@ -223,7 +233,7 @@ test("canvasTrash: a column whose deletion is close says when, by the keep it is
       placer: ADA,
       place: {
         kind: "trash",
-        left: { kind: "canvas", task: K, order: "a", width: 1 },
+        left: { kind: "canvas", canvas: K, order: "a", width: 1 },
       },
       content: NO_CONTENT,
     },
@@ -249,7 +259,7 @@ test("canvasTrash: a column whose deletion is close says when, by the keep it is
     canvasTrash({
       cards,
       histories,
-      task: K,
+      canvas: K,
       now,
       keepMs,
       names: new Map(),

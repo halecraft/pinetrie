@@ -173,7 +173,7 @@ for this reason.
 ### Lanes belong to threads, and never move (ADR-0120)
 
 The host owns one harness. A lane is a thread's line of work: created by
-`Agent.createThreadLane(at, lane)` where agent work is first wanted in a
+`Agent.createThreadLane(at, lane)` where an agent thread is first wanted in a
 thread, under its thread's id (`t-…`, minted by the column that opened the
 thread, ADR-0057, ADR-0117), and never navigated. People own no lanes; a
 message records its writer (`details.author`, from the transport). A lane's
@@ -205,7 +205,7 @@ Four facts from pi's source and the probes shape it:
   never saw it created. The Node e2e keeps a `writeEntry` fixture for that S3
   case.
 
-### Conversation threads have no lane (S21)
+### A chat has no lane (S21)
 
 A thread where the agent has not been asked has no lane. `Scribe.appendToTree` inserts
 its messages with `session.mutate` + `insertEntry`, parented at exactly the
@@ -275,7 +275,7 @@ harness never emits them (S22). What each event does to the document is
 
 `createAgent` passes pi's `toProviderMessages` our own: it gathers the bytes
 of every chat's `details.images` from `CreateAgentOptions.blobs`, encodes
-them, and runs `withChatImages` (`@pinetrie/rules`) before pi's own
+them, and runs `withMessageImages` (`@pinetrie/rules`) before pi's own
 `convertToLlm`, which it must still call so every other role converts as pi
 does. It runs once per request, and reads the store each time: no cache
 (S53 item 7). pi's compaction and branch summaries call `convertToLlm`
@@ -307,14 +307,14 @@ ADR-0098).
   every request (S92).
 - **Every thread's `<rules>` holds the context rules first**
   (`CONTEXT_RULES`, `systemPromptFor`), for a direct thread too:
-  `PINNED_RULE` (a thread's and a task's pinned cards) and `CANVAS_RULE`
+  `PINNED_RULE` (a thread's and a canvas's pinned cards) and `CANVAS_RULE`
   (the canvas list, ADR-0116), from the rules' context table. They are
   constant, so a lane's prompt stays the same between runs; each lane's
   prompt changed once when each was added. pi drops a guideline equal to
   another, so the lane's own lines stay distinct.
 - **pi's compaction carries the context entries** (`before_compaction`,
   `agent.ts`; `pinned.ts`). pi compacts in the middle of a run, and a
-  context entry summarised away (a thread's cards, a task's cards, the
+  context entry summarised away (a thread's cards, a canvas's cards, the
   canvas list) would leave the model without it. `carryContext` decides,
   pure, for every kind in the rules' context table (`CONTEXT_KINDS`): the
   newest of each kind among the summarised messages, when the retained tail
@@ -327,7 +327,7 @@ ADR-0098).
 - **A failed hook costs only the context.** It throws nothing on purpose:
   when `compact()` fails it returns nothing, and pi compacts on its own.
   The next run's entries restate what is not in view (`pinnedInView`,
-  `taskPinnedInView`, `canvasInView`, `@pinetrie/core`).
+  `canvasPinnedInView`, `canvasInView`, `@pinetrie/core`).
 - **The faux provider caches per lane** (`withUsageEstimate`), and pi stores
   each reply's `usage`, so `agent.test.ts` checks that an edited card keeps
   the cache with no model key. Each part is estimated rounding up, so a

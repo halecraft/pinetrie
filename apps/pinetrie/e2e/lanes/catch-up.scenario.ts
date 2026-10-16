@@ -98,7 +98,7 @@ async function catchUpSection(
       { tool: "bash", args: { command: "echo lane > lane.txt" } },
       { text: "started" },
     ])
-    await wu.chat("@agent start", ROOT, START_AGENT)
+    await wu.send("@agent start", ROOT, START_AGENT)
     await idle()
     const lane = laneWith("@agent start")?.name
     if (lane === undefined) throw new Error("no lane")
@@ -118,7 +118,7 @@ async function catchUpSection(
       { tool: "bash", args: { command: "cat landed.txt" } },
       { text: "caught up" },
     ])
-    await wu.chat("@agent catch up", at(laneTip(lane)), { thread: lane })
+    await wu.send("@agent catch up", at(laneTip(lane)), { thread: lane })
     await idle()
     const results = toolResults(lane)
     // The turn that called it records the merge: a branch
@@ -143,7 +143,7 @@ async function catchUpSection(
       { tool: "bash", args: { command: "cat landed.txt" } },
       { text: "branched" },
     ])
-    await wu.chat("@agent branch at the catch-up", at(call ?? null), BRANCH)
+    await wu.send("@agent branch at the catch-up", at(call ?? null), BRANCH)
     await idle()
     const branched = laneWith("@agent branch at the catch-up")?.name
     check(

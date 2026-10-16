@@ -114,10 +114,10 @@ async function recipeSection(
     text: string,
     command: string,
     where = ROOT,
-    how: Parameters<typeof wu.chat>[2] = START_AGENT,
+    how: Parameters<typeof wu.send>[2] = START_AGENT,
   ) => {
     script.use([{ tool: "bash", args: { command } }, { text: "done" }])
-    await wu.chat(text, where, how)
+    await wu.send(text, where, how)
     await idle()
     return laneWith(text)
   }
@@ -141,7 +141,7 @@ async function recipeSection(
       { text: "wrote them" },
     ])
     const earlier = recordsOf(first).length
-    await wu.chat("@agent build, and write .env", at(laneTip(first)), {
+    await wu.send("@agent build, and write .env", at(laneTip(first)), {
       thread: first,
     })
     await idle()
@@ -180,7 +180,7 @@ async function recipeSection(
       { tool: "bash", args: { command: `${GONE}; ls .store` } },
       { text: "caught up" },
     ])
-    await wu.chat("@agent catch up", at(laneTip(first)), { thread: first })
+    await wu.send("@agent catch up", at(laneTip(first)), { thread: first })
     await idle()
     const after = lastResult(first)
     check(
@@ -196,12 +196,12 @@ async function recipeSection(
       { tool: "bash", args: { command: "printf 'a\\n' > pkgs.txt" } },
       { text: "built, then changed" },
     ])
-    await wu.chat("@agent build, then drop package b", at(laneTip(first)), {
+    await wu.send("@agent build, then drop package b", at(laneTip(first)), {
       thread: first,
     })
     await idle()
     script.use([{ tool: "bash", args: { command: GONE } }, { text: "looked" }])
-    await wu.chat("@agent which outputs now?", at(laneTip(first)), {
+    await wu.send("@agent which outputs now?", at(laneTip(first)), {
       thread: first,
     })
     await idle()

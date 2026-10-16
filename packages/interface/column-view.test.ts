@@ -1,6 +1,7 @@
 import {
   type AgentMessageLike,
   type CardCommand,
+  canvasIdFor,
   commitId,
   type EntryId,
   entryId,
@@ -20,7 +21,6 @@ import {
   type ThreadLane,
   type ThreadName,
   type TreeIndex,
-  taskIdFor,
   textCardId,
   threadAt,
   threadIdFor,
@@ -35,7 +35,7 @@ import {
 } from "@pinetrie/rules"
 import type { ProposedChangesActing } from "@pinetrie/session"
 import { describe, expect, test } from "vitest"
-import { canvasMarkerWords, taskPinnedMarkerWords } from "./card-words.ts"
+import { canvasMarkerWords, canvasPinnedMarkerWords } from "./card-words.ts"
 import { projectColumns } from "./column-paths.ts"
 import {
   ACCEPT_LATER,
@@ -73,8 +73,8 @@ type Line = readonly [
   parent: string | null,
   message: AgentMessageLike,
 ]
-const chat = (text: string, compelled = false): AgentMessageLike => ({
-  role: "chat",
+const said = (text: string, compelled = false): AgentMessageLike => ({
+  role: "person",
   content: text,
   author: "Ada",
   writer: ADA,
@@ -117,16 +117,16 @@ const stretches = (
 // A conversation that asks the agent at its third message (lane A), and a
 // branch off the agent's reply whose first message starts lane B.
 const TRUNK: readonly Line[] = [
-  ["1", null, chat("hello")],
-  ["2", "1", chat("hi")],
-  ["3", "2", chat("@agent look", true)],
+  ["1", null, said("hello")],
+  ["2", "1", said("hi")],
+  ["3", "2", said("@agent look", true)],
   ["4", "3", reply("It says MANGO.")],
-  ["5", "4", chat("thanks, and?", true)],
+  ["5", "4", said("thanks, and?", true)],
   ["6", "5", reply("Nothing else.")],
 ]
 const BRANCH: readonly Line[] = [
   ...TRUNK,
-  ["b1", "4", chat("@agent try another", true)],
+  ["b1", "4", said("@agent try another", true)],
   ["b2", "b1", reply("Another.")],
 ]
 
@@ -134,7 +134,7 @@ describe("lanesAlong", () => {
   const index = tree(BRANCH)
   test.each([
     [
-      "a conversation that asks the agent: one stretch",
+      "a chat that asks the agent: one stretch",
       "6",
       { "3": A },
       null,
@@ -277,7 +277,7 @@ const facts = (
     lanes: [],
     work: work(),
     origins: {
-      task: null,
+      canvas: null,
       linkOf: thread => threadLink(thread, [], ADA),
       labelOf: () => "",
       reader: { me: ADA, nameOf: new Map() },
@@ -371,7 +371,7 @@ describe("columnView: the header", () => {
       { kind: "none" },
     ],
     [
-      "named as a conversation's thread, opened before its lane: its banner is due",
+      "named as a chat's thread, opened before its lane: its banner is due",
       { thread: A, createsLane: true, work: work({ names: NAMES }) },
       { kind: "ask", lane: A },
     ],
@@ -395,7 +395,7 @@ describe("columnView: the header", () => {
     ).toBeNull()
     expect(icon({}, { banners, names: NAMES })).toBeNull()
   })
-  test("under built-in icons, a named agent's header shows its noun's icon; a conversation's none", () => {
+  test("under built-in icons, a named agent's header shows its noun's icon; a chat's none", () => {
     const icons = { source: "built-in" } as const
     expect(
       headIconOf(
@@ -438,7 +438,7 @@ describe("columnView: the header", () => {
   })
   test("a lane that started above the column's first message still has a start", () => {
     // Column 1 shows only the branch; lane A started at 3, in column 0.
-    const index = tree([...BRANCH, ["b3", "b2", chat("more", true)]])
+    const index = tree([...BRANCH, ["b3", "b2", said("more", true)]])
     const view = projectColumns(index, [
       { anchor: entryId("6") },
       { anchor: entryId("b3") },
@@ -470,13 +470,13 @@ describe("columnView: the header", () => {
     expect(columnView(facts(1)).origin).toMatchObject({ speaker: "agent" })
     expect(columnView(facts(0)).origin).toEqual({ kind: "none" })
     const index = tree(TRUNK)
-    const [, fromChat] = projectColumns(index, [
+    const [, fromMessage] = projectColumns(index, [
       { anchor: entryId("6") },
       { anchor: entryId("2") },
     ])
-    if (fromChat === undefined) throw new Error("no view")
+    if (fromMessage === undefined) throw new Error("no view")
     expect(
-      columnView({ ...facts(0), index, view: fromChat }).origin,
+      columnView({ ...facts(0), index, view: fromMessage }).origin,
     ).toMatchObject({ speaker: "Ada", text: "hi" })
   })
 })
@@ -534,14 +534,14 @@ describe("columnView: the fork row of a branch opened from a proposal", () => {
         } as const,
       ],
     ])
-    const T = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
+    const T = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000c")
     const origin = columnView(
       facts(1, {
         index,
         thread,
         work: work({ forks }),
         origins: {
-          task: T,
+          canvas: T,
           linkOf: t =>
             threadLink(
               t,
@@ -551,7 +551,7 @@ describe("columnView: the fork row of a branch opened from a proposal", () => {
                   id: t,
                   owner: ADA,
                   placer: ADA,
-                  place: { kind: "canvas", task: T, order: "a", width: 1 },
+                  place: { kind: "canvas", canvas: T, order: "a", width: 1 },
                   content: NO_CONTENT,
                 },
               ],
@@ -599,7 +599,7 @@ describe("columnView: a thread's details", () => {
     [
       "at the root",
       [
-        ["r", null, chat("@agent go", true)],
+        ["r", null, said("@agent go", true)],
         ["r2", "r", reply("Gone.")],
       ],
       null,
@@ -607,7 +607,7 @@ describe("columnView: a thread's details", () => {
     [
       "at a message whose parent the index lacks",
       [
-        ["o", "gone", chat("@agent go", true)],
+        ["o", "gone", said("@agent go", true)],
         ["o2", "o", reply("Gone.")],
       ],
       null,
@@ -615,8 +615,8 @@ describe("columnView: a thread's details", () => {
     [
       "below the first message",
       [
-        ["r", null, chat("hello")],
-        ["o", "r", chat("@agent go", true)],
+        ["r", null, said("hello")],
+        ["o", "r", said("@agent go", true)],
         ["o2", "o", reply("Gone.")],
       ],
       "o",
@@ -1326,11 +1326,11 @@ describe("where the agent read pinned cards", () => {
       pinned: view,
     })
     const index = indexOf([
-      entry("1-q", null, chat("q")),
+      entry("1-q", null, said("q")),
       entry("2-k", "1-q", pinned(read(A, [card(cardIdFor("c1"), "a")]))),
-      entry("3-p", "2-k", chat("p", true)),
+      entry("3-p", "2-k", said("p", true)),
       entry("4-r", "3-p", { role: "assistant", content: "r" }),
-      entry("5-p", "4-r", chat("again", true)),
+      entry("5-p", "4-r", said("again", true)),
     ])
     const nodes = ["1-q", "3-p", "4-r", "5-p"].map(id => ({ id: entryId(id) }))
     expect([...pinnedMarkers(index, nodes)]).toEqual([
@@ -1344,23 +1344,23 @@ describe("where the agent read pinned cards", () => {
     ])
   })
 
-  test("pinnedMarkers: a run's task pins and canvas list, above its prompt, mark it too", () => {
-    const K = taskIdFor("k")
-    const canvas = { task: K, title: "T", lines: ["thread a"], more: 0 }
-    const taskCards = [card(cardIdFor("c2"), "all")]
+  test("pinnedMarkers: a run's canvas pins and canvas list, above its prompt, mark it too", () => {
+    const K = canvasIdFor("k")
+    const canvas = { canvas: K, title: "T", lines: ["thread a"], more: 0 }
+    const canvasCards = [card(cardIdFor("c2"), "all")]
     const index = indexOf([
-      entry("1-q", null, chat("q")),
+      entry("1-q", null, said("q")),
       entry("2-c", "1-q", { role: "canvas", content: "", canvas }),
       entry("3-t", "2-c", {
-        role: "task-pinned",
+        role: "canvas-pinned",
         content: "",
-        taskPinned: { task: K, cards: taskCards, retired: [] },
+        canvasPinned: { canvas: K, cards: canvasCards, retired: [] },
       }),
-      entry("4-p", "3-t", chat("p", true)),
+      entry("4-p", "3-t", said("p", true)),
       entry("5-r", "4-p", { role: "assistant", content: "r" }),
       // A canvas list alone, then a prompt: marked; the reply is not.
       entry("6-c", "5-r", { role: "canvas", content: "", canvas }),
-      entry("7-p", "6-c", chat("again", true)),
+      entry("7-p", "6-c", said("again", true)),
     ])
     const nodes = ["4-p", "5-r", "7-p"].map(id => ({ id: entryId(id) }))
     expect([...pinnedMarkers(index, nodes)]).toEqual([
@@ -1369,7 +1369,7 @@ describe("where the agent read pinned cards", () => {
         {
           cards: [],
           retired: [],
-          taskPinned: { cards: taskCards, retired: [] },
+          canvasPinned: { cards: canvasCards, retired: [] },
           canvas,
         },
       ],
@@ -1380,10 +1380,10 @@ describe("where the agent read pinned cards", () => {
     expect(promptParent(index, entryId("5-r"))).toBe("4-p")
     expect(promptParent(index, entryId("1-q"))).toBeNull()
     expect(canvasMarkerWords(canvas)).toBe(
-      "the agent was told the task's canvas: 1 card",
+      "the agent was told the canvas: 1 card",
     )
-    expect(taskPinnedMarkerWords({ cards: taskCards, retired: [] })).toBe(
-      "the agent read 1 card pinned to the task",
+    expect(canvasPinnedMarkerWords({ cards: canvasCards, retired: [] })).toBe(
+      "the agent read 1 card pinned to the canvas",
     )
   })
 })

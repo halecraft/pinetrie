@@ -167,7 +167,7 @@ changes pine·trie can keep this note true. You can skip them.
 ## People
 
 - Several people may write in one thread. Each message you read begins with
-  the name of the person who wrote it. <!-- packages/rules/chat.ts attributed -->
+  the name of the person who wrote it. <!-- packages/rules/message.ts attributed -->
 - When someone catches this thread up, pine·trie merges the thread's
   base into `/workspace`: accepted work's newest commit, or a fresh
   copy of the WIP it started from. A note tells you what changed. What they

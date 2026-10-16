@@ -113,32 +113,33 @@ const NEW_THREAD =
 export const parseNewThread = (s: string): ThreadId | undefined =>
   NEW_THREAD.test(s) ? (s as ThreadId) : undefined
 
-declare const taskIdBrand: unique symbol
+declare const canvasIdBrand: unique symbol
 /**
- * A task's id: `k-` and a uuidv7, minted by the tab that opens the task, as it
- * mints a `RootId`. A task is a card on the board, and this is its card's id:
+ * A canvas's id: `k-` and a uuidv7, minted by the tab that opens the canvas, as it
+ * mints a `RootId`. A canvas is a card on the board, and this is its card's id:
  * its place, its title, the sidebar and the layout are keyed by it. What it
  * holds is in the places document.
  */
-export type TaskId = string & { readonly [taskIdBrand]: true }
+export type CanvasId = string & { readonly [canvasIdBrand]: true }
 
-const TASK_PREFIX = "k-"
-const NEW_TASK =
+const CANVAS_PREFIX = "k-"
+const NEW_CANVAS =
   /^k-[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
 
-/** A task's id from the text after its prefix: for fixtures and parsers. */
-export const taskIdFor = (id: string): TaskId => `${TASK_PREFIX}${id}` as TaskId
+/** A canvas's id from the text after its prefix: for fixtures and parsers. */
+export const canvasIdFor = (id: string): CanvasId =>
+  `${CANVAS_PREFIX}${id}` as CanvasId
 
-/** The pattern a task's id matches (`isTaskId`), for a stored schema. */
-export const TASK_PATTERN = `^${TASK_PREFIX}[\\s\\S]`
+/** The pattern a canvas's id matches (`isCanvasId`), for a stored schema. */
+export const CANVAS_PATTERN = `^${CANVAS_PREFIX}[\\s\\S]`
 
-/** Whether text names a task: the check wherever a task's id is read. */
-export const isTaskId = (s: string): s is TaskId =>
-  s.startsWith(TASK_PREFIX) && s.length > TASK_PREFIX.length
+/** Whether text names a canvas: the check wherever a canvas's id is read. */
+export const isCanvasId = (s: string): s is CanvasId =>
+  s.startsWith(CANVAS_PREFIX) && s.length > CANVAS_PREFIX.length
 
-/** A new task's id as a client makes it, `k-` and a lowercase uuidv7; undefined for anything else. */
-export const parseNewTask = (s: string): TaskId | undefined =>
-  NEW_TASK.test(s) ? (s as TaskId) : undefined
+/** A new canvas's id as a client makes it, `k-` and a lowercase uuidv7; undefined for anything else. */
+export const parseNewCanvas = (s: string): CanvasId | undefined =>
+  NEW_CANVAS.test(s) ? (s as CanvasId) : undefined
 
 declare const rootIdBrand: unique symbol
 /**
@@ -197,37 +198,37 @@ export function rootOfDocId(docId: string): RootId | undefined {
 export const MOVES_DOC_PREFIX = "moves:"
 
 /**
- * Which of a person's histories of moves a step is in: a task's, or theirs
- * outside any task (a discard from their inventory while on no task).
+ * Which of a person's histories of moves a step is in: a canvas's, or theirs
+ * outside any canvas (a discard from their inventory while on no canvas).
  */
 export type MoveHistoryScope =
-  | { readonly kind: "task"; readonly task: TaskId }
+  | { readonly kind: "canvas"; readonly canvas: CanvasId }
   | { readonly kind: "person" }
 
 export const PERSON_HISTORY: MoveHistoryScope = { kind: "person" }
 
-/** The history of `task`, or the person's own for none. */
-export const historyScope = (task: TaskId | null): MoveHistoryScope =>
-  task === null ? PERSON_HISTORY : { kind: "task", task }
+/** The history of `canvas`, or the person's own for none. */
+export const historyScope = (canvas: CanvasId | null): MoveHistoryScope =>
+  canvas === null ? PERSON_HISTORY : { kind: "canvas", canvas }
 
 /**
- * The host's undo stack of `writer`'s moves in `scope`: `moves:<writer>:<task>`
- * for a task's, `moves:<writer>` for theirs outside any task. Only the host
+ * The host's undo stack of `writer`'s moves in `scope`: `moves:<writer>:<canvas>`
+ * for a canvas's, `moves:<writer>` for theirs outside any canvas. Only the host
  * holds it.
  */
 export const movesDocId = (
   writer: WriterId,
   scope: MoveHistoryScope,
 ): string =>
-  scope.kind === "task"
-    ? `${MOVES_DOC_PREFIX}${writer}:${scope.task}`
+  scope.kind === "canvas"
+    ? `${MOVES_DOC_PREFIX}${writer}:${scope.canvas}`
     : `${MOVES_DOC_PREFIX}${writer}`
 
 /**
  * A document id -> the writer and scope whose moves' stack it is, or
- * undefined for any other document. A task's id holds no `:`, and an
+ * undefined for any other document. A canvas's id holds no `:`, and an
  * email none (`normalizeEmail`), so a suffix after the last `:` that is a
- * task's id names a task's history, and none names the person's.
+ * canvas's id names a canvas's history, and none names the person's.
  */
 export function movesOfDocId(
   docId: string,
@@ -235,11 +236,11 @@ export function movesOfDocId(
   if (!docId.startsWith(MOVES_DOC_PREFIX)) return undefined
   const rest = docId.slice(MOVES_DOC_PREFIX.length)
   const cut = rest.lastIndexOf(":")
-  const task = cut <= 0 ? "" : rest.slice(cut + 1)
-  if (isTaskId(task))
+  const canvas = cut <= 0 ? "" : rest.slice(cut + 1)
+  if (isCanvasId(canvas))
     return {
       writer: rest.slice(0, cut) as WriterId,
-      scope: { kind: "task", task },
+      scope: { kind: "canvas", canvas },
     }
   return rest.startsWith("w-") && cut < 0
     ? { writer: rest as WriterId, scope: PERSON_HISTORY }
@@ -319,7 +320,7 @@ export type AskCardId = string & { readonly [askCardIdBrand]: true }
 export type CardId =
   | TextCardId
   | ThreadId
-  | TaskId
+  | CanvasId
   | NoteColumnId
   | FactCardId
   | ReferenceCardId
@@ -331,7 +332,7 @@ export type CardId =
 export type CardKind =
   | "text"
   | "thread"
-  | "task"
+  | "canvas"
   | "note-column"
   | "fact"
   | "reference"
@@ -388,12 +389,12 @@ const PREFIXED_CARD_RE = new RegExp(
  * fact's, a reference's, an ask's, a media card's and a file card's are their
  * prefix and one. A thread's is any id `isThreadId` takes, as everywhere a
  * thread is read, so a thread the store names is never dropped for its id's
- * shape; a task's, any `isTaskId` takes, the same way. The one way text becomes
+ * shape; a canvas's, any `isCanvasId` takes, the same way. The one way text becomes
  * a `CardId` outside a minter.
  */
 export function parseCardId(id: string): CardId | undefined {
   if (isThreadId(id)) return id
-  if (isTaskId(id)) return id
+  if (isCanvasId(id)) return id
   if (TEXT_CARD_RE.test(id)) return id as TextCardId
   return PREFIXED_CARD_RE.test(id) ? (id as CardId) : undefined
 }

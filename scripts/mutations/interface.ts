@@ -140,15 +140,15 @@ export const mutations: readonly Mutation[] = [
     from: "  return f.work.names.has(f.thread) && f.work.banners.has(f.thread)\n",
     to: "  return f.work.names.has(f.thread)\n",
     command: unit,
-    expect: "named as a conversation's thread, opened before its lane",
+    expect: "named as a chat's thread, opened before its lane",
   },
   {
-    name: "the undo key on no task does nothing",
+    name: "the undo key on no canvas does nothing",
     file: "packages/interface/card-intents.ts",
-    from: '  return [{ kind: "undoMoves", task: taskOfTab(state), direction }]\n',
-    to: '  const task = taskOfTab(state)\n  return task === null ? [] : [{ kind: "undoMoves", task, direction }]\n',
+    from: '  return [{ kind: "undoMoves", canvas: canvasOfTab(state), direction }]\n',
+    to: '  const canvas = canvasOfTab(state)\n  return canvas === null ? [] : [{ kind: "undoMoves", canvas, direction }]\n',
     command: unit,
-    expect: "on no task: your history outside any task",
+    expect: "on no canvas: your history outside any canvas",
   },
   {
     name: "a branch's fork row says it was copied",
@@ -159,13 +159,13 @@ export const mutations: readonly Mutation[] = [
     expect: "a copy says it was copied; a branch, only where it is from",
   },
   {
-    name: "a row from this task's thread names its task too",
+    name: "a row from this canvas's thread names its canvas too",
     file: "packages/interface/thread-link.ts",
-    from: '    if (link.kind === "open" && link.task === facts.here) continue\n',
+    from: '    if (link.kind === "open" && link.canvas === facts.here) continue\n',
     to: "",
     command: unit,
     expect:
-      "a row from another task's thread says where it is; from this task, nothing",
+      "a row from another canvas's thread says where it is; from this canvas, nothing",
   },
   {
     name: "a send to a held idle queue keeps the hold",
@@ -510,13 +510,13 @@ export const mutations: readonly Mutation[] = [
     expect: "outline keeps the last word of the column's last ended ask",
   },
   {
-    name: "the task you are on is not held",
+    name: "the canvas you are on is not held",
     file: "packages/interface/held-roots.ts",
-    from: '    ...(active?.kind === "task" ? [active.task] : []),',
+    from: '    ...(active?.kind === "canvas" ? [active.canvas] : []),',
     to: "    ...[],",
     command: unit,
     expect:
-      "the roots of the sidebar's tasks and the one you are on, and no other",
+      "the roots of the sidebar's canvases and the one you are on, and no other",
   },
   {
     name: "a tab holds only the root it is on",
@@ -525,7 +525,7 @@ export const mutations: readonly Mutation[] = [
     to: "",
     command: unit,
     expect:
-      "the roots of the sidebar's tasks and the one you are on, and no other",
+      "the roots of the sidebar's canvases and the one you are on, and no other",
   },
 
   {
@@ -661,7 +661,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "Move to Done names no proposed changes it withdraws",
     file: "packages/interface/thread-card.ts",
-    from: "        drops: closes ? (facts.proposed.get(task) ?? []) : [],",
+    from: "        drops: closes ? (facts.proposed.get(canvas) ?? []) : [],",
     to: "        drops: [],",
     command: unit,
     expect:
@@ -703,12 +703,12 @@ export const mutations: readonly Mutation[] = [
   },
 
   {
-    name: "a branch from agent work starts with nothing typed",
+    name: "a branch from an agent thread starts with nothing typed",
     file: "packages/interface/message-tools.ts",
     from: '  lane.kind === "lane" ? AGENT_PREFILL : undefined',
     to: '  lane.kind === "lane" ? undefined : undefined',
     command: unit,
-    expect: "branchPrefill: @agent, blank, in agent work",
+    expect: "branchPrefill: @agent, blank, in an agent thread",
   },
   {
     name: "a composer holding only its prefill sends it",
@@ -735,12 +735,12 @@ export const mutations: readonly Mutation[] = [
     expect: "sets a floor of the shrink",
   },
   {
-    name: "resolveLayout keeps archived tasks",
+    name: "resolveLayout keeps archived canvases",
     file: "packages/interface/layout.ts",
     from: "  const kept = list.filter(t => !archived.has(t) || t === here)",
     to: "  const kept = list",
     command: unit,
-    expect: "archived tasks leave the sidebar as drawn",
+    expect: "archived canvases leave the sidebar as drawn",
   },
 
   {
@@ -819,12 +819,12 @@ export const mutations: readonly Mutation[] = [
     expect: "prune with nothing stored lands on nothing",
   },
   {
-    name: "prune keeps an archived task you were on",
+    name: "prune keeps an archived canvas you were on",
     file: "packages/interface/layout.ts",
-    from: "        !facts.archived.has(active.task)))",
+    from: "        !facts.archived.has(active.canvas)))",
     to: "        true))",
     command: unit,
-    expect: "prune replaces a task you were on that is archived or gone",
+    expect: "prune replaces a canvas you were on that is archived or gone",
   },
   {
     name: "a v1 layout is decoded",
@@ -857,15 +857,15 @@ export const mutations: readonly Mutation[] = [
     from: "      return { ...state, active: afterClosing(state, here) }",
     to: "      return { ...state, active: afterClosing(state, here), roots: withRoot(state.roots, action.root, []) }",
     command: unit,
-    expect: "a task that leaves the sidebar keeps your view of it",
+    expect: "a canvas that leaves the sidebar keeps your view of it",
   },
   {
-    name: "prune falls back to an archived task",
+    name: "prune falls back to an archived canvas",
     file: "packages/interface/layout.ts",
     from: "  const list = facts.list.filter(t => known.has(t) && !facts.archived.has(t))",
     to: "  const list = facts.list.filter(t => known.has(t))",
     command: unit,
-    expect: "prune replaces a task you were on that is archived or gone",
+    expect: "prune replaces a canvas you were on that is archived or gone",
   },
   {
     name: "closing the root you are on leaves nothing",
@@ -873,7 +873,7 @@ export const mutations: readonly Mutation[] = [
     from: "  const next = items[at + 1] ?? items[at - 1]",
     to: "  const next = items[at]",
     command: unit,
-    expect: "closing the task you are on shows its neighbour below",
+    expect: "closing the canvas you are on shows its neighbour below",
   },
   {
     name: "every root anyone starts is in the sidebar",
@@ -882,7 +882,7 @@ export const mutations: readonly Mutation[] = [
     to: "  const open = drawnList([...new Set([...facts.list, ...[...facts.canvases.keys()]])], facts.archived, stored.active)",
     command: unit,
     expect:
-      "the sidebar is the facts', in its order, and the task you are on wherever it lacks it",
+      "the sidebar is the facts', in its order, and the canvas you are on wherever it lacks it",
   },
 
   {
@@ -931,7 +931,7 @@ export const mutations: readonly Mutation[] = [
     from: "      if (!at.includes(writer)) at.push(writer)",
     to: "      at.push(writer)",
     command: unit,
-    expect: "readersByTask turns people around",
+    expect: "readersByCanvas turns people around",
   },
   {
     name: "joining always renames you to the stored name",
@@ -1175,12 +1175,21 @@ export const mutations: readonly Mutation[] = [
     expect: "a content prefill sent unchanged is sent",
   },
   {
-    name: "a new tab drops its prefill",
+    name: "a new canvas drops its prefill",
     file: "packages/interface/intent.ts",
-    from: "              : { prefill: intent.prefill }),\n",
-    to: "              : {}),\n",
+    from: "          { prefill: intent.prefill ?? AGENT_PREFILL },\n",
+    to: "          {},\n",
     command: unit,
-    expect: "a new tab from a first message's edit starts with its text",
+    expect: "a new canvas from a first message's edit starts with its text",
+  },
+  {
+    name: "a new canvas opens with nothing typed",
+    file: "packages/interface/intent.ts",
+    from: "          { prefill: intent.prefill ?? AGENT_PREFILL },\n",
+    to: "          intent.prefill === undefined ? {} : { prefill: intent.prefill },\n",
+    command: unit,
+    expect:
+      "＋ opens a new canvas: its canvas and its thread written now, shown and in the sidebar, its thread's box starting with @agent, taking focus",
   },
   {
     name: "a read-only column offers no copy",
@@ -1321,65 +1330,66 @@ export const mutations: readonly Mutation[] = [
     expect: "no backticks inside close the code",
   },
   {
-    name: "→ in agent work opens a branch with nothing typed",
+    name: "→ in an agent thread opens a branch with nothing typed",
     file: "packages/interface/message-tools.ts",
     from: "            branch: { at: node.id, prefill: branchPrefill(at.lane) },",
     to: "            branch: { at: node.id, prefill: undefined },",
     command: unit,
-    expect: "a branch at the message, with @agent typed in agent work",
+    expect: "a branch at the message, with @agent typed in an agent thread",
   },
   {
-    name: "→ is hidden again at agent work's end",
+    name: "→ is hidden again at an agent thread's end",
     file: "packages/interface/message-tools.ts",
     from: '      at.isLast && at.lane.kind !== "lane"',
     to: "      at.isLast",
     command: unit,
-    expect: "hidden at a conversation's last message, shown at agent work's",
+    expect: "hidden at a chat's last message, shown at an agent thread's",
   },
   {
-    name: "→ shows at a conversation's end",
+    name: "→ shows at a chat's end",
     file: "packages/interface/message-tools.ts",
     from: '      at.isLast && at.lane.kind !== "lane"',
     to: "      false",
     command: unit,
-    expect: "hidden at a conversation's last message, shown at agent work's",
+    expect: "hidden at a chat's last message, shown at an agent thread's",
   },
   {
     name: "an edit branches at the message, not its parent",
     file: "packages/interface/message-tools.ts",
-    from: "      at: parentId,",
-    to: "    at: node.id,",
+    from: '    : { kind: "branch", branch: { at: parentId, prefill } }',
+    to: '    : { kind: "branch", branch: { at: node.id, prefill } }',
     command: unit,
     expect: "is a branch at the parent",
   },
   {
     name: "an edit never adds @agent",
     file: "packages/interface/message-tools.ts",
-    from: "      text: compelled && !named ? `${AGENT_PREFIX}${node.text}` : node.text,",
-    to: "      text: node.text,",
+    from: "      node.compelled === true && !named\n",
+    to: "      false\n",
     command: unit,
     expect: "asks the agent exactly when the original did",
   },
   {
     name: "an edit always adds @agent",
     file: "packages/interface/message-tools.ts",
-    from: "      text: compelled && !named ? `${AGENT_PREFIX}${node.text}` : node.text,",
-    to: "      text: `${AGENT_PREFIX}${node.text}`,",
+    from: "      node.compelled === true && !named\n",
+    to: "      true\n",
     command: unit,
     expect: "asks the agent exactly when the original did",
   },
   {
-    name: "a new tab never asks the agent",
+    name: "a first message's edit drops its @agent on a new canvas",
     file: "packages/interface/message-tools.ts",
-    from: "      asksAgent: compelled,",
-    to: "      asksAgent: false,",
+    from: '    ? { kind: "newCanvas", prefill }\n',
+    to: '    ? { kind: "newCanvas", prefill: { text: node.text, blank: false } }\n',
     command: unit,
-    expect: "a root's first message opens a new tab",
+    expect:
+      "a root's first message opens a new canvas, with @agent in front when it asked the agent",
   },
   {
     name: "every role can be edited",
     file: "packages/interface/message-tools.ts",
-    from: '    edit: node.role === "chat" ? editOf(node, at.parentId) : undefined,',
+    from: '    edit: node.role === "person" ? editOf(node, at.parentId) : undefined,',
     to: "    edit: editOf(node, at.parentId),",
     command: unit,
     expect: "only a person's message",
@@ -1393,12 +1403,12 @@ export const mutations: readonly Mutation[] = [
     expect: "while an image is uploading",
   },
   {
-    name: "a task's label ignores its title",
+    name: "a canvas's label ignores its title",
     file: "packages/interface/root-label.ts",
-    from: "      if (title !== undefined) return [t.task, title] as const\n",
+    from: "      if (title !== undefined) return [t.canvas, title] as const\n",
     to: "",
     command: unit,
-    expect: "a titled task is called by its title",
+    expect: "a titled canvas is called by its title",
   },
   {
     name: "the header counts every root as held",
@@ -1414,7 +1424,7 @@ export const mutations: readonly Mutation[] = [
     from: "      search.words.every(w => label.includes(w))",
     to: '      search.words.every(w => "".includes(w))',
     command: unit,
-    expect: "it keeps the tasks whose label holds every word",
+    expect: "it keeps the canvases whose label holds every word",
   },
   {
     name: "the board's search keeps a root with any one word",
@@ -1422,7 +1432,7 @@ export const mutations: readonly Mutation[] = [
     from: "      search.words.every(w => label.includes(w))",
     to: "      search.words.some(w => label.includes(w))",
     command: unit,
-    expect: "it keeps the tasks whose label holds every word",
+    expect: "it keeps the canvases whose label holds every word",
   },
   {
     name: "a state added right of a column lands left of it",
@@ -1447,7 +1457,7 @@ export const mutations: readonly Mutation[] = [
     from: "  const keeps = search === null ? null : boardFilter(search, input.me)",
     to: "  const keeps = null",
     command: unit,
-    expect: "it keeps the tasks whose label holds every word",
+    expect: "it keeps the canvases whose label holds every word",
   },
   {
     name: "mine keeps everyone's roots",
@@ -1455,7 +1465,7 @@ export const mutations: readonly Mutation[] = [
     from: "      (!search.mine || root.writers.includes(me)) &&",
     to: "      true &&",
     command: unit,
-    expect: "mine keeps the tasks you wrote in, in every state",
+    expect: "mine keeps the canvases you wrote in, in every state",
   },
   {
     name: "a blank query is a filter",
@@ -1466,9 +1476,9 @@ export const mutations: readonly Mutation[] = [
     expect: '"   ", mine false',
   },
   {
-    name: "a filtered head's signals cover every task",
+    name: "a filtered head's signals cover every canvas",
     file: "packages/interface/board-view.ts",
-    from: "      signals: stateSignals(cards.map(t => t.task)),",
+    from: "      signals: stateSignals(cards.map(t => t.canvas)),",
     to: "      signals: stateSignals(all),",
     command: unit,
     expect: "a filtered head counts what it shows",
@@ -1477,7 +1487,7 @@ export const mutations: readonly Mutation[] = [
     name: "a filtered head's mark counts only the shown",
     file: "packages/interface/board-view.ts",
     from: "    const mark = markOf(status, all)",
-    to: "    const mark = markOf(status, cards.map(t => t.task))",
+    to: "    const mark = markOf(status, cards.map(t => t.canvas))",
     command: unit,
     expect: "a filtered head counts what it shows",
   },
@@ -1485,7 +1495,7 @@ export const mutations: readonly Mutation[] = [
     name: "the strip's signals cover only the shown",
     file: "packages/interface/board-view.ts",
     from: "      signals: stateSignals(all),",
-    to: "      signals: stateSignals(cards.map(t => t.task)),",
+    to: "      signals: stateSignals(cards.map(t => t.canvas)),",
     command: unit,
     expect: "a filtered head counts what it shows",
   },
@@ -1498,7 +1508,7 @@ export const mutations: readonly Mutation[] = [
     expect: "a filtered head counts what it shows",
   },
   {
-    name: "Remove counts only the shown tasks",
+    name: "Remove counts only the shown canvases",
     file: "packages/interface/board-view.ts",
     from: "        why: removeWords(all.length, board.open.length),",
     to: "        why: removeWords(cards.length, board.open.length),",
@@ -1516,8 +1526,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a filtered board's moves step over hidden items",
     file: "packages/interface/board-view.ts",
-    from: "        cardOf(task, column.state.id, column.tasks, t => shown.has(t)),",
-    to: "        cardOf(task, column.state.id, column.tasks, () => true),",
+    from: "        cardOf(canvas, column.state.id, column.canvases, t => shown.has(t)),",
+    to: "        cardOf(canvas, column.state.id, column.canvases, () => true),",
     command: unit,
     expect: "Move up and Move down step among the items shown",
   },
@@ -1567,7 +1577,7 @@ export const mutations: readonly Mutation[] = [
     from: `  return \`Filtered by \${quoted(search)}\${search.mine ? " and mine" : ""}: \${of}\``,
     to: `  return \`Filtered by \${quoted(search)}: \${of}\``,
     command: unit,
-    expect: 'Filtered by "parser" and mine: 14 of 140 tasks',
+    expect: 'Filtered by "parser" and mine: 14 of 140 canvases',
   },
   {
     name: "the board's own open arms the search's focus",
@@ -1871,12 +1881,12 @@ export const mutations: readonly Mutation[] = [
   },
 
   {
-    name: "elsewhere holds for a task that has a tab",
+    name: "elsewhere holds for a canvas that has a tab",
     file: "packages/interface/layout.ts",
-    from: "  [...tasks].filter(t => !layout.open.includes(t) && !archived.has(t))",
-    to: "  [...tasks].filter(t => !archived.has(t))",
+    from: "  [...canvases].filter(t => !layout.open.includes(t) && !archived.has(t))",
+    to: "  [...canvases].filter(t => !archived.has(t))",
     command: unit,
-    expect: "your message marks its task and its thread's end",
+    expect: "your message marks its canvas and its thread's end",
   },
   {
     name: "railKeep drops your cards' ends",
@@ -1889,10 +1899,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the board marks no item",
     file: "packages/interface/thread-card.ts",
-    from: "    pip: facts.pips.has(task),",
+    from: "    pip: facts.pips.has(canvas),",
     to: "    pip: false,",
     command: unit,
-    expect: "an item holds your card exactly when its task does",
+    expect: "an item holds your card exactly when its canvas does",
   },
   {
     name: "a selection dragged out of the board closes it",
@@ -1957,7 +1967,7 @@ export const mutations: readonly Mutation[] = [
     from: "    for (const thread of [...threads].sort()) {",
     to: "    for (const thread of [...threads].sort().reverse()) {",
     command: unit,
-    expect: "a task takes the icon of its earliest thread with one",
+    expect: "a canvas takes the icon of its earliest thread with one",
   },
   {
     name: "a small window starts full",
@@ -1984,19 +1994,19 @@ export const mutations: readonly Mutation[] = [
     expect: "foldList asks for the width the sidebar does not show",
   },
   {
-    name: "an archived task lights ▦",
+    name: "an archived canvas lights ▦",
     file: "packages/interface/layout.ts",
-    from: "  [...tasks].filter(t => !layout.open.includes(t) && !archived.has(t))",
-    to: "  [...tasks].filter(t => !layout.open.includes(t))",
+    from: "  [...canvases].filter(t => !layout.open.includes(t) && !archived.has(t))",
+    to: "  [...canvases].filter(t => !layout.open.includes(t))",
     command: unit,
-    expect: "an archived task marks its row, never ▦",
+    expect: "an archived canvas marks its row, never ▦",
   },
 
   {
     name: "× writes to the host",
     file: "packages/interface/intent.ts",
-    from: '      return intent.here.kind === "task" ? closeTask(intent.here.task) : []',
-    to: '      return intent.here.kind === "task" ? [{ kind: "request", intent: { kind: "name", name: "x" } }, ...closeTask(intent.here.task)] : []',
+    from: '      return intent.here.kind === "canvas"\n        ? closeCanvas(intent.here.canvas)\n        : []',
+    to: '      return intent.here.kind === "canvas"\n        ? [{ kind: "request", intent: { kind: "name", name: "x" } }, ...closeCanvas(intent.here.canvas)]\n        : []',
     command: unit,
     expect:
       "× on a root closes it for you: it leaves the sidebar, and nothing shared is written",
@@ -2011,9 +2021,9 @@ export const mutations: readonly Mutation[] = [
     expect: "signing out forgets who you are, then reloads",
   },
   {
-    name: "a new tab's emptied task stays in your sidebar",
+    name: "an emptied new canvas stays in your sidebar",
     file: "packages/interface/card-intents.ts",
-    from: "      close: closeTaskEffects(emptied),",
+    from: "      close: closeCanvasEffects(emptied),",
     to: "      close: [],",
     command: unit,
     expect: "× on any column trashes its card alone",
@@ -2099,16 +2109,16 @@ export const mutations: readonly Mutation[] = [
     from: "          archived === undefined\n            ? null",
     to: "          true\n            ? null",
     command: unit,
-    expect: "an archived task is read-only, with Restore",
+    expect: "an archived canvas is read-only, with Restore",
   },
 
   {
-    name: "＋'s default starts a conversation",
+    name: "the sidebar's ＋ gets its ▾ back",
     file: "packages/interface/start-button.ts",
-    from: "    main: tab(main),\n",
-    to: "    main: tab({ ...main, asksAgent: false }),\n",
+    from: "    more: null,\n",
+    to: '    more: {\n      items: [item(NEW_COLUMNS.thread[1], { kind: "newCanvas" })],\n      label: "other ways to start",\n    },\n',
     command: unit,
-    expect: "＋'s main action starts agent work",
+    expect: "＋ canvas makes a canvas, with no ▾",
   },
   {
     name: "＋ past the last column offers no note column",
@@ -2135,10 +2145,10 @@ export const mutations: readonly Mutation[] = [
     expect: "a thread column is a new root opened at its spot on the canvas",
   },
   {
-    name: "a task's ⋯ shows only on the task you are on",
+    name: "a canvas's ⋯ shows only on the canvas you are on",
     file: "packages/interface/sidebar-view.ts",
-    from: "    menu: archived ? [] : menuOf(task, head),",
-    to: "    menu: archived || !sameHere(here, input.active) ? [] : menuOf(task, head),",
+    from: "    menu: archived ? [] : menuOf(canvas, head),",
+    to: "    menu: archived || !sameHere(here, input.active) ? [] : menuOf(canvas, head),",
     command: unit,
     expect: "every root not archived offers ⋯",
   },
@@ -2216,7 +2226,7 @@ export const mutations: readonly Mutation[] = [
     to: "        ...(v.prefill === undefined\n",
     command: unit,
     expect:
-      "a round trip keeps what you are on, each task's view and the board",
+      "a round trip keeps what you are on, each canvas's view and the board",
   },
 
   {
@@ -2419,10 +2429,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a queued card cannot be pinned from its ⋯",
     file: "packages/interface/card-frame.ts",
-    from: '        pin,\n        pinTask,\n        take,\n      ]\n    case "pinned":',
-    to: '        pinTask,\n        take,\n      ]\n    case "pinned":',
+    from: '        pin,\n        pinCanvas,\n        take,\n      ]\n    case "pinned":',
+    to: '        pinCanvas,\n        take,\n      ]\n    case "pinned":',
     command: unit,
-    expect: "Move to ▸ queued: the notes, pinned, the task, your inventory",
+    expect: "Move to ▸ queued: the notes, pinned, the canvas, your inventory",
   },
   {
     name: "every move flies",
@@ -2650,17 +2660,17 @@ export const mutations: readonly Mutation[] = [
       "a keep is one move of every card, and closes its column only once accepted",
   },
   {
-    name: "the header names no task of a root it does not hold",
+    name: "the header names no canvas of a root it does not hold",
     file: "packages/interface/here.ts",
-    from: "      (thread === null ? undefined : facts.taskOfThread.get(thread)) ??\n      facts.reported.get(end)\n",
-    to: "      thread === null ? undefined : facts.taskOfThread.get(thread)\n",
+    from: "      (thread === null ? undefined : facts.canvasOfThread.get(thread)) ??\n      facts.reported.get(end)\n",
+    to: "      thread === null ? undefined : facts.canvasOfThread.get(thread)\n",
     command: unit,
-    expect: "peopleHere names the task its reader reported",
+    expect: "peopleHere names the canvas its reader reported",
   },
   {
     name: "openIn opens nothing in a root not held",
     file: "packages/interface/intent.ts",
-    from: '  return [...showTask(task), { kind: "openWhenHeld", entry }]',
+    from: '  return [...showCanvas(canvas), { kind: "openWhenHeld", entry }]',
     to: "  return []",
     command: unit,
     expect: "openLink: an entry this tab holds opens as openAt does",
@@ -2674,22 +2684,22 @@ export const mutations: readonly Mutation[] = [
     expect: "the header's proposed changes are the open ones",
   },
   {
-    name: "a card marks no task",
+    name: "a card marks no canvas",
     file: "packages/interface/signals.ts",
-    from: "        if (end !== null) ends.add(end)\n        const task = taskOfPlace(input.tasks, card.place)\n        if (task !== null) tasks.add(task)\n",
-    to: "        if (end !== null) ends.add(end)\n        const task = taskOfPlace(input.tasks, card.place)\n",
+    from: "        if (end !== null) ends.add(end)\n        const canvas = canvasOfPlace(input.canvases, card.place)\n        if (canvas !== null) canvases.add(canvas)\n",
+    to: "        if (end !== null) ends.add(end)\n        const canvas = canvasOfPlace(input.canvases, card.place)\n",
     command: unit,
     expect:
-      "your message in a root this tab does not hold marks its thread's task",
+      "your message in a root this tab does not hold marks its thread's canvas",
   },
 
   {
-    name: "an undo in a task names no task",
+    name: "an undo in a canvas names no canvas",
     file: "packages/interface/card-intents.ts",
-    from: '  return active?.kind === "task" ? active.task : null',
+    from: '  return active?.kind === "canvas" ? active.canvas : null',
     to: "  return null",
     command: unit,
-    expect: "on a task: that task's history",
+    expect: "on a canvas: that canvas's history",
   },
   {
     name: "the panel's undo undoes moves",
@@ -2846,13 +2856,13 @@ export const mutations: readonly Mutation[] = [
     from: '  for (const { lane } of input.running) work.set(lane, "running")\n',
     to: "",
     command: unit,
-    expect: "threadWork and taskWork",
+    expect: "threadWork and canvasWork",
   },
   {
     name: "a column counts every item as working",
     file: "packages/interface/board-view.ts",
-    from: '    working: tasks.filter(t => headOf(t).status?.kind === "working").length,',
-    to: "    working: tasks.length,",
+    from: '    working: canvases.filter(t => headOf(t).status?.kind === "working").length,',
+    to: "    working: canvases.length,",
     command: unit,
     expect:
       "a column counts its items working and ready, not threads; an item's ⇡ names its threads",
@@ -2860,8 +2870,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a column counts ready threads, not items",
     file: "packages/interface/board-view.ts",
-    from: "    ready: tasks.filter(t => headOf(t).ready.length > 0).length,",
-    to: "    ready: tasks.reduce((n, t) => n + headOf(t).ready.length, 0),",
+    from: "    ready: canvases.filter(t => headOf(t).ready.length > 0).length,",
+    to: "    ready: canvases.reduce((n, t) => n + headOf(t).ready.length, 0),",
     command: unit,
     expect:
       "a column counts its items working and ready, not threads; an item's ⇡ names its threads",
@@ -2869,7 +2879,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a thread card never carries ⇡",
     file: "packages/interface/thread-card.ts",
-    from: "    ready: facts.proposed.get(task) ?? [],",
+    from: "    ready: facts.proposed.get(canvas) ?? [],",
     to: "    ready: [],",
     command: unit,
     expect:
@@ -2878,11 +2888,11 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a thread the host has not named has no ready mark",
     file: "packages/interface/sidebar-view.ts",
-    from: "    if (task !== undefined)\n      byTask.set",
-    to: "    if (task !== undefined && names.has(lane))\n      byTask.set",
+    from: "    if (canvas !== undefined)\n      byCanvas.set",
+    to: "    if (canvas !== undefined && names.has(lane))\n      byCanvas.set",
     command: unit,
     expect:
-      "openProposedByTask: each open proposed changes' thread, under its task",
+      "openProposedByCanvas: each open proposed changes' thread, under its canvas",
   },
   {
     name: "a reader who left is still said to be in",
@@ -2893,17 +2903,17 @@ export const mutations: readonly Mutation[] = [
     expect: "readerHeading: where a reader is, or that they have left",
   },
   {
-    name: "a task no lane works in is called by its first line",
+    name: "a canvas no lane works in is called by its first line",
     file: "packages/interface/root-label.ts",
     from: "          : worked.has(record.root)\n            ? record.firstLine\n            : CHAT_LABEL,",
     to: "          : record.firstLine,",
     command: unit,
-    expect: "an untitled task no lane works in is a chat",
+    expect: "an untitled canvas no lane works in is a chat",
   },
   {
-    name: "a task's ⋯ leaves out Auto-update title",
+    name: "a canvas's ⋯ leaves out Auto-update title",
     file: "packages/interface/sidebar-view.ts",
-    from: '    { kind: "retitle", intent: { kind: "retitle", task } },\n',
+    from: '    { kind: "retitle", intent: { kind: "retitle", canvas } },\n',
     to: "",
     command: unit,
     expect: "every root not archived offers ⋯",
@@ -2911,15 +2921,15 @@ export const mutations: readonly Mutation[] = [
   {
     name: "Auto-update title sends nothing",
     file: "packages/interface/intent.ts",
-    from: '        { kind: "request", intent: { kind: "retitle", task: intent.task } },',
+    from: '        { kind: "request", intent: { kind: "retitle", canvas: intent.canvas } },',
     to: "",
     command: unit,
     expect: "rename and retitle are one request each",
   },
   {
-    name: "moving the task you are on to Done leaves it in the sidebar",
+    name: "moving the canvas you are on to Done leaves it in the sidebar",
     file: "packages/interface/intent.ts",
-    from: "          moved: intent.closes ? closeTask(intent.task) : [],",
+    from: "          moved: intent.closes ? closeCanvas(intent.canvas) : [],",
     to: "          moved: [],",
     command: unit,
     expect:
@@ -2932,7 +2942,7 @@ export const mutations: readonly Mutation[] = [
     to: '  switch ("moved" as string) {\n    case "moved":\n      return moved\n',
     command: unit,
     expect:
-      "afterTaskMove: what follows a move runs only once the host accepts it",
+      "afterCanvasMove: what follows a move runs only once the host accepts it",
   },
   {
     name: "a thread you do not follow raises attention",
@@ -2964,15 +2974,15 @@ export const mutations: readonly Mutation[] = [
     from: "    !input.busy.has(lane) && followed(input, lane)",
     to: "    followed(input, lane)",
     command: unit,
-    expect: "a busy lane, or a thread of an archived task, raises nothing",
+    expect: "a busy lane, or a thread of an archived canvas, raises nothing",
   },
   {
-    name: "a thread of an archived task raises attention",
+    name: "a thread of an archived canvas raises attention",
     file: "packages/interface/attention.ts",
     from: "  !input.archived.has(lane) && follows(input.me, input.writers.get(lane) ?? [])",
     to: "  follows(input.me, input.writers.get(lane) ?? [])",
     command: unit,
-    expect: "a busy lane, or a thread of an archived task, raises nothing",
+    expect: "a busy lane, or a thread of an archived canvas, raises nothing",
   },
   {
     name: "highest takes the first level",
@@ -3128,7 +3138,7 @@ export const mutations: readonly Mutation[] = [
     from: "  return here === null || kept.includes(here) ? kept : [...kept, here]",
     to: "  return kept",
     command: unit,
-    expect: "and the task you are on wherever it lacks it",
+    expect: "and the canvas you are on wherever it lacks it",
   },
   {
     name: "the strip counts the archive as open",
@@ -3144,12 +3154,12 @@ export const mutations: readonly Mutation[] = [
     from: '      return s === undefined || s.kind === "working" ? null : s.kind',
     to: '      return s === undefined ? null : s.kind === "working" ? "needsYou" : s.kind',
     command: unit,
-    expect: "markOf: the highest level among the tasks it covers",
+    expect: "markOf: the highest level among the canvases it covers",
   },
   {
-    name: "a drop moves a task before itself",
+    name: "a drop moves a canvas before itself",
     file: "packages/interface/root-target.ts",
-    from: "  if (drag.state === null || target.before === drag.task) return null",
+    from: "  if (drag.state === null || target.before === drag.canvas) return null",
     to: "  if (drag.state === null) return null",
     command: unit,
     expect: "a root dropped before itself does nothing",
@@ -3213,7 +3223,7 @@ export const mutations: readonly Mutation[] = [
   },
   // ── pages and the account menu ──
   {
-    name: "a new tab opens under the page",
+    name: "a new canvas opens under the page",
     file: "packages/interface/layout.ts",
     from: '    case "show":\n      return true\n    case "board":',
     to: '    case "show":\n      return false\n    case "board":',
@@ -3367,12 +3377,12 @@ export const mutations: readonly Mutation[] = [
     expect: "a long text is cut at spaces around its first match",
   },
   {
-    name: "a search opened on one task applies on another",
+    name: "a search opened on one canvas applies on another",
     file: "packages/interface/search.ts",
-    from: '  s !== null && here?.kind === "task" && here.task === s.task ? s : null',
-    to: '  s !== null && here?.kind === "task" ? s : null',
+    from: '  s !== null && here?.kind === "canvas" && here.canvas === s.canvas ? s : null',
+    to: '  s !== null && here?.kind === "canvas" ? s : null',
     command: unit,
-    expect: "another task's search does not apply here",
+    expect: "another canvas's search does not apply here",
   },
   {
     name: "a column's gap counts one message too many",
@@ -3503,45 +3513,45 @@ export const mutations: readonly Mutation[] = [
     expect: "a running call's time counts from its stream's start",
   },
   {
-    name: "a discard names no task you are on",
+    name: "a discard names no canvas you are on",
     file: "packages/interface/card-intents.ts",
-    from: "    return [moveCard(move, how, false, null, taskOfTab(state))]",
+    from: "    return [moveCard(move, how, false, null, canvasOfTab(state))]",
     to: "    return [moveCard(move, how, false, null, null)]",
     command: unit,
     expect:
       "goes back to its thread's notes from its ⋯, and to the trash from its ×",
   },
   {
-    name: "a sidebar drop's move is in the tab's task, not the new one",
+    name: "a sidebar drop's move is in the tab's canvas, not the new one",
     file: "packages/interface/spin-off.ts",
-    from: '    here: to.kind === "sidebar" ? minted.task : taskOfTab(state),',
-    to: "    here: taskOfTab(state),",
+    from: '    here: to.kind === "sidebar" ? minted.canvas : canvasOfTab(state),',
+    to: "    here: canvasOfTab(state),",
     command: unit,
-    expect: "sent with the new task, which you will be on",
+    expect: "sent with the new canvas, which you will be on",
   },
   {
-    name: "a task's status is its last thread's",
+    name: "a canvas's status is its last thread's",
     file: "packages/interface/attention.ts",
-    from: "    if (task !== undefined) out.set(task, withItem(out.get(task), status))",
-    to: "    if (task !== undefined) out.set(task, status)",
+    from: "    if (canvas !== undefined) out.set(canvas, withItem(out.get(canvas), status))",
+    to: "    if (canvas !== undefined) out.set(canvas, status)",
     command: unit,
-    expect: "a task's status is its threads' together",
+    expect: "a canvas's status is its threads' together",
   },
   {
-    name: "a task's work is its last thread's",
+    name: "a canvas's work is its last thread's",
     file: "packages/interface/app-view.ts",
-    from: "    if (task !== undefined) out.set(task, moreWork(out.get(task), work))",
-    to: "    if (task !== undefined) out.set(task, work)",
+    from: "    if (canvas !== undefined) out.set(canvas, moreWork(out.get(canvas), work))",
+    to: "    if (canvas !== undefined) out.set(canvas, work)",
     command: unit,
-    expect: "threadWork and taskWork",
+    expect: "threadWork and canvasWork",
   },
   {
-    name: "a task's writers are its first root's",
+    name: "a canvas's writers are its first root's",
     file: "packages/interface/root-label.ts",
     from: "    for (const r of records) {",
     to: "    for (const r of records.slice(0, 1)) {",
     command: unit,
-    expect: "summaries: a task over two roots",
+    expect: "summaries: a canvas over two roots",
   },
 
   {
@@ -3601,7 +3611,7 @@ export const mutations: readonly Mutation[] = [
     to: "",
     command: unit,
     expect:
-      "a round trip keeps what you are on, each task's view and the board",
+      "a round trip keeps what you are on, each canvas's view and the board",
   },
   {
     name: "a stored branch's prefill is not restored",
@@ -3610,18 +3620,18 @@ export const mutations: readonly Mutation[] = [
     to: "",
     command: unit,
     expect:
-      "a round trip keeps what you are on, each task's view and the board",
+      "a round trip keeps what you are on, each canvas's view and the board",
   },
   {
-    name: "a view change changes every task",
+    name: "a view change changes every canvas",
     file: "packages/interface/layout.ts",
-    from: "        : { ...state, tasks: withView(state.tasks, action.task, after) }",
-    to: '        : { ...state, tasks: new Map([...new Set([...state.tasks.keys(), action.task, ...["k-5-r2"]])].map(t => [t, after])) }',
+    from: "        : { ...state, canvases: withView(state.canvases, action.canvas, after) }",
+    to: '        : { ...state, canvases: new Map([...new Set([...state.canvases.keys(), action.canvas, ...["k-5-r2"]])].map(t => [t, after])) }',
     command: unit,
-    expect: "a view change changes only its task's view",
+    expect: "a view change changes only its canvas's view",
   },
   {
-    name: "a task's first card starts folded",
+    name: "a canvas's first card starts folded",
     file: "packages/interface/canvas-columns.ts",
     from: "  cards: first === null ? new Map() : new Map([[first, { unfolded: true }]]),",
     to: "  cards: new Map(),",
@@ -3639,19 +3649,19 @@ export const mutations: readonly Mutation[] = [
   {
     name: "planOpen unfolds where a column already shows the entry",
     file: "packages/interface/layout.ts",
-    from: '  if (key !== undefined) return { kind: "scroll", task, key }\n',
+    from: '  if (key !== undefined) return { kind: "scroll", canvas, key }\n',
     to: "",
     command: unit,
     expect: "scrolls to a message an unfolded column already shows",
   },
   {
-    name: "an entry opens in a task its thread is not in",
+    name: "an entry opens in a canvas its thread is not in",
     file: "packages/interface/layout.ts",
-    from: "  if (task === undefined) return null\n  const columns",
+    from: "  if (canvas === undefined) return null\n  const columns",
     to: "  const columns",
     command: unit,
     expect:
-      "an entry the index lacks, or one whose thread is in no task, has no plan",
+      "an entry the index lacks, or one whose thread is in no canvas, has no plan",
   },
   {
     name: "a v7 layout is decoded",
@@ -3684,7 +3694,7 @@ export const mutations: readonly Mutation[] = [
     from: "  for (const { root, entry } of input.roots) {\n",
     to: "  for (const { root, entry } of index.roots.map(entry => ({ root: entry as never, entry }))) {\n",
     command: unit,
-    expect: "a task's rail is a tree per root of its threads",
+    expect: "a canvas's rail is a tree per root of its threads",
   },
   {
     name: "a column move goes before the card it lands after",
@@ -3695,20 +3705,20 @@ export const mutations: readonly Mutation[] = [
     expect: "a move reorders the column's card on the canvas",
   },
   {
-    name: "an archived task's column offers its moves",
-    file: "packages/interface/task-column-view.ts",
+    name: "an archived canvas's column offers its moves",
+    file: "packages/interface/canvas-column-view.ts",
     from: "    moves: input.archived ? [] : (head?.moves ?? []),",
     to: "    moves: head?.moves ?? [],",
     command: unit,
     expect: "archived: read only, nothing to move",
   },
   {
-    name: "the task column starts unfolded",
+    name: "the canvas column starts unfolded",
     file: "packages/interface/canvas-columns.ts",
-    from: '): Strip => [{ kind: "task", task, folded: !view.task.unfolded }, ...columns]',
-    to: '): Strip => [{ kind: "task", task, folded: false }, ...columns]',
+    from: '  { kind: "canvas", canvas, folded: !view.canvas.unfolded },',
+    to: '  { kind: "canvas", canvas, folded: false },',
     command: unit,
-    expect: "a strip's task column is first, folded by default",
+    expect: "a strip's canvas column is first, folded by default",
   },
   {
     name: "a note column made is left folded",
@@ -3719,35 +3729,35 @@ export const mutations: readonly Mutation[] = [
     expect: "a note column is made at its spot on the canvas, and unfolded",
   },
   {
-    name: "a pin to the task off a thread's task goes nowhere",
+    name: "a pin to the canvas off a thread's canvas goes nowhere",
     file: "packages/interface/card-intents.ts",
-    from: '    (active?.kind === "task" ? active.task : null)',
+    from: '    (active?.kind === "canvas" ? active.canvas : null)',
     to: "    null",
     command: unit,
     expect:
-      "pin to the task: the task it is in, else the one you are on; unpinned, to its notes",
+      "pin to the canvas: the canvas it is in, else the one you are on; unpinned, to its notes",
   },
   {
-    name: "an unpin from the task is ignored",
+    name: "an unpin from the canvas is ignored",
     file: "packages/interface/card-intents.ts",
-    from: '  if (now?.place.kind === "task-pinned")',
+    from: '  if (now?.place.kind === "canvas-pinned")',
     to: "  if (false)",
     command: unit,
     expect:
-      "pin to the task: the task it is in, else the one you are on; unpinned, to its notes",
+      "pin to the canvas: the canvas it is in, else the one you are on; unpinned, to its notes",
   },
   {
     name: "a card gone from the canvas keeps its view as stored",
     file: "packages/interface/layout.ts",
-    from: "    if (cards.size !== view.cards.size)\n      tasks = withView(tasks, task, { ...view, cards })",
-    to: "    if (false) tasks = withView(tasks, task, { ...view, cards })",
+    from: "    if (cards.size !== view.cards.size)\n      canvases = withView(canvases, canvas, { ...view, cards })",
+    to: "    if (false) canvases = withView(canvases, canvas, { ...view, cards })",
     command: unit,
     expect: "storing drops the view of a card no longer on the canvas",
   },
   {
     name: "a canvas not arrived drops every view as stored",
     file: "packages/interface/layout.ts",
-    from: "    if (canvas.length === 0) continue\n",
+    from: "    if (here.length === 0) continue\n",
     to: "",
     command: unit,
     expect: "storing drops the view of a card no longer on the canvas",
@@ -3759,7 +3769,7 @@ export const mutations: readonly Mutation[] = [
     to: "    false\n  )\n    at = index.parentOf(at)\n  return at",
     command: unit,
     expect:
-      "pinnedMarkers: a run's task pins and canvas list, above its prompt, mark it too",
+      "pinnedMarkers: a run's canvas pins and canvas list, above its prompt, mark it too",
   },
   {
     name: "a link to someone else's held thread opens it",
@@ -3768,7 +3778,7 @@ export const mutations: readonly Mutation[] = [
     to: "        ? reach.by !== null\n",
     command: unit,
     expect:
-      "a link opens a thread's task, your own held thread's preview, and nothing for someone else's",
+      "a link opens a thread's canvas, your own held thread's preview, and nothing for someone else's",
   },
   {
     name: "a link to your own held thread opens nothing",
@@ -3782,8 +3792,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a copy lands first on the canvas, not after its source",
     file: "packages/interface/intent.ts",
-    from: '        : { kind: "canvas", task, after: source }\n',
-    to: '        : { kind: "canvas", task, after: null }\n',
+    from: '        : { kind: "canvas", canvas, after: source }\n',
+    to: '        : { kind: "canvas", canvas, after: null }\n',
     command: unit,
     expect:
       "copyThread: a copy lands after its source, or in your inventory; none into a full one or from no canvas",
@@ -3791,8 +3801,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a copy here from no canvas is sent anyway",
     file: "packages/interface/intent.ts",
-    from: "      : task === undefined\n        ? null\n",
-    to: '      : task === undefined\n        ? { kind: "inventory", slot: null }\n',
+    from: "      : canvas === undefined\n        ? null\n",
+    to: '      : canvas === undefined\n        ? { kind: "inventory", slot: null }\n',
     command: unit,
     expect:
       "copyThread: a copy lands after its source, or in your inventory; none into a full one or from no canvas",
@@ -3867,13 +3877,13 @@ export const mutations: readonly Mutation[] = [
     expect: "a thread not yet started in a thread someone else holds says who",
   },
   {
-    name: "the rail draws every row of a task's roots",
+    name: "the rail draws every row of a canvas's roots",
     file: "packages/interface/app-view.ts",
     from: "      if (!keep.has(row.id)) continue\n",
     to: "",
     command: unit,
     expect:
-      "a task's rail is a tree per root of its threads, cut to their paths, a fork elsewhere a stub",
+      "a canvas's rail is a tree per root of its threads, cut to their paths, a fork elsewhere a stub",
   },
   {
     name: "the rail draws no stub",
@@ -3882,7 +3892,7 @@ export const mutations: readonly Mutation[] = [
     to: '        if (link.kind === "gone")\n          stubs.push({',
     command: unit,
     expect:
-      "a task's rail is a tree per root of its threads, cut to their paths, a fork elsewhere a stub",
+      "a canvas's rail is a tree per root of its threads, cut to their paths, a fork elsewhere a stub",
   },
   {
     name: "every root's tree is in the page's palette",
@@ -3891,7 +3901,7 @@ export const mutations: readonly Mutation[] = [
     to: "    const shift = 0 * shiftOf(input.seed, rootSeed(root))\n",
     command: unit,
     expect:
-      "a task's rail is a tree per root of its threads, cut to their paths, a fork elsewhere a stub",
+      "a canvas's rail is a tree per root of its threads, cut to their paths, a fork elsewhere a stub",
   },
   // ── a thread's first entry is not always a message ──
   {
@@ -3983,7 +3993,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a text card put on a canvas is put nowhere",
     file: "packages/interface/card-intents.ts",
-    from: '  if (target.kind === "canvas" || target.kind === "task") {',
+    from: '  if (target.kind === "canvas" || target.kind === "item") {',
     to: "  if (false) {",
     command: unit,
     expect:
@@ -4052,12 +4062,12 @@ export const mutations: readonly Mutation[] = [
       "goes back to its thread's notes from its ⋯, and to the trash from its ×",
   },
   {
-    name: "the board draws a task with no message",
+    name: "the board draws a canvas with no message",
     file: "packages/interface/board-view.ts",
-    from: "    const all = column.tasks.filter(task => summaries.has(task))",
-    to: "    const all = column.tasks",
+    from: "    const all = column.canvases.filter(canvas => summaries.has(canvas))",
+    to: "    const all = column.canvases",
     command: unit,
-    expect: "a task with no message yet is on no column",
+    expect: "a canvas with no message yet is on no column",
   },
   {
     name: "an undo back onto the board shows nothing",
@@ -4065,7 +4075,7 @@ export const mutations: readonly Mutation[] = [
     from: '        effects: [layout({ kind: "board", open: true })],',
     to: "        effects: [],",
     command: unit,
-    expect: "a task's card back on the board",
+    expect: "a canvas's card back on the board",
   },
   {
     name: "every level is needs you",
@@ -4230,42 +4240,43 @@ export const mutations: readonly Mutation[] = [
     to: '      return source.kind === "card"',
     command: unit,
     expect:
-      "a drop sends what a key or a menu would: moveColumn, put or the task's drop, nothing else",
+      "a drop sends what a key or a menu would: moveColumn, put or the canvas's drop, nothing else",
   },
   {
-    name: "a sidebar row is all onto its task",
+    name: "a sidebar row is all onto its canvas",
     file: "packages/interface/drag.ts",
-    from: '  if (at < 0.25) return { kind: "sidebar", before: task }',
-    to: '  if (false) return { kind: "sidebar", before: task }',
+    from: '  if (at < 0.25) return { kind: "sidebar", before: canvas }',
+    to: '  if (false) return { kind: "sidebar", before: canvas }',
     command: unit,
     expect:
-      "a sidebar row: between rows in its top and bottom quarters, onto its task in between",
+      "a sidebar row: between rows in its top and bottom quarters, onto its canvas in between",
   },
   {
-    name: "a task's drag opens the task it would go before",
+    name: "a canvas's drag opens the canvas it would go before",
     file: "packages/interface/drag.ts",
-    from: '  if (at.kind === "task") return NO_HOVER',
-    to: '  if (at.kind === "task") return at.over.kind === "root" && at.over.target.before !== null ? { kind: "task", task: at.over.target.before } : NO_HOVER',
-    command: unit,
-    expect: "a task's drag opens nothing, over a place among tasks or none",
-  },
-  {
-    name: "a card opens a sidebar task from between rows",
-    file: "packages/interface/drag.ts",
-    from: '        ? { kind: "task", task: over.target.task }\n        : NO_HOVER',
-    to: '        ? { kind: "task", task: over.target.task }\n        : over.target.kind === "sidebar" && over.target.before !== null\n          ? { kind: "task", task: over.target.before }\n          : NO_HOVER',
+    from: '  if (at.kind === "canvas") return NO_HOVER',
+    to: '  if (at.kind === "canvas") return at.over.kind === "root" && at.over.target.before !== null ? { kind: "canvas", canvas: at.over.target.before } : NO_HOVER',
     command: unit,
     expect:
-      "a card's drag opens a sidebar task from its middle and ▦ the board; between tasks, nothing",
+      "a canvas's drag opens nothing, over a place among canvases or none",
   },
   {
-    name: "a task's landing is marked as a card's move",
+    name: "a card opens a sidebar canvas from between rows",
+    file: "packages/interface/drag.ts",
+    from: '        ? { kind: "canvas", canvas: over.target.canvas }\n        : NO_HOVER',
+    to: '        ? { kind: "canvas", canvas: over.target.canvas }\n        : over.target.kind === "sidebar" && over.target.before !== null\n          ? { kind: "canvas", canvas: over.target.before }\n          : NO_HOVER',
+    command: unit,
+    expect:
+      "a card's drag opens a sidebar canvas from its middle and ▦ the board; between canvases, nothing",
+  },
+  {
+    name: "a canvas's landing is marked as a card's move",
     file: "packages/interface/drag.ts",
     from: '    case "root":\n      return "root"',
     to: '    case "root":\n      return "move"',
     command: unit,
     expect:
-      "a task's landing is marked as a root drop; a card's as its move or copy",
+      "a canvas's landing is marked as a root drop; a card's as its move or copy",
   },
   {
     name: "Alt+arrows move a column from a text box",
@@ -4278,7 +4289,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the trash's line says a week, whatever the keep",
-    file: "packages/interface/task-column-view.ts",
+    file: "packages/interface/canvas-column-view.ts",
     from: "  `kept for ${spanWords(keepMs)} after it is trashed, then deleted`",
     to: "  `kept for a week after it is trashed, then deleted`",
     command: unit,
@@ -4287,7 +4298,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a trash row warns from its last day, whatever the keep",
-    file: "packages/interface/task-column-view.ts",
+    file: "packages/interface/canvas-column-view.ts",
     from: "  Math.min(DAY_MS, keepMs / 4)",
     to: "  DAY_MS",
     command: unit,
@@ -4296,7 +4307,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a trash row never warns",
-    file: "packages/interface/task-column-view.ts",
+    file: "packages/interface/canvas-column-view.ts",
     from: "          deletesInMs: left <= trashWarnMs(keepMs) ? left : null,",
     to: "          deletesInMs: null,",
     command: unit,
@@ -4313,9 +4324,9 @@ export const mutations: readonly Mutation[] = [
       "spanWords(604800000) is a week, in the largest unit it is a whole number of",
   },
   {
-    name: "the canvas's trash lists another task's columns",
-    file: "packages/interface/task-column-view.ts",
-    from: "      c.place.left.task !== input.task\n",
+    name: "the canvas's trash lists another canvas's columns",
+    file: "packages/interface/canvas-column-view.ts",
+    from: "      c.place.left.canvas !== input.canvas\n",
     to: "      false\n",
     command: unit,
     expect:
@@ -4328,7 +4339,7 @@ export const mutations: readonly Mutation[] = [
     to: '    case "trashed":\n      return { kind: "nothing" }',
     command: unit,
     expect:
-      "a link to a trashed thread names the task it left, says so, and restores it",
+      "a link to a trashed thread names the canvas it left, says so, and restores it",
   },
   {
     name: "a column's ⋯ offers no trash",
@@ -4351,7 +4362,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a drop's kind of target is never round-tripped",
     file: "packages/interface/put-target.test.ts",
-    from: '    { kind: "task", task: TEST_TASK },\n  ] satisfies PutTarget[]',
+    from: '    { kind: "item", canvas: TEST_CANVAS },\n  ] satisfies PutTarget[]',
     to: "  ] satisfies PutTarget[]",
     // tsc names no failing check (`failingChecks`): with the interface's
     // typecheck clean, any error is the mutant's.
@@ -4393,13 +4404,13 @@ export const mutations: readonly Mutation[] = [
       "nothing moves under reduced motion, during a drag, out of view, or already narrow",
   },
   {
-    name: "the task column's fold names a card",
+    name: "the canvas column's fold names a card",
     file: "packages/interface/fold-motion.ts",
-    from: '        column: { kind: "task", task: action.task },\n',
-    to: '        column: { kind: "card", card: action.task as never },\n',
+    from: '        column: { kind: "canvas", canvas: action.canvas },\n',
+    to: '        column: { kind: "card", card: action.canvas as never },\n',
     command: unit,
     expect:
-      "a card's fold or the task column's, with which way; nothing for another action",
+      "a card's fold or the canvas column's, with which way; nothing for another action",
   },
   {
     name: "a fold that moves lands without its motion",
@@ -4417,7 +4428,7 @@ export const mutations: readonly Mutation[] = [
     to: "            changeViewOf(\n",
     command: unit,
     expect:
-      "a fold you ask for is your view of the task you are on, and moves; off a task, nothing",
+      "a fold you ask for is your view of the canvas you are on, and moves; off a canvas, nothing",
   },
   {
     name: "a folded strip's colour ignores the rail",
@@ -4533,7 +4544,7 @@ export const mutations: readonly Mutation[] = [
     from: "  return input.foreign === null\n    ? null\n",
     to: "  return true\n    ? null\n",
     command: unit,
-    expect: "is read-only, saying why, after a hold and a task's archive",
+    expect: "is read-only, saying why, after a hold and a canvas's archive",
   },
   {
     name: "a branch's column is read as its own thread, not its source",

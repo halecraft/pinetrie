@@ -215,9 +215,9 @@ them.
 The host owns one pi harness and is **not a writer**. Each connected client is
 a writer, identified by the transport's `LineSender.peer` and recorded in every
 message it sends; writers own no lanes. A lane belongs to a thread: created
-where agent work is first wanted there, never moved, never written while it
+where the agent is first asked there, never moved, never written while it
 runs (ADR-0120). A lane is a line of agent work, with its own state on disk,
-not a way to answer two people at once (ADR-0019). Threads run concurrently. Decisions are pure (`planChat`,
+not a way to answer two people at once (ADR-0019). Threads run concurrently. Decisions are pure (`planMessage`,
 `planArchive` and the rest in `@pinetrie/rules`, over facts read by `@pinetrie/reads`);
 the host gathers, plans and executes each command in one serial step. A
 decision that acts on your repo (proposed changes, accepted work) is a value typed in
@@ -357,22 +357,22 @@ pinetrie:live      LiveDoc                  streams and active runs: compacted
                                           restarted host
 pinetrie:card-places
                  PlacesDoc, Yjs           where every card is (ADR-0059),
-                                          a task's on the board among them
+                                          a canvas's on the board among them
                                           (ADR-0126); Yjs so the host undoes
                                           moves (ADR-0066)
-moves:<writer>:<TaskId>
+moves:<writer>:<CanvasId>
                  UndoDoc, one a person    a person's history of moves in
-                 and task                 that task (ADR-0066, ADR-0116):
+                 and canvas               that canvas (ADR-0066, ADR-0116):
                                           the host's only, shared with no
                                           client; moves:<writer>, theirs
-                                          outside any task (ADR-0126)
+                                          outside any canvas (ADR-0126)
 presence         ephemeral                who reads which thread, in which root
 ```
 
 The host holds the session, `live`, the places and every root not archived
 (not in the board's archive, ADR-0122).
 A client holds the session, `live`, the places and only the roots of the
-tasks it shows; it reads every other root through its directory record. pi runs one
+canvases it shows; it reads every other root through its directory record. pi runs one
 session and one harness per root (ADR-0092, ADR-0095).
 
 ### Document shape (entries: settled by S7; rest sketch)
@@ -490,7 +490,7 @@ Given tree `A → {B, C}`, `C → {D, E}`, at `E`, "fold in B":
 base   = path(root → A)      ← LCA. Sent ONCE.
 theirs = path(A → B)         ← the branch being folded
 ours   = path(A → C → E)     ← the destination
-task   = "summarize `theirs` so it is useful at E"
+canvas   = "summarize `theirs` so it is useful at E"
 ```
 
 This is git's three-way merge structure. Sending `A` once (not twice) both saves

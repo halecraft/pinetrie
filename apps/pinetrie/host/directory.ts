@@ -86,7 +86,7 @@ export function startDirectory(deps: {
   })
 
   // Every root no held document refreshes whose record is stale: opened,
-  // its record written once, and let go again (an archived task's root).
+  // its record written once, and let go again (an archived canvas's root).
   const stale = planRebuild({
     named: [...readThreads(basics.session).values()].map(t => t.root),
     recorded: new Set(readRoots(basics.session).keys()),

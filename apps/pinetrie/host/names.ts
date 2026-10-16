@@ -49,7 +49,7 @@ export function createNames(deps: {
     ensure: () =>
       keeper.run(async () => {
         // Every lane has a record from its creation, in whichever root it
-        // works, and every thread from its first message: a conversation thread
+        // works, and every thread from its first message: a chat
         // is named too.
         const lanes = readLaneRecords(session)
         const planned = planNames(
@@ -66,7 +66,7 @@ export function createNames(deps: {
           readNames(session),
           now(),
         )
-        // A conversation's thread is named, and draws no banner.
+        // A chat's thread is named, and draws no banner.
         for (const record of planned)
           await write(record, lanes.has(record.lane))
       }),
@@ -79,7 +79,7 @@ export function createNames(deps: {
           now(),
         )
         if (plan.kind === "name") await write(plan.record, true)
-        // A thread opened before its lane was named as a conversation's, with
+        // A thread opened before its lane was named as a chat's, with
         // no banner: its lane to come is due one.
         if (plan.kind === "known") deps.onNamed(lane)
         return plan.kind

@@ -13,7 +13,7 @@ import type { Effect } from "./effects.ts"
 import type { FocusKey } from "./focus-claim.ts"
 import { type ColumnMotion, foldOf } from "./fold-motion.ts"
 import type { Identity } from "./identity.ts"
-import { afterTaskMove, type Intent } from "./intent.ts"
+import { afterCanvasMove, type Intent } from "./intent.ts"
 import type { LayoutAction } from "./layout.ts"
 import type { ListWidth } from "./list-width.ts"
 import { commentMarkdown } from "./markdown-of.ts"
@@ -27,7 +27,7 @@ export interface AppPorts {
   readonly session: Pick<
     SessionClient,
     | "request"
-    | "chat"
+    | "send"
     | "proposed"
     | "createCard"
     | "cardText"
@@ -189,9 +189,9 @@ function performOne(effect: Effect, ports: AppPorts): void {
     case "list": {
       const { openThreads } = ports.session
       const { act } = effect
-      if (act.kind === "ensure") openThreads.ensure(act.task)
-      else if (act.kind === "place") openThreads.open(act.task, act.before)
-      else openThreads.close(act.task)
+      if (act.kind === "ensure") openThreads.ensure(act.canvas)
+      else if (act.kind === "place") openThreads.open(act.canvas, act.before)
+      else openThreads.close(act.canvas)
       return
     }
     case "spinOff":
@@ -199,17 +199,17 @@ function performOne(effect: Effect, ports: AppPorts): void {
         .request(effect.request)
         .then(outcome =>
           perform(
-            afterSpinOff(outcome, effect.request.task, effect.sidebar),
+            afterSpinOff(outcome, effect.request.canvas, effect.sidebar),
             ports,
           ),
         )
       return
-    case "moveTask":
+    case "moveCanvas":
       // A move made on the board: the refusal said there before goes.
       ports.session.acted(AT_BOARD)
       void ports.session
         .request(effect.move)
-        .then(outcome => perform(afterTaskMove(outcome, effect.moved), ports))
+        .then(outcome => perform(afterCanvasMove(outcome, effect.moved), ports))
       return
     case "notNeeded":
       if (effect.raised.kind === "verdict")
@@ -217,8 +217,8 @@ function performOne(effect: Effect, ports: AppPorts): void {
       else if (effect.raised.kind === "ready" && effect.raised.source !== null)
         ports.attention.dismissReady(effect.lane, effect.raised.source)
       return
-    case "chat":
-      void ports.session.chat(
+    case "send":
+      void ports.session.send(
         effect.text,
         effect.at,
         effect.card === null ? {} : { card: effect.card },
@@ -269,7 +269,7 @@ function performOne(effect: Effect, ports: AppPorts): void {
       return
     case "undoMoves":
       void ports.session
-        .undoMoves(effect.task, effect.direction)
+        .undoMoves(effect.canvas, effect.direction)
         .then(outcome => ports.intent({ kind: "undoAnswered", outcome }))
       return
     case "undoSwap":

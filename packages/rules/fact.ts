@@ -16,9 +16,9 @@ import { Type } from "typebox"
 import { Value } from "typebox/value"
 import { CatchUpFromSchema, catchUpName } from "./catch-up-from.ts"
 import {
+  CanvasIdSchema,
   EntryIdSchema,
   List,
-  TaskIdSchema,
   ThreadIdSchema,
   WriterIdSchema,
 } from "./decode.ts"
@@ -64,15 +64,15 @@ const QueuedFactSchema = Type.Union([
     why: Type.Union([
       Type.Object({
         kind: Type.Literal("archived"),
-        task: TaskIdSchema,
+        canvas: CanvasIdSchema,
         record: Type.Object({
-          task: TaskIdSchema,
+          canvas: CanvasIdSchema,
           by: WriterIdSchema,
           at: Type.Number(),
         }),
       }),
       Type.Object({ kind: Type.Literal("held"), by: WriterIdSchema }),
-      Type.Object({ kind: Type.Literal("trashed"), task: TaskIdSchema }),
+      Type.Object({ kind: Type.Literal("trashed"), canvas: CanvasIdSchema }),
       Type.Object({ kind: Type.Literal("gone") }),
     ]),
     by: WriterIdSchema,
@@ -142,10 +142,10 @@ const into = (to: CatchUpFrom) =>
  */
 const awayLine = (name: string, why: Away): string =>
   why.kind === "archived"
-    ? `${name}'s task is archived`
+    ? `${name}'s canvas is archived`
     : why.kind === "held"
       ? `${name} is in someone's inventory`
-      : `${name} is no longer on any task`
+      : `${name} is no longer on any canvas`
 
 /** The one line a column shows for a fact. */
 export function factLine(fact: QueuedFact): string {

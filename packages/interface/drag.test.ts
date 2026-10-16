@@ -1,8 +1,10 @@
-import { taskIdFor, threadIdFor, workflowStateIdFor } from "@pinetrie/core"
+import { canvasIdFor, threadIdFor, workflowStateIdFor } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
 import { expect, test } from "vitest"
 import {
   type Armed,
+  type CanvasOver,
+  type CanvasSource,
   type CardOver,
   type CardSource,
   type DragAt,
@@ -16,23 +18,24 @@ import {
   hoverOpens,
   sidebarSpotAt,
   sourceOfElement,
-  type TaskOver,
-  type TaskSource,
 } from "./drag.ts"
 import type { IntentState } from "./effects.ts"
 import { neighbourShifts } from "./reorder.ts"
 
 const T = threadIdFor("t")
-const K = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
-const NEXT = taskIdFor("01a0ffd2-0000-7000-8000-00000000000d")
+const K = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000c")
+const NEXT = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000d")
 const ARCHIVE = workflowStateIdFor("x")
 const DOING = workflowStateIdFor("d")
 const card: CardSource = { kind: "card", card: T }
-const task: TaskSource = { kind: "task", drag: { task: K, state: DOING } }
+const canvas: CanvasSource = {
+  kind: "canvas",
+  drag: { canvas: K, state: DOING },
+}
 const cardAt = (over: CardOver): DragAt => ({ ...card, over })
-const taskAt = (over: TaskOver): DragAt => ({ ...task, over })
+const overCanvas = (over: CanvasOver): DragAt => ({ ...canvas, over })
 const from: DragFrom = { column: 1, home: null, archive: ARCHIVE }
-/** A drag's verdict never reads the state for these: a task's, or one over the strip. */
+/** A drag's verdict never reads the state for these: a canvas's, or one over the strip. */
 const NO_STATE = {} as IntentState
 
 const element = (attrs: Readonly<Record<string, string>>) => ({
@@ -40,10 +43,13 @@ const element = (attrs: Readonly<Record<string, string>>) => ({
 })
 
 test("a handle's source round-trips through its attributes; an element with none is no handle", () => {
-  const stateless: DragSource = { kind: "task", drag: { task: K, state: null } }
+  const stateless: DragSource = {
+    kind: "canvas",
+    drag: { canvas: K, state: null },
+  }
   for (const s of [
     card,
-    task,
+    canvas,
     stateless,
     { kind: "card", card: cardIdFor("c") },
   ] as const)
@@ -51,7 +57,7 @@ test("a handle's source round-trips through its attributes; an element with none
   expect(sourceOfElement(element({}))).toBeNull()
 })
 
-test("a column over the strip reorders, over its own gap moves nothing; a task lands by its own drop", () => {
+test("a column over the strip reorders, over its own gap moves nothing; a canvas lands by its own drop", () => {
   expect(
     dragVerdict(cardAt({ kind: "strip", gap: 3 }), from, "move", NO_STATE),
   ).toEqual({ kind: "reorder", to: 2 })
@@ -60,22 +66,22 @@ test("a column over the strip reorders, over its own gap moves nothing; a task l
   ).toEqual({ kind: "reorder", to: null })
   expect(
     dragVerdict(
-      taskAt({ kind: "root", target: { kind: "list", before: NEXT } }),
+      overCanvas({ kind: "root", target: { kind: "list", before: NEXT } }),
       from,
       "move",
       NO_STATE,
     ),
   ).toEqual({
     kind: "root",
-    intent: { kind: "moveInList", task: K, before: NEXT },
+    intent: { kind: "moveInList", canvas: K, before: NEXT },
   })
 })
 
-test("a drop sends what a key or a menu would: moveColumn, put or the task's drop, nothing else", () => {
+test("a drop sends what a key or a menu would: moveColumn, put or the canvas's drop, nothing else", () => {
   expect(dropIntents(card, { kind: "reorder", to: 2 }, "move")).toEqual([
     { kind: "moveColumn", column: { kind: "card", card: T }, to: 2 },
   ])
-  const target = { kind: "task", task: K } as const
+  const target = { kind: "item", canvas: K } as const
   expect(
     dropIntents(
       card,
@@ -103,10 +109,10 @@ test("a drop sends what a key or a menu would: moveColumn, put or the task's dro
   expect(dropIntents(card, { kind: "reorder", to: null }, "move")).toEqual([])
 })
 
-test("held over a sidebar task it opens that task, over ▦ the board", () => {
-  expect(hoverOpens({ kind: "task", task: K })).toEqual({
+test("held over a sidebar canvas it opens that canvas, over ▦ the board", () => {
+  expect(hoverOpens({ kind: "canvas", canvas: K })).toEqual({
     kind: "show",
-    here: { kind: "task", task: K },
+    here: { kind: "canvas", canvas: K },
   })
   expect(hoverOpens({ kind: "board" })).toMatchObject({
     kind: "board",
@@ -115,13 +121,13 @@ test("held over a sidebar task it opens that task, over ▦ the board", () => {
   expect(hoverOpens({ kind: "none" })).toBeNull()
 })
 
-test("a sidebar row: between rows in its top and bottom quarters, onto its task in between", () => {
+test("a sidebar row: between rows in its top and bottom quarters, onto its canvas in between", () => {
   const row = { top: 100, height: 40 }
   expect(sidebarSpotAt(105, row, K, NEXT)).toEqual({
     kind: "sidebar",
     before: K,
   })
-  expect(sidebarSpotAt(120, row, K, NEXT)).toEqual({ kind: "task", task: K })
+  expect(sidebarSpotAt(120, row, K, NEXT)).toEqual({ kind: "item", canvas: K })
   expect(sidebarSpotAt(138, row, K, NEXT)).toEqual({
     kind: "sidebar",
     before: NEXT,
@@ -214,17 +220,19 @@ test("drawPlan: a column only translates, along the strip; off it, its face is d
 const opensFor = (at: DragAt) =>
   drawPlan(whole, { x: 0, y: 0 }, 0, at, { kind: "nothing" }, "move").opens
 
-test("a task's drag opens nothing, over a place among tasks or none", () => {
+test("a canvas's drag opens nothing, over a place among canvases or none", () => {
   expect(
-    opensFor(taskAt({ kind: "root", target: { kind: "list", before: NEXT } })),
+    opensFor(
+      overCanvas({ kind: "root", target: { kind: "list", before: NEXT } }),
+    ),
   ).toEqual({ kind: "none" })
-  expect(opensFor(taskAt({ kind: "none" }))).toEqual({ kind: "none" })
+  expect(opensFor(overCanvas({ kind: "none" }))).toEqual({ kind: "none" })
 })
 
-test("a card's drag opens a sidebar task from its middle and ▦ the board; between tasks, nothing", () => {
+test("a card's drag opens a sidebar canvas from its middle and ▦ the board; between canvases, nothing", () => {
   expect(
-    opensFor(cardAt({ kind: "put", target: { kind: "task", task: K } })),
-  ).toEqual({ kind: "task", task: K })
+    opensFor(cardAt({ kind: "put", target: { kind: "item", canvas: K } })),
+  ).toEqual({ kind: "canvas", canvas: K })
   expect(
     opensFor(cardAt({ kind: "put", target: { kind: "sidebar", before: K } })),
   ).toEqual({ kind: "none" })
@@ -234,8 +242,8 @@ test("a card's drag opens a sidebar task from its middle and ▦ the board; betw
   })
 })
 
-test("a task's landing is marked as a root drop; a card's as its move or copy", () => {
-  const intent = { kind: "moveInList", task: K, before: NEXT } as const
+test("a canvas's landing is marked as a root drop; a card's as its move or copy", () => {
+  const intent = { kind: "moveInList", canvas: K, before: NEXT } as const
   expect(dropMark({ kind: "root", intent }, "move")).toBe("root")
   const target = { kind: "column", key: "k" } as const
   const land = {

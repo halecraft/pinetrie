@@ -1,4 +1,4 @@
-import { entryId, projectRail, taskIdFor } from "@pinetrie/core"
+import { canvasIdFor, entryId, projectRail } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { entry, indexOf } from "./fixtures.ts"
 import {
@@ -103,7 +103,7 @@ test("every match in a message is found, in order", () => {
 
 test("searchCorpus: every message of the root, as a reader sees its text", () => {
   const index = indexOf([
-    entry("1", null, { role: "chat", content: "Fix the rail" }),
+    entry("1", null, { role: "person", content: "Fix the rail" }),
     entry("2", "1", {
       role: "assistant",
       content: [
@@ -117,7 +117,7 @@ test("searchCorpus: every message of the root, as a reader sees its text", () =>
       ],
     }),
     entry("3", "2", { role: "toolResult", toolCallId: "c", content: "rail" }),
-    entry("4", "1", { role: "chat", content: "a branch" }),
+    entry("4", "1", { role: "person", content: "a branch" }),
   ])
   expect(searchCorpus(index, projectRail(index, entryId("1")))).toEqual([
     { id: "1", text: "Fix the rail" },
@@ -168,18 +168,20 @@ describe("snippet", () => {
   })
 })
 
-test("opening starts empty, on the task it is opened on, and another task's search does not apply here", () => {
-  const t1 = taskIdFor("t1")
-  const open = searchReducer(null, { kind: "open", task: t1 }, 5)
-  expect(open).toEqual({ task: t1, query: "", since: 5 })
+test("opening starts empty, on the canvas it is opened on, and another canvas's search does not apply here", () => {
+  const t1 = canvasIdFor("t1")
+  const open = searchReducer(null, { kind: "open", canvas: t1 }, 5)
+  expect(open).toEqual({ canvas: t1, query: "", since: 5 })
   const typed = searchReducer(open, { kind: "type", query: "rail" }, 9)
-  expect(typed).toEqual({ task: t1, query: "rail", since: 5 })
-  expect(searchReducer(typed, { kind: "open", task: t1 }, 9)).toBe(typed)
+  expect(typed).toEqual({ canvas: t1, query: "rail", since: 5 })
+  expect(searchReducer(typed, { kind: "open", canvas: t1 }, 9)).toBe(typed)
   expect(searchReducer(typed, { kind: "clear" }, 9)).toEqual(open)
   expect(searchReducer(typed, { kind: "close" }, 9)).toBeNull()
   expect(searchReducer(null, { kind: "type", query: "x" }, 9)).toBeNull()
-  expect(searchOn(typed, { kind: "task", task: t1 })).toBe(typed)
-  expect(searchOn(typed, { kind: "task", task: taskIdFor("t2") })).toBeNull()
+  expect(searchOn(typed, { kind: "canvas", canvas: t1 })).toBe(typed)
+  expect(
+    searchOn(typed, { kind: "canvas", canvas: canvasIdFor("t2") }),
+  ).toBeNull()
   expect(searchOn(typed, { kind: "nothing" })).toBeNull()
   expect(searchOn(typed, null)).toBeNull()
 })

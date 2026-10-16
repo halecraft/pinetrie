@@ -30,9 +30,9 @@ export const HOST_PRINCIPAL = "pinetrie-host"
  *   - `chat` is a human message. `mode` says how it joins the tree:
  *     `reply` at the end of the thread `lane` names, whose end its sender saw
  *     at `parentId`; `branch` starts the thread `lane` names, minted by the
- *     sender's column, at `parentId` (`""`: the root). See `ChatAt` in
+ *     sender's column, at `parentId` (`""`: the root). See `MessageAt` in
  *     @pinetrie/core;
- *     `asksAgent` marks a Start Agent column; `cardId` names the card its text
+ *     `asksAgent` marks a column that asks the agent with nothing typed; `cardId` names the card its text
  *     was sent from, which the host spends once it is sent, and
  *     `pinned` the versions of the thread's pinned cards its run waits for.
  *     It runs the agent only when the agent is its addressee (`address`).
@@ -46,15 +46,15 @@ export const HOST_PRINCIPAL = "pinetrie-host"
  *     it (`release`).
  *   - `unqueue-all` takes every message card queued on that thread back
  *     below the line.
- *   - `move-task` moves the task `task`'s card on the board: `text` is JSON `{ from, to, before }`, the state its
- *     sender saw it in, the state it goes to, and the task it goes before
+ *   - `move-canvas` moves the canvas `canvas`'s card on the board: `text` is JSON `{ from, to, before }`, the state its
+ *     sender saw it in, the state it goes to, and the canvas it goes before
  *     there, or null for the end. Answered `moved`, or `unmoved` as a
  *     card's move is.
  *   - `workflow` changes the board's states: `mode` names the
  *     action (`add`, `rename`, `move`, `remove`), `targetId` the state (`""`
  *     to add), `text` its name, and `parentId` the state it goes before
  *     (`""` for after every open state).
- *   - `mark` titles the task `task`, or the note column `cardId`, with
+ *   - `mark` titles the canvas `canvas`, or the note column `cardId`, with
  *     `text`; `""` clears its title.
  *   - `retitle` asks a model for the root `root`'s title.
  * - `proposed` acts on that lane's proposed changes in your repo; `mode` names
@@ -80,17 +80,17 @@ export const HOST_PRINCIPAL = "pinetrie-host"
  *     among the pinned cards, in its note column or on its canvas: `moves`
  *     is `{ at, after, before }`, the key of where it is and the cards it
  *     goes after and before, `""` for none.
- *   - `card-width` draws the card `cardId` on the canvas of the task
- *     `task`, where its sender saw it, one column wide (`mode` `1`) or two
+ *   - `card-width` draws the card `cardId` on the canvas of the canvas
+ *     `canvas`, where its sender saw it, one column wide (`mode` `1`) or two
  *     (`2`).
  *   - `open-thread` starts the thread `lane`, a new id, in the root `root`
- *     and the task `task`, as `mode` says: `branch` at `parentId`;
- *     `new-task`, a new tab's, a new root and task its tab minted, `state`
- *     as for `spin-off`; `new-root`, a new root its tab minted in a task the
+ *     and the canvas `canvas`, as `mode` says: `branch` at `parentId`;
+ *     `new-canvas`, a new canvas's, a new root and canvas its tab minted, `state`
+ *     as for `spin-off`; `new-root`, a new root its tab minted in a canvas the
  *     session holds, its card just after `cardId` (`""` for first).
  *   - `branch-out` presses Start or Open (`mode` `start` or `open`) on the
  *     agent's proposal at `parentId`, in the root `root`, its branches
- *     landing in the task `task`: `text` is a JSON list of `{ thread, row }`,
+ *     landing in the canvas `canvas`: `text` is a JSON list of `{ thread, row }`,
  *     each with its `brief` on Start, in the proposal's order.
  *   - `copy-thread` copies the thread `lane` at its end `parentId` as its
  *     sender saw it: `moves` is the copy's one move, its new
@@ -102,7 +102,7 @@ export const HOST_PRINCIPAL = "pinetrie-host"
  *     after the discard of the card it replaces, if any; `text`
  *     is a reference's address, or a text card's origin (`""` for none),
  *     printed (`printAddress`); `seen` a reference's quote's blob; `here`
- *     the sender's task.
+ *     the sender's canvas.
  *   - `undo-move` undoes (`mode` `undo`) or redoes (`redo`) the sender's
  *     newest move in the root `root`.
  *   - `set-command` sets the card `cardId`'s command to `mode`, or
@@ -113,12 +113,12 @@ export const HOST_PRINCIPAL = "pinetrie-host"
  *     `approve`, `refuse` or `revoke`, for the thread `lane`.
  */
 export const COMMAND_KINDS = [
-  "chat",
+  "send",
   "name",
   "picture",
   "stop",
   "carry-on",
-  "move-task",
+  "move-canvas",
   "workflow",
   "mark",
   "retitle",
@@ -166,15 +166,15 @@ export interface Command {
    */
   readonly root: string
   /**
-   * `chat` and `spin-off`: the task a thread it starts goes in, for a new
-   * root a new task's id the sender's tab minted; `move-task`,
-   * `mark`, `retitle` and `undo-move`: the task it acts on; `card-width`:
-   * the task whose canvas its sender saw the card on; `branch-out`: the
-   * proposing thread's task. `""` otherwise.
+   * `chat` and `spin-off`: the canvas a thread it starts goes in, for a new
+   * root a new canvas's id the sender's tab minted; `move-canvas`,
+   * `mark`, `retitle` and `undo-move`: the canvas it acts on; `card-width`:
+   * the canvas whose canvas its sender saw the card on; `branch-out`: the
+   * proposing thread's canvas. `""` otherwise.
    */
-  readonly task: string
+  readonly canvas: string
   /**
-   * `move` and `spin-off`: the task its sender is on, which names a
+   * `move` and `spin-off`: the canvas its sender is on, which names a
    * discard's history for a card in an inventory. `""` for none.
    */
   readonly here: string
@@ -191,7 +191,7 @@ export interface Command {
    * thread whose lane it acts on.
    */
   readonly lane: string
-  /** `chat`: a Start Agent column, where no mention asks the agent. */
+  /** `send`: a column that asks the agent with nothing typed. */
   readonly asksAgent: boolean
   /**
    * `proposed` `accept`: the destination bookmark, `""`
@@ -230,7 +230,7 @@ export interface Command {
    */
   readonly base: string
   /**
-   * `chat` and `spin-off`: the workflow state a task it starts lands in,
+   * `chat` and `spin-off`: the workflow state a canvas it starts lands in,
    * or `""` for the first open state.
    */
   readonly state: string
@@ -305,11 +305,11 @@ export interface Reply {
  */
 export const EMPTY_COMMAND: Command = Object.freeze({
   id: "",
-  kind: "chat",
+  kind: "send",
   text: "",
   parentId: "",
   root: "",
-  task: "",
+  canvas: "",
   here: "",
   mode: "",
   lane: "",

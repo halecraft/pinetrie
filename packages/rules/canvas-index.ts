@@ -1,7 +1,8 @@
-// task — a task's canvas, and a thread's opening.
+// canvas — a canvas, and a thread's opening.
 
 import {
   agentAsk,
+  type CanvasId,
   type CanvasKey,
   type CanvasTarget,
   type CardId,
@@ -21,7 +22,6 @@ import {
   type PlaceOf,
   type RootId,
   type SurfaceOwner,
-  type TaskId,
   type ThreadFork,
   type ThreadId,
   type ThreadOrigin,
@@ -44,18 +44,18 @@ import { branchAfter, rankAfter } from "./rank.ts"
 import { setRecord } from "./records.ts"
 import { THREAD } from "./thread.ts"
 
-/** A card on a canvas, in its task's order. */
-export type CanvasCard = CardInPlace<"canvas">
+/** A card on a canvas, in its canvas's order. */
+export type CardOnCanvas = CardInPlace<"canvas">
 
 /** A canvas card's kinds: what every consumer of a canvas switches over. */
-export type CanvasKind = CanvasCard["kind"]
+export type KindOnCanvas = CardOnCanvas["kind"]
 
-export const isCanvasCard = (c: CardRecord): c is CanvasCard =>
+export const isCardOnCanvas = (c: CardRecord): c is CardOnCanvas =>
   hasPlaceKind(c, "canvas")
 
-const onCanvas = isCanvasCard
+const onCanvas = isCardOnCanvas
 
-const byRank = (a: CanvasCard, b: CanvasCard): number =>
+const byRank = (a: CardOnCanvas, b: CardOnCanvas): number =>
   a.place.order < b.place.order
     ? -1
     : a.place.order > b.place.order
@@ -67,30 +67,30 @@ const byRank = (a: CanvasCard, b: CanvasCard): number =>
           : 0
 
 /**
- * Where every card and thread is among tasks, from the places
+ * Where every card and thread is among canvases, from the places
  * and the threads' records alone: the one derivation the host and the page
- * both read, so they cannot disagree on which task something is in.
+ * both read, so they cannot disagree on which canvas something is in.
  */
-export interface TaskIndex {
-  /** Each task's cards, in its canvas's order: by rank, then by id. */
-  readonly canvases: ReadonlyMap<TaskId, readonly CanvasCard[]>
+export interface CanvasIndex {
+  /** Each canvas's cards, in its canvas's order: by rank, then by id. */
+  readonly cardsOn: ReadonlyMap<CanvasId, readonly CardOnCanvas[]>
   /**
-   * Each canvas card's task, a thread's or a note column's; a trashed one's
-   * is the task its canvas place was in, so its own cards keep a task while
+   * Each canvas card's canvas, a thread's or a note column's; a trashed one's
+   * is the canvas its canvas place was in, so its own cards keep a canvas while
    * it is in the trash.
    */
-  readonly taskOfCard: ReadonlyMap<CardId, TaskId>
-  /** Each thread's task, a trashed one's as `taskOfCard`'s; a thread in an inventory has none. */
-  readonly taskOfThread: ReadonlyMap<ThreadId, TaskId>
-  /** Each task's thread cards, in canvas order. */
-  readonly threadsOf: ReadonlyMap<TaskId, readonly ThreadId[]>
+  readonly canvasOfCard: ReadonlyMap<CardId, CanvasId>
+  /** Each thread's canvas, a trashed one's as `canvasOfCard`'s; a thread in an inventory has none. */
+  readonly canvasOfThread: ReadonlyMap<ThreadId, CanvasId>
+  /** Each canvas's thread cards, in canvas order. */
+  readonly threadsOf: ReadonlyMap<CanvasId, readonly ThreadId[]>
   /**
-   * The roots of each task's threads, each once, in the order its first
+   * The roots of each canvas's threads, each once, in the order its first
    * thread is on the canvas; a thread with no record yet is left out.
    */
-  readonly rootsOf: ReadonlyMap<TaskId, readonly RootId[]>
-  /** The tasks each root has a thread in, by task id. */
-  readonly tasksOfRoot: ReadonlyMap<RootId, readonly TaskId[]>
+  readonly rootsOf: ReadonlyMap<CanvasId, readonly RootId[]>
+  /** The canvases each root has a thread in, by canvas id. */
+  readonly canvasesOfRoot: ReadonlyMap<RootId, readonly CanvasId[]>
   /**
    * Each recorded thread's root: a place at a thread names no root, so a
    * place's root is its thread's (`THREAD`).
@@ -103,43 +103,43 @@ export interface TaskIndex {
   readonly forkOf: ReadonlyMap<ThreadId, ThreadFork>
 }
 
-/** Every card's task, as the places and the threads' records say. */
-export function indexTasks(
+/** Every card's canvas, as the places and the threads' records say. */
+export function indexCanvases(
   cards: readonly CardRecord[],
   threads: ReadonlyMap<ThreadId, ThreadRecord>,
-): TaskIndex {
-  const canvases = new Map<TaskId, CanvasCard[]>()
+): CanvasIndex {
+  const cardsOn = new Map<CanvasId, CardOnCanvas[]>()
   for (const c of cards.filter(onCanvas)) {
-    const list = canvases.get(c.place.task) ?? []
+    const list = cardsOn.get(c.place.canvas) ?? []
     list.push(c)
-    canvases.set(c.place.task, list)
+    cardsOn.set(c.place.canvas, list)
   }
-  const taskOfCard = new Map<CardId, TaskId>()
-  const taskOfThread = new Map<ThreadId, TaskId>()
-  const threadsOf = new Map<TaskId, readonly ThreadId[]>()
-  const rootsOf = new Map<TaskId, readonly RootId[]>()
-  const tasksOfRoot = new Map<RootId, TaskId[]>()
-  for (const task of [...canvases.keys()].sort()) {
-    const canvas = canvases.get(task) ?? []
-    canvas.sort(byRank)
-    for (const c of canvas) taskOfCard.set(c.id, task)
-    const ids = canvas.flatMap(c => (isThreadId(c.id) ? [c.id] : []))
-    threadsOf.set(task, ids)
+  const canvasOfCard = new Map<CardId, CanvasId>()
+  const canvasOfThread = new Map<ThreadId, CanvasId>()
+  const threadsOf = new Map<CanvasId, readonly ThreadId[]>()
+  const rootsOf = new Map<CanvasId, readonly RootId[]>()
+  const canvasesOfRoot = new Map<RootId, CanvasId[]>()
+  for (const canvas of [...cardsOn.keys()].sort()) {
+    const here = cardsOn.get(canvas) ?? []
+    here.sort(byRank)
+    for (const c of here) canvasOfCard.set(c.id, canvas)
+    const ids = here.flatMap(c => (isThreadId(c.id) ? [c.id] : []))
+    threadsOf.set(canvas, ids)
     const roots: RootId[] = []
     for (const thread of ids) {
-      taskOfThread.set(thread, task)
+      canvasOfThread.set(thread, canvas)
       const root = threads.get(thread)?.root
       if (root !== undefined && !roots.includes(root)) roots.push(root)
     }
-    rootsOf.set(task, roots)
+    rootsOf.set(canvas, roots)
     for (const root of roots)
-      tasksOfRoot.set(root, [...(tasksOfRoot.get(root) ?? []), task])
+      canvasesOfRoot.set(root, [...(canvasesOfRoot.get(root) ?? []), canvas])
   }
-  // A trashed card is in the task its `left` is in, and on no canvas.
+  // A trashed card is in the canvas its `left` is in, and on no canvas.
   for (const c of cards) {
     if (c.place.kind !== "trash" || c.place.left.kind !== "canvas") continue
-    taskOfCard.set(c.id, c.place.left.task)
-    if (isThreadId(c.id)) taskOfThread.set(c.id, c.place.left.task)
+    canvasOfCard.set(c.id, c.place.left.canvas)
+    if (isThreadId(c.id)) canvasOfThread.set(c.id, c.place.left.canvas)
   }
   const rootOfThread = new Map(
     [...threads].map(([thread, r]) => [thread, r.root] as const),
@@ -150,12 +150,12 @@ export function indexTasks(
     ),
   )
   return {
-    canvases,
-    taskOfCard,
-    taskOfThread,
+    cardsOn,
+    canvasOfCard,
+    canvasOfThread,
     threadsOf,
     rootsOf,
-    tasksOfRoot,
+    canvasesOfRoot,
     rootOfThread,
     forkOf,
   }
@@ -173,34 +173,37 @@ export const rootOfPlace = (
   return thread === null ? undefined : rootOfThread.get(thread)
 }
 
-/** No tasks: before the places arrive. */
-export const NO_TASK_INDEX: TaskIndex = indexTasks([], new Map())
+/** No canvases: before the places arrive. */
+export const NO_CANVAS_INDEX: CanvasIndex = indexCanvases([], new Map())
 
 /**
- * The task a place is in: its surface's owner's (`ownerOf`). A task's own;
- * a note column's or a thread's task; none for an inventory, or the board
- * (a task's card is in no task: the board is the team's). A trashed card's
+ * The canvas a place is in: its surface's owner's (`ownerOf`). A canvas's own;
+ * a note column's or a thread's canvas; none for an inventory, or the board
+ * (a canvas's card is in no canvas: the board is the team's). A trashed card's
  * is the place it left's; a trash key names none, since the host fills in
  * where a discard leaves.
  */
-export function taskOfPlace(
-  tasks: TaskIndex,
+export function canvasOfPlace(
+  canvases: CanvasIndex,
   place: CardPlace | PlaceKey,
-): TaskId | null {
+): CanvasId | null {
   if (place.kind === "trash")
-    return "left" in place ? taskOfPlace(tasks, place.left) : null
-  return taskOfOwner(tasks, ownerOf(place))
+    return "left" in place ? canvasOfPlace(canvases, place.left) : null
+  return canvasOfOwner(canvases, ownerOf(place))
 }
 
-/** The task a surface's owner is in: a task itself, a note column's or a thread's. */
-function taskOfOwner(tasks: TaskIndex, owner: SurfaceOwner): TaskId | null {
+/** The canvas a surface's owner is in: a canvas itself, a note column's or a thread's. */
+function canvasOfOwner(
+  canvases: CanvasIndex,
+  owner: SurfaceOwner,
+): CanvasId | null {
   switch (owner.kind) {
-    case "task":
-      return owner.task
+    case "canvas":
+      return owner.canvas
     case "note-column":
-      return tasks.taskOfCard.get(owner.column) ?? null
+      return canvases.canvasOfCard.get(owner.column) ?? null
     case "thread":
-      return tasks.taskOfThread.get(owner.thread) ?? null
+      return canvases.canvasOfThread.get(owner.thread) ?? null
     case "person":
     case "team":
       return null
@@ -208,63 +211,63 @@ function taskOfOwner(tasks: TaskIndex, owner: SurfaceOwner): TaskId | null {
 }
 
 /**
- * The task a move sends a card to: its place's (`taskOfPlace`); a thread's
+ * The canvas a move sends a card to: its place's (`canvasOfPlace`); a thread's
  * nearest notes, its thread's; a spot on a canvas, its canvas's.
  */
-export function taskOfTarget(
-  tasks: TaskIndex,
+export function canvasOfTarget(
+  canvases: CanvasIndex,
   to: CardPlace | MoveTarget,
-): TaskId | null {
+): CanvasId | null {
   switch (to.kind) {
     case "notes":
       return to.near === "thread"
-        ? (tasks.taskOfThread.get(to.thread) ?? null)
-        : to.task
+        ? (canvases.canvasOfThread.get(to.thread) ?? null)
+        : to.canvas
     case "canvas-at":
-    case "new-task":
-      return to.task
-    // A restore's task is its card's, read from where the card is.
+    case "new-canvas":
+      return to.canvas
+    // A restore's canvas is its card's, read from where the card is.
     case "back":
       return null
     default:
-      return taskOfPlace(tasks, to)
+      return canvasOfPlace(canvases, to)
   }
 }
 
 /**
- * Whether card `id` is on its task's canvas now: not in an inventory, and
- * not trashed, though the index still names a trashed card's task.
+ * Whether card `id` is on its canvas now: not in an inventory, and
+ * not trashed, though the index still names a trashed card's canvas.
  */
-export const isOnCanvas = (tasks: TaskIndex, id: CardId): boolean => {
-  const task = tasks.taskOfCard.get(id)
+export const isOnCanvas = (canvases: CanvasIndex, id: CardId): boolean => {
+  const canvas = canvases.canvasOfCard.get(id)
   return (
-    task !== undefined &&
-    (tasks.canvases.get(task) ?? []).some(c => c.id === id)
+    canvas !== undefined &&
+    (canvases.cardsOn.get(canvas) ?? []).some(c => c.id === id)
   )
 }
 
-/** The task a card is in now: its place's (`taskOfPlace`); null for none. */
-export const taskOfCard = (
-  tasks: TaskIndex,
+/** The canvas a card is in now: its place's (`canvasOfPlace`); null for none. */
+export const canvasOfCard = (
+  canvases: CanvasIndex,
   cards: readonly CardRecord[],
   id: CardId,
-): TaskId | null => {
+): CanvasId | null => {
   const now = cards.find(c => c.id === id)
-  return now === undefined ? null : taskOfPlace(tasks, now.place)
+  return now === undefined ? null : canvasOfPlace(canvases, now.place)
 }
 
-/** One task's cards, in order. */
-export const canvasOf = (
+/** One canvas's cards, in order. */
+export const cardsOnCanvas = (
   cards: readonly CardRecord[],
-  task: TaskId,
-): readonly CanvasCard[] =>
+  canvas: CanvasId,
+): readonly CardOnCanvas[] =>
   cards
     .filter(onCanvas)
-    .filter(c => c.place.task === task)
+    .filter(c => c.place.canvas === canvas)
     .sort(byRank)
 
 /**
- * Where a thread's card lands as the thread opens: on `task`'s
+ * Where a thread's card lands as the thread opens: on `canvas`'s
  * canvas just after the thread it forks from (`branchAfter`), else at the
  * canvas's end; where it was dropped on a canvas (`rankOnCanvas`); or in an
  * inventory.
@@ -272,18 +275,18 @@ export const canvasOf = (
 export type ThreadPlacement =
   | {
       readonly kind: "after"
-      readonly task: TaskId
+      readonly canvas: CanvasId
       /** The thread it forks from; null for a root's first thread. */
       readonly parent: ThreadId | null
     }
   | { readonly kind: "spot"; readonly to: CanvasKey | CanvasTarget }
   | { readonly kind: "inventory"; readonly holder: WriterId }
 
-/** The task a thread opens in, when the session does not hold it yet: a new tab's. */
-export interface TaskOpening {
+/** The canvas a thread opens in, when the session does not hold it yet: a new canvas's. */
+export interface CanvasOpening {
   /** The workflow state it lands in; null for the first open one. */
   readonly state: WorkflowStateId | null
-  /** The board's states; null before the host wrote them, when no task opens. */
+  /** The board's states; null before the host wrote them, when no canvas opens. */
   readonly workflow: Workflow | null
 }
 
@@ -293,8 +296,8 @@ export type ThreadOpen =
       readonly kind: "open"
       readonly records: readonly ValueWrite[]
       /**
-       * The cards re-ranked to make room, then its card; for a task the
-       * session lacks, the task's card first, at the end of its state on
+       * The cards re-ranked to make room, then its card; for a canvas the
+       * session lacks, the canvas's card first, at the end of its state on
        * the board (`boardEnd`).
        */
       readonly steps: readonly PlaceStep[]
@@ -305,7 +308,7 @@ export type ThreadOpen =
  * A thread opened: the one way a thread begins, before its first
  * entry, as its column opens, a copy is made or a card is spun into it. Its
  * record says how it began (`origin`); its card is made by `by`
- * (`makeCard`, `planMake`) where `placement` says; and a task the session
+ * (`makeCard`, `planMake`) where `placement` says; and a canvas the session
  * does not hold (`opens`) is made with it, its card by the host on `by`'s
  * behalf, `by` its owner: refused `no-place` before the board has states.
  * Its first send writes only its entry.
@@ -317,7 +320,7 @@ export function planThreadOpen(input: {
   readonly by: WriterId
   readonly now: number
   readonly placement: ThreadPlacement
-  readonly opens: TaskOpening | null
+  readonly opens: CanvasOpening | null
   readonly cards: readonly CardRecord[]
 }): ThreadOpen {
   const { thread, by, now, placement, cards } = input
@@ -333,13 +336,13 @@ export function planThreadOpen(input: {
         return { to: { ...to, width: 1 }, first }
       }
       case "after": {
-        const canvas = canvasOf(cards, placement.task)
+        const here = cardsOnCanvas(cards, placement.canvas)
         const { order, respaced } = rankAfter(
-          canvas,
-          branchAfter(canvas, placement.parent),
+          here,
+          branchAfter(here, placement.parent),
         )
         return {
-          to: { kind: "canvas", task: placement.task, order, width: 1 },
+          to: { kind: "canvas", canvas: placement.canvas, order, width: 1 },
           first: respaced.map(
             (record): PlaceStep => ({ kind: "write", record }),
           ),
@@ -362,31 +365,37 @@ export function planThreadOpen(input: {
       origin: input.origin,
     }),
   ]
-  const task = ranked.to.kind === "canvas" ? ranked.to.task : null
-  if (input.opens === null || task === null)
+  const canvas = ranked.to.kind === "canvas" ? ranked.to.canvas : null
+  if (input.opens === null || canvas === null)
     return { kind: "open", records, steps: [...ranked.first, made] }
-  const opened = planTaskOpening(task, by, input.opens, cards)
+  const opened = planCanvasOpening(canvas, by, input.opens, cards)
   if (opened.kind === "refused") return opened
   return { kind: "open", records, steps: [opened, ...ranked.first, made] }
 }
 
 /**
- * A task made for `by`, its owner: its card by the host at the end of its
- * state on the board (`boardEnd`), the one way a task is made, as a thread
- * opens in it or a card is dropped between tasks in the sidebar. Refused
+ * A canvas made for `by`, its owner: its card by the host at the end of its
+ * state on the board (`boardEnd`), the one way a canvas is made, as a thread
+ * opens in it or a card is dropped between canvases in the sidebar. Refused
  * `no-place` before the board has states, `exists` for an id in use.
  */
-export function planTaskOpening(
-  task: TaskId,
+export function planCanvasOpening(
+  canvas: CanvasId,
   by: WriterId,
-  opens: TaskOpening,
+  opens: CanvasOpening,
   cards: readonly CardRecord[],
 ): MakeStep {
   const { workflow, state } = opens
   if (workflow === null) return { kind: "refused", code: "no-place", now: null }
   return planMake(
     cards,
-    makeCard("task", task, boardEnd(workflow, cards, state), NO_CONTENT, by),
+    makeCard(
+      "canvas",
+      canvas,
+      boardEnd(workflow, cards, state),
+      NO_CONTENT,
+      by,
+    ),
     "host",
   )
 }
@@ -403,7 +412,7 @@ export interface ThreadOpening {
  * Each thread opened and not yet started: no entry of it in
  * `index`, and either its fork in `index` (a branch's or a copy's, its root
  * held here), or its root one the directory does not name yet (`started`:
- * a new tab's, whose root gets its document with its first entry). A
+ * a new canvas's, whose root gets its document with its first entry). A
  * thread whose root this tab does not hold is in neither.
  */
 export function unstartedThreads(
@@ -453,19 +462,19 @@ export function proposalDraft(input: {
 
 /**
  * Whether a thread card at `place` keeps its root held: in an inventory, or
- * on the canvas of a task outside `archived`. A trashed card is asked of the
+ * on the canvas of a canvas outside `archived`. A trashed card is asked of the
  * place it left, so a restore, or a link to it, finds its messages until the
  * sweep deletes it. The host's late writes ask the same (`lateAway`,
  * `reach.ts`), so a write it lets through finds its root loaded.
  */
 export function isLivePlace(
   place: CardPlace,
-  archived: { readonly has: (task: TaskId) => boolean },
+  archived: { readonly has: (canvas: CanvasId) => boolean },
 ): boolean {
   const left = livePlaceOf(place)
   return (
     left.kind === "inventory" ||
-    (left.kind === "canvas" && !archived.has(left.task))
+    (left.kind === "canvas" && !archived.has(left.canvas))
   )
 }
 
@@ -479,7 +488,7 @@ export function isLivePlace(
 export function rootsHeld(
   cards: readonly CardRecord[],
   threads: ReadonlyMap<ThreadId, ThreadRecord>,
-  archived: ReadonlySet<TaskId>,
+  archived: ReadonlySet<CanvasId>,
   started: ReadonlySet<RootId>,
 ): ReadonlySet<RootId> {
   const held = new Set<RootId>()

@@ -1,14 +1,14 @@
 import {
   type CardRecord,
+  canvasIdFor,
   entryId,
   NO_CONTENT,
-  taskIdFor,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import { expect, test } from "vitest"
 import {
-  crossTaskLinks,
+  crossCanvasLinks,
   linkWords,
   openOf,
   opens,
@@ -16,7 +16,7 @@ import {
 } from "./thread-link.ts"
 
 const T = threadIdFor("t")
-const TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
+const CANVAS = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 const ADA = writerId("ada@x.io")
 const BEA = writerId("bea@x.io")
 const reader = { me: ADA, nameOf: new Map([[BEA, "Bea"]]) }
@@ -32,13 +32,13 @@ const at = (place: CardRecord["place"]): CardRecord[] => [
 ]
 const E = entryId("e-1")
 
-test("a link opens a thread's task, your own held thread's preview, and nothing for someone else's", () => {
+test("a link opens a thread's canvas, your own held thread's preview, and nothing for someone else's", () => {
   const open = threadLink(
     T,
-    at({ kind: "canvas", task: TASK, order: "1", width: 1 }),
+    at({ kind: "canvas", canvas: CANVAS, order: "1", width: 1 }),
     ADA,
   )
-  expect(openOf(open, E)).toEqual({ kind: "task", task: TASK, entry: E })
+  expect(openOf(open, E)).toEqual({ kind: "canvas", canvas: CANVAS, entry: E })
   expect(linkWords(open, reader, () => "Fix the sync bug")).toBe(
     "Fix the sync bug",
   )
@@ -53,16 +53,16 @@ test("a link opens a thread's task, your own held thread's preview, and nothing 
   expect(linkWords(gone, reader, () => "")).toBe("deleted")
 })
 
-test("a link to a trashed thread names the task it left, says so, and restores it", () => {
+test("a link to a trashed thread names the canvas it left, says so, and restores it", () => {
   const trashed = threadLink(
     T,
     at({
       kind: "trash",
-      left: { kind: "canvas", task: TASK, order: "1", width: 1 },
+      left: { kind: "canvas", canvas: CANVAS, order: "1", width: 1 },
     }),
     ADA,
   )
-  expect(trashed).toMatchObject({ kind: "trashed", thread: T, task: TASK })
+  expect(trashed).toMatchObject({ kind: "trashed", thread: T, canvas: CANVAS })
   expect([openOf(trashed, E), opens(trashed)]).toEqual([
     { kind: "restore", thread: T },
     true,
@@ -75,26 +75,26 @@ test("a link is made only by threadLink", () => {
   const forged: Parameters<typeof openOf>[0] = {
     kind: "open",
     thread: T,
-    task: TASK,
+    canvas: CANVAS,
   }
   expect(forged.kind).toBe("open")
 })
 
-test("a row from another task's thread says where it is; from this task, nothing", () => {
-  const canvas = at({ kind: "canvas", task: TASK, order: "1", width: 1 })
+test("a row from another canvas's thread says where it is; from this canvas, nothing", () => {
+  const placed = at({ kind: "canvas", canvas: CANVAS, order: "1", width: 1 })
   const nodes = [
     { id: entryId("a"), role: "answer", from: T },
     { id: entryId("b"), role: "assistant" },
   ]
-  const facts = { cards: canvas, reader, labelOf: () => "Sync bug" }
-  const came = crossTaskLinks(nodes, { ...facts, here: null })
+  const facts = { cards: placed, reader, labelOf: () => "Sync bug" }
+  const came = crossCanvasLinks(nodes, { ...facts, here: null })
   expect([...came.keys()]).toEqual([entryId("a")])
   expect(came.get(entryId("a"))?.words).toBe("Sync bug")
-  expect(crossTaskLinks(nodes, { ...facts, here: TASK }).size).toBe(0)
-  const held = crossTaskLinks(nodes, {
+  expect(crossCanvasLinks(nodes, { ...facts, here: CANVAS }).size).toBe(0)
+  const held = crossCanvasLinks(nodes, {
     ...facts,
     cards: at({ kind: "inventory", holder: BEA }),
-    here: TASK,
+    here: CANVAS,
   })
   expect(held.get(entryId("a"))?.words).toBe("Bea has it")
 })

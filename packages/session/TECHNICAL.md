@@ -26,7 +26,7 @@ Where a rule lives, as `packages/rules/TECHNICAL.md` and
 > `@pinetrie/web`'s (ADR-0093).
 
 So `answerOf`, `withPending`, `settleSlots` and `nextActing` are here, while
-the host's command rules (`planChat`, `planMove`, `planStop`) are
+the host's command rules (`planMessage`, `planMove`, `planStop`) are
 `@pinetrie/rules`'. This package's `answerOf` (a move's answer) shares its
 name with `@pinetrie/rules`' banner rule; `index.ts` does not export it.
 
@@ -52,11 +52,11 @@ it.
 | one `snapshotStore<LocalState>` | the host's records, this tab's moves, the cards drawn | `localStep` (`card-moves.ts`) |
 | `inventorySlots` (`inventory-slots.ts`) | your inventory's slots, the repair's alarm | `repairStep`, `takeIntoInventoryWrites`, `swapWrites` (`inventory.ts`) |
 | `attentionStore` (`attention-doc.ts`) | what you have dealt with, the read marks' alarm | `readStep` (`read-marks.ts`) |
-| `openThreads` (`open-threads.ts`) | the sidebar: the tasks you have open, in your order (ADR-0122, ADR-0116) | `placeInList`, `planOpenRepair` (`open-repair.ts`) |
+| `openThreads` (`open-threads.ts`) | the sidebar: the canvases you have open, in your order (ADR-0122, ADR-0116) | `placeInList`, `planOpenRepair` (`open-repair.ts`) |
 | `presenceSeat` (`presence-seat.ts`) | this seat's reading and typing | none |
 | `hostLine` (`host-line.ts`) | the requests waiting for their replies | `encodeIntent`, `decodeReply` |
 | one `snapshotStore<ActingState>` | your proposed changes and setup and publish commands out | `nextActing` (`acting.ts`) |
-| `chat` | what a chat asks the host, and what it draws | `planChatRequest` (`chat.ts`) |
+| `send` | what a send asks the host, and what it draws | `planSendRequest` (`send.ts`) |
 
 - **Order matters to Kyneta.** `writersPolicy` is registered before the
   transport is ready, and `rootDocs` registers its `canShare` policy before
@@ -68,7 +68,7 @@ it.
   principal is its person's email, and each tab is a seat (ADR-0037).
 - **Every id this client mints is a uuidv7** (`ids.ts`), so ids sort
   oldest first and no two writers mint one key (ADR-0016, S9). The host
-  accepts a new thread's, root's or task's id only in that shape (ADR-0057,
+  accepts a new thread's, root's or canvas's id only in that shape (ADR-0057,
   ADR-0063, ADR-0116).
 - **A closed line answers at once** (`HostLine.close`). When the host
   leaves, or the client closes, every request waiting is answered
@@ -84,11 +84,11 @@ it.
 - **`exchange` is the one way past the session.** `ExchangeProvider`
   renders from it, and a host-suite check reads `exchange.has`; nothing
   else should reach past the session's own methods.
-- **A mark and a retitle are plain `request`s**: each names its task
+- **A mark and a retitle are plain `request`s**: each names its canvas
   (ADR-0116), so the session finds no root for them.
 - **`versionOf` is the one read of a card's text version** this client
   makes: a move into a queue is stamped with it (`stampSeen`), and a chat's
-  card and pinned cards are gathered by it before `planChatRequest` (S96).
+  card and pinned cards are gathered by it before `planSendRequest` (S96).
   It opens a card's document it does not hold yet, so it is a gather,
   never called from a plan.
 
@@ -107,20 +107,20 @@ it.
   records a root as `wanted` before it calls `get` (S86): a root allowed
   only after would be opened and never asked for.
 
-## A chat (`chat.ts`)
+## A send (`send.ts`)
 
-`chat` gathers (the root, minted and held for a send at the root; the card
-as drawn; each card's text version), plans (`planChatRequest`), then sends:
+`send` gathers (the root, minted and held for a send at the root; the card
+as drawn; each card's text version), plans (`planSendRequest`), then sends:
 tracked as a move of its card when it has one, else a plain request. The
 plan never refuses: the root a send at the root mints is held before it,
 so a refusal added to the plan must move the minting after it.
 
-A chat goes to a `ChatAt` (ADR-0117): the end of a thread its sender saw, or
+A chat goes to a `MessageAt` (ADR-0117): the end of a thread its sender saw, or
 a branch starting a thread its column minted (`newThreadId`, `ids.ts`, the
-one minter of a thread's id). `chatAtOf` makes one from a column's mode, its
-thread, where it is and its task: a reply continues its thread from the end
-it shows; a branch, or a send at the root, starts it in the task it names
-(ADR-0116), a new tab's minted with it (`newTaskId`).
+one minter of a thread's id). `columnMessageAt` makes one from a column's mode, its
+thread, where it is and its canvas: a reply continues its thread from the end
+it shows; a branch, or a send at the root, starts it in the canvas it names
+(ADR-0116), a new canvas's minted with it (`newCanvasId`).
 
 ## This tab's moves (`card-moves.ts`, ADR-0048, ADR-0059)
 
@@ -166,11 +166,11 @@ session or someone else's inventory throws before it is made.
   What the page closes after one (`afterKeep`, `@pinetrie/interface`)
   closes only once the host accepts it.
 - **A discard names no history** (ADR-0116): `moveCard` and `moveCards`
-  take `here`, the task the tab is on, which the `move` carries; the host
+  take `here`, the canvas the tab is on, which the `move` carries; the host
   names the history from it for a card leaving your inventory. Until the
   host answers, a discarded card is drawn in the trash recording the place
-  it was drawn at, and a restore (`back`) back there; a move to a new task
-  is drawn on that task's canvas, last (`drawnPlace`).
+  it was drawn at, and a restore (`back`) back there; a move to a new canvas
+  is drawn on that canvas, last (`drawnPlace`).
 - **Notices are values** (`CardNotice`, kept by `movesStep` until your
   next move where you acted): a refusal, or a discard the host accepted
   (ADR-0111), which says the undo key brings it back. The page words them
@@ -268,23 +268,23 @@ the two merge (S101), so a writer asks `ready()` first.
 
 ## The sidebar (`open-threads.ts`, `open-repair.ts`, ADR-0122)
 
-- **The sidebar is `OpenThreads`**, keyed by `TaskId` (ADR-0116): your
-  `OpenDoc` read in order (`tasks`, the same array until the document
-  changes, since the page reads it in render), `open` (before a task, or
+- **The sidebar is `OpenThreads`**, keyed by `CanvasId` (ADR-0116): your
+  `OpenDoc` read in order (`canvases`, the same array until the document
+  changes, since the page reads it in render), `open` (before a canvas, or
   at the end; one in it moves), `ensure` (at the end, unless it is there),
-  `close`, and `here`, the task the page shows. Every write waits for
+  `close`, and `here`, the canvas the page shows. Every write waits for
   `ready()` (S101).
-- **The repair deletes archived tasks but the one you are on**
+- **The repair deletes archived canvases but the one you are on**
   (`planOpenRepair`), on every change to your document, to the session's
-  records, and to `here`: a restore then brings a task back only for whoever
+  records, and to `here`: a restore then brings a canvas back only for whoever
   restores it (ADR-0030). It writes nothing when nothing differs.
-- **A task you start is in the sidebar**: `chat` ensures it once its
+- **A canvas you start is in the sidebar**: `send` ensures it once its
   answer says the send that started it was written (`startsRoot`:
   `appended` or `started`). A refused or failed send writes nothing. A
-  root started in a task you are on (＋ past its last column) ensures that
-  task too, which is in your sidebar already: nothing changes.
+  root started in a canvas you are on (＋ past its last column) ensures that
+  canvas too, which is in your sidebar already: nothing changes.
 - **`placeInList` renumbers** when `orderBetween` finds no room between a
-  task's neighbours, as the board does.
+  canvas's neighbours, as the board does.
 
 ## Your proposed changes and setup and publish commands (`acting.ts`)
 

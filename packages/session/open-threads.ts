@@ -1,9 +1,9 @@
-// session/open-threads — the sidebar: the tasks you have open, in your
+// session/open-threads — the sidebar: the canvases you have open, in your
 // order, in your own document. Every write waits for `PersonDoc.ready`.
 
 import type { Exchange } from "@kyneta/exchange"
 import { batch } from "@kyneta/schema"
-import type { TaskId, WriterId } from "@pinetrie/core"
+import type { CanvasId, WriterId } from "@pinetrie/core"
 import { personDocId } from "@pinetrie/protocol/writers"
 import { OpenDoc, readOpenKeys } from "@pinetrie/schema"
 import {
@@ -16,16 +16,16 @@ import { personDoc } from "./person-doc.ts"
 import type { Readable } from "./store.ts"
 
 export interface OpenThreads {
-  /** The sidebar, in order. A task the directory lacks is still listed. */
-  readonly tasks: Readable<readonly TaskId[]>
-  /** Put `task` before `before`, or at the end; a task already open moves there. */
-  open(task: TaskId, before: TaskId | null): void
-  /** `task` at the end of the sidebar, unless it is in it already. */
-  ensure(task: TaskId): void
-  close(task: TaskId): void
-  /** The task the page shows, or null: the repair keeps it while it is archived. */
-  here(task: TaskId | null): void
-  /** Repair against the archived tasks now: after a change to the session's records. */
+  /** The sidebar, in order. A canvas the directory lacks is still listed. */
+  readonly canvases: Readable<readonly CanvasId[]>
+  /** Put `canvas` before `before`, or at the end; a canvas already open moves there. */
+  open(canvas: CanvasId, before: CanvasId | null): void
+  /** `canvas` at the end of the sidebar, unless it is in it already. */
+  ensure(canvas: CanvasId): void
+  close(canvas: CanvasId): void
+  /** The canvas the page shows, or null: the repair keeps it while it is archived. */
+  here(canvas: CanvasId | null): void
+  /** Repair against the archived canvases now: after a change to the session's records. */
   repair(): void
   dispose(): void
 }
@@ -34,8 +34,8 @@ export function openThreads(
   exchange: Exchange,
   me: WriterId,
   host: string,
-  /** The tasks archived now (`readArchived`). */
-  archived: () => ReadonlySet<TaskId>,
+  /** The canvases archived now (`readArchived`). */
+  archived: () => ReadonlySet<CanvasId>,
 ): OpenThreads {
   const own = personDoc(
     exchange.get(personDocId("open", me), OpenDoc),
@@ -43,16 +43,16 @@ export function openThreads(
     readOpenKeys,
   )
   const doc = own.doc
-  let shown: TaskId | null = null
-  let lastKeys: ReadonlyMap<TaskId, string> | null = null
-  let lastList: readonly TaskId[] = []
+  let shown: CanvasId | null = null
+  let lastKeys: ReadonlyMap<CanvasId, string> | null = null
+  let lastList: readonly CanvasId[] = []
 
   const write = (writes: OpenWrites) => {
     if (!own.ready()) return
     if (writes.set.size === 0 && writes.delete.length === 0) return
     batch(doc, d => {
-      for (const [task, key] of writes.set) d.tasks.set(task, key)
-      for (const task of writes.delete) d.tasks.delete(task)
+      for (const [canvas, key] of writes.set) d.canvases.set(canvas, key)
+      for (const canvas of writes.delete) d.canvases.delete(canvas)
     })
   }
   const repair = () =>
@@ -60,7 +60,7 @@ export function openThreads(
   const unchanged = own.onChange(repair)
 
   return {
-    tasks: {
+    canvases: {
       // The same list until the document changes: a page reads it in render.
       current() {
         const keys = own.value.current()
@@ -72,19 +72,19 @@ export function openThreads(
       },
       subscribe: own.value.subscribe,
     },
-    open: (task, before) =>
-      write(placeInList(own.value.current(), task, before)),
-    ensure(task) {
-      if (!own.value.current().has(task))
-        write(placeInList(own.value.current(), task, null))
+    open: (canvas, before) =>
+      write(placeInList(own.value.current(), canvas, before)),
+    ensure(canvas) {
+      if (!own.value.current().has(canvas))
+        write(placeInList(own.value.current(), canvas, null))
     },
-    close(task) {
-      if (own.value.current().has(task))
-        write({ set: new Map(), delete: [task] })
+    close(canvas) {
+      if (own.value.current().has(canvas))
+        write({ set: new Map(), delete: [canvas] })
     },
-    here(task) {
-      if (task === shown) return
-      shown = task
+    here(canvas) {
+      if (canvas === shown) return
+      shown = canvas
       repair()
     },
     repair,

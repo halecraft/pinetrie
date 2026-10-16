@@ -260,7 +260,7 @@ export async function actOnProposedChanges(
     }
   // Off the command's reply, in a late step: what the command did, queued as
   // a card on its thread, which an idle lane pops at once and a running one
-  // when its run ends. A thread its task's archive took since gets none.
+  // when its run ends. A thread its canvas's archive took since gets none.
   void deps.later
     .step({ kind: "thread", thread: lane }, "proposed changes' fact", () => ({
       facts: [done.fact],

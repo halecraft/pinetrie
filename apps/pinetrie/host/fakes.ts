@@ -4,8 +4,10 @@
 // it.
 
 import {
+  type CanvasId,
   type CardId,
   type CardRecord,
+  canvasIdFor,
   type EntryId,
   indexTree,
   makeCard,
@@ -19,9 +21,7 @@ import {
   rootIdFor,
   type Send,
   type Target,
-  type TaskId,
   type ThreadId,
-  taskIdFor,
   threadIdFor,
   type ValueWrite,
   type WorkflowStateId,
@@ -41,9 +41,9 @@ import {
   byTarget,
   CARD_HISTORY,
   type Cleared,
-  canvasOf,
-  encodeChat,
-  indexTasks,
+  cardsOnCanvas,
+  encodeMessage,
+  indexCanvases,
   isBoardCard,
   LANE,
   orderAfter,
@@ -192,7 +192,7 @@ export const threadRow = (
   row(
     id,
     parentId,
-    encodeChat(
+    encodeMessage(
       {
         author: STARTER,
         authorName: "Starter",
@@ -375,17 +375,19 @@ export const NO_BLANK_CARDS = {
   blankQueued: async () => new Set<CardId>(),
 } as const
 
-/** The task the test's root's threads are in, unless it makes another. */
-export const TASK_ID: TaskId = taskIdFor("01a0ffd2-0000-7000-8000-00000000000a")
+/** The canvas the test's root's threads are in, unless it makes another. */
+export const CANVAS_ID: CanvasId = canvasIdFor(
+  "01a0ffd2-0000-7000-8000-00000000000a",
+)
 
 /**
- * A note column on `task`'s canvas, after its last card: where a test's notes
+ * A note column on `canvas`'s canvas, after its last card: where a test's notes
  * are.
  */
 export function putNoteColumn(
   b: Pick<FakeBasics, "places">,
   column: NoteColumnId,
-  task: TaskId = TASK_ID,
+  canvas: CanvasId = CANVAS_ID,
 ): void {
   seedPlaces(b.places, [
     {
@@ -397,8 +399,8 @@ export function putNoteColumn(
         placer: STARTER,
         place: {
           kind: "canvas",
-          task,
-          order: orderAfter(canvasOf(readPlaces(b.places), task)),
+          canvas,
+          order: orderAfter(cardsOnCanvas(readPlaces(b.places), canvas)),
           width: 1,
         },
         content: NO_CONTENT,
@@ -408,24 +410,24 @@ export function putNoteColumn(
 }
 
 /**
- * The step that puts `task`'s card on the board in `state`, placed by `by`:
+ * The step that puts `canvas`'s card on the board in `state`, placed by `by`:
  * made, at the end of its state, when there is none; moved, keeping its
  * rank, when it is elsewhere; none when it is there already.
  */
-function taskCardStep(
+function canvasCardStep(
   cards: readonly CardRecord[],
-  task: TaskId,
+  canvas: CanvasId,
   state: WorkflowStateId,
   by: WriterId,
 ): readonly PlaceStep[] {
-  const now = cards.find(c => c.id === task)
+  const now = cards.find(c => c.id === canvas)
   if (now === undefined)
     return [
       {
         kind: "write",
         record: makeCard(
-          "task",
-          task,
+          "canvas",
+          canvas,
           {
             kind: "board",
             state,
@@ -436,7 +438,7 @@ function taskCardStep(
         ),
       },
     ]
-  if (now.kind !== "task" || (isBoardCard(now) && now.place.state === state))
+  if (now.kind !== "canvas" || (isBoardCard(now) && now.place.state === state))
     return []
   const order = isBoardCard(now) ? now.place.order : orderAfter([])
   return [
@@ -448,23 +450,23 @@ function taskCardStep(
 }
 
 /**
- * `task`'s card on the board in `state`, put there by `by` at `at`, as its
- * card's history says: how a test archives a task. A card already there is not
+ * `canvas`'s card on the board in `state`, put there by `by` at `at`, as its
+ * card's history says: how a test archives a canvas. A card already there is not
  * written again.
  */
-export function placeTask(
+export function placeCanvas(
   b: WriteDocs & Pick<FakeBasics, "places">,
-  task: TaskId,
+  canvas: CanvasId,
   state: WorkflowStateId,
   by: WriterId,
   at = 1,
 ): void {
-  const steps = taskCardStep(readPlaces(b.places), task, state, by)
+  const steps = canvasCardStep(readPlaces(b.places), canvas, state, by)
   if (steps.length > 0) seedPlaces(b.places, steps)
   putValue(
     b,
     setRecord(CARD_HISTORY, {
-      card: task,
+      card: canvas,
       events: [
         { kind: "moved", by, from: null, to: { kind: "board", state }, at },
       ],
@@ -472,59 +474,59 @@ export function placeTask(
   )
 }
 
-/** The board state `putTask` puts a task's card in, by default. */
-export const TASK_STATE = workflowStateIdFor("open")
+/** The board state `putCanvas` puts a canvas's card in, by default. */
+export const CANVAS_STATE = workflowStateIdFor("open")
 
-/** The archive's state in the workflow `archiveTask` writes. */
+/** The archive's state in the workflow `archiveCanvas` writes. */
 export const ARCHIVE_STATE = workflowStateIdFor("done")
 
-/** Who archives a task in `archiveTask`, unless a test names another. */
+/** Who archives a canvas in `archiveCanvas`, unless a test names another. */
 export const ARCHIVER = writerId("archiver@example.com")
 
 /**
- * `task` moved into the archive by `by`: the workflow of `TASK_STATE` and
+ * `canvas` moved into the archive by `by`: the workflow of `CANVAS_STATE` and
  * `ARCHIVE_STATE` written first when the session has none.
  */
-export function archiveTask(
+export function archiveCanvas(
   b: WriteDocs & Pick<FakeBasics, "places">,
-  task: TaskId = TASK_ID,
+  canvas: CanvasId = CANVAS_ID,
   by: WriterId = ARCHIVER,
 ): void {
   if (readWorkflow(b.session) === null)
     putValue(
       b,
       setRecord(WORKFLOW, {
-        open: [{ id: TASK_STATE, name: "Doing" }],
+        open: [{ id: CANVAS_STATE, name: "Doing" }],
         archive: { id: ARCHIVE_STATE, name: "Done" },
       }),
     )
-  placeTask(b, task, ARCHIVE_STATE, by, 2)
+  placeCanvas(b, canvas, ARCHIVE_STATE, by, 2)
 }
 
 /**
- * A task as a thread's opening makes one (`planThreadOpen`): its card on
+ * A canvas as a thread's opening makes one (`planThreadOpen`): its card on
  * the board in `state`, the thread's record, and the thread's card on its
  * canvas, in `root`.
  */
-export function putTask(
+export function putCanvas(
   b: WriteDocs & Pick<FakeBasics, "places">,
   thread: ThreadId,
-  task: TaskId = TASK_ID,
+  canvas: CanvasId = CANVAS_ID,
   root: RootId = ROOT_ID,
-  state: WorkflowStateId = TASK_STATE,
+  state: WorkflowStateId = CANVAS_STATE,
 ): void {
   const cards = readPlaces(b.places)
-  // A task already made keeps its place, wherever a test put it.
-  const made = cards.some(c => c.id === task)
+  // A canvas already made keeps its place, wherever a test put it.
+  const made = cards.some(c => c.id === canvas)
     ? []
-    : taskCardStep(cards, task, state, STARTER)
+    : canvasCardStep(cards, canvas, state, STARTER)
   const opened = planThreadOpen({
     thread,
     origin: ROOT_ORIGIN,
     root,
     by: STARTER,
     now: 0,
-    placement: { kind: "after", task, parent: null },
+    placement: { kind: "after", canvas, parent: null },
     opens: null,
     cards,
   })
@@ -557,7 +559,7 @@ export const RUNS_ANY: Pick<LaneWork, "runnable"> = {
  */
 export function clearedSend(send: Send): Cleared<Send> {
   const plan = planGate(send, {
-    tasks: indexTasks([], new Map()),
+    canvases: indexCanvases([], new Map()),
     cards: [],
     archived: new Map(),
     lanes: new Map(),

@@ -1,6 +1,7 @@
 import {
   type CardPlace,
   type CardRecord,
+  canvasIdFor,
   cardIdOfKind,
   DISCARDED,
   entryId,
@@ -15,7 +16,6 @@ import {
   type Sha256,
   type TextCard,
   type TextPlace,
-  taskIdFor,
   textCardId,
   threadIdFor,
   workflowStateIdFor,
@@ -31,14 +31,14 @@ import type { Clip } from "./clip.ts"
 import { type ColumnKey, keyText } from "./columns.ts"
 import type { CardFacts, Effect, IntentState } from "./effects.ts"
 import {
+  canvasesFor,
+  NEW_CANVAS,
   NEW_NOTE_COLUMN,
   NEW_ROOT,
-  NEW_TASK,
   NEW_TEXT,
   NEW_THREAD,
   NO_CLIPS,
-  TEST_TASK,
-  tasksFor,
+  TEST_CANVAS,
   threadOfEntry,
   tree,
 } from "./fixtures.ts"
@@ -54,7 +54,7 @@ import { afterSpinOff } from "./spin-off.ts"
 
 /** The thread `index` is: its first entry names it (`withThreads`). */
 const TEST_THREAD = threadIdFor("1-r1")
-const R1_TASK_FOR_DROP = taskIdFor("01a0ffd2-0000-7000-8000-0000000000d1")
+const R1_CANVAS_FOR_DROP = canvasIdFor("01a0ffd2-0000-7000-8000-0000000000d1")
 const _TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 
 const ADA = writerId("ada@x.io")
@@ -89,21 +89,21 @@ const unstartedF1 = { kind: "composing", thread: F1 } as const
 const onR1: Layout = resolveLayout(
   layoutReducer(initialLayout(), {
     kind: "show",
-    here: { kind: "task", task: TEST_TASK },
+    here: { kind: "canvas", canvas: TEST_CANVAS },
   }),
   {
     index,
     lanes: [],
     archived: new Set(),
-    list: [TEST_TASK],
-    canvases: tasksFor(index, [TEST_TASK, R1]).index.canvases,
+    list: [TEST_CANVAS],
+    cardsOn: canvasesFor(index, [TEST_CANVAS, R1]).index.cardsOn,
     unstarted: new Map(),
     holders: new Map(),
   },
 )
 const withUnstarted: Layout = layoutReducer(onR1, {
   kind: "view",
-  task: TEST_TASK,
+  canvas: TEST_CANVAS,
   first: null,
   change: { kind: "opened", card: F1 },
 })
@@ -139,7 +139,7 @@ const state = (
   index,
   asks: indexAsks(index),
   cards: facts(cards),
-  tasks: tasksFor(index, [TEST_TASK, R1]),
+  canvases: canvasesFor(index, [TEST_CANVAS, R1]),
   listWidth: "full",
   page: null,
   searching: false,
@@ -148,7 +148,7 @@ const state = (
 const MINTED = {
   key: "new-k",
   root: NEW_ROOT,
-  task: NEW_TASK,
+  canvas: NEW_CANVAS,
   thread: NEW_THREAD,
   noteColumn: NEW_NOTE_COLUMN,
   reference: cardIdOfKind("reference", "01a0ffd2-0000-7000-8000-0000000000e1"),
@@ -213,7 +213,7 @@ const ofEveryKind = (): readonly CardRecord[] => {
   const at: Partial<Record<CardPlace["kind"], CardPlace>> = {
     composing: atEnd,
     note,
-    canvas: { kind: "canvas", task: TEST_TASK, order: "a", width: 1 },
+    canvas: { kind: "canvas", canvas: TEST_CANVAS, order: "a", width: 1 },
     board: { kind: "board", state: workflowStateIdFor("open"), order: "a" },
     queued: {
       kind: "queued",
@@ -337,7 +337,7 @@ describe("a queued reference", () => {
         how,
         queuedBy: null,
         fly: false,
-        here: TEST_TASK,
+        here: TEST_CANVAS,
       },
     ])
   })
@@ -373,7 +373,7 @@ describe("comments", () => {
         to: { kind: "queued", thread: TEST_THREAD, seen: "" },
         replacing: null,
         how: { actedAt: { kind: "column", key: TEST_THREAD }, slot: null },
-        here: TEST_TASK,
+        here: TEST_CANVAS,
       },
     ])
   })
@@ -408,7 +408,7 @@ describe("put", () => {
   test("to a spot on a canvas: a text card goes there for the host to make it a note column (WRAPS)", () => {
     const target = {
       kind: "canvas",
-      task: TEST_TASK,
+      canvas: TEST_CANVAS,
       after: TEST_THREAD,
     } as const
     const s = state({ cards: [card(C1, inventory)], slots: { "3": C1 } })
@@ -428,7 +428,7 @@ describe("put", () => {
         move: {
           card: C1,
           from: inventory,
-          to: { kind: "canvas-at", task: TEST_TASK, after: TEST_THREAD },
+          to: { kind: "canvas-at", canvas: TEST_CANVAS, after: TEST_THREAD },
         },
         how: { actedAt: { kind: "inventory" }, slot: null },
         queuedBy: null,
@@ -672,22 +672,22 @@ describe("pin and unpin", () => {
     ).toEqual([])
   })
 
-  test("pin to the task: the task it is in, else the one you are on; unpinned, to its notes", () => {
-    const pinnedToTask = {
-      kind: "task-pinned",
-      task: TEST_TASK,
+  test("pin to the canvas: the canvas it is in, else the one you are on; unpinned, to its notes", () => {
+    const pinnedToCanvas = {
+      kind: "canvas-pinned",
+      canvas: TEST_CANVAS,
       order: "a",
     } as const
-    const s = state({ cards: [card(C1, atEnd), card(C2, pinnedToTask)] })
+    const s = state({ cards: [card(C1, atEnd), card(C2, pinnedToCanvas)] })
     expect(
-      plan(inColumn({ kind: "pinToTask", card: C1 }, TRUNK_COLUMN), s),
+      plan(inColumn({ kind: "pinToCanvas", card: C1 }, TRUNK_COLUMN), s),
     ).toEqual([
       {
         kind: "moveCard",
         move: {
           card: C1,
           from: atEnd,
-          to: { kind: "task-pinned", task: TEST_TASK },
+          to: { kind: "canvas-pinned", canvas: TEST_CANVAS },
         },
         how: { actedAt: { kind: "column", key: threadKey }, slot: null },
         queuedBy: null,
@@ -696,28 +696,28 @@ describe("pin and unpin", () => {
       },
     ])
     // Pinned to it already: nothing.
-    expect(plan(inColumn({ kind: "pinToTask", card: C2 }), s)).toEqual([])
+    expect(plan(inColumn({ kind: "pinToCanvas", card: C2 }), s)).toEqual([])
     expect(plan(inColumn({ kind: "unpin", card: C2 }), s)[0]).toMatchObject({
       move: {
         card: C2,
-        from: { kind: "task-pinned", task: TEST_TASK },
-        to: { kind: "notes", near: "task", task: TEST_TASK },
+        from: { kind: "canvas-pinned", canvas: TEST_CANVAS },
+        to: { kind: "notes", near: "canvas", canvas: TEST_CANVAS },
       },
     })
-    // A drop on the task column's pins pins there.
+    // A drop on the canvas column's pins pins there.
     expect(
       plan(
         {
           kind: "put",
           source: { kind: "card", card: C1 },
           how: "move",
-          target: { kind: "taskPinned", task: TEST_TASK },
+          target: { kind: "canvasPinned", canvas: TEST_CANVAS },
         },
         state({ cards: [card(C1, inventory)], slots: { "3": C1 } }),
       )[0],
     ).toMatchObject({
-      move: { card: C1, to: { kind: "task-pinned", task: TEST_TASK } },
-      how: { actedAt: { kind: "column", key: TEST_TASK } },
+      move: { card: C1, to: { kind: "canvas-pinned", canvas: TEST_CANVAS } },
+      how: { actedAt: { kind: "column", key: TEST_CANVAS } },
     })
   })
 
@@ -749,9 +749,9 @@ test("afterKeep closes only when the keep was accepted", () => {
 describe("undo and redo of moves", () => {
   const undo: Intent = { kind: "undoMove", direction: "undo", inPanel: false }
 
-  test("on a task: that task's history", () => {
+  test("on a canvas: that canvas's history", () => {
     expect(plan(undo, state({}, onR1))).toEqual([
-      { kind: "undoMoves", task: TEST_TASK, direction: "undo" },
+      { kind: "undoMoves", canvas: TEST_CANVAS, direction: "undo" },
     ])
   })
 
@@ -761,13 +761,13 @@ describe("undo and redo of moves", () => {
     ])
   })
 
-  test("on no task: your history outside any task", () => {
+  test("on no canvas: your history outside any canvas", () => {
     const nothing = layoutReducer(onR1, {
       kind: "show",
       here: { kind: "nothing" },
     })
     expect(plan(undo, state({}, nothing))).toEqual([
-      { kind: "undoMoves", task: null, direction: "undo" },
+      { kind: "undoMoves", canvas: null, direction: "undo" },
     ])
   })
 })
@@ -820,15 +820,18 @@ describe("afterUndo: what an undo's answer brings into view", () => {
     ).toEqual([{ kind: "showInventory", brief: false }])
   })
 
-  test("your message back at a thread not yet started: its card unfolded in its task", () => {
-    const base = tasksFor(index, [TEST_TASK, R1])
+  test("your message back at a thread not yet started: its card unfolded in its canvas", () => {
+    const base = canvasesFor(index, [TEST_CANVAS, R1])
     const opened: IntentState = {
       ...state({}, onR1),
-      tasks: {
+      canvases: {
         ...base,
         index: {
           ...base.index,
-          taskOfCard: new Map([...base.index.taskOfCard, [F1, TEST_TASK]]),
+          canvasOfCard: new Map([
+            ...base.index.canvasOfCard,
+            [F1, TEST_CANVAS],
+          ]),
         },
       },
     }
@@ -841,15 +844,15 @@ describe("afterUndo: what an undo's answer brings into view", () => {
       {
         kind: "layout",
         moves: false,
-        action: { kind: "show", here: { kind: "task", task: TEST_TASK } },
+        action: { kind: "show", here: { kind: "canvas", canvas: TEST_CANVAS } },
       },
-      { kind: "list", act: { kind: "ensure", task: TEST_TASK } },
+      { kind: "list", act: { kind: "ensure", canvas: TEST_CANVAS } },
       {
         kind: "layout",
         moves: false,
         action: {
           kind: "view",
-          task: TEST_TASK,
+          canvas: TEST_CANVAS,
           first: threadOfEntry("1-r1"),
           change: { kind: "fold", card: F1, unfolded: true },
         },
@@ -879,13 +882,13 @@ describe("afterUndo: what an undo's answer brings into view", () => {
     })
   })
 
-  test("a task's card back on the board: the board, open", () => {
+  test("a canvas's card back on the board: the board, open", () => {
     expect(
       answered({
         kind: "undone",
         cards: [
           {
-            card: TEST_TASK,
+            card: TEST_CANVAS,
             place: { kind: "board", state: workflowStateIdFor("open") },
           },
         ],
@@ -945,27 +948,27 @@ describe("a card made a thread", () => {
   const spun = { kind: "trash" } as const
   test.each([
     [
-      "a note dropped on a state: its thread there, sent with the task you are on",
+      "a note dropped on a state: its thread there, sent with the canvas you are on",
       card(C1, note),
       { kind: "state", state: STATE1 },
-      { from: noteKey, state: STATE1, sidebar: null, here: TEST_TASK },
+      { from: noteKey, state: STATE1, sidebar: null, here: TEST_CANVAS },
     ],
     [
-      "an inventory card dropped in the sidebar: placed before the task it was dropped on, sent with the new task, which you will be on",
+      "an inventory card dropped in the sidebar: placed before the canvas it was dropped on, sent with the new canvas, which you will be on",
       card(C1, { kind: "inventory", holder: ADA }),
-      { kind: "sidebar", before: TEST_TASK },
+      { kind: "sidebar", before: TEST_CANVAS },
       {
         from: inventory,
         state: null,
-        sidebar: { before: TEST_TASK },
-        here: NEW_TASK,
+        sidebar: { before: TEST_CANVAS },
+        here: NEW_CANVAS,
       },
     ],
     [
-      "an inventory card dropped on a state, sent with the task you are on",
+      "an inventory card dropped on a state, sent with the canvas you are on",
       card(C1, { kind: "inventory", holder: ADA }),
       { kind: "state", state: STATE1 },
-      { from: inventory, state: STATE1, sidebar: null, here: TEST_TASK },
+      { from: inventory, state: STATE1, sidebar: null, here: TEST_CANVAS },
     ],
   ] as const)("%s", (_, c, target, want) => {
     expect(
@@ -986,7 +989,7 @@ describe("a card made a thread", () => {
           move: { card: C1, from: want.from, to: spun },
           root: NEW_ROOT,
           thread: NEW_THREAD,
-          task: NEW_TASK,
+          canvas: NEW_CANVAS,
           state: want.state,
           here: want.here,
         },
@@ -1030,28 +1033,32 @@ describe("a card made a thread", () => {
     ).toEqual([])
   })
 
-  test("afterSpinOff: a sidebar drop shows the new task once its first message is written", () => {
-    const sidebar = { before: TEST_TASK }
+  test("afterSpinOff: a sidebar drop shows the new canvas once its first message is written", () => {
+    const sidebar = { before: TEST_CANVAS }
     expect(
-      afterSpinOff({ kind: "appended", id: entryId("t-1") }, NEW_TASK, sidebar),
+      afterSpinOff(
+        { kind: "appended", id: entryId("t-1") },
+        NEW_CANVAS,
+        sidebar,
+      ),
     ).toEqual([
       {
         kind: "list",
-        act: { kind: "place", task: NEW_TASK, before: TEST_TASK },
+        act: { kind: "place", canvas: NEW_CANVAS, before: TEST_CANVAS },
       },
       {
         kind: "layout",
         moves: false,
-        action: { kind: "show", here: { kind: "task", task: NEW_TASK } },
+        action: { kind: "show", here: { kind: "canvas", canvas: NEW_CANVAS } },
       },
     ])
     expect(
-      afterSpinOff({ kind: "appended", id: entryId("t-1") }, NEW_TASK, null),
+      afterSpinOff({ kind: "appended", id: entryId("t-1") }, NEW_CANVAS, null),
     ).toEqual([])
     expect(
       afterSpinOff(
         { kind: "refused", code: "refused", message: "no" },
-        NEW_TASK,
+        NEW_CANVAS,
         sidebar,
       ),
     ).toEqual([])
@@ -1193,7 +1200,7 @@ describe("landing a copy", () => {
     ).toMatchObject({ kind: "text" })
   })
 
-  test("a thread's copy lands just after its source; Copy to this task too", () => {
+  test("a thread's copy lands just after its source; Copy to this canvas too", () => {
     const thread: Clip = {
       kind: "card",
       of: { kind: "thread", card: TEST_THREAD, end: A, text: "" },
@@ -1201,7 +1208,7 @@ describe("landing a copy", () => {
     }
     const effects = planPut(
       { kind: "clip", clip: thread },
-      { kind: "canvas", task: TEST_TASK, after: TEST_THREAD },
+      { kind: "canvas", canvas: TEST_CANVAS, after: TEST_THREAD },
       "copy",
       state(),
       MINTED,
@@ -1214,37 +1221,42 @@ describe("landing a copy", () => {
           source: TEST_THREAD,
           end: A,
           move: {
-            to: { kind: "canvas-at", task: TEST_TASK, after: TEST_THREAD },
+            to: { kind: "canvas-at", canvas: TEST_CANVAS, after: TEST_THREAD },
           },
         },
       },
     ])
   })
 
-  test("a column dropped on a sidebar task goes to its canvas's end; between tasks, to a new task", () => {
+  test("a column dropped on a sidebar canvas goes to its canvas's end; between canvases, to a new canvas", () => {
     const thread: CardRecord = {
       kind: "thread",
       id: F1,
       owner: ADA,
       placer: ADA,
-      place: { kind: "canvas", task: R1_TASK_FOR_DROP, order: "a", width: 1 },
+      place: {
+        kind: "canvas",
+        canvas: R1_CANVAS_FOR_DROP,
+        order: "a",
+        width: 1,
+      },
       content: NO_CONTENT,
     }
     const s = state({ cards: [thread] })
     const onto = planPut(
       { kind: "card", card: F1 },
-      { kind: "task", task: TEST_TASK },
+      { kind: "item", canvas: TEST_CANVAS },
       "move",
       s,
       MINTED,
     )
     expect(onto[0]).toMatchObject({
       kind: "moveCard",
-      move: { card: F1, to: { kind: "canvas-at", task: TEST_TASK } },
+      move: { card: F1, to: { kind: "canvas-at", canvas: TEST_CANVAS } },
     })
     const between = planPut(
       { kind: "card", card: F1 },
-      { kind: "sidebar", before: TEST_TASK },
+      { kind: "sidebar", before: TEST_CANVAS },
       "move",
       s,
       MINTED,
@@ -1256,8 +1268,8 @@ describe("landing a copy", () => {
           {
             move: {
               card: F1,
-              from: { kind: "canvas", task: R1_TASK_FOR_DROP },
-              to: { kind: "new-task", task: NEW_TASK },
+              from: { kind: "canvas", canvas: R1_CANVAS_FOR_DROP },
+              to: { kind: "new-canvas", canvas: NEW_CANVAS },
             },
             slot: null,
           },
@@ -1266,10 +1278,10 @@ describe("landing a copy", () => {
         close: [
           {
             kind: "list",
-            act: { kind: "place", task: NEW_TASK, before: TEST_TASK },
+            act: { kind: "place", canvas: NEW_CANVAS, before: TEST_CANVAS },
           },
         ],
-        here: NEW_TASK,
+        here: NEW_CANVAS,
       },
     ])
   })
@@ -1338,19 +1350,19 @@ describe("landing a copy", () => {
   })
 
   test("a slot is replaced only when its card is yours to discard, and never by a thread's copy", () => {
-    const task = {
-      kind: "task",
-      id: TEST_TASK,
+    const canvas = {
+      kind: "canvas",
+      id: TEST_CANVAS,
       owner: ADA,
       placer: ADA,
       place: inventory,
       content: {},
     } as unknown as CardRecord
-    const s = state({ cards: [task], slots: { "4": TEST_TASK } })
+    const s = state({ cards: [canvas], slots: { "4": TEST_CANVAS } })
     expect(land(past, { kind: "inventory", slot: 4 }, s)).toEqual({
       kind: "refused",
       code: "not-replaced",
-      card: TEST_TASK,
+      card: TEST_CANVAS,
     })
     const thread: Clip = {
       kind: "card",
@@ -1411,7 +1423,7 @@ describe("landing a copy", () => {
         to: inventory,
         replacing: { card: ref, from: inventory },
         how: { actedAt: { kind: "inventory" }, slot: 6 },
-        here: TEST_TASK,
+        here: TEST_CANVAS,
       },
     ])
   })

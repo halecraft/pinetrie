@@ -39,7 +39,7 @@ export interface ThreadsNow {
   /**
    * `thread` as it is now; null for a thread no root holds, or one whose card
    * is not at a live place (`lateAway`). Its root is opened if it is not
-   * loaded, which only a live thread's may be: an archived task's root
+   * loaded, which only a live thread's may be: an archived canvas's root
    * stays let go, and a destroyed one is not made again.
    */
   thread(thread: ThreadId): Promise<ThreadNow | null>

@@ -1,26 +1,37 @@
-// schema/open — the tasks a person has open, in their order: a Yjs document
+// schema/open — the canvases a person has open, in their order: a Yjs document
 // per person, written only by that person's tabs.
 //
-// A task maps to an order key, not a place in a list: two devices reordering
-// at once merge per task, and a list could hold a task twice.
+// A canvas maps to an order key, not a place in a list: two devices reordering
+// at once merge per canvas, and a list could hold a canvas twice.
 
 import { type BoundSchema, type DocRef, Schema } from "@kyneta/schema"
 import { yjs } from "@kyneta/yjs-schema"
-import { isTaskId, type TaskId } from "@pinetrie/core"
+import { type CanvasId, isCanvasId } from "@pinetrie/core"
 
-/** Each open task's id to its order key. A closed task has no key. */
+/** Each open canvas's id to its order key. A closed canvas has no key. */
 export const OpenDoc = yjs.bind(
+  Schema.struct({ canvases: Schema.record(Schema.string()) }),
+)
+
+/**
+ * The schema before canvases were named: its hash is what a stored document
+ * written under it carries, and the host's `0020-canvas-open` migration reads
+ * `tasks` through it. Delete with that migration.
+ */
+export const OpenDocBeforeCanvas = yjs.bind(
   Schema.struct({ tasks: Schema.record(Schema.string()) }),
 )
 
-/** An open-tasks document, as the Exchange gives it. */
+/** An open-canvases document, as the Exchange gives it. */
 export type OpenDocHandle =
   typeof OpenDoc extends BoundSchema<infer S, infer N> ? DocRef<S, N> : never
 
-/** Each open task and its order key, as stored; a key that is no task is left out. */
-export const readOpenKeys = (doc: OpenDocHandle): ReadonlyMap<TaskId, string> =>
+/** Each open canvas and its order key, as stored; a key that is no canvas is left out. */
+export const readOpenKeys = (
+  doc: OpenDocHandle,
+): ReadonlyMap<CanvasId, string> =>
   new Map(
-    Object.entries(doc.tasks()).flatMap(([task, key]) =>
-      isTaskId(task) ? [[task, key] as const] : [],
+    Object.entries(doc.canvases()).flatMap(([canvas, key]) =>
+      isCanvasId(canvas) ? [[canvas, key] as const] : [],
     ),
   )

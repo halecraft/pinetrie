@@ -22,7 +22,7 @@ const ADA = writerId("ada")
 const BEA = writerId("bea")
 const GUEST = writerId("p-7f1d")
 
-/** A root's directory record: its chats that name someone. Ids sort by age. */
+/** A root's directory record: its sends that name someone. Ids sort by age. */
 const record = (
   entry: string | null,
   newest: string | null,
@@ -62,7 +62,7 @@ const mine = mentionsOf({ roots, me: ADA, myName: "Ada", participants })
 const ids = mine.map(m => m.id)
 
 describe("mentionsOf", () => {
-  test("chats naming you, newest first, each with its root and writer", () => {
+  test("sends naming you, newest first, each with its root and writer", () => {
     expect(ids).toEqual(["7-d", "6-c", "1-r1"])
     expect(mine[1]).toMatchObject({ root: "r-4-r2", by: BEA })
   })

@@ -1,4 +1,4 @@
-import { taskIdFor, workflowStateIdFor } from "@pinetrie/core"
+import { canvasIdFor, workflowStateIdFor } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
   landingIn,
@@ -12,9 +12,9 @@ import {
 } from "./root-target.ts"
 
 const [DOING, DONE] = [workflowStateIdFor("d"), workflowStateIdFor("x")]
-const R1 = taskIdFor("01a0ffd2-0000-7000-8000-000000000001")
-const R2 = taskIdFor("01a0ffd2-0000-7000-8000-000000000002")
-const drag: RootDrag = { task: R1, state: DOING }
+const R1 = canvasIdFor("01a0ffd2-0000-7000-8000-000000000001")
+const R2 = canvasIdFor("01a0ffd2-0000-7000-8000-000000000002")
+const drag: RootDrag = { canvas: R1, state: DOING }
 const element = (attrs: Readonly<Record<string, string>>) => ({
   getAttribute: (name: string) => attrs[name] ?? null,
 })
@@ -39,8 +39,8 @@ describe("a root's drop lands where a key could move it", () => {
         null,
       ),
     ).toEqual({
-      kind: "moveTask",
-      task: R1,
+      kind: "moveCanvas",
+      canvas: R1,
       from: DOING,
       to: DONE,
       before: null,
@@ -49,7 +49,7 @@ describe("a root's drop lands where a key could move it", () => {
     // Before another in the sidebar.
     expect(
       planRootDrop(drag, { kind: "list", before: R2 }, DONE, null),
-    ).toEqual({ kind: "moveInList", task: R1, before: R2 })
+    ).toEqual({ kind: "moveInList", canvas: R1, before: R2 })
   })
 
   test("a root dropped before itself does nothing", () => {

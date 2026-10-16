@@ -4,9 +4,9 @@
 // components call these: never `App`, never a `Column`.
 
 import { useSelector } from "@kyneta/react"
-import type { EntryId, TaskId, TreeIndex, WriterId } from "@pinetrie/core"
+import type { CanvasId, EntryId, TreeIndex, WriterId } from "@pinetrie/core"
 import { readingAt, seenBy, whoIsAt } from "@pinetrie/interface"
-import { readReading, readReadingTasks, readTyping } from "@pinetrie/reads"
+import { readReading, readReadingCanvases, readTyping } from "@pinetrie/reads"
 import type { PresenceDocHandle } from "@pinetrie/schema"
 import { useMemo } from "react"
 
@@ -19,11 +19,11 @@ export function useReadingAt(
   return useMemo(() => readingAt(reading, me), [reading, me])
 }
 
-/** The task each thread end being read was reported on. */
-export function useReadingTasks(
+/** The canvas each thread end being read was reported on. */
+export function useReadingCanvases(
   presence: PresenceDocHandle,
-): ReadonlyMap<EntryId, TaskId> {
-  return useSelector(presence, readReadingTasks)
+): ReadonlyMap<EntryId, CanvasId> {
+  return useSelector(presence, readReadingCanvases)
 }
 
 /** Others reading the thread that ends at `end` (`seenBy`). */

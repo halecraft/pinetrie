@@ -4,9 +4,9 @@
 
 import type {
   AgentWork,
+  CanvasId,
   EntryId,
   RootRecord,
-  TaskId,
   ThreadId,
   Verdict,
   VerdictRecord,
@@ -109,7 +109,7 @@ export interface AttentionInput {
   readonly person: Attention
   /** Lanes running or with cards queued, in any root. */
   readonly busy: ReadonlySet<ThreadId>
-  /** The threads of archived tasks: they raise nothing. */
+  /** The threads of archived canvases: they raise nothing. */
   readonly archived: ReadonlySet<ThreadId>
 }
 
@@ -117,14 +117,14 @@ export interface AttentionInput {
 const latest = (a: string, b: string | undefined): string =>
   b !== undefined && b > a ? b : a
 
-/** Whether you follow `lane`, and its task is not archived. */
+/** Whether you follow `lane`, and its canvas is not archived. */
 const followed = (input: AttentionInput, lane: ThreadId): boolean =>
   !input.archived.has(lane) && follows(input.me, input.writers.get(lane) ?? [])
 
 /**
  * Everything raised for you, verdicts and ready proposed changes apart: a
  * thread can raise both. Only a thread you follow raises anything, and only
- * while its agent is idle and its task is not archived. Before your document's
+ * while its agent is idle and its canvas is not archived. Before your document's
  * first write (`since` ""), where you started is not known, and nothing is
  * raised.
  */
@@ -171,15 +171,15 @@ export function attentionOf(input: AttentionInput): readonly Item[] {
   return items
 }
 
-/** A thread's or a task's status: what its mark draws, in the sidebar and on the board. */
+/** A thread's or a canvas's status: what its mark draws, in the sidebar and on the board. */
 export type Status =
   | { readonly kind: "working" }
   | { readonly kind: Level; readonly item: Item }
 
 /**
  * The highest level among `keys` (`highest`): what one mark says for them
- * all. The one rule for a task's item, a board column's dot and ▦'s, which
- * covers the tasks not in the sidebar. Working raises nothing.
+ * all. The one rule for a canvas's item, a board column's dot and ▦'s, which
+ * covers the canvases not in the sidebar. Working raises nothing.
  */
 export const markOf = <K>(
   status: ReadonlyMap<K, Status>,
@@ -224,18 +224,18 @@ export function threadStatus(input: {
 }
 
 /**
- * Each task's status: its threads' together, working when any
- * works, else the highest item among them. A thread in no task counts for
+ * Each canvas's status: its threads' together, working when any
+ * works, else the highest item among them. A thread in no canvas counts for
  * none.
  */
-export function taskStatus(
+export function canvasStatus(
   threads: ReadonlyMap<ThreadId, Status>,
-  taskOfThread: ReadonlyMap<ThreadId, TaskId>,
-): ReadonlyMap<TaskId, Status> {
-  const out = new Map<TaskId, Status>()
+  canvasOfThread: ReadonlyMap<ThreadId, CanvasId>,
+): ReadonlyMap<CanvasId, Status> {
+  const out = new Map<CanvasId, Status>()
   for (const [thread, status] of threads) {
-    const task = taskOfThread.get(thread)
-    if (task !== undefined) out.set(task, withItem(out.get(task), status))
+    const canvas = canvasOfThread.get(thread)
+    if (canvas !== undefined) out.set(canvas, withItem(out.get(canvas), status))
   }
   return out
 }
@@ -253,12 +253,12 @@ export function doneThreads(input: AttentionInput): ReadonlySet<ThreadId> {
   return out
 }
 
-/** What each change of a task's status draws, seen live. */
+/** What each change of a canvas's status draws, seen live. */
 export interface Arrivals {
-  /** Tasks whose status rose to needs you: their mark pulses, then stays. */
-  readonly arrived: ReadonlySet<TaskId>
-  /** Tasks that stopped working with a run done: a ✓ fades. */
-  readonly done: ReadonlySet<TaskId>
+  /** Canvases whose status rose to needs you: their mark pulses, then stays. */
+  readonly arrived: ReadonlySet<CanvasId>
+  /** Canvases that stopped working with a run done: a ✓ fades. */
+  readonly done: ReadonlySet<CanvasId>
 }
 
 /**
@@ -267,29 +267,29 @@ export interface Arrivals {
  * still: motion marks a change you saw, never a state.
  */
 export function arrivals(
-  before: ReadonlyMap<TaskId, Status> | null,
-  after: ReadonlyMap<TaskId, Status>,
-  done: ReadonlySet<TaskId>,
+  before: ReadonlyMap<CanvasId, Status> | null,
+  after: ReadonlyMap<CanvasId, Status>,
+  done: ReadonlySet<CanvasId>,
 ): Arrivals {
-  const arrived = new Set<TaskId>()
-  const ended = new Set<TaskId>()
+  const arrived = new Set<CanvasId>()
+  const ended = new Set<CanvasId>()
   if (before === null) return { arrived, done: ended }
-  for (const [task, now] of after)
-    if (now.kind === "needsYou" && before.get(task)?.kind !== "needsYou")
-      arrived.add(task)
-  for (const [task, was] of before)
-    if (was.kind === "working" && !after.has(task) && done.has(task))
-      ended.add(task)
+  for (const [canvas, now] of after)
+    if (now.kind === "needsYou" && before.get(canvas)?.kind !== "needsYou")
+      arrived.add(canvas)
+  for (const [canvas, was] of before)
+    if (was.kind === "working" && !after.has(canvas) && done.has(canvas))
+      ended.add(canvas)
   return { arrived, done: ended }
 }
 
 /** How long an arrival's mark moves: the pulse's three beats, and the ✓'s fade (`index.html`). */
 export const ARRIVAL_MS = 3_000
 
-/** When each task's mark last arrived, and its ✓ last showed (ms since the epoch). */
+/** When each canvas's mark last arrived, and its ✓ last showed (ms since the epoch). */
 export interface Moments {
-  readonly arrived: ReadonlyMap<TaskId, number>
-  readonly done: ReadonlyMap<TaskId, number>
+  readonly arrived: ReadonlyMap<CanvasId, number>
+  readonly done: ReadonlyMap<CanvasId, number>
 }
 
 /**

@@ -22,7 +22,10 @@ const PROPOSAL: Proposal = {
     { title: "two", brief: "do two" },
   ],
 }
-const chat = (text = "hi"): Message => ({ role: "chat", content: text })
+const personMessage = (text = "hi"): Message => ({
+  role: "person",
+  content: text,
+})
 const calls = (call: string): Message => ({
   role: "assistant",
   content: [
@@ -46,18 +49,18 @@ const RESULT = entryId("3-r")
 /** A run that proposes, then answers; then a later run of the same thread. */
 const answered = indexTree(
   entriesOf([
-    entry("1-p", null, chat()),
+    entry("1-p", null, personMessage()),
     entry("2-a", "1-p", calls("c1")),
     entry("3-r", "2-a", proposed("c1")),
     entry("4-a", "3-r", said("the list")),
-    entry("5-p", "4-a", chat("later")),
+    entry("5-p", "4-a", personMessage("later")),
     entry("6-a", "5-p", said("later reply")),
   ]),
 )
 /** A run a Stop ended right after the proposal's result. */
 const stopped = indexTree(
   entriesOf([
-    entry("1-p", null, chat()),
+    entry("1-p", null, personMessage()),
     entry("2-a", "1-p", calls("c1")),
     entry("3-r", "2-a", proposed("c1")),
   ]),
@@ -111,7 +114,7 @@ describe("proposalState", () => {
     const started = indexTree(
       entriesOf([
         ...Object.values(answered.entries),
-        entry("7-c", "4-a", chat("@agent do two"), {
+        entry("7-c", "4-a", personMessage("@agent do two"), {
           thread: threadIdFor("b"),
         }),
       ]),

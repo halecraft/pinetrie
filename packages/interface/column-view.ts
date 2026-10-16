@@ -8,6 +8,8 @@ import {
   ancestry,
   type BannerRecord,
   type BaseRecord,
+  type CanvasId,
+  type CanvasPinnedView,
   type CanvasView,
   type CardRecord,
   type CommandSummary,
@@ -29,8 +31,6 @@ import {
   promptOf,
   type RevisionRecord,
   type SetupRecord,
-  type TaskId,
-  type TaskPinnedView,
   type TextPlace,
   type ThreadFork,
   type ThreadId,
@@ -108,7 +108,7 @@ export interface WorkFacts {
   readonly accepted: AcceptedRecord | null
   /** Each lane's base, as its history says it. */
   readonly bases: ReadonlyMap<ThreadId, BaseRecord>
-  /** Each forked thread's fork, a branch's or a copy's (`TaskIndex.forkOf`). */
+  /** Each forked thread's fork, a branch's or a copy's (`CanvasIndex.forkOf`). */
   readonly forks: ReadonlyMap<ThreadId, ThreadFork>
   /** The lanes that began from their base, their fork's files not kept. */
   readonly filesLost: ReadonlyMap<ThreadId, FilesLostRecord>
@@ -152,7 +152,7 @@ export interface LaneStretch {
  * The lanes along the path to `tip`, root first. An asked message belongs to
  * the lane its revision record names. The host writes that record when the
  * turn ends, so an asked message with none yet is `lane`'s running prompt.
- * It reads compelled chats, where a lane joins; what started each run, land
+ * It reads compelled sends, where a lane joins; what started each run, land
  * and stack messages included, is `indexAsks`'s.
  */
 export function lanesAlong(
@@ -167,7 +167,7 @@ export function lanesAlong(
     const id = path[i]
     if (id === undefined) continue
     const message = index.entries[id]?.message
-    if (message?.role !== "chat" || message.compelled !== true) continue
+    if (message?.role !== "person" || message.compelled !== true) continue
     const owner = revisions.get(id)?.lane ?? lane
     if (owner === null || owner === stretches.at(-1)?.lane) continue
     stretches.push({ start: id, lane: owner })
@@ -188,12 +188,12 @@ export type HeadIdentity =
     }
   /** A lane not named yet, or a next send that would create one. */
   | { readonly kind: "pending" }
-  /** A conversation. */
+  /** A chat: no agent works here. */
   | { readonly kind: "none" }
 
 /**
  * What a named thread's details show, under the header. Only a
- * named agent has them: a conversation has no thread to describe, and a new
+ * named agent has them: a chat has no thread to describe, and a new
  * agent not yet named has nothing to show.
  */
 export interface ThreadDetails {
@@ -216,7 +216,7 @@ export interface ThreadDetails {
  */
 export type HeadIcon = ThreadIcon & { readonly fade: boolean }
 
-/** Where a column forks: none for a root column, a new tab, or a column moved first. */
+/** Where a column forks: none for a root column, a new canvas, or a column moved first. */
 export type HeadOrigin =
   | {
       readonly kind: "fork"
@@ -225,7 +225,7 @@ export type HeadOrigin =
       readonly text: string
     }
   /**
-   * A copy, or a branch whose parent thread is in another task or an
+   * A copy, or a branch whose parent thread is in another canvas or an
    * inventory: it names its source and where that is, and opens
    * it there by its link, at the fork.
    */
@@ -239,12 +239,12 @@ export type HeadOrigin =
     }
   | { readonly kind: "none" }
 
-/** What a fork row needs to name a source in another task. */
+/** What a fork row needs to name a source in another canvas. */
 export interface OriginFacts {
-  /** The task the column is on; null for a new tab. */
-  readonly task: TaskId | null
+  /** The canvas the column is on; null for a new canvas. */
+  readonly canvas: CanvasId | null
   readonly linkOf: (thread: ThreadId) => ThreadLink
-  readonly labelOf: (task: TaskId) => string
+  readonly labelOf: (canvas: CanvasId) => string
   readonly reader: Reader
 }
 
@@ -431,7 +431,7 @@ export function behindMark(
 }
 
 /**
- * Only where the next send creates the thread's lane: a conversation's thread
+ * Only where the next send creates the thread's lane: a chat's thread
  * is named by the host as its first message is recorded, and is due no
  * drawn banner. `createsLane` is the composer's report, a render behind, so a
  * column whose thread has just got its lane may still carry it.
@@ -444,7 +444,7 @@ function reserveStep(f: ColumnFacts): ReserveStep {
     f.lane.kind !== "none"
   )
     return { kind: "none" }
-  // A thread opened before its lane is named already, as a conversation's,
+  // A thread opened before its lane is named already, as a chat's,
   // with no banner: the reservation makes a drawn banner due, where the
   // host draws.
   return f.work.names.has(f.thread) && f.work.banners.has(f.thread)
@@ -494,7 +494,7 @@ export const detailsTitle = (open: boolean): string =>
 
 /**
  * `head` is `headLane`'s. Only a named agent carries `details` and an icon:
- * pending, the header shows ✦ alone, and a conversation's names no thread.
+ * pending, the header shows ✦ alone, and a chat's names no thread.
  */
 function identityOf(
   head: ThreadId | null,
@@ -548,7 +548,7 @@ const isFirst = (index: TreeIndex, id: EntryId): boolean => {
 
 /**
  * A column's fork row: a copy names its source, wherever it is; a thread
- * whose parent thread is in another task or an inventory names that; a
+ * whose parent thread is in another canvas or an inventory names that; a
  * branch opened from a proposal names its item; else the message it forks
  * from on the path to its left.
  */
@@ -566,7 +566,7 @@ function originOf(
   const above = new Set(ancestry(f.index, at).path)
   const worked = stretches.findLast(s => above.has(s.start))
   const speaker =
-    message.role === "chat"
+    message.role === "person"
       ? speakerWords(message, f.nameOf)
       : ((worked === undefined ? undefined : f.work.names.get(worked.lane)) ??
         "agent")
@@ -610,10 +610,11 @@ function sourceOf(f: ColumnFacts): HeadOrigin | null {
   const link = origins.linkOf(parent)
   const copied = fork?.how === "copy"
   // A branch whose parent is on this canvas names the message it forks from.
-  if (!copied && link.kind === "open" && link.task === origins.task) return null
+  if (!copied && link.kind === "open" && link.canvas === origins.canvas)
+    return null
   const name = f.work.names.get(parent) ?? "a thread"
   const where =
-    link.kind === "open" && link.task === origins.task
+    link.kind === "open" && link.canvas === origins.canvas
       ? []
       : [linkWords(link, origins.reader, origins.labelOf)]
   const lost =
@@ -998,14 +999,14 @@ export const newPinAt = (f: {
 /**
  * What a column draws above a run's prompt for the context the run read:
  * its thread's pinned cards, the cards pinned to its
- * task, and the canvas list it was told.
+ * canvas, and the canvas list it was told.
  */
 export interface PinnedMarker {
   readonly cards: readonly PinnedCardRead[]
   /** Shown only when the cards replaced were read by the entry's own lane. */
   readonly retired: PinnedView["retired"]
-  /** The cards pinned to the task it read, when it read them. */
-  readonly taskPinned?: Pick<TaskPinnedView, "cards" | "retired">
+  /** The cards pinned to the canvas it read, when it read them. */
+  readonly canvasPinned?: Pick<CanvasPinnedView, "cards" | "retired">
   /** The canvas list it was told, when it was told one. */
   readonly canvas?: CanvasView
 }
@@ -1029,7 +1030,7 @@ export function pinnedMarker(
 /** The roles of the entries a run's prompt is written after, in its commit. */
 const BEFORE_PROMPT: ReadonlySet<string> = new Set([
   "pinned",
-  "task-pinned",
+  "canvas-pinned",
   "canvas",
   "behind",
 ])
@@ -1064,7 +1065,7 @@ export function pinnedMarkers(
   const out = new Map<EntryId, PinnedMarker>()
   for (const node of nodes) {
     let pinned: PinnedMarker | null = null
-    let taskPinned: TaskPinnedView | undefined
+    let canvasPinned: CanvasPinnedView | undefined
     let canvas: CanvasView | undefined
     for (
       let at = index.parentOf(node.id);
@@ -1077,21 +1078,21 @@ export function pinnedMarkers(
           message.pinned,
           pinnedInView(index, index.parentOf(at)),
         )
-      taskPinned ??= message?.taskPinned
+      canvasPinned ??= message?.canvasPinned
       canvas ??= message?.canvas
     }
     const told =
-      taskPinned !== undefined &&
-      (taskPinned.cards.length > 0 || taskPinned.retired.length > 0)
+      canvasPinned !== undefined &&
+      (canvasPinned.cards.length > 0 || canvasPinned.retired.length > 0)
     if (pinned === null && !told && canvas === undefined) continue
     out.set(node.id, {
       cards: pinned?.cards ?? [],
       retired: pinned?.retired ?? [],
-      ...(told && taskPinned !== undefined
+      ...(told && canvasPinned !== undefined
         ? {
-            taskPinned: {
-              cards: taskPinned.cards,
-              retired: taskPinned.retired,
+            canvasPinned: {
+              cards: canvasPinned.cards,
+              retired: canvasPinned.retired,
             },
           }
         : {}),

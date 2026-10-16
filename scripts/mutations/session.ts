@@ -226,11 +226,12 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a reply at an entry starts a thread",
-    file: "packages/session/chat.ts",
+    file: "packages/session/send.ts",
     from: '  mode === "reply" && at.kind === "entry"',
     to: "  false",
     command: unit,
-    expect: "chatAtOf: a reply continues its thread from the end it shows",
+    expect:
+      "columnMessageAt: a reply continues its thread from the end it shows",
   },
   {
     name: "a request waiting when the host leaves hangs",
@@ -326,7 +327,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a send from a card is not drawn out of its composer",
-    file: "packages/session/chat.ts",
+    file: "packages/session/send.ts",
     from: "    pending:\n      card === null\n",
     to: "    pending:\n      true\n",
     command: unit,
@@ -334,7 +335,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a send carries no pinned versions",
-    file: "packages/session/chat.ts",
+    file: "packages/session/send.ts",
     from: "    card: input.card,\n    pinned: input.pinned,",
     to: "    card: input.card,\n    pinned: [],",
     command: unit,
@@ -389,11 +390,11 @@ export const mutations: readonly Mutation[] = [
     from: "  const gone = [...keys.keys()].filter(r => archived.has(r) && r !== here)",
     to: "  const gone = [...keys.keys()].filter(r => archived.has(r))",
     command: unit,
-    expect: "planOpenRepair: archived tasks leave, but the one you are on",
+    expect: "planOpenRepair: archived canvases leave, but the one you are on",
   },
   {
     name: "a refused send at the root opens a root in the sidebar",
-    file: "packages/session/chat.ts",
+    file: "packages/session/send.ts",
     from: '  (outcome.kind === "appended" || outcome.kind === "started")',
     to: '  outcome.kind !== "busy"',
     command: unit,

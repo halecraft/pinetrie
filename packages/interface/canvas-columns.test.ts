@@ -1,18 +1,22 @@
 import {
   type CardRecord,
   type CardWidth,
+  canvasIdFor,
   cardIdOfKind,
   entryId,
   NO_CONTENT,
   type NoteColumnId,
   rootIdFor,
   type ThreadId,
-  taskIdFor,
   threadIdFor,
   type WriterId,
   writerId,
 } from "@pinetrie/core"
-import { type CanvasCard, canvasOf, type ThreadOpening } from "@pinetrie/rules"
+import {
+  type CardOnCanvas,
+  cardsOnCanvas,
+  type ThreadOpening,
+} from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
 import {
   type CardColumn,
@@ -21,25 +25,25 @@ import {
   defaultView,
   heldByOthers,
   openColumns,
-  type TaskView,
+  type YourCanvasView,
 } from "./canvas-columns.ts"
 import { BOUND } from "./columns.ts"
 import { threadOfEntry, tree } from "./fixtures.ts"
 
 const ADA = writerId("ada@x.io")
-const TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
+const CANVAS = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 const N1 = cardIdOfKind("note-column", "01a0ffd2-0000-7000-8000-0000000000a1")
 
-/** `ids` on `TASK`'s canvas, in that order: thread cards and note columns. */
+/** `ids` on `CANVAS`'s canvas, in that order: thread cards and note columns. */
 const canvasFor = (
   ids: readonly (ThreadId | NoteColumnId)[],
   widths: ReadonlyMap<string, CardWidth> = new Map(),
-): readonly CanvasCard[] =>
-  canvasOf(
+): readonly CardOnCanvas[] =>
+  cardsOnCanvas(
     ids.map((id, i): CardRecord => {
       const place = {
         kind: "canvas",
-        task: TASK,
+        canvas: CANVAS,
         order: String(i + 1).padStart(10, "0"),
         width: widths.get(id) ?? 1,
       } as const
@@ -61,7 +65,7 @@ const canvasFor = (
             content: NO_CONTENT,
           }
     }),
-    TASK,
+    CANVAS,
   )
 
 // 1-r -> 2-a -> 3-b is the trunk's thread; 4-c, a branch at 2-a, starts
@@ -81,11 +85,12 @@ const E = threadOfEntry("6-e")
 const ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 
 const draw = (
-  canvas: readonly CanvasCard[],
-  view: TaskView,
+  cards: readonly CardOnCanvas[],
+  view: YourCanvasView,
   unstarted: ReadonlyMap<ThreadId, ThreadOpening> = new Map(),
   holders: ReadonlyMap<ThreadId, WriterId> = new Map(),
-) => canvasColumns({ canvas, view, index, lanes: [], unstarted, holders })
+) =>
+  canvasColumns({ onCanvas: cards, view, index, lanes: [], unstarted, holders })
 
 const shape = (columns: readonly CardColumn[]) =>
   columns.map(c =>
@@ -96,14 +101,14 @@ const shape = (columns: readonly CardColumn[]) =>
 
 describe("canvasColumns", () => {
   test("every card is a column in the canvas's order, the first alone unfolded by default", () => {
-    const canvas = canvasFor([TRUNK, N1, C])
-    expect(shape(draw(canvas, defaultView(TRUNK)))).toEqual([
+    const cards = canvasFor([TRUNK, N1, C])
+    expect(shape(draw(cards, defaultView(TRUNK)))).toEqual([
       ["bound", TRUNK, false],
       ["notes", N1, true],
       ["bound", C, true],
     ])
     // Another order is everyone's; folds are the view's.
-    const view: TaskView = {
+    const view: YourCanvasView = {
       ...defaultView(null),
       cards: new Map([[C, { unfolded: true, density: "outline" }]]),
     }
@@ -134,7 +139,7 @@ describe("canvasColumns", () => {
   })
 
   test("a thread whose parent thread is on no column of the canvas folds its path above it", () => {
-    const view: TaskView = {
+    const view: YourCanvasView = {
       ...defaultView(C),
       cards: new Map([
         [C, { unfolded: true }],
@@ -151,7 +156,7 @@ describe("canvasColumns", () => {
 
   test("a thread not yet started ends at its fork, and sends as a branch there", () => {
     const F = threadIdFor("01a0ffd2-0000-7000-8000-0000000000f1")
-    const view: TaskView = {
+    const view: YourCanvasView = {
       ...defaultView(TRUNK),
       cards: new Map([
         [
@@ -187,7 +192,7 @@ describe("canvasColumns", () => {
         },
       },
     })
-    // A new tab's: at its root, with no anchor.
+    // A new canvas's: at its root, with no anchor.
     const [tab] = draw(
       canvasFor([F]),
       defaultView(F),
@@ -260,7 +265,7 @@ describe("canvasColumns", () => {
   })
 
   test("openColumns: the thread columns drawn whole, in order", () => {
-    const view: TaskView = {
+    const view: YourCanvasView = {
       ...defaultView(TRUNK),
       cards: new Map([
         [TRUNK, { unfolded: true }],
@@ -272,9 +277,9 @@ describe("canvasColumns", () => {
     ).toEqual([TRUNK, C])
   })
 
-  test("a task's view holds no order", () => {
-    const none = { task: { unfolded: false } }
-    const listed: TaskView = {
+  test("a canvas's view holds no order", () => {
+    const none = { canvas: { unfolded: false } }
+    const listed: YourCanvasView = {
       ...none,
       cards: new Map(),
       // @ts-expect-error: a view has no list of columns

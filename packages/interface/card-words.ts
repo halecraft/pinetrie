@@ -154,7 +154,7 @@ export function noticeWords(notice: CardNotice, reader: Reader): string {
       return "not moved: the cards around it changed first"
     case "replied":
       return by === null
-        ? "not lifted back: its thread or its task has more in it"
+        ? "not lifted back: its thread or its canvas has more in it"
         : `not lifted back: ${who(by, reader)} replied`
     case "archived":
       return "not undone: restore or archive it on the board"
@@ -217,7 +217,7 @@ export function newCardBox(to: ListKey): NewCardBoxView {
         tone: "note",
         placeholder: "write a note",
         title:
-          "a new note at the column's end, which everyone in the task sees",
+          "a new note at the column's end, which everyone in the canvas sees",
       }
     case "pinned":
       return {
@@ -231,7 +231,7 @@ export function newCardBox(to: ListKey): NewCardBoxView {
         tone: "note",
         placeholder: "write a comment",
         title:
-          "a comment on this message, which everyone in the task sees and no agent reads",
+          "a comment on this message, which everyone in the canvas sees and no agent reads",
       }
   }
 }
@@ -261,18 +261,18 @@ export const pinnedMarkerWords = (marker: PinnedMarker): string =>
     ? "the agent was told pinned cards no longer apply"
     : `the agent read ${marker.cards.length} pinned ${marker.cards.length === 1 ? "card" : "cards"}`
 
-/** The marker's line for the cards pinned to the task a run read. */
-export const taskPinnedMarkerWords = (
-  marker: NonNullable<PinnedMarker["taskPinned"]>,
+/** The marker's line for the cards pinned to the canvas a run read. */
+export const canvasPinnedMarkerWords = (
+  marker: NonNullable<PinnedMarker["canvasPinned"]>,
 ): string =>
   marker.cards.length === 0
-    ? "the agent was told the task's pinned cards no longer apply"
-    : `the agent read ${marker.cards.length} ${marker.cards.length === 1 ? "card" : "cards"} pinned to the task`
+    ? "the agent was told the canvas's pinned cards no longer apply"
+    : `the agent read ${marker.cards.length} ${marker.cards.length === 1 ? "card" : "cards"} pinned to the canvas`
 
 /** The marker's line for the canvas list a run was told. */
 export const canvasMarkerWords = (canvas: CanvasView): string => {
   const n = canvas.lines.length + canvas.more
-  return `the agent was told the task's canvas: ${n} ${n === 1 ? "card" : "cards"}`
+  return `the agent was told the canvas: ${n} ${n === 1 ? "card" : "cards"}`
 }
 
 /** A card the agent was told no longer applies, by its first line. */

@@ -5,6 +5,7 @@ import {
   type CardId,
   type CardPlace,
   type CardRecord,
+  canvasIdFor,
   cardIdOfKind,
   type EntryId,
   entryId,
@@ -15,7 +16,6 @@ import {
   type TextCard,
   type TextPlace,
   type TraceRecord,
-  taskIdFor,
   threadIdFor,
   type WriterId,
   writerId,
@@ -37,7 +37,7 @@ import {
 } from "./card-history.ts"
 
 const _TEST_THREAD = threadIdFor("e")
-const TEST_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
+const TEST_CANVAS = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 const _ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 const LANE = threadIdFor("x")
 const ADA = writerId("ada@x.io")
@@ -63,10 +63,10 @@ const PINNED: CardPlace = {
   thread: LANE,
   order: "1",
 }
-/** Pinned to the task the fixtures' threads are in. */
-const TASK_PINNED: CardPlace = {
-  kind: "task-pinned",
-  task: TEST_TASK,
+/** Pinned to the canvas the fixtures' threads are in. */
+const CANVAS_PINNED: CardPlace = {
+  kind: "canvas-pinned",
+  canvas: TEST_CANVAS,
   order: "1",
 }
 const BEAS: CardPlace = { kind: "inventory", holder: BEA }
@@ -158,8 +158,8 @@ describe("planProvenance: each card's history", () => {
     expect(events[0]?.by).toBe(cause.kind === "host" ? null : cause.by)
   })
 
-  test("a thread's card: each move between tasks and into an inventory is in its history", () => {
-    const OTHER = taskIdFor("01a0ffd2-0000-7000-8000-00000000000d")
+  test("a thread's card: each move between canvases and into an inventory is in its history", () => {
+    const OTHER = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000d")
     const thread = (
       place: CardPlace & { kind: "canvas" | "inventory" },
       placer: WriterId,
@@ -172,10 +172,10 @@ describe("planProvenance: each card's history", () => {
         place,
         content: NO_CONTENT,
       }) as const
-    const on = (task: typeof TEST_TASK) =>
-      ({ kind: "canvas", task, order: "1", width: 1 }) as const
+    const on = (canvas: typeof TEST_CANVAS) =>
+      ({ kind: "canvas", canvas, order: "1", width: 1 }) as const
     const moved = plan({
-      before: [thread(on(TEST_TASK), ADA)],
+      before: [thread(on(TEST_CANVAS), ADA)],
       after: [thread(on(OTHER), BEA)],
       cause: BY_BEA,
       ends: new Map(),
@@ -184,8 +184,8 @@ describe("planProvenance: each card's history", () => {
       {
         kind: "moved",
         by: BEA,
-        from: { kind: "canvas", task: TEST_TASK },
-        to: { kind: "canvas", task: OTHER },
+        from: { kind: "canvas", canvas: TEST_CANVAS },
+        to: { kind: "canvas", canvas: OTHER },
         at: 7,
       },
     ])
@@ -196,7 +196,7 @@ describe("planProvenance: each card's history", () => {
       ends: new Map(),
     })
     expect(eventsOf(taken).map(e => [e.from, e.to])).toEqual([
-      [{ kind: "canvas", task: OTHER }, BEAS],
+      [{ kind: "canvas", canvas: OTHER }, BEAS],
     ])
     expect([newTraces(moved), newTraces(taken)]).toEqual([[], []])
   })
@@ -370,8 +370,8 @@ test.each([
   [QUEUED, DRAFTING, "unqueued"],
   [DRAFTING, PINNED, "pinned"],
   [PINNED, DRAFTING, "unpinned"],
-  [DRAFTING, TASK_PINNED, "pinned"],
-  [TASK_PINNED, DRAFTING, "unpinned"],
+  [DRAFTING, CANVAS_PINNED, "pinned"],
+  [CANVAS_PINNED, DRAFTING, "unpinned"],
   [QUEUED, ADAS, "took-into-inventory"],
   [DRAFTING, BEAS, "took-into-inventory"],
   [BEAS, ELSEWHERE, "put"],
@@ -384,8 +384,8 @@ test.each([
         ? { kind: "queued", thread: p.thread, seen: p.seen }
         : p.kind === "pinned"
           ? { kind: "pinned", thread: p.thread }
-          : p.kind === "task-pinned"
-            ? { kind: "task-pinned", task: p.task }
+          : p.kind === "canvas-pinned"
+            ? { kind: "canvas-pinned", canvas: p.canvas }
             : p
   expect(verbOf(key(from), key(to))).toBe(verb)
 })
@@ -524,7 +524,7 @@ test("planTrashSweep: a card on a surface a deleted card owns goes with it, tras
     placer: ADA,
     place: {
       kind: "trash",
-      left: { kind: "canvas", task: TEST_TASK, order: "a", width: 1 },
+      left: { kind: "canvas", canvas: TEST_CANVAS, order: "a", width: 1 },
     },
     content: NO_CONTENT,
   }
@@ -535,7 +535,7 @@ test("planTrashSweep: a card on a surface a deleted card owns goes with it, tras
     placer: ADA,
     place: {
       kind: "trash",
-      left: { kind: "canvas", task: TEST_TASK, order: "b", width: 1 },
+      left: { kind: "canvas", canvas: TEST_CANVAS, order: "b", width: 1 },
     },
     content: NO_CONTENT,
   }

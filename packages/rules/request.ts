@@ -24,7 +24,12 @@ export const transcriptLine = (
  * message, and an ask from another thread or an asked agent's answer,
  * whose speakers are the asker and the answering thread.
  */
-const SPOKEN: ReadonlySet<string> = new Set(["chat", "user", "relay", "answer"])
+const SPOKEN: ReadonlySet<string> = new Set([
+  "person",
+  "user",
+  "relay",
+  "answer",
+])
 
 /**
  * Each chat, prompt, agent reply, and what agents in other threads asked and

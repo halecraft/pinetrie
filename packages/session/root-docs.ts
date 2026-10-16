@@ -4,9 +4,9 @@
 
 import type { Exchange } from "@kyneta/exchange"
 import {
-  type ChatAt,
   type EntryId,
   ERR,
+  type MessageAt,
   type RootId,
   rootDocId,
   rootOfDocId,
@@ -34,10 +34,10 @@ export interface RootDocs {
   /**
    * The root a write at `at` goes to: its entry's, or, at the root, one this
    * client starts and holds until the page asks for it too: `minting`, the
-   * root a new tab minted as it opened, or, for a send at the
+   * root a new canvas minted as it opened, or, for a send at the
    * root that names none (a script's), one minted here.
    */
-  rootFor(at: ChatAt, minting?: RootId): RootId | undefined
+  rootFor(at: MessageAt, minting?: RootId): RootId | undefined
 }
 
 export function rootDocs(exchange: Exchange): RootDocs {
