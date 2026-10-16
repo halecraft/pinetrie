@@ -5,6 +5,16 @@ const unit = ["pnpm", "exec", "vitest", "run", "apps/pinetrie/host"]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "every start-up phase is said, however quick",
+    file: "apps/pinetrie/host/startup-lines.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "  ms < 1000 ? null : `[host] starting: ${what} took ${Math.round(ms)} ms`",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    to: "  `[host] starting: ${what} took ${Math.round(ms)} ms`",
+    command: unit,
+    expect: "startupLaps: a phase of a second or more is said",
+  },
+  {
     name: "pnpm tidy takes no lock",
     file: "apps/pinetrie/host/tidy.ts",
     from: '    const db = openDatabase(file, { busyTimeoutMs: 0 })\n    return { kind: "held", release: () => db.close() }',
@@ -499,8 +509,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "accepted work's preview runs no git",
     file: "packages/jj/owner.ts",
-    from: "      kept = await readShared(op, runnerFor(root, { at: op }), git, repoConfig)",
-    to: '      kept = await readShared(op, runnerFor(root, { at: op }), async () => ({ ok: false, code: 1, stdout: "", stderr: "" }), repoConfig)',
+    from: "      kept = await readShared(op, runner({ at: op }), git, repoConfig)",
+    to: '      kept = await readShared(op, runner({ at: op }), async () => ({ ok: false, code: 1, stdout: "", stderr: "" }), repoConfig)',
     suite: "lanes",
     scenario: "main",
     expect:

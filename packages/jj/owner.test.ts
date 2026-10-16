@@ -134,6 +134,33 @@ describe("the owner of your repo", () => {
     close(owner)
   })
 
+  test("every command over the threshold is told, by its own arguments: a step's, its steps', and a pinned read's", async () => {
+    const { dir } = await repo("timed")
+    const told: string[] = []
+    const owner = startRepoOwner({
+      root: dir,
+      repoConfig: DEFAULT_REPO,
+      slowCommandMs: -1,
+      onSlowCommand: c => told.push(`${c.program} ${c.args.join(" ")}`),
+    })
+    await owner.idle()
+    await owner.command(async ops => {
+      await ops.jj(["log", "--no-graph", "-r", "@", "-T", "commit_id"])
+      await ops.execute([
+        host("bookmark", "create", "pinetrie-offer/timed", "-r", "@-"),
+      ])
+    })
+    await owner.read(ops => ops.jj(["log", "--no-graph", "-r", "@-"]))
+    expect(told).toEqual(
+      expect.arrayContaining([
+        "jj log --no-graph -r @ -T commit_id",
+        "jj bookmark create pinetrie-offer/timed -r @-",
+        "jj log --no-graph -r @-",
+      ]),
+    )
+    close(owner)
+  })
+
   test("a write by the owner moves only what it moved; a step that only read queues no observation", async () => {
     const { dir } = await repo("own-write")
     const { owner, steps, moves } = own(dir)

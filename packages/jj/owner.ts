@@ -17,7 +17,13 @@ import {
   planObserve,
 } from "./observe.ts"
 import { planImport } from "./plan.ts"
-import { executeRepo, operationGone, runnerFor } from "./run.ts"
+import {
+  type CommandWatch,
+  executeRepo,
+  operationGone,
+  runnerFor,
+  type TimedCommand,
+} from "./run.ts"
 import { readShared, type SharedFacts } from "./shared.ts"
 import type { RepoStep } from "./step.ts"
 
@@ -83,6 +89,10 @@ export function startRepoOwner(input: {
   readonly onError?: (error: unknown) => void
   readonly onSlow?: (step: SlowStep) => void
   readonly slowMs?: number
+  /** Each jj or git command, a step's or a read's, that ran longer than `slowCommandMs`. */
+  readonly onSlowCommand?: (command: TimedCommand) => void
+  /** Default 500 ms. */
+  readonly slowCommandMs?: number
   /** How often the heads are listed without an event; default 5 s. */
   readonly backstopMs?: number
 }): RepoOwner {
@@ -93,8 +103,15 @@ export function startRepoOwner(input: {
     ...(input.slowMs === undefined ? {} : { slowMs: input.slowMs }),
   })
   const listeners = new Set<(moved: Moved) => void>()
-  const host = runnerFor(root, "host")
-  const git = runnerFor(root, "git")
+  const slowCommandMs = input.slowCommandMs ?? 500
+  const timed: CommandWatch = command => {
+    if (command.ms > slowCommandMs) input.onSlowCommand?.(command)
+  }
+  /** Every runner the owner makes, each command of it watched. */
+  const runner = (as: Parameters<typeof runnerFor>[1]) =>
+    runnerFor(root, as, timed)
+  const host = runner("host")
+  const git = runner("git")
   let seen: Fingerprint | null = null
   const first = Promise.withResolvers<void>()
 
@@ -114,7 +131,7 @@ export function startRepoOwner(input: {
     if (!ran.ok) throw new Error(`jj op log failed: ${ran.stderr.trim()}`)
     const op = ran.stdout.trim()
     if (op === seen?.op) return
-    const read = await runnerFor(root, { at: op })(fingerprintRead(repoConfig))
+    const read = await runner({ at: op })(fingerprintRead(repoConfig))
     if (!read.ok)
       throw new Error(`reading what moved failed: ${read.stderr.trim()}`)
     const next = parseFingerprint(op, read.stdout, repoConfig)
@@ -138,13 +155,13 @@ export function startRepoOwner(input: {
     const op = seen?.op
     if (op === undefined) throw new Error("your repo has no operation to read")
     if (kept?.op !== op)
-      kept = await readShared(op, runnerFor(root, { at: op }), git, repoConfig)
+      kept = await readShared(op, runner({ at: op }), git, repoConfig)
     return kept
   }
 
   /** A step's ops, flagging the step as one that wrote. */
   function opsOf(wrote: { value: boolean }): RepoOps {
-    const asYou = runnerFor(root, "you")
+    const asYou = runner("you")
     return {
       jj: host,
       jjAsYou: args => {
@@ -156,7 +173,7 @@ export function startRepoOwner(input: {
       async execute(steps) {
         if (steps.length === 0) return
         try {
-          await executeRepo(root, steps)
+          await executeRepo(root, steps, timed)
         } finally {
           await observe().catch(e => input.onError?.(e))
         }
@@ -178,10 +195,10 @@ export function startRepoOwner(input: {
   const pinned: Runner = async args => {
     await first.promise
     const at = seen?.op ?? ""
-    const ran = await runnerFor(root, { at })(args)
+    const ran = await runner({ at })(args)
     if (!operationGone(ran)) return ran
     await keeper.once("observe", observeNow)
-    return runnerFor(root, { at: seen?.op ?? at })(args)
+    return runner({ at: seen?.op ?? at })(args)
   }
 
   // The watch, and its backstop: a head that is not the last observed queues

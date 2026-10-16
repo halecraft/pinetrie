@@ -189,3 +189,25 @@ export function sshLines(facts: {
       : []),
   ]
 }
+
+/** A start-up phase that took a second or more, worded; a quicker one says nothing. */
+export const startupPhaseLine = (what: string, ms: number): string | null =>
+  ms < 1000 ? null : `[host] starting: ${what} took ${Math.round(ms)} ms`
+
+/**
+ * A stopwatch over a host's start: each `lap(what)` logs the time since the
+ * last lap, or since it was made, when that is a second or more
+ * (`startupPhaseLine`).
+ */
+export function startupLaps(
+  log: (line: string) => void,
+  clock: () => number = () => performance.now(),
+): (what: string) => void {
+  let last = clock()
+  return what => {
+    const now = clock()
+    const said = startupPhaseLine(what, now - last)
+    if (said !== null) log(said)
+    last = now
+  }
+}

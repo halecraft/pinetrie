@@ -350,6 +350,13 @@ until the next compaction (S120), and the host compacts at startup. So
 
 ## Startup
 
+**A phase of the start that takes a second or more is logged**
+(`startupLaps`, `startup-lines.ts`): `[host] starting: <phase> took <n> ms`,
+the time since the last lap. The laps are the project and the lane VM, the
+store, its migrations, loading the session, places and live documents,
+opening the project and its config, pi's setup, the roots, and lane work. A
+start's quiet gap is one of these, and its line names which.
+
 After `recover`, `sweepHistories` retires the histories of moves no one will undo again (§
 Moves' history), and `sweepHolds` deletes the holds on queues whose lane no
 root holds or whose root is archived (ADR-0048 step 7). Both run again after
@@ -1376,6 +1383,10 @@ adapter's.
   (`jj/accepted.ts`), the offers (`jj/offers/`), the fetches (`jj/fetch.ts`)
   and the splits (`jj/split.ts`), and each lane's history (`historyOf`),
   whose `follow` is the lane's fetch into your repo.
+- **Each jj or git command on your repo over half a second is logged**
+  (`onSlowCommand`, `slowCommand`): `[host] your repo: <command> ran <n>
+  ms`, its arguments as its caller gave them, cut to a line. The owner's
+  `slow` names only the step; this names the command in it.
 - **A starting host says when a tidy is due** (ADR-0155): one pinned read of
   your whole op log (`readOpLog`), tracked and never awaited, so the start
   does not wait for it; when its oldest operation is more than twice the

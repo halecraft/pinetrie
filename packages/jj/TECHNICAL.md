@@ -113,6 +113,11 @@ everything else reads at the head it last saw.**
   `later(key)` is upkeep (`refresh:<lane>`, `line`, `observe`, `shared`), at
   most one queued per key, started only when no command waits
   (`@pinetrie/keeper`). A command waits for at most the one step running.
+- **Every command the owner runs is timed** (`runnerFor`'s `watch`, which
+  every owner runner and its `executeRepo` share): one longer than
+  `slowCommandMs` (500 ms) goes to `onSlowCommand`, by the arguments its
+  caller gave, with no runner flags. A slow step (`onSlow`) then names the
+  command that made it slow.
 - **Only the owner runs a `RepoStep`** (`RepoOps.execute`), but for a
   tidy's (`executeTidy`), which runs while no host, and so no owner, serves
   the repo. The package exports no other runner: a step gets `RepoOps` (`jj`

@@ -64,14 +64,31 @@ export function repoCommand(
   }
 }
 
-/** The one runner factory for your repo at `root`. */
-export function runnerFor(root: string, as: RepoRunner): Runner {
-  return args => {
+/** One command on your repo and how long it ran, as its caller gave it: no runner flags. */
+export interface TimedCommand {
+  readonly program: "jj" | "git"
+  readonly args: readonly string[]
+  readonly ms: number
+}
+
+/** Told of each command a runner ran, once it ends. */
+export type CommandWatch = (command: TimedCommand) => void
+
+/** The one runner factory for your repo at `root`; `watch` hears each command's time. */
+export function runnerFor(
+  root: string,
+  as: RepoRunner,
+  watch?: CommandWatch,
+): Runner {
+  return async args => {
     const c = repoCommand(root, as, args)
-    return run(c.program, c.args, {
+    const started = performance.now()
+    const ran = await run(c.program, c.args, {
       ...(c.cwd === null ? {} : { cwd: c.cwd }),
       ...(c.program === "jj" ? { env: NO_EDITOR } : {}),
     })
+    watch?.({ program: c.program, args, ms: performance.now() - started })
+    return ran
   }
 }
 
@@ -85,11 +102,13 @@ export const hostOps = (root: string): Runner => runnerFor(root, "host")
 export async function executeRepo(
   root: string,
   steps: readonly RepoStep[],
+  watch?: CommandWatch,
 ): Promise<void> {
   for (const step of steps) {
     const ran = await runnerFor(
       root,
       step.tool === "git" ? "git" : step.as,
+      watch,
     )(step.args)
     if (!ran.ok)
       throw new Error(

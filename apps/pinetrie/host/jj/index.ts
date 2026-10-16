@@ -35,11 +35,12 @@ import {
   revsetName,
   startRepoOwner,
   TIDY_DAYS,
+  type TimedCommand,
 } from "@pinetrie/jj"
 import { baseCheckout } from "@pinetrie/lanes"
 import { readLaneRecords, readRunning } from "@pinetrie/reads"
 import { planBegin } from "@pinetrie/rules"
-import { failed, slow } from "../basics.ts"
+import { type Basics, failed, slow } from "../basics.ts"
 import { tidyWords } from "../tidy.ts"
 import type { ProjectAdapter } from "../work/adapter.ts"
 import type { Destination } from "../work/destination.ts"
@@ -48,6 +49,24 @@ import { createFetches } from "./fetch.ts"
 import { startOffers } from "./offers/index.ts"
 import { recordedJjLane, requireJjLane } from "./proven.ts"
 import { createSplits } from "./split.ts"
+
+/** A slow command's words: its arguments cut to a line, as a template or revset can run long. */
+const commandWords = (c: TimedCommand): string => {
+  const words = `${c.program} ${c.args.join(" ")}`.replace(/\s+/g, " ")
+  return words.length > 120 ? `${words.slice(0, 119)}…` : words
+}
+
+/**
+ * An `onSlowCommand` handler that logs `[host] <where>: <command> ran <n> ms`:
+ * one command, where `slow` names only the step it ran in.
+ */
+function slowCommand(
+  basics: Pick<Basics, "log">,
+  where: string,
+): (command: TimedCommand) => void {
+  return c =>
+    basics.log(`[host] ${where}: ${commandWords(c)} ran ${Math.round(c.ms)} ms`)
+}
 
 export function startJjProject(dir: JjProjectDir): ProjectAdapter {
   const { root } = dir
@@ -63,6 +82,7 @@ export function startJjProject(dir: JjProjectDir): ProjectAdapter {
         repoConfig: names,
         onError: failed(basics, "your repo"),
         onSlow: slow(basics, "your repo"),
+        onSlowCommand: slowCommand(basics, "your repo"),
       })
       // pre-accepted: the owner's first command, before its first
       // observation. Delete with `renameAccepted`.

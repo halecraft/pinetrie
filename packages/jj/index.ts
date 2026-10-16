@@ -49,6 +49,7 @@ export {
   setupProposal,
 } from "./plan.ts"
 export { renameAccepted } from "./pre-accepted.ts"
+export type { TimedCommand } from "./run.ts"
 export {
   type JjProjectDir,
   prepareProjectDir,

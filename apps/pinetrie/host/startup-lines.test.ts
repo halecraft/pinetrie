@@ -4,6 +4,7 @@ import {
   agentReadyLine,
   reportLines,
   sessionLines,
+  startupLaps,
   storeLine,
 } from "./startup-lines.ts"
 
@@ -129,4 +130,17 @@ describe("agentReadyLine", () => {
       "[host] agent ready — no model: no config names one: set model, as provider/id; tools off",
     )
   })
+})
+
+test("startupLaps: a phase of a second or more is said with its time since the last lap; a quicker one is not", () => {
+  const lines: string[] = []
+  const times = [0, 400, 1900, 2899]
+  const lap = startupLaps(
+    line => lines.push(line),
+    () => times.shift() ?? 0,
+  )
+  lap("quick")
+  lap("slow")
+  lap("just under")
+  expect(lines).toEqual(["[host] starting: slow took 1500 ms"])
 })

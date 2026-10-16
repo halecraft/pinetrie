@@ -162,7 +162,7 @@ import { planSetupRecord } from "./setup-record.ts"
 import { planShutdown, type ShutdownStep } from "./shutdown.ts"
 import { createSplitCall } from "./split-call.ts"
 import { recover } from "./startup.ts"
-import { agentReadyLine, reportLines } from "./startup-lines.ts"
+import { agentReadyLine, reportLines, startupLaps } from "./startup-lines.ts"
 import { openStore } from "./store.ts"
 import { tasksNow } from "./tasks.ts"
 import { createTitles } from "./titles.ts"
@@ -321,6 +321,8 @@ export async function startHost({
   const key = isLoopback(bind) ? null : (givenKey ?? newKey())
   const toolsIn = project?.tools === true ? project.dir : null
 
+  // Each phase of the start that takes a second or more is logged.
+  const lap = startupLaps(log)
   // The config layers that do not change while the host runs, read once.
   // The project's copies are read once the project is open (`openProject`).
   const start = await readStartLayers(SETTINGS, where, env)
@@ -350,6 +352,7 @@ export async function startHost({
     await rm(sshDir, { recursive: true, force: true })
     throw new HostRefused(found.words)
   }
+  lap("the project and the lane VM")
 
   // --- transport + exchange ------------------------------------------------
   const serverTransport = new WebsocketServerTransport()
@@ -375,6 +378,7 @@ export async function startHost({
   // Each stored document's schema, checked before anything opens one: opened
   // under a changed schema, a dropped field's data goes at the next compaction.
   const stored = await readStored(store)
+  lap("opening the store")
   const openPlan = planStoredOpen(stored)
   if (openPlan.kind === "refuse") {
     await store.close()
@@ -410,6 +414,7 @@ export async function startHost({
     backup: opened.backup,
     log,
   })
+  lap("the store's migrations")
   // The session's records, the directory of roots among them. Each root's
   // document is opened through `docs`, below.
   const session = exchange.get(SESSION_DOC_ID, SessionDoc)
@@ -432,6 +437,7 @@ export async function startHost({
   await whenHydrated(session)
   await whenHydrated(places)
   await whenHydrated(live)
+  lap("loading the session, the places and what is live")
   // Each person's history of moves, per root.
   const histories = createMoveHistories(exchange)
   const docs = hostDocuments({ exchange, session, live, places })
@@ -481,6 +487,7 @@ export async function startHost({
     records,
     start,
   })
+  lap("opening the project and its config")
   const report: HostReport =
     openedProject === null
       ? await folderReport(start, project?.dir ?? null)
@@ -514,6 +521,7 @@ export async function startHost({
     ...(iconConfig.source === "drawn" ? { banner: iconConfig.model } : {}),
     ...(projectRoot === null ? {} : { project: projectRoot }),
   })
+  lap("pi's setup")
   for (const p of piSetup.refusedPackages)
     log(`[host] ${p} is not a folder: the package is not loaded`)
   const setupRecordNow = (r: HostReport) =>
@@ -542,6 +550,7 @@ export async function startHost({
   const threadsNow = readThreads(session)
   const roots = startingLoads({ session, places })
   for (const root of roots) await docs.root(root)
+  lap("opening the roots")
   const total = new Set([...threadsNow.values()].map(t => t.root)).size
   log(`[host] ${rootsOpenedWords({ opened: roots.length, total })}`)
   // The directory follows the roots opened above as well as those opened
@@ -620,6 +629,7 @@ export async function startHost({
     piSetup,
     ensureNames: names.ensure,
   })
+  lap("starting lane work")
 
   let relaysLate: Relays | null = null
   const relaysNow = (): Relays => {

@@ -290,6 +290,15 @@ export const mutations: readonly Mutation[] = [
     expect:
       "acceptedOfferCommitsRevset: accepted sources above the commit the base holds",
   },
+  // ── slow commands told ──
+  {
+    name: "a step's own commands are not timed",
+    file: "packages/jj/owner.ts",
+    from: "await executeRepo(root, steps, timed)",
+    to: "await executeRepo(root, steps)",
+    command: ["pnpm", "exec", "vitest", "run", "packages/jj/owner.test.ts"],
+    expect: "every command over the threshold is told",
+  },
   // ── pnpm tidy ──
   {
     name: "a tidy collects with --expire=now",
