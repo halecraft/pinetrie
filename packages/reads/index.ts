@@ -38,9 +38,9 @@ import {
   messageText,
   type NoteColumnId,
   type NoteColumnRecord,
-  type OfferRecord,
   type PlanMode,
   type ProjectRecord,
+  type ProposedChangesRecord,
   parseCardId,
   parseMentions,
   promptOf,
@@ -92,11 +92,11 @@ import {
   MARK,
   NAME,
   NOTE_COLUMN,
-  OFFER,
   PARTICIPANT,
   PICTURE,
   PROJECT,
   PROJECT_KEY,
+  PROPOSED_CHANGES,
   participants,
   promptAuthor,
   QUEUE_HOLD,
@@ -730,10 +730,11 @@ export const readLaneSnapshots = (
     .sort((a, b) => (a.entry < b.entry ? 1 : -1))
     .flatMap(r => (r.snapshot === null ? [] : [r.snapshot]))
 
-/** Each lane's offer in your repo, by lane. */
-export const readOffers = (
+/** Each lane's proposed changes in your repo, by lane. */
+export const readProposedByLane = (
   doc: SessionDocHandle,
-): ReadonlyMap<ThreadId, OfferRecord> => readRecords(doc, OFFER)
+): ReadonlyMap<ThreadId, ProposedChangesRecord> =>
+  readRecords(doc, PROPOSED_CHANGES)
 
 /** Accepted work as the host last read it; null before it wrote one. */
 export const readAccepted = (doc: SessionDocHandle): AcceptedRecord | null =>

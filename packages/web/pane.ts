@@ -35,7 +35,7 @@ export type BlockAddress = Extract<Address, { readonly kind: "block" }>
  * which has no entry yet) by its blob.
  */
 export type PaneSubject =
-  | { readonly kind: "offer" }
+  | { readonly kind: "strip" }
   | { readonly kind: "ask"; readonly ask: EntryId }
   | { readonly kind: "block"; readonly address: BlockAddress }
   | {
@@ -58,8 +58,8 @@ export type PaneSubject =
  */
 export function paneKey(subject: PaneSubject): string {
   switch (subject.kind) {
-    case "offer":
-      return "offer"
+    case "strip":
+      return "strip"
     case "ask":
       return `ask:${subject.ask}`
     case "block":
@@ -97,8 +97,8 @@ export type PaneView =
   | { readonly kind: "text"; readonly src: string; readonly title: string }
 
 export interface PaneFacts {
-  /** The strip's review and its line, while the offer has one. */
-  readonly offer: {
+  /** The work strip's review and its line, while the strip has one. */
+  readonly strip: {
     readonly target: ReviewTarget
     readonly line: string
   } | null
@@ -109,7 +109,7 @@ export interface PaneFacts {
 }
 
 /**
- * What to draw for `subject`, or null when it is gone: the offer has no
+ * What to draw for `subject`, or null when it is gone: the strip has no
  * review, the column no longer draws the message, an ask has no span, the
  * message has no such table. Null closes the pane.
  */
@@ -118,8 +118,8 @@ export function paneView(
   facts: PaneFacts,
 ): PaneView | null {
   switch (subject.kind) {
-    case "offer":
-      return facts.offer === null ? null : { kind: "review", ...facts.offer }
+    case "strip":
+      return facts.strip === null ? null : { kind: "review", ...facts.strip }
     case "ask": {
       const target = facts.askTarget(subject.ask)
       return target === null

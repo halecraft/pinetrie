@@ -171,7 +171,7 @@ export interface LaneHooks {
     path: string,
     choose: "ours" | "theirs" | "base",
   ): Promise<ToolAnswer>
-  /** `split_offer` was called: the host's answer. */
+  /** `split_proposed_changes` was called: the host's answer. */
   askSplit(lane: ThreadId): Promise<ToolAnswer>
   /** `ask` was called: the host relays it, and answers at once. */
   ask(lane: ThreadId, to: string, text: string): Promise<ToolAnswer>

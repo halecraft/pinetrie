@@ -1,6 +1,6 @@
 // interface/outcome-words — what the page says when the host answered a command
-// it waited on with a refusal or a failure: the work strip's offer commands
-// and the publish button's toast both say it this way.
+// it waited on with a refusal or a failure: the work strip's commands on
+// proposed changes and the publish button's toast both say it this way.
 
 import type { Unsuccessful } from "@pinetrie/session"
 

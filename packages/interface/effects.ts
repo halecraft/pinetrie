@@ -13,7 +13,7 @@ import type {
   LaneView,
   MoveDirection,
   MoveTarget,
-  OfferAction,
+  ProposedChangesAction,
   QueueHoldChange,
   QueueMove,
   ReferenceCardId,
@@ -190,11 +190,11 @@ export type Effect =
   | { readonly kind: "select"; readonly slot: number }
   /** Open the selected slot's card in your inventory: a thread's read-only preview. */
   | { readonly kind: "openSelected" }
-  /** An offer action, which the session tracks (`acting`). */
+  /** An action on proposed changes, which the session tracks (`acting`). */
   | {
-      readonly kind: "offer"
+      readonly kind: "proposed"
       readonly lane: ThreadId
-      readonly action: OfferAction
+      readonly action: ProposedChangesAction
       readonly to: string | null
     }
   /** Once this tab holds entry `entry`, show it (`openAt`). */

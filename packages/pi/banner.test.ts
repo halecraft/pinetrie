@@ -147,7 +147,7 @@ describe("banners in a harness", () => {
                   throw new Error("no conflict here")
                 },
                 askSplit: async () => {
-                  throw new Error("no split_offer here")
+                  throw new Error("no split_proposed_changes here")
                 },
                 ask: async () => {
                   throw new Error("unused")

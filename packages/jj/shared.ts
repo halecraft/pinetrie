@@ -14,19 +14,19 @@ import { describeFailure, lines, type Runner } from "@pinetrie/lanes"
 import { acceptedFacts } from "./accepted.ts"
 import { revsetName } from "./lane/names.ts"
 import {
-  ACCEPTED_OFFER_COMMIT_ROW,
-  parseAcceptedOfferCommits,
+  ACCEPTED_THREAD_COMMIT_ROW,
+  parseAcceptedThreadCommits,
 } from "./lane/revisions.ts"
-import { ACCEPTED_OFFER_COMMITS } from "./plan.ts"
+import { ACCEPTED_THREAD_COMMITS } from "./plan.ts"
 
-/** A commit on accepted work carrying accepted offers' `Pinetrie-Source` trailers. */
-export interface AcceptedOfferCommit {
+/** A commit on accepted work carrying accepted proposed changes' `Pinetrie-Source` trailers. */
+export interface AcceptedThreadCommit {
   readonly commit: CommitId
-  /** The lane commits it names, from every paragraph: a squash of two accepted offers keeps both. */
+  /** The lane commits it names, from every paragraph: a squash of two accepted proposed changes keep both. */
   readonly sources: readonly CommitId[]
 }
 
-/** An accepted-offer commit on accepted work that names lanes but no sources: accepted before offers carried their ledger. */
+/** An accepted thread commit on accepted work that names lanes but no sources: accepted before proposed changes carried their ledger. */
 export interface Untraced {
   readonly commit: CommitId
   readonly lanes: readonly ThreadId[]
@@ -37,11 +37,11 @@ export interface SharedFacts {
   readonly op: string
   /** What `acceptedFacts` reads: accepted work, its config, the WIPs, your work's state. */
   readonly accepted: AcceptedFacts
-  /** Every accepted-offer commit on accepted work that names sources. */
-  readonly acceptedOfferCommits: readonly AcceptedOfferCommit[]
-  /** Every accepted-offer commit on accepted work that names none (`untracedLanes`). */
+  /** Every accepted thread commit on accepted work that names sources. */
+  readonly acceptedThreadCommits: readonly AcceptedThreadCommit[]
+  /** Every accepted thread commit on accepted work that names none (`untracedLanes`). */
   readonly untraced: readonly Untraced[]
-  /** Files `@` changes: an offer's `yourEdits` is its files that are here. */
+  /** Files `@` changes: proposed changes' `yourEdits` is its files that are here. */
   readonly editing: ReadonlySet<string>
 }
 
@@ -56,12 +56,12 @@ export async function readShared(
     "log",
     "--no-graph",
     "-r",
-    `::present(${revsetName(repoConfig.acceptedBookmark)}) & ${ACCEPTED_OFFER_COMMITS}`,
+    `::present(${revsetName(repoConfig.acceptedBookmark)}) & ${ACCEPTED_THREAD_COMMITS}`,
     "-T",
-    ACCEPTED_OFFER_COMMIT_ROW,
+    ACCEPTED_THREAD_COMMIT_ROW,
   ])
   if (!ran.ok) throw new Error(describeFailure("jj log", ran))
-  const accepted = parseAcceptedOfferCommits(ran.stdout).map(
+  const accepted = parseAcceptedThreadCommits(ran.stdout).map(
     ({ commit, description }) => ({
       commit,
       sources: sourcesOf(description),
@@ -73,7 +73,7 @@ export async function readShared(
   return {
     op,
     accepted: await acceptedFacts(jj, git, repoConfig),
-    acceptedOfferCommits: accepted
+    acceptedThreadCommits: accepted
       .filter(t => t.sources.length > 0)
       .map(({ commit, sources }) => ({ commit, sources })),
     untraced: accepted

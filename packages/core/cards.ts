@@ -36,8 +36,8 @@ export const CATCH_UP_COMMANDS: readonly CatchUpCommand[] = [
 
 /**
  * A command a card is sent through; a plain card has none. The catch-up
- * commands, and `split`, which splits the thread's offer into a stack in a run
- * of its own, its text the person's intent.
+ * commands, and `split`, which splits the thread's proposed changes into a
+ * stack in a run of its own, its text the person's intent.
  */
 export type CardCommand = CatchUpCommand | "split"
 export const CARD_COMMANDS: readonly CardCommand[] = [
@@ -50,17 +50,17 @@ export const isCatchUp = (command: CardCommand): command is CatchUpCommand =>
   (CATCH_UP_COMMANDS as readonly string[]).includes(command)
 
 /**
- * What a command on a thread's offer did, as a fact in the thread: an
- * acceptance, with the change it was added as, the bookmark it moved and what
- * that bookmark is to the thread; or a description asked for again, a squash, a
- * refresh. `by` is who asked.
+ * What a command on a thread's proposed changes did, as a fact in the thread:
+ * an acceptance, with the change it was added as, the bookmark it moved and
+ * what that bookmark is to the thread; or a description asked for again, a
+ * squash, a refresh. `by` is who asked.
  */
-export type OfferFact =
+export type ProposedChangesFact =
   | {
       readonly kind: "accepted"
       readonly lane: ThreadId
       readonly by: WriterId
-      /** The change id the offer was added as. */
+      /** The change id the proposed changes were added as. */
       readonly as: string
       readonly bookmark: string
       readonly to: CatchUpFrom
@@ -73,11 +73,12 @@ export type OfferFact =
 
 /**
  * A fact on its way into its thread: what a fact card holds, appended as an
- * entry when the thread's end consumes it. What a command on the offer did, who
- * stopped a run, a member dismissed or gone, or a budget spent.
+ * entry when the thread's end consumes it. What a command on the proposed
+ * changes did, who stopped a run, a member dismissed or gone, or a budget
+ * spent.
  */
 export type QueuedFact =
-  | OfferFact
+  | ProposedChangesFact
   | StopFact
   | MemberFact
   | BudgetSpentFact

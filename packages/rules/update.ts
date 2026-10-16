@@ -49,10 +49,10 @@ export const folderIncoming = (from: "folder" | "parent"): string =>
     : "the newest work of the thread this one branched from"
 
 /**
- * The update message, for the model: what came in, and which of this
- * thread's files changed, or that none did. The commits are empty when all
- * that came in was accepted offers of work the copy holds, which a catch-up
- * joins and does not list (`withoutAcceptedOfferCommits`, `@pinetrie/lanes`).
+ * The update message, for the model: what came in, and which of this thread's
+ * files changed, or that none did. The commits are empty when all that came in
+ * was accepted thread commits of work the copy holds, which a catch-up joins
+ * and does not list (`withoutAcceptedThreadCommits`, `@pinetrie/lanes`).
  */
 export function encodeUpdate(
   details: UpdateDetails,
@@ -60,7 +60,7 @@ export function encodeUpdate(
 ): UpdateMessage {
   const commits =
     details.commits.length === 0
-      ? "- only work this copy already holds, as accepted offers\n"
+      ? "- only work this copy already holds, as accepted thread commits\n"
       : details.commits.map(c => `- ${firstLine(c, 200)}\n`).join("")
   const what = incomingWords(details.from)
   const files = details.files.map(f => `- ${f}\n`).join("")

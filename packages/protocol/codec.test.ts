@@ -290,21 +290,21 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
     },
     { kind: "retitle", task: TEST_TASK },
     {
-      kind: "offer",
+      kind: "proposed",
       lane: threadIdFor("abc"),
       action: "accept",
       to: null,
       seen: { ledger: null, conflicted: false },
     },
     {
-      kind: "offer",
+      kind: "proposed",
       lane: threadIdFor("abc"),
       action: "accept",
       to: "wip/search",
       seen: SEEN,
     },
     {
-      kind: "offer",
+      kind: "proposed",
       lane: threadIdFor("abc"),
       action: "squash",
       to: null,
@@ -555,11 +555,11 @@ test("a chat's malformed pinned cards are refused", () => {
   assert.equal(chat("").kind, "chat")
 })
 
-test("an acceptance that does not say which offer it was shown, well formed, is refused", () => {
+test("an acceptance that does not say which proposed changes it was shown, well formed, is refused", () => {
   const accept = (seen: string) =>
     decodeCommand({
       ...EMPTY_COMMAND,
-      kind: "offer",
+      kind: "proposed",
       lane: threadIdFor("abc"),
       mode: "accept",
       seen,
@@ -574,7 +574,7 @@ test("an acceptance that does not say which offer it was shown, well formed, is 
   ])
     assert.equal((accept(bad) as { kind: string }).kind, "refused", bad)
   assert.deepEqual(accept(JSON.stringify(SEEN)), {
-    kind: "offer",
+    kind: "proposed",
     lane: threadIdFor("abc"),
     action: "accept",
     to: null,
@@ -596,7 +596,7 @@ test("encodeOutcome -> decodeReply round-trips every outcome", () => {
     { kind: "marked" },
     { kind: "retitling" },
     { kind: "accepted" },
-    { kind: "offered" },
+    { kind: "proposed" },
     { kind: "reserved" },
     { kind: "seen" },
     { kind: "accepted-moved" },

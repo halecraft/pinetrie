@@ -22,7 +22,7 @@ export interface LiveInput {
     readonly ours: PointId
     readonly theirs: PointId
   }[]
-  readonly offers: readonly {
+  readonly proposed: readonly {
     readonly start: PointId
     readonly tip: PointId
   }[]
@@ -33,9 +33,9 @@ export interface LiveInput {
 }
 
 /**
- * The states whose snapshots are kept: each folder lane's tip, start, and
- * merge bases with accepted work's newest state and with its parent lane's
- * newest; every conflict's three states; each offer's two; and accepted
+ * The states whose snapshots are kept: each folder lane's tip, start, and merge
+ * bases with accepted work's newest state and with its parent lane's newest;
+ * every conflict's three states; each proposed changes' two; and accepted
  * work's newest `keep` line states, along first parents. A virtual base no
  * conflict names is not kept: it is made again when a merge needs it.
  */
@@ -51,7 +51,7 @@ export function liveStates(input: LiveInput): ReadonlySet<PointId> {
         live.add(b)
   }
   for (const c of input.conflicts) live.add(c.base).add(c.ours).add(c.theirs)
-  for (const o of input.offers) live.add(o.start).add(o.tip)
+  for (const o of input.proposed) live.add(o.start).add(o.tip)
   let line: PointId | undefined = input.folderNewest
   for (
     let kept = 0;

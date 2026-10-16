@@ -1,6 +1,6 @@
-// interface/attention — what needs you, and where, decided. A verdict clears
-// by reading past it, an offer by accepting or withdrawing it, and either by
-// "not needed".
+// interface/attention — what needs you, and where, decided. A verdict clears by
+// reading past it, proposed changes by accepting or withdrawing it, and either
+// by "not needed".
 
 import type {
   EntryId,
@@ -14,7 +14,7 @@ import type {
 } from "@pinetrie/core"
 import { PRODUCT_NAME } from "@pinetrie/core"
 import type { Attention } from "@pinetrie/schema"
-import type { OpenOffer, SshAsk } from "./app-view.ts"
+import type { OpenProposedChanges, SshAsk } from "./app-view.ts"
 
 /** Lowest first: `highest` and every comparison read this order. */
 export const LEVELS = ["worthARead", "needsYou"] as const
@@ -78,7 +78,8 @@ export type Raised =
       readonly ask: EntryId
     }
   | {
-      readonly kind: "offer"
+      /** Open proposed changes, ready to accept. */
+      readonly kind: "ready"
       /** Its `ledger.source`: what "not needed" dismisses; null, it cannot be. */
       readonly source: string | null
     }
@@ -99,7 +100,7 @@ export interface AttentionInput {
   /** Each thread's writers (`threadWriters`). */
   readonly writers: ReadonlyMap<ThreadId, readonly WriterId[]>
   readonly verdicts: ReadonlyMap<ThreadId, VerdictRecord>
-  readonly offers: readonly OpenOffer[]
+  readonly openProposed: readonly OpenProposedChanges[]
   /** Lanes waiting for their owner's answer about ssh (`appView`'s `sshAsks`). */
   readonly sshAsks: readonly SshAsk[]
   /** Whom the host names its owner: the asks are theirs alone. */
@@ -121,10 +122,11 @@ const followed = (input: AttentionInput, lane: ThreadId): boolean =>
   !input.archived.has(lane) && follows(input.me, input.writers.get(lane) ?? [])
 
 /**
- * Everything raised for you, verdicts and offers apart: a thread can raise
- * both. Only a thread you follow raises anything, and only while its agent
- * is idle and its task is not archived. Before your document's first write
- * (`since` ""), where you started is not known, and nothing is raised.
+ * Everything raised for you, verdicts and ready proposed changes apart: a
+ * thread can raise both. Only a thread you follow raises anything, and only
+ * while its agent is idle and its task is not archived. Before your document's
+ * first write (`since` ""), where you started is not known, and nothing is
+ * raised.
  */
 export function attentionOf(input: AttentionInput): readonly Item[] {
   const { me, person } = input
@@ -144,15 +146,15 @@ export function attentionOf(input: AttentionInput): readonly Item[] {
       raised: { kind: "verdict", verdict: v.verdict, ask: v.ask },
     })
   }
-  for (const o of input.offers) {
+  for (const o of input.openProposed) {
     if (!yours(o.lane)) continue
-    if (o.source !== null && person.dismissedOffers.get(o.lane) === o.source)
+    if (o.source !== null && person.dismissedReady.get(o.lane) === o.source)
       continue
     items.push({
       lane: o.lane,
       end: o.end,
       level: "needsYou",
-      raised: { kind: "offer", source: o.source },
+      raised: { kind: "ready", source: o.source },
     })
   }
   // An ask reaches its owner whether or not they follow the thread, and
@@ -306,7 +308,7 @@ export function attentionWords(
   raised: Raised,
   nameOf: (writer: WriterId) => string,
 ): string {
-  if (raised.kind === "offer") return "work ready to accept"
+  if (raised.kind === "ready") return "changes ready to accept"
   if (raised.kind === "ssh")
     return `wants your ssh for ${raised.host ?? "a host"}`
   const v = raised.verdict

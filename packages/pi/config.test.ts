@@ -83,7 +83,7 @@ test("a scripted model with nothing listed loads nothing of pi's, and still has 
     "pinetrie:skill:ask-digest",
     "pinetrie:skill:column-banner",
     "pinetrie:skill:commit-message",
-    "pinetrie:skill:offer-stack",
+    "pinetrie:skill:proposed-changes-stack",
     "pinetrie:skill:resolve-conflicts",
     "pinetrie:skill:tab-title",
   ])

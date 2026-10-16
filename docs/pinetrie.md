@@ -154,10 +154,10 @@ it, and the ADR says why. Every decision in force is in `docs/adrs/`, and
 | The host is the only writer of the session's documents; clients send commands. A lane belongs to its thread, and is never moved. | ADR-0120, ADR-0023 | `ARCHITECTURE.md`, `packages/schema/TECHNICAL.md` |
 | Everything unsent is a card, and a card's place has one owner at a time: the host, or a person's inventory. | ADR-0048, ADR-0059 | `packages/schema/TECHNICAL.md` |
 | One owner writes your repo, and the host never touches the working copy or `@` except in a publish with `publish.catchUp` on, as you. An acceptance is a forward bookmark move. | ADR-0065, ADR-0104 | `docs/the-jujutsu-repo.md`, `packages/jj/TECHNICAL.md` |
-| What the host cannot tell, it does not act on: an unknown answer never builds an offer. | ADR-0067 | `packages/jj/TECHNICAL.md` |
+| What the host cannot tell, it does not act on: an unknown answer never builds proposed changes. | ADR-0067 | `packages/jj/TECHNICAL.md` |
 | Every thread's agent works in a lane of its own; nothing works directly in a directory. | ADR-0102, ADR-0130 | `ARCHITECTURE.md`, `packages/lanes/TECHNICAL.md` |
 | What a person sees and does is decided in `@pinetrie/interface`, with no DOM and no React. | ADR-0093 | `packages/interface/TECHNICAL.md` |
-| One word per concept: accepted work, accept, offer, WIP, publish, catch up. | ADR-0100 | `docs/glossary.md` |
+| One word per concept: accepted work, accept, proposed changes, WIP, publish, catch up. | ADR-0100 | `docs/glossary.md` |
 
 ---
 
@@ -544,7 +544,7 @@ context.**
   (ADR-0150). A jj repo with no git directory beside it is refused. A
   folder with no jj repo is served as a folder project (ADR-0142): its
   accepted work is the folder, a thread starts from it as it is, and its
-  offer is reviewed as files; accepting one is not built yet. The
+  proposed changes are reviewed as files; accepting one is not built yet. The
   agent has its tools, and each
   thread's agent works in its own Linux container (ADR-0034), on a disk
   cloned from the turn it branched at: a root thread's starts from your
@@ -599,25 +599,25 @@ context.**
 - **Accepting a thread's work** (ADR-0038 to ADR-0040, ADR-0047, ADR-0100;
   the words are `docs/glossary.md`): each thread has a two-word name, shown
   in its column's header from before its first message (ADR-0057), and
-  keeps an **offer** in your repo, on the thread's base, under the bookmark
-  `pinetrie-offer/<name>`. While the thread works, the offer reads
+  keeps an **proposed changes** in your repo, on the thread's base, under the bookmark
+  `pinetrie-proposed/<name>`. While the thread works, the proposed changes read
   `WIP (<name>): <its first message>` and grows in place; when a run ends,
   an agent writes its commit message. Before you accept it, press the
-  offer's line in the work strip: the column's pane shows its message, its
+  proposed changes' line in the work strip: the column's pane shows its message, its
   files (flagging those that conflict with your committed work, and those
   you are editing) and every file's diff. Or find its bookmark, which a
-  press copies, in jj or jjui. **accept** (or **accept into wip/…**), in the
+  press copies, in jj or jjui. **accept changes** (or **accept changes into wip/…**), in the
   work strip at its column's foot, moves **accepted work**
   (`pinetrie-accepted`) or the WIP forward to it, and your `@` stays where
-  it is (ADR-0060). Reword, squash or split the offer like any commit of
+  it is (ADR-0060). Reword, squash or split the proposed changes like any commit of
   yours before then; the host then leaves it alone. **split into a stack**
   has the agent rewrite it as reviewable revisions, in a run of its own:
   while the thread works it waits in the queue, and the agent can ask for
-  one too (ADR-0080). The thread is told what you did to its offer, an
+  one too (ADR-0080). The thread is told what you did to its proposed changes, an
   acceptance included, and when accepted work has moved on: the agent can
   catch up itself (`catch_up`). **publish** moves `main` forward to
   accepted work (ADR-0090, ADR-0099). Set `accepted.bookmark` in
-  `pinetrie.json` to have offers land on another bookmark instead;
+  `pinetrie.json` to have proposed changes land on another bookmark instead;
   `jj git push --all` would push it: push by name.
 - **Sending your work to a thread:** the work strip's `⋯` offers **update
   from my work**: your `@`, uncommitted edits included, merged into the

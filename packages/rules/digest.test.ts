@@ -72,18 +72,18 @@ describe("digestOf and digestText", () => {
   test.each<[string, string, DigestBody | null]>([
     [
       "a headline alone",
-      "Moved offers out of core",
+      "Moved proposed changes out of core",
       {
-        headline: "Moved offers out of core",
+        headline: "Moved proposed changes out of core",
         points: [],
       },
     ],
     [
       "a headline and points, their markdown kept",
-      "Moved offers out of core\n\n- `core/offers.ts` is new\n* fixtures fixed",
+      "Moved proposed changes out of core\n\n- `core/proposed.ts` is new\n* fixtures fixed",
       {
-        headline: "Moved offers out of core",
-        points: ["`core/offers.ts` is new", "fixtures fixed"],
+        headline: "Moved proposed changes out of core",
+        points: ["`core/proposed.ts` is new", "fixtures fixed"],
       },
     ],
     [
@@ -112,9 +112,9 @@ describe("digestOf and digestText", () => {
     ],
     [
       "a headline with a colon inside",
-      "offer: scripted",
+      "proposed changes: scripted",
       {
-        headline: "offer: scripted",
+        headline: "proposed changes: scripted",
         points: [],
       },
     ],

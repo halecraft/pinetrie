@@ -1,6 +1,6 @@
 // host/folder/file-at — a file read at a site of a folder project: your
 // folder's newest state, a lane's newest work, or the state of accepted work
-// that lane's work is offered against.
+// that lane's proposed changes are computed against.
 
 import type { PointId, StateRecord } from "@pinetrie/core"
 import {

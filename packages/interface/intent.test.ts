@@ -974,10 +974,10 @@ describe("planIntent", () => {
         { kind: "armFocus", key: { kind: "card", card: yours.id } },
       ])
     })
-    test("an offer's other buttons are one command each", () => {
+    test("proposed changes' other buttons are one command each", () => {
       expect(
-        plan(column({ kind: "offer", lane, action: "squash", to: null })),
-      ).toEqual([{ kind: "offer", lane, action: "squash", to: null }])
+        plan(column({ kind: "proposed", lane, action: "squash", to: null })),
+      ).toEqual([{ kind: "proposed", lane, action: "squash", to: null }])
     })
     test("continue on accepted work queues its own command", () => {
       expect(

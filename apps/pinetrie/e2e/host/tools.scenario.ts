@@ -353,8 +353,8 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     await th.quiet()
     const afterRestart = await storedRecords(stored, SESSION_DOC_ID)
     // One whole document, and fewer records than it opened: what the host
-    // writes once it has compacted (the offers' refresh, read from the repo)
-    // follows it.
+    // writes once it has compacted (the proposed changes' refresh, read from
+    // the repo) follows it.
     check(
       "a starting host compacts the session it opened",
       beforeRestart.records > 2 &&

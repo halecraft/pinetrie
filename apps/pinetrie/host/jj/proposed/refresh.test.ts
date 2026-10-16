@@ -19,18 +19,18 @@ import {
 import {
   DEFAULT_REPO,
   laneTipRef,
-  offerBookmark,
+  proposedBookmark,
   startRepoOwner,
 } from "@pinetrie/jj"
 import { lines, run } from "@pinetrie/lanes"
 import type { PiSetup } from "@pinetrie/pi"
-import { readBases, readOffers } from "@pinetrie/reads"
+import { readBases, readProposedByLane } from "@pinetrie/reads"
 import { NAME, setRecord } from "@pinetrie/rules"
 import { afterAll, expect, test } from "vitest"
 import { applyWrites, basics, putValue, record } from "../../fakes.ts"
 import type { Records } from "../../records.ts"
 import { createRefresh } from "./refresh.ts"
-import { createOfferDeps } from "./state.ts"
+import { createProposedChangesDeps } from "./state.ts"
 
 const LANE = threadIdFor("1")
 const THREAD = "vernal-pine" as ThreadName
@@ -90,8 +90,9 @@ async function yourRepo(tag: string) {
 }
 
 /**
- * Refresh `lane`'s offer as the host does, until a round writes nothing to
- * your repo: it must by the second. Then the offer's files, or null for none.
+ * Refresh `lane`'s proposed changes as the host does, until a round writes
+ * nothing to your repo: it must by the second. Then the proposed changes'
+ * files, or null for none.
  */
 async function settles(dir: string, lane: ThreadId, name: ThreadName) {
   const b = basics()
@@ -101,7 +102,7 @@ async function settles(dir: string, lane: ThreadId, name: ThreadName) {
   })
   const owner = startRepoOwner({ root: dir, repoConfig: DEFAULT_REPO })
   try {
-    const deps = createOfferDeps({
+    const deps = createProposedChangesDeps({
       owner,
       repoConfig: DEFAULT_REPO,
       basics: b,
@@ -129,14 +130,14 @@ async function settles(dir: string, lane: ThreadId, name: ThreadName) {
       const ran = await ops.jj([
         "diff",
         "-r",
-        `present(${offerBookmark(name)})`,
+        `present(${proposedBookmark(name)})`,
         "--name-only",
       ])
       const bookmarked = await ops.jj([
         "log",
         "--no-graph",
         "-r",
-        `present(${offerBookmark(name)})`,
+        `present(${proposedBookmark(name)})`,
         "-T",
         "commit_id",
       ])
@@ -144,7 +145,7 @@ async function settles(dir: string, lane: ThreadId, name: ThreadName) {
     })
     return {
       files,
-      record: readOffers(b.session).get(lane) ?? null,
+      record: readProposedByLane(b.session).get(lane) ?? null,
       base: readBases(b.session).get(lane) ?? null,
     }
   } finally {
@@ -165,7 +166,7 @@ test("a catch-up that merged your acceptance of the lane's work leaves nothing t
     `feat: the lane's\n\nPinetrie-Thread: ${THREAD}\nPinetrie-Lane: ${LANE}\nPinetrie-Entry: e1\nPinetrie-Source: ${work}\nPinetrie-Start: ${you.base}\n`,
   )
   await you.moveAccepted(accepted)
-  // The lane catches up: a merge of its work and your accepted-offer
+  // The lane catches up: a merge of its work and your accepted thread
   // commit. Its range from that commit has a gap, which jj refuses to diff.
   const merged = await you.commit(
     [work, accepted],
@@ -176,8 +177,8 @@ test("a catch-up that merged your acceptance of the lane's work leaves nothing t
     }),
   )
   await you.setTip(LANE, merged)
-  // The empty offer an older host built from it, when it read jj's refusal as
-  // work, as the host's own.
+  // The empty proposed changes an older host built from it, when it read jj's
+  // refusal as work, as the host's own.
   await run(
     "jj",
     [
@@ -201,7 +202,7 @@ test("a catch-up that merged your acceptance of the lane's work leaves nothing t
       `operation.username=${HOST_OPERATOR}`,
       "bookmark",
       "create",
-      offerBookmark(THREAD),
+      proposedBookmark(THREAD),
       "-r",
       "@",
     ],
@@ -215,14 +216,14 @@ test("a catch-up that merged your acceptance of the lane's work leaves nothing t
   })
 }, 60_000)
 
-test("an accepted-offer commit with no Pinetrie-Source builds nothing until the lane catches up past it", async () => {
+test("an accepted thread commit with no Pinetrie-Source builds nothing until the lane catches up past it", async () => {
   const you = await yourRepo("untraced")
   const work = await you.commit(
     [you.base],
     { "a.txt": "the lane's\n" },
     `turn\n\nPinetrie-Lane: ${LANE}\nPinetrie-Entry: e1\n`,
   )
-  // Accepted before offers carried their ledger: no source, no start.
+  // Accepted before proposed changes carried their ledger: no source, no start.
   const accepted = await you.commit(
     [you.base],
     { "a.txt": "the lane's\n" },
@@ -236,8 +237,8 @@ test("an accepted-offer commit with no Pinetrie-Source builds nothing until the 
     `turn\n\nPinetrie-Lane: ${LANE}\nPinetrie-Entry: e2\n`,
   )
   await you.setTip(LANE, more)
-  // From its old base, the offer would replay a.txt onto yours. Catching up
-  // is the way on, and brings your a.txt.
+  // From its old base, the proposed changes would replay a.txt onto yours.
+  // Catching up is the way on, and brings your a.txt.
   expect(await settles(you.dir, LANE, THREAD)).toEqual({
     files: null,
     record: null,
@@ -262,7 +263,7 @@ test("an accepted-offer commit with no Pinetrie-Source builds nothing until the 
   })
 }, 60_000)
 
-test("work you landed yourself leaves the offer held: kept, with no files, and settled", async () => {
+test("work you landed yourself leaves the proposed changes held: kept, with no files, and settled", async () => {
   const you = await yourRepo("held")
   const work = await you.commit(
     [you.base],
@@ -307,11 +308,11 @@ const commitsAt = async (dir: string, revset: string) =>
       )
     ).stdout,
   )
-/** The host's version of `name`'s offer, tracked, as a revset. */
+/** The host's version of `name`'s proposed changes, tracked, as a revset. */
 const tracked = (name: ThreadName) =>
-  `tracked_remote_bookmarks(exact:"${offerBookmark(name)}", remote=exact:"pinetrie-host")`
+  `tracked_remote_bookmarks(exact:"${proposedBookmark(name)}", remote=exact:"pinetrie-host")`
 
-test("an offer the host builds is its version, tracked, and the round after writes nothing", async () => {
+test("proposed changes the host builds are its version, tracked, and the round after writes nothing", async () => {
   const you = await yourRepo("marked")
   const work = await you.commit(
     [you.base],
@@ -322,11 +323,14 @@ test("an offer the host builds is its version, tracked, and the round after writ
   expect(await settles(you.dir, LANE, THREAD)).toMatchObject({
     files: ["a.txt"],
   })
-  const offered = await commitsAt(you.dir, `present(${offerBookmark(THREAD)})`)
-  expect(await commitsAt(you.dir, tracked(THREAD))).toEqual(offered)
+  const proposed = await commitsAt(
+    you.dir,
+    `present(${proposedBookmark(THREAD)})`,
+  )
+  expect(await commitsAt(you.dir, tracked(THREAD))).toEqual(proposed)
 }, 60_000)
 
-test("an offer the host built before offers had a version of the host's is marked by its refresh", async () => {
+test("proposed changes the host built before proposed changes had a version of the host's is marked by its refresh", async () => {
   const you = await yourRepo("legacy")
   const work = await you.commit(
     [you.base],
@@ -341,13 +345,17 @@ test("an offer the host built before offers had a version of the host's is marke
   await you.jj(
     "bookmark",
     "untrack",
-    offerBookmark(THREAD),
+    proposedBookmark(THREAD),
     "--remote",
     "pinetrie-host",
   )
   await run(
     "git",
-    ["update-ref", "-d", `refs/remotes/pinetrie-host/${offerBookmark(THREAD)}`],
+    [
+      "update-ref",
+      "-d",
+      `refs/remotes/pinetrie-host/${proposedBookmark(THREAD)}`,
+    ],
     { cwd: you.dir },
   )
   await you.jj("git", "import")
@@ -356,11 +364,11 @@ test("an offer the host built before offers had a version of the host's is marke
     files: ["a.txt"],
   })
   expect(await commitsAt(you.dir, tracked(THREAD))).toEqual(
-    await commitsAt(you.dir, `present(${offerBookmark(THREAD)})`),
+    await commitsAt(you.dir, `present(${proposedBookmark(THREAD)})`),
   )
 }, 60_000)
 
-test("you deleted the offer's bookmark and the lane has nothing to offer: the host's version is forgotten", async () => {
+test("you deleted the proposed changes' bookmark and the lane has nothing to offer: the host's version is forgotten", async () => {
   const you = await yourRepo("left")
   const work = await you.commit(
     [you.base],
@@ -369,7 +377,7 @@ test("you deleted the offer's bookmark and the lane has nothing to offer: the ho
   )
   await you.setTip(LANE, work)
   await settles(you.dir, LANE, THREAD)
-  await you.jj("bookmark", "delete", offerBookmark(THREAD))
+  await you.jj("bookmark", "delete", proposedBookmark(THREAD))
   await you.setTip(LANE, you.base)
   expect(await settles(you.dir, LANE, THREAD)).toMatchObject({
     files: null,
@@ -378,7 +386,7 @@ test("you deleted the offer's bookmark and the lane has nothing to offer: the ho
   expect(
     await commitsAt(
       you.dir,
-      `remote_bookmarks(exact:"${offerBookmark(THREAD)}", remote=exact:"pinetrie-host")`,
+      `remote_bookmarks(exact:"${proposedBookmark(THREAD)}", remote=exact:"pinetrie-host")`,
     ),
   ).toEqual([])
 }, 60_000)

@@ -106,7 +106,7 @@ test("the prompt no longer tells the model to search with bash", () => {
         throw new Error("no conflict here")
       },
       askSplit: async () => {
-        throw new Error("no split_offer here")
+        throw new Error("no split_proposed_changes here")
       },
       ask: async () => {
         throw new Error("unused")
@@ -183,7 +183,7 @@ describe("laneGuidelines", () => {
   test("names no bookmark, which changes when the thread is named", () => {
     const told = text(facts())
     expect(told).toContain("your work as one commit, and never sees")
-    expect(told).not.toContain("pinetrie-offer")
+    expect(told).not.toContain("pinetrie-proposed")
   })
 
   test("one line per shared directory, and none without", () => {
@@ -337,7 +337,7 @@ describe("lanes in a harness", () => {
             throw new Error("no conflict here")
           },
           askSplit: async () => {
-            throw new Error("no split_offer here")
+            throw new Error("no split_proposed_changes here")
           },
           ask: async () => {
             throw new Error("unused")
@@ -593,7 +593,7 @@ describe("lanes in a harness", () => {
             throw new Error("no conflict here")
           },
           askSplit: async () => {
-            throw new Error("no split_offer here")
+            throw new Error("no split_proposed_changes here")
           },
           ask: async () => {
             throw new Error("unused")

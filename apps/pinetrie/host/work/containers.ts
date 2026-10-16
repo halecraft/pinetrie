@@ -25,7 +25,7 @@ import {
 import type { LaneAccess } from "@pinetrie/pi"
 import { readLaneSnapshots, readRunning, readThreadName } from "@pinetrie/reads"
 import { type Basics, failed } from "../basics.ts"
-import type { OfferActs } from "./destination.ts"
+import type { ProposedChangesActs } from "./destination.ts"
 import { removeStaleOutputs } from "./disk.ts"
 import type { LaneRegistry } from "./registry.ts"
 import type { Setup } from "./setup.ts"
@@ -38,7 +38,7 @@ export interface Containers {
   access(lane: ThreadId): LaneAccess | null
   /** Before any run: queue a lane of its own's container to start. */
   beforeRun(lane: ThreadId): void
-  /** After a run: stop its container, and follow its offer. */
+  /** After a run: stop its container, and follow its proposed changes. */
   runEnded(lane: ThreadId): void
   /**
    * Start a lane's container, as `planContainer` decides. A container made
@@ -59,9 +59,9 @@ export function createContainers(deps: {
   readonly registry: LaneRegistry
   /** Work nobody awaits: `quiet` waits for it. */
   readonly keeper: Keeper
-  readonly offers: Pick<OfferActs, "runEnded">
+  readonly proposed: Pick<ProposedChangesActs, "runEnded">
 }): Containers {
-  const { basics, setup, registry, keeper, offers } = deps
+  const { basics, setup, registry, keeper, proposed } = deps
   const { session, docs, log } = basics
 
   // A lane whose use of its owner's identity is taken back: its sessions
@@ -181,7 +181,7 @@ export function createContainers(deps: {
 
     runEnded(lane) {
       if (!registry.isOwn(lane)) return
-      offers.runEnded(lane)
+      proposed.runEnded(lane)
       const handle = registry.handleOf(lane)
       void keeper.track(
         handle.queue

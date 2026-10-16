@@ -29,7 +29,7 @@ import { taskSlot } from "./palette.ts"
 import {
   dropsWords,
   listKey,
-  offeredByTask,
+  openProposedByTask,
   pageTitle,
   type SidebarViewInput,
   sidebarView,
@@ -104,7 +104,7 @@ const input = (over: Partial<Facts> = {}): SidebarViewInput => {
     marks: new Map([[K("r1"), mark]]),
     archived: new Set(),
     work: new Map(),
-    offered: new Map(),
+    proposed: new Map(),
     unsent: none,
     status: new Map(),
     arrivals: { arrived: new Map(), done: new Map() },
@@ -197,9 +197,9 @@ describe("sidebarView", () => {
     expect(done).toMatchObject({ busy: "running", drops: [] })
   })
 
-  test("Move to Done names the threads whose offers it withdraws", () => {
+  test("Move to Done names the threads whose proposed changes it withdraws", () => {
     const amber = "amber-fox" as ThreadName
-    const [r1, r2] = items({ offered: new Map([[K("r1"), [amber]]]) })
+    const [r1, r2] = items({ proposed: new Map([[K("r1"), [amber]]]) })
     const done = (r: typeof r1) =>
       r?.kind === "task"
         ? r.menu.find(i => i.kind === "moveTo" && i.closes)
@@ -212,14 +212,14 @@ describe("sidebarView", () => {
     expect(dropsWords([])).toBe(null)
   })
 
-  test("offeredByTask: each open offer's thread, under its task; one the host has not named yet by its id's end; one in no task left out", () => {
+  test("openProposedByTask: each open proposed changes' thread, under its task; one the host has not named yet by its id's end; one in no task left out", () => {
     const lane = (n: string) => n as ThreadId
     const names = new Map([
       [lane("l1"), "amber-fox" as ThreadName],
       [lane("l2"), "cozy-mallard" as ThreadName],
     ])
     expect(
-      offeredByTask(
+      openProposedByTask(
         [
           { lane: lane("l1") },
           { lane: lane("l2") },
@@ -252,7 +252,7 @@ describe("sidebarView", () => {
       lane: threadIdFor("a"),
       end: entryId("e"),
       level: "needsYou",
-      raised: { kind: "offer", source: cardIdFor("c1") },
+      raised: { kind: "ready", source: cardIdFor("c1") },
     }
     const status = new Map<TaskId, Status>([
       [K("r1"), { kind: "working" }],
@@ -271,7 +271,7 @@ describe("sidebarView", () => {
       lane: threadIdFor("a"),
       end: entryId("e"),
       level: "worthARead",
-      raised: { kind: "offer", source: cardIdFor("c1") },
+      raised: { kind: "ready", source: cardIdFor("c1") },
     }
     const [raised] = items({
       status: new Map([[K("r1"), { kind: "worthARead", item }]]),

@@ -387,8 +387,14 @@ describe("writesIn: the tasks a command writes in", () => {
     ],
     ["a retitle: its task", { kind: "retitle", task: TASK }, [TASK]],
     [
-      "an offer: its lane's task",
-      { kind: "offer", lane: LANE_X, action: "refresh", to: null, seen: null },
+      "proposed changes: its lane's task",
+      {
+        kind: "proposed",
+        lane: LANE_X,
+        action: "refresh",
+        to: null,
+        seen: null,
+      },
       [OTHER_TASK],
     ],
     [

@@ -344,7 +344,8 @@ A person has one document of each kind in `PERSON_DOC_KINDS`, at
 `@pinetrie/protocol/writers`): each a Yjs document written only by that
 person's tabs.
 
-- **The host stores and relays them, and never writes them.** Its policy
+- **The host stores and relays them, and never writes them**, but once: its
+  `0018-dismissed-ready` migration, at startup, before any tab opens one. Its policy
   shares each only with peers whose principal is its writer
   (`holdsPersonDoc`, `apps/pinetrie/host/policy.ts`), and `resolveDoc` names
   its kind so the host interprets it with its schema.
@@ -376,8 +377,11 @@ panel draws a slot whose card is not held as empty.
   verdicts read only `since`.
 - `read`: per lane, the furthest entry read, which only moves forward
   (`readStep`).
-- `dismissed` and `dismissedOffers`: per lane, the ask whose verdict, and
-  the `ledger.source` whose offer, was marked "not needed".
+- `dismissed` and `dismissedReady`: per lane, the ask whose verdict, and
+  the `ledger.source` whose ready proposed changes, was marked "not needed".
+  `dismissedReady` was `dismissedOffers` (ADR-0153). `AttentionDocBeforeReady`
+  is the schema before the rename, kept only for the host's
+  `0018-dismissed-ready` migration, and deleted with it.
 - A key that is no lane name is left out when read.
 
 `OpenDoc` is the tasks the person has open, their list (ADR-0122,

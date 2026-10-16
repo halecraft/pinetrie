@@ -1,9 +1,9 @@
-// host/describe — an agent's description of a lane's offer, whatever kind of
-// project: a one-shot model request outside the thread, by the
-// commit-message skill, over the offer's diff, the thread's messages and
-// your recent work. One request per lane at a time, so two settles of one
-// lane never meet. Each adapter gathers its offer and decides, as it
-// settles, whether the offer is still the one asked about.
+// host/describe — an agent's description of a lane's proposed changes, whatever
+// kind of project: a one-shot model request outside the thread, by the
+// commit-message skill, over the proposed changes' diff, the thread's messages
+// and your recent work. One request per lane at a time, so two settles of one
+// lane never meet. Each adapter gathers its proposed changes and decides, as it
+// settles, whether the proposed changes are still the one asked about.
 
 import { projectTranscript, type ThreadId } from "@pinetrie/core"
 import type { Keeper } from "@pinetrie/keeper"
@@ -30,7 +30,7 @@ export type Describe = <G>(input: {
   readonly keeper: Pick<Keeper, "run" | "track">
   /** Null for nothing to describe. */
   readonly gather: () => Promise<DescribeGathered<G> | null>
-  /** The text written, if the offer is still the one `gathered` read; the thread's tip then. */
+  /** The text written, if the proposed changes are still the one `gathered` read; the thread's tip then. */
   readonly settle: (
     gathered: G,
     text: string,
@@ -46,7 +46,7 @@ export function createDescriber(deps: {
   const describing = new Set<ThreadId>()
   return input => {
     const { lane } = input
-    const fail = failed(deps.basics, "describing its offer", lane)
+    const fail = failed(deps.basics, "describing its proposed changes", lane)
     if (describing.has(lane)) return Promise.resolve()
     describing.add(lane)
     return input.keeper.track(
@@ -58,8 +58,9 @@ export function createDescriber(deps: {
           const tip = doc === null ? null : readLaneTip(doc, lane)
           // Asked outside the keeper, which tracks it, then settled in a step
           // of the keeper's. Not a late write of the documents' (`later.ts`):
-          // each adapter's settle writes only while its offer is the one
-          // asked about, and an archive withdraws its threads' offers.
+          // each adapter's settle writes only while its proposed changes are
+          // the one asked about, and an archive withdraws its threads' proposed
+          // changes.
           const messages = transcriptLines(
             doc === null ? [] : projectTranscript(readTreeIndex(doc), tip),
           )

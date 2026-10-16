@@ -364,8 +364,8 @@ describe.skipIf(!onBtrfs)(
     })
 
     test("a virtual base for a criss-cross keeps its bases' conflict as markers, and the lane's merge over it conflicts", async () => {
-      // An offer shown before the lane's catch-up, accepted after it: the
-      // lane's turn and your save are both bases of its next catch-up.
+      // Proposed changes shown before the lane's catch-up, accepted after it:
+      // the lane's turn and your save are both bases of its next catch-up.
       const f = (...ls: string[]) => ({ "f.txt": lines(...ls) })
       await state("k0", f("x", "y", "z"))
       await state("k1", f("x", "Y1", "z"), "k0")

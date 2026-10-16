@@ -46,13 +46,13 @@ import {
   type MoveTarget,
   modeOf,
   normalizeName,
-  OFFER_ACTIONS,
-  type OfferAction,
-  type OfferSeen,
   type Paste,
   type PlaceKey,
   type PlaceRefusal,
   type Position,
+  PROPOSED_CHANGES_ACTIONS,
+  type ProposedChangesAction,
+  type ProposedChangesSeen,
   parseAddress,
   parseCardId,
   parseMentions,
@@ -133,10 +133,10 @@ export type Outcome =
   | { readonly kind: "marked" }
   /** A model is asked for a root's title, which arrives as its mark. */
   | { readonly kind: "retitling" }
-  /** The lane's offer is accepted into accepted work or a WIP. */
+  /** The lane's proposed changes are accepted into accepted work or a WIP. */
   | { readonly kind: "accepted" }
-  /** An offer action was carried out (squash, describe, refresh). */
-  | { readonly kind: "offered" }
+  /** An action on proposed changes was carried out (squash, describe, refresh). */
+  | { readonly kind: "proposed" }
   /** A thread is named before its lane exists, or already was. */
   | { readonly kind: "reserved" }
   /** Traces the sender has seen are gone. */
@@ -489,18 +489,24 @@ export function decodeCommand(
       ? notNewLane(lane)
       : { kind: "reserve", lane: reserved }
   }
-  if (kind === "offer") {
+  if (kind === "proposed") {
     const lane = text(wire?.lane)
     if (!isThreadId(lane))
       return refused(ERR.UNKNOWN_TARGET, `not a thread's lane: ${lane}`)
     const action = text(wire?.mode)
     const to = text(wire?.targetId)
-    if (!isOfferAction(action))
-      return refused(ERR.UNKNOWN_KIND, `unknown offer action: ${action}`)
+    if (!isProposedChangesAction(action))
+      return refused(
+        ERR.UNKNOWN_KIND,
+        `unknown an action on proposed changes: ${action}`,
+      )
     if (action !== "accept") return { kind, lane, action, to: null, seen: null }
-    const seen = offerSeenFromWire(text(wire?.seen))
+    const seen = proposedChangesSeenFromWire(text(wire?.seen))
     return seen === null
-      ? refused(ERR.REFUSED, "an acceptance must say which offer it was shown")
+      ? refused(
+          ERR.REFUSED,
+          "an acceptance must say which proposed changes it was shown",
+        )
       : { kind, lane, action, to: to === "" ? null : to, seen }
   }
   if (kind === "move-task") {
@@ -648,14 +654,15 @@ function threadStartOfWire(
 }
 
 /** What an acceptance was shown, as the wire carries it in `seen`: JSON. */
-export const offerSeenToWire = (seen: OfferSeen | null): string =>
-  seen === null ? "" : JSON.stringify(seen)
+export const proposedChangesSeenToWire = (
+  seen: ProposedChangesSeen | null,
+): string => (seen === null ? "" : JSON.stringify(seen))
 
 const isCommit = (v: unknown): v is string =>
   typeof v === "string" && /^[0-9a-f]+$/.test(v)
 
 /** The wire's `seen` for an acceptance -> what it was shown; null when malformed. */
-function offerSeenFromWire(wire: string): OfferSeen | null {
+function proposedChangesSeenFromWire(wire: string): ProposedChangesSeen | null {
   let parsed: unknown
   try {
     parsed = JSON.parse(wire)
@@ -935,8 +942,8 @@ const PLACE_REFUSALS = {
 } as const satisfies Record<PlaceRefusal, true>
 const isPlaceRefusal = (c: string): c is PlaceRefusal => c in PLACE_REFUSALS
 
-const isOfferAction = (a: string): a is OfferAction =>
-  (OFFER_ACTIONS as readonly string[]).includes(a)
+const isProposedChangesAction = (a: string): a is ProposedChangesAction =>
+  (PROPOSED_CHANGES_ACTIONS as readonly string[]).includes(a)
 
 const isWorkflowAction = (a: string): a is WorkflowAction =>
   (WORKFLOW_ACTIONS as readonly string[]).includes(a)
@@ -1041,14 +1048,14 @@ export function encodeIntent(id: string, intent: Intent): Command {
       })
     case "retitle":
       return command({ id, kind: "retitle", task: intent.task })
-    case "offer":
+    case "proposed":
       return command({
         id,
-        kind: "offer",
+        kind: "proposed",
         lane: intent.lane,
         mode: intent.action,
         targetId: intent.to ?? "",
-        seen: offerSeenToWire(intent.seen),
+        seen: proposedChangesSeenToWire(intent.seen),
       })
     case "setup":
     case "publish":
@@ -1190,8 +1197,8 @@ function outcomeToWire(id: string, outcome: Outcome): Reply {
       return reply({ id, outcome: "retitling" })
     case "accepted":
       return reply({ id, outcome: "accepted" })
-    case "offered":
-      return reply({ id, outcome: "offered" })
+    case "proposed":
+      return reply({ id, outcome: "proposed" })
     case "reserved":
       return reply({ id, outcome: "reserved" })
     case "seen":
@@ -1264,8 +1271,8 @@ export function decodeReply(wire: Reply): Outcome {
       return { kind: "retitling" }
     case "accepted":
       return { kind: "accepted" }
-    case "offered":
-      return { kind: "offered" }
+    case "proposed":
+      return { kind: "proposed" }
     case "reserved":
       return { kind: "reserved" }
     case "seen":

@@ -12,7 +12,7 @@ import {
 import { cardIdFor } from "@pinetrie/core/fixtures"
 import type { Attention } from "@pinetrie/schema"
 import { describe, expect, test } from "vitest"
-import type { OpenOffer } from "./app-view.ts"
+import type { OpenProposedChanges } from "./app-view.ts"
 import {
   type AttentionInput,
   arrivals,
@@ -54,7 +54,7 @@ const person = (over: Partial<Attention> = {}): Attention => ({
   mentionsSince: "e-0",
   read: new Map(),
   dismissed: new Map(),
-  dismissedOffers: new Map(),
+  dismissedReady: new Map(),
   seen: new Set(),
   ...over,
 })
@@ -66,7 +66,7 @@ const input = (over: Partial<AttentionInput> = {}): AttentionInput => ({
     [B, [BEA]],
   ]),
   verdicts: new Map([[A, verdict(A, said("needsYou"))]]),
-  offers: [],
+  openProposed: [],
   sshAsks: [],
   owner: null,
   person: person(),
@@ -75,7 +75,10 @@ const input = (over: Partial<AttentionInput> = {}): AttentionInput => ({
   ...over,
 })
 
-const offer = (lane: ThreadId, source: string | null): OpenOffer => ({
+const proposed = (
+  lane: ThreadId,
+  source: string | null,
+): OpenProposedChanges => ({
   lane,
   root: lane === A ? R1 : R2,
   end: entryId("t"),
@@ -142,12 +145,12 @@ describe("attentionOf", () => {
     ])
   })
 
-  test("a thread you do not follow raises nothing, its offer included", () => {
+  test("a thread you do not follow raises nothing, its proposed changes included", () => {
     expect(
       attentionOf(
         input({
           verdicts: new Map([[B, verdict(B, said("needsYou"))]]),
-          offers: [offer(B, cardIdFor("c1"))],
+          openProposed: [proposed(B, cardIdFor("c1"))],
         }),
       ),
     ).toEqual([])
@@ -189,26 +192,26 @@ describe("attentionOf", () => {
     expect(attentionOf(input({ archived: new Set([A]) }))).toEqual([])
   })
 
-  test("an offer you follow needs you until not needed, which holds until new work", () => {
+  test("proposed changes you follow needs you until not needed, which holds until new work", () => {
     const read = person({ read: new Map([[A, entryId("e-9")]]) })
     const items = attentionOf(
       input({
         verdicts: new Map(),
-        offers: [offer(A, cardIdFor("c1"))],
+        openProposed: [proposed(A, cardIdFor("c1"))],
         person: read,
       }),
     )
     expect(items.map(i => [i.level, i.raised.kind])).toEqual([
-      ["needsYou", "offer"],
+      ["needsYou", "ready"],
     ])
     const dismissed = person({
-      dismissedOffers: new Map([[A, cardIdFor("c1")]]),
+      dismissedReady: new Map([[A, cardIdFor("c1")]]),
     })
     expect(
       attentionOf(
         input({
           verdicts: new Map(),
-          offers: [offer(A, cardIdFor("c1"))],
+          openProposed: [proposed(A, cardIdFor("c1"))],
           person: dismissed,
         }),
       ),
@@ -217,7 +220,7 @@ describe("attentionOf", () => {
       attentionOf(
         input({
           verdicts: new Map(),
-          offers: [offer(A, cardIdFor("c2"))],
+          openProposed: [proposed(A, cardIdFor("c2"))],
           person: dismissed,
         }),
       ),
@@ -228,7 +231,9 @@ describe("attentionOf", () => {
 describe("threadStatus and taskStatus", () => {
   const facts = { work: new Map(), verdicts: new Map() }
   test("working wins, and a pending verdict is working; else the highest item", () => {
-    const items = attentionOf(input({ offers: [offer(A, cardIdFor("c1"))] }))
+    const items = attentionOf(
+      input({ openProposed: [proposed(A, cardIdFor("c1"))] }),
+    )
     const status = threadStatus({
       ...facts,
       items,
@@ -246,7 +251,9 @@ describe("threadStatus and taskStatus", () => {
   })
 
   test("cards behind a held queue are not working: the thread shows what was raised there, or nothing", () => {
-    const items = attentionOf(input({ offers: [offer(A, cardIdFor("c1"))] }))
+    const items = attentionOf(
+      input({ openProposed: [proposed(A, cardIdFor("c1"))] }),
+    )
     const work = new Map([
       [A, "held"],
       [B, "held"],
@@ -355,8 +362,8 @@ test("attentionWords: each reason, as a value worded once", () => {
   expect(of({ kind: "unclassified" })).toBe(
     "the run ended; pine·trie could not tell what it needs",
   )
-  expect(attentionWords({ kind: "offer", source: null }, nameOf)).toBe(
-    "work ready to accept",
+  expect(attentionWords({ kind: "ready", source: null }, nameOf)).toBe(
+    "changes ready to accept",
   )
 })
 
@@ -365,7 +372,7 @@ test("markOf: the highest level among the tasks it covers; working raises nothin
     lane: threadIdFor("m"),
     end: entryId("e"),
     level,
-    raised: { kind: "offer" as const, source: "c" },
+    raised: { kind: "ready" as const, source: "c" },
   })
   const [a, b, c] = [taskIdFor("a"), taskIdFor("b"), taskIdFor("c")]
   const status = new Map<TaskId, Status>([

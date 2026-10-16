@@ -30,7 +30,7 @@ const ports = () => {
     dispatch: vi.fn(),
     session: {
       request: vi.fn(async (): Promise<Outcome> => answer),
-      offer: vi.fn(async (): Promise<Outcome> => answer),
+      proposed: vi.fn(async (): Promise<Outcome> => answer),
       createCard: vi.fn(async () => accepted),
       // Every card's text, as the comment queued below has it.
       cardText: vi.fn(
@@ -57,7 +57,7 @@ const ports = () => {
       },
     },
     inventory: { show: vi.fn(), select: vi.fn(), openSelected: vi.fn() },
-    attention: { dismiss: vi.fn(), dismissOffer: vi.fn() },
+    attention: { dismiss: vi.fn(), dismissReady: vi.fn() },
     fly: vi.fn(),
     foldColumn: vi.fn(),
     intent: vi.fn(),
@@ -123,8 +123,8 @@ test.each<Row>([
     args: [{ kind: "name", name: "Ada" }],
   },
   {
-    effect: { kind: "offer", lane, action: "accept", to: "wip/x" },
-    port: p => p.session.offer,
+    effect: { kind: "proposed", lane, action: "accept", to: "wip/x" },
+    port: p => p.session.proposed,
     args: [lane, "accept", "wip/x"],
   },
   {
@@ -476,7 +476,7 @@ test("a fold that moves goes through the fold's port, whose commit lands it; one
   expect(q.dispatch).toHaveBeenCalledWith(action)
 })
 
-test("not needed marks a verdict by its ask, an offer by its source, and an offer with none not at all", () => {
+test("not needed marks a verdict by its ask, proposed changes by its source, and proposed changes with none not at all", () => {
   const p: Ports = ports()
   const lane = threadIdFor("a")
   perform(
@@ -494,14 +494,14 @@ test("not needed marks a verdict by its ask, an offer by its source, and an offe
         kind: "notNeeded",
         lane,
         raised: {
-          kind: "offer",
+          kind: "ready",
           source: cardIdFor("c1"),
         },
       },
-      { kind: "notNeeded", lane, raised: { kind: "offer", source: null } },
+      { kind: "notNeeded", lane, raised: { kind: "ready", source: null } },
     ],
     p,
   )
   expect(p.attention.dismiss.mock.calls).toEqual([[lane, "p-1"]])
-  expect(p.attention.dismissOffer.mock.calls).toEqual([[lane, cardIdFor("c1")]])
+  expect(p.attention.dismissReady.mock.calls).toEqual([[lane, cardIdFor("c1")]])
 })

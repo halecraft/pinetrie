@@ -100,7 +100,7 @@ beside it (ADR-0081, turned sideways).
   (below). Moved to the archive, it is archived: the item says so
   ("archive: read-only for everyone until moved out"), is disabled while
   the agent works in that root or cards are queued there, with the reason,
-  and names the threads whose offers it withdraws from your repo ("work not
+  and names the threads whose proposed changes it withdraws from your repo ("work not
   accepted goes: amber-fox"); moving it out builds them again
   (ADR-0061). **×** is for putting a root away yourself.
 - **Archiving closes it for you** once the host accepts it, as **×** does,
@@ -162,8 +162,8 @@ While the page syncs, "syncing…" leads its right end.
   accept) plus the mentions you have not seen; the page's title carries the
   same count, before the root you are on: "(2) Fix the sync bug · pine·trie".
   Its sections, each shown only with rows: **Needs you** (each thread's
-  reason, in amber), **Ready to accept** (threads you follow with an open
-  offer), **Worth a read** (listed, not counted) and **Mentions of you**.
+  reason, in amber), **Ready to accept** (threads you follow with open
+  proposed changes), **Worth a read** (listed, not counted) and **Mentions of you**.
   It lists exactly what it counts. Each thread's row opens it; under each,
   **not needed** clears it on every device of yours, until the next run's
   end or new work. You follow a thread once you have written on it; threads
@@ -183,7 +183,7 @@ While the page syncs, "syncing…" leads its right end.
 - **The board's strip**: ▦ **Board**, then each workflow state's name and
   count, avatars of the people reading in its roots, an amber dot when a
   root there needs you, and, only when there are any, **◌n**, its roots the
-  agent works in, and **⇡n**, its roots with work ready to accept (ADR-0091).
+  agent works in, and **⇡n**, its roots with changes ready to accept (ADR-0091).
   Those two are facts for everyone: never a badge, never moving. While the
   board is open, the board's search and **mine** take the states' place,
   since each column's head shows the same (ADR-0115). ▦ carries
@@ -200,7 +200,7 @@ While the page syncs, "syncing…" leads its right end.
   exists, any host shows **set up**, which opens what it writes: the
   bookmark it makes at your `@-` and the exact `immutable_heads()` and
   `revsets.log` text for your repo's config (the log, so jj and jjui show
-  the offers), and what to add to a jjui revset of its own
+  the proposed changes), and what to add to a jjui revset of its own
   (`docs/the-jujutsu-repo.md`), done only when you choose it. After,
   **publish** shows only while there is something to publish, and does it
   in one act, the same whoever presses it and wherever the host listens:
@@ -297,7 +297,7 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
 - **A thread card** (ADR-0111) is a root, on the board and in the sidebar
   alike: its header, the same in both, shows its label, its status (with
   the agent's ring in any root, opened in this browser tab or not), a
-  blue **⇡** for everyone when a thread of it has work ready to accept (its
+  blue **⇡** for everyone when a thread of it has changes ready to accept (its
   title names the threads; the thread's followers have it in their inbox),
   and a dot in your colour when it holds something you typed. On the board,
   a titled root's first line is its body, and its foot shows who wrote in
@@ -307,7 +307,7 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
 - **Anyone moves a root, for everyone**: drag an item to another column, or
   before another item, or use its `⋯`'s **Move to ▸**, **Move up** and
   **Move down**. Dropped on your
-  list, it opens there. Nothing moves a root by itself: an offer ready, or a
+  list, it opens there. Nothing moves a root by itself: proposed changes ready, or a
   run that needs you, is a mark, never a move. A move from a state the root
   has left is refused, naming who moved it and where ("not moved: Bea moved
   it to Doing first").
@@ -331,7 +331,7 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   board. The filter outlives closing the board, not a reload.
 - **A root in the archive is archived** (ADR-0029): it is read-only for
   everyone until it is moved out, the host lets go of it, and its threads'
-  offers leave your repo. Its column, as wide as the others and marked ✓,
+  proposed changes leave your repo. Its column, as wide as the others and marked ✓,
   shows a count and its most recent roots, or every root the search keeps,
   newest first. An archived root opened from it
   is read-only, with **Restore** in its composer's place, which moves it to
@@ -342,7 +342,7 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   stays as it was. Its column says "made when the project had no jj repo:
   nothing runs here now" (or "had a jj repo") in its composer's place, and
   a branch or a copy from it says the same before its first send. The host
-  refuses the same: a message, a carry-on, a catch-up, an offer action
+  refuses the same: a message, a carry-on, a catch-up, an action on proposed changes
   that asks its agent, another thread's ask, and a crash's resume.
 - **Anyone edits the states**: a state's name is a button that turns into a
   field (Enter or leaving it saves; Escape keeps the old name); its `⋯`
@@ -507,7 +507,7 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   Nothing is sent in a trashed thread ("restore it first"); a link to it
   says "in the trash" and restores it. A week after its discard a trashed
   card is deleted, with everything on it; a thread takes its lane, its
-  bookmark and its offer with it, and its messages stay in their root,
+  bookmark and its proposed changes with it, and its messages stay in their root,
   where a link to it says "deleted".
 - **A branch not yet sent from a thread someone else has since taken**
   keeps its text, but its column says "Bea has it" in place of that
@@ -549,44 +549,43 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   identities its lane holds** (ADR-0140): its service identities, then
   your identity's state, then the hosts it reached ("🔑 deploy, Duane's
   ssh · pop"). A lane waiting for you reads "🔑 wants your ssh for pop"
-  with **approve** and **refuse**; an approved one offers **revoke**, and
+  with **approve** and **refuse**; an approved one proposed changes **revoke**, and
   a refused, revoked or unanswered one **approve**. Only the owner sees
   the buttons; everyone else reads "🔑 waiting for Duane". While your
   answer is out its buttons wait, and a refusal is said there. A lane
   that never asked and used no service identity has no row. A lane
   waiting for you is also in your inbox ("wants your ssh for pop"),
   whether or not you follow it; answering clears it.
-- **In a folder project** (ADR-0142), the strip's offer is the files the
+- **In a folder project** (ADR-0142), the strip's proposed changes are the files the
   thread's newest state changes against accepted work's newest, reviewed as
   files, each with its line counts and its unified diff; it has no bookmark,
-  no stack and no split. Its words name accepted work as a jj offer's do,
+  no stack and no split. Its words name accepted work as jj proposed changes' do,
   and its titles name no bookmark. **accept** is drawn disabled, titled
   with the words the host refuses one with (`ACCEPT_LATER`,
   `@pinetrie/interface`). The footer shows no publish or set up
   button, and the composer no WIP to start from: a folder project's
   accepted work is its folder.
 - **A row of the column's header, the work strip, says what became of the
-  agent's files** (ADR-0040, ADR-0113): an agent on its own copy shows its offer in plain words ("2
-  files ready"), with **accept** and its bookmark, which a press copies. The
-  button names a WIP the work goes into (ADR-0104, ADR-0090): "accept", or
-  "accept into wip/search" for a thread on a WIP, whose menu also offers
+  agent's files** (ADR-0040, ADR-0113): an agent on its own copy shows its proposed changes in plain words ("2
+  files changed"), with **accept changes** and its bookmark, which a press copies. The
+  button names a WIP the work goes into (ADR-0104, ADR-0090): "accept changes", or
+  "accept changes into wip/search" for a thread on a WIP, whose menu also offers
   "accept, with your 2 commits beneath it" into accepted work; its title
-  names the bookmark it moves. Accepting the offer (an *acceptance*,
-  ADR-0083) moves that bookmark forward to the offer and never touches your
+  names the bookmark it moves. Accepting the proposed changes (an *acceptance*,
+  ADR-0083) moves that bookmark forward to the proposed changes and never touches your
   working copy. From the click to the host's
   answer the strip says what your command is doing ("accepting…",
   "accepting into wip/search…", "squashing to one…", "splitting into
   a stack…", "rewriting the description…", "refreshing…"), and its buttons
   wait. A command refused or failed says so there, as the publish toast does
   ("not done: …", "it failed, and may be part done: …"), until your next
-  one on that thread; one carried out says nothing, as the offer then shows
-  it. An acceptance adds the offer the strip showed: if it now brings other work
+  one on that thread; one carried out says nothing, as the proposed changes then show
+  it. An acceptance adds the proposed changes the strip showed: if it now brings other work
   (the lane moved on), or conflicts where it did not, it is not done ("not
-  done: the offer changed since you looked at it: review it again"), and
-  the strip shows the new offer. A rebase onto moved accepted work, or your
-  own edit of the offer, is still the offer you saw, and is accepted. An
-  offer that conflicts is never accepted into accepted work; its button is
-  **catch up with accepted work and resolve**: the agent resolves what the merge leaves. An offer whose
+  done: the changes are not what you were shown: review them again"), and
+  the strip shows the new proposed changes. A rebase onto moved accepted work, or your
+  own edit of the proposed changes, is still the proposed changes you saw, and is accepted. Proposed changes that conflict are never accepted into accepted work; their button is
+  **catch up with accepted work and resolve**: the agent resolves what the merge leaves. Proposed changes whose
   every conflicted file was already conflicted where its thread's copy
   started says so instead: "began from a copy with an unresolved conflict
   in 1 file", and, when the thread it branched from has since resolved
@@ -596,8 +595,8 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   is gone, **continue from accepted work**; and, while the thread it branched
   from has new commits, **catch up with** that thread by its name, greyed
   out while that thread's agent works. When catching up would change files
-  in the thread, the strip says so ("2 files ready · accepted work has
-  moved on"), catching up stands beside the offer, titled with how many files it
+  in the thread, the strip says so ("2 files changed · accepted work has
+  moved on"), catching up stands beside the proposed changes, titled with how many files it
   changes, and the column's header shows ↓, titled with the count, the
   bookmark and both commits. When it would change nothing, it stays in the
   menu, greyed out, and says why: "already caught up with accepted work",
@@ -606,7 +605,7 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   file"
   (ADR-0067). A thread whose base pine·trie has not read yet (one whose agent
   never changed a file, so its work never reached your repo) keeps it in
-  the menu, enabled, and claims nothing. An offer whose work accepted work
+  the menu, enabled, and claims nothing. Proposed changes whose work accepted work
   already has says "nothing to accept: accepted work already has this
   thread's work": the header does not
   count it, and archiving its thread warns of nothing. A thread whose
@@ -626,7 +625,7 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   acceptance, a rewrite of the description, a squash and a refresh each add a line to
   the thread: "✓ accepted as k1a2b3c4", "✎ a new description
   was asked for", "⇣ the stack was squashed into one revision", "↻ the
-  offer was rebuilt from this thread's work". While the agent works, the
+  proposed changes were rebuilt from this thread's work". While the agent works, the
   line waits in the dock's queue as a quiet row, and joins the thread when
   the run ends. When accepted work has moved on with work the thread
   lacks, its next run, or its run in progress, begins with "↓ accepted
@@ -635,18 +634,18 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   before your message.
 - **Split into a stack waits its turn** (ADR-0080): the button queues a
   card with the split, as catching up does, sent when the thread is free;
-  the queued card says "⇶ splits the offer into a stack, with what you
+  the queued card says "⇶ splits the proposed changes into a stack, with what you
   write as its brief", its button reads "split", and while it waits the
   strip's **split** is greyed out. The agent can ask for a split too.
 - **The agent asks about a conflict** with `ask_about_conflict`: the strip
   then says "the agent has a question about your edits · see the thread"
-  until the offer changes.
+  until the proposed changes change.
 - **A branch from a conflicted copy is warned** (ADR-0072): when the next
   send would start a thread on its own copy cloned from a commit with
   conflicts, the line under the box says "starts from a copy with an
   unresolved conflict in 1 file".
 - **A column's pane opens what you read beside the thread** (ADR-0078):
-  the offer's review, an ask's review, a table, or an image, one at a time.
+  the proposed changes' review, an ask's review, a table, or an image, one at a time.
   The thread keeps its place and width, and the column widens to hold the
   pane, which takes what the strip has beside the thread, from 40rem to
   64rem (ADR-0087). Opening something else replaces it; opening it again,
@@ -655,7 +654,7 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   the thread and 40rem shows the pane over the page instead, with ← to go
   back to the thread; folding the sidebar can make room for it beside the
   thread. Nothing in it is kept: a reload closes it.
-- **The offer's line opens its review in the pane** (ADR-0047): a file
+- **The proposed changes' line opens its review in the pane** (ADR-0047): a file
   list when there is more than one file, and one scroll of every file's
   diff, each file's head pinned while its diff is in view, with the files
   that conflict and those you are editing flagged. In its head, **↩** wraps
@@ -685,7 +684,7 @@ the tree.
 - **An ask's digest line** counts its work: steps, tool calls, files its
   turns changed, how long it took, and failures. A press opens or closes the
   work under it. Its files open a review of what the ask alone changed, beside
-  the column, as an offer's review does.
+  the column, as proposed changes' review does.
 - **What the rail draws apart, no fold hides**: a fork, a branch's first
   message, a running tip, an open column's end. Each splits the fold around it.
 - **The running ask is open** in story and raw: until its run ends, which

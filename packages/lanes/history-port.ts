@@ -125,7 +125,7 @@ export type MergedOf<P extends string> =
       readonly merge: P
       /** The files the merge changed under the lane. */
       readonly files: readonly string[]
-      /** The titles of the commits that came in (`MergePlan.came`), without the accepted-offer commits joined. */
+      /** The titles of the commits that came in (`MergePlan.came`), without the accepted thread commits joined. */
       readonly commits: readonly string[]
     }
   | {
@@ -138,7 +138,7 @@ export type MergedOf<P extends string> =
       }[]
       /**
        * The revisions on each side that touched any conflicted file, oldest
-       * first; `theirs` without the accepted-offer commits joined.
+       * first; `theirs` without the accepted thread commits joined.
        */
       readonly ours: readonly TouchedRevision[]
       readonly theirs: readonly TouchedRevision[]

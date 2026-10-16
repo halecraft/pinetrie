@@ -3,9 +3,9 @@
 
 import {
   type AcceptedAction,
-  type AcceptedDecision,
   type AcceptedFacts,
   type AcceptedRecord,
+  type AcceptedWorkDecision,
   commitId,
   ERR,
   type ErrCode,
@@ -132,9 +132,9 @@ export const ACCEPTED: RecordSpec<
 }
 
 /**
- * Accepted work's record, the page's cache, from what the host read of it:
- * what setting it up would write to your repo's config
- * (`proposed`, `setupProposal`), and whether a publish catches the working copy up
+ * Accepted work's record, the page's cache, from what the host read of it: what
+ * setting it up would write to your repo's config (`proposed`,
+ * `setupProposal`), and whether a publish catches the working copy up
  * (`publish.catchUp`).
  */
 export function planAcceptedRecord(input: {
@@ -238,13 +238,13 @@ export function acceptedActionState(
 
 /**
  * A setup or publish, decided from the record read in its own step
- * (`acceptedActionState`). Setting up writes exactly the immutable heads and log
- * the record proposed, the text you were shown.
+ * (`acceptedActionState`). Setting up writes exactly the immutable heads and
+ * log the record proposed, the text you were shown.
  */
 export function planAcceptedAction(
   action: AcceptedAction,
   record: JjAcceptedRecord,
-): AcceptedDecision {
+): AcceptedWorkDecision {
   const state = acceptedActionState(action, record)
   if (state.kind === "refused") return state
   const { acceptedBookmark } = record

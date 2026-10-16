@@ -1,6 +1,6 @@
 // interface/inbox-view — your inbox, under the sidebar beside your avatar, or
 // in the menu your avatar opens while the sidebar is folded: how the threads
-// you follow ended, their work ready to accept, what is worth a read, and
+// you follow ended, their changes ready to accept, what is worth a read, and
 // mentions of you. It lists exactly what it counts: the badge is what needs you
 // (`inboxCount`), the one count the window's title shows too. Decided as a
 // value (`inboxView`) and worded in one function (`inboxWords`). Everyone's
@@ -23,13 +23,13 @@ const ORDER: readonly InboxSection[] = [
   "mentions",
 ]
 
-/** A verdict goes under its level; an offer, under ready. */
+/** A verdict goes under its level; proposed changes, under ready. */
 const sectionOf = (item: Item): ThreadSection =>
-  item.raised.kind === "offer" ? "ready" : item.level
+  item.raised.kind === "ready" ? "ready" : item.level
 
 /**
  * What needs you: the inbox's badge and the window's title (`pageTitle`).
- * The items that need you, an offer of a thread you follow among them,
+ * The items that need you, proposed changes of a thread you follow among them,
  * once, and unseen mentions; never what is worth a read.
  */
 export const inboxCount = (items: readonly Item[], unseen: number): number =>

@@ -1,7 +1,7 @@
-// host/work/destination — accepted work and offers as any kind of project
-// has them: the port lane work and the host reach your accepted work through.
-// Its adapter is chosen once (`host/project.ts`); lane work never learns
-// which.
+// host/work/destination — accepted work and proposed changes as any kind of
+// project has them: the port lane work and the host reach your accepted work
+// through. Its adapter is chosen once (`host/project.ts`); lane work never
+// learns which.
 
 import type {
   AcceptedAction,
@@ -10,20 +10,20 @@ import type {
   JjBaseRecord,
   LaneBase,
   LaneRecord,
-  OfferFact,
-  OfferSeen,
   PointId,
+  ProposedChangesFact,
+  ProposedChangesSeen,
   ThreadId,
   WriterId,
 } from "@pinetrie/core"
 import type { FileAt, ReadSite } from "@pinetrie/lanes"
-import { readOffers, readRevisions } from "@pinetrie/reads"
+import { readProposedByLane, readRevisions } from "@pinetrie/reads"
 import type {
   ArchiveTeardown,
   ForkBegin,
-  OfferAnswer,
-  OfferAsk,
-  planOfferRead,
+  planReviewRead,
+  ReviewAnswer,
+  ReviewAsk,
 } from "@pinetrie/rules"
 import type { Basics } from "../basics.ts"
 
@@ -40,27 +40,27 @@ export interface BaseNow {
   } | null
 }
 
-/** What any kind of project does with a lane's offer. */
-export interface OfferActs {
-  /** A run on `lane` ended: refresh its offer, then describe it if it is still a WIP. */
+/** What any kind of project does with a lane's proposed changes. */
+export interface ProposedChangesActs {
+  /** A run on `lane` ended: refresh its proposed changes, then describe it if it is still a WIP. */
   runEnded(lane: ThreadId): void
   /**
-   * An offer action other than a split; an acceptance names its destination,
-   * null for the default, and what it was shown. Carried out, it answers with
-   * its fact, which the thread is told.
+   * An action on proposed changes other than a split; an acceptance names its
+   * destination, null for the default, and what it was shown. Carried out, it
+   * answers with its fact, which the thread is told.
    */
   act(
     lane: ThreadId,
     action: "accept" | "squash" | "describe" | "refresh",
     by: WriterId,
     to?: string | null,
-    seen?: OfferSeen | null,
+    seen?: ProposedChangesSeen | null,
   ): Promise<
     | { readonly kind: "refused"; readonly code: ErrCode }
-    | { readonly kind: "done"; readonly fact: OfferFact }
+    | { readonly kind: "done"; readonly fact: ProposedChangesFact }
   >
-  /** A review or a diff a page asked for, of a commit an open offer holds. */
-  read(ask: OfferAsk): Promise<OfferAnswer>
+  /** A review or a diff a page asked for, of a commit open proposed changes hold. */
+  read(ask: ReviewAsk): Promise<ReviewAnswer>
 }
 
 /** A setup's or a publish's answer: null when carried out, else why not, worded. */
@@ -84,9 +84,9 @@ export interface Destination {
    * (thrown) for a lane whose history is not the destination's kind.
    */
   baseNow(lane: LaneRecord, base: LaneBase | null): Promise<BaseNow>
-  /** An archive's or a restore's lanes: their history set or dropped, their offers followed. */
+  /** An archive's or a restore's lanes: their history set or dropped, their proposed changes followed. */
   lanesMoved(refs: ArchiveTeardown["refs"]): Promise<void>
-  readonly offers: OfferActs
+  readonly proposed: ProposedChangesActs
   readonly accepted: AcceptedActs
   /** Settles when nothing is queued on accepted work. */
   quiet(): Promise<void>
@@ -95,14 +95,14 @@ export interface Destination {
 }
 
 /**
- * What a review may read is found in (`planOfferRead`): every offer, and
- * every held root's revisions, since a range is named by two states of one
- * lane.
+ * What a review may read is found in (`planReviewRead`): every proposed
+ * changes, and every held root's revisions, since a range is named by two
+ * states of one lane.
  */
-export const offerReadFacts = (
+export const reviewReadFacts = (
   basics: Pick<Basics, "session" | "docs">,
-): Parameters<typeof planOfferRead>[0] => ({
-  offers: readOffers(basics.session),
+): Parameters<typeof planReviewRead>[0] => ({
+  proposedByLane: readProposedByLane(basics.session),
   revisions: new Map(
     basics.docs.loaded().flatMap(root => {
       const view = basics.docs.view(root)

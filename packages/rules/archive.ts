@@ -153,11 +153,11 @@ function planTeardown(
 }
 
 /**
- * Lanes that will not run again, an archived task's or a deleted thread's:
- * each forgotten, its ref deleted (which withdraws its offer), and every
+ * Lanes that will not run again, an archived task's or a deleted thread's: each
+ * forgotten, its ref deleted (which withdraws its proposed changes), and every
  * snapshot of it but its newest and the one nearest each thread's end in
- * `trees`, whatever task that thread is in (`planRetention`), so a copy
- * from the archive finds its files.
+ * `trees`, whatever task that thread is in (`planRetention`), so a copy from
+ * the archive finds its files.
  */
 export function planLanesGone(
   lanes: readonly ThreadId[],
@@ -181,7 +181,7 @@ export function planLanesGone(
  * picture, a stop, a move on the board or a change to its states, a
  * reservation, a card's command, or traces seen. A send at a thread's end,
  * or popped from its queue, writes in the thread's task, a branch in the
- * task it lands in; an offer,
+ * task it lands in; proposed changes,
  * a carry-on and a queue's hold in their lane's thread's; a card's move in
  * the task each card leaves as well as the one it goes to, so nothing moves
  * out of an archived task; an undo of moves, a mark and a retitle in their
@@ -206,9 +206,9 @@ export function writesIn(
           ? intent.at.task
           : tasksOf.thread(intent.at.thread),
       )
-    // An offer acts at its lane's tip: an archived task's lanes offer no
-    // work out. A carry-on writes its message there.
-    case "offer":
+    // An action on proposed changes acts at its lane's tip: an archived task's
+    // lanes offer no work out. A carry-on writes its message there.
+    case "proposed":
     case "carry-on":
     // A queue's hold, and its cards unqueued, are its lane's thread's.
     case "queue-hold":

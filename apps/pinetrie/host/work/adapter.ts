@@ -116,7 +116,7 @@ export interface Splits {
     /** The split card's text: what the person asked of it. */
     intent: string,
   ): Promise<StackMessage | { readonly refused: string }>
-  /** A split's run ended: its stack, checked, becomes the offer, or why not. */
+  /** A split's run ended: its stack, checked, becomes the proposed changes, or why not. */
   splitEnded(lane: ThreadId, prompt: EntryId): Promise<string | null>
 }
 

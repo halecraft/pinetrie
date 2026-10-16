@@ -1,9 +1,10 @@
 // host/work/archive — what an archive or a restore does to its lanes, off the
 // documents' keeper: carries out `planArchive`'s teardown, deciding nothing.
-// Lanes forgotten and their containers and disks removed, a lane whose
-// removal fails reported and passed; their history in the destination moved
-// (`lanesMoved`), which follows each lane's offer (withdrawn, or built
-// again); the snapshots no one will branch from deleted in the background.
+// Lanes forgotten and their containers and disks removed, a lane whose removal
+// fails reported and passed; their history in the destination moved
+// (`lanesMoved`), which follows each lane's proposed changes (withdrawn, or
+// built again); the snapshots no one will branch from deleted in the
+// background.
 
 import type { Keeper } from "@pinetrie/keeper"
 import { type LaneRuntime, removeLane } from "@pinetrie/lanes"

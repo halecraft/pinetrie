@@ -124,7 +124,7 @@ export interface ThreadLaneHandle {
    * Append with no run, through the pi `Lane`: it plans from its own cached
    * tip, so a write that bypasses it would be dropped from its next turn.
    * A chat, or a host's fact: an update, or what a command on the thread's
-   * offer did.
+   * proposed changes did.
    */
   append(
     message: ChatMessage | UpdateMessage | FactMessage | AnswerMessage,

@@ -86,7 +86,8 @@ export function messageTools(
     readonly writable: boolean
   },
 ): MessageTools {
-  // Copying only reads, so a column that can't be written offers it too.
+  // Copying only reads, so a column that can't be written proposed changes it
+  // too.
   const copy = node.text !== "" || (node.toolCalls?.length ?? 0) > 0
   if (!at.writable)
     return {

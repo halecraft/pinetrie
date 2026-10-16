@@ -472,7 +472,7 @@ item 18, and in `lanes.test.ts` against the harness.
   skills it can read, where the runtime's programs are, and a `gate()` that
   settles with its channel).
   `LaneFacts` is everything the lane's prompt says about it: its directory,
-  `/workspace`, its shared directories relative to it (ADR-0035), its offer's
+  `/workspace`, its shared directories relative to it (ADR-0035), its proposed changes'
   bookmark, its grants, whether it runs the default image (`defaultImage`:
   a browser and python3), pine·trie's mount and the note's path. The host builds every name in it: the rules for them are
   in `@pinetrie/lanes`, which this package does not declare.
@@ -659,7 +659,7 @@ item 18, and in `lanes.test.ts` against the harness.
     never changes for people's words ("shell" for `bash` is interface's).
     The constants (`BASH_TOOL`, `GREP_TOOL`, `BANNER_TOOL`…) are core's.
   - **The host's tools are active in every lane** (`TOOL_IDS`, core):
-    `ask_about_conflict`, `catch_up` and `split_offer` (ADR-0080), and
+    `ask_about_conflict`, `catch_up` and `split_proposed_changes` (ADR-0080), and
     `set_banner` (ADR-0143). A call that does not apply answers why: the tool list never
     names who may call it.
   - **`ask_about_conflict`** (`conflictTool`, `lanes.ts`; renamed from
@@ -673,13 +673,13 @@ item 18, and in `lanes.test.ts` against the harness.
     lane takes the harness's seed. A restored lane stored with another list
     (by an agent with no tools, or under an older `TOOL_IDS`) is given the current one with
     pi's `lane.setActiveTools`, which pi stores in the lane's configuration.
-  - **The guidelines name nothing that changes**, the offer's bookmark among
+  - **The guidelines name nothing that changes**, the proposed changes' bookmark among
     them: it changes when a thread is named. `lane.md` says how it is named.
   - **A change is logged.** A `before_payload` hook hashes each request
     without its messages (`prefixOf`, `prefix.ts`), and calls
     `onPrefixChange(lane)` when it differs from the lane's last request
     (`prefixChange`). The host logs it.
-- **`catch_up` and `split_offer`** (`thread-tools.ts`, ADR-0080) read their
+- **`catch_up` and `split_proposed_changes`** (`thread-tools.ts`, ADR-0080) read their
   arguments (`parseCatchUpArgs`) and hand the call to the host
   (`LaneHooks.catchUp`, `LaneHooks.askSplit`), whose `ToolAnswer`
   (`@pinetrie/rules`) becomes the result: its text, and as `details` the
@@ -715,11 +715,13 @@ item 18, and in `lanes.test.ts` against the harness.
   bytes through the channel as base64, 64 MiB in a quarter second (S206).
 - **pine·trie's own skills** are in `skills/`, loaded after yours and the repo's
   (`additionalSkillPaths`; pi's loader keeps the first of a name):
-  `resolve-conflicts` (ADR-0033), `commit-message` and `offer-stack`
+  `resolve-conflicts` (ADR-0033), `commit-message` and `proposed-changes-stack`
   (ADR-0105), `column-banner` (ADR-0053), whose whole body is the image
   model's prompt, and `ask-digest` (ADR-0106), whose reply has a shape the
   host reads (`digestOf`, ADR-0075): a replacement must ask for it too. So
-  one of yours or the repo's of the same name replaces pine·trie's. All five are
+  one of yours or the repo's of the same name replaces pine·trie's; a
+  replacement goes by the skill's name, so one still named `offer-stack`,
+  the stack skill's name before ADR-0156, replaces nothing. All five are
   `disable-model-invocation: true`: only the host asks for them.
   `PiSetup.skill(name)` reads the file at call time, without its frontmatter,
   and hashes it. The scripted and named model choices load no resources, so
@@ -953,14 +955,14 @@ conformance stayed green, which is why they ran first.
 
 `complete({ system, user, purpose })` is one `completeSimple` request, with
 no tools and no session: nothing enters the tree or a lane's context. It
-writes an offer's commit message (`describeRequest`) and an ask's digest
+writes proposed changes' commit message (`describeRequest`) and an ask's digest
 (`digestRequest`, the `ask-digest` skill) on `describeModel`, and a root's
 title (`titleRequest`, the `tab-title` skill, `purpose: "title"`) on the
 model `titleModel` chose at load: `PiSetupOptions.titleModel` when pi
 has it (`titleModelFound` says whether), else `describeModel`, and always
 `describeModel` for a scripted model; the host
 builds each request and this package only carries it out. A failed request
-returns null: the offer keeps its placeholder, the ask its last digest, and
+returns null: the proposed changes keep its placeholder, the ask its last digest, and
 the root its label. A scripted model answers it from its own provider
 (`describe`), so none takes a reply from the run's script.
 

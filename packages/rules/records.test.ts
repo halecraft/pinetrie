@@ -6,8 +6,8 @@ import {
   type BaseRecord,
   commitId,
   entryId,
-  type JjOfferRecord,
-  type OfferRecord,
+  type JjProposedChangesRecord,
+  type ProposedChangesRecord,
   pointFromCommit,
   pointId,
   type RootRecord,
@@ -41,10 +41,10 @@ import {
   LANE,
   MARK,
   NAME,
-  OFFER,
   PARTICIPANT,
   PICTURE,
   PROJECT,
+  PROPOSED_CHANGES,
   planKindSweep,
   planUndeclaredSweep,
   QUEUE_HOLD,
@@ -74,7 +74,7 @@ const DIGESTED = {
   final: true,
 }
 
-const offer: JjOfferRecord = {
+const proposed: JjProposedChangesRecord = {
   kind: "jj",
   lane: L,
   size: 1,
@@ -85,7 +85,7 @@ const offer: JjOfferRecord = {
   yourEdits: [],
   described: true,
   edited: false,
-  bookmark: "pinetrie-offer/x",
+  bookmark: "pinetrie-proposed/x",
   acceptedAs: null,
   commits: [C],
   ledger: null,
@@ -186,9 +186,9 @@ const SAMPLES: readonly Sample[] = [
     "entry",
   ),
   sample(
-    "offer",
-    OFFER,
-    { ...offer, ledger: { source: C, start: [commitId("c0")] } },
+    "proposed",
+    PROPOSED_CHANGES,
+    { ...proposed, ledger: { source: C, start: [commitId("c0")] } },
     "lane",
   ),
   sample(
@@ -230,8 +230,8 @@ const SAMPLES: readonly Sample[] = [
     "lane",
   ),
   sample(
-    "a folder's offer",
-    OFFER,
+    "a folder's proposed changes",
+    PROPOSED_CHANGES,
     {
       kind: "folder",
       lane: L,
@@ -411,30 +411,19 @@ describe.each(SAMPLES)("%s", (_, spec, record, keyField) => {
 })
 
 test("a record stored before records had a kind does not decode", () => {
-  const { kind: _o, ...offerBefore } = OFFER.encode(offer) as Record<
-    string,
-    unknown
-  >
-  expect(OFFER.decode(offerBefore, L)).toBeUndefined()
+  const { kind: _o, ...proposedBefore } = PROPOSED_CHANGES.encode(
+    proposed,
+  ) as Record<string, unknown>
+  expect(PROPOSED_CHANGES.decode(proposedBefore, L)).toBeUndefined()
 })
 
-test("an offer record with no ledger reads back with none, and so does one written before the field", () => {
-  const stored = OFFER.encode(offer) as Record<string, unknown>
-  expect(OFFER.decode(stored, L)).toEqual(offer)
-  const { ledger: _, ...before } = stored
-  expect(OFFER.decode(before, L)).toEqual(offer)
-})
-
-test("an offer record written before the rename reads its `integratedAs` as `acceptedAs`", () => {
-  const stored = OFFER.encode(offer) as Record<string, unknown>
-  const { acceptedAs: _, ...rest } = stored
-  expect(OFFER.decode({ ...rest, integratedAs: "ktop" }, L)).toEqual({
-    ...offer,
-    acceptedAs: "ktop",
-  })
-  expect(OFFER.decode({ ...rest, integratedAs: null }, L)).toEqual(offer)
-  expect(OFFER.decode({ ...stored, integratedAs: "ktop" }, L)).toEqual(offer)
-  expect("integratedAs" in stored).toBe(false)
+test("a proposed-changes record with no ledger reads back with none; one missing a field does not decode", () => {
+  const stored = PROPOSED_CHANGES.encode(proposed) as Record<string, unknown>
+  expect(PROPOSED_CHANGES.decode(stored, L)).toEqual(proposed)
+  const { ledger: _, ...noLedger } = stored
+  expect(PROPOSED_CHANGES.decode(noLedger, L)).toBeUndefined()
+  const { acceptedAs: __, ...noAccepted } = stored
+  expect(PROPOSED_CHANGES.decode(noAccepted, L)).toBeUndefined()
 })
 
 test("a root record in an older shape does not decode: it is derived, and the directory rebuilds it", () => {
@@ -458,8 +447,8 @@ test("a root record's thread that is no lane is dropped, and the record kept", (
 })
 
 test("a record keyed by lane does not read at an address that is no lane", () => {
-  const write = setRecord(OFFER, offer)
-  expect(recordsOf(OFFER, [{ ...write, key: "main" }]).size).toBe(0)
+  const write = setRecord(PROPOSED_CHANGES, proposed)
+  expect(recordsOf(PROPOSED_CHANGES, [{ ...write, key: "main" }]).size).toBe(0)
 })
 
 test("each record lives where it is read: across roots in the session, by entry in its root", () => {
@@ -475,10 +464,10 @@ test("each record lives where it is read: across roots in the session, by entry 
     picture: "session",
     lane: "session",
     revision: "root",
-    offer: "session",
+    proposed: "session",
     line: "session",
     base: "session",
-    "a folder's offer": "session",
+    "a folder's proposed changes": "session",
     "a folder's accepted work": "session",
     "a folder lane's base": "session",
     name: "session",
@@ -506,7 +495,9 @@ test("a conflict does not read at an address with no lane before its path", () =
 })
 
 test("a write goes to the document its home names", () => {
-  expect(setRecord(OFFER, offer).target).toEqual({ kind: "session" })
+  expect(setRecord(PROPOSED_CHANGES, proposed).target).toEqual({
+    kind: "session",
+  })
   expect(setRecord(DIGEST, DIGESTED, TEST_ROOT).target).toEqual({
     kind: "root",
     root: TEST_ROOT,
@@ -514,7 +505,7 @@ test("a write goes to the document its home names", () => {
   // @ts-expect-error a root's record names its root
   setRecord(DIGEST, DIGESTED)
   // @ts-expect-error a session's record names none
-  setRecord(OFFER, offer, TEST_ROOT)
+  setRecord(PROPOSED_CHANGES, proposed, TEST_ROOT)
 })
 
 test("deleteRecord names the spec's namespace and the key", () => {
@@ -526,9 +517,9 @@ test("deleteRecord names the spec's namespace and the key", () => {
   })
 })
 
-test("planKindSweep deletes the offers, accepted work and bases of the other kind, and no other record", () => {
+test("planKindSweep deletes the proposed changes, accepted work and bases of the other kind, and no other record", () => {
   const F = threadIdFor("f")
-  const folderOffer = {
+  const folderProposed = {
     kind: "folder",
     lane: F,
     start: pointId("line-0192aaaa"),
@@ -546,9 +537,9 @@ test("planKindSweep deletes the offers, accepted work and bases of the other kin
     work: "none",
   } as const
   const records = {
-    offers: new Map<ThreadId, OfferRecord>([
-      [L, offer],
-      [F, folderOffer],
+    proposedByLane: new Map<ThreadId, ProposedChangesRecord>([
+      [L, proposed],
+      [F, folderProposed],
     ]),
     accepted: { kind: "folder", newest: pointId("line-0192aaaa"), at: 1 },
     bases: new Map<ThreadId, BaseRecord>([[F, folderBase]]),
@@ -556,11 +547,11 @@ test("planKindSweep deletes the offers, accepted work and bases of the other kin
   const swept = (kind: "jj" | "folder") =>
     planKindSweep(records, kind).map(w => [w.namespace, w.key])
   expect(swept("jj")).toEqual([
-    ["pinetrie.offer", F],
+    ["pinetrie.proposed", F],
     ["pinetrie.accepted", "accepted"],
     ["pinetrie.base", F],
   ])
-  expect(swept("folder")).toEqual([["pinetrie.offer", L]])
+  expect(swept("folder")).toEqual([["pinetrie.proposed", L]])
 })
 
 test("planUndeclaredSweep deletes a record stored outside its spec's home: a root's mark, from before tasks", () => {
@@ -584,18 +575,22 @@ test("planUndeclaredSweep deletes a record stored outside its spec's home: a roo
 
 describe("setIfChanged", () => {
   test("an unchanged host record is not written again; a changed or new one is", () => {
-    expect(setIfChanged(OFFER, offer, structuredClone(offer))).toEqual([])
-    expect(setIfChanged(OFFER, offer, undefined)).toEqual([
-      setRecord(OFFER, offer),
+    expect(
+      setIfChanged(PROPOSED_CHANGES, proposed, structuredClone(proposed)),
+    ).toEqual([])
+    expect(setIfChanged(PROPOSED_CHANGES, proposed, undefined)).toEqual([
+      setRecord(PROPOSED_CHANGES, proposed),
     ])
-    expect(setIfChanged(OFFER, offer, { ...offer, size: 2 })).toHaveLength(1)
+    expect(
+      setIfChanged(PROPOSED_CHANGES, proposed, { ...proposed, size: 2 }),
+    ).toHaveLength(1)
   })
 
   test("the same record with its keys in another order is unchanged", () => {
     const reordered = Object.fromEntries(
-      Object.entries(offer).reverse(),
-    ) as unknown as JjOfferRecord
-    expect(setIfChanged(OFFER, offer, reordered)).toEqual([])
+      Object.entries(proposed).reverse(),
+    ) as unknown as JjProposedChangesRecord
+    expect(setIfChanged(PROPOSED_CHANGES, proposed, reordered)).toEqual([])
   })
 })
 
@@ -621,7 +616,7 @@ describe("every spec, and writes by document", () => {
         target: SESSION_TARGET,
         namespaces: new Map([
           ["pinetrie.line", ["line"]],
-          ["pinetrie.offer", ["t-1"]],
+          ["pinetrie.proposed", ["t-1"]],
         ]),
       },
       {

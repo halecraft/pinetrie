@@ -23,12 +23,12 @@ const catchUpTest = [
 ]
 const repoTest = ["pnpm", "exec", "vitest", "run", "packages/jj/repo.test.ts"]
 const tidyTest = ["pnpm", "exec", "vitest", "run", "packages/jj/tidy.test.ts"]
-const offersRefresh = [
+const proposedRefresh = [
   "pnpm",
   "exec",
   "vitest",
   "run",
-  "apps/pinetrie/host/jj/offers/refresh.test.ts",
+  "apps/pinetrie/host/jj/proposed/refresh.test.ts",
 ]
 
 export const mutations: readonly Mutation[] = [
@@ -44,54 +44,83 @@ export const mutations: readonly Mutation[] = [
     expect: "a lane's commits in your repo are immutable",
   },
   {
-    name: "pre-accepted: a configured bookmark is renamed over",
-    file: "packages/jj/pre-accepted.ts",
-    from: "  if (configured !== DEFAULT_REPO.acceptedBookmark)\n    return { steps: [], lines: [] }\n",
+    name: "pre-proposed: a name already there is renamed over",
+    file: "packages/jj/pre-proposed.ts",
+    from: "    r => r.local && !facts.current.has(r.name),\n",
+    to: "    r => r.local,\n",
+    command: [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "packages/jj/pre-proposed.test.ts",
+    ],
+    expect:
+      "a name already there is not renamed, its old version kept with it, and said",
+  },
+  {
+    name: "pre-proposed: the config keeps the old glob",
+    file: "packages/jj/pre-proposed.ts",
+    from: "    ? value.replaceAll(RETIRED_OFFER_BOOKMARKS, PROPOSED_BOOKMARKS)\n",
+    to: "    ? value\n",
+    command: [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "packages/jj/pre-proposed.test.ts",
+    ],
+    expect: "each bookmark renamed as the host",
+  },
+  {
+    name: "pre-proposed: another remote's bookmark is moved",
+    file: "packages/jj/pre-proposed.ts",
+    from: '    else if (remote !== "git") othersRemote.push(`${bookmark}@${remote}`)\n',
+    to: '    else if (remote !== "git") entry.hostVersion = true\n',
+    command: [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "packages/jj/pre-proposed.test.ts",
+    ],
+    expect: "proposedRenameFacts: each old name once",
+  },
+  {
+    name: "pre-proposed: marked proposed changes are not marked under their new name",
+    file: "packages/jj/pre-proposed.ts",
+    from: "  if (toMark !== null) steps.push(...markSteps(...toMark))\n",
     to: "",
     command: [
       "pnpm",
       "exec",
       "vitest",
       "run",
-      "packages/jj/pre-accepted.test.ts",
+      "packages/jj/pre-proposed.test.ts",
     ],
-    expect: "a config that names its own bookmark is left alone",
+    expect: "marked, conflicted and plain bookmarks are renamed whole",
   },
   {
-    name: "pre-accepted: the rename runs onto pinetrie-accepted already there",
-    file: "packages/jj/pre-accepted.ts",
-    from: "  if (facts.old && !facts.current) {\n",
-    to: "  if (facts.old) {\n",
+    name: "pre-proposed: an old host version is forgotten only with its local bookmark",
+    file: "packages/jj/pre-proposed.ts",
+    from: "      .filter(r => r.hostVersion && (!r.local || !facts.current.has(r.name)))\n",
+    to: "      .filter(r => r.hostVersion && r.local && !facts.current.has(r.name))\n",
     command: [
       "pnpm",
       "exec",
       "vitest",
       "run",
-      "packages/jj/pre-accepted.test.ts",
+      "packages/jj/pre-proposed.test.ts",
     ],
-    expect: "both bookmarks: none renamed, and said",
+    expect: "each step from its own fact",
   },
   {
-    name: "pre-accepted: any immutable_heads() is rewritten",
-    file: "packages/jj/pre-accepted.ts",
-    from: "  if (heads?.endsWith(oldHeads)) {\n",
-    to: "  if (heads !== null) {\n",
-    command: [
-      "pnpm",
-      "exec",
-      "vitest",
-      "run",
-      "packages/jj/pre-accepted.test.ts",
-    ],
-    expect: "nothing once done, with no line, or with a config of jj's own",
-  },
-  {
-    name: "pre-rename: an old accepted offer's trailers are not read",
+    name: "pre-rename: an old accepted proposed changes' trailers are not read",
     file: "packages/core/trailers.ts",
     from: 'const READ = "Pine(?:trie|ta)-"',
     to: 'const READ = "Pinetrie-"',
     command: repoTest,
-    expect: "its offer starts above what it had accepted",
+    expect: "its proposed changes start above what it had accepted",
   },
   {
     name: "a lane read in a batch takes every base for a WIP's",
@@ -132,7 +161,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a lane's work always changes a file",
-    file: "packages/jj/offer.ts",
+    file: "packages/jj/proposed.ts",
     from: '  return lines(ran.stdout).length === 0 ? "none" : "some"\n',
     to: '  return "some"\n',
     command: repoTest,
@@ -148,24 +177,24 @@ export const mutations: readonly Mutation[] = [
     expect: "walkToHost",
   },
   {
-    name: "an offer is its bookmark's commit alone",
-    file: "packages/jj/offer.ts",
+    name: "proposed changes are its bookmark's commit alone",
+    file: "packages/jj/proposed.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "    `(::${bookmark} ~ ::(${input.target})) & (${thread} | ${bookmark})`,",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
     to: "    `(::${bookmark} ~ ::(${input.target})) & ${bookmark}`,",
     command: unit,
-    expect: "an offer on accepted work: built, immutable",
+    expect: "proposed changes on accepted work: built, immutable",
   },
   {
-    name: "an offer's revisions include what is already under its base",
-    file: "packages/jj/offer.ts",
+    name: "proposed changes' revisions include what is already under its base",
+    file: "packages/jj/proposed.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "    `(::${bookmark} ~ ::(${input.target})) & (${thread} | ${bookmark})`,",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
     to: "    `(::${bookmark}) & (${thread} | ${bookmark})`,",
     command: unit,
-    expect: "an offer on accepted work: built, immutable",
+    expect: "proposed changes on accepted work: built, immutable",
   },
   {
     name: "setting up accepted work leaves your log as it was",
@@ -173,10 +202,10 @@ export const mutations: readonly Mutation[] = [
     from: '  you("config", "set", "--repo", "revsets.log", input.log),',
     to: '  you("config", "set", "--repo", "revsets.log", "builtin_log()"),',
     command: unit,
-    expect: "an offer on accepted work: built, immutable",
+    expect: "proposed changes on accepted work: built, immutable",
   },
   {
-    name: "the offers are added to your log again at each setup",
+    name: "the proposed changes are added to your log again at each setup",
     file: "packages/jj/plan.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "  return base.endsWith(added) ? base : `${base} | ${added}`\n}\n\n/**\n * Set up",
@@ -193,7 +222,7 @@ export const mutations: readonly Mutation[] = [
     suite: "lanes",
     scenario: "main",
     expect:
-      "the offer is rebuilt on accepted work when you publish your commit, and says it conflicts with it",
+      "the proposed changes are rebuilt on accepted work when you publish your commit, and says it conflicts with it",
   },
   {
     name: "an accepting publish moves its two bookmarks one at a time",
@@ -259,36 +288,36 @@ export const mutations: readonly Mutation[] = [
     expect: "added to jj's builtin when the repo defines none, with present()",
   },
   {
-    name: "an offer starts at its base, ignoring what you accepted",
+    name: "proposed changes start at its base, ignoring what you accepted",
     file: "packages/jj/plan.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: '  const had = sources === "" ? input.start : `${input.start} | ::(${sources})`',
     to: "  const had = input.start",
     command: unit,
     expect:
-      "offerStart: the base's commit, and the history of each accepted source",
+      "proposedStart: the base's commit, and the history of each accepted source",
   },
   {
-    name: "a source accepted below the base still starts the offer",
+    name: "a source accepted below the base still starts the proposed changes",
     file: "packages/jj/plan.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: " ~ ::present(${input.base.source})) & ${ACCEPTED_OFFER_COMMITS}",
+    from: " ~ ::present(${input.base.source})) & ${ACCEPTED_THREAD_COMMITS}",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    to: ") & ${ACCEPTED_OFFER_COMMITS}",
+    to: ") & ${ACCEPTED_THREAD_COMMITS}",
     command: unit,
     expect:
-      "an offer after a catch-up starts at accepted work it merged, not at what you accepted below it",
+      "proposed changes after a catch-up start at accepted work it merged, not at what you accepted below it",
   },
   {
     name: "a WIP lane holds its copy",
     file: "packages/jj/plan.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: " ~ ::present(${input.base.source})) & ${ACCEPTED_OFFER_COMMITS}",
+    from: " ~ ::present(${input.base.source})) & ${ACCEPTED_THREAD_COMMITS}",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    to: " ~ ::present(${input.base.start})) & ${ACCEPTED_OFFER_COMMITS}",
+    to: " ~ ::present(${input.base.start})) & ${ACCEPTED_THREAD_COMMITS}",
     command: unit,
     expect:
-      "acceptedOfferCommitsRevset: accepted sources above the commit the base holds",
+      "acceptedThreadCommitsRevset: accepted sources above the commit the base holds",
   },
   // ── slow commands told ──
   {
@@ -366,19 +395,19 @@ export const mutations: readonly Mutation[] = [
     command: tidyTest,
     expect: "parseOpLog leaves jj's root operation out",
   },
-  // ── the host's version of an offer ──
+  // ── the host's version of proposed changes ──
   {
-    name: "a refresh moves the offer and leaves the host's version behind",
-    file: "packages/jj/offer-steps.ts",
-    from: "          ...planRefreshOffer(bottom, decision.place.target),\n          ...markSteps(decision.offer.bookmark),\n",
-    to: "          ...planRefreshOffer(bottom, decision.place.target),\n",
+    name: "a refresh moves the proposed changes and leaves the host's version behind",
+    file: "packages/jj/proposed-steps.ts",
+    from: "          ...planRefreshProposed(bottom, decision.place.target),\n          ...markSteps(decision.proposed.bookmark),\n",
+    to: "          ...planRefreshProposed(bottom, decision.place.target),\n",
     command: unit,
     expect: "refresh rebases the bottom onto the target, then marks",
   },
   {
-    name: "a build leaves the host with no version of its offer",
-    file: "packages/jj/offer-steps.ts",
-    from: "      ...markSteps(offerBookmark(rebuild.name)),\n",
+    name: "a build leaves the host with no version of its proposed changes",
+    file: "packages/jj/proposed-steps.ts",
+    from: "      ...markSteps(proposedBookmark(rebuild.name)),\n",
     to: "",
     command: unit,
     expect: "build names the lane's tip as its one source",
@@ -386,7 +415,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a mark leaves the host's version untracked",
     file: "packages/jj/plan.ts",
-    from: '  IMPORT,\n  host("bookmark", "track", bookmark, "--remote", HOST_REMOTE),\n',
+    from: '  IMPORT,\n  host("bookmark", "track", ...bookmarks, "--remote", HOST_REMOTE),\n',
     to: "  IMPORT,\n",
     command: repoTest,
     expect: "one mark makes it the version",
@@ -394,34 +423,36 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the host's version is deleted in git, and the import abandons your commits",
     file: "packages/jj/plan.ts",
-    from: '  host("bookmark", "forget", "--include-remotes", bookmark),\n]',
-    to: '  git("update-ref", "-d", hostOfferRef(bookmark)),\n  IMPORT,\n]',
+    from: '  host("bookmark", "forget", "--include-remotes", ...bookmarks),\n]',
+    to: '  ...bookmarks.map(b => git("update-ref", "-d", hostProposedRef(b))),\n  IMPORT,\n]',
     command: repoTest,
     expect: "the host's forget leaves your commits where they are",
   },
   {
-    name: "an offer reads as the host's version whatever its top",
-    file: "packages/jj/offer.ts",
+    name: "proposed changes read as the host's version whatever its top",
+    file: "packages/jj/proposed.ts",
     from: "  const marked = host === top\n",
     to: "  const marked = true\n",
     command: repoTest,
-    expect: "you change the offer's file: it is no longer the host's version",
+    expect:
+      "you change the proposed changes' file: it is no longer the host's version",
   },
   {
-    name: "the one read takes every offer for the host's version",
+    name: "the one read takes every proposed changes for the host's version",
     file: "packages/jj/lane-read.ts",
     from: "    marked: top.host,\n",
     to: "    marked: true,\n",
     command: repoTest,
-    expect: "you change the offer's file: it is no longer the host's version",
+    expect:
+      "you change the proposed changes' file: it is no longer the host's version",
   },
   {
-    name: "a marked offer's evolog is read all the same",
+    name: "marked proposed changes' evolog is read all the same",
     file: "packages/jj/plan.ts",
     from: '  if (input.marked)\n    return { kind: "known", facts: { reached: true, yoursChanged: false } }\n',
     to: "",
     command: repoTest,
-    expect: "an unchanged offer's refresh reads at most 2 jj processes",
+    expect: "unchanged proposed changes' refresh reads at most 2 jj processes",
   },
   {
     name: "a walk the op log cut short is taken as yours",
@@ -433,18 +464,18 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a race is split by the evolog alone",
-    file: "packages/jj/offer.ts",
+    file: "packages/jj/proposed.ts",
     from: "      inHost.length === 1\n",
     to: "      false\n",
     command: repoTest,
     expect: "its version names the host's commit",
   },
   {
-    name: "a forget leaves the host's version of an offer you deleted",
-    file: "packages/jj/offer-steps.ts",
-    from: "        steps: decision.hostLeft ? forgetSteps(offerBookmark(at.name)) : [],\n",
+    name: "a forget leaves the host's version of proposed changes you deleted",
+    file: "packages/jj/proposed-steps.ts",
+    from: "        steps: decision.hostLeft ? forgetSteps(proposedBookmark(at.name)) : [],\n",
     to: "        steps: [],\n",
-    command: offersRefresh,
+    command: proposedRefresh,
     expect: "the host's version is forgotten",
   },
   {
@@ -453,7 +484,7 @@ export const mutations: readonly Mutation[] = [
     from: '      if (laneOfRemote(name.slice(name.lastIndexOf("@") + 1)) !== null)',
     to: '      if (name !== "")',
     command: unit,
-    expect: "the host's version of an offer is not read",
+    expect: "the host's version of proposed changes are not read",
   },
   {
     name: "an archived lane's ref is deleted with nothing parked",
@@ -469,8 +500,7 @@ export const mutations: readonly Mutation[] = [
     from: '  (as === "host" ? host : you)("bookmark", "move", ...bookmarks, "--to", to)',
     to: '  (as === "host" ? host : you)("bookmark", "move", "--allow-backwards", ...bookmarks, "--to", to)',
     command: unit,
-    expect:
-      "planOfferAcceptanceSteps: the destination moved forward to the top",
+    expect: "planAcceptanceSteps: the destination moved forward to the top",
   },
   {
     name: "a publish leaves main where it was",
@@ -501,7 +531,7 @@ export const mutations: readonly Mutation[] = [
       "a move of the publish bookmark is observed as accepted work's alone",
   },
   {
-    name: "a move of main refreshes every offer",
+    name: "a move of main refreshes every proposed changes",
     file: "packages/jj/observe.ts",
     from: "    else if (name === repoConfig.publish) published = true\n",
     to: "",
@@ -509,12 +539,12 @@ export const mutations: readonly Mutation[] = [
     expect: "the publish bookmark moved: accepted work's record alone",
   },
   {
-    name: "accepted offers' sources are not read",
-    file: "packages/jj/offer.ts",
+    name: "accepted proposed changes' sources are not read",
+    file: "packages/jj/proposed.ts",
     from: "    sources: [...new Set(accepted.flatMap(t => sourcesOf(t.description)))],\n",
     to: "    sources: [] as CommitId[],\n",
     command: unit,
-    expect: "an offer on accepted work: built, immutable",
+    expect: "proposed changes on accepted work: built, immutable",
   },
   {
     name: "a stale base working copy is not recovered",
@@ -539,7 +569,7 @@ export const mutations: readonly Mutation[] = [
     from: "  user.startsWith(`${HOST_OPERATOR}@`)",
     to: "  false",
     command: unit,
-    expect: "an offer on accepted work: built, immutable",
+    expect: "proposed changes on accepted work: built, immutable",
   },
   {
     name: "a turn that changed nothing is committed",
@@ -556,10 +586,10 @@ export const mutations: readonly Mutation[] = [
     to: "  const parents = [ours, from]",
     command: repoTest,
     expect:
-      "your own acceptance, then your edit to it on accepted work: clean, and the accepted-offer commit is not listed as come in",
+      "your own acceptance, then your edit to it on accepted work: clean, and the accepted thread commit is not listed as come in",
   },
   {
-    name: "only the newest accepted-offer commit is joined",
+    name: "only the newest accepted thread commit is joined",
     file: "packages/jj/lane/merge.ts",
     from: "  const joins = planJoins(accepted, held)",
     to: "  const joins = planJoins(accepted, held).slice(-1)",
@@ -574,17 +604,17 @@ export const mutations: readonly Mutation[] = [
     to: "    if (false) {",
     command: repoTest,
     expect:
-      "an offer you edited where the lane wrote: its join conflicts, and is left out",
+      "proposed changes you edited where the lane wrote: its join conflicts, and is left out",
   },
   {
-    name: "an update lists the accepted-offer commits it joined as come in",
+    name: "an update lists the accepted thread commits it joined as come in",
     file: "packages/jj/lane/merge.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: '  joined.length === 0 ? range : `(${range}) ~ (${joined.join(" | ")})`',
     to: "  range",
     command: repoTest,
     expect:
-      "your own acceptance, then your edit to it on accepted work: clean, and the accepted-offer commit is not listed as come in",
+      "your own acceptance, then your edit to it on accepted work: clean, and the accepted thread commit is not listed as come in",
   },
   {
     name: "an update's merge is left uncommitted",
@@ -642,20 +672,20 @@ export const mutations: readonly Mutation[] = [
       "the runner factory: what each runner adds to a command on your repo",
   },
   {
-    name: "an offer is moved by its bottom revision alone",
+    name: "proposed changes are moved by its bottom revision alone",
     file: "packages/jj/plan.ts",
     from: '): RepoStep[] => [rewrite("rebase", "-s", bottom, "-o", target)]',
     to: '): RepoStep[] => [rewrite("rebase", "-r", bottom, "-o", target)]',
     command: unit,
-    expect: "planOffer: a commit per source",
+    expect: "planProposedChanges: a commit per source",
   },
   {
-    name: "a follow restores the tip where the offer sits",
+    name: "a follow restores the tip where the proposed changes sit",
     file: "packages/jj/plan.ts",
-    from: '    rewrite("rebase", "-s", change, ...input.start.flatMap(c => ["-o", c])),',
-    to: '    rewrite("rebase", "-s", change, "-o", input.target),',
+    from: '    rewrite("rebase", "-s", changeId, ...input.start.flatMap(c => ["-o", c])),',
+    to: '    rewrite("rebase", "-s", changeId, "-o", input.target),',
     command: repoTest,
-    expect: "an offer on accepted work: built, immutable",
+    expect: "proposed changes on accepted work: built, immutable",
   },
   {
     name: "the repair keeps the host's commit",
@@ -663,7 +693,7 @@ export const mutations: readonly Mutation[] = [
     from: '  rewrite("abandon", input.hosts),',
     to: '  rewrite("abandon", input.yours),',
     command: unit,
-    expect: "an offer on accepted work: built, immutable",
+    expect: "proposed changes on accepted work: built, immutable",
   },
   {
     name: "a lane's tip is fetched as a local bookmark",
@@ -693,21 +723,21 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a diff matches a path prefix",
-    file: "packages/jj/offer.ts",
+    file: "packages/jj/proposed.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "    `root-file:${JSON.stringify(path)}`,",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
     to: "    `root:${JSON.stringify(path)}`,",
     command: repoTest,
-    expect: "a review reads an offer's commit",
+    expect: "a review reads proposed changes' commit",
   },
   {
     name: "a range's counts take in its diff's headers",
-    file: "packages/jj/offer.ts",
+    file: "packages/jj/proposed.ts",
     from: "    else if (header) continue\n",
     to: "",
     command: unit,
-    expect: "a review reads an offer's commit",
+    expect: "a review reads proposed changes' commit",
   },
   {
     name: "a revision lists every file it touched",
@@ -743,12 +773,12 @@ export const mutations: readonly Mutation[] = [
     expect: "a WIP moved",
   },
   {
-    name: "a moved offer names no thread",
+    name: "a moved proposed changes name no thread",
     file: "packages/jj/observe.ts",
-    from: "      offers.add(name.slice(OFFER_PREFIX.length) as ThreadName)",
+    from: "      proposed.add(name.slice(PROPOSED_PREFIX.length) as ThreadName)",
     to: "      void name",
     command: unit,
-    expect: "an offer moved",
+    expect: "proposed changes moved",
   },
   {
     name: "your @ moving is not noticed",
@@ -816,7 +846,7 @@ export const mutations: readonly Mutation[] = [
     expect: "your jj describe is observed through the watch, with no timer",
   },
   {
-    name: "an accepted source under the lane's base starts its offer",
+    name: "an accepted source under the lane's base starts its proposed changes",
     file: "packages/jj/lane-read.ts",
     from: "    rows.filter(r => r.accepted && !r.underBase).map(r => r.commit),",
     to: "    rows.filter(r => r.accepted).map(r => r.commit),",
@@ -825,7 +855,7 @@ export const mutations: readonly Mutation[] = [
       "an accepted source above the base makes the start a read; one under it does not",
   },
   {
-    name: "a divergent offer reads as one",
+    name: "divergent proposed changes read as one",
     file: "packages/jj/lane-read.ts",
     from: "  if (heads.length > 1 || found.some(r => r.divergent))",
     to: "  if (heads.length > 1)",
@@ -838,28 +868,28 @@ export const mutations: readonly Mutation[] = [
     from: "    files: found.length === 1 ? top.files : null,",
     to: "    files: top.files,",
     command: repoTest,
-    expect: "an offer on accepted work: built, immutable",
+    expect: "proposed changes on accepted work: built, immutable",
   },
   {
-    name: "the offer's own files say whether the lane's work changes any",
+    name: "the proposed changes' own files say whether the lane's work changes any",
     file: "packages/jj/lane-read.ts",
-    from: "  const work = await workChanges(jj, { start, tip })\n",
-    to: '  const work =\n    offer?.kind === "offer"\n      ? offer.files.length === 0\n        ? "none"\n        : "some"\n      : await workChanges(jj, { start, tip })\n',
+    from: "  const work = await filesTouched(jj, { start, tip })\n",
+    to: '  const work =\n    proposed?.kind === "present"\n      ? proposed.files.length === 0\n        ? "none"\n        : "some"\n      : await filesTouched(jj, { start, tip })\n',
     command: repoTest,
-    expect: "an offer accepted work already holds is empty",
+    expect: "proposed changes accepted work already holds is empty",
   },
   {
     name: "one start's work is read over its range",
-    file: "packages/jj/offer.ts",
+    file: "packages/jj/proposed.ts",
     from: "    more.length === 0\n",
     to: "    false\n",
-    command: offersRefresh,
+    command: proposedRefresh,
     expect:
       "a catch-up that merged your acceptance of the lane's work leaves nothing to offer",
   },
   {
     name: "a range jj refuses reads as a change",
-    file: "packages/jj/offer.ts",
+    file: "packages/jj/proposed.ts",
     from: '  if (!ran.ok) return "unknown"\n',
     to: '  if (!ran.ok) return "some"\n',
     command: repoTest,
@@ -867,22 +897,22 @@ export const mutations: readonly Mutation[] = [
       "a lane whose work undoes itself changes no file, over a range jj diffs as one",
   },
   {
-    name: "an untraced accepted-offer commit is left out of the separate reads",
-    file: "packages/jj/offer.ts",
-    from: '  if (untraced.length > 0)\n    return { kind: "untraced", acceptedOfferCommits: untraced }\n',
+    name: "an untraced accepted thread commit is left out of the separate reads",
+    file: "packages/jj/proposed.ts",
+    from: '  if (untraced.length > 0)\n    return { kind: "untraced", acceptedThreadCommits: untraced }\n',
     to: "",
     command: repoTest,
     expect:
-      "an accepted-offer commit of the lane that names no source makes its start untraced, read either way, until it catches up past it",
+      "an accepted thread commit of the lane that names no source makes its start untraced, read either way, until it catches up past it",
   },
   {
-    name: "an untraced accepted-offer commit is left out of the one read",
+    name: "an untraced accepted thread commit is left out of the one read",
     file: "packages/jj/lane-read.ts",
     from: "    untraced.length > 0\n",
     to: "    false\n",
     command: unit,
     expect:
-      "an accepted-offer commit of the lane that names no source, above the base, makes the start untraced; one under it does not",
+      "an accepted thread commit of the lane that names no source, above the base, makes the start untraced; one under it does not",
   },
   {
     name: "catching up counts every file the base changed",
@@ -899,7 +929,7 @@ export const mutations: readonly Mutation[] = [
     to: "  return [...new Set([first, ...rest].flat())].filter(f => lacking.has(f))\n",
     command: repoTest,
     expect:
-      "offered, caught up, then accepted, and re-edited: the offer starts at two commits, and the forecast is none, as the merge",
+      "proposed, caught up, then accepted, and re-edited: the proposed changes start at two commits, and the forecast is none, as the merge",
   },
   {
     name: "catching up is forecast from the base's start",
@@ -907,7 +937,8 @@ export const mutations: readonly Mutation[] = [
     from: "    ? start.start\n",
     to: "    ? [base.start]\n",
     command: catchUpTest,
-    expect: "catchUpHolds: accepted work merged: where the next offer starts",
+    expect:
+      "catchUpHolds: accepted work merged: where the next proposed changes start",
   },
   {
     name: "the one read forecasts a lane on accepted work as a WIP's copy",
@@ -916,7 +947,7 @@ export const mutations: readonly Mutation[] = [
     to: '    target: { kind: "wip", commit: acceptedBookmark },\n',
     command: repoTest,
     expect:
-      "the lane re-edits a file of its own accepted offer, accepted work unchanged since: the forecast is none, and so is the merge",
+      "the lane re-edits a file of its own accepted proposed changes, accepted work unchanged since: the forecast is none, and so is the merge",
   },
   {
     name: "what catching up changes is read on every refresh",
@@ -951,7 +982,7 @@ export const mutations: readonly Mutation[] = [
     expect: "a write reads them anew",
   },
   {
-    name: "an offer's start conflicts go unread",
+    name: "proposed changes' start conflicts go unread",
     file: "packages/jj/lane-read.ts",
     from: "    startConflicts: await startConflictsOf(jj, ledger, conflicts),",
     to: "    startConflicts: [],",
@@ -976,43 +1007,43 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "forget keeps the record",
-    file: "packages/jj/offer-steps.ts",
-    from: '        steps: decision.hostLeft ? forgetSteps(offerBookmark(at.name)) : [],\n        after: { kind: "remove" },',
-    to: '        steps: decision.hostLeft ? forgetSteps(offerBookmark(at.name)) : [],\n        after: { kind: "nothing" },',
+    file: "packages/jj/proposed-steps.ts",
+    from: '        steps: decision.hostLeft ? forgetSteps(proposedBookmark(at.name)) : [],\n        after: { kind: "remove" },',
+    to: '        steps: decision.hostLeft ? forgetSteps(proposedBookmark(at.name)) : [],\n        after: { kind: "nothing" },',
     command: unit,
     expect: "forget removes the record",
   },
   {
     name: "the host never reads an archived thread as archived",
-    file: "packages/jj/offer-gather.ts",
+    file: "packages/jj/proposed-gather.ts",
     from: "  if (input.archived) {\n",
     to: "  if (false) {\n",
     suite: "lanes",
     scenario: "main",
     expect:
-      "archiving a root withdraws its threads' offers: no bookmark in your repo, no record",
+      "archiving a root withdraws its threads' proposed changes: no bookmark in your repo, no record",
   },
   {
-    name: "a rebuild builds another offer",
-    file: "packages/jj/offer-steps.ts",
+    name: "a rebuild builds another proposed changes",
+    file: "packages/jj/proposed-steps.ts",
     from: '    case "build":\n      return rebuildEffects(',
     to: '    case "build":\n    case "rebuild":\n      return rebuildEffects(',
     command: unit,
-    expect: "rebuild: planRebuildOffer's steps",
+    expect: "rebuild: planRebuildProposed's steps",
   },
   {
-    name: "a rebuilt offer keeps the agent's message",
-    file: "packages/jj/offer-steps.ts",
-    from: "          description: offerMessage(at.wip, {",
-    to: '          description: offerMessage("offer: scripted", {',
+    name: "rebuilt proposed changes keep the agent's message",
+    file: "packages/jj/proposed-steps.ts",
+    from: "          description: proposedMessage(at.wip, {",
+    to: '          description: proposedMessage("proposed changes: scripted", {',
     command: unit,
-    expect: "rebuild: planRebuildOffer's steps",
+    expect: "rebuild: planRebuildProposed's steps",
   },
   {
-    name: "a withdrawn offer keeps its record",
-    file: "packages/jj/offer-steps.ts",
-    from: '              ...forgetSteps(offerBookmark(at.name)),\n            ],\n            after: { kind: "remove" },',
-    to: '              ...forgetSteps(offerBookmark(at.name)),\n            ],\n            after: { kind: "nothing" },',
+    name: "withdrawn proposed changes keep its record",
+    file: "packages/jj/proposed-steps.ts",
+    from: '              ...forgetSteps(proposedBookmark(at.name)),\n            ],\n            after: { kind: "remove" },',
+    to: '              ...forgetSteps(proposedBookmark(at.name)),\n            ],\n            after: { kind: "nothing" },',
     command: unit,
     expect: "withdraw plans the abandon",
   },
@@ -1034,7 +1065,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a split's stack is read top first",
-    file: "packages/jj/offer-gather.ts",
+    file: "packages/jj/proposed-gather.ts",
     from: "  for (const commit of commits.toReversed())",
     to: "  for (const commit of commits)",
     command: repoTest,
@@ -1042,7 +1073,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "an acceptance counts none of the WIP's commits",
-    file: "packages/jj/offer-gather.ts",
+    file: "packages/jj/proposed-gather.ts",
     from: "        ).length\n      : 0",
     to: "        ).length * 0\n      : 0",
     command: repoTest,
@@ -1050,12 +1081,12 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a review never reads what pinetrie.json widens",
-    file: "packages/jj/offer.ts",
+    file: "packages/jj/proposed.ts",
     from: "  const touched = read.files.some(\n",
     to: "  const touched = false && read.files.some(\n",
     command: unit,
     expect:
-      "a review reads an offer's commit: its description, files and one file's diff",
+      "a review reads proposed changes' commit: its description, files and one file's diff",
   },
   // ── a lane's repo: moved with jj's side of lanes ──
   {
@@ -1097,16 +1128,16 @@ export const mutations: readonly Mutation[] = [
       "the old names on a disk: no bookmark, until planOldNamesOnDisk renames them",
   },
   {
-    name: "an accepted-offer commit naming no source the lane holds is joined",
+    name: "an accepted thread commit naming no source the lane holds is joined",
     file: "packages/jj/lane/plan.ts",
     from: "    return ours.length === 0\n      ? []",
     to: "    return false\n      ? []",
     command: unit,
     expect:
-      "an accepted-offer commit whose sources the lane lacks is not joined",
+      "an accepted thread commit whose sources the lane lacks is not joined",
   },
   {
-    name: "an accepted-offer commit is joined only when the lane holds every source it names",
+    name: "an accepted thread commit is joined only when the lane holds every source it names",
     file: "packages/jj/lane/plan.ts",
     from: "    return ours.length === 0\n      ? []",
     to: "    return ours.length < sources.length\n      ? []",
@@ -1114,8 +1145,8 @@ export const mutations: readonly Mutation[] = [
     expect: "a squash naming one source held and one not is joined",
   },
   {
-    name: "an acceptance finds no destination below the offer",
-    file: "packages/jj/offer-gather.ts",
+    name: "an acceptance finds no destination below the proposed changes",
+    file: "packages/jj/proposed-gather.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "          `present(${revsetName(bookmark)}) & ::parents(${bottom.commit})`,",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
@@ -1123,7 +1154,7 @@ export const mutations: readonly Mutation[] = [
     suite: "lanes",
     scenario: "main",
     expect:
-      "accepting the offer moves accepted work to it, on your landed commit; your working copy is untouched",
+      "accepting the proposed changes move accepted work to it, on your landed commit; your working copy is untouched",
   },
   {
     name: "publishing catches the working copy up unless told not to",
@@ -1193,7 +1224,8 @@ export const mutations: readonly Mutation[] = [
     to: '  return { kind: "none" }',
     suite: "lanes",
     scenario: "main",
-    expect: "a commit the agent made itself reaches its thread's offer",
+    expect:
+      "a commit the agent made itself reaches its thread's proposed changes",
   },
   {
     name: "a commit on another line is adopted",
@@ -1370,7 +1402,7 @@ export const mutations: readonly Mutation[] = [
     expect: "An accept then a catch-up changes no file.",
   },
   {
-    name: "no accepted-offer commit is joined (port suite: an accept then a catch-up changes no file)",
+    name: "no accepted thread commit is joined (port suite: an accept then a catch-up changes no file)",
     file: "packages/jj/lane/merge.ts",
     from: "  const joins = planJoins(accepted, held)\n",
     to: "  const joins: ReturnType<typeof planJoins> = []\n",

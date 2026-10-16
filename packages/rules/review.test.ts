@@ -2,8 +2,8 @@ import {
   commitId,
   type EntryId,
   entryId,
-  type FolderOfferRecord,
-  type JjOfferRecord,
+  type FolderProposedChangesRecord,
+  type JjProposedChangesRecord,
   pointId,
   type RevisionRecord,
   type ThreadId,
@@ -15,11 +15,11 @@ import {
   answerDiff,
   answerReview,
   diffUrl,
-  parseOfferPath,
-  planOfferRead,
+  parseReviewPath,
+  planReviewRead,
   reviewUrl,
 } from "./index.ts"
-import { MAX_DIFF_BYTES, OFFER_WIRE } from "./review.ts"
+import { MAX_DIFF_BYTES, REVIEW_WIRE } from "./review.ts"
 
 const LANE = threadIdFor("1")
 const _ADA = writerId("ada@x.io")
@@ -28,7 +28,7 @@ const _T2 = commitId("t2")
 const _BASE = commitId("b0")
 const _COPY = commitId("k1")
 
-const offer: JjOfferRecord = {
+const proposed: JjProposedChangesRecord = {
   kind: "jj",
   lane: LANE,
   size: 1,
@@ -39,7 +39,7 @@ const offer: JjOfferRecord = {
   yourEdits: [],
   described: true,
   edited: false,
-  bookmark: "pinetrie-offer/t-1",
+  bookmark: "pinetrie-proposed/t-1",
   acceptedAs: null,
   commits: [commitId("w1")],
   ledger: null,
@@ -49,47 +49,47 @@ const offer: JjOfferRecord = {
 describe("the review", () => {
   const C1 = commitId("c1")
   const C2 = commitId("c2")
-  const open: JjOfferRecord = { ...offer, commits: [C1, C2] }
-  const offers = new Map([[LANE, open]])
+  const open: JjProposedChangesRecord = { ...proposed, commits: [C1, C2] }
+  const proposedByLane = new Map([[LANE, open]])
   const facts = (
-    o: ReadonlyMap<ThreadId, JjOfferRecord>,
+    o: ReadonlyMap<ThreadId, JjProposedChangesRecord>,
     revisions: ReadonlyMap<EntryId, RevisionRecord> = new Map(),
-  ) => ({ offers: o, revisions })
+  ) => ({ proposedByLane: o, revisions })
   const rev = (c: string) => ({ kind: "revision", commit: c }) as const
-  test("planOfferRead: only a commit an open offer holds now", () => {
+  test("planReviewRead: only a commit open proposed changes hold now", () => {
     expect(
-      planOfferRead(facts(offers), { kind: "review", span: rev(C2) }),
+      planReviewRead(facts(proposedByLane), { kind: "review", span: rev(C2) }),
     ).toEqual({
       kind: "review",
       span: rev(C2),
     })
     expect(
-      planOfferRead(facts(offers), {
+      planReviewRead(facts(proposedByLane), {
         kind: "diff",
         span: rev(C1),
         path: "a b.txt",
       }),
     ).toEqual({ kind: "diff", span: rev(C1), path: "a b.txt" })
     const status = (
-      o: ReadonlyMap<ThreadId, JjOfferRecord>,
+      o: ReadonlyMap<ThreadId, JjProposedChangesRecord>,
       commit: string,
     ) => {
-      const read = planOfferRead(facts(o), {
+      const read = planReviewRead(facts(o), {
         kind: "review",
         span: rev(commit),
       })
       return read.kind === "refused" ? read.status : read.kind
     }
-    // A commit the offer no longer is, and one it never was.
-    expect(status(offers, "w1")).toBe(404)
-    expect(status(offers, "ffff")).toBe(404)
+    // A commit the proposed changes no longer are, and one it never was.
+    expect(status(proposedByLane, "w1")).toBe(404)
+    expect(status(proposedByLane, "ffff")).toBe(404)
     const accepted = new Map([[LANE, { ...open, acceptedAs: "t" }]])
     expect(status(accepted, C1)).toBe(404)
     // One accepted work already holds brings nothing to review.
     const held = new Map([[LANE, { ...open, files: [] }]])
     expect(status(held, C1)).toBe(404)
     const path = (p: string) => {
-      const read = planOfferRead(facts(offers), {
+      const read = planReviewRead(facts(proposedByLane), {
         kind: "diff",
         span: rev(C1),
         path: p,
@@ -98,8 +98,8 @@ describe("the review", () => {
     }
     expect([path(""), path("a\nb"), path("a\u007f")]).toEqual([400, 400, 400])
   })
-  test("planOfferRead: an open folder offer's range, with its lane", () => {
-    const folder: FolderOfferRecord = {
+  test("planReviewRead: an open folder proposed changes' range, with its lane", () => {
+    const folder: FolderProposedChangesRecord = {
       kind: "folder",
       lane: LANE,
       start: pointId("line-0192aaaa"),
@@ -109,14 +109,14 @@ describe("the review", () => {
       description: null,
       at: 10,
     }
-    const read = (o: FolderOfferRecord, from: string, to: string) =>
-      planOfferRead(
-        { offers: new Map([[LANE, o]]), revisions: new Map() },
+    const read = (o: FolderProposedChangesRecord, from: string, to: string) =>
+      planReviewRead(
+        { proposedByLane: new Map([[LANE, o]]), revisions: new Map() },
         { kind: "review", span: { kind: "range", from, to } },
       ).kind
     expect(
-      planOfferRead(
-        { offers: new Map([[LANE, folder]]), revisions: new Map() },
+      planReviewRead(
+        { proposedByLane: new Map([[LANE, folder]]), revisions: new Map() },
         {
           kind: "review",
           span: { kind: "range", from: folder.start, to: folder.tip },
@@ -131,7 +131,7 @@ describe("the review", () => {
       "refused",
     )
   })
-  test("planOfferRead: a range only between two commits one lane's turns recorded", () => {
+  test("planReviewRead: a range only between two commits one lane's turns recorded", () => {
     const OTHER = threadIdFor("other")
     const record = (entry: string, lane: typeof LANE, commit: string) =>
       [
@@ -154,7 +154,7 @@ describe("the review", () => {
     const range = (from: string, to: string) =>
       ({ kind: "range", from, to }) as const
     const read = (from: string, to: string) =>
-      planOfferRead(facts(new Map(), revisions), {
+      planReviewRead(facts(new Map(), revisions), {
         kind: "review",
         span: range(from, to),
       })
@@ -201,7 +201,7 @@ describe("the review", () => {
     expect(status(answerDiff("é".repeat(MAX_DIFF_BYTES / 2 + 1)))).toBe(413)
   })
   test("the wire: every URL parses back to what built it", () => {
-    const at = (u: string) => parseOfferPath(new URL(u, "http://host"))
+    const at = (u: string) => parseReviewPath(new URL(u, "http://host"))
     const c = { kind: "revision", commit: commitId("0123abcd") } as const
     const r = {
       kind: "range",
@@ -219,18 +219,19 @@ describe("the review", () => {
         expect(at(diffUrl(span, path))).toEqual({ kind: "diff", span, path })
     }
     expect(
-      at(reviewUrl(c).replace(`/${OFFER_WIRE}/`, `/${OFFER_WIRE + 1}/`)),
+      at(reviewUrl(c).replace(`/${REVIEW_WIRE}/`, `/${REVIEW_WIRE + 1}/`)),
     ).toBe("bad")
-    expect(at(`/offer/${OFFER_WIRE}/diff/${c.commit}`)).toBe("bad")
-    expect(at(`/offer/${OFFER_WIRE}/review/not-hex`)).toBe("bad")
-    expect(at(`/offer/${OFFER_WIRE}/review/0123..not_hex`)).toBe("bad")
+    expect(at(`/review/${REVIEW_WIRE}/diff/${c.commit}`)).toBe("bad")
+    expect(at(`/review/${REVIEW_WIRE}/review/not-hex`)).toBe("bad")
+    expect(at(`/review/${REVIEW_WIRE}/review/0123..not_hex`)).toBe("bad")
     // A folder state is a point of a range, never a revision.
-    expect(at(`/offer/${OFFER_WIRE}/review/${folder.from}`)).toBe("bad")
-    expect(at(`/offer/${OFFER_WIRE}/review/01..23..45`)).toBe("bad")
+    expect(at(`/review/${REVIEW_WIRE}/review/${folder.from}`)).toBe("bad")
+    expect(at(`/review/${REVIEW_WIRE}/review/01..23..45`)).toBe("bad")
     expect(at(`${reviewUrl(c)}/more`)).toBe("bad")
-    expect(at("/offer/anything")).toBe("bad")
-    expect(at("/offer")).toBe("bad")
-    expect(at("/offers")).toBeNull()
+    expect(at("/review/anything")).toBe("bad")
+    expect(at("/review")).toBe("bad")
+    expect(at("/reviews")).toBeNull()
+    expect(at(`/offer/${REVIEW_WIRE}/review/${c.commit}`)).toBeNull()
     expect(at("/other")).toBeNull()
   })
 })

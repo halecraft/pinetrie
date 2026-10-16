@@ -90,39 +90,39 @@ test("planForkSetup: a WIP's copy on accepted commit under it, never the WIP's o
   expect(steps.join("\n")).not.toContain("pnpm")
 })
 
-describe("planJoins: the accepted-offer commits a lane holds, joined before it catches up", () => {
+describe("planJoins: the accepted thread commits a lane holds, joined before it catches up", () => {
   const T1 = commitId("t1")
   const T2 = commitId("t2")
   const SRC1 = commitId("s1")
   const SRC2 = commitId("s2")
   const X = commitId("x1")
-  test("an accepted-offer commit whose sources the lane lacks is not joined", () => {
+  test("an accepted thread commit whose sources the lane lacks is not joined", () => {
     expect(
-      planJoins([{ acceptedOfferCommit: T1, sources: [X] }], new Set([SRC1])),
+      planJoins([{ acceptedThreadCommit: T1, sources: [X] }], new Set([SRC1])),
     ).toEqual([])
   })
   test("a squash naming one source held and one not is joined, with the held one alone", () => {
     expect(
       planJoins(
-        [{ acceptedOfferCommit: T1, sources: [SRC1, X] }],
+        [{ acceptedThreadCommit: T1, sources: [SRC1, X] }],
         new Set([SRC1]),
-      ).map(j => [j.acceptedOfferCommit, j.sources]),
+      ).map(j => [j.acceptedThreadCommit, j.sources]),
     ).toEqual([[T1, [SRC1]]])
   })
-  test("several accepted-offer commits keep their order, oldest first", () => {
+  test("several accepted thread commits keep their order, oldest first", () => {
     expect(
       planJoins(
         [
-          { acceptedOfferCommit: T1, sources: [SRC1] },
-          { acceptedOfferCommit: T2, sources: [SRC2] },
+          { acceptedThreadCommit: T1, sources: [SRC1] },
+          { acceptedThreadCommit: T2, sources: [SRC2] },
         ],
         new Set([SRC1, SRC2]),
-      ).map(j => j.acceptedOfferCommit),
+      ).map(j => j.acceptedThreadCommit),
     ).toEqual([T1, T2])
   })
-  test("a join's message names the accepted-offer commit and its sources, and carries no trailer", () => {
+  test("a join's message names the accepted thread commit and its sources, and carries no trailer", () => {
     const [join] = planJoins(
-      [{ acceptedOfferCommit: T1, sources: [SRC1] }],
+      [{ acceptedThreadCommit: T1, sources: [SRC1] }],
       new Set([SRC1]),
     )
     expect(join?.message).toBe("join: t1 holds s1")

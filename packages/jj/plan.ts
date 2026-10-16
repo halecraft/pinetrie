@@ -7,7 +7,8 @@ import {
   type CommitId,
   commitId,
   HOST_OPERATOR,
-  type OfferSource,
+  type NonEmpty,
+  type ProposedSource,
   type PublishMove,
   type RepoConfig,
   type RevisionFacts,
@@ -18,22 +19,22 @@ import {
 import {
   bookmarkName,
   HOST_REMOTE,
-  hostOfferRef,
+  hostProposedRef,
   laneParkedRef,
   laneStackRef,
   laneTipRef,
-  OFFER_BOOKMARKS,
-  offerBookmark,
+  PROPOSED_BOOKMARKS,
+  proposedBookmark,
   revsetName,
   stackBookmark,
 } from "./lane/names.ts"
 import { git, host, type RepoStep, you } from "./step.ts"
 
 /**
- * Your repo's `immutable_heads()` with accepted work and the offers on it
- * added: `current` is the definition the repo has, null for jj's builtin.
- * `present()`, or a repo with no line fails every jj command. An offer is
- * immutable only while its parent is accepted work, so nothing of yours
+ * Your repo's `immutable_heads()` with accepted work and the proposed changes
+ * on it added: `current` is the definition the repo has, null for jj's builtin.
+ * `present()`, or a repo with no line fails every jj command. Proposed changes
+ * are immutable only while its parent is accepted work, so nothing of yours
  * above accepted work is frozen. Given its own output, it returns it.
  */
 export function immutableHeads(
@@ -45,20 +46,20 @@ export function immutableHeads(
   return base.endsWith(added) ? base : `${base} | ${added}`
 }
 
-/** What `immutableHeads` adds for accepted work's `bookmark`: it and the offers on it. */
+/** What `immutableHeads` adds for accepted work's `bookmark`: it and the proposed changes on it. */
 export const acceptedHeads = (bookmark: string): string => {
   const accepted = `present(${revsetName(bookmark)})`
-  return `${accepted} | (${OFFER_BOOKMARKS} & children(${accepted}))`
+  return `${accepted} | (${PROPOSED_BOOKMARKS} & children(${accepted}))`
 }
 
 /**
- * Your repo's `revsets.log` with the offers added: `current` is
- * the definition the repo has, null for jj's default. An offer on accepted work is
- * an immutable head, which `builtin_log()` leaves out, so jj and jjui would
- * not show it. Given its own output, it returns it.
+ * Your repo's `revsets.log` with the proposed changes added: `current` is the
+ * definition the repo has, null for jj's default. Proposed changes on accepted
+ * work are an immutable head, which `builtin_log()` leaves out, so jj and jjui
+ * would not show it. Given its own output, it returns it.
  */
 export function logRevset(current: string | null): string {
-  const added = OFFER_BOOKMARKS
+  const added = PROPOSED_BOOKMARKS
   const base = (current ?? "builtin_log()").trim()
   return base.endsWith(added) ? base : `${base} | ${added}`
 }
@@ -213,47 +214,51 @@ export const laneRefSteps = (
       ]
 
 /**
- * The host's version of the offer under `bookmark` moved to the bookmark,
- * and tracked: copied in git from the bookmark's own ref, which jj exports
- * after each host command, so no step names a commit id; imported, which
- * moves a tracked bookmark with it; and tracked, which makes the tracking
- * the first time, writes nothing after, and repairs a jj command of yours
- * that imported the ref untracked before this import. An untracked one would
- * make the offer an immutable head. jj exports no conflicted bookmark, so
- * this is planned only for an offer read whole, never a divergent one.
+ * The host's version of the proposed changes under each of `bookmarks` moved
+ * to its bookmark, and tracked: copied in git from the bookmark's own ref,
+ * which jj exports after each host command, so no step names a commit id;
+ * imported once, which moves a tracked bookmark with it; and tracked, which
+ * makes the tracking the first time, writes nothing after, and repairs a jj
+ * command of yours that imported the ref untracked before this import. An
+ * untracked one would make the proposed changes an immutable head. jj exports
+ * no conflicted bookmark, so this is planned only for proposed changes read
+ * whole, never divergent ones.
  */
-export const markSteps = (bookmark: string): RepoStep[] => [
-  git("update-ref", hostOfferRef(bookmark), `refs/heads/${bookmark}`),
+export const markSteps = (...bookmarks: NonEmpty<string>): RepoStep[] => [
+  ...bookmarks.map(b =>
+    git("update-ref", hostProposedRef(b), `refs/heads/${b}`),
+  ),
   IMPORT,
-  host("bookmark", "track", bookmark, "--remote", HOST_REMOTE),
+  host("bookmark", "track", ...bookmarks, "--remote", HOST_REMOTE),
 ]
 
 /**
- * The offer's bookmark and the host's version of it forgotten: the one way
- * the host removes that ref. Deleted in git, then imported, it would make jj
- * abandon every commit only it held, a commit of yours under an offer
- * among them, and rebase yours off it. Forgetting abandons nothing, and is
- * no operation when there is nothing to forget.
+ * Each of `bookmarks` and the host's version of it forgotten, in one
+ * operation: the one way the host removes that ref. Deleted in git, then
+ * imported, it would make jj abandon every commit only it held, a commit of
+ * yours under proposed changes among them, and rebase yours off it.
+ * Forgetting abandons nothing, and is no operation when there is nothing to
+ * forget.
  */
-export const forgetSteps = (bookmark: string): RepoStep[] => [
-  host("bookmark", "forget", "--include-remotes", bookmark),
+export const forgetSteps = (...bookmarks: NonEmpty<string>): RepoStep[] => [
+  host("bookmark", "forget", "--include-remotes", ...bookmarks),
 ]
 
-/** The commits an acceptance made: its offer's trailers name a source or a thread. */
-export const ACCEPTED_OFFER_COMMITS = trailerRevset(["source", "thread"])
+/** The commits an acceptance made: its proposed changes' trailers name a source or a thread. */
+export const ACCEPTED_THREAD_COMMITS = trailerRevset(["source", "thread"])
 
 /**
- * Where an offer starts, as a revset: the newest ancestors of the
+ * Where proposed changes start, as a revset: the newest ancestors of the
  * lane's tip you already have. That is the commit the lane's base names
  * (`start`: accepted work's commit, or the WIP's copy), and every lane commit a
- * accepted offer's `Pinetrie-Source` names above what the base holds
- * (`acceptedOfferCommitsRevset`), with their history: a parent lane's work
+ * accepted proposed changes' `Pinetrie-Source` names above what the base holds
+ * (`acceptedThreadCommitsRevset`), with their history: a parent lane's work
  * accepted after this lane forked, or a branch of this lane accepted
  * whole. Each source is
  * `present()`: one not fetched here names nothing you have. Several heads
- * start the offer from their merge.
+ * start the proposed changes from their merge.
  */
-export function offerStart(input: {
+export function proposedStart(input: {
   readonly tip: CommitId
   readonly start: CommitId
   readonly sources: readonly CommitId[]
@@ -264,17 +269,18 @@ export function offerStart(input: {
 }
 
 /**
- * The accepted-offer commits `offerStart` reads, by their `Pinetrie-Source`
- * or `Pinetrie-Thread` trailers: an accepted offer's sources, or none for an
- * offer accepted before offers carried them (`untracedLanes`). Those in
- * `::<accepted>`, and in `::<wip>` for a lane on a WIP, but not in the
- * history of the base's `source`. The lane merged that commit, so it holds
- * what was accepted below it. An offer keeps the diff from the merge of its
- * start to the tip, so a source the target holds as another commit would be
- * subtracted from the target, and conflict where accepted work changed it since.
- * The source is `present()`: a commit gone from your repo excludes nothing.
+ * The accepted thread commits `proposedStart` reads, by their `Pinetrie-Source`
+ * or `Pinetrie-Thread` trailers: accepted proposed changes' sources, or none
+ * for an proposed changes accepted before proposed changes carried them
+ * (`untracedLanes`). Those in `::<accepted>`, and in `::<wip>` for a lane on a
+ * WIP, but not in the history of the base's `source`. The lane merged that
+ * commit, so it holds what was accepted below it. Proposed changes keep the
+ * diff from the merge of its start to the tip, so a source the target holds as
+ * another commit would be subtracted from the target, and conflict where
+ * accepted work changed it since. The source is `present()`: a commit gone from
+ * your repo excludes nothing.
  */
-export function acceptedOfferCommitsRevset(input: {
+export function acceptedThreadCommitsRevset(input: {
   readonly repoConfig: RepoConfig
   readonly base: CommitBase
 }): string {
@@ -283,18 +289,18 @@ export function acceptedOfferCommitsRevset(input: {
     `present(${revsetName(input.repoConfig.acceptedBookmark)})`,
     ...(base.kind === "wip" ? [`present(${revsetName(base.bookmark)})`] : []),
   ].join(" | ")
-  return `(::(${heads}) ~ ::present(${input.base.source})) & ${ACCEPTED_OFFER_COMMITS}`
+  return `(::(${heads}) ~ ::present(${input.base.source})) & ${ACCEPTED_THREAD_COMMITS}`
 }
 
 /** One version of a commit in `jj evolog`: who made it, and from what. */
 export interface EvologEntry {
   readonly commit: CommitId
-  readonly change: string
+  readonly changeId: string
   /** The operation that made it was the host's (`HOST_OPERATOR`). */
   readonly byHost: boolean
   readonly predecessors: readonly {
     readonly commit: CommitId
-    readonly change: string
+    readonly changeId: string
   }[]
 }
 
@@ -317,17 +323,18 @@ export function parseEvolog(stdout: string): EvologEntry[] {
     .split("\n")
     .filter(line => line !== "")
     .map(line => {
-      const [commit = "", change = "", user = "", preds = ""] = line.split("\t")
+      const [commit = "", changeId = "", user = "", preds = ""] =
+        line.split("\t")
       return {
         commit: commitId(commit),
-        change,
+        changeId,
         byHost: isHostUser(user),
         predecessors: preds
           .split(",")
           .filter(p => p !== "")
           .map(p => {
             const [c = "", ch = ""] = p.split(":")
-            return { commit: commitId(c), change: ch }
+            return { commit: commitId(c), changeId: ch }
           }),
       }
     })
@@ -358,7 +365,7 @@ export function walkToHost(
     if (entry === undefined || seen.has(at)) return { reached: false, yours }
     if (entry.byHost) return { reached: true, yours }
     seen.add(at)
-    const before = entry.predecessors.find(p => p.change === entry.change)
+    const before = entry.predecessors.find(p => p.changeId === entry.changeId)
     if (before === undefined) return { reached: false, yours }
     yours.push({ from: before.commit, to: at })
     at = before.commit
@@ -374,12 +381,12 @@ export type SinceHostRead =
   | { readonly kind: "compare"; readonly host: CommitId }
 
 /**
- * The next read of a revision since the host's version, from what is read
- * so far. A marked offer is the host's, whole, since a commit id hashes all
- * below it, so nothing is read. Otherwise the evolog, which also finds a
+ * The next read of a revision since the host's version, from what is read so
+ * far. Marked proposed changes are the host's, whole, since a commit id hashes
+ * all below it, so nothing is read. Otherwise the evolog, which also finds a
  * host step that stopped before its mark. A walk that cannot reach the host,
- * whose operations a tidy cut, compares with the host's version, when there
- * is one.
+ * whose operations a tidy cut, compares with the host's version, when there is
+ * one.
  */
 export function planSinceHost(input: {
   readonly marked: boolean
@@ -396,34 +403,34 @@ export function planSinceHost(input: {
 }
 
 /**
- * A host operation that rewrites an offer. An offer on accepted work is
- * immutable, so the host's own rewrites of it pass `--ignore-immutable`; a
- * bookmark move rewrites no commit and needs none.
+ * A host operation that rewrites proposed changes. Proposed changes on accepted
+ * work are immutable, so the host's own rewrites of it pass
+ * `--ignore-immutable`; a bookmark move rewrites no commit and needs none.
  */
 const rewrite = (...args: string[]): RepoStep =>
   host("--ignore-immutable", ...args)
 
 /**
- * The revset naming the `i`th commit an offer's plan makes, until the plan's
- * last steps describe it. `jj new` has no template, so a commit it makes can
- * be found again only by something unique the plan chose.
+ * The revset naming the `i`th commit proposed changes' plan makes, until the
+ * plan's last steps describe it. `jj new` has no template, so a commit it makes
+ * can be found again only by something unique the plan chose.
  */
 export const nonceRevset = (nonce: string, i: number): string =>
   `description(exact:"${nonce}-${i}\n")`
 
 /**
- * An offer in your repo: for each source, a commit on the one before (the
- * first on `start`, a merge when it names several heads), with that source's
- * files restored into it; the whole of it rebased onto `target`; the top
- * bookmarked; then each described, which retires its nonce. A single offer
- * has one source, the lane's tip; a stack has one per lane revision. Every
- * step is the host's, by nonce, never a commit id kept across steps: one
+ * Proposed changes in your repo: for each source, a commit on the one before
+ * (the first on `start`, a merge when it names several heads), with that
+ * source's files restored into it; the whole of it rebased onto `target`; the
+ * top bookmarked; then each described, which retires its nonce. Single proposed
+ * changes has one source, the lane's tip; a stack has one per lane revision.
+ * Every step is the host's, by nonce, never a commit id kept across steps: one
  * kept names a hidden commit once an earlier step rewrote it.
  */
-export function planOffer(input: {
+export function planProposedChanges(input: {
   readonly name: ThreadName
   readonly start: readonly CommitId[]
-  readonly sources: readonly OfferSource[]
+  readonly sources: readonly ProposedSource[]
   readonly target: string
   readonly nonce: string
 }): RepoStep[] {
@@ -442,12 +449,12 @@ export function planOffer(input: {
   const top = sources.length - 1
   return [
     ...made,
-    ...planRefreshOffer(at(0), input.target),
+    ...planRefreshProposed(at(0), input.target),
     host(
       "bookmark",
       "set",
       "--allow-backwards",
-      offerBookmark(input.name),
+      proposedBookmark(input.name),
       "-r",
       at(top),
     ),
@@ -457,53 +464,55 @@ export function planOffer(input: {
   ]
 }
 
-/** An offer moved onto the target: its bottom, and the rest with it. */
-export const planRefreshOffer = (
+/** Proposed changes moved onto the target: its bottom, and the rest with it. */
+export const planRefreshProposed = (
   bottom: string,
   target: string,
 ): RepoStep[] => [rewrite("rebase", "-s", bottom, "-o", target)]
 
 /**
- * A single offer rebuilt from its lane in place: back onto where it
+ * Single proposed changes rebuilt from its lane in place: back onto where it
  * starts now, the lane's tip restored into it, onto the target again. Its
  * tree is then your target plus the lane's change since the start, which the
  * tip's files cannot give where it sits; its change id and bookmark stay.
  * With `description`, it is described again: the WIP line, when the
  * agent's message no longer describes it.
  */
-export function planRebuildOffer(input: {
-  readonly change: string
+export function planRebuildProposed(input: {
+  readonly changeId: string
   readonly start: readonly CommitId[]
   readonly tip: CommitId
   readonly target: string
   readonly description: string | null
 }): RepoStep[] {
-  const { change } = input
+  const { changeId } = input
   return [
-    rewrite("rebase", "-s", change, ...input.start.flatMap(c => ["-o", c])),
-    rewrite("restore", "--from", input.tip, "--into", change),
-    ...planRefreshOffer(change, input.target),
+    rewrite("rebase", "-s", changeId, ...input.start.flatMap(c => ["-o", c])),
+    rewrite("restore", "--from", input.tip, "--into", changeId),
+    ...planRefreshProposed(changeId, input.target),
     ...(input.description === null
       ? []
-      : planDescribe(change, input.description)),
+      : planDescribe(changeId, input.description)),
   ]
 }
 
-/** An offer's revisions abandoned, to build it again. */
-export const planAbandonOffer = (changes: readonly string[]): RepoStep[] =>
-  changes.length === 0 ? [] : [rewrite("abandon", ...changes)]
+/** Proposed changes' revisions abandoned, to build it again. */
+export const planAbandonProposed = (
+  changeIds: readonly string[],
+): RepoStep[] =>
+  changeIds.length === 0 ? [] : [rewrite("abandon", ...changeIds)]
 
-/** One revision of an offer described again (an agent's commit message). */
-export const planDescribe = (change: string, message: string): RepoStep[] => [
-  rewrite("describe", "-r", change, "-m", message),
+/** One revision of proposed changes described again (an agent's commit message). */
+export const planDescribe = (changeId: string, message: string): RepoStep[] => [
+  rewrite("describe", "-r", changeId, "-m", message),
 ]
 
 /**
  * After a race left a revision divergent: abandon the commit the host's own
- * operation made, and point the offer's bookmark at yours.
+ * operation made, and point the proposed changes' bookmark at yours.
  */
 export const planRepair = (input: {
-  /** The offer's bookmark, as its record holds it. */
+  /** The proposed changes' bookmark, as its record holds it. */
   readonly bookmark: string
   readonly hosts: CommitId
   readonly yours: CommitId
@@ -525,13 +534,13 @@ export const planRepair = (input: {
 ]
 
 /**
- * Accept an offer: its destination bookmark moved forward to its
- * top (`moveForward`), as the host, then the offer's bookmark and the host's
- * version of it forgotten (`forgetSteps`), once the destination holds the
- * offer. Never a rebase, and never your `@`.
+ * Accept proposed changes: its destination bookmark moved forward to its top
+ * (`moveForward`), as the host, then the proposed changes' bookmark and the
+ * host's version of it forgotten (`forgetSteps`), once the destination holds
+ * the proposed changes. Never a rebase, and never your `@`.
  */
-export function planOfferAcceptanceSteps(input: {
-  /** The offer's bookmark, as its record holds it. */
+export function planAcceptanceSteps(input: {
+  /** The proposed changes' bookmark, as its record holds it. */
   readonly bookmark: string
   readonly top: string
   /** The bookmark the acceptance moves: accepted work, or a WIP. */

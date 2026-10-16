@@ -74,7 +74,7 @@ const handles = new WeakMap<
 >()
 
 /** What a scripted model answers a describe request with, by default. */
-export const SCRIPTED_DESCRIPTION = "offer: scripted"
+export const SCRIPTED_DESCRIPTION = "proposed changes: scripted"
 
 /** What a scripted model says of a run's end: nothing is needed. */
 export const SCRIPTED_VERDICT = "done"

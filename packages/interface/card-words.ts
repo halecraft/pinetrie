@@ -72,7 +72,7 @@ export const commandWords = (command: CardCommand, at: CatchUps): string =>
  */
 export const commandNote = (command: CardCommand, at: CatchUps): string =>
   command === "split"
-    ? "⇶ splits the offer into a stack, with what you write as its brief"
+    ? "⇶ splits the changes into a stack, with what you write as its brief"
     : command === "continue-on-accepted"
       ? "↓ continues from accepted work first, then sends what you write"
       : `↓ catches up with ${fromName(commandFrom(command, at))} first, then sends what you write`

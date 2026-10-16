@@ -16,6 +16,7 @@
 - **Amended by:**
   - ADR-0098: the inbox is an icon button in the corner; folded, it is in the
     account menu.
+  - ADR-0153: an inbox item ready to accept is `ready` in code too.
 
 Builds on ADR-0090.
 

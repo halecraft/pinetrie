@@ -1,11 +1,12 @@
-// fact — what the host records in a thread: what a command on its offer did,
-// who stopped a run, a member dismissed or gone, and a budget spent.
+// fact — what the host records in a thread: what a command on its proposed
+// changes did, who stopped a run, a member dismissed or gone, and a budget
+// spent.
 
 import type {
+  AcceptanceDecision,
   Away,
   CatchUpFrom,
-  OfferAcceptanceDecision,
-  OfferFact,
+  ProposedChangesFact,
   QueuedFact,
   ThreadId,
   WriterId,
@@ -142,11 +143,11 @@ export function factLine(fact: QueuedFact): string {
     case "accepted":
       return `✓ accepted${into(fact.to)} as ${fact.as.slice(0, 8)}`
     case "described":
-      return "✎ a new description was asked for"
+      return "✎ a new description of the changes was asked for"
     case "squashed":
-      return "⇣ the stack was squashed into one revision"
+      return "⇣ the changes were squashed into one revision"
     case "refreshed":
-      return "↻ the offer was rebuilt from this thread's work"
+      return "↻ the changes were rebuilt from this thread's work"
     case "stopped":
       return fact.budget === undefined
         ? "■ the run was stopped"
@@ -180,13 +181,13 @@ export function tokensWords(tokens: number): string {
 export function factContent(fact: QueuedFact, name: string): string {
   switch (fact.kind) {
     case "accepted":
-      return `${name} accepted this thread's work${into(fact.to)}, as the change ${fact.as}: ${fact.bookmark} moved forward to it. That work is no longer offered; what you do next is offered on top of it.`
+      return `${name} accepted this thread's work${into(fact.to)}, as the commit with change id ${fact.as}: ${fact.bookmark} moved forward to it. That work is no longer proposed; what you do next is proposed on top of it.`
     case "described":
-      return `${name} asked for a new description of this thread's offer.`
+      return `${name} asked for a new description of this thread's proposed changes.`
     case "squashed":
-      return `${name} squashed this thread's offer back into one revision.`
+      return `${name} squashed this thread's proposed changes back into one revision.`
     case "refreshed":
-      return `${name} rebuilt this thread's offer from your work as it is now, discarding their edits to it.`
+      return `${name} rebuilt this thread's proposed changes from your work as it is now, discarding their edits to them.`
     case "stopped":
       return fact.budget === undefined
         ? `${name} stopped this run.`
@@ -221,12 +222,9 @@ export const encodeFact = (
 export const acceptedFact = (input: {
   readonly lane: ThreadId
   readonly by: WriterId
-  readonly decision: Extract<
-    OfferAcceptanceDecision,
-    { readonly kind: "accept" }
-  >
+  readonly decision: Extract<AcceptanceDecision, { readonly kind: "accept" }>
   readonly acceptedBookmark: string
-}): OfferFact => {
+}): ProposedChangesFact => {
   const { destination, top } = input.decision
   return {
     kind: "accepted",
@@ -241,12 +239,12 @@ export const acceptedFact = (input: {
   }
 }
 
-/** The fact of an offer action that is not an acceptance: what it did, and who asked. */
+/** The fact of an action on proposed changes that are not an acceptance: what it did, and who asked. */
 export const actionFact = (
   action: "describe" | "squash" | "refresh",
   lane: ThreadId,
   by: WriterId,
-): OfferFact => ({
+): ProposedChangesFact => ({
   kind:
     action === "describe"
       ? "described"

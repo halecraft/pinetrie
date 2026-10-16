@@ -5,7 +5,7 @@ import {
   type DiffSpan,
   type EntryId,
   isFolderStateId,
-  type OfferRecord,
+  type ProposedChangesRecord,
   type RevisionRecord,
   type RevisionReview,
   spanKey,
@@ -13,7 +13,7 @@ import {
 } from "@pinetrie/core"
 import { Type } from "typebox"
 import { decodeWith } from "./decode.ts"
-import { offerStatus } from "./offer.ts"
+import { proposedChangesStatus } from "./proposed.ts"
 
 const ReviewFileSchema = Type.Object({
   path: Type.String({ minLength: 1 }),
@@ -46,25 +46,25 @@ const RevisionReviewSchema = Type.Object({
 
 /**
  * A revision's review from the wire: jj's output on the host, the host's
- * answer in the page. A change to it bumps `OFFER_WIRE`.
+ * answer in the page. A change to it bumps `REVIEW_WIRE`.
  */
 export const decodeRevisionReview = (
   value: unknown,
 ): RevisionReview | undefined => decodeWith(RevisionReviewSchema, value, r => r)
 
 /**
- * The version of what `/offer/` answers: `REVISION_READ` (`@pinetrie/lanes`)
+ * The version of what `/review/` answers: `REVISION_READ` (`@pinetrie/lanes`)
  * and the range read (`@pinetrie/jj`), `decodeRevisionReview`, `fileDiff`'s
  * flags, and the URLs' spans. Every answer is cached as immutable under a URL holding it,
  * so a change to any of them bumps it, or pages keep the old shape.
  */
-export const OFFER_WIRE = 3
+export const REVIEW_WIRE = 3
 
 /**
  * What a page asks: a span's review, or one file's diff in it. The commits
- * are the request's strings until `planOfferRead` finds them in a record.
+ * are the request's strings until `planReviewRead` finds them in a record.
  */
-export type OfferAsk =
+export type ReviewAsk =
   | { readonly kind: "review"; readonly span: AskedSpan }
   | {
       readonly kind: "diff"
@@ -77,18 +77,18 @@ type AskedSpan =
   | { readonly kind: "revision"; readonly commit: string }
   | { readonly kind: "range"; readonly from: string; readonly to: string }
 
-const OFFER_PREFIX = "/offer/"
+const REVIEW_PREFIX = "/review/"
 
 /**
- * A span's review: `/offer/<OFFER_WIRE>/review/<commit>` for a revision,
+ * A span's review: `/review/<REVIEW_WIRE>/review/<commit>` for a revision,
  * `…/review/<from>..<to>` for a range (`spanKey`).
  */
 export const reviewUrl = (span: DiffSpan): string =>
-  `${OFFER_PREFIX}${OFFER_WIRE}/review/${spanKey(span)}`
+  `${REVIEW_PREFIX}${REVIEW_WIRE}/review/${spanKey(span)}`
 
-/** One file's diff in a span: `/offer/<OFFER_WIRE>/diff/<span>?path=…`. */
+/** One file's diff in a span: `/review/<REVIEW_WIRE>/diff/<span>?path=…`. */
 export const diffUrl = (span: DiffSpan, path: string): string =>
-  `${OFFER_PREFIX}${OFFER_WIRE}/diff/${spanKey(span)}?${new URLSearchParams({ path })}`
+  `${REVIEW_PREFIX}${REVIEW_WIRE}/diff/${spanKey(span)}?${new URLSearchParams({ path })}`
 
 const HEX = /^[0-9a-f]+$/
 
@@ -107,17 +107,17 @@ function parseSpan(text: string | undefined): AskedSpan | null {
 }
 
 /**
- * An `/offer/` path as an ask: `bad` for anything else under `/offer/`,
+ * A `/review/` path as an ask: `bad` for anything else under `/review/`,
  * another version included, so the host answers only the wire it speaks;
  * null for a path outside it.
  */
-export function parseOfferPath(url: URL): OfferAsk | "bad" | null {
-  if (url.pathname !== "/offer" && !url.pathname.startsWith(OFFER_PREFIX))
+export function parseReviewPath(url: URL): ReviewAsk | "bad" | null {
+  if (url.pathname !== "/review" && !url.pathname.startsWith(REVIEW_PREFIX))
     return null
   const [version, kind, named, ...rest] = url.pathname
-    .slice(OFFER_PREFIX.length)
+    .slice(REVIEW_PREFIX.length)
     .split("/")
-  if (version !== String(OFFER_WIRE) || rest.length > 0) return "bad"
+  if (version !== String(REVIEW_WIRE) || rest.length > 0) return "bad"
   const span = parseSpan(named)
   if (span === null) return "bad"
   if (kind === "review") return { kind: "review", span }
@@ -130,9 +130,9 @@ export function parseOfferPath(url: URL): OfferAsk | "bad" | null {
 export const MAX_DIFF_BYTES = 1024 * 1024
 
 /**
- * A span found in a record: an offer's revision, or a range one lane's turns
- * recorded or a folder offer holds, naming that lane, whose points only it
- * can read.
+ * A span found in a record: proposed changes' revision, or a range one lane's
+ * turns recorded or folder proposed changes hold, naming that lane, whose
+ * points only it can read.
  */
 export type RecordedSpan =
   | Extract<DiffSpan, { readonly kind: "revision" }>
@@ -140,7 +140,7 @@ export type RecordedSpan =
       readonly lane: ThreadId
     })
 
-type OfferRead =
+type ReviewRead =
   | { readonly kind: "review"; readonly span: RecordedSpan }
   | {
       readonly kind: "diff"
@@ -159,18 +159,18 @@ const CONTROL = /[\u0000-\u001f\u007f]/
 
 /**
  * What a request may read, so it reaches nothing of your repo but what a thread
- * made: a revision an open offer holds now (what accepting it would bring), a
- * range between two states one lane's turns recorded (an ask's work), or an
- * open folder offer's `start..tip`, with that lane. The ids read are the
- * records', never the request's strings.
+ * made: a revision open proposed changes hold now (what accepting it would
+ * bring), a range between two states one lane's turns recorded (an ask's work),
+ * or an open folder proposed changes' `start..tip`, with that lane. The ids
+ * read are the records', never the request's strings.
  */
-export function planOfferRead(
+export function planReviewRead(
   facts: {
-    readonly offers: ReadonlyMap<ThreadId, OfferRecord>
+    readonly proposedByLane: ReadonlyMap<ThreadId, ProposedChangesRecord>
     readonly revisions: ReadonlyMap<EntryId, RevisionRecord>
   },
-  ask: OfferAsk,
-): OfferRead {
+  ask: ReviewAsk,
+): ReviewRead {
   const span = recordedSpan(facts, ask.span)
   if (span === null)
     return {
@@ -178,7 +178,7 @@ export function planOfferRead(
       status: 404,
       reason:
         ask.span.kind === "revision"
-          ? "no open offer holds it"
+          ? "no open proposed changes hold it"
           : "no lane recorded both",
     }
   if (ask.kind === "review") return { kind: "review", span }
@@ -188,21 +188,23 @@ export function planOfferRead(
 }
 
 function recordedSpan(
-  facts: Parameters<typeof planOfferRead>[0],
+  facts: Parameters<typeof planReviewRead>[0],
   asked: AskedSpan,
 ): RecordedSpan | null {
   if (asked.kind === "revision") {
-    const commit = [...facts.offers.values()]
+    const commit = [...facts.proposedByLane.values()]
       .flatMap(o =>
-        o.kind === "jj" && offerStatus(o).kind === "open" ? o.commits : [],
+        o.kind === "jj" && proposedChangesStatus(o).kind === "open"
+          ? o.commits
+          : [],
       )
       .find(c => c === asked.commit)
     return commit === undefined ? null : { kind: "revision", commit }
   }
-  for (const o of facts.offers.values())
+  for (const o of facts.proposedByLane.values())
     if (
       o.kind === "folder" &&
-      offerStatus(o).kind === "open" &&
+      proposedChangesStatus(o).kind === "open" &&
       o.start === asked.from &&
       o.tip === asked.to
     )
@@ -216,7 +218,7 @@ function recordedSpan(
   return null
 }
 
-export type OfferAnswer =
+export type ReviewAnswer =
   | { readonly kind: "review"; readonly review: RevisionReview }
   | { readonly kind: "diff"; readonly text: string }
   | {
@@ -226,7 +228,7 @@ export type OfferAnswer =
     }
 
 /** A review as jj printed it, unchecked: decoded, or 502, the host's read having failed. */
-export function answerReview(got: unknown): OfferAnswer {
+export function answerReview(got: unknown): ReviewAnswer {
   const review = decodeRevisionReview(got)
   return review === undefined
     ? { kind: "refused", status: 502, reason: "the host's read failed" }
@@ -234,7 +236,7 @@ export function answerReview(got: unknown): OfferAnswer {
 }
 
 /** A diff as jj printed it: 502 when the read failed, 413 past `MAX_DIFF_BYTES`. */
-export function answerDiff(text: string | null): OfferAnswer {
+export function answerDiff(text: string | null): ReviewAnswer {
   if (text === null)
     return { kind: "refused", status: 502, reason: "the host's read failed" }
   if (new TextEncoder().encode(text).length > MAX_DIFF_BYTES)

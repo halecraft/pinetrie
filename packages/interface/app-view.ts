@@ -15,7 +15,7 @@ import {
   type LaneRecord,
   type LaneView,
   laneWork,
-  type OfferRecord,
+  type ProposedChangesRecord,
   projectRail,
   type RailRow,
   type RootId,
@@ -27,7 +27,7 @@ import {
   type Workflow,
   type WriterId,
 } from "@pinetrie/core"
-import { displayName, offerStatus } from "@pinetrie/rules"
+import { displayName, proposedChangesStatus } from "@pinetrie/rules"
 import { PENDING_TRACK } from "./column-paths.ts"
 import type { Column } from "./columns.ts"
 import type { Intent } from "./intent.ts"
@@ -75,7 +75,7 @@ export interface AppViewInput {
   readonly archived: ReadonlyMap<TaskId, ArchivedTask>
   readonly workflow: Workflow | null
   readonly nameOf: ReadonlyMap<WriterId, string>
-  readonly offers: ReadonlyMap<ThreadId, OfferRecord>
+  readonly proposedByLane: ReadonlyMap<ThreadId, ProposedChangesRecord>
   /** Each lane's ssh identities and its owner's answers. */
   readonly access: ReadonlyMap<ThreadId, AccessRecord>
   /** The lanes of the roots this tab holds. */
@@ -139,18 +139,18 @@ export function taskWork(
 const WORK_ORDER: readonly RootWork[] = ["held", "waiting", "running"]
 
 /**
- * An open offer (`offerStatus`), for your inbox and the board's ⇡:
- * its lane, its root entry, and where it opens: its lane's tip, or its root
- * entry in a root this tab does not hold.
+ * Open proposed changes (`proposedChangesStatus`), for your inbox and the
+ * board's ⇡: its lane, its root entry, and where it opens: its lane's tip, or
+ * its root entry in a root this tab does not hold.
  */
-export interface OpenOffer {
+export interface OpenProposedChanges {
   readonly lane: ThreadId
   readonly root: EntryId
   readonly end: EntryId
   /**
-   * The lane tip it holds (a jj offer's `ledger.source`, a folder offer's
-   * `tip`): "not needed" holds until new work moves it. Null for a jj offer
-   * whose message carries none.
+   * The lane tip it holds (jj proposed changes' `ledger.source`, folder
+   * proposed changes' `tip`): "not needed" holds until new work moves it. Null
+   * for jj proposed changes whose message carries none.
    */
   readonly source: string | null
 }
@@ -164,14 +164,14 @@ export interface SshAsk {
 
 export function appView(input: AppViewInput): {
   readonly stage: Stage
-  /** Open offers whose lane has a tip, for your inbox and the board. */
-  readonly offers: readonly OpenOffer[]
+  /** Open proposed changes whose lane have a tip, for your inbox and the board. */
+  readonly openProposed: readonly OpenProposedChanges[]
   /** Lanes waiting for their owner's answer, for the owner's inbox. */
   readonly sshAsks: readonly SshAsk[]
 } {
   return {
     stage: stageOf(input),
-    offers: openOffers(input),
+    openProposed: openProposed(input),
     sshAsks: sshAsks(input),
   }
 }
@@ -213,15 +213,16 @@ function stageOf(input: AppViewInput): Stage {
 }
 
 /**
- * The offers with work to add (`offerStatus`'s `open`; not one accepted, nor
- * one accepted work already holds), each in a root with an entry. A lane this
- * tab holds opens at its tip, and one with none yet is left out; any other
- * lane opens at its root entry.
+ * The proposed changes with work to add (`proposedChangesStatus`'s `open`; not
+ * one accepted, nor one accepted work already holds), each in a root with an
+ * entry. A lane this tab holds opens at its tip, and one with none yet is left
+ * out; any other lane opens at its root entry.
  */
-const openOffers = (input: AppViewInput): readonly OpenOffer[] =>
-  [...input.offers.values()].flatMap(o => {
+const openProposed = (input: AppViewInput): readonly OpenProposedChanges[] =>
+  [...input.proposedByLane.values()].flatMap(o => {
     const root = input.laneRoots.get(o.lane)
-    if (offerStatus(o).kind !== "open" || root === undefined) return []
+    if (proposedChangesStatus(o).kind !== "open" || root === undefined)
+      return []
     const source = o.kind === "jj" ? (o.ledger?.source ?? null) : o.tip
     const held = input.lanes.find(l => l.name === o.lane)
     if (held === undefined) return [{ lane: o.lane, root, end: root, source }]

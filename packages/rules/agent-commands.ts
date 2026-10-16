@@ -18,8 +18,8 @@ import {
 import { type CatchUpNow, type ParentNow, parentAhead } from "./base.ts"
 import type { LandMessage } from "./land.ts"
 import { type PlaceStep, planMake } from "./moves.ts"
-import type { OfferStatus } from "./offer.ts"
 import { orderAfter } from "./order.ts"
+import type { ProposedChangesStatus } from "./proposed.ts"
 import { queuedOn } from "./queue.ts"
 import type { UpdateMessage } from "./update.ts"
 
@@ -173,43 +173,47 @@ export function resolveAnswer(
   return { text, isError: true, details: null }
 }
 
-/** Why `split_offer` queued nothing. */
-export type SplitRefusal = "folder" | "no-offer" | "queued" | "splitting"
+/** Why `split_proposed_changes` queued nothing. */
+export type SplitRefusal =
+  | "folder"
+  | "no-proposed-changes"
+  | "queued"
+  | "splitting"
 
-/** `split_offer`'s refusals, worded once. */
+/** `split_proposed_changes`'s refusals, worded once. */
 export function splitRefusal(code: SplitRefusal): string {
   switch (code) {
     case "folder":
-      return "A folder project's offer is its files, never a stack of revisions: there is nothing to split."
-    case "no-offer":
-      return "This thread has no offer to split: nothing of its work is offered."
+      return "A folder project's proposed changes are its files, never a stack of revisions: there is nothing to split."
+    case "no-proposed-changes":
+      return "This thread has no proposed changes to split: none of its work waits to be accepted."
     case "queued":
-      return "A split of this thread's offer is already queued."
+      return "A split of this thread's proposed changes is already queued."
     case "splitting":
       return "This run is the split."
   }
 }
 
-/** What `split_offer` answers when the host refused its own card, which it never does. */
+/** What `split_proposed_changes` answers when the host refused its own card, which it never does. */
 export const SPLIT_UNMADE =
   "The split was not queued: the host could not make its card."
 
-/** What `split_offer` answers once it queued the split. */
+/** What `split_proposed_changes` answers once it queued the split. */
 export const SPLIT_QUEUED =
   "Queued: the split runs when this run ends, as a run of its own."
 
 /**
- * Whether `split_offer` queues a split, from any run: a lane whose history
- * has revisions (a folder lane's offer is files), an open offer to split,
- * none queued, and no split running. A card waits for the
- * run's end, so queueing one touches nothing in the run. The card carries
- * the `split` command and no text, queued after the lane's last card by the
- * person behind the run (`promptAuthor`).
+ * Whether `split_proposed_changes` queues a split, from any run: a lane whose
+ * history has revisions (a folder lane's proposed changes are files), open
+ * proposed changes to split, none queued, and no split running. A card waits
+ * for the run's end, so queueing one touches nothing in the run. The card
+ * carries the `split` command and no text, queued after the lane's last card by
+ * the person behind the run (`promptAuthor`).
  */
 export function planSplitCall(input: {
   /** The lane's history's kind; null for a lane with no copy of its own. */
   readonly history: ProjectKind | null
-  readonly offer: OfferStatus
+  readonly proposed: ProposedChangesStatus
   readonly cards: readonly CardRecord[]
   readonly lane: ThreadId
   /** The role of the lane's latest prompt, and whether it runs. */
@@ -223,7 +227,8 @@ export function planSplitCall(input: {
   /** The host's own make of the card was refused, which none is: its shell logs it. */
   | { readonly kind: "unmade"; readonly code: MoveRefusal } {
   if (input.history === "folder") return { kind: "refused", why: "folder" }
-  if (input.offer.kind !== "open") return { kind: "refused", why: "no-offer" }
+  if (input.proposed.kind !== "open")
+    return { kind: "refused", why: "no-proposed-changes" }
   if (input.running && input.prompt === "stack")
     return { kind: "refused", why: "splitting" }
   const queued = queuedOn(input.cards, input.lane)

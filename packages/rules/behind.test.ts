@@ -3,7 +3,7 @@ import {
   commitId,
   type JjAcceptedRecord,
   type JjBaseRecord,
-  type JjOfferRecord,
+  type JjProposedChangesRecord,
   pointFromCommit,
   pointId,
   threadIdFor,
@@ -55,10 +55,10 @@ const base = (over: Partial<JjBaseRecord> = {}): JjBaseRecord => ({
   ...over,
 })
 
-const offer = {
+const proposed = {
   files: ["a.ts", "c.ts"],
   conflicts: ["a.ts"],
-} as unknown as JjOfferRecord
+} as unknown as JjProposedChangesRecord
 
 const VIEW: BehindView = {
   from: { kind: "accepted" },
@@ -76,13 +76,13 @@ describe("planBaseNews", () => {
       own: true,
       base: base(),
       accepted: line(),
-      offer,
+      proposed,
       known: null,
       told: null,
       ...over,
     })
 
-  test("a lane with work of its own is told: the files, those it changed too, and its offer's conflicts", () => {
+  test("a lane with work of its own is told: the files, those it changed too, and its proposed changes' conflicts", () => {
     expect(news()).toEqual({ kind: "tell", view: VIEW })
   })
 
@@ -130,7 +130,7 @@ describe("the behind message", () => {
     const text = behindContent(VIEW)
     expect(text).toContain("accepted work has moved on")
     expect(text).toContain("This thread changed these too:\n- a.ts\n")
-    expect(text).toContain("conflicts with it in:\n- a.ts\n")
+    expect(text).toContain("conflict with it in:\n- a.ts\n")
     expect(text).toContain("call `catch_up`")
     const many = behindContent({
       ...VIEW,

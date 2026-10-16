@@ -841,8 +841,8 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   it forks. It shows no commit and nothing of where the lane works.
 - **The work strip** (`WorkStripView`, a row of the column's header,
   ADR-0113) is the lane's
-  offer for its own copy (ADR-0105): `offerWords`' line, which opens the
-  review while the offer is open and holds files (ADR-0047, below), the
+  proposed changes for its own copy (ADR-0105): `workStripWords`' line, which opens the
+  review while the proposed changes are open and hold files (ADR-0047, below), the
   bookmark apart, which a press copies to find it in jj or jjui, its
   buttons, and a `⋯` menu for the rest
   ("catch up with accepted work", "rewrite description"). What the lane runs
@@ -853,8 +853,8 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   ADR-0061, ADR-0080): the button is the `queueNew` act, which makes a card
   in the queue with the command and no text, in one `queue-card` request:
   it is never drawn as a note. A split waits while the thread works, and a
-  queued one makes the strip's split button quiet (`offerView`'s
-  `queued`); only a catch-up makes the offer busy. The card carries its
+  queued one makes the strip's split button quiet (`workStripView`'s
+  `queued`); only a catch-up makes the proposed changes busy. The card carries its
   command from its first write, so the drain the queueing starts pops it
   with it. Your message in the composer is not touched. A card that carries a command anyway (one unqueued) says above its box what
   sending it does first (`commandNote`), its placeholder says its text is
@@ -864,7 +864,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   the host carries the command out when it pops it.
 - **One-line messages** (`LINE_ROLES`, core) show as one line each: `land`,
   `update`, `stack`, `carry-on`, `heard`, and the host's facts, `fact`
-  (what a command on the offer did, ADR-0080; a stop, a member gone, a
+  (what a command on the proposed changes did, ADR-0080; a stop, a member gone, a
   budget spent, a canvas change) and `behind` (the base's new work). The
   host wrote them all, so each one's speaker is pine·trie (`speakerWords`,
   `@pinetrie/interface`). The speaker label says who wrote a line, as it
@@ -879,20 +879,21 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   (ADR-0080).
 - **"Needs you" comes from the tree** (ADR-0080): the strip's `needs_you`
   is the thread's newest `ask_about_conflict` (`conflictAskedAt`) when it is
-  newer than the offer's record.
-- **Open offers in your repo** ("work ready to accept") are your inbox's
+  newer than the proposed changes' record.
+- **Open proposed changes in your repo** ("changes ready to accept") are your inbox's
   rows for the threads you follow, each leading with the thread's name and
   opening it, and a thread card's ⇡ for everyone (ADR-0091). Move to Done
-  in an item's `⋯` names the threads whose offers it withdraws (`offeredByTask`,
-  `dropsWords`). All read `openOffers`, which keeps only `offerStatus`'s
+  in an item's `⋯` names the threads whose proposed changes it withdraws (`openProposedByTask`,
+  `dropsWords`). All read `openProposed`, which keeps only `proposedChangesStatus`'s
   `open` (ADR-0067): one accepted work already holds (`held`) has nothing to
   add, so it is neither counted nor named, as the strip says.
-- **Selectors in the browser suite:** a column's offer is `.work.offer`, with
+- **Selectors in the browser suite:** a column's work strip is
+  `.work.work-strip`, with
   `data-state` (`ready`, `conflicts`, `stack`, and the rest of
-  `offerView`'s states); its line is `.offer-line` (a button when the offer
+  `workStripView`'s states); its line is `.work-line` (a button when the proposed changes
   can be reviewed; its caret is CSS, so its text is the words alone), its
-  bookmark `.offer-bookmark`, and each button `.offer-<button>`, the add
-  button being `.offer-accept`. The review is `.review`, with `.review-list` (rows
+  bookmark `.work-bookmark`, and each button `.work-<button>`, the add
+  button being `.work-accept`. The review is `.review`, with `.review-list` (rows
   `.review-list-file`, titled with the display path) and `.review-diffs`;
   each file is `.review-file[data-key][data-letter][data-state]`, its head
   `.review-file-head`, its diff `.review-diff` of `[data-kind]` lines. The
@@ -909,11 +910,11 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   that same-origin requests and upgrades carry. `connectSession({ key })` is
   for Node clients.
 
-## Reviewing an offer (`review.ts`, `review-pane.tsx`, `use-fetched.ts`, ADR-0047)
+## The review (`review.ts`, `review-pane.tsx`, `use-fetched.ts`, ADR-0047)
 
-The offer's line opens a review in the column's pane ("A column's pane",
-below). So does an ask's file count (ADR-0106): every review is of spans
-(`DiffSpan`), an offer's revisions or an ask's range from its prompt's
+The work strip's line opens a review in the column's pane (`{ kind:
+"strip" }`, "A column's pane", below). So does an ask's file count (ADR-0106): every review is of spans
+(`DiffSpan`), proposed changes' revisions or an ask's range from its prompt's
 commit to its last turn's (`askReviewTarget`), and `ReviewTarget.title`
 heads a range, which has no description.
 
@@ -947,15 +948,15 @@ heads a range, which has no description.
   a hanging indent of one character, so a continuation clears the `+`/`−`
   column. A wrapped section may load taller than its placeholder's
   estimate; scroll anchoring absorbs it, as it does any section.
-- **A 404 for a commit the offer has just left is brief:** the record arrives
+- **A 404 for a commit the proposed changes have just left is brief:** the record arrives
   with the new commits, and the review asks for their URLs.
 
 ## A column's pane (`pane.ts`, `pane.tsx`, ADR-0078)
 
 Beside the thread, a column has one pane, holding one thing at a time: the
-offer's review, an ask's, a table from a message, or a stored image.
+proposed changes' review, an ask's, a table from a message, or a stored image.
 
-- **A subject is a name, never data** (`PaneSubject`): the offer,
+- **A subject is a name, never data** (`PaneSubject`): the proposed changes,
   board (drawn while the column has a thread end), an ask by
   its entry, a table or an image of a message's text by its block's
   address (ADR-0126), an image that is no block (a tool's result, a reply
@@ -963,10 +964,10 @@ offer's review, an ask's, a table from a message, or a stored image.
   `paneKey` names it as a string; `samePane` compares keys, and the pane is
   keyed by it, so another subject mounts afresh and comes into view.
 - **`paneView` decides what a subject draws, and null closes the pane.**
-  The offer's review goes with the strip's, an ask's with its span, a table
+  The proposed changes' review goes with the strip's, an ask's with its span, a table
   or an image with its message leaving the column (`ColumnView.nodes`).
   `Column` resets its one state in render when the view is null, so no
-  frame draws a pane that is gone, and the next offer does not open it
+  frame draws a pane that is gone, and the next proposed changes do not open it
   unasked. `Column` asks on every render: a message's tree is parsed once
   per node (`treeOf`, a `WeakMap`), and `App` keeps a column's nodes while
   the index is the same, so a table keeps its identity and `TablePane`,

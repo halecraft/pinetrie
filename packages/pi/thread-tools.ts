@@ -1,11 +1,11 @@
-// pi/thread-tools — the tools an agent acts on its own thread with:
-// `catch_up`, which merges its base's or its parent's new work into its copy
-// during the run, `resolve_conflict`, which closes a folder lane's conflicted
-// path, and `split_offer`, which queues its offer's split; and the
-// tools it talks to other threads' agents with: `ask`, which
-// relays an ask to a member without waiting, and `leave`. The host
-// decides and carries them out (`LaneHooks`); this only reads the call and
-// hands back the host's answer, as the model reads it.
+// pi/thread-tools — the tools an agent acts on its own thread with: `catch_up`,
+// which merges its base's or its parent's new work into its copy during the
+// run, `resolve_conflict`, which closes a folder lane's conflicted path, and
+// `split_proposed_changes`, which queues its proposed changes' split; and the
+// tools it talks to other threads' agents with: `ask`, which relays an ask to a
+// member without waiting, and `leave`. The host decides and carries them out
+// (`LaneHooks`); this only reads the call and hands back the host's answer, as
+// the model reads it.
 
 import {
   ASK_TOOL,
@@ -141,15 +141,15 @@ export function resolveTool(
 }
 
 /**
- * `split_offer`: the host queues a card that splits the offer when
- * the run ends, as the strip's button does.
+ * `split_proposed_changes`: the host queues a card that splits the proposed
+ * changes when the run ends, as the strip's button does.
  */
 export function splitTool(askSplit: (lane: ThreadId) => Promise<ToolAnswer>) {
   return {
     name: SPLIT_TOOL,
-    label: "split the offer",
+    label: "split the changes",
     description:
-      "Ask for this thread's offer to be split into a stack of reviewable revisions. The split runs after this run ends, as a run of its own, and the person reviews the stack before taking it.",
+      "Ask for this thread's proposed changes to be split into a stack of reviewable revisions. The split runs after this run ends, as a run of its own, and the person reviews the stack before accepting it.",
     parameters: Type.Object({}),
     async execute(
       _id: string,

@@ -1,10 +1,10 @@
-// The port suite against the folder adapter: lanehost's disks role run in
-// this process over a btrfs directory, as `packages/lanehost/disks.test.ts`
-// runs it, the project's folder a directory beside it, and a lane's commands run on
-// the host in its disk. The rig's test-only hooks read the graph and a
-// diff of their own (`git diff --no-index` of two snapshots), and accept an
-// offer by writing the lane's tip into the project's folder and recording the read
-// as an accept. Where there is no btrfs, it skips, saying why.
+// The port suite against the folder adapter: lanehost's disks role run in this
+// process over a btrfs directory, as `packages/lanehost/disks.test.ts` runs it,
+// the project's folder a directory beside it, and a lane's commands run on the
+// host in its disk. The rig's test-only hooks read the graph and a diff of
+// their own (`git diff --no-index` of two snapshots), and accept an proposed
+// changes by writing the lane's tip into the project's folder and recording the
+// read as an accept. Where there is no btrfs, it skips, saying why.
 
 import { cp, mkdir, readFile, rm, statfs, writeFile } from "node:fs/promises"
 import path from "node:path"
@@ -256,7 +256,7 @@ async function makeRig(): Promise<FolderRig> {
         conflicts: [
           ...recordsOf(CONFLICT, values(CONFLICT.namespace)).values(),
         ],
-        offers: [],
+        proposed: [],
         keep: 1,
       })
       if (gone.length > 0)

@@ -1,23 +1,23 @@
 // host/routes — what the host does with a request or an upgrade, pure:
 // admission first (admission.ts), then which requests it answers itself, an
-// image blob or a read of an offer. Everything else is the page's: Vite's,
+// image blob or a review's read. Everything else is the page's: Vite's,
 // or a file of the built page (`planPageRequest`). `http.ts` carries each
 // plan out.
 
 import { isSha256, type Sha256 } from "@pinetrie/core"
-import { type OfferAsk, parseOfferPath } from "@pinetrie/rules"
+import { parseReviewPath, type ReviewAsk } from "@pinetrie/rules"
 import { admits, type RequestFacts } from "./admission.ts"
 
 export type Route =
   | { readonly kind: "blob-get"; readonly sha: Sha256 | null }
   | { readonly kind: "blob-post" }
-  | { readonly kind: "offer"; readonly ask: OfferAsk }
+  | { readonly kind: "review"; readonly ask: ReviewAsk }
   | { readonly kind: "bad" }
   | { readonly kind: "other" }
 
 /**
  * What a request is for. `GET /blob/<anything>` is a blob's, with a null hash
- * when it names none: a 404. Anything under `/offer/` that `parseOfferPath`
+ * when it names none: a 404. Anything under `/review/` that `parseReviewPath`
  * does not accept, or that is not a `GET`, is `bad`: a 400. Neither reaches
  * the page: Vite's fallback would answer `index.html`.
  */
@@ -28,16 +28,16 @@ export function route(method: string | undefined, url: URL): Route {
     return { kind: "blob-get", sha: isSha256(sha) ? sha : null }
   }
   if (pathname === "/blob" && method === "POST") return { kind: "blob-post" }
-  const ask = parseOfferPath(url)
+  const ask = parseReviewPath(url)
   if (ask === null) return { kind: "other" }
   if (ask === "bad" || method !== "GET") return { kind: "bad" }
-  return { kind: "offer", ask }
+  return { kind: "review", ask }
 }
 
 /**
  * A request: refused, redirected without the key it carried (the cookie a
  * link sets keeps it), or routed. Admission comes first: nothing reaches
- * the page, the blobs or an offer's reads without it.
+ * the page, the blobs or a review's reads without it.
  */
 export function planRequest(
   facts: RequestFacts,

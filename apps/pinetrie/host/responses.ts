@@ -1,5 +1,5 @@
-// host/responses — every answer the host gives over HTTP itself, pure: a
-// blob, an upload's outcome, an offer's read. `http.ts` writes each one with
+// host/responses — every answer the host gives over HTTP itself, pure: a blob,
+// an upload's outcome, proposed changes' read. `http.ts` writes each one with
 // `send`.
 
 import {
@@ -10,7 +10,7 @@ import {
   OPAQUE_MIME,
   type StoredBlob,
 } from "@pinetrie/core"
-import type { OfferAnswer } from "@pinetrie/rules"
+import type { ReviewAnswer } from "@pinetrie/rules"
 
 export interface HttpAnswer<
   Body extends string | Uint8Array = string | Uint8Array,
@@ -22,9 +22,9 @@ export interface HttpAnswer<
 
 /**
  * A blob is named by its bytes' hash, and a review or a diff by a commit and
- * the wire's version, so their answers never change and are cached for a
- * year. A refusal may change a moment later (the offer moved, and its record
- * has not yet arrived), so it is never stored.
+ * the wire's version, so their answers never change and are cached for a year.
+ * A refusal may change a moment later (the proposed changes moved, and its
+ * record has not yet arrived), so it is never stored.
  */
 const IMMUTABLE = {
   "cache-control": "private, max-age=31536000, immutable",
@@ -32,7 +32,7 @@ const IMMUTABLE = {
   "content-security-policy": "default-src 'none'",
 }
 
-export function offerResponse(answer: OfferAnswer): HttpAnswer<string> {
+export function reviewResponse(answer: ReviewAnswer): HttpAnswer<string> {
   switch (answer.kind) {
     case "review":
       return {

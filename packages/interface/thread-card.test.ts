@@ -37,13 +37,13 @@ const facts = (over: Partial<ThreadCardFacts> = {}): ThreadCardFacts => ({
   labels: new Map([[K1, "Tab names"]]),
   status: new Map(),
   pips: new Set([K1]),
-  offered: new Map([[K1, ["amber-fox"]]]),
+  proposed: new Map([[K1, ["amber-fox"]]]),
   work: new Map([[K1, "running"]]),
   ...over,
 })
 
 describe("threadCardHead", () => {
-  test("its label, ⇡, your pip, and Move to ▸ each other state; into the archive refused while the agent works, naming the offers it withdraws", () => {
+  test("its label, ⇡, your pip, and Move to ▸ each other state; into the archive refused while the agent works, naming the proposed changes it withdraws", () => {
     const head = threadCardHead(K1, facts())
     expect(head).toMatchObject({
       task: K1,
@@ -71,7 +71,7 @@ describe("threadCardHead", () => {
     expect(
       threadCardHead(
         K1,
-        facts({ pips: new Set(), offered: new Map(), work: new Map() }),
+        facts({ pips: new Set(), proposed: new Map(), work: new Map() }),
       ),
     ).toMatchObject({ status: null, ready: [], pip: false })
     expect(threadCardHead(K1, facts({ stateOf: new Map() })).moves).toEqual([])

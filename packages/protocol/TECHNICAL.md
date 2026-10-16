@@ -45,7 +45,7 @@ decisions:
 | `mark` | ADR-0045, ADR-0116 |
 | `card-width` | ADR-0116 |
 | `retitle` | ADR-0074 |
-| `offer` | an acceptance names what it was shown (ADR-0065) |
+| `proposed` | an acceptance names what it was shown (ADR-0065) |
 | `setup`, `publish` | ADR-0104, ADR-0090; `line` is no kind (ADR-0100) |
 | `reserve` | ADR-0057 |
 | `spin-off` | ADR-0111, ADR-0126 |
@@ -68,7 +68,7 @@ after its step, which a client draws its move until (ADR-0059).
 
 `writersPolicy` is registered on every peer, and Kyneta judges `canWrite`
 against a peer's own identity for its local writes as well as against the
-sender of every offer. So a client's write to a document it may not write
+sender of every proposed changes. So a client's write to a document it may not write
 throws before anything is applied: a refused write left in a client's copy
 diverges it for good (S28, S76). It judges the sender, not the author, so
 the host, which relays a person's documents between their tabs, is one of

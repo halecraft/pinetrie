@@ -103,23 +103,24 @@ export const mutations: readonly Mutation[] = [
   // ── the lanes suite, proven in a lane ──
   // ── a folder project, in the lanes suite ──
   {
-    name: "a folder lane's offer holds no file",
-    file: "apps/pinetrie/host/folder/offers.ts",
+    name: "a folder lane's proposed changes hold no file",
+    file: "apps/pinetrie/host/folder/proposed.ts",
     from: "      files: input.files,\n",
     to: "      files: [],\n",
     suite: "lanes",
     scenario: "folder",
     expect:
-      "a folder lane's offer is the files it changed, against accepted work's newest state",
+      "a folder lane's proposed changes are the files it changed, against accepted work's newest state",
   },
   {
-    name: "a folder offer's review lists no file",
-    file: "apps/pinetrie/host/folder/offers.ts",
+    name: "folder proposed changes' review lists no file",
+    file: "apps/pinetrie/host/folder/proposed.ts",
     from: "        reader.disks.diffStats(from, to, files),",
     to: "        reader.disks.diffStats(from, to, []),",
     suite: "lanes",
     scenario: "folder",
-    expect: "the offer is reviewed as files, with their line counts",
+    expect:
+      "the proposed changes are reviewed as files, with their line counts",
   },
   {
     name: "the project's folder's watcher reads nothing",
@@ -491,7 +492,7 @@ export const mutations: readonly Mutation[] = [
     suite: "lanes",
     scenario: "main",
     expect:
-      "a card that brings the thread up to date runs the resolution when it conflicts, with the card's text, and the offer comes back clean",
+      "a card that brings the thread up to date runs the resolution when it conflicts, with the card's text, and the proposed changes come back clean",
   },
   {
     name: "a clean update refuses the card's text",

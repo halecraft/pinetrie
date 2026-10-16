@@ -4,7 +4,7 @@ import type { PiSetup } from "@pinetrie/pi"
 import { expect, test } from "vitest"
 import { basics, record } from "../fakes.ts"
 import type { LaneRegistry } from "../work/registry.ts"
-import type { Offers } from "./offers/index.ts"
+import type { ProposedChanges } from "./proposed/index.ts"
 import { createSplits, finishSplit } from "./split.ts"
 
 test("a split's end fetches the stack before stackEnded, then moves the lane back to its own tip", async () => {
@@ -76,7 +76,7 @@ test("a split whose skill read fails starts no container", async () => {
     basics: basics(),
     owner: record<RepoOwner>({}).port,
     registry: record<LaneRegistry>({ isOwn: () => true }).port,
-    offers: record<Offers>({
+    proposed: record<ProposedChanges>({
       stackSpan: async () => ({
         start: [commitId("aaaa0000")],
         tip: commitId("bbbb0000"),

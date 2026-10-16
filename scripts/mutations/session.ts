@@ -13,7 +13,7 @@ export const mutations: readonly Mutation[] = [
     expect: "session declares only Kyneta's exchange and WebSocket transport",
   },
   {
-    name: "an answer to a replaced offer command overwrites the newer one",
+    name: "an answer to a replaced command on proposed changes overwrites the newer one",
     file: "packages/session/acting.ts",
     from: '  if (prev?.kind !== "sent" || prev.id !== event.id) return prev',
     to: '  if (prev?.kind !== "sent") return prev',
@@ -21,7 +21,7 @@ export const mutations: readonly Mutation[] = [
     expect: "an answer to a send since replaced changes nothing",
   },
   {
-    name: "a refused offer command is forgotten",
+    name: "a refused command on proposed changes is forgotten",
     file: "packages/session/acting.ts",
     from: '  if (outcome.kind === "refused")\n',
     to: "  if (false)\n",
@@ -29,7 +29,7 @@ export const mutations: readonly Mutation[] = [
     expect: "a refusal is kept, with its message",
   },
   {
-    name: "the answer to an offer command is never recorded",
+    name: "the answer to a command on proposed changes is never recorded",
     file: "packages/session/acting.ts",
     from: '        actingOn(command, { kind: "answered", id, outcome }),\n',
     to: '        actingOn(command, { kind: "sent", id }),\n',

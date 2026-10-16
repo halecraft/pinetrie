@@ -1,17 +1,16 @@
-// host/folder/sweep — the snapshots of a folder project's states that
-// nothing needs any more, deleted: what `liveStates` keeps is decided from
-// the records (each folder lane's tip, start and merge bases with accepted
-// work and with its parent lane, open conflicts' three states, open offers'
-// two, accepted work's newest states). A state's record
-// stays: merge bases walk parents through every state, so a record removed
-// would break every older state's ancestry; a state whose snapshot is gone
-// is known by that alone.
+// host/folder/sweep — the snapshots of a folder project's states that nothing
+// needs any more, deleted: what `liveStates` keeps is decided from the records
+// (each folder lane's tip, start and merge bases with accepted work and with
+// its parent lane, open conflicts' three states, open proposed changes' two,
+// accepted work's newest states). A state's record stays: merge bases walk
+// parents through every state, so a record removed would break every older
+// state's ancestry; a state whose snapshot is gone is known by that alone.
 
 import type {
   ConflictRecord,
-  OfferRecord,
   PointId,
   ProjectKind,
+  ProposedChangesRecord,
   StateRecord,
   ThreadId,
 } from "@pinetrie/core"
@@ -32,7 +31,7 @@ export function planSweep(input: {
     readonly history: ProjectKind
   }[]
   readonly conflicts: readonly ConflictRecord[]
-  readonly offers: readonly OfferRecord[]
+  readonly proposed: readonly ProposedChangesRecord[]
   readonly keep: number
 }): readonly PointId[] {
   const graph = stateGraph(input.states)
@@ -53,7 +52,7 @@ export function planSweep(input: {
     graph,
     lanes,
     conflicts: input.conflicts,
-    offers: input.offers.flatMap(o => (o.kind === "folder" ? [o] : [])),
+    proposed: input.proposed.flatMap(o => (o.kind === "folder" ? [o] : [])),
     folderNewest: newest,
     keep: input.keep,
   })

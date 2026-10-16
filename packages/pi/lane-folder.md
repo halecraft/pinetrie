@@ -20,14 +20,14 @@ changes pine·trie can keep this note true. You can skip them.
   reaches you as the same path under `/mnt/host-working-copy`. <!-- packages/core/index.ts HOST_WORKING_COPY -->
   <!-- packages/rules/work.ts showHostWorkingCopy -->
 - `/pinetrie-states` is read-only, and pine·trie's: `start` is accepted
-  work as this thread's work is offered against, so `diff -r
+  work as this thread's proposed changes are computed against, so `diff -r
   /pinetrie-states/start /workspace` shows all of your work.
   `conflicts/<path>/{base,ours,theirs}` holds a conflicted path's three
   versions while it is open. <!-- packages/lanes/plan.ts STATES_MOUNT -->
 - A shared directory, such as `/workspace/.plans` when the person shares
   it, is their own directory mounted read-write. Your edits there are
   visible to them and to every other thread at once, and are never part
-  of your offer. <!-- packages/lanes/plan.ts planMounts -->
+  of your proposed changes. <!-- packages/lanes/plan.ts planMounts -->
 - `/pinetrie` is the install of pine·trie that runs this lane, read-only. It
   is not your project, even when your project is pine·trie: its code can
   differ from yours. <!-- packages/lanes/plan.ts PINETRIE_MOUNT -->
@@ -65,12 +65,13 @@ changes pine·trie can keep this note true. You can skip them.
 
 ## What the person gets
 
-- Your work reaches the person as an offer: the files that differ between
-  `/pinetrie-states/start` and your newest state, which they review file
-  by file. They accept it when they choose.
-- When a run ends, another agent describes the offer; you don't need to.
-- The person sees your changes only through the offer, which pine·trie brings up
-  to date after each run. Nothing you write appears in accepted work until they accept it.
+- Your work reaches the person as proposed changes: the files that differ
+  between `/pinetrie-states/start` and your newest state, which they review
+  file by file. They accept them when they choose.
+- When a run ends, another agent describes the proposed changes; you don't
+  need to.
+- The person sees your work only through the proposed changes, which
+  pine·trie brings up to date after each run. Nothing you write appears in accepted work until they accept it.
 
 ## What lasts
 
@@ -102,7 +103,7 @@ changes pine·trie can keep this note true. You can skip them.
   `.gitignore` ignores, such as `node_modules` or a shared `.plans`, unless
   you name that directory as their `path`. They also skip what a `.ignore`
   file names, and `find` what git's global excludes file names, which your
-  offer still holds: a file they miss, `ls` or `diff -r` finds.
+  proposed changes still hold: a file they miss, `ls` or `diff -r` finds.
   <!-- packages/pi/search.ts grepTool -->
   <!-- packages/pi/search.ts findTool -->
 - A lane has 4 GiB of memory. <!-- apps/pinetrie/host/work/setup.ts LANE_MEMORY -->
@@ -165,7 +166,8 @@ changes pine·trie can keep this note true. You can skip them.
 
 - When accepted work has moved on, a pine·trie note says so, before the
   person's message or between your tool calls: which files would change,
-  which of them you changed too, and whether your offer conflicts with it.
+  which of them you changed too, and whether your proposed changes conflict
+  with it.
   <!-- packages/rules/behind.ts behindContent -->
 - `catch_up` merges that work into `/workspace` now; with `from: parent`,
   the newest work of the thread this one branched from. It acts only when
@@ -173,9 +175,9 @@ changes pine·trie can keep this note true. You can skip them.
   beside another is refused. A conflicted merge answers with the conflicts,
   to resolve here. <!-- packages/rules/agent-commands.ts planCatchUpCall -->
   <!-- packages/core/tools.ts CATCH_UP_TOOL -->
-- `split_offer` is refused here: an offer of a folder is its files, never
-  a stack of revisions. <!-- packages/rules/agent-commands.ts planSplitCall -->
-- Accepting your work is the person's: you offer it, they accept it. A note
+- `split_proposed_changes` is refused here: a folder project's proposed
+  changes are its files, never a stack of revisions. <!-- packages/rules/agent-commands.ts planSplitCall -->
+- Accepting your work is the person's: you propose changes, they accept them. A note
   in the thread says when they do. <!-- packages/rules/fact.ts factContent -->
 
 ## When the lane can't do something

@@ -14,14 +14,14 @@ test("before the host's copy arrives, your attention document is not written", (
   store.read(LANE, entryId("e-1"))
   store.leave()
   store.dismiss(LANE, entryId("p-1"))
-  store.dismissOffer(LANE, cardIdFor("c1"))
+  store.dismissReady(LANE, cardIdFor("c1"))
   store.setInbox({ since: "e-9", seen: ["e-10"] })
   expect(store.attention.current()).toEqual({
     since: "",
     mentionsSince: "",
     read: new Map(),
     dismissed: new Map(),
-    dismissedOffers: new Map(),
+    dismissedReady: new Map(),
     seen: new Set(),
   })
   store.dispose()

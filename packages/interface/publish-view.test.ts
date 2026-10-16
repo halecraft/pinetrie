@@ -63,7 +63,7 @@ describe("publishView: one button, only with something to do", () => {
     expect(w.heading).toBe("Set up accepted work: pinetrie-accepted")
     expect(w.notes[1]).toContain("builtin_immutable_heads() | …")
     expect(w.notes[2]).toContain("builtin_log() | …")
-    expect(w.notes[3]).toContain('bookmarks(glob:"pinetrie-offer/*")')
+    expect(w.notes[3]).toContain('bookmarks(glob:"pinetrie-proposed/*")')
   })
   test("before setup, set up whatever publish.catchUp says", () => {
     expect(

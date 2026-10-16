@@ -13,7 +13,7 @@ import {
 import { lines, type Runner } from "@pinetrie/lanes"
 import { revsetName } from "./lane/names.ts"
 import { commitsOf, conflictedFilesAt } from "./lane/revisions.ts"
-import { changeOf } from "./offer.ts"
+import { changeOf } from "./proposed.ts"
 
 /** What `planPublishCatchUp`'s rebase would do to the working copy: `AcceptedRecord`'s shape. */
 type CatchUpPreview = NonNullable<AcceptedFacts["yours"]["catchUp"]>

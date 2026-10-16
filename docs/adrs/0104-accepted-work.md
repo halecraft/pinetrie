@@ -13,6 +13,7 @@
   - ADR-0142: in a folder project, accepted work is the folder, and a thread
     starts from it as it is at the thread's first message. Such a project has
     no setup and no WIPs.
+  - ADR-0153: the ledger's commits are accepted thread commits.
   - ADR-0154: authorship of an offer comes from the host's remote bookmark.
     The op log no longer holds anything the host must read back.
 

@@ -13,6 +13,7 @@
     its width, head, Escape and focus, and covers a narrow screen.
   - ADR-0087: a review can wrap its long lines and fold its file list, both
     kept per device.
+  - ADR-0153: the review's routes and asks are the review's, not the offer's.
 
 **Context.** The work strip counts an offer's files ("2 files ready",
 "conflicts with your edits in 1 file"), and its line could not be opened.

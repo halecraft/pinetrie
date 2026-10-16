@@ -25,8 +25,8 @@ Where a rule lives, as `@pinetrie/core` and `@pinetrie/jj` state it too:
 
 So `planStop` is here beside `STOP`, and `agentByDefault` beside
 `addressChat`; `address`, `parseMentions` and `moveOf`, which know no
-record, are core's; the trailer format and the offer's facts and decisions
-are core's (`trailers.ts`, `offers.ts`), since `@pinetrie/jj` reads them.
+record, are core's; the trailer format and the proposed changes' facts and decisions
+are core's (`trailers.ts`, `proposed.ts`), since `@pinetrie/jj` reads them.
 
 ## Where things are
 
@@ -50,9 +50,9 @@ follow this list. A name only this package uses is imported from its module.
   message's markdown here uses (`shares.ts`, `blocks.ts`, `links.ts`).
 - `card-words.ts`: `wordsOf`, what a card says from where its kind keeps
   its words (`textSourceOf`).
-- `fact.ts`, `behind.ts`, `agent-commands.ts`: what a command on an offer
+- `fact.ts`, `behind.ts`, `agent-commands.ts`: what a command on proposed changes
   did, as a fact in the thread; the base's new work, told or caught up; the
-  agent's `catch_up` and `split_offer` (ADR-0080).
+  agent's `catch_up` and `split_proposed_changes` (ADR-0080).
 - `live.ts`: what each stream event, and a run's end and a host's start, do
   to `pinetrie:live`, as `LiveOp`s `@pinetrie/schema`'s `applyLiveOps` writes
   (`packages/schema/TECHNICAL.md`, Streams; ADR-0014, ADR-0107). A stream
@@ -89,7 +89,7 @@ follow this list. A name only this package uses is imported from its module.
   catching up would do and merge, and the thread a lane branched from.
 - `catch-up-from.ts`: what a catch-up merges (`CatchUpFrom`), as history
   stores it and as every wording names it.
-- `offer.ts`, `offer-view.ts`, `review.ts`: an offer's record and the
+- `proposed.ts`, `work-strip.ts`, `review.ts`: proposed changes' record and the
   host's decisions about it, the page's view of it, and the review's wire.
 - `ignores.ts`, its own export (`@pinetrie/rules/ignores`, which the page
   never imports): whether a project's `.gitignore` files ignore a path,
@@ -166,7 +166,7 @@ cannot reach the wrong document and needs no guard at run time.
 
 Each host record is one `RecordSpec<R, K>`: its `namespace`, `keyOf`,
 `encode` and `decode`, exported beside its type (`MARK` in `mark.ts`,
-`OFFER` in `offer.ts`). Everything else goes through the spec:
+`PROPOSED_CHANGES` in `proposed.ts`). Everything else goes through the spec:
 `setRecord` and `deleteRecord` build the `ValueWrite`s the host writes
 (`Records.writeValues`, ADR-0095), grouped by document with `byTarget`;
 `recordsIn` decodes a namespace as stored, which `readRecords` in
@@ -193,7 +193,7 @@ retired or rehomed record type leaves nothing behind.
   rewritten, so such a copy can stay; nothing reads it.
 - **`setIfChanged` ignores key order.** It compares `encode` of both sides
   with every object's keys sorted: a decoder may build fields in another
-  order than the planner that made the new record (`OFFER` rebuilds field
+  order than the planner that made the new record (`PROPOSED_CHANGES` rebuilds field
   by field), and comparing `JSON.stringify` strings would then rewrite an
   unchanged record on every check. The host writes only a changed record: a
   write compacted with no client connected moves the document's base past
@@ -936,7 +936,7 @@ trash, have no agent and no runner. Where its card leaves it is
 
 - **Where each command runs** (`runsIn`, beside `writesIn`): what each
   command or send (`Gated`) runs or writes a message in: a send at a
-  thread's end or popped from its queue, a carry-on, and an offer action
+  thread's end or popped from its queue, a carry-on, and an action on proposed changes
   that may ask the agent (all but an acceptance) run in their thread; a branch in the thread its
   fork is in, read from its root's tree; a new root in none. Exhaustive, so
   a new kind of command does not compile until it says. `threadsOf` turns
@@ -1065,7 +1065,7 @@ and made read-only, never removed.
 
 - **`planLanesGone`**: what lanes that will not run again lose, an
   archived task's or a thread the trash sweep deleted: each forgotten, its
-  ref deleted (which withdraws its offer), and every snapshot but its
+  ref deleted (which withdraws its proposed changes), and every snapshot but its
   newest and the one nearest each thread's end in the trees given. An
   archive's teardown and the trash sweep both ask it.
 - **`planArchive` decides what crossing the edge does**, pure, for a
@@ -1089,7 +1089,7 @@ and made read-only, never removed.
   lost (`planStartup`).
 - **The gate keys on the tasks a command writes in** (ADR-0063). `writesIn`
   names them for every intent (a chat's thread's task or a branch's, a
-  mark's, a retitle's, an undo of moves', an offer's lane's, a queue hold's
+  mark's, a retitle's, an undo of moves', proposed changes' lane's, a queue hold's
   and an unqueue all's lane's, a reorder's place's, and for a move the task
   each card goes to and the one it leaves), or none for one that writes in
   no task (a name, a stop, a move on the board or a change to its states,
@@ -1491,138 +1491,139 @@ Host-written records, each a `RecordSpec` (above) with a total decoder:
   message's text when its thread works, or will work, in its own copy, so
   people and the model read the same stored text (ADR-0034).
 
-# Offers (`offer.ts`, `offer-view.ts`, `review.ts`, ADR-0105)
+# Proposed changes (`proposed.ts`, `work-strip.ts`, `review.ts`, ADR-0105)
 
-A lane's work reaches you as an offer: one revision, or a stack, in your
-repo. Its record is `OFFER` (`offer.ts`):
+A lane's work reaches you as proposed changes: one revision, or a stack, in your
+repo. Its record is `PROPOSED_CHANGES` (`proposed.ts`):
 
 | record | namespace | key | written |
 |---|---|---|---|
-| a lane's offer in your repo | `pinetrie.offer` | the lane | when a trigger changed it, or it was accepted |
+| a lane's proposed changes in your repo | `pinetrie.proposed` | the lane | when a trigger changed it, or it was accepted |
 
-A record written before accepted work was named (ADR-0100) holds
-`integratedAs`, which decodes as `acceptedAs`; one written since keeps its
-own, null too.
+The namespace was `pinetrie.offer` until ADR-0156. Records are the page's
+cache of your repo, so the undeclared sweep deleted the old ones and the
+first full observation wrote the new: every field is required, and none
+reads a shape from before.
 
-What the host decides about it is `offer.ts`'s, from the facts
+What the host decides about it is `proposed.ts`'s, from the facts
 `@pinetrie/jj` gathers, as decisions typed in `@pinetrie/core`
-(`core/offers.ts`): `@pinetrie/jj` turns each into jj steps
-(`offerEffects` and the rest), and the host connects the two, deciding
-nothing itself. Where an offer starts (`startOfOffer`, `offerStart`) is
-`@pinetrie/jj`'s. What the page reads is `offer-view.ts`, the review's wire
+(`core/proposed.ts`): `@pinetrie/jj` turns each into jj steps
+(`proposedChangesEffects` and the rest), and the host connects the two, deciding
+nothing itself. Where proposed changes start (`startOfProposed`, `proposedStart`) is
+`@pinetrie/jj`'s. What the page reads is `work-strip.ts`, the review's wire
 `review.ts`, the commit-message format `@pinetrie/core`'s `trailers.ts`
 (`withTrailers`, `withoutTrailers`, `wipDescription`, `isWipLine`), and the
 commit-message request `request.ts` (`describeRequest`).
 
-## What the host decides (`offer.ts`)
+## What the host decides (`proposed.ts`)
 
 - **`planRefresh`** decides what a trigger does (`RefreshDecision`), from
   `RefreshFacts`: for a placed lane, its place (`Placed`: tip, base,
   target, a known start), whether the lane's work changes any file
-  (`WorkChanges`: `none`, `some` or `unknown`) and the offer as your repo
-  holds it (`OfferInRepo`); for an untraced start or a thread whose root is
-  archived (ADR-0061), the offer alone. Each decision carries what its
+  (`FilesTouched`: `none`, `some` or `unknown`) and the proposed changes as your repo
+  holds it (`ProposedChangesInRepo`); for an untraced start or a thread whose root is
+  archived (ADR-0061), the proposed changes alone. Each decision carries what its
   steps need: `build` (none: never built,
-  accepted, or gone), `rebuild` (the lane, or where the offer starts, moved under a single
-  offer: rebuilt in place, ADR-0039), `withdraw` (where it starts reached the
+  accepted, or gone), `rebuild` (the lane, or where the proposed changes start, moved under single
+  proposed changes: rebuilt in place, ADR-0039), `withdraw` (where it starts reached the
   tip, the lane's work changes no file, its start is untraced and the host
-  made it, or the thread is archived, edited or not), `forget` (no offer and none to build: a record left from one
-  goes, and with `hostLeft` the host's version of an offer you deleted,
+  made it, or the thread is archived, edited or not), `forget` (no proposed changes and none to build: a record left from one
+  goes, and with `hostLeft` the host's version of proposed changes you deleted,
   ADR-0154), `stale` (either moved under a stack), `refresh` (only
   the target moved), `leave` (you edited it), `repair` (a race left it
   divergent), `mark` (unchanged and the host's, but its top is not the
-  host's version: a host step stopped before its mark, or the offer was
-  built before offers had one; ADR-0154), `none`, or `untouched`: an untraced start with an offer you
+  host's version: a host step stopped before its mark, or the proposed changes were
+  built before proposed changes had one; ADR-0154), `none`, or `untouched`: an untraced start with proposed changes you
   edited, or one divergent, which nothing touches until the lane catches up
   (a gap ADR-0067's untraced start leaves). Only work known to change a file, from a known
   start, is built (ADR-0067): one built from less would be empty, or bring
   back what you accepted, and withdrawn after a build it would be built again on
-  the next poll. `unknown` keeps an offer that is there, and builds none. Where it starts is compared as a set
+  the next poll. `unknown` keeps proposed changes that are there, and builds none. Where it starts is compared as a set
   (`sameStart`): a merge's parents come in any order. `rebuild` is not `update`, which is "update from
-  my work" (`planUpdate`). An offer is edited (`offerEdited`) when its
+  my work" (`planUpdate`). Proposed changes are edited (`isProposedEdited`) when its
   bottom's parent is not an ancestor of the target (S48 item 7), a commit of
   yours sits between its revisions, or any revision is edited
   (`revisionEdited`): a version an operation not the host's made changed it
   since the host's newest version (S73). A revision the host never made is
-  yours. An offer you edit is never touched again, so nothing the host
-  writes can hide your version. Moved (`offerMoved`) is its ledger against
-  the lane's tip and start; an offer with no ledger reads as moved, and is
+  yours. Proposed changes you edit are never touched again, so nothing the host
+  writes can hide your version. Moved (`isProposedMoved`) is its ledger against
+  the lane's tip and start; proposed changes with no ledger read as moved, and is
   rebuilt once. The record's `stale` uses the same rule.
-- **`offerRecord`** is the record, the page's cache, from the offer as
+- **`proposedChangesRecord`** is the record, the page's cache, from the proposed changes as
   your repo holds it: its files and conflicts, your edits (its files that
   `@` changes), described (its first line no longer the WIP line), edited,
   stale (a stack whose lane moved past its ledger), its bookmark (as the
   gather found it) and its commits. **`planYourEdits`**: only `@` moved, so
   each record not yet accepted has its `yourEdits` rewritten from one
   shared read.
-- **`planOfferAcceptance`** decides an acceptance from the offer
-  read in its own command and what only an acceptance reads (`OfferAcceptanceFacts`: the WIP's commits above accepted work,
-  and which bookmarks sit below the offer). Refused, in this order: no
-  offer (`no_offer`), a WIP gone (`bad_destination`), nothing shown
-  (`offer_changed`), a divergent offer (`no_offer`), other work than was
+- **`planAcceptance`** decides an acceptance from the proposed changes
+  read in its own command and what only an acceptance reads (`AcceptanceFacts`: the WIP's commits above accepted work,
+  and which bookmarks sit below the proposed changes). Refused, in this order: no
+  proposed changes (`no_offer`), a WIP gone (`bad_destination`), nothing shown
+  (`offer_changed`), divergent proposed changes (`no_offer`), other work than was
   shown or a new conflict (`offer_changed`, ADR-0065), and a destination
-  that is not one of the offer's or not below it (`bad_destination`). Its
-  destinations are `offerAcceptanceDestinations`': the thread's WIP, then accepted work,
-  with how many of the WIP's commits land along. A conflicted offer never
+  that is not one of the proposed changes' or not below it (`bad_destination`). Its
+  destinations are `acceptanceDestinations`': the thread's WIP, then accepted work,
+  with how many of the WIP's commits land along. Conflicted proposed changes never
   lands on accepted work: accepted work is immutable, and the conflict would stay in
   its history. A gone WIP has none. An untraced place can be accepted: an
   acceptance moves a bookmark and needs no start.
-- **`planStackEnded`**: a split's stack replaces the offer only when its
+- **`planStackEnded`**: a split's stack replaces the proposed changes only when its
   top has exactly the tip's files (`acceptStack`, private), built at the
-  offer's place from the stack's own start and tip, which its ledger names;
+  proposed changes' place from the stack's own start and tip, which its ledger names;
   an untraced place accepts it. **`planRebuild`**, for squash and refresh,
   rebuilds from the lane's tip as one revision on its WIP line, from a known
   start only. Both are a `Rebuild`, as a build is, with the thread's name.
-- **`describeWanted`** says an offer is one to ask a message for: one
+- **`describeWanted`** says proposed changes are one to ask a message for: one
   revision, not edited, on its WIP line unless asked again.
   **`planDescribeAsk`** names the commit to ask for; **`planDescribeSettle`**
   writes the answer only to that commit, read again in the command that
-  writes it, keeping the offer's ledger (or the place's tip and start
-  without one). **`planDescribeAgain`** refuses `describe` without a named
-  offer.
-- **`offerStatus`** decodes a `pinetrie.offer` record once (ADR-0067): `none`,
+  writes it, keeping the proposed changes' ledger (or the place's tip and start
+  without one). **`planDescribeAgain`** refuses `describe` without named
+  proposed changes.
+- **`proposedChangesStatus`** decodes a `pinetrie.proposed` record once (ADR-0067): `none`,
   `accepted`, `held` or `open`. Every reader on the page switches on it, never
   on the record's fields: the strip, the header's activity badge and the tab's Archive
-  item (`openOffers`, client), and the review read (`planOfferRead`). An
+  item (`openProposed`, client), and the review read (`planReviewRead`). An
   record not yet accepted, with no files, that you did not edit is `held`: its work is
   already where it sits, by a route the ledger does not record (S89), so
   nothing counts it, warns about it, reviews it or accepts it. One you edited
   is `open` whatever its files.
   The host's records not yet accepted, open or held, are `isNotYetAccepted`: the lanes it
   marks on a full observation, and the records `@` rewrites.
-- **An offer's record is the page's cache** (ADR-0104): written from the
+- **Proposed changes' record is the page's cache** (ADR-0104): written from the
   repo after each of the host's steps, never read back to decide. Its
   `commits` are the revisions' commits at that read, what a review may
-  read. A divergent offer is recorded only once repaired.
+  read. Divergent proposed changes are recorded only once repaired.
 
-## What the page reads (`offer-view.ts`, `base.ts`)
+## What the page reads (`work-strip.ts`, `base.ts`)
 
-- **`offerView`** is the work strip's states (ADR-0105) as a decision, from an
-  `OfferStatus`: the offer's state, its buttons, its menu, which of those
+- **`workStripView`** is the work strip's states (ADR-0105) as a decision, from an
+  `ProposedChangesStatus`: the proposed changes' state, its buttons, its menu, which of those
   are `quiet` (listed, but drawn disabled: changing nothing now, or not
   yet possible), and the facts its words
-  are made from (`OfferFacts`: files, size, conflicts, bookmark, held, the
+  are made from (`WorkStripFacts`: files, size, conflicts, bookmark, held, the
   base as `effectiveBase` gives it, the catch-up, untraced, …). It writes
-  no words: accepted work and the button labels are the client's (`offerWords`,
+  no words: accepted work and the button labels are the client's (`workStripWords`,
   `@pinetrie/interface`, ADR-0040). A resolution that asked for you counts only
-  when newer than the offer. A held offer is `nothing`, with no
+  when newer than the proposed changes. Held proposed changes are `nothing`, with no
   destinations. When catching up `brings`, or the thread is untraced,
   catching up moves from the menu to the buttons; when it is `current` or
   `nothing-new` it stays in the menu, quiet; `unknown` leaves it there,
   enabled. An untraced thread offers no refresh, squash or split: each
   rebuilds from a start it does not have. A card with the command queued
-  makes the offer busy (`catch-up`). A conflicted offer's catch-up is the
+  makes the proposed changes busy (`catch-up`). Conflicted proposed changes' catch-up is the
   base's `update` (there is no `resolve`), unless its conflict came with
   its copy (`conflictCause`) and the parent, ahead, holds none of those
   files conflicted: then `catch-up-parent`. While the parent is ahead,
   `catch-up-parent` is in every idle state's menu, quiet while it runs.
-- **Where an acceptance goes is `offerView`'s `into`** (`AcceptsInto`):
-  a `bookmark` asks `offerAcceptanceDestinations` with it; a `folder`
+- **Where an acceptance goes is `workStripView`'s `into`** (`AcceptsInto`):
+  a `bookmark` asks `acceptanceDestinations` with it; a `folder`
   asks for none, and keeps `accept`, quiet, since accepting into a folder
   project is not built yet; null, a jj project's accepted work not yet
-  read, has no destination, so `accept` is dropped. `OfferFacts.into`
+  read, has no destination, so `accept` is dropped. `WorkStripFacts.into`
   carries it to the words, which name a bookmark only from a `bookmark`.
-- **`conflictCause`** says where an offer's conflict comes from: `start`
+- **`conflictCause`** says where proposed changes' conflict comes from: `start`
   when every file it conflicts in is in its `startConflicts`, the files
   conflicted where it starts, so the conflict came with the lane's copy;
   else `work` (ADR-0072).
@@ -1640,7 +1641,7 @@ commit-message request `request.ts` (`describeRequest`).
   host's `catchUp` was not read at the commit it is at now; or there is no
   `pinetrie.base` at all: the host has never read the lane, as for a lane
   whose turns never committed, so never reached your repo), `nothing-new`
-  (it moved by work the lane holds, as after you accepted its own offer,
+  (it moved by work the lane holds, as after you accepted its own proposed changes,
   even once the lane edited that work again: S102 item 11)
   or `brings`, with the file count and the move, the one kind that carries
   it. `catchUpOf` owns those checks; the commit comparison under them
@@ -1658,16 +1659,16 @@ commit-message request `request.ts` (`describeRequest`).
   import it:
   - Every read is of a span (`DiffSpan`, ADR-0106): a revision, or a range
     from one commit to another. `reviewUrl` and `diffUrl` build
-    `/offer/<OFFER_WIRE>/review/<span>` and
-    `/offer/<OFFER_WIRE>/diff/<span>?path=…`, the span as `spanKey` writes
-    it, `<commit>` or `<from>..<to>`; `parseOfferPath` reads them back, and
-    calls anything else under `/offer/` `bad`, another version included. An
+    `/review/<REVIEW_WIRE>/review/<span>` and
+    `/review/<REVIEW_WIRE>/diff/<span>?path=…`, the span as `spanKey` writes
+    it, `<commit>` or `<from>..<to>`; `parseReviewPath` reads them back, and
+    calls anything else under `/review/` `bad`, another version included. An
     answer is cached as immutable under its URL, so a change to the
     templates (`REVISION_READ`, `RANGE_FILES`, `@pinetrie/lanes`), the schema
-    or `fileDiff`'s flags bumps `OFFER_WIRE`.
+    or `fileDiff`'s flags bumps `REVIEW_WIRE`.
   - `decodeRevisionReview` is the one schema: the host decodes jj's JSON
     with it, and the page the host's answer.
-  - `planOfferRead` serves only a revision in an open offer's `commits`,
+  - `planReviewRead` serves only a revision in open proposed changes' `commits`,
     or a range whose two commits one lane's `pinetrie.revision` records name
     (an ask's work), each read from the record, never the request; and it
     refuses an empty path or one with a control character.
@@ -1679,14 +1680,14 @@ commit-message request `request.ts` (`describeRequest`).
 | record | namespace | key | written |
 |---|---|---|---|
 | accepted work: its commit, the WIP bookmarks above it, the publish bookmark and your work against it (`yours.ahead`, `yours.catchUp`), and `publish.catchUp` (`catchUp`) | `pinetrie.accepted` | `line` | when your repo's operation head moves |
-| a lane's base, as its newest `Pinetrie-Base` says it, whether a WIP base landed or is gone, what catching up would change and where that was read, and its untraced accepted-offer commits (S97) | `pinetrie.base` | the lane | when a refresh reads the lane |
+| a lane's base, as its newest `Pinetrie-Base` says it, whether a WIP base landed or is gone, what catching up would change and where that was read, and its untraced accepted thread commits (S97) | `pinetrie.base` | the lane | when a refresh reads the lane |
 
 - **`planAcceptedRecord`** is accepted work's record from what the host read
   (`AcceptedFacts`), beside what setting accepted work up would write to your
   repo's config, which `@pinetrie/jj` words (`setupProposal`: jj's config
   text), and `publish.catchUp` from accepted work's config (ADR-0099).
 - **`planAcceptedAction`** decides a setup or publish from the record read in
-  its own step (`AcceptedDecision`): setup writes exactly the heads and log the
+  its own step (`AcceptedWorkDecision`): setup writes exactly the heads and log the
   record proposed, the text you were shown; a publish (`PublishDecision`,
   ADR-0090) says whether the working copy catches up first (`catchUp`) and whether
   your commits move with accepted work (`accept`), both false with
@@ -1706,7 +1707,7 @@ commit-message request `request.ts` (`describeRequest`).
   with the `pinetrie.base` record; **`catchUpName`** (accepted work is
   "accepted work", ADR-0090) and **`baseMovedOn`** (a base that moved,
   worded once) in `catch-up-from.ts`. How the page reads them is under
-  Offers, "What the page reads".
+  Proposed changes, "What the page reads".
 - **`acceptedActionState` is the one rule for a setup or publish** (ADR-0076,
   ADR-0090): the host's `planAcceptedAction` decides from it, and the page's
   publish button reads it. Setup and publishing are anyone's, on any host
@@ -1719,16 +1720,16 @@ commit-message request `request.ts` (`describeRequest`).
   to do", which the page's hidden button reads too. `acceptedRefusal` words
   each refusal once, naming files with `named`, for the host's answer and
   the button's title.
-- **`pinetrie.offer`, `pinetrie.accepted` and `pinetrie.base` are unions on
+- **`pinetrie.proposed`, `pinetrie.accepted` and `pinetrie.base` are unions on
   the project's kind** (`kind`: `jj` or `folder`, ADR-0150), each decoded by
   its `kind`; one stored before records had a kind does not decode, and
   reads as unknown until the host writes it again. A folder's hold only
-  their own fields: an offer its `start` and `tip` states, files,
+  their own fields: proposed changes its `start` and `tip` states, files,
   conflicts and whether it is described; accepted work its
   `newest` state; a base its `start` state and what catching up would
-  change. Every reader switches on `kind`: a folder offer is never a stack
-  and never split (`offerView`), starts on no conflict (`conflictCause`),
-  and is reviewed as its `start..tip` range (`planOfferRead`, whose
+  change. Every reader switches on `kind`: folder proposed changes are never a stack
+  and never split (`workStripView`), starts on no conflict (`conflictCause`),
+  and is reviewed as its `start..tip` range (`planReviewRead`, whose
   `parseSpan` takes a folder state's id in a range, never as a revision);
   a folder project's accepted work has nothing to set up or publish to
   (`acceptedActionState` refuses both); `catchUpOf` compares a folder
@@ -1750,7 +1751,7 @@ commit-message request `request.ts` (`describeRequest`).
   nothing.
 - **What became of a WIP base** (`ok`, `landed` or `gone`, S77 item 2) is
   read in `@pinetrie/jj` (`wipState`, `readWipState`), since the gather
-  needs it to know where an offer sits. **`planUpdateFrom`** then says what
+  needs it to know where proposed changes sit. **`planUpdateFrom`** then says what
   bringing a thread up to date merges, from the lane's `LaneBase`: the base
   the thread follows by `effectiveBase`, the rule the
   page's button words itself from, so the button names what is merged. A
@@ -1781,7 +1782,7 @@ commit-message request `request.ts` (`describeRequest`).
   for one pi holds. So a name can have no lane yet: read names by lane
   (`readNames(doc).get(lane)`), never list them as threads.
 - **A name is stored, never recomputed**, so a changed word list renames
-  nothing, and never changes: the offer's bookmark and older trailers name
+  nothing, and never changes: the proposed changes' bookmark and older trailers name
   it. The decoder accepts only `word-word`; `ThreadName` is branded in
   `@pinetrie/core`, and minted only here.
 
@@ -1886,8 +1887,8 @@ reads, `details` what pine·trie reads back.
   commit** (ADR-0150). `PointSchema` and `CommitSchema` store the same
   bare string, so a message stored before points decodes unchanged.
   `update`'s `merged`, `land`'s `yours`, `behind`'s `to` and a
-  `catch_up`'s `merged` are points; offers, WIPs, accepted work's and a
-  base's jj records (`JjOfferRecord`, `JjAcceptedRecord`, `JjBaseRecord`,
+  `catch_up`'s `merged` are points; proposed changes, WIPs, accepted work's and a
+  base's jj records (`JjProposedChangesRecord`, `JjAcceptedRecord`, `JjBaseRecord`,
   `CatchUpRead`) and the stack's message are jj's, and commits; a base's
   move (`BaseMove`) is points. Where a
   jj-only fact meets the shared history, the rule converts it at that
@@ -1915,13 +1916,13 @@ with, and its revision is where a branch below it starts. `incomingWords`
 words whose work came in, for the update and for a resolution's prompt.
 The card that brought the thread up to date carries what the person wants
 done with it (ADR-0108); its text is sent after the update. A stack message (`pinetrie.stack`, role `stack`) is the prompt of the run that
-splits an offer: the `offer-stack` skill, the commit the stack starts from,
+splits proposed changes: the `proposed-changes-stack` skill, the commit the stack starts from,
 the tip it must match, and the bookmark to leave on it.
 
 # Facts, base news and agent commands (`fact.ts`, `behind.ts`, `agent-commands.ts`, ADR-0080)
 
 - **A fact is a history message** (`pinetrie.fact`, role `fact`): `content` is what the model reads, `details` the
-  `OfferFact`, which the column words as one line (`factLine`). Each offer
+  `ProposedChangesFact`, which the column words as one line (`factLine`). Each proposed changes
   action has one: an acceptance (`acceptedFact`: the change, the
   bookmark, and that bookmark as the thread knows it, accepted work or a WIP),
   and a description asked for again, a squash, a refresh (`actionFact`).
@@ -1955,7 +1956,7 @@ the tip it must match, and the bookmark to leave on it.
   says what to do (`catchUpRefusal`); `catchUpAnswer` is the tool's result,
   whose `details.merged` the turn's record reads.
 - **`planSplitCall`** queues a split card, made through `planMake`, or
-  refuses: a folder lane, whose offer is its files, never a stack; no offer open, a split running (the lane's latest prompt is a
+  refuses: a folder lane, whose proposed changes are its files, never a stack; no proposed changes open, a split running (the lane's latest prompt is a
   stack message), or one already queued. The tool answers `SPLIT_QUEUED`,
   or the refusal (`splitRefusal`); a refusal of its card's make (`unmade`,
   which none is) is logged and answered `SPLIT_UNMADE`.
@@ -2010,10 +2011,10 @@ Gotchas:
   card's text, whole, under its own heading (ADR-0108).
 - **A resolution has no record** (ADR-0080, S104): in progress, it is a
   running lane whose prompt is a land message; ended, it ended as any run
-  does. What it left conflicted is the offer's, and whether the agent asked
+  does. What it left conflicted is the proposed changes', and whether the agent asked
   for you is its newest `ask_about_conflict` in the tree
   (`conflictAskedAt`, core), which the strip reads as "needs you" while it
-  is newer than the offer's record.
+  is newer than the proposed changes' record.
 
 # Agents talking (`relay.ts`, `budget.ts`, `round.ts`, ADR-0128)
 

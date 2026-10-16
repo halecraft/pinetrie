@@ -28,7 +28,7 @@ the helper, S122 to S131 for Docker and the lane VM.
   `ContainerShape` holds its name, its lane (its disk, at `/workspace`), the
   image, memory, mounts (`planMounts`), environment, what is attached
   (`hostSocket`, `starts`), `nested` and `states` (a folder lane's states
-  directory, read-only at `STATES_MOUNT`, `/pinetrie-states`: its offer's
+  directory, read-only at `STATES_MOUNT`, `/pinetrie-states`: its proposed changes'
   `start` and each open conflict's versions), and no runtime's flags. A
   runtime renders it (`runSpec`); the hash of that value is its spec label
   (`specHashOf`), and a jj lane's renders no states mount, so its hash did
@@ -129,7 +129,7 @@ history:
 - **Ancestry, merge bases and diffs are each adapter's own**, computed
   inside it, never a port method: no crossing between an adapter and the
   shared history needs more than an equality test. What a kind does on the
-  destination's side (offers, WIPs, stacks) is not part of the algebra.
+  destination's side (proposed changes, WIPs, stacks) is not part of the algebra.
 
 jj computes its merge bases inside one command and reports none through
 the port; a folder project's graph states its own laws in
@@ -148,8 +148,8 @@ Its laws, each one test in the port suite titled by the law's sentence
 - **A clean merge descends from both sides.** A clean merge's result
   has the lane's state before it (`ours`) and the state merged (`from`) as
   ancestors.
-- **An accept then a catch-up changes no file.** Once the lane's offer
-  is accepted, its catch-up with accepted work changes no file in the
+- **An accept then a catch-up changes no file.** Once the lane's proposed changes
+  are accepted, its catch-up with accepted work changes no file in the
   lane: made at once, and made after the lane edits the accepted lines
   again and records a turn, with no catch-up between and accepted work
   unchanged since. It answers `nothing`, or `clean` with no files, and the
@@ -398,7 +398,7 @@ paths are its diff." would compare a function with itself.
   can give up a grant, and only accepted work gives one. A grant accepted
   after a lane started reaches it without a catch up. `configWidenings`
   says what one copy lets that another does not, which a write's reply
-  (`configChangeNote`) and an offer's review show. Your repo's names come
+  (`configChangeNote`) and proposed changes' review show. Your repo's names come
   from your config and your working copy's file at startup: they find
   accepted work, so they cannot come from it.
 - **A shared file has a lineage of versions (ADR-0135).** Every write into a
@@ -503,7 +503,7 @@ paths are its diff." would compare a function with itself.
 - **jj's bundle is made on the lane's queue; the owner of your repo imports
   it** (`@pinetrie/jj`'s `importLane`, a command), which tools never wait
   on. The owner observes the import, and the moved ref marks the lane's
-  offer for a refresh (`apps/pinetrie/host/jj/offers/`).
+  proposed changes for a refresh (`apps/pinetrie/host/jj/proposed/`).
 
 ## Tests
 
@@ -525,7 +525,7 @@ paths are its diff." would compare a function with itself.
   adapter's harness.
 - **`e2e:lanes`** (`apps/pinetrie/e2e/lanes.ts`): the same in real containers,
   with a repo in a fork's `/tmp` for the config's scope, an agent's own
-  `jj commit` reaching its offer and a branch, and the contract
+  `jj commit` reaching its proposed changes and a branch, and the contract
   test. The `main` section alone takes about 2.5 minutes on the Mac. Its `images` section also runs
   the runtime's rg, fd and sd and the `grep` and `find` tools on Alpine, and
   launches Chromium, through pine·trie's Playwright, and python3 on the default
@@ -549,7 +549,7 @@ paths are its diff." would compare a function with itself.
   jj's config scope, an agent's own commit, the image's browser and python3,
   the runtime's rg.
   `planContainer`'s and `planStartFrom`'s rules are unit mutations. These
-  are all that `e2e:lanes` proves by mutation: the host's lane work and offers
+  are all that `e2e:lanes` proves by mutation: the host's lane work and proposed changes
   are proven by unit tests (`apps/pinetrie/host/TECHNICAL.md`).
 - **The `contract` scenario is Docker's:** the checks in
   `packages/docker/TECHNICAL.md`.

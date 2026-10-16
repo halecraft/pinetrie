@@ -157,7 +157,7 @@ async function catchUpSection(
     )
 
     // An acceptance leaves a fact in the thread.
-    const accepted = await wu.offer(lane, "accept", "pinetrie-accepted")
+    const accepted = await wu.proposed(lane, "accept", "pinetrie-accepted")
     const fact = await waitFor(() => {
       const now = tree()
       return ancestry(now, laneTip(lane)).path.some(

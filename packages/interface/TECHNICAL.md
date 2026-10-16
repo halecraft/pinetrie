@@ -76,7 +76,7 @@ page's (`storage-keys.ts`, `tab-state.ts`, `same-props.ts`, `colors.ts`).
   task's summary and label (`summariesOf`, `labelsOf`), the board's items,
   `prune`'s known roots, the inbox's mentions, ▦'s count (`messageCount`:
   the held roots' messages, of every root's), the participants
-  (`participantsIn`), and the root entries of offers (`laneRootsOf`). A
+  (`participantsIn`), and the root entries of proposed changes (`laneRootsOf`). A
   card drafted in a root not held marks its thread's task, from the task
   index alone (`unsentSignals`).
   The board's search covers labels: a search of every message would hold
@@ -178,7 +178,7 @@ function is proven by a unit test in a second.
   `reload`. A request the session does not track is one `request` effect
   carrying the `HostRequest` itself, so a new kind of request adds no effect
   and no case. What the session tracks keeps a method of its own: a chat
-  and a move (`moves`), an offer action and a line action (`acting`), and a
+  and a move (`moves`), an action on proposed changes and a line action (`acting`), and a
   mark, whose root it finds. Whether a move animates is the plan's too
   (`moveCard`'s `fly`), and whether a fold moves (the `layout` effect's
   `moves`, set by `foldViewOf` for the `fold` and `foldTask` intents
@@ -188,7 +188,7 @@ function is proven by a unit test in a second.
   (`projectColumns`, `pathIds`, `branchColors`, `unsentSignals`) stay in `App`'s
   own `useMemo`s, and their results come in. One tree rebuilt each render
   would give every memoised child new props (S54, S59). `appView` gives the
-  stage (`connecting`, nothing, or a task's columns as `ColumnSlot`s), the read-only words, and the open offers your inbox and the board read. A slot
+  stage (`connecting`, nothing, or a task's columns as `ColumnSlot`s), the read-only words, and the open proposed changes your inbox and the board read. A slot
   is new each render; `Column` is not memoised, so this costs nothing, and
   a slot must never reach a memoised component by identity.
 - **A page over the stage is a value too** (`page.ts`, ADR-0098): the
@@ -413,7 +413,7 @@ task's threads (`hereRail`). A task's signals are its threads', whatever roots t
   foot: it covers the columns and moves none of them.
 - **A root is a thread card** (ADR-0111): `threadCardHeads` builds each
   root's header once in `App` (label, status, ⇡, your pip, its state and
-  its Move to ▸ moves, with the busy reason and the offers a close
+  its Move to ▸ moves, with the busy reason and the proposed changes a close
   withdraws), and `boardView` and `sidebarView` both read it from `heads`.
   A board card spreads its head and keeps it whole as `head`, adding Move
   up and Move down, its writers, and its body (`bodyOf`: its first line
@@ -670,7 +670,7 @@ pending.
 - **Your inbox** (`inbox-view.ts`, pure, ADR-0091): what the threads you
   follow raise (`attentionOf`'s items) and your mentions, in one menu
   (`inbox-menu.tsx`). `inboxView` groups the items into sections (a verdict
-  under its level, an offer under ready), so the inbox lists exactly what
+  under its level, open proposed changes under ready, its raised kind `ready`), so the inbox lists exactly what
   it counts; `inboxWords` words them. Its badge is `inboxCount`, given:
   `App` computes it once and the window's title shows the same number.
   `useInboxMenu` only turns each section's items into rows (`threadRow`,
@@ -690,8 +690,8 @@ pending.
   `threadStatus` rings a thread while the agent works there or its verdict
   is pending, and `taskStatus` a task while any of its threads rings;
   `boardView` folds each column's items into `working` and `ready` counts
-  beside `mark`, and an item's `ready` is its task's threads with an open
-  offer (`offeredByTask`, each named by `threadNameOf`, so one the host has
+  beside `mark`, and an item's `ready` is its task's threads with open
+  proposed changes (`openProposedByTask`, each named by `threadNameOf`, so one the host has
   not named yet still counts). Nothing lists the runs.
 - **The publish button and its toast** (`publish-view.ts`, `toast.tsx`,
   ADR-0090, ADR-0099): `publishView` decides the one button: `absent` with
@@ -778,10 +778,10 @@ pending.
 ## What needs you (`attention.ts`, `use-attention.ts`, ADR-0077)
 
 - **`attentionOf` decides what is raised**, pure: a thread's verdict and its
-  open offer, for its followers only (`follows`, over the directory's
+  open proposed changes, for its followers only (`follows`, over the directory's
   `RootRecord.threads`), while its lane is idle and its task not archived.
-  A verdict clears when your read mark passes its `end`, an offer when it
-  goes; either with "not needed" (`dismissed`, `dismissedOffers`). Nothing
+  A verdict clears when your read mark passes its `end`, proposed changes when it
+  goes; either with "not needed" (`dismissed`, `dismissedReady`). Nothing
   is raised before your attention document's `since` is set.
 - **`levelOf` turns a verdict, a fact, into a level for you**: a stop is
   done for whoever stopped it. `LEVELS` orders the levels once; `highest`
@@ -1050,7 +1050,7 @@ cut and paste* below is the rest.
   A fence or code span is longer than any run of backticks inside it. A
   result's images, a `write`'s content and an `edit`'s change are not in
   the view, so they are not copied. It only reads, so a column that can't
-  be written offers it too, alone.
+  be written proposed changes it too, alone.
 - **What the past copies as** (ADR-0126, ADR-0132): `messageReference`
   names the whole message, or the block named (a table's bar, an image);
   `selectionReference` names a selection when its text is in the message's
@@ -1076,7 +1076,7 @@ cut and paste* below is the rest.
   through a mention (`agentByDefault`), so a message its thread's default
   compelled gets `@agent ` in front. The unit test checks this through
   `address`, not the rule's own wording.
-- **Only people's messages** (role `chat`) offer edit: an agent's reply edited
+- **Only people's messages** (role `chat`) proposed changes edit: an agent's reply edited
   by a person would be a reply the agent never gave (ADR-0018).
 - **`→` is hidden at a conversation's last message**, where a branch would be
   the same as replying. At agent work's end it is a thread of its own.
@@ -1131,7 +1131,7 @@ which names the entry and its thread (`packages/rules/TECHNICAL.md`,
   state, the table the host refuses by; everyone else reads the state. The
   owner reads "your ssh"; others read the owner's name.
 - **An answer out makes the buttons wait,** and a refused or failed one is
-  said, as an offer command's is: the session keeps your answers per lane
+  said, as a command on proposed changes is: the session keeps your answers per lane
   (`acting.ts`'s `access`).
 - **An ask needs its owner wherever they are:** `appView`'s `sshAsks` raise
   an inbox item (`Raised` `ssh`) for the owner alone, whether or not they
@@ -1143,9 +1143,11 @@ which names the entry and its thread (`packages/rules/TECHNICAL.md`,
 `Column` gathers the facts (`ColumnFacts`), `columnView` decides, and
 `Column` draws what it returns: who works in the column (`identity`, its
 thread's name, ADR-0039), where it forks (`origin`), where lanes start on
-its path (`joins`), and what became of its files (`strip`, a row of the
-column's header, ADR-0113): each lane's offer in your repo (ADR-0105), and
-what its review reads (`ReviewTarget`, ADR-0047), an offer's revisions or
+its path (`joins`), and what became of its files (`strip`, the work
+strip, a row of the column's header, ADR-0113; null for a column with no
+lane of its own that it may write): each lane's proposed changes in your repo
+(ADR-0105), and
+what its review reads (`ReviewTarget`, ADR-0047), proposed changes' revisions or
 an ask's range. A revision whose `pinetrie.json` would let lanes do more
 once accepted says what, in one line (`wideningLine`, ADR-0135), worded
 from core's `wideningWords`, as the agent's reply to the write is.
@@ -1165,8 +1167,8 @@ composer*).
   (`@pinetrie/rules`, ADR-0061, ADR-0072, ADR-0090, ADR-0100): accepted
   work is "accepted work", a WIP its bookmark, the thread a thread branched from its name. The words
   take core's `CatchUpFrom`, never a bookmark string, and accepted work's
-  bookmark goes only in titles: `offerWords`' button titles ("moves
-  pinetrie-accepted forward to pinetrie-offer/amber-fox"), `behindMark`'s,
+  bookmark goes only in titles: `workStripWords`' button titles ("moves
+  pinetrie-accepted forward to pinetrie-proposed/amber-fox"), `behindMark`'s,
   `baseChoices`'. Accepted work is named one way for every kind of
   project: a folder project's is "accepted work" too, and no word names
   the folder as the person's (pine·trie may run hosted, where the folder
@@ -1179,11 +1181,11 @@ composer*).
 - **The thread a thread branched from** (`parentNow`, ADR-0072) is read
   from the column's tree, the revisions and each lane's thread end, with no
   read of your repo, once per `columnView` (`ColumnShows.parent`): the
-  strip's `offerView` takes it with whether its lane runs, and `Column`
-  words the composer's commands from it. A conflicted offer whose conflict came with its copy says
+  strip's `workStripView` takes it with whether its lane runs, and `Column`
+  words the composer's commands from it. Conflicted proposed changes whose conflict came with its copy says
   "began from a copy with an unresolved conflict in N files", adding "·
   \<parent\> has resolved it" with "catch up with \<parent\>" as its button
-  when the parent holds those files resolved; every other conflicted offer's
+  when the parent holds those files resolved; every other conflicted proposed changes'
   button is "catch up with \<base\> and resolve". The parent's catch-up,
   quiet while it runs, is titled why.
 - **A branch from a conflicted copy is warned** (`forkWords`, ADR-0072): a
@@ -1191,50 +1193,49 @@ composer*).
   ADR-0032; the where line says where it will work), at a commit whose
   records carry conflicts (`conflictsAt` of `nearestRevision`'s commit),
   shows `.where-fork-conflict` under the where line.
-- **An acceptance names the offer this tab shows** (ADR-0065): `SessionClient.offer`
+- **An acceptance names the proposed changes this tab shows** (ADR-0065): `SessionClient.proposed`
   reads the lane's record from its session document as it sends, the one
-  the strip was drawn from, and sends `offerSeen` of it (its ledger, and
+  the strip was drawn from, and sends `proposedChangesSeen` of it (its ledger, and
   whether it conflicted). The host refuses the acceptance `offer_changed` when the
-  offer now brings other work.
-- **Your offer and setup and publish commands are tracked per tab** (`acting.ts`,
-  `@pinetrie/session`): `SessionClient.offer` and `.line` mark the command
+  proposed changes now bring other work.
+- **Your proposed changes and setup and publish commands are tracked per tab** (`acting.ts`,
+  `@pinetrie/session`): `SessionClient.proposed` and `.line` mark the command
   `sent` at once and record the answer when it comes. A refusal or failure
   stays until your next command on that lane (or accepted work); an answer that
-  carried it out (`accepted`, `offered`, a split's `started`, `line-moved`)
+  carried it out (`accepted`, `proposed`, a split's `started`, `line-moved`)
   clears it, since the record then says how things stand. Each send has an
   id, so the answer to a send since replaced changes nothing. The page's
-  `offer` effect (`perform.ts`) only calls the session. `columnView` takes
+  `proposed` effect (`perform.ts`) only calls the session. `columnView` takes
   the lane's entry as `ColumnFacts.acting`: the strip's `waiting` disables
-  its buttons and menu rows while it is `sent`, and `offerWords` words it
-  as the strip's `note` (`.offer-note`, `role="status"`, `data-acting`
+  its buttons and menu rows while it is `sent`, and `workStripWords` words it
+  as the strip's `note` (`.work-note`, `role="status"`, `data-acting`
   `sent` or `said`). An acceptance in flight names a WIP destination
   ("accepting into wip/search…"); a refusal or failure is `outcomeWords`,
   shared with the publish toast.
-- **`offerView` (`@pinetrie/rules`) decides an offer; `offerWords`
-  words it**: its line and each button's label and title, by state. An
-  offer that conflicts says so even when it is `edited` (S73), and its
+- **`workStripView` (`@pinetrie/rules`) decides proposed changes; `workStripWords`
+  words it**: its line and each button's label and title, by state. Proposed changes that conflict say so even when they are `edited` (S73), and their
   accept button reads "accept anyway" whatever the state, as it does when
   a resolution asked for you. Each accept button names a WIP the work
-  goes into (ADR-0104, ADR-0083, ADR-0090): "accept", "accept into
-  wip/search", and, from a WIP thread's menu, "accept, with your 2 commits
-  beneath it". A conflicted offer on the
+  goes into (ADR-0104, ADR-0083, ADR-0090): "accept changes", "accept
+  changes into wip/search", and, from a WIP thread's menu, "accept, with your 2 commits
+  beneath it". Conflicted proposed changes on the
   line offers "resolve in the thread", never an acceptance into it. The bookmark is
-  a fact of its own, drawn apart (`.offer-bookmark`), never in the line.
-  `workStrip` hands `offerView` the record decoded (`offerStatus`): a `held`
-  offer says "nothing to accept: accepted work already has this thread's
+  a fact of its own, drawn apart (`.work-bookmark`), never in the line.
+  `workStrip` hands `workStripView` the record decoded (`proposedChangesStatus`): a `held`
+  proposed changes say "nothing to accept: accepted work already has this thread's
   work",
-  and has no review. An open offer's review reads a jj offer's revisions,
-  or a folder offer's `start..tip` range (`offerReview`), as an ask's range
-  is read; a folder offer has no bookmark, no stack and no split, and the
+  and has no review. Open proposed changes' review reads jj proposed changes' revisions,
+  or folder proposed changes' `start..tip` range (`proposedReview`), as an ask's range
+  is read; folder proposed changes have no bookmark, no stack and no split, and the
   composer offers no WIP to start from (`baseChoices`) in a folder project.
 - **Where an acceptance goes is a value** (`AcceptsInto`, `@pinetrie/core`):
-  `columnView` hands `offerView` a `folder` one for a folder project, a
+  `columnView` hands `workStripView` a `folder` one for a folder project, a
   `bookmark` one from a jj accepted record, and null for a jj project
   whose record is not read yet: then nothing is accepted into, and accept
-  is left out, as for a gone WIP. A jj offer's accept is titled with the
-  bookmark it moves ("moves pinetrie-accepted forward to …"); a folder
-  offer's names no bookmark anywhere. Its accept stays, drawn disabled
-  (`OfferView.quiet`), and titled `ACCEPT_LATER`, the one sentence the
+  is left out, as for a gone WIP. Jj proposed changes' accept is titled with the
+  bookmark it moves ("moves pinetrie-accepted forward to …"); folder
+  proposed changes' names no bookmark anywhere. Its accept stays, drawn disabled
+  (`WorkStripView.quiet`), and titled `ACCEPT_LATER`, the one sentence the
   host also refuses an accept with (`folder_accept_later`), so the two
   never drift. A quiet button's title always says why: it would change
   nothing now, or cannot yet be done.
@@ -1251,9 +1252,9 @@ composer*).
   stays in the menu, enabled, and claims nothing. So does a lane with no
   base record at all: the host has never read it. An untraced thread
   (`pinetrie.base`'s `untraced`) says "an earlier accept of this thread
-  can't be traced: catch up with accepted work to offer what's new", with catching up
+  can't be traced: catch up with accepted work to show what's new", with catching up
   beside it. `ColumnFacts.queuedCommands` are the commands of the cards
-  queued on the lane: a catch-up among them is `offerView`'s `catch-up`
+  queued on the lane: a catch-up among them is `workStripView`'s `catch-up`
   activity ("catching up with accepted work…"); a split only quiets the
   split button (ADR-0080).
 - **A thread's base** shows in its header only when it is not accepted work

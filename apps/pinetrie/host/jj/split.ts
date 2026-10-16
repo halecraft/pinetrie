@@ -1,5 +1,5 @@
-// host/jj/split — an offer split into a stack by a run on its lane: the run's
-// prompt, and what its end does.
+// host/jj/split — proposed changes split into a stack by a run on its lane: the
+// run's prompt, and what its end does.
 
 import { type CommitId, errorText, type ThreadId } from "@pinetrie/core"
 import type { RepoOwner } from "@pinetrie/jj"
@@ -18,12 +18,12 @@ import type { Basics } from "../basics.ts"
 import type { ProjectParts, Splits } from "../work/adapter.ts"
 import type { LaneRegistry } from "../work/registry.ts"
 import type { Fetches } from "./fetch.ts"
-import type { Offers } from "./offers/index.ts"
+import type { ProposedChanges } from "./proposed/index.ts"
 
 /**
- * A split's run ended, in order: its stack fetched into your repo, its top
- * read there, and the offer replaced by it if `stackEnded` accepts it. Then,
- * whether or not any of those threw, the lane moved back to its own tip,
+ * A split's run ended, in order: its stack fetched into your repo, its top read
+ * there, and the proposed changes replaced by it if `stackEnded` accepts it.
+ * Then, whether or not any of those threw, the lane moved back to its own tip,
  * which it goes on from rather than the stack's: a lane left on the stack
  * refuses every catch-up. Returns why the stack was refused, or null.
  */
@@ -31,7 +31,7 @@ export async function finishSplit(
   ports: {
     readonly fetchLane: Fetches["fetchLane"]
     readonly stackTop: (lane: ThreadId) => Promise<CommitId | null>
-    readonly stackEnded: Offers["stackEnded"]
+    readonly stackEnded: ProposedChanges["stackEnded"]
     readonly backToTip: (lane: ThreadId) => Promise<void>
   },
   lane: ThreadId,
@@ -51,20 +51,23 @@ export function createSplits(deps: {
   /** The owner of your repo. */
   readonly owner: RepoOwner
   readonly registry: LaneRegistry
-  readonly offers: Offers
+  readonly proposed: ProposedChanges
   readonly piSetup: Pick<PiSetup, "skill">
   readonly beforeRun: ProjectParts["beforeRun"]
   readonly fetchLane: Fetches["fetchLane"]
 }): Splits {
-  const { basics, owner, registry, offers } = deps
+  const { basics, owner, registry, proposed } = deps
   const { session, docs, log } = basics
   return {
     async prepareSplit(lane, by, intent) {
       if (!registry.isOwn(lane))
         return { refused: "the lane has no copy of its own" }
-      const span = await offers.stackSpan(lane)
-      if (span === null) return { refused: "the lane has nothing to offer" }
-      const skill = await deps.piSetup.skill("pinetrie:skill:offer-stack")
+      const span = await proposed.stackSpan(lane)
+      if (span === null)
+        return { refused: "the lane has no proposed changes to split" }
+      const skill = await deps.piSetup.skill(
+        "pinetrie:skill:proposed-changes-stack",
+      )
       // Last: nothing between the lane's start and its run can fail.
       deps.beforeRun(lane)
       return planStack({
@@ -94,7 +97,7 @@ export function createSplits(deps: {
                   (await commitsOf(jj, `present(${laneStackName(l)})`))[0] ??
                   null,
               ),
-            stackEnded: (l, stack) => offers.stackEnded(l, stack),
+            stackEnded: (l, stack) => proposed.stackEnded(l, stack),
             backToTip: async l => {
               await registry.withHistory(l, async (_h, handle) => {
                 const jj = laneJj(handle.runners.lane)

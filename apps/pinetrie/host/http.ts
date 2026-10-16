@@ -1,5 +1,5 @@
 // host/http — the host's one HTTP server: the Exchange's websocket, the page
-// (Vite, or its build), the blobs and an offer's reads. It carries out
+// (Vite, or its build), the blobs and proposed changes' reads. It carries out
 // `planRequest`, `planUpgrade` and `planPageRequest` (routes.ts), which
 // admit first.
 
@@ -12,7 +12,7 @@ import {
   wrapNodeWebsocket,
 } from "@kyneta/websocket-transport/server"
 import { type BlobStore, errorText, type Sha256 } from "@pinetrie/core"
-import type { OfferAsk } from "@pinetrie/rules"
+import type { ReviewAsk } from "@pinetrie/rules"
 import { createServer as createViteServer } from "vite"
 import { WebSocketServer } from "ws"
 import { KEY_COOKIE, planInvites, requestFacts, urlHost } from "./admission.ts"
@@ -21,7 +21,7 @@ import { type PageSource, pageDir } from "./page.ts"
 import {
   blobResponse,
   type HttpAnswer,
-  offerResponse,
+  reviewResponse,
   uploaded,
   uploadRefusal,
 } from "./responses.ts"
@@ -53,7 +53,7 @@ export async function startHttp(input: {
   readonly tools: boolean
   readonly serverTransport: WebsocketServerTransport
   readonly blobs: BlobStore
-  /** Your repo, whose offers a review reads; null for a host without tools. */
+  /** Your repo, whose proposed changes a review reads; null for a host without tools. */
   readonly destination: LaneWork["destination"]
   /** Where the page comes from: Vite, or the built page in `dist/`. */
   readonly page: PageSource
@@ -132,8 +132,8 @@ export async function startHttp(input: {
         return serveBlob(to.sha, res)
       case "blob-post":
         return void receiveBlob(req, res)
-      case "offer":
-        return void serveOfferRead(to.ask, res)
+      case "review":
+        return void serveReviewRead(to.ask, res)
       case "bad":
         res.writeHead(400).end()
         return
@@ -144,15 +144,19 @@ export async function startHttp(input: {
   })
 
   /**
-   * `GET /offer/…`: a review or a diff of a commit an open offer holds. A
-   * host without tools has no offers.
+   * `GET /review/…`: a review or a diff of a commit open proposed changes hold,
+   * or of an ask's range. A host without tools has nothing to review.
    */
-  async function serveOfferRead(ask: OfferAsk, res: ServerResponse) {
+  async function serveReviewRead(ask: ReviewAsk, res: ServerResponse) {
     const answer =
       destination === null
-        ? ({ kind: "refused", status: 404, reason: "no offers here" } as const)
-        : await destination.offers.read(ask)
-    send(res, offerResponse(answer))
+        ? ({
+            kind: "refused",
+            status: 404,
+            reason: "nothing to review here",
+          } as const)
+        : await destination.proposed.read(ask)
+    send(res, reviewResponse(answer))
   }
 
   function serveBlob(sha: Sha256 | null, res: ServerResponse): void {

@@ -141,11 +141,11 @@ here, so a superseded ADR leads to the scenarios to revisit.
 | `lanes/catch-up` | catching up mid-run (ADR-0080, S103), a publish that accepts (ADR-0099) and moves main (ADR-0090) |
 | `lanes/contract` | the Docker runtime (ADR-0130), lanehost's roles and diffs (ADR-0129), the Mac's fence (S136) |
 | `lanes/images` | the default image's browser (ADR-0041) |
-| `lanes/main` | lane containers (ADR-0034), offers (ADR-0105), thread names (ADR-0039), the review (ADR-0047), accepted work (ADR-0104), publish (ADR-0090), the repo's owner (ADR-0065), commands on a thread (ADR-0080); a lane's jj config for its own repo (S50), an agent's own commit (S56) |
+| `lanes/main` | lane containers (ADR-0034), proposed changes (ADR-0105), thread names (ADR-0039), the review (ADR-0047), accepted work (ADR-0104), publish (ADR-0090), the repo's owner (ADR-0065), commands on a thread (ADR-0080); a lane's jj config for its own repo (S50), an agent's own commit (S56) |
 | `lanes/recipe` | derived state rebuilt from its key (ADR-0131) |
 | `lanes/shared` | shared directories (ADR-0035) |
 | `lanes/vm-image` | the lane VM's image built on the Mac in a VM of its own, and booted (ADR-0147) |
-| `browser/tools` | asks (ADR-0106), where a new thread starts (ADR-0104), lanes for every agent (ADR-0102), search (ADR-0101), commands (ADR-0036), tool rows (ADR-0114, ADR-0123, S142), the dock's queue (ADR-0113), the header and offer (ADR-0039, ADR-0040, ADR-0105), the review (ADR-0047; render counts, S54), the board's work (ADR-0091), the rail's capsules (ADR-0031), digests (ADR-0071), threads and their tracks (ADR-0117, ADR-0125), your list (ADR-0030); a column's height and width while its agent works (S35, S37), following past a pick (S33) |
+| `browser/tools` | asks (ADR-0106), where a new thread starts (ADR-0104), lanes for every agent (ADR-0102), search (ADR-0101), commands (ADR-0036), tool rows (ADR-0114, ADR-0123, S142), the dock's queue (ADR-0113), the header and the work strip (ADR-0039, ADR-0040, ADR-0105), the review (ADR-0047; render counts, S54), the board's work (ADR-0091), the rail's capsules (ADR-0031), digests (ADR-0071), threads and their tracks (ADR-0117, ADR-0125), your list (ADR-0030); a column's height and width while its agent works (S35, S37), following past a pick (S33) |
 
 The helpers rest on these too: a start's modes (`START_AGENT`,
 `START_CHAT`, ADR-0021); a lane starts from your committed `@-`, so a
@@ -270,7 +270,7 @@ the queue (ADR-0113); a card's ⋯ (`page.ts`, ADR-0111).
   `unqueueCard`), as a column's plan does: each finds the card as its client
   draws it, builds the move with core's `moveOf` (onto its lane's thread),
   and sends it with `moveCard`. Each throws if the card is not
-  where it expects. An offer action and a line action are `client.offer`
+  where it expects. An action on proposed changes and a line action are `client.proposed`
   and `client.line`, which the session tracks (`acting`); anything else
   that moves no card is `client.request({ kind, … })`, one of core's
   `Intent`s.

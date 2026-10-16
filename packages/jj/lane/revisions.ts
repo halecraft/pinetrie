@@ -44,24 +44,24 @@ export async function commitsOf(
 }
 
 /**
- * An accepted-offer commit on accepted work as `ACCEPTED_OFFER_COMMIT_ROW`
+ * An accepted thread commit on accepted work as `ACCEPTED_THREAD_COMMIT_ROW`
  * prints it: its commit, and its message whole. Your repo reads the
- * accepted-offer commits on accepted work with it (`@pinetrie/jj`), and a lane
- * those it lacks before it catches up (`acceptedOfferCommitsAbove`).
+ * accepted thread commits on accepted work with it (`@pinetrie/jj`), and a lane
+ * those it lacks before it catches up (`acceptedThreadCommitsAbove`).
  */
-export interface AcceptedOfferCommitRow {
+export interface AcceptedThreadCommitRow {
   readonly commit: CommitId
   readonly description: string
 }
 
-/** One accepted-offer commit a line: its commit, a tab, and its message as a JSON string. */
-export const ACCEPTED_OFFER_COMMIT_ROW =
+/** One accepted thread commit a line: its commit, a tab, and its message as a JSON string. */
+export const ACCEPTED_THREAD_COMMIT_ROW =
   'commit_id ++ "\\t" ++ json(description) ++ "\\n"'
 
-/** `ACCEPTED_OFFER_COMMIT_ROW`'s output, read back. */
-export function parseAcceptedOfferCommits(
+/** `ACCEPTED_THREAD_COMMIT_ROW`'s output, read back. */
+export function parseAcceptedThreadCommits(
   stdout: string,
-): AcceptedOfferCommitRow[] {
+): AcceptedThreadCommitRow[] {
   return lines(stdout).map(row => {
     const tab = row.indexOf("\t")
     return {
@@ -285,7 +285,7 @@ export async function conflictedFilesAt(
 /**
  * A revision's description and per-file stats, printed as the JSON of
  * `RevisionReview` (`@pinetrie/core`): `json()` quotes every string. A
- * change to it bumps `OFFER_WIRE` (`@pinetrie/rules`).
+ * change to it bumps `REVIEW_WIRE` (`@pinetrie/rules`).
  */
 export const REVISION_READ =
   '"{\\"description\\":" ++ json(description) ++ ",\\"files\\":[" ++ ' +

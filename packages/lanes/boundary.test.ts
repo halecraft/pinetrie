@@ -67,7 +67,7 @@ test("@pinetrie/lanes exports none of jj's names", () => {
     "laneJj",
     "laneTipName",
     "mergeUpdate",
-    "offerBookmark",
+    "proposedBookmark",
     "oldNamesOnDisk",
     "planBaseCheckout",
     "planBundle",

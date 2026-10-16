@@ -32,7 +32,8 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     describe: {
       reply: context => {
         const asked = context.at(-1) ?? ""
-        if (!asked.startsWith(TITLE_REQUEST_HEAD)) return "offer: scripted"
+        if (!asked.startsWith(TITLE_REQUEST_HEAD))
+          return "proposed changes: scripted"
         return asked.includes("lexer") ? "Lexer work" : "Parser plan"
       },
     },

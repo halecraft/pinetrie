@@ -28,8 +28,8 @@ import {
   keyOf,
   type MoveDirection,
   type MoveTarget,
-  type OfferAction,
   type Paste,
+  type ProposedChangesAction,
   type QueueHoldChange,
   type QueueMove,
   type Reorder,
@@ -54,12 +54,12 @@ import {
 import { personDocId, writersPolicy } from "@pinetrie/protocol/writers"
 import {
   readArchived,
-  readOffers,
   readPlaces,
   readPlacesRev,
+  readProposedByLane,
   readRoots,
 } from "@pinetrie/reads"
-import { offerSeen, pastedCard } from "@pinetrie/rules"
+import { pastedCard, proposedChangesSeen } from "@pinetrie/rules"
 import {
   cardDocId,
   cardIdOfDoc,
@@ -339,29 +339,29 @@ export interface SessionClient {
    */
   readonly openThreads: OpenThreads
   /**
-   * An offer action on a lane's offer in your repo; an acceptance names its
-   * destination bookmark, null for the default, and the offer as this tab's
-   * record shows it (`offerSeen`). Tracked in `acting`.
+   * An action on a lane's proposed changes in your repo; an acceptance names
+   * its destination bookmark, null for the default, and the proposed changes as
+   * this tab's record shows it (`proposedChangesSeen`). Tracked in `acting`.
    */
-  offer(
+  proposed(
     lane: ThreadId,
-    action: OfferAction,
+    action: ProposedChangesAction,
     to?: string | null,
   ): Promise<Outcome>
   /** Set up accepted work, or publish it. Tracked in `acting`. */
   actOnAccepted(action: AcceptedAction): Promise<Outcome>
   /** Your answer to `lane`'s use of your ssh identity. Tracked in `acting`. */
   access(lane: ThreadId, answer: AccessAnswer): Promise<Outcome>
-  /** Your offer, setup and publish commands out now, or refused or failed (`acting.ts`). */
+  /** Your proposed changes, setup and publish commands out now, or refused or failed (`acting.ts`). */
   readonly acting: Readable<ActingState>
   /** Let go of every part, then shut the exchange down; rejects only when that fails. */
   close(): Promise<void>
 }
 
 /**
- * What the host is asked for that is neither tracked nor needs a root found:
- * a chat, a move and a reorder are tracked in `moves`, an undo of moves
- * waits for this tab's copy of the places, and an offer action and set up
+ * What the host is asked for that is neither tracked nor needs a root found: a
+ * chat, a move and a reorder are tracked in `moves`, an undo of moves waits for
+ * this tab's copy of the places, and an action on proposed changes and set up
  * or publish are tracked in `acting`.
  */
 export type HostRequest = Exclude<
@@ -372,7 +372,7 @@ export type HostRequest = Exclude<
       | "move"
       | "reorder"
       | "undo-move"
-      | "offer"
+      | "proposed"
       | "setup"
       | "publish"
   }
@@ -763,13 +763,15 @@ export async function connectSession(
     acted(at) {
       step({ kind: "acted", at })
     },
-    offer(lane, action, to = null) {
-      // An acceptance names the offer this tab shows now: its record, as the strip
-      // drew it.
+    proposed(lane, action, to = null) {
+      // An acceptance names the proposed changes this tab shows now: its
+      // record, as the strip drew it.
       const seen =
-        action === "accept" ? offerSeen(readOffers(session).get(lane)) : null
-      return sendActing(acting, { kind: "offer", lane, action, to }, () =>
-        send({ kind: "offer", lane, action, to, seen }),
+        action === "accept"
+          ? proposedChangesSeen(readProposedByLane(session).get(lane))
+          : null
+      return sendActing(acting, { kind: "proposed", lane, action, to }, () =>
+        send({ kind: "proposed", lane, action, to, seen }),
       )
     },
     actOnAccepted(action) {

@@ -2408,7 +2408,7 @@ async function run(check: Checks["check"]): Promise<void> {
 
         // 6. Mentions: the inbox badge counts what you have not seen, and
         // the inbox takes you there. With no lanes of their own here there are
-        // no offers, so the badge is the unseen mentions alone.
+        // no proposed changes, so the badge is the unseen mentions alone.
         const unseen = () =>
           page
             .$eval("#bottom .inbox-badge", n =>

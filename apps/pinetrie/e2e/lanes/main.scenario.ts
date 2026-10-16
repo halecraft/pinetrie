@@ -19,7 +19,7 @@ import {
   rootOf,
   type ThreadId,
 } from "@pinetrie/core"
-import { DEFAULT_REPO, laneBase, startOfOffer } from "@pinetrie/jj"
+import { DEFAULT_REPO, laneBase, startOfProposed } from "@pinetrie/jj"
 import { type Runner, run } from "@pinetrie/lanes"
 import { scriptedModel } from "@pinetrie/pi"
 import {
@@ -28,7 +28,7 @@ import {
   readProject,
   readRevisions,
 } from "@pinetrie/reads"
-import { deleteRecord, OFFER } from "@pinetrie/rules"
+import { deleteRecord, PROPOSED_CHANGES } from "@pinetrie/rules"
 import { rowMessage } from "@pinetrie/schema"
 import type { Checks } from "../checks.ts"
 import {
@@ -43,7 +43,7 @@ import {
   lanesOf,
   moveTaskTo,
   readJjAccepted,
-  readJjOffers,
+  readJjProposedByLane,
   rootRecordsOf,
   START_AGENT,
   setUpAccepted,
@@ -419,25 +419,26 @@ async function mainSection(
     await wu.chat("commit it yourself", ROOT, START_AGENT)
     await idle()
     const committer = laneWith("commit it yourself")
-    const committerOffer =
+    const committerProposed =
       committer === undefined
         ? undefined
         : readNames(wh.session).get(committer.name)
     const hasMine = async () =>
-      committerOffer !== undefined &&
+      committerProposed !== undefined &&
       (
         await jj(
           project,
           "file",
           "list",
           "-r",
-          // An empty revision set, before the offer is built, is no files.
-          `latest(present(bookmarks(exact:"pinetrie-offer/${committerOffer}")) | root())`,
+          // An empty revision set, before the proposed changes are built, is no
+          // files.
+          `latest(present(bookmarks(exact:"pinetrie-proposed/${committerProposed}")) | root())`,
           'root:"mine.txt"',
         )
       ).trim() !== ""
     check(
-      "a commit the agent made itself reaches its thread's offer",
+      "a commit the agent made itself reaches its thread's proposed changes",
       (await waitFor(hasMine, 30_000)) >= 0,
     )
     script.use([{ text: "just looking" }])
@@ -502,9 +503,12 @@ async function mainSection(
       await wu.request({ kind: "stop", lane: atOnce.name })
     await idle()
 
-    // ── 6. Offers: the thread's work as one commit you accept ────────────
-    const offerOf = () =>
-      two === undefined ? undefined : readJjOffers(wh.session).get(two.name)
+    // ── 6. ProposedChanges: the thread's work as one commit you accept
+    // ────────────
+    const proposedFromRows = () =>
+      two === undefined
+        ? undefined
+        : readJjProposedByLane(wh.session).get(two.name)
     const defaultLog = () =>
       jj(
         project,
@@ -524,61 +528,61 @@ async function mainSection(
       thread: two?.name,
     })
     await idle()
-    const offered = await waitFor(
-      () => offerOf()?.files.includes("shared.txt") === true,
+    const proposed = await waitFor(
+      () => proposedFromRows()?.files.includes("shared.txt") === true,
       30_000,
     )
     await wh.quiet()
     check(
-      "a turn's work is an offer in your repo, described, and its turns are not in your log",
-      offered >= 0 &&
-        offerOf()?.described === true &&
+      "a turn's work is proposed changes in your repo, described, and its turns are not in your log",
+      proposed >= 0 &&
+        proposedFromRows()?.described === true &&
         !(await defaultLog()).includes("edit line two") &&
-        (await defaultLog()).includes("offer: scripted"),
-      `${JSON.stringify({ files: offerOf()?.files, described: offerOf()?.described, log: (await defaultLog()).split("\n").slice(0, 4) })}`,
+        (await defaultLog()).includes("proposed changes: scripted"),
+      `${JSON.stringify({ files: proposedFromRows()?.files, described: proposedFromRows()?.described, log: (await defaultLog()).split("\n").slice(0, 4) })}`,
     )
-    // Every lane has a name, two words, and no two alike; the offer's
+    // Every lane has a name, two words, and no two alike; the proposed changes'
     // bookmark and its message's trailer carry it.
     const names = readNames(wh.session)
     const twoName = two === undefined ? undefined : names.get(two.name)
-    const offerBookmarkOf = (lane: ThreadId | undefined) =>
+    const proposedBookmarkFor = (lane: ThreadId | undefined) =>
       lane === undefined
         ? ""
-        : `pinetrie-offer/${readNames(wh.session).get(lane) ?? ""}`
+        : `pinetrie-proposed/${readNames(wh.session).get(lane) ?? ""}`
     const allNamed = lanesOf(wh, tree(), readPlaces(wh.places)).every(l =>
       names.has(l.name),
     )
     check(
-      "every lane has a two-word name, unique; the offer's bookmark and trailer carry it",
+      "every lane has a two-word name, unique; the proposed changes' bookmark and trailer carry it",
       allNamed &&
         [...names.values()].every(n => /^[a-z]+-[a-z]+$/.test(n)) &&
         new Set(names.values()).size === names.size &&
-        offerOf()?.bookmark === offerBookmarkOf(two?.name) &&
+        proposedFromRows()?.bookmark === proposedBookmarkFor(two?.name) &&
         (
           await jj(
             project,
             "log",
             "--no-graph",
             "-r",
-            offerBookmarkOf(two?.name),
+            proposedBookmarkFor(two?.name),
             "-T",
             "description",
           )
         ).includes(`Pinetrie-Thread: ${twoName}\n`),
-      `${JSON.stringify({ names: [...names.values()], bookmark: offerOf()?.bookmark })}`,
+      `${JSON.stringify({ names: [...names.values()], bookmark: proposedFromRows()?.bookmark })}`,
     )
-    const offerChange = () =>
+    const proposedChangeId = () =>
       jj(
         project,
         "log",
         "--no-graph",
         "-r",
-        offerBookmarkOf(two?.name),
+        proposedBookmarkFor(two?.name),
         "-T",
         "change_id",
       )
-    const firstChange = await offerChange()
-    /** An offer's descriptions, oldest first, each run of repeats once. */
+    const firstChange = await proposedChangeId()
+    /** Proposed changes' descriptions, oldest first, each run of repeats once. */
     const descriptionsOf = async (change: string) =>
       (
         await jj(
@@ -592,13 +596,13 @@ async function mainSection(
         )
       )
         .split("\n")
-        .filter(l => l !== "" && !l.startsWith("pinetrie-offer-"))
+        .filter(l => l !== "" && !l.startsWith("pinetrie-proposed-"))
         .reverse()
         .filter((l, i, all) => l !== all[i - 1])
     // You change the same line, commit, publish it, and keep editing: the
-    // offer is rebuilt on accepted work and shows the conflict before you
-    // accept it. Publishing needs a main to move: it is
-    // set at the project's first commit.
+    // proposed changes are rebuilt on accepted work and shows the conflict
+    // before you accept it. Publishing needs a main to move: it is set at the
+    // project's first commit.
     await jj(
       project,
       "bookmark",
@@ -612,23 +616,24 @@ async function mainSection(
     const landed = await wu.actOnAccepted("publish")
     writeFileSync(path.join(project, "still-editing.txt"), "wip\n")
     const conflicted = await waitFor(
-      () => offerOf()?.conflicts.includes("shared.txt") === true,
+      () => proposedFromRows()?.conflicts.includes("shared.txt") === true,
       30_000,
     )
     check(
-      "the offer is rebuilt on accepted work when you publish your commit, and says it conflicts with it",
+      "the proposed changes are rebuilt on accepted work when you publish your commit, and says it conflicts with it",
       landed.kind === "accepted-moved" && conflicted >= 0,
-      `${JSON.stringify({ landed, conflicts: offerOf()?.conflicts })}`,
+      `${JSON.stringify({ landed, conflicts: proposedFromRows()?.conflicts })}`,
     )
-    // You reword accepted work's commit under the offer, which is immutable
-    // until you say otherwise: jj rebases the offer, not the host, whose next
-    // trigger plans `none` and writes nothing to your repo. The record's
-    // `commits` names the offer as it is now, which is what a review reads.
-    // The first line stays, for the acceptance below.
-    // Publishing moved every open offer: their writes are done first.
+    // You reword accepted work's commit under the proposed changes, which is
+    // immutable until you say otherwise: jj rebases the proposed changes, not
+    // the host, whose next trigger plans `none` and writes nothing to your
+    // repo. The record's `commits` names the proposed changes as it is now,
+    // which is what a review reads. The first line stays, for the acceptance
+    // below. Publishing moved every open proposed changes: their writes are
+    // done first.
     await wh.quiet()
-    const commitsBefore = JSON.stringify(offerOf()?.commits)
-    /** Who made the offer's newest version: an operation's user. */
+    const commitsBefore = JSON.stringify(proposedFromRows()?.commits)
+    /** Who made the proposed changes' newest version: an operation's user. */
     const newestBy = () =>
       jj(
         project,
@@ -637,7 +642,7 @@ async function mainSection(
         "-n",
         "1",
         "-r",
-        offerBookmarkOf(two?.name),
+        proposedBookmarkFor(two?.name),
         "-T",
         'if(operation, operation.user(), "")',
       )
@@ -650,52 +655,54 @@ async function mainSection(
       "-m",
       "you edit line two\n\nreworded",
     )
-    const offerNow = () =>
+    const proposedNow = () =>
       jj(
         project,
         "log",
         "--no-graph",
         "-r",
-        offerBookmarkOf(two?.name),
+        proposedBookmarkFor(two?.name),
         "-T",
         "commit_id",
       )
     const followed = await waitFor(
       async () =>
-        JSON.stringify(offerOf()?.commits) ===
-        JSON.stringify([await offerNow()]),
+        JSON.stringify(proposedFromRows()?.commits) ===
+        JSON.stringify([await proposedNow()]),
       30_000,
     )
     await wh.quiet()
     check(
-      "the offer's record names its commit as it is now, after jj rebased it under the host, and the host wrote nothing",
+      "the proposed changes' record names its commit as it is now, after jj rebased it under the host, and the host wrote nothing",
       followed >= 0 &&
-        commitsBefore !== JSON.stringify(offerOf()?.commits) &&
+        commitsBefore !== JSON.stringify(proposedFromRows()?.commits) &&
         !(await newestBy()).startsWith(`${HOST_OPERATOR}@`) &&
-        offerOf()?.edited === false,
-      `${JSON.stringify({ before: commitsBefore, commits: offerOf()?.commits, now: await offerNow(), by: await newestBy(), edited: offerOf()?.edited })}`,
+        proposedFromRows()?.edited === false,
+      `${JSON.stringify({ before: commitsBefore, commits: proposedFromRows()?.commits, now: await proposedNow(), by: await newestBy(), edited: proposedFromRows()?.edited })}`,
     )
-    // The record is the page's cache: lost, the next trigger, a
-    // jj operation of yours that the offers depend on (a WIP bookmark, so
-    // everything is refreshed), writes it again from the repo, and
-    // the offer is the same commit, not built anew.
-    const lostAt = await offerNow()
+    // The record is the page's cache: lost, the next trigger, a jj operation of
+    // yours that the proposed changes depend on (a WIP bookmark, so everything
+    // is refreshed), writes it again from the repo, and the proposed changes
+    // are the same commit, not built anew.
+    const lostAt = await proposedNow()
     if (two !== undefined)
-      await wh.records.writeValues([deleteRecord(OFFER, two.name)])
+      await wh.records.writeValues([deleteRecord(PROPOSED_CHANGES, two.name)])
     const poke = `${DEFAULT_REPO.wipPrefix}e2e-poke`
     await jj(project, "bookmark", "create", poke, "-r", "@-")
     const rewritten = await waitFor(
-      () => JSON.stringify(offerOf()?.commits) === JSON.stringify([lostAt]),
+      () =>
+        JSON.stringify(proposedFromRows()?.commits) ===
+        JSON.stringify([lostAt]),
       30_000,
     )
     await wh.quiet()
     await jj(project, "bookmark", "delete", poke)
     check(
-      "a lost record changes nothing: the next trigger writes it again, and the offer keeps its change id",
+      "a lost record changes nothing: the next trigger writes it again, and the proposed changes keep its change id",
       rewritten >= 0 &&
-        (await offerNow()) === lostAt &&
-        (await offerChange()) === firstChange,
-      `${JSON.stringify({ lostAt, now: await offerNow(), record: offerOf()?.commits })}`,
+        (await proposedNow()) === lostAt &&
+        (await proposedChangeId()) === firstChange,
+      `${JSON.stringify({ lostAt, now: await proposedNow(), record: proposedFromRows()?.commits })}`,
     )
     // Catch it up: accepted work merged into the lane, and the
     // agent resolves the conflict, told what the card asked.
@@ -732,8 +739,8 @@ async function mainSection(
     const landMessage = projectTranscript(tree(), landing).at(-1)
     const clean = await waitFor(
       () =>
-        offerOf()?.conflicts.length === 0 &&
-        offerOf()?.files.includes("shared.txt") === true,
+        proposedFromRows()?.conflicts.length === 0 &&
+        proposedFromRows()?.files.includes("shared.txt") === true,
       30_000,
     )
     // What the model read: the land message's content, not its one line.
@@ -748,7 +755,7 @@ async function mainSection(
     const askedAt =
       two === undefined ? null : conflictAskedAt(tree(), laneTip(two.name))
     check(
-      "a card that brings the thread up to date runs the resolution when it conflicts, with the card's text, and the offer comes back clean",
+      "a card that brings the thread up to date runs the resolution when it conflicts, with the card's text, and the proposed changes come back clean",
       landMessage?.text.includes("1 file conflicts") === true &&
         typeof landPrompt === "string" &&
         landPrompt.endsWith(intent) &&
@@ -756,25 +763,25 @@ async function mainSection(
         clean >= 0,
       `${JSON.stringify({ landing, askedAt, clean })}`,
     )
-    // The resolution moved the lane: the offer followed it in place, back to
-    // a work in progress while the run went on, then described again.
+    // The resolution moved the lane: the proposed changes followed it in place,
+    // back to a work in progress while the run went on, then described again.
     await wh.quiet()
     const wip = `WIP (${twoName}): lane two: who are you?`
     const history = await descriptionsOf(firstChange)
     // The update's merge reaches your repo before the resolution runs, so it
     // is followed, and described, on its own: at least two rounds.
     check(
-      "a run that moves the lane keeps the offer's change id; it is a WIP line until each run ends",
-      (await offerChange()) === firstChange &&
+      "a run that moves the lane keeps the proposed changes' change id; it is a WIP line until each run ends",
+      (await proposedChangeId()) === firstChange &&
         history.length >= 4 &&
         history.every(
-          (d, i) => d === (i % 2 === 0 ? wip : "offer: scripted"),
+          (d, i) => d === (i % 2 === 0 ? wip : "proposed changes: scripted"),
         ) &&
         history.length % 2 === 0,
       `${JSON.stringify(history)}`,
     )
-    // Accept: accepted work moves forward to the offer, which stays one commit on
-    // your landed one; your working copy is untouched.
+    // Accept: accepted work moves forward to the proposed changes, which stays
+    // one commit on your landed one; your working copy is untouched.
     const atBefore = await jj(
       project,
       "log",
@@ -787,7 +794,7 @@ async function mainSection(
     const accepted =
       two === undefined
         ? null
-        : await wu.offer(two.name, "accept", "pinetrie-accepted")
+        : await wu.proposed(two.name, "accept", "pinetrie-accepted")
     const acceptedLog = await jj(
       project,
       "log",
@@ -798,9 +805,9 @@ async function mainSection(
       'description.first_line() ++ "\n"',
     )
     check(
-      "accepting the offer moves accepted work to it, on your landed commit; your working copy is untouched",
+      "accepting the proposed changes move accepted work to it, on your landed commit; your working copy is untouched",
       accepted?.kind === "accepted" &&
-        acceptedLog === "offer: scripted\nyou edit line two\n" &&
+        acceptedLog === "proposed changes: scripted\nyou edit line two\n" &&
         (await jj(
           project,
           "log",
@@ -816,7 +823,7 @@ async function mainSection(
           "wip\n",
       `${JSON.stringify(accepted)}, line: ${acceptedLog}`,
     )
-    // The next turn's offer holds only what came after.
+    // The next turn's proposed changes hold only what came after.
     script.use([
       { tool: "bash", args: { command: "echo after > after.txt" } },
       { text: "more" },
@@ -831,14 +838,15 @@ async function mainSection(
     await idle()
     const next = await waitFor(
       () =>
-        offerOf()?.acceptedAs === null &&
-        JSON.stringify(offerOf()?.files) === JSON.stringify(["after.txt"]),
+        proposedFromRows()?.acceptedAs === null &&
+        JSON.stringify(proposedFromRows()?.files) ===
+          JSON.stringify(["after.txt"]),
       30_000,
     )
     check(
-      "after an acceptance, the next offer holds only the new work",
+      "after an acceptance, the next proposed changes hold only the new work",
       next >= 0,
-      `${JSON.stringify(offerOf()?.files)}`,
+      `${JSON.stringify(proposedFromRows()?.files)}`,
     )
     // A clean update: a fact in the thread, then the card's text, sent. Your
     // work goes in accepted work first: a publish catches it up with what you
@@ -916,7 +924,8 @@ async function mainSection(
       `${JSON.stringify(afterUpdate)}`,
     )
     // Split into a stack: the agent builds it in the lane; the host checks it
-    // against the tip and makes it the offer. Squash brings it back to one.
+    // against the tip and makes it the proposed changes. Squash brings it back
+    // to one.
     await wh.quiet()
     const lane2 = two?.name
     const laneTipCommit =
@@ -931,7 +940,7 @@ async function mainSection(
             "-T",
             "commit_id",
           )
-    // Where the host starts the offer, as it computes it.
+    // Where the host starts the proposed changes, as it computes it.
     const tipCommit = commitId(laneTipCommit)
     // Your own reads, as you would run them: never snapshotting the working copy.
     const yours: Runner = args =>
@@ -940,7 +949,7 @@ async function mainSection(
     const read =
       base === null || lane2 === undefined
         ? null
-        : await startOfOffer(yours, {
+        : await startOfProposed(yours, {
             tip: tipCommit,
             base,
             repoConfig: DEFAULT_REPO,
@@ -962,19 +971,19 @@ async function mainSection(
         ? null
         : await queueCommand(wu, lane2, laneTip(lane2), "", "split")
     await idle()
-    const stacked = await waitFor(() => offerOf()?.size === 2, 30_000)
+    const stacked = await waitFor(() => proposedFromRows()?.size === 2, 30_000)
     const squashed =
       stacked >= 0 && lane2 !== undefined
-        ? await wu.offer(lane2, "squash")
+        ? await wu.proposed(lane2, "squash")
         : null
     await wh.quiet()
     check(
-      "split into a stack: the agent's stack becomes the offer, and squash makes it one again",
+      "split into a stack: the agent's stack becomes the proposed changes, and squash makes it one again",
       split !== null &&
         stacked >= 0 &&
-        squashed?.kind === "offered" &&
-        offerOf()?.size === 1,
-      `${JSON.stringify({ split, size: offerOf()?.size })}`,
+        squashed?.kind === "proposed" &&
+        proposedFromRows()?.size === 1,
+      `${JSON.stringify({ split, size: proposedFromRows()?.size })}`,
     )
 
     // A new root thread starts at accepted work: what you landed, not what you
@@ -1019,20 +1028,22 @@ async function mainSection(
       `${seenUnsaved.join(" | ").slice(0, 80)}`,
     )
 
-    // A branch's offer holds its parent's work you lack, with its own.
-    // Accepting the parent's shrinks it to its own, in place; accepting a
+    // A branch's proposed changes hold its parent's work you lack, with its
+    // own. Accepting the parent's shrinks it to its own, in place; accepting a
     // branch that holds all of its parent's withdraws the parent's.
-    const offerFor = (lane: ThreadId | undefined) =>
-      lane === undefined ? undefined : readJjOffers(wh.session).get(lane)
+    const proposedFor = (lane: ThreadId | undefined) =>
+      lane === undefined
+        ? undefined
+        : readJjProposedByLane(wh.session).get(lane)
     const filesOf = (lane: ThreadId | undefined) =>
-      JSON.stringify(offerFor(lane)?.files)
+      JSON.stringify(proposedFor(lane)?.files)
     const changeOf = (lane: ThreadId | undefined) =>
       jj(
         project,
         "log",
         "--no-graph",
         "-r",
-        offerBookmarkOf(lane),
+        proposedBookmarkFor(lane),
         "-T",
         "change_id",
       )
@@ -1048,20 +1059,23 @@ async function mainSection(
       )
       await idle()
       const lane = laneWith(text)?.name
-      await waitFor(() => offerFor(lane)?.files.includes(file) === true, 30_000)
+      await waitFor(
+        () => proposedFor(lane)?.files.includes(file) === true,
+        30_000,
+      )
       await wh.quiet()
       return lane
     }
     const branchA = await branchWriting("@agent branch a", "branch-a.txt")
     const aBefore = { files: filesOf(branchA), change: await changeOf(branchA) }
-    await wu.offer(lane2 ?? ("" as ThreadId), "accept", "pinetrie-accepted")
+    await wu.proposed(lane2 ?? ("" as ThreadId), "accept", "pinetrie-accepted")
     const shrunk = await waitFor(
       () => filesOf(branchA) === JSON.stringify(["branch-a.txt"]),
       30_000,
     )
     await wh.quiet()
     check(
-      "accepting a parent's offer shrinks its branch's offer to its own work, in place",
+      "accepting a parent's proposed changes shrink its branch's proposed changes to its own work, in place",
       aBefore.files === JSON.stringify(["after.txt", "branch-a.txt"]) &&
         shrunk >= 0 &&
         (await changeOf(branchA)) === aBefore.change,
@@ -1079,17 +1093,23 @@ async function mainSection(
       },
     )
     await idle()
-    await waitFor(() => offerOf()?.files.includes("more.txt") === true, 30_000)
+    await waitFor(
+      () => proposedFromRows()?.files.includes("more.txt") === true,
+      30_000,
+    )
     const branchB = await branchWriting("@agent branch b", "branch-b.txt")
     await wh.quiet()
-    const acceptedB = await wu.offer(
+    const acceptedB = await wu.proposed(
       branchB ?? ("" as ThreadId),
       "accept",
       "pinetrie-accepted",
     )
-    const withdrawn = await waitFor(() => offerOf() === undefined, 30_000)
+    const withdrawn = await waitFor(
+      () => proposedFromRows() === undefined,
+      30_000,
+    )
     check(
-      "accepting a branch that holds all its parent's work withdraws the parent's offer: no record, no bookmark",
+      "accepting a branch that holds all its parent's work withdraws the parent's proposed changes: no record, no bookmark",
       acceptedB.kind === "accepted" &&
         withdrawn >= 0 &&
         (await jj(
@@ -1097,11 +1117,11 @@ async function mainSection(
           "log",
           "--no-graph",
           "-r",
-          `bookmarks(exact:"${offerBookmarkOf(lane2)}")`,
+          `bookmarks(exact:"${proposedBookmarkFor(lane2)}")`,
           "-T",
           "commit_id",
         )) === "",
-      `${JSON.stringify({ acceptedB, parent: offerOf()?.files })}`,
+      `${JSON.stringify({ acceptedB, parent: proposedFromRows()?.files })}`,
     )
 
     // ── 7. Archiving keeps each lane's newest snapshot; restoring runs again ─
@@ -1117,9 +1137,9 @@ async function mainSection(
           r.snapshot !== null,
       )
     const before = inRootOne(rootRecordsOf(wh, readRevisions))
-    // The root's open offers, by lane: archiving withdraws them, and
+    // The root's open proposed changes, by lane: archiving withdraws them, and
     // restoring builds them again.
-    const offeredInRootOne = [...readJjOffers(wh.session).values()]
+    const proposedInRootOne = [...readJjProposedByLane(wh.session).values()]
       .filter(o => {
         const tip = laneTip(o.lane)
         return (
@@ -1130,16 +1150,16 @@ async function mainSection(
         )
       })
       .map(o => o.lane)
-    const offerBookmarks = () =>
+    const proposedBookmarks = () =>
       filterAsync(
-        offeredInRootOne,
+        proposedInRootOne,
         async lane =>
           (await jj(
             project,
             "log",
             "--no-graph",
             "-r",
-            `present(bookmarks(exact:"${offerBookmarkOf(lane)}"))`,
+            `present(bookmarks(exact:"${proposedBookmarkFor(lane)}"))`,
             "-T",
             "commit_id",
           )) !== "",
@@ -1165,26 +1185,30 @@ async function mainSection(
         !(await containerExists(container(one.name))),
       `${before.length} → ${kept.length}`,
     )
-    const left = await offerBookmarks()
+    const left = await proposedBookmarks()
     check(
-      "archiving a root withdraws its threads' offers: no bookmark in your repo, no record",
-      offeredInRootOne.length > 0 &&
+      "archiving a root withdraws its threads' proposed changes: no bookmark in your repo, no record",
+      proposedInRootOne.length > 0 &&
         left.length === 0 &&
-        offeredInRootOne.every(lane => !readJjOffers(wh.session).has(lane)),
-      `${JSON.stringify({ offered: offeredInRootOne, left })}`,
+        proposedInRootOne.every(
+          lane => !readJjProposedByLane(wh.session).has(lane),
+        ),
+      `${JSON.stringify({ proposed: proposedInRootOne, left })}`,
     )
     if (rootOne !== null) await moveTaskTo(wu, entryId(rootOne), "open")
     const rebuilt = await waitFor(
       async () =>
-        offeredInRootOne.length > 0 &&
-        (await offerBookmarks()).length === offeredInRootOne.length &&
-        offeredInRootOne.every(lane => readJjOffers(wh.session).has(lane)),
+        proposedInRootOne.length > 0 &&
+        (await proposedBookmarks()).length === proposedInRootOne.length &&
+        proposedInRootOne.every(lane =>
+          readJjProposedByLane(wh.session).has(lane),
+        ),
       30_000,
     )
     check(
-      "restoring it builds their offers again",
+      "restoring it builds their proposed changes again",
       rebuilt >= 0,
-      `${JSON.stringify({ offered: offeredInRootOne, back: await offerBookmarks() })}`,
+      `${JSON.stringify({ proposed: proposedInRootOne, back: await proposedBookmarks() })}`,
     )
     script.use([
       { tool: "bash", args: { command: "cat shared.txt" } },

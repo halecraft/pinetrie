@@ -6,13 +6,13 @@ const workspace = ["pnpm", "exec", "vitest", "run", "workspace.test.ts"]
 
 export const mutations: readonly Mutation[] = [
   {
-    name: "offerWords leaves a folder offer's accept untitled",
+    name: "workStripWords leaves folder proposed changes' accept untitled",
     file: "packages/interface/column-view.ts",
     from: '            into?.kind === "folder"\n              ? ACCEPT_LATER\n',
     to: '            into?.kind === "folder" && false\n              ? ACCEPT_LATER\n',
     command: unit,
     expect:
-      "a folder offer names accepted work, and its disabled accept says why, no bookmark moved",
+      "folder proposed changes name accepted work, and its disabled accept says why, no bookmark moved",
   },
   {
     name: "a host's line is labelled by its role, not by pine·trie",
@@ -503,12 +503,13 @@ export const mutations: readonly Mutation[] = [
     expect: "a command refused is worded as such",
   },
   {
-    name: "the strip's buttons do not wait for an offer command",
+    name: "the strip's buttons do not wait for a command on proposed changes",
     file: "packages/interface/column-view.ts",
     from: '    waiting: f.acting?.kind === "sent",',
     to: "    waiting: false,",
     command: unit,
-    expect: "your offer command waits while it is out, and not once answered",
+    expect:
+      "your command on proposed changes wait while they are out, and not once answered",
   },
   {
     name: "redoing a stale stack's split does not say it replaces the stack",
@@ -546,13 +547,13 @@ export const mutations: readonly Mutation[] = [
       "the jj facts are titles: which bookmark an acceptance moves, and what catching up merges",
   },
   {
-    name: "an offer's line says nothing of its base moving on",
+    name: "proposed changes' line says nothing of its base moving on",
     file: "packages/interface/column-view.ts",
     from: '    brings && state !== "nothing" && state !== "busy" && state !== "running"',
     to: '    false && state !== "nothing" && state !== "busy" && state !== "running"',
     command: unit,
     expect:
-      "behind its base, the strip says so and offers catching up beside the offer",
+      "behind its base, the strip says so and offers catching up beside the proposed changes",
   },
   {
     name: "the header never marks a thread behind",
@@ -609,12 +610,13 @@ export const mutations: readonly Mutation[] = [
       "placeholderWords says whether a message naming no one asks the agent",
   },
   {
-    name: "Move to Done names no offer it withdraws",
+    name: "Move to Done names no proposed changes it withdraws",
     file: "packages/interface/thread-card.ts",
-    from: "        drops: closes ? (facts.offered.get(task) ?? []) : [],",
+    from: "        drops: closes ? (facts.proposed.get(task) ?? []) : [],",
     to: "        drops: [],",
     command: unit,
-    expect: "Move to Done names the threads whose offers it withdraws",
+    expect:
+      "Move to Done names the threads whose proposed changes it withdraws",
   },
   {
     name: "setting up says nothing of jjui's own revset",
@@ -635,11 +637,11 @@ export const mutations: readonly Mutation[] = [
       "a WIP thread adds to its WIP, and offers the project with its commits",
   },
   {
-    name: "an edited offer hides its conflicts",
+    name: "edited proposed changes hide their conflicts",
     file: "packages/interface/column-view.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: '                ? `you edited this offer${conflicts === "" ? "" : ` · ${conflicts}`}`',
-    to: '                ? "you edited this offer"',
+    from: '                ? `you edited these changes${conflicts === "" ? "" : ` · ${conflicts}`}`',
+    to: '                ? "you edited these changes"',
     command: unit,
     expect: "edited, and conflicting",
   },
@@ -1000,12 +1002,12 @@ export const mutations: readonly Mutation[] = [
   },
 
   {
-    name: "a stack reads as one offer",
+    name: "a stack reads as one proposed changes",
     file: "packages/interface/column-view.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: "                      ? `a stack of ${facts.size} · ${files} ready${yours}`",
+    from: "                      ? `a stack of ${facts.size} · ${files} changed${yours}`",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    to: "                      ? `${files} ready${yours}`",
+    to: "                      ? `${files} changed${yours}`",
     command: unit,
     expect: "a stack",
   },
@@ -1144,7 +1146,7 @@ export const mutations: readonly Mutation[] = [
     from: "    return {\n      copy,\n      comment: false,",
     to: "    return {\n      copy: false,\n      comment: false,",
     command: unit,
-    expect: "a column that can't be written offers only copy",
+    expect: "a column that can't be written proposed changes only copy",
   },
   {
     name: "a message that only called tools offers no copy",
@@ -2039,21 +2041,21 @@ export const mutations: readonly Mutation[] = [
     expect: "switching tabs clears every column of the last tab",
   },
   {
-    name: "the header counts an offer accepted work already holds",
+    name: "the header counts proposed changes accepted work already holds",
     file: "packages/interface/app-view.ts",
-    from: '    if (offerStatus(o).kind !== "open" || root === undefined) return []',
-    to: "    if (o.acceptedAs !== null || root === undefined) return []",
+    from: '    if (proposedChangesStatus(o).kind !== "open" || root === undefined)\n',
+    to: "    if (o.acceptedAs !== null || root === undefined)\n",
     command: unit,
-    expect: "the header's offers are the open ones",
+    expect: "the header's proposed changes are the open ones",
   },
   {
-    name: "a held offer reviews nothing, but the strip offers it",
+    name: "held proposed changes review nothing, but the strip shows them",
     file: "packages/interface/column-view.ts",
-    from: '    review: offer.kind === "open" ? offerReview(offer.record) : null,',
-    to: '    review: offer.kind === "open" || offer.kind === "held" ? offerReview(offer.record) : null,',
+    from: '    review: proposed.kind === "open" ? proposedReview(proposed.record) : null,',
+    to: '    review: proposed.kind === "open" || proposed.kind === "held" ? proposedReview(proposed.record) : null,',
     command: unit,
     expect:
-      "an open offer with files can be reviewed, in every state; an accepted or empty one cannot",
+      "open proposed changes with files can be reviewed, in every state; an accepted or empty one cannot",
   },
 
   {
@@ -2633,12 +2635,12 @@ export const mutations: readonly Mutation[] = [
     expect: "openLink: an entry this tab holds opens as openAt does",
   },
   {
-    name: "the header lists no offer in a root not held",
+    name: "the header lists no proposed changes in a root not held",
     file: "packages/interface/app-view.ts",
     from: "    if (held === undefined) return [{ lane: o.lane, root, end: root, source }]",
     to: "    if (held === undefined) return []",
     command: unit,
-    expect: "the header's offers are the open ones",
+    expect: "the header's proposed changes are the open ones",
   },
   {
     name: "a card marks no task",
@@ -2756,7 +2758,7 @@ export const mutations: readonly Mutation[] = [
     to: "  items.length + unseen",
     command: unit,
     expect:
-      "counts what needs you, offers of threads you follow and unseen mentions",
+      "counts what needs you, proposed changes of threads you follow and unseen mentions",
   },
   {
     name: "the inbox badge leaves out unseen mentions",
@@ -2765,15 +2767,15 @@ export const mutations: readonly Mutation[] = [
     to: '  items.filter(i => i.level === "needsYou").length',
     command: unit,
     expect:
-      "counts what needs you, offers of threads you follow and unseen mentions",
+      "counts what needs you, proposed changes of threads you follow and unseen mentions",
   },
   {
-    name: "an offer goes under its level, not ready",
+    name: "proposed changes go under its level, not ready",
     file: "packages/interface/inbox-view.ts",
-    from: '  item.raised.kind === "offer" ? "ready" : item.level',
+    from: '  item.raised.kind === "ready" ? "ready" : item.level',
     to: "  item.level",
     command: unit,
-    expect: "each verdict under its level, each offer under ready",
+    expect: "each verdict under its level, each proposed changes under ready",
   },
   {
     name: "the mentions section shows alone",
@@ -2836,7 +2838,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a thread card never carries ⇡",
     file: "packages/interface/thread-card.ts",
-    from: "    ready: facts.offered.get(task) ?? [],",
+    from: "    ready: facts.proposed.get(task) ?? [],",
     to: "    ready: [],",
     command: unit,
     expect:
@@ -2848,7 +2850,8 @@ export const mutations: readonly Mutation[] = [
     from: "    if (task !== undefined)\n      byTask.set",
     to: "    if (task !== undefined && names.has(lane))\n      byTask.set",
     command: unit,
-    expect: "offeredByTask: each open offer's thread, under its task",
+    expect:
+      "openProposedByTask: each open proposed changes' thread, under its task",
   },
   {
     name: "a reader who left is still said to be in",
@@ -2917,12 +2920,12 @@ export const mutations: readonly Mutation[] = [
     expect: "reading to the run's end, on any device, clears its verdict",
   },
   {
-    name: "reading a thread clears its offer",
+    name: "reading a thread clears its proposed changes",
     file: "packages/interface/attention.ts",
     from: "    if (!yours(o.lane)) continue\n",
     to: "    if (!yours(o.lane) || person.read.has(o.lane)) continue\n",
     command: unit,
-    expect: "an offer you follow needs you until not needed",
+    expect: "proposed changes you follow needs you until not needed",
   },
   {
     name: "a busy lane raises attention",
@@ -2957,13 +2960,13 @@ export const mutations: readonly Mutation[] = [
     expect: "levelOf: stopped by you",
   },
   {
-    name: "an offer is counted twice",
+    name: "proposed changes are counted twice",
     file: "packages/interface/inbox-view.ts",
     from: '  items.filter(i => i.level === "needsYou").length + unseen',
-    to: '  items.filter(i => i.level === "needsYou").length +\n  items.filter(i => i.raised.kind === "offer").length + unseen',
+    to: '  items.filter(i => i.level === "needsYou").length +\n  items.filter(i => i.raised.kind === "ready").length + unseen',
     command: unit,
     expect:
-      "counts what needs you, offers of threads you follow and unseen mentions",
+      "counts what needs you, proposed changes of threads you follow and unseen mentions",
   },
   {
     name: "a pending verdict is no work",
@@ -3081,7 +3084,7 @@ export const mutations: readonly Mutation[] = [
       "on an idle lane whose queue is held, a send queues last and releases it",
   },
   {
-    name: "a queue's controls offer unqueue all with nothing queued",
+    name: "a queue's controls offers unqueue all with nothing queued",
     file: "packages/interface/next.ts",
     from: '  if (head.messages > 0) items.push("unqueue-all")',
     to: '  if (true) items.push("unqueue-all")',
@@ -3170,7 +3173,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a thread whose WIP is gone is offered a plain update",
-    file: "packages/rules/offer-view.ts",
+    file: "packages/rules/work-strip.ts",
     from: '      gone ? bs.map(b => (b === "update" ? "continue" : b)) : bs',
     to: "      bs",
     command: unit,

@@ -1,14 +1,14 @@
-// offer-view — a lane's offer as the page shows it. It writes no words: they
-// are the client's (`offerWords`).
+// work-strip — a lane's work strip, as the page shows it: its state, buttons
+// and menu, decided from its proposed changes' record. It writes no words: they
+// are the client's (`workStripWords`).
 
 import {
   type AcceptsInto,
   type CardCommand,
   type ConflictCause,
   isCatchUp,
-  type OfferRecord,
-  type OfferSeen,
   type ParentThread,
+  type ProposedChangesRecord,
   type ThreadBase,
 } from "@pinetrie/core"
 import {
@@ -19,18 +19,17 @@ import {
   parentAhead,
 } from "./base.ts"
 import {
-  type OfferAcceptanceDestination,
-  type OfferStatus,
-  offerAcceptanceDestinations,
-} from "./offer.ts"
+  type AcceptanceDestination,
+  acceptanceDestinations,
+  type ProposedChangesStatus,
+} from "./proposed.ts"
 
 /**
- * A button beside the offer, or in its menu. `accept` accepts it into
- * its default destination; `accept-into-accepted` into accepted work, from a WIP
- * thread; `continue`
- * moves a thread whose WIP is gone to accepted work.
+ * A button beside the proposed changes, or in its menu. `accept` accepts it
+ * into its default destination; `accept-into-accepted` into accepted work, from
+ * a WIP thread; `continue` moves a thread whose WIP is gone to accepted work.
  */
-export type OfferButton =
+export type WorkStripButton =
   | "accept"
   | "accept-into-accepted"
   | "continue"
@@ -42,10 +41,11 @@ export type OfferButton =
   | "catch-up-parent"
 
 /**
- * What the lane is running now, as far as the offer cares; `catch-up`: a
- * card that brings it up to date is queued, and popped before anything else.
+ * What the lane is running now, as far as the proposed changes cares;
+ * `catch-up`: a card that brings it up to date is queued, and popped before
+ * anything else.
  */
-export type OfferActivity =
+export type WorkStripActivity =
   | "idle"
   | "turn"
   | "resolution"
@@ -53,11 +53,11 @@ export type OfferActivity =
   | "catch-up"
 
 /**
- * One state of a lane's offer, what can be done in it (the work strip's
- * states), and the facts its words are made from. The words are the client's
- * (`offerWords`, `@pinetrie/interface`).
+ * One state of a lane's proposed changes, what can be done in it (the work
+ * strip's states), and the facts its words are made from. The words are the
+ * client's (`workStripWords`, `@pinetrie/interface`).
  */
-export interface OfferView {
+export interface WorkStripView {
   readonly state:
     | "nothing"
     | "running"
@@ -69,31 +69,31 @@ export interface OfferView {
     | "stale"
     | "edited"
     | "accepted"
-  /** Buttons beside the offer, the first the primary one. */
-  readonly buttons: readonly OfferButton[]
-  /** Buttons in the offer's menu. */
-  readonly menu: readonly OfferButton[]
+  /** Buttons beside the proposed changes, the first the primary one. */
+  readonly buttons: readonly WorkStripButton[]
+  /** Buttons in the proposed changes' menu. */
+  readonly menu: readonly WorkStripButton[]
   /** Of those, the ones drawn disabled: they would change nothing now, or cannot yet be done; each one's title says which. */
-  readonly quiet: readonly OfferButton[]
+  readonly quiet: readonly WorkStripButton[]
   /** Where `accept` (the first) and `accept-into-accepted` (accepted work, from a WIP) go. */
-  readonly destinations: readonly OfferAcceptanceDestination[]
-  readonly facts: OfferFacts
+  readonly destinations: readonly AcceptanceDestination[]
+  readonly facts: WorkStripFacts
 }
 
-/** What an offer's words are made from. */
-interface OfferFacts {
-  readonly activity: OfferActivity
-  /** Files in the offer not yet accepted; 0 with none. */
+/** What proposed changes' words are made from. */
+interface WorkStripFacts {
+  readonly activity: WorkStripActivity
+  /** Files in the proposed changes not yet accepted; 0 with none. */
   readonly files: number
-  /** Revisions in the offer not yet accepted: more than one is a stack. */
+  /** Revisions in the proposed changes not yet accepted: more than one is a stack. */
   readonly size: number
   /** Files that conflict with your work. */
   readonly conflicts: number
   /** It touches files you have uncommitted edits in. */
   readonly touchesYourEdits: boolean
-  /** Its bookmark, to find it in jj; null with no offer not yet accepted. */
+  /** Its bookmark, to find it in jj; null with no proposed changes not yet accepted. */
   readonly bookmark: string | null
-  /** An offer not yet accepted whose work accepted work already holds (`held`). */
+  /** Proposed changes not yet accepted whose work accepted work already holds (`held`). */
   readonly held: boolean
   /** The change id it was accepted as, or null. */
   readonly acceptedAs: string | null
@@ -106,23 +106,23 @@ interface OfferFacts {
   readonly into: AcceptsInto | null
   /** What catching up would do (`catchUpOf`). */
   readonly catchUp: CatchUpNow
-  /** An accepted-offer commit of this thread names no source: nothing is offered until it catches up. */
+  /** An accepted thread commit of this thread names no source: nothing is proposed until it catches up. */
   readonly untraced: boolean
   /** Where its conflict comes from (`conflictCause`); `work` with none. */
   readonly conflictCause: ConflictCause
   /** The thread this one branched from, while it is ahead of what this lane last caught up with. */
   readonly parent: ParentThread | null
-  /** That parent's newest commit holds every file of the offer's conflict resolved. */
+  /** That parent's newest commit holds every file of the proposed changes' conflict resolved. */
   readonly parentResolves: boolean
 }
 
 /**
- * Where an offer's conflict comes from: `start` when it conflicts, and every
- * file it conflicts in was already conflicted where it starts, so the
- * conflict came with the lane's copy; else `work`. A folder offer starts on
- * accepted work, which in a folder project holds no conflict.
+ * Where proposed changes' conflict comes from: `start` when it conflicts, and
+ * every file it conflicts in was already conflicted where it starts, so the
+ * conflict came with the lane's copy; else `work`. Folder proposed changes
+ * start on accepted work, which in a folder project holds no conflict.
  */
-export function conflictCause(record: OfferRecord): ConflictCause {
+export function conflictCause(record: ProposedChangesRecord): ConflictCause {
   if (record.kind === "folder") return "work"
   const at = new Set(record.startConflicts)
   return record.conflicts.length > 0 && record.conflicts.every(f => at.has(f))
@@ -131,17 +131,17 @@ export function conflictCause(record: OfferRecord): ConflictCause {
 }
 
 /**
- * The offer's state and buttons. `asked` is when the agent last asked about
- * a conflict on the thread's path (`conflictAskedAt`); it asks for
- * you only when newer than the offer. `base` is the lane's
- * (`pinetrie.base`), null before the host read it, as accepted work; `into`
- * and `wipAhead` come from accepted work's record. A jj offer's acceptance is
- * offered only with a destination (`offerAcceptanceDestinations`); a folder
- * offer's is drawn disabled until accepting into a folder is built.
+ * The proposed changes' state and buttons. `asked` is when the agent last asked
+ * about a conflict on the thread's path (`conflictAskedAt`); it asks for you
+ * only when newer than the proposed changes. `base` is the lane's
+ * (`pinetrie.base`), null before the host read it, as accepted work; `into` and
+ * `wipAhead` come from accepted work's record. Jj proposed changes' acceptance
+ * is offered only with a destination (`acceptanceDestinations`); a folder
+ * proposed changes' is drawn disabled until accepting into a folder is built.
  */
-export function offerView(input: {
-  readonly offer: OfferStatus
-  readonly activity: Exclude<OfferActivity, "catch-up">
+export function workStripView(input: {
+  readonly proposed: ProposedChangesStatus
+  readonly activity: Exclude<WorkStripActivity, "catch-up">
   readonly asked: number | null
   readonly base: FollowedBase | null
   /** Null for a jj project whose accepted work is not read yet: nothing to accept into. */
@@ -149,26 +149,28 @@ export function offerView(input: {
   readonly wipAhead: number
   /** What catching up would do (`catchUpOf`). */
   readonly catchUp: CatchUpNow
-  /** Accepted-offer commits of this thread that name no source (`BaseRecord.untraced`). */
+  /** Accepted thread commits of this thread that name no source (`BaseRecord.untraced`). */
   readonly untraced: boolean
   /**
-   * The commands of the cards queued on its lane: a catch-up makes the offer
-   * busy; a split quiets the split button.
+   * The commands of the cards queued on its lane: a catch-up makes the proposed
+   * changes busy; a split quiets the split button.
    */
   readonly queued: readonly CardCommand[]
   /** The thread this one branched from (`parentNow`); null for one that began at its base. */
   readonly parent: ParentNow | null
   /** That thread's agent runs: its copy moves with every turn. */
   readonly parentRunning: boolean
-}): OfferView {
-  const { offer, asked } = input
-  const activity: OfferActivity =
+}): WorkStripView {
+  const { proposed, asked } = input
+  const activity: WorkStripActivity =
     input.activity === "idle" && input.queued.some(isCatchUp)
       ? "catch-up"
       : input.activity
   const notYetAccepted =
-    offer.kind === "open" || offer.kind === "held" ? offer.record : undefined
-  const open = offer.kind === "open" ? offer.record : undefined
+    proposed.kind === "open" || proposed.kind === "held"
+      ? proposed.record
+      : undefined
+  const open = proposed.kind === "open" ? proposed.record : undefined
   const jjOpen = open?.kind === "jj" ? open : undefined
   const jjBase = input.base?.kind === "jj" ? input.base : null
   const ahead =
@@ -177,16 +179,16 @@ export function offerView(input: {
   const parentResolves =
     ahead !== null &&
     open?.conflicts.every(f => !ahead.conflicts.includes(f)) === true
-  const facts: OfferFacts = {
+  const facts: WorkStripFacts = {
     activity,
     files: open?.files.length ?? 0,
-    // A folder offer is one change: never a stack.
+    // Folder proposed changes are one change: never a stack.
     size: open === undefined ? 0 : (jjOpen?.size ?? 1),
     conflicts: open?.conflicts.length ?? 0,
     touchesYourEdits: (jjOpen?.yourEdits.length ?? 0) > 0,
     bookmark: notYetAccepted?.kind === "jj" ? notYetAccepted.bookmark : null,
-    held: offer.kind === "held",
-    acceptedAs: offer.kind === "accepted" ? offer.as : null,
+    held: proposed.kind === "held",
+    acceptedAs: proposed.kind === "accepted" ? proposed.as : null,
     base: effectiveBase(input.base),
     into: input.into,
     catchUp: input.catchUp,
@@ -199,7 +201,7 @@ export function offerView(input: {
   const destinations =
     open === undefined || into?.kind !== "bookmark"
       ? []
-      : offerAcceptanceDestinations({
+      : acceptanceDestinations({
           base: jjBase?.base ?? { kind: "accepted" },
           state: jjBase?.state ?? "ok",
           acceptedBookmark: into.bookmark,
@@ -207,34 +209,35 @@ export function offerView(input: {
           wipAhead: input.wipAhead,
         })
   const gone = jjBase?.state === "gone"
-  // A folder offer's accept stays, disabled: accepting into a folder
+  // Folder proposed changes' accept stays, disabled: accepting into a folder
   // project is not built yet, and its title says so.
   const later = into?.kind === "folder"
   const integrable = (
-    buttons: readonly OfferButton[],
-  ): readonly OfferButton[] =>
+    buttons: readonly WorkStripButton[],
+  ): readonly WorkStripButton[] =>
     destinations.length === 0 && !later
       ? buttons.filter(b => b !== "accept")
       : buttons
   const view = (
-    state: OfferView["state"],
-    buttons: readonly OfferButton[],
-    listed: readonly OfferButton[],
-  ): OfferView => {
+    state: WorkStripView["state"],
+    buttons: readonly WorkStripButton[],
+    listed: readonly WorkStripButton[],
+  ): WorkStripView => {
     // A thread whose WIP is gone is brought up to date only by moving it to
     // accepted work.
-    const toAccepted = (bs: readonly OfferButton[]) =>
+    const toAccepted = (bs: readonly WorkStripButton[]) =>
       gone ? bs.map(b => (b === "update" ? "continue" : b)) : bs
     // While the parent is ahead, catching up with it is listed, unless it
-    // already stands beside the offer.
+    // already stands beside the proposed changes.
     const menu = [
       ...toAccepted(listed),
       ...(ahead !== null && !buttons.includes("catch-up-parent")
         ? (["catch-up-parent"] as const)
         : []),
     ]
-    // When it brings work, or must come before any offer, catching up
-    // stands beside the offer; when it would change nothing, it is quiet.
+    // When it brings work, or must come before any proposed changes, catching
+    // up stands beside the proposed changes; when it would change nothing, it
+    // is quiet.
     const { kind } = input.catchUp
     const shown =
       (kind === "brings" || input.untraced) && menu.includes("update")
@@ -243,7 +246,7 @@ export function offerView(input: {
             menu: menu.filter(b => b !== "update"),
           }
         : { buttons, menu }
-    const quiet: OfferButton[] = [
+    const quiet: WorkStripButton[] = [
       ...(!input.untraced && (kind === "current" || kind === "nothing-new")
         ? (["update"] as const).filter(b => shown.menu.includes(b))
         : []),
@@ -255,8 +258,9 @@ export function offerView(input: {
       ...(input.queued.includes("split") ? (["split"] as const) : []),
       ...(later && buttons.includes("accept") ? (["accept"] as const) : []),
     ]
-    // An untraced start rebuilds nothing: only your edited offer is left.
-    const rebuilds = (b: OfferButton) =>
+    // An untraced start rebuilds nothing: only your edited proposed changes are
+    // left.
+    const rebuilds = (b: WorkStripButton) =>
       !input.untraced || (b !== "refresh" && b !== "squash" && b !== "split")
     return {
       state,
@@ -272,12 +276,12 @@ export function offerView(input: {
   }
   if (activity === "turn") return view("running", [], [])
   if (activity !== "idle") return view("busy", [], [])
-  if (offer.kind === "none") return view("nothing", [], ["update"])
-  if (offer.kind === "accepted") return view("accepted", [], ["update"])
-  const { record } = offer
+  if (proposed.kind === "none") return view("nothing", [], ["update"])
+  if (proposed.kind === "accepted") return view("accepted", [], ["update"])
+  const { record } = proposed
   if (asked !== null && asked > record.at)
     return view("needs_you", ["accept"], ["update"])
-  if (offer.kind === "held") return view("nothing", [], ["update"])
+  if (proposed.kind === "held") return view("nothing", [], ["update"])
   if (record.kind === "jj" && record.edited)
     return view("edited", ["accept", "refresh"], ["update"])
   // A conflict that came with the lane's copy, which the parent has since
@@ -291,7 +295,7 @@ export function offerView(input: {
         : ["update", "accept"],
       [],
     )
-  // A folder offer is its files: never split, never a stack.
+  // Folder proposed changes are its files: never split, never a stack.
   if (record.kind === "folder")
     return view("ready", ["accept"], ["describe", "update"])
   if (record.size > 1)
@@ -300,13 +304,3 @@ export function offerView(input: {
       : view("stack", ["accept", "squash"], ["update"])
   return view("ready", ["accept", "split"], ["describe", "update"])
 }
-
-/**
- * What an acceptance was shown, from the record the page drew: the
- * offer's ledger, and whether it conflicted. With no record, it was shown no
- * offer.
- */
-export const offerSeen = (record: OfferRecord | undefined): OfferSeen => ({
-  ledger: record?.kind === "jj" ? record.ledger : null,
-  conflicted: (record?.conflicts.length ?? 0) > 0,
-})

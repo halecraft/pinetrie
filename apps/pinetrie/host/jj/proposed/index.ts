@@ -1,24 +1,24 @@
-// host/jj/offers — each lane's offer in your repo, on the owner of your repo
-// (`@pinetrie/jj`).
+// host/jj/proposed — each lane's proposed changes in your repo, on the owner of
+// your repo (`@pinetrie/jj`).
 //
 // A refresh is upkeep, at most one queued per lane (`later("refresh:…")`):
-// gather (`gatherRefresh`), decide (`planRefresh`), translate (`offerEffects`),
-// and execute the steps, then write the `pinetrie.offer` record, the page's
-// cache, from the repo (`refresh.ts`). The host decides nothing from a record.
-// What marks a lane: a move the owner observes (`planMarks`: the lane's ref
-// after a fetch, its offer bookmark, accepted work, a WIP, your `@`), a run's
-// end, and a root archived or restored (`moveLanes`); accepted work's record
-// (`jj/accepted.ts`) is rewritten on the same moves. Commands (an offer
-// action, a split's span and end) are owner commands, ahead of every refresh
-// waiting. The reads a page asks for (`read`) are pinned reads, which wait on
-// nothing.
+// gather (`gatherRefresh`), decide (`planRefresh`), translate
+// (`proposedChangesEffects`), and execute the steps, then write the
+// `pinetrie.proposed` record, the page's cache, from the repo (`refresh.ts`).
+// The host decides nothing from a record. What marks a lane: a move the owner
+// observes (`planMarks`: the lane's ref after a fetch, its proposed bookmark,
+// accepted work, a WIP, your `@`), a run's end, and a root archived or restored
+// (`moveLanes`); accepted work's record (`jj/accepted.ts`) is rewritten on the
+// same moves. Commands (proposed changes action, a split's span and end) are
+// owner commands, ahead of every refresh waiting. The reads a page asks for
+// (`read`) are pinned reads, which wait on nothing.
 
 import {
   type CommitId,
   type ErrCode,
-  type OfferFact,
-  type OfferSeen,
   PROJECT_CONFIG_FILE,
+  type ProposedChangesFact,
+  type ProposedChangesSeen,
   type RepoConfig,
   type ThreadId,
   type WriterId,
@@ -32,23 +32,23 @@ import {
   revisionRead,
 } from "@pinetrie/jj"
 import type { PiSetup } from "@pinetrie/pi"
-import { readLaneRecords, readNames, readOffers } from "@pinetrie/reads"
+import { readLaneRecords, readNames, readProposedByLane } from "@pinetrie/reads"
 import {
   answerDiff,
   answerReview,
   isNotYetAccepted,
-  type OfferAnswer,
-  type OfferAsk,
-  offerStatus,
-  planOfferRead,
+  planReviewRead,
   planYourEdits,
+  proposedChangesStatus,
   type RecordedSpan,
+  type ReviewAnswer,
+  type ReviewAsk,
 } from "@pinetrie/rules"
 import { type Basics, failed } from "../../basics.ts"
 import { createDescriber } from "../../describe.ts"
 import type { Records } from "../../records.ts"
 import { decodeAuthority } from "../../settings.ts"
-import { offerReadFacts } from "../../work/destination.ts"
+import { reviewReadFacts } from "../../work/destination.ts"
 import type { AcceptedWork } from "../accepted.ts"
 import { recordedJjLane } from "../proven.ts"
 import { act } from "./act.ts"
@@ -56,13 +56,13 @@ import { describe } from "./describe.ts"
 import { planMarks } from "./marks.ts"
 import { createRefresh } from "./refresh.ts"
 import { stackEnded, stackSpan } from "./stack.ts"
-import { createOfferDeps } from "./state.ts"
+import { createProposedChangesDeps } from "./state.ts"
 
-export interface Offers {
+export interface ProposedChanges {
   /**
    * Set lanes' history in your repo, or delete it with a null commit (a root
-   * archived or restored), then refresh each lane's offer: an archived thread's
-   * is withdrawn, a restored one's built again.
+   * archived or restored), then refresh each lane's proposed changes: an
+   * archived thread's is withdrawn, a restored one's built again.
    */
   moveLanes(
     updates: readonly {
@@ -70,30 +70,31 @@ export interface Offers {
       readonly commit: CommitId | null
     }[],
   ): Promise<void>
-  /** A run on `lane` ended: refresh its offer, then describe it if it is still a WIP. */
+  /** A run on `lane` ended: refresh its proposed changes, then describe it if it is still a WIP. */
   runEnded(lane: ThreadId): void
   /**
-   * An offer action other than a split; an acceptance names its destination,
-   * null for the default, and what it was shown. Carried out, it answers with
-   * its fact, which the thread is told.
+   * An action on proposed changes other than a split; an acceptance names its
+   * destination, null for the default, and what it was shown. Carried out, it
+   * answers with its fact, which the thread is told.
    */
   act(
     lane: ThreadId,
     action: "accept" | "squash" | "describe" | "refresh",
     by: WriterId,
     to?: string | null,
-    seen?: OfferSeen | null,
+    seen?: ProposedChangesSeen | null,
   ): Promise<
     | { readonly kind: "refused"; readonly code: ErrCode }
-    | { readonly kind: "done"; readonly fact: OfferFact }
+    | { readonly kind: "done"; readonly fact: ProposedChangesFact }
   >
-  /** Where a split's stack starts and ends: the offer's start and the lane's tip. */
+  /** Where a split's stack starts and ends: the proposed changes' start and the lane's tip. */
   stackSpan(
     lane: ThreadId,
   ): Promise<{ readonly start: CommitId[]; readonly tip: CommitId } | null>
   /**
    * A split's run ended: its stack, fetched into your repo as `stack`, replaces
-   * the offer if it holds exactly the lane tip's files. Returns why not.
+   * the proposed changes if it holds exactly the lane tip's files. Returns why
+   * not.
    */
   stackEnded(
     lane: ThreadId,
@@ -104,14 +105,15 @@ export interface Offers {
     },
   ): Promise<string | null>
   /**
-   * A review or a diff a page asked for, of a commit an open offer holds now or
-   * a range one lane's turns recorded: gathered, planned (`planOfferRead`), and
-   * read pinned to the head the owner last observed, waiting on no write.
+   * A review or a diff a page asked for, of a commit open proposed changes hold
+   * now or a range one lane's turns recorded: gathered, planned
+   * (`planReviewRead`), and read pinned to the head the owner last observed,
+   * waiting on no write.
    */
-  read(ask: OfferAsk): Promise<OfferAnswer>
+  read(ask: ReviewAsk): Promise<ReviewAnswer>
 }
 
-export function startOffers(input: {
+export function startProposedChanges(input: {
   readonly owner: RepoOwner
   /** Accepted work's names. */
   readonly repoConfig: RepoConfig
@@ -119,15 +121,15 @@ export function startOffers(input: {
   readonly records: Pick<Records, "writeValues">
   /** What a description asks of the model. */
   readonly piSetup: Pick<PiSetup, "skill" | "complete">
-  /** Whether a lane is running now: an offer is described once it stops. */
+  /** Whether a lane is running now: proposed changes are described once it stops. */
   readonly running: (lane: ThreadId) => boolean
   /** A lane's base record changed: lane work announces it (`onBaseChanged`). */
   readonly baseChanged: (lane: ThreadId) => void
   /** Accepted work's record and commands (`host/jj/accepted.ts`): its record is rewritten when the owner observes accepted work or your `@` move. */
   readonly acceptedWork: AcceptedWork
-}): Offers {
+}): ProposedChanges {
   const deps = {
-    ...createOfferDeps(input),
+    ...createProposedChangesDeps(input),
     describer: createDescriber({
       basics: input.basics,
       piSetup: input.piSetup,
@@ -137,8 +139,8 @@ export function startOffers(input: {
   const refresh = createRefresh(deps)
 
   /**
-   * Refresh `lane`'s offer as upkeep, once however often it is marked
-   * before it starts; resolves with whether it built.
+   * Refresh `lane`'s proposed changes as upkeep, once however often it is
+   * marked before it starts; resolves with whether it built.
    */
   function mark(lane: ThreadId): Promise<boolean> {
     let built = false
@@ -149,7 +151,7 @@ export function startOffers(input: {
       .then(
         () => built,
         error => {
-          failed(basics, "refreshing its offer", lane)(error)
+          failed(basics, "refreshing its proposed changes", lane)(error)
           return false
         },
       )
@@ -175,7 +177,7 @@ export function startOffers(input: {
         const { editing } = await ops.shared()
         await acceptedWork.record(ops)
         for (const record of planYourEdits(
-          readOffers(basics.session).values(),
+          readProposedByLane(basics.session).values(),
           editing,
         ))
           await records.write(record)
@@ -187,8 +189,8 @@ export function startOffers(input: {
       moved,
       names,
       archived: new Set([...names.keys()].filter(l => deps.docs.archived(l))),
-      open: [...readOffers(basics.session).values()]
-        .filter(o => isNotYetAccepted(offerStatus(o)))
+      open: [...readProposedByLane(basics.session).values()]
+        .filter(o => isNotYetAccepted(proposedChangesStatus(o)))
         .map(o => o.lane),
     })
     if (planned.accepted) markAccepted()
@@ -225,7 +227,7 @@ export function startOffers(input: {
               to: commitFromPoint(lane, span.to),
             }
       }
-      const read = planOfferRead(offerReadFacts(basics), ask)
+      const read = planReviewRead(reviewReadFacts(basics), ask)
       if (read.kind === "refused") return read
       // A range names its lane's points: read only in that lane, proven jj.
       const span = spanInCommits(read.span)

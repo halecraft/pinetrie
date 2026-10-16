@@ -1,21 +1,21 @@
 # `@pinetrie/jj`: technical notes
 
 This package is jj's adapter, whole (ADR-0142): your repo as the host reads
-and writes it (the offers, the accepted work, and lanes' refs in it,
+and writes it (the proposed changes, the accepted work, and lanes' refs in it,
 ADR-0105, ADR-0104, ADR-0061, all through one owner, ADR-0065); each lane's
 own repo, as the `LaneHistory` port `@pinetrie/lanes` defines (A lane's
 repo); your repo at startup (`startup.ts`: finding its root, the shared
 directories and their exclude lines, your repo's names); and every jj name
-(`bookmarkName`, `laneTipName`, `offerBookmark`, `DEFAULT_REPO`). It declares
+(`bookmarkName`, `laneTipName`, `proposedBookmark`, `DEFAULT_REPO`). It declares
 `@pinetrie/core`, `@pinetrie/keeper` and `@pinetrie/lanes`
 (`workspace.test.ts`); `lanes` never imports it, and runs no jj
 (`packages/lanes/boundary.test.ts`). The host wires it as an adapter
 (`apps/pinetrie/host/jj/`), chosen by the project's kind
 (`apps/pinetrie/host/project.ts`). The client may not depend on it.
 
-What an offer or a setup or publish means is decided in
+What proposed changes or a setup or publish means is decided in
 `@pinetrie/rules`, which this package cannot declare: it returns
-each decision as a value typed in `@pinetrie/core` (`core/offers.ts`), this
+each decision as a value typed in `@pinetrie/core` (`core/proposed.ts`), this
 package reads the facts it is made from and turns it into steps, and the
 host connects the two. The rule all three packages keep:
 
@@ -32,7 +32,7 @@ host connects the two. The rule all three packages keep:
 `index.ts` names its exports of your repo: only what other packages use;
 a lane's repo (`lane/`) it exports whole. The separate
 reads, the one-read path and the step planners stay inside, so the host
-reads an offer only through a gather and runs only the steps a decision
+reads proposed changes only through a gather and runs only the steps a decision
 translates to.
 
 ## Where things are
@@ -44,25 +44,24 @@ translates to.
 - `plan.ts`: the steps, pure: accepted work's setup (`setupProposal`,
   `planSetup`), a publish's catch-up, move and undo
   (`planPublishCatchUp`, `planPublishMove`, `planCatchUpUndo`, ADR-0090),
-  an offer's build, rebuild, refresh, repair
+  proposed changes' build, rebuild, refresh, repair
   and acceptance, lanes' refs (`laneRefSteps`), a bundle's import
-  (`planImport`), where an offer starts (`offerStart`, `acceptedOfferCommitsRevset`), the
-  accepted-offer commits' revset (`ACCEPTED_OFFER_COMMITS`, read with `@pinetrie/lanes`' `ACCEPTED_OFFER_COMMIT_ROW` and
-  `parseAcceptedOfferCommits`), and the evolog walk
+  (`planImport`), where proposed changes start (`proposedStart`, `acceptedThreadCommitsRevset`), the
+  accepted thread commits' revset (`ACCEPTED_THREAD_COMMITS`, read with `@pinetrie/lanes`' `ACCEPTED_THREAD_COMMIT_ROW` and
+  `parseAcceptedThreadCommits`), and the evolog walk
   (`walkToHost`).
 - `run.ts`: the runner factory, private to the package.
-- `offer.ts`: the separate reads an offer's facts come from, and a
+- `proposed.ts`: the separate reads proposed changes' facts come from, and a
   review's.
-- `offer-gather.ts`: every read an offer step plans from, one per action
-  (`gatherOffer`, `gatherPlace`, `gatherRefresh`, `gatherOfferAcceptance`,
-  `gatherStack`, `gatherDescribe`), each returning core's facts. Where an
-  offer sits is decided here, once, as an `OfferPlace`, and so is the read
+- `proposed-gather.ts`: every read a step on proposed changes plans from, one per action
+  (`gatherProposedChanges`, `gatherPlace`, `gatherRefresh`, `gatherAcceptance`,
+  `gatherStack`, `gatherDescribe`), each returning core's facts. Where proposed changes sit is decided here, once, as an `ProposedChangesPlace`, and so is the read
   path: a refresh of a lane on accepted work takes the one read, every other
   gather the separate reads.
-- `offer-steps.ts`: a decision into steps, pure (`offerEffects`,
-  `rebuildEffects`, `offerAcceptanceEffects`, `describeEffects`), with what the host
-  does after (`OfferEffects.after`).
-- `offer-repair.ts`: `repairOffer`, the one offer step that reads between
+- `proposed-steps.ts`: a decision into steps, pure (`proposedChangesEffects`,
+  `rebuildEffects`, `acceptanceEffects`, `describeEffects`), with what the host
+  does after (`ProposedChangesEffects.after`).
+- `proposed-repair.ts`: `repairProposedChanges`, the one step on proposed changes that read between
   its steps.
 - `accepted.ts`: accepted work's facts, a new lane's begin, a WIP's state
   (`wipState`, `readWipState`).
@@ -137,11 +136,11 @@ everything else reads at the head it last saw.**
   --no-graph -n 1 -T id`, which merges divergent heads and names the result
   (S87 item 4). The same id ends it. Else one `jj log`, pinned to that id,
   reads the fingerprint: accepted work's bookmark, the WIP bookmarks, the
-  publish bookmark (`main`, ADR-0076), the offers' bookmarks, the lanes'
+  publish bookmark (`main`, ADR-0076), the proposed changes' bookmarks, the lanes'
   `pinetrie-*` remote bookmarks, each with its commit (a conflicted one with
   all its targets), and `@`'s commit. A bookmark of yours outside those is
   not read, so moving it moves nothing. The publish bookmark moving is
-  `Moved.published`, not `all`: no offer depends on it, so it refreshes
+  `Moved.published`, not `all`: no proposed changes depend on it, so it refreshes
   accepted work's record alone (`planMarks`). Accepted work's bookmark
   moving is also `Moved.acceptedMoved`, which the host's base snapshot
   follows (ADR-0090), wherever the move came from. `planObserve` says what
@@ -170,48 +169,48 @@ operation is read once and kept until the head moves.**
   `pinetrie.base` is written for it, and the page reads catching up as
   `unknown` (`catchUpOf`, `@pinetrie/rules`), never as caught up.
 - **`SharedFacts`**, per operation (`RepoOps.shared()`): accepted work's facts
-  (`acceptedFacts`, for accepted work's record), the accepted-offer commits on the
-  line (`ACCEPTED_OFFER_COMMITS`: a `Pinetrie-Source` or `Pinetrie-Thread`
-  trailer), split into those naming sources (`acceptedOfferCommits`) and
+  (`acceptedFacts`, for accepted work's record), the accepted thread commits on the
+  line (`ACCEPTED_THREAD_COMMITS`: a `Pinetrie-Source` or `Pinetrie-Thread`
+  trailer), split into those naming sources (`acceptedThreadCommits`) and
   those that name none for some lane (`untraced`,
   `untracedLanes`, S97), and the files `@` changes (`editing`). The owner keeps one set, keyed by the head as it
   is at the moment of reading: the one file in the heads directory; any
   other (an outside write, two heads) is observed first. A write in the same
   step observes, so a read after it reads a fresh set.
-- **`yourEdits` is `files ∩ editing`**, decided in `offerRecord`
+- **`yourEdits` is `files ∩ editing`**, decided in `proposedChangesRecord`
   (`@pinetrie/rules`): no lane reads `@`. `@` alone moving rewrites every open
   record's from one shared read (`planYourEdits`).
 - **A lane on accepted work is read in one `jj log`** (`laneRead`): its tip, the
   newest commit carrying `Pinetrie-Base`, the newest accepted commit in its
-  history, the offer's region (`::<bookmark> ~ ::<line>`), and the
-  accepted-offer commits and this lane's untraced ones not under its base; each row with
+  history, the proposed changes' region (`::<bookmark> ~ ::<line>`), and the
+  accepted thread commits and this lane's untraced ones not under its base; each row with
   its parents, its flags (`contained_in` each revset: tip, bookmark, region,
   base, under the base, accepted, untraced), whether it is divergent or
   conflicted, its files (in the region) and its description as JSON.
-  `planLaneRead` (pure) says the base, the start and the offer from them: an
-  untraced accepted-offer commit above the base makes the start `untraced`. "Under the base" stands for
-  `acceptedOfferCommitsRevset`'s `~ ::present(<base source>)`: the base commit merged that
-  source, and an accepted-offer commit is a accepted commit.
+  `planLaneRead` (pure) says the base, the start and the proposed changes from them: an
+  untraced accepted thread commit above the base makes the start `untraced`. "Under the base" stands for
+  `acceptedThreadCommitsRevset`'s `~ ::present(<base source>)`: the base commit merged that
+  source, and an accepted thread commit is a accepted commit.
 - **What the rows cannot say is read only when needed:** the start, when a
   accepted source above the base names more (`readStart`); a stack's files,
   and the top's conflicted files when it conflicts, with the files
   conflicted where its ledger says it starts (`startConflictsOf`,
-  ADR-0072): `conflictCause` reads both. An unconflicted offer pays
-  nothing. An offer whose top is the host's version (the row's `H` flag)
+  ADR-0072): `conflictCause` reads both. An unconflicted proposed changes pays
+  nothing. Proposed changes whose top are the host's version (the row's `H` flag)
   reads nothing more about who made it; any other reads each revision's
   evolog (`revisionSinceHost`). Whether the lane's work changes any
-  file (`workChanges`) is read unless the start is untraced. The second is asked of
-  the lane's own work, never read from the offer's files: those are a diff
+  file (`filesTouched`) is read unless the start is untraced. The second is asked of
+  the lane's own work, never read from the proposed changes' files: those are a diff
   against the target, empty once accepted work holds the lane's work, which
-  still changes files. Read from them, such an offer was withdrawn and built
+  still changes files. Read from them, such proposed changes were withdrawn and built
   again on every observation, without end (S89).
-- **The budget:** an unchanged offer's refresh runs at most 2 jj processes,
-  and no evolog (`repo.test.ts` counts 2: the read and `workChanges`);
+- **The budget:** unchanged proposed changes' refresh runs at most 2 jj processes,
+  and no evolog (`repo.test.ts` counts 2: the read and `filesTouched`);
   S89 measured 18 before, and 3 with the evolog (ADR-0154). A lane whose base moved runs two more, once per move,
-  and one more for each further head of its offer's start.
+  and one more for each further head of its proposed changes' start.
 - **One rule decides both.** `repo.test.ts` holds `gatherLane` beside the
-  separate reads (`laneTipIn`, `laneBase`, `startOfOffer`, `readOffer`,
-  `workChanges`, `readCatchUp`) at every offer it builds, accepts, follows, repairs and
+  separate reads (`laneTipIn`, `laneBase`, `startOfProposed`, `readProposedChanges`,
+  `filesTouched`, `readCatchUp`) at every proposed changes it builds, accepts, follows, repairs and
   stacks, and expects the same values. A lane on a WIP reads the separate
   way (`wipFacts`): its target and state need more of your repo. Which way
   a lane is read is `gatherRefresh`'s choice; the host never makes it.
@@ -237,18 +236,18 @@ update's merge will change.**
   memo) while the lane's tip and the target's commit stay: `planCatchUpRead`
   decides. The commits it diffs from are decided from the tip and the base,
   so the memo needs no other key.
-- **The forecast diffs from where the next offer would start**
+- **The forecast diffs from where the next proposed changes would start**
   (`catchUpHolds`, S102 item 11). It names the files
   catching up would change in a lane: those the base's commit `to` has
   differently from each commit the lane holds of its history
   (`jj diff --from <held> --to <to>`), and from the lane's tip
   (`jj diff --from <tip> --to <to>`), decided by `catchUpFilesOf`. On
-  accepted work the held commits are the offer's start, which holds every
+  accepted work the held commits are the proposed changes' start, which holds every
   accepted source the lane has: the sources `mergeBase` joins before it
   merges, so an acceptance of the lane's own work counts for nothing even
   after the lane edited it again. Diffed from the base's start instead, it
   counted every file the lane touched since. The start has two heads when
-  the lane caught up between its offer and the acceptance (the base's
+  the lane caught up between its proposed changes and the acceptance (the base's
   commit and the source). A file then counts only when `to` differs from
   both. A union would count every file of the acceptance again, and the
   intersection misses a file only when accepted work puts it back to the
@@ -285,16 +284,16 @@ update's merge will change.**
   adapter's `identity` reads your jj config (`user.name`) with `jjIn` too:
   config, not the repo.
 
-## Offers in your repo (`offer.ts`, `offer-gather.ts`, `offer-steps.ts`, `plan.ts`, ADR-0105, ADR-0039)
+## Proposed changes in your repo (`proposed.ts`, `proposed-gather.ts`, `proposed-steps.ts`, `plan.ts`, ADR-0105, ADR-0039)
 
-- **The host runs no jj on an offer.** Each of its offer steps is a gather
-  here, a decision in `@pinetrie/rules`, a translation here (`offerEffects` and
+- **The host runs no jj on proposed changes.** Each of its steps on proposed changes are a gather
+  here, a decision in `@pinetrie/rules`, a translation here (`proposedChangesEffects` and
   the rest), then the steps on the owner. A decision carries the facts its
-  steps need (a `Placed`, the offer, its changes), so each kind has one
+  steps need (a `Placed`, the proposed changes, its changes), so each kind has one
   translation and none that runs nothing because a case cannot occur.
 
-- **An offer's bookmark is `pinetrie-offer/<name>`**, the thread's two-word
-  name (`offerBookmark`). Every step finds the offer by it: one built under
+- **Proposed changes' bookmark is `pinetrie-proposed/<name>`**, the thread's two-word
+  name (`proposedBookmark`). Every step finds the proposed changes by it: one built under
   another name is not found, and a new one is built.
 
 - **Every host command on your repo carries `--ignore-working-copy` and
@@ -320,62 +319,77 @@ update's merge will change.**
   operation, and a refusal of either moves neither (S111), so the move
   itself needs no undo.
 - **Accepted work is immutable** (`immutableHeads`, written to the repo's config
-  only by setup): `present(<accepted>)`, and the offers on
+  only by setup): `present(<accepted>)`, and the proposed changes on
   it, joined to the repo's own definition. `present()`, or a repo without
-  the bookmark fails every jj command (S77 item 3). The host's rewrites of an
-  offer pass `--ignore-immutable` (`rewrite`); a bookmark move rewrites
+  the bookmark fails every jj command (S77 item 3). The host's rewrites of proposed changes pass `--ignore-immutable` (`rewrite`); a bookmark move rewrites
   no commit and needs none (S77 item 7). An immutable head is out of jj's
-  default log, so setup adds the offers to the repo's `revsets.log` too
+  default log, so setup adds the proposed changes to the repo's `revsets.log` too
   (`logRevset`), or jj and jjui would not show them (S77 item 8).
-- **An offer is built by nonce, never by a commit id kept between steps**
-  (`planOffer`): `jj new` has no template, so each commit is named by a
+- **Proposed changes are built by nonce, never by a commit id kept between steps**
+  (`planProposedChanges`): `jj new` has no template, so each commit is named by a
   unique description (`nonceRevset`) until its last step describes it
   (S48 item 18). A step given an old commit id acts on a hidden commit and
   forks the change (S48 item 2).
-- **A single offer is a stack of one**: `planOffer` makes one commit per
+- **Single proposed changes are a stack of one**: `planProposedChanges` makes one commit per
   source, each with that source's files restored, on the one before; the
   first on the start (a merge when the start names several heads), then all
   rebased onto the target. A stack's sources are the agent's revisions.
-- **Where an offer starts is read from the repo** (`startOfOffer`,
-  `offerStart`, ADR-0104): `heads(::tip & (<base start> | ::(<sources>)))`.
+- **Where proposed changes start is read from the repo** (`startOfProposed`,
+  `proposedStart`, ADR-0104): `heads(::tip & (<base start> | ::(<sources>)))`.
   The base start is the commit the lane's newest `Pinetrie-Base` names
   (`laneBase`); for a lane with none, from before accepted work, the newest line
   commit in the tip's history. The sources are the lane commits that
-  accepted offers' `Pinetrie-Source` trailers name, in `::<accepted>` and in `::<wip>`
-  for a lane on a WIP, minus `::present(<base source>)` (`acceptedOfferCommitsRevset`,
-  read by `acceptedOfferCommitFacts` with the lane's untraced ones), each `present()`: one never fetched here names
-  nothing you have. A squash of two accepted offers keeps both trailer
+  accepted proposed changes' `Pinetrie-Source` trailers name, in `::<accepted>` and in `::<wip>`
+  for a lane on a WIP, minus `::present(<base source>)` (`acceptedThreadCommitsRevset`,
+  read by `acceptedThreadCommitFacts` with the lane's untraced ones), each `present()`: one never fetched here names
+  nothing you have. A squash of two accepted proposed changes keep both trailer
   paragraphs, and `trailerValues` reads every one; jj's `trailers` template
   reads only the last (S77 item 6).
 - **Every trailer revset also matches `Pineta-*`** (`pre-rename:`, core's
-  `trailers.ts`): offers accepted before the rename carry `Pineta-Source`,
-  and an old lane's next offer would otherwise start below them and put
+  `trailers.ts`): proposed changes accepted before the rename carry `Pineta-Source`,
+  and an old lane's next proposed changes would otherwise start below them and put
   their files back over yours (`repo.test.ts`, pre-rename). A `Pineta-Base`
   on `pineta-onto` reads as accepted work, as any base off the WIP prefix
   does (`baseOf`, ADR-0100).
-- **`pre-accepted:` renames `pinetrie-onto` to `pinetrie-accepted`, once**
-  (`pre-accepted.ts`, ADR-0100, S121): the first command a starting host
-  puts on the owner (`startSetup`). The bookmark is renamed when the old one
-  is there and the new one is not; setup's `immutable_heads()` text is
-  rewritten when your config ends with it; each from its own fact, so a
-  start that stopped between them finishes the other. A config that names
-  its own `accepted.bookmark` is left alone. Delete it once Duane's repo has
-  passed it.
+- **`pre-proposed:` renames each `pinetrie-offer/<name>` to
+  `pinetrie-proposed/<name>`, once** (`pre-proposed.ts`, ADR-0156, S217):
+  the first command a starting host puts on the owner, before its first
+  observation, so the renames mark no refresh. Gathered from one `jj
+  bookmark list -a` of the old prefix (a local row, its conflict, and each
+  remote's) and the two config values; planned pure
+  (`planProposedRename`); executed in this order:
+  - one `jj bookmark rename` per old local bookmark whose new name is
+    absent. It keeps a conflicted bookmark's sides and adds no evolog
+    entry. A name held under both is left, and the startup line says so.
+  - `markSteps` of the renamed ones that had a host version and are not
+    conflicted, then `forgetSteps` of every old host version whose local
+    bookmark was renamed or is gone. A rename leaves the tracked remote
+    bookmark under the old name; deleting its ref in git instead would
+    abandon what only it held. A conflicted one is marked by its refresh
+    once repaired.
+  - the old glob (`RETIRED_OFFER_BOOKMARKS`, built as setup built it)
+    replaced by `PROPOSED_BOOKMARKS` in `immutable_heads()` and
+    `revsets.log`, as you.
+
+  A bookmark under the old prefix on any other remote is yours, pushed:
+  left, and named on the startup line. Each step is planned from what the
+  repo holds, so a start that stopped part way finishes on the next.
+  Delete it once Duane's repo has passed it.
 - **A source accepted below the base's source is not part of the start**
   (S81). A base's `source` (`CommitBase`) is the commit of yours the lane merged whole:
   the one its `Pinetrie-Base` names (the WIP's commit, never the copy, which
-  descends from no accepted-offer commit), else `start`. An offer keeps the diff from
+  descends from no accepted thread commit), else `start`. Proposed changes keep the diff from
   its start's merge to the tip, so a start the target holds as another
-  commit is subtracted from the target. An accepted-offer commit and a
+  commit is subtracted from the target. An accepted thread commit and a
   later catch-up are both heads, and their merge conflicts wherever accepted work
-  changed the accepted lines since: an offer conflicted where its lane had nothing left to
+  changed the accepted lines since: proposed changes conflicted where its lane had nothing left to
   resolve. `present()` around the base's source keeps a commit lost to
   `jj util gc` from failing every refresh; it then excludes nothing.
-- **Every revision of an offer carries the host's trailers and its ledger**
-  (`offerMessage`, core's `trailers.ts`): `Pinetrie-Thread`, `Pinetrie-Lane`,
+- **Every revision of proposed changes carry the host's trailers and its ledger**
+  (`proposedMessage`, core's `trailers.ts`): `Pinetrie-Thread`, `Pinetrie-Lane`,
   `Pinetrie-Entry`, then `Pinetrie-Source: <tip>` and `Pinetrie-Start`, in one
   paragraph, on its WIP line and kept through a description. The source is
-  the lane tip the whole offer holds, a stack's revisions included:
+  the lane tip the whole proposed changes hold, a stack's revisions included:
   accepted, it says you have that tip.
 - **`acceptedFacts` previews catching the working copy up** (`yours.catchUp`, S80):
   `git merge-tree --write-tree --name-only --merge-base=<fork point> <accepted>
@@ -391,47 +405,47 @@ update's merge will change.**
   of yours that `@`'s tree resolves can conflict where the preview of `@`
   says nothing. `yours.ahead` is `::@- ~ ::<accepted>`, whether or not `@-`
   descends from accepted work: what a publish accepts once caught up.
-- **`workChanges`** says whether a lane's work since its start changes any
+- **`filesTouched`** says whether a lane's work since its start changes any
   file: `none`, `some` or `unknown` (ADR-0067). From one start, `jj diff
   --from <start> --to <tip>`: the diff a build restores, so the two always
   agree. From several, `jj diff -r '(<start>)..<tip>'`, which diffs a range
   from its roots' parents, merged, to its tip. jj refuses a range with gaps,
-  as after a catch-up merged an accepted-offer commit (S97): the merge is in the range and
+  as after a catch-up merged an accepted thread commit (S97): the merge is in the range and
   one of its parents is not. A refusal, or an untraced start, is
-  `unknown`, which never builds an offer. A known start is never empty
-  (`NonEmpty`, core): `readStart` reads `offerStart`'s heads, which hold
+  `unknown`, which never builds proposed changes. A known start is never empty
+  (`NonEmpty`, core): `readStart` reads `proposedStart`'s heads, which hold
   the base's start, since `laneBase` reads it from the tip's own history.
-- **An untraced accepted-offer commit** is one whose paragraph names a
-  thread and a lane but no source (`untracedLanes`, core): an offer
-  accepted before offers carried their ledger. Above a lane's base, it makes the lane's start `untraced`
+- **An untraced accepted thread commit** is one whose paragraph names a
+  thread and a lane but no source (`untracedLanes`, core): proposed changes
+  accepted before proposed changes carried their ledger. Above a lane's base, it makes the lane's start `untraced`
   (`StartRead`), since no start can leave out what it brought: nothing is
-  offered until the lane catches up past it, which puts it under the base.
+  proposed until the lane catches up past it, which puts it under the base.
   A turn's commit names no thread, so it is never one. Only the lane's own
-  accepted-offer commits are matched, by `Pinetrie-Lane`: an untraced one of
+  accepted thread commits are matched, by `Pinetrie-Lane`: an untraced one of
   a lane it forked from is not found.
 - **An untraced place leaves a gap** (`untouched`, ADR-0067): on a lane
-  whose start is untraced, a divergent offer is not repaired and an offer
+  whose start is untraced, divergent proposed changes are not repaired and proposed changes
   you edited is not recorded again; nothing runs, and its record stays as
-  it was, until the lane catches up past the accepted-offer commit. Only an offer the host
+  it was, until the lane catches up past the accepted thread commit. Only proposed changes the host
   made is withdrawn there. `RefreshDecision` names it, so nothing reaches
   it by accident.
-- **`startOfOffer` is the one path to a start**, or to `untraced`. Every
+- **`startOfProposed` is the one path to a start**, or to `untraced`. Every
   gather reaches it, the one read included (`gatherLane`'s `readStart`,
-  which `startOfOffer` reads its start with too): the host's refresh, its `squash` and `refresh` actions and
+  which `startOfProposed` reads its start with too): the host's refresh, its `squash` and `refresh` actions and
   `stackSpan` all plan from it: a start from
   another rule would read as a moved start to `planRefresh`, and a split
   would build on it. The exclusion above is inside it: sources read any
   other way bring S81's conflicted start back.
-- **An offer is rebuilt from its lane in place** (`planRebuildOffer`, S49): `rebase -s`
+- **Proposed changes are rebuilt from its lane in place** (`planRebuildProposed`, S49): `rebase -s`
   back onto the start, `restore --from <tip>`, `rebase -s` onto the target.
   Restoring where it sits would give it the tip's tree, dropping your work
   under it. The change id and bookmark stay, and jj records no operation for
-  a restore that changes nothing. `planOffer` and the rebuild both end with
-  `planRefreshOffer`'s rebase.
+  a restore that changes nothing. `planProposedChanges` and the rebuild both end with
+  `planRefreshProposed`'s rebase.
 - **An acceptance is a forward bookmark move**
-  (`planOfferAcceptanceSteps`, ADR-0104): `jj bookmark move <destination>
-  --to <top>` as the host, then the offer's bookmark and the host's version
-  forgotten (`forgetSteps`), once the destination holds the offer. It never
+  (`planAcceptanceSteps`, ADR-0104): `jj bookmark move <destination>
+  --to <top>` as the host, then the proposed changes' bookmark and the host's version
+  forgotten (`forgetSteps`), once the destination holds the proposed changes. It never
   rebases and never touches your `@`. An acceptance and a publish each move bookmarks with `moveForward`, which never
   passes `--allow-backwards`: jj refuses a move that is not forward, so a
   stale move fails rather than drops commits (S77 item 1). A colocated
@@ -443,51 +457,51 @@ update's merge will change.**
   and git keeps through a gc. The pattern matches nothing for a lane never
   fetched, where an `update-ref` from a missing ref would fail. A restore
   writes the tip ref, then deletes the park.
-- **`readOffer` reads an offer from your repo alone** (`OfferInRepo`,
+- **`readProposedChanges` reads proposed changes from your repo alone** (`ProposedChangesInRepo`,
   ADR-0104): nothing the host remembers is needed, so a lost record costs
-  nothing. Its revisions (`offerRevisions`) are what is under the bookmark,
+  nothing. Its revisions (`proposedRevisions`) are what is under the bookmark,
   not already under the target, and carries the thread's trailer:
   `(::<bookmark> ~ ::<target>) & (description(regex:"(?m)^Pinetrie-Thread:
-  <name>$") | <bookmark>)`. A conflicted offer's `startConflicts` are the
+  <name>$") | <bookmark>)`. Conflicted proposed changes' `startConflicts` are the
   files conflicted at each commit its `Pinetrie-Start` names
   (`startConflictsOf`, shared with `gatherLane`); a start your repo lacks
-  names none. An accepted offer below carries the same trailer, but
+  names none. Accepted proposed changes below carry the same trailer, but
   is under the target; your commits carry none. The bookmark's own commit
   is always the top. A conflicted bookmark, or a change id naming two
   commits, reads as divergent, with only the change ids. Every read after
   the first names commits (S48 item 2). It returns facts, and the bookmark it
-  found them under; `planRefresh`, `offerEdited` and `offerMoved`
+  found them under; `planRefresh`, `isProposedEdited` and `isProposedMoved`
   (`@pinetrie/rules`) decide what they mean.
-- **The host's version of each offer is a tracked remote bookmark,
-  `pinetrie-offer/<name>@pinetrie-host`** (ADR-0154, S215 items 10, 11 and
-  18; `HOST_REMOTE`, `hostOfferRef`, `hostOfferRevset`). Its top equal to the
-  bookmark's (`OfferNow.marked`) is the whole stack the host's, since a
-  commit id hashes all below it: nothing more is read. jj shows an offer
-  you changed as `pinetrie-offer/<name>*`. The ref keeps the host's
-  version through any gc, so offers depend on nothing in the op log.
-- **Every decision that moves an offer ends with one mark** (`markSteps`,
-  added once per decision in `offer-steps.ts`): `git update-ref` from the
-  offer's own `refs/heads/<bookmark>`, which jj exports after every host
+- **The host's version of each proposed changes are a tracked remote bookmark,
+  `pinetrie-proposed/<name>@pinetrie-host`** (ADR-0154, S215 items 10, 11 and
+  18; `HOST_REMOTE`, `hostProposedRef`, `hostProposedRevset`). Its top equal to the
+  bookmark's (`ProposedChangesNow.marked`) is the whole stack the host's, since a
+  commit id hashes all below it: nothing more is read. jj shows proposed changes
+  you changed as `pinetrie-proposed/<name>*`. The ref keeps the host's
+  version through any gc, so proposed changes depend on nothing in the op log.
+- **Every decision that moves proposed changes end with one mark** (`markSteps`,
+  added once per decision in `proposed-steps.ts`): `git update-ref` from the
+  proposed changes' own `refs/heads/<bookmark>`, which jj exports after every host
   command, so no step names a commit id; `jj git import`, which moves a
   tracked bookmark with its remote; `jj bookmark track`, which tracks it the
   first time, writes nothing after, and repairs a jj command of yours that
   imported the ref first, untracked. An untracked remote bookmark is in
-  `builtin_immutable_heads()`: the WIP under the offer would become
+  `builtin_immutable_heads()`: the WIP under the proposed changes would become
   immutable to you. jj exports no conflicted bookmark, so a mark is planned
-  only for an offer read whole. A new offer's bookmark is still made with
-  `bookmark set` (`planOffer`), and the mark after its describes copies it.
+  only for proposed changes read whole. New proposed changes' bookmark is still made with
+  `bookmark set` (`planProposedChanges`), and the mark after its describes copies it.
 - **The host's version is removed only by `forgetSteps`** (`jj bookmark
   forget --include-remotes`): an acceptance, a withdraw, and a `forget`
-  decision with `hostLeft` (your offer bookmark gone, its version left).
+  decision with `hostLeft` (your proposed bookmark gone, its version left).
   **Never delete a remote ref of your repo in git:** the next `jj git
   import` abandons every commit only it held and rebases what is on them.
-  Measured, it abandoned an offer you had deleted, your `@-` under your
+  Measured, it abandoned proposed changes you had deleted, your `@-` under your
   commit on it, and rebased your commit onto the root (S215 item 18;
   `repo.test.ts`, the forget). Before a rebuild nothing is forgotten: the
   build's `bookmark set` then the mark brings a deleted bookmark and its
   version back together, where moving the ref alone would leave the
   bookmark conflicted.
-- **Who made a revision, when the offer is not marked**
+- **Who made a revision, when the proposed changes are not marked**
   (`revisionSinceHost`, its next read chosen by `planSinceHost`, pure):
   the evolog back to the host's newest version (`evologOf`, one `jj evolog
   -T EVOLOG_ENTRY`; `walkToHost`, pure), through each version's
@@ -497,7 +511,7 @@ update's merge will change.**
   reworded a commit below is your operation (S48 item 7), and changes
   nothing, so it is not an edit. A host step that stopped before its mark
   is found here as the host's, and the refresh's `mark` decision marks it;
-  so is an offer built before offers had a version. A walk the op log can
+  so is proposed changes built before proposed changes had a version. A walk the op log can
   no longer finish (a tidy cut its operations: the entry prints no user and
   no predecessors) compares the revision with the commit of its change in
   the host's version (`comparedWithHost`), read from the version's
@@ -526,7 +540,7 @@ update's merge will change.**
   user of each one's newest evolog operation (`evologOf` with a limit of 1,
   `isHostUser`). A race can leave the version behind both, since a mark
   copies no conflicted bookmark. The host's is abandoned, yours kept, and
-  the version stays where it was, so the offer reads as yours.
+  the version stays where it was, so the proposed changes read as yours.
 
 ## A tidy of your op log (`tidy.ts`, ADR-0155, S215)
 
@@ -572,14 +586,14 @@ with the steps this package gives it (`ForkSetup`, `BaseCheckout`).
   `historyOf` takes a `JjLane`, proved once by the host's adapter when the
   registry asks for the history, and its planners (`planForkSetup`,
   `planMerge`) convert inside.
-- **Reads of your repo stay in commits.** `laneBase`, the offers' gathers,
+- **Reads of your repo stay in commits.** `laneBase`, the proposed changes' gathers,
   `catch-up.ts` and `fileAt` read `CommitBase` (`LaneBaseOf<CommitId>`);
   `commitTurn` and `mergeUpdate` answer `TurnCommittedOf<CommitId>` and
   `MergedOf<CommitId>`. `historyOf` converts at the port (`baseFromCommits`,
   `turnFromCommits`, `mergedFromCommits`); the host's adapter converts a
   base a port carried back with its lane's proof (`baseInCommits`), and a
-  review's range with the lane `planOfferRead` named (`CommitSpan`).
-  WIPs, offers and accepted work's own records are jj's alone, and stay
+  review's range with the lane `planReviewRead` named (`CommitSpan`).
+  WIPs, proposed changes and accepted work's own records are jj's alone, and stay
   `CommitId` throughout.
 
 - **Every method is gather, a pure planner, then execute.** The planners
@@ -692,10 +706,9 @@ with the steps this package gives it (`ForkSetup`, `BaseCheckout`).
   with the name quoted (`revsetName`), so a name is never parsed as a
   revset.
 - **The host's trailers** (`Pinetrie-Thread`, `Pinetrie-Lane`, `Pinetrie-Entry`,
-  `Pinetrie-Base` and an offer's ledger) are written and read in one file,
+  `Pinetrie-Base` and proposed changes' ledger) are written and read in one file,
   core's `trailers.ts`: a turn's message (`revisionMessage`,
-  `entryOfMessage`), a base's (`baseMessage`, `parseBase`, `baseOf`), an
-  offer's, and the revset that finds commits by one (`trailerRevset`, here
+  `entryOfMessage`), a base's (`baseMessage`, `parseBase`, `baseOf`), proposed changes', and the revset that finds commits by one (`trailerRevset`, here
   in `newestBase`). A format lanes or jj must read or write lives in
   core.
   - **The readers also read `Pineta-*`** (`READ`, `pre-rename:`): commits
@@ -723,10 +736,10 @@ with the steps this package gives it (`ForkSetup`, `BaseCheckout`).
   - `@` is empty and its one parent descends from the bookmark: the agent
     committed in the turn, with jj or git, and that commit is the turn's
     revision. The bookmark moves to it, untouched, without trailers (S56).
-    Without this, the offer lacked the commit, and a branch at the turn ran
+    Without this, the proposed changes lacked the commit, and a branch at the turn ran
     `jj new` on the bookmark's commit and lost its files;
   - otherwise null. A parent on another line (a split's stack, built on the
-    offer's start) or a merge is never adopted.
+    proposed changes' start) or a merge is never adopted.
 
   `LaneHistory.commit` reads the bookmark first and passes it, the one copy
   of that pair; `recordTurn` returns it as the turn's `newest`, which
@@ -766,33 +779,33 @@ with the steps this package gives it (`ForkSetup`, `BaseCheckout`).
   `parent`, ADR-0072), merged as accepted work's commit is but with no
   `Pinetrie-Base`: ancestry says what the lane holds of it. Accepted work's merge carries `Pinetrie-Base`, a WIP's copy its own, and
   `newestBase` reads the newest one in a lane's history: its base, and
-  where its offers start. `laneBase` reads it in the lane's own repo too
+  where its proposed changes start. `laneBase` reads it in the lane's own repo too
   (`bookmarkRevset`), where a lane with none is null: that repo has no
   line bookmark to find a start on.
-- **An accepted-offer commit the lane holds is joined to its source
-  first** (`planJoins`, `mergeBase`, S102, ADR-0079). An accepted-offer
+- **An accepted thread commit the lane holds is joined to its source
+  first** (`planJoins`, `mergeBase`, S102, ADR-0079). An accepted thread
   commit is a copy of a lane's work on accepted work, naming the commit it
   copies (`Pinetrie-Source`). Merged as history says, its base is that
   commit's `Pinetrie-Start`, from before that work, so the work came in
   twice: any edit accepted work made to it since conflicted. So a join, a commit
-  merging the source with the accepted-offer commit (the same changes,
+  merging the source with the accepted thread commit (the same changes,
   so clean), goes first, and the update merges the lane, the last join and
   the base in one commit.
-  - **Which accepted-offer commits:** those in `::<from> ~ ::<ours>` (`ACCEPTED_OFFER_COMMIT_ROW`, one `jj
+  - **Which accepted thread commits:** those in `::<from> ~ ::<ours>` (`ACCEPTED_THREAD_COMMIT_ROW`, one `jj
     log`) naming any source the lane holds, a squash's included (S77 item
     6), read with `present()`.
   - **The order:** oldest first, each join on the last, so a later one's
     base holds the earlier ones.
-  - **A conflicted join is abandoned:** an acceptance of an offer you edited where
+  - **A conflicted join is abandoned:** an acceptance of proposed changes you edited where
     the lane wrote, merged as before.
-  - **A join carries no trailer:** bases and accepted-offer commits are
+  - **A join carries no trailer:** bases and accepted thread commits are
     found by theirs.
-  - **The update's titles and a conflict's `theirs` leave the accepted-offer commits out**
-    (`withoutAcceptedOfferCommits`), and keep accepted work's commits under them.
-  - **A WIP's copy has no accepted-offer commit in its history,** so a WIP thread joins
+  - **The update's titles and a conflict's `theirs` leave the accepted thread commits out**
+    (`withoutAcceptedThreadCommits`), and keep accepted work's commits under them.
+  - **A WIP's copy has no accepted thread commit in its history,** so a WIP thread joins
     nothing.
   - **The host's forecast starts from the same sources** (`catchUpFiles`,
-    `@pinetrie/jj`): it diffs from the offer's start, which holds them,
+    `@pinetrie/jj`): it diffs from the proposed changes' start, which holds them,
     not from the base's start (S102 item 11).
 - **`mergeUpdate` is an update's whole run in a lane** after its edits,
   on the lane's queue (`LaneHistory.merge` commits the edits, plans the
@@ -845,47 +858,46 @@ with the steps this package gives it (`ForkSetup`, `BaseCheckout`).
   base, a turn, an update with a conflict, forks from a turn and from a copy
   of your `@`, checked for divergence and immutability, and a repo beside a
   fork that the fork's config leaves alone (S50); a commit the agent makes
-  itself, with jj and with git (S56), reaching the offer and a branch at its turn, and an
-  update merging on it, while a stack's commits are never adopted; an offer
+  itself, with jj and with git (S56), reaching the proposed changes and a branch at its turn, and an
+  update merging on it, while a stack's commits are never adopted; proposed changes
   built, refreshed, left, rewritten by the host with its record lost (S73),
-  repaired, accepted under your edits and beside them, the next offer, and a
-  stack; an offer following a moved tip, your conflicting commit and a moved
-  start, each checked against a fresh build; an offer after you committed
+  repaired, accepted under your edits and beside them, the next proposed changes, and a
+  stack; proposed changes following a moved tip, your conflicting commit and a moved
+  start, each checked against a fresh build; proposed changes after you committed
   your edits differently, after an accepted branch that holds the lane's
   tip, from a branch whose parent was accepted after the fork (S72), and
   from a lane after a branch of it was accepted before its update (S51,
-  S72); an untraced accepted-offer commit, read either way until the lane catches up past it, and what catching
+  S72); an untraced accepted thread commit, read either way until the lane catches up past it, and what catching
   up changes against what the merge changed (S97), and after the lane
   edited its accepted work again, with one start and two (S102 item 11);
-  and a review of an
-  offer's commit (its description, a rename, names with a space and a
+  and a review of proposed changes' commit (its description, a rename, names with a space and a
   quote, and one file's diff, never a directory's). The gathers are held to
   it as well: each place kind (placed, untraced, a WIP gone), what an
-  acceptance reads on a WIP (`gatherOfferAcceptance`), a split's stack bottom first
-  (`gatherStack`), `repairOffer` on a divergent offer, and that
+  acceptance reads on a WIP (`gatherAcceptance`), a split's stack bottom first
+  (`gatherStack`), `repairProposedChanges` on divergent proposed changes, and that
   `trailerRevset` finds exactly the commits `hasTrailer` matches. And a
-  catch-up past an accepted-offer commit of the lane's own work, of its
+  catch-up past an accepted thread commit of the lane's own work, of its
   parent's, two of them, a conflict both sides made, and an acceptance of
-  an offer you edited (S102): the lane holds the accepted-offer commit's
+  proposed changes you edited (S102): the lane holds the accepted thread commit's
   source, so that commit is joined to it and the update is clean. Then a
   lane's ref deleted and imported again, which keeps the history under
   accepted work (S78); a branch cloned from a conflicted catch-up, whose
-  offer's conflict came with its copy (S99); and a base refreshed after your
+  proposed changes' conflict came with its copy (S99); and a base refreshed after your
   `@-` was rewritten, not built on (S74).
 - **`tidy.test.ts`**: `planTidy`, `isTidyRaced`, `planTidyHint` and
   `parseOpLog` as values; then real jj, on repos with operations dated
   long ago (`debug.operation-timestamp`): the log cut to the window with
   your working copy fresh after, and a write that loaded the head before the
   abandon kept, the tidy read as raced.
-- **`offer-steps.test.ts`**: each decision's steps, as the planners make
-  them, each that moves an offer ending in one mark, and that each `after`
+- **`proposed-steps.test.ts`**: each decision's steps, as the planners make
+  them, each that moves proposed changes ending in one mark, and that each `after`
   carries the decision's place.
-- **`repo.test.ts`, the host's version of an offer**: a built offer is its
+- **`repo.test.ts`, the host's version of proposed changes**: built proposed changes are its
   version, tracked, read with no evolog; your change to its file reads as
   yours; a host rebase without its mark is the host's, by the evolog and,
-  once the op log is cut, by the version; an offer from before versions
+  once the op log is cut, by the version; proposed changes from before versions
   reads as the host's and one mark makes it the version; the forget after
-  you deleted an offer's bookmark and built on it leaves your commits
+  you deleted proposed changes' bookmark and built on it leaves your commits
   where they are (the mutation that deletes the ref in git fails it); an
   acceptance leaves neither bookmark nor version; an archived lane's
   history survives a cut and collected op log, and restores.
@@ -902,7 +914,7 @@ with the steps this package gives it (`ForkSetup`, `BaseCheckout`).
   `lane/revisions.test.ts`, `startup.test.ts`**: a lane's planners, which
   commits a move fetches, a turn's paths and a copy's facts against jj, and
   the startup's root and kind, and repo names.
-- **`apps/pinetrie/host/jj/offers/refresh.test.ts`** runs the host's own refresh
+- **`apps/pinetrie/host/jj/proposed/refresh.test.ts`** runs the host's own refresh
   (`createRefresh`, a real owner) on the histories S97 found, until a round
   writes nothing: it lives with the host, since this package may not import
   `planRefresh` (`workspace.test.ts`).

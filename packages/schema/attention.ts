@@ -1,6 +1,6 @@
-// schema/attention — what a person has dealt with: how far they have read
-// each thread, the verdicts and offers they marked "not needed", and the
-// mentions they have seen. A Yjs document per person, written only by that
+// schema/attention — what a person has dealt with: how far they have read each
+// thread, the verdicts and ready proposed changes they marked "not needed", and
+// the mentions they have seen. A Yjs document per person, written only by that
 // person's tabs.
 //
 // It is a document of its own, not a part of the inventory's: read marks are
@@ -38,9 +38,25 @@ export const AttentionDoc = yjs.bind(
     read: Schema.record(Schema.string()),
     /** Lane to the ask whose verdict was marked "not needed". */
     dismissed: Schema.record(Schema.string()),
-    /** Lane to its offer's `ledger.source` when it was marked "not needed". */
-    dismissedOffers: Schema.record(Schema.string()),
+    /** Lane to its proposed changes' `ledger.source` when it was marked "not needed". */
+    dismissedReady: Schema.record(Schema.string()),
     /** Mentions seen above `since`, by entry id. */
+    seen: Schema.record(Schema.boolean()),
+  }),
+)
+
+/**
+ * The schema before `dismissedReady` was named: its hash is what a stored
+ * document written under it carries, and the host's `0018-dismissed-ready`
+ * migration reads `dismissedOffers` through it. Delete with that migration.
+ */
+export const AttentionDocBeforeReady = yjs.bind(
+  Schema.struct({
+    since: Schema.string(),
+    mentionsSince: Schema.string(),
+    read: Schema.record(Schema.string()),
+    dismissed: Schema.record(Schema.string()),
+    dismissedOffers: Schema.record(Schema.string()),
     seen: Schema.record(Schema.boolean()),
   }),
 )
@@ -62,8 +78,8 @@ export interface Attention {
   readonly mentionsSince: string
   readonly read: ReadonlyMap<ThreadId, EntryId>
   readonly dismissed: ReadonlyMap<ThreadId, EntryId>
-  /** Lane to the offer's `ledger.source`, a commit id. */
-  readonly dismissedOffers: ReadonlyMap<ThreadId, string>
+  /** Lane to the proposed changes' `ledger.source`, a commit id. */
+  readonly dismissedReady: ReadonlyMap<ThreadId, string>
   readonly seen: ReadonlySet<string>
 }
 
@@ -83,7 +99,7 @@ export const readAttention = (doc: AttentionDocHandle): Attention => ({
   mentionsSince: doc.mentionsSince(),
   read: byLane(doc.read(), entryId),
   dismissed: byLane(doc.dismissed(), entryId),
-  dismissedOffers: byLane(doc.dismissedOffers(), s => s),
+  dismissedReady: byLane(doc.dismissedReady(), s => s),
   seen: new Set(
     Object.entries(doc.seen()).flatMap(([id, on]) => (on ? [id] : [])),
   ),

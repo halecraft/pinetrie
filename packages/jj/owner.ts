@@ -246,7 +246,7 @@ export function startRepoOwner(input: {
               published: true,
               yours: true,
               lanes: new Set(),
-              offers: new Set(),
+              proposed: new Set(),
             })
         })
       return () => listeners.delete(listener)

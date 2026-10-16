@@ -613,8 +613,8 @@ export async function startHost({
       banners.due(lane).catch(failed(basics, "banner"))
     },
   })
-  // `split_offer`: a split card queued on the agent's lane, which its run's end
-  // pops.
+  // `split_proposed_changes`: a split card queued on the agent's lane, which
+  // its run's end pops.
   const askSplit = createSplitCall({ basics, keeper, placesWriter })
 
   // --- where lanes work -----------------------------------------------------

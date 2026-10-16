@@ -1,28 +1,28 @@
 import {
   commitId,
   type JjBaseRecord,
-  type OfferNow,
   type Placed,
+  type ProposedChangesNow,
   type ThreadName,
   threadIdFor,
 } from "@pinetrie/core"
-import { offerAcceptanceEffects, offerEffects } from "@pinetrie/jj"
-import { offerRecord } from "@pinetrie/rules"
+import { acceptanceEffects, proposedChangesEffects } from "@pinetrie/jj"
+import { proposedChangesRecord } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
 import { methods, record } from "../../fakes.ts"
-import { executeOffer, type OfferPorts } from "./execute.ts"
+import { executeProposedChanges, type ProposedChangesPorts } from "./execute.ts"
 
 const LANE = threadIdFor("0123456789abcdef")
 const NAME = "amber-fox" as ThreadName
 const TIP = commitId("11111111")
-const offer = (commit: string): OfferNow => ({
-  kind: "offer",
-  bookmark: `pinetrie-offer/${NAME}`,
+const proposed = (commit: string): ProposedChangesNow => ({
+  kind: "present",
+  bookmark: `pinetrie-proposed/${NAME}`,
   marked: true,
   revisions: [
     {
       commit: commitId(commit),
-      change: "kxyz",
+      changeId: "kxyz",
       since: { reached: true, yoursChanged: false },
     },
   ],
@@ -35,8 +35,8 @@ const offer = (commit: string): OfferNow => ({
   conflicts: [],
   startConflicts: [],
 })
-const BEFORE = offer("b0")
-const AFTER = offer("a1")
+const BEFORE = proposed("b0")
+const AFTER = proposed("a1")
 const PLACE: Placed = {
   kind: "placed",
   tip: commitId("22222222"),
@@ -60,11 +60,11 @@ const AT = {
   name: NAME,
   entry: "e1",
   wip: "WIP (amber-fox): fix it",
-  nonce: "pinetrie-offer-n",
+  nonce: "pinetrie-proposed-n",
 }
 
 const ports = () =>
-  record<OfferPorts>({
+  record<ProposedChangesPorts>({
     writeBase: async () => {},
     run: async () => {},
     read: async () => AFTER,
@@ -74,26 +74,29 @@ const ports = () =>
     accepted: async () => {},
   })
 
-describe("executeOffer", () => {
+describe("executeProposedChanges", () => {
   test("withdraw: its steps run, then the record is removed", async () => {
     const p = ports()
-    const effects = offerEffects({ kind: "withdraw", offer: BEFORE }, AT)
-    expect(await executeOffer(p.port, { base: null, effects }, BEFORE)).toBe(
-      "other",
+    const effects = proposedChangesEffects(
+      { kind: "withdraw", proposed: BEFORE },
+      AT,
     )
+    expect(
+      await executeProposedChanges(p.port, { base: null, effects }, BEFORE),
+    ).toBe("other")
     expect(methods(p.calls)).toEqual(["writeBase", "run", "remove"])
     expect(p.calls[1]?.args[0]).toEqual(effects.steps)
   })
 
-  test("follow: its steps run, then the offer is read again and recorded as it is after them", async () => {
+  test("follow: its steps run, then the proposed changes are read again and recorded as it is after them", async () => {
     const p = ports()
-    const effects = offerEffects(
-      { kind: "rebuild", place: PLACE, offer: BEFORE },
+    const effects = proposedChangesEffects(
+      { kind: "rebuild", place: PLACE, proposed: BEFORE },
       AT,
     )
-    expect(await executeOffer(p.port, { base: null, effects }, BEFORE)).toBe(
-      "built",
-    )
+    expect(
+      await executeProposedChanges(p.port, { base: null, effects }, BEFORE),
+    ).toBe("built")
     expect(methods(p.calls)).toEqual(["writeBase", "run", "read", "record"])
     expect(p.calls[2]?.args[0]).toBe(PLACE)
     expect(p.calls[3]?.args).toEqual([AFTER, PLACE])
@@ -101,19 +104,19 @@ describe("executeOffer", () => {
 
   test("none: no steps, so the read made before planning is recorded, and nothing more is read", async () => {
     const p = ports()
-    const effects = offerEffects({ kind: "none", place: PLACE }, AT)
-    await executeOffer(p.port, { base: null, effects }, BEFORE)
+    const effects = proposedChangesEffects({ kind: "none", place: PLACE }, AT)
+    await executeProposedChanges(p.port, { base: null, effects }, BEFORE)
     expect(methods(p.calls)).toEqual(["writeBase", "run", "record"])
     expect(p.calls[2]?.args[0]).toBe(BEFORE)
   })
 
-  test("repair: each change repaired, then the offer read again and recorded", async () => {
+  test("repair: each change repaired, then the proposed changes read again and recorded", async () => {
     const p = ports()
-    const effects = offerEffects(
-      { kind: "repair", place: PLACE, changes: ["ka", "kb"] },
+    const effects = proposedChangesEffects(
+      { kind: "repair", place: PLACE, changeIds: ["ka", "kb"] },
       AT,
     )
-    await executeOffer(p.port, { base: null, effects }, null)
+    await executeProposedChanges(p.port, { base: null, effects }, null)
     expect(methods(p.calls)).toEqual([
       "writeBase",
       "run",
@@ -126,19 +129,19 @@ describe("executeOffer", () => {
 
   test("the lane's base record is written before any step", async () => {
     const p = ports()
-    const effects = offerEffects({ kind: "build", place: PLACE }, AT)
-    await executeOffer(p.port, { base: BASE, effects }, null)
+    const effects = proposedChangesEffects({ kind: "build", place: PLACE }, AT)
+    await executeProposedChanges(p.port, { base: BASE, effects }, null)
     expect(methods(p.calls)[0]).toBe("writeBase")
     expect(p.calls[0]?.args[0]).toBe(BASE)
   })
 })
 
-test("an acceptance writes the lane's base record, runs its steps, then marks the offer accepted", async () => {
+test("an acceptance writes the lane's base record, runs its steps, then marks the proposed changes accepted", async () => {
   const accepted = {
-    ...offerRecord({
+    ...proposedChangesRecord({
       lane: LANE,
       name: NAME,
-      offer: BEFORE,
+      proposed: BEFORE,
       place: { tip: TIP, start: [TIP] },
       editing: new Set(),
       now: 1,
@@ -146,7 +149,7 @@ test("an acceptance writes the lane's base record, runs its steps, then marks th
     acceptedAs: "kxyz",
   }
   const p = ports()
-  const effects = offerAcceptanceEffects({
+  const effects = acceptanceEffects({
     kind: "accept",
     name: NAME,
     bookmark: accepted.bookmark,
@@ -154,7 +157,7 @@ test("an acceptance writes the lane's base record, runs its steps, then marks th
     top: "kxyz",
     accepted,
   })
-  await executeOffer(p.port, { base: BASE, effects }, null)
+  await executeProposedChanges(p.port, { base: BASE, effects }, null)
   expect(methods(p.calls)).toEqual(["writeBase", "run", "accepted"])
   expect(p.calls[1]?.args[0]).toEqual(effects.steps)
   expect(p.calls[2]?.args[0]).toBe(accepted)

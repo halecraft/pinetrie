@@ -175,7 +175,7 @@ export async function openProject(input: {
   const working = await folderCopy(root, "working")
   const names = repoNames(settleHost(input.start, { working }).settled)
   // Before anything else reads the project: the reads below, lane work's
-  // and the offers'.
+  // and the proposed changes'.
   const opened = await input.adapter.open({
     names,
     basics,

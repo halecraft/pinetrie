@@ -65,7 +65,7 @@ export function publishView(record: AcceptedRecord | null): PublishView {
  * setup writes does not reach it (`docs/the-jujutsu-repo.md`).
  */
 const JJUI_NOTE =
-  'jjui with a revset of its own: add | bookmarks(glob:"pinetrie-offer/*") to it'
+  'jjui with a revset of its own: add | bookmarks(glob:"pinetrie-proposed/*") to it'
 
 /** The button's text, and its title: what it does, in words and in jj, a refusal first. */
 export type PublishWords =
@@ -143,7 +143,7 @@ export function publishWords(
       notes: [
         `${view.acceptedBookmark} goes at your @-`,
         `your repo's immutable heads become: ${view.heads}`,
-        `its log, so jj and jjui show the offers: ${view.log}`,
+        `its log, so jj and jjui show threads' changes: ${view.log}`,
         JJUI_NOTE,
       ],
     }

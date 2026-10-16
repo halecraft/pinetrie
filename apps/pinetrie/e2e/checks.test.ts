@@ -29,15 +29,15 @@ test("check prints its label and what it found; a stop matches the label, not th
 test("skip is neither a pass nor a fail, and an error fails under the scenario's name", () => {
   const printed: string[] = []
   const checks = createChecks(undefined, l => printed.push(l))
-  checks.skip("offers", "Docker does not answer")
+  checks.skip("proposed", "Docker does not answer")
   checks.error("tools", "boom")
   expect([checks.passed, checks.failed, checks.skipped]).toEqual([
     [],
     ["tools"],
-    ["offers"],
+    ["proposed"],
   ])
   expect(printed).toEqual([
-    "  SKIP  offers · Docker does not answer",
+    "  SKIP  proposed · Docker does not answer",
     "  ERROR tools · boom",
   ])
   expect(isStop(new Error(stopMessage("x")))).toBe(true)

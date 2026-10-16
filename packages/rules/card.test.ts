@@ -18,10 +18,10 @@ import {
   type Move,
   movesDocId,
   NO_CONTENT,
-  type OfferFact,
   type Paste,
   PERSON_HISTORY,
   type PlacedKind,
+  type ProposedChangesFact,
   REORDER_PLACES,
   type ReferenceCard,
   type Replacing,
@@ -159,7 +159,7 @@ const queuedPlace = {
   by: ADA,
   seen: "",
 } as const
-const ACCEPTED: OfferFact = {
+const ACCEPTED: ProposedChangesFact = {
   kind: "accepted",
   lane: LANE,
   by: ADA,

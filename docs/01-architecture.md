@@ -126,7 +126,7 @@ packages/     libraries; their boundaries are enforced by resolution
   lanehost/      @pinetrie/lanehost     the lanes' machine: disks, diffs, merges, grants, by role (TECHNICAL.md)
   folder/        @pinetrie/folder       core only; a folder project's history as values: states, merge bases, the path merge (TECHNICAL.md)
   keeper/        @pinetrie/keeper       declares NOTHING; one step at a time on a resource (TECHNICAL.md)
-  repo/          @pinetrie/jj         your repo: reads, steps, the owner; offers, accepted work, lanes' refs (TECHNICAL.md)
+  repo/          @pinetrie/jj         your repo: reads, steps, the owner; proposed changes, accepted work, lanes' refs (TECHNICAL.md)
   session/       @pinetrie/session      one client's connection to a host; no React (TECHNICAL.md)
   shell/         @pinetrie/shell        unbash only; shell source as structure (TECHNICAL.md)
   interface/     @pinetrie/interface    what a person sees and does, for any client; no React, no DOM (ADR-0093)
@@ -216,7 +216,7 @@ runs (ADR-0120). A lane is a line of agent work, with its own state on disk,
 not a way to answer two people at once (ADR-0019). Threads run concurrently. Decisions are pure (`planChat`,
 `planArchive` and the rest in `@pinetrie/rules`, over facts read by `@pinetrie/reads`);
 the host gathers, plans and executes each command in one serial step. A
-decision that acts on your repo (an offer, accepted work) is a value typed in
+decision that acts on your repo (proposed changes, accepted work) is a value typed in
 `@pinetrie/core`, decided by `@pinetrie/rules` from facts `@pinetrie/jj`
 reads, and carried out by `@pinetrie/jj`'s steps: the two packages never
 import each other, and the host only connects them.
@@ -267,10 +267,10 @@ it): the project's folder is read into states of accepted work's line, by the ho
 disks role's checked copy; a lane's turns and catch-ups are states of the
 graph, a catch-up the path merge on its base, a conflict a record whose
 three versions the lane reads under `/pinetrie-states`, closed by
-`resolve_conflict`; an offer is a lane's newest state against accepted work's
+`resolve_conflict`; proposed changes are a lane's newest state against accepted work's
 newest, reviewed as files. Accepting into a folder project is not built:
 it is refused with words, and the page draws its accept disabled with the
-same words. At start the host deletes the offer, accepted-work and
+same words. At start the host deletes the proposed changes, accepted-work and
 base records of the other kind, and keeps every state.
 
 pine·trie reads only its own config (ADR-0146): five layers (system, user,
@@ -343,7 +343,7 @@ branches from the op log. Our mapping is exact. (ADR-0008)
 pinetrie:session   SessionDoc               session-wide host records:
                                           the directory of roots (pinetrie.root),
                                           every lane's record (pinetrie.lane),
-                                          the board, names, offers, banners
+                                          the board, names, proposed changes, banners
 root:<RootId>    RootDoc, one a root      that root's pi storage (entries,
                                           values, lists) and the records keyed
                                           by its entries (revision, mark, stop)
@@ -397,7 +397,7 @@ The shape of a `RootDoc`: pi's storage and the host's `records`. A
 - **values** — LWW map over `(namespace, key)`: pi's own. Carries
   `pi.branch.tip`, `pi.lane.*`, `pi.op.*`.
 - **records** — the host's records (`pinetrie.*`, ADR-0062, ADR-0095: the
-  directory, lanes, offers, marks, digests, verdicts, seats…), a record per
+  directory, lanes, proposed changes, marks, digests, verdicts, seats…), a record per
   namespace then key, written by the host directly. The session's document
   holds only these.
 

@@ -18,8 +18,8 @@ export const FIND_TOOL = "find"
 export const CONFLICT_TOOL = "ask_about_conflict"
 /** Merge the thread's base, or its parent's work, into its copy during a run. */
 export const CATCH_UP_TOOL = "catch_up"
-/** Queue a split of the thread's offer, run when the thread is free. */
-export const SPLIT_TOOL = "split_offer"
+/** Queue a split of the thread's proposed changes, run when the thread is free. */
+export const SPLIT_TOOL = "split_proposed_changes"
 /** Close a folder lane's conflicted path, with the version chosen. */
 export const RESOLVE_TOOL = "resolve_conflict"
 /** Set the image in a thread's column header. */

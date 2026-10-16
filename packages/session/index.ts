@@ -4,7 +4,7 @@
 export type {
   AcceptedActing,
   AccessActing,
-  OfferActing,
+  ProposedChangesActing,
   Unsuccessful,
 } from "./acting.ts"
 export type { AttentionStore, SeenMentions } from "./attention-doc.ts"

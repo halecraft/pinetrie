@@ -1,6 +1,6 @@
 import {
-  type JjOfferRecord,
-  type OfferFact,
+  type JjProposedChangesRecord,
+  type ProposedChangesFact,
   type QueuedFact,
   type ThreadName,
   taskIdFor,
@@ -22,7 +22,7 @@ import {
 
 const LANE = threadIdFor("1")
 const ADA = writerId("ada@x.io")
-const ACCEPTED: OfferFact = {
+const ACCEPTED: ProposedChangesFact = {
   kind: "accepted",
   lane: LANE,
   by: ADA,
@@ -30,7 +30,7 @@ const ACCEPTED: OfferFact = {
   bookmark: "pinetrie-accepted",
   to: { kind: "accepted" },
 }
-const FACTS: readonly OfferFact[] = [
+const FACTS: readonly ProposedChangesFact[] = [
   ACCEPTED,
   {
     ...ACCEPTED,
@@ -90,18 +90,20 @@ describe("a fact", () => {
   test.each([
     [ACCEPTED, "✓ accepted as kabcdefg"],
     [FACTS[1], "✓ accepted into wip/search as kabcdefg"],
-    [FACTS[2], "✎ a new description was asked for"],
-    [FACTS[3], "⇣ the stack was squashed into one revision"],
-    [FACTS[4], "↻ the offer was rebuilt from this thread's work"],
+    [FACTS[2], "✎ a new description of the changes was asked for"],
+    [FACTS[3], "⇣ the changes were squashed into one revision"],
+    [FACTS[4], "↻ the changes were rebuilt from this thread's work"],
   ] as const)("factLine: %o", (fact, line) => {
     expect(fact === undefined ? undefined : factLine(fact)).toBe(line)
   })
 
   test("the model reads who did it, and an acceptance's change and bookmark", () => {
     expect(factContent(ACCEPTED, "Ada")).toContain(
-      "Ada accepted this thread's work, as the change kabcdefghij: pinetrie-accepted moved forward to it.",
+      "Ada accepted this thread's work, as the commit with change id kabcdefghij: pinetrie-accepted moved forward to it.",
     )
-    expect(factContent(FACTS[4] as OfferFact, "Ada")).toMatch(/^Ada rebuilt/)
+    expect(factContent(FACTS[4] as ProposedChangesFact, "Ada")).toMatch(
+      /^Ada rebuilt/,
+    )
   })
 
   test("the column draws it as its one line, role fact", () => {
@@ -115,10 +117,10 @@ describe("a fact", () => {
     const decision = {
       kind: "accept",
       name: "amber-fox" as ThreadName,
-      bookmark: "pinetrie-offer/amber-fox",
+      bookmark: "pinetrie-proposed/amber-fox",
       destination: "pinetrie-accepted",
       top: "kabcdefghij",
-      accepted: {} as JjOfferRecord,
+      accepted: {} as JjProposedChangesRecord,
     } as const
     expect(
       acceptedFact({

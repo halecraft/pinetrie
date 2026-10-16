@@ -37,7 +37,7 @@ test("planSweep: a lane's tip and start, and accepted work's newest states kept;
       states,
       lanes: [{ lane: LANE, history: "folder" }],
       conflicts: [],
-      offers: [],
+      proposed: [],
       keep: 1,
     }),
   ).toEqual(["line-0", "start-a", "turn-a"])
@@ -65,7 +65,7 @@ test("planSweep: a branch's base with its parent kept, once the parent moved pas
       states,
       lanes: [{ lane: BRANCH, history: "folder" }],
       conflicts: [],
-      offers: [],
+      proposed: [],
       keep: 1,
     }),
   ).toEqual(["start-a", "turn-b"])

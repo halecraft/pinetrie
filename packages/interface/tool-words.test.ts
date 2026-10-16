@@ -12,7 +12,7 @@ describe("toolWord", () => {
     find: "find",
     ask_about_conflict: "ask",
     catch_up: "catch up",
-    split_offer: "split",
+    split_proposed_changes: "split",
     set_banner: "banner",
     ask: "asked",
     leave: "left",
@@ -37,7 +37,7 @@ describe("callLabel", () => {
     [call("bash", "pnpm test\necho done"), "shell pnpm test…"],
     [call("grep", "TODO src"), "search TODO src"],
     [call("find", "*.ts"), "find *.ts"],
-    [call("split_offer"), "split"],
+    [call("split_proposed_changes"), "split"],
     [call("mystery"), "mystery"],
   ])("cut, %o reads %s", (c, label) => {
     expect(callLabel(c, "cut")).toBe(label)

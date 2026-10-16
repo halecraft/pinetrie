@@ -39,10 +39,10 @@ export function planCatchUpRead(input: {
 }
 
 /**
- * The commits the forecast diffs from: where the lane's next offer would
- * start. When the update merges accepted work, that is the offer's start,
- * which holds every accepted source the lane has: the sources `mergeBase`
- * joins to their accepted-offer commits before it merges, so the
+ * The commits the forecast diffs from: where the lane's next proposed changes
+ * would start. When the update merges accepted work, that is the proposed
+ * changes' start, which holds every accepted source the lane has: the sources
+ * `mergeBase` joins to their accepted thread commits before it merges, so the
  * lane's own accepted work does not count as coming in. A WIP's copy is no
  * merge, and an untraced start names no source: both diff from the base's
  * start.
@@ -64,8 +64,8 @@ export function catchUpHolds(input: {
  * (`lacking`): those every held commit has differently from the base, and
  * the tip too. A file the base has as any held commit has it keeps that
  * commit's value as the merge's base, so the merge leaves it alone. A union
- * would count every file of an offer accepted after the lane caught up
- * between offering it and its acceptance, whose start has two heads. In
+ * would count every file of proposed changes accepted after the lane caught up
+ * between proposing it and its acceptance, whose start has two heads. In
  * the first diff's order.
  */
 export function catchUpFilesOf(input: {

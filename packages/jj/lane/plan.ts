@@ -119,7 +119,8 @@ export interface MergePlan {
   readonly mark: boolean
   /**
    * The commits whose titles the update lists, `<from>..<to>` without the
-   * accepted-offer commits it joined (`mergeUpdate`); `from` null is the lane before the merge.
+   * accepted thread commits it joined (`mergeUpdate`); `from` null is the lane
+   * before the merge.
    */
   readonly came: { readonly from: CommitId | null; readonly to: CommitId }
 }
@@ -165,47 +166,47 @@ export function planMerge(lane: JjLane, from: BaseMerge): MergePlan {
   }
 }
 
-/** An accepted-offer commit on accepted work the lane lacks, and the sources its message names (`sourcesOf`). */
-export interface AcceptedOfferCommitAbove {
-  readonly acceptedOfferCommit: CommitId
+/** An accepted thread commit on accepted work the lane lacks, and the sources its message names (`sourcesOf`). */
+export interface AcceptedThreadCommitAbove {
+  readonly acceptedThreadCommit: CommitId
   readonly sources: readonly CommitId[]
 }
 
-/** An accepted-offer commit to join to the sources the lane holds, before an update's merge. */
+/** An accepted thread commit to join to the sources the lane holds, before an update's merge. */
 export interface Join {
-  readonly acceptedOfferCommit: CommitId
+  readonly acceptedThreadCommit: CommitId
   /** Of its sources, those in the lane's history: a squash may name others. */
   readonly sources: readonly CommitId[]
   /**
    * The join's message. It carries no trailer: the host finds bases and
-   * accepted-offer commits by their trailers (`newestBase`,
-   * `acceptedOfferCommitsRevset`), and a join is neither.
+   * accepted thread commits by their trailers (`newestBase`,
+   * `acceptedThreadCommitsRevset`), and a join is neither.
    */
   readonly message: string
 }
 
 /**
- * The accepted-offer commits an update joins to their sources before it
- * merges, oldest first as they come: each that names a
- * source the lane holds. An accepted-offer commit is a copy of the lane's
- * work on accepted work, and the join says so in history, so the merge does not
- * bring that work in twice. One naming a source the lane lacks too, a
- * squash's, is joined all the same: the rest of it is accepted work's. Each join
- * is made on the one before, so a later one's base holds the earlier ones.
+ * The accepted thread commits an update joins to their sources before it
+ * merges, oldest first as they come: each that names a source the lane holds.
+ * An accepted thread commit is a copy of the lane's work on accepted work, and
+ * the join says so in history, so the merge does not bring that work in twice.
+ * One naming a source the lane lacks too, a squash's, is joined all the same:
+ * the rest of it is accepted work's. Each join is made on the one before, so a
+ * later one's base holds the earlier ones.
  */
 export function planJoins(
-  accepted: readonly AcceptedOfferCommitAbove[],
+  accepted: readonly AcceptedThreadCommitAbove[],
   held: ReadonlySet<CommitId>,
 ): readonly Join[] {
-  return accepted.flatMap(({ acceptedOfferCommit, sources }) => {
+  return accepted.flatMap(({ acceptedThreadCommit, sources }) => {
     const ours = sources.filter(s => held.has(s))
     return ours.length === 0
       ? []
       : [
           {
-            acceptedOfferCommit,
+            acceptedThreadCommit,
             sources: ours,
-            message: `join: ${acceptedOfferCommit} holds ${ours.join(" ")}`,
+            message: `join: ${acceptedThreadCommit} holds ${ours.join(" ")}`,
           },
         ]
   })
@@ -357,8 +358,8 @@ export type TurnCommit =
 /**
  * A turn whose `@` has changes commits them. With `@` empty, a single parent
  * that descends from the lane's bookmark is a commit the agent made in the
- * turn, and is the turn's revision: otherwise the offer would lack it,
- * and a branch's `jj new` would put the bookmark's files back. A parent on
+ * turn, and is the turn's revision: otherwise the proposed changes would lack
+ * it, and a branch's `jj new` would put the bookmark's files back. A parent on
  * another line, such as a stack's, or a merge, is left alone.
  */
 export function planTurnCommit(facts: {

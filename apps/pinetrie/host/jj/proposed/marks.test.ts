@@ -21,7 +21,7 @@ describe("planMarks: what a move the owner observed refreshes", () => {
     published: false,
     yours: false,
     lanes: new Set(),
-    offers: new Set(),
+    proposed: new Set(),
     ...over,
   })
   const marks = (m: Moved, open: readonly ThreadId[] = [C]) =>
@@ -33,10 +33,10 @@ describe("planMarks: what a move the owner observed refreshes", () => {
       lanes: [A, B, C],
     })
   })
-  test("an archived lane is still marked by its ref, its offer bookmark or an open record", () => {
+  test("an archived lane is still marked by its ref, its proposed bookmark or an open record", () => {
     expect(marks(moved({ lanes: new Set([D]) })).lanes).toEqual([D])
     expect(
-      marks(moved({ offers: new Set(["dusty-elk"] as ThreadName[]) })).lanes,
+      marks(moved({ proposed: new Set(["dusty-elk"] as ThreadName[]) })).lanes,
     ).toEqual([D])
     expect(marks(moved({ all: true }), [D]).lanes).toEqual([A, B, D])
   })
@@ -61,11 +61,11 @@ describe("planMarks: what a move the owner observed refreshes", () => {
       lanes: [B],
     })
   })
-  test("an offer bookmark marks the lane its thread names; an unknown name marks none", () => {
+  test("proposed bookmark marks the lane its thread names; an unknown name marks none", () => {
     expect(
       marks(
         moved({
-          offers: new Set(["amber-fox", "nobody-here"] as ThreadName[]),
+          proposed: new Set(["amber-fox", "nobody-here"] as ThreadName[]),
         }),
       ),
     ).toEqual({ accepted: false, shared: false, lanes: [A] })

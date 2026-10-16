@@ -2,12 +2,12 @@
 // registered on every peer: the host and every client (Kyneta's `canWrite`).
 //
 // Kyneta judges `canWrite` against a peer's own identity for its local writes,
-// and against the sender of every offer. So one declaration refuses a client's
-// write to the places before anything is applied, rather than letting the
-// write diverge that client's copy for good, and refuses the same
+// and against the sender of every proposed changes. So one declaration refuses
+// a client's write to the places before anything is applied, rather than
+// letting the write diverge that client's copy for good, and refuses the same
 // operations arriving from anyone else. It judges the sender, not the author:
-// the host relays an inventory between its person's tabs, so the host is one
-// of its writers, though it never writes one.
+// the host relays an inventory between its person's tabs, so the host is one of
+// its writers, though it never writes one.
 
 import type { Policy } from "@kyneta/exchange"
 import {

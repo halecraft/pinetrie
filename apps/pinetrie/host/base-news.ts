@@ -13,7 +13,7 @@ import type { Agent } from "@pinetrie/pi"
 import {
   readAccepted,
   readBases,
-  readOffers,
+  readProposedByLane,
   readRunning,
   readTreeIndex,
 } from "@pinetrie/reads"
@@ -53,7 +53,7 @@ export function createBaseNews(deps: {
       own: bases.has(lane),
       base: bases.get(lane),
       accepted: readAccepted(session),
-      offer: readOffers(session).get(lane),
+      proposed: readProposedByLane(session).get(lane),
       known: baseKnown(readTreeIndex(doc), readLaneTip(doc, lane)),
       told: told.get(lane) ?? null,
     })

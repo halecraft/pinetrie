@@ -1,7 +1,7 @@
 import {
   type CardRecord,
   commitId,
-  type JjOfferRecord,
+  type JjProposedChangesRecord,
   pointFromCommit,
   rootIdFor,
   type ThreadName,
@@ -172,12 +172,12 @@ describe("planSplitCall", () => {
   const _ROOT_ID = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
   const open = {
     kind: "open",
-    record: {} as JjOfferRecord,
+    record: {} as JjProposedChangesRecord,
   } as const
   const split = (over: Partial<Parameters<typeof planSplitCall>[0]> = {}) =>
     planSplitCall({
       history: "jj",
-      offer: open,
+      proposed: open,
       cards: [],
       lane: LANE,
       prompt: "chat",
@@ -218,8 +218,16 @@ describe("planSplitCall", () => {
   })
 
   test.each([
-    ["a folder lane, whose offer is files", { history: "folder" }, "folder"],
-    ["no open offer", { offer: { kind: "none" } }, "no-offer"],
+    [
+      "a folder lane, whose proposed changes are files",
+      { history: "folder" },
+      "folder",
+    ],
+    [
+      "no open proposed changes",
+      { proposed: { kind: "none" } },
+      "no-proposed-changes",
+    ],
     ["a split already queued", { cards: [queuedSplit] }, "queued"],
     ["a split running", { prompt: "stack" }, "splitting"],
   ] as const)("refused: %s", (_, over, why) => {

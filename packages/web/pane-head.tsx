@@ -12,7 +12,7 @@ export function PaneHead({
   narrow,
   close,
 }: {
-  /** What the subject is: an offer's line, an ask's. */
+  /** What the subject is: proposed changes' line, an ask's. */
   line?: string | undefined
   title?: string | undefined
   extra?: ReactNode

@@ -25,8 +25,8 @@ export type ItemMenuItem =
   /**
    * Move the task on the board to another workflow state, its thread card's
    * (`ThreadMove`). Into the archive it is archived: refused while its agent
-   * works there (`busy`), and it withdraws the offers of its threads named in
-   * `drops`.
+   * works there (`busy`), and it withdraws the proposed changes of its threads
+   * named in `drops`.
    */
   | ({ readonly kind: "moveTo" } & ThreadMove)
 
@@ -221,18 +221,18 @@ export const pageTitle = (
 }
 
 /**
- * The threads with an open offer, by their task, each as people read it
+ * The threads with open proposed changes, by their task, each as people read it
  * (`threadNameOf`), named or not: what archiving that task withdraws, and what
- * a thread card's ⇡ names. `offers` are the open offers (`appView`'s); one
- * whose thread is in no task is left out.
+ * a thread card's ⇡ names. `openProposed` are the open proposed changes
+ * (`appView`'s); one whose thread is in no task is left out.
  */
-export function offeredByTask(
-  offers: readonly { readonly lane: ThreadId }[],
+export function openProposedByTask(
+  openProposed: readonly { readonly lane: ThreadId }[],
   names: ReadonlyMap<ThreadId, ThreadName>,
   taskOfThread: ReadonlyMap<ThreadId, TaskId>,
 ): ReadonlyMap<TaskId, readonly string[]> {
   const byTask = new Map<TaskId, string[]>()
-  for (const { lane } of offers) {
+  for (const { lane } of openProposed) {
     const task = taskOfThread.get(lane)
     if (task !== undefined)
       byTask.set(task, [...(byTask.get(task) ?? []), threadNameOf(names, lane)])
@@ -240,7 +240,7 @@ export function offeredByTask(
   return byTask
 }
 
-/** What archiving a task does to its threads' offers, beside its item. */
+/** What archiving a task does to its threads' proposed changes, beside its item. */
 export const dropsWords = (drops: readonly string[]): string | null =>
   drops.length === 0 ? null : `work not accepted goes: ${drops.join(", ")}`
 

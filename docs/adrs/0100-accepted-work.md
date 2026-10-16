@@ -14,6 +14,9 @@
     code.
 - **Amended by:**
   - ADR-0118: accepted work is a branched source's.
+  - ADR-0153: the accepted-offer commit is the accepted thread commit.
+  - ADR-0156: *offer* is retired; the word is **changes**, and **proposed
+    changes** in code.
 
 **Context.** ADR-0090 made the page say **accepted work** and **accept**,
 and left the code saying *the line* and *integrate*, and the repo and the

@@ -81,18 +81,19 @@ changes pine·trie can keep this note true. You can skip them.
 - Your work reaches the person as one commit on their accepted work, where
   finished work goes (`pinetrie-accepted`, unless they named it otherwise),
   or on the WIP bookmark this thread started from, bookmarked
-  `pinetrie-offer/<thread name>`: the offer. They accept it when they choose. <!-- packages/jj/lane/names.ts offerBookmark -->
+  `pinetrie-proposed/<thread name>`: this thread's proposed changes. They
+  accept them when they choose. <!-- packages/jj/lane/names.ts proposedBookmark -->
 - This thread started from accepted work, or from a copy of that WIP: the
   commit in your history whose message carries `Pinetrie-Base`. Leave it as it
   is. <!-- packages/core/trailers.ts baseMessage -->
-- While you work, the offer is described `WIP (<thread name>): <first
-  message>`. When a run ends, another agent writes its description; you
+- While you work, the proposed changes are described `WIP (<thread name>):
+  <first message>`. When a run ends, another agent writes its description; you
   don't need to. <!-- packages/core/trailers.ts wipDescription -->
-- The person can ask for the offer as a stack of revisions. A pine·trie message
-  then asks you to build it, and says how.
+- The person can ask for the proposed changes as a stack of revisions. A
+  pine·trie message then asks you to build it, and says how.
   <!-- packages/rules/stack.ts planStack -->
-- The person sees your changes only through the offer, which pine·trie brings up
-  to date after each turn. Nothing you write appears in their editor.
+- The person sees your work only through the proposed changes, which
+  pine·trie brings up to date after each turn. Nothing you write appears in their editor.
 
 ## What lasts
 
@@ -185,17 +186,17 @@ changes pine·trie can keep this note true. You can skip them.
 - When the thread's base (accepted work, or the WIP it started from) has
   moved on, a pine·trie note says so, before the person's message or between
   your tool calls: which files would change, which of them you changed too,
-  and whether your offer conflicts with it. <!-- packages/rules/behind.ts behindContent -->
+  and whether your proposed changes conflict with it. <!-- packages/rules/behind.ts behindContent -->
 - `catch_up` merges that work into `/workspace` now; with `from: parent`,
   the newest work of the thread this one branched from. It acts only when
   there is something new, and only as the one tool call in its turn: a call
   beside another is refused. A conflicted merge answers with the conflicts,
   to resolve here. <!-- packages/rules/agent-commands.ts planCatchUpCall -->
   <!-- packages/core/tools.ts CATCH_UP_TOOL -->
-- `split_offer` asks for this thread's offer to be split into a stack of
-  reviewable revisions. The split runs after your run, as a run of its own.
+- `split_proposed_changes` asks for this thread's proposed changes to be
+  split into a stack of reviewable revisions. The split runs after your run, as a run of its own.
   <!-- packages/rules/agent-commands.ts planSplitCall -->
-- Accepting your work is the person's: you offer it, they accept it. A note
+- Accepting your work is the person's: you propose changes, they accept them. A note
   in the thread says when they do. <!-- packages/rules/fact.ts factContent -->
 
 ## When the lane can't do something

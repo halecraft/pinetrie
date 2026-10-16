@@ -80,14 +80,14 @@ export const mutations: readonly Mutation[] = [
   },
   // ── the lanes suite, proven in a lane ──
   {
-    name: "an offer's message names its thread under another key",
+    name: "proposed changes' message names its thread under another key",
     file: "packages/core/trailers.ts",
     from: '  thread: "Pinetrie-Thread",',
     to: '  thread: "Pinetrie-Topic",',
     suite: "lanes",
     scenario: "main",
     expect:
-      "every lane has a two-word name, unique; the offer's bookmark and trailer carry it",
+      "every lane has a two-word name, unique; the proposed changes' bookmark and trailer carry it",
   },
   {
     name: "nothing is steered into a run",
@@ -216,22 +216,22 @@ export const mutations: readonly Mutation[] = [
     expect: "isLongAsk: a run of LONG_ASK agent messages, not one fewer",
   },
   {
-    name: "an accepted-offer commit that names a source reads as untraced",
+    name: "an accepted thread commit that names a source reads as untraced",
     file: trailers,
     from: '        trailerValues(p, "source").length === 0,\n',
     to: "        true,\n",
     command: unit,
     expect:
-      "untracedLanes: only an accepted offer's paragraph that names no source",
+      "untracedLanes: only accepted proposed changes' paragraph that names no source",
   },
   {
-    name: "a turn reads as an untraced accepted-offer commit",
+    name: "a turn reads as an untraced accepted thread commit",
     file: trailers,
     from: '        trailerValues(p, "thread").length > 0 &&\n',
     to: "        true &&\n",
     command: unit,
     expect:
-      "untracedLanes: only an accepted offer's paragraph that names no source",
+      "untracedLanes: only accepted proposed changes' paragraph that names no source",
   },
   {
     name: "a chat at the root may name any root",
@@ -259,12 +259,12 @@ export const mutations: readonly Mutation[] = [
     expect: "an inventory needs its holder",
   },
   {
-    name: "an offer's ledger is read from its oldest paragraph",
+    name: "proposed changes' ledger is read from its oldest paragraph",
     file: trailers,
     from: '    .filter(p => trailerValues(p, "source").length > 0)\n    .at(-1)',
     to: '    .filter(p => trailerValues(p, "source").length > 0)\n    .at(0)',
     command: unit,
-    expect: "offerLedger reads the newest paragraph that names a source",
+    expect: "proposedLedger reads the newest paragraph that names a source",
   },
   {
     name: "a trailer is read from the last paragraph only",
@@ -280,7 +280,8 @@ export const mutations: readonly Mutation[] = [
     from: 'const READ = "Pine(?:trie|ta)-"',
     to: 'const READ = "Pinetrie-"',
     command: unit,
-    expect: "an offer's trailers and ledger, and the message without them",
+    expect:
+      "proposed changes' trailers and ledger, and the message without them",
   },
   {
     name: "a base off the WIP prefix is a WIP",
@@ -755,11 +756,11 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an acceptance need not say what it was shown",
     file: "packages/protocol/codec.ts",
-    from: "    const seen = offerSeenFromWire(text(wire?.seen))\n",
-    to: "    const seen = offerSeenFromWire(text(wire?.seen)) ?? { ledger: null, conflicted: false }\n",
+    from: "    const seen = proposedChangesSeenFromWire(text(wire?.seen))\n",
+    to: "    const seen = proposedChangesSeenFromWire(text(wire?.seen)) ?? { ledger: null, conflicted: false }\n",
     command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
     expect:
-      "an acceptance that does not say which offer it was shown, well formed, is refused",
+      "an acceptance that does not say which proposed changes it was shown, well formed, is refused",
   },
   {
     name: "a retitle may name anything as its task",

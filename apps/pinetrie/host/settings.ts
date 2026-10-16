@@ -334,7 +334,7 @@ export function laneAuthority(
 
 /**
  * A copy of `pinetrie.json`'s grants and its refusals: what a lane's own
- * write is told, and what an offer's review compares.
+ * write is told, and what proposed changes' review compares.
  */
 export function decodeAuthority(
   root: string,

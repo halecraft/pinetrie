@@ -160,7 +160,7 @@ describe("copy", () => {
   })
 })
 
-test("a column that can't be written offers only copy", () => {
+test("a column that can't be written proposed changes only copy", () => {
   expect(tools(chat("x", true), { writable: false })).toEqual({
     copy: true,
     comment: false,

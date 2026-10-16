@@ -11,14 +11,14 @@ import {
 } from "@pinetrie/core"
 import {
   LANE_REMOTE_PREFIX,
-  OFFER_BOOKMARKS,
-  OFFER_PREFIX,
+  PROPOSED_BOOKMARKS,
+  PROPOSED_PREFIX,
   revsetName,
 } from "./lane/names.ts"
 
 /**
- * What an outside change can move: accepted work, the WIPs, the publish bookmark,
- * the offers, the lanes' refs, and `@`.
+ * What an outside change can move: accepted work, the WIPs, the publish
+ * bookmark, the proposed changes, the lanes' refs, and `@`.
  */
 export interface Fingerprint {
   readonly op: string
@@ -32,13 +32,13 @@ export interface Fingerprint {
 
 /**
  * `all`: accepted work or a WIP moved, or this is the first observation.
- * `acceptedMoved`: accepted work's bookmark moved since an earlier
- * observation, which the base snapshot follows; never on the first, since
- * startup reads the base itself. `published`: the publish bookmark moved,
- * which changes only accepted work's record, since no offer depends on it.
- * `yours`: `@` moved, which changes only each record's `yourEdits` and
- * accepted work's preview. `lanes`: lanes' refs moved. `offers`: offer
- * bookmarks moved, by thread name.
+ * `acceptedMoved`: accepted work's bookmark moved since an earlier observation,
+ * which the base snapshot follows; never on the first, since startup reads the
+ * base itself. `published`: the publish bookmark moved, which changes only
+ * accepted work's record, since no proposed changes depend on it. `yours`: `@`
+ * moved, which changes only each record's `yourEdits` and accepted work's
+ * preview. `lanes`: lanes' refs moved. `proposed`: the threads whose proposed
+ * bookmarks moved, by name.
  */
 export interface Moved {
   readonly all: boolean
@@ -46,7 +46,7 @@ export interface Moved {
   readonly published: boolean
   readonly yours: boolean
   readonly lanes: ReadonlySet<ThreadId>
-  readonly offers: ReadonlySet<ThreadName>
+  readonly proposed: ReadonlySet<ThreadName>
 }
 
 /** A lane's remote in your repo is `pinetrie-<lane>` (`laneTipName`). */
@@ -55,25 +55,25 @@ const laneOfRemote = (remote: string): ThreadId | null => {
   return remote.startsWith(LANE_REMOTE_PREFIX) && isThreadId(lane) ? lane : null
 }
 
-/** Whether a local bookmark is one an offer or accepted work's record depends on. */
+/** Whether a local bookmark is one proposed changes or accepted work's record depends on. */
 const watchedLocal = (name: string, repoConfig: RepoConfig): boolean =>
   name === repoConfig.acceptedBookmark ||
   name === repoConfig.publish ||
   name.startsWith(repoConfig.wipPrefix) ||
-  name.startsWith(OFFER_PREFIX)
+  name.startsWith(PROPOSED_PREFIX)
 
 /**
  * The one `jj log` the fingerprint is read from: the commits of accepted work,
- * the WIPs, the publish bookmark, the offers, the lanes' remote bookmarks,
- * and `@`; each with
- * whether it is `@`, and its local and remote bookmarks.
+ * the WIPs, the publish bookmark, the proposed changes, the lanes' remote
+ * bookmarks, and `@`; each with whether it is `@`, and its local and remote
+ * bookmarks.
  */
 export function fingerprintRead(repoConfig: RepoConfig): readonly string[] {
   const revset = [
     `present(${revsetName(repoConfig.acceptedBookmark)})`,
     `bookmarks(glob:${revsetName(`${repoConfig.wipPrefix}*`)})`,
     `present(${revsetName(repoConfig.publish)})`,
-    OFFER_BOOKMARKS,
+    PROPOSED_BOOKMARKS,
     `remote_bookmarks(remote=glob:${revsetName(`${LANE_REMOTE_PREFIX}*`)})`,
     "@",
   ].join(" | ")
@@ -123,7 +123,7 @@ export function planObserve(
   repoConfig: RepoConfig,
 ): Moved {
   const lanes = new Set<ThreadId>()
-  const offers = new Set<ThreadName>()
+  const proposed = new Set<ThreadName>()
   let all = prev === null
   let published = false
   let acceptedMoved = false
@@ -138,8 +138,8 @@ export function planObserve(
     if (at >= 0) {
       const lane = laneOfRemote(name.slice(at + 1))
       if (lane !== null) lanes.add(lane)
-    } else if (name.startsWith(OFFER_PREFIX))
-      offers.add(name.slice(OFFER_PREFIX.length) as ThreadName)
+    } else if (name.startsWith(PROPOSED_PREFIX))
+      proposed.add(name.slice(PROPOSED_PREFIX.length) as ThreadName)
     else if (name === repoConfig.publish) published = true
     else if (watchedLocal(name, repoConfig)) {
       all = true
@@ -153,6 +153,6 @@ export function planObserve(
     published: published,
     yours: prev === null || prev.at !== next.at,
     lanes,
-    offers,
+    proposed,
   }
 }

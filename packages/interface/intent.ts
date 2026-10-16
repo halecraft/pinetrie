@@ -16,8 +16,8 @@ import {
   type MoveDirection,
   moveOf,
   noteOf,
-  type OfferAction,
   type Position,
+  type ProposedChangesAction,
   type QueueHoldChange,
   type RootId,
   type TaskId,
@@ -210,7 +210,7 @@ export type ColumnAct =
   /**
    * A card made in `lane`'s queue, with no text, never drawn anywhere first.
    * A command button's (catching up, continuing on accepted
-   * work, splitting the offer) carries its
+   * work, splitting the proposed changes) carries its
    * `command` and keeps the hold, so the host carries the command out when
    * the lane is free; "+ add to queue"'s has none and holds an idle queue
    * (`hold-if-idle`), so it waits while you type. Your message is left as
@@ -224,11 +224,11 @@ export type ColumnAct =
       readonly command: CardCommand | null
       readonly hold: Extract<QueueHoldChange, "keep" | "hold-if-idle">
     }
-  /** Act on the lane's offer in your repo; an acceptance names its destination. */
+  /** Act on the lane's proposed changes in your repo; an acceptance names its destination. */
   | {
-      readonly kind: "offer"
+      readonly kind: "proposed"
       readonly lane: ThreadId
-      readonly action: OfferAction
+      readonly action: ProposedChangesAction
       readonly to: string | null
     }
 
@@ -807,8 +807,10 @@ function planColumn(
             ]
           : []),
       ]
-    case "offer":
-      return [{ kind: "offer", lane: act.lane, action: act.action, to: act.to }]
+    case "proposed":
+      return [
+        { kind: "proposed", lane: act.lane, action: act.action, to: act.to },
+      ]
   }
 }
 

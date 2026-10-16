@@ -1,6 +1,6 @@
-// interface/review — what a column's review of its offer draws: each revision's
-// title, body and files, what each file's section shows, and a diff's lines by
-// kind. `review-pane.tsx` draws it; `use-fetched.ts` reads.
+// interface/review — what a column's review of its proposed changes draws: each
+// revision's title, body and files, what each file's section shows, and a
+// diff's lines by kind. `review-pane.tsx` draws it; `use-fetched.ts` reads.
 
 import {
   type ConfigWidening,
@@ -92,7 +92,7 @@ const LETTER: Record<FileChange, FileRow["letter"]> = {
 
 /**
  * The review's rows from each span's fetched review, in the target's
- * order. A file is flagged by path from the offer's record.
+ * order. A file is flagged by path from the proposed changes' record.
  */
 export function reviewView(
   target: ReviewTarget,

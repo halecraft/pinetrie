@@ -35,7 +35,7 @@ const BASE = {
 const ACCEPTED = { kind: "accepted", commit: TO } as const
 test.each([
   [
-    "accepted work merged: where the next offer starts",
+    "accepted work merged: where the next proposed changes start",
     { start: { kind: "known", start: [C1, C2] }, target: ACCEPTED },
     [C1, C2],
   ],
@@ -50,7 +50,7 @@ test.each([
   [
     "an untraced start: the base's start",
     {
-      start: { kind: "untraced", acceptedOfferCommits: [C2] },
+      start: { kind: "untraced", acceptedThreadCommits: [C2] },
       target: ACCEPTED,
     },
     [C1],

@@ -17,7 +17,6 @@ import {
   type WriterId,
 } from "./ids.ts"
 import type { Sha256 } from "./images.ts"
-import type { OfferLedger, OfferSeen, WorkChanges } from "./offers.ts"
 import type { Paste, Replacing } from "./paste.ts"
 import { isWithin } from "./paths.ts"
 import type {
@@ -34,6 +33,11 @@ import type {
   SentCard,
   TypedMove,
 } from "./places.ts"
+import type {
+  FilesTouched,
+  ProposedChangesSeen,
+  ProposedLedger,
+} from "./proposed.ts"
 import type { ConfigWidening, TurnShared } from "./runs.ts"
 import { isThreadNameHandle } from "./thread-names.ts"
 
@@ -135,11 +139,11 @@ export const ERR = {
   BUSY: "busy",
   /** Landing a lane that has no copy of its own: a host without tools made it. */
   NOT_OWN_COPY: "not_own_copy",
-  /** An offer action on a lane with no offer in your repo. */
-  NO_OFFER: "no_offer",
-  /** Accepting a folder project's offer, which the host cannot do yet. */
+  /** An action on proposed changes, on a lane with none in your repo. */
+  NO_PROPOSED_CHANGES: "no_proposed_changes",
+  /** Accepting a folder project's proposed changes, which the host cannot do yet. */
   FOLDER_ACCEPT_LATER: "folder_accept_later",
-  /** Squashing a folder project's offer, which is its files, never a stack. */
+  /** Squashing a folder project's proposed changes, which is its files, never a stack. */
   NOT_A_STACK: "not_a_stack",
   /** A `/package:name` command that names no command there is. */
   UNKNOWN_COMMAND: "unknown_command",
@@ -159,7 +163,7 @@ export const ERR = {
   TASK_ID_IN_USE: "task_id_in_use",
   /** A new root's id that names a root the session already holds. */
   ROOT_ID_IN_USE: "root_id_in_use",
-  /** An offer accepted, or a publish, before accepted work is set up. */
+  /** Proposed changes accepted, or a publish, before accepted work is set up. */
   NOT_SET_UP: "not_set_up",
   /** Publishing in a repo with no publish bookmark. */
   NO_PUBLISH: "no_publish",
@@ -167,7 +171,7 @@ export const ERR = {
   NOT_FAST_FORWARD: "not_fast_forward",
   /** Publishing while the working copy has conflicts, or catching it up would make some. */
   YOURS_CONFLICT: "yours_conflict",
-  /** An acceptance into a bookmark that is not one of the offer's destinations now. */
+  /** An acceptance into a bookmark that is not one of the proposed changes' destinations now. */
   BAD_DESTINATION: "bad_destination",
   /** A new thread's base that is not a WIP bookmark above accepted work. */
   BAD_BASE: "bad_base",
@@ -181,14 +185,14 @@ export const ERR = {
    * An acceptance that now brings other work than the one it was shown (another
    * ledger), or now conflicts where it did not.
    */
-  OFFER_CHANGED: "offer_changed",
+  NOT_AS_SHOWN: "not_as_shown",
   /** An answer to a lane's use of an ssh identity, from someone not its owner. */
   NOT_OWNER: "not_owner",
   /** An answer the lane's access does not take now: nothing waits, or it is already so. */
   NOTHING_TO_ANSWER: "nothing_to_answer",
   /**
-   * A run, a catch-up or an offer action on a lane whose history is not the
-   * project's kind: it was made before the project changed kind.
+   * A run, a catch-up or an action on proposed changes on a lane whose history
+   * are not the project's kind: it was made before the project changed kind.
    */
   FOREIGN_LANE: "foreign_lane",
 } as const
@@ -446,16 +450,16 @@ export type Intent =
   /** Ask a model for a task's title, from its first thread's messages. */
   | { readonly kind: "retitle"; readonly task: TaskId }
   /**
-   * Act on a lane's offer in your repo. An acceptance names its destination
-   * bookmark, null for the default, and what it was shown (`seen`); every other
-   * action, null.
+   * Act on a lane's proposed changes in your repo. An acceptance names its
+   * destination bookmark, null for the default, and what it was shown (`seen`);
+   * every other action, null.
    */
   | {
-      readonly kind: "offer"
+      readonly kind: "proposed"
       readonly lane: ThreadId
-      readonly action: OfferAction
+      readonly action: ProposedChangesAction
       readonly to: string | null
-      readonly seen: OfferSeen | null
+      readonly seen: ProposedChangesSeen | null
     }
   /** Set up accepted work, or publish it. */
   | { readonly kind: AcceptedAction }
@@ -544,13 +548,13 @@ export type Intent =
   | { readonly kind: "traces-seen"; readonly traces: readonly string[] }
 
 /**
- * What can be done with an offer: accept it into accepted work or a WIP, squash
- * a stack back to one revision, have the agent write its description again, or
- * rebuild it, discarding your edits. Splitting it is a card's command, `split`,
- * popped when the thread is free.
+ * What can be done with proposed changes: accept it into accepted work or a
+ * WIP, squash a stack back to one revision, have the agent write its
+ * description again, or rebuild it, discarding your edits. Splitting it is a
+ * card's command, `split`, popped when the thread is free.
  */
-export type OfferAction = "accept" | "squash" | "describe" | "refresh"
-export const OFFER_ACTIONS: readonly OfferAction[] = [
+export type ProposedChangesAction = "accept" | "squash" | "describe" | "refresh"
+export const PROPOSED_CHANGES_ACTIONS: readonly ProposedChangesAction[] = [
   "accept",
   "squash",
   "describe",
@@ -920,8 +924,8 @@ export const PRODUCT_NAME = "pine·trie"
 
 /**
  * The user every host operation on your repo carries, so the evolog says which
- * commits the host made where its version of an offer cannot: an offer it
- * rewrote before marking, and a race, repaired in your favour.
+ * commits the host made where its version of proposed changes cannot: proposed
+ * changes it rewrote before marking, and a race, repaired in your favour.
  */
 export const HOST_OPERATOR = "pinetrie-host"
 
@@ -1397,29 +1401,31 @@ export interface ProjectRecord {
 }
 
 /**
- * A lane's offer: the lane's work you do not have yet. A host-written
- * `pinetrie.offer` value keyed by lane: the page's cache, of the project's
- * kind. The host never decides from it, so a record lost or stale changes
- * nothing; at start it deletes those of the other kind.
+ * A lane's proposed changes: the lane's work you do not have yet. A
+ * host-written `pinetrie.proposed` value keyed by lane: the page's cache, of
+ * the project's kind. The host never decides from it, so a record lost or stale
+ * changes nothing; at start it deletes those of the other kind.
  */
-export type OfferRecord = JjOfferRecord | FolderOfferRecord
+export type ProposedChangesRecord =
+  | JjProposedChangesRecord
+  | FolderProposedChangesRecord
 
 /**
- * A jj project's offer: one revision, or a stack, in your repo. Written
- * from the repo after each of the host's steps (`offerRecord`,
- * `@pinetrie/rules`); the host reads the offer from your repo
- * (`OfferInRepo`). What accepting it would bring, each revision's
- * description, files and diffs, is not stored: the page reads it by commit
- * when it asks (`RevisionReview`).
+ * A jj project's proposed changes: one revision, or a stack, in your repo.
+ * Written from the repo after each of the host's steps
+ * (`proposedChangesRecord`, `@pinetrie/rules`); the host reads the proposed
+ * changes from your repo (`ProposedChangesInRepo`). What accepting it would
+ * bring, each revision's description, files and diffs, is not stored: the page
+ * reads it by commit when it asks (`RevisionReview`).
  */
-export interface JjOfferRecord {
+export interface JjProposedChangesRecord {
   readonly kind: "jj"
   readonly lane: ThreadId
-  /** Its revisions: 1 for a single offer, more for a stack. */
+  /** Its revisions: 1 for single proposed changes, more for a stack. */
   readonly size: number
   /** The lane turned since the stack was made: it no longer holds all of it. */
   readonly stale: boolean
-  /** None when accepted work already holds its work (`offerStatus`'s `held`). */
+  /** None when accepted work already holds its work (`proposedChangesStatus`'s `held`). */
   readonly files: readonly string[]
   /** Files that conflict with your committed work. */
   readonly conflicts: readonly string[]
@@ -1442,29 +1448,30 @@ export interface JjOfferRecord {
   readonly acceptedAs: string | null
   /**
    * Each revision's commit as the host last read it, bottom first: what a
-   * review may read. It follows a rebase jj made under the offer, and your
-   * edits.
+   * review may read. It follows a rebase jj made under the proposed changes,
+   * and your edits.
    */
   readonly commits: readonly CommitId[]
   /**
-   * What it brings, as its top's message says (`offerLedger`): the lane tip it
-   * holds and where it starts. An acceptance names it (`OfferSeen`). Null for
-   * an offer whose message carries none, and for a record written before the
-   * field, until the owner's first observation writes it again.
+   * What it brings, as its top's message says (`proposedLedger`): the lane tip
+   * it holds and where it starts. An acceptance names it
+   * (`ProposedChangesSeen`). Null for proposed changes whose message carry
+   * none, and for a record written before the field, until the owner's first
+   * observation writes it again.
    */
-  readonly ledger: OfferLedger | null
+  readonly ledger: ProposedLedger | null
   readonly at: number
 }
 
 /**
- * A folder project's offer: the lane's newest state against accepted work's
- * newest, its files those whose content differs. The page reviews it as the
- * range `start..tip`.
+ * A folder project's proposed changes: the lane's newest state against accepted
+ * work's newest, its files those whose content differs. The page reviews it as
+ * the range `start..tip`.
  */
-export interface FolderOfferRecord {
+export interface FolderProposedChangesRecord {
   readonly kind: "folder"
   readonly lane: ThreadId
-  /** Accepted work's newest state, which the offer is computed against. */
+  /** Accepted work's newest state, which the proposed changes are computed against. */
   readonly start: PointId
   /** The lane's newest state. */
   readonly tip: PointId
@@ -1478,9 +1485,9 @@ export interface FolderOfferRecord {
 }
 
 /**
- * Where an offer's conflict comes from (`conflictCause`): the lane's work
- * against its target, or the copy it was cloned with, every conflicted file
- * already conflicted where it starts.
+ * Where proposed changes' conflict comes from (`conflictCause`): the lane's
+ * work against its target, or the copy it was cloned with, every conflicted
+ * file already conflicted where it starts.
  */
 export type ConflictCause = "work" | "start"
 
@@ -1499,8 +1506,8 @@ export interface ReviewFile {
 }
 
 /**
- * One revision of an offer, as its commit holds it. A commit id names its
- * content, so this never changes for a commit.
+ * One revision of proposed changes, as its commit holds it. A commit id names
+ * its content, so this never changes for a commit.
  */
 export interface RevisionReview {
   /** Its description, the host's trailers included. */
@@ -1514,9 +1521,9 @@ export interface RevisionReview {
 }
 
 /**
- * What a review reads: one revision of an offer, the diff from its parent to
- * it, or a range, the diff from one state of a lane to another, such as an
- * ask's work across its turns. Each id names its content, so a review of
+ * What a review reads: one revision of proposed changes, the diff from its
+ * parent to it, or a range, the diff from one state of a lane to another, such
+ * as an ask's work across its turns. Each id names its content, so a review of
  * either never changes.
  */
 export type DiffSpan =
@@ -1758,8 +1765,8 @@ export interface JjAcceptedRecord {
   readonly heads: { readonly current: string | null; readonly proposed: string }
   /**
    * Your repo's `revsets.log` now (null: jj's default), and what setting up
-   * accepted work writes: the offers added, since an immutable head is out of
-   * jj's default log.
+   * accepted work writes: the proposed changes added, since an immutable head
+   * is out of jj's default log.
    */
   readonly log: { readonly current: string | null; readonly proposed: string }
   /** The WIP bookmarks a thread may start from, newest first. */
@@ -1836,8 +1843,8 @@ export interface JjBaseRecord {
    */
   readonly catchUp: CatchUpRead | null
   /**
-   * Accepted-offer commits of this thread on accepted work, above its base,
-   * that name no source (`untracedLanes`): nothing is offered until it catches
+   * Accepted thread commits of this thread on accepted work, above its base,
+   * that name no source (`untracedLanes`): nothing is proposed until it catches
    * up past them.
    */
   readonly untraced: readonly CommitId[]
@@ -1846,7 +1853,7 @@ export interface JjBaseRecord {
    * untraced start, or one jj could not diff. A thread is told its base has new
    * work only with `some`, and caught up quietly only with `none`.
    */
-  readonly work: WorkChanges
+  readonly work: FilesTouched
 }
 
 /**
@@ -1866,7 +1873,7 @@ export interface FolderBaseRecord {
     readonly to: PointId
     readonly files: readonly string[]
   } | null
-  readonly work: WorkChanges
+  readonly work: FilesTouched
 }
 
 /** What catching up would change in a lane (`catchUpFiles`), and what it was read at. */
@@ -2308,10 +2315,10 @@ export * from "./ids.ts"
 export * from "./images.ts"
 export * from "./kinds.ts"
 export * from "./live.ts"
-export * from "./offers.ts"
 export * from "./paste.ts"
 export * from "./paths.ts"
 export * from "./places.ts"
+export * from "./proposed.ts"
 export * from "./roots.ts"
 export * from "./runs.ts"
 export * from "./thread-names.ts"

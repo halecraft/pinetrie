@@ -36,7 +36,7 @@ export function saveBlobTool(
     name: SAVE_BLOB_TOOL,
     label: "save a shared file",
     description:
-      "Save a file shared in this thread (a /blob/<sha256> link in a message) to a path in your lane, to read or use it there. A path in the repo puts the file in your offer; a path .gitignore ignores keeps it to this lane; a shared directory shares it with the person and every thread.",
+      "Save a file shared in this thread (a /blob/<sha256> link in a message) to a path in your lane, to read or use it there. A path in the repo puts the file in your proposed changes; a path .gitignore ignores keeps it to this lane; a shared directory shares it with the person and every thread.",
     parameters: Type.Object({
       blob: Type.String({
         description:

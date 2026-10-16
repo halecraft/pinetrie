@@ -20,7 +20,7 @@ export interface ThreadMove {
   readonly closes: boolean
   /** Why it is refused now (`ROOT_BUSY_REASON`'s key), into the archive only. */
   readonly busy: RootWork | null
-  /** Into the archive, the threads whose offers it withdraws. */
+  /** Into the archive, the threads whose proposed changes it withdraws. */
   readonly drops: readonly string[]
   readonly intent: Intent
 }
@@ -31,7 +31,7 @@ export interface ThreadCardHead {
   readonly label: string
   /** What its mark draws (`taskStatus`), or null for none. */
   readonly status: Status | null
-  /** Its threads with work ready to accept (`offeredByTask`): ⇡, for everyone. */
+  /** Its threads with changes ready to accept (`openProposedByTask`): ⇡, for everyone. */
   readonly ready: readonly string[]
   /** An unsent card of yours is in it (`UnsentSignals.tasks`): your pip. */
   readonly pip: boolean
@@ -53,8 +53,8 @@ export interface ThreadCardFacts {
   readonly status: ReadonlyMap<TaskId, Status>
   /** Tasks holding an unsent card of yours (`UnsentSignals.tasks`). */
   readonly pips: ReadonlySet<TaskId>
-  /** The threads with an open offer, by task (`offeredByTask`). */
-  readonly offered: ReadonlyMap<TaskId, readonly string[]>
+  /** The threads with open proposed changes, by task (`openProposedByTask`). */
+  readonly proposed: ReadonlyMap<TaskId, readonly string[]>
   /** The agent's work in each task, held or not (`taskWork`). */
   readonly work: ReadonlyMap<TaskId, RootWork>
 }
@@ -68,7 +68,7 @@ export function threadCardHead(
     task,
     label: facts.labels.get(task) ?? NO_TEXT,
     status: facts.status.get(task) ?? null,
-    ready: facts.offered.get(task) ?? [],
+    ready: facts.proposed.get(task) ?? [],
     pip: facts.pips.has(task),
     state,
     moves: movesOf(task, state, facts),
@@ -91,7 +91,7 @@ function movesOf(
         name: to.name,
         closes,
         busy: closes ? (facts.work.get(task) ?? null) : null,
-        drops: closes ? (facts.offered.get(task) ?? []) : [],
+        drops: closes ? (facts.proposed.get(task) ?? []) : [],
         intent: {
           kind: "moveTask",
           task,

@@ -1,11 +1,11 @@
 // jj/fixtures — what jj's tests share: a lane's record proven jj, as the
 // adapter proves one (`proveJjLane`); and a lane's work reaching your repo,
-// offered and accepted, by the steps the host runs.
+// proposed and accepted, by the steps the host runs.
 
 import {
   type CommitBase,
   type CommitId,
-  type OfferSource,
+  type ProposedSource,
   type RepoConfig,
   rootIdFor,
   type ThreadId,
@@ -14,17 +14,17 @@ import {
 } from "@pinetrie/core"
 import { executeOrThrow, type LaneRunners, type Runner } from "@pinetrie/lanes"
 import { laneBase } from "./lane/base.ts"
-import { bookmarkName, offerBookmark, revsetName } from "./lane/names.ts"
+import { bookmarkName, proposedBookmark, revsetName } from "./lane/names.ts"
 import { planBundle } from "./lane/plan.ts"
 import { type JjLane, proveJjLane } from "./lane/points.ts"
 import { commitsOf } from "./lane/revisions.ts"
-import { laneTipIn, readOffer, startOfOffer } from "./offer.ts"
 import {
   markSteps,
+  planAcceptanceSteps,
   planImport,
-  planOffer,
-  planOfferAcceptanceSteps,
+  planProposedChanges,
 } from "./plan.ts"
+import { laneTipIn, readProposedChanges, startOfProposed } from "./proposed.ts"
 import { executeRepo, hostOps } from "./run.ts"
 
 /** `lane`'s record, keeping a jj history, proven. */
@@ -82,7 +82,7 @@ export async function acceptedIn(
   return c
 }
 
-/** Where `lane`'s offer starts, as commits; throws on an untraced start. */
+/** Where `lane`'s proposed changes start, as commits; throws on an untraced start. */
 export async function knownStart(
   jj: Runner,
   input: {
@@ -92,22 +92,22 @@ export async function knownStart(
     readonly lane: ThreadId
   },
 ): Promise<readonly CommitId[]> {
-  const read = await startOfOffer(jj, input)
+  const read = await startOfProposed(jj, input)
   if (read.kind !== "known") throw new Error("an untraced start")
   return read.start
 }
 
 /**
- * `lane`'s offer of `sources`, built on accepted work in your repo at
- * `yours` as the host builds it, then found there as the host finds it,
- * with nothing kept. The lane's tip must be fetched already.
+ * `lane`'s proposed changes of `sources`, built on accepted work in your repo
+ * at `yours` as the host builds it, then found there as the host finds it, with
+ * nothing kept. The lane's tip must be fetched already.
  */
-export async function buildOffer(
+export async function buildProposedChanges(
   yours: string,
   input: {
     readonly lane: ThreadId
     readonly name: ThreadName
-    readonly sources: readonly OfferSource[]
+    readonly sources: readonly ProposedSource[]
     readonly repoConfig: RepoConfig
   },
 ) {
@@ -119,29 +119,30 @@ export async function buildOffer(
   if (base === null) throw new Error("no base")
   const target = await acceptedIn(ops, repoConfig)
   await executeRepo(yours, [
-    ...planOffer({
+    ...planProposedChanges({
       name,
       start: await knownStart(ops, { tip, base, repoConfig, lane }),
       sources: input.sources,
       target,
       nonce: `n-${Math.random().toString(36).slice(2)}`,
     }),
-    ...markSteps(offerBookmark(name)),
+    ...markSteps(proposedBookmark(name)),
   ])
-  const read = await readOffer(ops, { name, target })
-  if (read?.kind !== "offer") throw new Error("no offer read")
+  const read = await readProposedChanges(ops, { name, target })
+  if (read?.kind !== "present") throw new Error("no proposed changes read")
   return {
     read,
     commits: read.revisions.map(r => r.commit),
-    changes: read.revisions.map(r => r.change),
+    changeIds: read.revisions.map(r => r.changeId),
   }
 }
 
 /**
- * `lane`'s offer of its tip as one revision, its ledger naming the tip, as
- * `buildOffer` builds it. The lane's tip must be fetched already.
+ * `lane`'s proposed changes of its tip as one revision, its ledger naming the
+ * tip, as `buildProposedChanges` builds it. The lane's tip must be fetched
+ * already.
  */
-export async function offerTip(
+export async function proposedTip(
   yours: string,
   input: {
     readonly lane: ThreadId
@@ -151,18 +152,18 @@ export async function offerTip(
 ) {
   const tip = await laneTipIn(hostOps(yours), input.lane)
   if (tip === null) throw new Error("no tip")
-  return buildOffer(yours, {
+  return buildProposedChanges(yours, {
     ...input,
     sources: [{ commit: tip, description: `WIP\n\nPinetrie-Source: ${tip}\n` }],
   })
 }
 
 /**
- * `name`'s offer, whose top change is `top`, accepted into accepted work in
- * your repo at `yours`: accepted work's bookmark moved forward to it, as
- * the host accepts one.
+ * `name`'s proposed changes, whose top change is `top`, accepted into accepted
+ * work in your repo at `yours`: accepted work's bookmark moved forward to it,
+ * as the host accepts one.
  */
-export async function acceptOffer(
+export async function acceptProposedChanges(
   yours: string,
   input: {
     readonly name: ThreadName
@@ -172,8 +173,8 @@ export async function acceptOffer(
 ): Promise<void> {
   await executeRepo(
     yours,
-    planOfferAcceptanceSteps({
-      bookmark: offerBookmark(input.name),
+    planAcceptanceSteps({
+      bookmark: proposedBookmark(input.name),
       top: input.top,
       destination: input.repoConfig.acceptedBookmark,
     }),

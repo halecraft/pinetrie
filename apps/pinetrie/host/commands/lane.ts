@@ -1,6 +1,6 @@
 // host/commands/lane — the commands that act on one thread's lane: stop it,
-// carry it on after a Stop, hold or release its queue, or act on its offer,
-// which leaves a fact in the thread.
+// carry it on after a Stop, hold or release its queue, or act on its proposed
+// changes, which leaves a fact in the thread.
 
 import {
   type AcceptedAction,
@@ -60,7 +60,7 @@ export interface LaneDeps {
   readonly cancel: Runs["cancel"]
   /** Drain a lane whose queue a card joined, unless it runs (`queueDrain`). */
   readonly drain: (lane: ThreadId) => void
-  /** An offer action's fact, written after the reply, in a late step of its own. */
+  /** The fact of an action on proposed changes, written after the reply, in a late step of its own. */
   readonly later: Pick<Later, "step">
   /** The writer of the places: a fact's card is the host's change. */
   readonly placesWriter: Places
@@ -232,7 +232,7 @@ export async function handleCarryOn(
   })
 }
 
-/** An offer or accepted work's action on a host without tools: no repo to act on. */
+/** Proposed changes or accepted work's action on a host without tools: no repo to act on. */
 const NO_REPO: Outcome = {
   kind: "refused",
   code: ERR.NOT_OWN_COPY,
@@ -240,48 +240,48 @@ const NO_REPO: Outcome = {
 }
 
 /**
- * An offer action, the offer shell's, on your repo. A split is a card's
+ * An action on proposed changes, the shell's, on your repo. A split is a card's
  * command, not an action.
  */
-export async function actOnOffer(
+export async function actOnProposedChanges(
   deps: LaneDeps,
-  intent: Extract<Intent, { kind: "offer" }>,
+  intent: Extract<Intent, { kind: "proposed" }>,
   by: WriterId,
 ): Promise<Outcome> {
   const { lane, action, to, seen } = intent
   const { work } = deps
   if (work.destination === null) return NO_REPO
-  const done = await work.destination.offers.act(lane, action, by, to, seen)
+  const done = await work.destination.proposed.act(lane, action, by, to, seen)
   if (done.kind === "refused")
     return {
       kind: "refused",
       code: done.code,
-      message: offerRefusal(done.code),
+      message: proposedChangesRefusal(done.code),
     }
   // Off the command's reply, in a late step: what the command did, queued as
   // a card on its thread, which an idle lane pops at once and a running one
   // when its run ends. A thread its task's archive took since gets none.
   void deps.later
-    .step({ kind: "thread", thread: lane }, "an offer's fact", () => ({
+    .step({ kind: "thread", thread: lane }, "proposed changes' fact", () => ({
       facts: [done.fact],
     }))
-    .catch(failed(deps.basics, "an offer's fact", lane))
-  return action === "accept" ? { kind: "accepted" } : { kind: "offered" }
+    .catch(failed(deps.basics, "proposed changes' fact", lane))
+  return action === "accept" ? { kind: "accepted" } : { kind: "proposed" }
 }
 
-/** Why an offer action was refused, worded once. */
-export function offerRefusal(code: ErrCode): string {
+/** Why an action on proposed changes were refused, worded once. */
+export function proposedChangesRefusal(code: ErrCode): string {
   switch (code) {
     case ERR.BAD_DESTINATION:
-      return "the offer cannot be added there now: a conflicted offer goes only into a WIP, and the destination must sit below it"
-    case ERR.OFFER_CHANGED:
-      return "the offer changed since you looked at it: review it again"
+      return "the changes cannot be accepted there now: conflicted changes go only into a WIP, and the destination must sit below them"
+    case ERR.NOT_AS_SHOWN:
+      return "the changes are not what you were shown: review them again"
     case ERR.FOLDER_ACCEPT_LATER:
       return ACCEPT_LATER
     case ERR.NOT_A_STACK:
-      return "a folder project's offer is its files, never a stack"
+      return "a folder project's changes are its files, never a stack"
     default:
-      return "this thread has no offer in your repo"
+      return "this thread has no changes to accept"
   }
 }
 

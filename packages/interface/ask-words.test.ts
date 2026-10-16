@@ -131,7 +131,7 @@ describe("outcomeWords", () => {
 describe("foldWords", () => {
   const ended = {
     running: false,
-    headline: "Moved offers out of core",
+    headline: "Moved proposed changes out of core",
     work: "30 steps · 12 files",
     outcome: "stopped by Bea",
     live: null,
@@ -153,7 +153,7 @@ describe("foldWords", () => {
         "story: the headline leads, then the work and how it ended",
         ended,
         "fold",
-        "[Moved offers out of core] · 30 steps · 12 files · stopped by Bea",
+        "[Moved proposed changes out of core] · 30 steps · 12 files · stopped by Bea",
       ],
       [
         "outline: how it ended, then the work; the headline is drawn under it",
@@ -171,7 +171,7 @@ describe("foldWords", () => {
         "story, running: the live headline",
         running,
         "fold",
-        "[Moved offers out of core] · 30 steps · 12 files",
+        "[Moved proposed changes out of core] · 30 steps · 12 files",
       ],
       [
         "no headline: the words as before digests",

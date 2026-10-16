@@ -102,7 +102,7 @@ describe("TOOL_IDS", () => {
       "find",
       "ask_about_conflict",
       "catch_up",
-      "split_offer",
+      "split_proposed_changes",
       BANNER_TOOL,
       "ask",
       "leave",

@@ -2,22 +2,22 @@
 
 The host serves one jj repo: the project's working copy on the machine the
 host runs on. ADR-0118, accepted and not yet built, will make it serve several sources, each
-branched repo with its own accepted work and offers. This page is for someone who works in that repo with jj or
+branched repo with its own accepted work and proposed changes. This page is for someone who works in that repo with jj or
 jjui beside pine·trie. It says what pine·trie puts there, what it expects, and
-what to configure. Why each piece is shaped as it is: ADR-0105 (offers),
+what to configure. Why each piece is shaped as it is: ADR-0105 and ADR-0156 (proposed changes),
 ADR-0039 (thread names), ADR-0104 (accepted work and the ledger),
-ADR-0154 (the host's version of an offer), ADR-0155 (tidying your op
+ADR-0154 (the host's version of proposed changes), ADR-0155 (tidying your op
 log), ADR-0076 and ADR-0090 (publishing).
 
 Two parties act on the repo. **The host** runs its jj commands as the
 operation user `pinetrie-host@<hostname>`. **The owner** is whoever runs the
 host, and works in the repo with jj directly. People in a session never
 touch the repo: their threads' agents work in lanes of their own, and their
-work reaches the repo as offers.
+work reaches the repo as proposed changes.
 
 pine·trie names these things by what they are for, one word each, in the
 page, the code and here (ADR-0100, `docs/glossary.md`): **accepted work**,
-**accept**, **offer**, **WIP**, **catch up**, and **publish**. The jj names
+**accept**, **proposed changes**, **WIP**, **catch up**, and **publish**. The jj names
 are in the page's titles.
 
 ## Bookmarks
@@ -25,11 +25,11 @@ are in the page's titles.
 | bookmark | whose | what it is |
 |---|---|---|
 | `pinetrie-accepted` | the owner's, moved by the host on an acceptance, and by a publish of the owner's commits | **Accepted work**: where finished work lands. It only moves forward. Immutable once set up. Named `pinetrie-onto` before ADR-0100; a starting host renames it, once. |
-| `pinetrie-offer/<name>` | the host's | **An offer**: a thread's work as one revision, or a stack, on the thread's base. Immutable while it sits on accepted work. `<name>` is the thread's two-word name. |
-| `pinetrie-offer/<name>@pinetrie-host` | the host's | **The host's version of an offer** (ADR-0154): a remote bookmark the offer's bookmark tracks, moved by the host after each of its steps on the offer. `pinetrie-host` is no git remote of yours: nothing fetches from it or pushes to it. While the two agree, `jj bookmark list` shows only the offer; `--all-remotes` shows both. |
+| `pinetrie-proposed/<name>` | the host's | **Proposed changes**: a thread's work as one revision, or a stack, on the thread's base. Immutable while it sits on accepted work. `<name>` is the thread's two-word name. |
+| `pinetrie-proposed/<name>@pinetrie-host` | the host's | **The host's version of proposed changes** (ADR-0154): a remote bookmark the proposed changes' bookmark tracks, moved by the host after each of its steps on the proposed changes. `pinetrie-host` is no git remote of yours: nothing fetches from it or pushes to it. While the two agree, `jj bookmark list` shows only the proposed changes; `--all-remotes` shows both. |
 | `main` | the owner's, moved on a publish | **Where the project is published**: moved forward to `pinetrie-accepted`, with it, never anywhere else. |
 | `wip/*` | the owner's | **A work in progress** a thread may start from, chosen at its first message. Never touched by the host, except an acceptance into it. |
-| `tip@pinetrie-<lane>` | the host's | **A lane's history**, fetched from the lane. A remote bookmark, untracked, so jj treats it as immutable and leaves it out of the default log. Archiving a thread deletes its lane's, and abandons its offer; restoring brings both back. Until then its history is parked under the git ref `refs/pinetrie/archived/<lane>`, which jj does not show, so a gc keeps it. |
+| `tip@pinetrie-<lane>` | the host's | **A lane's history**, fetched from the lane. A remote bookmark, untracked, so jj treats it as immutable and leaves it out of the default log. Archiving a thread deletes its lane's, and abandons its proposed changes; restoring brings both back. Until then its history is parked under the git ref `refs/pinetrie/archived/<lane>`, which jj does not show, so a gc keeps it. |
 
 The names `pinetrie-accepted`, `main` and `wip/` are the defaults. A project
 sets its own in `pinetrie.json` (read from the working copy, since the names
@@ -47,21 +47,25 @@ accept your commits first (ADR-0099):
 A config that still has `offers`, the key these replaced, is not read for
 it, and the host says so at startup.
 
-**The rename from `pinetrie-onto`** (ADR-0100, S121) is the first thing a
-starting host does in your repo, when the config names no bookmark of its
-own: `jj bookmark rename pinetrie-onto pinetrie-accepted`, as the host, which
-`jj op revert` undoes; and, when your `immutable_heads()` ends with what
-setup wrote for `pinetrie-onto`, that text rewritten to name
-`pinetrie-accepted` (`jj config set --repo`, a file write, which the op log
-does not show). A jjui revset of your own that names `pinetrie-onto` needs
-the same edit by hand.
+**The rename from `pinetrie-offer/*`** (ADR-0156, S217) is the first thing a
+starting host does in your repo: each `pinetrie-offer/<name>` becomes
+`pinetrie-proposed/<name>` (`jj bookmark rename`, as the host, one operation
+each, which `jj op revert` undoes); the host's version of each moves with it
+(one import, then one `jj bookmark forget` of the old names); and the
+`bookmarks(glob:"pinetrie-offer/*")` setup wrote into your `immutable_heads()`
+and `revsets.log` names `pinetrie-proposed/*` instead (`jj config set --repo`,
+a file write, which the op log does not show). A name held under both is
+left, and so is a `pinetrie-offer/<name>` you pushed to a remote of your own:
+the startup line names each. A jjui revset of your own that names
+`pinetrie-offer/*` needs the same edit by hand. (Accepted work's bookmark was
+renamed from `pinetrie-onto` the same way, by ADR-0100.)
 
-**An acceptance** moves one bookmark forward to an offer:
+**An acceptance** moves one bookmark forward to proposed changes:
 `pinetrie-accepted`, or the thread's `wip/` bookmark. It never rebases, and never
 touches `@`. jj itself refuses a move that is not forward, so a stale
-acceptance fails instead of dropping commits. Only an offer with no
+acceptance fails instead of dropping commits. Only proposed changes with no
 conflicts can be accepted into accepted work. The commit it leaves there is an
-**accepted-offer commit** (ADR-0083).
+**accepted thread commit** (ADR-0083).
 
 **Publish**, the page's one button for accepted work (ADR-0090), shows only while
 there is something to publish. With `publish.catchUp` on, it is up to three
@@ -119,10 +123,10 @@ is written, and only when chosen:
 
 ```toml
 [revset-aliases]
-"immutable_heads()" = 'builtin_immutable_heads() | present("pinetrie-accepted") | (bookmarks(glob:"pinetrie-offer/*") & children(present("pinetrie-accepted")))'
+"immutable_heads()" = 'builtin_immutable_heads() | present("pinetrie-accepted") | (bookmarks(glob:"pinetrie-proposed/*") & children(present("pinetrie-accepted")))'
 
 [revsets]
-log = 'builtin_log() | bookmarks(glob:"pinetrie-offer/*")'
+log = 'builtin_log() | bookmarks(glob:"pinetrie-proposed/*")'
 ```
 
 Each is added to the repo's current definition, not put in its place: a
@@ -131,9 +135,9 @@ with pine·trie's terms joined on.
 
 - **`present()` is required.** Without it, a repo with no `pinetrie-accepted`
   fails every jj command (S77 item 3).
-- **The log setting is needed because the offers are immutable.** jj's
+- **The log setting is needed because the proposed changes are immutable.** jj's
   default log, `builtin_log()`, shows mutable commits and their near
-  ancestors. An offer on accepted work is an immutable commit with nothing
+  ancestors. Proposed changes on accepted work are an immutable commit with nothing
   mutable above it, so the default log leaves it out (S77 item 8).
 
 ## Your op log
@@ -176,14 +180,14 @@ pnpm tidy [folder] [--days N] [--dry-run]
 
 jjui's own `[revisions] revset`, in `~/.config/jjui/config.toml`, replaces
 `revsets.log` for jjui, so the setting above does not reach it. A revset
-built like jj's default hides every offer on accepted work. Add the offers to it:
+built like jj's default hides every proposed changes on accepted work. Add the proposed changes to it:
 
 ```toml
 [revisions]
-  revset = '(present(@) | ancestors(immutable_heads().., 2) | ancestors(@, 5) | present(trunk())) | bookmarks(glob:"pinetrie-offer/*")'
+  revset = '(present(@) | ancestors(immutable_heads().., 2) | ancestors(@, 5) | present(trunk())) | bookmarks(glob:"pinetrie-proposed/*")'
 ```
 
-Accepted work and the offers on it show as immutable (◆). The owner's commits
+Accepted work and the proposed changes on it show as immutable (◆). The owner's commits
 above accepted work stay mutable.
 
 ## Trailers
@@ -195,9 +199,9 @@ and jj's `trailers` template reads only the last.
 | trailer | on | says |
 |---|---|---|
 | `Pinetrie-Base: accepted@<commit>`, `Pinetrie-Base: <wip>@<commit>` | a lane's start (`base: accepted work`, `copy of <wip>`), and each catch-up (`catch up: accepted work`) | the thread's base: accepted work, or a `wip/` bookmark, at that commit. A name with the WIP prefix is that WIP; any other, `pinetrie-onto` in older commits included, is accepted work |
-| `Pinetrie-Source: <commit>` | every revision of an offer | the lane tip the offer holds; on accepted work, that work has been accepted |
-| `Pinetrie-Start: <commit>` | every revision of an offer | where the offer starts |
-| `Pinetrie-Thread`, `Pinetrie-Lane`, `Pinetrie-Entry` | every revision of an offer | the thread, its lane, and the newest entry its work came from |
+| `Pinetrie-Source: <commit>` | every revision of proposed changes | the lane tip the proposed changes hold; on accepted work, that work has been accepted |
+| `Pinetrie-Start: <commit>` | every revision of proposed changes | where the proposed changes start |
+| `Pinetrie-Thread`, `Pinetrie-Lane`, `Pinetrie-Entry` | every revision of proposed changes | the thread, its lane, and the newest entry its work came from |
 
 A trailer is a statement pine·trie acts on. Removing one changes what it
 believes:
@@ -205,29 +209,29 @@ believes:
 - **A squash that keeps one message** (`jj squash -u`, or a message written
   by hand) drops the other commit's `Pinetrie-Source`. pine·trie then reads that
   work as not accepted, and offers it again.
-- **An offer's message rewritten without `Pinetrie-Thread`** still has its
+- **Proposed changes' message rewritten without `Pinetrie-Thread`** still has its
   top found by its bookmark, but a stack's lower revisions are no longer
-  recognised as the offer's, so the offer reads as edited.
+  recognised as the proposed changes', so the proposed changes read as edited.
 
 ## Rewriting under pine·trie
 
 - **Accepted work is immutable on purpose.** Rewriting it takes
   `--ignore-immutable`, which is the point: accepted work is final unless it
   is rewritten deliberately.
-- **Rewording or rewriting a commit under an offer is safe.** jj rebases
-  the offer as part of that operation. The host sees a version it did not
+- **Rewording or rewriting a commit under proposed changes are safe.** jj rebases
+  the proposed changes as part of that operation. The host sees a version it did not
   make that changes nothing, and does not count it as an edit.
-- **Editing an offer makes it the owner's.** Once a version an operation
-  not the host's made changes an offer (its message, or its files), the
-  host never touches that offer again. jj shows such an offer as
-  `pinetrie-offer/<name>*`, and `jj bookmark list --all-remotes` says how
+- **Editing proposed changes make it the owner's.** Once a version an operation
+  not the host's made changes proposed changes (its message, or its files), the
+  host never touches that proposed changes again. jj shows such proposed changes as
+  `pinetrie-proposed/<name>*`, and `jj bookmark list --all-remotes` says how
   far it is from the host's version. The host's version is a ref in your
   repo, so this holds across a host restart, and after your op log is cut.
-- **Abandoning an offer, or deleting its bookmark,** discards it: the host
+- **Abandoning proposed changes, or deleting its bookmark,** discards it: the host
   builds a new one when the thread has work not accepted. Until then jj
   lists the bookmark as `(deleted)`, beside the host's version, which the
   host forgets once there is nothing to offer. To be rid of a
-  thread's offer, archive the thread: the host abandons the offer, and
+  thread's proposed changes, archive the thread: the host abandons the proposed changes, and
   builds it again if the thread is restored.
 - **A `wip/` bookmark** is the owner's to rebase, amend or move. A thread
   started from it catches up with a fresh copy of it. Once the WIP's

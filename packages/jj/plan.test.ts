@@ -5,24 +5,24 @@ import { DEFAULT_REPO } from "./lane/names.ts"
 import { type LaneRow, planLaneRead } from "./lane-read.ts"
 import { type Fingerprint, parseFingerprint, planObserve } from "./observe.ts"
 import {
-  acceptedOfferCommitsRevset,
+  acceptedThreadCommitsRevset,
   forgetSteps,
   immutableHeads,
   laneRefSteps,
   logRevset,
   markSteps,
   nonceRevset,
-  offerStart,
   parseEvolog,
+  planAcceptanceSteps,
   planCatchUpUndo,
   planImport,
-  planOffer,
-  planOfferAcceptanceSteps,
+  planProposedChanges,
   planPublishCatchUp,
   planPublishMove,
-  planRebuildOffer,
+  planRebuildProposed,
   planSetup,
   planSinceHost,
+  proposedStart,
   walkToHost,
 } from "./plan.ts"
 import { repoCommand } from "./run.ts"
@@ -41,21 +41,21 @@ const argvs = (steps: readonly RepoStep[]) =>
       : `jj as ${s.as}: ${s.args.join(" ")}`,
   )
 
-describe("logRevset: the offers added to your log", () => {
+describe("logRevset: the proposed changes added to your log", () => {
   test("added to jj's default when the repo defines none, and idempotent", () => {
     const once = logRevset(null)
-    expect(once).toBe('builtin_log() | bookmarks(glob:"pinetrie-offer/*")')
+    expect(once).toBe('builtin_log() | bookmarks(glob:"pinetrie-proposed/*")')
     expect(logRevset(once)).toBe(once)
     expect(logRevset("@ | trunk()")).toBe(
-      '@ | trunk() | bookmarks(glob:"pinetrie-offer/*")',
+      '@ | trunk() | bookmarks(glob:"pinetrie-proposed/*")',
     )
   })
 })
 
-describe("immutableHeads: accepted work and its offers added to yours", () => {
+describe("immutableHeads: accepted work and its proposed changes added to yours", () => {
   test("added to jj's builtin when the repo defines none, with present()", () => {
     expect(immutableHeads(DEFAULT_REPO, null)).toBe(
-      'builtin_immutable_heads() | present("pinetrie-accepted") | (bookmarks(glob:"pinetrie-offer/*") & children(present("pinetrie-accepted")))',
+      'builtin_immutable_heads() | present("pinetrie-accepted") | (bookmarks(glob:"pinetrie-proposed/*") & children(present("pinetrie-accepted")))',
     )
   })
   test("joined to your own definition, and idempotent", () => {
@@ -65,35 +65,35 @@ describe("immutableHeads: accepted work and its offers added to yours", () => {
   })
 })
 
-describe("offers", () => {
+describe("proposed changes", () => {
   const op = (...args: string[]) => `jj as host: ${args.join(" ")}`
-  /** A rewrite of an offer, which may be immutable on accepted work. */
+  /** A rewrite of proposed changes, which may be immutable on accepted work. */
   const rw = (...args: string[]) => op("--ignore-immutable", ...args)
-  test("offerStart: the base's commit, and the history of each accepted source", () => {
-    expect(offerStart({ tip: C1, start: C2, sources: [] })).toBe(
+  test("proposedStart: the base's commit, and the history of each accepted source", () => {
+    expect(proposedStart({ tip: C1, start: C2, sources: [] })).toBe(
       "heads(::c1 & (c2))",
     )
     expect(
-      offerStart({
+      proposedStart({
         tip: C1,
         start: C2,
         sources: [commitId("t1"), commitId("t2")],
       }),
     ).toBe("heads(::c1 & (c2 | ::(present(t1) | present(t2))))")
   })
-  test("acceptedOfferCommitsRevset: accepted sources above the commit the base holds, never a WIP's copy", () => {
+  test("acceptedThreadCommitsRevset: accepted sources above the commit the base holds, never a WIP's copy", () => {
     const accepted =
       'description(regex:"(?m)^(Pine(?:trie|ta)-Source|Pine(?:trie|ta)-Thread): ")'
     expect(
-      acceptedOfferCommitsRevset({
+      acceptedThreadCommitsRevset({
         repoConfig: DEFAULT_REPO,
         base: { base: { kind: "accepted" }, start: C1, source: C1 },
       }),
     ).toBe(`(::(present("pinetrie-accepted")) ~ ::present(c1)) & ${accepted}`)
-    // A WIP lane starts at its copy, which holds no accepted-offer commit: what it
-    // holds is the WIP's commit the copy was made from.
+    // A WIP lane starts at its copy, which holds no accepted thread commit:
+    // what it holds is the WIP's commit the copy was made from.
     expect(
-      acceptedOfferCommitsRevset({
+      acceptedThreadCommitsRevset({
         repoConfig: DEFAULT_REPO,
         base: {
           base: { kind: "wip", bookmark: "wip/a" },
@@ -105,11 +105,11 @@ describe("offers", () => {
       `(::(present("pinetrie-accepted") | present("wip/a")) ~ ::present(c2)) & ${accepted}`,
     )
   })
-  test("planOffer: a commit per source, by nonce; rebased, bookmarked, then described", () => {
+  test("planProposedChanges: a commit per source, by nonce; rebased, bookmarked, then described", () => {
     const n = (i: number) => nonceRevset("N", i)
     expect(
       argvs(
-        planOffer({
+        planProposedChanges({
           name: NAME,
           start: [C1, C2],
           sources: [
@@ -130,7 +130,7 @@ describe("offers", () => {
         "bookmark",
         "set",
         "--allow-backwards",
-        "pinetrie-offer/amber-fox",
+        "pinetrie-proposed/amber-fox",
         "-r",
         n(1),
       ),
@@ -138,11 +138,11 @@ describe("offers", () => {
       rw("describe", "-r", n(1), "-m", "two"),
     ])
   })
-  test("planRebuildOffer: back onto the start, the tip restored, onto the target; described only when asked", () => {
+  test("planRebuildProposed: back onto the start, the tip restored, onto the target; described only when asked", () => {
     const follow = (description: string | null) =>
       argvs(
-        planRebuildOffer({
-          change: "ch",
+        planRebuildProposed({
+          changeId: "ch",
           start: [C1, C2],
           tip: commitId("t2"),
           target: "@-",
@@ -158,36 +158,41 @@ describe("offers", () => {
       rw("describe", "-r", "ch", "-m", "WIP (amber-fox): x"),
     )
   })
-  test("planOfferAcceptanceSteps: the destination moved forward to the top, as the host, never with --allow-backwards", () => {
+  test("planAcceptanceSteps: the destination moved forward to the top, as the host, never with --allow-backwards", () => {
     expect(
       argvs(
-        planOfferAcceptanceSteps({
-          bookmark: "pinetrie-offer/amber-fox",
+        planAcceptanceSteps({
+          bookmark: "pinetrie-proposed/amber-fox",
           top: "t",
           destination: "pinetrie-accepted",
         }),
       ),
     ).toEqual([
       op("bookmark", "move", "pinetrie-accepted", "--to", "t"),
-      ...argvs(forgetSteps("pinetrie-offer/amber-fox")),
+      ...argvs(forgetSteps("pinetrie-proposed/amber-fox")),
     ])
   })
-  test("markSteps: the host's version copied from the offer's own ref, imported, then tracked", () => {
-    expect(argvs(markSteps("pinetrie-offer/amber-fox"))).toEqual([
-      "git update-ref refs/remotes/pinetrie-host/pinetrie-offer/amber-fox refs/heads/pinetrie-offer/amber-fox",
+  test("markSteps: the host's version copied from the proposed changes' own ref, imported, then tracked", () => {
+    expect(argvs(markSteps("pinetrie-proposed/amber-fox"))).toEqual([
+      "git update-ref refs/remotes/pinetrie-host/pinetrie-proposed/amber-fox refs/heads/pinetrie-proposed/amber-fox",
       op("git", "import"),
       op(
         "bookmark",
         "track",
-        "pinetrie-offer/amber-fox",
+        "pinetrie-proposed/amber-fox",
         "--remote",
         "pinetrie-host",
       ),
     ])
   })
-  test("forgetSteps: the offer's bookmark and the host's version forgotten by jj, never deleted in git", () => {
-    expect(argvs(forgetSteps("pinetrie-offer/amber-fox"))).toEqual([
-      op("bookmark", "forget", "--include-remotes", "pinetrie-offer/amber-fox"),
+  test("forgetSteps: the proposed changes' bookmark and the host's version forgotten by jj, never deleted in git", () => {
+    expect(argvs(forgetSteps("pinetrie-proposed/amber-fox"))).toEqual([
+      op(
+        "bookmark",
+        "forget",
+        "--include-remotes",
+        "pinetrie-proposed/amber-fox",
+      ),
     ])
   })
   test("laneRefSteps: a restore writes the tip and drops its park; an archive parks the tip, then removes it; one import", () => {
@@ -308,7 +313,7 @@ describe("planSinceHost: what a revision's read since the host needs next", () =
   const HOST = commitId("h1")
   const host = { reached: true, yoursChanged: false }
   const unreached = { reached: false, yoursChanged: false }
-  test("a marked offer is the host's, with nothing read", () => {
+  test("marked proposed changes are the host's, with nothing read", () => {
     expect(planSinceHost({ marked: true, host: HOST, walked: null })).toEqual({
       kind: "known",
       facts: host,
@@ -397,7 +402,7 @@ describe("planObserve: what moved between two fingerprints", () => {
     "pinetrie-accepted": "c1",
     "wip/a": "c2",
     main: "c0",
-    "pinetrie-offer/amber-fox": "c3",
+    "pinetrie-proposed/amber-fox": "c3",
     [`tip@pinetrie-${LANE}`]: "c4",
   }
   const none = {
@@ -406,7 +411,7 @@ describe("planObserve: what moved between two fingerprints", () => {
     published: false,
     yours: false,
     lanes: new Set(),
-    offers: new Set(),
+    proposed: new Set(),
   }
   test.each([
     ["nothing moved", fp(base), none],
@@ -438,19 +443,19 @@ describe("planObserve: what moved between two fingerprints", () => {
       { ...none, lanes: new Set([LANE_B]) },
     ],
     [
-      "an offer moved",
-      fp({ ...base, "pinetrie-offer/amber-fox": "c9" }),
-      { ...none, offers: new Set(["amber-fox"]) },
+      "proposed changes moved",
+      fp({ ...base, "pinetrie-proposed/amber-fox": "c9" }),
+      { ...none, proposed: new Set(["amber-fox"]) },
     ],
     [
-      "an offer went",
+      "proposed changes went",
       fp({
         "pinetrie-accepted": "c1",
         "wip/a": "c2",
         main: "c0",
         [`tip@pinetrie-${LANE}`]: "c4",
       }),
-      { ...none, offers: new Set(["amber-fox"]) },
+      { ...none, proposed: new Set(["amber-fox"]) },
     ],
   ] as const)("%s", (_, next, moved) => {
     expect(planObserve(fp(base), next, DEFAULT_REPO)).toEqual(moved)
@@ -461,7 +466,7 @@ describe("planObserve: what moved between two fingerprints", () => {
   test("the first observation is not accepted work moving: startup reads the base itself", () => {
     expect(planObserve(null, fp(base), DEFAULT_REPO).acceptedMoved).toBe(false)
   })
-  test("a bookmark of yours outside accepted work, the WIPs, the publish bookmark, the offers and the lanes' remotes is not read", () => {
+  test("a bookmark of yours outside accepted work, the WIPs, the publish bookmark, the proposed changes and the lanes' remotes is not read", () => {
     const stdout = [
       "c1\t\tpinetrie-accepted,main,feature\tmain@origin,pinetrie-accepted@git",
       `c4\t@\t\ttip@pinetrie-${LANE}`,
@@ -476,11 +481,11 @@ describe("planObserve: what moved between two fingerprints", () => {
     )
     expect(read.at).toBe("c4")
   })
-  test("the host's version of an offer is not read: the offer's own bookmark moves with each mark", () => {
+  test("the host's version of proposed changes are not read: the proposed changes' own bookmark moves with each mark", () => {
     const stdout =
-      "c3\t\tpinetrie-offer/amber-fox\tpinetrie-offer/amber-fox@pinetrie-host\nc2\t\t\tpinetrie-offer/old@pinetrie-host"
+      "c3\t\tpinetrie-proposed/amber-fox\tpinetrie-proposed/amber-fox@pinetrie-host\nc2\t\t\tpinetrie-proposed/old@pinetrie-host"
     expect(parseFingerprint("op", stdout, DEFAULT_REPO).bookmarks).toEqual(
-      new Map([["pinetrie-offer/amber-fox", "c3"]]),
+      new Map([["pinetrie-proposed/amber-fox", "c3"]]),
     )
   })
   test("a conflicted bookmark is all its targets", () => {
@@ -496,7 +501,7 @@ describe("planObserve: what moved between two fingerprints", () => {
 describe("planLaneRead: what one lane's rows say", () => {
   const row = (commit: string, over: Partial<LaneRow> = {}): LaneRow => ({
     commit: commitId(commit),
-    change: `k${commit}`,
+    changeId: `k${commit}`,
     parents: [],
     tip: false,
     bookmark: false,
@@ -518,7 +523,7 @@ describe("planLaneRead: what one lane's rows say", () => {
     base: true,
     description: `start\n\nPinetrie-Base: pinetrie-accepted@c0\n`,
   })
-  const offerRow = row("f1", {
+  const proposedRow = row("f1", {
     bookmark: true,
     region: true,
     parents: [commitId("c0")],
@@ -532,20 +537,20 @@ describe("planLaneRead: what one lane's rows say", () => {
     planLaneRead(rows, {
       name: NAME,
       repoConfig: DEFAULT_REPO,
-      acceptedOfferCommits: accepted.map(t => ({
+      acceptedThreadCommits: accepted.map(t => ({
         commit: commitId(t.commit),
         sources: t.sources.map(commitId),
       })),
     })
-  test("its base from the newest Pinetrie-Base, its start that commit, and its offer", () => {
-    expect(read([tip, based, offerRow])).toMatchObject({
+  test("its base from the newest Pinetrie-Base, its start that commit, and its proposed changes", () => {
+    expect(read([tip, based, proposedRow])).toMatchObject({
       kind: "accepted",
       tip: "a1",
       base: { base: { kind: "accepted" }, start: "c0", source: "c0" },
       start: { kind: "known", start: ["c0"] },
-      offer: {
-        kind: "offer",
-        revisions: [{ commit: "f1", change: "kf1" }],
+      proposed: {
+        kind: "present",
+        revisions: [{ commit: "f1", changeId: "kf1" }],
         placed: true,
         bottomParents: ["c0"],
         files: ["a.txt"],
@@ -573,7 +578,7 @@ describe("planLaneRead: what one lane's rows say", () => {
       read([tip, based, under], [{ commit: "t2", sources: ["s2"] }]),
     ).toMatchObject({ start: { kind: "known", start: ["c0"] } })
   })
-  test("an accepted-offer commit of the lane that names no source, above the base, makes the start untraced; one under it does not", () => {
+  test("an accepted thread commit of the lane that names no source, above the base, makes the start untraced; one under it does not", () => {
     const above = row("u1", { untraced: true })
     const under = row("u2", { untraced: true, underBase: true })
     const accepted = row("t1", { accepted: true })
@@ -583,18 +588,20 @@ describe("planLaneRead: what one lane's rows say", () => {
         [{ commit: "t1", sources: ["s1"] }],
       ),
     ).toMatchObject({
-      start: { kind: "untraced", acceptedOfferCommits: ["u1"] },
+      start: { kind: "untraced", acceptedThreadCommits: ["u1"] },
     })
     expect(read([tip, based, under])).toMatchObject({
       start: { kind: "known", start: ["c0"] },
     })
   })
   test("a revision whose change id names two commits is divergent", () => {
-    expect(read([tip, based, { ...offerRow, divergent: true }])).toMatchObject({
-      offer: { kind: "divergent", changes: ["kf1"] },
+    expect(
+      read([tip, based, { ...proposedRow, divergent: true }]),
+    ).toMatchObject({
+      proposed: { kind: "divergent", changeIds: ["kf1"] },
     })
   })
-  test("no tip, no offer", () => {
+  test("no tip, no proposed changes", () => {
     expect(read([based])).toEqual({ kind: "none" })
   })
 })

@@ -1,8 +1,8 @@
 // e2e/browser/tools — a scripted tools host: tool rows, live output and Stop,
 // where the agent will work, the column's height while it works, commands,
-// widths, the thread's name and offer, the review, markdown, following, the
-// header's work, and the rail's capsules; first, each ask's work folded
-// and opened from the rail, on a host of its own.
+// widths, the thread's name and proposed changes, the review, markdown,
+// following, the header's work, and the rail's capsules; first, each ask's work
+// folded and opened from the rail, on a host of its own.
 
 import { existsSync, rmSync } from "node:fs"
 import path from "node:path"
@@ -42,7 +42,7 @@ import {
   idleNow,
   join,
   lanesOf,
-  readJjOffers,
+  readJjProposedByLane,
   SUITE_CONFIG,
   setUpAccepted,
   suitePlaces,
@@ -1474,8 +1474,8 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           `${JSON.stringify(widths)}`,
         )
 
-        // ── the thread's name in its header, and its offer at its foot ──────
-        // The name is as the host stored it.
+        // ── the thread's name in its header, and its proposed changes at its
+        // foot ────── The name is as the host stored it.
         const nameText = await tp.textContent(
           `${col(0)} .column-head .agent-name`,
         )
@@ -1536,24 +1536,24 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         await say("write two files")
         await toolIdle()
         const acceptShown = await appears(
-          `${col(0)} .work.offer[data-state="ready"] .offer-accept`,
+          `${col(0)} .work.work-strip[data-state="ready"] .work-accept`,
         )
         const line =
           (await tp
-            .textContent(`${col(0)} .work .offer-line`)
+            .textContent(`${col(0)} .work .work-line`)
             .catch(() => "")) ?? ""
         const bookmark =
           (await tp
-            .textContent(`${col(0)} .work .offer-bookmark`)
+            .textContent(`${col(0)} .work .work-bookmark`)
             .catch(() => "")) ?? ""
 
         // ── the review, beside the thread ────────────────────────────────────
         {
-          // Once described: describing rewrites the offer's commit, and the review
-          // would read the new one mid-check.
+          // Once described: describing rewrites the proposed changes' commit,
+          // and the review would read the new one mid-check.
           await waitFor(
             () =>
-              [...readJjOffers(toolHost.session).values()].some(
+              [...readJjProposedByLane(toolHost.session).values()].some(
                 o => o.acceptedAs === null && o.described,
               ),
             15_000,
@@ -1561,7 +1561,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           const review = `${col(0)} .review`
           const section = (file: string) =>
             `${review} .review-file[data-key$=":${file}"]`
-          await tp.click(`${col(0)} .work .offer-line`).catch(() => {})
+          await tp.click(`${col(0)} .work .work-line`).catch(() => {})
           const opened = await appears(`${review} .review-list-file`)
           const threadWidth = await tp
             .$eval(`${col(0)} .column-thread`, t => {
@@ -1579,7 +1579,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
             `${section("from-lane.txt")}[data-letter="A"][data-state="shown"] [data-kind="add"]:text-is("+lane")`,
           )
           check(
-            "the offer's line opens its review beside the thread, which keeps its 28rem: a row per file, and a file's diff",
+            "the proposed changes' line opens its review beside the thread, which keeps its 28rem: a row per file, and a file's diff",
             opened && threadWidth && rows === 2 && diffShown,
             `opened ${opened}, thread 28rem ${threadWidth}, rows ${rows}, diff ${diffShown}`,
           )
@@ -1648,8 +1648,8 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
             .click(`${col(0)} > .pane .pane-close`, { timeout: 5_000 })
             .catch(() => {})
           const closed = await appears(`${col(0)}:not(:has(.review))`, 5_000)
-          if (acceptShown) await tp.click(`${col(0)} .work .offer-accept`)
-          // The acceptance moves accepted work forward to the offer.
+          if (acceptShown) await tp.click(`${col(0)} .work .work-accept`)
+          // The acceptance moves accepted work forward to the proposed changes.
           const onAccepted = () =>
             command("jj", [
               "-R",
@@ -1667,9 +1667,9 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
             (await waitFor(onAccepted, 10_000)) >= 0 &&
             !existsSync(path.join(work, "from-lane.txt"))
           check(
-            "the column's foot shows the thread's offer in words, its bookmark apart, and its add button moves accepted work to it, leaving your working copy",
+            "the column's foot shows the thread's proposed changes in words, its bookmark apart, and its add button moves accepted work to it, leaving your working copy",
             acceptShown &&
-              bookmark.startsWith("pinetrie-offer/") &&
+              bookmark.startsWith("pinetrie-proposed/") &&
               !line.includes("`") &&
               accepted,
             `${line} · ${bookmark}`,
@@ -1680,7 +1680,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
                 const l = document.querySelector(sel)
                 return l !== null && l.tagName !== "BUTTON"
               },
-              `${col(0)} .work .offer-line`,
+              `${col(0)} .work .work-line`,
               { timeout: 10_000 },
             )
             .then(

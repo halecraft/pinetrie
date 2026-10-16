@@ -27,7 +27,7 @@ export interface AppPorts {
   readonly session: Pick<
     SessionClient,
     | "request"
-    | "offer"
+    | "proposed"
     | "createCard"
     | "cardText"
     | "paste"
@@ -43,7 +43,7 @@ export interface AppPorts {
     | "openThreads"
   >
   /** Your attention document: what "not needed" marks. */
-  readonly attention: Pick<AttentionStore, "dismiss" | "dismissOffer">
+  readonly attention: Pick<AttentionStore, "dismiss" | "dismissReady">
   /** The inventory panel: opened (briefly, for the flight of a take into it), and its selection. */
   readonly inventory: {
     readonly show: (brief: boolean) => void
@@ -182,8 +182,8 @@ function performOne(effect: Effect, ports: AppPorts): void {
     case "request":
       void ports.session.request(effect.intent)
       return
-    case "offer":
-      void ports.session.offer(effect.lane, effect.action, effect.to)
+    case "proposed":
+      void ports.session.proposed(effect.lane, effect.action, effect.to)
       return
     case "list": {
       const { openThreads } = ports.session
@@ -213,8 +213,8 @@ function performOne(effect: Effect, ports: AppPorts): void {
     case "notNeeded":
       if (effect.raised.kind === "verdict")
         ports.attention.dismiss(effect.lane, effect.raised.ask)
-      else if (effect.raised.kind === "offer" && effect.raised.source !== null)
-        ports.attention.dismissOffer(effect.lane, effect.raised.source)
+      else if (effect.raised.kind === "ready" && effect.raised.source !== null)
+        ports.attention.dismissReady(effect.lane, effect.raised.source)
       return
     case "createCard":
       void ports.session.createCard(effect.card, effect.text, effect.how)

@@ -37,7 +37,7 @@ import {
   threadRow,
   writeDirectory,
 } from "../fakes.ts"
-import type { Destination, OfferActs } from "../work/destination.ts"
+import type { Destination, ProposedChangesActs } from "../work/destination.ts"
 import { type CommandDeps, createCommands, placeOfCommand } from "./index.ts"
 
 const TEST_THREAD = threadIdFor("e")
@@ -157,9 +157,9 @@ function setUp(
 }
 
 test.each([
-  ["an acceptance", { kind: "offer", action: "accept" }, "repo"],
-  ["a squash", { kind: "offer", action: "squash" }, "repo"],
-  ["a description again", { kind: "offer", action: "describe" }, "repo"],
+  ["an acceptance", { kind: "proposed", action: "accept" }, "repo"],
+  ["a squash", { kind: "proposed", action: "squash" }, "repo"],
+  ["a description again", { kind: "proposed", action: "describe" }, "repo"],
   ["a publish", { kind: "publish" }, "repo"],
   ["a move on the board", { kind: "move-task" }, "board"],
   ["a workflow edit", { kind: "workflow" }, "documents"],
@@ -171,15 +171,16 @@ test.each([
 })
 
 test("a chat completes while an acceptance is held open on your repo's owner", async () => {
-  const held = Promise.withResolvers<Awaited<ReturnType<OfferActs["act"]>>>()
+  const held =
+    Promise.withResolvers<Awaited<ReturnType<ProposedChangesActs["act"]>>>()
   const { commands, replies, sender, chat } = setUp({
     destination: record<Destination>({
-      offers: record<OfferActs>({ act: () => held.promise }).port,
+      proposed: record<ProposedChangesActs>({ act: () => held.promise }).port,
     }).port,
   })
   const acceptance = commands.handle(sender, ALICE, {
     id: "t-1",
-    kind: "offer",
+    kind: "proposed",
     lane: HELD,
     mode: "accept",
     seen: JSON.stringify({ ledger: null, conflicted: false }),
@@ -336,7 +337,7 @@ test("nothing runs in a thread in an inventory", async () => {
   })
   await commands.handle(sender, ALICE, {
     id: "d-1",
-    kind: "offer",
+    kind: "proposed",
     lane: THREAD,
     mode: "describe",
   })

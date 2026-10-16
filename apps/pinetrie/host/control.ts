@@ -18,11 +18,11 @@ export type ControlSender = Parameters<
 
 /**
  * Hand each command from each seat to `handle`, which runs it where it runs
- * (`placeOfCommand`): one seat's in the order sent, each handed over only
- * once the one before it has replied, so what that one queued (a drain, say)
- * is ahead of it. Different seats' commands go in the order they arrive, and
- * an offer command of one never holds another's chat. A failed command does
- * not end its seat's commands. A departed seat's Line goes.
+ * (`placeOfCommand`): one seat's in the order sent, each handed over only once
+ * the one before it has replied, so what that one queued (a drain, say) is
+ * ahead of it. Different seats' commands go in the order they arrive, and a
+ * command on one thread's proposed changes never holds another's chat. A failed
+ * command does not end its seat's commands. A departed seat's Line goes.
  */
 export function startControl(input: {
   /** Only the peers: who each seat is, and when one leaves. */

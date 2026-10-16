@@ -127,8 +127,8 @@ export interface LaneSpec<L extends LaneOwner = ThreadId> {
 }
 
 /**
- * Where a folder lane sees its states directory, read-only: `start`, the
- * state its offer is computed against, and each open conflict's versions.
+ * Where a folder lane sees its states directory, read-only: `start`, the state
+ * its proposed changes are computed against, and each open conflict's versions.
  */
 export const STATES_MOUNT = "/pinetrie-states"
 

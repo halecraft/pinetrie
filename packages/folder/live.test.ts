@@ -42,7 +42,7 @@ const input = (over: Partial<LiveInput>): LiveInput => ({
   graph,
   lanes: [],
   conflicts: [],
-  offers: [],
+  proposed: [],
   folderNewest: p("line-4"),
   keep: 1,
   ...over,
@@ -77,7 +77,7 @@ describe("liveStates", () => {
     expect(
       ids(
         liveStates(
-          input({ keep: 2, offers: [{ start: p("line-1"), tip: p("t-1") }] }),
+          input({ keep: 2, proposed: [{ start: p("line-1"), tip: p("t-1") }] }),
         ),
       ),
     ).toEqual(["line-1", "line-3", "line-4", "t-1"])

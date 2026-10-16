@@ -617,7 +617,7 @@ describe("subjectOf, toolIdOf and tailEdit", () => {
     ["grep", { pattern: "TODO", path: "src" }, "TODO src"],
     ["find", { pattern: "*.ts" }, "*.ts"],
     ["catch_up", {}, "base"],
-    ["split_offer", {}, undefined],
+    ["split_proposed_changes", {}, undefined],
     ["mystery", { path: "a" }, undefined],
     ["constructor", { path: "a" }, undefined],
   ])("subjectOf(%s, %o) is %s", (name, args, subject) => {

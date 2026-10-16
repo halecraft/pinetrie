@@ -267,7 +267,7 @@ export const mutations: readonly Mutation[] = [
     suite: "browser",
     scenario: "tools",
     expect:
-      "the column's foot shows the thread's offer in words, its bookmark apart, and its add button moves accepted work to it, leaving your working copy",
+      "the column's foot shows the thread's proposed changes in words, its bookmark apart, and its add button moves accepted work to it, leaving your working copy",
   },
   {
     name: "a column you open does not take focus",
@@ -1430,17 +1430,17 @@ export const mutations: readonly Mutation[] = [
       "with a WIP above accepted work, the line says what the new thread starts from, and its menu changes it; with none, there is no line",
   },
   {
-    name: "the offer's line opens no review",
+    name: "the proposed changes' line opens no review",
     file: "packages/web/column.tsx",
     from: "          onClick={review.toggle}\n",
     to: "          onClick={() => {}}\n",
     suite: "browser",
     scenario: "tools",
     expect:
-      "the offer's line opens its review beside the thread, which keeps its 28rem: a row per file, and a file's diff",
+      "the proposed changes' line opens its review beside the thread, which keeps its 28rem: a row per file, and a file's diff",
   },
   {
-    name: "an accepted offer's line stays a button",
+    name: "accepted proposed changes' line stays a button",
     file: "packages/web/column.tsx",
     from: "      {strip.review === null ? (\n",
     to: "      {false ? (\n",

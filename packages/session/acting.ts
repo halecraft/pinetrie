@@ -1,12 +1,12 @@
-// session/acting — your offer, setup and publish commands, and your answers
-// to lanes' use of your ssh identity, while they are out, and what the host
-// answered; `nextActing` decides.
+// session/acting — your proposed changes, setup and publish commands, and your
+// answers to lanes' use of your ssh identity, while they are out, and what the
+// host answered; `nextActing` decides.
 
 import type {
   AcceptedAction,
   AccessAnswer,
   ErrCode,
-  OfferAction,
+  ProposedChangesAction,
   ThreadId,
 } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
@@ -36,8 +36,8 @@ export type Acting<A> =
     }
   | (Unsuccessful & { readonly action: A })
 
-/** An offer command of yours on a lane. */
-export type OfferActing = Acting<OfferAction>
+/** An command on proposed changes of yours on a lane. */
+export type ProposedChangesActing = Acting<ProposedChangesAction>
 /** An answer of yours to a lane's use of your ssh identity. */
 export type AccessActing = Acting<AccessAnswer>
 /** A setup or publish of yours: setting up, or publishing. */
@@ -81,23 +81,23 @@ export function nextActing<A>(
 
 /** Every command of yours this tab has out or was refused: per lane, and accepted work. */
 export interface ActingState {
-  readonly offers: ReadonlyMap<ThreadId, OfferActing>
+  readonly proposedByLane: ReadonlyMap<ThreadId, ProposedChangesActing>
   readonly access: ReadonlyMap<ThreadId, AccessActing>
   readonly accepted: AcceptedActing | null
 }
 
 export const NO_ACTING: ActingState = {
-  offers: new Map(),
+  proposedByLane: new Map(),
   access: new Map(),
   accepted: null,
 }
 
-/** What a command is on: a lane's offer, or accepted work. */
+/** What a command is on: a lane's proposed changes, or accepted work. */
 type ActingOn =
   | {
-      readonly kind: "offer"
+      readonly kind: "proposed"
       readonly lane: ThreadId
-      readonly event: ActingEvent<OfferAction>
+      readonly event: ActingEvent<ProposedChangesAction>
     }
   | {
       readonly kind: "access"
@@ -124,19 +124,22 @@ function actingStep(state: ActingState, on: ActingOn): ActingState {
   switch (on.kind) {
     case "accepted":
       return { ...state, accepted: nextActing(state.accepted, on.event) }
-    case "offer":
-      return { ...state, offers: laneStep(state.offers, on.lane, on.event) }
+    case "proposed":
+      return {
+        ...state,
+        proposedByLane: laneStep(state.proposedByLane, on.lane, on.event),
+      }
     case "access":
       return { ...state, access: laneStep(state.access, on.lane, on.event) }
   }
 }
 
-/** A command to send and track: an offer action on a lane, or a line action. */
+/** A command to send and track: an action on proposed changes on a lane, or a line action. */
 export type ActingCommand =
   | {
-      readonly kind: "offer"
+      readonly kind: "proposed"
       readonly lane: ThreadId
-      readonly action: OfferAction
+      readonly action: ProposedChangesAction
       readonly to: string | null
     }
   | {
@@ -158,9 +161,9 @@ function actingOn(
       },
 ): ActingOn {
   switch (command.kind) {
-    case "offer":
+    case "proposed":
       return {
-        kind: "offer",
+        kind: "proposed",
         lane: command.lane,
         event:
           event.kind === "sent"

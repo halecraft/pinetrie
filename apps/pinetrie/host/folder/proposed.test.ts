@@ -1,6 +1,6 @@
 import { pointId, type StateRecord, threadIdFor } from "@pinetrie/core"
 import { expect, test } from "vitest"
-import { planFolderRecords } from "./offers.ts"
+import { planFolderRecords } from "./proposed.ts"
 
 const LANE = threadIdFor("1")
 const state = (
@@ -31,9 +31,9 @@ const plan = (before: Parameters<typeof planFolderRecords>[0]["before"]) =>
     now: 2,
   })
 
-test("planFolderRecords: the offer against accepted work's newest, the base on what the lane holds, with what catching up brings", () => {
+test("planFolderRecords: the proposed changes against accepted work's newest, the base on what the lane holds, with what catching up brings", () => {
   expect(plan(undefined)).toEqual({
-    offer: {
+    proposed: {
       kind: "folder",
       lane: LANE,
       start: "line-1",
@@ -64,8 +64,8 @@ test("planFolderRecords: a description holds while it describes the same two sta
     description: "add a",
     at: 1,
   } as const
-  expect(plan(described)?.offer.description).toBe("add a")
+  expect(plan(described)?.proposed.description).toBe("add a")
   expect(
-    plan({ ...described, start: pointId("line-0") })?.offer.description,
+    plan({ ...described, start: pointId("line-0") })?.proposed.description,
   ).toBeNull()
 })

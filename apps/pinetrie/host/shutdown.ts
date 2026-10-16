@@ -5,7 +5,7 @@
 export type ShutdownStep =
   /** No new command, seat or queued card reaches a step. */
   | "intake"
-  /** The host's and the offers' queues refuse new steps; the offers' poll stops. */
+  /** The host's and the proposed changes' queues refuse new steps; the proposed changes' poll stops. */
   | "close"
   /** Every step already queued finishes, and its writes reach the store. */
   | "quiet"

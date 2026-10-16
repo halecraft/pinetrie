@@ -232,12 +232,12 @@ export const mutations: readonly Mutation[] = [
       "a table closes when its message is not drawn, or has no such table",
   },
   {
-    name: "the pane keeps the offer's review when the strip has none",
+    name: "the pane keeps the strip's review when the strip has none",
     file: "packages/web/pane.ts",
-    from: '      return facts.offer === null ? null : { kind: "review", ...facts.offer }',
-    to: '      return { kind: "review", target: facts.offer?.target ?? { lane: "x", spans: [], conflicts: [], yourEdits: [] }, line: "" } as PaneView',
+    from: '      return facts.strip === null ? null : { kind: "review", ...facts.strip }',
+    to: '      return { kind: "review", target: facts.strip?.target ?? { lane: "x", spans: [], conflicts: [], yourEdits: [] }, line: "" } as PaneView',
     command: unit,
-    expect: "the offer draws the strip's review, and closes without one",
+    expect: "the strip draws its review, and closes without one",
   },
   {
     name: "an ask's review drops its title",

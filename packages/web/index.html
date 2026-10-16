@@ -431,7 +431,7 @@
          it loads. */
       .initial img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
       .initial.more { background: #3a3f48; color: #bbb; }
-      /* What became of a column's files, in its header (ADR-0040): the offer
+      /* What became of a column's files, in its header (ADR-0040): the proposed changes
          in your repo (ADR-0038), or where a lane that works directly writes. */
       .work { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem .5rem;
         padding: .35rem .75rem; border-top: 1px solid #23272e; font-size: .75rem; color: #8b93a1; }
@@ -440,25 +440,25 @@
       .work .work-space { flex: 1; }
       .work button { padding: .1rem .5rem; font-size: .75rem; background: none;
         border: 1px solid #444; color: #bbb; }
-      .work .offer-line { color: #a8d8a8; }
-      /* An offer that can be reviewed: its line is the review's toggle, and
+      .work .work-line { color: #a8d8a8; }
+      /* Proposed changes that can be reviewed: the line is the review's toggle, and
          its bookmark copies; both read as text, not as the strip's buttons. */
-      .work button.offer-line, .work button.offer-bookmark { border: none; padding: 0;
+      .work button.work-line, .work button.work-bookmark { border: none; padding: 0;
         font-size: inherit; text-align: left; cursor: pointer; }
-      .work button.offer-line { font-size: .75rem; }
-      .work button.offer-line::after { content: " ▸"; }
-      .work button.offer-line[aria-expanded="true"]::after { content: " ◂"; }
-      .work button.offer-line:hover { text-decoration: underline; }
-      .work[data-state="nothing"] .offer-line, .work[data-state="taken"] .offer-line,
-      .work[data-state="running"] .offer-line, .work[data-state="busy"] .offer-line { color: #8b93a1; }
-      .work[data-state="conflicts"] .offer-line,
-      .work[data-state="needs_you"] .offer-line { color: #e8c07a; }
-      .work .offer-bookmark { font-family: ui-monospace, monospace; font-size: .7rem; color: #6f7784;
+      .work button.work-line { font-size: .75rem; }
+      .work button.work-line::after { content: " ▸"; }
+      .work button.work-line[aria-expanded="true"]::after { content: " ◂"; }
+      .work button.work-line:hover { text-decoration: underline; }
+      .work[data-state="nothing"] .work-line,
+      .work[data-state="running"] .work-line, .work[data-state="busy"] .work-line { color: #8b93a1; }
+      .work[data-state="conflicts"] .work-line,
+      .work[data-state="needs_you"] .work-line { color: #e8c07a; }
+      .work .work-bookmark { font-family: ui-monospace, monospace; font-size: .7rem; color: #6f7784;
         user-select: text; }
-      .work button.offer-bookmark:hover { color: #aab; }
-      /* Your last offer command: in flight, or why it was not done. */
-      .work .offer-note { font-size: .75rem; color: #8b93a1; }
-      .work .offer-note[data-acting="said"] { color: #e8c07a; }
+      .work button.work-bookmark:hover { color: #aab; }
+      /* Your last command on the proposed changes: in flight, or why it was not done. */
+      .work .work-note { font-size: .75rem; color: #8b93a1; }
+      .work .work-note[data-acting="said"] { color: #e8c07a; }
       .work button:disabled { opacity: .5; cursor: progress; }
       .work.access .access-line { font-size: .75rem; color: #aab; }
       .work.access[data-state="waiting"] .access-line { color: #e8c07a; }
@@ -542,8 +542,7 @@
       .review-diff [data-kind="del"] { color: #e89a9a; background: #2d1c1e; }
       .review-diff [data-kind="hunk"] { color: #7fa7d8; }
       .review-diff [data-kind="meta"] { color: #6f7784; }
-      .work .offer-take { border-color: #4f7a4f; color: #a8d8a8; }
-      .work .offer-update { border-color: #6b5a33; color: #e8c07a; }
+      .work .work-update { border-color: #6b5a33; color: #e8c07a; }
       .column-body { flex: 1; overflow-y: auto; padding: .75rem 1.75rem .75rem .75rem; }
 
       .msg { position: relative; margin: 0 0 1rem; }

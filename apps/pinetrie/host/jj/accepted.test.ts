@@ -39,7 +39,7 @@ function rig(
     shared: async () => ({
       op,
       accepted: now,
-      acceptedOfferCommits: [],
+      acceptedThreadCommits: [],
       untraced: [],
       editing: new Set(),
     }),

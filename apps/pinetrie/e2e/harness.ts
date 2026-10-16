@@ -23,7 +23,7 @@ import {
   type EntryId,
   entryId,
   type JjAcceptedRecord,
-  type JjOfferRecord,
+  type JjProposedChangesRecord,
   type LaneView,
   moveOf,
   noteOf,
@@ -44,8 +44,8 @@ import {
   readHeld,
   readHeldIndex,
   readLanes,
-  readOffers,
   readPlaces,
+  readProposedByLane,
   readQueueHolds,
   readRoots,
   readThreads,
@@ -358,12 +358,12 @@ export const readJjAccepted = (
   return record?.kind === "jj" ? record : null
 }
 
-/** Each lane's offer record of a jj project's. */
-export const readJjOffers = (
-  doc: Parameters<typeof readOffers>[0],
-): ReadonlyMap<ThreadId, JjOfferRecord> =>
+/** Each lane's record of the proposed changes of a jj project's. */
+export const readJjProposedByLane = (
+  doc: Parameters<typeof readProposedByLane>[0],
+): ReadonlyMap<ThreadId, JjProposedChangesRecord> =>
   new Map(
-    [...readOffers(doc)].flatMap(([lane, o]) =>
+    [...readProposedByLane(doc)].flatMap(([lane, o]) =>
       o.kind === "jj" ? [[lane, o] as const] : [],
     ),
   )

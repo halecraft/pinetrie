@@ -19,7 +19,7 @@ test("a blob's GET, with its hash or null; the upload's POST; else the page", ()
   expect(at("GET", "/")).toEqual({ kind: "other" })
 })
 
-test("an offer's read is a GET the wire accepts; anything else under /offer/ is bad", () => {
+test("a review's read is a GET the wire accepts; anything else under /review/ is bad", () => {
   const c = commitId("0123abcd")
   const revision = { kind: "revision", commit: c } as const
   const range = {
@@ -28,17 +28,17 @@ test("an offer's read is a GET the wire accepts; anything else under /offer/ is 
     to: pointId("4567ef"),
   } as const
   expect(at("GET", reviewUrl(revision))).toEqual({
-    kind: "offer",
+    kind: "review",
     ask: { kind: "review", span: revision },
   })
   expect(at("GET", diffUrl(range, "a b.txt"))).toEqual({
-    kind: "offer",
+    kind: "review",
     ask: { kind: "diff", span: range, path: "a b.txt" },
   })
   expect(at("POST", reviewUrl(revision))).toEqual({ kind: "bad" })
-  expect(at("GET", "/offer/anything")).toEqual({ kind: "bad" })
-  expect(at("GET", "/offer/2/review/0123..xyz")).toEqual({ kind: "bad" })
-  expect(at("GET", "/offer/1/review/0123abcd")).toEqual({ kind: "bad" })
+  expect(at("GET", "/review/anything")).toEqual({ kind: "bad" })
+  expect(at("GET", "/review/2/review/0123..xyz")).toEqual({ kind: "bad" })
+  expect(at("GET", "/review/1/review/0123abcd")).toEqual({ kind: "bad" })
 })
 
 describe("planRequest and planUpgrade: admission first", () => {
@@ -55,7 +55,7 @@ describe("planRequest and planUpgrade: admission first", () => {
   const withCookie = (url: string) =>
     facts(url, { cookie: `${KEY_COOKIE}=${KEY}` })
 
-  test("with a key, a request without it is refused, whatever it asks for: a page, a blob, an upload, an offer's read", () => {
+  test("with a key, a request without it is refused, whatever it asks for: a page, a blob, an upload, proposed changes' read", () => {
     const c = commitId("0123abcd")
     for (const [method, url] of [
       ["GET", "/"],

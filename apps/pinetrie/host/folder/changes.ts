@@ -1,5 +1,5 @@
 // host/folder/changes — what differs between two states as the project sees
-// it: the one answer a turn's paths, an offer's files and a catch-up's
+// it: the one answer a turn's paths, proposed changes' files and a catch-up's
 // forecast all use. The disk's diff, with each directory it names made or
 // gone read as the files under it; then the files whose bytes and mode
 // truly differ; then the source paths alone, as the lanes' ignore rule

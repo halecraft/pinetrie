@@ -1,10 +1,10 @@
 ---
-name: offer-stack
-description: How pine·trie's agent splits a thread's offer into a stack of reviewable revisions. pine·trie runs it; the agent does not choose it.
+name: proposed-changes-stack
+description: How pine·trie's agent splits a thread's proposed changes into a stack of reviewable revisions. pine·trie runs it; the agent does not choose it.
 disable-model-invocation: true
 ---
 
-# Splitting an offer into a stack
+# Splitting proposed changes into a stack
 
 The person asked for this thread's work as a series of revisions they can review one at a time, rather than one commit. Build that series with jj, in this thread's own copy.
 

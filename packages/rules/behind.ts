@@ -6,8 +6,8 @@ import {
   type BaseRecord,
   type BehindView,
   CATCH_UP_TOOL,
-  type OfferRecord,
   type PointId,
+  type ProposedChangesRecord,
 } from "@pinetrie/core"
 import { Type } from "typebox"
 import { catchUpOf } from "./base.ts"
@@ -60,7 +60,7 @@ export function behindContent(v: BehindView): string {
   const conflicts =
     v.conflicts.length === 0
       ? ""
-      : `\nThis thread's offer conflicts with it in:\n${named(v.conflicts)}`
+      : `\nThis thread's proposed changes conflict with it in:\n${named(v.conflicts)}`
   return (
     `${baseMovedOn(v.from)} since this thread's copy was made or last caught up. Catching up would change ${plural(v.files.length, "file", "files")}:\n${named(v.files)}\n` +
     `${overlap}${conflicts}\n` +
@@ -84,16 +84,16 @@ export type BaseNews =
 
 /**
  * Whether a thread's base has news for it, and what to do with it: from the
- * lane's base record and accepted work's (`catchUpOf`), its offer, the base
- * states it last heard of or merged (`baseKnown`), and the one the host
- * told it while it runs (`told`). Only a lane of its own has a base. `unknown`
- * work never acts, nor a gone base.
+ * lane's base record and accepted work's (`catchUpOf`), its proposed changes,
+ * the base states it last heard of or merged (`baseKnown`), and the one the
+ * host told it while it runs (`told`). Only a lane of its own has a base.
+ * `unknown` work never acts, nor a gone base.
  */
 export function planBaseNews(input: {
   readonly own: boolean
   readonly base: BaseRecord | undefined
   readonly accepted: AcceptedRecord | null
-  readonly offer: OfferRecord | undefined
+  readonly proposed: ProposedChangesRecord | undefined
   readonly known: readonly PointId[] | null
   readonly told: PointId | null
 }): BaseNews {
@@ -115,7 +115,7 @@ export function planBaseNews(input: {
   )
     return { kind: "nothing" }
   const files = base.catchUp?.files ?? []
-  const mine = new Set(input.offer?.files ?? [])
+  const mine = new Set(input.proposed?.files ?? [])
   return {
     kind: "tell",
     view: {
@@ -123,7 +123,7 @@ export function planBaseNews(input: {
       to,
       files,
       overlap: files.filter(f => mine.has(f)),
-      conflicts: input.offer?.conflicts ?? [],
+      conflicts: input.proposed?.conflicts ?? [],
     },
   }
 }

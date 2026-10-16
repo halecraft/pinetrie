@@ -460,9 +460,9 @@ export interface Completed {
 }
 
 /**
- * One request outside every thread, on `model`: an offer's commit message, an
- * ask's digest or a root's title. No tools, no session, so nothing enters the
- * tree or a lane's context.
+ * One request outside every thread, on `model`: proposed changes' commit
+ * message, an ask's digest or a root's title. No tools, no session, so nothing
+ * enters the tree or a lane's context.
  */
 export async function complete(
   setup: Pick<ModelSetup, "models">,

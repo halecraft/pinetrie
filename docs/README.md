@@ -15,7 +15,7 @@ with a conversation **tree** as the primary object rather than a transcript.
 | `06-interface.md` | The interface: columns for reading paths, a rail for the tree's shape. |
 | `the-jujutsu-repo.md` | The jj repo the host serves: what pine·trie writes there, and how jj and jjui see it. |
 | `pinetrie.md` | Handoff: where the project is, and how to pick it up. |
-| `glossary.md` | The words: accepted work, accept, offer, WIP, publish, catch up, base (ADR-0100). |
+| `glossary.md` | The words: accepted work, accept, proposed changes, WIP, publish, catch up, base (ADR-0100). |
 | `findings/` | Spikes, one file each: the open unknowns with their kill criteria, and the answers with their evidence. |
 | `record.md` | Not tracked: the index of the ADRs in force by living doc, the open spikes, and the archive, written by `pnpm run record`. |
 

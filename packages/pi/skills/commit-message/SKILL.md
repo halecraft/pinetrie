@@ -1,12 +1,12 @@
 ---
 name: commit-message
-description: How pine·trie writes the commit message of a thread's offer. pine·trie asks for it; the agent does not choose it.
+description: How pine·trie writes the commit message of a thread's proposed changes. pine·trie asks for it; the agent does not choose it.
 disable-model-invocation: true
 ---
 
-# Writing an offer's commit message
+# Writing the commit message of a thread's proposed changes
 
-A thread's work is offered to the person as a commit in their repository. Write its message. You are given the repository's recent commit messages, what the thread said, and the change itself.
+A thread's work reaches the person as proposed changes: a commit in their repository. Write its message. You are given the repository's recent commit messages, what the thread said, and the change itself.
 
 - Follow the repository's own style, as its recent messages show it: the same prefix convention (for example `feat(scope): …`), the same tense and case.
 - One subject line, under 72 characters, saying what the change does.

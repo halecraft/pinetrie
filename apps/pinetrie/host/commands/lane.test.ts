@@ -40,7 +40,7 @@ import { createLater } from "../later.ts"
 import type { Records } from "../records.ts"
 import type { RunStart } from "../runs.ts"
 import {
-  actOnOffer,
+  actOnProposedChanges,
   handleCarryOn,
   handleQueueHold,
   handleSshAccess,
@@ -245,7 +245,7 @@ test("the owner's answer to a lane's ssh is written; anyone else's is refused", 
   })
 })
 
-test("an offer's fact is queued after the reply, as a card at the thread's end, and the lane's drain asked for", async () => {
+test("proposed changes' fact is queued after the reply, as a card at the thread's end, and the lane's drain asked for", async () => {
   const b = basics()
   const lane = threadIdFor("0123456789abcdef")
   putTask(b, lane)
@@ -275,14 +275,20 @@ test("an offer's fact is queued after the reply, as a card at the thread's end, 
     later,
     work: {
       destination: {
-        offers: { act: async () => ({ kind: "done", fact }) },
+        proposed: { act: async () => ({ kind: "done", fact }) },
       },
     },
   } as unknown as LaneDeps
   expect(
-    await actOnOffer(
+    await actOnProposedChanges(
       deps,
-      { kind: "offer", lane, action: "accept", to: null, seen: null } as never,
+      {
+        kind: "proposed",
+        lane,
+        action: "accept",
+        to: null,
+        seen: null,
+      } as never,
       ada,
     ),
   ).toEqual({ kind: "accepted" })

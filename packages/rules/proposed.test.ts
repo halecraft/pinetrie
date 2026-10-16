@@ -1,23 +1,23 @@
 import {
+  type AcceptanceDecision,
   type CommitId,
   commitId,
   ERR,
+  type FilesTouched,
   type JjAcceptedRecord,
   type JjBaseRecord,
-  type JjOfferRecord,
-  type OfferAcceptanceDecision,
-  type OfferGather,
-  type OfferInRepo,
-  type OfferNow,
-  type OfferSeen,
+  type JjProposedChangesRecord,
   type Placed,
+  type ProposedChangesGather,
+  type ProposedChangesInRepo,
+  type ProposedChangesNow,
+  type ProposedChangesSeen,
   pointFromCommit,
   type RefreshFacts,
   type StackFacts,
   type StartRead,
   type ThreadName,
   threadIdFor,
-  type WorkChanges,
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
@@ -27,21 +27,22 @@ import {
   BASE as BASE_RECORD,
   decodeStack,
   encodeUpdate,
-  OFFER,
-  offerRecord,
+  PROPOSED_CHANGES,
+  planAcceptance,
   planDescribeAgain,
   planDescribeAsk,
   planDescribeSettle,
-  planOfferAcceptance,
   planRebuild,
   planRefresh,
   planStack,
   planStackEnded,
   planYourEdits,
+  proposedChangesRecord,
+  proposedChangesSeen,
   renderableMessage,
   setRecord,
 } from "./index.ts"
-import { offerAcceptanceDestinations, offerMoved } from "./offer.ts"
+import { acceptanceDestinations, isProposedMoved } from "./proposed.ts"
 import { decodeUpdate } from "./update.ts"
 
 const LANE = threadIdFor("1")
@@ -51,7 +52,7 @@ const T2 = commitId("t2")
 const BASE = commitId("b0")
 const COPY = commitId("k1")
 
-const offer: JjOfferRecord = {
+const proposed: JjProposedChangesRecord = {
   kind: "jj",
   lane: LANE,
   size: 1,
@@ -62,21 +63,39 @@ const offer: JjOfferRecord = {
   yourEdits: [],
   described: true,
   edited: false,
-  bookmark: "pinetrie-offer/t-1",
+  bookmark: "pinetrie-proposed/t-1",
   acceptedAs: null,
   commits: [commitId("w1")],
   ledger: null,
   at: 10,
 }
 
+test("proposedChangesSeen: what an acceptance was shown is the record's ledger and whether it conflicted; no record shows none", () => {
+  const ledger = { source: TIP, start: [BASE] }
+  expect(
+    proposedChangesSeen({ ...proposed, ledger, conflicts: ["a.txt"] }),
+  ).toEqual({
+    ledger,
+    conflicted: true,
+  })
+  expect(proposedChangesSeen(proposed)).toEqual({
+    ledger: null,
+    conflicted: false,
+  })
+  expect(proposedChangesSeen(undefined)).toEqual({
+    ledger: null,
+    conflicted: false,
+  })
+})
+
 describe("planRefresh", () => {
   const host = { reached: true, yoursChanged: false }
-  const rev = (since = host) => ({ commit: TIP, change: "k", since })
+  const rev = (since = host) => ({ commit: TIP, changeId: "k", since })
   const read = (
-    o: Partial<Extract<OfferInRepo, { kind: "offer" }>> = {},
-  ): OfferInRepo => ({
-    kind: "offer",
-    bookmark: `pinetrie-offer/t-1`,
+    o: Partial<Extract<ProposedChangesInRepo, { kind: "present" }>> = {},
+  ): ProposedChangesInRepo => ({
+    kind: "present",
+    bookmark: `pinetrie-proposed/t-1`,
     marked: true,
     revisions: [rev()],
     chained: true,
@@ -90,23 +109,23 @@ describe("planRefresh", () => {
     ...o,
   })
   const facts = (
-    offer: OfferInRepo | null,
+    proposed: ProposedChangesInRepo | null,
     tip = TIP,
     start: readonly CommitId[] | StartRead = [BASE],
-    work: WorkChanges = "some",
+    work: FilesTouched = "some",
     hostLeft = false,
   ): RefreshFacts =>
     "kind" in start
       ? start.kind === "untraced"
-        ? { kind: "untraced", offer, hostLeft }
+        ? { kind: "untraced", proposed, hostLeft }
         : {
             kind: "placed",
             place: placed(tip, start.start),
             work,
-            offer,
+            proposed,
             hostLeft,
           }
-      : { kind: "placed", place: placed(tip, start), work, offer, hostLeft }
+      : { kind: "placed", place: placed(tip, start), work, proposed, hostLeft }
   const placed = (tip: CommitId, start: readonly CommitId[]): Placed => ({
     kind: "placed",
     tip,
@@ -117,26 +136,26 @@ describe("planRefresh", () => {
   })
   /** What `planRefresh` decides, by its kind. */
   const plan = (f: RefreshFacts) => planRefresh(f).kind
-  test("no offer in your repo: build, unless the lane holds nothing you lack", () => {
+  test("no proposed changes in your repo: build, unless the lane holds nothing you lack", () => {
     expect(plan(facts(null))).toBe("build")
     expect(plan(facts(null, TIP, [TIP]))).toBe("forget")
   })
-  test("a lane whose work changes no file is never built, and its offer is withdrawn unless you edited it", () => {
+  test("a lane whose work changes no file is never built, and its proposed changes are withdrawn unless you edited it", () => {
     expect(plan(facts(null, TIP, [BASE], "none"))).toBe("forget")
     expect(plan(facts(read(), TIP, [BASE], "none"))).toBe("withdraw")
     expect(plan(facts(read({ chained: false }), TIP, [BASE], "none"))).toBe(
       "leave",
     )
   })
-  test("what jj could not tell never builds an offer, and keeps one that is there", () => {
+  test("what jj could not tell never builds proposed changes, and keeps one that is there", () => {
     expect(plan(facts(null, TIP, [BASE], "unknown"))).toBe("forget")
     expect(plan(facts(read(), TIP, [BASE], "unknown"))).toBe("none")
     expect(plan(facts(read(), T2, [BASE], "unknown"))).toBe("rebuild")
   })
-  test("an untraced start builds nothing, withdraws an offer, and leaves one you edited, or one divergent, untouched", () => {
+  test("an untraced start builds nothing, withdraws proposed changes, and leaves one you edited, or one divergent, untouched", () => {
     const untraced: StartRead = {
       kind: "untraced",
-      acceptedOfferCommits: [BASE],
+      acceptedThreadCommits: [BASE],
     }
     expect(plan(facts(null, TIP, untraced))).toBe("forget")
     expect(plan(facts(read(), TIP, untraced))).toBe("withdraw")
@@ -144,51 +163,51 @@ describe("planRefresh", () => {
       "untouched",
     )
     expect(
-      plan(facts({ kind: "divergent", changes: ["k"] }, TIP, untraced)),
+      plan(facts({ kind: "divergent", changeIds: ["k"] }, TIP, untraced)),
     ).toBe("untouched")
   })
-  test("each decision carries what its steps need: the place, the offer, the changes", () => {
+  test("each decision carries what its steps need: the place, the proposed changes, the changes", () => {
     const at = placed(TIP, [BASE])
     expect(planRefresh(facts(null))).toEqual({ kind: "build", place: at })
     expect(planRefresh(facts(read(), T2))).toEqual({
       kind: "rebuild",
       place: placed(T2, [BASE]),
-      offer: read(),
+      proposed: read(),
     })
     expect(planRefresh(facts(read({ onTarget: false })))).toEqual({
       kind: "refresh",
       place: at,
-      offer: read({ onTarget: false }),
+      proposed: read({ onTarget: false }),
     })
     expect(
-      planRefresh(facts({ kind: "divergent", changes: ["ka", "kb"] })),
-    ).toEqual({ kind: "repair", place: at, changes: ["ka", "kb"] })
+      planRefresh(facts({ kind: "divergent", changeIds: ["ka", "kb"] })),
+    ).toEqual({ kind: "repair", place: at, changeIds: ["ka", "kb"] })
     expect(
-      planRefresh({ kind: "archived", offer: read(), hostLeft: false }),
+      planRefresh({ kind: "archived", proposed: read(), hostLeft: false }),
     ).toEqual({
       kind: "withdraw",
-      offer: read(),
+      proposed: read(),
     })
   })
-  test("an archived thread's offer is withdrawn, an edited one too; with none, its record is forgotten", () => {
-    expect(plan({ kind: "archived", offer: read(), hostLeft: false })).toBe(
+  test("an archived thread's proposed changes are withdrawn, an edited one too; with none, its record is forgotten", () => {
+    expect(plan({ kind: "archived", proposed: read(), hostLeft: false })).toBe(
       "withdraw",
     )
     expect(
       plan({
         kind: "archived",
-        offer: read({ chained: false }),
+        proposed: read({ chained: false }),
         hostLeft: false,
       }),
     ).toBe("withdraw")
     expect(
       plan({
         kind: "archived",
-        offer: { kind: "divergent", changes: ["k"] },
+        proposed: { kind: "divergent", changeIds: ["k"] },
         hostLeft: false,
       }),
     ).toBe("withdraw")
-    expect(plan({ kind: "archived", offer: null, hostLeft: false })).toBe(
+    expect(plan({ kind: "archived", proposed: null, hostLeft: false })).toBe(
       "forget",
     )
   })
@@ -209,7 +228,7 @@ describe("planRefresh", () => {
       ),
     ).toBe("leave")
   })
-  test("no offer and none to build: the host's version left behind is forgotten with the record", () => {
+  test("no proposed changes and none to build: the host's version left behind is forgotten with the record", () => {
     expect(planRefresh(facts(null, TIP, [TIP], "some", true))).toEqual({
       kind: "forget",
       hostLeft: true,
@@ -219,10 +238,10 @@ describe("planRefresh", () => {
       hostLeft: false,
     })
     expect(
-      planRefresh({ kind: "archived", offer: null, hostLeft: true }),
+      planRefresh({ kind: "archived", proposed: null, hostLeft: true }),
     ).toEqual({ kind: "forget", hostLeft: true })
   })
-  test("the lane moved on: a single offer is rebuilt, a stack goes stale", () => {
+  test("the lane moved on: single proposed changes are rebuilt, a stack goes stale", () => {
     expect(plan(facts(read(), T2))).toBe("rebuild")
     expect(plan(facts(read({ revisions: [rev(), rev()] }), T2))).toBe("stale")
   })
@@ -241,7 +260,7 @@ describe("planRefresh", () => {
     )
     expect(plan(facts(read(), TIP, [TIP]))).toBe("withdraw")
   })
-  test("an offer with no ledger, built before offers carried one, reads as moved: it is followed once", () => {
+  test("proposed changes with no ledger, built before proposed changes carried one, reads as moved: it is followed once", () => {
     expect(plan(facts(read({ ledger: null })))).toBe("rebuild")
   })
   test("you edited it: a version of yours that changed a revision, a commit of yours between, or its bottom moved", () => {
@@ -264,22 +283,22 @@ describe("planRefresh", () => {
     expect(plan(facts(read(), T2))).toBe("rebuild")
   })
   test("divergent: repair, before anything else", () => {
-    expect(plan(facts({ kind: "divergent", changes: ["k"] }, TIP, [TIP]))).toBe(
-      "repair",
-    )
+    expect(
+      plan(facts({ kind: "divergent", changeIds: ["k"] }, TIP, [TIP])),
+    ).toBe("repair")
   })
 })
 
-describe("isWipLine, offerMoved, describeWanted", () => {
+describe("isWipLine, isProposedMoved, describeWanted", () => {
   const NAME = "t-1" as ThreadName
   const one = {
-    kind: "offer" as const,
-    bookmark: "pinetrie-offer/t-1",
+    kind: "present" as const,
+    bookmark: "pinetrie-proposed/t-1",
     marked: true,
     revisions: [
       {
         commit: TIP,
-        change: "k",
+        changeId: "k",
         since: { reached: true, yoursChanged: false },
       },
     ],
@@ -292,15 +311,15 @@ describe("isWipLine, offerMoved, describeWanted", () => {
     conflicts: [],
     startConflicts: [],
   }
-  test("offerMoved: the tip, or the start as a set, against the ledger; no ledger is moved", () => {
+  test("isProposedMoved: the tip, or the start as a set, against the ledger; no ledger is moved", () => {
     const ledger = { source: TIP, start: [BASE, T2] }
-    expect(offerMoved(ledger, { tip: TIP, start: [T2, BASE] })).toBe(false)
-    expect(offerMoved(ledger, { tip: T2, start: [T2, BASE] })).toBe(true)
-    expect(offerMoved(ledger, { tip: TIP, start: [BASE] })).toBe(true)
-    expect(offerMoved(null, { tip: TIP, start: [BASE] })).toBe(true)
+    expect(isProposedMoved(ledger, { tip: TIP, start: [T2, BASE] })).toBe(false)
+    expect(isProposedMoved(ledger, { tip: T2, start: [T2, BASE] })).toBe(true)
+    expect(isProposedMoved(ledger, { tip: TIP, start: [BASE] })).toBe(true)
+    expect(isProposedMoved(null, { tip: TIP, start: [BASE] })).toBe(true)
   })
   test("describeWanted: one revision, not yours, on its WIP line unless forced", () => {
-    const asks = (offer: OfferInRepo | null, force: boolean) =>
+    const asks = (proposed: ProposedChangesInRepo | null, force: boolean) =>
       planDescribeAsk(
         {
           place: {
@@ -312,7 +331,7 @@ describe("isWipLine, offerMoved, describeWanted", () => {
             start: [BASE],
           },
           name: NAME,
-          offer,
+          proposed,
           base: {
             kind: "jj",
             lane: LANE,
@@ -338,11 +357,15 @@ describe("isWipLine, offerMoved, describeWanted", () => {
 })
 
 describe("records", () => {
-  test("an offer, accepted work and a base round-trip", () => {
-    const o = setRecord(OFFER, offer)
-    expect([o.namespace, o.key]).toEqual(["pinetrie.offer", LANE])
-    expect(OFFER.decode(structuredClone(o.value), LANE)).toEqual(offer)
-    expect(OFFER.decode({ ...offer, size: 0 }, LANE)).toBeUndefined()
+  test("proposed changes, accepted work and a base round-trip", () => {
+    const o = setRecord(PROPOSED_CHANGES, proposed)
+    expect([o.namespace, o.key]).toEqual(["pinetrie.proposed", LANE])
+    expect(PROPOSED_CHANGES.decode(structuredClone(o.value), LANE)).toEqual(
+      proposed,
+    )
+    expect(
+      PROPOSED_CHANGES.decode({ ...proposed, size: 0 }, LANE),
+    ).toBeUndefined()
     const line: JjAcceptedRecord = {
       kind: "jj",
       acceptedBookmark: "pinetrie-accepted",
@@ -386,9 +409,9 @@ describe("records", () => {
     } = b.value as Record<string, unknown>
     expect(BASE_RECORD.decode(before, LANE)).toBeUndefined()
   })
-  test("an offer stored before its commits were kept does not decode", () => {
-    const { commits: _, ...before } = offer
-    expect(OFFER.decode(before, LANE)).toBeUndefined()
+  test("proposed changes stored before its commits were kept does not decode", () => {
+    const { commits: _, ...before } = proposed
+    expect(PROPOSED_CHANGES.decode(before, LANE)).toBeUndefined()
   })
 })
 
@@ -455,7 +478,7 @@ describe("the update and stack messages", () => {
     expect(m.content).not.toContain("Files that changed")
     expect(m.content).not.toContain("changed under you")
     expect(m.content).toContain(
-      "- only work this copy already holds, as accepted offers",
+      "- only work this copy already holds, as accepted thread commits",
     )
     expect(renderableMessage(m)).toMatchObject({
       content: "↓ caught up with accepted work: no file changed",
@@ -506,13 +529,13 @@ describe("the update and stack messages", () => {
   })
 })
 
-describe("offerAcceptanceDestinations", () => {
+describe("acceptanceDestinations", () => {
   const line = { kind: "accepted" } as const
   const wip = { kind: "wip", bookmark: "wip/x" } as const
   const of = (
-    over: Partial<Parameters<typeof offerAcceptanceDestinations>[0]> = {},
+    over: Partial<Parameters<typeof acceptanceDestinations>[0]> = {},
   ) =>
-    offerAcceptanceDestinations({
+    acceptanceDestinations({
       base: line,
       state: "ok",
       acceptedBookmark: "pinetrie-accepted",
@@ -529,7 +552,7 @@ describe("offerAcceptanceDestinations", () => {
       ["pinetrie-accepted", 2, true],
     ])
   })
-  test("a conflicted offer never lands on accepted work: only into a WIP", () => {
+  test("conflicted proposed changes never land on accepted work: only into a WIP", () => {
     expect(of({ conflicted: true })).toEqual([])
     expect(of({ base: wip, conflicted: true })).toEqual([["wip/x", 0, false]])
   })
@@ -541,7 +564,7 @@ describe("offerAcceptanceDestinations", () => {
   })
 })
 
-describe("the offer's policy over a gather", () => {
+describe("the proposed changes' policy over a gather", () => {
   const NAME = "amber-fox" as ThreadName
   const NOT_YOURS = { reached: true, yoursChanged: false }
   const START = commitId("s0")
@@ -561,12 +584,14 @@ describe("the offer's policy over a gather", () => {
     start: [START],
     ...over,
   })
-  /** An offer as your repo holds it: one revision, the host's, on its WIP line. */
-  const read = (over: Partial<OfferNow> = {}): OfferNow => ({
-    kind: "offer",
-    bookmark: `pinetrie-offer/${NAME}`,
+  /** Proposed changes as your repo holds it: one revision, the host's, on its WIP line. */
+  const read = (
+    over: Partial<ProposedChangesNow> = {},
+  ): ProposedChangesNow => ({
+    kind: "present",
+    bookmark: `pinetrie-proposed/${NAME}`,
     marked: true,
-    revisions: [{ commit: NOW_COMMIT, change: "kxyz", since: NOT_YOURS }],
+    revisions: [{ commit: NOW_COMMIT, changeId: "kxyz", since: NOT_YOURS }],
     chained: true,
     ledger: { source: TIP, start: [START] },
     firstLine: `WIP (${NAME}): fix it`,
@@ -587,20 +612,22 @@ describe("the offer's policy over a gather", () => {
     untraced: [],
     work: "some",
   }
-  const gather = (over: Partial<OfferGather> = {}): OfferGather => ({
+  const gather = (
+    over: Partial<ProposedChangesGather> = {},
+  ): ProposedChangesGather => ({
     place: at(),
     name: NAME,
-    offer: read(),
+    proposed: read(),
     base: baseRecord,
     ...over,
   })
 
-  describe("offerRecord: the page's cache, from the repo", () => {
+  describe("proposedChangesRecord: the page's cache, from the repo", () => {
     const record = (o = read(), tip = TIP) =>
-      offerRecord({
+      proposedChangesRecord({
         lane: LANE,
         name: NAME,
-        offer: o,
+        proposed: o,
         place: { tip, start: [START] },
         editing: new Set(["a.txt", "elsewhere.txt"]),
         now: 7,
@@ -617,7 +644,7 @@ describe("the offer's policy over a gather", () => {
         yourEdits: ["a.txt"],
         described: false,
         edited: false,
-        bookmark: "pinetrie-offer/amber-fox",
+        bookmark: "pinetrie-proposed/amber-fox",
         acceptedAs: null,
         commits: [NOW_COMMIT],
         ledger: { source: TIP, start: [START] },
@@ -626,10 +653,10 @@ describe("the offer's policy over a gather", () => {
     })
     test("your edits are its files that @ changes, and only those", () => {
       expect(
-        offerRecord({
+        proposedChangesRecord({
           lane: LANE,
           name: NAME,
-          offer: read({ files: ["a.txt", "b.txt"] }),
+          proposed: read({ files: ["a.txt", "b.txt"] }),
           place: { tip: TIP, start: [START] },
           editing: new Set(["b.txt", "c.txt"]),
           now: 1,
@@ -642,18 +669,18 @@ describe("the offer's policy over a gather", () => {
         revisions: [
           {
             commit: NOW_COMMIT,
-            change: "kxyz",
+            changeId: "kxyz",
             since: { reached: true, yoursChanged: true },
           },
         ],
       })
       expect(record(yours).edited).toBe(true)
     })
-    test("a stack is stale when the lane moved past its ledger; a single offer never is", () => {
+    test("a stack is stale when the lane moved past its ledger; single proposed changes never are", () => {
       const stack = read({
         revisions: [
-          { commit: commitId("b1"), change: "kb", since: NOT_YOURS },
-          { commit: commitId("b2"), change: "kt", since: NOT_YOURS },
+          { commit: commitId("b1"), changeId: "kb", since: NOT_YOURS },
+          { commit: commitId("b2"), changeId: "kt", since: NOT_YOURS },
         ],
       })
       expect(record(stack, NEW_TIP).stale).toBe(true)
@@ -663,15 +690,15 @@ describe("the offer's policy over a gather", () => {
   })
 
   test("planYourEdits: each record's files that @ changes, open and held alike, until it is accepted", () => {
-    const open = { ...offer, files: ["a.txt", "b.txt"], yourEdits: [] }
+    const open = { ...proposed, files: ["a.txt", "b.txt"], yourEdits: [] }
     const held = {
-      ...offer,
+      ...proposed,
       lane: threadIdFor("2"),
       files: [],
       yourEdits: ["x"],
     }
     const accepted = {
-      ...offer,
+      ...proposed,
       lane: threadIdFor("3"),
       acceptedAs: "kt",
     }
@@ -683,11 +710,11 @@ describe("the offer's policy over a gather", () => {
     ])
   })
 
-  describe("planOfferAcceptance", () => {
+  describe("planAcceptance", () => {
     const o = read({
       revisions: [
-        { commit: commitId("b1"), change: "kbot", since: NOT_YOURS },
-        { commit: commitId("b2"), change: "ktop", since: NOT_YOURS },
+        { commit: commitId("b1"), changeId: "kbot", since: NOT_YOURS },
+        { commit: commitId("b2"), changeId: "ktop", since: NOT_YOURS },
       ],
     })
     const WIP_BASE = {
@@ -695,25 +722,25 @@ describe("the offer's policy over a gather", () => {
       start: START,
       source: START,
     } as const
-    /** What the page drew: this offer's ledger, not conflicting. */
+    /** What the page drew: this proposed changes' ledger, not conflicting. */
     const SHOWN = { ledger: o.ledger, conflicted: false }
     const BOTH = new Set(["wip/x", "pinetrie-accepted"])
     const accept = (
       over: {
         readonly to?: string | null
         readonly below?: ReadonlySet<string>
-        readonly gathered?: OfferGather | null
-        readonly seen?: OfferSeen | null
-        readonly offer?: OfferInRepo
+        readonly gathered?: ProposedChangesGather | null
+        readonly seen?: ProposedChangesSeen | null
+        readonly proposed?: ProposedChangesInRepo
       } = {},
     ) =>
-      planOfferAcceptance({
+      planAcceptance({
         lane: LANE,
         gathered:
           over.gathered === undefined
             ? gather({
                 place: at({ base: WIP_BASE }),
-                offer: over.offer ?? o,
+                proposed: over.proposed ?? o,
               })
             : over.gathered,
         seen: over.seen === undefined ? SHOWN : over.seen,
@@ -723,13 +750,13 @@ describe("the offer's policy over a gather", () => {
         to: over.to ?? null,
         now: 9,
       })
-    const outcome = (t: OfferAcceptanceDecision) =>
+    const outcome = (t: AcceptanceDecision) =>
       t.kind === "accept" ? t.destination : t.code
-    test("the default destination is the WIP, the offer's top, and the record marked accepted", () => {
-      const record = offerRecord({
+    test("the default destination is the WIP, the proposed changes' top, and the record marked accepted", () => {
+      const record = proposedChangesRecord({
         lane: LANE,
         name: NAME,
-        offer: o,
+        proposed: o,
         place: { tip: TIP, start: [START] },
         editing: new Set(),
         now: 9,
@@ -746,10 +773,10 @@ describe("the offer's policy over a gather", () => {
         "pinetrie-accepted",
       )
     })
-    test("refused in order: no offer, a WIP gone, nothing shown, divergent, other work, no such destination", () => {
-      expect(outcome(accept({ gathered: null }))).toBe(ERR.NO_OFFER)
-      expect(outcome(accept({ gathered: gather({ offer: null }) }))).toBe(
-        ERR.NO_OFFER,
+    test("refused in order: no proposed changes, a WIP gone, nothing shown, divergent, other work, no such destination", () => {
+      expect(outcome(accept({ gathered: null }))).toBe(ERR.NO_PROPOSED_CHANGES)
+      expect(outcome(accept({ gathered: gather({ proposed: null }) }))).toBe(
+        ERR.NO_PROPOSED_CHANGES,
       )
       expect(
         outcome(
@@ -765,25 +792,31 @@ describe("the offer's policy over a gather", () => {
         outcome(
           accept({
             seen: null,
-            offer: { kind: "divergent", changes: ["k"] },
+            proposed: { kind: "divergent", changeIds: ["k"] },
           }),
         ),
-      ).toBe(ERR.OFFER_CHANGED)
+      ).toBe(ERR.NOT_AS_SHOWN)
       expect(
-        outcome(accept({ offer: { kind: "divergent", changes: ["k"] } })),
-      ).toBe(ERR.NO_OFFER)
+        outcome(accept({ proposed: { kind: "divergent", changeIds: ["k"] } })),
+      ).toBe(ERR.NO_PROPOSED_CHANGES)
       expect(outcome(accept({ to: "main" }))).toBe(ERR.BAD_DESTINATION)
       expect(outcome(accept({ below: new Set(["pinetrie-accepted"]) }))).toBe(
         ERR.BAD_DESTINATION,
       )
     })
-    test("a conflicted offer never goes to accepted work; an untraced place is accepted where it sits", () => {
+    test("conflicted proposed changes never go to accepted work; an untraced place is accepted where it sits", () => {
       const conflicted = { ...o, conflicts: ["a.txt"] }
       const shown = { ledger: o.ledger, conflicted: true }
-      expect(outcome(accept({ offer: conflicted, seen: shown }))).toBe("wip/x")
+      expect(outcome(accept({ proposed: conflicted, seen: shown }))).toBe(
+        "wip/x",
+      )
       expect(
         outcome(
-          accept({ offer: conflicted, seen: shown, to: "pinetrie-accepted" }),
+          accept({
+            proposed: conflicted,
+            seen: shown,
+            to: "pinetrie-accepted",
+          }),
         ),
       ).toBe(ERR.BAD_DESTINATION)
       const untraced = gather({
@@ -794,7 +827,7 @@ describe("the offer's policy over a gather", () => {
           state: "ok",
           target: commitId("l1"),
         },
-        offer: o,
+        proposed: o,
       })
       expect(outcome(accept({ gathered: untraced }))).toBe("pinetrie-accepted")
     })
@@ -802,10 +835,10 @@ describe("the offer's policy over a gather", () => {
       [
         "rebased onto a moved target, the same ledger",
         {
-          offer: read({
+          proposed: read({
             ...o,
             revisions: [
-              { commit: commitId("c9"), change: "ktop", since: NOT_YOURS },
+              { commit: commitId("c9"), changeId: "ktop", since: NOT_YOURS },
             ],
           }),
         },
@@ -814,12 +847,12 @@ describe("the offer's policy over a gather", () => {
       [
         "edited by you, the same ledger",
         {
-          offer: read({
+          proposed: read({
             ...o,
             revisions: [
               {
                 commit: commitId("c9"),
-                change: "ktop",
+                changeId: "ktop",
                 since: { reached: true, yoursChanged: true },
               },
             ],
@@ -829,23 +862,25 @@ describe("the offer's policy over a gather", () => {
       ],
       [
         "another ledger: the lane moved on",
-        { offer: read({ ...o, ledger: { source: NEW_TIP, start: [START] } }) },
-        ERR.OFFER_CHANGED,
+        {
+          proposed: read({ ...o, ledger: { source: NEW_TIP, start: [START] } }),
+        },
+        ERR.NOT_AS_SHOWN,
       ],
       [
         "another start, the same source",
         {
-          offer: read({
+          proposed: read({
             ...o,
             ledger: { source: TIP, start: [START, NEW_TIP] },
           }),
         },
-        ERR.OFFER_CHANGED,
+        ERR.NOT_AS_SHOWN,
       ],
       [
         "the same start, in another order",
         {
-          offer: read({
+          proposed: read({
             ...o,
             ledger: { source: TIP, start: [NEW_TIP, START] },
           }),
@@ -858,13 +893,13 @@ describe("the offer's policy over a gather", () => {
       ],
       [
         "newly conflicting",
-        { offer: read({ ...o, conflicts: ["a.txt"] }) },
-        ERR.OFFER_CHANGED,
+        { proposed: read({ ...o, conflicts: ["a.txt"] }) },
+        ERR.NOT_AS_SHOWN,
       ],
       [
         "conflicting, as it was shown",
         {
-          offer: read({ ...o, conflicts: ["a.txt"] }),
+          proposed: read({ ...o, conflicts: ["a.txt"] }),
           seen: { ledger: o.ledger, conflicted: true },
         },
         "wip/x",
@@ -872,14 +907,14 @@ describe("the offer's policy over a gather", () => {
       [
         "shown no ledger, now one",
         { seen: { ledger: null, conflicted: false } },
-        ERR.OFFER_CHANGED,
+        ERR.NOT_AS_SHOWN,
       ],
-    ] as const)("an acceptance of the offer it was shown: %s", (_, over, expected) => {
+    ] as const)("an acceptance of the proposed changes it was shown: %s", (_, over, expected) => {
       expect(outcome(accept(over))).toBe(expected)
     })
   })
 
-  describe("planStackEnded and planRebuild: an offer built anew", () => {
+  describe("planStackEnded and planRebuild: proposed changes built anew", () => {
     const span = { start: [commitId("s1")], tip: NEW_TIP }
     const sources = [
       { commit: commitId("r1"), description: "first" },
@@ -887,14 +922,14 @@ describe("the offer's policy over a gather", () => {
     ]
     const stack = (
       facts: StackFacts | "no-top" = { revisions: sources, differing: [] },
-      gathered: OfferGather | null = gather(),
+      gathered: ProposedChangesGather | null = gather(),
     ) => planStackEnded({ stack: span, facts, gathered })
     test("a stack of exactly the tip's files is built from its own start and tip, bottom first", () => {
       expect(stack()).toEqual({
         kind: "rebuild",
         name: NAME,
         place: at({ tip: NEW_TIP, start: [commitId("s1")] }),
-        changes: ["kxyz"],
+        changeIds: ["kxyz"],
         sources,
       })
     })
@@ -940,12 +975,12 @@ describe("the offer's policy over a gather", () => {
         kind: "rebuild",
         name: NAME,
         place: at(),
-        changes: ["kxyz"],
+        changeIds: ["kxyz"],
         sources: [{ commit: TIP, description: "WIP (amber-fox): x" }],
       })
       expect(planRebuild(null, "")).toEqual({
         kind: "refused",
-        why: ERR.NO_OFFER,
+        why: ERR.NO_PROPOSED_CHANGES,
       })
       expect(
         planRebuild(
@@ -966,27 +1001,32 @@ describe("the offer's policy over a gather", () => {
           }),
           "",
         ),
-      ).toEqual({ kind: "refused", why: ERR.NO_OFFER })
+      ).toEqual({ kind: "refused", why: ERR.NO_PROPOSED_CHANGES })
     })
   })
 
   describe("a commit message: asked, then settled", () => {
-    test("planDescribeAsk: the offer's one revision while it is on its WIP line, or forced", () => {
+    test("planDescribeAsk: the proposed changes' one revision while it is on its WIP line, or forced", () => {
       expect(planDescribeAsk(gather(), false)).toBe(NOW_COMMIT)
       expect(
         planDescribeAsk(
-          gather({ offer: read({ firstLine: "fix: x" }) }),
+          gather({ proposed: read({ firstLine: "fix: x" }) }),
           false,
         ),
       ).toBeNull()
       expect(
-        planDescribeAsk(gather({ offer: read({ firstLine: "fix: x" }) }), true),
+        planDescribeAsk(
+          gather({ proposed: read({ firstLine: "fix: x" }) }),
+          true,
+        ),
       ).toBe(NOW_COMMIT)
       expect(planDescribeAsk(gather({ name: undefined }), true)).toBeNull()
       expect(planDescribeAgain(gather())).toBeNull()
-      expect(planDescribeAgain(gather({ offer: null }))).toBe(ERR.NO_OFFER)
+      expect(planDescribeAgain(gather({ proposed: null }))).toBe(
+        ERR.NO_PROPOSED_CHANGES,
+      )
     })
-    test("planDescribeSettle: written only to the commit it was asked for, keeping the offer's ledger", () => {
+    test("planDescribeSettle: written only to the commit it was asked for, keeping the proposed changes' ledger", () => {
       expect(
         planDescribeSettle({
           gathered: gather(),
@@ -996,7 +1036,7 @@ describe("the offer's policy over a gather", () => {
       ).toEqual({
         name: NAME,
         place: at(),
-        change: "kxyz",
+        changeId: "kxyz",
         ledger: { source: TIP, start: [START] },
       })
       expect(
@@ -1009,14 +1049,14 @@ describe("the offer's policy over a gather", () => {
       const edited = read({ chained: false })
       expect(
         planDescribeSettle({
-          gathered: gather({ offer: edited }),
+          gathered: gather({ proposed: edited }),
           asked: NOW_COMMIT,
           force: true,
         }),
       ).toBeNull()
       expect(
         planDescribeSettle({
-          gathered: gather({ offer: read({ ledger: null }) }),
+          gathered: gather({ proposed: read({ ledger: null }) }),
           asked: NOW_COMMIT,
           force: false,
         })?.ledger,

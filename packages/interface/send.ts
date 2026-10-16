@@ -437,8 +437,8 @@ export function raceWords(by: WriterId | null, reader: Reader): string {
 // ── where a new lane starts ────────────────────────────────────
 
 /**
- * A new lane here would be cloned from a commit with conflicts: its offer
- * would start conflicted until it catches up.
+ * A new lane here would be cloned from a commit with conflicts: its proposed
+ * changes would start conflicted until it catches up.
  */
 export const forkWords = (files: number): string =>
   `starts from a copy with an unresolved conflict in ${files} ${files === 1 ? "file" : "files"}`

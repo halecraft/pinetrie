@@ -1,7 +1,7 @@
-// web/review-pane — a review in a column's pane: of its offer, or of what an
-// ask changed. A file list, when there is more than one file, beside one scroll
-// of every file's diff, each file's head pinned while its diff is in view.
-// `review.ts` decides what it shows; `useFetched` reads. The pane's frame
+// web/review-pane — a review in a column's pane: of its proposed changes, or of
+// what an ask changed. A file list, when there is more than one file, beside
+// one scroll of every file's diff, each file's head pinned while its diff is in
+// view. `review.ts` decides what it shows; `useFetched` reads. The pane's frame
 // (`pane.tsx`) gives it its width, Escape and focus.
 
 import type { RevisionReview } from "@pinetrie/core"

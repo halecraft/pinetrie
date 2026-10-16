@@ -286,15 +286,15 @@ export const inventoryFull = (
   ).length >= INVENTORY_SLOTS
 
 /**
- * A fact's card: queued on its lane, made by the host
- * for whoever acted (`makeCard`, `planMake`), its owner and placer, with no
- * text to wait for (`seen` ""). What a command on the offer did goes after
- * every card there, in order with them. A stop goes before them: it
- * happened before anything queued is sent, so the run's end appends it
- * first, whatever the hold (`planNextQueuedCardPop`), and nothing queued
- * may pass it. With no room before the first card, the crowded cards are
- * given new ranks (`respace`), written with it. Null when the host's own
- * make is refused, which no queue does: the host's shell logs it.
+ * A fact's card: queued on its lane, made by the host for whoever acted
+ * (`makeCard`, `planMake`), its owner and placer, with no text to wait for
+ * (`seen` ""). What a command on the proposed changes did goes after every card
+ * there, in order with them. A stop goes before them: it happened before
+ * anything queued is sent, so the run's end appends it first, whatever the hold
+ * (`planNextQueuedCardPop`), and nothing queued may pass it. With no room
+ * before the first card, the crowded cards are given new ranks (`respace`),
+ * written with it. Null when the host's own make is refused, which no queue
+ * does: the host's shell logs it.
  */
 export function planFactCard(input: {
   readonly cards: readonly CardRecord[]
@@ -398,7 +398,7 @@ export type CarryPlan =
       /** After a clean update or nothing new: the card's text, or nothing to send. */
       readonly after: "send" | "discard"
     }
-  /** Split the offer in a run of its own, the card's text its intent. */
+  /** Split the proposed changes in a run of its own, the card's text its intent. */
   | {
       readonly kind: "split"
       readonly card: QueuedText

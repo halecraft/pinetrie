@@ -4,7 +4,7 @@
 // (`JjProjectDir`), and gives lane work its `Destination` and each lane's
 // `LaneHistory` (`@pinetrie/jj`'s `historyOf`). What only a jj project has
 // stays here: publish and setup (`accepted.ts`), WIPs, splits and stacks
-// (`split.ts`, `offers/stack.ts`), and each lane's fetch into your repo
+// (`split.ts`, `proposed/stack.ts`), and each lane's fetch into your repo
 // (`fetch.ts`), which `LaneHistory`'s moves hand back as `follow`.
 //
 // Your repo has one writer, its owner: every read here is pinned to the head
@@ -31,7 +31,7 @@ import {
   proveJjLane,
   readOpLog,
   readWipState,
-  renameAccepted,
+  renameProposed,
   revsetName,
   startRepoOwner,
   TIDY_DAYS,
@@ -46,7 +46,7 @@ import type { ProjectAdapter } from "../work/adapter.ts"
 import type { Destination } from "../work/destination.ts"
 import { createAcceptedWork } from "./accepted.ts"
 import { createFetches } from "./fetch.ts"
-import { startOffers } from "./offers/index.ts"
+import { startProposedChanges } from "./proposed/index.ts"
 import { recordedJjLane, requireJjLane } from "./proven.ts"
 import { createSplits } from "./split.ts"
 
@@ -76,7 +76,7 @@ export function startJjProject(dir: JjProjectDir): ProjectAdapter {
       const { log } = basics
       // Made here, from the project root and accepted work's names, before
       // anything else reads your repo: the reads below, lane work's and the
-      // offers'.
+      // proposed changes'.
       const owner = startRepoOwner({
         root,
         repoConfig: names,
@@ -84,15 +84,16 @@ export function startJjProject(dir: JjProjectDir): ProjectAdapter {
         onSlow: slow(basics, "your repo"),
         onSlowCommand: slowCommand(basics, "your repo"),
       })
-      // pre-accepted: the owner's first command, before its first
-      // observation. Delete with `renameAccepted`.
+      // pre-proposed: the owner's first command, before its first
+      // observation, so its renames mark no refresh. Delete with
+      // `renameProposed`.
       await owner
-        .command(ops => renameAccepted(ops, names.acceptedBookmark))
+        .command(ops => renameProposed(ops))
         .then(
           lines => {
             for (const line of lines) log(`[host] ${line}`)
           },
-          failed(basics, "renaming accepted work's bookmark"),
+          failed(basics, "renaming the proposed changes' bookmarks"),
         )
       // Read beside the start, never awaited: the whole op log, once, to say
       // when `pnpm tidy` would cut it.
@@ -157,7 +158,7 @@ export function startJjProject(dir: JjProjectDir): ProjectAdapter {
           owner.onMoved(moved => {
             if (moved.acceptedMoved) parts.acceptedMoved()
           })
-          const offers = startOffers({
+          const proposed = startProposedChanges({
             owner,
             repoConfig: names,
             basics,
@@ -178,7 +179,7 @@ export function startJjProject(dir: JjProjectDir): ProjectAdapter {
             basics,
             owner,
             registry,
-            offers,
+            proposed,
             piSetup,
             beforeRun: parts.beforeRun,
             fetchLane: fetches.fetchLane,
@@ -219,7 +220,7 @@ export function startJjProject(dir: JjProjectDir): ProjectAdapter {
             // A lane jj cannot read has no ref in your repo to move: left.
             lanesMoved(refs) {
               const records = readLaneRecords(basics.session)
-              return offers.moveLanes(
+              return proposed.moveLanes(
                 refs.flatMap<{
                   readonly lane: ThreadId
                   readonly commit: CommitId | null
@@ -232,7 +233,7 @@ export function startJjProject(dir: JjProjectDir): ProjectAdapter {
                 }),
               )
             },
-            offers,
+            proposed,
             accepted,
             quiet: () => owner.idle(),
             close: () => owner.close(),

@@ -4,8 +4,8 @@ import type {
   AcceptedRecord,
   BaseRecord,
   HostNamespace,
-  OfferRecord,
   ProjectKind,
+  ProposedChangesRecord,
   Target,
   ThreadId,
   ValueWrite,
@@ -24,8 +24,8 @@ import { CONFLICT, STATE } from "./folder-records.ts"
 import { MARK } from "./mark.ts"
 import { NAME } from "./names.ts"
 import { NOTE_COLUMN } from "./note-column.ts"
-import { OFFER } from "./offer.ts"
 import { PARTICIPANT, PICTURE } from "./participant.ts"
+import { PROPOSED_CHANGES } from "./proposed.ts"
 import { QUEUE_HOLD } from "./queue-hold.ts"
 import { deleteRecord, type RecordSpec } from "./records.ts"
 import { ROOT } from "./roots.ts"
@@ -59,7 +59,7 @@ export const RECORD_SPECS: readonly AnyRecordSpec[] = [
   MARK,
   NAME,
   NOTE_COLUMN,
-  OFFER,
+  PROPOSED_CHANGES,
   PARTICIPANT,
   PICTURE,
   PROJECT,
@@ -110,22 +110,22 @@ export const planUndeclaredSweep = (
   )
 
 /**
- * Deletes for every offer, accepted-work and base record of another kind
- * than the project's: caches of a project that was the other kind before,
- * which no reader of this one reads. A folder's `STATE` and `CONFLICT`
- * records are never among them, so accepted work's line outlives a jj period.
+ * Deletes for every proposed changes, accepted-work and base record of another
+ * kind than the project's: caches of a project that was the other kind before,
+ * which no reader of this one reads. A folder's `STATE` and `CONFLICT` records
+ * are never among them, so accepted work's line outlives a jj period.
  */
 export const planKindSweep = (
   records: {
-    readonly offers: ReadonlyMap<ThreadId, OfferRecord>
+    readonly proposedByLane: ReadonlyMap<ThreadId, ProposedChangesRecord>
     readonly accepted: AcceptedRecord | null
     readonly bases: ReadonlyMap<ThreadId, BaseRecord>
   },
   kind: ProjectKind,
 ): ValueWrite[] => [
-  ...[...records.offers.values()]
+  ...[...records.proposedByLane.values()]
     .filter(r => r.kind !== kind)
-    .map(r => deleteRecord(OFFER, r.lane)),
+    .map(r => deleteRecord(PROPOSED_CHANGES, r.lane)),
   ...(records.accepted !== null && records.accepted.kind !== kind
     ? [deleteRecord(ACCEPTED, ACCEPTED_KEY)]
     : []),

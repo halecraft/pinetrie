@@ -5,7 +5,7 @@ import {
   type FolderBaseRecord,
   type JjAcceptedRecord,
   type JjBaseRecord,
-  type JjOfferRecord,
+  type JjProposedChangesRecord,
   pointFromCommit,
   pointId,
   type ThreadName,
@@ -15,20 +15,18 @@ import { describe, expect, test } from "vitest"
 import {
   type CatchUpNow,
   catchUpOf,
-  offerSeen,
-  offerStatus,
-  offerView,
   type ParentNow,
+  proposedChangesStatus,
+  workStripView,
 } from "./index.ts"
-import { conflictCause } from "./offer-view.ts"
+import { conflictCause } from "./work-strip.ts"
 
 const LANE = threadIdFor("1")
 const TIP = commitId("t1")
 const T2 = commitId("t2")
-const BASE = commitId("b0")
 const _COPY = commitId("k1")
 
-const offer: JjOfferRecord = {
+const proposed: JjProposedChangesRecord = {
   kind: "jj",
   lane: LANE,
   size: 1,
@@ -39,24 +37,14 @@ const offer: JjOfferRecord = {
   yourEdits: [],
   described: true,
   edited: false,
-  bookmark: "pinetrie-offer/t-1",
+  bookmark: "pinetrie-proposed/t-1",
   acceptedAs: null,
   commits: [commitId("w1")],
   ledger: null,
   at: 10,
 }
 
-test("offerSeen: what an acceptance was shown is the record's ledger and whether it conflicted; no record shows none", () => {
-  const ledger = { source: TIP, start: [BASE] }
-  expect(offerSeen({ ...offer, ledger, conflicts: ["a.txt"] })).toEqual({
-    ledger,
-    conflicted: true,
-  })
-  expect(offerSeen(offer)).toEqual({ ledger: null, conflicted: false })
-  expect(offerSeen(undefined)).toEqual({ ledger: null, conflicted: false })
-})
-
-describe("offerView: the work strip's states", () => {
+describe("workStripView: the work strip's states", () => {
   const MOVE = {
     base: { kind: "accepted" },
     bookmark: "pinetrie-accepted",
@@ -64,7 +52,7 @@ describe("offerView: the work strip's states", () => {
     to: pointId("l2"),
   } as const
   const view = (
-    o: JjOfferRecord | undefined,
+    o: JjProposedChangesRecord | undefined,
     activity: "idle" | "turn" | "resolution" | "split" = "idle",
     asked: number | null = null,
     catching: {
@@ -75,8 +63,8 @@ describe("offerView: the work strip's states", () => {
       parentRunning?: boolean
     } = {},
   ) =>
-    offerView({
-      offer: offerStatus(o),
+    workStripView({
+      proposed: proposedChangesStatus(o),
       activity,
       asked,
       base: null,
@@ -91,63 +79,64 @@ describe("offerView: the work strip's states", () => {
   const at = (v: ReturnType<typeof view>) => [v.state, v.buttons, v.menu]
   test("every state, with its buttons", () => {
     expect(at(view(undefined))).toEqual(["nothing", [], ["update"]])
-    expect(at(view({ ...offer, files: [] }))).toEqual([
+    expect(at(view({ ...proposed, files: [] }))).toEqual([
       "nothing",
       [],
       ["update"],
     ])
-    expect(at(view(offer, "turn"))).toEqual(["running", [], []])
-    expect(at(view(offer, "resolution"))).toEqual(["busy", [], []])
-    expect(at(view(offer, "split"))).toEqual(["busy", [], []])
-    expect(at(view(offer))).toEqual([
+    expect(at(view(proposed, "turn"))).toEqual(["running", [], []])
+    expect(at(view(proposed, "resolution"))).toEqual(["busy", [], []])
+    expect(at(view(proposed, "split"))).toEqual(["busy", [], []])
+    expect(at(view(proposed))).toEqual([
       "ready",
       ["accept", "split"],
       ["describe", "update"],
     ])
-    // Only a clean offer lands on accepted work: no acceptance on a thread on accepted work.
-    expect(at(view({ ...offer, conflicts: ["a.txt"] }))).toEqual([
+    // Only clean proposed changes land on accepted work: no acceptance on a
+    // thread on accepted work.
+    expect(at(view({ ...proposed, conflicts: ["a.txt"] }))).toEqual([
       "conflicts",
       ["update"],
       [],
     ])
-    expect(at(view({ ...offer, size: 2 }))).toEqual([
+    expect(at(view({ ...proposed, size: 2 }))).toEqual([
       "stack",
       ["accept", "squash"],
       ["update"],
     ])
-    expect(at(view({ ...offer, size: 2, stale: true }))).toEqual([
+    expect(at(view({ ...proposed, size: 2, stale: true }))).toEqual([
       "stale",
       ["split", "accept"],
       ["update"],
     ])
-    expect(at(view({ ...offer, edited: true }))).toEqual([
+    expect(at(view({ ...proposed, edited: true }))).toEqual([
       "edited",
       ["accept", "refresh"],
       ["update"],
     ])
-    expect(at(view({ ...offer, acceptedAs: "zz12345678" }))).toEqual([
+    expect(at(view({ ...proposed, acceptedAs: "zz12345678" }))).toEqual([
       "accepted",
       [],
       ["update"],
     ])
   })
   test("files you are editing are a fact; the state and buttons stay", () => {
-    const v = view({ ...offer, yourEdits: ["b.txt"] })
+    const v = view({ ...proposed, yourEdits: ["b.txt"] })
     expect([v.state, v.buttons, v.facts.touchesYourEdits]).toEqual([
       "ready",
       ["accept", "split"],
       true,
     ])
-    expect(view(offer).facts.touchesYourEdits).toBe(false)
+    expect(view(proposed).facts.touchesYourEdits).toBe(false)
   })
-  test("the facts: an offer's bookmark, files and size, until it is accepted", () => {
-    expect(view({ ...offer, size: 2 }).facts).toEqual({
+  test("the facts: proposed changes' bookmark, files and size, until it is accepted", () => {
+    expect(view({ ...proposed, size: 2 }).facts).toEqual({
       activity: "idle",
       files: 2,
       size: 2,
       conflicts: 0,
       touchesYourEdits: false,
-      bookmark: "pinetrie-offer/t-1",
+      bookmark: "pinetrie-proposed/t-1",
       held: false,
       acceptedAs: null,
       base: { kind: "accepted" },
@@ -158,42 +147,44 @@ describe("offerView: the work strip's states", () => {
       parent: null,
       parentResolves: false,
     })
-    expect(view(offer, "turn").facts.files).toBe(2)
+    expect(view(proposed, "turn").facts.files).toBe(2)
     const none = view(undefined).facts
     expect([none.files, none.bookmark, none.acceptedAs]).toEqual([
       0,
       null,
       null,
     ])
-    const accepted = view({ ...offer, acceptedAs: "zz12345678" }).facts
+    const accepted = view({ ...proposed, acceptedAs: "zz12345678" }).facts
     expect([accepted.files, accepted.bookmark, accepted.acceptedAs]).toEqual([
       0,
       null,
       "zz12345678",
     ])
     // Held: its bookmark is a fact in jj, and nothing in it is to accept.
-    const held = view({ ...offer, files: [] })
+    const held = view({ ...proposed, files: [] })
     expect([held.facts.held, held.facts.bookmark, held.destinations]).toEqual([
       true,
-      "pinetrie-offer/t-1",
+      "pinetrie-proposed/t-1",
       [],
     ])
   })
-  test("offerStatus: one decoding of a record, which every reader shares", () => {
-    expect(offerStatus(undefined)).toEqual({ kind: "none" })
-    expect(offerStatus({ ...offer, acceptedAs: "zz" })).toEqual({
+  test("proposedChangesStatus: one decoding of a record, which every reader shares", () => {
+    expect(proposedChangesStatus(undefined)).toEqual({ kind: "none" })
+    expect(proposedChangesStatus({ ...proposed, acceptedAs: "zz" })).toEqual({
       kind: "accepted",
       as: "zz",
     })
-    expect(offerStatus({ ...offer, files: [] }).kind).toBe("held")
-    expect(offerStatus({ ...offer, files: [], edited: true }).kind).toBe("open")
-    expect(offerStatus(offer).kind).toBe("open")
+    expect(proposedChangesStatus({ ...proposed, files: [] }).kind).toBe("held")
+    expect(
+      proposedChangesStatus({ ...proposed, files: [], edited: true }).kind,
+    ).toBe("open")
+    expect(proposedChangesStatus(proposed).kind).toBe("open")
   })
-  test("behind its base, catching up stands beside the offer; with nothing to accept, alone", () => {
+  test("behind its base, catching up stands beside the proposed changes; with nothing to accept, alone", () => {
     const behind = {
       catchUp: { kind: "brings", move: MOVE, files: 2 },
     } as const
-    expect(at(view(offer, "idle", null, behind))).toEqual([
+    expect(at(view(proposed, "idle", null, behind))).toEqual([
       "ready",
       ["accept", "split", "update"],
       ["describe"],
@@ -207,18 +198,22 @@ describe("offerView: the work strip's states", () => {
       behind.catchUp,
     )
     // Running, nothing to catch up with is offered at all.
-    expect(at(view(offer, "turn", null, behind))).toEqual(["running", [], []])
+    expect(at(view(proposed, "turn", null, behind))).toEqual([
+      "running",
+      [],
+      [],
+    ])
   })
   test("catching up that would change nothing is listed, but quiet; one not yet read is not", () => {
     const quiet = (catchUp: CatchUpNow) =>
-      view(offer, "idle", null, { catchUp }).quiet
+      view(proposed, "idle", null, { catchUp }).quiet
     expect(quiet({ kind: "current" })).toEqual(["update"])
     expect(quiet({ kind: "nothing-new" })).toEqual(["update"])
     expect(quiet({ kind: "unknown" })).toEqual([])
     expect(quiet({ kind: "brings", move: MOVE, files: 1 })).toEqual([])
     // A thread whose WIP is gone continues on accepted work: never quiet.
-    const gone = offerView({
-      offer: offerStatus(undefined),
+    const gone = workStripView({
+      proposed: proposedChangesStatus(undefined),
       activity: "idle",
       asked: null,
       base: {
@@ -236,8 +231,8 @@ describe("offerView: the work strip's states", () => {
     })
     expect([gone.menu, gone.quiet]).toEqual([["continue"], []])
   })
-  test("an untraced thread's offer you edited can be accepted, never rebuilt", () => {
-    const edited = view({ ...offer, edited: true }, "idle", null, {
+  test("an untraced thread's proposed changes you edited can be accepted, never rebuilt", () => {
+    const edited = view({ ...proposed, edited: true }, "idle", null, {
       untraced: true,
     })
     expect(at(edited)).toEqual(["edited", ["accept", "update"], []])
@@ -252,23 +247,25 @@ describe("offerView: the work strip's states", () => {
       true,
     ])
   })
-  test("a card bringing the thread up to date, queued on an idle lane: the offer is busy with it", () => {
-    const queued = view(offer, "idle", null, { queued: ["bring-up-to-date"] })
+  test("a card bringing the thread up to date, queued on an idle lane: the proposed changes are busy with it", () => {
+    const queued = view(proposed, "idle", null, {
+      queued: ["bring-up-to-date"],
+    })
     expect([queued.state, queued.buttons, queued.facts.activity]).toEqual([
       "busy",
       [],
       "catch-up",
     ])
     expect(
-      view(offer, "turn", null, { queued: ["bring-up-to-date"] }).facts
+      view(proposed, "turn", null, { queued: ["bring-up-to-date"] }).facts
         .activity,
     ).toBe("turn")
   })
-  test("a split queued is not a catch-up: the offer stays ready, its split button quiet", () => {
-    const queued = view(offer, "idle", null, { queued: ["split"] })
+  test("a split queued is not a catch-up: the proposed changes stay ready, its split button quiet", () => {
+    const queued = view(proposed, "idle", null, { queued: ["split"] })
     expect([queued.state, queued.facts.activity]).toEqual(["ready", "idle"])
     expect(queued.quiet).toContain("split")
-    expect(view(offer, "idle", null).quiet).not.toContain("split")
+    expect(view(proposed, "idle", null).quiet).not.toContain("split")
   })
   test("catchUpOf: from the commit a lane last caught up with to the base's now", () => {
     const moved = (...args: Parameters<typeof catchUpOf>) =>
@@ -405,8 +402,8 @@ describe("offerView: the work strip's states", () => {
     })
   })
   const folderView = () =>
-    offerView({
-      offer: offerStatus({
+    workStripView({
+      proposed: proposedChangesStatus({
         kind: "folder",
         lane: LANE,
         start: pointId("line-0192aaaa"),
@@ -427,19 +424,19 @@ describe("offerView: the work strip's states", () => {
       untraced: false,
       queued: [],
     })
-  test("a folder offer is accepted or described, never split", () => {
+  test("folder proposed changes are accepted or described, never split", () => {
     const v = folderView()
     expect(at(v)).toEqual(["ready", ["accept"], ["describe", "update"]])
     expect([v.facts.size, v.facts.bookmark]).toEqual([1, null])
   })
-  test("a folder offer's accept is drawn disabled, with no destination", () => {
+  test("folder proposed changes' accept is drawn disabled, with no destination", () => {
     const v = folderView()
     expect(v.destinations).toEqual([])
     expect(v.quiet).toContain("accept")
   })
-  test("a jj offer before accepted work is read has no accept", () => {
-    const v = offerView({
-      offer: offerStatus(offer),
+  test("jj proposed changes before accepted work are read has no accept", () => {
+    const v = workStripView({
+      proposed: proposedChangesStatus(proposed),
       activity: "idle",
       asked: null,
       base: null,
@@ -453,10 +450,10 @@ describe("offerView: the work strip's states", () => {
     })
     expect([v.buttons, v.destinations]).toEqual([["split"], []])
   })
-  test("an ask about a conflict counts only when newer than the offer", () => {
-    expect(view(offer, "idle", 20).state).toBe("needs_you")
-    expect(view(offer, "idle", 5).state).toBe("ready")
-    expect(view(offer, "idle", null).state).toBe("ready")
+  test("an ask about a conflict counts only when newer than the proposed changes", () => {
+    expect(view(proposed, "idle", 20).state).toBe("needs_you")
+    expect(view(proposed, "idle", 5).state).toBe("ready")
+    expect(view(proposed, "idle", null).state).toBe("ready")
   })
 })
 
@@ -471,9 +468,13 @@ describe("a conflict that came with the copy, and the thread it branched from", 
     conflicts: [],
     ...over,
   })
-  const view = (o: JjOfferRecord, p: ParentNow | null, parentRunning = false) =>
-    offerView({
-      offer: offerStatus(o),
+  const view = (
+    o: JjProposedChangesRecord,
+    p: ParentNow | null,
+    parentRunning = false,
+  ) =>
+    workStripView({
+      proposed: proposedChangesStatus(o),
       activity: "idle",
       asked: null,
       base: null,
@@ -486,22 +487,22 @@ describe("a conflict that came with the copy, and the thread it branched from", 
       parentRunning,
     })
   const fromStart = {
-    ...offer,
+    ...proposed,
     conflicts: ["a.txt"],
     startConflicts: ["a.txt"],
   }
   test("conflictCause: the start only when every conflicted file was conflicted there", () => {
-    expect(conflictCause(offer)).toBe("work")
+    expect(conflictCause(proposed)).toBe("work")
     expect(conflictCause(fromStart)).toBe("start")
     expect(
       conflictCause({
-        ...offer,
+        ...proposed,
         conflicts: ["a.txt", "b.txt"],
         startConflicts: ["a.txt"],
       }),
     ).toBe("work")
     expect(
-      conflictCause({ ...offer, conflicts: [], startConflicts: ["a.txt"] }),
+      conflictCause({ ...proposed, conflicts: [], startConflicts: ["a.txt"] }),
     ).toBe("work")
   })
   test("a start conflict the parent has resolved is caught up with the parent", () => {
@@ -525,21 +526,20 @@ describe("a conflict that came with the copy, and the thread it branched from", 
       view(fromStart, parent({ newest: pointFromCommit(TIP) })).buttons,
     ).toEqual(["update"])
     expect(view(fromStart, null).buttons).toEqual(["update"])
-    expect(view({ ...offer, conflicts: ["a.txt"] }, parent()).buttons).toEqual([
-      "update",
-    ])
+    expect(
+      view({ ...proposed, conflicts: ["a.txt"] }, parent()).buttons,
+    ).toEqual(["update"])
   })
   test("while the parent is ahead it is in the menu, quiet while it runs", () => {
-    expect(view(offer, parent()).menu).toEqual([
+    expect(view(proposed, parent()).menu).toEqual([
       "describe",
       "update",
       "catch-up-parent",
     ])
-    expect(view(offer, parent({ newest: pointFromCommit(TIP) })).menu).toEqual([
-      "describe",
-      "update",
-    ])
-    expect(view(offer, parent(), true).quiet).toContain("catch-up-parent")
+    expect(
+      view(proposed, parent({ newest: pointFromCommit(TIP) })).menu,
+    ).toEqual(["describe", "update"])
+    expect(view(proposed, parent(), true).quiet).toContain("catch-up-parent")
     expect(view(fromStart, parent(), true).quiet).toEqual(["catch-up-parent"])
   })
 })

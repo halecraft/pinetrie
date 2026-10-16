@@ -24,7 +24,7 @@ import {
   type Level,
   type Moments,
   markOf,
-  type OpenOffer,
+  type OpenProposedChanges,
   type SshAsk,
   type Status,
   taskStatus,
@@ -58,7 +58,7 @@ export function useAttention(input: {
   readonly attention: AttentionStore
   readonly directory: ReadonlyMap<RootId, RootRecord>
   readonly verdicts: ReadonlyMap<ThreadId, VerdictRecord>
-  readonly offers: readonly OpenOffer[]
+  readonly openProposed: readonly OpenProposedChanges[]
   /** Lanes waiting for their owner's answer about ssh. */
   readonly sshAsks: readonly SshAsk[]
   /** Whom the host names its owner. */
@@ -112,7 +112,7 @@ export function useAttention(input: {
       me: input.me,
       writers,
       verdicts: input.verdicts,
-      offers: input.offers,
+      openProposed: input.openProposed,
       sshAsks: input.sshAsks,
       owner: input.owner,
       person,
@@ -127,7 +127,7 @@ export function useAttention(input: {
     input.me,
     writers,
     input.verdicts,
-    input.offers,
+    input.openProposed,
     input.sshAsks,
     input.owner,
     person,

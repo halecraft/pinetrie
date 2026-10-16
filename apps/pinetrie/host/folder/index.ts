@@ -1,11 +1,11 @@
 // host/folder — a folder project's adapter: a folder with no jj repo, its
-// accepted work the folder itself. The project's folder is read into its
-// line (`line.ts`) at a thread's first message, at each catch-up, and once it
-// has been quiet after a change (`watch.ts`); each lane's history is states
-// of the graph (`history.ts`); its offer is the lane's newest state against
-// accepted work's newest (`offers.ts`). Nothing is written into the project's folder
-// but the shared directories its config asks for. Accepting into it is the
-// next step's: refused, with words.
+// accepted work the folder itself. The project's folder is read into its line
+// (`line.ts`) at a thread's first message, at each catch-up, and once it has
+// been quiet after a change (`watch.ts`); each lane's history is states of the
+// graph (`history.ts`); its proposed changes are the lane's newest state
+// against accepted work's newest (`proposed.ts`). Nothing is written into the
+// project's folder but the shared directories its config asks for. Accepting
+// into it is the next step's: refused, with words.
 
 import { mkdir, stat } from "node:fs/promises"
 import path from "node:path"
@@ -25,7 +25,7 @@ import {
 } from "@pinetrie/lanes"
 import {
   readLaneRecords,
-  readOffers,
+  readProposedByLane,
   readRecords,
   readRunning,
 } from "@pinetrie/reads"
@@ -37,7 +37,7 @@ import type { Destination } from "../work/destination.ts"
 import { folderFileAt } from "./file-at.ts"
 import { folderHistory } from "./history.ts"
 import { createFolderLine } from "./line.ts"
-import { startFolderOffers } from "./offers.ts"
+import { startFolderProposedChanges } from "./proposed.ts"
 import { proveFolderLane } from "./proven.ts"
 import { planSweep } from "./sweep.ts"
 import { watchFolder } from "./watch.ts"
@@ -148,7 +148,7 @@ export function startFolderProject(dir: {
             await parts.ready()
             return line.read()
           }
-          const offers = startFolderOffers({
+          const proposed = startFolderProposedChanges({
             basics,
             records: parts.records,
             keeper: parts.keeper,
@@ -159,12 +159,12 @@ export function startFolderProject(dir: {
             running: lane => readRunning(basics.live, lane),
             baseChanged: parts.baseChanged,
           })
-          // Accepted work moving is base news: every lane's offer and base
-          // follow it.
+          // Accepted work moving is base news: every lane's proposed changes
+          // and base follow it.
           movedListeners.push(() => {
             parts.acceptedMoved()
             void parts.keeper.track(
-              offers
+              proposed
                 .rebuildAll()
                 .catch(failed(basics, "following the project's folder")),
             )
@@ -185,7 +185,7 @@ export function startFolderProject(dir: {
                   : [{ lane: r.lane, history: r.history }],
               ),
               conflicts: [...readRecords(session, CONFLICT).values()],
-              offers: [...readOffers(session).values()],
+              proposed: [...readProposedByLane(session).values()],
               keep: parts.keepStates(),
             }).filter(id => !swept.has(id))
             if (gone.length === 0) return
@@ -226,17 +226,17 @@ export function startFolderProject(dir: {
               }
             },
             // Nothing holds a lane's history but its states: an archived
-            // lane's offer goes, a restored one's is built again.
+            // lane's proposed changes go, a restored one's is built again.
             async lanesMoved(refs) {
               for (const { lane, point } of refs)
                 await (point === null
-                  ? offers.withdraw(lane)
-                  : offers.rebuild(lane))
+                  ? proposed.withdraw(lane)
+                  : proposed.rebuild(lane))
             },
-            offers: {
-              ...offers,
+            proposed: {
+              ...proposed,
               runEnded(lane) {
-                offers.runEnded(lane)
+                proposed.runEnded(lane)
                 sweepSoon()
               },
             },
@@ -277,7 +277,7 @@ export function startFolderProject(dir: {
             splits: {
               prepareSplit: async () => ({
                 refused:
-                  "a folder project's offer is its files, never a stack of revisions",
+                  "a folder project's changes are its files, never a stack of revisions",
               }),
               splitEnded: async () => null,
             },

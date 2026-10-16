@@ -1,30 +1,30 @@
 import {
   commitId,
-  type JjOfferRecord,
-  type OfferNow,
-  offerMessage,
+  type JjProposedChangesRecord,
   type Placed,
+  type ProposedChangesNow,
+  proposedMessage,
   type RefreshDecision,
   type ThreadName,
   threadIdFor,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
-  describeEffects,
-  offerAcceptanceEffects,
-  offerEffects,
-  rebuildEffects,
-} from "./offer-steps.ts"
-import {
   forgetSteps,
   markSteps,
-  planAbandonOffer,
+  planAbandonProposed,
+  planAcceptanceSteps,
   planDescribe,
-  planOffer,
-  planOfferAcceptanceSteps,
-  planRebuildOffer,
-  planRefreshOffer,
+  planProposedChanges,
+  planRebuildProposed,
+  planRefreshProposed,
 } from "./plan.ts"
+import {
+  acceptanceEffects,
+  describeEffects,
+  proposedChangesEffects,
+  rebuildEffects,
+} from "./proposed-steps.ts"
 
 const LANE = threadIdFor("0123456789abcdef")
 const NAME = "amber-fox" as ThreadName
@@ -33,13 +33,13 @@ const NEW_TIP = commitId("22222222")
 const START = commitId("33333333")
 const TARGET = commitId("44444444")
 const NOT_YOURS = { reached: true, yoursChanged: false }
-const BOOKMARK = `pinetrie-offer/${NAME}`
-const OFFER: OfferNow = {
-  kind: "offer",
+const BOOKMARK = `pinetrie-proposed/${NAME}`
+const PROPOSED_CHANGES: ProposedChangesNow = {
+  kind: "present",
   bookmark: BOOKMARK,
   marked: true,
   revisions: [
-    { commit: commitId("55555555"), change: "kxyz", since: NOT_YOURS },
+    { commit: commitId("55555555"), changeId: "kxyz", since: NOT_YOURS },
   ],
   chained: true,
   ledger: { source: TIP, start: [START] },
@@ -62,17 +62,20 @@ const TRAILERS = { lane: LANE, name: NAME, entry: "e1" }
 const AT = { ...TRAILERS, wip: "WIP (amber-fox): fix it", nonce: "n1" }
 const LEDGER = { source: NEW_TIP, start: [START] }
 
-describe("offerEffects: each refresh decision's steps, and what follows", () => {
-  test("rebuild: planRebuildOffer's steps, its WIP line with the host's trailers and the new ledger, then a record", () => {
-    const e = offerEffects({ kind: "rebuild", place: PLACE, offer: OFFER }, AT)
+describe("proposedChangesEffects: each refresh decision's steps, and what follows", () => {
+  test("rebuild: planRebuildProposed's steps, its WIP line with the host's trailers and the new ledger, then a record", () => {
+    const e = proposedChangesEffects(
+      { kind: "rebuild", place: PLACE, proposed: PROPOSED_CHANGES },
+      AT,
+    )
     expect(e).toEqual({
       steps: [
-        ...planRebuildOffer({
-          change: "kxyz",
+        ...planRebuildProposed({
+          changeId: "kxyz",
           start: [START],
           tip: NEW_TIP,
           target: TARGET,
-          description: offerMessage(AT.wip, { ...TRAILERS, ledger: LEDGER }),
+          description: proposedMessage(AT.wip, { ...TRAILERS, ledger: LEDGER }),
         }),
         ...markSteps(BOOKMARK),
       ],
@@ -80,63 +83,75 @@ describe("offerEffects: each refresh decision's steps, and what follows", () => 
       built: true,
     })
   })
-  test("none, stale and leave run nothing and record: the read made before planning is still the offer", () => {
+  test("none, stale and leave run nothing and record: the read made before planning is still the proposed changes", () => {
     for (const kind of ["none", "stale", "leave"] as const)
-      expect(offerEffects({ kind, place: PLACE }, AT)).toEqual({
+      expect(proposedChangesEffects({ kind, place: PLACE }, AT)).toEqual({
         steps: [],
         after: { kind: "record", place: PLACE },
         built: false,
       })
   })
-  test("mark marks the offer, then records it", () => {
-    expect(offerEffects({ kind: "mark", place: PLACE }, AT)).toEqual({
+  test("mark marks the proposed changes, then records it", () => {
+    expect(proposedChangesEffects({ kind: "mark", place: PLACE }, AT)).toEqual({
       steps: markSteps(BOOKMARK),
       after: { kind: "record", place: PLACE },
       built: false,
     })
   })
   test("withdraw plans the abandon and forgets the host's version, then removes the record", () => {
-    expect(offerEffects({ kind: "withdraw", offer: OFFER }, AT)).toEqual({
-      steps: [...planAbandonOffer(["kxyz"]), ...forgetSteps(BOOKMARK)],
+    expect(
+      proposedChangesEffects(
+        { kind: "withdraw", proposed: PROPOSED_CHANGES },
+        AT,
+      ),
+    ).toEqual({
+      steps: [...planAbandonProposed(["kxyz"]), ...forgetSteps(BOOKMARK)],
       after: { kind: "remove" },
       built: false,
     })
   })
   test("forget removes the record, and forgets the host's version only when one is left", () => {
-    expect(offerEffects({ kind: "forget", hostLeft: false }, AT)).toEqual({
+    expect(
+      proposedChangesEffects({ kind: "forget", hostLeft: false }, AT),
+    ).toEqual({
       steps: [],
       after: { kind: "remove" },
       built: false,
     })
-    expect(offerEffects({ kind: "forget", hostLeft: true }, AT).steps).toEqual(
-      forgetSteps(BOOKMARK),
-    )
+    expect(
+      proposedChangesEffects({ kind: "forget", hostLeft: true }, AT).steps,
+    ).toEqual(forgetSteps(BOOKMARK))
   })
   test("refresh rebases the bottom onto the target, then marks; repair names the changes; untouched does nothing", () => {
     expect(
-      offerEffects({ kind: "refresh", place: PLACE, offer: OFFER }, AT).steps,
-    ).toEqual([...planRefreshOffer("kxyz", TARGET), ...markSteps(BOOKMARK)])
+      proposedChangesEffects(
+        { kind: "refresh", place: PLACE, proposed: PROPOSED_CHANGES },
+        AT,
+      ).steps,
+    ).toEqual([...planRefreshProposed("kxyz", TARGET), ...markSteps(BOOKMARK)])
     expect(
-      offerEffects({ kind: "repair", place: PLACE, changes: ["ka", "kb"] }, AT)
-        .after,
-    ).toEqual({ kind: "repair", place: PLACE, changes: ["ka", "kb"] })
-    expect(offerEffects({ kind: "untouched" }, AT)).toEqual({
+      proposedChangesEffects(
+        { kind: "repair", place: PLACE, changeIds: ["ka", "kb"] },
+        AT,
+      ).after,
+    ).toEqual({ kind: "repair", place: PLACE, changeIds: ["ka", "kb"] })
+    expect(proposedChangesEffects({ kind: "untouched" }, AT)).toEqual({
       steps: [],
       after: { kind: "nothing" },
       built: false,
     })
   })
   test("build names the lane's tip as its one source on its WIP line, and is a rebuild with nothing to abandon", () => {
-    const build = offerEffects({ kind: "build", place: PLACE }, AT)
+    const build = proposedChangesEffects({ kind: "build", place: PLACE }, AT)
     expect(build).toEqual({
       steps: [
-        ...planOffer({
+        ...planProposedChanges({
           name: NAME,
           start: [START],
           sources: [
             {
               commit: NEW_TIP,
-              description: offerMessage(AT.wip, {
+              description: proposedMessage(AT.wip, {
                 ...TRAILERS,
                 ledger: LEDGER,
               }),
@@ -155,7 +170,7 @@ describe("offerEffects: each refresh decision's steps, and what follows", () => 
         {
           name: NAME,
           place: PLACE,
-          changes: [],
+          changeIds: [],
           sources: [{ commit: NEW_TIP, description: AT.wip }],
         },
         AT,
@@ -165,14 +180,14 @@ describe("offerEffects: each refresh decision's steps, and what follows", () => 
   test("each decision's after carries its place", () => {
     const decisions: RefreshDecision[] = [
       { kind: "build", place: PLACE },
-      { kind: "rebuild", place: PLACE, offer: OFFER },
-      { kind: "refresh", place: PLACE, offer: OFFER },
+      { kind: "rebuild", place: PLACE, proposed: PROPOSED_CHANGES },
+      { kind: "refresh", place: PLACE, proposed: PROPOSED_CHANGES },
       { kind: "none", place: PLACE },
       { kind: "mark", place: PLACE },
-      { kind: "repair", place: PLACE, changes: ["k"] },
+      { kind: "repair", place: PLACE, changeIds: ["k"] },
     ]
     for (const d of decisions) {
-      const { after } = offerEffects(d, AT)
+      const { after } = proposedChangesEffects(d, AT)
       expect("place" in after && after.place).toBe(PLACE)
     }
   })
@@ -183,20 +198,23 @@ test("rebuildEffects: the old revisions abandoned, then each source on the start
     {
       name: NAME,
       place: PLACE,
-      changes: ["ka", "kb"],
+      changeIds: ["ka", "kb"],
       sources: [{ commit: commitId("r1"), description: "first" }],
     },
     { ...TRAILERS, nonce: "n2" },
   )
   expect(e.steps).toEqual([
-    ...planAbandonOffer(["ka", "kb"]),
-    ...planOffer({
+    ...planAbandonProposed(["ka", "kb"]),
+    ...planProposedChanges({
       name: NAME,
       start: [START],
       sources: [
         {
           commit: commitId("r1"),
-          description: offerMessage("first", { ...TRAILERS, ledger: LEDGER }),
+          description: proposedMessage("first", {
+            ...TRAILERS,
+            ledger: LEDGER,
+          }),
         },
       ],
       target: TARGET,
@@ -206,8 +224,8 @@ test("rebuildEffects: the old revisions abandoned, then each source on the start
   ])
 })
 
-test("offerAcceptanceEffects and describeEffects: the acceptance's bookmark move, and the message with the offer's ledger", () => {
-  const accepted: JjOfferRecord = {
+test("acceptanceEffects and describeEffects: the acceptance's bookmark move, and the message with the proposed changes' ledger", () => {
+  const accepted: JjProposedChangesRecord = {
     kind: "jj",
     lane: LANE,
     size: 1,
@@ -218,14 +236,14 @@ test("offerAcceptanceEffects and describeEffects: the acceptance's bookmark move
     yourEdits: [],
     described: false,
     edited: false,
-    bookmark: `pinetrie-offer/${NAME}`,
+    bookmark: `pinetrie-proposed/${NAME}`,
     acceptedAs: "ktop",
     commits: [],
     ledger: null,
     at: 1,
   }
   expect(
-    offerAcceptanceEffects({
+    acceptanceEffects({
       kind: "accept",
       name: NAME,
       bookmark: accepted.bookmark,
@@ -234,7 +252,7 @@ test("offerAcceptanceEffects and describeEffects: the acceptance's bookmark move
       accepted,
     }),
   ).toEqual({
-    steps: planOfferAcceptanceSteps({
+    steps: planAcceptanceSteps({
       bookmark: accepted.bookmark,
       top: "ktop",
       destination: "pinetrie-accepted",
@@ -245,13 +263,16 @@ test("offerAcceptanceEffects and describeEffects: the acceptance's bookmark move
   const ledger = { source: TIP, start: [START] }
   expect(
     describeEffects(
-      { name: NAME, place: PLACE, change: "kxyz", ledger },
+      { name: NAME, place: PLACE, changeId: "kxyz", ledger },
       "fix: it",
       TRAILERS,
     ),
   ).toEqual({
     steps: [
-      ...planDescribe("kxyz", offerMessage("fix: it", { ...TRAILERS, ledger })),
+      ...planDescribe(
+        "kxyz",
+        proposedMessage("fix: it", { ...TRAILERS, ledger }),
+      ),
       ...markSteps(BOOKMARK),
     ],
     after: { kind: "record", place: PLACE },

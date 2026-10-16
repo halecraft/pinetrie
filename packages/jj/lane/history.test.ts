@@ -2,8 +2,8 @@
 // with your repo beside them, and the host's runner standing in for a lane's
 // channel. A lane's `/workspace` and `/mnt/host-working-copy` are directories
 // here. The harness supplies the rig's test-only hooks with jj run in the
-// lane's own repo, and accepts an offer by the steps `repo.test.ts` uses
-// (`fixtures.ts`).
+// lane's own repo, and accepts proposed changes by the steps `repo.test.ts`
+// uses (`fixtures.ts`).
 
 import {
   mkdir,
@@ -47,10 +47,10 @@ import { afterAll, beforeAll, expect, test } from "vitest"
 import { fileAt } from "../file-at.ts"
 import {
   acceptedIn,
-  acceptOffer,
+  acceptProposedChanges,
   fetchLane,
   jjLaneFor,
-  offerTip,
+  proposedTip,
 } from "../fixtures.ts"
 import { hostJj } from "../run.ts"
 import { historyOf } from "./history.ts"
@@ -276,16 +276,20 @@ async function makeRig(): Promise<
       await fetchLane(runnersFor(lane), yoursDir, {
         lane,
         have: [],
-        bundle: path.join(dir, `${lane}-offer.bundle`),
+        bundle: path.join(dir, `${lane}-proposed.bundle`),
       })
-      const built = await offerTip(yoursDir, {
+      const built = await proposedTip(yoursDir, {
         lane,
         name,
         repoConfig: DEFAULT_REPO,
       })
-      const [top] = built.changes
-      if (top === undefined) throw new Error("no offer")
-      await acceptOffer(yoursDir, { name, top, repoConfig: DEFAULT_REPO })
+      const [top] = built.changeIds
+      if (top === undefined) throw new Error("no proposed changes")
+      await acceptProposedChanges(yoursDir, {
+        name,
+        top,
+        repoConfig: DEFAULT_REPO,
+      })
       return pointFromCommit(await acceptedIn(yours, DEFAULT_REPO))
     },
 

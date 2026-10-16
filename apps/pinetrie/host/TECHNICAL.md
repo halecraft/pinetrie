@@ -29,7 +29,7 @@ wires them.
 | `canvas.ts` | what a run is told of its thread's task (ADR-0116): `readTaskContext`, the canvas list and the cards pinned to the task, each written only when it differs from the newest of its kind on the lane's path, so an unchanged task keeps the prompt's cache (S92); `runs.ts` writes them between base news and the thread's pinned cards |
 | `canvas-news.ts` | a card added to a running thread's canvas or taken from it, steered into its lane as a fact line (`planCanvasFacts`), heard from `Provenance.onChanged`; never a queued fact card, which would wait for the run's end |
 | `base-news.ts` | what a thread is told of its base's new work (ADR-0080): `atStart`, a chat's run's behind entry; `baseChanged`, a steer into a running lane, at most once per base commit (`told`), heard from lane work's `onBaseChanged`; `runEnded` forgets what was steered. Made after the agent, whose lanes it steers |
-| `split-call.ts` | `split_offer` (ADR-0080): a split card queued on the thread, popped when its run ends: pi calls it only during a run, so its step is queued before the run's end queues the drain, which the keeper runs after it |
+| `split-call.ts` | `split_proposed_changes` (ADR-0080): a split card queued on the thread, popped when its run ends: pi calls it only during a run, so its step is queued before the run's end queues the drain, which the keeper runs after it |
 | `queued-card-pop.ts` | popping a lane's queued cards to send them (ADR-0048, ADR-0083): `popNextQueuedCard`, and `drain`, which carries each out as `planCarry` decides: a fact appended, a catch-up, a split's run, a message sent (ADR-0108, ADR-0080); and `createWaits`, the drain's waits for its top card's text or for someone's typing in it to stop (ADR-0048 step 7) |
 | `settle.ts` | what happens between runs: drains, then the compaction and sweep as upkeep (the keeper's `later`) |
 | `housekeeping.ts` | which documents a run's end compacts (`planCompaction`: its roots, the session, the places, `pinetrie:live`; § The session's documents), deleting images nothing shows (ADR-0042), retiring histories of moves (`sweepHistories`), and deleting holds on queues nobody can use (`sweepHolds`, ADR-0048 step 7) |
@@ -41,8 +41,8 @@ wires them.
 | `seats.ts` | each connected seat's person (ADR-0037), written once as a `pinetrie.seat` record (started after `recover`), and unloading the histories of moves of a person with no seat left |
 | `startup.ts` | `recover`: what a starting host does before it takes a command |
 | `control.ts` | the command Line of each client seat (ADR-0007), and who its writer is: the principal its connection named, an email, so no command field can claim to be someone else (ADR-0037). The host is no writer: writers are the connected clients, and own no lanes, which belong to threads (ADR-0120) |
-| `commands/` | one module per command: `chat`, `board` (a move on the board, a change to its states: ADR-0122), `mark` (ADR-0045, ADR-0116), `lane` (stop, carry on, hold or release a queue, offer: each finds its lane through `laneAt`), `cards` (a move, a reorder, unqueue all, an undo of moves, a command, a busy chat's card queued, a sent card spent, a paste, a thread's copy: ADR-0059, ADR-0066, ADR-0132); `index.ts` decodes, decides where it runs (`placeOfCommand`), clears it through the gate, and routes; every send, a `chat` command's, a popped queued card's (`sendPoppedQueuedCard`) or a spin-off's, is cleared too. `gate.ts`: `clear`, the gate's shell over `planGate` (`@pinetrie/rules`) |
-| `http.ts` | the HTTP server: admission, the page (Vite or the built one), the websocket, blobs, offer reads, invites |
+| `commands/` | one module per command: `chat`, `board` (a move on the board, a change to its states: ADR-0122), `mark` (ADR-0045, ADR-0116), `lane` (stop, carry on, hold or release a queue, proposed changes: each finds its lane through `laneAt`), `cards` (a move, a reorder, unqueue all, an undo of moves, a command, a busy chat's card queued, a sent card spent, a paste, a thread's copy: ADR-0059, ADR-0066, ADR-0132); `index.ts` decodes, decides where it runs (`placeOfCommand`), clears it through the gate, and routes; every send, a `chat` command's, a popped queued card's (`sendPoppedQueuedCard`) or a spin-off's, is cleared too. `gate.ts`: `clear`, the gate's shell over `planGate` (`@pinetrie/rules`) |
+| `http.ts` | the HTTP server: admission, the page (Vite or the built one), the websocket, blobs, proposed changes read, invites |
 | `responses.ts` | every answer the host writes itself, as a pure `HttpAnswer` |
 | `routes.ts` | what a request or an upgrade gets, pure: admission first (`planRequest`, `planUpgrade`), then which requests are the host's (`route`) |
 | `admission.ts`, `policy.ts`, `lines.ts`, `blobs.ts`, `store.ts` | the invite key and links (ADR-0107; a blob, like the page, is admitted only from this host's own page on loopback, ADR-0042), the write policy, departed seats (a seat is fresh per page load, ADR-0037), the blob store (images, ADR-0042, and references' quotes as markdown, ADR-0126), the SQLite store, on `node:sqlite`, so with no native dependency (S22), which owns its file: it takes the file's lock, and a second connection, process or reader is refused (S47) |
@@ -50,7 +50,7 @@ wires them.
 | `project.ts` | the project's adapter, chosen once by its kind (`projectAdapter`: an exhaustive switch, `assertNever` its default): jj's for a jj workspace, the folder's for any other folder; a folder lanes cannot serve (`projectDirWords`) is refused before any runtime is asked |
 | `folder/` | a folder project's adapter, as it is built (§ A folder project's adapter): the project's folder's reads (`scan.ts`, `line.ts`) and watcher (`watch.ts`), the only code that touches the project's folder (ADR-0142) |
 | `watch-dir.ts` | one directory watched with `@parcel/watcher` (FSEvents on the Mac, inotify on Linux), its events handed on after a quiet window (`quietWindow`; 0 for the shared directories, 10 s for the project's folder), a dropped-events error at once |
-| `jj/` | jj's adapter (`startJjProject`, § jj's adapter): each lane's offer in your repo (ADR-0105), on the owner of your repo (§ Offers), and the reviews and diffs a page reads of it (ADR-0047); accepted work's record and commands (`jj/accepted.ts`); each lane's fetch into your repo (`jj/fetch.ts`); splits (`jj/split.ts`) |
+| `jj/` | jj's adapter (`startJjProject`, § jj's adapter): each lane's proposed changes in your repo (ADR-0105), on the owner of your repo (§ Proposed changes), and the reviews and diffs a page reads of it (ADR-0047); accepted work's record and commands (`jj/accepted.ts`); each lane's fetch into your repo (`jj/fetch.ts`); splits (`jj/split.ts`) |
 | `names.ts` | every thread's name (ADR-0039, ADR-0117): `ensure` for the lanes pi holds and the threads recorded, `reserve` for a thread a column opened before its first message (ADR-0057), on one queue |
 | `banners.ts` | each thread's column banner (ADR-0050, ADR-0053): made as the thread is named, at reservation or creation, set by `set_banner`; every step a late one |
 | `digests.ts` | each ask's digest (ADR-0106, ADR-0075), unless the config turns them off (ADR-0071); a live digest waits for someone reading the thread (presence, ADR-0024); every step a late one, and `writePendingVerdict`, the verdict a stopping run writes before its end |
@@ -68,7 +68,7 @@ wires them.
   `HostKey` in `basics.ts`). Where a command runs is decided, pure, by
   `placeOfCommand` (`commands/index.ts`, ADR-0065), which reads a table
   of every kind (`COMMAND_PLACE`), so a kind with no place does not
-  compile: an offer action but a
+  compile: an action on proposed changes but a
   split, and a setup or publish, go straight to the owner of your repo after
   the gate, which opens no root for these kinds, and hold no other command; a move
   on the board is up to three parts (`commands/board.ts`): its place on the
@@ -147,13 +147,13 @@ wires them.
 `planRunEnd(role)` returns the order, and `runs.ts` carries it out: a
 split's `splitEnded`, then `verdictPending`, `endRun`, `laneStopped`,
 `ended`. A resolution ends as any run does (ADR-0080, S104): what it left
-conflicted is the offer's, and whether the agent asked is the tree's. A run touches no tools: every lane's list is the
+conflicted is the proposed changes', and whether the agent asked is the tree's. A run touches no tools: every lane's list is the
 same for every run (`packages/pi/TECHNICAL.md`, S85).
 
 - **`endRun` comes before `laneStopped` and `ended`.** It closes the lane's
   streams (ADR-0044: a stream stays open past its message's end) and clears
   its active run. `laneStopped` is lane work's `runEnded`: the container
-  stops, and the offer is refreshed; then base news forgets what it
+  stops, and the proposed changes are refreshed; then base news forgets what it
   steered into the lane, so the next run plans from the tree alone. `ended`
   drains the lane; a drain that ran before
   `endRun` could start the next run with the last one's reply still open.
@@ -226,7 +226,7 @@ same for every run (`packages/pi/TECHNICAL.md`, S85).
   The host's `TaskIndex` is `tasksNow(basics)` (`tasks.ts`), from the
   places and the threads' records, built once per command by the
   dispatcher (`commands/index.ts`), which hands it to the gate and
-  every card command; a drain, a title and an offer each build their own,
+  every card command; a drain, a title and proposed changes each build their own,
   once a step. Only an undo reads it again, after its revert wrote.
 
 ## The stored schemas (`migrations/`, ADR-0096)
@@ -261,8 +261,18 @@ until the next compaction (S120), and the host compacts at startup. So
   planned the same way next time.
 - **One file per migration**, deleted once Duane's store has passed it; a
   store still on its hash is then refused. A change that moves no data is a
-  migration with no `run`: registering it is the acknowledgement. None is
-  registered now: `0001-live-row`, `0002-records` (ADR-0095),
+  migration with no `run`: registering it is the acknowledgement.
+- **`0018-dismissed-ready` is the one migration of a person's document**
+  (ADR-0153): each attention document's `dismissedOffers` is copied to
+  `dismissedReady`, under the same lane. It is the host's only write to a
+  person's document, made before any tab opens it. A Yjs document keys each
+  field by an identity hash, not its name, so the old field is read from a
+  snapshot opened under the old schema (`AttentionDocBeforeReady`,
+  `@pinetrie/schema`). A document the Exchange loaded from a store already
+  read the old data under the new name in a probe, where one made from a
+  snapshot (`createDoc`) did not; the copy writes only what the new field
+  lacks, so either way it is right.
+- **None with no `run` is registered now:** `0001-live-row`, `0002-records` (ADR-0095),
   `0005-tasks`' places and sidebars (ADR-0116) and `0008-entry-thread`
   (every root's rows given the thread column, a context entry in the
   thread of the prompt below it, ADR-0125) ran, and were deleted.
@@ -367,7 +377,7 @@ stream survives a process), a new store's default workflow
 (`planWorkflowSeed`), the deletion of the records of a type no spec
 declares, in the session and the roots opened (`planUndeclaredSweep`,
 ADR-0100, so a renamed record leaves nothing behind), the deletion of
-the offer, accepted-work and base records of another kind than the
+the proposed changes, accepted-work and base records of another kind than the
 project's (`planKindSweep`, ADR-0150: caches of the project as it was
 before; a folder's `STATE` and `CONFLICT` records are kept whatever the
 kind), a
@@ -457,7 +467,7 @@ any refresh they queued.
   (project, runtime, your repo's owner, the lanes' configs, `ready`) or,
   without tools, null, and lane work is then `NO_LANES`: it records each
   lane and its name, and its `destination` (`Destination`: accepted work
-  and the offers, all or none) is null. Nothing
+  and the proposed changes, all or none) is null. Nothing
   asks a lane's access then.
 - **Commands are taken only after `recover`.** `Control.listen` is made
   earlier, and `startControl` registers `onReceive` after `recover`. Earlier,
@@ -558,7 +568,7 @@ rejects `shutdown()`.
   and ends the process, even while `shutdown()` hangs.
 
 - **The queues close before `quiet`.** `quiet` waits only for what is queued
-  when it looks. A step started after it (an offer refresh marked by an
+  when it looks. A step started after it (proposed changes refresh marked by an
   observed move or a lane's fetch, a drain from a command) writes to a
   closing agent and document: its jj steps land and its record is lost
   (S73). A watch event after `close` finds the owner closed.
@@ -939,17 +949,17 @@ rejects `shutdown()`.
   startup and in `settle`'s sweep. A deleted thread's lanes of
   their own go as an archive's do (`planLanesGone`, through
   `work.teardown`, off the documents' keeper), which withdraws their
-  offers; the thread's record stays, since its entries name it.
+  proposed changes; the thread's record stays, since its entries name it.
 - **`reorder` and `unqueue-all` are moves of their own** (`commands/cards.ts`).
   A reorder is written in the sender's history of its place's root
   (`planReorder`), through `carry`, and drains nothing. Unqueue all plans
   its moves from the queue as it is (`planUnqueueAll`) and hands them to
   `move`, so it is one step one undo reverses; with nothing queued it
   answers `nothing`.
-- **A command on an offer leaves a fact** (ADR-0080): `actOnOffer`
+- **A command on proposed changes leave a fact** (ADR-0080): `actOnProposedChanges`
   answers first, then writes the action's fact as a queued fact card in a late
   step of its own (`Later.step`, through `queueFact`), with its history
-  (cause `host`, as for every fact and the split card `split_offer`
+  (cause `host`, as for every fact and the split card `split_proposed_changes`
   queues), and asks for the lane's drain. An idle
   lane appends it at once; a running one when its run ends, in order with
   the cards already queued. The client draws it as a quiet row, and nobody
@@ -968,7 +978,7 @@ rejects `shutdown()`.
 An archived task is read-only, and a command is refused there by the gate
 (`planGate`). The host's own writes that it decides before a gap and makes
 after it are refused by `Later`'s: a model request's answer, a step a run's
-end queues, an offer action's fact, a budget a round's request spent. A
+end queues, an action on proposed changes' fact, a budget a round's request spent. A
 root record written through `Records` after an archive let its root go
 opened it again for good, and one written after `docs.destroy` made the
 document again (S198); a fact queued in an archived task left it holding
@@ -1028,10 +1038,10 @@ queued cards, which `planArchive` refuses.
   - `relays.ts`' `ask`, `leave`, `relayChat`, `relayCard` and `deliver`:
     each reads both threads' reach and refuses with `unreachableRefusal`
     in the step that writes;
-  - an offer's description (`describe.ts`, for either kind of project):
-    each adapter's settle writes only while its offer is the one asked
-    about (`planDescribeSettle`, or a folder offer's start and tip), and an
-    archive's teardown withdraws its threads' offers;
+  - proposed changes' description (`describe.ts`, for either kind of project):
+    each adapter's settle writes only while its proposed changes are the one asked
+    about (`planDescribeSettle`, or folder proposed changes' start and tip), and an
+    archive's teardown withdraws its threads' proposed changes;
   - a turn's tail (`work/turns.ts`): its revision, fetch and snapshot after
     a run ends. Dropping it would lose a revision a restore needs; whether
     an archive must wait for it (`pendingRecords`, as a fork does) is not
@@ -1196,7 +1206,8 @@ queued cards, which `planArchive` refuses.
 ## HTTP
 
 - **Admission comes first**, for a request and for an upgrade. Nothing
-  reaches the page, the blobs, an offer's reads or the Exchange without it.
+  reaches the page, the blobs, a review's reads (`/review/…`) or the
+  Exchange without it.
 - **The built page is sent by `planPageRequest`** (`routes.ts`), over the
   set of files `dist/` held at start: `/` is `index.html`, `no-cache`, so a
   rebuild is seen at the next load; `assets/` files, named by their hash,
@@ -1227,7 +1238,7 @@ adapter's.
 | module | owns |
 |---|---|
 | `adapter.ts` | `ProjectAdapter`, which carries its `kind`: opened by setup where it reads your repo's names, with the runtime, a folder project's `FolderDisks`, the session's lane files and the records, before anything else reads the project (`OpenProject`: `kind`, `fileAt`, `prepareShared`, `identity`, `acceptedNow`, whose checkout is bound to its read, or none for a folder), then started once lane work has its registry, with `ready` (asked, never held: a read waits on it for lanehost) and `keepStates` (`StartedProject`: the `Destination`, each lane's `history` from its record, refused for a lane of another kind, and `Splits`). The registry and the containers it is started with are bound late: neither is asked for before startup ends |
-| `destination.ts` | `Destination`: accepted work and offers as any kind has them: a file at a point (`fileAt`), where a new lane begins (`begin`), what a catch-up's base is now (`baseNow`), an archive's lanes moved (`lanesMoved`), the offers' acts (`OfferActs`), setup and publish (`AcceptedActs`), `quiet` and `close` |
+| `destination.ts` | `Destination`: accepted work and proposed changes as any kind has them: a file at a point (`fileAt`), where a new lane begins (`begin`), what a catch-up's base is now (`baseNow`), an archive's lanes moved (`lanesMoved`), the proposed changes' acts (`ProposedChangesActs`), setup and publish (`AcceptedActs`), `quiet` and `close` |
 | `setup.ts` | `openProject`: the project opened through its adapter, with your repo's names settled from your files and the working copy's `pinetrie.json`, before anything else reads it, and its lane configs, before pi's setup. `Setup`, all of it or none: the opened project, the lanes' ssh, the shared directories, the default-image check (the default image carries a browser, ADR-0041, and python3, ADR-0064), the images and runtime (`ready`), `specOf`, the granted host paths (planned at its start, from the roots of the commands pi's setup loaded, none inside the project and none holding pine·trie's own directories, ADR-0036), and the base snapshot's refreshes |
 | `config.ts` | `pinetrie.json` as a fact of a state (ADR-0135, ADR-0146): accepted work's copy read at accepted work (`Destination.fileAt`) at startup and when the base moves (`readAccepted`), decoded by the host's table and settled with the start layers, its shared directories (the settled `lanes.shared`) prepared again, and put in force (`takeAccepted`, `onTaken`) once what it names is shared; a lane's own copy and the copy it started on, read at its tip and its start before its container starts (`readLane`), so `specOf` and the prompt's facts use the lane's config; the note on a write of the file (`configNote`, the `configWritten` hook): what it changes, and each key not taken. A lane with no commit in your repo yet runs with accepted work's |
 | `shared.ts` | the shared files' lineages (`pinetrie.shared`, ADR-0135), one recorder for every lane and the watcher, so none reads and writes a lineage at once: a turn's accesses of shared files (`classifyWritesOnQueue` hands them over), based on what the lane last read, numbered and flagged (`planSharedLineages`) after the turn's queued step, since the lineages are every lane's; the watcher's stamps (`seen`). An earlier turn found concurrent after its rival is learnt has its revision record rewritten; one whose record is not written yet keeps what it says |
@@ -1305,7 +1316,7 @@ adapter's.
   takes), the lane's base from its own history, accepted work and the WIP
   from the destination (`baseNow`), `planUpdateFrom`, then `merge`: the
   edits committed and, for jj, `mergeUpdate`
-  (which first joins each accepted-offer commit the lane holds to its source, ADR-0079), so nothing
+  (which first joins each accepted thread commit the lane holds to its source, ADR-0079), so nothing
   changes the lane between what is read and what is merged. Before the
   merge, `planCatchUp` settles the floor a resolution's prompt must fit
   (ADR-0084), from the resolve-conflicts skill, read before the step, and
@@ -1378,9 +1389,9 @@ adapter's.
   `Extract<ProjectDir, { kind: "jj" }>`, `project.test.ts`). Opened, it
   takes your repo's names as settled (`repoNames`, from your files and the
   working copy's `pinetrie.json`), starts the owner of your repo,
-  renames accepted work's old bookmark (`pre-accepted:`), and reads files at
+  renames the proposed changes' old bookmarks (`pre-proposed:`), and reads files at
   a point (`fileAt`, `@pinetrie/jj`). Started, it makes accepted work
-  (`jj/accepted.ts`), the offers (`jj/offers/`), the fetches (`jj/fetch.ts`)
+  (`jj/accepted.ts`), the proposed changes (`jj/proposed/`), the fetches (`jj/fetch.ts`)
   and the splits (`jj/split.ts`), and each lane's history (`historyOf`),
   whose `follow` is the lane's fetch into your repo.
 - **Each jj or git command on your repo over half a second is logged**
@@ -1443,23 +1454,23 @@ adapter's.
   `follow` is always null: nothing is fetched.
 - **The destination** (`index.ts`): `begin` and `baseNow` read the project's
   folder first, so a catch-up merges its newest state; a WIP is refused. Each run's
-  end builds the lane's offer and base records (`offers.ts`) and describes
-  the offer with the host's describer (`describe.ts`, jj's too); accepted
+  end builds the lane's proposed changes and base records (`folder/proposed.ts`) and describes
+  the proposed changes with the host's describer (`describe.ts`, jj's too); accepted
   work moving rebuilds every folder lane's. An accept is refused
   (`folder_accept_later`, worded by `ACCEPT_LATER`, the page's title for
   the disabled button too), a squash too (`not_a_stack`), a setup and a
-  publish with why. A review reads an open folder offer's `start..tip`:
+  publish with why. A review reads an open folder proposed changes' `start..tip`:
   its files with their line counts (`diffStats`), and one file's diff
   (`fileDiff`), both lanehost's.
 - **The sweep** (`sweep.ts`), at start and after each run's end, deletes the
   snapshots of the states `liveStates` keeps not, `folder.history.states`
   of accepted work's line among them; every `STATE` record stays.
 
-## Offers (`jj/offers/`)
+## Proposed changes (`jj/proposed/`)
 
-- **Every offer step runs on the owner of your repo** (`@pinetrie/jj`,
+- **Every step on proposed changes runs on the owner of your repo** (`@pinetrie/jj`,
   `packages/jj/TECHNICAL.md`, ADR-0065), since a take once waited behind
-  every refresh queued before it (S89). An offer action, a `line`
+  every refresh queued before it (S89). An action on proposed changes, a `line`
   command, a split's span and its end, and moving lanes' refs are owner
   commands; a refresh is upkeep, `later("refresh:<lane>")`, and accepted work's
   record `later("line")`. So a command waits for at most the one step
@@ -1473,54 +1484,52 @@ adapter's.
   rewrites each open record's `yourEdits` (its files that `@` changes,
   `planYourEdits`) and
   accepted work's record from the shared facts; a lane's
-  ref (a fetch's import) marks that lane; an offer bookmark the lane its
+  ref (a fetch's import) marks that lane; proposed bookmark the lane its
   thread names. A run's end marks its lane, then describes it. A refresh
   that wrote is observed, and refreshes the lanes it moved once more: that
   one reads, plans `none`, and writes nothing, so it ends there. The record
-  is only a hint of where to look: it is how an offer you abandoned by hand
-  is built again. A bookmark of yours that no offer depends on moves
-  nothing. Every named lane, not only those with an offer, so each lane's
+  is only a hint of where to look: it is how proposed changes you abandoned by hand
+  is built again. A bookmark of yours that no proposed changes depend on moves
+  nothing. Every named lane, not only those with proposed changes, so each lane's
   `pinetrie.base` follows accepted work, and with it what catching up would
   change. Not an archived root's lanes: they have no base to follow
-  (`gatherRefresh` gives them none), and their refresh only withdraws an
-  offer. What could still hold one marks such a lane anyway: its ref or its
-  offer bookmark (the first observation reports every bookmark as moved),
+  (`gatherRefresh` gives them none), and their refresh only withdraws proposed changes. What could still hold one marks such a lane anyway: its ref or its
+  proposed bookmark (the first observation reports every bookmark as moved),
   or an open record. That is safe because an untraced start, or what jj cannot say,
-  builds nothing (ADR-0067): a thread accepted before offers carried
-  `Pinetrie-Source` is not offered again (S97).
+  builds nothing (ADR-0067): a thread accepted before proposed changes carried
+  `Pinetrie-Source` is not proposed again (S97).
 - **Reads are pinned and never queued:** a page's review or diff
-  (`Offers.read`), a description's gather, and lane work's reads of your
-  repo run at the head the owner last observed (`owner.read`). An offer
+  (`ProposedChanges.read`), a description's gather, and lane work's reads of your
+  repo run at the head the owner last observed (`owner.read`). Proposed changes
   acceptance gathers in its own command, unpinned, so it acts on the repo as it is.
-- **The host decides nothing and runs no jj on an offer.** Each step is a
-  gather (`@pinetrie/jj`: `gatherRefresh`, `gatherOffer`, `gatherOfferAcceptance`,
+- **The host decides nothing and runs no jj on proposed changes.** Each step is a
+  gather (`@pinetrie/jj`: `gatherRefresh`, `gatherProposedChanges`, `gatherAcceptance`,
   `gatherStack`, `gatherDescribe`), a decision (`@pinetrie/rules`: `planRefresh`,
-  `planOfferAcceptance`, `planRebuild`, `planStackEnded`, `planDescribeSettle`),
-  a translation into steps (`@pinetrie/jj`: `offerEffects`, `offerAcceptanceEffects`,
-  `rebuildEffects`, `describeEffects`), and `executeOffer` (`execute.ts`),
+  `planAcceptance`, `planRebuild`, `planStackEnded`, `planDescribeSettle`),
+  a translation into steps (`@pinetrie/jj`: `proposedChangesEffects`, `acceptanceEffects`,
+  `rebuildEffects`, `describeEffects`), and `executeProposedChanges` (`execute.ts`),
   which carries out every action over ports: the lane's base record first,
   when it differs from the page's, then the steps, then what comes after
-  (`OfferEffects.after`). So the rules are tested as values in the two
+  (`ProposedChangesEffects.after`). So the rules are tested as values in the two
   packages, what the host writes is tested over `record<T>()`, and
   `packages/jj/repo.test.ts` proves the reads and steps against real jj.
 - **What only the documents know is read here, first** (`state.ts`,
-  `OfferDocs`): the thread's name, whether its root is archived (from its
+  `ProposedChangesDocs`): the thread's name, whether its root is archived (from its
   board place, `readArchived`, never from the lane's tip being missing: a tip missing
-  for one import, S78, must not withdraw a live offer), the last catch-up
+  for one import, S78, must not withdraw live proposed changes), the last catch-up
   read (`pinetrie.base`, a memo `readCatchUp` keeps at the same tip and base
   commit, never read to decide), the lane's tip entry and the WIP line.
-  Everything else is read from your repo (ADR-0104), and where an offer
-  sits is decided once there (`OfferPlace`): a WIP gone moves nothing and
+  Everything else is read from your repo (ADR-0104), and where proposed changes
+  sit is decided once there (`ProposedChangesPlace`): a WIP gone moves nothing and
   writes only its base record; an untraced start builds nothing, so squash,
   refresh, describe and a split's span refuse it, while an acceptance, a
-  bookmark move, can still accept an offer you edited there.
+  bookmark move, can still accept proposed changes you edited there.
 - **The records are written from the repo after each step**
-  (`OfferRecords`): an offer's from the read made before planning when the
+  (`ProposedChangesRecords`): proposed changes' from the read made before planning when the
   step ran no steps (the common `none` reads nothing more; a `mark`, which
-  moves only the host's version of the offer, reads it again), else from a new
+  moves only the host's version of the proposed changes, reads it again), else from a new
   read; `withdraw` and `forget` remove it; an acceptance writes it marked
-  accepted (`acceptedAs`; a record from before ADR-0083 says `taken`,
-  read as the same).
+  accepted (`acceptedAs`).
   Each write is skipped when it changes nothing, and the records are read
   only for that. A base record that changed is reported (`baseChanged`), so a
   running thread whose base now has news is told (`base-news.ts`,
@@ -1532,22 +1541,22 @@ adapter's.
   command; `act.ts` and `stack.ts` are the actions and a split's stack;
   `marks.ts` is `planMarks`.
 - **A root archived or restored moves its lanes' refs in an owner
-  command** (`Offers.moveLanes`, called by `work/archive.ts`), then marks
-  each lane: an archived thread's offer is withdrawn, a restored one's built
+  command** (`ProposedChanges.moveLanes`, called by `work/archive.ts`), then marks
+  each lane: an archived thread's proposed changes are withdrawn, a restored one's built
   again (ADR-0061).
-- **An acceptance names the offer it was shown** (`OfferSeen`, ADR-0065): the
+- **An acceptance names the proposed changes it was shown** (`ProposedChangesSeen`, ADR-0065): the
   ledger its record carried, and whether it conflicted, which the page's
-  session client reads from the record as it sends (`offerSeen`).
-  `planOfferAcceptance` refuses `offer_changed` when the ledger now differs (its source, or its
-  start as a set), or the offer conflicts now and did not then. A rebase
+  session client reads from the record as it sends (`proposedChangesSeen`).
+  `planAcceptance` refuses `offer_changed` when the ledger now differs (its source, or its
+  start as a set), or the proposed changes conflict now and did not then. A rebase
   onto a moved target and your edit keep the ledger, and are accepted.
-- **An acceptance names its destination** (`planOfferAcceptance`): one of
-  `offerAcceptanceDestinations`, and refused (`bad_destination`) unless the bookmark is
-  at or below the offer's bottom's parent, read in the same command
-  (`gatherOfferAcceptance`). jj's
+- **An acceptance names its destination** (`planAcceptance`): one of
+  `acceptanceDestinations`, and refused (`bad_destination`) unless the bookmark is
+  at or below the proposed changes' bottom's parent, read in the same command
+  (`gatherAcceptance`). jj's
   refusal of a backwards move is the second guard (S77 item 1).
 - **Setup and publish** (`jj/accepted.ts`, created by the adapter's start beside
-  the offers, which rewrite its record when the owner observes accepted work or
+  the proposed changes, which rewrite its record when the owner observes accepted work or
   your `@` move): decided by `@pinetrie/rules` (`planAcceptedAction`), its steps
   `@pinetrie/jj`'s. `setup` creates accepted work's bookmark at your `@-` and
   writes `immutable_heads()` and `revsets.log` to the repo's config, the

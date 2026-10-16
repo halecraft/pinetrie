@@ -136,8 +136,8 @@ export interface TextMerged {
 }
 
 /**
- * A change to a lane's states directory, which its container sees
- * read-only: the state its offer is computed against (`start`), and each
+ * A change to a lane's states directory, which its container sees read-only:
+ * the state its proposed changes are computed against (`start`), and each
  * conflict's three versions. The directory goes with its lane's disk.
  */
 export type LaneStatesOp =

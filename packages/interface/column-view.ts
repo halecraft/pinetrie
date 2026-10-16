@@ -20,11 +20,11 @@ import {
   type LaneRecord,
   type LaneView,
   messageText,
-  type OfferRecord,
   type PinnedCardRead,
   type PinnedView,
   type Position,
   type ProjectRecord,
+  type ProposedChangesRecord,
   pinnedInView,
   promptOf,
   type RevisionRecord,
@@ -48,19 +48,19 @@ import {
   catchUpOf,
   displayName,
   type FilesLostRecord,
-  type OfferActivity,
-  type OfferButton,
-  type OfferView,
-  offerStatus,
-  offerView,
   type ParentNow,
   type PinnedStatus,
   parentNow,
   pinnedDiff,
   pinnedReads,
+  proposedChangesStatus,
   type QueuedCard,
+  type WorkStripActivity,
+  type WorkStripButton,
+  type WorkStripView,
+  workStripView,
 } from "@pinetrie/rules"
-import type { OfferActing } from "@pinetrie/session"
+import type { ProposedChangesActing } from "@pinetrie/session"
 import { type AccessView, accessView } from "./access-view.ts"
 import { commandWords } from "./card-words.ts"
 import type { ColumnView } from "./column-paths.ts"
@@ -96,8 +96,8 @@ export interface WorkFacts {
   readonly commands: readonly CommandSummary[]
   readonly lanes: ReadonlyMap<ThreadId, LaneRecord>
   readonly revisions: ReadonlyMap<EntryId, RevisionRecord>
-  /** Each lane's offer in your repo. */
-  readonly offers: ReadonlyMap<ThreadId, OfferRecord>
+  /** Each lane's proposed changes in your repo. */
+  readonly proposedByLane: ReadonlyMap<ThreadId, ProposedChangesRecord>
   readonly names: ReadonlyMap<ThreadId, ThreadName>
   readonly banners: ReadonlyMap<ThreadId, BannerRecord>
   /** Where icons come from; null before a host published it. */
@@ -255,55 +255,52 @@ export interface LaneJoin {
   readonly from: { readonly name: ThreadName | undefined } | null
 }
 
-/** An offer's words: its line, and a label for each button and menu row. */
-export interface OfferWords {
+/** Proposed changes' words: its line, and a label for each button and menu row. */
+export interface WorkStripWords {
   readonly line: string
-  /** Your last offer command here: in flight, refused or failed; null for none. */
+  /** Your last command on proposed changes here: in flight, refused or failed; null for none. */
   readonly note: string | null
   readonly buttons: readonly LabelledButton[]
   readonly menu: readonly LabelledButton[]
 }
 
 export interface LabelledButton {
-  readonly button: OfferButton
+  readonly button: WorkStripButton
   readonly label: string
   /** What it does in jj, for whoever works there too; or why it is disabled. */
   readonly title?: string
-  /** It would change nothing now (`OfferView.quiet`). */
+  /** It would change nothing now (`WorkStripView.quiet`). */
   readonly disabled?: true
 }
 
 /**
- * What a review is read from: an offer's revisions, or an ask's
+ * What a review is read from: proposed changes' revisions, or an ask's
  * range, each a span, and which of their files to flag. `title`
  * heads a review whose spans have no description: an ask's line.
  */
 export interface ReviewTarget {
   readonly lane: ThreadId
   readonly conflicts: readonly string[]
-  /** Files you are editing in your working copy: a jj offer's alone. */
+  /** Files you are editing in your working copy: jj proposed changes' alone. */
   readonly yourEdits: readonly string[]
   readonly spans: readonly DiffSpan[]
   readonly title?: string
 }
 
 /**
- * What became of a column's files: the offer, with what its review reads
- * while it is open and holds files.
+ * What became of a column's files: the proposed changes, with what its review
+ * reads while it is open and holds files.
  */
-export type WorkStrip =
-  | {
-      readonly kind: "offer"
-      readonly state: OfferView["state"]
-      readonly words: OfferWords
-      /** Your offer command here is out: the buttons wait for its answer. */
-      readonly waiting: boolean
-      readonly bookmark: string | null
-      readonly review: ReviewTarget | null
-      /** Where `accept` and `accept-into-accepted` go. */
-      readonly destinations: OfferView["destinations"]
-    }
-  | { readonly kind: "none" }
+export interface WorkStrip {
+  readonly state: WorkStripView["state"]
+  readonly words: WorkStripWords
+  /** Your command on proposed changes here are out: the buttons wait for its answer. */
+  readonly waiting: boolean
+  readonly bookmark: string | null
+  readonly review: ReviewTarget | null
+  /** Where `accept` and `accept-into-accepted` go. */
+  readonly destinations: WorkStripView["destinations"]
+}
 
 export interface ColumnFacts {
   readonly index: TreeIndex
@@ -326,8 +323,8 @@ export interface ColumnFacts {
   readonly work: WorkFacts
   /** The cards queued on its lane, in the order they are popped (`queuedOn`). */
   readonly queued: readonly QueuedCard[]
-  /** Your last offer command on the column's lane (`acting.ts`); null for none. */
-  readonly acting: OfferActing | null
+  /** Your last command on proposed changes on the column's lane (`acting.ts`); null for none. */
+  readonly acting: ProposedChangesActing | null
   readonly origins: OriginFacts
 }
 
@@ -336,7 +333,8 @@ export interface ColumnShows {
   readonly origin: HeadOrigin
   /** Dividers, by the entry they sit above. */
   readonly joins: ReadonlyMap<EntryId, LaneJoin>
-  readonly strip: WorkStrip
+  /** Null for a column with no lane of its own that it may write. */
+  readonly strip: WorkStrip | null
   /** The access row: the lane's ssh identities; null when it holds and used none. */
   readonly access: AccessView | null
   /** What `Column` does to have its thread named before it starts. */
@@ -630,20 +628,18 @@ function joinsOf(
   return joins
 }
 
-const NO_STRIP: WorkStrip = { kind: "none" }
-
-function workStrip(f: ColumnFacts, parent: ParentNow | null): WorkStrip {
+function workStrip(f: ColumnFacts, parent: ParentNow | null): WorkStrip | null {
   const { lane, work } = f
   const project = work.project
-  if (!f.writable || lane.kind !== "lane" || project === null) return NO_STRIP
+  if (!f.writable || lane.kind !== "lane" || project === null) return null
   const record = work.lanes.get(lane.name)
-  if (record === undefined || record.history === null) return NO_STRIP
-  const offer = offerStatus(work.offers.get(lane.name))
+  if (record === undefined || record.history === null) return null
+  const proposed = proposedChangesStatus(work.proposedByLane.get(lane.name))
   const base = work.bases.get(lane.name) ?? null
   const jjBase = base?.kind === "jj" ? base : null
   const accepted = work.accepted?.kind === "jj" ? work.accepted : null
-  const view = offerView({
-    offer,
+  const view = workStripView({
+    proposed,
     activity: activityOf(f.index, lane),
     asked: conflictAskedAt(f.index, lane.tip),
     base,
@@ -668,18 +664,17 @@ function workStrip(f: ColumnFacts, parent: ParentNow | null): WorkStrip {
       parent !== null && f.lanes.some(l => l.name === parent.lane && l.running),
   })
   return {
-    kind: "offer",
     state: view.state,
-    words: offerWords(view, f.acting),
+    words: workStripWords(view, f.acting),
     waiting: f.acting?.kind === "sent",
     bookmark: view.facts.bookmark,
     destinations: view.destinations,
-    review: offer.kind === "open" ? offerReview(offer.record) : null,
+    review: proposed.kind === "open" ? proposedReview(proposed.record) : null,
   }
 }
 
-/** What an open offer's review reads: a jj offer's revisions, or a folder offer's range. */
-const offerReview = (record: OfferRecord): ReviewTarget =>
+/** What open proposed changes' review reads: jj proposed changes' revisions, or folder proposed changes' range. */
+const proposedReview = (record: ProposedChangesRecord): ReviewTarget =>
   record.kind === "folder"
     ? {
         lane: record.lane,
@@ -694,11 +689,11 @@ const offerReview = (record: OfferRecord): ReviewTarget =>
         yourEdits: record.yourEdits,
       }
 
-/** What a lane runs now, as its offer cares: a turn, a resolution, a split. */
+/** What a lane runs now, as its proposed changes cares: a turn, a resolution, a split. */
 export function activityOf(
   index: TreeIndex,
   view: LaneView | undefined,
-): Exclude<OfferActivity, "catch-up"> {
+): Exclude<WorkStripActivity, "catch-up"> {
   if (view === undefined || !view.running) return "idle"
   const prompt = promptOf(index, view.tip)
   const role =
@@ -710,7 +705,7 @@ export function activityOf(
 
 const BUTTON_LABEL: Record<
   Exclude<
-    OfferButton,
+    WorkStripButton,
     | "accept"
     | "accept-into-accepted"
     | "update"
@@ -725,21 +720,24 @@ const BUTTON_LABEL: Record<
   refresh: "refresh (discards your edits)",
 }
 
-/** What an offer command in flight says, until the host answers. */
-const SENDING: Record<Exclude<OfferActing["action"], "accept">, string> = {
+/** What a command on proposed changes in flight says, until the host answers. */
+const SENDING: Record<
+  Exclude<ProposedChangesActing["action"], "accept">,
+  string
+> = {
   squash: "squashing to one…",
   describe: "rewriting the description…",
   refresh: "refreshing…",
 }
 
 /**
- * Your last offer command, worded: an acceptance in flight names a WIP it
- * goes into ("accepting into wip/search…"), the rest their own words; a
- * refusal or a failure as every command's (`outcomeWords`).
+ * Your last command on proposed changes, worded: an acceptance in flight names
+ * a WIP it goes into ("accepting into wip/search…"), the rest their own words;
+ * a refusal or a failure as every command's (`outcomeWords`).
  */
 function actingWords(
-  acting: OfferActing | null,
-  destinations: OfferView["destinations"],
+  acting: ProposedChangesActing | null,
+  destinations: WorkStripView["destinations"],
 ): string | null {
   if (acting === null) return null
   if (acting.kind !== "sent") return outcomeWords(acting)
@@ -751,17 +749,17 @@ function actingWords(
 }
 
 /**
- * Why a folder offer's accept is disabled: the accept button's title, and
- * the host's words when it refuses one.
+ * Why folder proposed changes' accept is disabled: the accept button's title,
+ * and the host's words when it refuses one.
  */
 export const ACCEPT_LATER =
   "accepting comes in a later step for a project without a jj repo"
 
-/** Every word an offer shows: its line, and its buttons' labels by state. */
-export function offerWords(
-  view: OfferView,
-  acting: OfferActing | null,
-): OfferWords {
+/** Every word proposed changes show: its line, and its buttons' labels by state. */
+export function workStripWords(
+  view: WorkStripView,
+  acting: ProposedChangesActing | null,
+): WorkStripWords {
   const { state, facts } = view
   const files = count(facts.files, "file", "files")
   const yours = facts.touchesYourEdits ? " · touches files you're editing" : ""
@@ -782,7 +780,7 @@ export function offerWords(
   const said =
     state === "nothing"
       ? facts.untraced
-        ? `an earlier accept of this thread can't be traced: catch up with ${base} to offer what's new`
+        ? `an earlier accept of this thread can't be traced: catch up with ${base} to show what's new`
         : brings
           ? moved
           : facts.held
@@ -797,20 +795,20 @@ export function offerWords(
             ? `catching up with ${base}…`
             : facts.activity === "resolution"
               ? `resolving what's new in ${base} into this thread`
-              : "splitting the offer into a stack"
+              : "splitting the changes into a stack"
           : state === "accepted"
             ? `accepted as ${(facts.acceptedAs ?? "").slice(0, 8)}`
             : state === "needs_you"
               ? "the agent has a question about your edits · see the thread"
               : state === "edited"
-                ? `you edited this offer${conflicts === "" ? "" : ` · ${conflicts}`}`
+                ? `you edited these changes${conflicts === "" ? "" : ` · ${conflicts}`}`
                 : state === "conflicts"
                   ? conflicts
                   : state === "stale"
                     ? `a stack of ${facts.size}, and changes since`
                     : state === "stack"
-                      ? `a stack of ${facts.size} · ${files} ready${yours}`
-                      : `${files} ready${yours}`
+                      ? `a stack of ${facts.size} · ${files} changed${yours}`
+                      : `${files} changed${yours}`
   const line =
     brings && state !== "nothing" && state !== "busy" && state !== "running"
       ? `${said} · ${baseMovedOn(facts.base)}`
@@ -835,11 +833,11 @@ export function offerWords(
         ? `accept stack and the rest${where}`
         : facts.conflicts > 0 || state === "needs_you"
           ? `accept anyway${where}`
-          : `accept${where}`
+          : `accept changes${where}`
   }
   const baseBookmark =
     facts.base.kind === "accepted" ? intoBookmark : facts.base.bookmark
-  const labelled = (button: OfferButton): LabelledButton => {
+  const labelled = (button: WorkStripButton): LabelledButton => {
     switch (button) {
       case "accept":
         return {
@@ -901,7 +899,7 @@ export function offerWords(
     }
   }
   /** A quiet button is drawn disabled: it would change nothing now, or cannot yet be done. */
-  const shown = (button: OfferButton): LabelledButton =>
+  const shown = (button: WorkStripButton): LabelledButton =>
     view.quiet.includes(button)
       ? { ...labelled(button), disabled: true }
       : labelled(button)

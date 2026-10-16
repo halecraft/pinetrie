@@ -55,7 +55,7 @@ it.
 | `openThreads` (`open-threads.ts`) | the sidebar: the tasks you have open, in your order (ADR-0122, ADR-0116) | `placeInList`, `planOpenRepair` (`open-repair.ts`) |
 | `presenceSeat` (`presence-seat.ts`) | this seat's reading and typing | none |
 | `hostLine` (`host-line.ts`) | the requests waiting for their replies | `encodeIntent`, `decodeReply` |
-| one `snapshotStore<ActingState>` | your offer and setup and publish commands out | `nextActing` (`acting.ts`) |
+| one `snapshotStore<ActingState>` | your proposed changes and setup and publish commands out | `nextActing` (`acting.ts`) |
 | `chat` | what a chat asks the host, and what it draws | `planChatRequest` (`chat.ts`) |
 
 - **Order matters to Kyneta.** `writersPolicy` is registered before the
@@ -251,7 +251,7 @@ the two merge (S101), so a writer asks `ready()` first.
 ## What you have dealt with (`attention-doc.ts`, `read-marks.ts`, ADR-0077)
 
 - **`attentionStore`** reads your `AttentionDoc` (`readAttention`) and
-  writes it: read marks, "not needed" (`dismiss`, `dismissOffer`) and the
+  writes it: read marks, "not needed" (`dismiss`, `dismissReady`) and the
   inbox's seen mentions (`setInbox`, as the page's `inbox.ts` decides
   them). Nothing is written before `ready()`; a click before then is
   dropped.
@@ -285,15 +285,15 @@ the two merge (S101), so a writer asks `ready()` first.
 - **`placeInList` renumbers** when `orderBetween` finds no room between a
   task's neighbours, as the board does.
 
-## Your offer and setup and publish commands (`acting.ts`)
+## Your proposed changes and setup and publish commands (`acting.ts`)
 
-`SessionClient.offer` and `.line` go through `sendActing`, which marks the
+`SessionClient.proposed` and `.line` go through `sendActing`, which marks the
 command `sent` in the `acting` store at once and records the answer when it
 comes; `nextActing` decides. A refusal or failure stays until your next
 command on that lane (or accepted work, ADR-0104); an answer that carried
-it out clears it, since the record then says how things stand. An acceptance names the offer
-this tab's record shows as it sends (`offerSeen`, ADR-0065). A split is
-no offer command: it is a card's command, queued (ADR-0080).
+it out clears it, since the record then says how things stand. An acceptance names the proposed changes
+this tab's record shows as it sends (`proposedChangesSeen`, ADR-0065). A split is
+no command on proposed changes: it is a card's command, queued (ADR-0080).
 A refusal keeps its code (`Unsuccessful.code`). A setup or publish's
 refusal or failure is shown by the page's publish toast, not a menu
 (ADR-0090); a conflict in the working copy is said there, and left to jj

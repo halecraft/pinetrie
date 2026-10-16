@@ -76,18 +76,18 @@ describe("runsIn: what each command runs or writes a message in", () => {
       [{ kind: "thread", thread: T }],
     ],
     [
-      "an offer's description, asked of its agent",
-      { kind: "offer", lane: T, action: "describe", to: null, seen: null },
+      "proposed changes' description, asked of its agent",
+      { kind: "proposed", lane: T, action: "describe", to: null, seen: null },
       [{ kind: "thread", thread: T }],
     ],
     [
-      "an offer's refresh, which may ask for a description",
-      { kind: "offer", lane: T, action: "refresh", to: null, seen: null },
+      "proposed changes' refresh, which may ask for a description",
+      { kind: "proposed", lane: T, action: "refresh", to: null, seen: null },
       [{ kind: "thread", thread: T }],
     ],
     [
       "an acceptance: your repo alone",
-      { kind: "offer", lane: T, action: "accept", to: null, seen: null },
+      { kind: "proposed", lane: T, action: "accept", to: null, seen: null },
       [],
     ],
     [

@@ -10,9 +10,9 @@ words they were written with.
 | word | what it is | in code | retired |
 |---|---|---|---|
 | **accepted work** | The commits finished work lands on, under the bookmark `pinetrie-accepted` (config `accepted.bookmark`). It only moves forward. A folder project's accepted work is its folder, read into states on its line. | `accepted`, `AcceptedRecord`, `AcceptedFacts`, `acceptedBookmark`, `AcceptsInto`, `FolderAcceptedRecord`, `folderNewest` | the line, the integration line, the project, `onto`, `pinetrie-onto`, your folder |
-| **accept** | Move an offer into accepted work, or into a WIP: its bookmark moves forward to the offer. | `accept`, `planOfferAcceptance`, `acceptedAs` | integrate, take (of an offer), land, add to the project |
-| **accepted-offer commit** | The commit an accepted offer leaves, carrying `Pinetrie-Source`. | `AcceptedOfferCommit`, `acceptedOfferCommits` | integrated-offer commit |
-| **offer** | A thread's work, as one revision or a stack, waiting to be accepted, under `pinetrie-offer/<thread name>`. | `offer`, `OfferRecord` | |
+| **accept** | Move proposed changes into accepted work, or into a WIP: its bookmark moves forward to the proposed changes. | `accept`, `planAcceptance`, `acceptedAs` | integrate, take (of proposed changes), land, add to the project, merge |
+| **accepted thread commit** | A commit in accepted work that a thread's work became, carrying `Pinetrie-Source` (ADR-0153). Every commit in accepted work is accepted, yours too, so the name says it was a thread's. | `AcceptedThreadCommit`, `acceptedThreadCommits` | accepted-offer commit, integrated-offer commit |
+| **proposed changes**, read as **changes** | A thread's work waiting to be accepted: one revision or a stack under `pinetrie-proposed/<thread name>`, or a folder project's files. People read **changes** ("2 files changed", **accept changes**); code, docs and the agent say **proposed changes**, and *changes* is never bare in code (ADR-0156). | `ProposedChangesInRepo`, `ProposedChangesRecord`, `ProposedChangesStatus`, `proposedBookmark`, `PROPOSED_CHANGES` (`pinetrie.proposed`) | offer |
 | **WIP** | A bookmark (prefix `wip/`, config `wip.prefix`) a thread may start from and be accepted into. | `wip`, `wipPrefix` | |
 | **publish** | Move `main` (config `publish.bookmark`) forward to accepted work; with `publish.catchUp` on, catch the working copy up and accept your commits below `@` first (ADR-0099). | `publish`, `publishCatchesUp` | |
 | **set up** | Create accepted work's bookmark at your `@-` and write its `immutable_heads()` and `revsets.log` to your repo's config. | `setup`, `planSetup`, `setupProposal` | |
@@ -25,6 +25,11 @@ words they were written with.
 | **base** | Where a thread started: accepted work, or a copy of a WIP. Its first commit's `Pinetrie-Base` trailer says which (`accepted@<commit>`, or `<wip>@<commit>`). | `base`, `LaneBase`, `BaseTrailer` | the line (as a base) |
 | **catch up** | Bring the working copy, or a thread's copy, up to date with what it is based on. Its commit is titled `catch up: accepted work`, `catch up: <thread>`, or `copy of <wip>`. | `catchUp`, `CatchUpFrom`, `catchUpName` | update, follow, bring up to date |
 | **lane** | A thread's own copy of your repo, in a container of its own (ADR-0034), named by its thread's id (ADR-0117). | `lane`, `ThreadId`, `laneOf` | |
+| **work strip** | The row of a column's header that says what became of its thread's files, with its buttons and its ⋯ (ADR-0153). | `WorkStripView`, `workStripView`, `WorkStripButton`, `WorkStripWords`, `.work-strip` | offer view, offer strip |
+| **review** | The pane that shows proposed changes' or an ask's revisions, files and diffs, read by commit id (`/review/…`, ADR-0047, ADR-0153). | `ReviewAsk`, `ReviewAnswer`, `parseReviewPath`, `REVIEW_WIRE` | offer read, `/offer/` |
+| **ready** | An inbox item for proposed changes you follow, waiting to be accepted; "not needed" dismisses it (ADR-0091, ADR-0153). | raised kind `ready`, `dismissReady`, `dismissedReady` | |
+| **change id** | jj's id of a revision, kept across its rewrites; never called "change" alone (ADR-0153). | `changeId`, `changeIdsOf` | change (for the id) |
+| **files touched** | Whether a lane's work since its start changes any file: `none`, `some` or `unknown` (ADR-0067, ADR-0153). | `FilesTouched`, `filesTouched` | `WorkChanges` |
 
 ## A folder project
 
@@ -44,7 +49,7 @@ words they were written with.
 | **state** (of a folder project) | A point of a folder project's history: a snapshot, recorded with its parents when it is made, never changed after (ADR-0142). | `StateRecord`, `STATE`, `planState`, `StateGraph` | |
 | **merge base** | Where two states' histories last met: their lowest common ancestor; several are merged first into one virtual base, never one chosen (ADR-0142). | `mergeBases`, `planBase`, `BasePlan` | |
 | **conflict** (a folder lane's) | A path a merge into a lane could not merge, kept as the lane's, recorded with the states of its base and both sides, whose three versions the lane reads (ADR-0142). | `ConflictRecord`, `CONFLICT`, `planPathMerge` | |
-| **source** | A path `.gitignore` does not ignore: what the project is made of, committed and offered (ADR-0135). | `PathClass` `"source"` | tracked (as a class) |
+| **source** | A path `.gitignore` does not ignore: what the project is made of, committed and proposed (ADR-0135). | `PathClass` `"source"` | tracked (as a class) |
 | **derived** | An ignored path a command made from source: a lane drops it when what it was made from changes, and makes it again. | `PathClass` `"derived"`, `TurnDisk.derived` | recipe output |
 | **local** | An ignored path no command made from source, such as `.env`: it stays on its disk, and is never sent. The page counts **local files**. | `PathClass` `"local"`, `TurnDisk.local` | ignored file |
 | **recipe** | A recorded command that made derived files, kept with what it read; never declared. | `Recipe`, `Registry` | `lanes.install` |
@@ -117,7 +122,7 @@ a value is stored.
 | **block** | Part of a message: a paragraph, a table, code, an image, numbered once by its kind in document order (ADR-0126). | `BlockRef`, `blocksOf`, `markBlocks`, `data-block` | |
 | **address** | What names a thread, an entry, a block, a range of text or a card; of the past, both a snapshot and a link (ADR-0126). | `Address`, `printAddress`, `parseAddress`, `/a/<address>` | |
 | **message** | An entry a person or the agent wrote. | `TranscriptMessage`, roles `chat` and `assistant` | |
-| **fact** | An entry the host wrote: a catch-up, an acceptance, the base's news (ADR-0080), who stopped a run (ADR-0126). | roles `fact`, `update`, `land`, `behind`; `OfferFact`, `StopFact`, `QueuedFact`, `AskIndex.stoppedBy` | `pinetrie.stop` |
+| **fact** | An entry the host wrote: a catch-up, an acceptance, the base's news (ADR-0080), who stopped a run (ADR-0126). | roles `fact`, `update`, `land`, `behind`; `ProposedChangesFact`, `StopFact`, `QueuedFact`, `AskIndex.stoppedBy` | `pinetrie.stop` |
 | **run** | The agent's work in answer to an ask: the entries it wrote, and any fact steered into it. A run has an ask (ADR-0106). | `AskIndex.work`, `runOf` | |
 | **ask** | The message that started a run (ADR-0106). | `askOf`, `indexAsks` (by prompt) | |
 | **fork** | The point, at an entry, where threads diverge; not an entry. Forking before an entry edits it (ADR-0043); after it, branches. | `ThreadOrigin.fork` | |
@@ -134,7 +139,7 @@ a value is stored.
 | **workflow state** | A column of the board: Backlog, Doing, or any a team makes. Every task is in one. | `WorkflowState`, `Workflow`, `boardOf` | |
 | **team** | The people who share a board, its tasks and, later, its sources and runners: today, everyone in the session (ADR-0126). | the session | the host's session, as the board's owner |
 | **the archive** | The board's last workflow state, always there, named Done in a new session and renamed as any state is. | `Workflow.archive` | the closed state, the Archive tab |
-| **archived** | In the archive: read-only for everyone, unloaded by the host, its threads' offers withdrawn, until moved out (**restore**). | `archivedOf`, `archivedIn`, `planArchive`, `readArchived` | closed |
+| **archived** | In the archive: read-only for everyone, unloaded by the host, its threads' proposed changes withdrawn, until moved out (**restore**). | `archivedOf`, `archivedIn`, `planArchive`, `readArchived` | closed |
 
 ## The canvas
 
@@ -157,7 +162,7 @@ Nothing in the code uses them yet, beyond a reserved id (`MediaId`,
 | **file card** | A card showing one file of a source: as it is on disk for a live or read-only source, as accepted work has it for a branched one. | ADR-0116 | |
 | **media card** | A card showing an image, a video or a piece of art, kept as a blob. | ADR-0116 | |
 | **source** | A folder the host's owner registers, which a thread's lane gets in one of three modes. | ADR-0118 | the host's one project |
-| **branched**, **live**, **read-only** | A source's modes: its own copy in the lane, whose work comes back as an offer; a read-write mount, never branched; a read-only mount. | ADR-0118 | |
+| **branched**, **live**, **read-only** | A source's modes: its own copy in the lane, whose work comes back as proposed changes; a read-write mount, never branched; a read-only mount. | ADR-0118 | |
 | **runner** | Where a lane runs: the host that holds it, that host's machine, and the model of each run. | ADR-0119 | |
 | **consume** | What a thread's live end does to a card: a send, a fact popped. The card ends; the entry it became is the record. A spin sends its card to the trash instead, so it can be undone. | ADR-0126 | |
 | **party** | A person or a team: what owns a surface that no content does (an inventory, a trash, a board). | ADR-0126 | |
@@ -177,7 +182,7 @@ word alone.)
   and Kyneta's command **Line** (`host/control.ts`), one per seat. None of
   them is accepted work, and none is a shared file's **lineage**.
 - **take**: take a card into your inventory (ADR-0083); a thread's run
-  stops as it is taken (ADR-0124). Nothing is done to an offer by taking
+  stops as it is taken (ADR-0124). Nothing is done to proposed changes by taking
   it.
 - **close**: what × does in the sidebar, for you alone, writing nothing
   shared. Nothing archives by closing.
@@ -213,7 +218,7 @@ word alone.)
   the host's session document (`SessionDocHandle`, its records) and pi's
   session, one per root; neither is what a person reads as a session.
 - **accept** in plain English: the host accepts a command or a write
-  (`acceptsWrite`, a move `accepted`). Only an offer is *accepted* into
+  (`acceptsWrite`, a move `accepted`). Only proposed changes are *accepted* into
   accepted work.
 
 ## Where these are configured

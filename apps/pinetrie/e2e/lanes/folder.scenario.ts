@@ -1,8 +1,9 @@
 // e2e/lanes/folder — a folder with no jj repo served: a thread works in its
-// lane, its offer is the files it changed; the project's folder, edited, is read once
-// it is quiet; a clean catch-up, then one that conflicts, its versions in the
-// lane and resolved by `resolve_conflict`; nothing written in the project's folder.
-// Then the folder becomes a jj repo, and the folder lane is refused.
+// lane, its proposed changes are the files it changed; the project's folder,
+// edited, is read once it is quiet; a clean catch-up, then one that conflicts,
+// its versions in the lane and resolved by `resolve_conflict`; nothing written
+// in the project's folder. Then the folder becomes a jj repo, and the folder
+// lane is refused.
 
 import {
   chmodSync,
@@ -24,7 +25,7 @@ import {
   type ThreadId,
 } from "@pinetrie/core"
 import { scriptedModel } from "@pinetrie/pi"
-import { readAccepted, readOffers, readPlaces } from "@pinetrie/reads"
+import { readAccepted, readPlaces, readProposedByLane } from "@pinetrie/reads"
 import { foreignLaneWords } from "@pinetrie/rules"
 import { rowMessage } from "@pinetrie/schema"
 import type { Checks } from "../checks.ts"
@@ -113,7 +114,8 @@ async function folderSection(
   }
   try {
     const before = listing(dir)
-    // 1. A thread writes a file in its lane; its offer is that file.
+    // 1. A thread writes a file in its lane; its proposed changes are that
+    //    file.
     script.use([
       { tool: "write", args: { path: "b.txt", content: "lane's\n" } },
       { text: "wrote" },
@@ -122,27 +124,27 @@ async function folderSection(
     await idle()
     const lane = laneWith("@agent write b")?.name
     if (lane === undefined) throw new Error("no lane")
-    const offerOf = () => {
-      const o = readOffers(wh.session).get(lane)
+    const proposedFromRows = () => {
+      const o = readProposedByLane(wh.session).get(lane)
       return o?.kind === "folder" && o.files.length > 0 ? o : undefined
     }
-    await waitFor(() => offerOf() !== undefined, 60_000)
-    const offer = offerOf()
+    await waitFor(() => proposedFromRows() !== undefined, 60_000)
+    const proposed = proposedFromRows()
     check(
-      "a folder lane's offer is the files it changed, against accepted work's newest state",
-      offer?.kind === "folder" &&
-        offer.files.join() === "b.txt" &&
+      "a folder lane's proposed changes are the files it changed, against accepted work's newest state",
+      proposed?.kind === "folder" &&
+        proposed.files.join() === "b.txt" &&
         readAccepted(wh.session)?.kind === "folder",
-      JSON.stringify(offer),
+      JSON.stringify(proposed),
     )
     const review = await fetch(
       new URL(
-        `/offer/3/review/${offer?.kind === "folder" ? `${offer.start}..${offer.tip}` : ""}`,
+        `/review/3/review/${proposed?.kind === "folder" ? `${proposed.start}..${proposed.tip}` : ""}`,
         wh.httpUrl,
       ),
     ).then(r => (r.ok ? r.json() : r.status))
     check(
-      "the offer is reviewed as files, with their line counts",
+      "the proposed changes are reviewed as files, with their line counts",
       typeof review === "object" &&
         JSON.stringify(review).includes('"path":"b.txt"'),
       JSON.stringify(review),

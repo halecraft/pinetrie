@@ -4,7 +4,7 @@ import {
   indexTree,
   type LaneView,
   NO_CONTENT,
-  type OfferRecord,
+  type ProposedChangesRecord,
   rootIdFor,
   type ThreadId,
   taskIdFor,
@@ -55,7 +55,7 @@ const input = (over: Partial<AppViewInput>): AppViewInput => ({
   archived: new Map(),
   workflow: WORKFLOW,
   nameOf,
-  offers: new Map(),
+  proposedByLane: new Map(),
   access: new Map(),
   lanes: [],
   laneRoots: new Map(),
@@ -115,13 +115,13 @@ test("readOnlyWords offers no Restore before the board has states", () => {
   })
 })
 
-test("the header's offers are the open ones: a held lane's at its tip, another's at its root", () => {
+test("the header's proposed changes are the open ones: a held lane's at its tip, another's at its root", () => {
   const A = threadIdFor("a")
   const B = threadIdFor("b")
   const C = threadIdFor("c")
   const D = threadIdFor("d")
   const E = threadIdFor("e")
-  const offer = (
+  const proposed = (
     lane: ThreadId,
     acceptedAs: string | null,
     files = ["a.txt"],
@@ -133,17 +133,17 @@ test("the header's offers are the open ones: a held lane's at its tip, another's
       files,
       edited: false,
       ledger: lane === A ? { source: cardIdFor("ca"), start: [] } : null,
-    }) as unknown as OfferRecord
+    }) as unknown as ProposedChangesRecord
   const lane = (name: ThreadId, tip: string | null) =>
     ({ name, tip }) as unknown as LaneView
-  const { offers } = appView(
+  const { openProposed } = appView(
     input({
-      offers: new Map([
-        [A, offer(A, null)],
-        [B, offer(B, "accepted")],
-        [C, offer(C, null)],
-        [D, offer(D, null)],
-        [E, offer(E, null, [])],
+      proposedByLane: new Map([
+        [A, proposed(A, null)],
+        [B, proposed(B, "accepted")],
+        [C, proposed(C, null)],
+        [D, proposed(D, null)],
+        [E, proposed(E, null, [])],
       ]),
       lanes: [lane(A, "t1"), lane(B, "t2"), lane(C, null)],
       laneRoots: new Map([
@@ -155,7 +155,7 @@ test("the header's offers are the open ones: a held lane's at its tip, another's
       ]),
     }),
   )
-  expect(offers).toEqual([
+  expect(openProposed).toEqual([
     {
       lane: A,
       root: "r1",

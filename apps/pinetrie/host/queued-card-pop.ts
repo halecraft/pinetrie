@@ -414,8 +414,8 @@ async function catchUpThenSend(
 }
 
 /**
- * A card that splits the offer: the split's own run, the card's text its
- * intent; refused, the card goes back below the line, saying why.
+ * A card that splits the proposed changes: the split's own run, the card's text
+ * its intent; refused, the card goes back below the line, saying why.
  */
 async function splitThen(
   deps: QueuedCardPopDeps,

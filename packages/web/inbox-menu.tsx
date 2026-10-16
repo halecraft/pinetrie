@@ -140,7 +140,7 @@ export function useInboxMenu({
       className: `here-thread raised ${signalOfLevel(item.level)}`,
     },
     // An ssh ask clears when its owner answers it, in the column's header.
-    ...((item.raised.kind === "offer" && item.raised.source === null) ||
+    ...((item.raised.kind === "ready" && item.raised.source === null) ||
     item.raised.kind === "ssh"
       ? []
       : [

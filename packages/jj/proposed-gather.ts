@@ -1,47 +1,48 @@
-// Every read an offer step plans from, in core's types. The host passes in
-// what only the documents know (`OfferInput`). Nothing here writes. A refresh
-// of a lane on the line reads it in one `jj log` (`gatherLane`), every other
-// gather the separate reads: `repo.test.ts` holds them to the same values.
+// Every read a step on proposed changes plans from, in core's types. The host
+// passes in what only the documents know (`ProposedChangesInput`). Nothing here
+// writes. A refresh of a lane on the line reads it in one `jj log`
+// (`gatherLane`), every other gather the separate reads: `repo.test.ts` holds
+// them to the same values.
 
 import type {
+  AcceptanceFacts,
   CatchUpRead,
   CommitBase,
   CommitId,
+  FilesTouched,
   JjBaseRecord,
-  OfferAcceptanceFacts,
-  OfferGather,
-  OfferInRepo,
-  OfferPlace,
-  OfferSource,
+  ProposedChangesGather,
+  ProposedChangesInRepo,
+  ProposedChangesPlace,
+  ProposedSource,
   RefreshFacts,
   RepoConfig,
   StackFacts,
   StartRead,
   ThreadId,
   ThreadName,
-  WorkChanges,
 } from "@pinetrie/core"
 import { lines, type Runner } from "@pinetrie/lanes"
 import { readWipState } from "./accepted.ts"
 import { type CatchUpTarget, readCatchUp } from "./catch-up.ts"
 import { laneBase } from "./lane/base.ts"
-import { offerBookmark, revsetName } from "./lane/names.ts"
+import { proposedBookmark, revsetName } from "./lane/names.ts"
 import { commitsOf, titlesOf } from "./lane/revisions.ts"
 import { gatherLane } from "./lane-read.ts"
+import type { RepoOps, RepoReads } from "./owner.ts"
 import {
+  filesTouched,
   hostVersionOf,
   laneTipIn,
   query,
-  readOffer,
-  startOfOffer,
-  workChanges,
-} from "./offer.ts"
-import type { RepoOps, RepoReads } from "./owner.ts"
+  readProposedChanges,
+  startOfProposed,
+} from "./proposed.ts"
 
 /** What the documents say of a lane, read by the host before it gathers. */
-export interface OfferInput {
+export interface ProposedChangesInput {
   readonly lane: ThreadId
-  /** The thread's name: an offer is found by it. Undefined before it is named. */
+  /** The thread's name: proposed changes are found by it. Undefined before it is named. */
   readonly name: ThreadName | undefined
   readonly repoConfig: RepoConfig
   /** What catching up would change, as the page's base record last said: kept at the same tip and base commit (`readCatchUp`). */
@@ -78,7 +79,7 @@ const baseRecord = (
     readonly state: JjBaseRecord["state"]
     readonly start: StartRead
     readonly catchUp: CatchUpRead | null
-    readonly work: WorkChanges
+    readonly work: FilesTouched
   },
 ): JjBaseRecord => ({
   kind: "jj",
@@ -88,12 +89,12 @@ const baseRecord = (
   state: input.state,
   catchUp: input.catchUp,
   untraced:
-    input.start.kind === "untraced" ? input.start.acceptedOfferCommits : [],
+    input.start.kind === "untraced" ? input.start.acceptedThreadCommits : [],
   work: input.work,
 })
 
 /** A place with a target: untraced, or placed when its start is known. */
-type Sited = Exclude<OfferPlace, { readonly kind: "gone" }>
+type Sited = Exclude<ProposedChangesPlace, { readonly kind: "gone" }>
 
 /** Where a place with a target sits, decided once. */
 const sited = (input: {
@@ -116,7 +117,7 @@ const placeFrom = (input: {
   readonly state: JjBaseRecord["state"]
   readonly target: CommitId | null
   readonly start: StartRead
-}): OfferPlace => {
+}): ProposedChangesPlace => {
   const { state, target } = input
   return state === "gone" || target === null
     ? { kind: "gone", tip: input.tip, base: input.base }
@@ -133,18 +134,18 @@ const targetOf = (
 ): CatchUpTarget | null => (commit === null ? null : { kind, commit })
 
 /**
- * Where a lane's offer sits and starts, and its base record, by the separate
- * reads: its base from the lane's newest `Pinetrie-Base`, its target accepted work's
- * commit or the WIP's, its start `startOfOffer`. Null before the lane has a
- * tip here, or a accepted commit in its history.
+ * Where a lane's proposed changes sit and start, and its base record, by the
+ * separate reads: its base from the lane's newest `Pinetrie-Base`, its target
+ * accepted work's commit or the WIP's, its start `startOfProposed`. Null before
+ * the lane has a tip here, or a accepted commit in its history.
  */
 async function placeOf(
   jj: Runner,
-  input: OfferInput,
+  input: ProposedChangesInput,
 ): Promise<{
-  readonly place: OfferPlace
+  readonly place: ProposedChangesPlace
   readonly base: JjBaseRecord
-  readonly work: WorkChanges
+  readonly work: FilesTouched
 } | null> {
   const { repoConfig, lane } = input
   const tip = await laneTipIn(jj, lane)
@@ -160,13 +161,14 @@ async function placeOf(
       : state === "gone"
         ? null
         : targetOf("accepted", await commitOf(jj, repoConfig.acceptedBookmark))
-  const start = await startOfOffer(jj, { tip, base, repoConfig, lane })
+  const start = await startOfProposed(jj, { tip, base, repoConfig, lane })
   const catchUp =
     target === null
       ? null
       : await readCatchUp(jj, { base, start, target, tip, known: input.known })
-  // An untraced start reads nothing: its work is unknown, which builds no offer.
-  const work = await workChanges(jj, { start, tip })
+  // An untraced start reads nothing: its work is unknown, which builds no
+  // proposed changes.
+  const work = await filesTouched(jj, { start, tip })
   return {
     place: placeFrom({
       tip,
@@ -180,76 +182,79 @@ async function placeOf(
   }
 }
 
-/** Where a lane's offer sits and starts, with no read of the offer itself: a split's span. */
+/** Where a lane's proposed changes sit and start, with no read of the proposed changes itself: a split's span. */
 export const gatherPlace = (
   ops: Pick<RepoOps, "jj">,
-  input: OfferInput,
-): Promise<OfferPlace | null> =>
+  input: ProposedChangesInput,
+): Promise<ProposedChangesPlace | null> =>
   placeOf(ops.jj, input).then(read => read?.place ?? null)
 
 /**
  * The one gather an acceptance, a squash, a description and a split plan from:
- * where the lane's offer sits, and the offer as your repo holds it there.
- * Null offer with no name yet, or a WIP gone. Null before the lane has a tip
- * here. Writes nothing, so it runs in a step or pinned.
+ * where the lane's proposed changes sit, and the proposed changes as your repo
+ * holds it there. Null proposed changes with no name yet, or a WIP gone. Null
+ * before the lane has a tip here. Writes nothing, so it runs in a step or
+ * pinned.
  */
-export async function gatherOffer(
+export async function gatherProposedChanges(
   ops: Pick<RepoOps, "jj">,
-  input: OfferInput,
-): Promise<OfferGather | null> {
+  input: ProposedChangesInput,
+): Promise<ProposedChangesGather | null> {
   const read = await placeOf(ops.jj, input)
   if (read === null) return null
   const { place, base } = read
   const { name } = input
-  const offer =
+  const proposed =
     name === undefined || place.kind === "gone"
       ? null
-      : await readOffer(ops.jj, { name, target: place.target })
-  return { place, name, offer, base }
+      : await readProposedChanges(ops.jj, { name, target: place.target })
+  return { place, name, proposed, base }
 }
 
 /**
- * The offer under `name`'s bookmark at `target`, and whether the host's
- * version is left with no offer beside it: read only when there is none.
+ * The proposed changes under `name`'s bookmark at `target`, and whether the
+ * host's version is left with no proposed changes beside it: read only when
+ * there is none.
  */
-async function readOfferAndHost(
+async function readProposedAndHost(
   jj: Runner,
   name: ThreadName,
   target: string,
 ): Promise<{
-  readonly offer: OfferInRepo | null
+  readonly proposed: ProposedChangesInRepo | null
   readonly hostLeft: boolean
 }> {
-  const offer = await readOffer(jj, { name, target })
+  const proposed = await readProposedChanges(jj, { name, target })
   return {
-    offer,
+    proposed,
     hostLeft:
-      offer === null && (await hostVersionOf(jj, offerBookmark(name))) !== null,
+      proposed === null &&
+      (await hostVersionOf(jj, proposedBookmark(name))) !== null,
   }
 }
 
 /**
- * What a refresh plans from. An archived thread's offer is read against the
- * line: its lane's history is gone, and with it its base, and the thread's
- * trailer leaves a WIP's own commits out of the offer. A lane on accepted work is
- * read in one `jj log` with the shared facts; a lane on a WIP the
- * separate way, since its target and state need more of your repo.
+ * What a refresh plans from. An archived thread's proposed changes are read
+ * against the line: its lane's history is gone, and with it its base, and the
+ * thread's trailer leaves a WIP's own commits out of the proposed changes. A
+ * lane on accepted work is read in one `jj log` with the shared facts; a lane
+ * on a WIP the separate way, since its target and state need more of your repo.
  */
 export async function gatherRefresh(
   ops: RepoOps,
-  input: OfferInput & { readonly archived: boolean },
+  input: ProposedChangesInput & { readonly archived: boolean },
 ): Promise<RefreshGather> {
   const { jj } = ops
   const { lane, name, repoConfig } = input
   if (name === undefined) return { kind: "none" }
   if (input.archived) {
     const target = `present(${revsetName(repoConfig.acceptedBookmark)})`
-    const { offer, hostLeft } = await readOfferAndHost(jj, name, target)
+    const { proposed, hostLeft } = await readProposedAndHost(jj, name, target)
     return {
       kind: "plan",
       name,
       base: null,
-      facts: { kind: "archived", offer, hostLeft },
+      facts: { kind: "archived", proposed, hostLeft },
     }
   }
   const gathered = await gatherLane(jj, {
@@ -261,7 +266,7 @@ export async function gatherRefresh(
   })
   if (gathered === "none") return { kind: "none" }
   if (gathered !== "wip") {
-    const { tip, base, target, start, offer, hostLeft, work, catchUp } =
+    const { tip, base, target, start, proposed, hostLeft, work, catchUp } =
       gathered
     return {
       kind: "plan",
@@ -269,7 +274,7 @@ export async function gatherRefresh(
       base: baseRecord(lane, { base, state: "ok", start, catchUp, work }),
       facts: factsOf(sited({ tip, base, state: "ok", target, start }), {
         work,
-        offer,
+        proposed,
         hostLeft,
       }),
     }
@@ -278,12 +283,16 @@ export async function gatherRefresh(
   if (read === null) return { kind: "none" }
   const { place, base, work } = read
   if (place.kind === "gone") return { kind: "gone", base }
-  const { offer, hostLeft } = await readOfferAndHost(jj, name, place.target)
+  const { proposed, hostLeft } = await readProposedAndHost(
+    jj,
+    name,
+    place.target,
+  )
   return {
     kind: "plan",
     name,
     base,
-    facts: factsOf(place, { work, offer, hostLeft }),
+    facts: factsOf(place, { work, proposed, hostLeft }),
   }
 }
 
@@ -291,8 +300,8 @@ export async function gatherRefresh(
 const factsOf = (
   place: Sited,
   read: {
-    readonly work: WorkChanges
-    readonly offer: OfferInRepo | null
+    readonly work: FilesTouched
+    readonly proposed: ProposedChangesInRepo | null
     readonly hostLeft: boolean
   },
 ): RefreshFacts =>
@@ -301,26 +310,27 @@ const factsOf = (
         kind: "placed",
         place,
         work: read.work,
-        offer: read.offer,
+        proposed: read.proposed,
         hostLeft: read.hostLeft,
       }
-    : { kind: "untraced", offer: read.offer, hostLeft: read.hostLeft }
+    : { kind: "untraced", proposed: read.proposed, hostLeft: read.hostLeft }
 
 /**
- * What an acceptance reads besides its gather: how many of the WIP's commits land
- * with it on accepted work, and which of accepted work's and the WIP's bookmarks sit
- * at or below the offer's bottom's parent, so a move to one is forward. Null
- * without an offer to accept: none, divergent, or a WIP gone.
+ * What an acceptance reads besides its gather: how many of the WIP's commits
+ * land with it on accepted work, and which of accepted work's and the WIP's
+ * bookmarks sit at or below the proposed changes' bottom's parent, so a move to
+ * one is forward. Null without proposed changes to accept: none, divergent, or
+ * a WIP gone.
  */
-export async function gatherOfferAcceptance(
+export async function gatherAcceptance(
   ops: Pick<RepoOps, "jj">,
-  gathered: OfferGather,
+  gathered: ProposedChangesGather,
   repoConfig: RepoConfig,
-): Promise<OfferAcceptanceFacts | null> {
+): Promise<AcceptanceFacts | null> {
   const { jj } = ops
-  const { place, offer } = gathered
-  if (place.kind === "gone" || offer?.kind !== "offer") return null
-  const [bottom] = offer.revisions
+  const { place, proposed } = gathered
+  if (place.kind === "gone" || proposed?.kind !== "present") return null
+  const [bottom] = proposed.revisions
   if (bottom === undefined) return null
   const { base } = place.base
   const wipAhead =
@@ -374,7 +384,7 @@ export async function gatherStack(
       "--name-only",
     ]),
   )
-  const revisions: OfferSource[] = []
+  const revisions: ProposedSource[] = []
   for (const commit of commits.toReversed())
     revisions.push({
       commit,

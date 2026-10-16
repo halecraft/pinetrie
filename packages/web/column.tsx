@@ -106,11 +106,11 @@ import {
   effectiveBase,
   marginCards,
   marginCounts,
-  type OfferButton,
   pinnedAt,
   queuedOn,
   threadReach,
   traceEnd,
+  type WorkStripButton,
   yourCard,
 } from "@pinetrie/rules"
 import { type LiveDocHandle, readStreamText } from "@pinetrie/schema"
@@ -207,7 +207,7 @@ export interface ColumnProps {
   /** The streams to draw, from the same moment as `index` (`liveWork`). */
   live: LiveWork
   lanes: readonly LaneView[]
-  /** Where lanes work, the files at each entry, and each lane's offer. */
+  /** Where lanes work, the files at each entry, and each lane's proposed changes. */
   work: WorkFacts
   /** The ids on this column's path, which the app has already computed. */
   path: ReadonlySet<EntryId>
@@ -605,7 +605,8 @@ export function Column(p: ColumnProps) {
   const pinned =
     unstarted || threadEnd === null ? [] : pinnedAt(threadEnd, p.cards, index)
   const inView = threadEnd === null ? null : pinnedInView(index, threadEnd)
-  // Your last offer command on this lane: in flight, refused or failed.
+  // Your last command on proposed changes on this lane: in flight, refused or
+  // failed.
   const acting = useSyncExternalStore(
     p.session.acting.subscribe,
     p.session.acting.current,
@@ -621,7 +622,9 @@ export function Column(p: ColumnProps) {
   )
   const shows = columnView({
     acting:
-      lane.kind === "lane" ? (acting.offers.get(lane.name) ?? null) : null,
+      lane.kind === "lane"
+        ? (acting.proposedByLane.get(lane.name) ?? null)
+        : null,
     mountedIcon,
     queued,
     index,
@@ -722,11 +725,11 @@ export function Column(p: ColumnProps) {
     () => agentCandidates(p.inReach, thread, agentsHere),
     [p.inReach, thread, agentsHere],
   )
-  // The column's pane: what you opened beside the thread, kept
-  // only while the column is mounted. One subject at a time, named, so
-  // `paneView` can tell when it is gone: the offer's review after an
-  // acceptance or a withdrawal, a table or an image whose message this column no longer
-  // draws. The thread's next offer does not open it with nobody asking.
+  // The column's pane: what you opened beside the thread, kept only while the
+  // column is mounted. One subject at a time, named, so `paneView` can tell
+  // when it is gone: the proposed changes' review after an acceptance or a
+  // withdrawal, a table or an image whose message this column no longer draws.
+  // The thread's next proposed changes do not open it with nobody asking.
   const [pane, setPane] = useState<PaneSubject | null>(null)
   const openPane = useStable((subject: PaneSubject) =>
     setPane(shown => togglePane(shown, subject)),
@@ -736,13 +739,13 @@ export function Column(p: ColumnProps) {
     () => ({ shown: pane, open: openPane }),
     [pane, openPane],
   )
-  const review = shows.strip.kind === "offer" ? shows.strip.review : null
+  const review = shows.strip?.review ?? null
   const paneShows =
     pane === null
       ? null
       : paneView(pane, {
-          offer:
-            review === null || shows.strip.kind !== "offer"
+          strip:
+            review === null || shows.strip === null
               ? null
               : { target: review, line: shows.strip.words.line },
           nodes: view.nodes,
@@ -758,23 +761,22 @@ export function Column(p: ColumnProps) {
   // Reset in render, not an effect: no frame draws a pane that is gone.
   if (pane !== null && paneShows === null) setPane(null)
   const paneId = `pane-${p.column.key}`
-  const toggleReview = useStable(() => openPane({ kind: "offer" }))
+  const toggleReview = useStable(() => openPane({ kind: "strip" }))
   // Catching up and splitting are a card with the command and no text,
   // made in the queue: the host
   // pops it when the lane is free. An acceptance names its destination: the default,
   // or accepted work.
-  const actOnOffer = (button: OfferButton) => {
+  const actOnProposedChanges = (button: WorkStripButton) => {
     if (lane.kind !== "lane") return
     if (button === "accept" || button === "accept-into-accepted") {
-      const destinations =
-        shows.strip.kind === "offer" ? shows.strip.destinations : []
+      const destinations = shows.strip?.destinations ?? []
       const to =
         button === "accept"
           ? destinations[0]
           : destinations.find(d => d.kind === "accepted")
       if (to === undefined) return
       return act({
-        kind: "offer",
+        kind: "proposed",
         lane: lane.name,
         action: "accept",
         to: to.bookmark,
@@ -786,7 +788,12 @@ export function Column(p: ColumnProps) {
       button !== "catch-up-parent" &&
       button !== "split"
     )
-      return act({ kind: "offer", lane: lane.name, action: button, to: null })
+      return act({
+        kind: "proposed",
+        lane: lane.name,
+        action: button,
+        to: null,
+      })
     if (at.kind !== "entry") return
     act({
       kind: "queueNew",
@@ -986,10 +993,10 @@ export function Column(p: ColumnProps) {
             )}
             {/* The work strip, a row of the header. */}
             <WorkStripView
-              act={actOnOffer}
+              act={actOnProposedChanges}
               review={{
                 id: paneId,
-                open: pane?.kind === "offer",
+                open: pane?.kind === "strip",
                 toggle: toggleReview,
               }}
               strip={shows.strip}
@@ -1469,14 +1476,14 @@ function Origin({
 }
 
 /**
- * An offer's bookmark, which a press copies. Where it can't be copied, a
+ * Proposed changes' bookmark, which a press copies. Where it can't be copied, a
  * press selects the bookmark's own text (`useCopy`).
  */
 function Bookmark({ name }: { name: string }) {
   const { copied, copy } = useCopy()
   return (
     <button
-      className="offer-bookmark"
+      className="work-bookmark"
       onClick={e => copy(name, [e.currentTarget])}
       title={copied ? COPIED : "copy the bookmark, to find it in jj"}
       type="button"
@@ -1525,9 +1532,9 @@ function AccessRowView({
 }
 
 /**
- * What became of the column's files, at its foot: the lane's offer
+ * What became of the column's files, at its foot: the lane's proposed changes
  * in your repo. An
- * offer's line opens its review; its bookmark, copied, finds it in
+ * proposed changes' line opens its review; its bookmark, copied, finds it in
  * jj or jjui.
  */
 function WorkStripView({
@@ -1535,25 +1542,25 @@ function WorkStripView({
   act,
   review,
 }: {
-  strip: WorkStrip
-  act: (button: OfferButton) => void
+  strip: WorkStrip | null
+  act: (button: WorkStripButton) => void
   review: {
     readonly id: string
     readonly open: boolean
     readonly toggle: () => void
   }
 }) {
-  if (strip.kind === "none") return null
+  if (strip === null) return null
   const { words } = strip
   return (
-    <div className="work offer" data-state={strip.state}>
+    <div className="work work-strip" data-state={strip.state}>
       {strip.review === null ? (
-        <span className="offer-line">{words.line}</span>
+        <span className="work-line">{words.line}</span>
       ) : (
         <button
           aria-controls={review.id}
           aria-expanded={review.open}
-          className="offer-line"
+          className="work-line"
           onClick={review.toggle}
           title={
             review.open ? "close the review" : "review what adding it brings"
@@ -1566,7 +1573,7 @@ function WorkStripView({
       {strip.bookmark !== null && <Bookmark name={strip.bookmark} />}
       {words.note !== null && (
         <span
-          className="offer-note"
+          className="work-note"
           data-acting={strip.waiting ? "sent" : "said"}
           role="status"
         >
@@ -1576,7 +1583,7 @@ function WorkStripView({
       <span className="work-space" />
       {words.buttons.map(({ button, label, title, disabled }) => (
         <button
-          className={`offer-${button}`}
+          className={`work-${button}`}
           disabled={strip.waiting || disabled === true}
           key={button}
           onClick={() => act(button)}
@@ -1588,24 +1595,24 @@ function WorkStripView({
       ))}
       {words.menu.length > 0 && (
         <Menu
-          className="offer-more"
+          className="work-more"
           sections={[
             {
-              key: "offer",
+              key: "work",
               items: words.menu.map(({ button, label, title, disabled }) => ({
                 key: button,
                 label,
-                className: `offer-${button}`,
+                className: `work-${button}`,
                 disabled: strip.waiting || disabled === true,
                 ...(title === undefined ? {} : { title }),
                 onChoose: () => act(button),
               })),
             },
           ]}
-          label="more for this thread's offer"
-          title="this thread's offer"
+          label="more for this thread's changes"
+          title="this thread's changes"
           trigger="⋯"
-          triggerClassName="offer-more-trigger"
+          triggerClassName="work-more-trigger"
         />
       )}
     </div>

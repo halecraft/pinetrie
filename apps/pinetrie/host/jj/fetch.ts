@@ -1,6 +1,6 @@
-// host/jj/fetch — a lane's history into your repo: bundled in the lane, on
-// its queue, then imported by the owner of your repo as the lane's remote
-// bookmark. The owner observes the import, which marks the lane's offer.
+// host/jj/fetch — a lane's history into your repo: bundled in the lane, on its
+// queue, then imported by the owner of your repo as the lane's remote bookmark.
+// The owner observes the import, which marks the lane's proposed changes.
 
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"

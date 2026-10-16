@@ -63,7 +63,7 @@ export const foreignLaneWords = (lane: ForeignLane): string =>
     ? "this thread's work was made when the project had a jj repo"
     : "this thread's work was made when the project had no jj repo"
 
-/** A run, a catch-up or an offer action refused on a lane of another kind. */
+/** A run, a catch-up or an action on proposed changes refused on a lane of another kind. */
 export const foreignRefusal = (lane: ForeignLane): Refusal =>
   refused(ERR.FOREIGN_LANE, foreignLaneWords(lane))
 
@@ -82,12 +82,12 @@ export type RunAt =
     }
 
 /**
- * What a command or a send runs or writes a message in, every kind said:
- * a new kind of command does not compile until it is. A send at a thread's
- * end or popped from its queue, a carry-on, and an offer action that may ask
- * the agent run in their thread; a branch in the thread its fork is in,
- * which stays its holder's; a new root in none. A stop, an unqueue or a
- * hold runs nothing.
+ * What a command or a send runs or writes a message in, every kind said: a new
+ * kind of command does not compile until it is. A send at a thread's end or
+ * popped from its queue, a carry-on, and an action on proposed changes that may
+ * ask the agent run in their thread; a branch in the thread its fork is in,
+ * which stays its holder's; a new root in none. A stop, an unqueue or a hold
+ * runs nothing.
  */
 export function runsIn(command: Gated): readonly RunAt[] {
   const thread = (t: ThreadId): RunAt => ({ kind: "thread", thread: t })
@@ -110,10 +110,10 @@ export function runsIn(command: Gated): readonly RunAt[] {
     // Opening a thread runs nothing: its first send is the branch.
     case "open-thread":
       return []
-    // Describing an offer asks its agent, and a squash or a refresh asks
-    // it again when its description is wanted; an acceptance acts in your
-    // repo alone (offers stay there while a thread is held).
-    case "offer":
+    // Describing proposed changes asks its agent, and a squash or a refresh
+    // asks it again when its description is wanted; an acceptance acts in your
+    // repo alone (proposed changes stay there while a thread is held).
+    case "proposed":
       return command.action === "accept" ? [] : [thread(command.lane)]
     case "stop":
     case "queue-hold":

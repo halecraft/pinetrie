@@ -26,7 +26,7 @@ browser ──commands (Kyneta Line)──▶ host ──▶ pi agent core
   on Docker, on btrfs snapshots: in pine·trie's own VM on the Mac, on the
   host on Linux (ADR-0130). A host with tools that cannot run them does not
   start. A lane's work
-  reaches your repo as an offer, a single commit you can review first.
+  reaches your repo as proposed changes, a single commit you can review first.
 
 ## Packages
 
@@ -40,7 +40,7 @@ browser ──commands (Kyneta Line)──▶ host ──▶ pi agent core
 | `rules` | each stored shape and the pure rules about it |
 | `reads` | document reads shared by host and client |
 | `lanes` | what a lane is and what runs in it: its container's shape, mounts, grants, disks, forks and snapshots; it defines the `LaneRuntime` port and a kind of project's ports (`LaneHistory`), implements neither, and runs no jj |
-| `jj` | jj's adapter: your repo as the host reads and writes it (its one owner, offers, accepted work and lanes' refs in it), each lane's own repo as a `LaneHistory`, your repo at startup, and every jj name |
+| `jj` | jj's adapter: your repo as the host reads and writes it (its one owner, proposed changes, accepted work and lanes' refs in it), each lane's own repo as a `LaneHistory`, your repo at startup, and every jj name |
 | `folder` | a folder project's history as values (ADR-0142): its graph of states and their merge bases, the path merge's plan, and the snapshots kept; it declares only `core`, does no I/O, and lanehost carries out what it decides |
 | `docker` | running lanes on Docker: the `LaneRuntime` over the docker CLI, btrfs disks in a helper container, Docker's startup refusals, lanes inside a lane; beside it a folder project's `FolderDisks` |
 | `vm` | a Linux machine on the Mac: the image's build, the launcher, a host's lease on a slot; it knows nothing of lanes |

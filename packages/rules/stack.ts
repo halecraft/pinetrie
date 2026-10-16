@@ -1,4 +1,5 @@
-// stack — the prompt of the run that splits a thread's offer into a stack.
+// stack — the prompt of the run that splits a thread's proposed changes into a
+// stack.
 
 import { type Static, Type } from "typebox"
 import { CommitSchema, List, ThreadIdSchema, WriterIdSchema } from "./decode.ts"
@@ -6,7 +7,7 @@ import { type HistoryMessage, historyMessage } from "./history.ts"
 
 const StackDetailsSchema = Type.Object({
   lane: ThreadIdSchema,
-  /** Where the offer starts: the stack builds on it. */
+  /** Where the proposed changes start: the stack builds on it. */
   start: List(CommitSchema),
   /** The lane's tip: the stack's last revision must have exactly its files. */
   tip: CommitSchema,

@@ -14,9 +14,9 @@ import {
   readAccepted,
   readBases,
   readIcons,
-  readOffers,
   readPlaces,
   readProject,
+  readProposedByLane,
   readRecords,
   readSeats,
   readSetup,
@@ -95,16 +95,15 @@ export interface StartupDeps {
  * In order: no stream survives a process, so clear them; give a new store the
  * default workflow (`planWorkflowSeed`); delete the records of a type no spec
  * declares, in the session and the roots opened (`planUndeclaredSweep`), and
- * the offers, accepted work and bases of another kind than the project's
- * (`planKindSweep`); log
- * the stored lane names that are not a thread's, which no reader is given; name
- * every lane that has none; resume each lane a crash interrupted, in its own
- * directory (`planStartup`); write what the host found, the commands its pi
- * loaded, the icon source and the verdicts whose request died with the last host, those that
- * changed in one write; sweep what no one will type in again (`sweepTexts`);
- * and last, settle the lanes with cards queued, whose compaction then holds
- * every write above. Nothing else runs yet, so clearing the streams needs no
- * keeper step.
+ * the proposed changes, accepted work and bases of another kind than the
+ * project's (`planKindSweep`); log the stored lane names that are not a
+ * thread's, which no reader is given; name every lane that has none; resume
+ * each lane a crash interrupted, in its own directory (`planStartup`); write
+ * what the host found, the commands its pi loaded, the icon source and the
+ * verdicts whose request died with the last host, those that changed in one
+ * write; sweep what no one will type in again (`sweepTexts`); and last, settle
+ * the lanes with cards queued, whose compaction then holds every write above.
+ * Nothing else runs yet, so clearing the streams needs no keeper step.
  */
 export async function recover(deps: StartupDeps): Promise<void> {
   const { agent, records, piSetup, work, keeper, settle } = deps
@@ -139,7 +138,7 @@ export async function recover(deps: StartupDeps): Promise<void> {
       ? []
       : planKindSweep(
           {
-            offers: readOffers(doc),
+            proposedByLane: readProposedByLane(doc),
             accepted: readAccepted(doc),
             bases: readBases(doc),
           },

@@ -64,7 +64,7 @@ export interface HistoryRig {
     to: PointId,
   ): Promise<readonly string[]>
   /**
-   * Test-only: `lane`'s offer accepted into accepted work, as the
+   * Test-only: `lane`'s proposed changes accepted into accepted work, as the
    * destination accepts one; accepted work's new state.
    */
   accept(lane: RigLane): Promise<PointId>

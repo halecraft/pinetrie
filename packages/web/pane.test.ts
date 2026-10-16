@@ -49,7 +49,7 @@ const node = (id: string, text: string): SpineNode => ({
 })
 const TABLES = "| State | When |\n|---|---|\n| x | y |\n\n| a |\n|---|\n| 1 |"
 const facts = (over: Partial<PaneFacts> = {}): PaneFacts => ({
-  offer: null,
+  strip: null,
   nodes: [node("m1", TABLES)],
   askTarget: () => null,
   ...over,
@@ -69,11 +69,11 @@ const image = (alt = ""): PaneSubject => ({ kind: "image", sha256: SHA, alt })
 describe("togglePane", () => {
   test("opening what is shown closes it", () => {
     expect(togglePane(table("m1", 0), table("m1", 0))).toBeNull()
-    expect(togglePane({ kind: "offer" }, { kind: "offer" })).toBeNull()
+    expect(togglePane({ kind: "strip" }, { kind: "strip" })).toBeNull()
   })
   test("anything else replaces it: another kind, table or message", () => {
     const next = table("m1", 1)
-    expect(togglePane({ kind: "offer" }, next)).toBe(next)
+    expect(togglePane({ kind: "strip" }, next)).toBe(next)
     expect(togglePane(table("m1", 0), next)).toBe(next)
     expect(togglePane(table("m2", 1), next)).toBe(next)
     const there = image("another")
@@ -83,10 +83,10 @@ describe("togglePane", () => {
 })
 
 describe("paneView", () => {
-  test("the offer draws the strip's review, and closes without one", () => {
-    expect(paneView({ kind: "offer" }, facts())).toBeNull()
+  test("the strip draws its review, and closes without one", () => {
+    expect(paneView({ kind: "strip" }, facts())).toBeNull()
     expect(
-      paneView({ kind: "offer" }, facts({ offer: { target, line: "ready" } })),
+      paneView({ kind: "strip" }, facts({ strip: { target, line: "ready" } })),
     ).toEqual({ kind: "review", target, line: "ready" })
   })
   test("an ask draws its review, and closes without one", () => {

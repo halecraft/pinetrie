@@ -17,6 +17,6 @@ test("failed logs the host's line, with the thread when it names a lane", () => 
 
 test("failed logs nothing for a step a closed keeper refused", () => {
   const b = basics()
-  failed(b, "refreshing its offer")(new KeeperClosed())
+  failed(b, "refreshing its proposed changes")(new KeeperClosed())
   expect(b.lines).toEqual([])
 })

@@ -1,41 +1,41 @@
-// host/jj/offers/act — an offer action other than a split: accept, squash,
-// refresh, or describe again. Each is one owner command: gather (`gatherOffer`,
-// and `gatherOfferAcceptance` for an acceptance), decide
-// (`planOfferAcceptance`, `planRebuild`), translate and execute. An acceptance
-// moves one bookmark forward to the offer. An action carried out answers with
-// its fact, what the thread is told it did.
+// host/jj/proposed/act — an action on proposed changes other than a split:
+// accept, squash, refresh, or describe again. Each is one owner command: gather
+// (`gatherProposedChanges`, and `gatherAcceptance` for an acceptance), decide
+// (`planAcceptance`, `planRebuild`), translate and execute. An acceptance moves
+// one bookmark forward to the proposed changes. An action carried out answers
+// with its fact, what the thread is told it did.
 
 import {
   ERR,
   type ErrCode,
-  type OfferFact,
-  type OfferSeen,
+  type ProposedChangesFact,
+  type ProposedChangesSeen,
   type ThreadId,
   type WriterId,
 } from "@pinetrie/core"
 import {
-  gatherOffer,
-  gatherOfferAcceptance,
-  offerAcceptanceEffects,
+  acceptanceEffects,
+  gatherAcceptance,
+  gatherProposedChanges,
   type RepoOps,
 } from "@pinetrie/jj"
 import { readThreadName } from "@pinetrie/reads"
 import {
   acceptedFact,
   actionFact,
+  planAcceptance,
   planDescribeAgain,
-  planOfferAcceptance,
   planRebuild,
 } from "@pinetrie/rules"
 import type { Describe } from "../../describe.ts"
 import { describe } from "./describe.ts"
-import { executeOffer } from "./execute.ts"
+import { executeProposedChanges } from "./execute.ts"
 import type { Refresh } from "./refresh.ts"
-import type { OfferDeps } from "./state.ts"
+import type { ProposedChangesDeps } from "./state.ts"
 
 export async function act(
   deps: Pick<
-    OfferDeps,
+    ProposedChangesDeps,
     "owner" | "repoConfig" | "basics" | "docs" | "piSetup" | "running"
   > & { readonly describer: Describe },
   refresh: Pick<Refresh, "rebuild" | "ports">,
@@ -43,10 +43,10 @@ export async function act(
   action: "accept" | "squash" | "describe" | "refresh",
   by: WriterId,
   to: string | null = null,
-  seen: OfferSeen | null = null,
+  seen: ProposedChangesSeen | null = null,
 ): Promise<
   | { readonly kind: "refused"; readonly code: ErrCode }
-  | { readonly kind: "done"; readonly fact: OfferFact }
+  | { readonly kind: "done"; readonly fact: ProposedChangesFact }
 > {
   const { owner, repoConfig, basics, docs } = deps
   const done = await owner.command(ops => carry(ops))
@@ -58,17 +58,17 @@ export async function act(
     : { kind: "done", fact: done.fact }
 
   /**
-   * The command, whether its offer is described after it (forced, or if
-   * wanted), and its fact: null when it was refused.
+   * The command, whether its proposed changes are described after it (forced,
+   * or if wanted), and its fact: null when it was refused.
    */
   async function carry(ops: RepoOps): Promise<{
     readonly code: ErrCode | null
     readonly describe: boolean | null
-    readonly fact: OfferFact | null
+    readonly fact: ProposedChangesFact | null
   }> {
     const code = (c: ErrCode) => ({ code: c, describe: null, fact: null })
     // gather
-    const gathered = await gatherOffer(ops, docs.input(lane))
+    const gathered = await gatherProposedChanges(ops, docs.input(lane))
     if (action === "describe") {
       const refused = planDescribeAgain(gathered)
       return refused === null
@@ -83,10 +83,10 @@ export async function act(
       const acceptance =
         gathered === null
           ? null
-          : await gatherOfferAcceptance(ops, gathered, repoConfig)
+          : await gatherAcceptance(ops, gathered, repoConfig)
       const { editing } = await ops.shared()
       // plan
-      const planned = planOfferAcceptance({
+      const planned = planAcceptance({
         lane,
         gathered,
         seen,
@@ -98,16 +98,16 @@ export async function act(
       })
       if (planned.kind === "refused") return code(planned.code)
       // execute: the lane's base record first, as the acceptance found it.
-      await executeOffer(
+      await executeProposedChanges(
         refresh.ports(ops, lane, planned.name),
         {
           base: gathered?.base ?? null,
-          effects: offerAcceptanceEffects(planned),
+          effects: acceptanceEffects(planned),
         },
         null,
       )
       basics.log(
-        `[host] ${readThreadName(basics.session, lane)}: offer accepted by ${by} as ${planned.top.slice(0, 8)}`,
+        `[host] ${readThreadName(basics.session, lane)}: proposed changes accepted by ${by} as ${planned.top.slice(0, 8)}`,
       )
       return {
         code: null,
@@ -120,7 +120,8 @@ export async function act(
         }),
       }
     }
-    // squash and refresh: the offer rebuilt from the lane's tip, as one.
+    // squash and refresh: the proposed changes rebuilt from the lane's tip, as
+    // one.
     const name = gathered?.name
     const planned = planRebuild(
       gathered,

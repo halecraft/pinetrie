@@ -3,8 +3,9 @@
 pine·trie is a collaborative agentic harness: pi's agent core over a Kyneta CRDT
 document, where the conversation is a tree. Start with `docs/pinetrie.md` (the
 handoff) and `docs/README.md` (the map of the docs). The words for the work
-in your repo (accepted work, accept, offer, WIP, publish, catch up) are
-`docs/glossary.md`: use them, and no others. What is true now is in the
+in your repo (accepted work, accept, proposed changes, which people read as
+changes, WIP, publish, catch up) are `docs/glossary.md`: use them, and no
+others. What is true now is in the
 living docs: `ARCHITECTURE.md`, `docs/01-architecture.md`,
 `docs/06-interface.md`, `docs/the-jujutsu-repo.md`, and each package's
 `TECHNICAL.md` with its gotchas: read the one nearest the code you change,

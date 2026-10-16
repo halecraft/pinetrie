@@ -77,8 +77,8 @@ import {
   NO_TEXT,
   nameEffects,
   noteColumnsOf,
-  offeredByTask,
   openColumns,
+  openProposedByTask,
   ownCards,
   pageTitle,
   parseQuery,
@@ -490,8 +490,8 @@ export function App({
     () => messageCount(directory, new Set(roots.keys())),
     [directory, roots],
   )
-  // Each root's root entry, held or not: where a lane running in
-  // a root this tab does not hold rings it, and where its offer's ⇡ goes.
+  // Each root's root entry, held or not: where a lane running in a root this
+  // tab does not hold rings it, and where its proposed changes' ⇡ goes.
   const rootEntries = useMemo(() => rootEntriesOf(directory), [directory])
   // The tasks in the archive.
   const archivedTasks = useMemo(() => new Set(archived.keys()), [archived])
@@ -977,7 +977,7 @@ export function App({
         archived,
         workflow,
         nameOf,
-        offers: workFacts.offers,
+        proposedByLane: workFacts.proposedByLane,
         access: workFacts.access,
         lanes,
         laneRoots,
@@ -989,7 +989,7 @@ export function App({
       archived,
       workflow,
       nameOf,
-      workFacts.offers,
+      workFacts.proposedByLane,
       workFacts.access,
       lanes,
       laneRoots,
@@ -1022,9 +1022,9 @@ export function App({
       }),
     )
   }, [view.stage, columns, views, paths, search, matches, index, workFacts])
-  const offered = useMemo(
-    () => offeredByTask(view.offers, workFacts.names, taskOfThread),
-    [view.offers, workFacts.names, taskOfThread],
+  const proposed = useMemo(
+    () => openProposedByTask(view.openProposed, workFacts.names, taskOfThread),
+    [view.openProposed, workFacts.names, taskOfThread],
   )
 
   // Your inbox: the messages that mention you, and which you have seen.
@@ -1050,7 +1050,7 @@ export function App({
     attention: session.attention,
     directory,
     verdicts,
-    offers: view.offers,
+    openProposed: view.openProposed,
     sshAsks: view.sshAsks,
     owner: workFacts.project?.owner ?? null,
     running,
@@ -1088,7 +1088,7 @@ export function App({
         labels,
         status: attention.status,
         pips: unsent.tasks,
-        offered,
+        proposed,
         work: workOfTask,
       }),
     [
@@ -1099,7 +1099,7 @@ export function App({
       labels,
       attention.status,
       unsent.tasks,
-      offered,
+      proposed,
       workOfTask,
     ],
   )

@@ -47,7 +47,7 @@ export type Count =
 export interface StateSignals {
   /** Its tasks the agent works in (`Status` working, a pending verdict among them): ◌. */
   readonly working: number
-  /** Its tasks with work ready to accept: ⇡. */
+  /** Its tasks with changes ready to accept: ⇡. */
   readonly ready: number
   /** The tasks whose readers' avatars it shows. */
   readonly tasks: readonly TaskId[]
@@ -173,7 +173,7 @@ export function boardView(input: BoardViewInput): BoardView {
     before,
     closes: false,
   })
-  /** The signals of `tasks`, from each one's status and offers. */
+  /** The signals of `tasks`, from each one's status and proposed changes. */
   const stateSignals = (tasks: readonly TaskId[]): StateSignals => ({
     working: tasks.filter(t => headOf(t).status?.kind === "working").length,
     ready: tasks.filter(t => headOf(t).ready.length > 0).length,
@@ -445,7 +445,7 @@ export const stateWords = (
   signals: Pick<StateSignals, "working" | "ready">,
 ): { readonly working: string; readonly ready: string } => ({
   working: `the agent is working in ${tasksWords(signals.working)}`,
-  ready: `${tasksWords(signals.ready)} with work ready to accept`,
+  ready: `${tasksWords(signals.ready)} with changes ready to accept`,
 })
 
 /** A thread card's ⇡: the threads it names. */

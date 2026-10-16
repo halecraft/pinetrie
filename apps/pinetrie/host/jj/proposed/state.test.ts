@@ -1,17 +1,17 @@
 import {
   commitId,
   type JjBaseRecord,
-  type JjOfferRecord,
+  type JjProposedChangesRecord,
   threadIdFor,
 } from "@pinetrie/core"
 import type { RepoOwner } from "@pinetrie/jj"
 import { DEFAULT_REPO } from "@pinetrie/jj"
 import type { PiSetup } from "@pinetrie/pi"
-import { readBases, readOffers } from "@pinetrie/reads"
+import { readBases, readProposedByLane } from "@pinetrie/reads"
 import { expect, test } from "vitest"
 import { applyWrites, basics, record } from "../../fakes.ts"
 import type { Records } from "../../records.ts"
-import { createOfferDeps } from "./state.ts"
+import { createProposedChangesDeps } from "./state.ts"
 
 const LANE = threadIdFor("1")
 const BASE: JjBaseRecord = {
@@ -24,7 +24,7 @@ const BASE: JjBaseRecord = {
   untraced: [],
   work: "some",
 }
-const OFFER: JjOfferRecord = {
+const PROPOSED_CHANGES: JjProposedChangesRecord = {
   kind: "jj",
   lane: LANE,
   size: 1,
@@ -35,7 +35,7 @@ const OFFER: JjOfferRecord = {
   yourEdits: [],
   described: false,
   edited: false,
-  bookmark: "pinetrie-offer/amber-fox",
+  bookmark: "pinetrie-proposed/amber-fox",
   acceptedAs: null,
   commits: [commitId("c1")],
   ledger: null,
@@ -48,7 +48,7 @@ test("the records the host writes from your repo: only what changed, and only a 
     writeValues: async writes => applyWrites(b, writes),
   })
   const changed: string[] = []
-  const { records } = createOfferDeps({
+  const { records } = createProposedChangesDeps({
     owner: record<RepoOwner>({}).port,
     repoConfig: DEFAULT_REPO,
     basics: b,
@@ -62,16 +62,18 @@ test("the records the host writes from your repo: only what changed, and only a 
   expect(scribe.calls).toEqual([])
   await records.writeBase(BASE)
   await records.writeBase(BASE)
-  await records.write(OFFER)
-  await records.write(OFFER)
+  await records.write(PROPOSED_CHANGES)
+  await records.write(PROPOSED_CHANGES)
   expect(scribe.calls).toHaveLength(2)
   expect(readBases(b.session).get(LANE)).toEqual(BASE)
   // A base record that changed is announced, and one unchanged is not.
   expect(changed).toEqual([LANE])
-  // An accepted offer's record is written whatever is there.
-  await records.writeAcceptedOffer({ ...OFFER, acceptedAs: "kt" })
-  expect(readOffers(b.session).get(LANE)).toMatchObject({ acceptedAs: "kt" })
+  // Accepted proposed changes' record is written whatever is there.
+  await records.writeAcceptedProposed({ ...PROPOSED_CHANGES, acceptedAs: "kt" })
+  expect(readProposedByLane(b.session).get(LANE)).toMatchObject({
+    acceptedAs: "kt",
+  })
   await records.remove(LANE)
-  expect(readOffers(b.session).has(LANE)).toBe(false)
+  expect(readProposedByLane(b.session).has(LANE)).toBe(false)
   expect(scribe.calls).toHaveLength(4)
 })

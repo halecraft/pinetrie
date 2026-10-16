@@ -1,4 +1,4 @@
-import { type OfferAction, threadIdFor } from "@pinetrie/core"
+import { type ProposedChangesAction, threadIdFor } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import { describe, expect, test } from "vitest"
 import {
@@ -15,8 +15,8 @@ const A = threadIdFor("a")
 const B = threadIdFor("b")
 const sent = (
   id: string,
-  action: OfferAction = "accept",
-): Acting<OfferAction> => ({
+  action: ProposedChangesAction = "accept",
+): Acting<ProposedChangesAction> => ({
   kind: "sent",
   id,
   action,
@@ -24,9 +24,17 @@ const sent = (
 })
 const send = (
   id: string,
-  action: OfferAction = "accept",
-): ActingEvent<OfferAction> => ({ kind: "sent", id, action, to: null })
-const answered = (id: string, outcome: Outcome): ActingEvent<OfferAction> => ({
+  action: ProposedChangesAction = "accept",
+): ActingEvent<ProposedChangesAction> => ({
+  kind: "sent",
+  id,
+  action,
+  to: null,
+})
+const answered = (
+  id: string,
+  outcome: Outcome,
+): ActingEvent<ProposedChangesAction> => ({
   kind: "answered",
   id,
   outcome,
@@ -69,7 +77,12 @@ describe("nextActing: what is said of your last command on one thing", () => {
       answered("1", { kind: "accepted" }),
       null,
     ],
-    ["offered clears it", sent("1"), answered("1", { kind: "offered" }), null],
+    [
+      "proposed clears it",
+      sent("1"),
+      answered("1", { kind: "proposed" }),
+      null,
+    ],
     [
       "an answer to a send since replaced changes nothing",
       sent("2"),
@@ -83,7 +96,7 @@ describe("nextActing: what is said of your last command on one thing", () => {
       null,
     ],
   ] as const)("%s", (_, prev, event, next) => {
-    expect(nextActing<OfferAction>(prev, event)).toEqual(next)
+    expect(nextActing<ProposedChangesAction>(prev, event)).toEqual(next)
   })
 })
 
@@ -93,20 +106,20 @@ describe("sendActing: the session's store, around one command", () => {
     let reply: (o: Outcome) => void = () => {}
     const out = sendActing(
       store,
-      { kind: "offer", lane: A, action: "accept", to: "wip/x" },
+      { kind: "proposed", lane: A, action: "accept", to: "wip/x" },
       () => new Promise(resolve => (reply = resolve)),
       "1",
     )
-    expect(store.current().offers.get(A)).toEqual({
+    expect(store.current().proposedByLane.get(A)).toEqual({
       kind: "sent",
       id: "1",
       action: "accept",
       to: "wip/x",
     })
-    expect(store.current().offers.has(B)).toBe(false)
+    expect(store.current().proposedByLane.has(B)).toBe(false)
     reply(REFUSED)
     expect(await out).toEqual(REFUSED)
-    expect(store.current().offers.get(A)).toEqual({
+    expect(store.current().proposedByLane.get(A)).toEqual({
       kind: "refused",
       code: "refused",
       action: "accept",
@@ -114,11 +127,11 @@ describe("sendActing: the session's store, around one command", () => {
     })
     await sendActing(
       store,
-      { kind: "offer", lane: A, action: "accept", to: null },
+      { kind: "proposed", lane: A, action: "accept", to: null },
       () => Promise.resolve({ kind: "accepted" }),
       "2",
     )
-    expect(store.current().offers.has(A)).toBe(false)
+    expect(store.current().proposedByLane.has(A)).toBe(false)
   })
   test("accepted work's command is kept apart from every lane's", async () => {
     const store = snapshotStore<ActingState>(NO_ACTING)
@@ -129,12 +142,12 @@ describe("sendActing: the session's store, around one command", () => {
       "1",
     )
     expect(store.current()).toEqual({
-      offers: new Map(),
+      proposedByLane: new Map(),
       access: new Map(),
       accepted: { kind: "failed", action: "publish", message: "jj said no" },
     })
   })
-  test("an ssh answer is kept per lane, apart from its offer", async () => {
+  test("an ssh answer is kept per lane, apart from its proposed changes", async () => {
     const store = snapshotStore<ActingState>(NO_ACTING)
     await sendActing(
       store,
@@ -153,6 +166,6 @@ describe("sendActing: the session's store, around one command", () => {
       action: "approve",
       message: "not yours",
     })
-    expect(store.current().offers.has(A)).toBe(false)
+    expect(store.current().proposedByLane.has(A)).toBe(false)
   })
 })

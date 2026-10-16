@@ -1,8 +1,8 @@
-// host/split-call — `split_offer`: a split card queued on the agent's lane, in
-// one step on the documents' keeper, as the strip's button queues one. Its
-// run's end pops it (`settle.ts`, `queued-card-pop.ts`): pi calls the hook only
-// during a run, and the tool awaits the step, so the step is queued before the
-// run's end queues its drain, which a keeper runs after it
+// host/split-call — `split_proposed_changes`: a split card queued on the
+// agent's lane, in one step on the documents' keeper, as the strip's button
+// queues one. Its run's end pops it (`settle.ts`, `queued-card-pop.ts`): pi
+// calls the hook only during a run, and the tool awaits the step, so the step
+// is queued before the run's end queues its drain, which a keeper runs after it
 // (`packages/keeper/TECHNICAL.md`), even when a Stop ends the run while the
 // step waits.
 
@@ -10,14 +10,14 @@ import { type ThreadId, textCardId } from "@pinetrie/core"
 import {
   readLaneRecords,
   readLatestPrompt,
-  readOffers,
   readPlaces,
+  readProposedByLane,
   readRunAuthor,
   readRunning,
 } from "@pinetrie/reads"
 import {
-  offerStatus,
   planSplitCall,
+  proposedChangesStatus,
   SPLIT_QUEUED,
   SPLIT_UNMADE,
   splitRefusal,
@@ -27,7 +27,7 @@ import { readLaneTip } from "@pinetrie/schema"
 import type { Basics, HostKeeper } from "./basics.ts"
 import type { Places } from "./places.ts"
 
-/** What `split_offer` answers when its call reaches no thread. */
+/** What `split_proposed_changes` answers when its call reaches no thread. */
 const NO_THREAD: ToolAnswer = {
   text: "This call reached no thread.",
   isError: true,
@@ -57,7 +57,7 @@ export const createSplitCall =
       // plan
       const planned = planSplitCall({
         history: readLaneRecords(session).get(lane)?.history ?? null,
-        offer: offerStatus(readOffers(session).get(lane)),
+        proposed: proposedChangesStatus(readProposedByLane(session).get(lane)),
         cards: readPlaces(places),
         lane,
         prompt: readLatestPrompt(doc, lane)?.role,

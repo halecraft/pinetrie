@@ -57,7 +57,8 @@ export const HOST_PRINCIPAL = "pinetrie-host"
  *   - `mark` titles the task `task`, or the note column `cardId`, with
  *     `text`; `""` clears its title.
  *   - `retitle` asks a model for the root `root`'s title.
- *   - `offer` acts on that lane's offer in your repo; `mode` names the
+ * - `proposed` acts on that lane's proposed changes in your repo; `mode` names
+ * the
  *     action: `accept`, `split`, `squash`, `describe` or `refresh`. An
  *     acceptance names its destination bookmark in `targetId`, `""` for the default,
  *     and what it was shown in `seen`.
@@ -117,7 +118,7 @@ export const COMMAND_KINDS = [
   "workflow",
   "mark",
   "retitle",
-  "offer",
+  "proposed",
   "reserve",
   "move",
   "queue-card",
@@ -171,7 +172,7 @@ export interface Command {
    */
   readonly here: string
   /**
-   * `chat`: `reply` or `branch`; `offer` and `workflow`: the action;
+   * `chat`: `reply` or `branch`; `proposed` and `workflow`: the action;
    * `set-command`: the command; `undo-move`: `undo` or `redo`;
    * `card-width`: `1` or `2`; `ssh-access`: the answer; `""` otherwise.
    */
@@ -185,7 +186,7 @@ export interface Command {
   /** `chat`: a Start Agent column, where no mention asks the agent. */
   readonly asksAgent: boolean
   /**
-   * `offer` `accept`: the destination bookmark, `""`
+   * `proposed` `accept`: the destination bookmark, `""`
    * for the default; `workflow`: the state; `queue-card`: the command of
    * the card it creates, `""` for none. Separate from `parentId` on
    * purpose.
@@ -197,9 +198,10 @@ export interface Command {
    */
   readonly cardId: string
   /**
-   * `chat`: the card's text version as the sender had it, which the host
-   * waits for, since the text can reach it after the card's record; or `""`.
-   * `offer` `accept`: what the acceptance was shown (`OfferSeen`), as JSON; an acceptance without it is refused.
+   * `chat`: the card's text version as the sender had it, which the host waits
+   * for, since the text can reach it after the card's record; or `""`.
+   * `proposed` `accept`: what the acceptance was shown (`ProposedChangesSeen`),
+   * as JSON; an acceptance without it is refused.
    */
   readonly seen: string
   /**
@@ -243,7 +245,7 @@ export const OUTCOME_KINDS = [
   "marked",
   "retitling",
   "accepted",
-  "offered",
+  "proposed",
   "seen",
   "accepted-moved",
   "moved",

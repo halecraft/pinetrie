@@ -1,17 +1,18 @@
-// host/jj/offers/state — what the offer modules share, built once by
-// `startOffers`: what the documents say of a lane (`OfferDocs`), the records
-// the host writes (`OfferRecords`), and the owner of your repo
-// (`@pinetrie/jj`). Every read of your repo is `@pinetrie/jj`'s
-// (`gatherOffer`, `gatherRefresh`, …), and every decision `@pinetrie/rules`':
-// the documents are read here only for what your repo cannot say, and a record
-// only to skip a write that changes nothing.
+// host/jj/proposed/state — what the proposed changes modules share, built once
+// by `startProposedChanges`: what the documents say of a lane
+// (`ProposedChangesDocs`), the records the host writes
+// (`ProposedChangesRecords`), and the owner of your repo (`@pinetrie/jj`).
+// Every read of your repo is `@pinetrie/jj`'s (`gatherProposedChanges`,
+// `gatherRefresh`, …), and every decision `@pinetrie/rules`': the documents are
+// read here only for what your repo cannot say, and a record only to skip a
+// write that changes nothing.
 
 import {
   type BaseRecord,
   type CatchUpRead,
   firstPromptOf,
   type JjBaseRecord,
-  type OfferRecord,
+  type ProposedChangesRecord,
   projectTranscript,
   type RepoConfig,
   type ThreadId,
@@ -19,13 +20,13 @@ import {
   type ValueWrite,
   wipDescription,
 } from "@pinetrie/core"
-import type { OfferInput, RepoOwner } from "@pinetrie/jj"
+import type { ProposedChangesInput, RepoOwner } from "@pinetrie/jj"
 import type { PiSetup } from "@pinetrie/pi"
 import {
   readArchived,
   readBases,
   readNames,
-  readOffers,
+  readProposedByLane,
   readRevisions,
   readTreeIndex,
 } from "@pinetrie/reads"
@@ -33,7 +34,7 @@ import {
   archivedIn,
   BASE,
   deleteRecord,
-  OFFER,
+  PROPOSED_CHANGES,
   setIfChanged,
   setRecord,
 } from "@pinetrie/rules"
@@ -43,36 +44,36 @@ import type { Records } from "../../records.ts"
 import { tasksNow } from "../../tasks.ts"
 
 /** What the documents say of a lane, for what your repo cannot say. */
-export interface OfferDocs {
+export interface ProposedChangesDocs {
   nameOf(lane: ThreadId): ThreadName | undefined
-  /** Read from the archive record, never from the lane's tip being missing: a tip missing for one import must not withdraw a live offer. */
+  /** Read from the archive record, never from the lane's tip being missing: a tip missing for one import must not withdraw live proposed changes. */
   archived(lane: ThreadId): boolean
   /** A gather's input: the lane, its name, accepted work's names, and the last catch-up read, a memo `readCatchUp` keeps at the same tip and base commit. */
-  input(lane: ThreadId): OfferInput
+  input(lane: ThreadId): ProposedChangesInput
   /** The lane's tip entry, for `Pinetrie-Entry`; "" for none. */
   tipOf(lane: ThreadId): string
   /**
-   * An offer's line until an agent describes it: the thread's name and its own
-   * first message, the first prompt its lane ran.
+   * Proposed changes' line until an agent describes it: the thread's name and
+   * its own first message, the first prompt its lane ran.
    */
   wipLine(lane: ThreadId, name: ThreadName): string
 }
 
 /** The records the host writes from your repo, the page's cache. */
-export interface OfferRecords {
-  /** An offer's record, when it changed. */
-  write(record: OfferRecord): Promise<void>
-  /** An accepted offer's record, written whatever is there. */
-  writeAcceptedOffer(record: OfferRecord): Promise<void>
-  /** Remove an offer's record, when there is one. */
+export interface ProposedChangesRecords {
+  /** Proposed changes' record, when it changed. */
+  write(record: ProposedChangesRecord): Promise<void>
+  /** Accepted proposed changes' record, written whatever is there. */
+  writeAcceptedProposed(record: ProposedChangesRecord): Promise<void>
+  /** Remove proposed changes' record, when there is one. */
   remove(lane: ThreadId): Promise<void>
   /** The lane's base record as the repo says it, when it differs from the page's; none for null. */
   writeBase(next: JjBaseRecord | null): Promise<void>
   writeValues(writes: readonly ValueWrite[]): Promise<void>
 }
 
-/** Everything an offer module may use; each names the `Pick` it needs. */
-export interface OfferDeps {
+/** Everything proposed changes module may use; each names the `Pick` it needs. */
+export interface ProposedChangesDeps {
   /** The one writer of your repo: commands, refreshes as upkeep, pinned reads. */
   readonly owner: RepoOwner
   /** Accepted work's names. */
@@ -80,13 +81,13 @@ export interface OfferDeps {
   readonly basics: Basics
   /** What a description asks of the model. */
   readonly piSetup: Pick<PiSetup, "skill" | "complete">
-  /** Whether a lane is running now: an offer is described once it stops. */
+  /** Whether a lane is running now: proposed changes are described once it stops. */
   readonly running: (lane: ThreadId) => boolean
-  readonly docs: OfferDocs
-  readonly records: OfferRecords
+  readonly docs: ProposedChangesDocs
+  readonly records: ProposedChangesRecords
 }
 
-export function createOfferDeps(input: {
+export function createProposedChangesDeps(input: {
   readonly owner: RepoOwner
   readonly repoConfig: RepoConfig
   readonly basics: Basics
@@ -95,13 +96,13 @@ export function createOfferDeps(input: {
   readonly running: (lane: ThreadId) => boolean
   /** A lane's base record changed. */
   readonly baseChanged: (lane: ThreadId) => void
-}): OfferDeps {
+}): ProposedChangesDeps {
   const { basics, repoConfig } = input
   const { session: doc, docs } = basics
   const writeValues = (writes: readonly ValueWrite[]) =>
     writes.length === 0 ? Promise.resolve() : input.records.writeValues(writes)
   const nameOf = (lane: ThreadId) => readNames(doc).get(lane)
-  const offerDocs: OfferDocs = {
+  const proposedDocs: ProposedChangesDocs = {
     nameOf,
     archived(lane) {
       const task = tasksNow({
@@ -135,16 +136,21 @@ export function createOfferDeps(input: {
       return wipDescription(name, text ?? "")
     },
   }
-  const records: OfferRecords = {
+  const records: ProposedChangesRecords = {
     writeValues,
     write: record =>
       writeValues(
-        setIfChanged(OFFER, record, readOffers(doc).get(record.lane)),
+        setIfChanged(
+          PROPOSED_CHANGES,
+          record,
+          readProposedByLane(doc).get(record.lane),
+        ),
       ),
-    writeAcceptedOffer: record => writeValues([setRecord(OFFER, record)]),
+    writeAcceptedProposed: record =>
+      writeValues([setRecord(PROPOSED_CHANGES, record)]),
     remove: lane =>
-      readOffers(doc).has(lane)
-        ? writeValues([deleteRecord(OFFER, lane)])
+      readProposedByLane(doc).has(lane)
+        ? writeValues([deleteRecord(PROPOSED_CHANGES, lane)])
         : Promise.resolve(),
     async writeBase(next) {
       if (next === null) return
@@ -161,7 +167,7 @@ export function createOfferDeps(input: {
     basics,
     piSetup: input.piSetup,
     running: input.running,
-    docs: offerDocs,
+    docs: proposedDocs,
     records,
   }
 }

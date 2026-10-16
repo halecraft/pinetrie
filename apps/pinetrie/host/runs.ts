@@ -103,11 +103,11 @@ export type RunEndStep =
 /**
  * A run's end, in order, from its prompt's role. A split checks its stack,
  * however it started. A resolution ends as any run does: its outcome is the
- * offer's conflicts and the agent's asks in the tree. The run's verdict is
- * pending before `endRun`: written after, a reader would see the lane stopped
- * beside the last run's verdict. `endRun` comes before `laneStopped` and
- * `ended`: it closes the lane's streams, and what follows reads the lane as
- * idle.
+ * proposed changes' conflicts and the agent's asks in the tree. The run's
+ * verdict is pending before `endRun`: written after, a reader would see the
+ * lane stopped beside the last run's verdict. `endRun` comes before
+ * `laneStopped` and `ended`: it closes the lane's streams, and what follows
+ * reads the lane as idle.
  */
 export function planRunEnd(role: string | undefined): readonly RunEndStep[] {
   const outcome: readonly RunEndStep[] = role === "stack" ? ["splitEnded"] : []

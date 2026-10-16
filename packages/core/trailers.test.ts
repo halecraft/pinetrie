@@ -7,8 +7,8 @@ import {
   entryOfMessage,
   hasTrailer,
   isWipLine,
-  offerLedger,
-  offerMessage,
+  proposedLedger,
+  proposedMessage,
   revisionMessage,
   sourcesOf,
   type ThreadName,
@@ -43,23 +43,25 @@ test("trailerValues reads a trailer from every paragraph, as a squash leaves two
   expect(trailerValues(squashed, "base")).toEqual([])
 })
 
-test("offerLedger reads the newest paragraph that names a source; none without one", () => {
+test("proposedLedger reads the newest paragraph that names a source; none without one", () => {
   const one =
-    "offer: x\n\nPinetrie-Source: aaaa\nPinetrie-Start: s1\nPinetrie-Start: s2\n"
-  expect(offerLedger(one)).toEqual({
+    "proposed changes: x\n\nPinetrie-Source: aaaa\nPinetrie-Start: s1\nPinetrie-Start: s2\n"
+  expect(proposedLedger(one)).toEqual({
     source: commitId("aaaa"),
     start: [commitId("s1"), commitId("s2")],
   })
   const squashed = `${one}\nPinetrie-Source: bbbb\nPinetrie-Start: s3\n`
-  expect(offerLedger(squashed)).toEqual({
+  expect(proposedLedger(squashed)).toEqual({
     source: commitId("bbbb"),
     start: [commitId("s3")],
   })
-  expect(offerLedger("offer: yours, rewritten\n")).toBeNull()
-  expect(offerLedger("offer: x\n\nPinetrie-Source: aaaa\n")).toBeNull()
+  expect(proposedLedger("proposed changes: yours, rewritten\n")).toBeNull()
+  expect(
+    proposedLedger("proposed changes: x\n\nPinetrie-Source: aaaa\n"),
+  ).toBeNull()
 })
 
-test("untracedLanes: only an accepted offer's paragraph that names no source", () => {
+test("untracedLanes: only accepted proposed changes' paragraph that names no source", () => {
   const old = `feat: x\n\nPinetrie-Thread: amber-fox\nPinetrie-Lane: ${LANE}\nPinetrie-Entry: e\n`
   expect(untracedLanes(old)).toEqual([LANE])
   expect(
@@ -82,13 +84,13 @@ test("sourcesOf reads every paragraph of a squash, each source once", () => {
     source: commitId(source),
     start: [commitId("s1")],
   })
-  const one = offerMessage("first", {
+  const one = proposedMessage("first", {
     lane: LANE,
     name: NAME,
     entry: "e1",
     ledger: ledger("aaaa"),
   })
-  const two = offerMessage("second", {
+  const two = proposedMessage("second", {
     lane: LANE,
     name: NAME,
     entry: "e2",
@@ -145,9 +147,9 @@ describe("what is written reads back", () => {
       commit: C1,
     })
   })
-  test("offerMessage reads back: its thread, lane and entry, its ledger, and the message without them", () => {
+  test("proposedMessage reads back: its thread, lane and entry, its ledger, and the message without them", () => {
     const ledger = { source: commitId("t1"), start: [commitId("s1")] }
-    const m = offerMessage("feat: x\n\nwhy", {
+    const m = proposedMessage("feat: x\n\nwhy", {
       lane: LANE,
       name: NAME,
       entry: "e9",
@@ -157,7 +159,7 @@ describe("what is written reads back", () => {
     expect(trailerValues(m, "thread")).toEqual([NAME])
     expect(trailerValues(m, "lane")).toEqual([LANE])
     expect(trailerValues(m, "entry")).toEqual(["e9"])
-    expect(offerLedger(m)).toEqual(ledger)
+    expect(proposedLedger(m)).toEqual(ledger)
     expect(hasTrailer(m, "thread", NAME)).toBe(true)
     expect(withoutTrailers(m)).toBe("feat: x\n\nwhy")
   })
@@ -178,9 +180,9 @@ describe("what is written reads back", () => {
     ).toBe(
       `feat: x\n\nPinetrie-Thread: amber-fox\nPinetrie-Lane: ${LANE}\nPinetrie-Entry: e9\n`,
     )
-    expect(wipDescription(NAME, "add the offer line\nmore")).toBe(
-      "WIP (amber-fox): add the offer line",
-    )
+    expect(
+      wipDescription(NAME, "add the line of the proposed changes\nmore"),
+    ).toBe("WIP (amber-fox): add the line of the proposed changes")
     expect(wipDescription(NAME, "")).toBe("WIP (amber-fox): this thread's work")
   })
   test("the WIP line is this thread's; an agent's message is not", () => {
@@ -237,7 +239,7 @@ test("trailerRevset names what hasTrailer matches", () => {
 })
 
 describe("pre-rename: what the host wrote as Pineta is read", () => {
-  const offer = [
+  const proposed = [
     "feat: x",
     "",
     "Pineta-Thread: amber-fox",
@@ -248,14 +250,14 @@ describe("pre-rename: what the host wrote as Pineta is read", () => {
     "",
   ].join("\n")
 
-  test("an offer's trailers and ledger, and the message without them", () => {
-    expect(hasTrailer(offer, "thread", NAME)).toBe(true)
-    expect(offerLedger(offer)).toEqual({
+  test("proposed changes' trailers and ledger, and the message without them", () => {
+    expect(hasTrailer(proposed, "thread", NAME)).toBe(true)
+    expect(proposedLedger(proposed)).toEqual({
       source: commitId("aaaa"),
       start: [commitId("s1")],
     })
-    expect(sourcesOf(offer)).toEqual([commitId("aaaa")])
-    expect(withoutTrailers(offer)).toBe("feat: x")
+    expect(sourcesOf(proposed)).toEqual([commitId("aaaa")])
+    expect(withoutTrailers(proposed)).toBe("feat: x")
     expect(
       entryOfMessage(`turn\n\nPineta-Entry: e2\nPineta-Lane: ${LANE}\n`),
     ).toBe("e2")
@@ -279,7 +281,7 @@ describe("pre-rename: what the host wrote as Pineta is read", () => {
 
   test("the writers write Pinetrie only", () => {
     const written = [
-      offerMessage("feat: x", {
+      proposedMessage("feat: x", {
         lane: LANE,
         name: NAME,
         entry: "e1",

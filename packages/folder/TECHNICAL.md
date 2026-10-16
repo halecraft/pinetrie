@@ -116,7 +116,7 @@ flows, merged by `git merge-file` as lanehost merges.
 - **The snapshots kept:** each folder lane's tip, start, and merge bases
   with accepted work's newest state and with its parent lane's newest,
   foreign lanes included (ADR-0150); every conflict's three states; each
-  offer's start and tip; accepted work's newest `keep` line states, along
+  proposed changes' start and tip; accepted work's newest `keep` line states, along
   first parents, its newest always.
 - **A lane's parent is read from the graph** (`parentLane`): the lane whose
   state its start state's parent is. So the sweep keeps a parent base only

@@ -245,7 +245,7 @@ describe("rowSummary", () => {
   })
 
   test("a call with no subject is its word, untagged; an unknown tool is tagged with its name", () => {
-    expect(rowSummary(call("split_offer"))).toEqual({
+    expect(rowSummary(call("split_proposed_changes"))).toEqual({
       tag: undefined,
       whole: [{ text: "split", role: "plain" }],
     })

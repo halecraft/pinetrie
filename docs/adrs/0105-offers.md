@@ -15,6 +15,9 @@
   - ADR-0154: whether you edited an offer is read from the host's remote
     bookmark, not from the evolog. An archived lane's tip is parked under a
     ref of the host's, not deleted.
+  - ADR-0156: a thread's proposed changes sit under
+    `pinetrie-proposed/<name>`; a starting host renames each
+    `pinetrie-offer/<name>`, once.
 
 Restates ADR-0038 as amended by ADR-0039, ADR-0040, ADR-0047, ADR-0055,
 ADR-0060, ADR-0061, ADR-0065, ADR-0067, ADR-0080, ADR-0083, ADR-0100 and

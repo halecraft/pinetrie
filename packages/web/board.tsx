@@ -1,7 +1,7 @@
 // web/board — the board: everyone's roots, each in its workflow state. Its
 // strip sits in the footer and says each state's name, count, the people
 // reading in its roots, its highest mark, and how many of its roots the agent
-// works in and have work ready to accept, counts that ask nothing of you; ▦
+// works in and have changes ready to accept, counts that ask nothing of you; ▦
 // opens the board over the columns, moving none of them, and ▦, Escape or a
 // click outside it closes it. While the board is open, the strip holds the
 // board's search and "mine" in the states' place, and each column's head says

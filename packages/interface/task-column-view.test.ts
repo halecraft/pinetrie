@@ -51,7 +51,7 @@ const head = threadCardHead(K, {
   labels: new Map([[K, "Fix the sync bug"]]),
   status: new Map(),
   pips: new Set(),
-  offered: new Map(),
+  proposed: new Map(),
   work: new Map(),
 })
 

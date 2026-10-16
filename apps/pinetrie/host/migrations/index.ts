@@ -19,6 +19,7 @@ import { trashLeft } from "./0014-trash-left.ts"
 import { laneHistory } from "./0015-lane-history.ts"
 import { revisionPoint } from "./0016-revision-point.ts"
 import { staleDocuments } from "./0017-stale-documents.ts"
+import { dismissedReady } from "./0018-dismissed-ready.ts"
 
 /** What a migration reads with, and writes with once every read loaded. */
 export interface MigrationRun {
@@ -48,13 +49,18 @@ export interface Migration {
 
 /**
  * Every migration this build carries, oldest first: 0012-unstarted-threads and
- * 0013-task-cards. A store opens through the one migration from its stored
+ * 0013-task-cards (the places), and 0018-dismissed-ready (each person's
+ * attention). A store opens through the one migration from its stored
  * hash, so 0012 moves 0013's data too. 0001-live-row, 0002-records, 0005-tasks'
  * places and sidebars, 0008-entry-thread and 0010-reference-fields ran on
  * Duane's store and were deleted; restore one from the revision that deleted it
  * for a store still on its hash.
  */
-export const MIGRATIONS: readonly Migration[] = [unstartedThreads, taskCards]
+export const MIGRATIONS: readonly Migration[] = [
+  unstartedThreads,
+  taskCards,
+  dismissedReady,
+]
 
 /**
  * A one-time change to stored contents that keeps every schema's hash: a

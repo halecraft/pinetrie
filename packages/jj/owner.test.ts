@@ -129,7 +129,7 @@ describe("the owner of your repo", () => {
       published: true,
       yours: false,
       lanes: new Set(),
-      offers: new Set(),
+      proposed: new Set(),
     })
     close(owner)
   })
@@ -147,14 +147,14 @@ describe("the owner of your repo", () => {
     await owner.command(async ops => {
       await ops.jj(["log", "--no-graph", "-r", "@", "-T", "commit_id"])
       await ops.execute([
-        host("bookmark", "create", "pinetrie-offer/timed", "-r", "@-"),
+        host("bookmark", "create", "pinetrie-proposed/timed", "-r", "@-"),
       ])
     })
     await owner.read(ops => ops.jj(["log", "--no-graph", "-r", "@-"]))
     expect(told).toEqual(
       expect.arrayContaining([
         "jj log --no-graph -r @ -T commit_id",
-        "jj bookmark create pinetrie-offer/timed -r @-",
+        "jj bookmark create pinetrie-proposed/timed -r @-",
         "jj log --no-graph -r @-",
       ]),
     )
@@ -174,7 +174,7 @@ describe("the owner of your repo", () => {
     expect(observed()).toBe(before)
     await owner.command(ops =>
       ops.execute([
-        host("bookmark", "create", "pinetrie-offer/amber-fox", "-r", "@-"),
+        host("bookmark", "create", "pinetrie-proposed/amber-fox", "-r", "@-"),
       ]),
     )
     await owner.idle()
@@ -184,7 +184,7 @@ describe("the owner of your repo", () => {
       published: false,
       yours: false,
       lanes: new Set(),
-      offers: new Set(["amber-fox"]),
+      proposed: new Set(["amber-fox"]),
     })
     // A read after the command is pinned to what it wrote.
     const read = await owner.read(ops =>
@@ -192,7 +192,7 @@ describe("the owner of your repo", () => {
         "log",
         "--no-graph",
         "-r",
-        "pinetrie-offer/amber-fox",
+        "pinetrie-proposed/amber-fox",
         "-T",
         "commit_id",
       ]),
@@ -207,14 +207,14 @@ describe("the owner of your repo", () => {
     await owner.idle()
     const seen = await owner.command(async ops => {
       await ops.execute([
-        host("bookmark", "create", "pinetrie-offer/x", "-r", "@-"),
+        host("bookmark", "create", "pinetrie-proposed/x", "-r", "@-"),
       ])
       return owner.read(r =>
         r.jj([
           "log",
           "--no-graph",
           "-r",
-          "pinetrie-offer/x",
+          "pinetrie-proposed/x",
           "-T",
           "commit_id",
         ]),

@@ -160,7 +160,7 @@ module but `fixtures.ts`, which tests import as `@pinetrie/core/fixtures`.
   a point freely (`pointFromCommit`), and only `@pinetrie/jj` turns a
   point back, in a lane proven jj. A lane's base is `LaneBaseOf<P>`: the
   ports carry `LaneBase` (points), jj's reads `CommitBase`. A review's
-  range is a lane's points; one revision is an offer's commit
+  range is a lane's points; one revision is proposed changes' commit
   (`DiffSpan`). Rules and the ports test points for equality and nothing
   else: an ordering, an ancestry or a diff over `PointId` is an adapter's
   computation. The rule binds the type wherever it is used, and is held by
@@ -174,18 +174,18 @@ module but `fixtures.ts`, which tests import as `@pinetrie/core/fixtures`.
 - `NO_EDITOR`: a shell with no terminal would wait on an editor until its
   timeout (S36).
 
-## Offers and accepted work (`offers.ts`, `trailers.ts`, `work.ts`)
+## Proposed changes and accepted work (`proposed.ts`, `trailers.ts`, `work.ts`)
 
-- A thread's work reaches your repo as an offer, one commit or a stack
+- A thread's work reaches your repo as proposed changes, one commit or a stack
   (ADR-0105, S48), accepted by a forward bookmark move onto accepted work
   (ADR-0104, ADR-0061), through one owner (ADR-0065). An archived root's
-  offer is withdrawn (ADR-0029). The repo is the
+  proposed changes are withdrawn (ADR-0029). The repo is the
   ledger: the host decides from it, never from its record, which a restart
   can lose (S73).
-- What the host cannot tell, it does not act on (ADR-0067): an offer is
+- What the host cannot tell, it does not act on (ADR-0067): proposed changes are
   built only from work known to change a file, from a known start, and an
-  accepted-offer commit that names no source (S97) leaves its lane
-  untraced until it catches up past it. An offer already held is `held`
+  accepted thread commit that names no source (S97) leaves its lane
+  untraced until it catches up past it. Proposed changes already held are `held`
   (S89).
 - A thread catches up with its base or the thread it branched from
   (ADR-0072); a publish catches your files up first (ADR-0090, ADR-0099),
@@ -196,8 +196,8 @@ module but `fixtures.ts`, which tests import as `@pinetrie/core/fixtures`.
   template reads only a message's last paragraph, and a squash keeps two,
   so the readers read every paragraph (S77). A base trailer names accepted
   work by its kind, not its bookmark, which config may rename (ADR-0100).
-- A thread has a name you can say, which its offer's bookmark and trailers
-  carry, and its offer holds the WIP line until an agent describes it
+- A thread has a name you can say, which its proposed changes' bookmark and trailers
+  carry, and its proposed changes hold the WIP line until an agent describes it
   (ADR-0039).
 - A lane's work, its state and its disk are read from the nearest revision
   records above an entry (ADR-0032, ADR-0034), with the lanes that recorded

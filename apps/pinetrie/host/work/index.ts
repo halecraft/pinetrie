@@ -5,9 +5,10 @@
 // execute. What is not in the document, in a lane's history, or on a lane's
 // disk is held here: what startup found (`Setup`), each lane's handle
 // (`LaneRegistry`), and each coordination set in the module that writes it
-// (`turns`' pending records, `update`'s guidance flag). Accepted work, offers
-// and each lane's history are the project's adapter's (`adapter.ts`), which
-// `host/project.ts` chooses by the project's kind: nothing here names one.
+// (`turns`' pending records, `update`'s guidance flag). Accepted work, proposed
+// changes and each lane's history are the project's adapter's (`adapter.ts`),
+// which `host/project.ts` chooses by the project's kind: nothing here names
+// one.
 
 import type { ConfigPlaces } from "@pinetrie/config"
 import {
@@ -54,7 +55,7 @@ export type LaneWork = Pick<
     readonly project: ProjectRecord | null
     /** pi's hooks lane work answers; `askSplit` is the documents' (`host/split-call.ts`). */
     readonly hooks: Omit<LaneHooks, "askSplit" | "ask" | "leave" | "readBlob">
-    /** Accepted work and offers, as the project keeps them; null for a host without tools. */
+    /** Accepted work and proposed changes, as the project keeps them; null for a host without tools. */
     readonly destination: Destination | null
     /**
      * Settles when every lane's queued steps, fetches and the base snapshot's
@@ -160,7 +161,7 @@ export async function startLaneWork(input: {
     setup,
     registry,
     keeper,
-    offers: destination.offers,
+    proposed: destination.proposed,
   })
   const sharedLineages = createSharedLineages({
     basics,

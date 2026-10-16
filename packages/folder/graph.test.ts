@@ -110,14 +110,14 @@ function walked(
     else if (action === 3 && !isAncestor(g.graph, folder, tip))
       lane.push(g.add(`c-${i}`, { kind: "catch-up", lane: LANE }, tip, folder))
     else if (action >= 4) {
-      // Mostly the lane's tip; now and then an offer shown earlier.
-      const offered = action === 5 ? (lane[pick(lane.length)] ?? tip) : tip
-      if (!isAncestor(g.graph, offered, folder))
+      // Mostly the lane's tip; now and then proposed changes shown earlier.
+      const proposed = action === 5 ? (lane[pick(lane.length)] ?? tip) : tip
+      if (!isAncestor(g.graph, proposed, folder))
         folder = g.add(
           `line-${i}`,
           { kind: "accept", lane: LANE },
           folder,
-          offered,
+          proposed,
         )
     }
   }
@@ -321,7 +321,7 @@ function mergeOver(flow: Flow) {
 
 /**
  * Catch-ups after accepts, an accept recorded as a merge: A to D with one
- * base each; E to F criss-crosses, an offer shown before the lane's
+ * base each; E to F criss-crosses, proposed changes shown before the lane's
  * catch-up accepted after it, where neither base alone is always right.
  */
 function flows(): readonly Flow[] {
@@ -408,7 +408,8 @@ function flows(): readonly Flow[] {
   const c3 = state({ [F]: lines("P", "PP", "CC", "4") }, turn, c2)
   flow("D", c3, h2, { [F]: lines("P", "PP", "CC", "4") })
 
-  // E: criss-cross: an offer shown before the lane's catch-up is accepted after it.
+  // E: criss-cross: proposed changes shown before the lane's catch-up is
+  // accepted after it.
   fresh()
   const k0 = state({ [F]: lines("x", "y", "z") }, read)
   const k1 = state({ [F]: lines("x", "Y1", "z") }, turn, k0)

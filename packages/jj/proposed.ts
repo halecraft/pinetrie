@@ -1,18 +1,19 @@
-// The separate reads of an offer in your repo, and a review's reads of a
-// commit or a range. Reads only.
+// The separate reads of proposed changes in your repo, and a review's reads of
+// a commit or a range. Reads only.
 
 import {
   type CommitBase,
   type CommitId,
   commitId,
   type DiffSpan,
+  type FilesTouched,
   type NonEmpty,
   nonEmpty,
-  type OfferInRepo,
-  type OfferLedger,
-  type OfferRevision,
-  offerLedger,
   PROJECT_CONFIG_FILE,
+  type ProposedChangesInRepo,
+  type ProposedLedger,
+  type ProposedRevision,
+  proposedLedger,
   type RepoConfig,
   type RevisionFacts,
   type StartRead,
@@ -21,7 +22,6 @@ import {
   type ThreadName,
   trailerRevset,
   untracedLanes,
-  type WorkChanges,
 } from "@pinetrie/core"
 import {
   configWidenings,
@@ -32,25 +32,25 @@ import {
 } from "@pinetrie/lanes"
 import {
   bookmarkRevset,
-  hostOfferRevset,
+  hostProposedRevset,
   laneTipName,
-  offerBookmark,
+  proposedBookmark,
 } from "./lane/names.ts"
 import {
-  ACCEPTED_OFFER_COMMIT_ROW,
+  ACCEPTED_THREAD_COMMIT_ROW,
   commitsOf,
   conflictedFilesAt,
   fileText,
-  parseAcceptedOfferCommits,
+  parseAcceptedThreadCommits,
   REVISION_READ,
 } from "./lane/revisions.ts"
 import {
-  acceptedOfferCommitsRevset,
+  acceptedThreadCommitsRevset,
   EVOLOG_ENTRY,
   type EvologEntry,
-  offerStart,
   parseEvolog,
   planSinceHost,
+  proposedStart,
   walkToHost,
 } from "./plan.ts"
 
@@ -64,8 +64,8 @@ export async function query(
   return ran.stdout
 }
 
-/** The files an offer changes: from its bottom's parents to its top. */
-export const offerFiles = async (
+/** The files proposed changes change: from its bottom's parents to its top. */
+export const proposedFiles = async (
   jj: Runner,
   bottom: CommitId,
   top: string,
@@ -91,14 +91,14 @@ export async function laneTipIn(
 }
 
 /**
- * What the accepted-offer commits `acceptedOfferCommitsRevset` finds say
+ * What the accepted thread commits `acceptedThreadCommitsRevset` finds say
  * for `lane`: the lane commits they name in `Pinetrie-Source` trailers, what
  * you have of lanes that the lane's base does not already hold, read from
  * every paragraph of each message, since jj's `trailers` reads only the
- * last; and the accepted-offer commits of `lane` that name none
+ * last; and the accepted thread commits of `lane` that name none
  * (`untracedLanes`).
  */
-async function acceptedOfferCommitFacts(
+async function acceptedThreadCommitFacts(
   jj: Runner,
   input: {
     readonly repoConfig: RepoConfig
@@ -111,12 +111,12 @@ async function acceptedOfferCommitFacts(
     "--ignore-working-copy",
     "--no-graph",
     "-r",
-    acceptedOfferCommitsRevset(input),
+    acceptedThreadCommitsRevset(input),
     "-T",
-    ACCEPTED_OFFER_COMMIT_ROW,
+    ACCEPTED_THREAD_COMMIT_ROW,
   ])
   if (!ran.ok) throw new Error(describeFailure("jj log", ran))
-  const accepted = parseAcceptedOfferCommits(ran.stdout)
+  const accepted = parseAcceptedThreadCommits(ran.stdout)
   return {
     sources: [...new Set(accepted.flatMap(t => sourcesOf(t.description)))],
     untraced: accepted
@@ -126,14 +126,13 @@ async function acceptedOfferCommitFacts(
 }
 
 /**
- * Where an offer starts: the lane's base and the accepted offers' sources
- * above what the base holds (read), then `offerStart`'s revset (read); or
- * `untraced`, when an accepted-offer commit of the lane above its base
- * names no source. The
- * host's every start comes from here, so an offer is built, followed and
- * split from one start.
+ * Where proposed changes start: the lane's base and the accepted proposed
+ * changes' sources above what the base holds (read), then `proposedStart`'s
+ * revset (read); or `untraced`, when an accepted thread commit of the lane
+ * above its base names no source. The host's every start comes from here, so
+ * proposed changes are built, followed and split from one start.
  */
-export async function startOfOffer(
+export async function startOfProposed(
   jj: Runner,
   input: {
     readonly tip: CommitId
@@ -142,9 +141,9 @@ export async function startOfOffer(
     readonly lane: ThreadId
   },
 ): Promise<StartRead> {
-  const { sources, untraced } = await acceptedOfferCommitFacts(jj, input)
+  const { sources, untraced } = await acceptedThreadCommitFacts(jj, input)
   if (untraced.length > 0)
-    return { kind: "untraced", acceptedOfferCommits: untraced }
+    return { kind: "untraced", acceptedThreadCommits: untraced }
   return {
     kind: "known",
     start: await readStart(jj, {
@@ -156,15 +155,15 @@ export async function startOfOffer(
 }
 
 /**
- * `offerStart`'s heads, read. Never empty in practice: `start`, the base's
+ * `proposedStart`'s heads, read. Never empty in practice: `start`, the base's
  * start, is in `::tip`, since `laneBase` reads it from the tip's own
  * history; an empty read falls back to it.
  */
 export async function readStart(
   jj: Runner,
-  input: Parameters<typeof offerStart>[0],
+  input: Parameters<typeof proposedStart>[0],
 ): Promise<NonEmpty<CommitId>> {
-  return nonEmpty(await commitsOf(jj, offerStart(input))) ?? [input.start]
+  return nonEmpty(await commitsOf(jj, proposedStart(input))) ?? [input.start]
 }
 
 /**
@@ -172,12 +171,12 @@ export async function readStart(
  * diff from it to the tip: what a build restores, so the two agree. From
  * several, one diff over `start..tip`, from its roots' parents, merged, to
  * the tip. jj refuses a range with gaps, as after a catch-up merged an
- * accepted-offer commit: that, or an untraced start, is `unknown`.
+ * accepted thread commit: that, or an untraced start, is `unknown`.
  */
-export async function workChanges(
+export async function filesTouched(
   jj: Runner,
   input: { readonly start: StartRead; readonly tip: CommitId },
-): Promise<WorkChanges> {
+): Promise<FilesTouched> {
   if (input.start.kind === "untraced") return "unknown"
   const { start } = input.start
   const [only, ...more] = start
@@ -245,7 +244,7 @@ async function walkedSinceHost(
 }
 
 /**
- * The revision of `change` in the host's version against `commit`: none
+ * The revision of `changeId` in the host's version against `commit`: none
  * found is a revision the host never made; found and changed, yours. The
  * host's version is often hidden (your edit rewrote it), and `change_id()`
  * names visible commits only, so its revisions are read from its `depth`
@@ -253,7 +252,7 @@ async function walkedSinceHost(
  */
 async function comparedWithHost(
   jj: Runner,
-  input: { readonly commit: CommitId; readonly change: string },
+  input: { readonly commit: CommitId; readonly changeId: string },
   host: { readonly commit: CommitId; readonly depth: number },
 ): Promise<RevisionFacts> {
   const was = lines(
@@ -267,7 +266,7 @@ async function comparedWithHost(
     ]),
   )
     .map(row => row.split("\t"))
-    .find(([, change]) => change === input.change)?.[0]
+    .find(([, changeId]) => changeId === input.changeId)?.[0]
   if (was === undefined) return { reached: false, yoursChanged: false }
   const step = await sameAs(jj, commitId(was), input.commit)
   return {
@@ -278,23 +277,23 @@ async function comparedWithHost(
 
 /**
  * One revision's facts since the host's version of it, reading only what
- * `planSinceHost` asks for next: nothing for a marked offer, else its
+ * `planSinceHost` asks for next: nothing for marked proposed changes, else its
  * evolog, and a comparison with the host's version when the walk cannot
  * reach the host.
  */
 export async function revisionSinceHost(
   jj: Runner,
-  revision: { readonly commit: CommitId; readonly change: string },
-  offer: {
+  revision: { readonly commit: CommitId; readonly changeId: string },
+  proposed: {
     readonly marked: boolean
     readonly host: CommitId | null
-    /** How many revisions the offer has: how far below its top to look. */
+    /** How many revisions the proposed changes have: how far below its top to look. */
     readonly size: number
   },
 ): Promise<RevisionFacts> {
   let walked: RevisionFacts | null = null
   for (;;) {
-    const next = planSinceHost({ ...offer, walked })
+    const next = planSinceHost({ ...proposed, walked })
     switch (next.kind) {
       case "known":
         return next.facts
@@ -304,34 +303,34 @@ export async function revisionSinceHost(
       case "compare":
         return comparedWithHost(jj, revision, {
           commit: next.host,
-          depth: offer.size,
+          depth: proposed.size,
         })
     }
   }
 }
 
-/** The host's version of the offer under `bookmark`; null when it has none. */
+/** The host's version of the proposed changes under `bookmark`; null when it has none. */
 export async function hostVersionOf(
   jj: Runner,
   bookmark: string,
 ): Promise<CommitId | null> {
-  const [host] = await commitsOf(jj, hostOfferRevset(bookmark))
+  const [host] = await commitsOf(jj, hostProposedRevset(bookmark))
   return host ?? null
 }
 
 /**
- * An offer's revisions in your repo, bottom first, each with its change id:
- * what is under its bookmark and not already under its target, and carries
- * its thread's trailer. An accepted offer below carries a ledger too, but is
- * under the target; your commits carry no thread trailer. The bookmark's own
- * commit is always the top, so an offer built before the trailer was
+ * Proposed changes' revisions in your repo, bottom first, each with its change
+ * id: what is under its bookmark and not already under its target, and carries
+ * its thread's trailer. Accepted proposed changes below carry a ledger too, but
+ * is under the target; your commits carry no thread trailer. The bookmark's own
+ * commit is always the top, so proposed changes built before the trailer was
  * written there is still found. Empty with no bookmark.
  */
-export async function offerRevisions(
+export async function proposedRevisions(
   jj: Runner,
   input: { readonly name: ThreadName; readonly target: string },
-): Promise<{ readonly commit: CommitId; readonly change: string }[]> {
-  const bookmark = bookmarkRevset(offerBookmark(input.name))
+): Promise<{ readonly commit: CommitId; readonly changeId: string }[]> {
+  const bookmark = bookmarkRevset(proposedBookmark(input.name))
   const thread = trailerRevset(["thread"], input.name)
   const ran = await jj([
     "log",
@@ -344,21 +343,21 @@ export async function offerRevisions(
   if (!ran.ok) throw new Error(describeFailure("jj log", ran))
   return lines(ran.stdout)
     .map(line => {
-      const [commit = "", change = ""] = line.split("\t")
-      return { commit: commitId(commit), change }
+      const [commit = "", changeId = ""] = line.split("\t")
+      return { commit: commitId(commit), changeId }
     })
     .toReversed()
 }
 
 /**
- * The files conflicted at an offer's start, as its ledger names it: read
- * only when the offer conflicts, since only then can its conflict have come
- * with the lane's copy (`conflictCause`). A start your repo no
- * longer has names none.
+ * The files conflicted at proposed changes' start, as its ledger names it: read
+ * only when the proposed changes conflict, since only then can its conflict
+ * have come with the lane's copy (`conflictCause`). A start your repo no longer
+ * has names none.
  */
 export async function startConflictsOf(
   jj: Runner,
-  ledger: OfferLedger | null,
+  ledger: ProposedLedger | null,
   conflicts: readonly string[],
 ): Promise<readonly string[]> {
   if (conflicts.length === 0 || ledger === null) return []
@@ -370,36 +369,36 @@ export async function startConflictsOf(
 }
 
 /**
- * An offer as your repo holds it now (`OfferInRepo`): its revisions and
- * each one's facts since the host's version (`revisionSinceHost`), whether
- * its top is that version, its ledger and first line, where it sits, its
- * files and conflicts. Null when its bookmark is gone (you abandoned it, or
- * accepted it by hand). Divergent when the bookmark is conflicted or a
- * change id names two commits: then only its change ids. Every read after
- * the first names commits, so no read acts on a hidden one.
+ * Proposed changes as your repo holds it now (`ProposedChangesInRepo`): its
+ * revisions and each one's facts since the host's version
+ * (`revisionSinceHost`), whether its top is that version, its ledger and first
+ * line, where it sits, its files and conflicts. Null when its bookmark is gone
+ * (you abandoned it, or accepted it by hand). Divergent when the bookmark is
+ * conflicted or a change id names two commits: then only its change ids. Every
+ * read after the first names commits, so no read acts on a hidden one.
  */
-export async function readOffer(
+export async function readProposedChanges(
   jj: Runner,
   input: { readonly name: ThreadName; readonly target: string },
-): Promise<OfferInRepo | null> {
+): Promise<ProposedChangesInRepo | null> {
   const heads = await commitsOf(
     jj,
-    `present(${bookmarkRevset(offerBookmark(input.name))})`,
+    `present(${bookmarkRevset(proposedBookmark(input.name))})`,
   )
-  const found = await offerRevisions(jj, input)
+  const found = await proposedRevisions(jj, input)
   const [top] = heads
   const [bottom] = found
   if (top === undefined || bottom === undefined) return null
-  const changes = [...new Set(found.map(r => r.change))]
+  const changeIds = [...new Set(found.map(r => r.changeId))]
   const visible = await commitsOf(
     jj,
-    changes.map(c => `change_id(${c})`).join(" | "),
+    changeIds.map(c => `change_id(${c})`).join(" | "),
   )
-  if (heads.length > 1 || visible.length > changes.length)
-    return { kind: "divergent", changes }
-  const host = await hostVersionOf(jj, offerBookmark(input.name))
+  if (heads.length > 1 || visible.length > changeIds.length)
+    return { kind: "divergent", changeIds }
+  const host = await hostVersionOf(jj, proposedBookmark(input.name))
   const marked = host === top
-  const revisions: OfferRevision[] = []
+  const revisions: ProposedRevision[] = []
   for (const r of found)
     revisions.push({
       ...r,
@@ -426,7 +425,7 @@ export async function readOffer(
   const target = await commitsOf(jj, input.target)
   const onTarget =
     parents.length === target.length && parents.every(p => target.includes(p))
-  const files = await offerFiles(jj, bottom.commit, top)
+  const files = await proposedFiles(jj, bottom.commit, top)
   const conflicts = await conflictedFilesAt(jj, top)
   const message = await query(jj, [
     "log",
@@ -436,10 +435,10 @@ export async function readOffer(
     "-T",
     "description",
   ])
-  const ledger = offerLedger(message)
+  const ledger = proposedLedger(message)
   return {
-    kind: "offer",
-    bookmark: offerBookmark(input.name),
+    kind: "present",
+    bookmark: proposedBookmark(input.name),
     marked,
     revisions,
     chained,
@@ -457,7 +456,7 @@ export async function readOffer(
  * A range's files, each as one JSON object per line: a `TreeDiffEntry` has
  * a path, how it is shown and its status, but no line counts, which
  * `spanRead` takes from the range's git diff. A change to it bumps
- * `OFFER_WIRE`.
+ * `REVIEW_WIRE`.
  */
 const RANGE_FILES =
   '"{\\"path\\":" ++ json(path) ++ ",\\"shown\\":" ++ json(display_diff_path) ++ ' +
@@ -489,8 +488,8 @@ function gitDiffCounts(
 }
 
 /**
- * A span as jj reads it in your repo: an offer's revision, or a range of a
- * lane's turns, its points read in its proven lane (`commitFromPoint`).
+ * A span as jj reads it in your repo: proposed changes' revision, or a range of
+ * a lane's turns, its points read in its proven lane (`commitFromPoint`).
  */
 export type CommitSpan =
   | Extract<DiffSpan, { readonly kind: "revision" }>
@@ -584,7 +583,7 @@ async function spanFiles(
  * One file's git diff in a span; null when jj fails. `root-file:` names
  * the file from the repo's root, and exactly it: a bare path is read from the
  * process's directory, and `root:` matches every file under a directory of
- * that name. A change to the flags bumps `OFFER_WIRE`.
+ * that name. A change to the flags bumps `REVIEW_WIRE`.
  */
 export async function fileDiff(
   jj: Runner,
@@ -604,23 +603,23 @@ export async function fileDiff(
 }
 
 /**
- * A divergent revision's commits, split into the host's and yours. The
- * host's is the one in its version of the offer (`host`), when that names
- * exactly one: a race with your edit can leave the version behind both,
- * since jj exports no conflicted bookmark for a mark to copy. Otherwise the
- * one whose newest evolog entry names the host's operation. Null unless
- * exactly one is the host's.
+ * A divergent revision's commits, split into the host's and yours. The host's
+ * is the one in its version of the proposed changes (`host`), when that names
+ * exactly one: a race with your edit can leave the version behind both, since
+ * jj exports no conflicted bookmark for a mark to copy. Otherwise the one whose
+ * newest evolog entry names the host's operation. Null unless exactly one is
+ * the host's.
  */
 export async function hostCommitIn(
   jj: Runner,
-  change: string,
+  changeId: string,
   host: CommitId | null,
 ): Promise<{ readonly hosts: CommitId; readonly yours: CommitId } | null> {
-  const commits = await commitsOf(jj, `present(change_id(${change}))`)
+  const commits = await commitsOf(jj, `present(change_id(${changeId}))`)
   const inHost =
     host === null
       ? []
-      : await commitsOf(jj, `present(change_id(${change})) & ::${host}`)
+      : await commitsOf(jj, `present(change_id(${changeId})) & ::${host}`)
   const byHost: CommitId[] = []
   const byYou: CommitId[] = []
   for (const c of commits) {

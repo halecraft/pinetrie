@@ -1,8 +1,8 @@
 // host/later — the host's own writes that land after a gap: a model request's
-// answer, a step a run's end queues, an offer action's fact. Each is planned
-// when its step runs, behind the archive's gate for late writes (`lateAway`),
-// and its writes are values this module carries out, so a module whose work
-// is late needs no write port of its own.
+// answer, a step a run's end queues, an action on proposed changes' fact. Each
+// is planned when its step runs, behind the archive's gate for late writes
+// (`lateAway`), and its writes are values this module carries out, so a module
+// whose work is late needs no write port of its own.
 
 import type { Away, QueuedFact, ThreadId, ValueWrite } from "@pinetrie/core"
 import type { Keeper } from "@pinetrie/keeper"

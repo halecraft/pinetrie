@@ -204,7 +204,7 @@ test("recover deletes the records of a type no spec declares, in the session and
   ])
 })
 
-test("recover deletes the offers, accepted work and bases of another kind than the project's", async () => {
+test("recover deletes the proposed changes, accepted work and bases of another kind than the project's", async () => {
   const b = basics()
   putValue(
     b,

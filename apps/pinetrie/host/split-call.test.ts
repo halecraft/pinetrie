@@ -1,7 +1,12 @@
 import { entryId, runId, threadIdFor, writerId } from "@pinetrie/core"
 import { createKeeper } from "@pinetrie/keeper"
 import { readCardHistories, readPlaces } from "@pinetrie/reads"
-import { OFFER, SPLIT_QUEUED, setRecord, splitRefusal } from "@pinetrie/rules"
+import {
+  PROPOSED_CHANGES,
+  SPLIT_QUEUED,
+  setRecord,
+  splitRefusal,
+} from "@pinetrie/rules"
 import { beginRun, writeEntry, writeLaneTip } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import type { HostKey } from "./basics.ts"
@@ -11,8 +16,8 @@ import { createSplitCall } from "./split-call.ts"
 const LANE = threadIdFor("0123456789abcdef")
 const ADA = writerId("ada@x.io")
 
-/** A running lane, its prompt by Ada, with an open offer: what `split_offer` splits. */
-function runningWithOffer() {
+/** A running lane, its prompt by Ada, with open proposed changes: what `split_proposed_changes` splits. */
+function runningWithProposed() {
   const b = basics()
   putLane(b, LANE, entryId("p-1"))
   writeEntry(
@@ -23,7 +28,7 @@ function runningWithOffer() {
   beginRun(b.live, LANE, runId("r-1"))
   putValue(
     b,
-    setRecord(OFFER, {
+    setRecord(PROPOSED_CHANGES, {
       kind: "jj",
       lane: LANE,
       size: 1,
@@ -34,7 +39,7 @@ function runningWithOffer() {
       yourEdits: [],
       described: true,
       edited: false,
-      bookmark: "pinetrie-offer/x",
+      bookmark: "pinetrie-proposed/x",
       acceptedAs: null,
       commits: [],
       ledger: null,
@@ -44,8 +49,8 @@ function runningWithOffer() {
   return b
 }
 
-test("split_offer queues a split card by the person behind the run, once", async () => {
-  const b = runningWithOffer()
+test("split_proposed_changes queues a split card by the person behind the run, once", async () => {
+  const b = runningWithProposed()
   const askSplit = createSplitCall({
     basics: b,
     keeper: { run: f => f() },
@@ -76,7 +81,7 @@ test("split_offer queues a split card by the person behind the run, once", async
 })
 
 test("a split asked as its run is stopped is popped by the run's end", async () => {
-  const b = runningWithOffer()
+  const b = runningWithProposed()
   const keeper = createKeeper<HostKey>()
   const askSplit = createSplitCall({
     basics: b,

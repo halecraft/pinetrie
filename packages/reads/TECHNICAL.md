@@ -9,7 +9,7 @@ What the session document says, read once, by the host and the client alike.
   `readDigests`, and `readRootRecord`, the root's directory
   record as the host writes it.
 - **The session's reads take its `SessionDocHandle`**: every record read
-  across roots (`readLaneRecords`, `readNames`, `readOffers`, `readWorkflow`,
+  across roots (`readLaneRecords`, `readNames`, `readProposedByLane`, `readWorkflow`,
   `readArchived` (with the places, ADR-0126) and `readMarks`, each by
   task (ADR-0116), `readThreads`,
   `readRoots`, the singletons…), `readRunningLanes` with `pinetrie:live`, and
@@ -37,7 +37,7 @@ functions.
 
 Reads the host decides from, or that more than one reader needs:
 `readRenderableEntries`, `readTreeIndex`, `readLanes`, `readRunning`, `readLatestPrompt` (what a lane's run is: a
-run's end and `split_offer` decide by it), `readRunAuthor` (the person
+run's end and `split_proposed_changes` decide by it), `readRunAuthor` (the person
 behind it, `promptAuthor`, ADR-0080),
 `readParticipantNames`, `readParticipantPictures` (ADR-0098), `readParticipants`, `readReading`, `readTyping`,
 `readTypingIn` and `readQueueHolds` (ADR-0048 step 7), `readAgentActivity`,
@@ -109,7 +109,7 @@ The records it reads, and the decisions that made them:
 | `readCardHistories`, `readTraces` | `pinetrie.card-history`, `pinetrie.trace` | ADR-0048 step 6 |
 | `readQueueHolds` | `pinetrie.queue-hold` | ADR-0048 step 7 |
 | `readParticipantPictures` | `pinetrie.picture` | ADR-0098 |
-| `readOffers` | `pinetrie.offer` | ADR-0105 |
+| `readProposedByLane` | `pinetrie.proposed` | ADR-0105 |
 | `readAccepted`, `readBases` | `pinetrie.accepted`, `pinetrie.base` | ADR-0104 |
 | `readFilesLost` | `pinetrie.files-lost` | ADR-0124 |
 | `readBudgets` | `pinetrie.budget` | ADR-0128 |
@@ -180,7 +180,7 @@ Kyneta has let go.
   and `Object.keys` give back `string`, which cannot index it (TS7053), so
   `renderableEntries` walks `Object.values` and keys by `entry.id`.
 - **A map keyed by an entry, a root, a task or a lane says so in its type** (`readArchived`,
-  `readRevisions`, `readOffers`…). A `string`-keyed map still accepts an
+  `readRevisions`, `readProposedByLane`…). A `string`-keyed map still accepts an
   `EntryId`, so a key type left `string` compiles and leaves its lookups
   unchecked (S95).
 - **`readRenderableEntries` decodes chat** (`renderableMessage`), so the index

@@ -122,7 +122,7 @@ const input = (over: Partial<Facts> = {}): BoardViewInput => {
       labels: f.labels,
       status: f.status,
       pips: f.cardRoots,
-      offered: f.ready,
+      proposed: f.ready,
       work: f.work,
     }),
   }
@@ -176,7 +176,7 @@ describe("boardView", () => {
       lane: threadIdFor("a"),
       end: entryId("e-1"),
       level: "needsYou" as const,
-      raised: { kind: "offer" as const, source: "c" },
+      raised: { kind: "ready" as const, source: "c" },
     }
     const status = new Map<TaskId, Status>([
       [E(1), { kind: "needsYou", item }],
@@ -217,7 +217,7 @@ describe("boardView", () => {
   test("stateWords and readyWords: what a state's ◌ and ⇡ and an item's ⇡ say", () => {
     expect(stateWords({ working: 1, ready: 2 })).toEqual({
       working: "the agent is working in 1 task",
-      ready: "2 tasks with work ready to accept",
+      ready: "2 tasks with changes ready to accept",
     })
     expect(readyWords(["amber-fox", "cozy-mallard"])).toBe(
       "ready to accept: amber-fox, cozy-mallard",
@@ -339,7 +339,7 @@ describe("the board's search", () => {
       lane: threadIdFor("a"),
       end: entryId("e-2"),
       level: "needsYou" as const,
-      raised: { kind: "offer" as const, source: "c" },
+      raised: { kind: "ready" as const, source: "c" },
     }
     status.set(E(2), { kind: "needsYou", item })
     const view = boardView(input({ labels, status, ready, ...find("board") }))

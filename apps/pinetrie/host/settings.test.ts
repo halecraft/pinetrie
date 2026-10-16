@@ -204,7 +204,7 @@ describe("your repo's names", () => {
     ])
   })
 
-  test("the old offers key is refused as unknown", () => {
+  test("the old `offers` key is refused as unknown", () => {
     expect(
       user({ offers: { onto: "trunk" } }).refusals.map(r => [r.key, r.why]),
     ).toEqual([["offers", "unknown"]])

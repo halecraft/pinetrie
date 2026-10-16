@@ -194,7 +194,7 @@ function baseMoved(
  *   or the host has never read the lane at all (no `pinetrie.base`): a lane
  *   whose turns changed no file never reached your repo;
  * - `nothing-new`: it moved, but by work the lane already holds, as after
- *   you accepted its own offer: catching up changes no file;
+ *   you accepted its own proposed changes: catching up changes no file;
  * - `brings`: catching up changes `files` files in the lane. Only this one
  *   says the move, for the header's ↓ (`behindMark`).
  */

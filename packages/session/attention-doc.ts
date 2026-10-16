@@ -44,8 +44,8 @@ export interface AttentionStore {
   leave(): void
   /** Mark `lane`'s verdict, of the run `ask` started, "not needed". */
   dismiss(lane: ThreadId, ask: EntryId): void
-  /** Mark `lane`'s offer "not needed" while it holds `source`. */
-  dismissOffer(lane: ThreadId, source: string): void
+  /** Mark `lane`'s proposed changes "not needed" while it holds `source`. */
+  dismissReady(lane: ThreadId, source: string): void
   /** The mentions seen, as the inbox decided them next. */
   setInbox(next: SeenMentions): void
   dispose(): void
@@ -121,8 +121,8 @@ export function attentionStore(
     read: (lane, entry) => step({ lane, entry }, false),
     leave: () => step(null, true),
     dismiss: (lane, ask) => write(d => d.dismissed.set(lane, ask)),
-    dismissOffer: (lane, source) =>
-      write(d => d.dismissedOffers.set(lane, source)),
+    dismissReady: (lane, source) =>
+      write(d => d.dismissedReady.set(lane, source)),
     setInbox(next) {
       const stored = own.value.current()
       const seen = new Set(next.seen)

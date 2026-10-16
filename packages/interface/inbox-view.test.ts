@@ -19,11 +19,11 @@ const verdict = (lane: string, level: Level): Item => ({
     ask: entryId(`p-${lane}`),
   },
 })
-const offer = (lane: string): Item => ({
+const proposed = (lane: string): Item => ({
   lane: threadIdFor(lane),
   end: entryId(`e-${lane}`),
   level: "needsYou",
-  raised: { kind: "offer", source: cardIdFor("c1") },
+  raised: { kind: "ready", source: cardIdFor("c1") },
 })
 
 const view = (
@@ -46,10 +46,10 @@ const view = (
 }
 
 describe("inboxCount", () => {
-  test("counts what needs you, offers of threads you follow and unseen mentions; never what is worth a read", () => {
+  test("counts what needs you, proposed changes of threads you follow and unseen mentions; never what is worth a read", () => {
     expect(
       inboxCount(
-        [verdict("a", "needsYou"), offer("b"), verdict("c", "worthARead")],
+        [verdict("a", "needsYou"), proposed("b"), verdict("c", "worthARead")],
         1,
       ),
     ).toBe(3)
@@ -58,9 +58,9 @@ describe("inboxCount", () => {
 })
 
 describe("inboxView", () => {
-  test("each verdict under its level, each offer under ready, in the order given", () => {
+  test("each verdict under its level, each proposed changes under ready, in the order given", () => {
     const a = verdict("a", "needsYou")
-    const b = offer("b")
+    const b = proposed("b")
     const c = verdict("c", "worthARead")
     const d = verdict("d", "needsYou")
     expect(view({ items: [a, b, c, d] }).items).toEqual({
@@ -74,13 +74,13 @@ describe("inboxView", () => {
       view({
         items: [
           verdict("c", "worthARead"),
-          offer("b"),
+          proposed("b"),
           verdict("a", "needsYou"),
         ],
         mentions: 1,
       }).sections,
     ).toEqual(["needsYou", "ready", "worthARead", "mentions"])
-    expect(view({ items: [offer("b")] }).sections).toEqual(["ready"])
+    expect(view({ items: [proposed("b")] }).sections).toEqual(["ready"])
     expect(view().sections).toEqual([])
   })
   test("a seen mention counts nothing, and keeps the mentions section", () => {
@@ -89,7 +89,7 @@ describe("inboxView", () => {
     expect(seen.sections).toEqual(["mentions"])
   })
   test("alone, with no mentions, there is no mentions section", () => {
-    expect(view({ items: [offer("b")] }).sections).not.toContain("mentions")
+    expect(view({ items: [proposed("b")] }).sections).not.toContain("mentions")
   })
   test("an open menu keeps its emptied section", () => {
     expect(view({ kept: ["needsYou"] }).sections).toEqual(["needsYou"])
@@ -100,7 +100,7 @@ describe("inboxWords", () => {
   test("the label says what needs you, and never where the agent works", () => {
     const words = inboxWords(
       view({
-        items: [verdict("a", "needsYou"), offer("b"), offer("c")],
+        items: [verdict("a", "needsYou"), proposed("b"), proposed("c")],
         mentions: 1,
         unseen: 1,
       }),
@@ -109,7 +109,7 @@ describe("inboxWords", () => {
       "Inbox · 4 things need you: 1 run ended, 2 ready to accept, 1 unseen mention",
     )
     expect(inboxWords(view()).label).toBe("Inbox · nothing needs you")
-    expect(inboxWords(view({ items: [offer("b")] })).heading).toBe(
+    expect(inboxWords(view({ items: [proposed("b")] })).heading).toBe(
       "1 thing needs you",
     )
   })
@@ -131,7 +131,7 @@ describe("inboxWords", () => {
         view({
           items: [
             verdict("a", "needsYou"),
-            offer("b"),
+            proposed("b"),
             verdict("c", "worthARead"),
           ],
           mentions: 1,

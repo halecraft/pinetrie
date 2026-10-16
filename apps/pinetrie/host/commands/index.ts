@@ -43,7 +43,7 @@ import { type ChatDeps, sendChat, spendsCard } from "./chat.ts"
 import { clear } from "./gate.ts"
 import {
   actOnAccepted,
-  actOnOffer,
+  actOnProposedChanges,
   handleCarryOn,
   handleQueueHold,
   handleSshAccess,
@@ -82,7 +82,7 @@ export interface CommandDeps {
     Pick<Provenance, "onTaken">
   /** The documents' keeper: a `documents` command is one step on it. */
   readonly keeper: Pick<HostKeeper, "run" | "track">
-  /** An offer action's fact is a late write. */
+  /** The fact of an action on proposed changes is a late write. */
   readonly later: LaneDeps["later"]
   readonly relays: ChatDeps["relays"]
 }
@@ -91,9 +91,9 @@ export interface CommandDeps {
 type CommandPlace = "documents" | "repo" | "board"
 
 /**
- * Where each kind of command runs. An offer action and a setup or publish act
- * on your repo only: they go straight to its owner, and hold no other
- * command. A move on the board is up to three parts (`handleTaskMove`).
+ * Where each kind of command runs. An action on proposed changes and a setup or
+ * publish act on your repo only: they go straight to its owner, and hold no
+ * other command. A move on the board is up to three parts (`handleTaskMove`).
  * Everything else is one step on the documents' keeper. A kind with no place
  * does not compile.
  */
@@ -121,7 +121,7 @@ const COMMAND_PLACE = {
   workflow: "documents",
   mark: "documents",
   retitle: "documents",
-  offer: "repo",
+  proposed: "repo",
   setup: "repo",
   publish: "repo",
   "move-task": "board",
@@ -315,8 +315,8 @@ export function createCommands(deps: CommandDeps): Commands {
         return settled(await handleMark(deps, writer, intent))
       case "retitle":
         return settled(await deps.titles.asked(intent.task, writer))
-      case "offer":
-        return settled(await actOnOffer(deps, intent, writer))
+      case "proposed":
+        return settled(await actOnProposedChanges(deps, intent, writer))
       case "setup":
       case "publish":
         return settled(await actOnAccepted(deps, intent.kind))

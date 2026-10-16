@@ -384,28 +384,6 @@ export {
   toNotes,
 } from "./notes.ts"
 export {
-  isNotYetAccepted,
-  OFFER,
-  type OfferAcceptanceDestination,
-  offerRecord,
-  offerStatus,
-  planDescribeAgain,
-  planDescribeAsk,
-  planDescribeSettle,
-  planOfferAcceptance,
-  planRebuild,
-  planRefresh,
-  planStackEnded,
-  planYourEdits,
-} from "./offer.ts"
-export {
-  type OfferActivity,
-  type OfferButton,
-  type OfferView,
-  offerSeen,
-  offerView,
-} from "./offer-view.ts"
-export {
   type GatheredStart,
   type OpenPlan,
   type OpenThread,
@@ -438,6 +416,22 @@ export {
   pinnedReads,
   planPinnedRead,
 } from "./pinned.ts"
+export {
+  type AcceptanceDestination,
+  isNotYetAccepted,
+  PROPOSED_CHANGES,
+  planAcceptance,
+  planDescribeAgain,
+  planDescribeAsk,
+  planDescribeSettle,
+  planRebuild,
+  planRefresh,
+  planStackEnded,
+  planYourEdits,
+  proposedChangesRecord,
+  proposedChangesSeen,
+  proposedChangesStatus,
+} from "./proposed.ts"
 export {
   blankQueued,
   type CarryPlan,
@@ -516,11 +510,11 @@ export {
   decodeRevisionReview,
   diffUrl,
   MAX_DIFF_BYTES,
-  type OfferAnswer,
-  type OfferAsk,
-  parseOfferPath,
-  planOfferRead,
+  parseReviewPath,
+  planReviewRead,
   type RecordedSpan,
+  type ReviewAnswer,
+  type ReviewAsk,
   reviewUrl,
 } from "./review.ts"
 export {
@@ -668,3 +662,9 @@ export {
   REVISION,
   sourceHistory,
 } from "./work.ts"
+export {
+  type WorkStripActivity,
+  type WorkStripButton,
+  type WorkStripView,
+  workStripView,
+} from "./work-strip.ts"

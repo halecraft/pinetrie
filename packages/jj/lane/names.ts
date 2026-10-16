@@ -1,6 +1,6 @@
 // jj/lane/names — the names pine·trie gives in a lane's repo and in yours:
 // each lane's bookmark, its history and stack as remote bookmarks in your
-// repo, offers' bookmarks, and your repo's own names (`RepoConfig`).
+// repo, the proposed bookmarks, and your repo's own names (`RepoConfig`).
 
 import type { RepoConfig, ThreadId, ThreadName } from "@pinetrie/core"
 
@@ -49,27 +49,27 @@ export const laneParkedRef = (lane: ThreadId): string =>
   `refs/pinetrie/archived/${lane}`
 
 /**
- * The remote the host keeps its version of each offer under, as a tracked
- * remote bookmark. No git remote is added, so nothing fetches from it or
- * pushes to it. It starts with `LANE_REMOTE_PREFIX`, and is no lane's.
+ * The remote the host keeps its version of each proposed changes under, as a
+ * tracked remote bookmark. No git remote is added, so nothing fetches from it
+ * or pushes to it. It starts with `LANE_REMOTE_PREFIX`, and is no lane's.
  */
 export const HOST_REMOTE = "pinetrie-host"
-/** Where git keeps the host's version of the offer under `bookmark`. */
-export const hostOfferRef = (bookmark: string): string =>
+/** Where git keeps the host's version of the proposed changes under `bookmark`. */
+export const hostProposedRef = (bookmark: string): string =>
   `refs/remotes/${HOST_REMOTE}/${bookmark}`
-/** The host's version of the offer under `bookmark`, as a revset: empty when there is none. */
-export const hostOfferRevset = (bookmark: string): string =>
+/** The host's version of the proposed changes under `bookmark`, as a revset: empty when there is none. */
+export const hostProposedRevset = (bookmark: string): string =>
   `remote_bookmarks(exact:${revsetName(bookmark)}, remote=exact:${revsetName(HOST_REMOTE)})`
 
 /**
- * A lane's offer in your repo. Not under `pinetrie/`, whose bookmarks were
- * immutable when offers began.
+ * A lane's proposed changes in your repo. Not under `pinetrie/`, whose
+ * bookmarks were immutable when proposed bookmarks began.
  */
-export const OFFER_PREFIX = "pinetrie-offer/"
-export const offerBookmark = (name: ThreadName): string =>
-  `${OFFER_PREFIX}${name}`
-/** Every offer's bookmark, as a revset. */
-export const OFFER_BOOKMARKS = `bookmarks(glob:${revsetName(`${OFFER_PREFIX}*`)})`
+export const PROPOSED_PREFIX = "pinetrie-proposed/"
+export const proposedBookmark = (name: ThreadName): string =>
+  `${PROPOSED_PREFIX}${name}`
+/** Every proposed changes' bookmark, as a revset. */
+export const PROPOSED_BOOKMARKS = `bookmarks(glob:${revsetName(`${PROPOSED_PREFIX}*`)})`
 
 export const DEFAULT_REPO: RepoConfig = {
   acceptedBookmark: "pinetrie-accepted",

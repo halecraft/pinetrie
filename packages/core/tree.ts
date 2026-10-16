@@ -61,7 +61,7 @@ export interface BehindView {
   readonly files: readonly string[]
   /** Those of `files` this thread's work changes too. */
   readonly overlap: readonly string[]
-  /** The files the thread's offer conflicts in with the base now. */
+  /** The files the thread's proposed changes conflict in with the base now. */
   readonly conflicts: readonly string[]
 }
 
@@ -407,12 +407,12 @@ function renderableMessage(entry: EntryLike): TranscriptMessage | null {
 }
 
 /**
- * The host's own messages, which a column shows as one line, from pine·trie:
- * a resolution's prompt (`land`), an update and a split's prompt (`update`,
+ * The host's own messages, which a column shows as one line, from pine·trie: a
+ * resolution's prompt (`land`), an update and a split's prompt (`update`,
  * `stack`), a Resume's carry-on (`carry-on`), the host's facts (`fact`: what a
- * command on the offer did, a stop, a member gone, a budget spent, a canvas
- * change), that the base has new work (`behind`), and what an asked agent
- * heard of the thread that asked (`heard`).
+ * command on the proposed changes did, a stop, a member gone, a budget spent, a
+ * canvas change), that the base has new work (`behind`), and what an asked
+ * agent heard of the thread that asked (`heard`).
  */
 export const LINE_ROLES: ReadonlySet<string> = new Set([
   "land",
