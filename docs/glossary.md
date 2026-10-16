@@ -9,7 +9,7 @@ words they were written with.
 
 | word | what it is | in code | retired |
 |---|---|---|---|
-| **accepted work** | The commits finished work lands on, under the bookmark `pinetrie-accepted` (config `accepted.bookmark`). It only moves forward. | `accepted`, `AcceptedRecord`, `AcceptedFacts`, `acceptedBookmark` | the line, the integration line, the project, `onto`, `pinetrie-onto` |
+| **accepted work** | The commits finished work lands on, under the bookmark `pinetrie-accepted` (config `accepted.bookmark`). It only moves forward. A folder project's accepted work is its folder, read into states on its line. | `accepted`, `AcceptedRecord`, `AcceptedFacts`, `acceptedBookmark`, `AcceptsInto`, `FolderAcceptedRecord`, `folderNewest` | the line, the integration line, the project, `onto`, `pinetrie-onto`, your folder |
 | **accept** | Move an offer into accepted work, or into a WIP: its bookmark moves forward to the offer. | `accept`, `planOfferAcceptance`, `acceptedAs` | integrate, take (of an offer), land, add to the project |
 | **accepted-offer commit** | The commit an accepted offer leaves, carrying `Pinetrie-Source`. | `AcceptedOfferCommit`, `acceptedOfferCommits` | integrated-offer commit |
 | **offer** | A thread's work, as one revision or a stack, waiting to be accepted, under `pinetrie-offer/<thread name>`. | `offer`, `OfferRecord` | |
@@ -31,8 +31,7 @@ words they were written with.
 | word | what it is | in code | retired |
 |---|---|---|---|
 | **folder project** | A project whose folder is no jj repo: pine·trie keeps its history itself, as states (ADR-0142). | `ProjectKind` `"folder"`, `startFolderProject` | |
-| **your folder** | A folder project's accepted work: the folder itself, read into states on its line. | `FolderAcceptedRecord`, `folderNewest` | |
-| **state** | A snapshot of a folder project's disk, recorded with its parents: a read of your folder, a lane's start, turn or catch-up. | `StateRecord`, `PointId` | |
+| **state** | A snapshot of a folder project's disk, recorded with its parents: a read of the project's folder, a lane's start, turn or catch-up. | `StateRecord`, `PointId` | |
 | **conflict** | A path a catch-up left conflicted in a folder lane: a record of its three versions' states, shown under `/pinetrie-states/conflicts/`. | `ConflictRecord` | |
 | **resolve** | Close a conflict with the version chosen: the lane's own (`ours`), `theirs` or `base`. | `resolve_conflict`, `LaneHistory.resolve` | |
 

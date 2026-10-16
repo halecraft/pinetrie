@@ -80,6 +80,23 @@ export const mutations: readonly Mutation[] = [
     to: "    for (const b of [])\n",
     command: unit,
     expect:
-      "a foreign folder lane's tip, start and base with your folder are kept",
+      "a foreign folder lane's tip, start and base with accepted work are kept",
+  },
+  {
+    name: "liveStates drops a branch's base with its parent",
+    file: "packages/folder/live.ts",
+    from: "    if (lane.parent !== null)\n",
+    to: "    if (lane.parent !== null && false)\n",
+    command: unit,
+    expect:
+      "a branch's base with its parent is kept once the parent moved past it",
+  },
+  {
+    name: "parentLane answers the grandparent",
+    file: graph,
+    from: "  return parent === undefined ? null : laneOf(parent)\n",
+    to: "  const p = parent === undefined ? null : laneOf(parent)\n  return p === null ? null : (parentLane(g, p) ?? p)\n",
+    command: unit,
+    expect: "a branch of a branch has its own parent, not the grandparent",
   },
 ]

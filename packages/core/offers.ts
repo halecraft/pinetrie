@@ -13,6 +13,11 @@ import type {
   ThreadName,
 } from "./index.ts"
 
+/** Where an offer is accepted into: accepted work's bookmark, or a folder project's accepted work. */
+export type AcceptsInto =
+  | { readonly kind: "bookmark"; readonly bookmark: string }
+  | { readonly kind: "folder" }
+
 /**
  * A revision since the host's version of it (`readOffer` in `@pinetrie/jj`
  * reads it, `revisionEdited` in `@pinetrie/rules` decides from it): whether

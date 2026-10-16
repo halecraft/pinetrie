@@ -230,7 +230,7 @@ export interface HelperShape {
   readonly project: string
   readonly image: string
   readonly lanesDir: string
-  /** The project's root on the host: the disks role reads your folder from it. */
+  /** The project's root on the host: the disks role reads the project's folder from it. */
   readonly root: string
   /** pine·trie's install and the lane runtime, on the host: the server runs from them. */
   readonly install: string
@@ -241,7 +241,7 @@ export interface HelperShape {
  * A lanehost role's container, without its spec label: its grant (`ROLES`),
  * the lanes directory at its own path, and the install and the runtime
  * read-only where a lane has them; the disks role, the project's root
- * read-only at `FOLDER_MOUNT`, which a read of your folder copies from. It only waits: the host starts the
+ * read-only at `FOLDER_MOUNT`, which a read of the project's folder copies from. It only waits: the host starts the
  * server in it with `exec -i`.
  */
 export function renderHelper(

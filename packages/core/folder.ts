@@ -7,7 +7,7 @@ import type { EntryId, NonEmpty, PointId, ThreadId, WriterId } from "./index.ts"
 
 /** How a folder project's state came to be: what its parents mean. */
 export type StateMade =
-  /** Your folder, read; the first has no parent. */
+  /** The project's folder, read; the first has no parent. */
   | { readonly kind: "read" }
   /** A lane begun: its one parent is the state its disk was restored from. */
   | { readonly kind: "start"; readonly lane: ThreadId }
@@ -18,11 +18,12 @@ export type StateMade =
     }
   /** Its parents: the lane's state before, and the state it merged. */
   | { readonly kind: "catch-up"; readonly lane: ThreadId }
-  /** Its parents: your folder's state before, and the lane's tip. */
+  /** Its parents: accepted work's state before, and the lane's tip. */
   | { readonly kind: "accept"; readonly lane: ThreadId }
   /**
-   * Your folder set back to `of`'s content. Its one parent is your folder's
-   * newest state, never `of`, so your folder's line stays a line.
+   * The project's folder set back to `of`'s content. Its one parent is
+   * accepted work's newest state, never `of`, so accepted work's line stays a
+   * line.
    */
   | { readonly kind: "restore"; readonly of: PointId }
   /** A virtual base a conflict names; its parents are the bases it merges. */
@@ -32,7 +33,7 @@ export type StateMade =
 export interface StateRecord {
   /** Its snapshot's name (`isFolderStateId`). */
   readonly id: PointId
-  /** States recorded before it; none only for your folder's first read. */
+  /** States recorded before it; none only for the first read of the project's folder. */
   readonly parents: readonly PointId[]
   readonly made: StateMade
   readonly at: number
@@ -61,13 +62,13 @@ export const isDiskName = (name: string): boolean =>
  * A folder state's id: a disk name holding a dash, so never a jj commit's
  * (40 hex digits). A lane's states are `start-`, `turn-` and
  * `catch-up-<uuidv7>`, never its entry's id, which names the entry's own
- * snapshot; your folder's line's are `line-<uuidv7>`; a virtual base's is
+ * snapshot; accepted work's line's are `line-<uuidv7>`; a virtual base's is
  * `bases-<hash>`.
  */
 export const isFolderStateId = (id: string): boolean =>
   id.includes("-") && isDiskName(id) && !/^[0-9a-f]{40}$/.test(id)
 
-/** A state of your folder's line, from a uuidv7 its caller mints. */
+/** A state of accepted work's line, from a uuidv7 its caller mints. */
 export const lineStateId = (uuid: string): PointId => `line-${uuid}` as PointId
 
 /** A turn's state in a folder lane, from a uuidv7 its caller mints. */
@@ -154,7 +155,7 @@ export type LaneStatesOp =
   | { readonly kind: "resolved"; readonly path: string }
 
 /**
- * A source path of your folder as a read stamps it, by `lstat`: a file or a
+ * A source path of the project's folder as a read stamps it, by `lstat`: a file or a
  * symlink, never a directory (a directory is the paths under it). Size and
  * ctime are what the lane VM reads alike, so a stamp the host read
  * is the one the disks role checks.
@@ -176,14 +177,14 @@ export interface DiffStat {
   readonly removed: number
 }
 
-/** A path a read copies into your folder's line, with the stamp the host read. */
+/** A path a read copies into accepted work's line, with the stamp the host read. */
 export interface ReadPath {
   readonly path: string
   readonly stamp: Pick<FolderStamp, "size" | "ctimeNs">
 }
 
 /**
- * What a read into your folder's line answered: its state made, or the
+ * What a read into accepted work's line answered: its state made, or the
  * paths whose stamp moved during their copy, and no state.
  */
 export type ReadInAnswer =

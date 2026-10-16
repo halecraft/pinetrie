@@ -15,7 +15,7 @@ const state = (
   by: null,
 })
 
-test("planSweep: a lane's tip and start, and your folder's newest states kept; older ones and a lane's past turns swept", () => {
+test("planSweep: a lane's tip and start, and accepted work's newest states kept; older ones and a lane's past turns swept", () => {
   const states = [
     state("line-0", { kind: "read" }),
     state("line-1", { kind: "read" }, "line-0"),
@@ -41,4 +41,32 @@ test("planSweep: a lane's tip and start, and your folder's newest states kept; o
       keep: 1,
     }),
   ).toEqual(["line-0", "start-a", "turn-a"])
+})
+
+test("planSweep: a branch's base with its parent kept, once the parent moved past it", () => {
+  const BRANCH = threadIdFor("2")
+  const states = [
+    state("line-1", { kind: "read" }),
+    state("start-a", { kind: "start", lane: LANE }, "line-1"),
+    state(
+      "turn-a",
+      { kind: "turn", lane: LANE, entry: entryId("e") },
+      "start-a",
+    ),
+    state(
+      "turn-b",
+      { kind: "turn", lane: LANE, entry: entryId("f") },
+      "turn-a",
+    ),
+    state("start-b", { kind: "start", lane: BRANCH }, "turn-a"),
+  ]
+  expect(
+    planSweep({
+      states,
+      lanes: [{ lane: BRANCH, history: "folder" }],
+      conflicts: [],
+      offers: [],
+      keep: 1,
+    }),
+  ).toEqual(["start-a", "turn-b"])
 })

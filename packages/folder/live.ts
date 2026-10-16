@@ -14,6 +14,8 @@ export interface LiveInput {
     readonly history: ProjectKind
     readonly tip: PointId
     readonly start: PointId
+    /** The newest state of the lane it branched from (`parentLane`); null for one started on accepted work's line. */
+    readonly parent: PointId | null
   }[]
   readonly conflicts: readonly {
     readonly base: PointId
@@ -24,18 +26,18 @@ export interface LiveInput {
     readonly start: PointId
     readonly tip: PointId
   }[]
-  /** Your folder's newest state. */
+  /** Accepted work's newest state. */
   readonly folderNewest: PointId
-  /** How many of your folder's line states to keep, newest first; the newest always. */
+  /** How many of accepted work's line states to keep, newest first; the newest always. */
   readonly keep: number
 }
 
 /**
- * The states whose snapshots are kept: each folder lane's tip, start and
- * merge bases with your folder's newest state; every conflict's three
- * states; each offer's two; and your folder's newest `keep` line states,
- * along first parents. A virtual base no conflict names is not kept: it is
- * made again when a merge needs it.
+ * The states whose snapshots are kept: each folder lane's tip, start, and
+ * merge bases with accepted work's newest state and with its parent lane's
+ * newest; every conflict's three states; each offer's two; and accepted
+ * work's newest `keep` line states, along first parents. A virtual base no
+ * conflict names is not kept: it is made again when a merge needs it.
  */
 export function liveStates(input: LiveInput): ReadonlySet<PointId> {
   const live = new Set<PointId>()
@@ -44,6 +46,9 @@ export function liveStates(input: LiveInput): ReadonlySet<PointId> {
     live.add(lane.tip).add(lane.start)
     for (const b of mergeBases(input.graph, lane.tip, input.folderNewest))
       live.add(b)
+    if (lane.parent !== null)
+      for (const b of mergeBases(input.graph, lane.tip, lane.parent))
+        live.add(b)
   }
   for (const c of input.conflicts) live.add(c.base).add(c.ours).add(c.theirs)
   for (const o of input.offers) live.add(o.start).add(o.tip)

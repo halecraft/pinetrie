@@ -150,7 +150,7 @@ export const effectiveBase = (base: FollowedBase | null): ThreadBase =>
 /** Where a thread's base moved since its lane last caught up with it (`baseMoved`). */
 interface BaseMove {
   readonly base: ThreadBase
-  /** The base's bookmark: accepted work's, or the WIP's; null for your folder. */
+  /** The base's bookmark: accepted work's, or the WIP's; null for a folder project's accepted work. */
   readonly bookmark: string | null
   /** The state the lane last began on or caught up with, and the base's now. */
   readonly from: PointId

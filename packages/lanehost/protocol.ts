@@ -136,7 +136,7 @@ export type LanehostCall =
       readonly markers: boolean
     }
   /**
-   * Your folder's paths read into a new state of its line (`folder.ts`):
+   * The project's folder's paths read into a new state of its line (`folder.ts`):
    * made from `from` (null: empty), `deleted` removed, `paths` copied from
    * the folder's mount, each checked against its stamp.
    */

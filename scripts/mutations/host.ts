@@ -45,9 +45,44 @@ export const mutations: readonly Mutation[] = [
     to: "    live.add(lane.start)\n",
     command: unit,
     expect:
-      "planSweep: a lane's tip and start, and your folder's newest states kept; older ones and a lane's past turns swept",
+      "planSweep: a lane's tip and start, and accepted work's newest states kept; older ones and a lane's past turns swept",
   },
   // ── a folder lane's history ──
+  {
+    name: "a folder state is snapshotted without its lane's sync",
+    file: "apps/pinetrie/host/folder/history.ts",
+    from: "    executeOrThrow(planSnapshot({ lane, snapshot: snapshotId(state) }), runners)\n",
+    to: '    runtime.disk({ kind: "snapshot", lane, snapshot: snapshotId(state) })\n',
+    command: unit,
+    expect: "every folder state is snapshotted straight after its lane's sync",
+  },
+  {
+    name: "a folder catch-up keeps a virtual base no conflict names",
+    file: "apps/pinetrie/host/folder/history.ts",
+    from: '        if (plan.kind === "virtual" && !graph().states.has(plan.name))\n',
+    to: "        if (false)\n",
+    command: unit,
+    expect:
+      "a clean catch-up over a virtual base leaves no snapshot of it; two in turn each make it",
+  },
+  {
+    name: "a folder catch-up deletes a virtual base a conflict names",
+    file: "apps/pinetrie/host/folder/history.ts",
+    from: '        if (plan.kind === "virtual" && !graph().states.has(plan.name))\n',
+    to: '        if (plan.kind === "virtual")\n',
+    command: unit,
+    expect:
+      "a virtual base a conflict names is recorded and kept, a clean catch-up over it after included",
+  },
+  {
+    name: "a folder catch-up goes on over a base whose snapshot is gone",
+    file: "apps/pinetrie/host/folder/history.ts",
+    from: "      if ((await baseMissing(reader, plan)) !== null)\n",
+    to: "      if (false)\n",
+    command: unit,
+    expect:
+      "a catch-up whose base's snapshot is gone is refused with words, and makes nothing",
+  },
   {
     name: "sourceChanges keeps an ignored path",
     file: "apps/pinetrie/host/folder/changes.ts",
@@ -82,7 +117,7 @@ export const mutations: readonly Mutation[] = [
     to: "      forkSetup(null, []),",
     command: unit,
     expect:
-      "a folder lane's fork restores from your folder's state, or from its source's snapshot when branched",
+      "a folder lane's fork restores from accepted work's state, or from its source's snapshot when branched",
   },
   {
     name: "a folder turn's state is kept with nothing changed",
@@ -92,7 +127,7 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "a commit with nothing changed commits nothing",
   },
-  // ── your folder's reads ──
+  // ── the project's folder's reads ──
   {
     name: "the scan stamps what a .gitignore ignores",
     file: "apps/pinetrie/host/folder/scan.ts",
@@ -109,7 +144,7 @@ export const mutations: readonly Mutation[] = [
     to: "      from: newest,",
     command: unit,
     expect:
-      "with the last read's stamps lost, a read copies everything into an empty disk, on your folder's line",
+      "with the last read's stamps lost, a read copies everything into an empty disk, on accepted work's line",
   },
   {
     name: "a read's stamps are kept before its state is recorded",
@@ -130,7 +165,7 @@ export const mutations: readonly Mutation[] = [
       "a read whose paths moved is read again; its stamps are kept only once its state is recorded",
   },
   {
-    name: "a change only ignored paths saw reads your folder",
+    name: "a change only ignored paths saw reads the project's folder",
     file: "apps/pinetrie/host/folder/watch.ts",
     from: "  ignoredPaths({ ...input, dirs: new Set() }).size < input.paths.length",
     to: "  input.paths.length > 0",

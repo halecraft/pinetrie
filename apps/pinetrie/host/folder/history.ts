@@ -37,6 +37,7 @@ import {
   type FolderDisks,
   forkSetup,
   type LaneHistory,
+  type LaneQueue,
   type LaneRunners,
   type LaneRuntime,
   planSnapshot,
@@ -45,16 +46,18 @@ import {
 } from "@pinetrie/lanes"
 import {
   CONFLICT,
+  catchUpName,
   conflictKey,
   deleteRecord,
   folderIncoming,
+  mergedFrom,
   STATE,
   setRecord,
 } from "@pinetrie/rules"
 import { sourceChanges } from "./changes.ts"
 import { conflictedPaths, mergeInto } from "./merge.ts"
 import type { FolderLane } from "./proven.ts"
-import { baseState } from "./virtual-base.ts"
+import { baseMissing, baseState } from "./virtual-base.ts"
 
 /** A folder project's records of its history, as lane work reads and writes them. */
 export interface FolderStore {
@@ -68,6 +71,8 @@ export interface FolderStore {
 export interface FolderHistoryDeps {
   readonly runtime: LaneRuntime
   readonly disks: FolderDisks
+  /** The project's one queue, the folder's line's reads on it too: a virtual base is made, merged over and deleted on it. */
+  readonly queue: LaneQueue
   readonly store: FolderStore
   /** pine·trie's own patterns now (`laneIgnores`, with the lane's shared directories). */
   readonly own: () => string
@@ -113,7 +118,7 @@ export function folderHistory(
     return newest
   }
 
-  /** `start` moved to the state of your folder `of` holds, when there is one. */
+  /** `start` moved to the state of accepted work `of` holds, when there is one. */
   const startOp = (g: StateGraph, of: PointId): LaneStatesOp[] => {
     const held = folderStateHeld(g, of)
     return held === null ? [] : [{ kind: "start", state: held }]
@@ -223,35 +228,69 @@ export function folderHistory(
         throw new Error(
           `${ours} and ${theirs} share no state: every state of a folder project descends from its first read`,
         )
-      const base = await baseState(reader, plan)
-      const merged = await mergeInto(reader, {
-        disk: lane,
-        ours,
-        theirs,
-        base,
-        markers: false,
-      })
+      if ((await baseMissing(reader, plan)) !== null)
+        return {
+          kind: "refused",
+          reason: `the state this thread shares with ${catchUpName(mergedFrom(from))} is no longer kept`,
+          follow: null,
+        }
       const state = catchUpStateId(input.newId())
-      await snapshot(state)
-      const paths = conflictedPaths(merged)
-      const conflicts = paths.map(path => ({ lane, path, base, ours, theirs }))
-      const record: StateRecord = {
-        id: state,
-        parents: [ours, theirs],
-        made: { kind: "catch-up", lane },
-        at: input.now(),
-        by: null,
+      /**
+       * The base had, the lane merged over it and snapshotted, and the
+       * records written. A virtual base is named by its bases, so two lanes
+       * merging the same bases share its snapshot: on the project's queue,
+       * one at a time, neither deletes it under the other. The step never
+       * reads the project's folder: a read inside it would queue behind it
+       * and never run.
+       */
+      const mergeOver = async () => {
+        const base = await baseState(reader, plan)
+        const merged = await mergeInto(reader, {
+          disk: lane,
+          ours,
+          theirs,
+          base,
+          markers: false,
+        })
+        await snapshot(state)
+        const paths = conflictedPaths(merged)
+        const conflicts = paths.map(path => ({
+          lane,
+          path,
+          base,
+          ours,
+          theirs,
+        }))
+        const record: StateRecord = {
+          id: state,
+          parents: [ours, theirs],
+          made: { kind: "catch-up", lane },
+          at: input.now(),
+          by: null,
+        }
+        // A virtual base becomes a state only when a conflict names it.
+        const baseRecord =
+          plan.kind === "virtual" && paths.length > 0
+            ? stateWrite(g, virtualBaseRecord(plan, input.now()))
+            : []
+        await store.write([
+          ...baseRecord,
+          ...stateWrite(g, record),
+          ...conflicts.map(c => setRecord(CONFLICT, c)),
+        ])
+        // Once a state, a virtual base is the sweep's; else it goes now,
+        // left behind by an earlier merge or not.
+        if (plan.kind === "virtual" && !graph().states.has(plan.name))
+          await runtime.disk({
+            kind: "deleteSnapshots",
+            ids: [snapshotId(plan.name)],
+          })
+        return { paths, conflicts }
       }
-      // A virtual base becomes a state only when a conflict names it.
-      const baseRecord =
-        plan.kind === "virtual" && paths.length > 0
-          ? stateWrite(g, virtualBaseRecord(plan, input.now()))
-          : []
-      await store.write([
-        ...baseRecord,
-        ...stateWrite(g, record),
-        ...conflicts.map(c => setRecord(CONFLICT, c)),
-      ])
+      const { paths, conflicts } =
+        plan.kind === "virtual"
+          ? await input.queue.enqueue(mergeOver)
+          : await mergeOver()
       const after = graph()
       for (const op of [
         ...startOp(after, state),

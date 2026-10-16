@@ -25,7 +25,7 @@ pine·trie decides the outcome from the repository, not from your summary. The u
 
 ## In a project without jj
 
-In a folder that is no jj repo, there are no markers: each conflicted path keeps this thread's version in `/workspace/<path>`, and its three versions are at `/pinetrie-states/conflicts/<path>/` (`base`, `ours`, `theirs`; one the merge had no file for is absent). The message names each path. The steps above apply, with these in place of jj's:
+In a project with no jj repo, there are no markers: each conflicted path keeps this thread's version in `/workspace/<path>`, and its three versions are at `/pinetrie-states/conflicts/<path>/` (`base`, `ours`, `theirs`; one the merge had no file for is absent). The message names each path. The steps above apply, with these in place of jj's:
 
 1. The paths still conflicted are the directories under `/pinetrie-states/conflicts/`.
 2. Compare the versions with `diff` (`diff base ours`, `diff base theirs`) to see what each side changed.

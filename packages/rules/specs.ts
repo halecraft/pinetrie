@@ -113,7 +113,7 @@ export const planUndeclaredSweep = (
  * Deletes for every offer, accepted-work and base record of another kind
  * than the project's: caches of a project that was the other kind before,
  * which no reader of this one reads. A folder's `STATE` and `CONFLICT`
- * records are never among them, so your folder's line outlives a jj period.
+ * records are never among them, so accepted work's line outlives a jj period.
  */
 export const planKindSweep = (
   records: {

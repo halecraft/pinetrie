@@ -1,10 +1,10 @@
-// host/folder/scan — your folder's source paths, stamped: a walk by `lstat`
+// host/folder/scan — the project's folder's source paths, stamped: a walk by `lstat`
 // that reads each directory's `.gitignore` as it enters it and never enters
 // a directory that is ignored, so `node_modules` costs nothing. What is
 // ignored is the lanes' own rule (`ignoredPaths`, with `laneIgnores`), so a
 // read holds what a lane's diff counts as source. Symlinks are stamped,
 // never followed. With the watcher (`watch.ts`) and the line (`line.ts`),
-// the only code that touches your folder.
+// the only code that touches the project's folder.
 
 import { lstat, readdir, readFile, readlink } from "node:fs/promises"
 import path from "node:path"

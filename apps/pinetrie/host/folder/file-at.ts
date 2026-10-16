@@ -1,5 +1,5 @@
 // host/folder/file-at — a file read at a site of a folder project: your
-// folder's newest state, a lane's newest work, or the state of your folder
+// folder's newest state, a lane's newest work, or the state of accepted work
 // that lane's work is offered against.
 
 import type { PointId, StateRecord } from "@pinetrie/core"
@@ -15,7 +15,7 @@ import type { FileAt, FolderDisks, ReadSite } from "@pinetrie/lanes"
 const FILE_LIMIT = 1024 * 1024
 
 /**
- * The state a site names; null where it has none: your folder before its
+ * The state a site names; null where it has none: accepted work before its
  * first read, or a lane with no work of its own yet (its newest is its
  * start), as a jj lane has no tip until its first turn.
  */

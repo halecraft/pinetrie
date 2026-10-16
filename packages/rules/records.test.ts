@@ -245,7 +245,7 @@ const SAMPLES: readonly Sample[] = [
     "lane",
   ),
   sample(
-    "your folder",
+    "a folder's accepted work",
     ACCEPTED,
     { kind: "folder", newest: pointId("line-0192aaaa"), at: 1 },
     null,
@@ -479,7 +479,7 @@ test("each record lives where it is read: across roots in the session, by entry 
     line: "session",
     base: "session",
     "a folder's offer": "session",
-    "your folder": "session",
+    "a folder's accepted work": "session",
     "a folder lane's base": "session",
     name: "session",
     banner: "session",
@@ -676,7 +676,7 @@ describe("every spec, and writes by document", () => {
   })
 })
 
-test("your folder's stamps read back whole; a file that is not them reads as none", () => {
+test("the project's folder's stamps read back whole; a file that is not them reads as none", () => {
   const stamps = new Map([
     [
       "a.txt",

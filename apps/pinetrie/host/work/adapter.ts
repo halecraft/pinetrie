@@ -101,7 +101,7 @@ export interface ProjectParts {
    * handles that.
    */
   readonly ready: () => Promise<void>
-  /** How many of your folder's states a folder project keeps (`folder.history.states`). */
+  /** How many states of accepted work a folder project keeps (`folder.history.states`). */
   readonly keepStates: () => number
   /** A lane's base record changed. */
   readonly baseChanged: (lane: ThreadId) => void

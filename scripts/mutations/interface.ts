@@ -6,6 +6,15 @@ const workspace = ["pnpm", "exec", "vitest", "run", "workspace.test.ts"]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "offerWords leaves a folder offer's accept untitled",
+    file: "packages/interface/column-view.ts",
+    from: '            into?.kind === "folder"\n              ? ACCEPT_LATER\n',
+    to: '            into?.kind === "folder" && false\n              ? ACCEPT_LATER\n',
+    command: unit,
+    expect:
+      "a folder offer names accepted work, and its disabled accept says why, no bookmark moved",
+  },
+  {
     name: "a host's line is labelled by its role, not by pine·trie",
     file: "packages/interface/names.ts",
     from: "  if (LINE_ROLES.has(role)) return PRODUCT_NAME\n",

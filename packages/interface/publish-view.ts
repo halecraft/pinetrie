@@ -20,7 +20,7 @@ import { outcomeWords } from "./outcome-words.ts"
 /** The publish button as the footer shows it. */
 export type PublishView =
   /**
-   * No lanes of their own here, or a folder project: your folder is
+   * No lanes of their own here, or a folder project: its folder is
    * accepted work, with nothing to set up or publish to.
    */
   | { readonly kind: "absent" }

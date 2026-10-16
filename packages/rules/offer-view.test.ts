@@ -3,7 +3,6 @@ import {
   commitId,
   type FolderAcceptedRecord,
   type FolderBaseRecord,
-  type FolderOfferRecord,
   type JjAcceptedRecord,
   type JjBaseRecord,
   type JjOfferRecord,
@@ -81,7 +80,7 @@ describe("offerView: the work strip's states", () => {
       activity,
       asked,
       base: null,
-      acceptedBookmark: "pinetrie-accepted",
+      into: { kind: "bookmark", bookmark: "pinetrie-accepted" },
       wipAhead: 0,
       catchUp: catching.catchUp ?? { kind: "current" },
       untraced: catching.untraced ?? false,
@@ -152,7 +151,7 @@ describe("offerView: the work strip's states", () => {
       held: false,
       acceptedAs: null,
       base: { kind: "accepted" },
-      acceptedBookmark: "pinetrie-accepted",
+      into: { kind: "bookmark", bookmark: "pinetrie-accepted" },
       catchUp: { kind: "current" },
       untraced: false,
       conflictCause: "work",
@@ -229,7 +228,7 @@ describe("offerView: the work strip's states", () => {
       },
       parent: null,
       parentRunning: false,
-      acceptedBookmark: "pinetrie-accepted",
+      into: { kind: "bookmark", bookmark: "pinetrie-accepted" },
       wipAhead: 0,
       catchUp: { kind: "current" },
       untraced: false,
@@ -366,7 +365,7 @@ describe("offerView: the work strip's states", () => {
       kind: "unknown",
     })
   })
-  test("catchUpOf for a folder: from the state a lane last caught up with to your folder's newest", () => {
+  test("catchUpOf for a folder: from the state a lane last caught up with to accepted work's newest", () => {
     const FIRST = pointId("line-0192aaaa")
     const SECOND = pointId("line-0192bbbb")
     const folder = (newest: typeof FIRST): FolderAcceptedRecord => ({
@@ -405,32 +404,54 @@ describe("offerView: the work strip's states", () => {
       kind: "unknown",
     })
   })
-  test("a folder offer is accepted or described, never split", () => {
-    const folder: FolderOfferRecord = {
-      kind: "folder",
-      lane: LANE,
-      start: pointId("line-0192aaaa"),
-      tip: pointId("turn-0192bbbb"),
-      files: ["a.txt"],
-      conflicts: [],
-      description: null,
-      at: 10,
-    }
-    const v = offerView({
-      offer: offerStatus(folder),
+  const folderView = () =>
+    offerView({
+      offer: offerStatus({
+        kind: "folder",
+        lane: LANE,
+        start: pointId("line-0192aaaa"),
+        tip: pointId("turn-0192bbbb"),
+        files: ["a.txt"],
+        conflicts: [],
+        description: null,
+        at: 10,
+      }),
       activity: "idle",
       asked: null,
       base: { kind: "folder" },
       parent: null,
       parentRunning: false,
-      acceptedBookmark: "",
+      into: { kind: "folder" },
       wipAhead: 0,
       catchUp: { kind: "current" },
       untraced: false,
       queued: [],
     })
+  test("a folder offer is accepted or described, never split", () => {
+    const v = folderView()
     expect(at(v)).toEqual(["ready", ["accept"], ["describe", "update"]])
     expect([v.facts.size, v.facts.bookmark]).toEqual([1, null])
+  })
+  test("a folder offer's accept is drawn disabled, with no destination", () => {
+    const v = folderView()
+    expect(v.destinations).toEqual([])
+    expect(v.quiet).toContain("accept")
+  })
+  test("a jj offer before accepted work is read has no accept", () => {
+    const v = offerView({
+      offer: offerStatus(offer),
+      activity: "idle",
+      asked: null,
+      base: null,
+      parent: null,
+      parentRunning: false,
+      into: null,
+      wipAhead: 0,
+      catchUp: { kind: "current" },
+      untraced: false,
+      queued: [],
+    })
+    expect([v.buttons, v.destinations]).toEqual([["split"], []])
   })
   test("an ask about a conflict counts only when newer than the offer", () => {
     expect(view(offer, "idle", 20).state).toBe("needs_you")
@@ -456,7 +477,7 @@ describe("a conflict that came with the copy, and the thread it branched from", 
       activity: "idle",
       asked: null,
       base: null,
-      acceptedBookmark: "pinetrie-accepted",
+      into: { kind: "bookmark", bookmark: "pinetrie-accepted" },
       wipAhead: 0,
       catchUp: { kind: "current" },
       untraced: false,

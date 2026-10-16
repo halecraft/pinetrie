@@ -19,7 +19,7 @@ responsibility. It declares `@pinetrie/core` and `@pinetrie/channel` only
 | `serving.ts` | a server's arguments (`serverArgs`) and their reading (`servingFrom`) |
 | `client.ts` | the host's side: one channel per role, each call routed and logged |
 | `disks.ts` | subvolumes: each operation planned as `DiskStep`s, then executed; a file read from a snapshot |
-| `folder.ts` | a folder project's merges: path facts, alike content, a merge's steps applied, a lane's states directory; a read of your folder into its line (`readIn`) |
+| `folder.ts` | a folder project's merges: path facts, alike content, a merge's steps applied, a lane's states directory; a read of the project's folder into its line (`readIn`) |
 | `projects.ts` | a project's root recorded, the listing, a project's removal |
 | `grants.ts` | a project's grant of the Mac's ports in the lane VM's firewall |
 | `diff.ts` | what differs between two snapshots: by `btrfs send`, or by a walk |
@@ -281,17 +281,17 @@ out, every call checked and planned into paths first (`planApply`,
   `resolved` removes a path's versions and its emptied directories. A
   lane's `delete` disk operation drops it, and a project's removal takes
   its whole directory.
-- **A read of your folder into its line** (`readIn`, S185): the host scans
-  your folder and names each path to copy with the stamp it read (size and
+- **A read of the project's folder into its line** (`readIn`, S185): the
+  host scans the project's folder and names each path to copy with the stamp it read (size and
   ctime, which the lane VM reads alike, S169); the disks role makes the
-  `folder-line` disk (`FOLDER_LINE`) from your folder's newest state, or
+  `folder-line` disk (`FOLDER_LINE`) from accepted work's newest state, or
   empty, removes the deleted paths and the directories they leave empty,
   copies each path from the project's root, mounted read-only in its
   container at `FOLDER_MOUNT` (a file by `copyFile`, which keeps its
   mode; a symlink made again; a file or link where a directory now stands
   replaced), and snapshots the disk as the new state. Each path's stamp is
   checked before and after its copy, and one that moved, or now under a
-  symlink in your folder, makes no state: the call answers the moved paths
+  symlink in the project's folder, makes no state: the call answers the moved paths
   and the host reads again (S149 rule 4). The disk is dropped either way.
   Where the root is mounted is a `Serving` fact (`servingFrom`'s
   `folder`), so a test serves a folder of its own (`fixtures.ts`'

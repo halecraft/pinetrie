@@ -542,9 +542,9 @@ context.**
   its real path and named for it (ADR-0149); pine·trie keeps the session's
   files in its data directory and writes nothing in the project
   (ADR-0150). A jj repo with no git directory beside it is refused. A
-  folder with no jj repo is served as a folder project (ADR-0142): your
-  folder is accepted work, a thread starts from it as it is, and its offer is
-  reviewed as files; accepting one into your folder is not built yet. The
+  folder with no jj repo is served as a folder project (ADR-0142): its
+  accepted work is the folder, a thread starts from it as it is, and its
+  offer is reviewed as files; accepting one is not built yet. The
   agent has its tools, and each
   thread's agent works in its own Linux container (ADR-0034), on a disk
   cloned from the turn it branched at: a root thread's starts from your

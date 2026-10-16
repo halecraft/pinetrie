@@ -56,7 +56,7 @@ export interface FolderDisks {
   /** A file of `state`'s, by its path; null when absent. Refused past `limit` bytes. */
   read(state: PointId, path: string, limit: number): Promise<string | null>
   /**
-   * Your folder's `paths` read into `state`, a new state of its line made
+   * The project's folder's `paths` read into `state`, a new state of its line made
    * from `from` (null: empty), `deleted` removed; each path checked against
    * the stamp the host read, before and after its copy. No state when any
    * moved: the host reads again.

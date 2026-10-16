@@ -31,7 +31,7 @@ const plan = (before: Parameters<typeof planFolderRecords>[0]["before"]) =>
     now: 2,
   })
 
-test("planFolderRecords: the offer against your folder's newest, the base on what the lane holds, with what catching up brings", () => {
+test("planFolderRecords: the offer against accepted work's newest, the base on what the lane holds, with what catching up brings", () => {
   expect(plan(undefined)).toEqual({
     offer: {
       kind: "folder",

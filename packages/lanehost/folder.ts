@@ -1,7 +1,7 @@
 // lanehost/folder — a folder project's merges on its disks, as
 // `@pinetrie/folder` plans them: what a snapshot holds at a path, whether two
 // hold alike content, a merge's steps applied to a disk, a lane's states
-// directory, and a read of your folder into its line. Every call is checked and planned into absolute paths first
+// directory, and a read of the project's folder into its line. Every call is checked and planned into absolute paths first
 // (`layout.ts`), then carried out.
 
 import { constants } from "node:fs"
@@ -464,9 +464,9 @@ export async function executeStates(planned: StatesPlanned): Promise<void> {
   }
 }
 
-/** A read of your folder into its line, checked and planned into absolute paths. */
+/** A read of the project's folder into its line, checked and planned into absolute paths. */
 export interface ReadInPlanned {
-  /** Your folder, as the disks role sees it, read-only. */
+  /** The project's folder, as the disks role sees it, read-only. */
   readonly folder: string
   /** The line's disk, made from `from` (null: empty) and dropped after. */
   readonly disk: readonly DiskStep[]
@@ -552,10 +552,10 @@ async function pruneEmpty(root: string, p: string): Promise<void> {
 
 /**
  * Carry out a read: the line's disk made from its newest state, the deleted
- * paths removed, each path copied from your folder with its stamp checked
+ * paths removed, each path copied from the project's folder with its stamp checked
  * before and after (a read that saw no stamp move held one version whole),
  * then the disk snapshotted as the new state. A path whose stamp moved, or
- * that is under a symlink in your folder now, makes no state: the host
+ * that is under a symlink in the project's folder now, makes no state: the host
  * reads again. A symlink is made again; the disk is dropped either way.
  */
 export async function executeReadIn(

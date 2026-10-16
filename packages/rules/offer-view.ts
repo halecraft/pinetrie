@@ -2,6 +2,7 @@
 // are the client's (`offerWords`).
 
 import {
+  type AcceptsInto,
   type CardCommand,
   type ConflictCause,
   isCatchUp,
@@ -72,7 +73,7 @@ export interface OfferView {
   readonly buttons: readonly OfferButton[]
   /** Buttons in the offer's menu. */
   readonly menu: readonly OfferButton[]
-  /** Of those, the ones that would change nothing now: drawn, but disabled. */
+  /** Of those, the ones drawn disabled: they would change nothing now, or cannot yet be done; each one's title says which. */
   readonly quiet: readonly OfferButton[]
   /** Where `accept` (the first) and `accept-into-accepted` (accepted work, from a WIP) go. */
   readonly destinations: readonly OfferAcceptanceDestination[]
@@ -101,8 +102,8 @@ interface OfferFacts {
    * WIP, or accepted work once the WIP landed or for a thread on accepted work.
    */
   readonly base: ThreadBase
-  /** Accepted work's bookmark, for titles. */
-  readonly acceptedBookmark: string
+  /** Where an acceptance goes, for titles; null for a jj project's before its record is read. */
+  readonly into: AcceptsInto | null
   /** What catching up would do (`catchUpOf`). */
   readonly catchUp: CatchUpNow
   /** An accepted-offer commit of this thread names no source: nothing is offered until it catches up. */
@@ -119,7 +120,7 @@ interface OfferFacts {
  * Where an offer's conflict comes from: `start` when it conflicts, and every
  * file it conflicts in was already conflicted where it starts, so the
  * conflict came with the lane's copy; else `work`. A folder offer starts on
- * your folder, which holds no conflict.
+ * accepted work, which in a folder project holds no conflict.
  */
 export function conflictCause(record: OfferRecord): ConflictCause {
   if (record.kind === "folder") return "work"
@@ -133,16 +134,18 @@ export function conflictCause(record: OfferRecord): ConflictCause {
  * The offer's state and buttons. `asked` is when the agent last asked about
  * a conflict on the thread's path (`conflictAskedAt`); it asks for
  * you only when newer than the offer. `base` is the lane's
- * (`pinetrie.base`), null before the host read it, as accepted work; `acceptedBookmark` and
- * `wipAhead` come from accepted work's record. An acceptance is offered only with a
- * destination (`offerAcceptanceDestinations`).
+ * (`pinetrie.base`), null before the host read it, as accepted work; `into`
+ * and `wipAhead` come from accepted work's record. A jj offer's acceptance is
+ * offered only with a destination (`offerAcceptanceDestinations`); a folder
+ * offer's is drawn disabled until accepting into a folder is built.
  */
 export function offerView(input: {
   readonly offer: OfferStatus
   readonly activity: Exclude<OfferActivity, "catch-up">
   readonly asked: number | null
   readonly base: FollowedBase | null
-  readonly acceptedBookmark: string
+  /** Null for a jj project whose accepted work is not read yet: nothing to accept into. */
+  readonly into: AcceptsInto | null
   readonly wipAhead: number
   /** What catching up would do (`catchUpOf`). */
   readonly catchUp: CatchUpNow
@@ -185,28 +188,34 @@ export function offerView(input: {
     held: offer.kind === "held",
     acceptedAs: offer.kind === "accepted" ? offer.as : null,
     base: effectiveBase(input.base),
-    acceptedBookmark: input.acceptedBookmark,
+    into: input.into,
     catchUp: input.catchUp,
     untraced: input.untraced,
     conflictCause: cause,
     parent: ahead,
     parentResolves,
   }
+  const { into } = input
   const destinations =
-    open === undefined
+    open === undefined || into?.kind !== "bookmark"
       ? []
       : offerAcceptanceDestinations({
           base: jjBase?.base ?? { kind: "accepted" },
           state: jjBase?.state ?? "ok",
-          acceptedBookmark: input.acceptedBookmark,
+          acceptedBookmark: into.bookmark,
           conflicted: open.conflicts.length > 0,
           wipAhead: input.wipAhead,
         })
   const gone = jjBase?.state === "gone"
+  // A folder offer's accept stays, disabled: accepting into a folder
+  // project is not built yet, and its title says so.
+  const later = into?.kind === "folder"
   const integrable = (
     buttons: readonly OfferButton[],
   ): readonly OfferButton[] =>
-    destinations.length === 0 ? buttons.filter(b => b !== "accept") : buttons
+    destinations.length === 0 && !later
+      ? buttons.filter(b => b !== "accept")
+      : buttons
   const view = (
     state: OfferView["state"],
     buttons: readonly OfferButton[],
@@ -244,6 +253,7 @@ export function offerView(input: {
         : []),
       // A split already waits in the queue.
       ...(input.queued.includes("split") ? (["split"] as const) : []),
+      ...(later && buttons.includes("accept") ? (["accept"] as const) : []),
     ]
     // An untraced start rebuilds nothing: only your edited offer is left.
     const rebuilds = (b: OfferButton) =>

@@ -1,4 +1,4 @@
-// A read of your folder into its line against real btrfs, as the disks role
+// A read of the project's folder into its line against real btrfs, as the disks role
 // runs it (`disks.test.ts` says where that holds), with the folder at a
 // directory of its own in place of the role's mount. Elsewhere it skips,
 // saying why.
@@ -42,7 +42,7 @@ const serving = servingFrom([
 const disks = projectDisks(LANES, KEY)
 const call = <C extends LanehostCall>(c: C) => answer(c, serving)
 
-/** `paths` of your folder, each with the stamp it has now. */
+/** `paths` of the project's folder, each with the stamp it has now. */
 const stamped = (paths: readonly string[]): Promise<ReadPath[]> =>
   Promise.all(
     paths.map(async p => {
@@ -100,7 +100,7 @@ test("a read's plan refuses a path that leaves the disk", () => {
 })
 
 describe.skipIf(!onBtrfs)(
-  "reading your folder into its line on btrfs (skipped: not on btrfs here)",
+  "reading the project's folder into its line on btrfs (skipped: not on btrfs here)",
   () => {
     test("a first read copies only the paths it is told: a file, its mode, a symlink", async () => {
       await mkdir(path.join(FOLDER, "d"), { recursive: true })

@@ -41,7 +41,7 @@ export const isAncestor = (g: StateGraph, a: PointId, b: PointId): boolean =>
 
 const byId = (x: PointId, y: PointId) => (x < y ? -1 : x > y ? 1 : 0)
 
-/** Whether a state is one of your folder's line's: a read, an accept or a restore. */
+/** Whether a state is one of accepted work's line's: a read, an accept or a restore. */
 const isLineState = (r: StateRecord): boolean =>
   r.made.kind === "read" ||
   r.made.kind === "accept" ||
@@ -54,6 +54,20 @@ const laneOf = (r: StateRecord): ThreadId | null =>
   r.made.kind === "catch-up"
     ? r.made.lane
     : null
+
+/**
+ * The lane `lane` branched from: the lane whose state its start state's one
+ * parent is. Null for a lane started on accepted work's line, or before its
+ * start. A start is made once per lane.
+ */
+export function parentLane(g: StateGraph, lane: ThreadId): ThreadId | null {
+  const start = [...g.states.values()].find(
+    r => r.made.kind === "start" && r.made.lane === lane,
+  )
+  const [from] = start?.parents ?? []
+  const parent = from === undefined ? undefined : g.states.get(from)
+  return parent === undefined ? null : laneOf(parent)
+}
 
 /**
  * `lane`'s newest state: the one of its own no other of its own has as its
@@ -72,7 +86,7 @@ export function laneNewest(g: StateGraph, lane: ThreadId): PointId | null {
 }
 
 /**
- * The newest state of your folder's line that `of` holds by its own line:
+ * The newest state of accepted work's line that `of` holds by its own line:
  * walking first parents from `of`, the line state a start was restored
  * from, or a catch-up merged in. A lane branched from another's turn walks
  * on into that lane. Null when its line reaches none.
@@ -93,9 +107,9 @@ export function folderStateHeld(g: StateGraph, of: PointId): PointId | null {
 }
 
 /**
- * Your folder's newest state: the line state no other line state has as its
+ * Accepted work's newest state: the line state no other line state has as its
  * first parent, the line's states being made one at a time; null before
- * your folder's first read.
+ * the first read of the project's folder.
  */
 export function folderNewest(g: StateGraph): PointId | null {
   const line = [...g.states.values()].filter(isLineState)
@@ -103,7 +117,7 @@ export function folderNewest(g: StateGraph): PointId | null {
   const heads = line.filter(r => !followed.has(r.id))
   if (heads.length > 1)
     throw new Error(
-      `your folder's line has ${heads.length} newest states: ${heads.map(r => r.id).join(", ")}`,
+      `the project's folder's line has ${heads.length} newest states: ${heads.map(r => r.id).join(", ")}`,
     )
   return heads[0]?.id ?? null
 }
@@ -198,7 +212,7 @@ export type StateRefusal =
 
 /**
  * How many parents a state made so may have. A read has none only when the
- * graph has no state yet: your folder's first read.
+ * graph has no state yet: the first read of the project's folder.
  */
 function isParentCount(made: StateMade, count: number, empty: boolean) {
   switch (made.kind) {

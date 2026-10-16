@@ -15,12 +15,12 @@ changes pine·trie can keep this note true. You can skip them.
   disk. It is no repo of pine·trie's: don't run `jj` or `git` to record
   your work, which pine·trie records as it goes.
   <!-- packages/core/index.ts WORKSPACE_ROOT -->
-- `/mnt/host-working-copy` is the person's folder, read-only. A path under
-  their folder that someone writes in a message reaches you as the same
-  path under `/mnt/host-working-copy`. <!-- packages/core/index.ts HOST_WORKING_COPY -->
+- `/mnt/host-working-copy` is the project's folder, which is accepted
+  work, read-only. A path under it that someone writes in a message
+  reaches you as the same path under `/mnt/host-working-copy`. <!-- packages/core/index.ts HOST_WORKING_COPY -->
   <!-- packages/rules/work.ts showHostWorkingCopy -->
-- `/pinetrie-states` is read-only, and pine·trie's: `start` is the folder
-  as this thread's work is offered against, so `diff -r
+- `/pinetrie-states` is read-only, and pine·trie's: `start` is accepted
+  work as this thread's work is offered against, so `diff -r
   /pinetrie-states/start /workspace` shows all of your work.
   `conflicts/<path>/{base,ours,theirs}` holds a conflicted path's three
   versions while it is open. <!-- packages/lanes/plan.ts STATES_MOUNT -->
@@ -70,7 +70,7 @@ changes pine·trie can keep this note true. You can skip them.
   by file. They accept it when they choose.
 - When a run ends, another agent describes the offer; you don't need to.
 - The person sees your changes only through the offer, which pine·trie brings up
-  to date after each run. Nothing you write appears in their folder.
+  to date after each run. Nothing you write appears in accepted work until they accept it.
 
 ## What lasts
 
@@ -148,7 +148,7 @@ changes pine·trie can keep this note true. You can skip them.
 
 - Several people may write in one thread. Each message you read begins with
   the name of the person who wrote it. <!-- packages/rules/chat.ts attributed -->
-- When someone catches this thread up, pine·trie merges the folder's newest
+- When someone catches this thread up, pine·trie merges accepted work's newest
   state into `/workspace`, path by path, writing only what changed. A note
   tells you what changed. What they want done with it comes after, as
   their message.
@@ -163,7 +163,7 @@ changes pine·trie can keep this note true. You can skip them.
 
 ## This thread's base
 
-- When the folder has moved on, a pine·trie note says so, before the
+- When accepted work has moved on, a pine·trie note says so, before the
   person's message or between your tool calls: which files would change,
   which of them you changed too, and whether your offer conflicts with it.
   <!-- packages/rules/behind.ts behindContent -->

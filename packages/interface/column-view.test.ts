@@ -37,6 +37,7 @@ import { describe, expect, test } from "vitest"
 import { canvasMarkerWords, taskPinnedMarkerWords } from "./card-words.ts"
 import { projectColumns } from "./column-paths.ts"
 import {
+  ACCEPT_LATER,
   behindMark,
   type ColumnFacts,
   type ColumnShows,
@@ -772,7 +773,7 @@ describe("offerWords", () => {
         activity,
         asked: null,
         base,
-        acceptedBookmark: "pinetrie-accepted",
+        into: { kind: "bookmark", bookmark: "pinetrie-accepted" },
         wipAhead: 2,
         catchUp: catching.catchUp ?? { kind: "current" },
         untraced: catching.untraced ?? false,
@@ -889,6 +890,39 @@ describe("offerWords", () => {
     )
     expect(words(offer, "idle", WIP_BASE).buttons[0]?.title).toBe(
       "moves wip/search forward to pinetrie-offer/amber-fox",
+    )
+  })
+  test("a folder offer names accepted work, and its disabled accept says why, no bookmark moved", () => {
+    const w = offerWords(
+      offerView({
+        offer: offerStatus({
+          kind: "folder",
+          lane: threadIdFor("1"),
+          start: pointId("line-0192aaaa"),
+          tip: pointId("turn-0192bbbb"),
+          files: ["a.txt"],
+          conflicts: ["a.txt"],
+          description: null,
+          at: 10,
+        }),
+        activity: "idle",
+        asked: null,
+        base: { kind: "folder" },
+        into: { kind: "folder" },
+        wipAhead: 0,
+        catchUp: { kind: "unknown" },
+        untraced: false,
+        queued: [],
+        parent: null,
+        parentRunning: false,
+      }),
+      null,
+    )
+    expect(w.line).toBe("conflicts with accepted work in 1 file")
+    const accept = w.buttons.find(b => b.button === "accept")
+    expect(accept).toMatchObject({ title: ACCEPT_LATER, disabled: true })
+    expect(w.buttons.find(b => b.button === "update")?.title).toBe(
+      "merges accepted work into this thread's copy",
     )
   })
   const brings = { catchUp: { kind: "brings", move: MOVE, files: 3 } } as const

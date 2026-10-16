@@ -1,10 +1,10 @@
 // host/folder/offers — each folder lane's offer: its newest state against
-// your folder's newest, its files those whose content differs
+// accepted work's newest, its files those whose content differs
 // (`sourceChanges`), reviewed as the range between the two, described by the
 // host's describer. With it, the lane's base record: the state of your
-// folder its line holds, and what catching up with your folder's newest
+// folder its line holds, and what catching up with accepted work's newest
 // would change. Both are the page's caches, written from the graph; nothing
-// decides from them. Accepting into your folder is the next step's: refused.
+// decides from them. Accepting into the project's folder is the next step's: refused.
 
 import {
   ERR,
@@ -49,9 +49,9 @@ const DESCRIBE_DIFF_BYTES = 200_000
 export function planFolderRecords(input: {
   readonly lane: ThreadId
   readonly states: readonly StateRecord[]
-  /** The offer's files: the source paths differing between your folder's newest and the lane's newest. */
+  /** The offer's files: the source paths differing between accepted work's newest and the lane's newest. */
   readonly files: readonly string[]
-  /** What catching up would bring: the source paths differing between the lane's start and your folder's newest. */
+  /** What catching up would bring: the source paths differing between the lane's start and accepted work's newest. */
   readonly brings: readonly string[]
   /** Whether the lane changed anything since its start. */
   readonly worked: boolean
@@ -95,7 +95,7 @@ export function planFolderRecords(input: {
 }
 
 export interface FolderOffers extends OfferActs {
-  /** Every folder lane's offer and base built again: your folder moved. */
+  /** Every folder lane's offer and base built again: accepted work moved. */
   rebuildAll(): Promise<void>
   /** `lane`'s offer built again, or withdrawn. */
   rebuild(lane: ThreadId): Promise<void>

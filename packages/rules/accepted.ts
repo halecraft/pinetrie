@@ -215,7 +215,7 @@ export function acceptedActionState(
   action: AcceptedAction,
   record: AcceptedRecord,
 ): AcceptedActionState {
-  // Your folder is accepted work: there is nothing to set up or publish to.
+  // A folder project's accepted work is its folder: there is nothing to set up or publish to.
   if (record.kind === "folder") return refused(ERR.REFUSED)
   if (action === "setup")
     return record.commit === null ? OK : refused(ERR.REFUSED)

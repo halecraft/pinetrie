@@ -99,5 +99,7 @@ export function mergedFromCommits(m: MergedOf<CommitId>): MergedOf<PointId> {
       }
     case "conflicted":
       return { ...m, from: pointFromCommit(m.from) }
+    case "refused":
+      return m
   }
 }

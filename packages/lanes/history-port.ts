@@ -143,6 +143,8 @@ export type MergedOf<P extends string> =
       readonly ours: readonly TouchedRevision[]
       readonly theirs: readonly TouchedRevision[]
     }
+  /** The merge cannot be made, and nothing was: why, worded for a person and the agent. */
+  | { readonly kind: "refused"; readonly reason: string }
 export type Merged = MergedOf<PointId>
 
 /** What a change to the lane is recorded as: its title and its entry. */

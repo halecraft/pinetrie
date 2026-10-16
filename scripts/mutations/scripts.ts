@@ -28,6 +28,7 @@ const numbering = ["pnpm", "exec", "vitest", "run", "scripts/numbering.test.ts"]
 const record = ["pnpm", "exec", "vitest", "run", "scripts/record.test.ts"]
 const laws = ["pnpm", "exec", "vitest", "run", "scripts/laws.test.ts"]
 const gate = ["pnpm", "exec", "vitest", "run", "apps/pinetrie/e2e/gate.test.ts"]
+const words = ["pnpm", "exec", "vitest", "run", "scripts/words.test.ts"]
 const scenarios = [
   "pnpm",
   "exec",
@@ -37,6 +38,14 @@ const scenarios = [
 ]
 
 export const mutations: readonly Mutation[] = [
+  {
+    name: "a folder catch-up's words name your folder",
+    file: "packages/rules/update.ts",
+    from: '    ? "accepted work, as it was last read"\n',
+    to: '    ? "your folder, as it was last read"\n',
+    command: words,
+    expect: 'no source says "your folder"',
+  },
   {
     name: "a unit mutation's expect may name a test its command does not run",
     file: "scripts/proofs.ts",

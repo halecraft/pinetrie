@@ -110,7 +110,7 @@ export const mutations: readonly Mutation[] = [
     suite: "lanes",
     scenario: "folder",
     expect:
-      "a folder lane's offer is the files it changed, against your folder's newest state",
+      "a folder lane's offer is the files it changed, against accepted work's newest state",
   },
   {
     name: "a folder offer's review lists no file",
@@ -122,13 +122,14 @@ export const mutations: readonly Mutation[] = [
     expect: "the offer is reviewed as files, with their line counts",
   },
   {
-    name: "your folder's watcher reads nothing",
+    name: "the project's folder's watcher reads nothing",
     file: "apps/pinetrie/host/folder/index.ts",
     from: "            read: () => parts.acceptedMoved(),",
     to: "            read: () => {},",
     suite: "lanes",
     scenario: "folder",
-    expect: "your folder, edited, is read into a new state once it is quiet",
+    expect:
+      "the project's folder, edited, is read into a new state once it is quiet",
   },
   {
     name: "a folder lane's catch-up applies no step",
@@ -137,7 +138,8 @@ export const mutations: readonly Mutation[] = [
     to: "    steps: [],",
     suite: "lanes",
     scenario: "folder",
-    expect: "a clean catch-up merges your folder's newest state into the lane",
+    expect:
+      "a clean catch-up merges accepted work's newest state into the lane",
   },
   {
     name: "a conflict's versions are not shown in its lane",
@@ -159,13 +161,13 @@ export const mutations: readonly Mutation[] = [
     expect: "resolve_conflict writes the version chosen, and its versions go",
   },
   {
-    name: "your folder's stamps are kept in your folder",
+    name: "the project's folder's stamps are kept in the project's folder",
     file: "apps/pinetrie/host/folder/index.ts",
     from: "        stampsFile: files.folderStamps,",
     to: '        stampsFile: path.join(root, ".pinetrie-stamps.json"),',
     suite: "lanes",
     scenario: "folder",
-    expect: "nothing of pine·trie's is written in your folder",
+    expect: "nothing of pine·trie's is written in the project's folder",
   },
   {
     name: "a folder lane runs in a jj project",

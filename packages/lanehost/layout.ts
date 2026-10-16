@@ -42,7 +42,7 @@ export const checkedDiskName = (name: string): string => {
 }
 
 /**
- * The disk a read of your folder is made on (`readIn`): restored from your
+ * The disk a read of the project's folder is made on (`readIn`): restored from your
  * folder's newest state, then dropped once snapshotted. No thread's id is a
  * disk name with this shape.
  */

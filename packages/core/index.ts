@@ -1023,7 +1023,7 @@ export interface RepoConfig {
   readonly publishCatchesUp: boolean
 }
 
-/** Your folder, as the host last read it: its newest state. */
+/** A folder project's accepted work, as the host last read the project's folder: its newest state. */
 export interface FolderAcceptedRecord {
   readonly kind: "folder"
   readonly newest: PointId
@@ -1457,18 +1457,18 @@ export interface JjOfferRecord {
 }
 
 /**
- * A folder project's offer: the lane's newest state against your folder's
+ * A folder project's offer: the lane's newest state against accepted work's
  * newest, its files those whose content differs. The page reviews it as the
  * range `start..tip`.
  */
 export interface FolderOfferRecord {
   readonly kind: "folder"
   readonly lane: ThreadId
-  /** Your folder's newest state, which the offer is computed against. */
+  /** Accepted work's newest state, which the offer is computed against. */
   readonly start: PointId
   /** The lane's newest state. */
   readonly tip: PointId
-  /** None when your folder already holds its work. */
+  /** None when accepted work already holds its work. */
   readonly files: readonly string[]
   /** The lane's open conflicts among them. */
   readonly conflicts: readonly string[]
@@ -1850,7 +1850,7 @@ export interface JjBaseRecord {
 }
 
 /**
- * A folder lane's base: your folder's state it began on or last caught up
+ * A folder lane's base: accepted work's state it began on or last caught up
  * with. A folder project has no WIP, so its base is always accepted work.
  */
 export interface FolderBaseRecord {
@@ -1859,7 +1859,7 @@ export interface FolderBaseRecord {
   readonly start: PointId
   /**
    * What catching up would change, read at the lane's newest state and your
-   * folder's then; null when your folder had not moved.
+   * folder's then; null when accepted work had not moved.
    */
   readonly catchUp: {
     readonly tip: PointId

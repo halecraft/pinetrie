@@ -15,6 +15,7 @@ import {
   type TreeIndex,
   type WriterId,
 } from "@pinetrie/core"
+import { ACCEPT_LATER } from "@pinetrie/interface"
 import type { Agent } from "@pinetrie/pi"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import {
@@ -276,7 +277,7 @@ export function offerRefusal(code: ErrCode): string {
     case ERR.OFFER_CHANGED:
       return "the offer changed since you looked at it: review it again"
     case ERR.FOLDER_ACCEPT_LATER:
-      return "accepting into your folder comes in the next step"
+      return ACCEPT_LATER
     case ERR.NOT_A_STACK:
       return "a folder project's offer is its files, never a stack"
     default:

@@ -1,4 +1,4 @@
-// folder/read — what a read of your folder copies into its line: the paths
+// folder/read — what a read of the project's folder copies into its line: the paths
 // whose stamp moved since the last read, and those gone. A scan's stamps are
 // kept only once the state they made is recorded, so a read that failed is
 // planned again whole.

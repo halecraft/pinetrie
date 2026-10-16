@@ -112,7 +112,7 @@ const FolderStampsSchema = Type.Record(
   }),
 )
 
-/** Your folder's stamps of its last read as the session's file stores them. */
+/** The project's folder's stamps of its last read as the session's file stores them. */
 export const encodeFolderStamps = (
   stamps: ReadonlyMap<string, FolderStamp>,
 ): string => JSON.stringify(Object.fromEntries(stamps))

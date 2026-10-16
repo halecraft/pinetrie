@@ -1,6 +1,7 @@
 // host/folder/virtual-base — a merge base as a state: one already, or
 // several merged first into a snapshot named by them (`virtualBaseName`),
-// made once and found made after. A conflict inside it keeps git's markers,
+// found made while it is kept. The merge over it deletes it after, unless a
+// record names it (`history.ts`). A conflict inside it keeps git's markers,
 // as git's recursive strategy does; each inner base is made first, by this
 // same driver.
 
@@ -20,6 +21,26 @@ type MergeReader = StateReader & {
     FolderDisks,
     "pathFacts" | "sameContent" | "applyMerge" | "filesUnder" | "read"
   >
+}
+
+/**
+ * The first state `plan` reads whose snapshot is gone, or null when it can
+ * be had: a virtual base found made reads nothing below it.
+ */
+export async function baseMissing(
+  r: Pick<MergeReader, "runtime">,
+  plan: BasePlan,
+): Promise<PointId | null> {
+  const has = (state: PointId) => r.runtime.snapshotExists(snapshotId(state))
+  if (plan.kind === "state") return (await has(plan.state)) ? null : plan.state
+  if (await has(plan.name)) return null
+  if (!(await has(plan.first))) return plan.first
+  for (const m of plan.merges) {
+    if (!(await has(m.other))) return m.other
+    const below = m.base === null ? null : await baseMissing(r, m.base)
+    if (below !== null) return below
+  }
+  return null
 }
 
 /** The state `plan` names: itself, or its virtual base made now unless it is made already. */

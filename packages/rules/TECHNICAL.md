@@ -1599,7 +1599,8 @@ commit-message request `request.ts` (`describeRequest`).
 
 - **`offerView`** is the work strip's states (ADR-0105) as a decision, from an
   `OfferStatus`: the offer's state, its buttons, its menu, which of those
-  are `quiet` (listed, but changing nothing now), and the facts its words
+  are `quiet` (listed, but drawn disabled: changing nothing now, or not
+  yet possible), and the facts its words
   are made from (`OfferFacts`: files, size, conflicts, bookmark, held, the
   base as `effectiveBase` gives it, the catch-up, untraced, …). It writes
   no words: accepted work and the button labels are the client's (`offerWords`,
@@ -1615,6 +1616,12 @@ commit-message request `request.ts` (`describeRequest`).
   its copy (`conflictCause`) and the parent, ahead, holds none of those
   files conflicted: then `catch-up-parent`. While the parent is ahead,
   `catch-up-parent` is in every idle state's menu, quiet while it runs.
+- **Where an acceptance goes is `offerView`'s `into`** (`AcceptsInto`):
+  a `bookmark` asks `offerAcceptanceDestinations` with it; a `folder`
+  asks for none, and keeps `accept`, quiet, since accepting into a folder
+  project is not built yet; null, a jj project's accepted work not yet
+  read, has no destination, so `accept` is dropped. `OfferFacts.into`
+  carries it to the words, which name a bookmark only from a `bookmark`.
 - **`conflictCause`** says where an offer's conflict comes from: `start`
   when every file it conflicts in is in its `startConflicts`, the files
   conflicted where it starts, so the conflict came with the lane's copy;
@@ -1717,15 +1724,15 @@ commit-message request `request.ts` (`describeRequest`).
   its `kind`; one stored before records had a kind does not decode, and
   reads as unknown until the host writes it again. A folder's hold only
   their own fields: an offer its `start` and `tip` states, files,
-  conflicts and whether it is described; accepted work your folder's
+  conflicts and whether it is described; accepted work its
   `newest` state; a base its `start` state and what catching up would
   change. Every reader switches on `kind`: a folder offer is never a stack
   and never split (`offerView`), starts on no conflict (`conflictCause`),
   and is reviewed as its `start..tip` range (`planOfferRead`, whose
   `parseSpan` takes a folder state's id in a range, never as a revision);
-  your folder has nothing to set up or publish to (`acceptedActionState`
-  refuses both); `catchUpOf` compares a folder base's `start` with your
-  folder's `newest`. At start the host deletes those of the other kind
+  a folder project's accepted work has nothing to set up or publish to
+  (`acceptedActionState` refuses both); `catchUpOf` compares a folder
+  base's `start` with accepted work's `newest`. At start the host deletes those of the other kind
   (`planKindSweep`, `specs.ts`); a folder's `STATE` and `CONFLICT` records
   are never among them.
 - **`pinetrie.accepted` and `pinetrie.base` are caches** (ADR-0104): the repo is

@@ -647,7 +647,12 @@ function workStrip(f: ColumnFacts, parent: ParentNow | null): WorkStrip {
     activity: activityOf(f.index, lane),
     asked: conflictAskedAt(f.index, lane.tip),
     base,
-    acceptedBookmark: accepted?.acceptedBookmark ?? "",
+    into:
+      project.kind === "folder"
+        ? { kind: "folder" }
+        : accepted === null
+          ? null
+          : { kind: "bookmark", bookmark: accepted.acceptedBookmark },
     wipAhead:
       accepted?.wips.find(
         w => jjBase?.base.kind === "wip" && w.bookmark === jjBase.base.bookmark,
@@ -745,6 +750,13 @@ function actingWords(
     : `accepting into ${to.bookmark}…`
 }
 
+/**
+ * Why a folder offer's accept is disabled: the accept button's title, and
+ * the host's words when it refuses one.
+ */
+export const ACCEPT_LATER =
+  "accepting comes in a later step for a project without a jj repo"
+
 /** Every word an offer shows: its line, and its buttons' labels by state. */
 export function offerWords(
   view: OfferView,
@@ -810,6 +822,8 @@ export function offerWords(
     facts.bookmark === null
       ? undefined
       : `moves ${bookmark} forward to ${facts.bookmark}`
+  const { into } = facts
+  const intoBookmark = into?.kind === "bookmark" ? into.bookmark : null
   const acceptLabel = (): string => {
     const where =
       first === undefined || first.kind === "accepted"
@@ -824,16 +838,20 @@ export function offerWords(
           : `accept${where}`
   }
   const baseBookmark =
-    facts.base.kind === "accepted"
-      ? facts.acceptedBookmark
-      : facts.base.bookmark
+    facts.base.kind === "accepted" ? intoBookmark : facts.base.bookmark
   const labelled = (button: OfferButton): LabelledButton => {
     switch (button) {
       case "accept":
         return {
           button,
           label: acceptLabel(),
-          ...titled(first === undefined ? undefined : moves(first.bookmark)),
+          ...titled(
+            into?.kind === "folder"
+              ? ACCEPT_LATER
+              : first === undefined
+                ? undefined
+                : moves(first.bookmark),
+          ),
         }
       case "accept-into-accepted":
         return {
@@ -842,7 +860,7 @@ export function offerWords(
             toAccepted === undefined || toAccepted.bringsAlong === 0
               ? "accept"
               : `accept, with your ${count(toAccepted.bringsAlong, "commit", "commits")} beneath it`,
-          ...titled(moves(facts.acceptedBookmark)),
+          ...titled(intoBookmark === null ? undefined : moves(intoBookmark)),
         }
       case "update": {
         const label = commandWords("bring-up-to-date", catchUps)
@@ -858,7 +876,7 @@ export function offerWords(
         return {
           button,
           label: commandWords("continue-on-accepted", catchUps),
-          title: `merges ${facts.acceptedBookmark} into this thread's copy, its base from then on`,
+          title: `merges ${intoBookmark ?? catchUpName({ kind: "accepted" })} into this thread's copy, its base from then on`,
         }
       case "catch-up-parent":
         return {
@@ -882,7 +900,7 @@ export function offerWords(
         return { button, label: BUTTON_LABEL[button] }
     }
   }
-  /** A quiet button is drawn disabled: it would change nothing now. */
+  /** A quiet button is drawn disabled: it would change nothing now, or cannot yet be done. */
   const shown = (button: OfferButton): LabelledButton =>
     view.quiet.includes(button)
       ? { ...labelled(button), disabled: true }
@@ -902,9 +920,10 @@ export function offerWords(
 function catchUpTitle(
   catchUp: CatchUpNow,
   base: string,
-  bookmark: string,
+  /** The base's bookmark; null for a folder project's accepted work, which has none. */
+  bookmark: string | null,
 ): string {
-  const merges = `merges ${bookmark} into this thread's copy`
+  const merges = `merges ${bookmark ?? base} into this thread's copy`
   switch (catchUp.kind) {
     case "current":
       return `already caught up with ${base}`

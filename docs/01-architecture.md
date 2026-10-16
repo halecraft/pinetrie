@@ -262,14 +262,15 @@ whatever the project's kind: pine·trie writes nothing in your project, and
 no exclude line for itself. A turn's classes read `.gitignore` with a pure
 matcher (`@pinetrie/rules/ignores`), and the search tools read it with no
 repo too. The folder's adapter is built (`apps/pinetrie/host/folder/`, the
-only code that touches your folder; `@pinetrie/folder` decides for it):
-your folder is read into states on its line, by the host's scan and the
+only code that touches the project's folder; `@pinetrie/folder` decides for
+it): the project's folder is read into states of accepted work's line, by the host's scan and the
 disks role's checked copy; a lane's turns and catch-ups are states of the
 graph, a catch-up the path merge on its base, a conflict a record whose
 three versions the lane reads under `/pinetrie-states`, closed by
-`resolve_conflict`; an offer is a lane's newest state against your folder's
-newest, reviewed as files. Accepting into your folder is not built: it is
-refused with words. At start the host deletes the offer, accepted-work and
+`resolve_conflict`; an offer is a lane's newest state against accepted work's
+newest, reviewed as files. Accepting into a folder project is not built:
+it is refused with words, and the page draws its accept disabled with the
+same words. At start the host deletes the offer, accepted-work and
 base records of the other kind, and keeps every state.
 
 pine·trie reads only its own config (ADR-0146): five layers (system, user,

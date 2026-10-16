@@ -34,7 +34,7 @@ export const mutations: readonly Mutation[] = [
       "a path whose stamp moved since the host read it makes no state, and is answered",
   },
   {
-    name: "the disks role cannot see your folder",
+    name: "the disks role cannot see the project's folder",
     file: plan,
     from: '      ...(shape.role === "disks"',
     to: '      ...(shape.role === "privileged"',

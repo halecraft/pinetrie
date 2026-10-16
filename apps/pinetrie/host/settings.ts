@@ -184,7 +184,7 @@ export const SETTINGS = defineTable({
   "folder.history.states": pick(count({ min: 1, max: 100_000 }), {
     fallback: 200,
     describe:
-      "how many of your folder's states a folder project keeps, newest first",
+      "how many states of accepted work a folder project keeps, newest first",
     order: ["user", "local"],
   }),
   "lanes.vm.slots": pick(count({ min: 1, max: MAX_VM_SLOTS }), {

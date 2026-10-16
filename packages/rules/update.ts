@@ -45,7 +45,7 @@ export const updateLine = (d: UpdateDetails): string =>
  */
 export const folderIncoming = (from: "folder" | "parent"): string =>
   from === "folder"
-    ? "your folder, as it was last read"
+    ? "accepted work, as it was last read"
     : "the newest work of the thread this one branched from"
 
 /**

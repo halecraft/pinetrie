@@ -96,8 +96,8 @@ the helper, S122 to S131 for Docker and the lane VM.
   wrapper of `LaneStep`s that only its own maker wraps
   (`history-port.test.ts` holds that neither takes the other). A
   `ForkSetup` also names the snapshot the fork restores (`from`): null for
-  the fork source's own, as jj's; a folder lane's from your folder names
-  your folder's newest state. A kind whose forks name their own has no
+  the fork source's own, as jj's; a folder lane's from accepted work names
+  accepted work's newest state. A kind whose forks name their own has no
   base snapshot: its `AcceptedNow.checkout` is null, and `refreshBase`
   then does nothing.
 - **What follows a move is the adapter's, fired by the caller**
@@ -123,8 +123,9 @@ history:
   (`packages/core/TECHNICAL.md`).
 - **Its operations are the port's:** a turn recorded as a state, with the
   paths it changed (`recordTurn`); the lane's base (`base`); a state merged
-  into the lane, clean, conflicted or nothing (`merge`); the conflicts in
-  the copy (`conflicts`).
+  into the lane, clean, conflicted or nothing (`merge`), or refused with
+  words before anything is made (a folder lane's whose base's snapshot is
+  gone; jj's never refuses); the conflicts in the copy (`conflicts`).
 - **Ancestry, merge bases and diffs are each adapter's own**, computed
   inside it, never a port method: no crossing between an adapter and the
   shared history needs more than an equality test. What a kind does on the

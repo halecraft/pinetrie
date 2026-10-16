@@ -27,6 +27,7 @@ import {
   isAncestor,
   laneNewest,
   mergeBases,
+  parentLane,
   planBase,
   planState,
   type StateGraph,
@@ -307,7 +308,7 @@ interface Flow {
   readonly expected: Files | "conflict"
 }
 
-/** The lane's catch-up of each flow: its tip merged with your folder's over the planned base. */
+/** The lane's catch-up of each flow: its tip merged with accepted work's over the planned base. */
 function mergeOver(flow: Flow) {
   const plan = planBase(flow.graph, flow.ours, flow.theirs)
   return mergeFiles(
@@ -445,7 +446,7 @@ function flows(): readonly Flow[] {
   return out
 }
 
-test("folderNewest: your folder's newest state, along its line, whatever lanes did", () => {
+test("folderNewest: accepted work's newest state, along its line, whatever lanes did", () => {
   for (const seed of SEEDS) {
     const { graph, folder } = walked(seed, 40)
     expect(folderNewest(graph)).toBe(folder)
@@ -453,7 +454,7 @@ test("folderNewest: your folder's newest state, along its line, whatever lanes d
   expect(folderNewest(stateGraph([]))).toBeNull()
 })
 
-test("laneNewest and folderStateHeld: a lane's newest state, and the state of your folder its line holds", () => {
+test("laneNewest and folderStateHeld: a lane's newest state, and the state of accepted work its line holds", () => {
   const OTHER = threadIdFor("2")
   const g = new Growing()
   const l0 = g.add("line-0", { kind: "read" })
@@ -479,6 +480,33 @@ test("laneNewest and folderStateHeld: a lane's newest state, and the state of yo
   expect(folderStateHeld(g.graph, t)).toBe(l0)
   expect(folderStateHeld(g.graph, b)).toBe(l0)
   expect(folderStateHeld(g.graph, l1)).toBe(l1)
+})
+
+describe("parentLane", () => {
+  const OTHER = threadIdFor("2")
+  const THIRD = threadIdFor("3")
+  const g = new Growing()
+  const l0 = g.add("line-0", { kind: "read" })
+  const s = g.add("start-1", { kind: "start", lane: LANE }, l0)
+  const t = g.add(
+    "turn-1",
+    { kind: "turn", lane: LANE, entry: entryId("e") },
+    s,
+  )
+  const b = g.add("start-2", { kind: "start", lane: OTHER }, t)
+  g.add("start-3", { kind: "start", lane: THIRD }, b)
+
+  test("a lane started on accepted work's line has none", () => {
+    expect(parentLane(g.graph, LANE)).toBeNull()
+  })
+
+  test("a branch at another lane's turn has that lane", () => {
+    expect(parentLane(g.graph, OTHER)).toBe(LANE)
+  })
+
+  test("a branch of a branch has its own parent, not the grandparent", () => {
+    expect(parentLane(g.graph, THIRD)).toBe(OTHER)
+  })
 })
 
 describe("the flows of catch-ups and accepts", () => {
@@ -618,7 +646,7 @@ describe("planState", () => {
     ).toEqual(refused)
   })
 
-  test("your folder's first read has no parent, and a restore its line's newest", () => {
+  test("the first read of the project's folder has no parent, and a restore its line's newest", () => {
     expect(
       planState(stateGraph([]), proposed("line-1", { kind: "read" })).kind,
     ).toBe("record")

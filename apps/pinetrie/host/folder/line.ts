@@ -1,7 +1,7 @@
-// host/folder/line — your folder read into its line: the Mac scans (`scan.ts`),
+// host/folder/line — the project's folder read into its line: the Mac scans (`scan.ts`),
 // the read is planned from the last read's stamps (`planRead`), and the disks
 // role copies only what changed into a new state (`readIn`), checking each
-// path's stamp. One read at a time, on the line's own queue. The stamps are
+// path's stamp. One read at a time, on the project's queue. The stamps are
 // written only once the state they made is recorded, so a read that failed
 // is planned again from the last one that held.
 
@@ -14,7 +14,7 @@ import {
   type StateRecord,
 } from "@pinetrie/core"
 import { folderNewest, planRead, planState, stateGraph } from "@pinetrie/folder"
-import { createQueue, type FolderDisks } from "@pinetrie/lanes"
+import type { FolderDisks, LaneQueue } from "@pinetrie/lanes"
 import { decodeFolderStamps, encodeFolderStamps } from "@pinetrie/rules"
 import { scanFolder } from "./scan.ts"
 
@@ -23,7 +23,7 @@ const READ_TRIES = 5
 
 /** What a read does, decided from what it gathered. */
 export type LineRead =
-  /** Your folder holds what its newest state holds. */
+  /** The project's folder holds what accepted work's newest state holds. */
   | { readonly kind: "current"; readonly newest: PointId }
   | {
       readonly kind: "read"
@@ -35,7 +35,7 @@ export type LineRead =
 /**
  * The read to make. With no stamps kept (none, or none since a read was
  * lost), a read copies every path into an empty disk, so nothing deleted
- * since lingers; else only what changed, on your folder's newest state. The
+ * since lingers; else only what changed, on accepted work's newest state. The
  * first read makes a state even of an empty folder: a lane needs one to
  * start from.
  */
@@ -87,26 +87,28 @@ export function planLineRead(input: {
 }
 
 export interface FolderLine {
-  /** Your folder read, after any read before it: its newest state then. */
+  /** The project's folder read, after any read before it: its newest state then. */
   read(): Promise<PointId>
 }
 
 export function createFolderLine(deps: {
-  /** Your folder, on the host. */
+  /** The project's folder, on the host. */
   readonly root: string
   /** pine·trie's own patterns now (`laneIgnores`, with the shared directories). */
   readonly own: () => string
   readonly disks: Pick<FolderDisks, "readIn">
+  /** The project's queue, which a virtual base's merge runs on too. */
+  readonly queue: LaneQueue
   /** The session's file of the last read's stamps (`SessionFiles.folderStamps`). */
   readonly stampsFile: string
   readonly states: () => readonly StateRecord[]
   readonly writeState: (record: StateRecord) => Promise<void>
   readonly newId: () => string
   readonly now: () => number
-  /** A read made a state: your folder moved. */
+  /** A read made a state: accepted work moved. */
   readonly moved: (newest: PointId) => void
 }): FolderLine {
-  const queue = createQueue()
+  const { queue } = deps
 
   const lastStamps = () =>
     readFile(deps.stampsFile, "utf8").then(decodeFolderStamps, () => null)
@@ -144,7 +146,7 @@ export function createFolderLine(deps: {
       return planned.record.id
     }
     throw new Error(
-      `your folder kept changing while it was read: ${moved.slice(0, 5).join(", ")}`,
+      `the project's folder kept changing while it was read: ${moved.slice(0, 5).join(", ")}`,
     )
   }
 

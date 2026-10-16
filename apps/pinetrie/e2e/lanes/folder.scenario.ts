@@ -1,7 +1,7 @@
 // e2e/lanes/folder — a folder with no jj repo served: a thread works in its
-// lane, its offer is the files it changed; your folder, edited, is read once
+// lane, its offer is the files it changed; the project's folder, edited, is read once
 // it is quiet; a clean catch-up, then one that conflicts, its versions in the
-// lane and resolved by `resolve_conflict`; nothing written in your folder.
+// lane and resolved by `resolve_conflict`; nothing written in the project's folder.
 // Then the folder becomes a jj repo, and the folder lane is refused.
 
 import {
@@ -129,7 +129,7 @@ async function folderSection(
     await waitFor(() => offerOf() !== undefined, 60_000)
     const offer = offerOf()
     check(
-      "a folder lane's offer is the files it changed, against your folder's newest state",
+      "a folder lane's offer is the files it changed, against accepted work's newest state",
       offer?.kind === "folder" &&
         offer.files.join() === "b.txt" &&
         readAccepted(wh.session)?.kind === "folder",
@@ -148,7 +148,7 @@ async function folderSection(
       JSON.stringify(review),
     )
 
-    // 2. Your folder, edited, is read once it is quiet, and the thread hears of it.
+    // 2. The project's folder, edited, is read once it is quiet, and the thread hears of it.
     const newestOf = () => {
       const now = readAccepted(wh.session)
       return now?.kind === "folder" ? now.newest : null
@@ -158,7 +158,7 @@ async function folderSection(
     await waitFor(() => newestOf() !== first, 60_000)
     const moved = newestOf()
     check(
-      "your folder, edited, is read into a new state once it is quiet",
+      "the project's folder, edited, is read into a new state once it is quiet",
       moved !== first,
     )
 
@@ -171,7 +171,7 @@ async function folderSection(
     await wu.chat("@agent catch up", at(laneTip(lane)), { thread: lane })
     await idle()
     check(
-      "a clean catch-up merges your folder's newest state into the lane",
+      "a clean catch-up merges accepted work's newest state into the lane",
       toolResults(lane).at(-1)?.trim() === "yours",
       JSON.stringify(toolResults(lane)),
     )
@@ -214,7 +214,7 @@ async function folderSection(
       resolved,
     )
     check(
-      "nothing of pine·trie's is written in your folder",
+      "nothing of pine·trie's is written in the project's folder",
       JSON.stringify(listing(dir)) ===
         JSON.stringify([...before, "c.txt"].sort()),
       JSON.stringify(listing(dir)),

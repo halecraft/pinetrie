@@ -1,7 +1,8 @@
 // host/folder/sweep — the snapshots of a folder project's states that
 // nothing needs any more, deleted: what `liveStates` keeps is decided from
-// the records (each folder lane's tip and start, open conflicts' three
-// states, open offers' two, your folder's newest states). A state's record
+// the records (each folder lane's tip, start and merge bases with accepted
+// work and with its parent lane, open conflicts' three states, open offers'
+// two, accepted work's newest states). A state's record
 // stays: merge bases walk parents through every state, so a record removed
 // would break every older state's ancestry; a state whose snapshot is gone
 // is known by that alone.
@@ -19,6 +20,7 @@ import {
   folderStateHeld,
   laneNewest,
   liveStates,
+  parentLane,
   stateGraph,
 } from "@pinetrie/folder"
 
@@ -39,9 +41,13 @@ export function planSweep(input: {
   const lanes = input.lanes.flatMap(l => {
     const tip = laneNewest(graph, l.lane)
     const start = tip === null ? null : folderStateHeld(graph, tip)
+    // The parent's newest whether or not it is still served: a lane archived
+    // since cannot be caught up with, and its base costs one snapshot.
+    const from = parentLane(graph, l.lane)
+    const parent = from === null ? null : laneNewest(graph, from)
     return tip === null || start === null
       ? []
-      : [{ history: l.history, tip, start }]
+      : [{ history: l.history, tip, start, parent }]
   })
   const live = liveStates({
     graph,

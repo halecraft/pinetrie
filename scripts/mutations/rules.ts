@@ -6,6 +6,22 @@ const archive = "packages/rules/archive.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "offerView leaves a folder offer's accept live",
+    file: "packages/rules/offer-view.ts",
+    from: '      ...(later && buttons.includes("accept") ? (["accept"] as const) : []),\n',
+    to: "",
+    command: unit,
+    expect: "a folder offer's accept is drawn disabled, with no destination",
+  },
+  {
+    name: "offerView offers accept before accepted work is read",
+    file: "packages/rules/offer-view.ts",
+    from: '  const later = into?.kind === "folder"\n',
+    to: '  const later = into?.kind !== "bookmark"\n',
+    command: unit,
+    expect: "a jj offer before accepted work is read has no accept",
+  },
+  {
     name: "a refresh never marks an offer whose host version lags",
     file: "packages/rules/offer.ts",
     from: '  return offer.marked ? { kind: "none", place } : { kind: "mark", place }',
@@ -24,7 +40,7 @@ export const mutations: readonly Mutation[] = [
       "planKindSweep deletes the offers, accepted work and bases of the other kind",
   },
   {
-    name: "a folder lane caught up with your folder's newest reads as behind",
+    name: "a folder lane caught up with accepted work's newest reads as behind",
     file: "packages/rules/base.ts",
     from: '    if (base.start === accepted.newest) return { kind: "current" }\n',
     to: "",
@@ -56,7 +72,7 @@ export const mutations: readonly Mutation[] = [
     expect: "the wire: every URL parses back to what built it",
   },
   {
-    name: "your folder may be set up",
+    name: "a folder project's accepted work may be set up",
     file: "packages/rules/accepted.ts",
     from: '  if (record.kind === "folder") return refused(ERR.REFUSED)\n',
     to: "",

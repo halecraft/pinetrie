@@ -8,6 +8,7 @@ import {
   type ReadInAnswer,
   type StateRecord,
 } from "@pinetrie/core"
+import { createQueue } from "@pinetrie/lanes"
 import { afterEach, describe, expect, test } from "vitest"
 import { createFolderLine, planLineRead } from "./line.ts"
 
@@ -29,7 +30,7 @@ const read = (id: string, ...parents: PointId[]): StateRecord => ({
 const NEXT = pointId("line-next")
 
 describe("planLineRead", () => {
-  test("your folder's first read copies every path into an empty disk, a state with no parent", () => {
+  test("the first read of the project's folder copies every path into an empty disk, a state with no parent", () => {
     const planned = planLineRead({
       states: [],
       last: null,
@@ -64,7 +65,7 @@ describe("planLineRead", () => {
     ).toBe("read")
   })
 
-  test("nothing changed since the last read: your folder's newest, and no state", () => {
+  test("nothing changed since the last read: accepted work's newest, and no state", () => {
     const last = stamps({ "a.txt": file(1) })
     expect(
       planLineRead({
@@ -77,7 +78,7 @@ describe("planLineRead", () => {
     ).toEqual({ kind: "current", newest: "line-1" })
   })
 
-  test("a read on your folder's newest copies what changed and deletes what is gone", () => {
+  test("a read on accepted work's newest copies what changed and deletes what is gone", () => {
     expect(
       planLineRead({
         states: [read("line-1")],
@@ -96,7 +97,7 @@ describe("planLineRead", () => {
     })
   })
 
-  test("with the last read's stamps lost, a read copies everything into an empty disk, on your folder's line", () => {
+  test("with the last read's stamps lost, a read copies everything into an empty disk, on accepted work's line", () => {
     expect(
       planLineRead({
         states: [read("line-1")],
@@ -141,6 +142,7 @@ describe("createFolderLine", () => {
           return answers.shift() ?? { kind: "made" }
         },
       },
+      queue: createQueue(),
       stampsFile,
       states: () => states,
       writeState: async r => {

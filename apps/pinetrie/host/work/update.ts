@@ -183,7 +183,7 @@ export async function withLaneStarted(
 
 /** What a merge found, with what a resolution's prompt needs when it conflicted. */
 export type SettleFacts =
-  | Exclude<Merged, { readonly kind: "conflicted" }>
+  | Exclude<Merged, { readonly kind: "conflicted" | "refused" }>
   | (Extract<Merged, { readonly kind: "conflicted" }> & {
       /** What the prompt must fit, settled before the merge (`planCatchUp`). */
       readonly floor: Floor
@@ -469,6 +469,7 @@ export function createUpdates(deps: {
           catchUp.from,
           await editsOf(lane),
         )
+        if (merged.kind === "refused") return refused(merged.reason)
         // The merge may have changed what a recipe read: its outputs go
         // before anything snapshots the disk, a catch_up's turn included.
         await removeStaleOutputs(handle, (await setup.ready).image).catch(

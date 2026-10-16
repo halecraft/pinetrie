@@ -1,5 +1,5 @@
-// host/folder/watch — your folder watched: once nothing has changed for a
-// quiet window, a change to a source path reads your folder (`line.ts`); a
+// host/folder/watch — the project's folder watched: once nothing has changed for a
+// quiet window, a change to a source path reads the project's folder (`line.ts`); a
 // change only ignored paths saw (a build, an install) reads nothing. A
 // dropped-events error reads at once: what changed is found by the read's
 // own scan.
@@ -13,7 +13,7 @@ import {
 } from "@pinetrie/rules/ignores"
 import { watchDir } from "../watch-dir.ts"
 
-/** How long your folder stays quiet before a change to it is read: a burst of saves is one read. */
+/** How long the project's folder stays quiet before a change to it is read: a burst of saves is one read. */
 export const FOLDER_QUIET_MS = 10_000
 
 /**
@@ -29,7 +29,7 @@ export const isSourceChange = (input: {
 }): boolean =>
   ignoredPaths({ ...input, dirs: new Set() }).size < input.paths.length
 
-/** Your folder watched until closed: `read` after each quiet window that saw a source path change. */
+/** The project's folder watched until closed: `read` after each quiet window that saw a source path change. */
 export async function watchFolder(deps: {
   readonly root: string
   readonly own: () => string

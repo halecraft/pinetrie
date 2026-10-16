@@ -1167,7 +1167,11 @@ composer*).
   take core's `CatchUpFrom`, never a bookmark string, and accepted work's
   bookmark goes only in titles: `offerWords`' button titles ("moves
   pinetrie-accepted forward to pinetrie-offer/amber-fox"), `behindMark`'s,
-  `baseChoices`'. A card's command (ADR-0108) is worded from `CatchUps` (the thread's
+  `baseChoices`'. Accepted work is named one way for every kind of
+  project: a folder project's is "accepted work" too, and no word names
+  the folder as the person's (pine·trie may run hosted, where the folder
+  is no one's own; `scripts/words.test.ts` holds it). Having no bookmark,
+  it is named so in titles as well. A card's command (ADR-0108) is worded from `CatchUps` (the thread's
   base and its parent), which `Column` keeps as one object while it says
   the same, since the composer is memoised. A base that moved is worded by
   `baseMovedOn` beside it ("accepted work has moved on"), never as "has new
@@ -1223,6 +1227,17 @@ composer*).
   or a folder offer's `start..tip` range (`offerReview`), as an ask's range
   is read; a folder offer has no bookmark, no stack and no split, and the
   composer offers no WIP to start from (`baseChoices`) in a folder project.
+- **Where an acceptance goes is a value** (`AcceptsInto`, `@pinetrie/core`):
+  `columnView` hands `offerView` a `folder` one for a folder project, a
+  `bookmark` one from a jj accepted record, and null for a jj project
+  whose record is not read yet: then nothing is accepted into, and accept
+  is left out, as for a gone WIP. A jj offer's accept is titled with the
+  bookmark it moves ("moves pinetrie-accepted forward to …"); a folder
+  offer's names no bookmark anywhere. Its accept stays, drawn disabled
+  (`OfferView.quiet`), and titled `ACCEPT_LATER`, the one sentence the
+  host also refuses an accept with (`folder_accept_later`), so the two
+  never drift. A quiet button's title always says why: it would change
+  nothing now, or cannot yet be done.
 - **What catching up would do** (`catchUpOf`, from `pinetrie.base`'s `start`
   and `catchUp` against `pinetrie.accepted`'s commits, S97): when it `brings`
   files, the strip's line adds "· accepted work has moved on", or is that

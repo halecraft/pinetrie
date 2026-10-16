@@ -1,9 +1,9 @@
 // host/folder — a folder project's adapter: a folder with no jj repo, its
-// accepted work the folder itself. Your folder is read into its
+// accepted work the folder itself. The project's folder is read into its
 // line (`line.ts`) at a thread's first message, at each catch-up, and once it
 // has been quiet after a change (`watch.ts`); each lane's history is states
 // of the graph (`history.ts`); its offer is the lane's newest state against
-// your folder's newest (`offers.ts`). Nothing is written into your folder
+// accepted work's newest (`offers.ts`). Nothing is written into the project's folder
 // but the shared directories its config asks for. Accepting into it is the
 // next step's: refused, with words.
 
@@ -17,7 +17,12 @@ import {
   snapshotId,
   type ThreadId,
 } from "@pinetrie/core"
-import { laneIgnores, planShared, sharedCandidates } from "@pinetrie/lanes"
+import {
+  createQueue,
+  laneIgnores,
+  planShared,
+  sharedCandidates,
+} from "@pinetrie/lanes"
 import {
   readLaneRecords,
   readOffers,
@@ -64,12 +69,15 @@ export function startFolderProject(dir: {
         write: (writes: Parameters<typeof records.writeValues>[0]) =>
           records.writeValues(writes),
       }
-      /** Your folder moved: its record, then whoever listens. */
+      /** Accepted work moved: its record, then whoever listens. */
       const movedListeners: ((newest: PointId) => void)[] = []
+      // The folder's reads and every virtual base's merge, one at a time.
+      const queue = createQueue()
       const line = createFolderLine({
         root,
         own,
         disks,
+        queue,
         stampsFile: files.folderStamps,
         states: store.states,
         writeState: r => records.writeValues([setRecord(STATE, r)]),
@@ -88,7 +96,9 @@ export function startFolderProject(dir: {
         return records.writeValues([setRecord(ACCEPTED, record)])
       }
       movedListeners.push(newest => {
-        void writeAccepted(newest).catch(failed(basics, "your folder's record"))
+        void writeAccepted(newest).catch(
+          failed(basics, "the project's folder's record"),
+        )
       })
       const fileAt: Destination["fileAt"] = (site, p) =>
         folderFileAt({ states: store.states, disks }, site, p)
@@ -133,7 +143,7 @@ export function startFolderProject(dir: {
 
         start(parts) {
           const reader = { runtime, disks, own }
-          /** Your folder read, once lanehost runs. */
+          /** The project's folder read, once lanehost runs. */
           const read = async () => {
             await parts.ready()
             return line.read()
@@ -149,17 +159,17 @@ export function startFolderProject(dir: {
             running: lane => readRunning(basics.live, lane),
             baseChanged: parts.baseChanged,
           })
-          // Your folder moving is base news: every lane's offer and base
+          // Accepted work moving is base news: every lane's offer and base
           // follow it.
           movedListeners.push(() => {
             parts.acceptedMoved()
             void parts.keeper.track(
               offers
                 .rebuildAll()
-                .catch(failed(basics, "following your folder")),
+                .catch(failed(basics, "following the project's folder")),
             )
           })
-          // Your folder is read once lanehost runs: as accepted work moving
+          // The project's folder is read once lanehost runs: as accepted work moving
           // is, which waits for setup (`acceptedNow`); so is each change the
           // watcher saw.
           parts.acceptedMoved()
@@ -187,16 +197,18 @@ export function startFolderProject(dir: {
           }
           const sweepSoon = () =>
             void parts.keeper.track(
-              sweep().catch(failed(basics, "sweeping your folder's states")),
+              sweep().catch(
+                failed(basics, "sweeping the project's folder's states"),
+              ),
             )
           sweepSoon()
           const watching = watchFolder({
             root,
             own,
             read: () => parts.acceptedMoved(),
-            failed: failed(basics, "watching your folder"),
+            failed: failed(basics, "watching the project's folder"),
           }).catch(error => {
-            failed(basics, "watching your folder")(error)
+            failed(basics, "watching the project's folder")(error)
             return null
           })
           const destination: Destination = {
@@ -233,8 +245,8 @@ export function startFolderProject(dir: {
                 code: ERR.REFUSED,
                 message:
                   action === "setup"
-                    ? "your folder is accepted work: there is nothing to set up"
-                    : "your folder is accepted work: there is nothing to publish to",
+                    ? "a folder project's accepted work is its folder: there is nothing to set up"
+                    : "a folder project's accepted work is its folder: there is nothing to publish to",
               }),
             },
             quiet: () => parts.keeper.idle(),
@@ -254,6 +266,7 @@ export function startFolderProject(dir: {
                   runners,
                   runtime,
                   disks,
+                  queue,
                   store,
                   own,
                   newId: basics.newId,

@@ -19,7 +19,8 @@ export type LaneMove =
  * has them, or null for none. A turn that committed: the bookmark before it.
  * A clean merge: the lane before it and what it merged. Nothing merged: the
  * lane, when a mark naming accepted work was made. A conflicted merge
- * fetches nothing: the resolution's turns fetch the lane as they commit.
+ * fetches nothing: the resolution's turns fetch the lane as they commit. A
+ * refused merge made nothing to fetch.
  */
 export function planFetch(move: LaneMove): readonly (CommitId | null)[] | null {
   if (move.kind === "turn")
@@ -31,6 +32,7 @@ export function planFetch(move: LaneMove): readonly (CommitId | null)[] | null {
     case "clean":
       return [merged.ours, merged.from]
     case "conflicted":
+    case "refused":
       return null
   }
 }
