@@ -234,14 +234,21 @@ A document opened under a changed schema keeps a dropped field's data only
 until the next compaction (S120), and the host compacts at startup. So
 `startHost` checks every stored document's schema before its first `get`:
 
+- **`deleteStored`** runs first, after the stored command Lines are
+  deleted: each `StoreMigration` (`STORE_MIGRATIONS`) names, from every
+  stored id, the documents nothing writes any more, and they are deleted
+  from the store, after one `backup`. Each is one-time, like a
+  `RecordMigration`. Registered now: `0017-stale-documents`, the Lines of
+  the `pineta.control` topic from before the rename, which the deletion of
+  Lines no longer matches, and `pinetrie:cards`, the cards document
+  ADR-0059 replaced.
 - **`readStored`** reads each document's stored schema hash through the
-  `Store` (`listDocIds`, `currentMeta`), after the stored command Lines are
-  deleted. **`planStoredOpen`** compares each with the hash of the schema its
+  `Store` (`listDocIds`, `currentMeta`). **`planStoredOpen`** compares each with the hash of the schema its
   kind opens with (`storedKind` and `SCHEMA_OF`, `policy.ts`, which `resolve`
   uses too): open as it is, run the migrations registered from a stored
-  hash, or refuse to start, naming the document and both hashes. An id no
-  schema of ours opens (a stack of moves, which has Kyneta's own schema; a
-  `pinetrie:cards` from before ADR-0059) is logged and left alone.
+  hash, or refuse to start, naming the document and both hashes. A stack
+  of moves has Kyneta's own schema and is skipped; any other id no schema
+  of ours opens is logged and left alone.
 - **`migrate`** runs the plan on the host's Exchange: every migration's reads
   first, then, if every stored record loaded, its writes; then it compacts
   and unloads what it opened. Before a migration that moves data it copies

@@ -18,6 +18,7 @@ import { taskCards } from "./0013-task-cards.ts"
 import { trashLeft } from "./0014-trash-left.ts"
 import { laneHistory } from "./0015-lane-history.ts"
 import { revisionPoint } from "./0016-revision-point.ts"
+import { staleDocuments } from "./0017-stale-documents.ts"
 
 /** What a migration reads with, and writes with once every read loaded. */
 export interface MigrationRun {
@@ -88,6 +89,54 @@ export const RECORD_MIGRATIONS: readonly RecordMigration[] = [
   laneHistory,
   revisionPoint,
 ]
+
+/**
+ * A one-time deletion of stored documents no schema of ours opens, run on the
+ * store before `readStored`, so the check of stored schemas no longer reports
+ * them. Deleted once Duane's store has run it.
+ */
+export interface StoreMigration {
+  /** A name for the log, as its file's. */
+  readonly name: string
+  /** The stored ids it deletes, from every stored id: none once they are gone. */
+  readonly doomed: (storedIds: readonly string[]) => readonly string[]
+}
+
+/**
+ * Every one-time store deletion this build carries, oldest first:
+ * 0017-stale-documents (the `pineta.control` Lines and `pinetrie:cards`).
+ */
+export const STORE_MIGRATIONS: readonly StoreMigration[] = [staleDocuments]
+
+/**
+ * Delete what each store migration names. `backup` copies a file store,
+ * naming the copy for the first migration that deletes anything, before it
+ * does.
+ */
+export async function deleteStored(input: {
+  readonly store: Pick<Store, "listDocIds" | "delete">
+  readonly migrations: readonly StoreMigration[]
+  readonly backup: ((name: string) => string) | null
+  readonly log: (line: string) => void
+}): Promise<void> {
+  const { store, log } = input
+  const ids = new Set<string>()
+  for await (const id of store.listDocIds()) ids.add(id)
+  let backup = input.backup
+  for (const migration of input.migrations) {
+    const doomed = migration.doomed([...ids])
+    if (doomed.length === 0) continue
+    if (backup !== null) {
+      log(`[host] store copied to ${backup(migration.name)}`)
+      backup = null
+    }
+    for (const id of doomed) {
+      await store.delete(id)
+      ids.delete(id)
+    }
+    log(`[host] ${migration.name}: ${doomed.length} document(s) deleted`)
+  }
+}
 
 /** Each stored document's id and the hash of the schema it was written under. */
 export async function readStored(

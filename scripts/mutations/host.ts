@@ -2032,6 +2032,32 @@ export const mutations: readonly Mutation[] = [
     expect: "writes sets and deletes, each in the document its target names",
   },
   {
+    name: "a store migration deletes nothing",
+    file: "apps/pinetrie/host/migrations/index.ts",
+    from: "      await store.delete(id)\n",
+    to: "",
+    command: unit,
+    expect:
+      "deleteStored deletes what each migration dooms, once, after one copy",
+  },
+  {
+    name: "the store is copied before each store migration",
+    file: "apps/pinetrie/host/migrations/index.ts",
+    from: "      backup = null\n",
+    to: "",
+    command: unit,
+    expect:
+      "deleteStored deletes what each migration dooms, once, after one copy",
+  },
+  {
+    name: "every Line is a stale document",
+    file: "apps/pinetrie/host/migrations/0017-stale-documents.ts",
+    from: "id.startsWith(OLD_LINES)",
+    to: 'id.startsWith("line:")',
+    command: unit,
+    expect: "only the pineta Lines and the old cards document are doomed",
+  },
+  {
     name: "a stack of moves is reported as unknown",
     file: "apps/pinetrie/host/migrations/index.ts",
     from: '    if (kind === "kyneta") continue\n',

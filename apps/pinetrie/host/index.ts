@@ -121,11 +121,13 @@ import { startHttp } from "./http.ts"
 import { createLater } from "./later.ts"
 import { lineDocPrefix } from "./lines.ts"
 import {
+  deleteStored,
   migrate,
   planStoredOpen,
   RECORD_MIGRATIONS,
   readStored,
   refusalLine,
+  STORE_MIGRATIONS,
 } from "./migrations/index.ts"
 import { createMoveHistories } from "./move-history.ts"
 import { createNames } from "./names.ts"
@@ -364,6 +366,12 @@ export async function startHost({
   // client keeps no store and does not reconnect (host/lines.ts).
   for await (const id of store.listDocIds(lineDocPrefix(CONTROL_TOPIC)))
     await store.delete(id)
+  await deleteStored({
+    store,
+    migrations: STORE_MIGRATIONS,
+    backup: opened.backup,
+    log,
+  })
   // Each stored document's schema, checked before anything opens one: opened
   // under a changed schema, a dropped field's data goes at the next compaction.
   const stored = await readStored(store)
