@@ -10,6 +10,7 @@ import {
   NOBODY,
   type PlanMode,
   type Position,
+  PROPOSE_TOOL,
   parseMentions,
   proveRunnable,
   type Responder,
@@ -685,6 +686,16 @@ describe("a host tool's result as a fact", () => {
     ).toEqual(["c1"])
     expect(
       renderableMessage(result(CATCH_UP_TOOL, { merged: [3] })).merged,
+    ).toBeUndefined()
+  })
+
+  test("a propose_branches result carries its proposal; one that holds none carries nothing", () => {
+    const proposal = { branches: [{ title: "a", brief: "do a" }] }
+    expect(renderableMessage(result(PROPOSE_TOOL, proposal)).proposal).toEqual(
+      proposal,
+    )
+    expect(
+      renderableMessage(result(PROPOSE_TOOL, undefined)).proposal,
     ).toBeUndefined()
   })
 })

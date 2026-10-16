@@ -27,6 +27,7 @@ export interface AppPorts {
   readonly session: Pick<
     SessionClient,
     | "request"
+    | "chat"
     | "proposed"
     | "createCard"
     | "cardText"
@@ -215,6 +216,13 @@ function performOne(effect: Effect, ports: AppPorts): void {
         ports.attention.dismiss(effect.lane, effect.raised.ask)
       else if (effect.raised.kind === "ready" && effect.raised.source !== null)
         ports.attention.dismissReady(effect.lane, effect.raised.source)
+      return
+    case "chat":
+      void ports.session.chat(
+        effect.text,
+        effect.at,
+        effect.card === null ? {} : { card: effect.card },
+      )
       return
     case "createCard":
       void ports.session.createCard(effect.card, effect.text, effect.how)

@@ -1,0 +1,37 @@
+
+=== e2e:lanes ===
+
+── branch-probe
+accepted kind jj
+transcript [
+  '01a146d3-6fbe-73cc-b7bc-237dd765057d chat: @agent parent',
+  '01a146d3-8262-73cc-b7bc-2380e2e6d1be assistant: ',
+  '01a146d3-82c0-73cc-b7bc-238b710d1e71 assistant: LIST: one, two, three'
+]
+  PASS  item 1: the run's last entry, found from its tool call's entry · prompt 01a146d3-6fbe-73cc-b7bc-237dd765057d last 01a146d3-82c0-73cc-b7bc-238b710d1e71 end 01a146d3-82c0-73cc-b7bc-238b710d1e71
+  PASS  item 1: the run's last entry is unchanged after the thread moved on · 01a146d3-82c0-73cc-b7bc-238b710d1e71 vs end 01a146d3-88ca-73cc-b7bc-239badfaa302
+outcomes [ 'started', 'started', 'started' ] sent order [
+  't-01a146d3-89b4-77b7-bcf1-fb394310f38c',
+  't-01a146d3-89b4-71f1-9cd6-0b71cc1c60ac',
+  't-01a146d3-89b4-7350-b90a-c1ab5dd2e7d4'
+]
+  PASS  items 3, 4: every branch sent at once gets its own lane and its run answers · started,started,started; lanes 3/3; answered 3/3
+  PASS  item 4: every branch's lane holds the parent's files at the fork · ["from parent\nbase\n","from parent\nbase\n","from parent\nbase\n"]
+  PASS  item 4: the parent's lane is untouched · a.txt
+parent.txt
+
+canvas [
+  't-01a146d3-6fa5-7ad0-9ad4-db3657193d5a',
+  't-01a146d3-8e29-7ec9-a819-7e123188e03b',
+  't-01a146d3-8e29-7d13-a08c-adbe0b953bd1',
+  't-01a146d3-8e29-7de6-aaf7-a86710d46b1f',
+  't-01a146d3-89b4-7350-b90a-c1ab5dd2e7d4',
+  't-01a146d3-89b4-71f1-9cd6-0b71cc1c60ac',
+  't-01a146d3-89b4-77b7-bcf1-fb394310f38c'
+] parent at 0 opened at [ 3, 2, 1 ]
+  PASS  item 2: branches opened one after another at one fork land just after the parent · parent 0, opened 3,2,1
+  PASS  item 5: a draft the presser's client writes is their message in each opened thread · 01a146d3-8e33-7799-9401-4c0735a186cf,01a146d3-8e37-7d98-8f1b-e27318473028,01a146d3-8e38-777f-a19f-c7c8746a78bf vs 01a146d3-8e33-7799-9401-4c0735a186cf,01a146d3-8e37-7d98-8f1b-e27318473028,01a146d3-8e38-777f-a19f-c7c8746a78bf
+  PASS  item 5: sending two drafts starts those two, spends their cards, and leaves the third · started,started
+  PASS  item 6: a branch opened and not sent is on the canvas in another person's copy · seen 3/3; by w-u85fi76nd@section-33652.test,w-u85fi76nd@section-33652.test,w-u85fi76nd@section-33652.test
+
+=== e2e:lanes: pass=9 fail=0 skip=0 ===

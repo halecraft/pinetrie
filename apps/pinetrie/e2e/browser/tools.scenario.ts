@@ -506,6 +506,120 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       }
     }
 
+    // ── a proposal: its card after the ask's work, Open, then Send ────────
+    {
+      const script = scriptedModel()
+      const proposing = await lanes.sectionHost({
+        files: { "notes.txt": "hello\n" },
+        model: { kind: "scripted", script },
+      })
+      const proposeHost = proposing.host
+      const pp = await (await browser.newContext()).newPage()
+      await asPerson(pp, "pia@browser.test", "Pia")
+      try {
+        await pp.goto(proposeHost.httpUrl, { waitUntil: "domcontentloaded" })
+        await pp.click("#sidebar .add-agent")
+        script.use([
+          {
+            tool: "propose_branches",
+            args: {
+              branches: [
+                { title: "one", brief: "do one" },
+                { title: "two", brief: "do two" },
+                { title: "three", brief: "do three" },
+              ],
+            },
+          },
+          { text: "three things" },
+        ])
+        await pp.fill(`${col(0)} .composer .input`, "split it")
+        await pp.click(`${col(0)} .composer .send`)
+        await waitFor(() => idleNow(proposeHost))
+        const card = `${col(0)} .proposal`
+        // A card never drawn fails the check below, rather than the scenario.
+        const drawn = await pp
+          .waitForSelector(`${card} .proposal-open:not([disabled])`, {
+            timeout: 15_000,
+          })
+          .then(
+            () => true,
+            () => false,
+          )
+        // Drawn after the ask's last word, and in no ask's work.
+        const after = await pp.evaluate(
+          ([cardSel, last]) => {
+            const c = document.querySelector(cardSel)
+            const word = [...document.querySelectorAll(".msg")].find(m =>
+              m.textContent?.includes(last),
+            )
+            return (
+              c !== null &&
+              word !== undefined &&
+              (word.compareDocumentPosition(c) &
+                Node.DOCUMENT_POSITION_FOLLOWING) !==
+                0 &&
+              c.closest(".ask-work") === null
+            )
+          },
+          [card, "three things"] as const,
+        )
+        const boxes = drawn
+          ? await pp
+              .click(`${card} .proposal-open`)
+              .then(() => pp.waitForSelector(`${col(3)} .composer .input`))
+              .then(() =>
+                Promise.all(
+                  [1, 2, 3].map(n =>
+                    pp.inputValue(`${col(n)} .composer .input`),
+                  ),
+                ),
+              )
+          : []
+        const sendLabel = drawn
+          ? await pp
+              .waitForSelector(`${card} .proposal-send`, { timeout: 15_000 })
+              .then(() => pp.textContent(`${card} .proposal-send`))
+              .catch(() => null)
+          : null
+        check(
+          "a proposal's card is drawn after its ask's work, and Open unfolds a column for each branch, its composer holding the brief",
+          drawn &&
+            after &&
+            boxes.join("|") === "@agent do one|@agent do two|@agent do three" &&
+            sendLabel === "Send 3",
+          `drawn ${drawn}; after ${after}; boxes ${JSON.stringify(boxes)}; ${sendLabel}`,
+        )
+        // One edited in its column; Send starts all three, that one as edited.
+        // Focus puts the caret after the brief, as a person goes on typing it.
+        await pp.focus(`${col(2)} .composer .input`)
+        await pp.keyboard.type(", my way")
+        await waitFor(() =>
+          readPlaces(proposeHost.places).some(
+            c => c.kind === "text" && c.place.kind === "composing",
+          ),
+        )
+        await pp.click(`${card} .proposal-send`)
+        const started = () => {
+          const index = treeOf(proposeHost)
+          return Object.values(index.entries)
+            .filter(e => e.message?.role === "chat")
+            .map(e => messageText(e.message))
+            .filter(t => t.startsWith("@agent do"))
+            .sort()
+        }
+        await waitFor(() => started().length === 3, 30_000).catch(() => {})
+        check(
+          "Send starts each opened branch from its composer, an edited one with its edit",
+          started().join("|") ===
+            "@agent do one|@agent do three|@agent do two, my way",
+          started().join(" | "),
+        )
+      } finally {
+        await pp.context().close()
+        await proposing.close()
+      }
+    }
+
     {
       const work = await committedProject("pinetrie-browser-tools-", {
         "notes.txt": "the secret word is MANGO\n",

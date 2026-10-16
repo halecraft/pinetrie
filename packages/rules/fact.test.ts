@@ -1,4 +1,5 @@
 import {
+  entryId,
   type JjProposedChangesRecord,
   type ProposedChangesFact,
   type QueuedFact,
@@ -55,6 +56,22 @@ describe("a fact", () => {
     expect(
       decodeFact({ role: "custom", customType: "pinetrie.fact" }),
     ).toBeUndefined()
+  })
+
+  test("a proposal's branches opened round-trip, worded with who pressed and each title", () => {
+    const fact: QueuedFact = {
+      kind: "branched",
+      lane: LANE,
+      by: ADA,
+      proposal: entryId("r"),
+      how: "started",
+      titles: ["one", "two"],
+    }
+    expect(decodeFact(encodeFact(fact, "Ada", 1))).toEqual(fact)
+    expect(decodeQueuedFact(encodeQueuedFact(fact))).toEqual(fact)
+    expect(factLine(fact)).toBe("⑂ 2 branches started from the proposal")
+    expect(factContent(fact, "Ada")).toContain("Ada started 2 branches")
+    expect(factContent(fact, "Ada")).toContain("one; two")
   })
 
   test("an answer not sent says where its asker went, and round-trips", () => {

@@ -198,6 +198,20 @@ describe("canvasColumns", () => {
     })
     // Not yet started and not opened here, it is left out as a thread not held is.
     expect(draw(canvasFor([F]), defaultView(F))).toEqual([])
+    // A proposal's branch you opened starts with its brief; your own prefill wins.
+    const proposed = new Map([
+      [F, { root: ROOT, fork: entryId("3-b"), draft: "@agent do one" }],
+    ])
+    const [drafted] = draw(canvasFor([F]), defaultView(F), proposed)
+    expect(drafted).toMatchObject({
+      column: {
+        mode: { prefill: { text: "@agent do one", blank: false } },
+      },
+    })
+    const [mine] = draw(canvasFor([F]), view, proposed)
+    expect(mine).toMatchObject({
+      column: { mode: { prefill: { text: "hi", blank: false } } },
+    })
   })
 
   test("a thread not yet started in a thread someone else holds says who, drawn without its entries", () => {

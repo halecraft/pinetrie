@@ -7,6 +7,7 @@ import type { Address } from "./address.ts"
 import type { CardId, EntryId, TextCardId, ThreadId, WriterId } from "./ids.ts"
 import type { Sha256 } from "./images.ts"
 import type {
+  BranchedFact,
   BudgetSpentFact,
   CatchUpFrom,
   MemberFact,
@@ -74,8 +75,9 @@ export type ProposedChangesFact =
 /**
  * A fact on its way into its thread: what a fact card holds, appended as an
  * entry when the thread's end consumes it. What a command on the proposed
- * changes did, who stopped a run, a member dismissed or gone, or a budget
- * spent.
+ * changes did, who stopped a run, a member dismissed or gone, a budget spent,
+ * an ask unanswered or an answer undelivered, a round's line for people, or a
+ * proposal's branches opened.
  */
 export type QueuedFact =
   | ProposedChangesFact
@@ -85,6 +87,7 @@ export type QueuedFact =
   | UnansweredFact
   | UndeliveredFact
   | RoundFact
+  | BranchedFact
 
 /** A card's command, or null: only a text card has one. */
 export const commandOf = (card: CardRecord): CardCommand | null =>

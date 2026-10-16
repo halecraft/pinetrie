@@ -784,6 +784,18 @@ rejects `shutdown()`.
   to the closer's trash in the same step (`emptiedTasks`,
   `planTasksTrashed`), in their history outside any task, so the undo key
   on no task brings both back.
+- **`branch-out` is a press on an agent's proposal** (ADR-0157,
+  `branchOut`), in one keeper step: the root's tree and asks, the thread
+  records and whether the proposing lane runs (its `runningAsk`, the
+  prompt of its running run) gathered with no await before the first
+  write; `planBranchOut` (`@pinetrie/rules`); then every branch's records
+  and cards written as one opening (`executeOpening`, which `open-thread`
+  shares: records first, one places change of the presser's, names); for
+  Start, each branch's message cleared and sent in order through `send`,
+  as a spin-off's is; then the press's fact (`queueFact`). A refused send
+  is logged and leaves its thread opened, unsent. The host writes no
+  draft: Open's composers start from the proposal on the page, and Send K
+  is the page's ordinary sends.
 - **A person's documents are clients' documents the host only keeps**
   (ADR-0059, ADR-0077, ADR-0122): their inventory, their attention and
   their list. `resolveDoc` names a `<kind>:<writer>` id's kind, and the host

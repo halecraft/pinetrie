@@ -50,6 +50,7 @@ decisions:
 | `reserve` | ADR-0057 |
 | `spin-off` | ADR-0111, ADR-0126 |
 | `open-thread` | ADR-0126 |
+| `branch-out` | ADR-0157: Open carries rows, Start rows with their briefs, in `text`; rows strictly increasing, threads new and distinct, a brief non-blank on Start and absent on Open, so a decoded press keeps its proposal's order |
 | `copy-thread` | ADR-0117 |
 | `paste` | ADR-0132; it discards the card it replaces first (ADR-0133) |
 | `undo-move` | ADR-0066; `""` names your history outside any task (ADR-0126) |

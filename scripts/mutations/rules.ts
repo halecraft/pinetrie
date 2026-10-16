@@ -5,6 +5,58 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/rules"]
 const archive = "packages/rules/archive.ts"
 
 export const mutations: readonly Mutation[] = [
+  // ── a proposal's branches ──
+  {
+    name: "each branch of a press lands just after the proposing thread",
+    file: "packages/rules/proposal.ts",
+    from: "    after = b.thread\n",
+    to: "",
+    command: unit,
+    expect:
+      "opens each row after the one before it, the first right after the proposing thread",
+  },
+  {
+    name: "a spent proposal can be pressed again",
+    file: "packages/rules/proposal.ts",
+    from: '  if (state.kind !== "ready") return { kind: "refused", why: state.kind }',
+    to: '  if (state.kind === "running") return { kind: "refused", why: state.kind }',
+    command: unit,
+    expect:
+      "refuses while its run runs, once a record names the proposal, and past its last row",
+  },
+  {
+    name: "a Start's message is its brief alone, which may not ask the agent",
+    file: "packages/rules/proposal.ts",
+    from: "    const text = agentAsk(b.brief)",
+    to: "    const text = b.brief",
+    command: unit,
+    expect: "a brief that names a person still asks the agent",
+  },
+  {
+    name: "a proposal takes a blank brief",
+    file: "packages/rules/proposal.ts",
+    from: '    if (t === "" || r === "")',
+    to: '    if (t === "")',
+    command: unit,
+    expect: "refuses no branch, a blank title and a blank brief",
+  },
+  {
+    name: "a thread record read back drops its proposal",
+    file: "packages/rules/thread.ts",
+    from: "    return proposal === undefined\n",
+    to: "    return true\n",
+    command: unit,
+    expect:
+      "a branch opened from a proposal reads back with it; a branch without one still decodes",
+  },
+  {
+    name: "a proposal's draft is anyone's",
+    file: "packages/rules/task.ts",
+    from: "  if (origin.proposal === undefined || record.by !== input.me) return undefined",
+    to: "  if (origin.proposal === undefined) return undefined",
+    command: unit,
+    expect: "is the row's brief asked of the agent, for its opener alone",
+  },
   {
     name: "workStripView leaves folder proposed changes' accept live",
     file: "packages/rules/work-strip.ts",
@@ -601,8 +653,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a branch opens at an entry in no root it holds",
     file: "packages/rules/open.ts",
-    from: '      if (parent === null || !held) return { kind: "refused", why: "unknown" }\n',
-    to: '      if (!held) return { kind: "refused", why: "unknown" }\n',
+    from: "  if (parent === null || !input.tasks.has(input.task))\n",
+    to: "  if (!input.tasks.has(input.task))\n",
     command: unit,
     expect: "refused: its entry is in no root it holds",
   },

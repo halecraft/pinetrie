@@ -8,6 +8,7 @@ import type {
   CardCommand,
   CardId,
   CardRecord,
+  ChatAt,
   EntryId,
   LaneRecord,
   LaneView,
@@ -99,6 +100,16 @@ export type Effect =
       readonly kind: "moveTask"
       readonly move: Extract<HostRequest, { kind: "move-task" }>
       readonly moved: readonly Effect[]
+    }
+  /**
+   * A message sent as a column's composer would send it: a branch's first
+   * from its card when you typed one, else its text.
+   */
+  | {
+      readonly kind: "chat"
+      readonly text: string
+      readonly at: ChatAt
+      readonly card: TextCardId | null
     }
   | {
       readonly kind: "createCard"

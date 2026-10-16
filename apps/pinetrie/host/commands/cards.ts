@@ -1,6 +1,7 @@
 // host/commands/cards — the commands that move cards: a move, a reorder and
 // unqueue all, an undo of moves, a card's command, a busy chat's card queued, a
-// sent card spent, a card made a thread and lifted back, and traces seen.
+// sent card spent, a card made a thread and lifted back, a thread opened, a
+// proposal's branches opened, and traces seen.
 //
 // Each runs inside one step of the documents' keeper, as every command does, so
 // it is ordered with a queued card's pop and with every other move: gather the places,
@@ -12,6 +13,8 @@
 // `rev`: a client draws its move until its copy reaches it.
 
 import {
+  type BranchOut,
+  branchesByProposal,
   type CardCommand,
   type CardId,
   cardIdOfKind,
@@ -20,6 +23,7 @@ import {
   ERR,
   historyScope,
   type Intent,
+  indexAsks,
   isTextCardId,
   keyOf,
   type Move,
@@ -28,6 +32,8 @@ import {
   moveOf,
   type NoteColumnId,
   PERSON_HISTORY,
+  promptOf,
+  type QueuedFact,
   type QueueHoldChange,
   type QueueMove,
   type Reorder,
@@ -38,6 +44,8 @@ import {
   type TextCardId,
   type ThreadId,
   type TreeIndex,
+  threadAt,
+  threadEnd,
   threadOfSend,
   type ValueWrite,
   type WriterId,
@@ -60,6 +68,7 @@ import {
 import {
   afterSteps,
   type BoardMove,
+  type BranchOutRefusal,
   type Cause,
   type CopyPlan,
   type CopyThread,
@@ -72,8 +81,10 @@ import {
   lanesToDrain,
   type MoveStep,
   type MovesStep,
+  type Opening,
   type OpenPlan,
   type OpenThread,
+  planBranchOut,
   planCopy,
   planLiftRoot,
   planMoveCommand,
@@ -122,7 +133,7 @@ export const settled = (
 export interface CardCommandDeps {
   readonly basics: Pick<
     Basics,
-    "docs" | "live" | "places" | "session" | "now" | "newId"
+    "docs" | "live" | "places" | "session" | "now" | "newId" | "log"
   >
   readonly cards: Pick<
     CardPort,
@@ -176,6 +187,24 @@ export function createCardCommands(deps: CardCommandDeps) {
       },
       places.rev(),
     )
+
+  /**
+   * One or more threads' opening written: the records first, so a reader
+   * that finds a card finds its thread's root; then every card in one
+   * change of the opener's; then each thread's name.
+   */
+  async function executeOpening(
+    writer: WriterId,
+    opening: Opening,
+  ): Promise<Settled> {
+    await deps.records.writeValues(opening.records)
+    const done = await carry({ kind: "steps", steps: opening.steps }, [], {
+      kind: "move",
+      by: writer,
+    })
+    await deps.ensureNames()
+    return done
+  }
 
   /**
    * Carry out steps as one change under `cause`, as one step of a history of
@@ -664,15 +693,59 @@ export function createCardCommands(deps: CardCommandDeps) {
         now: deps.basics.now(),
       })
       if (plan.kind === "refused") return settled(openRefusal(plan.why))
-      // execute: the records first, so a reader that finds the card finds
-      // its thread's root
-      await deps.records.writeValues(plan.records)
-      const done = await carry({ kind: "steps", steps: plan.steps }, [], {
-        kind: "move",
-        by: writer,
+      return executeOpening(writer, plan)
+    },
+
+    /**
+     * A press on an agent's proposal, in one step of the keeper: planned
+     * (`planBranchOut`) from its root's tree, the thread records and whether
+     * the proposing lane runs; every branch opened in one change; for Start,
+     * each branch's message sent in order through `start`, which clears it
+     * as any send; then the press's fact. A refused send is logged and leaves
+     * its thread opened, unsent. The answer is the opening's.
+     */
+    async branchOut(
+      writer: WriterId,
+      press: BranchOut,
+      tasks: TaskIndex,
+      start: (chat: Send) => Promise<Outcome>,
+      queueFact: (fact: QueuedFact) => Promise<void>,
+    ): Promise<Settled> {
+      // gather
+      const index = readTreeIndex(await docs.root(press.root))
+      const threads = readThreads(session)
+      const lane = threadAt(index, press.proposal)
+      const runningAsk =
+        lane !== null && running(lane)
+          ? promptOf(index, threadEnd(index, lane))
+          : null
+      // plan
+      const plan = planBranchOut({
+        press,
+        index,
+        asks: indexAsks(index),
+        branches: branchesByProposal(threads),
+        runningAsk,
+        sender: writer,
+        cards: readPlaces(places),
+        threads,
+        taskOfThread: tasks.taskOfThread,
+        tasks: readTasks(places),
+        now: deps.basics.now(),
       })
-      await deps.ensureNames()
-      return done
+      if ("kind" in plan) return settled(branchOutRefusal(plan.why))
+      // execute
+      const opened = await executeOpening(writer, plan.opening)
+      if (plan.how === "start")
+        for (const send of plan.sends) {
+          const sent = await start(send)
+          if (sent.kind === "refused" || sent.kind === "failed")
+            deps.basics.log(
+              `[host] a proposal's branch was opened but not started: ${sent.message}`,
+            )
+        }
+      await queueFact(plan.fact)
+      return opened
     },
 
     /**
@@ -912,6 +985,38 @@ function openRefusal(
       }
     default:
       return { kind: "unmoved", code: why, place: null, by: null }
+  }
+}
+
+/** Why a press on a proposal was refused, as its sender is answered. */
+function branchOutRefusal(why: BranchOutRefusal): Outcome {
+  switch (why) {
+    case "no-proposal":
+      return {
+        kind: "refused",
+        code: ERR.UNKNOWN_TARGET,
+        message: "no proposal at that entry",
+      }
+    case "running":
+      return {
+        kind: "refused",
+        code: ERR.REFUSED,
+        message: "the run that proposed these has not ended",
+      }
+    case "spent":
+      return {
+        kind: "refused",
+        code: ERR.REFUSED,
+        message: "someone has already opened these branches",
+      }
+    case "no-row":
+      return {
+        kind: "refused",
+        code: ERR.UNKNOWN_TARGET,
+        message: "the proposal has no such row",
+      }
+    default:
+      return openRefusal(why)
   }
 }
 

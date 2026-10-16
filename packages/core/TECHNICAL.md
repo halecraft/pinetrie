@@ -40,8 +40,9 @@ module but `fixtures.ts`, which tests import as `@pinetrie/core/fixtures`.
   in core, the client and the host, and a `runId` import in core and the
   client (S95).
 - A person is their email (ADR-0037), and owns no lane (ADR-0120). A thread's
-  id, `t-` and a uuidv7, is minted by the column that opens it before
-  anything is written (ADR-0057), and names its lane too (ADR-0117,
+  id, `t-` and a uuidv7, is minted by the page that opens it before
+  anything is written (ADR-0057): by its column, or one per row by a press
+  on a proposal (ADR-0157). It names its lane too (ADR-0117,
   ADR-0120): a container and its volume are named after it, so a new one is
   checked strictly (`parseNewThread`). A task's id is its card's (ADR-0116,
   ADR-0126); a root's names its document, not its root entry (ADR-0063); a
@@ -96,6 +97,15 @@ module but `fixtures.ts`, which tests import as `@pinetrie/core/fixtures`.
 - A root is a document (ADR-0063), rooted at its first message (S30). Its
   summary, written to the directory, carries its followers (ADR-0077) and
   its mentions, for your inbox (ADR-0030).
+- An agent's proposal of branches (ADR-0157, `proposals.ts`) is a
+  `propose_branches` result's `proposal`; a branch opened from it names it
+  and its row in its origin (`ThreadFork.proposal`, which a copy cannot
+  carry), and those records alone make it spent (`branchesByProposal`,
+  `proposalState`). It forks at its run's last entry (`AskIndex.last`),
+  and is running only while its own run is the lane's (`runningAsk`, the
+  prompt of the run the lane runs), never while a later one is.
+- `agentAsk` (`ids.ts`) is the one way a text is made a message to the
+  agent: a proposal's Start and its drafts, and the composer's `@agent `.
 - An address names a thread, an entry, a block, a range or a card, and an
   entry's names its thread (ADR-0125, ADR-0126).
 - A tool keeps its id for the model; core reads what a call touched, and
@@ -108,7 +118,8 @@ module but `fixtures.ts`, which tests import as `@pinetrie/core/fixtures`.
   copy it shows (ADR-0151). `ImageRef` is stored in chats as it is, so a
   blob's size is the store's `size`, never a field of the ref.
 - `TOOL_IDS` is every lane's tool list, the same in every run, `set_banner`
-  included under any icon source (ADR-0143); its order is part of every
+  included under any icon source (ADR-0143), `propose_branches` last
+  (ADR-0157); its order is part of every
   request's prefix, and a changed prefix drops a lane's earlier thinking
   (S85). The search tools run programs
   carried into every lane (`RUNTIME_PROGRAMS`, ADR-0064).

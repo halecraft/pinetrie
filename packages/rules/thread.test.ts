@@ -22,6 +22,39 @@ describe("a thread's record", () => {
     ).toEqual({ kind: "fork", at: entryId("e"), how: "copy" })
   })
 
+  test("a branch opened from a proposal reads back with it; a branch without one still decodes", () => {
+    const proposal = { entry: "r", row: 2 }
+    expect(
+      THREAD.decode(
+        stored({ kind: "fork", at: "e", how: "branch", proposal }),
+        KEY,
+      )?.origin,
+    ).toEqual({
+      kind: "fork",
+      at: entryId("e"),
+      how: "branch",
+      proposal: { entry: entryId("r"), row: 2 },
+    })
+    expect(
+      THREAD.decode(stored({ kind: "fork", at: "e", how: "branch" }), KEY)
+        ?.origin,
+    ).toEqual({ kind: "fork", at: entryId("e"), how: "branch" })
+  })
+
+  test("a copy never carries a proposal", () => {
+    expect(
+      THREAD.decode(
+        stored({
+          kind: "fork",
+          at: "e",
+          how: "copy",
+          proposal: { entry: "r", row: 0 },
+        }),
+        KEY,
+      )?.origin,
+    ).toEqual({ kind: "fork", at: entryId("e"), how: "copy" })
+  })
+
   test("an origin this build does not know does not decode, never read as a root", () => {
     for (const origin of [
       { kind: "started" },

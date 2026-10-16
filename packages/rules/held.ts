@@ -107,6 +107,17 @@ export function runsIn(command: Gated): readonly RunAt[] {
             ]
     case "carry-on":
       return [thread(command.lane)]
+    // A press on a proposal forks, and for Start runs, in the thread the
+    // proposal is in.
+    case "branch-out":
+      return [
+        {
+          kind: "entry",
+          root: command.root,
+          entry: command.proposal,
+          starts: command.branches[0].thread,
+        },
+      ]
     // Opening a thread runs nothing: its first send is the branch.
     case "open-thread":
       return []

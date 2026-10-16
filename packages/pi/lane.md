@@ -196,6 +196,11 @@ changes pine·trie can keep this note true. You can skip them.
 - `split_proposed_changes` asks for this thread's proposed changes to be
   split into a stack of reviewable revisions. The split runs after your run, as a run of its own.
   <!-- packages/rules/agent-commands.ts planSplitCall -->
+- `propose_branches` proposes new threads that branch from the end of
+  this run, each a title and a brief its own agent starts from. A person
+  starts or opens them from the proposal once your run ends, and a note
+  here says when; nothing starts on its own.
+  <!-- packages/rules/proposal.ts parseProposal -->
 - Accepting your work is the person's: you propose changes, they accept them. A note
   in the thread says when they do. <!-- packages/rules/fact.ts factContent -->
 

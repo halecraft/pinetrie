@@ -35,6 +35,7 @@ import type {
 } from "./places.ts"
 import type {
   FilesTouched,
+  NonEmpty,
   ProposedChangesSeen,
   ProposedLedger,
 } from "./proposed.ts"
@@ -74,12 +75,73 @@ export type ThreadOrigin =
   | { readonly kind: "spun"; readonly card: TextCardId }
   | ThreadFork
 
-/** A thread forked at an entry: a branch, or a copy, whose fork row says so. */
-export interface ThreadFork {
-  readonly kind: "fork"
-  readonly at: EntryId
-  readonly how: "branch" | "copy"
+/**
+ * A thread forked at an entry: a branch, or a copy, whose fork row says so. A
+ * branch opened from an agent's proposal names it, and only a branch can.
+ */
+export type ThreadFork =
+  | {
+      readonly kind: "fork"
+      readonly at: EntryId
+      readonly how: "branch"
+      readonly proposal?: ProposalBranch
+    }
+  | { readonly kind: "fork"; readonly at: EntryId; readonly how: "copy" }
+
+/**
+ * A branch's place in the proposal it was opened from: the entry of the
+ * `propose_branches` result, and its row there. The thread records naming a
+ * proposal are what make it spent (`proposalState`).
+ */
+export interface ProposalBranch {
+  readonly entry: EntryId
+  readonly row: number
 }
+
+/** One branch an agent proposes: a short title, and the brief its agent starts from. */
+export interface ProposedBranch {
+  readonly title: string
+  readonly brief: string
+}
+
+/** What a `propose_branches` call proposes, in its order: at least one branch. */
+export interface Proposal {
+  readonly branches: NonEmpty<ProposedBranch>
+}
+
+/** A row of a proposal pressed: the thread its branch opens as, minted by the presser's page. */
+export interface OpenedRow {
+  readonly thread: ThreadId
+  readonly row: number
+}
+
+/** A row pressed Start: its brief as the presser left it, which the host asks the agent. */
+export interface StartedRow extends OpenedRow {
+  readonly brief: string
+}
+
+/**
+ * A press on a proposal: Open opens its rows unsent, and carries no text;
+ * Start opens them and sends each brief.
+ */
+export type BranchOut =
+  | {
+      readonly kind: "branch-out"
+      readonly how: "open"
+      readonly root: RootId
+      /** The proposing thread's task, where the branches land. */
+      readonly task: TaskId
+      readonly proposal: EntryId
+      readonly branches: NonEmpty<OpenedRow>
+    }
+  | {
+      readonly kind: "branch-out"
+      readonly how: "start"
+      readonly root: RootId
+      readonly task: TaskId
+      readonly proposal: EntryId
+      readonly branches: NonEmpty<StartedRow>
+    }
 
 /** A root's first thread. */
 export const ROOT_ORIGIN: ThreadOrigin = { kind: "root" }
@@ -486,6 +548,13 @@ export type Intent =
       readonly start: ThreadStart
     }
   /**
+   * Open a branch for each row pressed on an agent's proposal, at its fork,
+   * after the proposing thread in the proposal's order; Start also sends each
+   * one's brief as the sender's message to the agent. Rows are strictly
+   * increasing and threads distinct, as the codec decodes them.
+   */
+  | BranchOut
+  /**
    * Copy the thread `source`: a new thread, its id the move's card, forked at
    * `end`, the source's end as its copier saw it, its card made where the move
    * puts it: a spot on a canvas or the copier's inventory. One step of the
@@ -797,6 +866,22 @@ export interface RoundFact {
   readonly lane: ThreadId
   readonly line: string
   readonly by: WriterId
+}
+
+/**
+ * A person pressed Start or Open on an agent's proposal, in the thread that
+ * proposed it. It tells the agent and people; whether the proposal is spent
+ * is read from its branches' records, which a queued fact would lag.
+ */
+export interface BranchedFact {
+  readonly kind: "branched"
+  readonly lane: ThreadId
+  readonly by: WriterId
+  /** The `propose_branches` result's entry. */
+  readonly proposal: EntryId
+  readonly how: "started" | "opened"
+  /** The titles of the rows pressed, in the proposal's order. */
+  readonly titles: readonly string[]
 }
 
 /**
@@ -2318,6 +2403,7 @@ export * from "./live.ts"
 export * from "./paste.ts"
 export * from "./paths.ts"
 export * from "./places.ts"
+export * from "./proposals.ts"
 export * from "./proposed.ts"
 export * from "./roots.ts"
 export * from "./runs.ts"

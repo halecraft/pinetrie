@@ -1073,6 +1073,80 @@ test("decode: a thread opened names a new thread, its root, its task and how it 
     assert.equal(decodeCommand(wire).kind, "refused")
 })
 
+test("decode: a press on a proposal keeps its rows in order, briefs on Start alone", () => {
+  const second = threadIdFor("01a0ffd2-0000-7000-8000-0000000000ab")
+  const open = encodeIntent("c", {
+    kind: "branch-out",
+    how: "open",
+    root: TEST_ROOT,
+    task: TEST_TASK,
+    proposal: entryId("e-1"),
+    branches: [
+      { thread: NEW_THREAD, row: 0 },
+      { thread: second, row: 2 },
+    ],
+  })
+  assert.deepEqual(decodeCommand(open), {
+    kind: "branch-out",
+    how: "open",
+    root: TEST_ROOT,
+    task: TEST_TASK,
+    proposal: "e-1",
+    branches: [
+      { thread: NEW_THREAD, row: 0 },
+      { thread: second, row: 2 },
+    ],
+  })
+  const start = encodeIntent("c", {
+    kind: "branch-out",
+    how: "start",
+    root: TEST_ROOT,
+    task: TEST_TASK,
+    proposal: entryId("e-1"),
+    branches: [{ thread: NEW_THREAD, row: 1, brief: "do it" }],
+  })
+  assert.deepEqual(decodeCommand(start), {
+    kind: "branch-out",
+    how: "start",
+    root: TEST_ROOT,
+    task: TEST_TASK,
+    proposal: "e-1",
+    branches: [{ thread: NEW_THREAD, row: 1, brief: "do it" }],
+  })
+  const rows = (list: unknown[]) => JSON.stringify(list)
+  for (const wire of [
+    { ...open, text: rows([]) },
+    {
+      ...open,
+      text: rows([
+        { thread: second, row: 2 },
+        { thread: NEW_THREAD, row: 0 },
+      ]),
+    },
+    {
+      ...open,
+      text: rows([
+        { thread: NEW_THREAD, row: 0 },
+        { thread: second, row: 0 },
+      ]),
+    },
+    {
+      ...open,
+      text: rows([
+        { thread: NEW_THREAD, row: 0 },
+        { thread: NEW_THREAD, row: 1 },
+      ]),
+    },
+    { ...open, text: rows([{ thread: "t-not-new", row: 0 }]) },
+    { ...open, text: rows([{ thread: NEW_THREAD, row: 0, brief: "x" }]) },
+    { ...start, text: rows([{ thread: NEW_THREAD, row: 0, brief: " " }]) },
+    { ...open, mode: "send" },
+    { ...open, parentId: "" },
+    { ...open, task: "r-x" },
+  ])
+    assert.equal(decodeCommand(wire).kind, "refused")
+})
+
 test("decode: a malformed reorder or queue hold is refused", () => {
   const queued = {
     kind: "queued",

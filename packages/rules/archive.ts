@@ -217,8 +217,10 @@ export function writesIn(
     // A card queued writes in its queue's task, and leaves its own.
     case "queue-card":
       return only(tasksOf.place(intent.move.to), tasksOf.card(intent.move.card))
-    // A thread opened writes in the task its card lands in.
+    // A thread opened writes in the task its card lands in, as a
+    // proposal's branches do.
     case "open-thread":
+    case "branch-out":
       return only(intent.task)
     // A spin-off writes a new task, in no archive, and the card leaves its
     // own for the history its trash place names.

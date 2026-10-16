@@ -154,6 +154,7 @@ const MINTED = {
   noteColumn: NEW_NOTE_COLUMN,
   reference: cardIdOfKind("reference", "01a0ffd2-0000-7000-8000-0000000000e1"),
   text: NEW_TEXT,
+  branches: () => [],
 }
 const plan = (intent: Intent, s: IntentState) => planIntent(intent, s, MINTED)
 /** The trunk's column and the note column, as keys an intent names. */

@@ -186,7 +186,7 @@ function cardColumn(
                 ? {}
                 : heldAt(index, opening.fork, facts.holders)),
               ...(seen?.pending === undefined ? {} : { pending: seen.pending }),
-              ...(seen?.prefill === undefined ? {} : { prefill: seen.prefill }),
+              ...unstartedPrefill(seen, opening),
             },
           },
           folded,
@@ -212,6 +212,21 @@ function cardColumn(
       return c satisfies never
   }
 }
+
+/**
+ * What an unstarted thread's composer starts with: your own prefill on this
+ * device, else a proposal's brief for the one who opened it (`proposalDraft`),
+ * as content, so it is sent as it reads.
+ */
+const unstartedPrefill = (
+  seen: CardView | undefined,
+  opening: ThreadOpening,
+): Pick<UnstartedMode, "prefill"> =>
+  seen?.prefill !== undefined
+    ? { prefill: seen.prefill }
+    : opening.draft !== undefined
+      ? { prefill: { text: opening.draft, blank: false } }
+      : {}
 
 /**
  * `thread`, when the thread it forks from is on no column of this canvas

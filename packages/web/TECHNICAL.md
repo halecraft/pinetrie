@@ -665,6 +665,19 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   what the floor still takes up is a row's detail the reader folds mid-run,
   and columns opened to the left.
 
+## A proposal's card (`proposal-card.tsx`, ADR-0157)
+
+- **`ProposalCard` draws `proposalView`** and nothing else it decides: a
+  button's `press` is null exactly when it is disabled. `MessageList` draws
+  one for each proposal `Column` found on its path (`columnProposals`),
+  after its ask's row, so the list's memo compares them by value
+  (`proposals`), with the card's memory (`proposalMemory`) and the
+  column's read-only words by identity and value.
+- **Its memory outlives an unmount** as a tool row's does
+  (`useRememberedProposal`, after `useRemembered`): each change is written
+  to `App`'s `ScreenMemory<ProposalMemory>` in the same call that sets the
+  state, so a tab shown again draws the edits as they were left.
+
 ## Tools and live work (ADR-0107)
 
 - **A tool call is a row under the agent's message** (`ToolRow` in
@@ -1426,6 +1439,12 @@ board draws it (`boardView`), and an inventory never holds one
   `.match-none` and its header's `.match-count`; the rail's
   `.rail[data-searching]` and each item's `[data-match]`; and
   `.msg[data-landed]` where leaving landed.
+- **A proposal's card** (ADR-0157): `.proposal[data-proposal]` in its
+  column, after its ask's work and outside `.ask-work`; its rows
+  `.proposal-row` (`data-dropped`), each a `.proposal-title` button and
+  `.proposal-line` or, opened, `.proposal-brief`; `.proposal-drop`;
+  `.proposal-start`, `.proposal-open`, `.proposal-send` (disabled while a
+  press would be refused) and `.proposal-state`.
 
 ## Who you are (ADR-0037)
 

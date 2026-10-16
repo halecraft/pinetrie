@@ -1275,3 +1275,130 @@ describe("a card made a thread, and lifted back", () => {
     expect(readRoots(b.session).has(THREAD)).toBe(true)
   })
 })
+
+describe("a press on a proposal", () => {
+  const PROPOSAL = {
+    branches: [
+      { title: "one", brief: "do one" },
+      { title: "two", brief: "do two" },
+    ],
+  }
+  const RESULT = entryId("e-3")
+  const FIRST = threadIdFor("01a0ffd2-0000-7000-8000-0000000000b1")
+  const SECOND = threadIdFor("01a0ffd2-0000-7000-8000-0000000000b2")
+  /** The lane's run, after its chat: a call, its proposal's result, the reply. */
+  const proposed = (b: ReturnType<typeof setUp>["b"]) => {
+    writeEntry(
+      b.root,
+      row(
+        "e-2",
+        "e-1",
+        {
+          role: "assistant",
+          content: [{ type: "toolCall", id: "c1", name: "propose_branches" }],
+        },
+        LANE,
+      ),
+    )
+    writeEntry(
+      b.root,
+      row(
+        "e-3",
+        "e-2",
+        {
+          role: "toolResult",
+          toolCallId: "c1",
+          toolName: "propose_branches",
+          content: [{ type: "text", text: "proposed" }],
+          details: PROPOSAL,
+          isError: false,
+        },
+        LANE,
+      ),
+    )
+    writeEntry(
+      b.root,
+      row(
+        "e-4",
+        "e-3",
+        { role: "assistant", content: [{ type: "text", text: "two" }] },
+        LANE,
+      ),
+    )
+    writeLaneTip(b.root, LANE, entryId("e-4"))
+  }
+  const start = {
+    kind: "branch-out",
+    how: "start",
+    root: TEST_ROOT,
+    task: TEST_TASK,
+    proposal: RESULT,
+    branches: [
+      { thread: FIRST, row: 0, brief: "do one" },
+      { thread: SECOND, row: 1, brief: "do two" },
+    ],
+  } as const
+
+  test("Start opens every branch in one change before any send, sends each in order, then queues one fact", async () => {
+    const { b, raw } = setUp()
+    proposed(b)
+    const seenAtSend: boolean[] = []
+    const sent: string[] = []
+    const facts: unknown[] = []
+    const done = await raw.branchOut(
+      ADA,
+      start,
+      tasksNow(b),
+      async chat => {
+        const cards = readPlaces(b.places)
+        seenAtSend.push(
+          cards.some(c => c.id === FIRST) && cards.some(c => c.id === SECOND),
+        )
+        sent.push(chat.text)
+        return { kind: "started", runId: runId("r") }
+      },
+      async fact => void facts.push(fact),
+    )
+    expect(done.outcome).toEqual({ kind: "moved" })
+    expect(seenAtSend).toEqual([true, true])
+    expect(sent).toEqual(["@agent do one", "@agent do two"])
+    expect(facts).toMatchObject([
+      { kind: "branched", lane: LANE, how: "started", titles: ["one", "two"] },
+    ])
+    expect(readThreads(b.session).get(SECOND)?.origin).toEqual({
+      kind: "fork",
+      at: entryId("e-4"),
+      how: "branch",
+      proposal: { entry: RESULT, row: 1 },
+    })
+  })
+
+  test("a refused send leaves its thread opened, and a second press is refused as spent", async () => {
+    const { b, raw } = setUp()
+    proposed(b)
+    const refuse = async () =>
+      ({ kind: "refused", code: "refused", message: "no" }) as const
+    await raw.branchOut(ADA, start, tasksNow(b), refuse, async () => {})
+    expect(readPlaces(b.places).some(c => c.id === FIRST)).toBe(true)
+    const again = await raw.branchOut(
+      BEA,
+      {
+        ...start,
+        branches: [
+          {
+            thread: threadIdFor("01a0ffd2-0000-7000-8000-0000000000b3"),
+            row: 0,
+            brief: "x",
+          },
+        ],
+      },
+      tasksNow(b),
+      refuse,
+      async () => {},
+    )
+    expect(again.outcome).toMatchObject({
+      kind: "refused",
+      message: "someone has already opened these branches",
+    })
+  })
+})

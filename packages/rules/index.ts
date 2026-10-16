@@ -417,6 +417,12 @@ export {
   planPinnedRead,
 } from "./pinned.ts"
 export {
+  type BranchOutRefusal,
+  type Opening,
+  parseProposal,
+  planBranchOut,
+} from "./proposal.ts"
+export {
   type AcceptanceDestination,
   isNotYetAccepted,
   PROPOSED_CHANGES,

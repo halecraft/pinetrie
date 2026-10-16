@@ -6,6 +6,7 @@
 // under its key, and a message's acts (`MessageAct`) are among them.
 
 import {
+  agentAsk,
   type CardCommand,
   type CardId,
   type CardWidth,
@@ -15,6 +16,7 @@ import {
   type MarkTarget,
   type MoveDirection,
   moveOf,
+  nonEmpty,
   noteOf,
   type Position,
   type ProposedChangesAction,
@@ -31,7 +33,7 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
-import { isQueuedMessage } from "@pinetrie/rules"
+import { isQueuedMessage, yourCard } from "@pinetrie/rules"
 import {
   type ActedAt,
   AT_BOARD,
@@ -99,6 +101,7 @@ import {
 import { otherWidth } from "./list-width.ts"
 import type { MessageAct } from "./message-tools.ts"
 import type { PageName } from "./page.ts"
+import type { ProposalPress } from "./proposal-view.ts"
 import type { CanvasPut, PutTarget } from "./put-target.ts"
 import { type SearchAsk, searchActOn } from "./search.ts"
 import { planSpinOff } from "./spin-off.ts"
@@ -223,6 +226,12 @@ export type ColumnAct =
       readonly at: Position
       readonly command: CardCommand | null
       readonly hold: Extract<QueueHoldChange, "keep" | "hold-if-idle">
+    }
+  /** A press on the card of the agent's proposal at `proposal`. */
+  | {
+      readonly kind: "proposal"
+      readonly proposal: EntryId
+      readonly press: ProposalPress
     }
   /** Act on the lane's proposed changes in your repo; an acceptance names its destination. */
   | {
@@ -671,6 +680,8 @@ function planColumn(
     )
   }
   switch (act.kind) {
+    case "proposal":
+      return planProposal(act.proposal, act.press, state, minted)
     case "openAt":
       return planOpenAt(act.entry, state)
     case "newTab":
@@ -1008,6 +1019,102 @@ function planOpenBranch(
 }
 
 /** What a thread's column starts with, until its first send. */
+/**
+ * A press on a proposal, from the thread that proposed it. Start and Open are
+ * one request, its threads minted here in the rows' order; Open also unfolds
+ * each column for this page, a row edited in the card starting with that
+ * edit. Send sends each opened thread's composer text as its composer would:
+ * your card's, else your prefill, else its row's brief.
+ */
+function planProposal(
+  proposal: EntryId,
+  press: ProposalPress,
+  state: IntentState,
+  minted: Minted,
+): readonly Effect[] {
+  const lane = threadAt(state.index, proposal)
+  const task =
+    lane === null ? undefined : state.tasks.index.taskOfThread.get(lane)
+  const root =
+    lane === null ? undefined : state.tasks.index.rootOfThread.get(lane)
+  if (task === undefined || root === undefined) return []
+  if (press.kind === "send") {
+    const view = state.layout.tasks.get(task)
+    const content = state.index.entries[proposal]?.message?.proposal
+    return press.threads.flatMap(({ thread, row }): readonly Effect[] => {
+      const card = yourCard(
+        state.cards.me,
+        { kind: "thread", thread },
+        state.cards.cards,
+        state.index,
+      )
+      const brief = content?.branches[row]?.brief
+      const text = (
+        card !== undefined
+          ? state.clips.textOf(card.id)
+          : (view?.cards.get(thread)?.prefill?.text ??
+            (brief === undefined ? "" : agentAsk(brief)))
+      ).trim()
+      if (text === "") return []
+      return [
+        {
+          kind: "chat",
+          text,
+          at: { kind: "branch", thread, at: press.fork, task },
+          card: card?.id ?? null,
+        },
+        changeViewOf(state, task, { kind: "sent", card: thread }),
+      ]
+    })
+  }
+  const threads = minted.branches(press.rows.length)
+  const rows = nonEmpty(
+    press.rows.flatMap((r, i) => {
+      const thread = threads[i]
+      return thread === undefined ? [] : [{ ...r, thread }]
+    }),
+  )
+  if (rows === null) return []
+  const base = { kind: "branch-out", root, task, proposal } as const
+  const opened = ({ thread, row }: (typeof rows)[number]) => ({ thread, row })
+  const started = (r: (typeof rows)[number]) => ({
+    ...opened(r),
+    brief: r.brief,
+  })
+  const [head, ...tail] = rows
+  if (press.kind === "start")
+    return [
+      {
+        kind: "request",
+        intent: {
+          ...base,
+          how: "start",
+          branches: [started(head), ...tail.map(started)],
+        },
+      },
+    ]
+  return [
+    { kind: "armFocus", key: { kind: "column", key: head.thread } },
+    {
+      kind: "request",
+      intent: {
+        ...base,
+        how: "open",
+        branches: [opened(head), ...tail.map(opened)],
+      },
+    },
+    ...rows.map(r =>
+      changeViewOf(state, task, {
+        kind: "opened",
+        card: r.thread,
+        ...(r.edited
+          ? { prefill: { text: agentAsk(r.brief), blank: false } }
+          : {}),
+      }),
+    ),
+  ]
+}
+
 type ColumnStarts = Omit<
   Extract<ViewChange, { kind: "opened" }>,
   "kind" | "card"

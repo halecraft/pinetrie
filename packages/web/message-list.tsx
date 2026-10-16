@@ -1,6 +1,7 @@
 // web/message-list — a column's messages, memoised as a whole
 // (`message-list-props.ts`): the part of a column that grows with its thread.
-// Each ask's work is drawn together, folded or open (`AskWork`).
+// Each ask's work is drawn together, folded or open (`AskWork`), and after it
+// each proposal its run made (`ProposalCard`), outside the fold.
 
 import { ancestry, type EntryId } from "@pinetrie/core"
 import {
@@ -25,6 +26,7 @@ import {
   sameMessageListProps,
 } from "./message-list-props.ts"
 import { nameFor } from "./presence.tsx"
+import { ProposalCard } from "./proposal-card.tsx"
 
 function MessageListView(p: MessageListProps) {
   // No dependency list: once per commit of the list itself.
@@ -100,24 +102,37 @@ function MessageListView(p: MessageListProps) {
     row.kind === "message" ? (
       message(row.id)
     ) : (
-      <AskWork
-        density={p.density}
-        folds={p.folds}
+      <Fragment
         key={`ask-${row.ask}-${row.parts[0].kind === "entry" ? row.parts[0].id : row.parts[0].ids[0]}`}
-        message={message}
-        parts={row.parts}
-        view={askView({
-          index,
-          asks,
-          ask: row.ask,
-          runningAsk: p.runningAsk,
-          lastEnded,
-          revisions: p.revisions,
-          digests: p.digests,
-          releasedPath,
-          nameOf,
-        })}
-      />
+      >
+        <AskWork
+          density={p.density}
+          folds={p.folds}
+          message={message}
+          parts={row.parts}
+          view={askView({
+            index,
+            asks,
+            ask: row.ask,
+            runningAsk: p.runningAsk,
+            lastEnded,
+            revisions: p.revisions,
+            digests: p.digests,
+            releasedPath,
+            nameOf,
+          })}
+        />
+        {(p.proposals.get(row.ask) ?? []).map(facts => (
+          <ProposalCard
+            facts={facts}
+            key={facts.proposal}
+            memory={p.proposalMemory}
+            nameOf={p.nameOf}
+            onAct={p.onColumnAct}
+            readOnly={p.readOnly}
+          />
+        ))}
+      </Fragment>
     ),
   ])
 }

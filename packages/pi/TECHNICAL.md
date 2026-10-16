@@ -659,9 +659,9 @@ item 18, and in `lanes.test.ts` against the harness.
     never changes for people's words ("shell" for `bash` is interface's).
     The constants (`BASH_TOOL`, `GREP_TOOL`, `BANNER_TOOL`…) are core's.
   - **The host's tools are active in every lane** (`TOOL_IDS`, core):
-    `ask_about_conflict`, `catch_up` and `split_proposed_changes` (ADR-0080), and
-    `set_banner` (ADR-0143). A call that does not apply answers why: the tool list never
-    names who may call it.
+    `ask_about_conflict`, `catch_up` and `split_proposed_changes` (ADR-0080),
+    `set_banner` (ADR-0143), and `propose_branches` (ADR-0157). A call that
+    does not apply answers why: the tool list never names who may call it.
   - **`ask_about_conflict`** (`conflictTool`, `lanes.ts`; renamed from
     `ask_for_guidance` by ADR-0080) is taken while jj finds a conflict in the
     lane's copy, in any run (`LaneHooks.askedAboutConflict`, async). Taken,
@@ -689,6 +689,13 @@ item 18, and in `lanes.test.ts` against the harness.
   pi's harness reads only the run's `toolExecution`, never a tool's
   `executionMode`, so `catch_up` cannot ask to run alone; the host refuses a
   call with a sibling instead.
+- **`propose_branches`** (`proposeTool`, `thread-tools.ts`, ADR-0157) asks
+  the host nothing: it reads its call with `parseProposal`
+  (`@pinetrie/rules`) and answers with the proposal as its result's
+  `details`, which the page reads (`renderableMessage`'s `proposal`) and a
+  person's press acts on. A call that is no proposal throws its refusal,
+  since pi marks a result failed only when its tool throws, and so leaves
+  no details and no card.
 - **`resolve_conflict`** (`thread-tools.ts`) is in every lane's list, so a
   run's tools never change (S85): `{ path, choose }`, `choose` read by
   `parseResolveChoice` (`ours`, `theirs` or `base`), handed to the host

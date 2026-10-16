@@ -21,6 +21,7 @@ import {
   GREP_TOOL,
   LEAVE_TOOL,
   PROJECT_CONFIG_FILE,
+  PROPOSE_TOOL,
   READ_TOOL,
   RESOLVE_TOOL,
   SAVE_BLOB_TOOL,
@@ -41,6 +42,7 @@ import {
   askTool,
   catchUpTool,
   leaveTool,
+  proposeTool,
   resolveTool,
   splitTool,
 } from "./thread-tools.ts"
@@ -94,6 +96,7 @@ export const TOOLS: Readonly<
     ),
   [SAVE_BLOB_TOOL]: input =>
     saveBlobTool((lane, blob) => input.hooks.readBlob(lane, blob)),
+  [PROPOSE_TOOL]: () => proposeTool(),
 }
 
 type Executes = {

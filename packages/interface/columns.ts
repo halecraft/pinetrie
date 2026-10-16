@@ -38,7 +38,8 @@ export interface Pending {
 
 /**
  * What the shell mints for one intent: a key, the root and the task a new
- * tab opens, the thread a column opens, and a note column made on a canvas.
+ * tab opens, the thread a column opens, the threads a press on a proposal
+ * opens, and a note column made on a canvas.
  */
 export interface Minted {
   readonly key: string
@@ -50,6 +51,8 @@ export interface Minted {
   readonly reference: ReferenceCardId
   /** A text card a paste makes where it lands. */
   readonly text: TextCardId
+  /** `count` new threads, one for each row a press on a proposal opens. */
+  readonly branches: (count: number) => readonly ThreadId[]
 }
 
 export interface Column {
@@ -97,7 +100,9 @@ export interface Column {
  * a new root's first for null, in `root`. `held`: the thread it forks from,
  * when someone else holds it: its entries are left out, the
  * column says who has it, and a send there is refused until it is on a
- * canvas again. `pending` and `prefill` are the opener's own (`CardView`).
+ * canvas again. `pending` and `prefill` are the opener's own: from their
+ * `CardView`, or, for a branch they opened from a proposal, its brief
+ * (`ThreadOpening.draft`).
  */
 export interface UnstartedMode {
   readonly kind: "unstarted"

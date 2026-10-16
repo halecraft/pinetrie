@@ -170,7 +170,7 @@ function is proven by a unit test in a second.
   nothing, that a column you open takes focus (`armFocus`). Ids come from
   the shell as an argument (`Minted`): a key, a new tab's root and task, the
   thread a column opens, a note column's id.
-  `afterRootMove` plans a move on the board's answer, and `nameEffects` the settle's
+  `afterTaskMove` plans a move on the board's answer, and `nameEffects` the settle's
   name step (`reconcileName`).
 - **`perform` carries the effects out** (`perform.ts`), one port call each,
   through `AppPorts`: the reducer's `dispatch`, the session's writes,
@@ -297,10 +297,10 @@ task's threads (`hereRail`). A task's signals are its threads', whatever roots t
   strip counts as the board's own, so what is in it acts alone: ▦ toggles,
   and while the board is open, the search field, its × and "mine" (which
   stand in the state buttons' place then, ADR-0115) keep it open.
-- **Moving a root on the board** is a `moveRoot` effect: the host's
-  `move-root`, and, into the archive, the effects that close it for you
-  (`moved`), which `afterRootMove` runs only once the host answers
-  `moved-root`, as `afterKeep` does for a keep.
+- **Moving a task on the board** is a `moveTask` effect: the host's
+  `move-task`, and, into the archive, the effects that close it for you
+  (`moved`), which `afterTaskMove` runs only once the host answers
+  `moved`, as `afterKeep` does for a keep.
 - **Column keys hold no `:`.** A presence key is
   `${writer}:${seat}:${columnKey}`, and `readReading` takes the writer from
   before the first colon (ADR-0037). A writer holds none (`normalizeEmail`
@@ -595,6 +595,13 @@ density?, details?, mode }`, `mode` `bound` or `unstarted`
   thread's end (`threadAnchor`), or an unstarted thread's fork.
 - **A null anchor** belongs only to an unstarted new root's thread: a new
   tab's, or one ＋ made past a canvas's last column.
+- **A proposal's branch you opened starts with its brief**
+  (ADR-0157): `unstartedThreads` (`@pinetrie/rules`) gives its opening a
+  `draft`, the row's brief asked of the agent, for the one who opened it
+  alone, and `canvasColumns` makes that the column's content prefill
+  where your `CardView` keeps none. It is read from the proposal, never
+  stored, so it is the same on every device of yours, and `startText`
+  takes it as it takes any prefill: your card's text first.
 - **An unstarted thread's column can carry a `Prefill`**, which its
   composer starts with, and a `pending` first message it sends as it opens
   ("branch here" after a conflict), both from your `CardView` (`opened`),
@@ -986,6 +993,35 @@ the columns read one. `segmentPath` (`ask-segments.ts`) decides what a column fo
   `data-first`), `.ask-files`, `.ask-line` (`.running`), `.ask-headline`, `.ask-digest`,
   `.ask-outcome`, `.ask-bar` (`data-ask`, `data-where`), `.left-line`.
   The browser suite reads finished work raw (`readRaw`).
+
+## A proposal's card (`proposal-view.ts`, ADR-0157)
+
+- **`columnProposals` finds what a column draws**: for each node on its
+  path, the tool results under it that hold a proposal, by the prompt of
+  the ask whose run made each, and where each stands (`proposalState`,
+  core). Running is read from the proposing lane, not the column's: a
+  shared stretch is drawn in the leftmost column showing it. `Column`
+  memoises it; `MessageList` draws each proposal after its ask's row, at
+  every density, so no fold hides it.
+- **`proposalView` decides the card**: its rows, Start and Open counting
+  the rows kept, each with the press it makes or null while the host would
+  refuse it (the run still running, the column read only, nothing kept),
+  and, once spent, Send for its presser alone. Words come from
+  `proposalWords`. The reader's edits, drops and opened rows are a
+  `ProposalMemory`, kept by proposal in `App`'s screen memory as a tool
+  row's is: the page's until a press sends them.
+- **A press is a `proposal` column act** (`planProposal`, `intent.ts`).
+  Start and Open are one `branch-out` request, their threads minted in
+  the rows' order (`Minted.branches`). Open also unfolds each column for
+  this page, with an `opened` change carrying a content prefill for a row
+  edited in the card. Send is one `chat` effect per opened thread still
+  unsent, its text as that column's composer would send it (your card's,
+  else your prefill, else its row's brief) and a blank one not at all,
+  then its `sent` view change. Each is an ordinary send: a second send of
+  a thread that has started is refused by the host.
+- **A branch from a proposal's fork row names its item** (`originOf`,
+  `column-view.ts`): the proposing agent's proposal and its row's title,
+  read from the proposal, never stored twice.
 
 ## Search (`search.ts`, `search-view.ts`, ADR-0101)
 

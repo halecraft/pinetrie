@@ -501,6 +501,15 @@ export {
   readSessionFacts,
 } from "./projection.ts"
 export {
+  columnProposals,
+  NO_PROPOSAL_MEMORY,
+  type ProposalButton,
+  type ProposalFacts,
+  type ProposalMemory,
+  type ProposalPress,
+  proposalView,
+} from "./proposal-view.ts"
+export {
   publishToast,
   publishView,
   publishWords,

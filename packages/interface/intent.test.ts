@@ -9,6 +9,7 @@ import {
   entryId,
   INVENTORY_SLOTS,
   indexAsks,
+  indexTree,
   NO_CONTENT,
   rootIdFor,
   type TaskId,
@@ -22,7 +23,7 @@ import {
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
+import { cardIdFor, entriesOf, entry } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import type { ColumnKey } from "./columns.ts"
 import type { CardFacts, Effect, IntentState } from "./effects.ts"
@@ -39,6 +40,7 @@ import {
 } from "./fixtures.ts"
 import {
   afterTaskMove,
+  type ColumnAct,
   type Intent,
   nameEffects,
   planIntent,
@@ -172,7 +174,12 @@ const plan = (intent: Intent, state: IntentState = R1) =>
       "01a0ffd2-0000-7000-8000-0000000000e1",
     ),
     text: NEW_TEXT,
+    branches: count => BRANCHES.slice(0, count),
   })
+/** The threads a press on a proposal mints, in order. */
+const BRANCHES = [1, 2, 3].map(n =>
+  threadIdFor(`01a0ffd2-0000-7000-8000-0000000000c${n}`),
+)
 /** The column keys these tests name: a branch's card's, a card's. */
 const UNSTARTED: ColumnKey = { kind: "card", card: F }
 const CARD_C: ColumnKey = { kind: "card", card: C }
@@ -1175,5 +1182,164 @@ describe("a search over the root you are on", () => {
   test("while not searching, openAt plans exactly as before", () => {
     expect(plan(openAt)).not.toContainEqual(close)
     expect(plan(openAt).some(e => e.kind === "landed")).toBe(false)
+  })
+})
+
+describe("a press on a proposal", () => {
+  // The trunk's run, below 3-b, proposed three branches; it ended at 3-b.
+  const RESULT = entryId("9-res")
+  const PROPOSAL = {
+    branches: [
+      { title: "one", brief: "do one" },
+      { title: "two", brief: "do two" },
+      { title: "three", brief: "do three" },
+    ],
+  } as const
+  const proposed = indexTree(
+    entriesOf([
+      ...Object.values(index.entries),
+      entry(
+        "9-res",
+        "3-b",
+        {
+          role: "toolResult",
+          toolCallId: "c1",
+          content: "ok",
+          proposal: PROPOSAL,
+        },
+        { thread: TRUNK },
+      ),
+    ]),
+  )
+  const R1_TASK = TASK_OF("1-r1")
+  const state = (cards: CardFacts = NO_CARDS, layout = onRoot("1-r1")) => ({
+    ...at(layout, indexAsks(proposed), cards),
+    index: proposed,
+  })
+  const press = (p: Extract<ColumnAct, { kind: "proposal" }>["press"]) =>
+    column({ kind: "proposal", proposal: RESULT, press: p }, CARD_C)
+
+  test("Start is one request, its threads minted in the rows' order, each with its brief as left", () => {
+    const effects = plan(
+      press({
+        kind: "start",
+        rows: [
+          { row: 0, brief: "do one", edited: false },
+          { row: 2, brief: "do three, carefully", edited: true },
+        ],
+      }),
+      state(),
+    )
+    expect(effects).toEqual([
+      {
+        kind: "request",
+        intent: {
+          kind: "branch-out",
+          how: "start",
+          root: TEST_ROOT,
+          task: R1_TASK,
+          proposal: RESULT,
+          branches: [
+            { thread: BRANCHES[0], row: 0, brief: "do one" },
+            { thread: BRANCHES[1], row: 2, brief: "do three, carefully" },
+          ],
+        },
+      },
+    ])
+  })
+
+  test("Open requests the rows, unfolds each column, starts an edited one with its edit, and focuses the first", () => {
+    const effects = plan(
+      press({
+        kind: "open",
+        rows: [
+          { row: 0, brief: "do one", edited: false },
+          { row: 1, brief: "do two now", edited: true },
+        ],
+      }),
+      state(),
+    )
+    expect(effects[0]).toEqual({
+      kind: "armFocus",
+      key: { kind: "column", key: BRANCHES[0] },
+    })
+    expect(effects[1]).toMatchObject({
+      kind: "request",
+      intent: {
+        how: "open",
+        branches: [
+          { thread: BRANCHES[0], row: 0 },
+          { thread: BRANCHES[1], row: 1 },
+        ],
+      },
+    })
+    const opened = effects
+      .slice(2)
+      .map(e =>
+        e.kind === "layout" &&
+        e.action.kind === "view" &&
+        e.action.change.kind === "opened"
+          ? e.action.change
+          : null,
+      )
+    expect(opened).toEqual([
+      { kind: "opened", card: BRANCHES[0] },
+      {
+        kind: "opened",
+        card: BRANCHES[1],
+        prefill: { text: "@agent do two now", blank: false },
+      },
+    ])
+  })
+
+  test("Send sends each unsent thread's composer text: your card's, else its row's brief; a blank one not at all", () => {
+    const [mine, untouched, cleared] = BRANCHES
+    if (mine === undefined || untouched === undefined || cleared === undefined)
+      throw new Error("three threads")
+    const yours = (id: string, thread: typeof mine): TextCard => ({
+      kind: "text",
+      id: cardIdFor(id),
+      owner: ME,
+      placer: ME,
+      place: { kind: "composing", thread },
+      content: { command: null, unsent: null, origin: null },
+    })
+    const texts = new Map([
+      [cardIdFor("c-mine"), "@agent do one my way"],
+      [cardIdFor("c-gone"), "  "],
+    ])
+    const cards = {
+      ...NO_CARDS,
+      cards: [yours("c-mine", mine), yours("c-gone", cleared)],
+    }
+    const effects = plan(
+      press({
+        kind: "send",
+        fork: entryId("3-b"),
+        threads: [
+          { thread: mine, row: 0 },
+          { thread: untouched, row: 1 },
+          { thread: cleared, row: 2 },
+        ],
+      }),
+      {
+        ...state(cards),
+        clips: { ...NO_CLIPS, textOf: id => texts.get(id) ?? "" },
+      },
+    )
+    expect(effects.filter(e => e.kind === "chat")).toEqual([
+      {
+        kind: "chat",
+        text: "@agent do one my way",
+        at: { kind: "branch", thread: mine, at: "3-b", task: R1_TASK },
+        card: cardIdFor("c-mine"),
+      },
+      {
+        kind: "chat",
+        text: "@agent do two",
+        at: { kind: "branch", thread: untouched, at: "3-b", task: R1_TASK },
+        card: null,
+      },
+    ])
   })
 })

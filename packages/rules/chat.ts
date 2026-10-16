@@ -17,6 +17,8 @@ import {
   type PlanMode,
   type PointId,
   type Position,
+  PROPOSE_TOOL,
+  type Proposal,
   planModeOf,
   pointId,
   type Recipients,
@@ -43,6 +45,7 @@ import { decodeFact, factLine } from "./fact.ts"
 import { decodeLand, type LandMessage, landLine } from "./land.ts"
 import { type LinkedQuote, withQuotes } from "./links.ts"
 import { decodePinned } from "./pinned.ts"
+import { decodeProposal } from "./proposal.ts"
 import {
   type AnswerMessage,
   decodeAnswer,
@@ -318,14 +321,16 @@ export const decodeChat = (message: unknown): ChatDetails | undefined =>
 
 /**
  * What a tool result of the host's tools says as a fact, from its
- * `details`, never its text: an `ask_about_conflict` the host took, or the
- * states a `catch_up` merged. Undefined for any other message.
+ * `details`, never its text: an `ask_about_conflict` the host took, the
+ * states a `catch_up` merged, or what `propose_branches` proposed. Undefined
+ * for any other message.
  */
 function toolResultFacts(
   message: unknown,
 ):
   | { readonly asked: true }
   | { readonly merged: readonly PointId[] }
+  | { readonly proposal: Proposal }
   | undefined {
   if (typeof message !== "object" || message === null) return undefined
   const m = message as {
@@ -346,6 +351,10 @@ function toolResultFacts(
     details.merged.every(c => typeof c === "string" && c !== "")
   )
     return { merged: details.merged.map(c => pointId(c as string)) }
+  if (m.toolName === PROPOSE_TOOL) {
+    const proposal = decodeProposal(m.details)
+    return proposal === undefined ? undefined : { proposal }
+  }
   return undefined
 }
 
@@ -358,7 +367,7 @@ function toolResultFacts(
  * a canvas entry role `canvas` with the list it told; an ask relayed from
  * another thread, an answer and what an asked agent heard become roles `relay`,
  * `answer` and `heard` with their details; a host tool's result keeps its role
- * and gains what it says as a fact (`asked`, `merged`); anything else passes
+ * and gains what it says as a fact (`asked`, `merged`, `proposal`); anything else passes
  * through unchanged for `core` to judge.
  */
 export function renderableMessage(message: unknown): AgentMessageLike {

@@ -14,7 +14,7 @@ import {
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { threadContext } from "./thread-context.ts"
-import { parseCatchUpArgs } from "./thread-tools.ts"
+import { parseCatchUpArgs, proposeTool } from "./thread-tools.ts"
 import { assembleTools, TOOLS, toolsChanged } from "./tools.ts"
 
 const unused = async (): Promise<never> => {
@@ -108,6 +108,7 @@ describe("TOOL_IDS", () => {
       "leave",
       "resolve_conflict",
       "save_blob",
+      "propose_branches",
     ])
   })
 })
@@ -121,6 +122,19 @@ describe("toolsChanged", () => {
     expect(toolsChanged(["a", "b"], ["a"])).toBe(true)
     expect(toolsChanged(["a"], ["a", "b"])).toBe(true)
     expect(toolsChanged(["a", "b"], ["a", "c"])).toBe(true)
+  })
+})
+
+describe("propose_branches", () => {
+  test("a proposal's result holds it as details; a blank brief fails, with no details", async () => {
+    const tool = proposeTool()
+    const proposal = { branches: [{ title: "one", brief: "do one" }] }
+    const done = await tool.execute("c1", proposal)
+    expect(done.details).toEqual(proposal)
+    expect(done.content[0]?.text).toContain("Proposed 1 branch: one")
+    await expect(
+      tool.execute("c2", { branches: [{ title: "one", brief: " " }] }),
+    ).rejects.toThrow("branch 1 needs a title and a brief")
   })
 })
 

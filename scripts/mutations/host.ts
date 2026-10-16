@@ -4,6 +4,16 @@ import type { Mutation } from "../mutate.ts"
 const unit = ["pnpm", "exec", "vitest", "run", "apps/pinetrie/host"]
 
 export const mutations: readonly Mutation[] = [
+  // ── a press on a proposal ──
+  {
+    name: "a press leaves no fact",
+    file: "apps/pinetrie/host/commands/cards.ts",
+    from: "      await queueFact(plan.fact)\n",
+    to: "",
+    command: unit,
+    expect:
+      "Start opens every branch in one change before any send, sends each in order, then queues one fact",
+  },
   {
     name: "every start-up phase is said, however quick",
     file: "apps/pinetrie/host/startup-lines.ts",

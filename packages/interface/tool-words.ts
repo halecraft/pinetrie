@@ -13,6 +13,7 @@ import {
   FIND_TOOL,
   GREP_TOOL,
   LEAVE_TOOL,
+  PROPOSE_TOOL,
   READ_TOOL,
   RESOLVE_TOOL,
   SAVE_BLOB_TOOL,
@@ -39,6 +40,7 @@ const TOOL_WORDS: Readonly<Record<ToolId, string>> = {
   [LEAVE_TOOL]: "left",
   [RESOLVE_TOOL]: "resolve",
   [SAVE_BLOB_TOOL]: "save",
+  [PROPOSE_TOOL]: "propose",
 }
 
 /** A tool's word; a tool pine·trie does not register goes by its own name. */

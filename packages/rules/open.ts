@@ -1,10 +1,13 @@
-// open — a thread opened as its column opens: a branch at an entry, a new
-// tab's new root in a new task, or a new root in a task the session holds.
+// open — a thread opened before its first send: as its column opens, a branch
+// at an entry, a new tab's new root in a new task, or a new root in a task the
+// session holds; or one branch of a proposal's press (`planBranchOpen`).
 
 import {
   type CardRecord,
+  type EntryId,
   type Intent,
   type MoveRefusal,
+  type ProposalBranch,
   type RootId,
   type TaskId,
   type ThreadId,
@@ -41,10 +44,10 @@ export type OpenPlan =
 /**
  * A thread opened by `sender`, refused unless its id is new. A branch at
  * an entry of its root's tree, in a task the session holds, its card just
- * after the thread the entry is in; a new tab's, a new root's first thread
- * in a new task, which lands on the board in its state; or a new root's
- * first thread in a task the session holds, its card where a card dropped
- * after `after` would land (`rankOnCanvas`).
+ * after the thread the entry is in (`planBranchOpen`); a new tab's, a new
+ * root's first thread in a new task, which lands on the board in its state;
+ * or a new root's first thread in a task the session holds, its card where a
+ * card dropped after `after` would land (`rankOnCanvas`).
  */
 export function planOpenThread(input: {
   readonly open: Omit<OpenThread, "start">
@@ -60,11 +63,22 @@ export function planOpenThread(input: {
   readonly now: number
 }): OpenPlan {
   const { open, start } = input
-  if (
-    input.threads.has(open.thread) ||
-    input.cards.some(c => c.id === open.thread) ||
-    (start.kind === "branch" && start.index.firstOf.has(open.thread))
-  )
+  if (start.kind === "branch")
+    return planBranchOpen({
+      thread: open.thread,
+      root: open.root,
+      task: open.task,
+      at: start.at,
+      after: null,
+      proposal: null,
+      index: start.index,
+      sender: input.sender,
+      cards: input.cards,
+      threads: input.threads,
+      tasks: input.tasks,
+      now: input.now,
+    })
+  if (isTaken(open.thread, input.cards, input.threads, null))
     return { kind: "refused", why: "taken" }
   const base = {
     thread: open.thread,
@@ -75,18 +89,6 @@ export function planOpenThread(input: {
   }
   const held = input.tasks.has(open.task)
   switch (start.kind) {
-    case "branch": {
-      const parent = threadAt(start.index, start.at)
-      if (parent === null || !held) return { kind: "refused", why: "unknown" }
-      return settled(
-        planThreadOpen({
-          ...base,
-          origin: { kind: "fork", at: start.at, how: "branch" },
-          placement: { kind: "after", task: open.task, parent },
-          opens: null,
-        }),
-      )
-    }
     case "new-task":
       if (input.roots.has(open.root) || held)
         return { kind: "refused", why: "taken" }
@@ -113,6 +115,67 @@ export function planOpenThread(input: {
         }),
       )
   }
+}
+
+/** Whether `thread` names a thread already: a record, a card, or an entry. */
+const isTaken = (
+  thread: ThreadId,
+  cards: readonly CardRecord[],
+  threads: ReadonlyMap<ThreadId, ThreadRecord>,
+  index: TreeIndex | null,
+): boolean =>
+  threads.has(thread) ||
+  cards.some(c => c.id === thread) ||
+  (index?.firstOf.has(thread) ?? false)
+
+/**
+ * A branch at `at` opened by `sender`, refused unless its id is new, `at`
+ * is in its root's tree and the task is the session's. Its card goes just
+ * after `after`'s, or with null after the thread `at` is in; a proposal's
+ * press names the branch before, so its branches keep the proposal's order.
+ * A branch from a proposal records it in its origin.
+ */
+export function planBranchOpen(input: {
+  readonly thread: ThreadId
+  readonly root: RootId
+  readonly task: TaskId
+  readonly at: EntryId
+  readonly after: ThreadId | null
+  readonly proposal: ProposalBranch | null
+  /** The root's tree. */
+  readonly index: TreeIndex
+  readonly sender: WriterId
+  readonly cards: readonly CardRecord[]
+  readonly threads: ReadonlyMap<ThreadId, ThreadRecord>
+  /** Every task the session holds. */
+  readonly tasks: ReadonlySet<TaskId>
+  readonly now: number
+}): OpenPlan {
+  const { thread, at, index } = input
+  if (isTaken(thread, input.cards, input.threads, index))
+    return { kind: "refused", why: "taken" }
+  const parent = threadAt(index, at)
+  if (parent === null || !input.tasks.has(input.task))
+    return { kind: "refused", why: "unknown" }
+  return settled(
+    planThreadOpen({
+      thread,
+      root: input.root,
+      by: input.sender,
+      now: input.now,
+      cards: input.cards,
+      origin:
+        input.proposal === null
+          ? { kind: "fork", at, how: "branch" }
+          : { kind: "fork", at, how: "branch", proposal: input.proposal },
+      placement: {
+        kind: "after",
+        task: input.task,
+        parent: input.after ?? parent,
+      },
+      opens: null,
+    }),
+  )
 }
 
 const settled = (opened: ThreadOpen): OpenPlan =>

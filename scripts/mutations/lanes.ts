@@ -7,6 +7,26 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/lanes"]
 const plan = "packages/lanes/plan.ts"
 
 export const mutations: readonly Mutation[] = [
+  // ── a proposal's branches, in the lanes suite ──
+  {
+    name: "a Start's sends lose their mention of the agent",
+    file: "apps/pinetrie/host/commands/index.ts",
+    from: "          chat => send(writer, newId(), chat),\n          fact => queueFact(deps, fact),\n",
+    to: "          chat => send(writer, newId(), { ...chat, mentions: [] }),\n          fact => queueFact(deps, fact),\n",
+    suite: "lanes",
+    scenario: "proposal",
+    expect:
+      "Start opens each branch right after the proposing thread in the proposal's order, each a lane of its own asked its brief by the presser",
+  },
+  {
+    name: "the dispatcher drops a press's fact",
+    file: "apps/pinetrie/host/commands/index.ts",
+    from: "          fact => queueFact(deps, fact),\n",
+    to: "          async () => {},\n",
+    suite: "lanes",
+    scenario: "proposal",
+    expect: "the press leaves a fact in the proposing thread",
+  },
   {
     name: "a fork restores from its source though the adapter names a snapshot",
     file: plan,

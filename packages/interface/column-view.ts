@@ -548,8 +548,9 @@ const isFirst = (index: TreeIndex, id: EntryId): boolean => {
 
 /**
  * A column's fork row: a copy names its source, wherever it is; a thread
- * whose parent thread is in another task or an inventory names that;
- * else the message it forks from on the path to its left.
+ * whose parent thread is in another task or an inventory names that; a
+ * branch opened from a proposal names its item; else the message it forks
+ * from on the path to its left.
  */
 function originOf(
   f: ColumnFacts,
@@ -560,6 +561,8 @@ function originOf(
   const at = f.view.forkFrom
   const message = at === null ? undefined : f.index.entries[at]?.message
   if (at === null || message === undefined) return { kind: "none" }
+  const item = proposedItem(f)
+  if (item !== null) return { kind: "fork", at, ...item }
   const above = new Set(ancestry(f.index, at).path)
   const worked = stretches.findLast(s => above.has(s.start))
   const speaker =
@@ -573,6 +576,24 @@ function originOf(
     speaker,
     text: firstLine(messageText(message), 48),
   }
+}
+
+/**
+ * A branch opened from a proposal, as its fork row names it: the proposing
+ * agent's proposal, and the title of its row there, read from the proposal
+ * so it is never stored twice. Null for any other thread.
+ */
+function proposedItem(
+  f: ColumnFacts,
+): { readonly speaker: string; readonly text: string } | null {
+  const fork = f.thread === null ? undefined : f.work.forks.get(f.thread)
+  if (fork?.how !== "branch" || fork.proposal === undefined) return null
+  const { entry, row } = fork.proposal
+  const title = f.index.entries[entry]?.message?.proposal?.branches[row]?.title
+  if (title === undefined) return null
+  const lane = threadAt(f.index, entry)
+  const agent = (lane === null ? undefined : f.work.names.get(lane)) ?? "agent"
+  return { speaker: `${agent}'s proposal`, text: title }
 }
 
 /** A copy's source, or a parent thread elsewhere, as its fork row names it; null for neither. */

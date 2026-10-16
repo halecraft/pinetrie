@@ -27,6 +27,9 @@
     the workspace people share in its place.
   - ADR-0126: a fact is a card of its own kind, only ever queued, not a text
     card with no text.
+  - ADR-0157: an agent-callable tool may propose what only a person may do:
+    `propose_branches` writes only its own call, and the threads it proposes
+    start at a person's press.
 
 Also changes `packages/pi/TECHNICAL.md`'s "A running lane is never written": a
 tool's own result carries a merge, and a steer carries a host's fact; see

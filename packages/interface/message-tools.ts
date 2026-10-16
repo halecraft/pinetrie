@@ -6,11 +6,11 @@
 
 import {
   type Address,
+  agentAsk,
   type BlockRef,
   type EntryId,
   parseMentions,
   type TextCardId,
-  THE_AGENT,
   type ThreadId,
   type ThreadLane,
   type TranscriptMessage,
@@ -20,7 +20,7 @@ import type { Prefill } from "./columns.ts"
 import { markdownOf } from "./markdown-of.ts"
 
 /** The mention that asks the agent, as a composer starts with it. */
-const AGENT_PREFIX = `@${THE_AGENT} `
+const AGENT_PREFIX = agentAsk("")
 
 /** `@agent ` as a box starts with it: the one blank prefill, nothing typed. */
 export const AGENT_PREFILL: Prefill = { text: AGENT_PREFIX, blank: true }

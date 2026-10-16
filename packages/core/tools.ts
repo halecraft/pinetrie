@@ -30,6 +30,8 @@ export const ASK_TOOL = "ask"
 export const LEAVE_TOOL = "leave"
 /** Save a file shared in the thread into the agent's lane. */
 export const SAVE_BLOB_TOOL = "save_blob"
+/** Propose new threads branching from this run's end, which a person opens or starts. */
+export const PROPOSE_TOOL = "propose_branches"
 
 /**
  * Every tool pine·trie registers, in the order the model is given them, and
@@ -56,6 +58,7 @@ export const TOOL_IDS = [
   LEAVE_TOOL,
   RESOLVE_TOOL,
   SAVE_BLOB_TOOL,
+  PROPOSE_TOOL,
 ] as const
 
 export type ToolId = (typeof TOOL_IDS)[number]
@@ -104,6 +107,7 @@ const SUBJECTS: Readonly<
   [LEAVE_TOOL]: args => field(args, "thread"),
   [RESOLVE_TOOL]: path,
   [SAVE_BLOB_TOOL]: path,
+  [PROPOSE_TOOL]: undefined,
 }
 
 /**

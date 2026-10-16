@@ -25,6 +25,7 @@ import { whenSettled } from "@kyneta/exchange"
 import { useDocStatus, useSelector } from "@kyneta/react"
 import {
   type ArchivedTask,
+  branchesByProposal,
   type CardId,
   type EntryId,
   isPastAddress,
@@ -80,6 +81,7 @@ import {
   openColumns,
   openProposedByTask,
   ownCards,
+  type ProposalMemory,
   pageTitle,
   parseQuery,
   parseSearch,
@@ -541,8 +543,14 @@ export function App({
   // Each thread opened and not yet started: its column ends at
   // its fork, or a new tab's at its root.
   const unstarted = useMemo(
-    () => unstartedThreads(threads, index, new Set(directory.keys())),
-    [threads, index, directory],
+    () =>
+      unstartedThreads(
+        threads,
+        index,
+        new Set(directory.keys()),
+        session.writer,
+      ),
+    [threads, index, directory, session.writer],
   )
   // Each thread someone else holds: a branch not yet sent from
   // one is drawn without its entries.
@@ -1264,6 +1272,11 @@ export function App({
   const [rows] = useState(() => screenMemory<RowMemory>())
   // Each ask's fold as its reader chose it, kept as rows are.
   const [folds] = useState(() => foldMemory())
+  // What each proposal's card holds before a press, kept as rows are: edits
+  // are the page's until a press sends them.
+  const [proposalMemory] = useState(() => screenMemory<ProposalMemory>())
+  // Each proposal's branches, read from the thread records once for every column.
+  const proposalBranches = useMemo(() => branchesByProposal(threads), [threads])
 
   // After the alignment above: a picked message the alignment left out of
   // view is scrolled to.
@@ -1478,6 +1491,7 @@ export function App({
         noteColumn: newNoteColumnId(),
         reference: newReferenceCardId(),
         text: newCardId(),
+        branches: count => Array.from({ length: count }, () => newThreadId()),
       }),
     ),
   )
@@ -1587,6 +1601,8 @@ export function App({
     inReach,
     archived,
     rows,
+    proposalMemory,
+    proposalBranches,
     seats,
     session,
     traces,

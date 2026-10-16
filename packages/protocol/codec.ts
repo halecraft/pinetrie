@@ -45,7 +45,10 @@ import {
   type MoveDirection,
   type MoveTarget,
   modeOf,
+  type NonEmpty,
+  nonEmpty,
   normalizeName,
+  type OpenedRow,
   type Paste,
   type PlaceKey,
   type PlaceRefusal,
@@ -72,6 +75,7 @@ import {
   refused,
   runId,
   type SentCard,
+  type StartedRow,
   type TaskId,
   type ThreadId,
   type ThreadStart,
@@ -378,6 +382,30 @@ export function decodeCommand(
     if (task === undefined || !isTaskId(task))
       return refused(ERR.UNKNOWN_TARGET, `not a task: ${taskText}`)
     return { kind, thread, root, task, start }
+  }
+  if (kind === "branch-out") {
+    if (at.kind !== "entry")
+      return refused(ERR.UNKNOWN_TARGET, "a press names its proposal's entry")
+    const how = text(wire?.mode)
+    if (how !== "open" && how !== "start")
+      return refused(ERR.UNKNOWN_TARGET, `not a press: ${how}`)
+    const rootText = text(wire?.root)
+    if (!isRootId(rootText))
+      return refused(ERR.UNKNOWN_TARGET, `not a root: ${rootText}`)
+    const taskText = text(wire?.task)
+    if (!isTaskId(taskText))
+      return refused(ERR.UNKNOWN_TARGET, `not a task: ${taskText}`)
+    const rows = pressedRowsFromWire(text(wire?.text), how)
+    if (typeof rows === "string") return refused(ERR.UNKNOWN_TARGET, rows)
+    const base = {
+      kind,
+      root: rootText,
+      task: taskText,
+      proposal: at.id,
+    } as const
+    return rows.how === "open"
+      ? { ...base, how: "open", branches: rows.branches }
+      : { ...base, how: "start", branches: rows.branches }
   }
   if (kind === "copy-thread") {
     const source = text(wire?.lane)
@@ -701,6 +729,50 @@ const pinnedToWire = (pinned: readonly SentCard[]): string =>
   pinned.length === 0
     ? ""
     : JSON.stringify(pinned.map(p => ({ card: p.id, seen: p.seen })))
+
+/**
+ * A press's rows from the wire, a JSON list of `{ thread, row }`, each with a
+ * non-blank `brief` on Start and none on Open; or why not. Rows strictly
+ * increase and threads are new and distinct, so a decoded press keeps its
+ * proposal's order and opens each thread once.
+ */
+function pressedRowsFromWire(
+  s: string,
+  how: "open" | "start",
+):
+  | { readonly how: "open"; readonly branches: NonEmpty<OpenedRow> }
+  | { readonly how: "start"; readonly branches: NonEmpty<StartedRow> }
+  | string {
+  const value = parsed(s)
+  if (!Array.isArray(value)) return "a press names at least one row"
+  // An Open's rows carry no brief: "" until they are told apart below.
+  const read: StartedRow[] = []
+  for (const item of value) {
+    const { thread, row, brief } = (item ?? {}) as Record<string, unknown>
+    const id = parseNewThread(typeof thread === "string" ? thread : "")
+    if (id === undefined) return `not a new thread: ${String(thread)}`
+    if (read.some(o => o.thread === id)) return `a thread twice: ${id}`
+    if (typeof row !== "number" || !Number.isInteger(row) || row < 0)
+      return `not a row: ${String(row)}`
+    const before = read.at(-1)
+    if (before !== undefined && row <= before.row)
+      return "a press's rows go in the proposal's order, each once"
+    if (how === "open" && brief !== undefined) return "an open sends no brief"
+    if (how === "start" && (typeof brief !== "string" || brief.trim() === ""))
+      return "a start sends each row's brief"
+    read.push({
+      thread: id,
+      row,
+      brief: typeof brief === "string" ? brief.trim() : "",
+    })
+  }
+  const rows = nonEmpty(read)
+  if (rows === null) return "a press names at least one row"
+  if (how === "start") return { how, branches: rows }
+  const opened = ({ thread, row }: StartedRow): OpenedRow => ({ thread, row })
+  const [head, ...tail] = rows
+  return { how, branches: [opened(head), ...tail.map(opened)] }
+}
 
 /** The most traces one `traces-seen` names: a column's worth, and more. */
 export const MAX_TRACES_SEEN = 100
@@ -1096,6 +1168,16 @@ export function encodeIntent(id: string, intent: Intent): Command {
         root: intent.root,
         task: intent.task,
         ...threadStartWire(intent.start),
+      })
+    case "branch-out":
+      return command({
+        id,
+        kind: "branch-out",
+        mode: intent.how,
+        root: intent.root,
+        task: intent.task,
+        parentId: intent.proposal,
+        text: JSON.stringify(intent.branches),
       })
     case "copy-thread":
       return command({

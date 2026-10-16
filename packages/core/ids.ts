@@ -411,6 +411,12 @@ export type AgentId = string & { readonly [agentIdBrand]: true }
 /** The host's agent, addressed as `@agent`. */
 export const THE_AGENT = "agent" as AgentId
 
+/**
+ * `text` as a message that asks the agent, whatever else it mentions: a
+ * mention of a person alone would address the message to them instead.
+ */
+export const agentAsk = (text: string): string => `@${THE_AGENT} ${text}`
+
 // --- positions --------------------------------------------------------------
 
 /**

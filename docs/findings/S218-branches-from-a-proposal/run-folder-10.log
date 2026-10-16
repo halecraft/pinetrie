@@ -1,0 +1,55 @@
+
+=== e2e:lanes ===
+
+── branch-probe
+transcript [
+  '01a146d1-7bca-7614-b193-d22bb52ea979 chat: @agent parent',
+  '01a146d1-7db6-7614-b193-d235e9ef2606 assistant: ',
+  '01a146d1-7ddb-7614-b193-d24128f8053a assistant: LIST: one, two, three'
+]
+  PASS  item 1: the run's last entry, found from its tool call's entry · prompt 01a146d1-7bca-7614-b193-d22bb52ea979 last 01a146d1-7ddb-7614-b193-d24128f8053a end 01a146d1-7ddb-7614-b193-d24128f8053a
+  PASS  item 1: the run's last entry is unchanged after the thread moved on · 01a146d1-7ddb-7614-b193-d24128f8053a vs end 01a146d1-7f8b-7614-b193-d254309e5b4f
+outcomes [
+  'started', 'started',
+  'started', 'started',
+  'started', 'started',
+  'started', 'started',
+  'started', 'started'
+] sent order [
+  't-01a146d1-7ffd-7525-af19-4779963f53e9',
+  't-01a146d1-7ffd-750c-bad6-d3887820fb17',
+  't-01a146d1-7ffd-774c-b0ee-6dd1bfa07f0b',
+  't-01a146d1-7ffd-73b1-aa11-69929b014e52',
+  't-01a146d1-7ffd-797b-8546-bb012fb5e427',
+  't-01a146d1-7ffd-75cf-90b2-e93fb71e9a1e',
+  't-01a146d1-7ffd-7e69-8738-ac5b36990e82',
+  't-01a146d1-7ffd-7cba-acc5-fd58d9f38148',
+  't-01a146d1-7ffd-7d30-b513-eedad69d8cd4',
+  't-01a146d1-7ffd-705f-9368-7697deaa7b80'
+]
+  PASS  items 3, 4: every branch sent at once gets its own lane and its run answers · started,started,started,started,started,started,started,started,started,started; lanes 10/10; answered 10/10
+  PASS  item 4: every branch's lane holds the parent's files at the fork · ["from parent\nbase\n","from parent\nbase\n","from parent\nbase\n","from parent\nbase\n","from parent\nbase\n","from parent\nbase\n","from parent\nbase\n","from parent\nbase\n","from parent\nbase\n","from parent\nbase\n"]
+  PASS  item 4: the parent's lane is untouched · a.txt
+parent.txt
+
+canvas [
+  't-01a146d1-7b97-78c3-a152-8173334eab87',
+  't-01a146d1-89ae-7b16-9fab-fc7c9bab84c0',
+  't-01a146d1-89ae-7bd8-89cf-1b8defdaa8fe',
+  't-01a146d1-89ae-7469-a316-0c407cfd9aaf',
+  't-01a146d1-7ffd-705f-9368-7697deaa7b80',
+  't-01a146d1-7ffd-7d30-b513-eedad69d8cd4',
+  't-01a146d1-7ffd-7cba-acc5-fd58d9f38148',
+  't-01a146d1-7ffd-7e69-8738-ac5b36990e82',
+  't-01a146d1-7ffd-75cf-90b2-e93fb71e9a1e',
+  't-01a146d1-7ffd-797b-8546-bb012fb5e427',
+  't-01a146d1-7ffd-73b1-aa11-69929b014e52',
+  't-01a146d1-7ffd-774c-b0ee-6dd1bfa07f0b',
+  't-01a146d1-7ffd-750c-bad6-d3887820fb17',
+  't-01a146d1-7ffd-7525-af19-4779963f53e9'
+] parent at 0 opened at [ 3, 2, 1 ]
+  PASS  item 2: branches opened one after another at one fork land just after the parent · parent 0, opened 3,2,1
+  PASS  item 6: a branch opened and not sent is on the canvas in another person's copy · seen 3/3; by w-uqou9jimi@section-21765.test,w-uqou9jimi@section-21765.test,w-uqou9jimi@section-21765.test
+
+=== e2e:lanes: pass=7 fail=0 skip=0 ===
+exit 0

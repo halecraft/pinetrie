@@ -4,6 +4,7 @@ import {
   type ColumnView,
   foldMemory,
   type LaneJoin,
+  type ProposalMemory,
   type RowMemory,
   screenMemory,
 } from "@pinetrie/interface"
@@ -56,6 +57,10 @@ const shared = {
   openMargin: null,
   marginSlot: null,
   onMargin: () => {},
+  proposals: new Map(),
+  proposalMemory: screenMemory<ProposalMemory>(),
+  readOnly: null,
+  onColumnAct: () => {},
 }
 const props = (over: Partial<MessageListProps> = {}): MessageListProps => ({
   ...shared,

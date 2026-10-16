@@ -6,6 +6,27 @@ const markdown = "packages/web/markdown.ts"
 const tabState = "packages/web/tab-state.ts"
 
 export const mutations: readonly Mutation[] = [
+  // ── a proposal's card, in the browser suite ──
+  {
+    name: "a column draws no proposal",
+    file: "packages/web/column.tsx",
+    from: "                    proposals={proposals}\n",
+    to: "                    proposals={new Map()}\n",
+    suite: "browser",
+    scenario: "tools",
+    expect:
+      "a proposal's card is drawn after its ask's work, and Open unfolds a column for each branch, its composer holding the brief",
+  },
+  {
+    name: "a chat the page plans is never sent",
+    file: "packages/interface/perform.ts",
+    from: '    case "chat":\n      void ports.session.chat(\n',
+    to: '    case "chat":\n      return\n      void ports.session.chat(\n',
+    suite: "browser",
+    scenario: "tools",
+    expect:
+      "Send starts each opened branch from its composer, an edited one with its edit",
+  },
   {
     name: "a fitted image draws its original inline",
     file: "packages/web/markdown.ts",

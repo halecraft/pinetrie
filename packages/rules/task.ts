@@ -1,6 +1,7 @@
 // task — a task's canvas, and a thread's opening.
 
 import {
+  agentAsk,
   type CanvasKey,
   type CanvasTarget,
   type CardId,
@@ -394,6 +395,8 @@ export function planTaskOpening(
 export interface ThreadOpening {
   readonly root: RootId
   readonly fork: EntryId | null
+  /** What its composer starts with for this reader: a proposal's brief (`proposalDraft`). */
+  readonly draft?: string
 }
 
 /**
@@ -407,6 +410,7 @@ export function unstartedThreads(
   threads: ReadonlyMap<ThreadId, ThreadRecord>,
   index: TreeIndex,
   started: ReadonlySet<RootId>,
+  me: WriterId,
 ): ReadonlyMap<ThreadId, ThreadOpening> {
   const out = new Map<ThreadId, ThreadOpening>()
   for (const [thread, r] of threads) {
@@ -414,10 +418,37 @@ export function unstartedThreads(
     const fork = forkEntry(r.origin)
     if (
       fork === null ? !started.has(r.root) : index.entries[fork] !== undefined
-    )
-      out.set(thread, { root: r.root, fork })
+    ) {
+      const draft = proposalDraft({ record: r, index, me })
+      out.set(
+        thread,
+        draft === undefined
+          ? { root: r.root, fork }
+          : { root: r.root, fork, draft },
+      )
+    }
   }
   return out
+}
+
+/**
+ * What an opened branch's composer starts with for `me`: its row's brief,
+ * asked of the agent. Only for the one who opened it, and only before its
+ * first send; never stored, so it reads the same on each of their devices.
+ */
+export function proposalDraft(input: {
+  readonly record: ThreadRecord
+  readonly index: TreeIndex
+  readonly me: WriterId
+}): string | undefined {
+  const { record, index } = input
+  const { origin } = record
+  if (origin.kind !== "fork" || origin.how !== "branch") return undefined
+  if (origin.proposal === undefined || record.by !== input.me) return undefined
+  if (index.firstOf.has(record.thread)) return undefined
+  const proposal = index.entries[origin.proposal.entry]?.message?.proposal
+  const brief = proposal?.branches[origin.proposal.row]?.brief
+  return brief === undefined ? undefined : agentAsk(brief)
 }
 
 /**

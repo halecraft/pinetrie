@@ -1,6 +1,7 @@
 // fact — what the host records in a thread: what a command on its proposed
-// changes did, who stopped a run, a member dismissed or gone, and a budget
-// spent.
+// changes did, who stopped a run, a member dismissed or gone, a budget spent,
+// an ask unanswered or an answer undelivered, a round's line, and a proposal's
+// branches opened.
 
 import type {
   AcceptanceDecision,
@@ -16,6 +17,7 @@ import { Value } from "typebox/value"
 import { CatchUpFromSchema, catchUpName } from "./catch-up-from.ts"
 import {
   EntryIdSchema,
+  List,
   TaskIdSchema,
   ThreadIdSchema,
   WriterIdSchema,
@@ -87,6 +89,14 @@ const QueuedFactSchema = Type.Union([
     member: ThreadIdSchema,
     why: Type.Union([Type.Literal("stopped"), Type.Literal("failed")]),
     by: WriterIdSchema,
+  }),
+  Type.Object({
+    kind: Type.Literal("branched"),
+    lane: ThreadIdSchema,
+    by: WriterIdSchema,
+    proposal: EntryIdSchema,
+    how: Type.Union([Type.Literal("started"), Type.Literal("opened")]),
+    titles: List(Type.String()),
   }),
   Type.Object({
     kind: Type.Literal("budget-spent"),
@@ -166,8 +176,13 @@ export function factLine(fact: QueuedFact): string {
       return fact.why === "stopped"
         ? "■ an asked agent was stopped before it answered"
         : "■ an asked agent's run failed before it answered"
+    case "branched":
+      return `⑂ ${branchesWords(fact.titles.length)} ${fact.how} from the proposal`
   }
 }
+
+const branchesWords = (n: number): string =>
+  n === 1 ? "1 branch" : `${n} branches`
 
 /** A number of tokens as people read it: "200k tokens", "1.5M tokens". */
 export function tokensWords(tokens: number): string {
@@ -204,6 +219,10 @@ export function factContent(fact: QueuedFact, name: string): string {
       return `The agent you asked in another thread did not answer: its run ${fact.why === "stopped" ? "was stopped" : "failed"}.`
     case "budget-spent":
       return `Agents talking from ${name}'s message spent its budget of ${tokensWords(fact.limit)}. Asking another thread's agent is refused until ${name} adds more.`
+    case "branched":
+      return fact.how === "started"
+        ? `${name} started ${branchesWords(fact.titles.length)} from your proposal, each a thread of its own with its own agent: ${fact.titles.join("; ")}.`
+        : `${name} opened ${branchesWords(fact.titles.length)} from your proposal, not yet sent: ${fact.titles.join("; ")}.`
   }
 }
 

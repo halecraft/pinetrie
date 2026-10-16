@@ -18,6 +18,7 @@ import {
   laneOf,
   nearestRevision,
   type Position,
+  type ProposedThread,
   pinnedInView,
   pinnedOf,
   promptOf,
@@ -50,6 +51,7 @@ import {
   type Column as ColumnSpec,
   type ColumnView,
   type ComposerPlacesStore,
+  columnProposals,
   columnView,
   composerPlace,
   crossTaskLinks,
@@ -79,6 +81,7 @@ import {
   noticeWords,
   opens,
   type Pending,
+  type ProposalMemory,
   type ReadOnly,
   type ReserveStep,
   type RowMemory,
@@ -225,6 +228,10 @@ export interface ColumnProps {
   seenEnd: ScreenMemory<SeenEnd>
   /** Each tool row's state, by its call's id, across unmounts. */
   rows: ScreenMemory<RowMemory>
+  /** Each proposal's card, as its reader left it, across unmounts. */
+  proposalMemory: ScreenMemory<ProposalMemory>
+  /** Each proposal's branches, from the thread records (`branchesByProposal`). */
+  proposalBranches: ReadonlyMap<EntryId, readonly ProposedThread[]>
   /** Every ask (`indexAsks`), from the same moment as `index`. */
   asks: AskIndex
   /** What the rail draws apart in this column's root, sorted: no fold hides it. */
@@ -328,6 +335,19 @@ export function Column(p: ColumnProps) {
   const [openMargin, setOpenMargin] = useState<EntryId | null>(null)
   const [selected, setSelected] = useState<EntryId | null>(null)
   const margins = useMemo(() => marginCounts(p.cards), [p.cards])
+  // The proposals this column draws, and where each stands.
+  const proposals = useMemo(
+    () =>
+      columnProposals({
+        nodes: view.nodes.map(n => n.id),
+        index,
+        asks: p.asks,
+        branches: p.proposalBranches,
+        lanes: p.lanes,
+        me: p.session.writer,
+      }),
+    [view.nodes, index, p.asks, p.proposalBranches, p.lanes, p.session.writer],
+  )
   const openComments = useMemo(
     () => (openMargin === null ? [] : marginCards(p.cards, openMargin)),
     [p.cards, openMargin],
@@ -1128,6 +1148,10 @@ export function Column(p: ColumnProps) {
                     marginSlot={marginSlot}
                     onMargin={onMargin}
                     openMargin={openMargin}
+                    proposals={proposals}
+                    proposalMemory={p.proposalMemory}
+                    readOnly={p.readOnly?.label ?? null}
+                    onColumnAct={act}
                     leftBefore={leftLine(
                       index,
                       leftAt,

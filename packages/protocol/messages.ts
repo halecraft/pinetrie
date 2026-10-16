@@ -88,6 +88,10 @@ export const HOST_PRINCIPAL = "pinetrie-host"
  *     `new-task`, a new tab's, a new root and task its tab minted, `state`
  *     as for `spin-off`; `new-root`, a new root its tab minted in a task the
  *     session holds, its card just after `cardId` (`""` for first).
+ *   - `branch-out` presses Start or Open (`mode` `start` or `open`) on the
+ *     agent's proposal at `parentId`, in the root `root`, its branches
+ *     landing in the task `task`: `text` is a JSON list of `{ thread, row }`,
+ *     each with its `brief` on Start, in the proposal's order.
  *   - `copy-thread` copies the thread `lane` at its end `parentId` as its
  *     sender saw it: `moves` is the copy's one move, its new
  *     thread's card from nowhere onto a canvas spot or into the sender's
@@ -128,6 +132,7 @@ export const COMMAND_KINDS = [
   "unqueue-all",
   "spin-off",
   "open-thread",
+  "branch-out",
   "copy-thread",
   "paste",
   "set-command",
@@ -156,14 +161,16 @@ export interface Command {
   readonly parentId: string
   /**
    * `chat`: the root it writes in; for a chat at the root, a new
-   * root's id the sender's tab minted. `""` otherwise.
+   * root's id the sender's tab minted. `branch-out`: the proposal's root.
+   * `""` otherwise.
    */
   readonly root: string
   /**
    * `chat` and `spin-off`: the task a thread it starts goes in, for a new
    * root a new task's id the sender's tab minted; `move-task`,
    * `mark`, `retitle` and `undo-move`: the task it acts on; `card-width`:
-   * the task whose canvas its sender saw the card on. `""` otherwise.
+   * the task whose canvas its sender saw the card on; `branch-out`: the
+   * proposing thread's task. `""` otherwise.
    */
   readonly task: string
   /**
@@ -174,7 +181,8 @@ export interface Command {
   /**
    * `chat`: `reply` or `branch`; `proposed` and `workflow`: the action;
    * `set-command`: the command; `undo-move`: `undo` or `redo`;
-   * `card-width`: `1` or `2`; `ssh-access`: the answer; `""` otherwise.
+   * `card-width`: `1` or `2`; `ssh-access`: the answer; `branch-out`:
+   * `open` or `start`; `""` otherwise.
    */
   readonly mode: string
   /**

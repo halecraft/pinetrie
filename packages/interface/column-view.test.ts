@@ -10,6 +10,7 @@ import {
   type JjProposedChangesRecord,
   type LaneRecord,
   type LaneView,
+  NO_CONTENT,
   type PinnedView,
   type ProjectRecord,
   pointId,
@@ -497,6 +498,76 @@ describe("columnView: the fork row of a thread forked elsewhere", () => {
       o.kind === "source" ? o.words : ""
     expect(words(row("copy"))).toMatch(/^copied from /)
     expect(words(row("branch"))).toMatch(/^from /)
+  })
+})
+
+describe("columnView: the fork row of a branch opened from a proposal", () => {
+  test("names the proposing agent's proposal and its row's title", () => {
+    const index = tree([
+      ...BRANCH,
+      [
+        "pr",
+        "6",
+        {
+          role: "toolResult",
+          toolCallId: "c1",
+          content: "ok",
+          proposal: {
+            branches: [
+              { title: "one", brief: "do one" },
+              { title: "two", brief: "do two" },
+            ],
+          },
+        },
+      ],
+    ])
+    const thread = threadAt(index, entryId("b1"))
+    if (thread === null) throw new Error("no thread")
+    const forks = new Map([
+      [
+        thread,
+        {
+          kind: "fork",
+          at: entryId("4"),
+          how: "branch",
+          proposal: { entry: entryId("pr"), row: 1 },
+        } as const,
+      ],
+    ])
+    const T = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
+    const origin = columnView(
+      facts(1, {
+        index,
+        thread,
+        work: work({ forks }),
+        origins: {
+          task: T,
+          linkOf: t =>
+            threadLink(
+              t,
+              [
+                {
+                  kind: "thread",
+                  id: t,
+                  owner: ADA,
+                  placer: ADA,
+                  place: { kind: "canvas", task: T, order: "a", width: 1 },
+                  content: NO_CONTENT,
+                },
+              ],
+              ADA,
+            ),
+          labelOf: () => "",
+          reader: { me: ADA, nameOf: new Map() },
+        },
+      }),
+    ).origin
+    expect(origin).toEqual({
+      kind: "fork",
+      at: entryId("4"),
+      speaker: "agent's proposal",
+      text: "two",
+    })
   })
 })
 

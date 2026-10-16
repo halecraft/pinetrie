@@ -12,6 +12,7 @@ import type {
   WriterId,
 } from "@pinetrie/core"
 import type {
+  ColumnAct,
   ColumnView,
   CrossTaskLink,
   Density,
@@ -19,6 +20,8 @@ import type {
   LaneJoin,
   LiveWork,
   MessageAct,
+  ProposalFacts,
+  ProposalMemory,
   RowMemory,
   ScreenMemory,
   ThreadLink,
@@ -80,6 +83,14 @@ export interface MessageListProps {
   marginSlot: ReactNode
   /** Open an entry's margin. */
   onMargin: (entry: EntryId) => void
+  /** The proposals on this path, by the prompt of the ask that made each (`columnProposals`). */
+  proposals: ReadonlyMap<EntryId, readonly ProposalFacts[]>
+  /** Each proposal's card, as its reader left it, across unmounts. */
+  proposalMemory: ScreenMemory<ProposalMemory>
+  /** Why nothing may be written in this column; null where you may. */
+  readOnly: string | null
+  /** A column act: a press on a proposal's card. */
+  onColumnAct: (act: ColumnAct) => void
 }
 
 /**
@@ -124,6 +135,10 @@ const MESSAGE_LIST_PROPS = {
   openMargin: "value",
   marginSlot: "identity",
   onMargin: "identity",
+  proposals: "value",
+  proposalMemory: "identity",
+  readOnly: "value",
+  onColumnAct: "identity",
 } as const satisfies { readonly [K in keyof MessageListProps]-?: PropRule }
 
 /** Whether a column's message list would draw the same. */

@@ -1,22 +1,26 @@
 // pi/thread-tools — the tools an agent acts on its own thread with: `catch_up`,
 // which merges its base's or its parent's new work into its copy during the
-// run, `resolve_conflict`, which closes a folder lane's conflicted path, and
-// `split_proposed_changes`, which queues its proposed changes' split; and the
-// tools it talks to other threads' agents with: `ask`, which relays an ask to a
-// member without waiting, and `leave`. The host decides and carries them out
+// run, `resolve_conflict`, which closes a folder lane's conflicted path,
+// `split_proposed_changes`, which queues its proposed changes' split, and
+// `propose_branches`, which proposes threads a person starts; and the tools it
+// talks to other threads' agents with: `ask`, which relays an ask to a member
+// without waiting, and `leave`. The host decides and carries them out
 // (`LaneHooks`); this only reads the call and hands back the host's answer, as
-// the model reads it.
+// the model reads it. `propose_branches` asks the host nothing: its result is
+// the proposal, and a person's press acts on it.
 
 import {
   ASK_TOOL,
   CATCH_UP_TOOL,
   LEAVE_TOOL,
   type PointId,
+  PROPOSE_TOOL,
+  type Proposal,
   RESOLVE_TOOL,
   SPLIT_TOOL,
   type ThreadId,
 } from "@pinetrie/core"
-import type { ToolAnswer } from "@pinetrie/rules"
+import { parseProposal, type ToolAnswer } from "@pinetrie/rules"
 import { Type } from "typebox"
 import { threadOfContext } from "./thread-context.ts"
 
@@ -226,6 +230,45 @@ export function leaveTool(
           ? NO_LANE
           : await leave(lane, params.thread.replace(/^@/, ""))
       return resultOf(answer)
+    },
+  }
+}
+
+/** What the model is told of a proposal it made. */
+const proposedText = (proposal: Proposal): string =>
+  `Proposed ${proposal.branches.length === 1 ? "1 branch" : `${proposal.branches.length} branches`}: ${proposal.branches.map(b => b.title).join("; ")}. A person starts them from the proposal, after this run ends. Finish your reply; nothing runs until then.`
+
+/**
+ * `propose_branches`: its result's `details` are the proposal, which the
+ * page draws as a card and a person's press opens or starts. An invalid call
+ * fails with why, and has no details, so no card is drawn for it.
+ */
+export function proposeTool() {
+  return {
+    name: PROPOSE_TOOL,
+    label: "propose branches",
+    description:
+      "Propose new threads that branch from the end of this run, one per item, each with a short title and a brief the new thread's agent starts from. A person reads the proposal and starts or opens them; nothing starts on its own. Use it when the person asks for work split into threads.",
+    parameters: Type.Object({
+      branches: Type.Array(
+        Type.Object({
+          title: Type.String({ description: "A few words naming the work" }),
+          brief: Type.String({
+            description:
+              "What the new thread's agent is asked to do; it also reads this conversation",
+          }),
+        }),
+        { description: "One per new thread, in the order to show them" },
+      ),
+    }),
+    async execute(_id: string, params: unknown) {
+      const read = parseProposal(params)
+      // pi marks a result failed only when its tool throws.
+      if ("refused" in read) throw new Error(read.refused)
+      return {
+        content: [{ type: "text" as const, text: proposedText(read) }],
+        details: read,
+      }
     },
   }
 }

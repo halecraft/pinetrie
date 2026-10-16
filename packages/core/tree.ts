@@ -21,6 +21,7 @@ import {
   type HeardDetails,
   type PointId,
   type Position,
+  type Proposal,
   type RelayDetails,
   type SendAt,
   type TaskId,
@@ -164,6 +165,8 @@ export interface AgentMessageLike {
   readonly merged?: readonly PointId[]
   /** An `ask_about_conflict` tool result the host took: the agent asked. */
   readonly asked?: true
+  /** A `propose_branches` tool result that held a proposal. */
+  readonly proposal?: Proposal
   /** Role `behind` only: the base's new work the thread was told of. */
   readonly behind?: BehindView
   /**

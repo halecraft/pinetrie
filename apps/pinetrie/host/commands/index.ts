@@ -26,6 +26,7 @@ import {
 } from "@pinetrie/rules"
 import { failed, type HostKeeper } from "../basics.ts"
 import type { ControlSender } from "../control.ts"
+import { queueFact } from "../facts.ts"
 import type { Names } from "../names.ts"
 import type { Places } from "../places.ts"
 import type { Provenance } from "../provenance.ts"
@@ -111,6 +112,7 @@ const COMMAND_PLACE = {
   move: "documents",
   "copy-thread": "documents",
   "open-thread": "documents",
+  "branch-out": "documents",
   paste: "documents",
   "spin-off": "documents",
   reorder: "documents",
@@ -256,6 +258,14 @@ export function createCommands(deps: CommandDeps): Commands {
         return cardCommands.copyThread(writer, intent, tasks)
       case "open-thread":
         return cardCommands.openThread(writer, intent)
+      case "branch-out":
+        return cardCommands.branchOut(
+          writer,
+          intent,
+          tasks,
+          chat => send(writer, newId(), chat),
+          fact => queueFact(deps, fact),
+        )
       case "paste":
         return cardCommands.paste(writer, intent, tasks)
       case "spin-off":

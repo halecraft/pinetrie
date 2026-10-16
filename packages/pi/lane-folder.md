@@ -177,6 +177,11 @@ changes pine·trie can keep this note true. You can skip them.
   <!-- packages/core/tools.ts CATCH_UP_TOOL -->
 - `split_proposed_changes` is refused here: a folder project's proposed
   changes are its files, never a stack of revisions. <!-- packages/rules/agent-commands.ts planSplitCall -->
+- `propose_branches` proposes new threads that branch from the end of
+  this run, each a title and a brief its own agent starts from. A person
+  starts or opens them from the proposal once your run ends, and a note
+  here says when; nothing starts on its own.
+  <!-- packages/rules/proposal.ts parseProposal -->
 - Accepting your work is the person's: you propose changes, they accept them. A note
   in the thread says when they do. <!-- packages/rules/fact.ts factContent -->
 

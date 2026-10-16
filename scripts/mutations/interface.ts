@@ -5,6 +5,60 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/interface"]
 const workspace = ["pnpm", "exec", "vitest", "run", "workspace.test.ts"]
 
 export const mutations: readonly Mutation[] = [
+  // ── a proposal's card ──
+  {
+    name: "a proposal's buttons count dropped rows",
+    file: "packages/interface/proposal-view.ts",
+    from: '  const kept = rows.filter(r => !r.dropped && r.brief.trim() !== "")',
+    to: '  const kept = rows.filter(r => r.brief.trim() !== "")',
+    command: unit,
+    expect:
+      "Start and Open count the rows kept, and press them with their briefs as edited",
+  },
+  {
+    name: "Send is offered to someone who did not open the branches",
+    file: "packages/interface/proposal-view.ts",
+    from: '        state.kind === "spent" && state.by === input.me',
+    to: '        state.kind === "spent"',
+    command: unit,
+    expect:
+      "names your unsent branches once you opened them, and nobody else's",
+  },
+  {
+    name: "a read-only column's proposal can be pressed",
+    file: "packages/interface/proposal-view.ts",
+    from: '    state.kind === "ready" && input.readOnly === null && kept.length > 0',
+    to: '    state.kind === "ready" && kept.length > 0',
+    command: unit,
+    expect:
+      "offers no press while the run runs, or in a column nothing may be written in, saying why",
+  },
+  {
+    name: "Send sends a blank composer",
+    file: "packages/interface/intent.ts",
+    from: '      if (text === "") return []\n',
+    to: "",
+    command: unit,
+    expect:
+      "Send sends each unsent thread's composer text: your card's, else its row's brief; a blank one not at all",
+  },
+  {
+    name: "a proposal's brief wins over your own prefill",
+    file: "packages/interface/canvas-columns.ts",
+    from: "  seen?.prefill !== undefined\n",
+    to: "  opening.draft === undefined && seen?.prefill !== undefined\n",
+    command: unit,
+    expect:
+      "a thread not yet started ends at its fork, and sends as a branch there",
+  },
+  {
+    name: "a proposal's branch's fork row names the message it forks from",
+    file: "packages/interface/column-view.ts",
+    from: "  if (title === undefined) return null\n",
+    to: "  if (title !== null) return null\n",
+    command: unit,
+    expect: "names the proposing agent's proposal and its row's title",
+  },
   {
     name: "workStripWords leaves folder proposed changes' accept untitled",
     file: "packages/interface/column-view.ts",

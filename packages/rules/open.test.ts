@@ -88,6 +88,20 @@ describe("planOpenThread", () => {
     })
   })
 
+  test("a branch a column opens records no proposal", () => {
+    const opened = plan()
+    expect(
+      opened.kind === "open" && opened.records[0]?.kind === "set"
+        ? opened.records[0].value
+        : undefined,
+    ).toMatchObject({ origin: { how: "branch" } })
+    expect(
+      opened.kind === "open" && opened.records[0]?.kind === "set"
+        ? (opened.records[0].value as { origin: object }).origin
+        : {},
+    ).not.toHaveProperty("proposal")
+  })
+
   test("a new tab: a new root's first thread, in a new task whose card ends its state", () => {
     const opened = plan({ root: NEW_ROOT, task: NEW_TASK }, newTab(STATE))
     expect(
@@ -178,7 +192,7 @@ describe("unstartedThreads", () => {
         },
       ],
     ])
-    expect(unstartedThreads(threads, index, new Set([ROOT]))).toEqual(
+    expect(unstartedThreads(threads, index, new Set([ROOT]), ADA)).toEqual(
       new Map([
         [NEW, { root: ROOT, fork: "b" }],
         [threadIdFor("tab"), { root: NEW_ROOT, fork: null }],
@@ -186,7 +200,7 @@ describe("unstartedThreads", () => {
     )
     // Its first entry written, and its root in the directory: started.
     expect(
-      unstartedThreads(threads, index, new Set([ROOT, NEW_ROOT])).has(
+      unstartedThreads(threads, index, new Set([ROOT, NEW_ROOT]), ADA).has(
         threadIdFor("tab"),
       ),
     ).toBe(false)

@@ -11,6 +11,50 @@ const places = "packages/core/places.ts"
 const trailers = "packages/core/trailers.ts"
 
 export const mutations: readonly Mutation[] = [
+  // ── a proposal's branches ──
+  {
+    name: "a proposal waits on any run of its lane",
+    file: "packages/core/proposals.ts",
+    from: "  return input.runningAsk === prompt\n",
+    to: "  return input.runningAsk !== null\n",
+    command: unit,
+    expect: "is running only while its own run is the one running",
+  },
+  {
+    name: "a proposal forks at its run's last message, not its last entry",
+    file: "packages/core/proposals.ts",
+    from: "  const fork = asks.last.get(prompt)",
+    to: "  const fork = asks.work.get(prompt)?.at(-1)",
+    command: unit,
+    expect:
+      "forks at the run's last entry, a tool result a Stop left last included",
+  },
+  {
+    name: "any proposal's branches spend every proposal",
+    file: "packages/core/proposals.ts",
+    from: "  const opened = input.branches.get(proposal)",
+    to: "  const opened = [...input.branches.values()][0]",
+    command: unit,
+    expect: "is not spent by a record naming another proposal",
+  },
+  {
+    name: "a press's rows may go out of order",
+    file: "packages/protocol/codec.ts",
+    from: "    if (before !== undefined && row <= before.row)",
+    to: "    if (false)",
+    command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
+    expect:
+      "decode: a press on a proposal keeps its rows in order, briefs on Start alone",
+  },
+  {
+    name: "an Open may carry briefs",
+    file: "packages/protocol/codec.ts",
+    from: '    if (how === "open" && brief !== undefined) return "an open sends no brief"',
+    to: '    if (false) return "an open sends no brief"',
+    command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
+    expect:
+      "decode: a press on a proposal keeps its rows in order, briefs on Start alone",
+  },
   {
     name: "a name's noun is not checked against the list",
     file: "packages/core/thread-names.ts",

@@ -748,6 +748,22 @@
       .ask-digest p, .ask-digest ul { margin: 0; }
       .ask-digest ul { padding-left: 1rem; }
       .ask-outcome { margin: -.6rem 0 1rem; padding-left: .5rem; font-size: .78rem; color: #e0a080; }
+      /* An agent's proposal of branches, after its ask's work: never folded. */
+      .proposal { margin: -.4rem 0 1rem; padding: .5rem .6rem; border: 1px solid #3a4250;
+        border-radius: 6px; background: #1b1e24; font-size: .82rem; }
+      .proposal-rows { margin: 0 0 .5rem; padding-left: 1.2rem; }
+      .proposal-row { margin: .2rem 0; }
+      .proposal-row[data-dropped] { opacity: .45; text-decoration: line-through; }
+      .proposal-title { padding: 0; background: none; border: 0; color: inherit;
+        font-weight: 600; cursor: pointer; }
+      .proposal-line { margin-left: .4rem; color: #a8b0bc; white-space: pre-wrap; }
+      .proposal-brief { display: block; width: 100%; min-height: 4rem; margin: .2rem 0;
+        font: inherit; }
+      .proposal-drop { margin-left: .3rem; padding: 0 .3rem; }
+      .proposal-actions { display: flex; gap: .4rem; align-items: center; flex-wrap: wrap; }
+      .proposal-start { font-weight: 600; }
+      .proposal-open, .proposal-send { font-size: .78rem; }
+      .proposal-state { color: #a8b0bc; font-size: .78rem; }
       /* Which ask the work at the top answers, while its message is out of
          sight. The slot is sticky and zero-height, as .jump-slot is, so the
          bar takes no room and the content's height is as it was. */

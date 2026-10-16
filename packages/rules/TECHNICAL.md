@@ -911,6 +911,15 @@ width, so a card has one place by construction.
   its column ends: no entry of it in the tree, and either its fork in the
   tree (its root held here), or its root one the directory does not name
   yet (a new tab's, or a new root's in a task already held). The page draws its card's column from it.
+  For a branch opened from a proposal by the reader, it carries the
+  composer's start, `proposalDraft`: the row's brief asked of the agent
+  (core's `agentAsk`), read from the proposal by row, never stored, and
+  gone once the thread starts (ADR-0157).
+- **A branch's opening is one planner** (`planBranchOpen`, `open.ts`): the
+  `taken` and `unknown` checks, then `planThreadOpen` after the thread
+  it names (`after`), or the thread its fork is in. `planOpenThread`'s
+  branch case calls it once; a proposal's press, once per row
+  (`planBranchOut`).
 - **`rootsHeld`**: the roots with a thread at a live place
   (`isLivePlace`: the card, unwrapped from the trash, on the canvas of a
   task outside the archive, or in an inventory): what a starting host
@@ -1960,6 +1969,42 @@ the tip it must match, and the bookmark to leave on it.
   stack message), or one already queued. The tool answers `SPLIT_QUEUED`,
   or the refusal (`splitRefusal`); a refusal of its card's make (`unmade`,
   which none is) is logged and answered `SPLIT_UNMADE`.
+- **A press on a proposal leaves a `branched` fact** in the proposing
+  thread, naming who pressed, Start or Open, and the titles of the rows
+  pressed. It only tells: whether the proposal is spent is read from the
+  thread records ("A proposal's branches", below), since a fact can wait in the
+  queue while a later run runs.
+
+# A proposal's branches (`proposal.ts`, ADR-0157, S218)
+
+An agent's `propose_branches` call proposes threads; a person's press opens
+them, or opens and starts them.
+
+- **One rule reads a proposal** (`parseProposal`): the tool's arguments
+  and the stored result's `details` alike (`decodeProposal` is it, with the
+  refusal read as undefined), so what a call proposed and what a page reads
+  cannot drift. Titles and briefs are trimmed; none may be blank; at least
+  one branch.
+- **Spent is read from the thread records**, never the facts: a branch
+  opened from a proposal names it and its row in its origin
+  (`ThreadFork.proposal`, core), written in the same step as the press,
+  and a sweep keeps a thread's record, so a proposal stays spent even once
+  every branch is closed. `proposalState` (core) reads it from
+  `branchesByProposal`, one pass over the records.
+- **The fork is the proposing run's last entry**, a tool result included
+  when a Stop left one last: a reply after a Stop goes there too, and the
+  message before may hold a call that would then have no result.
+- **`planBranchOut` folds `planBranchOpen` over the rows**, each after the
+  branch before it, the first after the proposing thread: opened one by one
+  after their parent, N branches would land reversed (S218 item 2). Each
+  made card is added to the cards the next row plans against. It refuses a
+  run still running, a spent proposal, a row past the proposal's end, and a
+  task that is not the proposing thread's; the codec has already made the
+  rows strictly increasing and the threads distinct.
+- **Start's message is built here, from the brief** (`agentAsk`, its
+  mentions parsed as `planSpinOff` parses its own), so every Start branch
+  asks the agent whatever its brief mentions. Only Start's plan carries
+  sends (`BranchOutPlan`).
 
 # The resolution's prompt (`land.ts`, ADR-0033)
 

@@ -30,6 +30,7 @@ const ports = () => {
     dispatch: vi.fn(),
     session: {
       request: vi.fn(async (): Promise<Outcome> => answer),
+      chat: vi.fn(async (): Promise<Outcome> => answer),
       proposed: vi.fn(async (): Promise<Outcome> => answer),
       createCard: vi.fn(async () => accepted),
       // Every card's text, as the comment queued below has it.

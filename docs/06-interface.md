@@ -393,8 +393,9 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
 - **A thread's column is one path**, from its root to its thread's end,
   read top to bottom. Its composer sends at its last message.
 - **Opening a branch adds a column after the thread it forks from**, starting
-  after the fork, and yours alone until its first send. Its card then lands
-  on the canvas in that place, for everyone, unfolded for you. An aside of
+  after the fork. Its card is on the canvas in that place from the moment
+  it opens, for everyone, unfolded for you and folded for others (S218);
+  what you type in it is your message, yours alone until you send it. An aside of
   an aside opens a third column.
 - **A column's header says who works in it and where it came from**
   (ADR-0040). Its first row names the agent working there, `✦ amber-fox` in
@@ -940,6 +941,29 @@ The rail is E; the column is T. Seeing both at once is the product.
   conversation's end `→` is hidden, since it would be the same as replying.
 - Every one of these only opens a column. Nothing is written until the first
   send, and closing the column first leaves no trace.
+- **An agent can propose branches** (ADR-0157): its `propose_branches`
+  call is drawn as one card after its ask's work, at every density, never
+  folded. Each row is a title and its brief's first line; a press on a
+  title opens it to read or edit the brief, and × drops it (↺ keeps it
+  again). Edits stay in your page until a press.
+  - **Start N** opens a branch for each row kept, at the end of the run
+    that proposed them, after the proposing thread in the proposal's
+    order, and sends each `@agent <brief>` as your message: their runs
+    start, folded.
+  - **Open N** opens the same branches unsent, unfolded on your page.
+    Each composer starts with `@agent <brief>`, on any of your devices,
+    and is a card of yours only once you type in it. Everyone else sees
+    them folded, with nothing in them.
+  - Both wait, disabled, while the run that proposed them runs ("waiting
+    for the run to end"), and in a column nothing may be written in,
+    saying why. Once either is pressed the proposal is spent, for
+    everyone: the card says "started by Ada" or "opened by Ada · 2
+    unsent", and only Ada sees **Send K**, which sends each of her opened
+    branches still unsent from its composer.
+  - A branch opened from a proposal names its item in its fork row,
+    `↰ amber-fox's proposal: “Fix the sync bug”`, and the press leaves a
+    fact in the proposing thread, "⑂ 3 branches started from the
+    proposal".
 
 ### Messages
 
