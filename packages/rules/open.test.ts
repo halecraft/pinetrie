@@ -12,7 +12,7 @@ import {
 } from "@pinetrie/core"
 import { canvasCard, fromParents, threadOfEntry } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
-import { rootsHeld, unstartedThreads } from "./canvas-index.ts"
+import { unstartedThreads } from "./canvas-index.ts"
 import { threadCardOf } from "./fixtures.ts"
 import { planOpenThread } from "./open.ts"
 import { emptiedCanvases, planCanvasesTrashed } from "./root.ts"
@@ -290,26 +290,4 @@ describe("closing a new canvas before its first send", () => {
         }),
       ).toEqual([])
   })
-})
-
-test("rootsHeld: a root with a thread on an open canvas or in an inventory", () => {
-  const tab = threadCardOf({
-    thread: NEW,
-    canvas: NEW_CANVAS,
-    by: ADA,
-    cards: [],
-  })
-  const threads = new Map([
-    [R, record(R)],
-    [NEW, record(NEW, NEW_ROOT)],
-  ])
-  expect(
-    rootsHeld([onCanvas, tab], threads, new Set(), new Set([ROOT])),
-  ).toEqual(new Set([ROOT]))
-  expect(
-    rootsHeld([onCanvas, tab], threads, new Set(), new Set([ROOT, NEW_ROOT])),
-  ).toEqual(new Set([ROOT, NEW_ROOT]))
-  expect(
-    rootsHeld([onCanvas, tab], threads, new Set([CANVAS]), new Set([ROOT])),
-  ).toEqual(new Set())
 })

@@ -709,15 +709,6 @@ export const mutations: readonly Mutation[] = [
       "never a canvas that holds another card, nor one whose root has started",
   },
   {
-    name: "a starting host loads an unstarted new canvas's root",
-    file: "packages/rules/canvas-index.ts",
-    from: "      root !== undefined &&\n      started.has(root)\n",
-    to: "      root !== undefined\n",
-    command: unit,
-    expect:
-      "rootsHeld: a root with a thread on an open canvas or in an inventory",
-  },
-  {
     name: "a person's history outside any canvas is retired at startup",
     file: "packages/rules/move-history.ts",
     from: '    if (of === undefined || of.scope.kind === "person") return false\n',
@@ -2507,14 +2498,6 @@ export const mutations: readonly Mutation[] = [
     expect: "restore: each lane's ref back at its tip's nearest revision",
   },
   {
-    name: "an archive unloads nothing",
-    file: "packages/rules/archive.ts",
-    from: "        ? input.roots.filter(r => !input.stillHeld.has(r))\n",
-    to: "        ? []\n",
-    command: ["pnpm", "exec", "vitest", "run", "packages/rules"],
-    expect: "archive: its lanes forgotten",
-  },
-  {
     name: "cardEnd resolves a pinned card too",
     file: "packages/rules/card.ts",
     from: '  card.place.kind === "composing" ? placeEnd(card.place, index) : null',
@@ -4083,12 +4066,13 @@ export const mutations: readonly Mutation[] = [
     expect: "in its canvas by the index, and on no canvas",
   },
   {
-    name: "a trashed thread's root is let go",
+    name: "a trashed thread is not live",
     file: "packages/rules/canvas-index.ts",
     from: "  const left = livePlaceOf(place)\n",
     to: "  const left = place\n",
     command: unit,
-    expect: "its root stays held until it is deleted",
+    expect:
+      "lands in a thread on an open canvas, in an inventory, or trashed from either",
   },
   {
     name: "a restore goes back into a trashed column",

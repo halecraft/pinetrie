@@ -43,6 +43,7 @@ import { readLaneTip } from "@pinetrie/schema"
 import type { Basics } from "./basics.ts"
 import { canvasesNow } from "./canvases.ts"
 import type { CardPort } from "./cards.ts"
+import type { RunDocs } from "./runs.ts"
 
 /** What a run on a lane is told of its canvas first, in the order it is written. */
 export type CanvasContext = readonly (CanvasMessage | CanvasPinnedMessage)[]
@@ -65,10 +66,13 @@ export const canvasTitle = (
 }
 
 export function createCanvasContext(deps: {
-  readonly basics: Pick<Basics, "docs" | "places" | "session" | "live" | "now">
+  readonly basics: Pick<Basics, "places" | "session" | "live" | "now">
+  /** A run reads its canvas's context at its start, its root held by its lease. */
+  readonly runs: RunDocs
   readonly cards: Pick<CardPort, "hydrate" | "textNow">
 }) {
-  const { docs, places, session, live, now } = deps.basics
+  const { places, session, live, now } = deps.basics
+  const docs = deps.runs
 
   /**
    * The canvas entry and the canvas's cards entry a run on `lane` starts with,
@@ -79,7 +83,7 @@ export function createCanvasContext(deps: {
     // gather
     const canvases = canvasesNow({ places, session })
     const canvas = canvases.canvasOfThread.get(lane)
-    const doc = docs.docOfLane(lane)
+    const doc = docs.docOf(lane)
     const tip = doc === null ? null : readLaneTip(doc, lane)
     if (canvas === undefined || doc === null || tip === null) return []
     const cards = readPlaces(places)

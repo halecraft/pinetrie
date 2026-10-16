@@ -24,14 +24,22 @@ import {
   PARTICIPANT,
   setRecord,
 } from "@pinetrie/rules"
-import { failed, type HostKeeper } from "../basics.ts"
+import {
+  type Basics,
+  failed,
+  type HostKeeper,
+  inStep,
+  type StepBasics,
+} from "../basics.ts"
 import { canvasesNow } from "../canvases.ts"
 import type { ControlSender } from "../control.ts"
 import { queueFact } from "../facts.ts"
 import type { Names } from "../names.ts"
 import type { Places } from "../places.ts"
 import type { Provenance } from "../provenance.ts"
-import type { Records } from "../records.ts"
+import type { Records, StepRecords } from "../records.ts"
+import type { StepDocs } from "../roots.ts"
+import type { RunDocs } from "../runs.ts"
 import type { Titles } from "../titles.ts"
 import { type BoardDeps, handleCanvasMove, handleWorkflow } from "./board.ts"
 import {
@@ -50,18 +58,16 @@ import {
   handleStop,
   type LaneDeps,
 } from "./lane.ts"
-import { handleMark, type MarkDeps } from "./mark.ts"
+import { handleMark } from "./mark.ts"
 import { handlePicture, type PictureDeps } from "./picture.ts"
 import { type SendDeps, sendMessage, spendsCard } from "./send.ts"
 
 export interface CommandDeps {
-  readonly basics: SendDeps["basics"]
+  readonly basics: Basics
   readonly agent: SendDeps["agent"] & LaneDeps["agent"]
   readonly scribe: SendDeps["scribe"]
-  readonly records: BoardDeps["records"] &
-    MarkDeps["records"] &
-    LaneDeps["records"] &
-    Pick<Records, "writeValues">
+  /** The session's records; a step's commands write through its documents. */
+  readonly records: Pick<Records, "writeValues">
   readonly piSetup: SendDeps["piSetup"]
   readonly work: SendDeps["work"] & BoardDeps["work"] & LaneDeps["work"]
   readonly blobs: SendDeps["blobs"] & PictureDeps["blobs"]
@@ -76,7 +82,9 @@ export interface CommandDeps {
   readonly names: Pick<Names, "reserve" | "ensure">
   readonly titles: SendDeps["titles"] & Pick<Titles, "asked">
   readonly drain: CardCommandDeps["drain"]
-  readonly histories: CardCommandDeps["histories"]
+  readonly histories: CardCommandDeps["histories"] & BoardDeps["histories"]
+  /** A running lane's root, held by its run. */
+  readonly runs: RunDocs
   /** The writer of the places. */
   readonly placesWriter: Places
   readonly provenance: CardCommandDeps["provenance"] &
@@ -150,24 +158,39 @@ export interface Commands {
    * through the gate, then `sendMessage`, as a `chat` command goes.
    */
   sendPoppedQueuedCard(
+    roots: StepDocs,
     writer: WriterId,
     sendId: string,
     outgoing: Send,
   ): Promise<Outcome>
 }
 
+/**
+ * The commands' dependencies inside one step of the documents' keeper: its
+ * documents, and the records it writes through them.
+ */
+type StepDeps = Omit<CommandDeps, "basics" | "records"> & {
+  readonly basics: StepBasics
+  readonly records: Pick<StepRecords, "writeValues">
+}
+
 export function createCommands(deps: CommandDeps): Commands {
-  const { records } = deps
   const { newId } = deps.basics
-  const cardCommands = createCardCommands({
+  /** `deps` inside the step whose documents are `roots`. */
+  const stepDeps = (roots: StepDocs): StepDeps => ({
     ...deps,
-    ensureNames: () => deps.names.ensure(),
+    basics: inStep(deps.basics, roots),
+    records: roots.records,
   })
+  /** The card commands of the step whose documents `step` holds. */
+  const cardsOf = (step: StepDeps) =>
+    createCardCommands({ ...step, ensureNames: () => deps.names.ensure() })
   // A change that takes a thread into an inventory stops its run, as the
-  // taker's own stop, whatever wrote it.
-  deps.provenance.onTaken(async (threads, by) => {
+  // taker's own stop, whatever wrote it, in the step that made the change.
+  deps.provenance.onTaken(async (threads, by, roots) => {
     for (const lane of threads)
-      if (readRunning(deps.basics.live, lane)) await handleStop(deps, lane, by)
+      if (readRunning(deps.basics.live, lane))
+        await handleStop(stepDeps(roots), lane, by)
   })
 
   async function handle(
@@ -204,35 +227,70 @@ export function createCommands(deps: CommandDeps): Commands {
     if (intent.kind === "refused") return settled(intent)
     switch (placeOfCommand(intent)) {
       case "documents":
-        return deps.keeper.run(() => clearAndCarry(writer, intent, id))
+        return deps.keeper.run(roots =>
+          clearAndCarry(stepDeps(roots), writer, intent, id),
+        )
       case "repo":
       case "board":
-        // The gate opens no root for these kinds (`runsIn` names no entry),
-        // so it needs no keeper.
-        return clearAndCarry(writer, intent, id)
+        return clearElsewhere(writer, intent)
     }
   }
 
-  /** Clear one decoded command through the gate, and carry it out. */
+  /** Clear one decoded command through the gate in its step, and carry it out. */
   async function clearAndCarry(
+    step: StepDeps,
     writer: WriterId,
     intent: Intent,
     id: string,
   ): Promise<Settled> {
     // gather: the canvas index once, for the gate and every card command
-    const canvases = canvasesNow(deps.basics)
-    const gate = await clear(deps, intent, canvases)
+    const canvases = canvasesNow(step.basics)
+    const gate = await clear(step, step.basics.roots, intent, canvases)
     if (gate.kind !== "cleared") return settled(gate)
-    return carry(writer, gate.command, id, canvases)
+    return carry(step, writer, gate.command, id, canvases)
   }
 
-  /** Carry out one command the gate cleared. */
+  /**
+   * Clear and carry out a command that runs outside a step: an action on
+   * your repo goes to its owner, and a board move makes its own steps. The
+   * gate opens no root for these kinds (`runsIn` names no entry), so it
+   * needs no step.
+   */
+  async function clearElsewhere(
+    writer: WriterId,
+    intent: Intent,
+  ): Promise<Settled> {
+    const gate = await clear(deps, null, intent, canvasesNow(deps.basics))
+    if (gate.kind !== "cleared") return settled(gate)
+    const command = gate.command
+    switch (command.kind) {
+      case "move-canvas":
+        return handleCanvasMove(
+          { ...deps, moves: roots => cardsOf(stepDeps(roots)) },
+          writer,
+          command,
+        )
+      case "proposed":
+        return settled(await actOnProposedChanges(deps, command, writer))
+      case "setup":
+      case "publish":
+        return settled(await actOnAccepted(deps, command.kind))
+      default:
+        throw new Error(`${command.kind} is carried out in a step`)
+    }
+  }
+
+  /** Carry out one command the gate cleared, in the step `step` holds. */
   async function carry(
+    step: StepDeps,
     writer: WriterId,
     intent: Cleared<Intent>,
     id: string,
     canvases: CanvasIndex,
   ): Promise<Settled> {
+    const deps = step
+    const cardCommands = cardsOf(step)
+    const { records } = step
     switch (intent.kind) {
       case "send": {
         // The command's id is the send's id: its column finds its message by it.
@@ -263,7 +321,7 @@ export function createCommands(deps: CommandDeps): Commands {
           writer,
           intent,
           canvases,
-          outgoing => send(writer, newId(), outgoing),
+          outgoing => send(step, writer, newId(), outgoing),
           fact => queueFact(deps, fact),
         )
       case "paste":
@@ -272,7 +330,7 @@ export function createCommands(deps: CommandDeps): Commands {
         return cardCommands.spinOff(
           writer,
           intent,
-          outgoing => send(writer, newId(), outgoing),
+          outgoing => send(step, writer, newId(), outgoing),
           canvases,
         )
       case "queue-card":
@@ -317,23 +375,19 @@ export function createCommands(deps: CommandDeps): Commands {
         return settled(await handleCarryOn(deps, intent.lane, writer))
       case "ssh-access":
         return settled(await handleSshAccess(deps, writer, intent))
-      case "move-canvas":
-        return handleCanvasMove(
-          { ...deps, moves: cardCommands },
-          writer,
-          intent,
-        )
       case "workflow":
         return settled(await handleWorkflow(deps, intent))
       case "mark":
         return settled(await handleMark(deps, writer, intent))
       case "retitle":
-        return settled(await deps.titles.asked(intent.canvas, writer))
+        return settled(
+          await deps.titles.asked(step.basics.roots, intent.canvas, writer),
+        )
+      case "move-canvas":
       case "proposed":
-        return settled(await actOnProposedChanges(deps, intent, writer))
       case "setup":
       case "publish":
-        return settled(await actOnAccepted(deps, intent.kind))
+        throw new Error(`${intent.kind} is carried out outside a step`)
       case "reserve":
         return settled(
           (await deps.names.reserve(intent.lane)) === "held"
@@ -347,17 +401,27 @@ export function createCommands(deps: CommandDeps): Commands {
     }
   }
 
-  /** A send made for `writer`, cleared through the gate, then sent. */
+  /** A send made for `writer`, cleared through the gate, then sent, in `step`. */
   async function send(
+    step: StepDeps,
     writer: WriterId,
     sendId: string,
     outgoing: Send,
   ): Promise<Outcome> {
-    const gate = await clear(deps, outgoing, canvasesNow(deps.basics))
+    const gate = await clear(
+      step,
+      step.basics.roots,
+      outgoing,
+      canvasesNow(step.basics),
+    )
     return gate.kind === "cleared"
-      ? sendMessage(deps, writer, sendId, gate.command)
+      ? sendMessage(step, writer, sendId, gate.command)
       : gate
   }
 
-  return { handle, sendPoppedQueuedCard: send }
+  return {
+    handle,
+    sendPoppedQueuedCard: (roots, writer, sendId, chat) =>
+      send(stepDeps(roots), writer, sendId, chat),
+  }
 }

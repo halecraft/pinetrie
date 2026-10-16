@@ -18,7 +18,6 @@ import {
   indexCanvases,
   isOnCanvas,
   planThreadOpen,
-  rootsHeld,
   type ThreadPlacement,
 } from "./canvas-index.ts"
 import { orderKey } from "./order.ts"
@@ -234,15 +233,5 @@ describe("a trashed card is in the canvas its left place is in", () => {
     expect(canvasOfPlace(canvases, pinned)).toBe(K)
     const trashed = cards.find(c => c.id === B)
     expect(trashed && canvasOfPlace(canvases, trashed.place)).toBe(K)
-  })
-
-  test("its root stays held until it is deleted", () => {
-    const started = new Set([ROOT])
-    const alone = cards.filter(c => c.id === B)
-    expect(rootsHeld(alone, threads, new Set(), started)).toEqual(
-      new Set([ROOT]),
-    )
-    expect(rootsHeld([], threads, new Set(), started)).toEqual(new Set())
-    expect(rootsHeld(alone, threads, new Set([K]), started)).toEqual(new Set())
   })
 })

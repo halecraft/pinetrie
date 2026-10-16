@@ -98,7 +98,7 @@ export function canvasRole(w: Workflow, state: WorkflowStateId): CanvasRole {
 export const planWorkflowSeed = (
   workflow: Workflow | null,
   newId: () => string,
-): readonly ValueWrite[] =>
+): readonly ValueWrite<"session">[] =>
   workflow === null ? [setRecord(WORKFLOW, defaultWorkflow(newId))] : []
 
 /** Every state, open then the archive: the board's columns. */

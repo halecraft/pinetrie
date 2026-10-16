@@ -28,6 +28,7 @@ import {
   planStream,
   settleRun,
 } from "@pinetrie/rules"
+import type { RootDocHandle } from "@pinetrie/schema"
 import {
   applyLiveOps,
   type LiveDocHandle,
@@ -39,6 +40,7 @@ import {
 import type { BaseNews } from "./base-news.ts"
 import { type Basics, failed } from "./basics.ts"
 import type { CanvasContext } from "./canvas.ts"
+import type { Lease, StepDocs } from "./roots.ts"
 import type { LaneWork } from "./work/index.ts"
 
 export type RunStart =
@@ -68,14 +70,42 @@ export type ReadPinned = (
 /** What a run on `lane` is told of its canvas first (`canvas.ts`). */
 export type ReadCanvasContext = (lane: ThreadId) => Promise<CanvasContext>
 
+/**
+ * A running lane's root, through the lease its run holds from its start
+ * until its end's last step has run. What reads a run's root (its stream, its
+ * pinned cards, its canvas's context, its budget, its pending verdict) reads it
+ * here; null is "no run". The leases say what must stay in memory: which
+ * lanes run is `pinetrie:live`'s.
+ */
+export interface RunDocs {
+  docOf(lane: ThreadId): RootDocHandle | null
+}
+
+/** The runs' leases, by lane: `hold` as a run starts, `drop` as it ends. */
+export function createRunDocs(): RunDocs & {
+  hold(lane: ThreadId, lease: Lease): void
+  drop(lane: ThreadId, lease: Lease): void
+} {
+  const held = new Map<ThreadId, Lease>()
+  return {
+    docOf: lane => held.get(lane)?.doc ?? null,
+    hold: (lane, lease) => void held.set(lane, lease),
+    drop(lane, lease) {
+      if (held.get(lane) === lease) held.delete(lane)
+    },
+  }
+}
+
 export interface Runs {
   /**
    * Start one turn on a thread's lane, streaming into the document. A
    * prompt's run reads its pinned cards first, which may wait for their text.
    * Only a lane proven runnable (`LaneWork.runnable`) starts one, so none
-   * starts on a lane of another kind, whatever path asks.
+   * starts on a lane of another kind, whatever path asks. Only a step starts
+   * one: the run leases its lane's root from `roots`, and lets it go once its
+   * end has run.
    */
-  start(lane: RunnableLane, start: RunStart): RunId
+  start(roots: StepDocs, lane: RunnableLane, start: RunStart): RunId
   /**
    * Stop a chat's run that has not reached pi yet: it is waiting for its
    * pinned cards' text, where pi's `abort` reaches nothing. Its message is
@@ -116,16 +146,15 @@ export function planRunEnd(role: string | undefined): readonly RunEndStep[] {
 
 /**
  * The agent's `onStream`: gather the lane's streams from `pinetrie:live` and
- * its tip from its root's document, plan, execute. A lane runs only in a
- * root the host holds. The documents record what each
+ * its tip from its run's root, plan, execute. The documents record what each
  * lane is running and streaming; a second copy here would be two sources of
  * truth.
  */
 export const streamInto =
-  (basics: Pick<Basics, "docs" | "live" | "newId">) =>
+  (basics: Pick<Basics, "live" | "newId">, runs: RunDocs) =>
   (event: StreamEvent): void => {
-    const { docs, live, newId } = basics
-    const doc = docs.docOfLane(event.lane)
+    const { live, newId } = basics
+    const doc = runs.docOf(event.lane)
     applyLiveOps(
       live,
       planStream({
@@ -152,6 +181,7 @@ export const endRun = (live: LiveDocHandle, lane: ThreadId, run: RunId): void =>
 
 export function createRuns(deps: {
   readonly basics: Basics
+  readonly runDocs: ReturnType<typeof createRunDocs>
   readonly agent: Pick<Agent, "lane">
   readonly work: Pick<LaneWork, "beforeRun" | "runEnded" | "splitEnded">
   readonly readPinned: ReadPinned
@@ -162,7 +192,8 @@ export function createRuns(deps: {
   readonly pending: (lane: ThreadId, prompt: EntryId) => Promise<void>
 }): Runs {
   const { basics, agent, work, readPinned, readCanvasContext, baseNews } = deps
-  const { docs, live, log } = basics
+  const { live, log, docs } = basics
+  const { runDocs } = deps
   let ended: (lane: ThreadId, prompt: EntryId | null) => void = () => {}
   /**
    * A chat's run between its start and pi's, by lane. Only a chat's: a land
@@ -176,7 +207,7 @@ export function createRuns(deps: {
    * is logged; `endRun` and every step after it always run.
    */
   async function end(lane: ThreadId, id: RunId): Promise<void> {
-    const doc = docs.docOfLane(lane)
+    const doc = runDocs.docOf(lane)
     const prompt = doc === null ? null : readLatestPrompt(doc, lane)
     const steps = planRunEnd(prompt?.role)
     const cut = steps.indexOf("endRun")
@@ -208,7 +239,11 @@ export function createRuns(deps: {
   }
 
   return {
-    start(lane, start) {
+    start(roots, lane, start) {
+      const root = docs.rootOfLane(lane)
+      if (root === null) throw new Error(`${lane} has no root to run in`)
+      const lease = roots.lease(root)
+      runDocs.hold(lane, lease)
       const id = runId(basics.newId())
       applyLiveOps(live, [{ kind: "begin", lane, run: id }])
       const handle = agent.lane(lane)
@@ -220,6 +255,10 @@ export function createRuns(deps: {
       const stop = new AbortController()
       if (personMessage !== null) waiting.set(lane, stop)
       void (async () => {
+        // The step that starts a run has loaded its lane's root, so the
+        // lease holds it hydrated: nothing waits before the pinned cards'
+        // read, which a stop may cancel at once.
+        await using _held = lease
         try {
           work.beforeRun(lane)
           if (start.kind === "resume") {
@@ -274,6 +313,7 @@ export function createRuns(deps: {
           failed(basics, "run")(error)
         } finally {
           await end(lane, id)
+          runDocs.drop(lane, lease)
         }
       })()
       return id
@@ -302,11 +342,12 @@ export function startRun(
     readonly work: Pick<LaneWork, "runnable">
     readonly start: Runs["start"]
   },
+  roots: StepDocs,
   lane: ThreadId,
   start: RunStart,
 ): { readonly kind: "started"; readonly runId: RunId } | Refusal {
   const runnable = deps.work.runnable(lane)
   return typeof runnable === "object"
     ? foreignRefusal(runnable)
-    : { kind: "started", runId: deps.start(runnable, start) }
+    : { kind: "started", runId: deps.start(roots, runnable, start) }
 }

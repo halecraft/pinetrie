@@ -5,7 +5,6 @@ import {
   type ValueWrite,
   writerId,
 } from "@pinetrie/core"
-import { createKeeper } from "@pinetrie/keeper"
 import { readCardHistories, readPlaces, readRecords } from "@pinetrie/reads"
 import {
   BUDGET,
@@ -22,6 +21,7 @@ import {
   basics,
   placesFor,
   putCanvas,
+  stepKeeper,
 } from "./fakes.ts"
 import { createLater } from "./later.ts"
 
@@ -102,13 +102,14 @@ function overBudget() {
     newBudget({ message: budget, thread: here, by: ada, limit: 10 }),
   ])
   const drained: string[] = []
-  const keeper = createKeeper()
+  const keeper = stepKeeper(b)
   const records = {
     writeValues: async (w: readonly ValueWrite[]) => applyWrites(b, w),
   }
   const { placesWriter } = placesFor(b)
   const budgets = createBudgets({
     basics: b,
+    runs: { docOf: () => b.root },
     keeper,
     records,
     placesWriter,
@@ -116,7 +117,6 @@ function overBudget() {
     later: createLater({
       basics: b,
       keeper,
-      records,
       placesWriter,
       drain: lane => void drained.push(lane),
     }),

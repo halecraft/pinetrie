@@ -98,7 +98,6 @@ The records it reads, and the decisions that made them:
 | reader | record | decision |
 |---|---|---|
 | `readRoots`, `readRootRecord` | `pinetrie.root` | ADR-0063; each thread's writers on its path, ADR-0077 |
-| `readStartedRoots` | `pinetrie.root`'s keys, decoded or not | the roots the directory names, a record in an older shape among them (S199) |
 | `readThreads` | `pinetrie.thread` | ADR-0117 |
 | `readNames` | `pinetrie.name` | ADR-0039 |
 | `readMarks` | `pinetrie.mark` | ADR-0045, ADR-0116 |

@@ -40,8 +40,8 @@ export type LateScope =
 /**
  * Why a write the host decided before a gap may not land now, or null when
  * it may. A thread takes it when its card is at a live place
- * (`isLivePlace`), the rule its root is held by, so a write let through
- * finds its root loaded; otherwise its `threadReach` says why. That is not
+ * (`isLivePlace`), and its late step then loads its root; otherwise its
+ * `threadReach` says why. That is not
  * `threadReach`'s own answer: it calls a thread trashed in an archived canvas
  * `trashed`, and one trashed from an inventory `gone`. A thread not opened
  * yet (named for a column before its first message) is in no canvas and has

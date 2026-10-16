@@ -50,7 +50,10 @@ type MarkPlan =
   /** The title is already stored, or there is none to clear: nothing is written. */
   | { readonly kind: "unchanged" }
   /** The title's record written, or deleted to clear it. */
-  | { readonly kind: "writes"; readonly writes: readonly ValueWrite[] }
+  | {
+      readonly kind: "writes"
+      readonly writes: readonly ValueWrite<"session">[]
+    }
 
 /**
  * Decide a mark: set a canvas's or a note column's

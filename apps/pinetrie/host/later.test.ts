@@ -6,7 +6,6 @@ import {
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
-import { createKeeper } from "@pinetrie/keeper"
 import { readPlaces } from "@pinetrie/reads"
 import {
   MARK,
@@ -20,10 +19,14 @@ import {
   applyWrites,
   basics,
   CANVAS_ID,
+  hostRoots,
   placeCanvas,
   placesFor,
   putCanvas,
   putValue,
+  ROOT_ID,
+  stepKeeper,
+  writeDirectory,
 } from "./fakes.ts"
 import { createLater } from "./later.ts"
 
@@ -48,18 +51,19 @@ function setUp() {
   placeCanvas(b, CANVAS_ID, DOING, ADA)
   placeCanvas(b, SHUT, DONE, ADA)
   putValue(b, setRecord(PARTICIPANT, { writer: ADA, name: "Ada" }))
-  const keeper = createKeeper()
   const written: unknown[] = []
-  const drained: string[] = []
-  const later = createLater({
-    basics: b,
-    keeper,
+  const keeper = stepKeeper(b, {
     records: {
       writeValues: async writes => {
         written.push(...writes)
         applyWrites(b, writes)
       },
     },
+  })
+  const drained: string[] = []
+  const later = createLater({
+    basics: b,
+    keeper,
     placesWriter: placesFor(b).placesWriter,
     drain: lane => drained.push(lane),
   })
@@ -169,4 +173,23 @@ describe("a late write of the host's", () => {
     })
     expect([failures.length, held.size]).toEqual([1, 0])
   })
+})
+
+test("a late step into a thread loads its root before its plan, so pi may write there", async () => {
+  const b = basics()
+  putCanvas(b, HERE)
+  writeDirectory(b)
+  const { keeper, roots } = hostRoots({ session: b.session })
+  const later = createLater({
+    basics: b,
+    keeper,
+    placesWriter: placesFor(b).placesWriter,
+    drain: () => {},
+  })
+  let handed = false
+  await later.step({ kind: "thread", thread: HERE }, "a test", async () => {
+    handed = (await roots.pi.root(ROOT_ID).catch(() => null)) !== null
+    return null
+  })
+  expect(handed).toBe(true)
 })

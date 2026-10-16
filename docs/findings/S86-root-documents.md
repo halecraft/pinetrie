@@ -1,7 +1,7 @@
 # S86 — what Kyneta does with many root documents
 
 - **Status:** Answered
-- **Led to:** ADR-0063
+- **Led to:** ADR-0063, ADR-0162
 
 Measured in a lane (Linux, Node 24) for `PLAN-2026-10-03-root-documents`,
 before ADR-0063. Kyneta read at `kyneta/workspace/pineta`. The setup: a host

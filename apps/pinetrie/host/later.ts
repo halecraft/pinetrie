@@ -3,13 +3,17 @@
 // is planned when its step runs, behind the archive's gate for late writes
 // (`lateAway`), and its writes are values this module carries out, so a module
 // whose work is late needs no write port of its own.
+//
+// A late step reads only through its own step's documents: a thread scope's
+// root is loaded once the gate lets it through, before the plan reads it, so
+// a plan never meets a root the host let go during the gap.
 
 import type { Away, QueuedFact, ThreadId, ValueWrite } from "@pinetrie/core"
-import type { Keeper } from "@pinetrie/keeper"
 import {
   readArchived,
   readParticipantNames,
   readPlaces,
+  readRoots,
   readThreadName,
   readThreads,
 } from "@pinetrie/reads"
@@ -19,10 +23,10 @@ import {
   type LateScope,
   lateAway,
 } from "@pinetrie/rules"
-import type { Basics } from "./basics.ts"
+import type { Basics, HostKeeper } from "./basics.ts"
 import { queueFact } from "./facts.ts"
 import type { Places } from "./places.ts"
-import type { Records } from "./records.ts"
+import type { StepDocs } from "./roots.ts"
 
 /**
  * What a late step writes, once its gate has let it through: records, facts
@@ -35,22 +39,23 @@ import type { Records } from "./records.ts"
 export interface LateWrite {
   readonly records?: readonly ValueWrite[]
   readonly facts?: readonly QueuedFact[]
-  readonly after?: () => Promise<void>
+  /** Run in the late step, with its documents. */
+  readonly after?: (roots: StepDocs) => Promise<void>
 }
 
 export interface Later {
   /**
    * Queue one step on the keeper, at once: a caller that orders its step
    * before another's by queueing first (an answer before the run's end's
-   * drain) keeps that order. In the step: the gate, then `plan`, which reads
-   * the documents as they are now (`docs.view`, or `threadsNow`, which opens
-   * only a live thread's root; never a handle read before the gap) and
+   * drain) keeps that order. In the step: the gate, then the thread scope's
+   * root loaded, then `plan`, which reads the documents as they are now
+   * through the step's `roots` (never a handle read before the gap) and
    * returns what to write, or null.
    */
   step(
     scope: LateScope,
     what: string,
-    plan: () => LateWrite | null | Promise<LateWrite | null>,
+    plan: (roots: StepDocs) => LateWrite | null | Promise<LateWrite | null>,
   ): Promise<void>
   /**
    * A model request outside the keeper, tracked so `quiet` waits for it, then
@@ -61,7 +66,10 @@ export interface Later {
     readonly scope: LateScope
     readonly what: string
     readonly request: () => Promise<R | null>
-    readonly plan: (answer: R) => LateWrite | null | Promise<LateWrite | null>
+    readonly plan: (
+      answer: R,
+      roots: StepDocs,
+    ) => LateWrite | null | Promise<LateWrite | null>
     readonly failed: (error: unknown) => void
     readonly held?: { readonly set: Set<K>; readonly key: K }
   }): Promise<void>
@@ -80,8 +88,7 @@ export const lateAwayNow = (
 
 export function createLater(deps: {
   readonly basics: Pick<Basics, "session" | "places" | "log" | "newId">
-  readonly keeper: Pick<Keeper, "run" | "track">
-  readonly records: Pick<Records, "writeValues">
+  readonly keeper: Pick<HostKeeper, "run" | "track">
   readonly placesWriter: Places
   /** Ask for a lane's drain: a fact queued on an idle lane is appended so. */
   readonly drain: (lane: ThreadId) => void
@@ -103,9 +110,9 @@ export function createLater(deps: {
     return `[host] ${where}${what} not written: ${why}`
   }
 
-  async function execute(write: LateWrite): Promise<void> {
+  async function execute(write: LateWrite, roots: StepDocs): Promise<void> {
     if (write.records !== undefined && write.records.length > 0)
-      await deps.records.writeValues(write.records)
+      await roots.records.writeValues(write.records)
     for (const fact of write.facts ?? []) {
       const refused = refusal(
         { kind: "thread", thread: fact.lane },
@@ -114,18 +121,25 @@ export function createLater(deps: {
       if (refused === null) await queueFact(deps, fact)
       else log(refused)
     }
-    await write.after?.()
+    await write.after?.(roots)
   }
 
   const step: Later["step"] = (scope, what, plan) =>
-    keeper.run(async () => {
+    keeper.run(async roots => {
       const refused = refusal(scope, what)
       if (refused !== null) {
         log(refused)
         return
       }
-      const write = await plan()
-      if (write !== null) await execute(write)
+      if (scope.kind === "thread") {
+        const root = readThreads(session).get(scope.thread)?.root
+        // Only a started root: one not yet named in the directory has
+        // nothing to read.
+        if (root !== undefined && readRoots(session).has(root))
+          await roots.root(root)
+      }
+      const write = await plan(roots)
+      if (write !== null) await execute(write, roots)
     })
 
   return {
@@ -138,7 +152,9 @@ export function createLater(deps: {
           try {
             const answer = await input.request()
             if (answer !== null)
-              await step(input.scope, input.what, () => input.plan(answer))
+              await step(input.scope, input.what, roots =>
+                input.plan(answer, roots),
+              )
           } catch (error) {
             input.failed(error)
           } finally {

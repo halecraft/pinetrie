@@ -95,7 +95,10 @@ it.
 ## The roots held (`root-docs.ts`, `root-hold.ts`, ADR-0063)
 
 - **`SessionClient.holdRoots` opens what is new and `destroy`s what is
-  not**, which leaves the host's copy (S86). Which roots the page asks for
+  not**, which leaves the host's copy (S86). It destroys a root before it
+  stops wanting it: Kyneta tells the host a tab left a document only while
+  `canShare` allows it, and the host keeps a root loaded while a tab holds
+  it (ADR-0162, S216). Which roots the page asks for
   is the interface's (`planHeldRoots`, `@pinetrie/interface`). A root this client
   starts is held from its first send until the page asks for it, and after
   that only while the page does. `planHold` (pure) decides what opens and

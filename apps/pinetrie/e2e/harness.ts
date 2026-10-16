@@ -511,16 +511,32 @@ type SuiteHostOptions = Omit<StartHostOptions, "project" | "binding"> & {
  * gives its own) and binding, so no suite reads the person's config or
  * credentials.
  */
-export const startSuiteHost = (
+export const startSuiteHost = async (
   options: SuiteHostOptions,
 ): Promise<RunningHost> =>
-  startHost({
-    places: suitePlaces(),
-    ssh: suiteSshPlaces(),
-    binding: suiteBinding(),
-    env: {},
-    ...options,
+  readEveryRoot(
+    await startHost({
+      places: suitePlaces(),
+      ssh: suiteSshPlaces(),
+      binding: suiteBinding(),
+      env: {},
+      ...options,
+    }),
+  )
+
+/**
+ * `host`, once every root its directory names has been loaded in a step, so
+ * the suites' synchronous reads (`held`, `rootsRead`) find a root this host
+ * has not needed yet: a restarted host loads only an interrupted run's.
+ * The upkeep lets them go again, as it would any root.
+ */
+export async function readEveryRoot(host: RunningHost): Promise<RunningHost> {
+  await host.steps.run(async step => {
+    for (const root of [...readRoots(host.session).keys()].sort())
+      await step.root(root)
   })
+  return host
+}
 
 /** Start a host, give it to `body`, and shut it down however `body` ends. */
 export async function withHost<T>(
@@ -545,18 +561,19 @@ export interface Held {
   readonly roots: readonly RootDocHandle[]
 }
 
-/** The host's held roots, or a client's, with its session and what streams. */
+/**
+ * A client's held roots, or every root the host has loaded in its life, as
+ * it last held each (`rootsRead`): a quiet host holds none, and a root let
+ * go reads what it held. With the session and what streams.
+ */
 export function held(
   x:
-    | Pick<RunningHost, "session" | "live" | "docs">
+    | Pick<RunningHost, "session" | "live" | "rootsRead">
     | Pick<SessionClient, "session" | "live" | "roots">,
 ): Held {
   const roots =
-    "docs" in x
-      ? x.docs.loaded().flatMap(root => {
-          const view = x.docs.view(root)
-          return view === null ? [] : [view.doc]
-        })
+    "rootsRead" in x
+      ? [...x.rootsRead().values()]
       : [...x.roots.current().values()]
   return { session: x.session, live: x.live, roots }
 }
@@ -738,15 +755,15 @@ export const entryMessageIn = (
  * there is no entry (a lane with no tip yet).
  */
 export function rootHolding(
-  host: Pick<RunningHost, "docs">,
+  host: Pick<RunningHost, "rootsRead">,
   entry: EntryId | null,
 ): RootId {
   const root =
     entry === null
       ? undefined
-      : host.docs
-          .loaded()
-          .find(r => host.docs.view(r)?.doc.entries.get(entry) !== undefined)
+      : [...host.rootsRead()].find(
+          ([, doc]) => doc.entries.get(entry) !== undefined,
+        )?.[0]
   if (root === undefined)
     throw new Error(`no root the host holds has the entry ${entry}`)
   return root

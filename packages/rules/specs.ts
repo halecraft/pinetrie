@@ -123,7 +123,7 @@ export const planKindSweep = (
     readonly bases: ReadonlyMap<ThreadId, BaseRecord>
   },
   kind: ProjectKind,
-): ValueWrite[] => [
+): ValueWrite<"session">[] => [
   ...[...records.proposedByLane.values()]
     .filter(r => r.kind !== kind)
     .map(r => deleteRecord(PROPOSED_CHANGES, r.lane)),

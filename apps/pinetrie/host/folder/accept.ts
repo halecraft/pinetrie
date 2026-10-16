@@ -139,7 +139,7 @@ export function createFolderAccept(deps: {
   readonly states: () => readonly StateRecord[]
   readonly proposed: (lane: ThreadId) => FolderProposedChangesRecord | undefined
   readonly journals: () => readonly AcceptJournal[]
-  readonly write: (writes: readonly ValueWrite[]) => Promise<void>
+  readonly write: (writes: readonly ValueWrite<"session">[]) => Promise<void>
   readonly newId: () => string
   readonly now: () => number
   /** Accepted work moved: its record, then whoever listens. */

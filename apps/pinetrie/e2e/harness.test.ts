@@ -17,12 +17,13 @@ const lateClient = (after: number) => {
 /** A host holding `entries` in each root. */
 const hostWith = (held: Readonly<Record<string, readonly string[]>>) =>
   ({
-    docs: {
-      loaded: () => Object.keys(held),
-      view: (root: string) => ({
-        doc: { entries: new Map((held[root] ?? []).map(e => [e, {}])) },
-      }),
-    },
+    rootsRead: () =>
+      new Map(
+        Object.entries(held).map(([root, entries]) => [
+          root,
+          { entries: new Map(entries.map(e => [e, {}])) },
+        ]),
+      ),
   }) as unknown as Parameters<typeof rootHolding>[0]
 
 describe("waitForRootHolding", () => {

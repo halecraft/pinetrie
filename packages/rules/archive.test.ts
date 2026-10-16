@@ -78,18 +78,15 @@ const plan = (
     own: [],
     revisions: new Map(),
     trees: [],
-    roots: [TEST_ROOT, OTHER_ROOT],
-    stillHeld: new Set([OTHER_ROOT]),
     verdicts: new Map(),
     ...over,
   })
 
 describe("planArchive", () => {
-  test("archiving tears down and lets go of the roots nothing else holds a thread of", () => {
+  test("archiving tears down", () => {
     expect(plan()).toEqual({
       kind: "cross",
       teardown: { forget: [], refs: [], snapshots: [] },
-      unload: [TEST_ROOT],
       verdicts: [],
     })
   })
@@ -138,7 +135,7 @@ describe("planArchive", () => {
     )
     expect(
       plan({ crossing: "restore", lanes: [lane("mine", { running: true })] }),
-    ).toMatchObject({ kind: "cross", unload: [] })
+    ).toMatchObject({ kind: "cross" })
   })
   describe("what follows the record, off the documents' keeper", () => {
     const [A, B] = [threadIdFor("la"), threadIdFor("lb")]
@@ -181,7 +178,6 @@ describe("planArchive", () => {
           ],
           snapshots: ["s-a1"],
         },
-        unload: [TEST_ROOT],
       })
     })
     test("archive keeps the snapshot nearest each thread's end, a copy's files", () => {
@@ -208,7 +204,6 @@ describe("planArchive", () => {
           refs: [{ lane: A, point: "c0000000-0000-7000-8000-00000000000a" }],
           snapshots: [],
         },
-        unload: [],
       })
     })
   })

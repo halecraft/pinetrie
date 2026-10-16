@@ -41,6 +41,7 @@ import type { Budgets } from "./budgets.ts"
 import { canvasesNow } from "./canvases.ts"
 import { queueFact as queueFactIn } from "./facts.ts"
 import type { Places } from "./places.ts"
+import type { StepDocs } from "./roots.ts"
 import type { Runs } from "./runs.ts"
 import { threadsNow } from "./threads-now.ts"
 import type { LaneWork } from "./work/index.ts"
@@ -73,15 +74,21 @@ export interface Relays {
   leave(lane: ThreadId, thread: string): Promise<ToolAnswer>
   /** A person's chat, sent with `sendId` in `thread`, asked or invited members. */
   relayMessage(thread: ThreadId, sendId: string): Promise<void>
-  /** An ask card popped on `lane`: relay it now. */
-  relayCard(lane: ThreadId, relay: RelayDetails): Promise<"ran" | "next">
+  /** An ask card popped on `lane`, in the drain's step: relay it now. */
+  relayCard(
+    roots: StepDocs,
+    lane: ThreadId,
+    relay: RelayDetails,
+  ): Promise<"ran" | "next">
   /**
-   * Relay into `to`, from `from`, inside a keeper step: refused for a thread
+   * Relay into `to`, from `from`, inside the keeper step whose documents are
+   * `roots`: refused for a thread
    * out of reach before either root is opened, else run there or queued as
    * an ask card. `end` is where the asking thread's path ends, when not at
    * its end now.
    */
   deliver(
+    roots: StepDocs,
     from: ThreadId,
     to: ThreadId,
     relay: Omit<RelayDetails, "from" | "fromName">,
@@ -98,7 +105,7 @@ export type Delivered =
 export function createRelays(deps: {
   readonly basics: Pick<
     Basics,
-    "docs" | "session" | "places" | "live" | "now" | "newId" | "log"
+    "session" | "places" | "live" | "now" | "newId" | "log"
   >
   readonly keeper: Pick<HostKeeper, "run" | "track">
   readonly start: Runs["start"]
@@ -132,6 +139,7 @@ export function createRelays(deps: {
    * a keeper step.
    */
   async function deliverRelay(
+    roots: StepDocs,
     fromThread: ThreadId,
     to: ThreadId,
     relay: Omit<RelayDetails, "from" | "fromName">,
@@ -140,7 +148,7 @@ export function createRelays(deps: {
     const reaches = bothReaches(fromThread, to)
     const away = unreachableRefusal(reaches)
     if (away !== null) return { kind: "refused", why: away }
-    const now = await threads.thread(fromThread)
+    const now = await threads.thread(roots, fromThread)
     if (now === null)
       return {
         kind: "refused",
@@ -150,7 +158,7 @@ export function createRelays(deps: {
     // Proven once: the plan refuses a lane of another kind, and a run
     // starts only with the proof.
     const runnable = deps.runnable(to)
-    const target = await threads.thread(to)
+    const target = await threads.thread(roots, to)
     const planned = planRelay({
       ...reaches,
       from: from.thread,
@@ -188,7 +196,7 @@ export function createRelays(deps: {
           why: { kind: "foreign", name: nameOf(to), lane: runnable },
         }
       const now = basics.now()
-      deps.start(runnable, {
+      deps.start(roots, runnable, {
         kind: "prompt",
         message: encodeRelayMessage(planned.relay, now),
         pinnedSeen: [],
@@ -236,8 +244,8 @@ export function createRelays(deps: {
     to: string,
     text: string,
   ): Promise<ToolAnswer> {
-    return deps.keeper.run(async () => {
-      const from = await threads.thread(lane)
+    return deps.keeper.run(async roots => {
+      const from = await threads.thread(roots, lane)
       const target = findAgent(to)
       const budget = budgets.runBudget(lane)
       if (from === null || budget === null)
@@ -248,7 +256,7 @@ export function createRelays(deps: {
       const by = budget.by
       if (by === null) return said("This call reached no thread.", true)
       await budgets.ensure(budget.key, lane, by)
-      const delivered = await deliverRelay(lane, target.thread, {
+      const delivered = await deliverRelay(roots, lane, target.thread, {
         source: from.end ?? budget.key,
         asker: { kind: "agent", thread: lane },
         askerName: nameOf(lane),
@@ -274,7 +282,7 @@ export function createRelays(deps: {
   }
 
   async function leave(lane: ThreadId, name: string): Promise<ToolAnswer> {
-    return deps.keeper.run(async () => {
+    return deps.keeper.run(async roots => {
       const left = findAgent(name)
       const by = budgets.runBudget(lane)?.by ?? null
       if (left === null || by === null)
@@ -282,7 +290,7 @@ export function createRelays(deps: {
       // A thread out of reach is told nothing, and its root is not opened.
       const away = unreachableRefusal(bothReaches(lane, left.thread))
       if (away !== null) return said(refusal(away), true)
-      const there = await threads.thread(left.thread)
+      const there = await threads.thread(roots, left.thread)
       if (there === null) return said(refusal({ kind: "unknown", name }), true)
       if (!threadMembers(there.index, there.end).includes(lane))
         return said(`You are not a member of ${left.name}.`, true)
@@ -297,8 +305,8 @@ export function createRelays(deps: {
   }
 
   async function relayMessage(thread: ThreadId, sendId: string): Promise<void> {
-    await deps.keeper.run(async () => {
-      const from = await threads.thread(thread)
+    await deps.keeper.run(async roots => {
+      const from = await threads.thread(roots, thread)
       if (from === null) return
       const source = from.index.bySend.get(sendId)
       const personMessage =
@@ -317,6 +325,7 @@ export function createRelays(deps: {
       // What came after the chat is not heard with it: its path ends there.
       for (const to of asks) {
         const delivered = await deliverRelay(
+          roots,
           thread,
           to,
           {
@@ -338,10 +347,11 @@ export function createRelays(deps: {
   }
 
   async function relayCard(
+    roots: StepDocs,
     lane: ThreadId,
     relay: RelayDetails,
   ): Promise<"ran" | "next"> {
-    const delivered = await deliverRelay(relay.from, lane, relay)
+    const delivered = await deliverRelay(roots, relay.from, lane, relay)
     if (delivered.kind === "refused")
       basics.log(
         `[host] an ask for ${nameOf(lane)} was dropped: ${refusal(delivered.why)}`,

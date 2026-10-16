@@ -395,7 +395,7 @@ export const mutations: readonly Mutation[] = [
     to: "",
     command: unit,
     expect:
-      "a moved card's watched thread end leaves no trace; one in a root not loaded does",
+      "a moved card's watched thread end leaves no trace; one in a canvas no one reads does",
   },
   {
     name: "a split card is sent as a message",
@@ -498,13 +498,13 @@ export const mutations: readonly Mutation[] = [
       "a root's record follows its document: a new entry refreshes it, once per burst",
   },
   {
-    name: "a compaction runs as a command, before the refreshes waiting",
-    file: "apps/pinetrie/host/settle.ts",
-    from: '    return keeper.later("compact", async () => {',
-    to: "    return keeper.run(async () => {",
+    name: "the upkeep runs as a command, before the refreshes waiting",
+    file: "apps/pinetrie/host/roots.ts",
+    from: '): Promise<void> => keeper.later("upkeep", body)',
+    to: "): Promise<void> => (keeper as unknown as HostKeeper).run(body)",
     command: unit,
     expect:
-      "a compaction queued while refreshes and drains wait runs after all of them",
+      "an upkeep queued while refreshes and drains wait runs after all of them",
   },
   {
     name: "a root is not refreshed as it is watched",
@@ -513,16 +513,16 @@ export const mutations: readonly Mutation[] = [
     to: "  }\n",
     command: unit,
     expect:
-      "the roots held when the directory starts are refreshed, and an unchanged record is not written again",
+      "a root loaded when the directory starts is refreshed, and an unchanged record is not written again",
   },
   {
     name: "a late listener misses the roots already held",
-    file: "apps/pinetrie/host/docs.ts",
-    from: "      for (const [root, doc] of held) listener(root, doc)\n",
-    to: "",
+    file: "apps/pinetrie/host/roots.ts",
+    from: "        if (entry.heard) listener(root, entry.doc)\n",
+    to: "        if (entry.heard && false) listener(root, entry.doc)\n",
     command: unit,
     expect:
-      "onOpened hears every root already held, then each root as it is opened, once",
+      "onOpened hears every root loaded, then each root as it loads, once a load",
   },
   {
     name: "a root's refreshes are not merged",
@@ -531,7 +531,7 @@ export const mutations: readonly Mutation[] = [
     to: "    keeper.run(() =>",
     command: unit,
     expect:
-      "five changes to one root before its refresh starts read and write it once",
+      "five changes to one root before its refresh starts read it once and write it once",
   },
   {
     name: "a root's record is rewritten unchanged",
@@ -551,12 +551,12 @@ export const mutations: readonly Mutation[] = [
       "a thread at the root under a root id in use is refused, and nothing is written",
   },
   {
-    name: "a root held is not loaded at startup",
+    name: "a starting host opens no interrupted run's root",
     file: "apps/pinetrie/host/docs.ts",
-    from: "  [...held].sort()",
-    to: "  [...held].filter(() => false).sort()",
+    from: "  [...new Set(running.flatMap(lane => rootOfLane(lane) ?? []))].sort()",
+    to: "  [...new Set(running.flatMap(() => []))].sort()",
     command: unit,
-    expect: "planLoads: every root something still holds a thread of",
+    expect: "planLoads: the roots of the lanes a crash interrupted a run in",
   },
   {
     name: "accepted work's preview runs no git",
@@ -757,21 +757,21 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "what streams is never compacted",
-    file: "apps/pinetrie/host/housekeeping.ts",
-    from: "  LIVE_DOC_ID,\n]",
-    to: "]",
+    file: "apps/pinetrie/host/roots.ts",
+    from: "        : [SESSION_DOC_ID, PLACES_DOC_ID, LIVE_DOC_ID]),",
+    to: "        : [SESSION_DOC_ID, PLACES_DOC_ID]),",
     command: unit,
     expect:
-      "planCompaction: the roots that ran, and the session, the places and what is streaming; no other root",
+      "a root is compacted before it is let go, and the session's documents only after a settle",
   },
   {
     name: "a run's end compacts no root",
-    file: "apps/pinetrie/host/housekeeping.ts",
-    from: "  ...[...roots].sort().map(rootDocId),\n",
-    to: "",
+    file: "apps/pinetrie/host/roots.ts",
+    from: "    input.settled === null ? [] : [...input.settled].filter(r => loaded.has(r))\n",
+    to: "    []\n",
     command: unit,
     expect:
-      "planCompaction: the roots that ran, and the session, the places and what is streaming; no other root",
+      "a root is compacted before it is let go, and the session's documents only after a settle",
   },
   {
     name: "the image sweep forgets what roots show",
@@ -875,19 +875,19 @@ export const mutations: readonly Mutation[] = [
     expect: "its text refused after a clean update",
   },
   {
-    name: "a compaction forgets the roots of the settles it covers",
-    file: "apps/pinetrie/host/settle.ts",
-    from: "      const covered = roots\n      roots = new Set()\n",
-    to: "      const covered = new Set<RootId>()\n",
+    name: "an upkeep forgets the roots of the settles it covers",
+    file: "apps/pinetrie/host/roots.ts",
+    from: "      const settled = settledRoots\n",
+    to: "      const settled = settledRoots === null ? null : new Set<RootId>()\n",
     command: unit,
     expect:
-      "two settles in a burst drain both lanes, then compact once, over both lanes' roots",
+      "an upkeep compacts every root the settles before it named, then the session's documents",
   },
   {
     name: "a failed drain stops the settle",
     file: "apps/pinetrie/host/settle.ts",
-    from: '        input.drain(lane).catch(failed(basics, "draining", lane)),',
-    to: "        input.drain(lane),",
+    from: '        input.drain(docs, lane).catch(failed(basics, "draining", lane)),',
+    to: "        input.drain(docs, lane),",
     command: unit,
     expect: "a failed drain is logged; the other lanes drain",
   },
@@ -903,8 +903,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "startup settles before it resumes",
     file: "apps/pinetrie/host/startup.ts",
-    from: '  for (const lane of planned.resume) {\n    log(\n      `[host] resuming ${readThreadName(doc, lane)}, which a crash interrupted`,\n    )\n    deps.start(lane, { kind: "resume" })\n  }\n',
-    to: '  void settle(planned.drain)\n  for (const lane of planned.resume) {\n    log(\n      `[host] resuming ${readThreadName(doc, lane)}, which a crash interrupted`,\n    )\n    deps.start(lane, { kind: "resume" })\n  }\n',
+    from: "  await deps.ensureNames()\n  const interrupted = await keeper.run(async roots => {\n",
+    to: "  await deps.ensureNames()\n  void settle([])\n  const interrupted = await keeper.run(async roots => {\n",
     command: unit,
     expect: "recover resumes each interrupted lane before it settles",
   },
@@ -1384,7 +1384,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a popped queued card skips the gate",
     file: "apps/pinetrie/host/commands/index.ts",
-    from: "    const gate = await clear(deps, outgoing, canvasesNow(deps.basics))\n",
+    from: "    const gate = await clear(\n      step,\n      step.basics.roots,\n      outgoing,\n      canvasesNow(step.basics),\n    )\n",
     to: '    const gate = { kind: "cleared", command: outgoing } as never\n',
     command: unit,
     expect: "a popped queued card in an archived root is refused",
@@ -1568,10 +1568,10 @@ export const mutations: readonly Mutation[] = [
       "an undo answers each card it moved and where it is now, with a rev raised after it",
   },
   {
-    name: "a starting host counts archived roots as opened",
+    name: "a starting host says it opened roots when it opened none",
     file: "apps/pinetrie/host/docs.ts",
-    from: "  const archived = total - opened\n",
-    to: "  const archived = 0\n",
+    from: "  return opened === 0\n",
+    to: "  return opened < 0\n",
     command: unit,
     expect: "rootsOpenedWords: how many roots a starting host opened",
   },
@@ -1586,7 +1586,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a starting host leaves records no spec declares",
     file: "apps/pinetrie/host/startup.ts",
-    from: "    await keeper.run(() => records.writeValues(undeclared))\n",
+    from: "    await roots.records.writeValues(undeclared)\n",
     to: "",
     command: unit,
     expect:
@@ -1693,7 +1693,7 @@ export const mutations: readonly Mutation[] = [
     to: "  await deps.keeper.run(() => deps.work.teardown(recorded.teardown))",
     command: unit,
     expect:
-      "a move into Done holds the keeper only for its place and its unload",
+      "a move into Done holds the keeper only for its place and its stacks' unload",
   },
   {
     name: "a move into Done answers before its teardown",
@@ -1702,16 +1702,15 @@ export const mutations: readonly Mutation[] = [
     to: "  void deps.keeper.track(deps.work.teardown(recorded.teardown))",
     command: unit,
     expect:
-      "a move into Done holds the keeper only for its place and its unload",
+      "a move into Done holds the keeper only for its place and its stacks' unload",
   },
   {
-    name: "an archived root stays loaded",
+    name: "an archived canvas keeps its stacks of moves",
     file: "apps/pinetrie/host/commands/board.ts",
-    from: "  if (unload.length > 0)",
-    to: "  if (false)",
+    from: '  if (recorded.crossing === "archive")\n',
+    to: "  if (false)\n",
     command: unit,
-    expect:
-      "a move into Done holds the keeper only for its place and its unload",
+    expect: "archiving lets go of the canvas's stacks of moves",
   },
   {
     name: "an unasked title is written over a mark written meanwhile",
@@ -1732,8 +1731,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a new lane never titles its root",
     file: "apps/pinetrie/host/commands/send.ts",
-    from: "      await deps.titles.laneStarted({",
-    to: "      void ({",
+    from: "      await deps.titles.laneStarted(deps.basics.roots, {",
+    to: "      void (deps.basics.roots, {",
     command: unit,
     expect:
       "createAndRun creates the lane, prepares it, may title its root, and runs there",
@@ -1741,8 +1740,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a retitle is answered without asking",
     file: "apps/pinetrie/host/commands/index.ts",
-    from: "        return settled(await deps.titles.asked(intent.canvas, writer))",
-    to: '        return settled({ kind: "retitling" })',
+    from: "          await deps.titles.asked(step.basics.roots, intent.canvas, writer),",
+    to: '          { kind: "retitling" } as const,',
     command: unit,
     expect: "a retitle asks for its canvas's title as its sender",
   },
@@ -1872,8 +1871,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a refused carry-on still starts",
     file: "apps/pinetrie/host/commands/lane.ts",
-    from: '  if (planned.kind === "refused") return planned\n  return startRun(deps, lane, {',
-    to: "  return startRun(deps, lane, {",
+    from: '  if (planned.kind === "refused") return planned\n  return startRun(deps, basics.roots, lane, {',
+    to: "  return startRun(deps, basics.roots, lane, {",
     command: unit,
     expect: "a carry-on the rule refuses is answered with its refusal",
   },
@@ -2014,12 +2013,12 @@ export const mutations: readonly Mutation[] = [
     expect: "untilNotTyped",
   },
   {
-    name: "unload lets the document go before its listeners",
-    file: "apps/pinetrie/host/docs.ts",
-    from: "      for (const listener of releasing) await listener(root)\n      exchange.unload(rootDocId(root))",
-    to: "      exchange.unload(rootDocId(root))\n      for (const listener of releasing) await listener(root)",
+    name: "the upkeep lets the document go before its listeners",
+    file: "apps/pinetrie/host/roots.ts",
+    from: '        await release(root, "unload")\n',
+    to: '        exchange.unload(rootDocId(root))\n        await release(root, "unload")\n',
     command: unit,
-    expect: "a root's releasing listeners run in order",
+    expect: "the upkeep runs each root's releasing listeners in order",
   },
   {
     name: "an unchanged base is announced",
@@ -2040,8 +2039,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the split call is upkeep",
     file: "apps/pinetrie/host/split-call.ts",
-    from: "    deps.keeper.run(async () => {",
-    to: '    (deps.keeper as unknown as HostKeeper).later("compact", async () => {',
+    from: "    deps.keeper.run(async roots => {",
+    to: '    (deps.keeper as unknown as HostKeeper).later("upkeep", async roots => {',
     command: unit,
     expect: "a split asked as its run is stopped",
   },
@@ -2097,10 +2096,11 @@ export const mutations: readonly Mutation[] = [
   {
     name: "every record is written to the session",
     file: "apps/pinetrie/host/records.ts",
-    from: '          target.kind === "session"\n            ? docs.session\n            : await docs.root(target.root),',
-    to: "          docs.session,",
+    from: '          target.kind === "session"\n            ? input.session\n            : await input.root(target.root),',
+    to: "          input.session,",
     command: unit,
-    expect: "writes sets and deletes, each in the document its target names",
+    expect:
+      "a step's records: sets and deletes, each in the document its target names",
   },
   {
     name: "a store migration deletes nothing",
@@ -2219,10 +2219,10 @@ export const mutations: readonly Mutation[] = [
     expect: "a card added to a canvas is told to its running threads",
   },
   {
-    name: "a root opened to rebuild its record stays open",
+    name: "a root loaded to rebuild its record is held past its step",
     file: "apps/pinetrie/host/directory.ts",
-    from: "      await basics.docs.unload(root)\n",
-    to: "",
+    from: "        for (const root of stale) await step.root(root)\n",
+    to: "        for (const root of stale) await step.lease(root).ready\n",
     command: unit,
     expect:
       "a starting directory rebuilds a stale record of a root no one holds",
@@ -2273,7 +2273,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a take stops no run",
     file: "apps/pinetrie/host/provenance.ts",
-    from: "      for (const stop of stoppers) await stop(threads, by)\n",
+    from: "      for (const stop of stoppers) await stop(threads, by, roots)\n",
     to: "      for (const stop of stoppers) void stop\n",
     command: unit,
     expect:
@@ -2582,8 +2582,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a thread's start is the host's change",
     file: "apps/pinetrie/host/commands/send.ts",
-    from: '    await deps.placesWriter.change({ kind: "move", by: writer }, open =>',
-    to: '    await deps.placesWriter.change({ kind: "host" }, open =>',
+    from: '    await deps.placesWriter.change(\n      { kind: "move", by: writer },\n      open => open.apply(start.steps),\n',
+    to: '    await deps.placesWriter.change(\n      { kind: "host" },\n      open => open.apply(start.steps),\n',
     command: unit,
     expect:
       "a thread its first send opens is its sender's change to the places",
@@ -2622,15 +2622,6 @@ export const mutations: readonly Mutation[] = [
     expect: "drops a fact for a lane out of reach, and writes the rest",
   },
   {
-    name: "a started root is one whose record decodes",
-    file: "packages/reads/index.ts",
-    from: "  new Set(Object.keys(readNamespace(doc, ROOT.namespace)).filter(isRootId))\n",
-    to: "  new Set(readRoots(doc).keys())\n",
-    command: unit,
-    expect:
-      "a starting host opens an open canvas's root whose directory record is in an older shape, and keeps it open",
-  },
-  {
     name: "an archive leaves its pending verdicts pending",
     file: "apps/pinetrie/host/commands/board.ts",
     from: "  if (crossed.verdicts.length > 0)\n",
@@ -2647,6 +2638,128 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "an answer held for an asker archived meanwhile is the answering thread's undelivered fact",
+  },
+  {
+    name: "the upkeep lets a leased root go",
+    file: "apps/pinetrie/host/roots.ts",
+    from: "    .filter(r => !input.leased.has(r) && !input.shown.has(r))\n",
+    to: "    .filter(r => !input.shown.has(r))\n",
+    command: unit,
+    expect:
+      "every sequence of three events keeps L1, L2, L3 and the upkeep's guard",
+  },
+  {
+    name: "the upkeep lets a root a tab holds go",
+    file: "apps/pinetrie/host/roots.ts",
+    from: "    .filter(r => !input.leased.has(r) && !input.shown.has(r))\n",
+    to: "    .filter(r => !input.leased.has(r))\n",
+    command: unit,
+    expect:
+      "every sequence of three events keeps L1, L2, L3 and the upkeep's guard",
+  },
+  {
+    name: "a lease's release queues no upkeep",
+    file: "apps/pinetrie/host/roots.ts",
+    from: "        else leases.delete(r)\n        input.queueUpkeep()\n",
+    to: "        else leases.delete(r)\n",
+    command: unit,
+    expect:
+      "every sequence of three events keeps L1, L2, L3 and the upkeep's guard",
+  },
+  {
+    name: "the upkeep runs off the keeper",
+    file: "apps/pinetrie/host/roots.ts",
+    from: '): Promise<void> => keeper.later("upkeep", body)',
+    to: "): Promise<void> => Promise.resolve().then(() => body(undefined as never))",
+    command: unit,
+    expect:
+      "every sequence of three events keeps L1, L2, L3 and the upkeep's guard",
+  },
+  {
+    name: "a step's documents outlive their step",
+    file: "apps/pinetrie/host/roots.ts",
+    from: "      if (!live) throw new StepEnded()\n",
+    to: "",
+    command: unit,
+    expect: "a step's documents are revoked once the step ends",
+  },
+  {
+    name: "pi is handed a root nothing holds",
+    file: "apps/pinetrie/host/roots.ts",
+    from: "          (!stepping.has(root) && (leases.get(root) ?? 0) === 0)\n",
+    to: "          false\n",
+    command: unit,
+    expect:
+      "pi is refused a root no step or lease holds, and handed one a step loaded",
+  },
+  {
+    name: "a leased root is destroyed",
+    file: "apps/pinetrie/host/roots.ts",
+    from: "        if ((leases.get(r) ?? 0) > 0)\n",
+    to: "        if (false)\n",
+    command: unit,
+    expect: "a leased root is not destroyed",
+  },
+  {
+    name: "a root's first load is heard at every load",
+    file: "apps/pinetrie/host/roots.ts",
+    from: "          if (!everLoaded.has(root)) {\n",
+    to: "          if (true) {\n",
+    command: unit,
+    expect: "a root's first load is heard once, however often it loads",
+  },
+  {
+    name: "a run lets its root go before its end",
+    file: "apps/pinetrie/host/runs.ts",
+    from: "          await end(lane, id)\n",
+    to: "          await lease[Symbol.asyncDispose]()\n          await end(lane, id)\n",
+    command: unit,
+    expect:
+      "a run holds its lane's root from its start until its end's last step, through a failed step before endRun",
+  },
+  {
+    name: "a late step plans before it loads its thread's root",
+    file: "apps/pinetrie/host/later.ts",
+    from: "          await roots.root(root)\n",
+    to: "          void root\n",
+    command: unit,
+    expect:
+      "a late step into a thread loads its root before its plan, so pi may write there",
+  },
+  {
+    name: "a person's change reads no root",
+    file: "apps/pinetrie/host/places.ts",
+    from: "    const trees = roots === undefined ? new Map() : await readTrees(roots)\n",
+    to: "    const trees = new Map()\n",
+    command: unit,
+    expect:
+      "a moved card's watched thread end leaves no trace; one in a canvas no one reads does",
+  },
+  {
+    name: "a module makes a roots' store of its own",
+    file: "apps/pinetrie/host/later.ts",
+    from: 'import type { StepDocs } from "./roots.ts"\n',
+    to: 'import type { StepDocs } from "./roots.ts"\nvoid (() => createRoots({} as never))\n',
+    command: unit,
+    expect: "only the host's start makes the roots' store",
+  },
+  {
+    name: "the archive unloads a root itself",
+    file: "apps/pinetrie/host/commands/board.ts",
+    from: '  if (recorded.crossing === "archive")\n',
+    to: '  void ((exchange: { unload: (id: string) => void }) => exchange.unload(rootDocId(intent.canvas)))\n  if (recorded.crossing === "archive")\n',
+    command: unit,
+    expect:
+      "only the upkeep lets a root go, the migrations aside, which run before any step",
+  },
+  {
+    name: "a root's first load resumes a lane this host runs",
+    file: "apps/pinetrie/host/startup.ts",
+    from: "    .filter(l => !running(l))\n",
+    to: "",
+    command: unit,
+    expect:
+      "a root's first load resumes no lane this host runs now: only a crash's",
   },
   {
     name: "the executor renames over a target instead of linking",
@@ -2722,5 +2835,23 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "the first read recovers once; asides are checked at a quiet read, never at an accept's own",
+  },
+  {
+    name: "the host follows a tab's new root before its first send",
+    file: "apps/pinetrie/host/roots.ts",
+    from: "        if (loaded.has(root) || !readRoots(session).has(root)) return\n",
+    to: "        if (loaded.has(root)) return\n",
+    command: unit,
+    expect:
+      "a root a tab asks for is followed only once the directory names it: a tab's new root is not",
+  },
+  {
+    name: "the directory records a root with no message",
+    file: "apps/pinetrie/host/directory.ts",
+    from: "    if (record.entry === null && stored === undefined) return\n",
+    to: "",
+    command: unit,
+    expect:
+      "a root with no message is not recorded: a tab's new root is not started",
   },
 ]

@@ -1,6 +1,7 @@
 // records — the host's records, one `RecordSpec` each.
 
 import {
+  type Home,
   type HostNamespace,
   type RootId,
   SESSION_TARGET,
@@ -8,8 +9,7 @@ import {
   type ValueWrite,
 } from "@pinetrie/core"
 
-/** Which document a record lives in. */
-export type Home = "session" | "root"
+export type { Home }
 
 export interface RecordSpec<R, K extends string, H extends Home = Home> {
   readonly namespace: HostNamespace
@@ -31,8 +31,11 @@ export interface RecordSpec<R, K extends string, H extends Home = Home> {
   readonly decode: (contents: unknown, key: string) => R | undefined
 }
 
-type SetWrite = Extract<ValueWrite, { kind: "set" }>
-type DeleteWrite = Extract<ValueWrite, { kind: "delete" }>
+type SetWrite<H extends Home = Home> = Extract<ValueWrite<H>, { kind: "set" }>
+type DeleteWrite<H extends Home = Home> = Extract<
+  ValueWrite<H>,
+  { kind: "delete" }
+>
 
 /**
  * Writes grouped by the document they go to, in the order each target first
@@ -58,12 +61,12 @@ const targetOf = (root: RootId | undefined): Target =>
 export function setRecord<R, K extends string>(
   spec: RecordSpec<R, K, "session">,
   record: NoInfer<R>,
-): SetWrite
+): SetWrite<"session">
 export function setRecord<R, K extends string>(
   spec: RecordSpec<R, K, "root">,
   record: NoInfer<R>,
   root: RootId,
-): SetWrite
+): SetWrite<"root">
 export function setRecord<R, K extends string>(
   spec: RecordSpec<R, K>,
   record: NoInfer<R>,
@@ -81,12 +84,12 @@ export function setRecord<R, K extends string>(
 export function deleteRecord<R, K extends string>(
   spec: RecordSpec<R, K, "session">,
   key: K,
-): DeleteWrite
+): DeleteWrite<"session">
 export function deleteRecord<R, K extends string>(
   spec: RecordSpec<R, K, "root">,
   key: K,
   root: RootId,
-): DeleteWrite
+): DeleteWrite<"root">
 export function deleteRecord<R, K extends string>(
   spec: RecordSpec<R, K>,
   key: K,
@@ -157,13 +160,13 @@ export function setIfChanged<R, K extends string>(
   spec: RecordSpec<R, K, "session">,
   record: NoInfer<R>,
   stored: NoInfer<R> | undefined,
-): readonly ValueWrite[]
+): readonly ValueWrite<"session">[]
 export function setIfChanged<R, K extends string>(
   spec: RecordSpec<R, K, "root">,
   record: NoInfer<R>,
   stored: NoInfer<R> | undefined,
   root: RootId,
-): readonly ValueWrite[]
+): readonly ValueWrite<"root">[]
 export function setIfChanged<R, K extends string>(
   spec: RecordSpec<R, K>,
   record: NoInfer<R>,

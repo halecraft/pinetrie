@@ -25,12 +25,16 @@ import {
   CANVAS_ID,
   deferred,
   fakeLane,
+  hostRoots,
   methods,
+  putLane,
+  ROOT_ID,
   record,
   row,
   runnableFor,
 } from "./fakes.ts"
 import {
+  createRunDocs,
   createRuns,
   planRunEnd,
   type ReadCanvasContext,
@@ -99,8 +103,10 @@ function setUp(
   const agent = record<Pick<Agent, "lane">>({ lane: () => lane.lane })
   // Whether the lane was still running when its verdict was made pending.
   const pending: { prompt: string; running: boolean }[] = []
+  const runDocs = createRunDocs()
   const runs = createRuns({
     basics: b,
+    runDocs,
     agent: agent.port,
     work: work.port,
     readPinned,
@@ -124,7 +130,14 @@ function setUp(
       prompt,
     }),
   )
-  return { b, lane, runs, pending, ended: ended.promise }
+  return {
+    b,
+    lane,
+    runs: { ...runs, start: runs.start.bind(null, b.roots) },
+    runDocs,
+    pending,
+    ended: ended.promise,
+  }
 }
 
 test("a run starts only on a lane proven runnable", () => {
@@ -136,13 +149,13 @@ test("a run starts only on a lane proven runnable", () => {
 
 describe("a run's end", () => {
   test("when ended is called, the lane has no active run and no open stream, and it has stopped", async () => {
-    const { b, lane, runs, ended } = setUp()
+    const { b, lane, runs, runDocs, ended } = setUp()
     runs.start(runnableFor(LANE), {
       kind: "prompt",
       message: said,
       pinnedSeen: [],
     })
-    streamInto(b)({ kind: "text", lane: LANE, delta: "hello" })
+    streamInto(b, runDocs)({ kind: "text", lane: LANE, delta: "hello" })
     expect(readStreams(b.live).filter(s => s.lane === LANE)).toHaveLength(1)
     lane.finish({ kind: "ok" })
     expect(await ended).toEqual({
@@ -427,8 +440,10 @@ describe("a run's pinned cards", () => {
 test("a run's end forgets the lane's base news as the lane stops, before ended", async () => {
   const lane = fakeLane(LANE)
   const order: string[] = []
+  const b = basics()
   const runs = createRuns({
-    basics: basics(),
+    basics: b,
+    runDocs: createRunDocs(),
     agent: { lane: () => lane.lane },
     work: {
       beforeRun: () => {},
@@ -448,7 +463,7 @@ test("a run's end forgets the lane's base news as the lane stops, before ended",
     order.push(`ended ${l}`)
     ended.resolve()
   })
-  runs.start(runnableFor(LANE), {
+  runs.start(b.roots, runnableFor(LANE), {
     kind: "prompt",
     message: said,
     pinnedSeen: [],
@@ -456,4 +471,46 @@ test("a run's end forgets the lane's base news as the lane stops, before ended",
   lane.finish({ kind: "ok" })
   await ended.promise
   expect(order).toEqual([`work ${LANE}`, `news ${LANE}`, `ended ${LANE}`])
+})
+
+test("a run holds its lane's root from its start until its end's last step, through a failed step before endRun", async () => {
+  const b = basics()
+  putLane(b, LANE)
+  const { keeper, roots } = hostRoots({ session: b.session })
+  const lane = fakeLane(LANE)
+  const runDocs = createRunDocs()
+  const loadedAtEnded = deferred<boolean>()
+  const runs = createRuns({
+    basics: b,
+    runDocs,
+    agent: { lane: () => lane.lane },
+    work: {
+      beforeRun: () => {},
+      runEnded: () => {},
+      splitEnded: async () => null,
+    },
+    readPinned: async () => null,
+    readCanvasContext: async () => [],
+    baseNews: { atStart: async () => null, runEnded: () => {} },
+    pending: async () => {
+      throw new Error("verdict lost")
+    },
+  })
+  runs.onEnded(() => loadedAtEnded.resolve(roots.loaded().includes(ROOT_ID)))
+  await keeper.run(async step =>
+    runs.start(step, runnableFor(LANE), {
+      kind: "prompt",
+      message: said,
+      pinnedSeen: [],
+    }),
+  )
+  await keeper.idle()
+  expect(roots.loaded()).toEqual([ROOT_ID])
+  expect(runDocs.docOf(LANE)).not.toBeNull()
+  lane.finish({ kind: "ok" })
+  expect(await loadedAtEnded.promise).toBe(true)
+  await new Promise(r => setTimeout(r, 0))
+  await keeper.idle()
+  expect(roots.loaded()).toEqual([])
+  expect(runDocs.docOf(LANE)).toBeNull()
 })

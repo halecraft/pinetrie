@@ -1,7 +1,7 @@
 # S199 — A reachable thread's root is not always held: two trash places disagree with `threadReach`, and a stale directory record leaves an open task's root unloaded after startup
 
 - **Status:** Answered
-- **Led to:** ADR-0029
+- **Led to:** ADR-0029, ADR-0162
 
 **Question.** A late step that reads its root through `docs.view` (or
 `docOfLane`) finds nothing for a root the host does not hold, and then

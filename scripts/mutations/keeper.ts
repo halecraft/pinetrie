@@ -95,4 +95,13 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "a step that waited or ran past slowMs is reported",
   },
+  {
+    name: "a step's context is never closed",
+    file,
+    from: "            context.close(opened.value)\n",
+    to: "            void opened.value\n",
+    command: unit,
+    expect:
+      "each step is handed its own context, closed once it settles, a throw included",
+  },
 ]

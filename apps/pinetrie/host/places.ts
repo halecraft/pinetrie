@@ -19,6 +19,7 @@
 import { isDeepStrictEqual } from "node:util"
 import { batch } from "@kyneta/schema"
 import {
+  type CanvasId,
   type CardHistoryRecord,
   type CardId,
   type CardRecord,
@@ -32,7 +33,12 @@ import {
   type TreeIndex,
   type WriterId,
 } from "@pinetrie/core"
-import { readPlaces, readThreads, readTreeIndex } from "@pinetrie/reads"
+import {
+  readPlaces,
+  readRoots,
+  readThreads,
+  readTreeIndex,
+} from "@pinetrie/reads"
 import {
   type Cause,
   encodeCard,
@@ -44,12 +50,16 @@ import {
 } from "@pinetrie/rules"
 import type { PlacesDocHandle } from "@pinetrie/schema"
 import type { Basics } from "./basics.ts"
+import { canvasesNow } from "./canvases.ts"
 import type { CardPort } from "./cards.ts"
-import type { HostDocuments } from "./docs.ts"
 import type { PlacesChange, ProvenanceHooks } from "./provenance.ts"
+import type { StepDocs } from "./roots.ts"
 
 /** Run a write as one step of an undo stack (`MoveHistories.gesture`). */
 export type Gesture = <T>(write: () => T) => T
+
+/** A person's cause: their change may leave traces, and may take threads. */
+export type PersonCause = Exclude<Cause, { readonly kind: "host" }>
 
 /** The writer of the places: every write is a change. */
 export interface Places {
@@ -58,8 +68,22 @@ export interface Places {
    * check and remove with nothing in between. After `body` settles, or
    * throws, the change closes as `planClose` decides. One opened while
    * another is open is a change of its own, which records its own cards.
+   *
+   * A person's change is made in a step, whose documents (`roots`) load the
+   * roots of the canvases someone reads before `body` runs: a card's thread end
+   * decides whether its placer watched it go, and only a thread someone
+   * reads can be watched. The host's own change leaves no trace, so it reads
+   * no root.
    */
-  change<T>(cause: Cause, body: (open: OpenChange) => T): Promise<Awaited<T>>
+  change<T>(
+    cause: { readonly kind: "host" },
+    body: (open: OpenChange) => T,
+  ): Promise<Awaited<T>>
+  change<T>(
+    cause: PersonCause,
+    body: (open: OpenChange) => T,
+    roots: StepDocs,
+  ): Promise<Awaited<T>>
 }
 
 /** A change while its body runs. */
@@ -155,47 +179,58 @@ const takenBy = (
     : { threads, by: cause.by }
 
 interface PlacesDeps {
-  readonly basics: Pick<
-    Basics,
-    "places" | "session" | "now" | "newId" | "log"
-  > & {
-    /** A shared card's thread end is read from its root only when loaded. */
-    readonly docs: Pick<HostDocuments, "view">
-  }
+  readonly basics: Pick<Basics, "places" | "session" | "now" | "newId" | "log">
+  /** The canvases someone reads now, from presence (`readReadingCanvases`). */
+  readonly readingCanvases: () => Iterable<CanvasId>
   readonly provenance: ProvenanceHooks
   readonly texts: Pick<CardPort, "destroy">
 }
 
 export function createPlaces(deps: PlacesDeps): Places {
-  const { docs, places, session } = deps.basics
+  const { places, session } = deps.basics
 
-  /** A shared card's thread end, from its thread's loaded root; absent otherwise. */
+  /** The trees of the roots of the canvases someone reads, loaded through `roots`. */
+  async function readTrees(
+    roots: StepDocs,
+  ): Promise<ReadonlyMap<RootId, TreeIndex>> {
+    const canvases = canvasesNow({ places, session })
+    const read = new Set<RootId>()
+    for (const canvas of new Set(deps.readingCanvases()))
+      for (const root of canvases.rootsOf.get(canvas) ?? []) read.add(root)
+    const trees = new Map<RootId, TreeIndex>()
+    // Only started roots: a canvas's unstarted thread names a root with
+    // nothing to read.
+    const started = readRoots(session)
+    for (const root of [...read].sort())
+      if (started.has(root))
+        trees.set(root, readTreeIndex(await roots.root(root)))
+    return trees
+  }
+
+  /** A shared card's thread end, from its thread's tree among `trees`; absent otherwise. */
   function endOf(
     card: CardRecord,
-    trees: Map<RootId, TreeIndex | null>,
+    trees: ReadonlyMap<RootId, TreeIndex>,
   ): EntryId | null | undefined {
     const p = card.place
     if (p.kind !== "composing" && p.kind !== "queued" && p.kind !== "pinned")
       return undefined
     const root = readThreads(session).get(p.thread)?.root
-    if (root === undefined) return undefined
-    if (!trees.has(root)) {
-      const held = docs.view(root)
-      trees.set(root, held === null ? null : readTreeIndex(held.doc))
-    }
-    const index = trees.get(root) ?? null
-    return index === null ? undefined : placeEnd(p, index)
+    const index = root === undefined ? undefined : trees.get(root)
+    return index === undefined ? undefined : placeEnd(p, index)
   }
 
-  function open(cause: Cause): {
+  function open(
+    cause: Cause,
+    trees: ReadonlyMap<RootId, TreeIndex>,
+    roots: StepDocs | null,
+  ): {
     readonly change: OpenChange
     readonly close: () => Promise<void>
   } {
     const touched = new Map<CardId, CardRecord | undefined>()
     const ends = new Map<CardId, EntryId | null>()
     const applied: PlaceStep[] = []
-    // One index per root, however many cards the change touches.
-    const trees = new Map<RootId, TreeIndex | null>()
 
     /** Take each card not yet touched as it is now, with its thread end. */
     const touch = (ids: readonly CardId[]) => {
@@ -243,7 +278,7 @@ export function createPlaces(deps: PlacesDeps): Places {
         newId: deps.basics.newId,
       })
       // execute: each text after its record, which the body wrote
-      await executeClose(plan, {
+      await executeClose(plan, roots, {
         destroy: deps.texts.destroy,
         provenance: deps.provenance,
       })
@@ -255,8 +290,10 @@ export function createPlaces(deps: PlacesDeps): Places {
   async function change<T>(
     cause: Cause,
     body: (open: OpenChange) => T,
+    roots?: StepDocs,
   ): Promise<Awaited<T>> {
-    const opened = open(cause)
+    const trees = roots === undefined ? new Map() : await readTrees(roots)
+    const opened = open(cause, trees, roots ?? null)
     let result: Awaited<T>
     try {
       result = await body(opened.change)
@@ -284,6 +321,7 @@ export function createPlaces(deps: PlacesDeps): Places {
  */
 async function executeClose(
   plan: ClosePlan,
+  roots: StepDocs | null,
   ports: {
     readonly destroy: (id: TextCardId) => Promise<void>
     readonly provenance: Pick<ProvenanceHooks, "write" | "changed" | "taken">
@@ -292,8 +330,9 @@ async function executeClose(
   for (const id of plan.texts) await ports.destroy(id)
   await ports.provenance.write(plan.provenance)
   ports.provenance.changed(plan.change)
-  if (plan.taken !== null)
-    await ports.provenance.taken(plan.taken.threads, plan.taken.by)
+  // A take is a person's change, made in a step with its documents.
+  if (plan.taken !== null && roots !== null)
+    await ports.provenance.taken(plan.taken.threads, plan.taken.by, roots)
 }
 
 const byId = (cards: readonly CardRecord[]): ReadonlyMap<CardId, CardRecord> =>

@@ -34,9 +34,23 @@ lane work. It declares nothing (`workspace.test.ts`).
 Why the host drains with `once` and not `later`: a drain must keep its place
 among commands. A late message sent after a card was queued goes after the
 card: the drain queued first runs first. Upkeep would let the message's
-command overtake it. The compaction is the one `later` on the host's
+command overtake it. The upkeep is the one `later` on the host's
 documents: it may wait, and waiting is what makes the records it compacts
 current.
+
+## A step context
+
+- **A keeper made with `context` hands each step a value of its own**
+  (`StepContext`): `open` makes it as the step starts, and `close` runs once
+  the step has settled, a throw included, before the next step opens its
+  own. The host's documents' keeper hands each step its `StepDocs`
+  (`apps/pinetrie/host/roots.ts`, ADR-0162), which `close` revokes, so what
+  a step reaches through it is that step's alone. A keeper without one
+  hands `undefined`, and its steps ignore it.
+- **A step never awaits another step of its keeper**: the inner one waits
+  for the outer one to end, which waits for the inner. Work that a step
+  awaits, and that needs what a step holds, takes it another way (the
+  host's leases).
 
 ## Failures, voiding and closing
 

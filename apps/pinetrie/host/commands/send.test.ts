@@ -105,7 +105,7 @@ function setUp(begin: ErrCode | null = null) {
     cards: record<SendDeps["cards"]>({
       blankQueued: NO_BLANK_CARDS.blankQueued,
     }).port,
-    start: (lane, start) => {
+    start: (_roots, lane, start) => {
       started.push(lane)
       if (start.kind === "prompt") seen.push(start.pinnedSeen)
       return runId("r-1")
@@ -141,7 +141,8 @@ describe("executeSend", () => {
       "prepareLane",
       "runnable",
     ])
-    expect(titles.calls.map(c => c.args)).toEqual([
+    // Each after the step's documents, its first argument.
+    expect(titles.calls.map(c => c.args.slice(1))).toEqual([
       [
         {
           root: ROOT_ID,
@@ -345,7 +346,7 @@ describe("sendMessage", () => {
       },
       quoteBytes: 16,
       cards: cards.port,
-      start: (_lane, s) => {
+      start: (_roots, _lane, s) => {
         if (s.kind === "prompt" && s.message.customType === MESSAGE_TYPE) {
           started.push(s.message as PersonMessage)
           seen.push(s.pinnedSeen)
@@ -677,7 +678,7 @@ describe("sendMessage", () => {
       const out = await sendCleared(
         {
           ...deps,
-          start: (_lane, s) => {
+          start: (_roots, _lane, s) => {
             if (s.kind === "prompt") prompts.push(s.message)
             return runId("r-2")
           },

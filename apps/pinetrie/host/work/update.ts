@@ -69,7 +69,7 @@ import {
   type UpdateRefusal,
 } from "@pinetrie/rules"
 import { readLaneTip } from "@pinetrie/schema"
-import { type Basics, failed } from "../basics.ts"
+import { failed, type LeaseBasics } from "../basics.ts"
 import type { Containers } from "./containers.ts"
 import type { Destination } from "./destination.ts"
 import { removeStaleOutputs } from "./disk.ts"
@@ -338,7 +338,7 @@ export interface Updates {
 }
 
 export function createUpdates(deps: {
-  readonly basics: Basics
+  readonly basics: LeaseBasics
   readonly setup: Pick<Setup, "ready">
   readonly destination: Pick<Destination, "baseNow">
   readonly registry: LaneRegistry
@@ -389,7 +389,8 @@ export function createUpdates(deps: {
    * turn of the lane's tip, read from its own root's document.
    */
   async function editsOf(lane: ThreadId): Promise<Edits | null> {
-    const doc = await docs.laneDoc(lane)
+    await using held = basics.leases.lane(lane)
+    const doc = held === null ? null : await held.ready
     const tip = doc === null ? null : readLaneTip(doc, lane)
     if (doc === null || tip === null) return null
     return {
@@ -405,7 +406,8 @@ export function createUpdates(deps: {
   async function parentOf(
     lane: ThreadId,
   ): Promise<{ readonly now: ParentNow | null; readonly running: boolean }> {
-    const doc = await docs.laneDoc(lane)
+    await using held = basics.leases.lane(lane)
+    const doc = held === null ? null : await held.ready
     if (doc === null) return { now: null, running: false }
     const now = parentNow({
       index: readTreeIndex(doc),
@@ -518,7 +520,8 @@ export function createUpdates(deps: {
     },
 
     async catchUpInRun(lane, from) {
-      const doc = await docs.laneDoc(lane)
+      await using held = basics.leases.lane(lane)
+      const doc = held === null ? null : await held.ready
       // Who the update is by: the person behind the run.
       const by = doc === null ? null : readRunAuthor(doc, docs.session, lane)
       if (!registry.isOwn(lane) || doc === null || by === null)
@@ -587,7 +590,8 @@ export function createUpdates(deps: {
           if (done.kind === "copy") return refused(catchUpRefusal(done.why))
           if (done.kind !== "merged") return done
           const { from, facts, follow } = done
-          const doc = await docs.laneDoc(lane)
+          await using held = basics.leases.lane(lane)
+          const doc = held === null ? null : await held.ready
           const settle = planSettle(facts, {
             lane,
             by,

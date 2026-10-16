@@ -42,6 +42,7 @@ import { type Basics, failed, type HostKeeper } from "./basics.ts"
 import type { Later } from "./later.ts"
 import type { Places } from "./places.ts"
 import type { Records } from "./records.ts"
+import type { RunDocs } from "./runs.ts"
 
 /** The budget a run's prompt names, and whether the run spends from it. */
 export interface RunBudget {
@@ -97,8 +98,10 @@ export interface Budgets {
 export function createBudgets(deps: {
   readonly basics: Pick<
     Basics,
-    "docs" | "session" | "places" | "live" | "now" | "newId" | "log"
+    "session" | "places" | "live" | "now" | "newId" | "log"
   >
+  /** A budget is read and spent while its run holds its root. */
+  readonly runs: RunDocs
   readonly keeper: Pick<HostKeeper, "run">
   readonly records: Pick<Records, "writeValues">
   /** The writer of the places: a budget's stop is the host's change. */
@@ -108,7 +111,8 @@ export function createBudgets(deps: {
   /** The settled `agents.budget`. */
   readonly limit: number
 }): Budgets {
-  const { docs, session, places } = deps.basics
+  const { session, places } = deps.basics
+  const docs = deps.runs
   // The live count of each budget spent from since the host started.
   const counts = new Map<EntryId, number>()
   // Each run's budget, by its prompt, once seen: its end and its requests
@@ -125,7 +129,7 @@ export function createBudgets(deps: {
   function runOf(
     lane: ThreadId,
   ): { readonly prompt: EntryId; readonly budget: RunBudget } | null {
-    const doc = docs.docOfLane(lane)
+    const doc = docs.docOf(lane)
     const prompt = doc === null ? null : readPromptMessage(doc, lane)
     if (prompt === null) return null
     const known = byPrompt.get(prompt.id)
@@ -171,7 +175,7 @@ export function createBudgets(deps: {
    * next request (`mayRequest`).
    */
   function stopNow(lane: ThreadId, over: BudgetRecord): void {
-    const doc = docs.docOfLane(lane)
+    const doc = docs.docOf(lane)
     if (doc === null) return
     const index = readTreeIndex(doc)
     const cards = readPlaces(places)

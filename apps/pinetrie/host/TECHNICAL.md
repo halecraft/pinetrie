@@ -31,10 +31,11 @@ wires them.
 | `base-news.ts` | what a thread is told of its base's new work (ADR-0080): `atStart`, a chat's run's behind entry; `baseChanged`, a steer into a running lane, at most once per base commit (`told`), heard from lane work's `onBaseChanged`; `runEnded` forgets what was steered. Made after the agent, whose lanes it steers |
 | `split-call.ts` | `split_proposed_changes` (ADR-0080): a split card queued on the thread, popped when its run ends: pi calls it only during a run, so its step is queued before the run's end queues the drain, which the keeper runs after it |
 | `queued-card-pop.ts` | popping a lane's queued cards to send them (ADR-0048, ADR-0083): `popNextQueuedCard`, and `drain`, which carries each out as `planCarry` decides: a fact appended, a catch-up, a split's run, a message sent (ADR-0108, ADR-0080); and `createWaits`, the drain's waits for its top card's text or for someone's typing in it to stop (ADR-0048 step 7) |
-| `settle.ts` | what happens between runs: drains, then the compaction and sweep as upkeep (the keeper's `later`) |
-| `housekeeping.ts` | which documents a run's end compacts (`planCompaction`: its roots, the session, the places, `pinetrie:live`; § The session's documents), deleting images nothing shows (ADR-0042), retiring histories of moves (`sweepHistories`), and deleting holds on queues nobody can use (`sweepHolds`, ADR-0048 step 7) |
-| `docs.ts` | `HostDocuments`: every document the host holds, a root's opened as it is asked for, `onOpened`, which replays the roots already held to a listener that joins late, and `onReleasing`, whose listeners `unload` awaits, in order, before it lets a root go; `planLoads` |
-| `records.ts` | the host's writes of its records (ADR-0095): `createRecords`, whose `writeValues` writes each document's in one batch; every module that writes a record takes it |
+| `settle.ts` | what happens between runs: drains, then the upkeep (§ Roots: steps, leases and the upkeep) |
+| `housekeeping.ts` | deleting images nothing shows (ADR-0042), retiring histories of moves (`sweepHistories`), deleting holds on queues nobody can use (`sweepHolds`, ADR-0048 step 7), and trashed cards past their week (`sweepTrash`) |
+| `docs.ts` | `HostDocuments`: the documents the host always holds (the session's, `pinetrie:live`, the places) and the reads of the session that name a root; `planLoads`, the roots a starting host opens |
+| `roots.ts` | every root's document (ADR-0162): `StepDocs`, a step's own, and `Lease`; pi's port; `planUpkeep` and the upkeep; `onOpened`, `onReleasing`, `onFirstLoad` (§ Roots: steps, leases and the upkeep) |
+| `records.ts` | the host's writes of its records (ADR-0095): `createRecords`, the session's, which every module made at startup takes, and `createStepRecords`, a step's or a lease's, which writes a root's too; a write's home is in its type (`ValueWrite<H>`) |
 | `migrations/` | each stored document's schema, checked before anything opens it, and the migrations from a stored hash (§ The stored schemas, ADR-0096) |
 | `directory.ts` | each root's directory record, refreshed as its document changes: `startDirectory`, started with the records, and the startup rebuild of records that do not decode (`planRebuild`) |
 | `cards.ts` | the card port (ADR-0048), about texts only: who wrote in a card, destroying one, loading and reading texts for the queue's pops and a run's pinned cards, waiting until a text holds a version (`whenHolds`, which an `AbortSignal` gives up), and the texts of given cards gathered for the sweeps; where the shell opens card documents |
@@ -86,9 +87,12 @@ wires them.
 - **What merges by key:** a lane's drain is `once` (`drain:<lane>`), queued
   by a card's move (`queueDrain`, `index.ts`) and by a settle alike, so one
   waiting drain covers both, and keeps its place among the commands. A
-  root's directory record is `once` (`root:<id>`). The compaction is
-  `later` ("compact"): it starts only when no command, drain or refresh
-  waits.
+  root's directory record is `once` (`root:<id>`). The upkeep is
+  `later` ("upkeep", `roots.ts`): it starts only when no command, drain or
+  refresh waits.
+- **Each step is handed its documents** (`StepDocs`, the keeper's step
+  context): the roots it reaches, revoked as it ends (§ Roots: steps,
+  leases and the upkeep).
 - **A failed step never stops the steps behind it,** and is logged
   (`[host] step failed: …`); its caller still gets the rejection. A step
   that ran over a second is logged too (`onSlow`), and so is a command or a
@@ -174,25 +178,11 @@ same for every run (`packages/pi/TECHNICAL.md`, S85).
 
 ## The session's documents (`docs.ts`, `directory.ts`, ADR-0063)
 
-- **`Basics.docs` is the one port for documents** (`HostDocuments`): the
-  session's, `pinetrie:live`, the places, a root's by its `RootId` (opened and
-  hydrated if it is not), a loaded root's `RootView`, a lane's root from its
-  `LANE` record, and `unload`. A synchronous step plans from `view` and
-  `docOfLane`, which answer only for a loaded root; an async one asks
-  `root` or `laneDoc`.
-- **A starting host opens the roots `planLoads` names**: every root in the
-  directory with a thread on the canvas of a canvas outside the archive, or
-  in an inventory (`rootsHeld`, ADR-0116), before `recover`. A busy canvas
-  cannot be archived, so these hold every lane a crash could have
-  interrupted. Which canvases are archived is the board's (`readArchived`,
-  ADR-0122). Archiving `unload`s the canvas's roots nothing else holds
-  (`work/archive.ts`); restoring opens them.
-  `unload` first runs its `onReleasing` listeners: the scribe's `release`
-  closes the agent's harness over the root, then the root's pi session
-  (`packages/pi/TECHNICAL.md`, ADR-0092), and the root's histories of moves
-  are unloaded. A harness kept would write to the closed document, and
-  every later command in the root, the restored one included, would fail
-  with "This document was unloaded, and is closed".
+- **`Basics.docs` holds what is always loaded** (`HostDocuments`): the
+  session's, `pinetrie:live` and the places, and the session's reads that
+  name a root (`rootOfLane`, `rootOfEntry`). A root's document is reached
+  only through a step's documents or a lease (§ Roots: steps, leases and
+  the upkeep).
 - **The host is every document's authority** (`{ authority: "self" }`), so
   Kyneta loads a root it let go again when a client asks for it (S86).
   `resolveDoc` interprets a `root:` id the directory names, as an archived
@@ -200,24 +190,89 @@ same for every run (`packages/pi/TECHNICAL.md`, S85).
 - **The directory follows each root's document** (`directory.ts`): a change
   to its entries, pi's values or its records queues one refresh, the
   keeper's `once` (`root:<id>`), absorbed by one already queued, which writes
-  `readRootRecord` with `setIfChanged`. It starts once the records port
-  exists, since a refresh writes through it, and follows every root through
-  `onOpened`: the roots `startHost` opened before it, then each opened
-  later. It refreshes each as it starts to follow it, so a record stored
-  before a field was added (ADR-0077) is rewritten at startup. `ROOT` is
-  derived, so its shape changes with no migration: a root a thread's record
-  names whose record does not decode, and which is not held, is opened,
-  refreshed and let go at startup (`planRebuild`). A settle's compaction is `later`, so
-  it runs after every refresh queued before it starts, and the records it
-  compacts are current. A write after a compaction only lands in the next
-  one's log.
+  `readRootRecord` with `setIfChanged`. It follows every root through
+  `onOpened`, and refreshes each as it starts to follow it, so a record
+  stored before a field was added (ADR-0077) is rewritten. As the upkeep
+  lets a root go it is written once more, from the document as it leaves:
+  a change after the last refresh is not lost. `ROOT` is derived, so its
+  shape changes with no migration: a root a thread's record names whose
+  record does not decode, and which is not loaded, is loaded in a step at
+  startup, and the upkeep lets it go (`planRebuild`).
 - **A compaction replaces a document's stored records with what it holds
-  now** (`compactAfter`), which also trims a `json` document's in-memory op
+  now** (the upkeep's), which also trims a `json` document's in-memory op
   log (ADR-0023). The places are Yjs (ADR-0066): their storage is
   compacted, and nothing in memory is trimmed (S90). A client's command
   Line is stored too but not compacted: Kyneta cannot compact a replica of
   a document another peer writes, which its pruning should do upstream
   (S25). A card's text is Yjs, which Kyneta cannot compact live (S24).
+
+## Roots: steps, leases and the upkeep (`roots.ts`, ADR-0162)
+
+- **A root is reached only through a step's documents or a lease.** The
+  documents' keeper hands each step a `StepDocs` (the keeper's step
+  context, `packages/keeper/TECHNICAL.md`), revoked as the step ends: a
+  call after throws `StepEnded`. A plan takes the handles its step loaded.
+  Work off the keeper (lane work, which a step may await; a description's
+  read) takes a `Lease` from `LeaseBasics.leases` and disposes of it with
+  `await using`. Only `index.ts` makes the store (`createRoots`); a test
+  reads the sources and fails on any other (`roots.test.ts`).
+- **A run holds its root by a lease**, taken in `Runs.start`, which takes
+  its step's `StepDocs` and so runs only in a step, and released after the
+  run's `ended` has run. What reads a running lane's root (its stream, its
+  pinned cards, its canvas's context, its budget, its pending verdict, base
+  news, `save_blob`) reads `RunDocs.docOf`, whose null is "no run". The
+  leases say what must stay in memory; which lanes run is
+  `pinetrie:live`'s.
+- **pi opens a root only if a step or a lease holds it.** Its port
+  (`Roots.pi`) refuses any other root with `NotHeld`, the one check made at
+  run time, since pi's calls cross its package boundary. The scribe asks
+  once per root and keeps the session; that stays sound because the
+  upkeep runs the scribe's `release` before it lets the root go.
+- **One upkeep reconciles storage and memory** (`planUpkeep`, the keeper's
+  `later("upkeep")`, queued by `queueUpkeepOn`). It compacts the loaded
+  roots settles named and every root it lets go, then, after a settle, the
+  session's documents; runs each released root's `onReleasing` listeners
+  (the scribe's `release`, the directory's last write); lets go of every
+  loaded root no lease and no tab holds; and watches each root a tab holds
+  until none does. A load, a lease's release, a settle and a change to a
+  watched root's tabs each queue it. A failed
+  compaction is logged and the root let go all the same: Kyneta unloads it
+  only once the store holds every write. Only the upkeep unloads a root;
+  a test reads the sources and fails on any other `exchange.unload`, the
+  migrations' and the stacks of moves' aside.
+- **What follows, by construction:** L1, a root a step loaded stays loaded
+  until the step ends (only the upkeep unloads, and it is a step of the
+  same keeper); L2, a leased root stays loaded while its lease lives (it is
+  counted as it is taken, and the upkeep decides each unload again after
+  its last await); L3, with the keeper idle, no lease held and no tab
+  holding a root, no root is loaded (every load and release queues the
+  upkeep). `roots.model.test.ts` runs every sequence of three events (a
+  step, a lease, a release, a tab's ask, its sync, its drop, an idle wait) and
+  checks each after every event.
+- **A root a tab asked for is followed** (`exchange.documents`'
+  `doc-promoted` or `doc-created`) once the directory names it: a tab
+  announces the root it mints before its first send, and loading that one
+  would have the directory record it, so the send would find its id in use.
+  It is counted as loaded, and kept while a tab holds it: unloading one a
+  tab holds makes the tab ask again, and doing that at every load never
+  ends (S216). A tab that lets a root go destroys its copy before it stops
+  wanting it (`packages/session/TECHNICAL.md`), so the host hears it. A
+  root with no message is not recorded by the directory: a step may load a
+  tab's new root before its first send.
+- **A starting host opens only the roots of the lanes `pinetrie:live`
+  names as running** (`planLoads`), read before `recover` clears them, and
+  `recover` resumes the interrupted lanes among them. A root's first load
+  in a host's life queues `recoverRoot` as a step of its own: its
+  interrupted lanes resumed, records of a type no spec declares deleted,
+  malformed lanes logged.
+- **Archiving lets go of no root itself**: the upkeep does, as for any
+  root. Its close unloads the canvas's stacks of moves (`unloadCanvas`), which
+  keep their own lifetime (§ Moves' history). Restoring opens nothing.
+- **The suites read a root synchronously** through `rootsRead`
+  (`Roots.lastRead`): each root this host has loaded, by its newest
+  handle. A handle Kyneta has let go reads its last value, and only the
+  host writes a root, while it is loaded, so that value is the stored one.
+
 - **A command names its root and its canvas** (`Command.root`,
   `Command.canvas`, ADR-0063, ADR-0116): a chat writes in its root, and a
   chat at the root starts it, under the root and canvas ids the sender's tab
@@ -367,22 +422,21 @@ start's quiet gap is one of these, and its line names which.
 After `recover`, `sweepHistories` retires the histories of moves no one will undo again (§
 Moves' history), and `sweepHolds` deletes the holds on queues whose lane no
 root holds or whose root is archived (ADR-0048 step 7). Both run again after
-each run's end, in `settle`'s sweep.
+each run's end, in the upkeep's sweep.
 
 `recover` runs, in order: the clear of `pinetrie:live` (`planClear`: no
 stream survives a process), a new store's default workflow
 (`planWorkflowSeed`), the deletion of the records of a type no spec
-declares, in the session and the roots opened (`planUndeclaredSweep`,
-ADR-0100, so a renamed record leaves nothing behind), the deletion of
+declares in the session (`planUndeclaredSweep`, ADR-0100, so a renamed
+record leaves nothing behind), the deletion of
 the proposed changes, accepted-work and base records of another kind than the
 project's (`planKindSweep`, ADR-0150: caches of the project as it was
 before; a folder's `STATE` and `CONFLICT` records are kept whatever the
-kind), a
-log of the stored lane names, in the roots opened, that fail `isThreadId`
-(`readStoredLanes`: no reader is given them, so the log is where one shows;
-it never throws, and nothing is deleted), `ensureNames` (ADR-0039),
-`planStartup` over the queued cards and `interrupted(roots)`, each
-interrupted lane resumed before anything waiting for it (S36 item 18), the
+kind), `ensureNames` (ADR-0039), `recoverRoot` for each root opened, in
+one step (its undeclared records deleted, its stored lane names that fail
+`isThreadId` logged, since no reader is given them, and each interrupted
+lane resumed before anything waiting for it, S36 item 18), `planStartup`
+over the queued cards and those lanes, the
 project and commands records that changed in one write (`setIfChanged`),
 the sweep of what no one will type in again: empty cards, card documents
 with no record, and seat records no stored text names, all of them in one
@@ -391,8 +445,9 @@ their texts and deletes their histories, then the documents no record
 names), then traces older than 30 days and histories a crash left with no
 card (`provenance.sweep`, which each run's end's settle runs too), and last
 `settle` for the lanes with cards queued:
-its compaction is `later`, so it runs after every write above, and after
-any refresh they queued.
+its upkeep is `later`, so it runs after every write above, and after
+any refresh they queued. Every other root is recovered by `recoverRoot`
+as it first loads (§ Roots: steps, leases and the upkeep).
 
 - **A starting host reads its config before anything opens** (ADR-0146,
   `@pinetrie/config`). `startHost` takes `places` (each layer's file and
@@ -473,8 +528,9 @@ any refresh they queued.
 - **pi is made in three parts, each when what it needs exists**
   (ADR-0092, `packages/pi/TECHNICAL.md`), and every module is given values,
   never a function that returns one:
-  1. the documents, then the host's records (`createRecords`, ADR-0095),
-     which every module that writes a record takes
+  1. the documents and the roots' store (`createRoots`), then the host's
+     records (`createRecords`, ADR-0095), which every module that writes a
+     session record takes
      (`Pick<Records, "writeValues">`), then the cards' texts, provenance and
      the writer of the places (`createPlaces`), which every module that
      writes a card takes (`placesWriter`), then the scribe;
@@ -482,7 +538,8 @@ any refresh they queued.
      before the store opens, so a refusal leaves nothing to close), then
      pi's setup (`loadPiSetup`), which loads from its root and reads no
      document; the title-model and banner logs follow it;
-  3. the documents' keeper, the roots `planLoads` names, the directory,
+  3. the documents' keeper, with the roots' step context, the roots
+     `planLoads` names, opened in one step, the directory,
      banners, digests, titles, names and the split call, each
      with the records and the setup;
   4. lane work, with them;
@@ -644,7 +701,7 @@ rejects `shutdown()`.
   card (`placeCanvas`, the card commands': a move in its mover's history
   outside any canvas, a reorder in none, with its card's history) and
   answers `moved`; one that crosses the archive's edge gathers the canvas's
-  roots' documents (`docs.root` loads an unloaded one, S86) and
+  roots' documents (its step's `StepDocs` loads each) and
   `planArchive`s the crossing first. A refusal is a card move's,
   `unmoved`, saying where the card is and who put it there. An undo of
   moves whose step crossed the archive's edge is refused `archived`
@@ -850,7 +907,10 @@ rejects `shutdown()`.
   `retire` destroys a stack loaded or not (S91).
 - **Unloaded when nobody can use them:** a person's when their last seat
   leaves (the seats step, `idleWriters`), a canvas's when it is archived
-  (`unloadCanvas`). The next move loads one again (S91).
+  (`unloadCanvas`, in its close's last step). The next move loads one
+  again (S91). The upkeep does not unload them: whether a stack loaded
+  again still refuses the undo of a move the host overtook meanwhile is
+  not measured (ADR-0162).
 - **Shutdown disposes them, then flushes,** so a stack's open step is
   stored before the Exchange stops.
 
@@ -1000,7 +1060,8 @@ queued cards, which `planArchive` refuses.
   the canvas (a title's) it writes into, and on a refusal logs `[host]
   <thread>: <what> not written: <why>` (`awayWords`) and stops. Else
   `plan` reads the documents as they are now and returns a `LateWrite`,
-  which `Later` carries out: its records (`Records`), then each fact,
+  which `Later` carries out: its records (the step's `StepDocs.records`,
+  which write a root's too), then each fact,
   gated again on its own lane and queued by `queueFact` (`facts.ts`), each
   a host change of its own with its history and its lane's drain, then
   `after`, a write whose own rule gates it in the same step (a relay,
@@ -1011,12 +1072,10 @@ queued cards, which `planArchive` refuses.
   anything is awaited, so a caller that orders its step ahead of another's
   by queueing first keeps that order (`answers.ended`'s held answers ahead
   of the run's end's drain).
-- **A plan never reads through `docs.root` or a handle from before the
-  gap.** It reads `docs.view` or `docOfLane`, or `threadsNow`'s `thread`,
-  which opens a root only for a live thread. A thread `lateAway` lets
-  through is live, and a live thread's root is held once it is started
-  (S199), so a late step opens no archived root and makes no destroyed one
-  again.
+- **A late step loads its thread's root once the gate lets it through**,
+  then plans; the plan reads through the step's `StepDocs`, never a handle
+  read before the gap. A refused step loads nothing, so a late step opens
+  no archived root and makes no destroyed one again.
 - **`Later.outside`** asks a model outside the keeper, tracked so `quiet`
   waits for it, then plans its answer as a `step`; a null answer writes
   nothing. With `held`, a key is in a set while the request is out, for the

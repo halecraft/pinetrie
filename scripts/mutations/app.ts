@@ -15,16 +15,7 @@ export const mutations: readonly Mutation[] = [
     expect:
       "a lane whose removal fails leaves the other lanes removed and the snapshots deleted",
   },
-  {
-    name: "an ask of an archived member opens its root first",
-    file: "apps/pinetrie/host/relays.ts",
-    from: '    if (away !== null) return { kind: "refused", why: away }\n',
-    to: "",
-    suite: "host",
-    scenario: "agents",
-    expect:
-      "an ask of a member whose canvas was archived says why, and its root stays unloaded",
-  },
+
   // ── agents talking, the host suite's agents scenario ──
   {
     name: "a chat stores none of the agents it invites",
@@ -1648,8 +1639,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the dispatcher answers a move on the board without moving",
     file: "apps/pinetrie/host/commands/index.ts",
-    from: "        return handleCanvasMove(\n          { ...deps, moves: cardCommands },\n          writer,\n          intent,\n        )\n",
-    to: '        return settled({ kind: "moved" })\n',
+    from: "        return handleCanvasMove(\n",
+    to: '        return settled({ kind: "moved" }) ?? handleCanvasMove(\n',
     suite: "host",
     scenario: "board",
     expect:
@@ -1668,8 +1659,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a root moved out of Done keeps its place there",
     file: "apps/pinetrie/host/commands/board.ts",
-    from: "  const outcome = await deps.moves.placeCanvas(writer, moved)\n",
-    to: '  const outcome =\n    moved.transition === "archive"\n      ? await deps.moves.placeCanvas(writer, moved)\n      : settled({ kind: "moved" })\n',
+    from: "  const outcome = await deps.moves(roots).placeCanvas(writer, moved)\n",
+    to: '  const outcome =\n    moved.transition === "archive"\n      ? await deps.moves(roots).placeCanvas(writer, moved)\n      : settled({ kind: "moved" })\n',
     suite: "host",
     scenario: "board",
     expect:
@@ -1715,8 +1706,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the scribe writes into another document",
     file: "apps/pinetrie/host/index.ts",
-    from: "  const scribe = createScribe({ documents: docs, replicaId: newId(), blobs })",
-    to: "  const scribe = createScribe({\n    documents: { ...docs, root: async () => newRootDoc() },\n    replicaId: newId(),\n    blobs,\n  })",
+    from: "    documents: roots.pi,\n    replicaId: newId(),\n",
+    to: "    documents: { ...roots.pi, root: async () => newRootDoc() },\n    replicaId: newId(),\n",
     suite: "host",
     scenario: "send",
     expect: "the thread reads the message, then the agent's reply",
@@ -1724,7 +1715,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the agent's streams reach no document",
     file: "apps/pinetrie/host/index.ts",
-    from: "    onStream: streamInto(basics),",
+    from: "    onStream: streamInto(basics, runDocs),",
     to: "    onStream: () => {},",
     suite: "host",
     scenario: "send",
@@ -2023,8 +2014,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the drain waits behind a move that came after the queue",
     file: "apps/pinetrie/host/index.ts",
-    from: "    void keeper.once(`drain:${lane}`, () => drain(lane))",
-    to: "    setTimeout(() => void keeper.once(`drain:${lane}`, () => drain(lane)), 300)",
+    from: "    void keeper.once(`drain:${lane}`, step => drain(step, lane))",
+    to: "    setTimeout(() => void keeper.once(`drain:${lane}`, step => drain(step, lane)), 300)",
     suite: "host",
     scenario: "cards",
     expect:
@@ -2178,7 +2169,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an archived root's harness outlives its document",
     file: "apps/pinetrie/host/index.ts",
-    from: "  docs.onReleasing(root => scribe.release(root))\n",
+    from: "  roots.onReleasing(async root => scribe.release(root))\n",
     to: "",
     suite: "browser",
     scenario: "page",
@@ -2207,8 +2198,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a retitle is answered without asking the model",
     file: "apps/pinetrie/host/commands/index.ts",
-    from: "        return settled(await deps.titles.asked(intent.canvas, writer))",
-    to: '        return settled({ kind: "retitling" })',
+    from: "          await deps.titles.asked(step.basics.roots, intent.canvas, writer),",
+    to: '          { kind: "retitling" } as const,',
     suite: "host",
     scenario: "titles",
     expect:
@@ -2729,5 +2720,24 @@ export const mutations: readonly Mutation[] = [
     suite: "host",
     scenario: "send",
     expect: "a host with no model starts, and its setup record says why",
+  },
+  {
+    name: "the host hears no tab hold a root",
+    file: "apps/pinetrie/host/roots.ts",
+    from: '    if (states.some(s => s.state === "pending")) return "pending"\n',
+    to: '    if (states.length >= 0) return "none"\n',
+    suite: "host",
+    scenario: "board",
+    expect:
+      "a root is loaded while a tab holds it, and let go once none does and the host is quiet",
+  },
+  {
+    name: "a refused ask does not say why",
+    file: "apps/pinetrie/host/relays.ts",
+    from: "    relayRefusalText(why, personName)",
+    to: '    (void why, "it cannot be asked.")',
+    suite: "host",
+    scenario: "agents",
+    expect: "an ask of a member whose canvas was archived says why",
   },
 ]

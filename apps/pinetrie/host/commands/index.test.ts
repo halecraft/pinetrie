@@ -8,7 +8,6 @@ import {
   writerId,
 } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
-import { createKeeper } from "@pinetrie/keeper"
 import type { WireCommand } from "@pinetrie/protocol/codec"
 import type { Reply } from "@pinetrie/protocol/messages"
 import { readPlaces } from "@pinetrie/reads"
@@ -21,7 +20,6 @@ import {
 } from "@pinetrie/rules"
 import { writeEntry } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
-import type { HostKey } from "../basics.ts"
 import {
   applyWrites,
   basics,
@@ -34,9 +32,11 @@ import {
   ROOT_ID,
   record,
   seedPlaces,
+  stepKeeper,
   threadRow,
   writeDirectory,
 } from "../fakes.ts"
+import type { StepRecords } from "../records.ts"
 import type { Destination, ProposedChangesActs } from "../work/destination.ts"
 import { type CommandDeps, createCommands, placeOfCommand } from "./index.ts"
 
@@ -69,7 +69,6 @@ function setUp(
   { writes = true }: { readonly writes?: boolean } = {},
 ) {
   const b = basics()
-  const keeper = createKeeper<HostKey>()
   const cards = record<CommandDeps["cards"]>({
     writers: async () => [],
     destroy: async () => {},
@@ -88,12 +87,14 @@ function setUp(
   const pi = record<
     CommandDeps["agent"] &
       CommandDeps["scribe"] &
-      CommandDeps["records"] &
+      Pick<StepRecords, "writeValues"> &
       CommandDeps["piSetup"]
   >({
     appendToTree: async () => ({ kind: "appended", id: entryId("e-2") }),
     ...(writes ? { writeValues: async w => applyWrites(b, w) } : {}),
   })
+  // A step's records are the agent's record's too, so its writes show there.
+  const keeper = stepKeeper(b, { records: pi.port })
   const commands = createCommands({
     relays: { relayMessage: async () => {} },
     basics: b,
@@ -122,7 +123,9 @@ function setUp(
     drain: lane => void drains.push(lane),
     histories: record<CommandDeps["histories"]>({
       gestureOf: async () => write => write(),
+      unloadCanvas: async () => {},
     }).port,
+    runs: { docOf: () => null },
     // Its own writes, so a test counting the agent's sees only the command's.
     ...placesFor(b, { texts: cards.port }),
     titles: titles.port,
@@ -202,10 +205,9 @@ test("a chat completes while an acceptance is held open on your repo's owner", a
   ])
 })
 
-test("a move into Done holds the keeper only for its place and its unload: a command waits on neither its teardown, and one into the root is refused meanwhile; its reply comes after it all", async () => {
+test("a move into Done holds the keeper only for its place and its stacks' unload: a command waits on neither its teardown, and one into the root is refused meanwhile; its reply comes after it all", async () => {
   const teardown = Promise.withResolvers<void>()
   const {
-    b,
     commands,
     replies,
     sender,
@@ -234,7 +236,6 @@ test("a move into Done holds the keeper only for its place and its unload: a com
   teardown.resolve()
   await archive
   expect(replies.at(-1)).toMatchObject({ id: "a-1", outcome: "moved" })
-  expect(b.docs.loaded()).not.toContain(ROOT_ID)
 })
 
 test("a chat in an archived root is refused, and the agent is never called", async () => {
@@ -307,7 +308,7 @@ test("a chat command spends its card once written, record then text, answering w
 test("a popped queued card in an archived root is refused, and the agent is never called", async () => {
   const { b, pi, commands } = setUp()
   placeRoot(b, DONE)
-  const out = await commands.sendPoppedQueuedCard(ALICE, "s-1", {
+  const out = await commands.sendPoppedQueuedCard(b.roots, ALICE, "s-1", {
     kind: "send",
     text: "from the queue",
     root: ROOT_ID,
@@ -353,7 +354,7 @@ test("nothing runs in a thread in an inventory", async () => {
   expect(replies.map(r => [r.outcome, r.errorMessage])).toEqual(
     Array(4).fill(["refused", HELD_WORDS]),
   )
-  const popped = await commands.sendPoppedQueuedCard(ALICE, "s-1", {
+  const popped = await commands.sendPoppedQueuedCard(b.roots, ALICE, "s-1", {
     kind: "send",
     text: "from the queue",
     root: ROOT_ID,
@@ -399,7 +400,7 @@ test("nothing runs on a lane of another kind than the project's; a held one is r
     history: "folder",
   })
   await commands.handle(sender, ALICE, said(cardIdFor("c1")))
-  const popped = await commands.sendPoppedQueuedCard(ALICE, "s-1", {
+  const popped = await commands.sendPoppedQueuedCard(b.roots, ALICE, "s-1", {
     kind: "send",
     text: "from the queue",
     root: ROOT_ID,
@@ -477,7 +478,8 @@ test("a retitle asks for its canvas's title as its sender, and answers retitling
     kind: "retitle",
     canvas: CANVAS_ID,
   } as never)
-  expect(titles.calls.map(c => [c.method, ...c.args])).toEqual([
+  // Asked in the command's step, with its documents first.
+  expect(titles.calls.map(c => [c.method, ...c.args.slice(1)])).toEqual([
     ["asked", CANVAS_ID, ALICE],
   ])
   expect(replies.map(r => [r.id, r.outcome])).toEqual([

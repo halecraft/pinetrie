@@ -1,5 +1,4 @@
 import { entryId, runId, threadIdFor, writerId } from "@pinetrie/core"
-import { createKeeper } from "@pinetrie/keeper"
 import {
   type PiSetup,
   SCRIPTED_DESCRIPTION,
@@ -33,10 +32,11 @@ import {
   ROOT_ID,
   record,
   row,
+  stepKeeper,
   writesOf,
 } from "./fakes.ts"
 import { createLater } from "./later.ts"
-import type { Records } from "./records.ts"
+import type { StepRecords } from "./records.ts"
 import { endRun } from "./runs.ts"
 
 const lane = threadIdFor("0123456789abcdef")
@@ -79,7 +79,7 @@ function running(
   const presence = newPresenceDoc()
   // The setup and the scribe in one record, so the order of their calls shows.
   const pi = record<
-    Pick<PiSetup, "complete" | "skill"> & Pick<Records, "writeValues">
+    Pick<PiSetup, "complete" | "skill"> & Pick<StepRecords, "writeValues">
   >({
     skill: async () => ({ path: "SKILL.md", content: "Summarize.", hash: "h" }),
     complete: async () => ({ text: await answer, tokens: 0 }),
@@ -87,11 +87,10 @@ function running(
   })
   // The thread on an open canvas, so its late writes land.
   putCanvas(b, lane)
-  const keeper = createKeeper()
+  const keeper = stepKeeper(b, { records: pi.port })
   const later = createLater({
     basics: b,
     keeper,
-    records: pi.port,
     placesWriter: placesFor(b).placesWriter,
     drain: () => {},
   })
@@ -102,7 +101,10 @@ function running(
     piSetup: pi.port,
     enabled,
   })
-  const pending = writePendingVerdict({ basics: b, records: pi.port })
+  const pending = writePendingVerdict({
+    runs: { docOf: () => b.root },
+    records: pi.port,
+  })
   const read = () =>
     presence.reading.set(
       readingKey(seatKey(writerId("ada@example.com"), "s1"), "c1"),
@@ -418,13 +420,14 @@ test("the scripted model answers a run's end with a verdict and a digest, so the
 test("a run's end answered after its canvas was archived writes nothing and opens no root", async () => {
   const answer = Promise.withResolvers<string | null>()
   const { b, pi, keeper, digests } = await stopping(answer.promise)
+  await digests.ended(ROOT_ID, lane, entryId("e-1"), failed)
+  // What the late step opens, from here on.
   const opened: unknown[] = []
-  const root = b.docs.root.bind(b.docs)
-  b.docs.root = async id => {
+  const root = b.roots.root
+  ;(b.roots as { root: typeof root }).root = async id => {
     opened.push(id)
     return root(id)
   }
-  await digests.ended(ROOT_ID, lane, entryId("e-1"), failed)
   const written = writesOf(pi.calls).length
   // Its canvas is archived while the model writes.
   archiveCanvas(b)

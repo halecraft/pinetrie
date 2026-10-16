@@ -33,11 +33,12 @@ import {
   transcriptLines,
 } from "@pinetrie/rules"
 import { readEntryMessage } from "@pinetrie/schema"
-import type { Basics } from "./basics.ts"
+import type { Basics, HostKeeper } from "./basics.ts"
 import type { Budgets } from "./budgets.ts"
 import type { Later, LateWrite } from "./later.ts"
 import type { Relays } from "./relays.ts"
-import type { Runs } from "./runs.ts"
+import type { StepDocs } from "./roots.ts"
+import type { RunDocs, Runs } from "./runs.ts"
 import { threadsNow } from "./threads-now.ts"
 import type { LaneWork } from "./work/index.ts"
 
@@ -65,6 +66,10 @@ export function createAnswers(deps: {
     "docs" | "session" | "places" | "live" | "now" | "log"
   >
   readonly later: Later
+  /** A round's gather reads its asker's thread in a step of its own. */
+  readonly keeper: Pick<HostKeeper, "run">
+  /** A run's prompt is read at its end, while its lease holds its root. */
+  readonly runs: RunDocs
   /** A relay into another thread, gated by both threads' reach when it runs. */
   readonly relays: Pick<Relays, "deliver">
   readonly agent: Pick<Agent, "lane">
@@ -76,7 +81,7 @@ export function createAnswers(deps: {
   readonly piSetup: Pick<PiSetup, "complete" | "skill">
 }): Answers {
   const { basics, budgets, later } = deps
-  const { docs, session } = basics
+  const { session } = basics
   const threads = threadsNow(basics)
   // Answers that wake nobody, for a lane that was running when they came:
   // appended when its run ends, never steered into it, so its agent does
@@ -120,8 +125,9 @@ export function createAnswers(deps: {
         }
       case "answer":
         return {
-          after: () =>
+          after: roots =>
             deliver(
+              roots,
               lane,
               relay,
               encodeAnswer(plan.answer, basics.now()),
@@ -133,12 +139,13 @@ export function createAnswers(deps: {
 
   /** `message` into the asker's thread, as `planDelivery` places it. */
   async function deliver(
+    roots: StepDocs,
     lane: ThreadId,
     relay: RelayDetails,
     message: AnswerMessage,
     wakes: boolean,
   ): Promise<void> {
-    const from = await threads.thread(relay.from)
+    const from = await threads.thread(roots, relay.from)
     if (from === null) return
     const to = planDelivery({
       lane: from.lane,
@@ -155,7 +162,7 @@ export function createAnswers(deps: {
         if (typeof runnable === "object")
           await deps.agent.lane(to.thread).append(message)
         else
-          deps.start(runnable, {
+          deps.start(roots, runnable, {
             kind: "prompt",
             message,
             pinnedSeen: [],
@@ -217,9 +224,9 @@ export function createAnswers(deps: {
 
   /** `lane`'s answer to `relay`, the relayed run that `prompt` started. */
   const answer = (lane: ThreadId, prompt: EntryId, relay: RelayDetails) =>
-    later.step({ kind: "thread", thread: lane }, "an answer", () => {
-      const doc = docs.docOfLane(lane)
-      if (doc === null) return null
+    later.step({ kind: "thread", thread: lane }, "an answer", async roots => {
+      const doc = (await roots.lane(lane))?.doc
+      if (doc === undefined) return null
       const index = readTreeIndex(doc)
       const asks = indexAsks(index)
       const outcome = askOutcome(index, asks, prompt, { running: false })
@@ -252,7 +259,9 @@ export function createAnswers(deps: {
    */
   async function round(relay: RelayDetails): Promise<void> {
     if (threads.reach(relay.from).kind !== "open") return
-    const from = await threads.thread(relay.from)
+    const from = await deps.keeper.run(roots =>
+      threads.thread(roots, relay.from),
+    )
     if (from === null) return
     const asked = from.index.entries[relay.source]?.message?.asks ?? []
     if (
@@ -302,10 +311,10 @@ export function createAnswers(deps: {
             }
           case "ask":
             return {
-              after: async () => {
-                const now = await threads.thread(relay.from)
+              after: async roots => {
+                const now = await threads.thread(roots, relay.from)
                 if (now === null) return
-                await deps.relays.deliver(relay.from, next.thread, {
+                await deps.relays.deliver(roots, relay.from, next.thread, {
                   source: now.end ?? relay.source,
                   asker: { kind: "person", writer: relay.by },
                   askerName: threads.personName(relay.by),
@@ -324,15 +333,17 @@ export function createAnswers(deps: {
 
   return {
     async ended(lane, prompt) {
+      // Read before the first await, while the run's lease holds its root:
+      // the prompt's entry is written once, so reading it now holds.
+      const doc = deps.runs.docOf(lane)
+      const stored =
+        doc === null || prompt === null ? null : readEntryMessage(doc, prompt)
       // Queued now, before the run's end drains the lane: what waited for
       // the run is appended before anything the drain starts.
       const held = heldAnswers(lane)
       await Promise.all(held)
       if (prompt === null) return
       await budgets.runEnded(prompt)
-      const doc = docs.docOfLane(lane)
-      // The prompt's entry is written once, so reading it here holds.
-      const stored = doc === null ? null : readEntryMessage(doc, prompt)
       const relay =
         stored?.present === true ? decodeRelay(stored.message) : undefined
       if (relay === undefined) return

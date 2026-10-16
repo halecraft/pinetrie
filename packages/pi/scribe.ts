@@ -118,6 +118,10 @@ export function createScribe(options: {
       built: undefined,
     }
     held.set(root, made)
+    // A root the host refused to hand over is asked again next time.
+    made.session.catch(() => {
+      if (held.get(root) === made) held.delete(root)
+    })
     return made
   }
 

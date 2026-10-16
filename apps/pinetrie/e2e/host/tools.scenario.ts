@@ -180,7 +180,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     // hide them here.
     await th.quiet()
     const ranIn = l3 === undefined ? null : th.docs.rootOfLane(l3.name)
-    const ranDoc = ranIn === null ? null : th.docs.view(ranIn)?.doc
+    const ranDoc = ranIn === null ? null : th.rootsRead().get(ranIn)
     const compacted =
       ranIn === null
         ? { records: Number.POSITIVE_INFINITY, bytes: 0 }

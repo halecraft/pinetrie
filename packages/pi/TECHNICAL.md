@@ -34,7 +34,11 @@ object its factory did not make. `index.ts` exports neither the maps nor
 The host gives the scribe and the agent its `AgentDocuments`: a root's
 document by its `RootId`, and the root a lane works in (its `LANE` record).
 The session's document has no pi session: the host writes its records
-itself (ADR-0095).
+itself (ADR-0095). The host hands over a root only while a step of its
+documents' keeper or a lease holds it, and refuses any other (ADR-0162).
+The scribe asks once per root and keeps the session; a refusal is not
+kept, so the next call asks again. That stays sound because the host runs
+`release` before it lets a root go.
 
 - **The scribe holds each root's one `KynetaStorage` and
   `StorageBackedSession`**, made the first time an append or the agent asks,

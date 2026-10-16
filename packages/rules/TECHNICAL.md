@@ -118,7 +118,10 @@ package must never require changing stored data.
 document, one keyed by a root's entries in that root's. `setRecord`,
 `deleteRecord` and `setIfChanged` take the root exactly when the home is
 `"root"` (overloads), and put the `Target` in the `ValueWrite`, so a write
-cannot reach the wrong document and needs no guard at run time.
+cannot reach the wrong document and needs no guard at run time. The home is
+in the write's type too, `ValueWrite<H>` (`@pinetrie/core`): the host's
+port that modules get at startup takes `ValueWrite<"session">` alone, so a
+root's record is written only through a step's documents (ADR-0162).
 `records.test.ts` lists every spec's home.
 
 - **`ROOT`** (`roots.ts`): a root's directory record, keyed by its `RootId`:
@@ -874,9 +877,8 @@ width, so a card has one place by construction.
   history, the archive gate) while nothing trashed is drawn, and
   `canvasOfPlace` of any place is its owner's canvas (`ownerOf`).
   A reader that means "on the canvas" reads `canvases` (`cardsOnCanvas`,
-  `isOnCanvas`), never `canvasOfThread`. `rootsHeld` holds a trashed
-  thread's root, so a restart within the week keeps its messages loaded for
-  a restore or a link.
+  `isOnCanvas`), never `canvasOfThread`. A trashed thread is live
+  (`isLivePlace`), so a restore or a link within the week still reaches it.
 - **One way to make a canvas** (`planCanvasOpening`): its card by the host,
   its opener its owner, at the end of its state on the board (`boardEnd`);
   `no-place` before the board has states. A thread opening in a new canvas's
@@ -922,16 +924,7 @@ width, so a card has one place by construction.
   it names (`after`), or the thread its fork is in. `planOpenThread`'s
   branch case calls it once; a proposal's press, once per row
   (`planBranchOut`).
-- **`rootsHeld`**: the roots with a thread at a live place
-  (`isLivePlace`: the card, unwrapped from the trash, on the canvas of a
-  canvas outside the archive, or in an inventory): what a starting host
-  loads, and what archiving keeps. A root the directory does not name has
-  no document yet (an unstarted new canvas's, ADR-0063) and is not held. The
-  directory names a root by any record of it, one that decodes in this
-  build's shape or not (`readStartedRoots`, `@pinetrie/reads`): `ROOT` is
-  derived and changes shape with no migration, and a stale record read as
-  none left an open canvas's root unloaded after startup, and the lanes a
-  crash interrupted in it unresumed (S199).
+
 - **`forkOf`**: each forked thread's fork (`ThreadFork`), a branch's or a
   copy's, from its record's `origin`: where its column ends before its
   first send, and whether its fork row says "copied from".
@@ -2123,8 +2116,8 @@ a round is done are read from the path (`threadMembers`, `lastHeardEntry`,
   holds no queue (`planStop`).
 - **A late write's gate** (`reach.ts`, `lateAway`): what the host decided
   before a gap lands only in a thread at a live place (`isLivePlace`,
-  `canvas-index.ts`), the rule a root is held by, so a write let through finds its
-  root loaded; a thread not opened yet (named for a column before its
+  `canvas-index.ts`), whose late step then loads its root (ADR-0162); a thread not
+  opened yet (named for a column before its
   first message) is in no canvas and takes one; a canvas scope (a title's)
   takes one unless it is archived. A refusal is an `Away`, worded by
   `awayWords`. Three readings of whether a thread can take work, each for

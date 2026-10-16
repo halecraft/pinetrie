@@ -167,7 +167,7 @@ export interface ThreadLanes {
   createThreadLane(at: Position, lane: ThreadId): Promise<CreateOutcome>
   lane(name: ThreadId): ThreadLaneHandle
   /** Lanes pi holds an operation open on: a crash interrupted them. */
-  interrupted(): Promise<readonly ThreadId[]>
+  interrupted(skip?: (lane: ThreadId) => boolean): Promise<readonly ThreadId[]>
 }
 
 export function threadLanes(input: {
@@ -262,9 +262,10 @@ export function threadLanes(input: {
       })
     },
 
-    async interrupted() {
+    async interrupted(skip) {
       const out: ThreadId[] = []
       for (const name of readLaneNames(doc)) {
+        if (skip?.(name) === true) continue
         const lane = await existing(name)
         if (lane === undefined) continue
         const info = await lane.inspectExecution(CTX)

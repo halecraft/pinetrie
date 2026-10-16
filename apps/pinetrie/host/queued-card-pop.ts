@@ -175,7 +175,10 @@ export interface QueuedCardPopDeps {
   /** Where a fact is appended. */
   readonly agent: Pick<Agent, "lane">
   readonly work: Pick<LaneWork, "prepareUpdate" | "prepareSplit" | "runnable">
-  readonly start: Runs["start"]
+  /** Start a run in the drain's step, whose documents lease its root. */
+  readonly start: (
+    ...args: Parameters<Runs["start"]> extends [unknown, ...infer R] ? R : never
+  ) => ReturnType<Runs["start"]>
   /** Send a popped card's text as its queuer's message, through the gate and `sendMessage`. */
   readonly send: (popped: PoppedMessage) => Promise<Outcome>
   /** Where a queued reference's quote is read. */

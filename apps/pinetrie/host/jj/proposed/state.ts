@@ -39,7 +39,7 @@ import {
   setRecord,
 } from "@pinetrie/rules"
 import { readLaneTip } from "@pinetrie/schema"
-import type { Basics } from "../../basics.ts"
+import type { LeaseBasics } from "../../basics.ts"
 import { canvasesNow } from "../../canvases.ts"
 import type { Records } from "../../records.ts"
 
@@ -50,13 +50,13 @@ export interface ProposedChangesDocs {
   archived(lane: ThreadId): boolean
   /** A gather's input: the lane, its name, accepted work's names, and the last catch-up read, a memo `readCatchUp` keeps at the same tip and base commit. */
   input(lane: ThreadId): ProposedChangesInput
-  /** The lane's tip entry, for `Pinetrie-Entry`; "" for none. */
-  tipOf(lane: ThreadId): string
+  /** The lane's tip entry, for `Pinetrie-Entry`, its root leased; "" for none. */
+  tipOf(lane: ThreadId): Promise<string>
   /**
    * Proposed changes' line until an agent describes it: the thread's name and
-   * its own first message, the first prompt its lane ran.
+   * its own first message, the first prompt its lane ran, its root leased.
    */
-  wipLine(lane: ThreadId, name: ThreadName): string
+  wipLine(lane: ThreadId, name: ThreadName): Promise<string>
 }
 
 /** The records the host writes from your repo, the page's cache. */
@@ -69,7 +69,7 @@ export interface ProposedChangesRecords {
   remove(lane: ThreadId): Promise<void>
   /** The lane's base record as the repo says it, when it differs from the page's; none for null. */
   writeBase(next: JjBaseRecord | null): Promise<void>
-  writeValues(writes: readonly ValueWrite[]): Promise<void>
+  writeValues(writes: readonly ValueWrite<"session">[]): Promise<void>
 }
 
 /** Everything proposed changes module may use; each names the `Pick` it needs. */
@@ -78,7 +78,7 @@ export interface ProposedChangesDeps {
   readonly owner: RepoOwner
   /** Accepted work's names. */
   readonly repoConfig: RepoConfig
-  readonly basics: Basics
+  readonly basics: LeaseBasics
   /** What a description asks of the model. */
   readonly piSetup: Pick<PiSetup, "skill" | "complete">
   /** Whether a lane is running now: proposed changes are described once it stops. */
@@ -90,7 +90,7 @@ export interface ProposedChangesDeps {
 export function createProposedChangesDeps(input: {
   readonly owner: RepoOwner
   readonly repoConfig: RepoConfig
-  readonly basics: Basics
+  readonly basics: LeaseBasics
   readonly records: Pick<Records, "writeValues">
   readonly piSetup: Pick<PiSetup, "skill" | "complete">
   readonly running: (lane: ThreadId) => boolean
@@ -98,8 +98,8 @@ export function createProposedChangesDeps(input: {
   readonly baseChanged: (lane: ThreadId) => void
 }): ProposedChangesDeps {
   const { basics, repoConfig } = input
-  const { session: doc, docs } = basics
-  const writeValues = (writes: readonly ValueWrite[]) =>
+  const { session: doc } = basics
+  const writeValues = (writes: readonly ValueWrite<"session">[]) =>
     writes.length === 0 ? Promise.resolve() : input.records.writeValues(writes)
   const nameOf = (lane: ThreadId) => readNames(doc).get(lane)
   const proposedDocs: ProposedChangesDocs = {
@@ -122,12 +122,14 @@ export function createProposedChangesDeps(input: {
       repoConfig,
       known: jjCatchUp(readBases(doc).get(lane)),
     }),
-    tipOf(lane) {
-      const root = docs.docOfLane(lane)
+    async tipOf(lane) {
+      await using held = basics.leases.lane(lane)
+      const root = held === null ? null : await held.ready
       return (root === null ? null : readLaneTip(root, lane)) ?? ""
     },
-    wipLine(lane, name) {
-      const root = docs.docOfLane(lane)
+    async wipLine(lane, name) {
+      await using held = basics.leases.lane(lane)
+      const root = held === null ? null : await held.ready
       if (root === null) return wipDescription(name, "")
       const index = readTreeIndex(root)
       const tip = readLaneTip(root, lane)

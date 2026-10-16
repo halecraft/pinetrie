@@ -10,6 +10,10 @@
 // order queued. `later` is upkeep: it starts only when no `run` or `once` step
 // waits. `once` and `later` merge by key: a step queued and not yet started
 // covers every call with its key until it starts.
+//
+// A keeper made with a step context hands each step a value of its own: made
+// as the step starts, and closed once the step settles. What a step reaches
+// through it is that step's alone.
 
 /** What a closed keeper's steps reject with. */
 export class KeeperClosed extends Error {
@@ -31,25 +35,36 @@ export interface SlowStep {
 }
 
 /**
+ * What each step of a keeper is handed. `close` runs once the step has
+ * settled, whether it threw or not, and before the next step opens its own.
+ */
+export interface StepContext<C> {
+  open(): C
+  close(context: C): void
+}
+
+/**
  * Every promise a keeper returns is already handled: a caller may void it.
  * Awaiting it inside a function whose own promise is voided is not safe: that
- * function's promise then rejects unhandled.
+ * function's promise then rejects unhandled. Nor is awaiting a step of the
+ * same keeper inside one of its steps: the inner step waits for the outer one
+ * to end, which waits for the inner.
  */
-export interface Keeper<K extends string = never> {
+export interface Keeper<K extends string = never, C = void> {
   /** A step someone waits on: after every `run` and `once` step queued before it, before any `later` step not yet started. */
-  run<T>(step: () => Promise<T>): Promise<T>
+  run<T>(step: (context: C) => Promise<T>): Promise<T>
   /**
    * A `run` step queued at most once per key until it starts; a call while it
    * runs queues one more. Every caller gets the promise of the step that
    * covers its call.
    */
-  once(key: K, step: () => Promise<void>): Promise<void>
+  once(key: K, step: (context: C) => Promise<void>): Promise<void>
   /**
    * Upkeep: queued once per key until it starts, and started only when no
    * `run` or `once` step waits. So a `later` step runs after every `run` and
    * `once` step queued before it starts.
    */
-  later(key: K, step: () => Promise<void>): Promise<void>
+  later(key: K, step: (context: C) => Promise<void>): Promise<void>
   /** Hold `work` in `idle` until it settles. */
   track<T>(work: Promise<T>): Promise<T>
   /** Settles when nothing is queued, running or tracked, including what is added while it waits. */
@@ -58,15 +73,17 @@ export interface Keeper<K extends string = never> {
   close(): void
 }
 
-interface Entry {
+interface Entry<C> {
   readonly key: string | null
-  readonly step: () => Promise<unknown>
+  readonly step: (context: C) => Promise<unknown>
   readonly queued: number
   readonly done: PromiseWithResolvers<unknown>
 }
 
-export function createKeeper<K extends string = never>(
+export function createKeeper<K extends string = never, C = void>(
   options: {
+    /** What each step is handed; without one, `undefined`. */
+    readonly context?: StepContext<C>
     /** Hears each failed step once; its callers still get the rejection. */
     readonly onError?: (error: unknown) => void
     /** Called for each `SlowStep`. */
@@ -74,16 +91,17 @@ export function createKeeper<K extends string = never>(
     readonly slowMs?: number
     readonly now?: () => number
   } = {},
-): Keeper<K> {
+): Keeper<K, C> {
+  type Queued = Entry<C>
   const now = options.now ?? (() => performance.now())
   const slowMs = options.slowMs ?? 1000
   /** `run` and `once` steps, in the order queued. */
-  const waiting: Entry[] = []
+  const waiting: Queued[] = []
   /** `later` steps, in the order queued. */
-  const upkeep: Entry[] = []
+  const upkeep: Queued[] = []
   /** Keyed steps queued and not yet started. */
-  const onceQueued = new Map<string, Entry>()
-  const laterQueued = new Map<string, Entry>()
+  const onceQueued = new Map<string, Queued>()
+  const laterQueued = new Map<string, Queued>()
   const tracked = new Set<Promise<unknown>>()
   const listeners = new Set<() => void>()
   let running = false
@@ -95,7 +113,10 @@ export function createKeeper<K extends string = never>(
     listeners.clear()
   }
 
-  function entry(key: string | null, step: () => Promise<unknown>): Entry {
+  function entry(
+    key: string | null,
+    step: (context: C) => Promise<unknown>,
+  ): Queued {
     const done = Promise.withResolvers<unknown>()
     done.promise.catch(error => options.onError?.(error))
     return { key, step, queued: now(), done }
@@ -116,7 +137,15 @@ export function createKeeper<K extends string = never>(
       }
       running = true
       const started = now()
+      const { context } = options
+      let opened: { readonly value: C } | null = null
       const finish = () => {
+        if (context !== undefined && opened !== null)
+          try {
+            context.close(opened.value)
+          } catch (error) {
+            options.onError?.(error)
+          }
         const ran = now() - started
         const waited = started - next.queued
         if (ran > slowMs || (!isUpkeep && waited > slowMs))
@@ -125,7 +154,12 @@ export function createKeeper<K extends string = never>(
         schedule()
         notify()
       }
-      new Promise(resolve => resolve(next.step())).then(
+      new Promise(resolve => {
+        opened = {
+          value: context === undefined ? (undefined as C) : context.open(),
+        }
+        resolve(next.step(opened.value))
+      }).then(
         value => {
           next.done.resolve(value)
           finish()
@@ -145,10 +179,10 @@ export function createKeeper<K extends string = never>(
   }
 
   function queue(
-    into: Entry[],
-    keyed: Map<string, Entry> | null,
+    into: Queued[],
+    keyed: Map<string, Queued> | null,
     key: string | null,
-    step: () => Promise<unknown>,
+    step: (context: C) => Promise<unknown>,
   ): Promise<unknown> {
     if (closed) return refused()
     const covering = key === null ? undefined : keyed?.get(key)
@@ -161,7 +195,7 @@ export function createKeeper<K extends string = never>(
   }
 
   return {
-    run: <T>(step: () => Promise<T>) =>
+    run: <T>(step: (context: C) => Promise<T>) =>
       queue(waiting, null, null, step) as Promise<T>,
     once: (key, step) => queue(waiting, onceQueued, key, step) as Promise<void>,
     later: (key, step) =>

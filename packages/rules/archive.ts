@@ -17,7 +17,6 @@ import {
   type PointId,
   type Refusal,
   type RevisionRecord,
-  type RootId,
   refused,
   type SnapshotId,
   type ThreadId,
@@ -58,8 +57,6 @@ type ArchivePlan =
       readonly kind: "cross"
       /** Off the keeper, after the place is written. */
       readonly teardown: ArchiveTeardown
-      /** On the keeper again, after the teardown: the roots to let go of. */
-      readonly unload: readonly RootId[]
       /**
        * With the place, on archiving: each of the canvas's threads' verdicts
        * still pending, `unclassified`. Its run's end, a late write, is
@@ -79,9 +76,8 @@ export const CANVAS_BUSY_REASON = {
  * Decide what crossing the archive's edge does for a canvas. A canvas an agent
  * of its threads works in, or where cards are queued, is not archived:
  * stopping the run or holding the queue would do work nobody asked for, so
- * the person chooses. Restoring is never busy. Archiving lets go
- * of the roots no canvas outside the archive, and no inventory, still holds a
- * thread of (`stillHeld`).
+ * the person chooses. Restoring is never busy. Which of its roots the
+ * host lets go is the upkeep's, as for any root.
  */
 export function planArchive(input: {
   readonly crossing: Crossing
@@ -100,10 +96,6 @@ export function planArchive(input: {
   readonly revisions: ReadonlyMap<EntryId, RevisionRecord>
   /** Its roots' trees, whose every thread's end keeps its snapshot. */
   readonly trees: readonly TreeIndex[]
-  /** The roots of the canvas's threads. */
-  readonly roots: readonly RootId[]
-  /** The roots a thread outside this canvas, in no archived canvas, is in. */
-  readonly stillHeld: ReadonlySet<RootId>
   /** Every thread's verdict, by its lane. */
   readonly verdicts: ReadonlyMap<ThreadId, VerdictRecord>
 }): ArchivePlan {
@@ -114,10 +106,6 @@ export function planArchive(input: {
   return {
     kind: "cross",
     teardown: planTeardown(crossing, input),
-    unload:
-      crossing === "archive"
-        ? input.roots.filter(r => !input.stillHeld.has(r))
-        : [],
     verdicts:
       crossing === "archive"
         ? unclassifiedPending(input.verdicts.values(), lane =>

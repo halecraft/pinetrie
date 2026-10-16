@@ -371,8 +371,9 @@ moves:<writer>:<CanvasId>
 presence         ephemeral                who reads which thread, in which root
 ```
 
-The host holds the session, `live`, the places and every root not archived
-(not in the board's archive, ADR-0122).
+The host holds the session, `live` and the places, and a root only while a
+step of its documents' keeper or a lease (a run's, say) holds it: one
+upkeep lets go of every other, once no tab holds it (ADR-0162).
 A client holds the session, `live`, the places and only the roots of the
 canvases it shows; it reads every other root through its directory record. pi runs one
 session and one harness per root (ADR-0092, ADR-0095).

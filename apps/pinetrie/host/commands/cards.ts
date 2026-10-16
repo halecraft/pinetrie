@@ -70,7 +70,6 @@ import {
   type BoardMove,
   type BranchOutRefusal,
   type CanvasIndex,
-  type Cause,
   type CopyPlan,
   type CopyThread,
   canvasOfPlace,
@@ -107,13 +106,13 @@ import {
   type SpunThread,
   undoAnswer,
 } from "@pinetrie/rules"
-import type { Basics } from "../basics.ts"
+import type { StepBasics } from "../basics.ts"
 import { canvasesNow } from "../canvases.ts"
 import type { CardPort } from "../cards.ts"
 import type { MoveHistories } from "../move-history.ts"
-import type { Gesture, OpenChange, Places } from "../places.ts"
+import type { Gesture, OpenChange, PersonCause, Places } from "../places.ts"
 import type { Provenance } from "../provenance.ts"
-import type { Records } from "../records.ts"
+import type { StepRecords } from "../records.ts"
 import { spendsCard } from "./send.ts"
 
 /**
@@ -132,8 +131,8 @@ export const settled = (
 
 export interface CardCommandDeps {
   readonly basics: Pick<
-    Basics,
-    "docs" | "live" | "places" | "session" | "now" | "newId" | "log"
+    StepBasics,
+    "roots" | "live" | "places" | "session" | "now" | "newId" | "log"
   >
   readonly cards: Pick<
     CardPort,
@@ -150,7 +149,7 @@ export interface CardCommandDeps {
   /** The traces a person has seen. */
   readonly provenance: Pick<Provenance, "seen">
   /** A queue's hold, written with a card queued. */
-  readonly records: Pick<Records, "writeValues">
+  readonly records: Pick<StepRecords, "writeValues">
   /** Name every recorded thread that has none: a copy is named as it is made. */
   readonly ensureNames: () => Promise<void>
 }
@@ -167,8 +166,13 @@ const writersOf = (index: TreeIndex): readonly (WriterId | null)[] =>
 /** The card commands (`createCardCommands`). */
 export type CardCommands = ReturnType<typeof createCardCommands>
 
+/**
+ * The card commands of one step of the documents' keeper: made in each step,
+ * with its documents (`basics.roots`).
+ */
 export function createCardCommands(deps: CardCommandDeps) {
-  const { docs, live, places, session } = deps.basics
+  const { roots, live, places, session } = deps.basics
+  const docs = roots
   const running = (lane: ThreadId) => readRunning(deps.basics.live, lane)
   /** A note column's id, for one made for a note with nowhere else to go. */
   const newColumn = (): NoteColumnId =>
@@ -214,13 +218,15 @@ export function createCardCommands(deps: CardCommandDeps) {
   async function carry(
     step: MovesStep | MoveStep | ReorderStep,
     drain: readonly ThreadId[],
-    cause: Cause,
+    cause: PersonCause,
     gesture?: Gesture,
   ): Promise<Settled> {
     if (step.kind === "refused") return unmoved(step)
     const steps = step.kind === "steps" ? step.steps : [step]
-    const rev = await deps.placesWriter.change(cause, open =>
-      open.apply(steps, gesture),
+    const rev = await deps.placesWriter.change(
+      cause,
+      open => open.apply(steps, gesture),
+      roots,
     )
     for (const lane of drain) deps.drain(lane)
     return settled({ kind: "moved" }, rev)
@@ -545,6 +551,7 @@ export function createCardCommands(deps: CardCommandDeps) {
             }
           }
         },
+        roots,
       )
     },
 
@@ -644,6 +651,7 @@ export function createCardCommands(deps: CardCommandDeps) {
           await deps.ensureNames()
           return open.apply([plan.step], gesture)
         },
+        roots,
       )
       return settled(sent, rev)
     },

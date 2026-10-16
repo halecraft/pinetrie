@@ -27,7 +27,7 @@ import type {
 } from "@pinetrie/lanes"
 import type { PiSetup } from "@pinetrie/pi"
 import type { StackMessage } from "@pinetrie/rules"
-import type { Basics } from "../basics.ts"
+import type { LeaseBasics } from "../basics.ts"
 import type { Records } from "../records.ts"
 import type { Destination } from "./destination.ts"
 import type { LaneRegistry } from "./registry.ts"
@@ -43,7 +43,7 @@ export interface ProjectAdapter {
    */
   open(input: {
     readonly names: RepoConfig
-    readonly basics: Basics
+    readonly basics: LeaseBasics
     /** Where lanes run, and a folder project's calls of its disks. */
     readonly found: Pick<Found, "runtime" | "folder">
     /** The session's files for its lanes. */
@@ -83,7 +83,7 @@ export interface OpenProject {
 
 /** What the adapter's own parts run on, from lane work. */
 export interface ProjectParts {
-  readonly basics: Basics
+  readonly basics: LeaseBasics
   readonly records: Pick<Records, "writeValues">
   readonly piSetup: Pick<PiSetup, "skill" | "complete">
   /** Work nobody awaits: `quiet` waits for it. */

@@ -67,8 +67,8 @@ function setUp() {
   putValue(b, setRecord(PARTICIPANT, { writer: ADA, name: "Ada" }))
   // Every root the relays open, in order: an archived one must not be.
   const opened: RootId[] = []
-  const root = b.docs.root.bind(b.docs)
-  b.docs.root = async (id: RootId) => {
+  const root = b.roots.root
+  ;(b.roots as { root: typeof root }).root = async (id: RootId) => {
     opened.push(id)
     return root(id)
   }
@@ -86,7 +86,7 @@ function setUp() {
   }).port
   const relays = createRelays({
     basics: b,
-    keeper: { run: step => step(), track: work => work },
+    keeper: { run: step => step(b.roots), track: work => work },
     start: () => {
       throw new Error("no run starts")
     },
@@ -118,8 +118,8 @@ describe("other threads' agents in reach", () => {
   })
 
   test("an ask card whose asker was archived since is dropped, its root unopened", async () => {
-    const { relays, opened } = setUp()
-    const ran = await relays.relayCard(FOX, {
+    const { b, relays, opened } = setUp()
+    const ran = await relays.relayCard(b.roots, FOX, {
       from: OWL as ThreadId,
       fromName: "slate-owl",
       source: entryId("s"),

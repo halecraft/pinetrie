@@ -38,18 +38,19 @@ export const createSplitCall =
   (deps: {
     readonly basics: Pick<
       Basics,
-      "docs" | "session" | "live" | "places" | "newId" | "log"
+      "session" | "live" | "places" | "newId" | "log"
     >
     readonly keeper: Pick<HostKeeper, "run">
     /** The writer of the places: the split's card is the host's change. */
     readonly placesWriter: Places
   }) =>
   (lane: ThreadId): Promise<ToolAnswer> =>
-    deps.keeper.run(async () => {
-      const { docs, session, live, places, newId } = deps.basics
+    deps.keeper.run(async roots => {
+      const { session, live, places, newId } = deps.basics
       // gather
-      const root = docs.rootOfLane(lane)
-      const doc = await docs.laneDoc(lane)
+      const at = await roots.lane(lane)
+      const root = at?.root ?? null
+      const doc = at?.doc ?? null
       const tip = doc === null ? null : readLaneTip(doc, lane)
       const by = doc === null ? null : readRunAuthor(doc, session, lane)
       if (root === null || doc === null || tip === null || by === null)

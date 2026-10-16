@@ -45,7 +45,7 @@ import {
   type ReviewAnswer,
   setRecord,
 } from "@pinetrie/rules"
-import { type Basics, failed } from "../basics.ts"
+import { failed, type LeaseBasics } from "../basics.ts"
 import type { Describe } from "../describe.ts"
 import type { Records } from "../records.ts"
 import {
@@ -198,7 +198,7 @@ export async function makeShownMerge(
 }
 
 export function startFolderProposedChanges(deps: {
-  readonly basics: Basics
+  readonly basics: LeaseBasics
   readonly records: Pick<Records, "writeValues">
   readonly keeper: Keeper
   readonly reader: ShownReader
@@ -376,7 +376,7 @@ export function startFolderProposedChanges(deps: {
       }
     },
     async read(ask): Promise<ReviewAnswer> {
-      const read = planReviewRead(reviewReadFacts(basics), ask)
+      const read = planReviewRead(await reviewReadFacts(basics), ask)
       if (read.kind === "refused") return read
       if (read.span.kind !== "range")
         return {

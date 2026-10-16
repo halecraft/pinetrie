@@ -12,7 +12,6 @@ import {
   writerId,
 } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
-import { createKeeper } from "@pinetrie/keeper"
 import { readPlaces, readPlacesRev } from "@pinetrie/reads"
 import {
   ACCEPTED,
@@ -26,18 +25,21 @@ import {
   setRecord,
   VERDICT,
 } from "@pinetrie/rules"
-import { newPlacesDoc, writeLaneTip } from "@pinetrie/schema/fixtures"
+import { readNamespace } from "@pinetrie/schema"
+import { beginRun, newPlacesDoc, writeLaneTip } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import {
   basics,
+  type FakeBasics,
   placesFor,
   putValue,
   ROOT_ID,
   RUNS_ANY,
   record,
+  stepKeeper,
   writesOf,
 } from "./fakes.ts"
-import { recover, type StartupDeps } from "./startup.ts"
+import { recover, recoverRoot, type StartupDeps } from "./startup.ts"
 
 const TEST_THREAD = threadIdFor("e")
 
@@ -64,41 +66,51 @@ const ports = ({ port }: ReturnType<typeof fakePi>) => ({
   piSetup: port,
 })
 
-/** What `recover` needs, doing nothing, with `over` in place. */
-const deps = (over: Partial<StartupDeps> = {}): StartupDeps => ({
-  basics: basics(),
-  roots: [ROOT_ID],
-  ...ports(fakePi()),
-  work: record<StartupDeps["work"]>({
-    ...RUNS_ANY,
-    project: null,
-  }).port,
-  icons: { source: "built-in" },
-  setup: {
-    files: [],
-    refusals: [],
-    model: { kind: "none", why: "unset", named: null },
-    credentials: [],
-    settings: [],
-    session: null,
-    refusedPackages: [],
-    contextFiles: [],
-  },
-  ensureNames: async () => {},
-  keeper: createKeeper(),
-  start: () => runId("r-1"),
-  settle: async () => {},
-  cards: record<StartupDeps["cards"]>({
-    texts: async () => [],
-    stored: async () => [],
-    destroyDocs: async () => {},
-  }).port,
-  // A writer over documents of its own: a test that sweeps cards gives one
-  // over its own.
-  placesWriter: placesFor(basics()).placesWriter,
-  provenance: { sweep: async () => {} },
-  ...over,
-})
+/**
+ * What `recover` needs, doing nothing, with `over` in place: its steps are
+ * handed `basics`' documents.
+ */
+const deps = (
+  over: Partial<Omit<StartupDeps, "basics">> & {
+    readonly basics?: FakeBasics
+  } = {},
+): StartupDeps => {
+  const b = over.basics ?? basics()
+  return {
+    basics: b,
+    keeper: stepKeeper(b),
+    roots: [ROOT_ID],
+    ...ports(fakePi()),
+    work: record<StartupDeps["work"]>({
+      ...RUNS_ANY,
+      project: null,
+    }).port,
+    icons: { source: "built-in" },
+    setup: {
+      files: [],
+      refusals: [],
+      model: { kind: "none", why: "unset", named: null },
+      credentials: [],
+      settings: [],
+      session: null,
+      refusedPackages: [],
+      contextFiles: [],
+    },
+    ensureNames: async () => {},
+    start: () => runId("r-1"),
+    settle: async () => {},
+    cards: record<StartupDeps["cards"]>({
+      texts: async () => [],
+      stored: async () => [],
+      destroyDocs: async () => {},
+    }).port,
+    // A writer over documents of its own: a test that sweeps cards gives one
+    // over its own.
+    placesWriter: placesFor(basics()).placesWriter,
+    provenance: { sweep: async () => {} },
+    ...over,
+  }
+}
 
 test("recover resumes each interrupted lane before it settles the others, and names lanes first", async () => {
   const LANE = threadIdFor("0123456789abcdef")
@@ -136,7 +148,7 @@ test("recover resumes each interrupted lane before it settles the others, and na
       ensureNames: async () => {
         events.push("names")
       },
-      start: (lane, s) => {
+      start: (_roots, lane, s) => {
         events.push(`${s.kind} ${lane}`)
         return runId("r-1")
       },
@@ -182,24 +194,16 @@ test("recover deletes the records of a type no spec declares, in the session and
     key: "k",
     value: {},
   })
-  const agent = fakePi()
-  await recover(deps({ basics: b, ...ports(agent) }))
-  expect(writesOf(agent.calls).filter(w => w.kind === "delete")).toEqual([
-    {
-      kind: "delete",
-      target: SESSION_TARGET,
-      namespace: "pinetrie.line",
-      key: "line",
-    },
-    {
-      kind: "delete",
-      target: { kind: "root", root: ROOT_ID },
-      namespace: "pinetrie.gone",
-      key: "k",
-    },
-  ])
+  await recover(deps({ basics: b }))
+  // Through the steps' documents: the session's, then the root's as it is
+  // recovered.
+  expect([
+    readNamespace(b.session, "pinetrie.line"),
+    readNamespace(b.root, "pinetrie.gone"),
+  ]).toEqual([{}, {}])
   expect(b.lines.filter(l => l.includes("no longer kept"))).toEqual([
-    "[host] deleting 2 stored records of types no longer kept: pinetrie.line, pinetrie.gone",
+    "[host] deleting 1 stored records of types no longer kept: pinetrie.line",
+    "[host] deleting 1 stored records of types no longer kept: pinetrie.gone",
   ])
 })
 
@@ -373,4 +377,25 @@ test("recover gives a new store the default workflow first, before it names lane
     }),
   )
   expect(events.slice(0, 2)).toEqual(["set pinetrie.workflow", "names"])
+})
+
+test("a root's first load resumes no lane this host runs now: only a crash's", async () => {
+  const b = basics()
+  const [running, crashed] = [threadIdFor("1111"), threadIdFor("2222")]
+  beginRun(b.live, running, runId("r-now"))
+  const started: string[] = []
+  const found = await recoverRoot(
+    {
+      basics: b,
+      agent: { interrupted: async () => [running, crashed] },
+      work: { ...RUNS_ANY, project: null },
+      start: (_roots, lane) => {
+        started.push(lane)
+        return runId("r-1")
+      },
+    },
+    b.roots,
+    ROOT_ID,
+  )
+  expect([found, started]).toEqual([[crashed], [crashed]])
 })

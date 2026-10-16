@@ -6,7 +6,6 @@ import {
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
-import { createKeeper } from "@pinetrie/keeper"
 import type { PiSetup } from "@pinetrie/pi"
 import { readMarks } from "@pinetrie/reads"
 import { MARK, setRecord } from "@pinetrie/rules"
@@ -25,6 +24,7 @@ import {
   ROOT_ID,
   record,
   row,
+  stepKeeper,
   writeDirectory,
 } from "./fakes.ts"
 import { createLater } from "./later.ts"
@@ -60,11 +60,10 @@ function setUp(
     }),
     writeValues: async w => applyWrites(b, w),
   })
-  const keeper = createKeeper()
+  const keeper = stepKeeper(b)
   const later = createLater({
     basics: b,
     keeper,
-    records: pi.port,
     placesWriter: placesFor(b).placesWriter,
     drain: () => {},
   })
@@ -81,7 +80,7 @@ function setUp(
 test("a new root's first lane: its canvas titled by the agent", async () => {
   const { b, pi, keeper, titles, reply, title } = setUp()
   putLane(b, L1)
-  await keeper.run(() => titles.laneStarted(started))
+  await keeper.run(roots => titles.laneStarted(roots, started))
   reply.resolve("Rail layout")
   await keeper.idle()
   expect(title()).toMatchObject({ title: "Rail layout", by: THE_AGENT })
@@ -98,7 +97,7 @@ test("a root with a lane already, or with titles off, is not titled unasked", as
   for (const { s, lane } of cases) {
     const { b, pi, keeper, titles } = s
     putLane(b, lane)
-    await keeper.run(() => titles.laneStarted(started))
+    await keeper.run(roots => titles.laneStarted(roots, started))
     await keeper.idle()
     expect(pi.calls).toEqual([])
   }
@@ -108,7 +107,7 @@ test("a mark written while the title was asked wins over it", async () => {
   const { b, keeper, titles, reply, title } = setUp()
   putLane(b, L1)
   writeEntry(b.root, row(E1, null))
-  await keeper.run(() => titles.laneStarted(started))
+  await keeper.run(roots => titles.laneStarted(roots, started))
   putValue(
     b,
     setRecord(MARK, { canvas: CANVAS_ID, title: "Mine", by: ADA, at: 1 }),
@@ -125,7 +124,7 @@ test("asked: answers at once, and its title replaces a person's, as theirs", asy
     b,
     setRecord(MARK, { canvas: CANVAS_ID, title: "Mine", by: ADA, at: 1 }),
   )
-  const answer = await keeper.run(() => titles.asked(CANVAS_ID, ADA))
+  const answer = await keeper.run(roots => titles.asked(roots, CANVAS_ID, ADA))
   expect(answer).toEqual({ kind: "retitling" })
   reply.resolve("Rail layout")
   await keeper.idle()
@@ -134,8 +133,12 @@ test("asked: answers at once, and its title replaces a person's, as theirs", asy
 
 test("asked, with no message yet: refused, and nothing asked", async () => {
   const { pi, keeper, titles } = setUp()
-  const answer = await keeper.run(() =>
-    titles.asked(canvasIdFor("01a0ffd2-0000-7000-8000-0000000000ee"), ADA),
+  const answer = await keeper.run(roots =>
+    titles.asked(
+      roots,
+      canvasIdFor("01a0ffd2-0000-7000-8000-0000000000ee"),
+      ADA,
+    ),
   )
   expect(answer.kind).toBe("refused")
   expect(pi.calls).toEqual([])
@@ -144,7 +147,7 @@ test("asked, with no message yet: refused, and nothing asked", async () => {
 test("a reply that is not a title, or a root archived meanwhile, writes nothing", async () => {
   const wordy = setUp({ reply: "Here is a title for the thread: Rail" })
   writeEntry(wordy.b.root, row(E1, null))
-  await wordy.keeper.run(() => wordy.titles.asked(CANVAS_ID, ADA))
+  await wordy.keeper.run(roots => wordy.titles.asked(roots, CANVAS_ID, ADA))
   await wordy.keeper.idle()
   expect(wordy.title()).toBeUndefined()
   expect(wordy.b.lines.join("\n")).toContain("the model's title is not one")
@@ -152,7 +155,9 @@ test("a reply that is not a title, or a root archived meanwhile, writes nothing"
   const archived = setUp()
   writeEntry(archived.b.root, row(E1, null))
   writeDirectory(archived.b)
-  await archived.keeper.run(() => archived.titles.asked(CANVAS_ID, ADA))
+  await archived.keeper.run(roots =>
+    archived.titles.asked(roots, CANVAS_ID, ADA),
+  )
   archiveCanvas(archived.b)
   archived.reply.resolve("Rail layout")
   await archived.keeper.idle()

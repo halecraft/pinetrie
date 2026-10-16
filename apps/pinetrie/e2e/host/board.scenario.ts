@@ -116,6 +116,11 @@ async function run(check: Checks["check"]): Promise<void> {
         `${late.kind} ${reopened.kind} ${accepted.kind}`,
       )
 
+      // While a tab holds a root the host keeps it loaded: let go, the tab
+      // asks again, and the host would load it again with no end.
+      await host.quiet()
+      const heldWhileShown = host.rootsLoaded().length
+
       const titled = await bea.mark(entryId(r2), "Tab names")
       const mark = readMarks(host.session).get(id2)
       check(
@@ -180,6 +185,16 @@ async function run(check: Checks["check"]): Promise<void> {
         `${opened.kind} ${shut.kind} ${trashed?.kind} ${undone.kind}`,
       )
       await Promise.all([ada.close(), bea.close()])
+      // No tab holds a root now: the next upkeep lets every one go.
+      await waitFor(async () => {
+        await host.quiet()
+        return host.rootsLoaded().length === 0
+      }, 10_000)
+      check(
+        "a root is loaded while a tab holds it, and let go once none does and the host is quiet",
+        heldWhileShown > 0 && host.rootsLoaded().length === 0,
+        `${heldWhileShown} loaded while shown · ${host.rootsLoaded().length} after`,
+      )
     },
   )
 }

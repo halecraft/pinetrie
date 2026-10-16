@@ -176,7 +176,6 @@ export {
   planCanvasOpening,
   planThreadOpen,
   rootOfPlace,
-  rootsHeld,
   type ThreadOpen,
   type ThreadOpening,
   type ThreadPlacement,
@@ -634,6 +633,7 @@ export {
   planStop,
   stopperOf,
 } from "./stop.ts"
+
 export { THREAD } from "./thread.ts"
 export {
   planTitling,

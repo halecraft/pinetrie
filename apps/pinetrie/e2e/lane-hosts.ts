@@ -29,6 +29,7 @@ import {
   idleNow,
   join,
   laneHolding,
+  readEveryRoot,
   setUpAccepted,
   suiteBinding,
   suiteDirsNow,
@@ -141,18 +142,20 @@ export const laneHosts: LaneHosts = {
   sectionHost: input => sectionHost(input ?? {}),
 }
 
-const startLaneHost = (options: LaneHostOptions): Promise<RunningHost> =>
-  startHost({
-    places: suitePlaces(),
-    ssh: suiteSshPlaces(),
-    binding: suiteBinding(),
-    env: {},
-    ...options,
-    project: {
-      ...options.project,
-      files: suiteSessionFiles(options.project.dir).lanes,
-    },
-  })
+const startLaneHost = async (options: LaneHostOptions): Promise<RunningHost> =>
+  readEveryRoot(
+    await startHost({
+      places: suitePlaces(),
+      ssh: suiteSshPlaces(),
+      binding: suiteBinding(),
+      env: {},
+      ...options,
+      project: {
+        ...options.project,
+        files: suiteSessionFiles(options.project.dir).lanes,
+      },
+    }),
+  )
 
 /**
  * A host of its own for a section: a project (`files`, or an existing `dir`),

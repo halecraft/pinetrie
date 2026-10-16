@@ -48,7 +48,7 @@ export function planQueueHold(input: {
   readonly by: WriterId
   readonly now: number
   readonly held: boolean
-}): readonly ValueWrite[] {
+}): readonly ValueWrite<"session">[] {
   const { holds, lane } = input
   const there = holds.has(lane)
   if (input.held === there) return []
@@ -80,7 +80,7 @@ export function planQueueCard(input: {
 }): {
   readonly step: MovesStep
   readonly drain: readonly ThreadId[]
-  readonly holds: readonly ValueWrite[]
+  readonly holds: readonly ValueWrite<"session">[]
 } {
   const { move, hold } = input
   // A queueing discards nothing: its target is a queue.

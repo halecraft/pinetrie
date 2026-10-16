@@ -1,7 +1,7 @@
 # S84 — the session as one document: what compaction rewrites, and why
 
 - **Status:** Answered
-- **Led to:** ADR-0063
+- **Led to:** ADR-0063, ADR-0162
 
 Measured on a copy of the person's `.pinetrie/pinetrie.db` (2026-10-03, mid-run),
 read with `node:sqlite` in a lane. Kyneta read at

@@ -1,40 +1,47 @@
-import { rootIdFor, threadIdFor } from "@pinetrie/core"
-import { createKeeper } from "@pinetrie/keeper"
+import { type RootId, rootIdFor, threadIdFor } from "@pinetrie/core"
 import { readThreadName } from "@pinetrie/reads"
 import { expect, test } from "vitest"
-import type { HostKey } from "./basics.ts"
-import { basics, deferred } from "./fakes.ts"
+import { basics, deferred, stepKeeper } from "./fakes.ts"
 import { createSettle } from "./settle.ts"
 
-/** A settle over lanes `a` and `b`, recording what it does. */
+/**
+ * A settle over lanes `a` and `b`, recording what it does, its upkeep the
+ * keeper's `later` as the host's is: the roots of every settle before it
+ * starts, compacted once.
+ */
 function setUp() {
   const [a, b] = [threadIdFor("a"), threadIdFor("b")]
   const roots = new Map([
     [a, rootIdFor("ra")],
     [b, rootIdFor("rb")],
   ])
-  const keeper = createKeeper<HostKey>()
+  const bs = basics()
+  const keeper = stepKeeper(bs)
   const done: string[] = []
   const compacting = deferred<void>()
   let hold = false
+  let pending = new Set<RootId>()
   const settle = createSettle({
-    basics: basics(),
+    basics: bs,
     keeper,
-    drain: async lane => {
+    drain: async (_step, lane) => {
       done.push(`drain ${lane === a ? "a" : "b"}`)
     },
     rootOf: lane => roots.get(lane) ?? null,
-    compact: async covered => {
-      done.push(`compact ${[...covered].sort().join(" ")}`)
-      if (hold) await compacting.promise
-    },
-    sweep: async () => {
-      done.push("sweep")
+    settled: changed => {
+      for (const root of changed) pending.add(root)
+      return keeper.later("upkeep", async () => {
+        const covered = pending
+        pending = new Set()
+        done.push(`compact ${[...covered].sort().join(" ")}`)
+        if (hold) await compacting.promise
+      })
     },
   })
   return {
     a,
     b,
+    bs,
     keeper,
     done,
     settle,
@@ -45,7 +52,7 @@ function setUp() {
   }
 }
 
-test("two settles in a burst drain both lanes, then compact once, over both lanes' roots", async () => {
+test("two settles in a burst drain both lanes, then their upkeep runs once, over both lanes' roots", async () => {
   const { a, b, keeper, done, settle } = setUp()
   // Hold the keeper, so both are asked for before either starts.
   const gate = deferred<void>()
@@ -55,10 +62,10 @@ test("two settles in a burst drain both lanes, then compact once, over both lane
   expect(second).toBe(first)
   gate.resolve()
   await first
-  expect(done).toEqual(["drain a", "drain b", "compact r-ra r-rb", "sweep"])
+  expect(done).toEqual(["drain a", "drain b", "compact r-ra r-rb"])
 })
 
-test("a settle during the compaction queues a second, over its own roots", async () => {
+test("a settle during the upkeep queues a second, over its own roots", async () => {
   const { a, b, keeper, done, settle, holdCompaction } = setUp()
   const release = holdCompaction()
   void settle([a])
@@ -67,58 +74,28 @@ test("a settle during the compaction queues a second, over its own roots", async
   void settle([b])
   release()
   await keeper.idle()
-  expect(done).toEqual([
-    "drain a",
-    "compact r-ra",
-    "sweep",
-    "drain b",
-    "compact r-rb",
-    "sweep",
-  ])
+  expect(done).toEqual(["drain a", "compact r-ra", "drain b", "compact r-rb"])
 })
 
-test("a failed compaction is logged, and the sweep still runs", async () => {
-  const b = basics()
-  const done: string[] = []
-  const settle = createSettle({
-    basics: b,
-    keeper: createKeeper<HostKey>(),
-    drain: async () => {},
-    rootOf: () => null,
-    compact: async () => {
-      throw new Error("store closed")
-    },
-    sweep: async () => {
-      done.push("sweep")
-    },
-  })
-  await settle([])
-  expect(done).toEqual(["sweep"])
-  expect(b.lines).toEqual(["[host] compaction failed: store closed"])
-})
-
-test("a failed drain is logged; the other lanes drain, and the next settle compacts", async () => {
-  const [a, b] = [threadIdFor("a"), threadIdFor("b")]
-  const bs = basics()
-  const done: string[] = []
-  const settle = createSettle({
+test("a failed drain is logged; the other lanes drain, and the upkeep runs", async () => {
+  const { a, b, bs, done } = setUp()
+  const failing = createSettle({
     basics: bs,
-    keeper: createKeeper<HostKey>(),
-    drain: async lane => {
+    keeper: stepKeeper(bs),
+    drain: async (_step, lane) => {
       if (lane === a) throw new Error("append refused")
       done.push(`drain ${lane}`)
     },
     rootOf: () => null,
-    compact: async () => {
-      done.push("compact")
-    },
-    sweep: async () => {
-      done.push("sweep")
+    settled: async () => {
+      done.push("upkeep")
     },
   })
-  await settle([a, b])
-  await settle([])
-  expect(done).toEqual([`drain ${b}`, "compact", "sweep", "compact", "sweep"])
+  await failing([a, b])
+  // The drains are steps of their own, queued before the upkeep asked.
+  expect(done).toEqual(["upkeep"])
+  await new Promise(r => setTimeout(r, 0))
+  expect(done).toEqual(["upkeep", `drain ${b}`])
   expect(bs.lines).toEqual([
     `[host] ${readThreadName(bs.session, a)}: draining failed: append refused`,
   ])

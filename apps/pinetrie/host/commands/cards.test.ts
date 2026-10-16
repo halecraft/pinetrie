@@ -70,6 +70,7 @@ import {
   seedChange,
   seedPlaces,
   threadRow,
+  writeDirectory,
 } from "../fakes.ts"
 import { popNextQueuedCard } from "../queued-card-pop.ts"
 import { type CardCommandDeps, createCardCommands } from "./cards.ts"
@@ -1019,8 +1020,15 @@ describe("every command that moves a card records it", () => {
   const tracesOf = (b: ReturnType<typeof setUp>["b"]) => [
     ...readTraces(b.session).values(),
   ]
-  const reading = (s: ReturnType<typeof setUp>, writer: string) =>
+  // A reader names the end it reads and its canvas: only a canvas someone reads
+  // has its roots read.
+  const reading = (s: ReturnType<typeof setUp>, writer: string) => {
     s.presence.reading.set(readingKey(seatKey(writer, "s1"), "k"), E1)
+    s.presence.readingCanvas.set(
+      readingKey(seatKey(writer, "s1"), "k"),
+      TEST_CANVAS,
+    )
+  }
 
   test("a move: an event; and a trace for the card's placer, who was not reading its thread", async () => {
     const { b, commands, put } = setUp()
@@ -1038,6 +1046,7 @@ describe("every command that moves a card records it", () => {
     const s = setUp()
     const pinned = { ...queuedKey, kind: "pinned", order: "a" } as const
     s.put({ place: pinned })
+    writeDirectory(s.b)
     reading(s, ADA)
     await s.commands.move(
       BEA,
@@ -1177,7 +1186,7 @@ describe("a card made a thread, and lifted back", () => {
         origin: { kind: "spun", card: C1 },
       }),
     )
-    const doc = await b.docs.root(THREAD)
+    const doc = await b.roots.root(THREAD)
     for (const [i, w] of writers.entries())
       writeEntry(
         doc,
@@ -1267,7 +1276,7 @@ describe("a card made a thread, and lifted back", () => {
     expect(readRoots(b.session).has(THREAD)).toBe(false)
     expect(readPlaces(b.places).some(c => c.id === SPUN_CANVAS)).toBe(false)
     expect(readPlaces(b.places).some(c => c.id === STARTS)).toBe(false)
-    expect(b.docs.loaded()).not.toContain(THREAD)
+    expect(b.rootsHeld()).not.toContain(THREAD)
   })
 
   test("once someone replied, the undo is refused, naming them, and nothing is reverted", async () => {

@@ -11,7 +11,7 @@ import type { PiSetup } from "@pinetrie/pi"
 import { readTreeIndex } from "@pinetrie/reads"
 import { describeRequest, transcriptLines } from "@pinetrie/rules"
 import { readLaneTip } from "@pinetrie/schema"
-import { type Basics, failed } from "./basics.ts"
+import { failed, type LeaseBasics } from "./basics.ts"
 
 /** A description request's size: the skill, recent messages, the thread, the diff. */
 const DESCRIBE_BUDGET = 24_000
@@ -40,7 +40,7 @@ export type Describe = <G>(input: {
 
 /** The describer of a host: one request per lane at a time; a failure is logged. */
 export function createDescriber(deps: {
-  readonly basics: Pick<Basics, "docs" | "session" | "log">
+  readonly basics: Pick<LeaseBasics, "leases" | "session" | "log">
   readonly piSetup: Pick<PiSetup, "skill" | "complete">
 }): Describe {
   const describing = new Set<ThreadId>()
@@ -54,16 +54,25 @@ export function createDescriber(deps: {
         .gather()
         .then(async asked => {
           if (asked === null) return
-          const doc = deps.basics.docs.docOfLane(lane)
-          const tip = doc === null ? null : readLaneTip(doc, lane)
+          // The thread read under a lease, let go before the request, which
+          // is long.
+          const read = await (async () => {
+            await using held = deps.basics.leases.lane(lane)
+            const doc = held === null ? null : await held.ready
+            const tip = doc === null ? null : readLaneTip(doc, lane)
+            return {
+              tip,
+              lines: transcriptLines(
+                doc === null ? [] : projectTranscript(readTreeIndex(doc), tip),
+              ),
+            }
+          })()
+          const { tip } = read
           // Asked outside the keeper, which tracks it, then settled in a step
           // of the keeper's. Not a late write of the documents' (`later.ts`):
           // each adapter's settle writes only while its proposed changes are
           // the one asked about, and an archive withdraws its threads' proposed
           // changes.
-          const messages = transcriptLines(
-            doc === null ? [] : projectTranscript(readTreeIndex(doc), tip),
-          )
           const skill = await deps.piSetup.skill(
             "pinetrie:skill:commit-message",
           )
@@ -72,7 +81,7 @@ export function createDescriber(deps: {
               skill:
                 skill?.content ?? "Write a commit message for this change.",
               diff: asked.diff,
-              messages,
+              messages: read.lines,
               recent: asked.recent,
               budget: DESCRIBE_BUDGET,
             }),

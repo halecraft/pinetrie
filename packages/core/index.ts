@@ -282,24 +282,31 @@ export type Target =
   | { readonly kind: "session" }
   | { readonly kind: "root"; readonly root: RootId }
 
-export const SESSION_TARGET: Target = { kind: "session" }
+/** Which document a record lives in: the session's, or a root's. */
+export type Home = Target["kind"]
+
+/** A target in `H`. */
+export type TargetIn<H extends Home> = Extract<Target, { readonly kind: H }>
+
+export const SESSION_TARGET: TargetIn<"session"> = { kind: "session" }
 
 /**
  * One write to a pi value at its address, in its document, as the host decides
  * it and pi's session carries it out. Built by `setRecord` and `deleteRecord`
- * (`@pinetrie/rules`), which take the target from the record's home.
+ * (`@pinetrie/rules`), which take the target from the record's home, and say
+ * it in `H`: a write into a root is reached only through a step's documents.
  */
-export type ValueWrite =
+export type ValueWrite<H extends Home = Home> =
   | {
       readonly kind: "set"
-      readonly target: Target
+      readonly target: TargetIn<H>
       readonly namespace: HostNamespace
       readonly key: string
       readonly value: unknown
     }
   | {
       readonly kind: "delete"
-      readonly target: Target
+      readonly target: TargetIn<H>
       readonly namespace: HostNamespace
       readonly key: string
     }

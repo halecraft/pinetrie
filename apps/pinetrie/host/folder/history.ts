@@ -64,7 +64,7 @@ interface FolderStore {
   readonly states: () => readonly StateRecord[]
   /** The lane's open conflicts. */
   readonly conflicts: (lane: FolderLane["lane"]) => readonly ConflictRecord[]
-  readonly write: (writes: readonly ValueWrite[]) => Promise<void>
+  readonly write: (writes: readonly ValueWrite<"session">[]) => Promise<void>
 }
 
 /** What a folder lane's history runs on. */
@@ -81,7 +81,10 @@ interface FolderHistoryDeps {
 }
 
 /** A state's record checked against the graph (`planState`); thrown with why when refused. */
-function stateWrite(g: StateGraph, record: StateRecord): ValueWrite[] {
+function stateWrite(
+  g: StateGraph,
+  record: StateRecord,
+): ValueWrite<"session">[] {
   const planned = planState(g, record)
   switch (planned.kind) {
     case "record":

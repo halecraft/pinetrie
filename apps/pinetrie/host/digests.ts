@@ -50,6 +50,7 @@ import type { PresenceDocHandle } from "@pinetrie/schema"
 import type { Basics } from "./basics.ts"
 import type { Later } from "./later.ts"
 import type { Records } from "./records.ts"
+import type { RunDocs } from "./runs.ts"
 
 /**
  * A digest request's size: the skill aside, the ask, its newest work, its
@@ -81,11 +82,11 @@ export interface Digests {
  */
 export const writePendingVerdict =
   (deps: {
-    readonly basics: Pick<Basics, "docs">
+    readonly runs: RunDocs
     readonly records: Pick<Records, "writeValues">
   }) =>
   async (lane: ThreadId, prompt: EntryId): Promise<void> => {
-    const doc = deps.basics.docs.docOfLane(lane)
+    const doc = deps.runs.docOf(lane)
     if (doc === null) return
     const end = indexAsks(readTreeIndex(doc)).last.get(prompt) ?? prompt
     await deps.records.writeValues([
@@ -148,10 +149,10 @@ export function createDigests(deps: {
   /** One step: gather, decide with `planDigest`, and ask outside the queue. */
   const live = (lane: ThreadId, at: EntryId, failed: Failed) =>
     later
-      .step({ kind: "thread", thread: lane }, "a digest", () => {
+      .step({ kind: "thread", thread: lane }, "a digest", async roots => {
         const root = docs.rootOfLane(lane)
-        const doc = root === null ? undefined : docs.view(root)?.doc
-        if (!enabled || root === null || doc === undefined) return null
+        if (!enabled || root === null) return null
+        const doc = await roots.root(root)
         const index = readTreeIndex(doc)
         const ask = promptOf(index, at)
         if (ask === null) return null
@@ -187,9 +188,8 @@ export function createDigests(deps: {
             })
             return read === null ? null : { body: read.digest }
           },
-          plan: ({ body }) => {
-            const now = docs.view(root)?.doc
-            if (now === undefined) return null
+          plan: async ({ body }, roots) => {
+            const now = await roots.root(root)
             const record = digestToWrite({
               stored: readDigests(now).get(ask),
               asked: { final: false },
@@ -218,92 +218,94 @@ export function createDigests(deps: {
     failed: Failed,
   ) =>
     later
-      .step({ kind: "thread", thread: lane }, "a run's verdict", () => {
-        const doc = docs.view(root)?.doc
-        if (doc === undefined) return null
-        const index = readTreeIndex(doc)
-        const asks = indexAsks(index)
-        const end = asks.last.get(prompt) ?? prompt
-        const plan = planRunEnded({
-          current: readVerdicts(basics.session).get(lane)?.ask === prompt,
-          // Until its fact is appended, a stop's queued fact names who
-          // stopped the run.
-          outcome: endedOutcome(
-            index,
-            asks,
-            prompt,
-            queuedOn(readPlaces(basics.places), lane),
-          ),
-          lines: askLines(index, asks, prompt),
-          digest: enabled
-            ? planDigest({
-                index,
-                asks,
-                ask: prompt,
-                ended: true,
-                stored: readDigests(doc).get(prompt),
-                inFlight: false,
-                reading: false,
-                now: basics.now(),
-              })
-            : null,
-        })
-        const { request } = plan
-        if (request !== null) {
-          const answer: Answer = request.answer
-          void later.outside({
-            scope: { kind: "thread", thread: lane },
-            what: "a run's verdict",
-            held: { set: asking, key: prompt },
-            failed,
-            request: async () => {
-              const reply = await askModel(prompt, {
-                answer,
-                ask: request.lines.said,
-                work: request.lines.work,
-                shown: request.lines.shown,
-                previous: request.previous,
-              }).catch((error: unknown) => {
-                failed(error)
-                return null
-              })
-              // Never null, so the settle runs for a failed request too.
-              return { reply }
-            },
-            plan: ({ reply }) => {
-              const now = docs.view(root)?.doc
-              if (now === undefined) return null
-              return {
-                records: runEndedToWrite({
-                  root,
-                  lane,
+      .step(
+        { kind: "thread", thread: lane },
+        "a run's verdict",
+        async roots => {
+          const doc = await roots.root(root)
+          const index = readTreeIndex(doc)
+          const asks = indexAsks(index)
+          const end = asks.last.get(prompt) ?? prompt
+          const plan = planRunEnded({
+            current: readVerdicts(basics.session).get(lane)?.ask === prompt,
+            // Until its fact is appended, a stop's queued fact names who
+            // stopped the run.
+            outcome: endedOutcome(
+              index,
+              asks,
+              prompt,
+              queuedOn(readPlaces(basics.places), lane),
+            ),
+            lines: askLines(index, asks, prompt),
+            digest: enabled
+              ? planDigest({
+                  index,
+                  asks,
                   ask: prompt,
-                  end,
-                  answer,
-                  stored: {
-                    verdict: readVerdicts(basics.session).get(lane),
-                    digest: readDigests(now).get(prompt),
-                  },
-                  reply,
-                  at: basics.now(),
-                }),
-              }
-            },
+                  ended: true,
+                  stored: readDigests(doc).get(prompt),
+                  inFlight: false,
+                  reading: false,
+                  now: basics.now(),
+                })
+              : null,
           })
-        }
-        return plan.verdict === null
-          ? null
-          : {
-              records: [
-                setRecord(VERDICT, {
-                  lane,
-                  ask: prompt,
-                  end,
-                  verdict: plan.verdict,
-                }),
-              ],
-            }
-      })
+          const { request } = plan
+          if (request !== null) {
+            const answer: Answer = request.answer
+            void later.outside({
+              scope: { kind: "thread", thread: lane },
+              what: "a run's verdict",
+              held: { set: asking, key: prompt },
+              failed,
+              request: async () => {
+                const reply = await askModel(prompt, {
+                  answer,
+                  ask: request.lines.said,
+                  work: request.lines.work,
+                  shown: request.lines.shown,
+                  previous: request.previous,
+                }).catch((error: unknown) => {
+                  failed(error)
+                  return null
+                })
+                // Never null, so the settle runs for a failed request too.
+                return { reply }
+              },
+              plan: async ({ reply }, roots) => {
+                const now = await roots.root(root)
+                return {
+                  records: runEndedToWrite({
+                    root,
+                    lane,
+                    ask: prompt,
+                    end,
+                    answer,
+                    stored: {
+                      verdict: readVerdicts(basics.session).get(lane),
+                      digest: readDigests(now).get(prompt),
+                    },
+                    reply,
+                    at: basics.now(),
+                  }),
+                }
+              },
+            })
+          }
+          return plan.verdict === null
+            ? null
+            : {
+                records: [
+                  setRecord(VERDICT, {
+                    lane,
+                    ask: prompt,
+                    end,
+                    verdict: plan.verdict,
+                  }),
+                ],
+              }
+        },
+      )
       .catch(failed)
 
   return { step: live, ended }

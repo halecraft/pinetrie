@@ -9,7 +9,7 @@
 import type { Keeper } from "@pinetrie/keeper"
 import { type LaneRuntime, removeLane } from "@pinetrie/lanes"
 import type { ArchiveTeardown } from "@pinetrie/rules"
-import { type Basics, failed } from "../basics.ts"
+import { failed, type LeaseBasics } from "../basics.ts"
 import type { Destination } from "./destination.ts"
 import type { LaneRegistry } from "./registry.ts"
 
@@ -19,7 +19,7 @@ export interface Archive {
 }
 
 export function createArchive(deps: {
-  readonly basics: Basics
+  readonly basics: LeaseBasics
   /** Where lanes' work goes when lanes have their own copies, else null. */
   readonly destination: Pick<Destination, "lanesMoved"> | null
   /** What lanes run on. */

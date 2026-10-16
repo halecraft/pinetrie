@@ -34,6 +34,7 @@ import {
 import { type Basics, failed } from "./basics.ts"
 import { canvasesNow } from "./canvases.ts"
 import type { Later } from "./later.ts"
+import type { StepDocs } from "./roots.ts"
 
 /** A title request's size: the skill aside, the first message and the newest. */
 const TITLE_BUDGET = 6_000
@@ -42,20 +43,23 @@ export interface Titles {
   /**
    * A lane was just created in `root` at `at`, for `prompt`, which the run
    * writes: its canvas's title, when it is the root's first lane, the canvas
-   * has none, and titles are on.
+   * has none, and titles are on. In the step whose documents are `roots`.
    */
-  laneStarted(input: {
-    readonly root: RootId
-    readonly lane: ThreadId
-    readonly at: Position
-    readonly prompt: { readonly author: string; readonly text: string }
-  }): Promise<void>
+  laneStarted(
+    roots: StepDocs,
+    input: {
+      readonly root: RootId
+      readonly lane: ThreadId
+      readonly at: Position
+      readonly prompt: { readonly author: string; readonly text: string }
+    },
+  ): Promise<void>
   /** Auto-update title: `retitling`, or refused for a canvas with no message. */
-  asked(canvas: CanvasId, by: WriterId): Promise<Outcome>
+  asked(roots: StepDocs, canvas: CanvasId, by: WriterId): Promise<Outcome>
 }
 
 export function createTitles(deps: {
-  readonly basics: Pick<Basics, "session" | "places" | "docs" | "log" | "now">
+  readonly basics: Pick<Basics, "session" | "places" | "log" | "now">
   readonly later: Pick<Later, "outside">
   /** The settled `titles.enabled`: whether a canvas is titled unasked. */
   readonly enabled: boolean
@@ -73,11 +77,12 @@ export function createTitles(deps: {
    * or null once asked or skipped.
    */
   async function consider(
+    roots: StepDocs,
     canvas: CanvasId,
     root: RootId,
     trigger: TitleTrigger,
   ): Promise<Refusal | null> {
-    const doc = await basics.docs.root(root)
+    const doc = await roots.root(root)
     const plan = planTitling({
       index: readTreeIndex(doc),
       root,
@@ -139,12 +144,12 @@ export function createTitles(deps: {
   }
 
   return {
-    laneStarted: async ({ root, ...started }) => {
+    laneStarted: async (roots, { root, ...started }) => {
       const canvas = canvasesNow(basics).canvasOfThread.get(started.lane)
       if (canvas !== undefined)
-        await consider(canvas, root, { kind: "lane", ...started })
+        await consider(roots, canvas, root, { kind: "lane", ...started })
     },
-    asked: async (canvas, by) => {
+    asked: async (roots, canvas, by) => {
       const root = canvasesNow(basics).rootsOf.get(canvas)?.[0]
       if (root === undefined)
         return {
@@ -153,7 +158,7 @@ export function createTitles(deps: {
           message: "there is no message to title yet",
         }
       return (
-        (await consider(canvas, root, { kind: "asked", by })) ?? {
+        (await consider(roots, canvas, root, { kind: "asked", by })) ?? {
           kind: "retitling",
         }
       )

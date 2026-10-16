@@ -1,5 +1,4 @@
 import { type Sha256, type ThreadName, threadIdFor } from "@pinetrie/core"
-import { createKeeper } from "@pinetrie/keeper"
 import { type Drawn, type PiSetup, sha256Of } from "@pinetrie/pi"
 import { readBanners } from "@pinetrie/reads"
 import { type BannerAsk, NAME as NAME_RECORD, setRecord } from "@pinetrie/rules"
@@ -14,9 +13,10 @@ import {
   placesFor,
   putValue,
   record,
+  stepKeeper,
 } from "./fakes.ts"
 import { createLater } from "./later.ts"
-import type { Records } from "./records.ts"
+import type { StepRecords } from "./records.ts"
 
 const LANE = threadIdFor("1")
 const NAME = "clear-zebra" as ThreadName
@@ -29,13 +29,12 @@ const DRAWN: Drawn = {
 
 /** The setup and the scribe in one record, so the order of their calls shows. */
 type FakePi = Pick<PiSetup, "canDrawBanners" | "drawBanner" | "skill"> &
-  Pick<Records, "writeValues">
+  Pick<StepRecords, "writeValues">
 
 function setUp(pi: Partial<FakePi> = {}, named = true, drawing = true) {
   const b = basics()
   if (named)
     putValue(b, setRecord(NAME_RECORD, { lane: LANE, name: NAME, at: 1 }))
-  const keeper = createKeeper()
   const blobs = memoryBlobs(() => 1_000)
   const fake = record<FakePi>({
     canDrawBanners: async () => true,
@@ -48,10 +47,11 @@ function setUp(pi: Partial<FakePi> = {}, named = true, drawing = true) {
     writeValues: async writes => applyWrites(b, writes),
     ...pi,
   })
+  // A step's records are the fake's, so its writes show there.
+  const keeper = stepKeeper(b, { records: fake.port })
   const later = createLater({
     basics: b,
     keeper,
-    records: fake.port,
     placesWriter: placesFor(b).placesWriter,
     drain: () => {},
   })

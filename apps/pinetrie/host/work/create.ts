@@ -29,7 +29,7 @@ import {
   setRecord,
   sourceHistory,
 } from "@pinetrie/rules"
-import { type Basics, failed } from "../basics.ts"
+import { type Basics, failed, type LeaseBasics } from "../basics.ts"
 import type { Records } from "../records.ts"
 import type { Destination } from "./destination.ts"
 import type { LaneRegistry } from "./registry.ts"
@@ -112,7 +112,7 @@ export async function recordLane(
 }
 
 export function createNewLanes(deps: {
-  readonly basics: Basics
+  readonly basics: LeaseBasics
   readonly setup: Setup
   readonly registry: LaneRegistry
   /** Work nobody awaits: `quiet` waits for it. */

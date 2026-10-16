@@ -3,23 +3,16 @@
 // will undo again, and delete holds on queues nobody can use, and delete
 // trashed cards no one brought back in a week, a deleted thread's lane with it.
 
-import type { Exchange, Store } from "@kyneta/exchange"
+import type { Store } from "@kyneta/exchange"
 import {
   type BlobStore,
   type EntryId,
   isTextCard,
   MOVES_DOC_PREFIX,
   type RevisionRecord,
-  type RootId,
-  rootDocId,
   type Sha256,
   textSourceOf,
 } from "@pinetrie/core"
-import {
-  LIVE_DOC_ID,
-  PLACES_DOC_ID,
-  SESSION_DOC_ID,
-} from "@pinetrie/protocol/messages"
 import {
   planSweep,
   readArchived,
@@ -42,42 +35,12 @@ import {
   QUEUE_HOLD,
   TRASH_KEEP_MS,
 } from "@pinetrie/rules"
-import type { Basics } from "./basics.ts"
+import type { Basics, LeaseBasics } from "./basics.ts"
 import type { CardPort } from "./cards.ts"
 import type { MoveHistories } from "./move-history.ts"
 import type { Places } from "./places.ts"
 import type { Records } from "./records.ts"
 import type { LaneWork } from "./work/index.ts"
-
-/**
- * The documents a compaction replaces with what they hold now: `roots`', whose
- * lanes ran, and the session's, the places and `pinetrie:live`, which every run
- * writes.
- */
-export const planCompaction = (
-  roots: ReadonlySet<RootId>,
-): readonly string[] => [
-  ...[...roots].sort().map(rootDocId),
-  SESSION_DOC_ID,
-  PLACES_DOC_ID,
-  LIVE_DOC_ID,
-]
-
-/**
- * Replace the store's records with each document `planCompaction` names as it
- * stands, which also trims each `json` one's in-memory op log. The places are
- * Yjs: their storage is compacted, and nothing in memory is trimmed. The host
- * writes them all alone. Only those: each client's command Line is stored too,
- * but half of it is the client's to write, and Kyneta cannot compact a replica
- * of a document another peer writes. Its pruning should compact it; that is
- * upstream. A card's text is Yjs, which Kyneta cannot compact live.
- */
-export async function compactAfter(
-  exchange: Exchange,
-  roots: ReadonlySet<RootId>,
-): Promise<void> {
-  for (const id of planCompaction(roots)) await exchange.compact(id)
-}
 
 /**
  * Delete the blobs nothing shows or quotes any more: gather every card's text
@@ -199,11 +162,14 @@ export async function sweepHolds(input: {
  * histories go in one change of the host's.
  */
 export async function sweepTrash(input: {
-  readonly basics: Pick<Basics, "session" | "places" | "docs" | "log" | "now">
+  readonly basics: Pick<
+    LeaseBasics,
+    "session" | "places" | "leases" | "log" | "now"
+  >
   readonly placesWriter: Places
   readonly work: Pick<LaneWork, "teardown" | "destination">
 }): Promise<void> {
-  const { session, places, docs, log, now } = input.basics
+  const { session, places, leases, log, now } = input.basics
   // gather
   const cards = readPlaces(places)
   const histories = readCardHistories(session)
@@ -223,7 +189,8 @@ export async function sweepTrash(input: {
   const revisions = new Map<EntryId, RevisionRecord>()
   const trees = []
   for (const root of new Set(own.flatMap(t => threads.get(t)?.root ?? []))) {
-    const doc = await docs.root(root)
+    await using held = leases.root(root)
+    const doc = await held.ready
     trees.push(readTreeIndex(doc))
     for (const [entry, r] of readRevisions(doc)) revisions.set(entry, r)
   }

@@ -83,7 +83,7 @@ export type BranchOutRefusal =
 
 /** Everything a press opens: the threads' records, then one places change. */
 export interface Opening {
-  readonly records: readonly ValueWrite[]
+  readonly records: readonly ValueWrite<"session">[]
   readonly steps: readonly PlaceStep[]
 }
 
@@ -146,7 +146,7 @@ export function planBranchOut(input: {
     return { kind: "refused", why: "no-row" }
   let cards = input.cards
   let after: ThreadId = lane
-  const records: ValueWrite[] = []
+  const records: ValueWrite<"session">[] = []
   const steps: PlaceStep[] = []
   for (const b of press.branches) {
     const opened = planBranchOpen({

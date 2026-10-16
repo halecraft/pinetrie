@@ -38,7 +38,8 @@ import {
   row,
 } from "../fakes.ts"
 import { createLater } from "../later.ts"
-import type { Records } from "../records.ts"
+import type { StepRecords } from "../records.ts"
+import type { StepDocs } from "../roots.ts"
 import type { RunStart } from "../runs.ts"
 import {
   actOnProposedChanges,
@@ -70,7 +71,7 @@ function running(onAbort: () => void = () => {}) {
     },
   })
   // The agent and the scribe in one record, so the order of their calls shows.
-  const pi = record<Pick<Agent, "lane"> & Pick<Records, "writeValues">>({
+  const pi = record<Pick<Agent, "lane"> & Pick<StepRecords, "writeValues">>({
     lane: () => handle.lane,
     writeValues: async () => {},
   })
@@ -88,6 +89,7 @@ const stopDeps = (
   records: r.pi.port,
   cancel,
   placesWriter: placesFor(r.b).placesWriter,
+  runs: { docOf: () => null },
 })
 
 /** The stop facts queued on `lane`, as the places hold them. */
@@ -183,7 +185,7 @@ test("a hold is written once, its release deleted and the lane drained, each ans
   const deps = {
     basics: b,
     records: {
-      writeValues: async (w: Parameters<Records["writeValues"]>[0]) => {
+      writeValues: async (w: Parameters<StepRecords["writeValues"]>[0]) => {
         writes.push(w)
         applyWrites(b, w)
       },
@@ -224,7 +226,7 @@ test("the owner's answer to a lane's ssh is written; anyone else's is refused", 
   const deps = {
     basics: b,
     records: {
-      writeValues: async (w: Parameters<Records["writeValues"]>[0]) =>
+      writeValues: async (w: Parameters<StepRecords["writeValues"]>[0]) =>
         applyWrites(b, w),
     },
   }
@@ -263,12 +265,13 @@ test("proposed changes' fact is queued after the reply, as a card at the thread'
     bookmark: "pinetrie-accepted",
     to: { kind: "accepted" },
   } as const
-  const keeper = createKeeper()
+  const keeper = createKeeper<never, StepDocs>({
+    context: { open: () => b.roots, close: () => {} },
+  })
   const { placesWriter } = placesFor(b)
   const later = createLater({
     basics: b,
     keeper,
-    records: { writeValues: async w => applyWrites(b, w) },
     placesWriter,
     drain: l => void drained.push(l),
   })
@@ -327,7 +330,7 @@ function stopped() {
   writeLaneTip(b.root, lane, entryId("e-2"))
   putValue(b, setRecord(PARTICIPANT, { writer: ada, name: "Ada" }))
   const started: [string, RunStart][] = []
-  const start = (l: string, s: RunStart) => {
+  const start = (_roots: StepDocs, l: string, s: RunStart) => {
     started.push([l, s])
     return runId("r-2")
   }

@@ -40,7 +40,7 @@ test("save_blob is given a blob the lane's path shared, never one shared beside 
     [ELSEWHERE, BYTES],
   ])
   const readBlob = createReadBlob({
-    basics: b,
+    runs: { docOf: () => b.root },
     blobs: {
       get: sha => {
         const bytes = stored.get(sha)

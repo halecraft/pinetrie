@@ -314,8 +314,8 @@ would refuse each whole undo of a move (S82).
 - **A row is one leaf** (`Schema.struct.json`): the host writes a record
   whole. Kyneta gives an unchanged row the same object across writes, which
   `readPlaces` relies on.
-- **Its storage is compacted after each run** (`planCompaction`); nothing
-  in memory is trimmed (S90).
+- **Its storage is compacted after each run** (the host's upkeep,
+  `planUpkeep`); nothing in memory is trimmed (S90).
 - **A store from before ADR-0059 holds a `pinetrie:cards` document**, and one
   from before ADR-0066 a `json` `pinetrie:places` document, that no code
   opens; delete them by hand. The startup sweep removes the texts no record
@@ -413,9 +413,10 @@ A session is a document per root, the session's own, and `pinetrie:live`.
   Agent creates a lane at the root before pi writes the first entry. The
   directory record maps one to the other.
 - **Every document is compacted alone.** A run's end compacts the roots its
-  lanes ran in, the session, `pinetrie:live` and the places
-  (`planCompaction`, `apps/pinetrie/host/housekeeping.ts`). The largest root
-  in the session that motivated this took 182 ms (S84).
+  lanes ran in, the session, `pinetrie:live` and the places, and a root is
+  compacted as the host lets it go (`planUpkeep`,
+  `apps/pinetrie/host/roots.ts`). The largest root in the session that
+  motivated this took 182 ms (S84).
 
 ## Persistence
 

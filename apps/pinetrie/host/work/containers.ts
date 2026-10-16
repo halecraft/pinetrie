@@ -26,7 +26,7 @@ import {
 } from "@pinetrie/lanes"
 import type { LaneAccess, LaneFacts } from "@pinetrie/pi"
 import { readLaneSnapshots, readRunning, readThreadName } from "@pinetrie/reads"
-import { type Basics, failed } from "../basics.ts"
+import { failed, type LeaseBasics } from "../basics.ts"
 import type { ProposedChangesActs } from "./destination.ts"
 import { removeStaleOutputs } from "./disk.ts"
 import type { LaneRegistry } from "./registry.ts"
@@ -84,7 +84,7 @@ export interface Containers {
 }
 
 export function createContainers(deps: {
-  readonly basics: Basics
+  readonly basics: LeaseBasics
   readonly setup: Setup
   readonly registry: LaneRegistry
   /** Work nobody awaits: `quiet` waits for it. */
@@ -92,7 +92,7 @@ export function createContainers(deps: {
   readonly proposed: Pick<ProposedChangesActs, "runEnded">
 }): Containers {
   const { basics, setup, registry, keeper, proposed } = deps
-  const { session, docs, log } = basics
+  const { session, log } = basics
 
   // A lane whose use of its owner's identity is taken back: its sessions
   // through the host are closed already; any that went around the host end
@@ -109,8 +109,8 @@ export function createContainers(deps: {
 
   /** The snapshots of `lane`'s own records, newest first. */
   async function ownSnapshots(lane: ThreadId): Promise<SnapshotId[]> {
-    const doc = await docs.laneDoc(lane)
-    return doc === null ? [] : readLaneSnapshots(doc, lane)
+    await using held = basics.leases.lane(lane)
+    return held === null ? [] : readLaneSnapshots(await held.ready, lane)
   }
 
   /** The newest snapshot of `lane`'s own records that is still there. */

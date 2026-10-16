@@ -1,8 +1,6 @@
-import type { Exchange } from "@kyneta/exchange"
 import {
   cardIdOfKind,
   makeCard,
-  rootDocId,
   rootIdFor,
   type Sha256,
   storedText,
@@ -10,18 +8,13 @@ import {
   writerId,
 } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
-import {
-  LIVE_DOC_ID,
-  PLACES_DOC_ID,
-  SESSION_DOC_ID,
-} from "@pinetrie/protocol/messages"
 import { readRootRecord } from "@pinetrie/reads"
 import { ROOT, setRecord } from "@pinetrie/rules"
 import { newRootDoc } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import { memoryBlobs } from "./blobs.ts"
 import { basics, putValue, seedPlaces } from "./fakes.ts"
-import { compactAfter, planCompaction, sweepBlobs } from "./housekeeping.ts"
+import { sweepBlobs } from "./housekeeping.ts"
 
 // A 1×1 PNG: what the store keeps is only its bytes, type and size.
 const ADA = writerId("ada@x.io")
@@ -82,34 +75,6 @@ test("a draft's file link keeps its file, and an image's original keeps its fitt
   expect(kept).toContain(original.sha256)
   expect(fitted).toBeDefined()
   expect(kept).toContain(fitted)
-})
-
-test("planCompaction: the roots that ran, and the session, the places and what is streaming; no other root", () => {
-  const [a, b] = [rootIdFor("a"), rootIdFor("b")]
-  expect(planCompaction(new Set([b, a]))).toEqual([
-    rootDocId(a),
-    rootDocId(b),
-    SESSION_DOC_ID,
-    PLACES_DOC_ID,
-    LIVE_DOC_ID,
-  ])
-  expect(planCompaction(new Set())).toEqual([
-    SESSION_DOC_ID,
-    PLACES_DOC_ID,
-    LIVE_DOC_ID,
-  ])
-})
-
-test("compactAfter compacts each document planCompaction names", async () => {
-  const compacted: string[] = []
-  const exchange = {
-    compact: async (id: string) => {
-      compacted.push(id)
-    },
-  } as unknown as Exchange
-  const ran = new Set([rootIdFor("a")])
-  await compactAfter(exchange, ran)
-  expect(compacted).toEqual([...planCompaction(ran)])
 })
 
 test("the image sweep keeps what a root's directory record shows, though no root is loaded", async () => {

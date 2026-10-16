@@ -26,7 +26,7 @@ import { executeOrThrow, type Follow, planSnapshot } from "@pinetrie/lanes"
 import type { LaneHooks } from "@pinetrie/pi"
 import { readRevisions, readTreeIndex } from "@pinetrie/reads"
 import { planTurnRecord, REVISION, setRecord } from "@pinetrie/rules"
-import { type Basics, failed } from "../basics.ts"
+import { failed, type LeaseBasics } from "../basics.ts"
 import type { Records } from "../records.ts"
 import { classifyWritesOnQueue, diskOfTurn } from "./disk.ts"
 import type { LaneRegistry } from "./registry.ts"
@@ -78,7 +78,7 @@ interface Disk {
 }
 
 export function createTurns(deps: {
-  readonly basics: Basics
+  readonly basics: LeaseBasics
   readonly setup: Pick<Setup, "configs" | "ready">
   readonly registry: LaneRegistry
   /** Work nobody awaits: `quiet` waits for it. */
@@ -111,7 +111,9 @@ export function createTurns(deps: {
   const writeRevision = async (record: RevisionRecord) => {
     const root = docs.rootOfLane(record.lane)
     if (root === null) throw new Error(`${record.lane} is in no root`)
-    await deps.records.writeValues([setRecord(REVISION, record, root)])
+    await using held = basics.leases.root(root)
+    await held.ready
+    await held.records.writeValues([setRecord(REVISION, record, root)])
   }
 
   return {
@@ -123,7 +125,8 @@ export function createTurns(deps: {
       try {
         const record = registry.recordOf(lane)
         if (record === undefined) return
-        const doc = await docs.root(record.root)
+        await using held = basics.leases.root(record.root)
+        const doc = await held.ready
         const index = readTreeIndex(doc)
         const entry = turnEntry(index, tip)
         const isPrompt = promptOf(index, entry) === entry

@@ -252,9 +252,13 @@ the queue (ADR-0113); a card's ⋯ (`page.ts`, ADR-0111).
 ## Reading a session of roots (ADR-0063)
 
 - **`held(x)` is what a host or a client holds**: the session's document,
-  `pinetrie:live` and the roots it has open. `treeOf`, `entriesOf`,
-  `rootRecordsOf`, `lanesOf`, `laneNamesOf`, `tipIn` and `entryMessageIn`
-  read across them, as one.
+  `pinetrie:live` and the roots it has open. A quiet host holds no root
+  (ADR-0162), so on the host it is every root it has loaded in its life, as
+  it last held each (`rootsRead`): a handle the host let go reads its last
+  value. A root a restarted host has not loaded yet is not among them.
+  `treeOf`, `entriesOf`, `rootRecordsOf`, `lanesOf`, `laneNamesOf`, `tipIn`
+  and `entryMessageIn` read across them, as one. What is loaded now is
+  `rootsLoaded`.
 - **A scenario's client holds every root** (`holdEvery`, in `join`), and its
   `send` and `mark` wait until it holds the root of the entry they name
   (`rootHeldWithin`): a page holds only its tabs' roots, and writes only

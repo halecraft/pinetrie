@@ -44,7 +44,7 @@ import {
   type ReviewAnswer,
   type ReviewAsk,
 } from "@pinetrie/rules"
-import { type Basics, failed } from "../../basics.ts"
+import { failed, type LeaseBasics } from "../../basics.ts"
 import { createDescriber } from "../../describe.ts"
 import type { Records } from "../../records.ts"
 import { decodeAuthority } from "../../settings.ts"
@@ -117,7 +117,7 @@ export function startProposedChanges(input: {
   readonly owner: RepoOwner
   /** Accepted work's names. */
   readonly repoConfig: RepoConfig
-  readonly basics: Basics
+  readonly basics: LeaseBasics
   readonly records: Pick<Records, "writeValues">
   /** What a description asks of the model. */
   readonly piSetup: Pick<PiSetup, "skill" | "complete">
@@ -227,7 +227,7 @@ export function startProposedChanges(input: {
               to: commitFromPoint(lane, span.to),
             }
       }
-      const read = planReviewRead(reviewReadFacts(basics), ask)
+      const read = planReviewRead(await reviewReadFacts(basics), ask)
       if (read.kind === "refused") return read
       // A range names its lane's points: read only in that lane, proven jj.
       const span = spanInCommits(read.span)

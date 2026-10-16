@@ -41,18 +41,21 @@ import {
   setRecord,
 } from "@pinetrie/rules"
 import type { RootDocHandle } from "@pinetrie/schema"
-import { type Basics, failed } from "../basics.ts"
+import { type Basics, failed, type StepBasics } from "../basics.ts"
 import type { CardPort } from "../cards.ts"
 import type { Later } from "../later.ts"
 import type { Places } from "../places.ts"
-import type { Records } from "../records.ts"
-import { type Runs, startRun } from "../runs.ts"
+import type { StepRecords } from "../records.ts"
+import { type RunDocs, type Runs, startRun } from "../runs.ts"
 import type { LaneWork } from "../work/index.ts"
 
+/** A lane's command is carried out in a step of the documents' keeper. */
 export interface LaneDeps {
-  readonly basics: Basics
+  readonly basics: StepBasics
   readonly agent: Pick<Agent, "lane">
-  readonly records: Pick<Records, "writeValues">
+  readonly records: Pick<StepRecords, "writeValues">
+  /** A running lane's root, held by its run (a stop's asked runs). */
+  readonly runs: RunDocs
   readonly work: Pick<LaneWork, "destination" | "runnable">
   readonly start: Runs["start"]
   /** Stop a chat's run that has not reached pi yet (`Runs.cancel`). */
@@ -83,10 +86,10 @@ async function laneAt(
   deps: Pick<LaneDeps, "basics" | "cards">,
   lane: ThreadId,
 ): Promise<LaneHere | null> {
-  const { docs, live, places, session } = deps.basics
-  const root = docs.rootOfLane(lane)
-  if (root === null) return null
-  const doc = await docs.root(root)
+  const { roots, live, places, session } = deps.basics
+  const at = await roots.lane(lane)
+  if (at === null) return null
+  const { root, doc } = at
   const cards = readPlaces(places)
   const blank = await deps.cards.blankQueued(cards)
   const index = readTreeIndex(doc)
@@ -112,7 +115,13 @@ async function laneAt(
 export async function handleStop(
   deps: Pick<
     LaneDeps,
-    "basics" | "cards" | "agent" | "records" | "cancel" | "placesWriter"
+    | "basics"
+    | "cards"
+    | "agent"
+    | "records"
+    | "cancel"
+    | "placesWriter"
+    | "runs"
   >,
   lane: ThreadId,
   by: WriterId,
@@ -146,20 +155,19 @@ export async function handleStop(
     if (!deps.cancel(lane)) await agent.lane(lane).abort()
   }
   // A run this thread asked for in another thread stops with it.
-  for (const asked of askedFrom(deps.basics, lane))
-    await handleStop(deps, asked, by)
+  for (const asked of askedFrom(deps, lane)) await handleStop(deps, asked, by)
   return { kind: "stopped" }
 }
 
 /** The running lanes whose run another thread's ask from `lane` started. */
 function askedFrom(
-  basics: Pick<LaneDeps["basics"], "docs" | "session" | "live">,
+  deps: Pick<LaneDeps, "basics" | "runs">,
   lane: ThreadId,
 ): readonly ThreadId[] {
-  return readRunningLanes(basics.session, basics.live).flatMap(
+  return readRunningLanes(deps.basics.session, deps.basics.live).flatMap(
     ({ lane: l }) => {
       if (l === lane) return []
-      const doc = basics.docs.docOfLane(l)
+      const doc = deps.runs.docOf(l)
       const prompt = doc === null ? null : readPromptMessage(doc, l)
       return prompt !== null && decodeRelay(prompt.message)?.from === lane
         ? [l]
@@ -224,7 +232,7 @@ export async function handleCarryOn(
     },
   )
   if (planned.kind === "refused") return planned
-  return startRun(deps, lane, {
+  return startRun(deps, basics.roots, lane, {
     kind: "prompt",
     message: planned.message,
     pinnedSeen: [],
@@ -243,7 +251,9 @@ const NO_REPO: Outcome = {
  * command, not an action.
  */
 export async function actOnProposedChanges(
-  deps: LaneDeps,
+  deps: Pick<LaneDeps, "work" | "later"> & {
+    readonly basics: Pick<Basics, "session" | "log">
+  },
   intent: Extract<Intent, { kind: "proposed" }>,
   by: WriterId,
 ): Promise<Outcome> {

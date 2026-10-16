@@ -3,10 +3,11 @@
 // host's records (a mark) change, so what the sidebar, the board, the inbox and
 // the image sweep read of a root follows it without any of them opening it.
 //
-// The directory follows every root the documents hold (`onOpened`), those
-// opened before it started among them, and refreshes each as it starts to
-// follow it. A refresh writes through the host's records, so it can start as
-// soon as they exist.
+// The directory follows every root loaded (`onOpened`), those loaded before
+// it started among them, and refreshes each as it starts to follow it, and
+// once more as the upkeep lets it go, so what changed after the last refresh
+// is in the record. A refresh writes through the host's records, so it can
+// start as soon as they exist.
 //
 // A change queues one refresh per root, the documents' keeper's `once`
 // (`root:<id>`): changes before it starts are absorbed by it. The refresh
@@ -23,6 +24,7 @@ import { ROOT, setIfChanged } from "@pinetrie/rules"
 import type { RootDocHandle } from "@pinetrie/schema"
 import { type Basics, failed, type HostKeeper } from "./basics.ts"
 import type { Records } from "./records.ts"
+import type { Roots } from "./roots.ts"
 
 /**
  * The roots a starting host opens only to rebuild their directory record: named
@@ -41,23 +43,28 @@ export function planRebuild(input: {
 }
 
 export function startDirectory(deps: {
-  readonly basics: Pick<Basics, "session" | "docs" | "log">
+  readonly basics: Pick<Basics, "session" | "log">
   readonly keeper: HostKeeper
   readonly records: Pick<Records, "writeValues">
+  readonly roots: Pick<Roots, "onOpened" | "onReleasing" | "loaded">
 }): void {
-  const { basics, keeper } = deps
-  /** Each followed root's unsubscribes, dropped as the root is let go. */
-  const following = new Map<RootId, readonly (() => void)[]>()
+  const { basics, keeper, roots } = deps
+  /** Each followed root's document and unsubscribes, dropped as the root is let go. */
+  const following = new Map<
+    RootId,
+    { readonly doc: RootDocHandle; readonly stops: readonly (() => void)[] }
+  >()
 
   async function write(root: RootId): Promise<void> {
-    const view = basics.docs.view(root)
-    if (view === null) return
-    const record = readRootRecord(root, view.doc)
-    const writes = setIfChanged(
-      ROOT,
-      record,
-      readRoots(basics.session).get(root),
-    )
+    const doc = following.get(root)?.doc
+    if (doc === undefined) return
+    const record = readRootRecord(root, doc)
+    const stored = readRoots(basics.session).get(root)
+    // A root with no message has not started: a step may load a tab's new
+    // root before its first send, and a record now would make that send
+    // find its id in use.
+    if (record.entry === null && stored === undefined) return
+    const writes = setIfChanged(ROOT, record, stored)
     if (writes.length > 0) await deps.records.writeValues(writes)
   }
 
@@ -69,36 +76,42 @@ export function startDirectory(deps: {
 
   function watch(root: RootId, doc: RootDocHandle): void {
     const changed = () => void refresh(root)
-    following.set(root, [
-      subscribe(doc.entries, changed),
-      subscribe(doc.values, changed),
-      subscribe(doc.records, changed),
-    ])
+    following.set(root, {
+      doc,
+      stops: [
+        subscribe(doc.entries, changed),
+        subscribe(doc.values, changed),
+        subscribe(doc.records, changed),
+      ],
+    })
     // A root no one writes in would keep the record it was stored with,
     // missing any field added since. Unchanged, the refresh writes nothing.
     changed()
   }
 
-  basics.docs.onOpened(watch)
-  basics.docs.onReleasing(async root => {
-    for (const stop of following.get(root) ?? []) stop()
+  roots.onOpened(watch)
+  // Let go: written once more, in the upkeep's step, from the document as it
+  // leaves; destroyed: its record went with it, so nothing is written.
+  roots.onReleasing(async (root, why) => {
+    for (const stop of following.get(root)?.stops ?? []) stop()
+    if (why === "unload")
+      await write(root).catch(failed(basics, "refreshing a root's record"))
     following.delete(root)
   })
 
-  // Every root no held document refreshes whose record is stale: opened,
-  // its record written once, and let go again (an archived canvas's root).
+  // Every root not loaded whose record is stale: loaded in a step, which
+  // its first refresh follows, and let go by the upkeep (an archived canvas's
+  // root).
   const stale = planRebuild({
     named: [...readThreads(basics.session).values()].map(t => t.root),
     recorded: new Set(readRoots(basics.session).keys()),
-    loaded: new Set(basics.docs.loaded()),
+    loaded: new Set(roots.loaded()),
   })
-  void (async () => {
-    for (const root of stale) {
-      await basics.docs.root(root)
-      await refresh(root)
-      await basics.docs.unload(root)
-    }
-    if (stale.length > 0)
-      basics.log(`[host] rebuilt ${stale.length} roots' directory records`)
-  })().catch(failed(basics, "rebuilding the directory"))
+  if (stale.length > 0)
+    keeper
+      .run(async step => {
+        for (const root of stale) await step.root(root)
+        basics.log(`[host] rebuilt ${stale.length} roots' directory records`)
+      })
+      .catch(failed(basics, "rebuilding the directory"))
 }

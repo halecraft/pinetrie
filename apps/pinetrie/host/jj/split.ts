@@ -14,7 +14,7 @@ import type { PiSetup } from "@pinetrie/pi"
 import { readThreadName } from "@pinetrie/reads"
 import { decodeStack, planStack } from "@pinetrie/rules"
 import { readEntryMessage } from "@pinetrie/schema"
-import type { Basics } from "../basics.ts"
+import type { LeaseBasics } from "../basics.ts"
 import type { ProjectParts, Splits } from "../work/adapter.ts"
 import type { LaneRegistry } from "../work/registry.ts"
 import type { Fetches } from "./fetch.ts"
@@ -47,7 +47,7 @@ export async function finishSplit(
 }
 
 export function createSplits(deps: {
-  readonly basics: Basics
+  readonly basics: LeaseBasics
   /** The owner of your repo. */
   readonly owner: RepoOwner
   readonly registry: LaneRegistry
@@ -57,7 +57,7 @@ export function createSplits(deps: {
   readonly fetchLane: Fetches["fetchLane"]
 }): Splits {
   const { basics, owner, registry, proposed } = deps
-  const { session, docs, log } = basics
+  const { session, log } = basics
   return {
     async prepareSplit(lane, by, intent) {
       if (!registry.isOwn(lane))
@@ -80,7 +80,8 @@ export function createSplits(deps: {
     },
 
     async splitEnded(lane, prompt) {
-      const doc = await docs.laneDoc(lane)
+      await using held = basics.leases.lane(lane)
+      const doc = held === null ? null : await held.ready
       const stored =
         doc === null
           ? { present: false as const }

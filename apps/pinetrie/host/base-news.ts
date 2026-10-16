@@ -20,6 +20,7 @@ import {
 import { type BehindMessage, encodeBehind, planBaseNews } from "@pinetrie/rules"
 import { readLaneTip } from "@pinetrie/schema"
 import { type Basics, failed, type HostKeeper } from "./basics.ts"
+import type { RunDocs } from "./runs.ts"
 
 export interface BaseNews {
   /** What a chat's run on `lane` is told first: its base's new work, or null. */
@@ -35,18 +36,20 @@ export interface BaseNews {
 }
 
 export function createBaseNews(deps: {
-  readonly basics: Pick<Basics, "docs" | "session" | "live" | "log" | "now">
+  readonly basics: Pick<Basics, "session" | "live" | "log" | "now">
   readonly agent: Pick<Agent, "lane">
   readonly keeper: Pick<HostKeeper, "run">
+  /** News is read for a running lane, whose run holds its root. */
+  readonly runs: RunDocs
 }): BaseNews {
   const { basics } = deps
-  const { docs, session, live } = basics
+  const { session, live } = basics
   /** The base state steered into each running lane, until its run ends. */
   const told = new Map<ThreadId, PointId>()
 
   /** Gather and plan: what `lane`'s base has for it now. */
   async function newsOf(lane: ThreadId) {
-    const doc = await docs.laneDoc(lane)
+    const doc = deps.runs.docOf(lane)
     if (doc === null) return null
     const bases = readBases(session)
     const news = planBaseNews({

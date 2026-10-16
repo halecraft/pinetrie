@@ -25,7 +25,7 @@ import {
   setRecord,
   sharedTouches,
 } from "@pinetrie/rules"
-import type { Basics } from "../basics.ts"
+import type { LeaseBasics } from "../basics.ts"
 import type { Records } from "../records.ts"
 
 export interface SharedLineages {
@@ -40,7 +40,7 @@ export interface SharedLineages {
 }
 
 export function createSharedLineages(deps: {
-  readonly basics: Basics
+  readonly basics: LeaseBasics
   readonly records: Pick<Records, "writeValues">
 }): SharedLineages {
   const { basics, records } = deps
@@ -60,15 +60,15 @@ export function createSharedLineages(deps: {
     if (writer.kind !== "lane") return
     const root = basics.docs.rootOfLane(writer.lane)
     if (root === null) return
-    const doc = await basics.docs.root(root)
-    const record = readRevisions(doc).get(writer.entry)
+    await using held = basics.leases.root(root)
+    const record = readRevisions(await held.ready).get(writer.entry)
     if (record?.disk === undefined || record.disk === null) return
     const wrote = record.disk.shared.wrote.map(w =>
       w.path === at.path && w.version === at.version
         ? { ...w, concurrent: true }
         : w,
     )
-    await records.writeValues([
+    await held.records.writeValues([
       setRecord(
         REVISION,
         {

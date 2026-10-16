@@ -55,7 +55,8 @@ export const newBudget = (input: {
   readonly thread: ThreadId
   readonly by: WriterId
   readonly limit: number
-}): ValueWrite => setRecord(BUDGET, { ...input, spent: 0, over: false })
+}): ValueWrite<"session"> =>
+  setRecord(BUDGET, { ...input, spent: 0, over: false })
 
 /** One model request's tokens, as the provider reported them. */
 export interface RequestTokens {

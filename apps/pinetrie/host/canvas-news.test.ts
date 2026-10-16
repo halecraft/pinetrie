@@ -36,7 +36,7 @@ test("a card added to a canvas is told to its running threads, as a steer", asyn
   const news = createCanvasNews({
     basics: b,
     agent: { lane: () => handle },
-    keeper: { run: f => f() },
+    keeper: { run: f => f(b.roots) },
   })
   const before = readPlaces(b.places)
   const column: CardRecord = {

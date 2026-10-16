@@ -78,6 +78,7 @@ function setUp() {
   })
   const { readCanvasContext } = createCanvasContext({
     basics: b,
+    runs: { docOf: () => b.root },
     cards: cards.port,
   })
   return { b, readCanvasContext }

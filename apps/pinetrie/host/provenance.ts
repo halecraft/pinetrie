@@ -30,6 +30,7 @@ import {
 import type { PresenceDocHandle } from "@pinetrie/schema"
 import type { Basics } from "./basics.ts"
 import type { Records } from "./records.ts"
+import type { StepDocs } from "./roots.ts"
 
 export interface Provenance {
   /** Delete the traces `writer` has seen; others' ids are ignored. */
@@ -47,10 +48,14 @@ export interface Provenance {
    * Call `stop` after each change a person made that takes threads into an
    * inventory (`takenIn`), with those threads and who made it: their runs stop
    * with it, whatever wrote it. Awaited in the change's close, in the step
-   * that made the change.
+   * that made the change, whose documents are `roots`.
    */
   onTaken(
-    stop: (threads: readonly ThreadId[], by: WriterId) => Promise<void>,
+    stop: (
+      threads: readonly ThreadId[],
+      by: WriterId,
+      roots: StepDocs,
+    ) => Promise<void>,
   ): void
 }
 
@@ -81,7 +86,11 @@ export interface ProvenanceHooks {
   /** Tell each `onChanged` listener. */
   changed(change: PlacesChange): void
   /** Stop the runs of the threads a person's change took, as each `onTaken` says. */
-  taken(threads: readonly ThreadId[], by: WriterId): Promise<void>
+  taken(
+    threads: readonly ThreadId[],
+    by: WriterId,
+    roots: StepDocs,
+  ): Promise<void>
 }
 
 interface ProvenanceDeps {
@@ -116,6 +125,7 @@ export function createProvenance(deps: ProvenanceDeps): {
   const stoppers: ((
     threads: readonly ThreadId[],
     by: WriterId,
+    roots: StepDocs,
   ) => Promise<void>)[] = []
 
   const provenance: Provenance = {
@@ -159,8 +169,8 @@ export function createProvenance(deps: ProvenanceDeps): {
     changed(change) {
       for (const listener of listeners) listener(change)
     },
-    async taken(threads, by) {
-      for (const stop of stoppers) await stop(threads, by)
+    async taken(threads, by, roots) {
+      for (const stop of stoppers) await stop(threads, by, roots)
     },
   }
 

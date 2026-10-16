@@ -23,7 +23,7 @@ export type CopyPlan =
   | {
       readonly kind: "copy"
       /** The copy's record: its root and fork are its source's end's. */
-      readonly records: readonly ValueWrite[]
+      readonly records: readonly ValueWrite<"session">[]
       /** The cards re-ranked to make room, then the copy's card. */
       readonly steps: readonly PlaceStep[]
     }

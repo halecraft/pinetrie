@@ -219,3 +219,38 @@ describe("idle, close and slow steps", () => {
     ])
   })
 })
+
+describe("a step context", () => {
+  test("each step is handed its own context, closed once it settles, a throw included", async () => {
+    const events: string[] = []
+    let made = 0
+    const keeper = createKeeper<never, number>({
+      context: {
+        open: () => {
+          made++
+          events.push(`open ${made}`)
+          return made
+        },
+        close: n => void events.push(`close ${n}`),
+      },
+    })
+    const a = keeper.run(async n => {
+      events.push(`step ${n}`)
+      throw new Error("a")
+    })
+    const b = keeper.run(async n => {
+      events.push(`step ${n}`)
+      return n
+    })
+    await expect(a).rejects.toThrow("a")
+    await expect(b).resolves.toBe(2)
+    expect(events).toEqual([
+      "open 1",
+      "step 1",
+      "close 1",
+      "open 2",
+      "step 2",
+      "close 2",
+    ])
+  })
+})

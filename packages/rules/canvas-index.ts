@@ -294,7 +294,7 @@ export interface CanvasOpening {
 export type ThreadOpen =
   | {
       readonly kind: "open"
-      readonly records: readonly ValueWrite[]
+      readonly records: readonly ValueWrite<"session">[]
       /**
        * The cards re-ranked to make room, then its card; for a canvas the
        * session lacks, the canvas's card first, at the end of its state on
@@ -356,7 +356,7 @@ export function planThreadOpen(input: {
     by,
   )
   if (made.kind === "refused") return made
-  const records: ValueWrite[] = [
+  const records: ValueWrite<"session">[] = [
     setRecord(THREAD, {
       thread,
       root: input.root,
@@ -461,11 +461,11 @@ export function proposalDraft(input: {
 }
 
 /**
- * Whether a thread card at `place` keeps its root held: in an inventory, or
- * on the canvas of a canvas outside `archived`. A trashed card is asked of the
- * place it left, so a restore, or a link to it, finds its messages until the
- * sweep deletes it. The host's late writes ask the same (`lateAway`,
- * `reach.ts`), so a write it lets through finds its root loaded.
+ * Whether a thread card at `place` is live: in an inventory, or on a
+ * canvas outside `archived`. A trashed card is asked of the place it left,
+ * so a restore, or a link to it, still reaches its thread until the sweep
+ * deletes it. The host's late writes take this as their gate (`lateAway`,
+ * `reach.ts`).
  */
 export function isLivePlace(
   place: CardPlace,
@@ -476,31 +476,4 @@ export function isLivePlace(
     left.kind === "inventory" ||
     (left.kind === "canvas" && !archived.has(left.canvas))
   )
-}
-
-/**
- * The roots something still holds: those with a thread whose card is at a
- * live place (`isLivePlace`). What a starting host loads (`planLoads`), and
- * what archiving keeps. A root gets its document with its first entry, so
- * one the directory does not name (`started`) is not held: an unstarted new
- * tab's thread names a root with nothing to load.
- */
-export function rootsHeld(
-  cards: readonly CardRecord[],
-  threads: ReadonlyMap<ThreadId, ThreadRecord>,
-  archived: ReadonlySet<CanvasId>,
-  started: ReadonlySet<RootId>,
-): ReadonlySet<RootId> {
-  const held = new Set<RootId>()
-  for (const c of cards) {
-    if (c.kind !== "thread") continue
-    const root = threads.get(c.id)?.root
-    if (
-      isLivePlace(c.place, archived) &&
-      root !== undefined &&
-      started.has(root)
-    )
-      held.add(root)
-  }
-  return held
 }

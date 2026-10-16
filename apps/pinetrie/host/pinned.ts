@@ -27,6 +27,7 @@ import {
 import { readLaneTip } from "@pinetrie/schema"
 import type { Basics } from "./basics.ts"
 import type { CardPort } from "./cards.ts"
+import type { RunDocs } from "./runs.ts"
 
 /**
  * How long a run waits for its pinned cards' text as its sender had it.
@@ -51,16 +52,19 @@ export async function waitFor(
 }
 
 export function createPinned(deps: {
-  readonly basics: Pick<Basics, "docs" | "places" | "session" | "now">
+  readonly basics: Pick<Basics, "places" | "session" | "now">
+  /** A run reads its pinned cards at its start, its root held by its lease. */
+  readonly runs: RunDocs
   readonly cards: Pick<CardPort, "hydrate" | "textNow" | "whenHolds">
   readonly waitMs?: number
 }) {
-  const { docs, places, session, now } = deps.basics
+  const { places, session, now } = deps.basics
+  const docs = deps.runs
   const { cards } = deps
 
   /** The pinned cards at the lane's tip: its thread's end. */
   function pinnedOn(lane: ThreadId) {
-    const doc = docs.docOfLane(lane)
+    const doc = docs.docOf(lane)
     const tip = doc === null ? null : readLaneTip(doc, lane)
     if (doc === null || tip === null) return null
     const index = readTreeIndex(doc)

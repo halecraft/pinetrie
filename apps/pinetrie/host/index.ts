@@ -27,6 +27,7 @@ import {
   type CardId,
   isTextCardId,
   type ModelLine,
+  type RootId,
   type SetupSession,
   type ThreadId,
   threadEnd,
@@ -54,7 +55,9 @@ import {
 } from "@pinetrie/protocol/messages"
 import { writersPolicy } from "@pinetrie/protocol/writers"
 import {
+  readLaneRecords,
   readParticipantNames,
+  readReadingCanvases,
   readRoots,
   readRunning,
   readSetup,
@@ -79,6 +82,8 @@ import {
   type PresenceDecay,
   type PresenceDocHandle,
   presenceDoc,
+  type RootDocHandle,
+  readActiveLanes,
   SessionDoc,
   type SessionDocHandle,
   TextDoc,
@@ -93,13 +98,13 @@ import {
   failed,
   type HostKeeper,
   type HostKey,
+  type LeaseBasics,
   slow,
 } from "./basics.ts"
 import { memoryBlobs } from "./blobs.ts"
 import { createBudgets } from "./budgets.ts"
 import { createCanvasContext } from "./canvas.ts"
 import { createCanvasNews } from "./canvas-news.ts"
-import { canvasesNow } from "./canvases.ts"
 import { startCards } from "./cards.ts"
 import { createCommands } from "./commands/index.ts"
 import { startControl } from "./control.ts"
@@ -108,11 +113,10 @@ import { startDirectory } from "./directory.ts"
 import {
   type HostDocuments,
   hostDocuments,
+  planLoads,
   rootsOpenedWords,
-  startingLoads,
 } from "./docs.ts"
 import {
-  compactAfter,
   sweepBlobs,
   sweepHistories,
   sweepHolds,
@@ -146,7 +150,8 @@ import {
 } from "./queued-card-pop.ts"
 import { createRecords, type Records } from "./records.ts"
 import { createRelays, type Relays } from "./relays.ts"
-import { createRuns, streamInto } from "./runs.ts"
+import { createRoots, queueUpkeepOn, type StepDocs } from "./roots.ts"
+import { createRunDocs, createRuns, streamInto } from "./runs.ts"
 import { createReadBlob } from "./save-blob.ts"
 import { startSeats } from "./seats.ts"
 import {
@@ -162,7 +167,7 @@ import { createSettle } from "./settle.ts"
 import { planSetupRecord } from "./setup-record.ts"
 import { planShutdown, type ShutdownStep } from "./shutdown.ts"
 import { createSplitCall } from "./split-call.ts"
-import { recover } from "./startup.ts"
+import { recover, recoverRoot } from "./startup.ts"
 import { agentReadyLine, reportLines, startupLaps } from "./startup-lines.ts"
 import { openStore } from "./store.ts"
 import { createTitles } from "./titles.ts"
@@ -264,8 +269,20 @@ export interface RunningHost {
   readonly config: HostReport
   /** The session's records, as the host holds them: for the suites to read. */
   readonly session: SessionDocHandle
-  /** Every document, each root's among them (`docs.ts`): for the suites. */
+  /** The documents always held (`docs.ts`): for the suites. */
   readonly docs: HostDocuments
+  /**
+   * The documents' keeper: a suite reads a root in a step of its own
+   * (`run`), as the host does.
+   */
+  readonly steps: Pick<HostKeeper, "run">
+  /** The roots loaded now: for a suite to check what the upkeep let go. */
+  rootsLoaded(): readonly RootId[]
+  /**
+   * Each root this host has loaded, as it last held it (`Roots.lastRead`):
+   * what the suites read synchronously, loaded or not now.
+   */
+  rootsRead(): ReadonlyMap<RootId, RootDocHandle>
   /** What is streaming now, as the host holds it: for the suites to read. */
   readonly live: LiveDocHandle
   readonly presence: PresenceDocHandle
@@ -440,7 +457,26 @@ export async function startHost({
   lap("loading the session, the places and what is live")
   // Each person's history of moves, per root.
   const histories = createMoveHistories(exchange)
-  const docs = hostDocuments({ exchange, session, live, places })
+  const docs = hostDocuments({ session, live, places })
+  // Every root's document, reached only through a step of the documents'
+  // keeper or a lease (`roots.ts`). The upkeep is queued on the keeper, made
+  // below: bound late.
+  let queueUpkeepLate: () => Promise<void> = async () => {}
+  const roots = createRoots({
+    exchange,
+    session,
+    queueUpkeep: () => void queueUpkeepLate(),
+    failed: error => failed(basics, "compaction")(error),
+  })
+  // Each root's first load is recovered (`recoverRoot`) in a step of its own,
+  // once the agent and the runs exist: the roots that load before are held
+  // here until then.
+  const firstLoads: RootId[] = []
+  let recoverLate: ((root: RootId) => void) | null = null
+  roots.onFirstLoad(root => {
+    if (recoverLate === null) firstLoads.push(root)
+    else recoverLate(root)
+  })
   const basics: Basics = {
     session,
     live,
@@ -450,15 +486,21 @@ export async function startHost({
     newId,
     now,
   }
+  /** `basics` for work off the keeper, which takes a lease to reach a root. */
+  const leaseBasics: LeaseBasics = { ...basics, leases: roots.leases }
+  // Each run's lease on its lane's root: what reads a running lane's root.
+  const runDocs = createRunDocs()
 
-  // The host writes its own records; every module that writes one takes this.
-  const records = createRecords(docs)
+  // The host writes the session's records; every module that writes one takes
+  // this. A root's are written in a step, through its documents.
+  const records = createRecords(session)
   // Cards' texts, and the one writer of the places: each change records its
   // cards' history and traces, and destroys the texts of the cards it removed.
   const cardPort = startCards({ exchange, store, session })
   const { provenance, hooks } = createProvenance({ basics, presence, records })
   const placesWriter = createPlaces({
     basics,
+    readingCanvases: () => readReadingCanvases(presence).values(),
     provenance: hooks,
     texts: cardPort,
   })
@@ -466,22 +508,20 @@ export async function startHost({
   // --- pi: the scribe and the model setup --------------------------------
   // A thread's appends go through the scribe, which holds each root's one pi
   // session; the agent, made last, builds its harnesses over them.
-  const scribe = createScribe({ documents: docs, replicaId: newId(), blobs })
+  const scribe = createScribe({
+    documents: roots.pi,
+    replicaId: newId(),
+    blobs,
+  })
   // Before a root's document goes, what holds it lets go: the scribe closes the
   // agent's harness over it, then its session.
-  docs.onReleasing(root => scribe.release(root))
-  // So do the stacks of moves of the canvases holding its threads.
-  docs.onReleasing(async root => {
-    const canvases =
-      canvasesNow({ places, session }).canvasesOfRoot.get(root) ?? []
-    for (const canvas of canvases) await histories.unloadCanvas(canvas)
-  })
+  roots.onReleasing(async root => scribe.release(root))
   const projectRoot = found?.project.root ?? project?.dir ?? null
   // The project, opened, and the config settled with accepted work's copy:
   // before pi's setup, which reads `model`, `skills` and `prompts` from it.
   // A host without lane work reads its folder's file as every copy.
   const openedProject = await openProject({
-    basics,
+    basics: leaseBasics,
     found,
     adapter: chosen?.adapter ?? null,
     files: project?.tools === true ? project.files : null,
@@ -542,21 +582,28 @@ export async function startHost({
       `[host] icons are drawn, but ${iconConfig.model.provider}/${iconConfig.model.model} cannot be drawn: no key, or no such model`,
     )
 
-  const keeper: HostKeeper = createKeeper<HostKey>({
+  const keeper: HostKeeper = createKeeper<HostKey, StepDocs>({
+    context: roots.context,
     onError: failed(basics, "step"),
     onSlow: slow(basics),
   })
-  // The roots that are not archived, opened before anything reads one: every
-  // lane that could be running is in one of them (`planLoads`).
-  const threadsNow = readThreads(session)
-  const roots = startingLoads({ session, places })
-  for (const root of roots) await docs.root(root)
+  // The roots of the lanes a crash interrupted a run in, read before
+  // `recover` clears what was running, opened in one step. Every other root
+  // is loaded by the step that needs it (`planLoads`).
+  const opening = planLoads(
+    readActiveLanes(live),
+    lane => readLaneRecords(session).get(lane)?.root,
+  )
+  await keeper.run(async step => {
+    for (const root of opening) await step.root(root)
+  })
   lap("opening the roots")
-  const total = new Set([...threadsNow.values()].map(t => t.root)).size
-  log(`[host] ${rootsOpenedWords({ opened: roots.length, total })}`)
+  const total = new Set([...readThreads(session).values()].map(t => t.root))
+    .size
+  log(`[host] ${rootsOpenedWords({ opened: opening.length, total })}`)
   // The directory follows the roots opened above as well as those opened
   // later (`onOpened`).
-  startDirectory({ basics, keeper, records })
+  startDirectory({ basics, keeper, records, roots })
   // Each thread's banner: a pasted one under any icon source, a drawn one only
   // under `drawn`.
   // Every write the host decides before a gap and makes after it. Its
@@ -565,7 +612,6 @@ export async function startHost({
   const later = createLater({
     basics,
     keeper,
-    records,
     placesWriter,
     drain: lane => queueDrainLate(lane),
   })
@@ -581,6 +627,7 @@ export async function startHost({
   // after the agent, whose hooks call them: bound late.
   const budgets = createBudgets({
     basics,
+    runs: runDocs,
     keeper,
     records,
     placesWriter,
@@ -620,7 +667,7 @@ export async function startHost({
 
   // --- where lanes work -----------------------------------------------------
   const work = await startLaneWork({
-    basics,
+    basics: leaseBasics,
     project: openedProject,
     report: openedProject === null ? null : report,
     places: where,
@@ -640,7 +687,7 @@ export async function startHost({
 
   // --- the agent, at work in threads' lanes ---------------------------------
   const agent = await createAgent({
-    documents: docs,
+    documents: roots.pi,
     scribe,
     setup: piSetup,
     blobs,
@@ -655,7 +702,7 @@ export async function startHost({
               askSplit,
               ask: (lane, to, text) => relaysNow().ask(lane, to, text),
               leave: (lane, thread) => relaysNow().leave(lane, thread),
-              readBlob: createReadBlob({ basics, blobs }),
+              readBlob: createReadBlob({ runs: runDocs, blobs }),
               // A turn recorded, then a live digest of the ask `tip` is in,
               // when due.
               turnDone: async (lane, tip) => {
@@ -664,7 +711,7 @@ export async function startHost({
               },
             },
           },
-    onStream: streamInto(basics),
+    onStream: streamInto(basics, runDocs),
     onPrefixChange: lane =>
       log(
         `[host] ${readThreadName(session, lane)}: the model's prompt or tools changed`,
@@ -683,23 +730,32 @@ export async function startHost({
   // --- the shell -----------------------------------------------------------
   // What each thread is told of its base's new work: lane work's refreshes
   // announce a changed base, and a running lane is steered.
-  const baseNews = createBaseNews({ basics, agent, keeper })
+  const baseNews = createBaseNews({ basics, agent, keeper, runs: runDocs })
   work.onBaseChanged(lane => baseNews.baseChanged(lane))
   // A card added to or taken from a canvas, told to its running threads.
   const canvasNews = createCanvasNews({ basics, agent, keeper })
   provenance.onChanged(change => canvasNews.changed(change))
   // Commands are received only from `startControl`, after `recover`.
   const listener = Control.listen(exchange)
-  const { readPinned } = createPinned({ basics, cards: cardPort })
-  const { readCanvasContext } = createCanvasContext({ basics, cards: cardPort })
+  const { readPinned } = createPinned({
+    basics,
+    runs: runDocs,
+    cards: cardPort,
+  })
+  const { readCanvasContext } = createCanvasContext({
+    basics,
+    runs: runDocs,
+    cards: cardPort,
+  })
   const runs = createRuns({
     basics,
+    runDocs,
     agent,
     work,
     readPinned,
     readCanvasContext,
     baseNews,
-    pending: writePendingVerdict({ basics, records }),
+    pending: writePendingVerdict({ runs: runDocs, records }),
   })
   const relays = createRelays({
     basics,
@@ -714,6 +770,8 @@ export async function startHost({
   const answers = createAnswers({
     basics,
     later,
+    keeper,
+    runs: runDocs,
     relays,
     agent,
     scribe,
@@ -745,6 +803,7 @@ export async function startHost({
     titles,
     drain: lane => queueDrain(lane),
     histories,
+    runs: runDocs,
     placesWriter,
     provenance,
     keeper,
@@ -760,21 +819,25 @@ export async function startHost({
     wait(card, signal => untilNotTyped(presence, card.id, signal))
   const blank = (card: QueuedText) =>
     wait(card, signal => cardPort.whenWritten(card.id, signal))
-  const drain = (lane: ThreadId) =>
-    drainQueue(
+  // A lane's drain, in the step whose documents are `step`: the lane's root
+  // loaded first, which pi's appends and runs there need.
+  const drain = async (step: StepDocs, lane: ThreadId) => {
+    await step.lane(lane)
+    return drainQueue(
       {
         basics,
-        records,
+        records: step.records,
         texts: cardPort,
         blobs,
         agent,
         work,
-        start: runs.start,
+        start: (l, s) => runs.start(step, l, s),
         send: async popped => {
           const root = readThreads(session).get(popped.card.place.thread)?.root
           return root === undefined
             ? { kind: "failed", message: "its thread has no record" }
             : commands.sendPoppedQueuedCard(
+                step,
                 popped.card.place.by,
                 newId(),
                 sendOfPoppedQueuedCard(popped, root),
@@ -785,16 +848,13 @@ export async function startHost({
         typing,
         blank,
         placesWriter,
-        relay: (to, relay) => relays.relayCard(to, relay),
+        relay: (to, relay) => relays.relayCard(step, to, relay),
         appendLaneless: async (thread, fact) => {
-          if (docs.docOfLane(thread) !== null) return false
+          if (docs.rootOfLane(thread) !== null) return false
           const root = readThreads(session).get(thread)?.root
-          const doc = root === undefined ? null : docs.view(root)?.doc
-          const end =
-            doc === null || doc === undefined
-              ? null
-              : threadEnd(readTreeIndex(doc), thread)
-          if (root === undefined || end === null) return false
+          if (root === undefined) return false
+          const end = threadEnd(readTreeIndex(await step.root(root)), thread)
+          if (end === null) return false
           const names = readParticipantNames(session)
           await scribe.appendToTree(
             encodeFact(
@@ -810,23 +870,35 @@ export async function startHost({
       },
       lane,
     )
-  const settle = createSettle({
-    basics,
-    keeper,
-    drain,
-    rootOf: docs.rootOfLane,
-    compact: roots => compactAfter(exchange, roots),
-    sweep: async () => {
+  }
+  // The upkeep (`roots.ts`): what runs changed compacted, the roots nothing
+  // holds let go; after a settle, the images, histories, holds, trash and
+  // traces swept. One body for every caller: a `later` keeps the body of
+  // the call that queued it.
+  const upkeep = (): Promise<void> =>
+    queueUpkeepOn(keeper, async step => {
+      const { settled } = await roots.upkeep(step)
+      if (!settled) return
       await sweepBlobs({
         basics,
         blobs,
         grace: BLOB_GRACE_MS,
         texts: cardPort.texts,
-      })
+      }).catch(failed(basics, "deleting unreferenced images"))
       await sweepHistories({ basics, store, histories, startup: false })
       await sweepHolds({ basics, records })
-      await sweepTrash({ basics, placesWriter, work })
+      await sweepTrash({ basics: leaseBasics, placesWriter, work })
       await provenance.sweep()
+    })
+  queueUpkeepLate = upkeep
+  const settle = createSettle({
+    basics,
+    keeper,
+    drain,
+    rootOf: docs.rootOfLane,
+    settled: changed => {
+      roots.settled(changed)
+      return upkeep()
     },
   })
   // A run's end: the lane drains and the session compacts. A thread whose banner failed tries again. The
@@ -847,7 +919,7 @@ export async function startHost({
   // commands, so a late message still goes after the queued cards.
   const queueDrain = (lane: ThreadId) => {
     if (readRunning(live, lane)) return
-    void keeper.once(`drain:${lane}`, () => drain(lane))
+    void keeper.once(`drain:${lane}`, step => drain(step, lane))
   }
   queueDrainLate = queueDrain
   /**
@@ -863,7 +935,7 @@ export async function startHost({
 
   await recover({
     basics,
-    roots,
+    roots: opening,
     agent,
     records,
     piSetup,
@@ -893,9 +965,21 @@ export async function startHost({
       )
       .catch(failed(basics, "the setup record")),
   )
+  // Every other root is recovered as it first loads, in a step of its own:
+  // `recover` did those it opened.
+  recoverLate = root => {
+    void keeper
+      .run(step =>
+        recoverRoot({ basics, agent, work, start: runs.start }, step, root),
+      )
+      .catch(failed(basics, "recovering a root"))
+  }
+  for (const root of firstLoads) if (!opening.includes(root)) recoverLate(root)
   await sweepHistories({ basics, store, histories, startup: true })
   await sweepHolds({ basics, records })
-  await sweepTrash({ basics, placesWriter, work })
+  await keeper.run(() =>
+    sweepTrash({ basics: leaseBasics, placesWriter, work }),
+  )
   await provenance.sweep()
   const seats = startSeats({ exchange, basics, keeper, records, histories })
   const control = startControl({
@@ -941,6 +1025,7 @@ export async function startHost({
           await work.close()
           return rm(sshDir, { recursive: true, force: true })
         case "exchange":
+          roots.close()
           histories.dispose()
           await exchange.flush()
           return exchange.shutdown()
@@ -966,6 +1051,9 @@ export async function startHost({
     config: report,
     session,
     docs,
+    steps: keeper,
+    rootsLoaded: () => roots.loaded(),
+    rootsRead: () => roots.lastRead(),
     live,
     presence,
     places,

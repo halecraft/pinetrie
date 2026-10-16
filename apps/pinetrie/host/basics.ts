@@ -10,13 +10,14 @@ import type {
   SessionDocHandle,
 } from "@pinetrie/schema"
 import type { HostDocuments } from "./docs.ts"
+import type { Leases, StepDocs } from "./roots.ts"
 
 export interface Basics {
   /** The session's records, the directory of roots among them. */
   readonly session: SessionDocHandle
   /** What is streaming now: which lanes run, and their streams. */
   readonly live: LiveDocHandle
-  /** Every document, each root's among them (`docs.ts`). */
+  /** The documents always held (`docs.ts`); a root's is reached through `roots`. */
   readonly docs: HostDocuments
   /**
    * Where every card is: what is queued for each lane. Written only in a
@@ -29,13 +30,35 @@ export interface Basics {
 }
 
 /**
- * What the documents' keeper merges by: a lane's drain, a root's directory
- * record, and the compaction.
+ * `Basics` inside a step of the documents' keeper: the roots it reaches,
+ * through its `StepDocs`. Only a step has one, so a module that needs a root
+ * takes this, and a module made once at startup cannot reach one.
  */
-export type HostKey = `drain:${ThreadId}` | `root:${RootId}` | "compact"
+export type StepBasics = Basics & { readonly roots: StepDocs }
 
-/** The documents' keeper: every command, drain and write of the host's. */
-export type HostKeeper = Keeper<HostKey>
+/**
+ * `Basics` for work off the documents' keeper that reads or writes a root:
+ * lane work, which a step may await, takes a lease rather than a step.
+ */
+export type LeaseBasics = Basics & { readonly leases: Leases }
+
+/** `basics` inside the step whose documents are `roots`. */
+export const inStep = <B extends object>(
+  basics: B,
+  roots: StepDocs,
+): B & { readonly roots: StepDocs } => ({ ...basics, roots })
+
+/**
+ * What the documents' keeper merges by: a lane's drain, a root's directory
+ * record, and the upkeep (`roots.ts`).
+ */
+export type HostKey = `drain:${ThreadId}` | `root:${RootId}` | "upkeep"
+
+/**
+ * The documents' keeper: every command, drain and write of the host's. Each
+ * step is handed its `StepDocs`.
+ */
+export type HostKeeper = Keeper<HostKey, StepDocs>
 
 /**
  * A `.catch` handler that logs `[host] <thread>: <what> failed: <error>`,

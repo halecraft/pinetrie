@@ -68,7 +68,11 @@ export const newId = (): string => uuidv7()
 
 /** The documents pi's sessions are over, a pi session for each root. */
 export interface AgentDocuments {
-  /** A root's document, held and loaded: opened if it is not. */
+  /**
+   * A root's document, loaded. The host refuses a root it does not hold for
+   * the caller (a step or a lease); the scribe asks once per root and keeps
+   * its session until `release`.
+   */
   root(root: RootId): Promise<RootDocHandle>
   /** The root a lane works in, from its record; null for a lane no root holds. */
   rootOfLane(lane: ThreadId): RootId | null
@@ -168,7 +172,14 @@ export interface Agent {
   createThreadLane(spot: Spot, lane: ThreadId): Promise<CreateOutcome>
   lane(name: ThreadId): ThreadLaneHandle
   /** Lanes pi holds an operation open on, in `roots`: a crash interrupted them. */
-  interrupted(roots: readonly RootId[]): Promise<readonly ThreadId[]>
+  /**
+   * `skip` names lanes not to ask of: pi's inspection of a lane waits for its
+   * running operation to end, so a lane the host runs now is skipped.
+   */
+  interrupted(
+    roots: readonly RootId[],
+    skip?: (lane: ThreadId) => boolean,
+  ): Promise<readonly ThreadId[]>
   /** Close every harness, which ends running runs. The scribe's sessions close after. */
   close(): Promise<void>
 }
@@ -373,10 +384,10 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
       return (await ofRoot(spot.root)).lanes.createThreadLane(spot.at, lane)
     },
 
-    async interrupted(roots) {
+    async interrupted(roots, skip) {
       const out: ThreadId[] = []
       for (const root of roots)
-        out.push(...(await (await ofRoot(root)).lanes.interrupted()))
+        out.push(...(await (await ofRoot(root)).lanes.interrupted(skip)))
       return out
     },
 

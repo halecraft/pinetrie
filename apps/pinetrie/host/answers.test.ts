@@ -7,7 +7,6 @@ import {
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
-import { createKeeper } from "@pinetrie/keeper"
 import type { Agent, PiSetup, Scribe } from "@pinetrie/pi"
 import { readPlaces } from "@pinetrie/reads"
 import { encodeRelayMessage, queuedOn } from "@pinetrie/rules"
@@ -16,7 +15,6 @@ import { expect, test } from "vitest"
 import { createAnswers } from "./answers.ts"
 import type { Budgets } from "./budgets.ts"
 import {
-  applyWrites,
   archiveCanvas,
   basics,
   fakeLane,
@@ -26,6 +24,7 @@ import {
   RUNS_ANY,
   record,
   row,
+  stepKeeper,
 } from "./fakes.ts"
 import { createLater } from "./later.ts"
 
@@ -69,12 +68,11 @@ function setUp() {
     ),
   )
   putLane(b, ANSWERER, entryId("e-2"))
-  const keeper = createKeeper()
+  const keeper = stepKeeper(b)
   const { placesWriter } = placesFor(b)
   const later = createLater({
     basics: b,
     keeper,
-    records: { writeValues: async w => applyWrites(b, w) },
     placesWriter,
     drain: () => {},
   })
@@ -84,6 +82,8 @@ function setUp() {
   const answers = createAnswers({
     basics: b,
     later,
+    keeper,
+    runs: { docOf: () => b.root },
     relays: { deliver: async () => ({ kind: "ran" }) },
     agent: { lane: () => asker.lane } as Pick<Agent, "lane">,
     scribe: record<Pick<Scribe, "appendToTree">>().port,

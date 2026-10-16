@@ -28,19 +28,21 @@ import {
 import { describe, expect, test } from "vitest"
 import {
   basics,
+  CANVAS_ID,
   deferred,
   placesFor,
   putCanvas,
   seedPlaces,
   threadRow,
+  writeDirectory,
 } from "./fakes.ts"
-import { planClose } from "./places.ts"
+import { type PersonCause, planClose } from "./places.ts"
 
 const LANE = threadIdFor("0123456789abcdef")
 const ADA = writerId("ada@x.io")
 const BEA = writerId("bea@x.io")
-const MOVE: Cause = { kind: "move", by: ADA }
-const HOST: Cause = { kind: "host" }
+const MOVE: PersonCause = { kind: "move", by: ADA }
+const HOST = { kind: "host" } as const
 
 const card = (
   id: string,
@@ -199,8 +201,10 @@ describe("the writer", () => {
         },
       },
     })
-    await placesWriter.change(MOVE, open =>
-      open.apply([{ kind: "remove", id: C1.id }]),
+    await placesWriter.change(
+      MOVE,
+      open => open.apply([{ kind: "remove", id: C1.id }]),
+      b.roots,
     )
     expect(seen).toEqual([[]])
   })
@@ -209,10 +213,14 @@ describe("the writer", () => {
     const b = basics()
     const { placesWriter } = placesFor(b)
     const waiting = deferred<void>()
-    const first = placesWriter.change(MOVE, async open => {
-      open.apply([{ kind: "write", record: C1 }])
-      await waiting.promise
-    })
+    const first = placesWriter.change(
+      MOVE,
+      async open => {
+        open.apply([{ kind: "write", record: C1 }])
+        await waiting.promise
+      },
+      b.roots,
+    )
     // Another change, the host's, while the first waits.
     await placesWriter.change(HOST, open =>
       open.apply([{ kind: "write", record: C2 }]),
@@ -229,15 +237,20 @@ describe("the writer", () => {
     seedPlaces(b.places, [{ kind: "write", record: C1 }])
     const { placesWriter } = placesFor(b)
     const before = readPlacesRev(b.places)
-    const nothing = await placesWriter.change({ kind: "undo", by: ADA }, open =>
-      open.revert([C1.id], async () => "nothing"),
+    const nothing = await placesWriter.change(
+      { kind: "undo", by: ADA },
+      open => open.revert([C1.id], async () => "nothing"),
+      b.roots,
     )
     expect(nothing).toEqual({ result: "nothing", rev: before })
-    const undone = await placesWriter.change({ kind: "undo", by: ADA }, open =>
-      open.revert([C1.id], async () => {
-        seedPlaces(b.places, [{ kind: "remove", id: C1.id }])
-        return "undone"
-      }),
+    const undone = await placesWriter.change(
+      { kind: "undo", by: ADA },
+      open =>
+        open.revert([C1.id], async () => {
+          seedPlaces(b.places, [{ kind: "remove", id: C1.id }])
+          return "undone"
+        }),
+      b.roots,
     )
     // The seed raised one, the revert's own one more.
     expect(undone).toEqual({ result: "undone", rev: before + 2 })
@@ -250,10 +263,13 @@ describe("the writer", () => {
     const { placesWriter } = placesFor(b, {
       texts: { destroy: async id => void destroyed.push(id) },
     })
-    await placesWriter.change({ kind: "undo", by: ADA }, open =>
-      open.revert([C1.id], async () => {
-        seedPlaces(b.places, [{ kind: "remove", id: C1.id }])
-      }),
+    await placesWriter.change(
+      { kind: "undo", by: ADA },
+      open =>
+        open.revert([C1.id], async () => {
+          seedPlaces(b.places, [{ kind: "remove", id: C1.id }])
+        }),
+      b.roots,
     )
     expect(readPlaces(b.places)).toEqual([])
     expect(destroyed).toEqual([])
@@ -269,22 +285,26 @@ describe("the writer", () => {
       },
     })
     await expect(
-      placesWriter.change(MOVE, open => {
-        open.apply([{ kind: "write", record: C1 }])
-        throw new Error("the body")
-      }),
+      placesWriter.change(
+        MOVE,
+        open => {
+          open.apply([{ kind: "write", record: C1 }])
+          throw new Error("the body")
+        },
+        b.roots,
+      ),
     ).rejects.toThrow("the body")
     expect(b.lines).toEqual([
       "[host] a change to the places did not close: the close",
     ])
   })
 
-  test("a moved card's watched thread end leaves no trace; one in a root not loaded does", async () => {
+  test("a moved card's watched thread end leaves no trace; one in a canvas no one reads does", async () => {
     const b = basics()
     const E1 = entryId("e-1")
     writeEntry(b.root, threadRow(E1, null, LANE))
     writeLaneTip(b.root, LANE, E1)
-    // A thread's root is its record's: LANE's is loaded, AWAY's is not.
+    // A thread's root is its record's: LANE's canvas is read, AWAY's is not.
     const AWAY = threadIdFor("fedcba9876543210")
     putCanvas(b, LANE)
     putCanvas(
@@ -309,19 +329,24 @@ describe("the writer", () => {
     ])
     // Ada reads the thread end both cards are pinned at, as far as the host
     // can tell: LANE's end, E1.
+    writeDirectory(b)
     const presence = newPresenceDoc()
     presence.reading.set(readingKey(seatKey(ADA, "s1"), "c1"), E1)
+    presence.readingCanvas.set(readingKey(seatKey(ADA, "s1"), "c1"), CANVAS_ID)
     const { placesWriter } = placesFor(b, { presence })
     const inBea = (c: TextCard): TextCard => ({
       ...c,
       place: { kind: "inventory", holder: BEA } as const,
       placer: BEA,
     })
-    await placesWriter.change({ kind: "move", by: BEA }, open =>
-      open.apply([
-        { kind: "write", record: inBea(here) },
-        { kind: "write", record: inBea(away) },
-      ]),
+    await placesWriter.change(
+      { kind: "move", by: BEA },
+      open =>
+        open.apply([
+          { kind: "write", record: inBea(here) },
+          { kind: "write", record: inBea(away) },
+        ]),
+      b.roots,
     )
     expect([...readTraces(b.session).values()].map(t => t.card)).toEqual([
       away.id,

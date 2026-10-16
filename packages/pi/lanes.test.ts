@@ -628,6 +628,8 @@ describe("lanes in a harness", () => {
       },
     })
     expect(await second.interrupted([ONE_ROOT])).toEqual([lane])
+    // A lane skipped is not asked of: its inspection would wait for a run.
+    expect(await second.interrupted([ONE_ROOT], l => l === lane)).toEqual([])
     expect(await second.lane(lane).run(prompt("again"), [])).toMatchObject({
       kind: "refused",
     })

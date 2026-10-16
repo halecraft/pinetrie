@@ -27,6 +27,9 @@
     host's records alone), and a root's is pi's storage plus `records`.
   - ADR-0116: a root is the unit of storage, not of work; the host holds the
     roots of open tasks' threads.
+  - ADR-0162: the host no longer holds every root that is not archived. A root
+    is loaded while a keeper step or a lease holds it, and a starting host
+    opens only the roots of lanes a crash interrupted a run in.
 
 **Context.** The session was one Kyneta document, `pinetrie:session`: pi's
 storage for every root ever started, the host's records, and what is

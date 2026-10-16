@@ -6,6 +6,7 @@
 import type {
   AcceptedAction,
   CommitId,
+  EntryId,
   ErrCode,
   JjBaseRecord,
   LaneBase,
@@ -13,11 +14,16 @@ import type {
   PointId,
   ProposedChangesFact,
   ProposedChangesSeen,
+  RevisionRecord,
   ThreadId,
   WriterId,
 } from "@pinetrie/core"
 import type { FileAt, ReadSite } from "@pinetrie/lanes"
-import { readProposedByLane, readRevisions } from "@pinetrie/reads"
+import {
+  readLaneRecords,
+  readProposedByLane,
+  readRevisions,
+} from "@pinetrie/reads"
 import type {
   ArchiveTeardown,
   ForkBegin,
@@ -25,7 +31,7 @@ import type {
   ReviewAnswer,
   ReviewAsk,
 } from "@pinetrie/rules"
-import type { Basics } from "../basics.ts"
+import type { LeaseBasics } from "../basics.ts"
 
 /** What a catch-up decides its base's update from (`planUpdateFrom`). */
 export interface BaseNow {
@@ -101,17 +107,22 @@ export interface Destination {
 
 /**
  * What a review may read is found in (`planReviewRead`): every proposed
- * changes, and every held root's revisions, since a range is named by two
- * states of one lane.
+ * changes, and the revisions of the roots of their lanes, each leased while
+ * it is read, since a range is named by two states of one lane.
  */
-export const reviewReadFacts = (
-  basics: Pick<Basics, "session" | "docs">,
-): Parameters<typeof planReviewRead>[0] => ({
-  proposedByLane: readProposedByLane(basics.session),
-  revisions: new Map(
-    basics.docs.loaded().flatMap(root => {
-      const view = basics.docs.view(root)
-      return view === null ? [] : [...readRevisions(view.doc)]
-    }),
-  ),
-})
+export async function reviewReadFacts(
+  basics: Pick<LeaseBasics, "session" | "leases">,
+): Promise<Parameters<typeof planReviewRead>[0]> {
+  const proposedByLane = readProposedByLane(basics.session)
+  const lanes = readLaneRecords(basics.session)
+  const roots = new Set(
+    [...proposedByLane.keys()].flatMap(lane => lanes.get(lane)?.root ?? []),
+  )
+  const revisions = new Map<EntryId, RevisionRecord>()
+  for (const root of [...roots].sort()) {
+    await using held = basics.leases.root(root)
+    for (const [entry, r] of readRevisions(await held.ready))
+      revisions.set(entry, r)
+  }
+  return { proposedByLane, revisions }
+}

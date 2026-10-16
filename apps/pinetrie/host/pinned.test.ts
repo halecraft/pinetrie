@@ -65,6 +65,7 @@ function setUp(texts: Record<string, string>, port: Partial<CardPort> = {}) {
     )
   const { readPinned } = createPinned({
     basics: b,
+    runs: { docOf: () => b.root },
     cards: cards.port,
     waitMs: 20,
   })

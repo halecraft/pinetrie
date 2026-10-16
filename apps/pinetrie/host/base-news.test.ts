@@ -61,9 +61,10 @@ function behind(to = "l2") {
   const news = createBaseNews({
     basics: b,
     agent: { lane: () => handle },
+    runs: { docOf: () => b.root },
     keeper: {
       run: f => {
-        const next = tail.then(f)
+        const next = tail.then(() => f(b.roots))
         tail = next.catch(() => {})
         return next
       },

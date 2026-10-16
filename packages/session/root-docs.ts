@@ -60,13 +60,16 @@ export function rootDocs(exchange: Exchange): RootDocs {
     const plan = planHold({ asked, minted, held: new Set(now.keys()) })
     minted = plan.minted
     if (plan.open.length === 0 && plan.drop.length === 0) return
+    // Destroyed while still wanted: Kyneta tells a peer this client leaves a
+    // document only where `canShare` still allows it, and the host keeps a
+    // root loaded while a tab holds it. Narrowed first, the host would never
+    // hear the drop. `destroy` lets go of this client's copy only.
+    for (const root of plan.drop) void exchange.destroy(rootDocId(root))
     wanted = plan.want
     const next = new Map([...now].filter(([root]) => plan.want.has(root)))
     for (const root of plan.open)
       next.set(root, exchange.get(rootDocId(root), RootDoc))
     roots.set(next)
-    // `destroy` lets go of this client's copy; the host keeps its own.
-    for (const root of plan.drop) void exchange.destroy(rootDocId(root))
   }
   const rootOf = (entry: EntryId): RootId | undefined => {
     for (const [root, doc] of roots.current())

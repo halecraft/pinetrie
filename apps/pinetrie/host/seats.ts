@@ -9,11 +9,11 @@
 
 import type { Exchange } from "@kyneta/exchange"
 import type { WriterId } from "@pinetrie/core"
-import type { Keeper } from "@pinetrie/keeper"
+
 import { readSeats } from "@pinetrie/reads"
 import { planSeats, SEAT, setRecord } from "@pinetrie/rules"
 import { seatOf } from "@pinetrie/schema"
-import type { Basics } from "./basics.ts"
+import type { Basics, HostKeeper } from "./basics.ts"
 import type { MoveHistories } from "./move-history.ts"
 import type { Records } from "./records.ts"
 
@@ -34,7 +34,7 @@ export function startSeats(input: {
     readonly peers: Pick<Exchange["peers"], "current" | "subscribe">
   }
   readonly basics: Pick<Basics, "session" | "now">
-  readonly keeper: Keeper
+  readonly keeper: Pick<HostKeeper, "run">
   readonly records: Pick<Records, "writeValues">
   readonly histories: Pick<MoveHistories, "loaded" | "unloadWriters">
 }): { stop(): void } {

@@ -988,4 +988,12 @@ export const mutations: readonly Mutation[] = [
     // any error is the mutant's (an unused `@ts-expect-error`).
     command: ["pnpm", "exec", "tsc", "--noEmit"],
   },
+  {
+    name: "pi asks of a lane it was told to skip",
+    file: "packages/pi/thread-lanes.ts",
+    from: "        if (skip?.(name) === true) continue\n",
+    to: "",
+    command: ["pnpm", "exec", "vitest", "run", "packages/pi/lanes.test.ts"],
+    expect: "after a crash, the lane is resumed in its own directory",
+  },
 ]

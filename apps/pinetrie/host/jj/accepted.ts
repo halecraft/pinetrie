@@ -51,7 +51,9 @@ export function createAcceptedWork(deps: {
   readonly basics: Pick<Basics, "session">
   /** Accepted work's names and `publish.catchUp`. */
   readonly repoConfig: RepoConfig
-  readonly writeValues: (writes: readonly ValueWrite[]) => Promise<void>
+  readonly writeValues: (
+    writes: readonly ValueWrite<"session">[],
+  ) => Promise<void>
 }): AcceptedWork {
   const { owner, repoConfig } = deps
   const { session: doc } = deps.basics

@@ -40,7 +40,7 @@ import {
   slotMounts,
 } from "@pinetrie/lanes"
 import type { PiSetup } from "@pinetrie/pi"
-import { type Basics, failed } from "../basics.ts"
+import { failed, type LeaseBasics } from "../basics.ts"
 import type { Records } from "../records.ts"
 import {
   folderCopy,
@@ -157,7 +157,7 @@ export interface OpenedProject {
  * Null without tools.
  */
 export async function openProject(input: {
-  readonly basics: Basics
+  readonly basics: LeaseBasics
   /** What `findProject` found; null with no tools. */
   readonly found: Found | null
   /** The project's adapter, with `found`. */
@@ -217,7 +217,7 @@ async function writeLaneGit(
 }
 
 export async function startSetup(input: {
-  readonly basics: Basics
+  readonly basics: LeaseBasics
   /** The project, opened (`openProject`); null with no tools. */
   readonly project: OpenedProject | null
   /** Accepted work's settled config: the owner, and `lanes.ssh`. */

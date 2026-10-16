@@ -98,8 +98,8 @@ export function createRefresh(
       const effects = proposedChangesEffects(planRefresh(facts), {
         lane,
         name,
-        entry: docs.tipOf(lane),
-        wip: docs.wipLine(lane, name),
+        entry: await docs.tipOf(lane),
+        wip: await docs.wipLine(lane, name),
         nonce: newNonce(),
       })
       // execute
@@ -112,7 +112,7 @@ export function createRefresh(
     async rebuild(ops, lane, rebuild) {
       const effects = rebuildEffects(rebuild, {
         lane,
-        entry: docs.tipOf(lane),
+        entry: await docs.tipOf(lane),
         nonce: newNonce(),
       })
       await executeProposedChanges(

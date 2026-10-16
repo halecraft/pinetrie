@@ -86,7 +86,7 @@ export function planCanvasesTrashed(
 /** What deleting a root writes, and what it lets go. */
 export interface RootDelete {
   /** Its directory record, its thread's, and its canvas's title. */
-  readonly values: readonly ValueWrite[]
+  readonly values: readonly ValueWrite<"session">[]
   /** Every card still in it, a new canvas's, say, its canvas and the canvas's card. */
   readonly cards: readonly PlaceStep[]
   /** Its document, destroyed: its tree, and the records kept in it. */

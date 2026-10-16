@@ -1,14 +1,15 @@
 // host/startup — what a starting host does before it accepts a command.
 
 import {
+  type ForeignLane,
   type IconsRecord,
   isTextCard,
   type RootId,
+  type RunnableLane,
   SESSION_TARGET,
   type SetupRecord,
   type ThreadId,
 } from "@pinetrie/core"
-import type { Keeper } from "@pinetrie/keeper"
 import type { Agent, PiSetup } from "@pinetrie/pi"
 import {
   readAccepted,
@@ -18,6 +19,7 @@ import {
   readProject,
   readProposedByLane,
   readRecords,
+  readRunning,
   readSeats,
   readSetup,
   readThreadName,
@@ -42,7 +44,6 @@ import {
   planWorkflowSeed,
   SEAT,
   SETUP,
-  type StoredRecords,
   setIfChanged,
   setRecord,
   VERDICT,
@@ -55,11 +56,12 @@ import {
   readStoredRecordKeys,
   readStreamIds,
 } from "@pinetrie/schema"
-import type { Basics } from "./basics.ts"
+import type { Basics, HostKeeper } from "./basics.ts"
 import type { CardPort } from "./cards.ts"
 import type { Places } from "./places.ts"
 import type { Provenance } from "./provenance.ts"
 import type { Records } from "./records.ts"
+import type { StepDocs } from "./roots.ts"
 import type { Runs } from "./runs.ts"
 import type { LaneWork } from "./work/index.ts"
 
@@ -68,7 +70,11 @@ export interface StartupDeps {
     Basics,
     "session" | "docs" | "live" | "places" | "log" | "newId" | "now"
   >
-  /** The roots this host opened at its start (`planLoads`): every lane that could be running. */
+  /**
+   * The roots this host opened at its start (`planLoads`): those of the lanes
+   * a crash interrupted a run in. Every other root is recovered as it first
+   * loads (`recoverRoot`).
+   */
   readonly roots: readonly RootId[]
   readonly agent: Pick<Agent, "interrupted">
   readonly records: Pick<Records, "writeValues">
@@ -81,7 +87,7 @@ export interface StartupDeps {
   readonly setup: SetupRecord
   /** Name every lane that has none. */
   readonly ensureNames: () => Promise<void>
-  readonly keeper: Keeper
+  readonly keeper: HostKeeper
   readonly start: Runs["start"]
   readonly settle: (lanes: readonly ThreadId[]) => Promise<void>
   readonly cards: Pick<CardPort, "texts" | "stored" | "destroyDocs">
@@ -92,46 +98,97 @@ export interface StartupDeps {
 }
 
 /**
+ * What a root holds that a crash or an older build left: lanes a crash
+ * interrupted, resumed in their own directory (`planStartup`), and those of
+ * another kind left as they are; records of a type no spec declares, deleted
+ * (`planUndeclaredSweep`); stored lane names that are not a thread's, logged,
+ * since no reader is given them. Run in the step whose documents are `roots`,
+ * at startup for the roots it opened and later as each other root first
+ * loads. A lane this host runs now is no crash's: the step that first loaded
+ * its root may have started it. Returns the lanes it resumed or kept, for
+ * the session's plan.
+ */
+export async function recoverRoot(
+  deps: Pick<StartupDeps, "agent" | "work" | "start"> & {
+    readonly basics: Pick<Basics, "session" | "places" | "live" | "log">
+  },
+  roots: StepDocs,
+  root: RootId,
+): Promise<readonly (RunnableLane | ForeignLane)[]> {
+  const { session, places, live, log } = deps.basics
+  // gather
+  const doc = await roots.root(root)
+  const malformed = readStoredLanes(doc).malformed
+  const namespaces = readStoredRecordKeys(doc)
+  // pi's inspection of a running lane waits for its run to end, and so would
+  // this step and every step behind it.
+  const running = (lane: ThreadId) => readRunning(live, lane)
+  const interrupted = (await deps.agent.interrupted([root], running))
+    .filter(l => !running(l))
+    .map(l => deps.work.runnable(l))
+  // plan
+  const undeclared = planUndeclaredSweep([
+    { target: { kind: "root", root }, namespaces },
+  ])
+  const planned = planStartup({
+    cards: readPlaces(places),
+    interrupted,
+    verdicts: [],
+  })
+  // execute
+  if (undeclared.length > 0) {
+    log(
+      `[host] deleting ${undeclared.length} stored records of types no longer kept: ${[...new Set(undeclared.map(w => w.namespace))].join(", ")}`,
+    )
+    await roots.records.writeValues(undeclared)
+  }
+  if (malformed.length > 0)
+    log(
+      `[host] ignoring stored lanes that are no thread's: ${malformed.join(", ")}`,
+    )
+  for (const lane of planned.resume) {
+    log(
+      `[host] resuming ${readThreadName(session, lane)}, which a crash interrupted`,
+    )
+    deps.start(roots, lane, { kind: "resume" })
+  }
+  for (const foreign of planned.kept)
+    log(
+      `[host] ${readThreadName(session, foreign.lane)} stays interrupted: ${foreignLaneWords(foreign)}`,
+    )
+  return interrupted
+}
+
+/**
  * In order: no stream survives a process, so clear them; give a new store the
  * default workflow (`planWorkflowSeed`); delete the records of a type no spec
- * declares, in the session and the roots opened (`planUndeclaredSweep`), and
- * the proposed changes, accepted work and bases of another kind than the
- * project's (`planKindSweep`); log the stored lane names that are not a
- * thread's, which no reader is given; name every lane that has none; resume
- * each lane a crash interrupted, in its own directory (`planStartup`); write
- * what the host found, the commands its pi loaded, the icon source and the
- * verdicts whose request died with the last host, those that changed in one
- * write; sweep what no one will type in again (`sweepTexts`); and last, settle
- * the lanes with cards queued, whose compaction then holds every write above.
- * Nothing else runs yet, so clearing the streams needs no keeper step.
+ * declares in the session (`planUndeclaredSweep`), and the proposed changes,
+ * accepted work and bases of another kind than the project's
+ * (`planKindSweep`); name every lane that has none; recover the roots opened
+ * (`recoverRoot`), in one step; write what the host found, the commands its
+ * pi loaded, the icon source and the verdicts whose request died with the
+ * last host, those that changed in one write; sweep what no one will type in
+ * again (`sweepTexts`); and last, settle the lanes with cards queued, whose
+ * compaction then holds every write above. Nothing else runs yet, so clearing
+ * the streams needs no keeper step.
  */
 export async function recover(deps: StartupDeps): Promise<void> {
-  const { agent, records, piSetup, work, keeper, settle } = deps
-  const { session: doc, docs, live, places, log, newId } = deps.basics
+  const { records, piSetup, work, keeper, settle } = deps
+  const { session: doc, live, places, log, newId } = deps.basics
   applyLiveOps(
     live,
     planClear({ streams: readStreamIds(live), running: readActiveLanes(live) }),
   )
   const seed = planWorkflowSeed(readWorkflow(doc), newId)
   if (seed.length > 0) await keeper.run(() => records.writeValues(seed))
-  const malformed: string[] = []
-  const stored: StoredRecords[] = [
+  const undeclared = planUndeclaredSweep([
     { target: SESSION_TARGET, namespaces: readStoredRecordKeys(doc) },
-  ]
-  for (const root of deps.roots) {
-    const rootDoc = await docs.root(root)
-    malformed.push(...readStoredLanes(rootDoc).malformed)
-    stored.push({
-      target: { kind: "root", root },
-      namespaces: readStoredRecordKeys(rootDoc),
-    })
-  }
-  const undeclared = planUndeclaredSweep(stored)
+  ])
   if (undeclared.length > 0) {
     log(
       `[host] deleting ${undeclared.length} stored records of types no longer kept: ${[...new Set(undeclared.map(w => w.namespace))].join(", ")}`,
     )
-    await keeper.run(() => records.writeValues(undeclared))
+    await keeper.run(roots => roots.records.writeValues(undeclared))
   }
   const otherKind =
     work.project === null
@@ -150,29 +207,18 @@ export async function recover(deps: StartupDeps): Promise<void> {
     )
     await keeper.run(() => records.writeValues(otherKind))
   }
-  if (malformed.length > 0)
-    log(
-      `[host] ignoring stored lanes that are no thread's: ${malformed.join(", ")}`,
-    )
   await deps.ensureNames()
+  const interrupted = await keeper.run(async roots => {
+    const found: (RunnableLane | ForeignLane)[] = []
+    for (const root of deps.roots)
+      found.push(...(await recoverRoot(deps, roots, root)))
+    return found
+  })
   const planned = planStartup({
     cards: readPlaces(places),
-    interrupted: (await agent.interrupted(deps.roots)).map(l =>
-      work.runnable(l),
-    ),
+    interrupted,
     verdicts: [...readVerdicts(doc).values()],
   })
-  for (const lane of planned.resume) {
-    log(
-      `[host] resuming ${readThreadName(doc, lane)}, which a crash interrupted`,
-    )
-    deps.start(lane, { kind: "resume" })
-  }
-  for (const foreign of planned.kept) {
-    log(
-      `[host] ${readThreadName(doc, foreign.lane)} stays interrupted: ${foreignLaneWords(foreign)}`,
-    )
-  }
   const changed = [
     ...planned.unclassified.map(v => setRecord(VERDICT, v)),
     // A lane that waited for its owner's answer waits no longer: the request

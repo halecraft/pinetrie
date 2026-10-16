@@ -3,6 +3,7 @@
 // and values in a document as the host would. Production code never imports
 // it.
 
+import { createInMemoryStore, Exchange } from "@kyneta/exchange"
 import {
   type CanvasId,
   type CardId,
@@ -29,10 +30,12 @@ import {
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
+import { createKeeper } from "@pinetrie/keeper"
 import type { ThreadLaneHandle, WriteOutcome } from "@pinetrie/pi"
 import {
   readLaneRecords,
   readPlaces,
+  readReadingCanvases,
   readRootRecord,
   readRoots,
   readWorkflow,
@@ -72,7 +75,7 @@ import {
   newSessionDoc,
   writeLaneTip,
 } from "@pinetrie/schema/fixtures"
-import type { Basics } from "./basics.ts"
+import type { Basics, HostKey } from "./basics.ts"
 import type { CardPort } from "./cards.ts"
 import type { HostDocuments } from "./docs.ts"
 import {
@@ -87,6 +90,15 @@ import {
   type ProvenanceHooks,
 } from "./provenance.ts"
 import type { Records } from "./records.ts"
+import {
+  createRoots,
+  type Lease,
+  type Leases,
+  type PeerState,
+  type PeerStates,
+  queueUpkeepOn,
+  type StepDocs,
+} from "./roots.ts"
 import type { LaneWork } from "./work/index.ts"
 
 export interface Call {
@@ -241,69 +253,103 @@ export const writesOf = (calls: readonly Call[]): ValueWrite[] =>
 export const ROOT_ID: RootId = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 
 /**
- * The host's documents over `session`, `live`, `places` and `roots`, held
- * from the start. A lane with no record is in `ROOT_ID`, so a test that
- * writes a tip there needs no `LANE` record; a root a test asks for that it
- * did not give is made empty.
+ * The host's documents over `session`, `live` and `places`. A lane with no
+ * record is in `ROOT_ID`, so a test that writes a tip there needs no `LANE`
+ * record.
  */
 function fakeDocuments(input: {
   readonly session: SessionDocHandle
   readonly live: LiveDocHandle
   readonly places: PlacesDocHandle
-  readonly roots: Map<RootId, RootDocHandle>
 }): HostDocuments {
-  const { session, live, places, roots } = input
-  const rootOfLane = (lane: ThreadId): RootId =>
-    readLaneRecords(session).get(lane)?.root ?? ROOT_ID
-  const listeners: ((root: RootId, doc: RootDocHandle) => void)[] = []
-  const releasing: ((root: RootId) => Promise<void>)[] = []
-  const open = (root: RootId): RootDocHandle => {
-    const known = roots.get(root)
-    if (known !== undefined) return known
-    const made = newRootDoc()
-    roots.set(root, made)
-    for (const listener of listeners) listener(root, made)
-    return made
-  }
+  const { session, live, places } = input
   return {
     session,
     live,
     places,
-    root: async root => open(root),
-    view: root => {
-      const doc = roots.get(root)
-      return doc === undefined ? null : { root, doc, session, live }
-    },
-    rootOfLane,
-    docOfLane: lane => roots.get(rootOfLane(lane)) ?? null,
-    laneDoc: async lane => open(rootOfLane(lane)),
+    rootOfLane: lane => readLaneRecords(session).get(lane)?.root ?? ROOT_ID,
     rootOfEntry: entry => {
       for (const r of readRoots(session).values())
         if (r.entry === entry) return r.root
       return null
     },
-    unload: async root => {
-      if (!roots.has(root)) return
-      for (const listener of releasing) await listener(root)
-      roots.delete(root)
+  }
+}
+
+/**
+ * A step's documents and the leases over `roots`, every root loaded from the
+ * start: a root a test asks for that it did not give is made empty. A lane
+ * with no record is in `ROOT_ID`. `destroyed` hears each root destroyed.
+ */
+export function fakeRoots(input: {
+  readonly session: SessionDocHandle
+  readonly roots: Map<RootId, RootDocHandle>
+  readonly destroyed?: (root: RootId) => void
+}): { readonly step: StepDocs; readonly leases: Leases } {
+  const { session, roots } = input
+  const open = (root: RootId): RootDocHandle => {
+    const known = roots.get(root)
+    if (known !== undefined) return known
+    const made = newRootDoc()
+    roots.set(root, made)
+    return made
+  }
+  const rootOfLane = (lane: ThreadId): RootId =>
+    readLaneRecords(session).get(lane)?.root ?? ROOT_ID
+  const lease = (root: RootId): Lease => {
+    const doc = open(root)
+    return {
+      root,
+      doc,
+      ready: Promise.resolve(doc),
+      records: {
+        writeValues: async writes => {
+          for (const [target, group] of byTarget(writes))
+            applyRecordWrites(
+              target.kind === "session" ? session : open(target.root),
+              group,
+            )
+        },
+      },
+      async [Symbol.asyncDispose]() {},
+    }
+  }
+  return {
+    step: {
+      root: async root => open(root),
+      async lane(lane) {
+        const root = rootOfLane(lane)
+        return { root, doc: open(root) }
+      },
+      lease,
+      async destroy(root) {
+        roots.delete(root)
+        input.destroyed?.(root)
+      },
+      records: {
+        writeValues: async writes => {
+          for (const [target, group] of byTarget(writes))
+            applyRecordWrites(
+              target.kind === "session" ? session : open(target.root),
+              group,
+            )
+        },
+      },
     },
-    destroy: async root => {
-      if (roots.has(root))
-        for (const listener of releasing) await listener(root)
-      roots.delete(root)
-    },
-    loaded: () => [...roots.keys()],
-    onOpened(listener) {
-      for (const [root, doc] of roots) listener(root, doc)
-      listeners.push(listener)
-    },
-    onReleasing(listener) {
-      releasing.push(listener)
+    leases: {
+      root: lease,
+      lane: lane => lease(rootOfLane(lane)),
     },
   }
 }
 
-type FakeBasics = Basics & {
+export type FakeBasics = Basics & {
+  /** A step's documents over the test's roots: `ROOT_ID`'s is `root`. */
+  readonly roots: StepDocs
+  /** Leases over the same roots. */
+  readonly leases: Leases
+  /** The roots `roots` holds now: a destroyed one is gone. */
+  readonly rootsHeld: () => readonly RootId[]
   /** The document of `ROOT_ID`, where a test's entries and pi's values go. */
   readonly root: RootDocHandle
   readonly lines: string[]
@@ -350,16 +396,16 @@ export function basics(
 ): FakeBasics {
   let n = 0
   const lines: string[] = []
+  const rootDocs = new Map([[ROOT_ID, root]])
+  const held = fakeRoots({ session, roots: rootDocs })
   return {
     session,
     root,
     live,
-    docs: fakeDocuments({
-      session,
-      live,
-      places,
-      roots: new Map([[ROOT_ID, root]]),
-    }),
+    docs: fakeDocuments({ session, live, places }),
+    roots: held.step,
+    leases: held.leases,
+    rootsHeld: () => [...rootDocs.keys()],
     places,
     log: m => lines.push(m),
     // A uuidv7's shape, as the host's minter gives: a card's id is parsed.
@@ -595,11 +641,11 @@ export function seedPlaces(
     basics: {
       places,
       session: newSessionDoc(),
-      docs: { view: () => null },
       now: () => 0,
       newId: () => "seed",
       log: () => {},
     },
+    readingCanvases: () => [],
     provenance: NO_HOOKS,
     texts: { destroy: async () => {} },
   }).change({ kind: "host" }, open => open.apply(steps, gesture))
@@ -625,6 +671,8 @@ export function placesFor(
   })
   const placesWriter = createPlaces({
     basics: b,
+    readingCanvases: () =>
+      readReadingCanvases(input.presence ?? newPresenceDoc()).values(),
     provenance: hooks,
     texts: input.texts ?? { destroy: async () => {} },
   })
@@ -640,3 +688,76 @@ export const seedChange = (
     return places.rev()
   },
 })
+
+/**
+ * A documents' keeper whose every step is handed `b.roots`, read when the
+ * step opens, and `over` over it: a test records a step's writes so.
+ */
+export const stepKeeper = (
+  b: Pick<FakeBasics, "roots">,
+  over: Partial<StepDocs> = {},
+) =>
+  createKeeper<HostKey, StepDocs>({
+    context: { open: () => ({ ...b.roots, ...over }), close: () => {} },
+  })
+
+/** The roots' store over an in-memory Exchange, with the keeper its upkeep runs on. */
+export function hostRoots(
+  input: {
+    readonly session?: ReturnType<typeof basics>["session"]
+    readonly peers?: PeerStates
+    readonly failed?: (error: unknown) => void
+  } = {},
+) {
+  const exchange = new Exchange({
+    principal: "pinetrie-host",
+    store: createInMemoryStore(),
+  })
+  // Each compaction, by document id, in order.
+  const compacted: string[] = []
+  const compact = exchange.compact.bind(exchange)
+  exchange.compact = async id => {
+    compacted.push(id)
+    await compact(id)
+  }
+  const session = input.session ?? basics().session
+  const roots = createRoots({
+    exchange,
+    session,
+    queueUpkeep: () =>
+      void queueUpkeepOn(keeper, async step => {
+        await roots.upkeep(step)
+      }),
+    ...(input.peers === undefined ? {} : { peers: input.peers }),
+    ...(input.failed === undefined ? {} : { failed: input.failed }),
+  })
+  const keeper = createKeeper<HostKey, StepDocs>({ context: roots.context })
+  return {
+    exchange,
+    roots,
+    keeper,
+    session,
+    compacted,
+  }
+}
+
+/** Peer states a test sets by hand: `none` for a root it names nothing for. */
+export function handPeers(): PeerStates & {
+  set(doc: RootDocHandle, state: PeerState): void
+} {
+  const states = new Map<RootDocHandle, PeerState>()
+  const watchers = new Map<RootDocHandle, Set<() => void>>()
+  return {
+    state: doc => states.get(doc) ?? "none",
+    watch(doc, changed) {
+      const set = watchers.get(doc) ?? new Set()
+      set.add(changed)
+      watchers.set(doc, set)
+      return () => set.delete(changed)
+    },
+    set(doc, state) {
+      states.set(doc, state)
+      for (const changed of watchers.get(doc) ?? []) changed()
+    },
+  }
+}

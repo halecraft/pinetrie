@@ -7,7 +7,6 @@ import {
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
-import { createKeeper } from "@pinetrie/keeper"
 import { readPlaces } from "@pinetrie/reads"
 import { pendingVerdict, setRecord, VERDICT, WORKFLOW } from "@pinetrie/rules"
 import { beginRun, writeEntry, writeLaneTip } from "@pinetrie/schema/fixtures"
@@ -22,11 +21,12 @@ import {
   putValue,
   record,
   row,
+  stepKeeper,
   writeDirectory,
   writesOf,
 } from "../fakes.ts"
 import { type BoardDeps, handleCanvasMove, handleWorkflow } from "./board.ts"
-import { settled } from "./cards.ts"
+import { type CardCommands, settled } from "./cards.ts"
 
 /** The canvas's one thread. */
 const THREAD_1 = threadIdFor("0123456789abcdef")
@@ -51,18 +51,22 @@ function setUp() {
     destination: null,
     teardown: async () => {},
   })
-  const moves = record<BoardDeps["moves"]>({
+  const moves = record<Pick<CardCommands, "placeCanvas">>({
     placeCanvas: async () => settled({ kind: "moved" }, 1),
+  })
+  const histories = record<BoardDeps["histories"]>({
+    unloadCanvas: async () => {},
   })
   const deps: BoardDeps = {
     basics: b,
     records: records.port,
     work: work.port,
-    keeper: createKeeper(),
+    keeper: stepKeeper(b),
     cards: NO_BLANK_CARDS,
-    moves: moves.port,
+    moves: () => moves.port,
+    histories: histories.port,
   }
-  return { b, root, records, work, moves, deps }
+  return { b, root, records, work, moves, histories, deps }
 }
 
 const toDone = {
@@ -85,7 +89,7 @@ test("a canvas an agent of its threads works in is not archived, and nothing is 
   expect(moves.calls).toEqual([])
 })
 
-test("an idle canvas moved to Done: its card's move written, then torn down and unloaded", async () => {
+test("an idle canvas moved to Done: its card's move written, then torn down", async () => {
   const { moves, work, deps } = setUp()
   const out = await handleCanvasMove(deps, ADA, toDone)
   expect(out.outcome).toEqual({ kind: "moved" })
@@ -110,6 +114,26 @@ test("an idle canvas moved to Done: its card's move written, then torn down and 
     },
   ])
   expect(methods(work.calls)).toEqual(["teardown"])
+})
+
+test("archiving lets go of the canvas's stacks of moves, after its teardown; a move within open states does not", async () => {
+  const { work, histories, deps } = setUp()
+  await handleCanvasMove(deps, ADA, toDone)
+  expect(histories.calls).toEqual([
+    { method: "unloadCanvas", args: [CANVAS_ID] },
+  ])
+  expect(methods(work.calls)).toEqual(["teardown"])
+  const open = setUp()
+  const review = workflowStateIdFor("r")
+  putValue(
+    open.b,
+    setRecord(WORKFLOW, {
+      ...WORKFLOW_NOW,
+      open: [...WORKFLOW_NOW.open, { id: review, name: "Review" }],
+    }),
+  )
+  await handleCanvasMove(open.deps, ADA, { ...toDone, to: review })
+  expect(open.histories.calls).toEqual([])
 })
 
 test("an idle canvas moved to Done with its last run's verdict pending leaves it unclassified", async () => {

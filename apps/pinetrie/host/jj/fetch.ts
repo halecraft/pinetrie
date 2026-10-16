@@ -18,7 +18,7 @@ import {
 } from "@pinetrie/jj"
 import type { Keeper } from "@pinetrie/keeper"
 import { executeOrThrow } from "@pinetrie/lanes"
-import { type Basics, failed } from "../basics.ts"
+import { failed, type LeaseBasics } from "../basics.ts"
 import type { ProjectParts } from "../work/adapter.ts"
 import type { LaneRegistry } from "../work/registry.ts"
 
@@ -42,7 +42,7 @@ export interface Fetches {
 }
 
 export function createFetches(deps: {
-  readonly basics: Basics
+  readonly basics: LeaseBasics
   /** The owner of your repo. */
   readonly owner: RepoOwner
   readonly registry: LaneRegistry

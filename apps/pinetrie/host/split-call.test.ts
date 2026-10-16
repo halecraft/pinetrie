@@ -1,5 +1,4 @@
 import { entryId, runId, threadIdFor, writerId } from "@pinetrie/core"
-import { createKeeper } from "@pinetrie/keeper"
 import { readCardHistories, readPlaces } from "@pinetrie/reads"
 import {
   PROPOSED_CHANGES,
@@ -9,8 +8,14 @@ import {
 } from "@pinetrie/rules"
 import { beginRun, writeEntry, writeLaneTip } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
-import type { HostKey } from "./basics.ts"
-import { basics, placesFor, putLane, putValue, row } from "./fakes.ts"
+import {
+  basics,
+  placesFor,
+  putLane,
+  putValue,
+  row,
+  stepKeeper,
+} from "./fakes.ts"
 import { createSplitCall } from "./split-call.ts"
 
 const LANE = threadIdFor("0123456789abcdef")
@@ -53,7 +58,7 @@ test("split_proposed_changes queues a split card by the person behind the run, o
   const b = runningWithProposed()
   const askSplit = createSplitCall({
     basics: b,
-    keeper: { run: f => f() },
+    keeper: { run: f => f(b.roots) },
     placesWriter: placesFor(b).placesWriter,
   })
   expect(await askSplit(LANE)).toEqual({
@@ -82,7 +87,7 @@ test("split_proposed_changes queues a split card by the person behind the run, o
 
 test("a split asked as its run is stopped is popped by the run's end", async () => {
   const b = runningWithProposed()
-  const keeper = createKeeper<HostKey>()
+  const keeper = stepKeeper(b)
   const askSplit = createSplitCall({
     basics: b,
     keeper,

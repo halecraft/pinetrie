@@ -4,14 +4,12 @@ import {
   type CardRecord,
   canvasIdFor,
   type LivePlace,
-  rootIdFor,
   type ThreadName,
-  type ThreadRecord,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
-import { indexCanvases, rootsHeld } from "./canvas-index.ts"
+import { indexCanvases } from "./canvas-index.ts"
 import { threadCardOf } from "./fixtures.ts"
 import {
   awayWords,
@@ -154,23 +152,5 @@ describe("a late write of the host's", () => {
         { cards: [], archived, opened },
       ),
     ).toBeNull()
-  })
-  test("lands only in a thread whose root is held, wherever its card is", () => {
-    const root = rootIdFor("01a00000-0000-7000-8000-0000000000c1")
-    const threads = new Map<typeof fox, ThreadRecord>([
-      [
-        fox,
-        { thread: fox, root, by: ada, createdAt: 0, origin: { kind: "root" } },
-      ],
-    ])
-    for (const [where, place] of Object.entries(places)) {
-      const held = rootsHeld(
-        cardsAt(place),
-        threads,
-        new Set(archived.keys()),
-        new Set([root]),
-      ).has(root)
-      expect(away(place) === null, where).toBe(held)
-    }
   })
 })

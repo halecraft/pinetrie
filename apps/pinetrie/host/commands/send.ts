@@ -65,18 +65,19 @@ import {
   type ThreadOpen,
   textBlobs,
 } from "@pinetrie/rules"
-import type { Basics } from "../basics.ts"
+import type { StepBasics } from "../basics.ts"
 import type { CardPort } from "../cards.ts"
 import type { Names } from "../names.ts"
 import type { Places } from "../places.ts"
-import type { Records } from "../records.ts"
+import type { StepRecords } from "../records.ts"
 import { type Relays, readReachableAgents } from "../relays.ts"
 import { type Runs, startRun } from "../runs.ts"
 import type { Titles } from "../titles.ts"
 import type { LaneWork } from "../work/index.ts"
 
+/** A chat is carried out in a step of the documents' keeper. */
 export interface SendDeps {
-  readonly basics: Basics
+  readonly basics: StepBasics
   readonly agent: Pick<Agent, "createThreadLane" | "lane">
   /** A message on a thread with no lane is written through the scribe. */
   readonly scribe: Pick<Scribe, "appendToTree">
@@ -95,7 +96,7 @@ export interface SendDeps {
   /** A new lane may title its root. */
   readonly titles: Pick<Titles, "laneStarted">
   /** A thread's record, written with its first message. */
-  readonly records: Pick<Records, "writeValues">
+  readonly records: Pick<StepRecords, "writeValues">
   /** The writer of the places: a thread's card is its sender's change. */
   readonly placesWriter: Places
   /** Every thread is named once recorded. */
@@ -204,7 +205,7 @@ export async function sendMessage(
   caughtUp = false,
 ): Promise<Outcome> {
   const { work, blobs, cards } = deps
-  const { docs, session, live } = deps.basics
+  const { roots, session, live } = deps.basics
 
   // A thread at the root starts a root, under the id its tab minted, in a new
   // canvas: one the session already holds is another's, but for the canvas its
@@ -235,7 +236,7 @@ export async function sendMessage(
   // gather
   const view: RootView = {
     root: send.root,
-    doc: await docs.root(send.root),
+    doc: await roots.root(send.root),
     session,
     live,
   }
@@ -449,7 +450,7 @@ async function catchUpFirst(
     "run",
   )
   if (prepared.kind === "conflicted")
-    return startRun(deps, lane, {
+    return startRun(deps, deps.basics.roots, lane, {
       kind: "prompt",
       message: prepared.message,
       pinnedSeen: send.pinned,
@@ -483,8 +484,10 @@ export async function executeSend(
   const { start } = context
   if (start !== null) {
     await deps.records.writeValues(start.records)
-    await deps.placesWriter.change({ kind: "move", by: writer }, open =>
-      open.apply(start.steps),
+    await deps.placesWriter.change(
+      { kind: "move", by: writer },
+      open => open.apply(start.steps),
+      deps.basics.roots,
     )
     // A chat's thread is named once its record is; a new lane's is
     // named as its lane is made, which draws its banner.
@@ -518,7 +521,7 @@ export async function executeSend(
       return { kind: "appended", id: appended.id }
     }
     case "run":
-      return startRun(deps, planned.thread, {
+      return startRun(deps, deps.basics.roots, planned.thread, {
         kind: "prompt",
         message: message(planned.details),
         pinnedSeen: context.pinned,
@@ -556,7 +559,7 @@ export async function executeSend(
         `[host] ${writer.slice(-8)} starts ${readThreadName(view.session, created.lane)}`,
       )
       // After `prepareLane`, so the lane's record is among the root's.
-      await deps.titles.laneStarted({
+      await deps.titles.laneStarted(deps.basics.roots, {
         root,
         lane: created.lane,
         at: planned.at,
@@ -565,7 +568,7 @@ export async function executeSend(
           text: planned.details.text,
         },
       })
-      return startRun(deps, created.lane, {
+      return startRun(deps, deps.basics.roots, created.lane, {
         kind: "prompt",
         message: message(planned.details),
         pinnedSeen: context.pinned,

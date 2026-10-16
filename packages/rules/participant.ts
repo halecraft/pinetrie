@@ -110,7 +110,7 @@ export function planPicture(
 export const pictureWrites = (
   writer: WriterId,
   sha256: Sha256 | null,
-): ValueWrite =>
+): ValueWrite<"session"> =>
   sha256 === null
     ? deleteRecord(PICTURE, writer)
     : setRecord(PICTURE, { writer, sha256 })

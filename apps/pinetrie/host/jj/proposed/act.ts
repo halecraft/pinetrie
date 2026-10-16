@@ -125,7 +125,7 @@ export async function act(
     const name = gathered?.name
     const planned = planRebuild(
       gathered,
-      name === undefined ? "" : docs.wipLine(lane, name),
+      name === undefined ? "" : await docs.wipLine(lane, name),
     )
     if (planned.kind === "refused") return code(planned.why)
     await refresh.rebuild(ops, lane, planned)

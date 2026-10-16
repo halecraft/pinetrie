@@ -23,7 +23,7 @@ import {
 import { createKeeper } from "@pinetrie/keeper"
 import type { LaneHooks, PiSetup } from "@pinetrie/pi"
 import { refusedAnswer, resolveAnswer } from "@pinetrie/rules"
-import { type Basics, failed } from "../basics.ts"
+import { failed, type LeaseBasics } from "../basics.ts"
 import type { Records } from "../records.ts"
 import type { HostReport } from "../settings.ts"
 import type { Splits, StartedProject } from "./adapter.ts"
@@ -79,7 +79,7 @@ export type LaneWork = Pick<
  * first steps wait for them.
  */
 export async function startLaneWork(input: {
-  readonly basics: Basics
+  readonly basics: LeaseBasics
   /** The project, opened (`openProject`); null with no tools. */
   readonly project: OpenedProject | null
   /** Accepted work's settled config; null with no tools. */
