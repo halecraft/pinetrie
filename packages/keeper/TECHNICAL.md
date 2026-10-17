@@ -63,7 +63,11 @@ current.
   is voided is not: that function's promise rejects unhandled, which ends the
   process.
 - **A closed keeper refuses every new step** with `KeeperClosed`, already
-  handled, and finishes what it holds. The host's `failed()` logs nothing for
+  handled, and finishes what it holds: the running step and every `run` and
+  `once` step queued. The closer says what becomes of upkeep not yet
+  started: `close("finish")` runs it, `close("drop")` rejects it unstarted
+  with `KeeperClosed`. The host's documents finish theirs, a compaction;
+  the owner of your repo drops its refreshes, which the next start rebuilds. The host's `failed()` logs nothing for
   it: a refusal during shutdown is expected.
 - **`idle` settles when nothing is queued, running or tracked**, including
   what is added while it waits. `track(work)` holds `idle` for work that is not

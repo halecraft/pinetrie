@@ -1030,7 +1030,8 @@ export async function startHost({
           stalls.stop()
           return
         case "close":
-          keeper.close()
+          // The documents' upkeep compacts: it finishes before the store closes.
+          keeper.close("finish")
           work.destination?.close()
           return
         case "quiet":

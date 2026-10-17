@@ -626,7 +626,7 @@ as it first loads (§ Roots: steps, leases and the upkeep).
 ## Shutdown
 
 `planShutdown` (`shutdown.ts`) returns the order, and `shutdown()` carries
-it out, each step but `server` in its own `try`: `intake` (seats, control), `close` (the documents' keeper and the owner of your repo, which stops its watch), `quiet`, `agent` (every harness),
+it out, each step but `server` in its own `try`: `intake` (seats, control), `close` (the documents' keeper, whose upkeep still finishes, and the owner of your repo, which stops its watch and drops its upkeep not yet started), `quiet`, `agent` (every harness),
 `scribe` (every pi session, so a later write is refused in any document), `work` (the containers, then, on the Mac, the lease: its slot empties, and the VM outlives the host until no lease is left for 10 minutes), `exchange`, `server`. Only a failure in `server`
 rejects `shutdown()`.
 

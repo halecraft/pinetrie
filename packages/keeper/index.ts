@@ -14,6 +14,10 @@
 // A keeper made with a step context hands each step a value of its own: made
 // as the step starts, and closed once the step settles. What a step reaches
 // through it is that step's alone.
+//
+// Closing refuses new steps. The upkeep queued and not yet started is
+// finished or dropped, as the closer says: upkeep that only rebuilds what the
+// next start rebuilds anyway is not worth a shutdown that waits on it.
 
 /** What a closed keeper's steps reject with. */
 export class KeeperClosed extends Error {
@@ -69,8 +73,12 @@ export interface Keeper<K extends string = never, C = void> {
   track<T>(work: Promise<T>): Promise<T>
   /** Settles when nothing is queued, running or tracked, including what is added while it waits. */
   idle(): Promise<void>
-  /** Refuse every step from now on (`KeeperClosed`), and finish what it holds. */
-  close(): void
+  /**
+   * Refuse every step from now on (`KeeperClosed`), and finish the running
+   * step and every `run` and `once` step queued. Upkeep not yet started is
+   * finished too, or with `"drop"` rejected with `KeeperClosed` unstarted.
+   */
+  close(upkeep: "finish" | "drop"): void
 }
 
 interface Entry<C> {
@@ -219,8 +227,14 @@ export function createKeeper<K extends string = never, C = void>(
       )
         await new Promise<void>(resolve => listeners.add(resolve))
     },
-    close() {
+    close(queued) {
       closed = true
+      if (queued === "finish") return
+      const dropped = upkeep.splice(0)
+      laterQueued.clear()
+      for (const step of dropped) step.done.reject(new KeeperClosed())
+      // `idle` waits on what was queued: it may have nothing left to wait for.
+      notify()
     },
   }
 }

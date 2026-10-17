@@ -818,6 +818,15 @@ export const mutations: readonly Mutation[] = [
     expect: "a write by the owner moves only what it moved",
   },
   {
+    name: "a closed owner finishes its queued upkeep",
+    file: "packages/jj/owner.ts",
+    from: '      keeper.close("drop")\n',
+    to: '      keeper.close("finish")\n',
+    command: ["pnpm", "exec", "vitest", "run", "packages/jj/owner.test.ts"],
+    expect:
+      "a closed owner finishes the commands queued and drops the upkeep not yet started",
+  },
+  {
     name: "the heads are not watched",
     file: "packages/jj/owner.ts",
     from: "      watcher = watch(dir, check)\n",

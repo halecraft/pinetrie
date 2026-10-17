@@ -154,6 +154,12 @@ everything else reads at the head it last saw.**
   exactly the last observed one do nothing; anything else queues an
   observation. `.jj/repo` is a file naming the repo in a secondary
   workspace (`headsDir`). `close()` stops both and refuses every step.
+- **A closed owner drops its upkeep not yet started** (`owner.ts`): the
+  running step and the commands queued finish, and each refresh, shared
+  read and observation still waiting rejects unstarted. Upkeep only
+  rebuilds records from your repo, and the next start's first observation
+  marks everything. Finishing it held a host's shutdown for a refresh per
+  lane whenever accepted work had just moved.
 - **`importLane`** is `planImport` as a command: the host's operation
   (`pinetrie-host`, S87 item 7), in the order the bundles were made. Its
   `jj git import` passes `--ignore-working-copy`, which leaves your working

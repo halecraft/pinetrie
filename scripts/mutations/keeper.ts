@@ -14,6 +14,24 @@ export const mutations: readonly Mutation[] = [
     expect: "a closed keeper refuses a new step",
   },
   {
+    name: "a keeper closed to drop upkeep still starts it",
+    file,
+    from: '      if (queued === "finish") return\n',
+    to: "      return\n",
+    command: unit,
+    expect:
+      "closed to drop upkeep, a keeper finishes its running and queued commands, and starts no upkeep",
+  },
+  {
+    name: "a keeper closed to drop upkeep drops its queued commands too",
+    file,
+    from: "      const dropped = upkeep.splice(0)\n",
+    to: "      const dropped = [...waiting.splice(0), ...upkeep.splice(0)]\n",
+    command: unit,
+    expect:
+      "closed to drop upkeep, a keeper finishes its running and queued commands, and starts no upkeep",
+  },
+  {
     name: "a failed step stops the keeper",
     file,
     from: "          next.done.reject(error)\n          finish()\n",

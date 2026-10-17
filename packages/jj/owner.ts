@@ -70,7 +70,13 @@ export interface RepoOwner {
   /** Hold `work` in `idle` until it settles: a request outside the owner, say. */
   track<T>(work: Promise<T>): Promise<T>
   idle(): Promise<void>
-  /** Refuse every step from now on, finish what is queued, and stop watching. */
+  /**
+   * Refuse every step from now on, finish the commands queued, drop the
+   * upkeep not yet started, and stop watching. Upkeep only rebuilds records
+   * from your repo, which the next start's first observation rebuilds
+   * anyway: a refresh per lane, queued when accepted work moved, would
+   * otherwise hold a shutdown for as long as they all take.
+   */
   close(): void
 }
 
@@ -267,7 +273,7 @@ export function startRepoOwner(input: {
       closed = true
       clearInterval(backstop)
       watcher?.close()
-      keeper.close()
+      keeper.close("drop")
       // A read waiting for a first observation that will never come.
       first.resolve()
     },

@@ -2,6 +2,7 @@ import { mkdtemp, readdir, realpath, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { NO_EDITOR } from "@pinetrie/core"
+import { KeeperClosed } from "@pinetrie/keeper"
 import { run } from "@pinetrie/lanes"
 import { afterAll, beforeAll, describe, expect, test } from "vitest"
 import { DEFAULT_REPO } from "./lane/names.ts"
@@ -107,6 +108,25 @@ describe("the owner of your repo", () => {
     await owner.idle()
     expect(order).toEqual(["line", "command", "shared"])
     close(owner)
+  })
+
+  test("a closed owner finishes the commands queued and drops the upkeep not yet started", async () => {
+    const { dir } = await repo("closing")
+    const { owner } = own(dir)
+    await owner.idle()
+    const order: string[] = []
+    const held = Promise.withResolvers<void>()
+    void owner.command(async () => {
+      await held.promise
+      order.push("running")
+    })
+    void owner.command(async () => void order.push("command"))
+    const upkeep = owner.later("shared", async () => void order.push("shared"))
+    owner.close()
+    held.resolve()
+    await expect(upkeep).rejects.toBeInstanceOf(KeeperClosed)
+    await owner.idle()
+    expect(order).toEqual(["running", "command"])
   })
 
   test("a move of the publish bookmark is observed as accepted work's alone", async () => {
@@ -280,8 +300,8 @@ describe("the owner of your repo", () => {
     const { dir, heads, diverge } = await repo("pinned")
     const { owner } = own(dir, 10 * 60_000)
     await owner.idle()
-    // `close` stops the watch and `idle` waits out an observation already
-    // queued, so only the read could merge the heads. A closed owner still
+    // `close` stops the watch and drops an observation still queued, so only
+    // the read could merge the heads. A closed owner still
     // reads: `read` does not go through the keeper.
     owner.close()
     await owner.idle()

@@ -5,9 +5,9 @@
 export type ShutdownStep =
   /** No new command, seat or queued card reaches a step. */
   | "intake"
-  /** The host's and the proposed changes' queues refuse new steps; the proposed changes' poll stops. */
+  /** The host's and the proposed changes' queues refuse new steps; your repo's upkeep not yet started is dropped, and its watch stops. */
   | "close"
-  /** Every step already queued finishes, and its writes reach the store. */
+  /** Every step the queues still hold finishes, and its writes reach the store. */
   | "quiet"
   /** Every harness closes, which ends running runs. */
   | "agent"

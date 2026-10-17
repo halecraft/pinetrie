@@ -157,7 +157,7 @@ describe("idle, close and slow steps", () => {
       await held.promise
       done.push("held")
     })
-    keeper.close()
+    keeper.close("finish")
     await expect(keeper.run(async () => {})).rejects.toBeInstanceOf(
       KeeperClosed,
     )
@@ -168,6 +168,25 @@ describe("idle, close and slow steps", () => {
     held.resolve()
     await idle
     expect(done).toEqual(["held"])
+  })
+
+  test("closed to drop upkeep, a keeper finishes its running and queued commands, and starts no upkeep", async () => {
+    const keeper = createKeeper<"k" | "j">()
+    const done: string[] = []
+    const held = gate()
+    void keeper.run(async () => {
+      await held.promise
+      done.push("running")
+    })
+    void keeper.run(async () => void done.push("queued"))
+    const upkeep = keeper.later("k", async () => void done.push("upkeep"))
+    void keeper.later("j", async () => void done.push("other upkeep"))
+    keeper.close("drop")
+    await expect(upkeep).rejects.toBeInstanceOf(KeeperClosed)
+    const idle = keeper.idle()
+    held.resolve()
+    await idle
+    expect(done).toEqual(["running", "queued"])
   })
 
   test("a step that waited or ran past slowMs is reported, with its key", async () => {
