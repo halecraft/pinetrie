@@ -36,6 +36,15 @@
   - ADR-0150: a lane's history has one kind, on its record, and a project's
     change of kind refuses the lanes of the other kind, as whole lanes, until
     a conversion that is still left open.
+  - ADR-0159: a folder lane's proposed changes are the merge of accepted
+    work's newest state and the lane's tip, made when either moves, and an
+    accept writes that merge as reviewed, refused unless it is still what the
+    person was shown; the merged state's files reach the project's folder as
+    one stream from the disks role, staged in a reserved directory inside the
+    folder; the journal's shape and its recovery are decided; a write through
+    a file held across an accept is kept as a state of its own beside the
+    accept, not on accepted work's line; restore is the same write, on the
+    page's plan.
 
 **Context.**
 

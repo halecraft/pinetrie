@@ -3,7 +3,7 @@
 Numbered S188 until 2026-10-14, when two files held that number.
 
 - **Status:** Answered
-- **Led to:** ADR-0142
+- **Led to:** ADR-0142, ADR-0159
 
 **Question.** S185 found that renaming over a checked file loses saves
 landing between the check and the rename. Moving the file aside and linking

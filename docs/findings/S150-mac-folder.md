@@ -1,7 +1,7 @@
 # S150 — FSEvents drops events in a burst but says so, and names a renamed directory without its contents; APFS ignores case and Unicode form on lookup, as documented; modification times do not repeat; a stat walk of 100,000 files takes 0.3 s, and SHA-256 hashes at 2.8 GB/s
 
 - **Status:** Answered (questions 1–4; 5 and 6 not run)
-- **Led to:** ADR-0142
+- **Led to:** ADR-0142, ADR-0159
 
 **Question.** S149 set out twelve rules for syncing a person's folder with
 their thread, read from Mutagen and Syncthing. Some of them rest on beliefs
