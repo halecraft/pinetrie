@@ -37,17 +37,36 @@ export function stallToReport(input: {
   return stalled >= input.thresholdMs ? stalled : null
 }
 
-export const stallWords = (ms: number): string =>
-  `[host] the event loop stalled for ${Math.round(ms)} ms: anything the host awaited meanwhile, a command among them, was timed that much longer`
+/**
+ * Below this share of a stall spent on the CPU, the host was not busy but
+ * stopped: the machine slept, or a synchronous call waited on the disk.
+ */
+const BUSY_SHARE = 0.1
+
+/** A stall's line, worded from how long it was and how much of it was CPU. */
+export function stallWords(stall: {
+  readonly ms: number
+  readonly cpuMs: number
+}): string {
+  const ms = Math.round(stall.ms)
+  const cpu = Math.round(stall.cpuMs)
+  return stall.cpuMs < stall.ms * BUSY_SHARE
+    ? `[host] the host was paused for ${ms} ms, ${cpu} ms of it on the CPU: the machine slept, or a synchronous call waited`
+    : `[host] the event loop stalled for ${ms} ms, ${cpu} ms of it on the CPU: anything the host awaited meanwhile, a command among them, was timed that much longer`
+}
 
 /**
  * One check: a line for a stall, and the histogram cleared after it. Only
  * after one: a reset drops the next sample, which spans the reset, so a
- * reset on every check would miss a stall that began just after it.
+ * reset on every check would miss a stall that began just after it. A
+ * stall not yet reported began after the last check, since that check
+ * reported any before it, so `cpuMs`, the CPU time since the last check,
+ * holds the stall's own.
  */
 export function checkStalls(
   histogram: DelayHistogram,
   log: (line: string) => void,
+  cpuMs: number,
 ): void {
   const stalled = stallToReport({
     maxNs: histogram.max,
@@ -55,7 +74,7 @@ export function checkStalls(
     thresholdMs: STALL_MS,
   })
   if (stalled === null) return
-  log(stallWords(stalled))
+  log(stallWords({ ms: stalled, cpuMs: Math.min(cpuMs, stalled) }))
   histogram.reset()
 }
 
@@ -69,7 +88,12 @@ export function watchStalls(log: (line: string) => void): {
 } {
   const histogram = monitorEventLoopDelay({ resolution: RESOLUTION_MS })
   histogram.enable()
-  const timer = setInterval(() => checkStalls(histogram, log), CHECK_EVERY_MS)
+  let cpu = process.cpuUsage()
+  const timer = setInterval(() => {
+    const since = process.cpuUsage(cpu)
+    cpu = process.cpuUsage()
+    checkStalls(histogram, log, (since.user + since.system) / 1_000)
+  }, CHECK_EVERY_MS)
   timer.unref()
   return {
     stop() {

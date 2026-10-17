@@ -110,6 +110,12 @@ wires them.
   interval is taken off. The histogram is reset only after a logged stall:
   a reset drops the sample that spans it (measured, Node 24), so a reset on
   every check would miss a stall that began just after one.
+- **A stall names its CPU time, and one mostly off the CPU is a pause**
+  (`stallWords`): a machine that sleeps stops every timer, and Node's
+  histogram reads its sleep as a stall (Duane's host logged 1,042 s). The
+  CPU time since the last check bounds the stall's own, since a check
+  reports any stall before it; under a tenth of the stall, the line says
+  the host was paused: the machine slept, or a synchronous call waited.
 - **One seat's commands run in the order sent, by a chain, not by timing**
   (`control.ts`). Each is queued on the keeper only once the one before it
   has replied, so what that one queued is ahead of it: a queue's drain runs

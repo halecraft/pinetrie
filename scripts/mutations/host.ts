@@ -3084,8 +3084,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "every check clears the delay histogram",
     file: "apps/pinetrie/host/stalls.ts",
-    from: "  if (stalled === null) return\n  log(stallWords(stalled))\n  histogram.reset()\n",
-    to: "  histogram.reset()\n  if (stalled === null) return\n  log(stallWords(stalled))\n",
+    from: "  if (stalled === null) return\n  log(stallWords({ ms: stalled, cpuMs: Math.min(cpuMs, stalled) }))\n  histogram.reset()\n",
+    to: "  histogram.reset()\n  if (stalled === null) return\n  log(stallWords({ ms: stalled, cpuMs: Math.min(cpuMs, stalled) }))\n",
     command: unit,
     expect: "a check that finds no stall leaves the histogram as it is",
   },
@@ -3124,6 +3124,14 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "a thread deleted from the trash leaves the shared files' lineages it read",
+  },
+  {
+    name: "a stall off the CPU is told as work",
+    file: "apps/pinetrie/host/stalls.ts",
+    from: "  return stall.cpuMs < stall.ms * BUSY_SHARE\n",
+    to: "  return false\n",
+    command: unit,
+    expect: "a stall spent off the CPU is told as a pause, not as work",
   },
   // ── the roots' trace ──
   {
