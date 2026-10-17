@@ -28,6 +28,7 @@ import {
   composeAt,
   entriesOf,
   idleNow,
+  idOfText,
   join,
   lanesOf,
   noQueued,
@@ -41,7 +42,6 @@ import { cleanUp, inLane, inLaneQuiet, type LaneHosts } from "../lane-hosts.ts"
 import type { Scenario } from "../scenario.ts"
 
 import {
-  idOfIn,
   LATE_LOAD_MS,
   rootBytes,
   slowToLoad,
@@ -242,7 +242,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     // entries say only that the run was aborted. The run's end appends it,
     // the thread's last entry, and the asks name the stopper from it.
     // Stopping it again, idle, queues nothing.
-    const sleepAsk = idOfIn(th, "sleep")
+    const sleepAsk = idOfText(th, "sleep")
     const stopFacts = () =>
       Object.values(ttree().entries).filter(
         e => e.message?.stopped !== undefined,
@@ -349,7 +349,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       `${linesAfter.length} stored`,
     )
     unwatch = watch()
-    await waitFor(() => idOfIn(th, heldText) !== null, 15_000)
+    await waitFor(() => idOfText(th, heldText) !== null, 15_000)
     await th.quiet()
     const afterRestart = await storedRecords(stored, SESSION_DOC_ID)
     // One whole document, and fewer records than it opened: what the host

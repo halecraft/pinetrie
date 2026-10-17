@@ -50,7 +50,7 @@ async function run(check: Checks["check"]): Promise<void> {
           if (s.kind === "reply") samples.push(s.text)
       })
       const client = await join(host, "e2e-client", "send")
-      await client.send("hello", ROOT, START_AGENT)
+      await client.send("@agent hello", ROOT, START_AGENT)
       await idle()
       unsample()
       const lane = lanesOf(host, tree(), readPlaces(host.places))[0]
@@ -58,7 +58,7 @@ async function run(check: Checks["check"]): Promise<void> {
       check(
         "the thread reads the message, then the agent's reply",
         first.length === 2 &&
-          first[0]?.endsWith(":hello") &&
+          first[0]?.endsWith(":@agent hello") &&
           first[1] === "assistant",
         first.join(" | "),
       )

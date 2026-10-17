@@ -323,8 +323,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a new canvas's first send is refused for its own canvas",
     file: "apps/pinetrie/host/commands/send.ts",
-    from: "    if (said.at.at === null && known && !opened)\n",
-    to: "    if (said.at.at === null && known)\n",
+    from: "    if (send.at.at === null && known && !opened)\n",
+    to: "    if (send.at.at === null && known)\n",
     command: unit,
     expect:
       "a new canvas's first send, its thread and canvas opened as it opened, writes its entry alone",
@@ -485,8 +485,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a quiet catch-up loops",
     file: "apps/pinetrie/host/commands/send.ts",
-    from: "  return sendMessage(deps, writer, sendId, said, true)",
-    to: "  return sendMessage(deps, writer, sendId, said, false)",
+    from: "  return sendMessage(deps, writer, sendId, send, true)",
+    to: "  return sendMessage(deps, writer, sendId, send, false)",
     command: unit,
     expect:
       "the update first, keeping the lane up; then the chat runs after it, once",
@@ -580,8 +580,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a new root takes an id another holds",
     file: "apps/pinetrie/host/commands/send.ts",
-    from: "    if (said.at.at === null && readRoots(session).has(said.root))",
-    to: "    if (said.at.at === null && readRoots(session).has(said.root) && false)",
+    from: "    if (send.at.at === null && readRoots(session).has(send.root))",
+    to: "    if (send.at.at === null && readRoots(session).has(send.root) && false)",
     command: unit,
     expect:
       "a thread at the root under a root id in use is refused, and nothing is written",
@@ -846,7 +846,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a refused run's message is lost",
     file: "apps/pinetrie/host/runs.ts",
-    from: "            await handle.append(said)\n          }\n        } catch (error) {",
+    from: "            await handle.append(personMessage)\n          }\n        } catch (error) {",
     to: "          }\n        } catch (error) {",
     command: unit,
     expect: "a compelled chat pi refuses to run is appended",
@@ -993,15 +993,6 @@ export const mutations: readonly Mutation[] = [
     to: '    case "refused":\n    case "conflict":\n      return planned\n    case "busy":\n      return { kind: "appended", id: "e-busy" as never }',
     command: unit,
     expect: "busy writes nothing and answers busy",
-  },
-  {
-    name: "the host ignores a column that asks the agent",
-    file: "apps/pinetrie/host/commands/send.ts",
-    from: "    asksAgent: said.asksAgent,",
-    to: "    asksAgent: false,",
-    command: unit,
-    expect:
-      "a column that asks the agent's message, naming nobody, starts a run",
   },
   {
     name: "sendMessage leaves details' shares empty",
@@ -1429,8 +1420,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a popped queued card skips the gate",
     file: "apps/pinetrie/host/commands/index.ts",
-    from: "    const gate = await clear(deps, said, canvasesNow(deps.basics))\n",
-    to: '    const gate = { kind: "cleared", command: said } as never\n',
+    from: "    const gate = await clear(deps, outgoing, canvasesNow(deps.basics))\n",
+    to: '    const gate = { kind: "cleared", command: outgoing } as never\n',
     command: unit,
     expect: "a popped queued card in an archived root is refused",
   },
@@ -1802,7 +1793,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a stop before pi starts is lost",
     file: "apps/pinetrie/host/runs.ts",
-    from: "          if (said !== null && stop.signal.aborted) {",
+    from: "          if (personMessage !== null && stop.signal.aborted) {",
     to: "          if (false) {",
     command: unit,
     expect: "a stop while a chat's run waits for its pinned cards",
@@ -1810,7 +1801,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a land start can be cancelled",
     file: "apps/pinetrie/host/runs.ts",
-    from: "      if (said !== null) waiting.set(lane, stop)",
+    from: "      if (personMessage !== null) waiting.set(lane, stop)",
     to: "      waiting.set(lane, stop)",
     command: unit,
     expect: "a land or stack start cannot be cancelled",
@@ -1827,8 +1818,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a chat's pinned versions are dropped",
     file: "apps/pinetrie/host/commands/send.ts",
-    from: "    base: said.base,\n    pinned: said.pinned,",
-    to: "    base: said.base,\n    pinned: [],",
+    from: "    base: send.base,\n    pinned: send.pinned,",
+    to: "    base: send.base,\n    pinned: [],",
     command: unit,
     expect: "the chat command",
   },
@@ -2292,7 +2283,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a branch names a copy anywhere",
     file: "apps/pinetrie/host/commands/send.ts",
-    from: "    forkEntry(copied.origin) !== said.at.at\n",
+    from: "    forkEntry(copied.origin) !== send.at.at\n",
     to: "    true\n",
     command: unit,
     expect:
@@ -2555,8 +2546,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "sendMessage takes any send",
     file: "apps/pinetrie/host/commands/send.ts",
-    from: "  said: Cleared<Send>,\n  /** This send has caught its lane up already",
-    to: "  said: Send,\n  /** This send has caught its lane up already",
+    from: "  send: Cleared<Send>,\n  /** This send has caught its lane up already",
+    to: "  send: Send,\n  /** This send has caught its lane up already",
     command: ["pnpm", "exec", "tsc", "--noEmit"],
   },
   {

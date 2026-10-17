@@ -140,7 +140,6 @@ function setUp(
       root: ROOT_ID,
       mode: "reply",
       lane: THREAD,
-      asksAgent: false,
     }) satisfies WireCommand
   return {
     b,
@@ -313,7 +312,6 @@ test("a popped queued card in an archived root is refused, and the agent is neve
     text: "from the queue",
     root: ROOT_ID,
     at: { kind: "queue", thread: THREAD },
-    asksAgent: false,
     mentions: [],
     card: null,
     pinned: [],
@@ -360,7 +358,6 @@ test("nothing runs in a thread in an inventory", async () => {
     text: "from the queue",
     root: ROOT_ID,
     at: { kind: "queue", thread: THREAD },
-    asksAgent: false,
     mentions: [],
     card: null,
     pinned: [],
@@ -407,7 +404,6 @@ test("nothing runs on a lane of another kind than the project's; a held one is r
     text: "from the queue",
     root: ROOT_ID,
     at: { kind: "queue", thread: THREAD },
-    asksAgent: false,
     mentions: [],
     card: null,
     pinned: [],

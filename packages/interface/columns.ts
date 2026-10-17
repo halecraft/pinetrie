@@ -69,8 +69,6 @@ export interface Column {
    * (`laneOf`). A column opens its thread before its first send.
    */
   readonly thread: ThreadId
-  /** A column that asks the agent with nothing typed: a message with no mention asks the agent. */
-  readonly asksAgent?: true
   /**
    * Its own thread, when the thread it forks from is on no column of its
    * canvas: the path above the thread's first message folds

@@ -57,7 +57,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "referencedBlobs skips a chat's shares",
     file: "packages/reads/index.ts",
-    from: "    for (const share of said?.shared ?? []) {",
+    from: "    for (const share of details?.shared ?? []) {",
     to: "    for (const share of []) {",
     command: unit,
     expect: "a chat's shares keep their originals and fitted copies",

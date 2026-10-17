@@ -9,13 +9,13 @@ import type { Checks } from "../checks.ts"
 import {
   at,
   canvasHolding,
+  idOfText,
   START_AGENT,
   suitePlaces,
   waitFor,
 } from "../harness.ts"
 import type { LaneHosts } from "../lane-hosts.ts"
 import type { Scenario } from "../scenario.ts"
-import { idOfIn } from "./support.ts"
 
 export const scenario: Scenario = {
   lanes: true,
@@ -70,7 +70,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
   if (entry === null) throw new Error("the root has no entry")
   await tu.mark(entry, "Mine")
   await waitFor(() => title() === "Mine", 10_000)
-  await tu.send("@agent now the lexer", at(idOfIn(th, "noted")), {
+  await tu.send("@agent now the lexer", at(idOfText(th, "noted")), {
     mode: "reply",
   })
   await idle()

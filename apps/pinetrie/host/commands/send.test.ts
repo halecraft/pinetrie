@@ -281,12 +281,11 @@ describe("sendMessage", () => {
     ],
   ])
   // E1 starts thread LANE: a lane by that name is the thread's.
-  const said = (text: string, asksAgent = false): Send => ({
+  const said = (text: string): Send => ({
     kind: "send",
     text,
     root: ROOT_ID,
     at: { kind: "end", thread: LANE, seen: E1 },
-    asksAgent,
     mentions: parseMentions(text),
     card: null,
     pinned: [],
@@ -364,7 +363,7 @@ describe("sendMessage", () => {
     const { b, pi, started, deps } = setUp()
     writeDirectory(b)
     const out = await sendCleared(deps, ALICE, "s-1", {
-      ...said("do it", true),
+      ...said("@agent do it"),
       at: { kind: "branch", thread: NEW, at: null, canvas: NEW_CANVAS },
     })
     expect(out).toMatchObject({ kind: "refused", code: ERR.ROOT_ID_IN_USE })
@@ -375,7 +374,7 @@ describe("sendMessage", () => {
     const { b, pi, records, deps } = setUp()
     putCanvas(b, NEW, NEW_CANVAS)
     const first = {
-      ...said("do it", true),
+      ...said("@agent do it"),
       at: { kind: "branch", thread: NEW, at: null, canvas: NEW_CANVAS },
     } as const
     expect(await sendCleared(deps, ALICE, "s-1", first)).toEqual({
@@ -396,9 +395,9 @@ describe("sendMessage", () => {
     ).toMatchObject({ kind: "refused", code: ERR.CANVAS_ID_IN_USE })
   })
 
-  test("a column that asks the agent's message, naming nobody, starts a run", async () => {
+  test("@agent in a thread with no lane starts a run", async () => {
     const { started, deps } = setUp()
-    const out = await sendCleared(deps, ALICE, "s-1", said("do it", true))
+    const out = await sendCleared(deps, ALICE, "s-1", said("@agent do it"))
     expect(out).toEqual({ kind: "started", runId: "r-1" })
     expect(started).toHaveLength(1)
   })
@@ -406,15 +405,15 @@ describe("sendMessage", () => {
   test("the chat command's pinned versions reach its run", async () => {
     const { seen, deps } = setUp()
     const pinned = [{ id: cardIdFor("c1"), seen: "v-1" }]
-    await sendCleared(deps, ALICE, "s-1", { ...said("do it", true), pinned })
+    await sendCleared(deps, ALICE, "s-1", { ...said("@agent do it"), pinned })
     expect(seen).toEqual([pinned])
   })
 
   test("a new lane is named by its thread's id", async () => {
     const { pi, deps } = setUp()
-    await sendCleared(deps, ALICE, "s-1", said("do it", true))
+    await sendCleared(deps, ALICE, "s-1", said("@agent do it"))
     await sendCleared(deps, ALICE, "s-2", {
-      ...said("do it", true),
+      ...said("@agent do it"),
       at: { kind: "branch", thread: NEW, at: E1, canvas: CANVAS_ID },
     })
     expect(

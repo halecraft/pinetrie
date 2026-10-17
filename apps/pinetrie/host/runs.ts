@@ -213,12 +213,12 @@ export function createRuns(deps: {
       applyLiveOps(live, [{ kind: "begin", lane, run: id }])
       const handle = agent.lane(lane)
       // A chat's message, which is kept if its run never happens.
-      const said =
+      const personMessage =
         start.kind === "prompt" && start.message.customType === MESSAGE_TYPE
           ? start.message
           : null
       const stop = new AbortController()
-      if (said !== null) waiting.set(lane, stop)
+      if (personMessage !== null) waiting.set(lane, stop)
       void (async () => {
         try {
           work.beforeRun(lane)
@@ -235,15 +235,15 @@ export function createRuns(deps: {
             return null
           })
           if (waiting.get(lane) === stop) waiting.delete(lane)
-          if (said !== null && stop.signal.aborted) {
+          if (personMessage !== null && stop.signal.aborted) {
             log(`[host] run ${id.slice(-8)} stopped before it started`)
-            await handle.append(said)
+            await handle.append(personMessage)
             return
           }
           // A chat's run is told its base's new work first; a resolution or a
           // split has a prompt of its own.
           const behind =
-            said === null
+            personMessage === null
               ? null
               : await baseNews.atStart(lane).catch(error => {
                   failed(basics, "the base's news")(error)
@@ -264,11 +264,11 @@ export function createRuns(deps: {
             pinned,
           ].filter(m => m !== null)
           const ran = await handle.run(start.message, before)
-          if (said !== null && settleRun(ran) === "keep") {
+          if (personMessage !== null && settleRun(ran) === "keep") {
             // The reply was already `started`, so the author cannot be told;
             // at least their message is not lost.
             log(`[host] run ${id.slice(-8)} REFUSED: kept as a message`)
-            await handle.append(said)
+            await handle.append(personMessage)
           }
         } catch (error) {
           failed(basics, "run")(error)

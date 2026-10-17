@@ -442,7 +442,7 @@ canvas's threads (`canvasRail`). A canvas's signals are its threads', whatever r
   not hold yet is left out until it is.
 - **Your view of a canvas is `YourCanvasView`**: each card's `CardView`
   (unfolded, density, details, and for a thread you opened what it starts
-  with: `pending`, `prefill`, `asksAgent`), and the canvas column's fold. Maps and a flag, so the layout
+  with: `pending`, `prefill`), and the canvas column's fold. Maps and a flag, so the layout
   has nowhere to keep an order of its own. A canvas with no view is drawn
   with its first card alone unfolded (`defaultView`); a view action
   carries the canvas's first card to start one (`first`).
@@ -585,7 +585,7 @@ take the same scene and differ only in which way their frames run.
 
 ## The column model (`columns.ts`)
 
-A thread column is `{ key, anchor, thread, asksAgent?, foldAbove?,
+A thread column is `{ key, anchor, thread, foldAbove?,
 density?, details?, mode }`, `mode` `bound` or `unstarted`
 (`UnstartedMode`). Every column comes from its card on a canvas
 (`canvasColumns`).
@@ -617,7 +617,7 @@ density?, details?, mode }`, `mode` `bound` or `unstarted`
   ("branch here" after a conflict), both from your `CardView` (`opened`),
   spent by its first send (`sentFirst`). A blank prefill means nothing
   sent alone: `@agent ` in a branch from an agent thread (`branchPrefill`)
-  or a new canvas (`AGENT_PREFILL`), which
+  or a new canvas's or ＋'s agent thread (`AGENT_PREFILL`), which
   `sendable` (`send.ts`) will not send by itself. Anything else is content:
   an edit's text, which sent unchanged is a retry, on a branch or a new
   canvas (an edit of a root's first message). The prefill is stored with the
@@ -647,12 +647,12 @@ density?, details?, mode }`, `mode` `bound` or `unstarted`
   message, a branch would be the same as replying. At an agent thread's end
   it is "open a branch here", as on every message; its `@agent ` deleted, it
   steps back down to a chat (ADR-0021).
-- **`asksAgent`** is an agent thread ＋ made past the canvas's last column
-  (ADR-0138), the one place a thread starts asking the agent with nothing
-  typed: a
-  message with no mention asks the agent, as if `@agent` were written, until
-  the thread has a lane of its own. Only the composer reads it; the header
-  shows what the composer will do (`onCreatesLane`, below).
+- **No column asks the agent with nothing typed** (ADR-0164): a new
+  canvas's thread, ＋'s agent thread past the canvas's last column
+  (`NewColumn` `opens` `"agent"`) and a branch from an agent thread open with
+  `AGENT_PREFILL`, so a message asks the agent only where its text says so,
+  or where its thread has a lane. The header shows what the composer will
+  do (`onCreatesLane`, below).
 - **Deduplication is `planOpen`'s** (`layout.ts`, above).
 - **Open columns are never written to the document.** Which paths a person
   reads is theirs. The page keeps them in the browser (Kept per tab,
@@ -1416,8 +1416,8 @@ composer*).
   `sendButton` words the plan (labels: `docs/06-interface.md`), and
   `placeholderWords` gives the box's placeholder: the composer holds only its
   state and draws.
-- **Every send from a column carries its `ColumnHow`**: its thread, whether
-  it asks the agent with nothing typed (`asksAgent`), and an unstarted thread's root, built once by
+- **Every send from a column carries its `ColumnHow`**: its thread, and an
+  unstarted thread's root, built once by
   `Column` for its composer and for everyone else's cards at its end, since
   sending any of them here creates this column's lane.
 - **The queue names who queued the last card,** not who the agent is

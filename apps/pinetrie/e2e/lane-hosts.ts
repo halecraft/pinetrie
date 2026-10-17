@@ -9,13 +9,7 @@
 import { rmSync } from "node:fs"
 import { homedir } from "node:os"
 import path from "node:path"
-import {
-  ancestry,
-  entryId,
-  messageText,
-  projectTranscript,
-  type ThreadId,
-} from "@pinetrie/core"
+import { ancestry, entryId, messageText, type ThreadId } from "@pinetrie/core"
 import { dockerWords } from "@pinetrie/docker"
 import { type SessionFiles, sessionFiles } from "@pinetrie/lanes"
 import { scriptedModel } from "@pinetrie/pi"
@@ -34,7 +28,7 @@ import {
   entriesOf,
   idleNow,
   join,
-  lanesOf,
+  laneHolding,
   setUpAccepted,
   suiteBinding,
   suiteDirsNow,
@@ -198,16 +192,8 @@ async function sectionHost(input: SectionInput) {
     await host.quiet()
   }
   /** The lane whose thread holds the message with `text`. */
-  const laneWith = (text: string) => {
-    const index = treeOf(host)
-    const id =
-      Object.values(index.entries).find(
-        e => projectTranscript(index, e.id).at(-1)?.text === text,
-      )?.id ?? null
-    return lanesOf(host, index, readPlaces(host.places)).find(
-      l => id !== null && ancestry(index, l.tip).path.includes(id),
-    )
-  }
+  const laneWith = (text: string) =>
+    laneHolding(host, readPlaces(host.places), text)
   /** Every tool result's text in the thread holding `text`, oldest first. */
   const results = async (text: string) => {
     await idle()

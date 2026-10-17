@@ -1448,7 +1448,7 @@ async function run(check: Checks["check"]): Promise<void> {
       await idle()
       await texts(before)
       await texts(before + 1)
-      // A branch from a conversation opens with nothing typed. The message's
+      // A branch from a chat opens with nothing typed. The message's
       // markdown draws as other text, for copy below.
       await send(before + 1, STILL_SOURCE)
       await page.waitForSelector(stillMsg(downCol), { timeout: 60_000 })

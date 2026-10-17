@@ -31,7 +31,8 @@ export interface StartButton {
 
 /** What each kind of canvas card is made as. A `KindOnCanvas` it lacks fails to compile at `Makes[K]`. */
 interface Makes {
-  readonly thread: { readonly asksAgent: boolean }
+  /** What its composer opens with: `@agent ` typed, or nothing (a chat). */
+  readonly thread: { readonly opens: "agent" | "chat" }
   readonly "note-column": Record<never, never>
 }
 
@@ -53,8 +54,8 @@ export type NewColumnTable = {
 /** What ＋ past a canvas's last column offers, by kind, in the ▾'s order. */
 const NEW_COLUMNS = {
   thread: [
-    { kind: "thread", asksAgent: true },
-    { kind: "thread", asksAgent: false },
+    { kind: "thread", opens: "agent" },
+    { kind: "thread", opens: "chat" },
   ],
   "note-column": [{ kind: "note-column" }],
 } as const satisfies NewColumnTable
@@ -66,13 +67,13 @@ const AGENT: NewColumn = NEW_COLUMNS.thread[0]
 function startWords(make: NewColumn): Omit<StartItem, "intent"> {
   switch (make.kind) {
     case "thread":
-      return make.asksAgent
+      return make.opens === "agent"
         ? {
             key: "agent",
             label: "agent",
             name: "new agent thread",
             title:
-              "a new thread where the agent answers every message that names no one",
+              "a new thread with @agent typed: its first message asks the agent, and deleting it makes a chat",
           }
         : {
             key: "chat",

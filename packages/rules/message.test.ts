@@ -107,7 +107,6 @@ const plan = (over: Partial<PlanInput>) => {
     lane: NONE,
     mentions: [],
     participants: ["Alice", "Bo"],
-    asksAgent: false,
     sendId: "s-1",
     news: "nothing",
     caughtUp: false,
@@ -147,7 +146,6 @@ describe("addressMessage: who a chat is for, host and composer alike", () => {
       agents: [],
       mode: "reply",
       lane: NONE,
-      asksAgent: false,
       command: false,
       ...over,
     })
@@ -168,7 +166,7 @@ describe("addressMessage: who a chat is for, host and composer alike", () => {
   test("no mention asks the agent in an agent thread, and nobody in a branch", () => {
     expect(to({ lane: lane() }).compels).toEqual(AGENT)
     expect(to({ lane: lane(), mode: "branch" }).compels).toEqual(NOBODY)
-    expect(to({ mode: "branch", asksAgent: true }).compels).toEqual(AGENT)
+    expect(to({ mode: "branch", mentions: ASK }).compels).toEqual(AGENT)
   })
 })
 
@@ -316,10 +314,10 @@ describe("planMessage: a compelled message", () => {
     expect(startsOf(plan({}))).toBeNull()
     expect(startsOf(plan({ mentions: ASK }))).toBeNull()
   })
-  test("a thread with a lane, or a column that asks the agent, compels without a mention", () => {
+  test("only a thread with a lane compels without a mention; elsewhere @agent does", () => {
     expect(kind(plan({ lane: lane() }))).toBe("run")
-    expect(kind(plan({ asksAgent: true }))).toBe("createAndRun")
-    expect(kind(plan({ asksAgent: true, mode: "branch" }))).toBe("createAndRun")
+    expect(kind(plan({}))).not.toBe("createAndRun")
+    expect(kind(plan({ mentions: ASK, mode: "branch" }))).toBe("createAndRun")
   })
   test("an idle lane: runs on it", () => {
     expect(plan({ mentions: ASK, lane: lane() })).toMatchObject({

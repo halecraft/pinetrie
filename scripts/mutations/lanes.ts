@@ -11,8 +11,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a Start's sends lose their mention of the agent",
     file: "apps/pinetrie/host/commands/index.ts",
-    from: "          said => send(writer, newId(), said),\n          fact => queueFact(deps, fact),\n",
-    to: "          said => send(writer, newId(), { ...said, mentions: [] }),\n          fact => queueFact(deps, fact),\n",
+    from: "          outgoing => send(writer, newId(), outgoing),\n          fact => queueFact(deps, fact),\n",
+    to: "          outgoing => send(writer, newId(), { ...outgoing, mentions: [] }),\n          fact => queueFact(deps, fact),\n",
     suite: "lanes",
     scenario: "proposal",
     expect:

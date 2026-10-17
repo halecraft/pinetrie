@@ -199,7 +199,6 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       text: "hi @agent",
       root: NEW_ROOT,
       at: { kind: "branch", thread: NEW_THREAD, at: null, canvas: NEW_CANVAS },
-      asksAgent: true,
       mentions: [{ kind: "agent", agent: THE_AGENT }],
       card: null,
       pinned: [],
@@ -211,7 +210,6 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       text: "hi @bob",
       root: TEST_ROOT,
       at: { kind: "end", thread: threadIdFor("abc"), seen: entryId("e-5") },
-      asksAgent: false,
       mentions: [{ kind: "person", name: "bob" }],
       card: {
         id: cardIdFor("c7"),
@@ -234,7 +232,6 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
         at: entryId("e-3"),
         canvas: NEW_CANVAS,
       },
-      asksAgent: false,
       mentions: [],
       card: null,
       pinned: [],

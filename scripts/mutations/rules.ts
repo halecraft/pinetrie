@@ -1530,12 +1530,12 @@ export const mutations: readonly Mutation[] = [
     expect: "every lane with queued cards drains",
   },
   {
-    name: "a column that asks the agent asks no one",
+    name: "a thread with no lane asks the agent by default",
     file: "packages/rules/message.ts",
-    from: '  (send.mode !== "branch" && send.lane.kind === "lane") || send.asksAgent',
-    to: '  send.mode !== "branch" && send.lane.kind === "lane"',
+    from: '}): boolean => send.mode !== "branch" && send.lane.kind === "lane"',
+    to: '}): boolean => send.mode !== "branch"',
     command: unit,
-    expect: "or a column that asks the agent",
+    expect: "only a thread with a lane compels without a mention",
   },
   {
     name: "archiving ignores the root's work",

@@ -86,7 +86,7 @@ async function run(check: Checks["check"]): Promise<void> {
     START_AGENT,
   )
   await waitFor(() => idleNow(live), 120_000)
-  // A Start Agent message begins a thread of its own: its lane is the new one.
+  // A message at the root begins a thread of its own: its lane is the new one.
   const imageLane = laneNamesOf(live).find(l => l !== lane)
   const seenBy = projectTranscript(
     treeOf(live),

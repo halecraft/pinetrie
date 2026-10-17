@@ -15,6 +15,7 @@ import { subscribe } from "@kyneta/schema"
 import type { ConfigPlaces } from "@pinetrie/config"
 import {
   type ArchivedCanvas,
+  ancestry,
   atEntry,
   type CanvasId,
   type CardCommand,
@@ -28,6 +29,8 @@ import {
   moveOf,
   noteOf,
   type Position,
+  parseMentions,
+  projectTranscript,
   ROOT,
   type RootId,
   type SendMode,
@@ -94,6 +97,11 @@ type ScenarioHow = SendHow & {
    * canvas of the thread its entry is in.
    */
   readonly canvas?: CanvasId
+  /**
+   * Sent as a new canvas's box holds it: `@agent ` before the text, unless
+   * the text names the agent already or is a command.
+   */
+  readonly agent?: true
 }
 
 /** The canvas of the thread `entry` is in, as `client` holds the places. */
@@ -132,8 +140,8 @@ export const archivedFor = (
       )
 }
 
-/** How the two starts send at the root, and a branch's. */
-export const START_AGENT = { mode: "branch", asksAgent: true } as const
+/** How a new canvas's thread sends at the root, @agent typed or deleted, and a branch's. */
+export const START_AGENT = { mode: "branch", agent: true } as const
 export const START_CHAT = { mode: "branch" } as const
 export const BRANCH = { mode: "branch" } as const
 
@@ -270,7 +278,7 @@ export const join = async (
       how: ScenarioHow = {},
     ): Promise<Outcome> => {
       await holds(at)
-      const { mode, thread, canvas, ...rest } = how
+      const { mode, thread, canvas, agent, ...rest } = how
       const branch = mode === "branch" || at.kind === "root"
       const resolved =
         thread ??
@@ -286,8 +294,12 @@ export const join = async (
         (at.kind === "root"
           ? newCanvasId()
           : (entryCanvas(client, at.id) ?? newCanvasId()))
+      // A command asks the agent whatever it names, and must come first.
+      const asks =
+        text.startsWith("/") ||
+        parseMentions(text).some(m => m.kind === "agent")
       return said(
-        text,
+        agent === true && !asks ? `@agent ${text}` : text,
         columnMessageAt(branch ? "branch" : "reply", resolved, at, into),
         rest,
       )
@@ -566,6 +578,36 @@ export const rootRecordsOf = <K, V>(
 ): ReadonlyMap<K, V> => readHeld(held(x).roots, read)
 
 /** Every lane in the roots `x` holds, with its queue from `cards`. */
+/**
+ * The message whose text is `text`, with a new canvas's `@agent ` before it
+ * or not: a scenario names a message by what it typed after the prefill.
+ */
+export function idOfText(
+  x: Parameters<typeof held>[0],
+  text: string,
+): EntryId | null {
+  const index = treeOf(x)
+  return (
+    Object.values(index.entries).find(e => {
+      const sent = projectTranscript(index, e.id).at(-1)?.text
+      return sent === text || sent === `@agent ${text}`
+    })?.id ?? null
+  )
+}
+
+/** The lane whose thread holds the message `text` (`idOfText`). */
+export function laneHolding(
+  x: Parameters<typeof held>[0],
+  cards: readonly CardRecord[],
+  text: string,
+): LaneView | undefined {
+  const id = idOfText(x, text)
+  const index = treeOf(x)
+  return lanesOf(x, index, cards).find(
+    l => id !== null && ancestry(index, l.tip).path.includes(id),
+  )
+}
+
 export const lanesOf = (
   x: Parameters<typeof held>[0],
   index: TreeIndex,

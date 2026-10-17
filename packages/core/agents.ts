@@ -74,15 +74,15 @@ export const lastHeardEntry = (
 export function isRoundAnswered(
   index: TreeIndex,
   tip: EntryId | null,
-  said: EntryId,
+  asking: EntryId,
 ): boolean {
-  const asked = index.entries[said]?.message?.asks ?? []
+  const asked = index.entries[asking]?.message?.asks ?? []
   if (asked.length === 0) return false
   const answered = new Set<ThreadId>()
   for (const id of ancestry(index, tip).path) {
-    if (id === said) break
+    if (id === asking) break
     const answer = index.entries[id]?.message?.answer
-    if (answer?.source === said) answered.add(answer.from)
+    if (answer?.source === asking) answered.add(answer.from)
   }
   return asked.every(t => answered.has(t))
 }

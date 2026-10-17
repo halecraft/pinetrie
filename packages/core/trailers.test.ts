@@ -184,6 +184,12 @@ describe("what is written reads back", () => {
       wipDescription(NAME, "add the line of the proposed changes\nmore"),
     ).toBe("WIP (amber-fox): add the line of the proposed changes")
     expect(wipDescription(NAME, "")).toBe("WIP (amber-fox): this thread's work")
+    expect(wipDescription(NAME, "@agent fix it")).toBe(
+      "WIP (amber-fox): fix it",
+    )
+    expect(wipDescription(NAME, "ask @agent here")).toBe(
+      "WIP (amber-fox): ask @agent here",
+    )
   })
   test("the WIP line is this thread's; an agent's message is not", () => {
     const name = "t-1" as ThreadName

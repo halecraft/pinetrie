@@ -98,8 +98,6 @@ export type ViewChange =
       readonly pending?: Pending
       /** What its composer starts with, unsent. */
       readonly prefill?: Prefill
-      /** A column that asks the agent with nothing typed: its first message with no mention asks the agent. */
-      readonly asksAgent?: true
     }
   /** A thread you opened sent its first message: what it started with is spent. */
   | { readonly kind: "sent"; readonly card: ThreadId }
@@ -191,8 +189,7 @@ const sameCardView = (a: CardView, b: CardView): boolean =>
   a.density === b.density &&
   a.details === b.details &&
   a.pending === b.pending &&
-  a.prefill === b.prefill &&
-  a.asksAgent === b.asksAgent
+  a.prefill === b.prefill
 
 /** `seen` with `key` set to `value`, or left out for undefined. */
 const set = <K extends keyof CardView>(
@@ -223,11 +220,7 @@ function changeView(view: YourCanvasView, change: ViewChange): YourCanvasView {
       )
     case "opened":
       return withCard(view, change.card, c => ({
-        ...set(
-          set(set(c, "pending", change.pending), "prefill", change.prefill),
-          "asksAgent",
-          change.asksAgent,
-        ),
+        ...set(set(c, "pending", change.pending), "prefill", change.prefill),
         unfolded: true,
       }))
     case "sent":
@@ -499,7 +492,7 @@ export function planOpen(
 //
 // Kept per browser tab through `tab-state.ts`. Built field by field both ways,
 // so a field the schema does not name is never stored or restored. A thread
-// you opened keeps its `prefill` and `asksAgent`; its `pending` is not
+// you opened keeps its `prefill`; its `pending` is not
 // kept: restoring it would send its message again. The reader's settings,
 // `density` and `details`, are kept so a reload shows the column as it was
 // left.
@@ -520,7 +513,6 @@ const StoredCardView = Type.Object({
   density: Type.Optional(StoredDensity),
   details: Type.Optional(Type.Literal(true)),
   prefill: Type.Optional(StoredPrefill),
-  asksAgent: Type.Optional(Type.Literal(true)),
 })
 
 /** A canvas's view as stored: records by id, so no order can be kept. */
@@ -537,10 +529,11 @@ const StoredHere = Type.Union([
 /**
  * `v` changes when the shape does; an older layout is dropped, not migrated.
  * `v: 9`: a thread you opened is a card, so no canvas view keeps branches of its
- * own, and no new canvas's thread is kept apart from it.
+ * own, and no new canvas's thread is kept apart from it. `v: 10`: the board's
+ * card is a canvas, so views are kept by canvas.
  */
 const StoredLayout = Type.Object({
-  v: Type.Literal(9),
+  v: Type.Literal(10),
   active: Type.Union([StoredHere, Type.Null()]),
   canvases: Type.Record(Type.String(), StoredYourCanvasView),
   board: Type.Boolean(),
@@ -561,7 +554,6 @@ const toStoredView = (
         ...(v.prefill === undefined
           ? {}
           : { prefill: storedPrefill(v.prefill) }),
-        ...(v.asksAgent ? { asksAgent: true } : {}),
       },
     ]),
   ),
@@ -581,14 +573,13 @@ const fromStoredView = (
       ...(v.density === undefined ? {} : { density: v.density }),
       ...(v.details ? { details: true } : {}),
       ...(v.prefill === undefined ? {} : { prefill: storedPrefill(v.prefill) }),
-      ...(v.asksAgent ? { asksAgent: true } : {}),
     })
   }
   return { cards, canvas: { unfolded: s.canvas.unfolded } }
 }
 
 export const encodeLayout = (layout: Layout): Static<typeof StoredLayout> => ({
-  v: 9,
+  v: 10,
   active: layout.active,
   canvases: Object.fromEntries(
     [...layout.canvases].map(([canvas, view]) => [canvas, toStoredView(view)]),

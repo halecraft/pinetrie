@@ -400,8 +400,6 @@ export type Intent =
        */
       readonly root: RootId
       readonly at: MessageAt
-      /** A column that asks the agent with nothing typed: with no mention, the agent is asked. */
-      readonly asksAgent: boolean
       readonly mentions: readonly Mention[]
       /**
        * The card the text was sent from, spent once it is written or running,
@@ -2215,7 +2213,7 @@ export function mentionTargets(
  * compels this thread's agent. Otherwise a message naming participants or
  * asking members is for them, and the agent is left out; an invite alone leaves
  * the message where it would have gone. Otherwise the thread decides: the agent
- * where it is the default (a thread with a lane, or a column that asks the agent with nothing typed),
+ * where it is the default (a thread with a lane),
  * nobody where it is not. A message that then compels nobody, names no one and
  * asks no member asks the agents it invites, since nobody else would answer.
  *

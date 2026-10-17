@@ -47,7 +47,6 @@ const isRaw = (v: unknown): v is Raw =>
 const KINDS: Readonly<Record<string, string>> = {
   "task-pinned": "canvas-pinned",
   "discarded-task-pinned": "discarded-canvas-pinned",
-  "new-task": "new-canvas",
 }
 
 /**

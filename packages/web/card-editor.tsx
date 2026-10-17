@@ -127,8 +127,8 @@ export function CardEditor(p: {
   /** The thread's lane (`laneOf`): whether the agent is busy there. */
   lane: ThreadLane
   /**
-   * What every send from this column carries: its thread, whether it asks the
-   * agent with nothing typed, and a new canvas's root.
+   * What every send from this column carries: its thread, and a new canvas's
+   * root.
    */
   how: ColumnHow
   /** A unstarted column: its first message starts the thread (`branch`). */
@@ -208,7 +208,6 @@ export function CardEditor(p: {
     text,
     unstarted: p.unstarted,
     lane: p.lane,
-    asksAgent: p.how.asksAgent,
     participants: p.participants,
     agents: p.agents,
     reader: p.reader,

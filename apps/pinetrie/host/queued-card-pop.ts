@@ -150,7 +150,6 @@ export const sendOfPoppedQueuedCard = (
   text: popped.text,
   root,
   at: { kind: "queue", thread: popped.card.place.thread },
-  asksAgent: false,
   mentions: parseMentions(popped.text),
   // A reference is sent from no text card: nothing is spent with it.
   card:

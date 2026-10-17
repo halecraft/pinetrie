@@ -11,6 +11,8 @@
 - **Amended by:**
   - ADR-0158: ＋ past a canvas's last column offers an agent thread, a chat or
     a note column: the conversation is a chat.
+  - ADR-0164: ＋'s agent thread past a canvas's last column opens with `@agent
+    ` typed, as a new canvas's thread does.
 
 **Context.**
 

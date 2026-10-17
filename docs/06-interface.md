@@ -392,8 +392,9 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   reading, the cards pinned to the canvas, and the canvas list its agents
   are told.
 - **＋ past the last column makes a column** (ADR-0138), for everyone, on a
-  canvas you may change, and nowhere else: **＋** an agent thread, its **▾** a
-  chat or a note column. It lands where a drop there would, at the
+  canvas you may change, and nowhere else: **＋** an agent thread, its box
+  starting with `@agent ` typed (ADR-0164), its **▾** a chat or a note
+  column. It lands where a drop there would, at the
   canvas's end; a thread made there starts a new root, with no history of
   its own, unfolded for you and ready to type in. On a read-only canvas it is
   not drawn.
@@ -932,7 +933,10 @@ The rail is E; the column is T. Seeing both at once is the product.
   message asks the agent and makes its lane; deleting `@agent ` makes the
   thread a chat. No choice is asked before the first message. Past a
   canvas's last column, ＋ makes a column of the canvas you are on instead
-  (ADR-0138): an agent thread, its ▾ a chat or a note column.
+  (ADR-0138): an agent thread, its box starting with `@agent ` as well
+  (ADR-0164), its ▾ a chat or a note column. Every thread with no lane
+  asks the agent only through a mention, so a message that asks always
+  shows it.
 - **A new canvas is one from the moment it opens** (ADR-0126): its thread,
   not yet started, is a card on its canvas, and the canvas is in your sidebar
   at once, placed at the end of the first open state from your list's ＋,

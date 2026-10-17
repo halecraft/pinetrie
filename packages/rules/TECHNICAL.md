@@ -224,9 +224,9 @@ are the only code that builds or reads the shape.
 - **Who a message is for is `address`** (`@pinetrie/core`, ADR-0021): `@agent`
   asks the agent; a message naming only participants is for them; with no
   mention that resolves, the thread decides (`agentByDefault`: the agent where
-  the thread has a lane or the column asks the agent with nothing typed
-  (`asksAgent`, ＋'s agent thread past a canvas's last column), and never by a
-  lane's default for a `branch`, which is a new thread). A handle resolves
+  the thread has a lane, and never by a lane's default for a `branch`, which
+  is a new thread; a thread with no lane asks only through `@agent`, which a
+  new thread's composer starts with, ADR-0164). A handle resolves
   by `mentionTargets`, which the composer's list is drawn from, so it offers
   only what a send would reach: a handle names one target, another thread's
   agent before a person and, of two people sharing one (ADR-0037), the later

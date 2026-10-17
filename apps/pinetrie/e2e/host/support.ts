@@ -3,13 +3,12 @@
 // and a message found by its text. Positions and starts are `harness.ts`'s.
 
 import type { Store } from "@kyneta/exchange"
-import { type EntryId, projectTranscript } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import { CONTROL_TOPIC, SESSION_DOC_ID } from "@pinetrie/protocol/messages"
 import type { RootDocHandle } from "@pinetrie/schema"
 import { lineDocPrefix } from "../../host/lines.ts"
 import { openStore } from "../../host/store.ts"
-import { type SuiteClock, treeOf } from "../harness.ts"
+import type { SuiteClock } from "../harness.ts"
 
 export const sleep = (ms: number): Promise<void> =>
   new Promise(r => setTimeout(r, ms))
@@ -112,15 +111,3 @@ export const rootBytes = (doc: RootDocHandle): number =>
     lists: doc.lists(),
     records: doc.records(),
   }).length
-/** In `doc`, the id of the message whose text is exactly `text`. */
-export const idOfIn = (
-  x: Parameters<typeof treeOf>[0],
-  text: string,
-): EntryId | null => {
-  const index = treeOf(x)
-  return (
-    Object.values(index.entries).find(
-      e => projectTranscript(index, e.id).at(-1)?.text === text,
-    )?.id ?? null
-  )
-}

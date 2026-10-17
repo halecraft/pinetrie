@@ -18,6 +18,7 @@
     "sign-in": "pnpm --filter @pinetrie/app run sign-in",
     "sign-out": "pnpm --filter @pinetrie/app run sign-out",
     "session": "pnpm --filter @pinetrie/app run session",
+    "dry-run-migrations": "pnpm --filter @pinetrie/app run dry-run-migrations",
     "tidy": "pnpm --filter @pinetrie/app run tidy",
     "e2e": "pnpm --filter @pinetrie/app run e2e",
     "e2e:live": "pnpm --filter @pinetrie/app run e2e:live",

@@ -11,6 +11,14 @@ const places = "packages/core/places.ts"
 const trailers = "packages/core/trailers.ts"
 
 export const mutations: readonly Mutation[] = [
+  {
+    name: "the WIP line keeps the @agent its first message asks with",
+    file: "packages/core/trailers.ts",
+    from: "  const said = first.startsWith(ASKED) ? first.slice(ASKED.length) : first\n",
+    to: "  const said = first\n",
+    command: unit,
+    expect: "withTrailers and the WIP line",
+  },
   // ── a proposal's branches ──
   {
     name: "a proposal waits on any run of its lane",

@@ -44,8 +44,6 @@ export interface CardView {
   readonly pending?: Pending
   /** What a thread you opened starts its composer with, unsent. */
   readonly prefill?: Prefill
-  /** A column that asks the agent with nothing typed: its first message with no mention asks the agent. */
-  readonly asksAgent?: true
 }
 
 /**
@@ -176,7 +174,6 @@ function cardColumn(
             anchor: opening.fork,
             thread: c.id,
             ...readerOf(seen),
-            ...(seen?.asksAgent === true ? { asksAgent: true } : {}),
             mode: {
               kind: "unstarted",
               fork: opening.fork,

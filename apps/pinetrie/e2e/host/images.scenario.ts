@@ -11,6 +11,7 @@ import {
   at,
   composeAt,
   idleNow,
+  idOfText,
   join,
   laneNamesOf,
   queueCard,
@@ -22,7 +23,7 @@ import {
 import { BLUE_PNG, GREEN_PNG, RED_PNG, YELLOW_PNG } from "../images.ts"
 import type { Scenario } from "../scenario.ts"
 
-import { clockedStore, idOfIn, recordsHold } from "./support.ts"
+import { clockedStore, recordsHold } from "./support.ts"
 
 export const scenario: Scenario = {
   run: ({ check }) => run(check),
@@ -90,7 +91,7 @@ async function run(check: Checks["check"]): Promise<void> {
         },
       },
     ])
-    const asked = `what colour is this? ![red](/blob/${red.sha256})`
+    const asked = `@agent what colour is this? ![red](/blob/${red.sha256})`
     await iu.send(asked, ROOT, START_AGENT)
     await iidle()
 
@@ -102,7 +103,7 @@ async function run(check: Checks["check"]): Promise<void> {
 
     // 4. A card queued for its lane carries its images when it is popped.
     const green = await upload(GREEN_PNG)
-    const replyId = idOfIn(ih, "a red one")
+    const replyId = idOfText(ih, "a red one")
     const paused = script.hold("hold on")
     script.use([{ text: "held" }, { text: "a green one" }])
     await iu.send("@agent hold on", at(replyId), {
@@ -124,9 +125,13 @@ async function run(check: Checks["check"]): Promise<void> {
 
     // 5. An image the host does not store refuses the send.
     const missing = "9".repeat(64)
-    await iu.send(`![gone](/blob/${missing})`, at(idOfIn(ih, "a green one")), {
-      mode: "reply",
-    })
+    await iu.send(
+      `![gone](/blob/${missing})`,
+      at(idOfText(ih, "a green one")),
+      {
+        mode: "reply",
+      },
+    )
 
     // 6. No image bytes in the session's records, compacted.
     await ih.quiet()
@@ -140,7 +145,7 @@ async function run(check: Checks["check"]): Promise<void> {
     const draftedText = `next: ![yellow](/blob/${yellow.sha256})`
     const drafted = await composeAt(
       iu,
-      { entry: idOfIn(ih, "a green one"), lane: null },
+      { entry: idOfText(ih, "a green one"), lane: null },
       draftedText,
     )
     await waitFor(() => ih.cardText(drafted) === draftedText, 5_000)
@@ -151,7 +156,7 @@ async function run(check: Checks["check"]): Promise<void> {
     clock.advance(BLOB_GRACE_MS + 1)
     const iv = await join(ih, "ivy", "images")
     script.use([{ text: "swept" }])
-    await iv.send("@agent anything", at(idOfIn(ih, "a green one")), {
+    await iv.send("@agent anything", at(idOfText(ih, "a green one")), {
       mode: "reply",
     })
     await iidle()
@@ -173,7 +178,7 @@ async function run(check: Checks["check"]): Promise<void> {
         },
       },
     ])
-    await iv.send("@agent and the first one?", at(idOfIn(ih, "swept")), {
+    await iv.send("@agent and the first one?", at(idOfText(ih, "swept")), {
       mode: "reply",
     })
     await iidle()

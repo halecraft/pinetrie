@@ -32,7 +32,6 @@ import { noModelWords } from "./setup-words.ts"
 
 /** What every send from one column carries, whichever card it is sent from. */
 export type ColumnHow = Pick<SendHow, "base" | "root" | "pinned"> & {
-  readonly asksAgent: boolean
   readonly column: string
   /** The column's thread: the one a unstarted column's first send starts. */
   readonly thread: ThreadId
@@ -210,7 +209,6 @@ export function planSend(input: {
   readonly text: string
   readonly unstarted: boolean
   readonly lane: ThreadLane
-  readonly asksAgent: boolean
   readonly participants: readonly string[]
   /** Other threads' agents on open canvases. */
   readonly agents: readonly AgentCandidate[]
@@ -221,11 +219,7 @@ export function planSend(input: {
   readonly noModel: string | null
 }): SendPlan {
   const { unstarted, lane } = input
-  const how = {
-    mode: unstarted ? "branch" : "reply",
-    lane,
-    asksAgent: input.asksAgent,
-  } as const
+  const how = { mode: unstarted ? "branch" : "reply", lane } as const
   const to = addressMessage({
     ...how,
     mentions: parseMentions(input.text),

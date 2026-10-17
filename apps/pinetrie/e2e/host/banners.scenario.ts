@@ -9,6 +9,7 @@ import type { Checks } from "../checks.ts"
 import {
   at,
   entriesOf,
+  idOfText,
   lanesOf,
   START_AGENT,
   SUITE_CONFIG,
@@ -20,7 +21,6 @@ import {
 import { RED_PNG } from "../images.ts"
 import type { LaneHosts } from "../lane-hosts.ts"
 import type { Scenario } from "../scenario.ts"
-import { idOfIn } from "./support.ts"
 
 export const scenario: Scenario = {
   lanes: true,
@@ -79,7 +79,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
 
     // 2. The sweep keeps a banner nothing else shows.
     clock.advance(BLOB_GRACE_MS + 1)
-    const reply = idOfIn(bh, "noted")
+    const reply = idOfText(bh, "noted")
     await bu.send("@agent and the lexer", at(reply), { mode: "reply" })
     await bidle()
 
@@ -99,7 +99,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     ])
     await bu.send(
       `@agent use this as the banner ![red](/blob/${red.sha256})`,
-      at(idOfIn(bh, "noted")),
+      at(idOfText(bh, "noted")),
       { mode: "reply" },
     )
     await bidle()
@@ -114,7 +114,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       now?.sha === red.sha256 && toolSaid.includes("The banner is set."),
     )
     clock.advance(BLOB_GRACE_MS + 1)
-    await bu.send("@agent thanks", at(idOfIn(bh, "set it")), {
+    await bu.send("@agent thanks", at(idOfText(bh, "set it")), {
       mode: "reply",
     })
     await bidle()

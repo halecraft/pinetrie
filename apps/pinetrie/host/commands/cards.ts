@@ -559,7 +559,7 @@ export function createCardCommands(deps: CardCommandDeps) {
     async spinOff(
       writer: WriterId,
       request: SpinOff,
-      start: (said: Send) => Promise<Outcome>,
+      start: (outgoing: Send) => Promise<Outcome>,
       canvases: CanvasIndex,
     ): Promise<Settled> {
       const { move } = request
@@ -625,7 +625,6 @@ export function createCardCommands(deps: CardCommandDeps) {
           at: null,
           canvas: request.canvas,
         },
-        asksAgent: false,
         mentions: plan.mentions,
         card: { id: card, seen: "" },
         pinned: [],
@@ -715,7 +714,7 @@ export function createCardCommands(deps: CardCommandDeps) {
       writer: WriterId,
       press: BranchOut,
       canvases: CanvasIndex,
-      start: (said: Send) => Promise<Outcome>,
+      start: (outgoing: Send) => Promise<Outcome>,
       queueFact: (fact: QueuedFact) => Promise<void>,
     ): Promise<Settled> {
       // gather
@@ -913,18 +912,18 @@ export function createCardCommands(deps: CardCommandDeps) {
      */
     async queueBusy(
       writer: WriterId,
-      said: Send & { card: SentCard },
+      outgoing: Send & { card: SentCard },
     ): Promise<Settled | null> {
-      const doc = await docs.root(said.root)
+      const doc = await docs.root(outgoing.root)
       const index = readTreeIndex(doc)
       const cards = readPlaces(places)
       const blank = await deps.cards.blankQueued(cards)
       const thread = threadOfSend(
         index,
         readLanes({ doc, live }, index, cards, readQueueHolds(session), blank),
-        { at: said.at, me: writer },
+        { at: outgoing.at, me: writer },
       )
-      const now = cards.find(c => c.id === said.card.id)
+      const now = cards.find(c => c.id === outgoing.card.id)
       if (
         thread.kind !== "thread" ||
         thread.lane.kind !== "lane" ||
@@ -937,7 +936,7 @@ export function createCardCommands(deps: CardCommandDeps) {
           moveOf(now, {
             kind: "queued",
             thread: thread.lane.name,
-            seen: said.card.seen,
+            seen: outgoing.card.seen,
           }),
         ],
         writer,

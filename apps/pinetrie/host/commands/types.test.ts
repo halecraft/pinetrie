@@ -12,7 +12,6 @@ test("a send the gate did not clear does not compile", () => {
     text: "x",
     root: ROOT_ID,
     at: { kind: "queue", thread: threadIdFor("t") },
-    asksAgent: false,
     mentions: [],
     card: null,
     pinned: [],

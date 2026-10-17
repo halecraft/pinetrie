@@ -52,7 +52,6 @@ test("a chat fills in what its column left out, and carries each card's version 
     kind: "send",
     root: TEST_ROOT,
     at: end,
-    asksAgent: false,
     card: null,
     pinned: [],
     base: null,
@@ -72,7 +71,6 @@ test("a chat fills in what its column left out, and carries each card's version 
       text: "go",
       at: branch,
       how: {
-        asksAgent: true,
         base: "wip",
         pinned: pinned.map(p => p.id),
       },
@@ -83,7 +81,6 @@ test("a chat fills in what its column left out, and carries each card's version 
     }).intent,
   ).toMatchObject({
     at: branch,
-    asksAgent: true,
     card: { id: cardIdFor("c1"), seen: "v-c-1" },
     pinned,
     base: "wip",

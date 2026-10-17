@@ -192,7 +192,6 @@ export function planBranchOut(input: {
         at: state.fork,
         canvas: press.canvas,
       },
-      asksAgent: false,
       mentions: parseMentions(text),
       card: null,
       pinned: [],

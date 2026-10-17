@@ -39,7 +39,9 @@ import {
   entryMessageIn,
   filterAsync,
   idleNow,
+  idOfText,
   join,
+  laneHolding,
   lanesOf,
   moveCanvasOnBoard,
   readJjAccepted,
@@ -100,22 +102,10 @@ async function mainSection(
     await waitFor(() => idleNow(wh), 180_000)
     await wh.quiet()
   }
-  const idOf = (text: string): EntryId | null => {
-    const index = tree()
-    return (
-      Object.values(index.entries).find(
-        e => projectTranscript(index, e.id).at(-1)?.text === text,
-      )?.id ?? null
-    )
-  }
+  const idOf = (text: string): EntryId | null => idOfText(wh, text)
   /** The lane whose thread holds the message with `text`. */
-  const laneWith = (text: string) => {
-    const id = idOf(text)
-    const index = tree()
-    return lanesOf(wh, index, readPlaces(wh.places)).find(
-      l => id !== null && ancestry(index, l.tip).path.includes(id),
-    )
-  }
+  const laneWith = (text: string) =>
+    laneHolding(wh, readPlaces(wh.places), text)
   const tipOf = (text: string) => laneWith(text)?.tip ?? null
   const laneTip = (lane: ThreadId) =>
     lanesOf(wh, tree(), readPlaces(wh.places)).find(l => l.name === lane)

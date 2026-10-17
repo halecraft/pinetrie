@@ -170,7 +170,6 @@ describe("planSend: what the send does, as the host will decide", () => {
       text,
       unstarted: false,
       lane: { kind: "none" },
-      asksAgent: false,
       participants: ["Ada", "Bea", "Cy"],
       agents: [],
       reader: READER,
@@ -211,11 +210,7 @@ describe("planSend: what the send does, as the host will decide", () => {
   })
   test("asking the agent where there is no lane creates one", () => {
     expect(plan("@agent hi")).toMatchObject({ to: AGENT, createsLane: true })
-    expect(plan("hi", { asksAgent: true })).toMatchObject({
-      to: AGENT,
-      createsLane: true,
-      agentByDefault: true,
-    })
+    expect(plan("hi")).toMatchObject({ createsLane: false })
     expect(plan("/fixture:skill:hello")).toMatchObject({
       to: AGENT,
       createsLane: true,
@@ -286,7 +281,6 @@ describe("a send with no model", () => {
       text,
       unstarted: false,
       lane: { kind: "none" },
-      asksAgent: false,
       participants: ["Ada"],
       agents: [],
       reader: READER,

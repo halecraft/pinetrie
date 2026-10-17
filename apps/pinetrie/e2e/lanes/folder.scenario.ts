@@ -23,7 +23,6 @@ import {
   ERR,
   entryId,
   messageText,
-  projectTranscript,
   RESOLVE_TOOL,
   ROOT,
   type ThreadId,
@@ -39,6 +38,7 @@ import {
   entriesOf,
   idleNow,
   join,
+  laneHolding,
   lanesOf,
   START_AGENT,
   treeOf,
@@ -97,16 +97,8 @@ async function folderSection(
   const laneTip = (lane: ThreadId) =>
     lanesOf(wh, tree(), readPlaces(wh.places)).find(l => l.name === lane)
       ?.tip ?? null
-  const laneWith = (text: string) => {
-    const index = tree()
-    const id =
-      Object.values(index.entries).find(
-        e => projectTranscript(index, e.id).at(-1)?.text === text,
-      )?.id ?? null
-    return lanesOf(wh, index, readPlaces(wh.places)).find(
-      l => id !== null && ancestry(index, l.tip).path.includes(id),
-    )
-  }
+  const laneWith = (text: string) =>
+    laneHolding(wh, readPlaces(wh.places), text)
   const toolResults = (lane: ThreadId): string[] => {
     const onPath = new Set(ancestry(tree(), laneTip(lane)).path)
     return Object.values(entriesOf(wh))

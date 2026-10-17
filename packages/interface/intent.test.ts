@@ -547,11 +547,11 @@ describe("planIntent", () => {
     })
   })
 
-  test("a thread column is a new root opened at its spot on the canvas, asking the agent as it was made to, taking focus", () => {
+  test("a thread column is a new root opened at its spot on the canvas, @agent typed in an agent thread's, taking focus", () => {
     const at = { kind: "canvas", canvas: R1_ID, after: C } as const
-    const made = (asksAgent: boolean) =>
-      plan({ kind: "addColumn", make: { kind: "thread", asksAgent }, at })
-    expect(made(true)).toEqual([
+    const made = (opens: "agent" | "chat") =>
+      plan({ kind: "addColumn", make: { kind: "thread", opens }, at })
+    expect(made("agent")).toEqual([
       { kind: "armFocus", key: { kind: "column", key: NEW_THREAD } },
       {
         kind: "request",
@@ -563,9 +563,9 @@ describe("planIntent", () => {
           start: { kind: "new-root", after: C },
         },
       },
-      onR1({ kind: "opened", card: NEW_THREAD, asksAgent: true }),
+      onR1({ kind: "opened", card: NEW_THREAD, prefill: AGENT_PREFILL }),
     ])
-    expect(made(false)[2]).toEqual(onR1({ kind: "opened", card: NEW_THREAD }))
+    expect(made("chat")[2]).toEqual(onR1({ kind: "opened", card: NEW_THREAD }))
   })
 
   test("a width is asked of the host, from the canvas the card is on; a card on none, nothing", () => {

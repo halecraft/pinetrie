@@ -199,7 +199,7 @@ export async function sendMessage(
   deps: SendDeps,
   writer: WriterId,
   sendId: string,
-  said: Cleared<Send>,
+  send: Cleared<Send>,
   /** This send has caught its lane up already (`catch-up-first`). */
   caughtUp = false,
 ): Promise<Outcome> {
@@ -210,22 +210,22 @@ export async function sendMessage(
   // canvas: one the session already holds is another's, but for the canvas its
   // thread was opened in, in that root. A branch elsewhere goes in a canvas the
   // session holds.
-  if (said.at.kind === "branch") {
-    const known = readCanvases(deps.basics.places).has(said.at.canvas)
-    const opened = readThreads(session).get(said.at.thread)?.root === said.root
-    if (said.at.at === null && readRoots(session).has(said.root))
+  if (send.at.kind === "branch") {
+    const known = readCanvases(deps.basics.places).has(send.at.canvas)
+    const opened = readThreads(session).get(send.at.thread)?.root === send.root
+    if (send.at.at === null && readRoots(session).has(send.root))
       return {
         kind: "refused",
         code: ERR.ROOT_ID_IN_USE,
         message: "that root's id is in use",
       }
-    if (said.at.at === null && known && !opened)
+    if (send.at.at === null && known && !opened)
       return {
         kind: "refused",
         code: ERR.CANVAS_ID_IN_USE,
         message: "that canvas's id is in use",
       }
-    if (said.at.at !== null && !known)
+    if (send.at.at !== null && !known)
       return {
         kind: "refused",
         code: ERR.UNKNOWN_TARGET,
@@ -234,8 +234,8 @@ export async function sendMessage(
   }
   // gather
   const view: RootView = {
-    root: said.root,
-    doc: await docs.root(said.root),
+    root: send.root,
+    doc: await docs.root(send.root),
     session,
     live,
   }
@@ -243,9 +243,9 @@ export async function sendMessage(
   const names = readParticipantNames(session)
   const nameOf = (w: WriterId) => displayName(w, names.get(w))
   const contributors =
-    said.card === null
+    send.card === null
       ? []
-      : (await cards.writers(said.card.id)).filter(w => w !== writer)
+      : (await cards.writers(send.card.id)).filter(w => w !== writer)
 
   const placed = readPlaces(deps.basics.places)
   const blank = await cards.blankQueued(placed)
@@ -254,7 +254,7 @@ export async function sendMessage(
   const thread = threadOfSend(
     index,
     readLanes(view, index, placed, readQueueHolds(session), blank),
-    { at: said.at, me: writer },
+    { at: send.at, me: writer },
   )
   // A thread or entry this document does not hold has nowhere to go: refused
   // before anything is written, as pi would refuse a lane there.
@@ -274,11 +274,11 @@ export async function sendMessage(
     }
   // A recorded thread's first send is a branch where its record says it begins:
   // any other branch naming it is another's.
-  const copied = readThreads(session).get(said.at.thread)
+  const copied = readThreads(session).get(send.at.thread)
   if (
-    said.at.kind === "branch" &&
+    send.at.kind === "branch" &&
     copied !== undefined &&
-    forkEntry(copied.origin) !== said.at.at
+    forkEntry(copied.origin) !== send.at.at
   )
     return {
       kind: "refused",
@@ -289,10 +289,10 @@ export async function sendMessage(
   // lane sees them: your working copy's, and a command's files.
   const own = worksOwn(view.session, {
     lane: thread.lane,
-    mode: planModeOf(said.at),
+    mode: planModeOf(send.at),
   })
   // gather: the command its first word names, from its file as it is now
-  const typed = parseCommand(said.text)
+  const typed = parseCommand(send.text)
   const source =
     typed === null ? null : resolveCommand(typed.name, deps.piSetup.commands())
   const command =
@@ -305,7 +305,7 @@ export async function sendMessage(
           })
   // gather: what the store holds of each blob its text shares, and the
   // bytes of each that is not an image, for its quote
-  const named = textBlobs(said.text)
+  const named = textBlobs(send.text)
   const held = gatherShares(blobs, named)
 
   // gather: the thread's base, for a lane with no work of its own to catch up
@@ -339,23 +339,22 @@ export async function sendMessage(
     hostWorkingCopy: own ? (work.project?.root ?? null) : null,
     author: writer,
     authorName: nameOf(writer),
-    text: said.text,
-    at: said.at,
+    text: send.text,
+    at: send.at,
     thread,
-    mentions: said.mentions,
+    mentions: send.mentions,
     participants: readParticipants(session, index),
     agents: agentCandidates(
       readReachableAgents({ places: deps.basics.places, session }),
-      said.at.thread,
+      send.at.thread,
       threadMembers(index, thread.end.kind === "entry" ? thread.end.id : null),
     ),
-    asksAgent: said.asksAgent,
     sendId,
     contributors,
-    state: said.state,
+    state: send.state,
   })
   if (planned.kind === "catch-up-first")
-    return catchUpFirst(deps, writer, sendId, said, planned.thread)
+    return catchUpFirst(deps, writer, sendId, send, planned.thread)
   const begun =
     planned.kind === "appendToTree" || planned.kind === "createAndRun"
       ? planned
@@ -369,10 +368,10 @@ export async function sendMessage(
       : planThreadOpen({
           thread: begun.thread,
           origin:
-            said.at.kind === "branch" && said.at.at !== null
-              ? { kind: "fork", at: said.at.at, how: "branch" }
+            send.at.kind === "branch" && send.at.at !== null
+              ? { kind: "fork", at: send.at.at, how: "branch" }
               : ROOT_ORIGIN,
-          root: said.root,
+          root: send.root,
           by: writer,
           now: deps.basics.now(),
           // A branch's card goes just after the thread it forks from.
@@ -380,8 +379,8 @@ export async function sendMessage(
             kind: "after",
             canvas: begun.starts.canvas,
             parent:
-              said.at.kind === "branch" && said.at.at !== null
-                ? threadAt(index, said.at.at)
+              send.at.kind === "branch" && send.at.at !== null
+                ? threadAt(index, send.at.at)
                 : null,
           },
           opens: readCanvases(deps.basics.places).has(begun.starts.canvas)
@@ -402,7 +401,7 @@ export async function sendMessage(
   // gather: the past its text links to, from the root it is in; then each
   // file it shares that the model reads as text
   const quotes = [
-    ...linkedQuotes(said.text, address => {
+    ...linkedQuotes(send.text, address => {
       const message = index.entries[address.entry]?.message
       return message === undefined ? undefined : messageText(message)
     }),
@@ -411,8 +410,8 @@ export async function sendMessage(
   const sent = await executeSend(deps, planned, {
     view,
     writer,
-    base: said.base,
-    pinned: said.pinned,
+    base: send.base,
+    pinned: send.pinned,
     start,
     quotes,
   })
@@ -424,7 +423,7 @@ export async function sendMessage(
     (sent.kind === "appended" || sent.kind === "started") &&
     ((details.asks?.length ?? 0) > 0 || (details.invites?.length ?? 0) > 0)
   )
-    void deps.relays.relayMessage(said.at.thread, sendId)
+    void deps.relays.relayMessage(send.at.thread, sendId)
   return sent
 }
 
@@ -439,13 +438,13 @@ async function catchUpFirst(
   deps: SendDeps,
   writer: WriterId,
   sendId: string,
-  said: Cleared<Send>,
+  send: Cleared<Send>,
   lane: ThreadId,
 ): Promise<Outcome> {
   const prepared = await deps.work.prepareUpdate(
     deps.agent.lane(lane),
     writer,
-    said.text,
+    send.text,
     "bring-up-to-date",
     "run",
   )
@@ -453,13 +452,13 @@ async function catchUpFirst(
     return startRun(deps, lane, {
       kind: "prompt",
       message: prepared.message,
-      pinnedSeen: said.pinned,
+      pinnedSeen: send.pinned,
     })
   if (prepared.kind === "refused")
     deps.basics.log(
       `[host] ${readThreadName(deps.basics.session, lane)}: not caught up before its run: ${prepared.reason}`,
     )
-  return sendMessage(deps, writer, sendId, said, true)
+  return sendMessage(deps, writer, sendId, send, true)
 }
 
 /**

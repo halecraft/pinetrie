@@ -9,7 +9,6 @@ import {
   type EntryId,
   entryId,
   messageText,
-  projectTranscript,
   ROOT,
   type ThreadId,
 } from "@pinetrie/core"
@@ -24,6 +23,7 @@ import {
   entriesOf,
   idleNow,
   join,
+  laneHolding,
   lanesOf,
   rootRecordsOf,
   START_AGENT,
@@ -69,16 +69,8 @@ async function catchUpSection(
     lanesOf(wh, tree(), readPlaces(wh.places)).find(l => l.name === lane)
       ?.tip ?? null
   /** The lane whose thread's end holds `text`. */
-  const laneWith = (text: string) => {
-    const index = tree()
-    const id =
-      Object.values(index.entries).find(
-        e => projectTranscript(index, e.id).at(-1)?.text === text,
-      )?.id ?? null
-    return lanesOf(wh, index, readPlaces(wh.places)).find(
-      l => id !== null && ancestry(index, l.tip).path.includes(id),
-    )
-  }
+  const laneWith = (text: string) =>
+    laneHolding(wh, readPlaces(wh.places), text)
   /** Every tool result's text in a lane's thread, oldest first. */
   const toolResults = (lane: ThreadId | undefined): string[] => {
     if (lane === undefined) return []

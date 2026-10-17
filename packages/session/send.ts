@@ -20,8 +20,6 @@ import { IN_COLUMN, type Pending, sendPendingOf } from "./card-moves.ts"
 
 /** How a chat is sent: from what column and card, and its send id. */
 export interface SendHow {
-  /** A column that asks the agent with nothing typed (`asksAgent`). */
-  readonly asksAgent?: boolean
   /** The send's id, when its sender names one. */
   readonly id?: string
   /** The card the text is sent from, which the host spends once it is sent. */
@@ -75,7 +73,6 @@ function sendIntent(input: {
     text,
     root: input.root,
     at: input.at,
-    asksAgent: how.asksAgent === true,
     mentions: parseMentions(text),
     card: input.card,
     pinned: input.pinned,

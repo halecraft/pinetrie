@@ -17,11 +17,11 @@ test("＋ past the last column makes an agent thread; its ▾, a chat and a note
   const button = newColumnButton(at)
   expect(button.main.intent).toEqual({
     kind: "addColumn",
-    make: { kind: "thread", asksAgent: true },
+    make: { kind: "thread", opens: "agent" },
     at,
   })
   expect(button.more?.items.map(i => i.intent)).toEqual([
-    { kind: "addColumn", make: { kind: "thread", asksAgent: false }, at },
+    { kind: "addColumn", make: { kind: "thread", opens: "chat" }, at },
     { kind: "addColumn", make: { kind: "note-column" }, at },
   ])
   expect(button.more?.items.map(i => i.label)).toEqual(["chat", "note column"])
@@ -46,7 +46,7 @@ test("a board column's ＋ lands its canvas in that column's state", () => {
 
 test("the table of new columns holds every kind, each column under its own", () => {
   const whole = {
-    thread: [{ kind: "thread", asksAgent: true }],
+    thread: [{ kind: "thread", opens: "agent" }],
     "note-column": [{ kind: "note-column" }],
   } as const satisfies NewColumnTable
   // @ts-expect-error a kind with nothing to make

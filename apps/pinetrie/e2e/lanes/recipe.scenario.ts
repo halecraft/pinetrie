@@ -13,7 +13,6 @@ import {
   type EntryId,
   entryId,
   messageText,
-  projectTranscript,
   type RevisionRecord,
   ROOT,
   type ThreadId,
@@ -28,6 +27,7 @@ import {
   entriesOf,
   idleNow,
   join,
+  laneHolding,
   lanesOf,
   rootRecordsOf,
   START_AGENT,
@@ -78,16 +78,8 @@ async function recipeSection(
     lanesOf(wh, tree(), readPlaces(wh.places)).find(l => l.name === lane)
       ?.tip ?? null
   /** The lane whose thread holds `text`. */
-  const laneWith = (text: string) => {
-    const index = tree()
-    const id =
-      Object.values(index.entries).find(
-        e => projectTranscript(index, e.id).at(-1)?.text === text,
-      )?.id ?? null
-    return lanesOf(wh, index, readPlaces(wh.places)).find(
-      l => id !== null && ancestry(index, l.tip).path.includes(id),
-    )?.name
-  }
+  const laneWith = (text: string) =>
+    laneHolding(wh, readPlaces(wh.places), text)?.name
   /** The last tool result's text in a lane's thread. */
   const lastResult = (lane: ThreadId | undefined): string => {
     if (lane === undefined) return ""

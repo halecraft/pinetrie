@@ -41,6 +41,7 @@ import {
   committedProject,
   FIXTURE_PACKAGES,
   idleNow,
+  idOfText,
   join,
   lanesOf,
   readJjProposedByLane,
@@ -111,15 +112,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           await ap.click(`${col(0)} .composer .send`)
         }
         const idle = () => waitFor(() => idleNow(askHost))
-        const askId = (text: string) => {
-          const index = treeOf(askHost)
-          return (
-            Object.values(index.entries).find(
-              // The first ask keeps the new canvas's `@agent `.
-              e => messageText(e.message).replace(/^@agent /, "") === text,
-            )?.id ?? ""
-          )
-        }
+        const askId = (text: string) => idOfText(askHost, text) ?? ""
         /**
          * Eight reads, a command held until its gate is closed, then a reply:
          * a run that lasts until the step ends it.

@@ -239,24 +239,25 @@ export function withMessageImages<M>(
   >,
 ): M[] {
   return messages.map(message => {
-    const said = decodeMessage(message)
-    if (said?.images === undefined || said.images.length === 0) return message
+    const decoded = decodeMessage(message)
+    if (decoded?.images === undefined || decoded.images.length === 0)
+      return message
     const text = (message as { content: unknown }).content
     const parts: ({ type: "text"; text: string } | ImagePart)[] = [
       {
         type: "text",
-        text: typeof text === "string" ? text : attributed(said),
+        text: typeof text === "string" ? text : attributed(decoded),
       },
     ]
     const fittedLines = new Map(
-      (said.shared ?? []).flatMap(share => {
+      (decoded.shared ?? []).flatMap(share => {
         const line = fittedLine(share)
         return share.shown === null || line === null
           ? []
           : [[share.shown.sha256, line] as const]
       }),
     )
-    for (const image of said.images) {
+    for (const image of decoded.images) {
       const blob = blobs.get(image.sha256)
       const line = fittedLines.get(image.sha256)
       if (line !== undefined) parts.push({ type: "text", text: line })
@@ -432,24 +433,26 @@ export function renderableMessage(message: unknown): AgentMessageLike {
   const result = toolResultFacts(message)
   if (result !== undefined)
     return { ...(message as AgentMessageLike), ...result }
-  const said = decodeMessage(message)
-  return said === undefined
+  const decoded = decodeMessage(message)
+  return decoded === undefined
     ? (message as AgentMessageLike)
     : {
         role: "person",
-        content: said.text,
-        author: said.authorName,
-        compelled: said.compels.kind === "agent",
-        writer: said.author,
-        sendId: said.sendId,
-        ...(said.contributors === undefined
+        content: decoded.text,
+        author: decoded.authorName,
+        compelled: decoded.compels.kind === "agent",
+        writer: decoded.author,
+        sendId: decoded.sendId,
+        ...(decoded.contributors === undefined
           ? {}
-          : { contributors: said.contributors }),
-        ...(said.command === undefined ? {} : { command: said.command.name }),
-        ...(said.images === undefined ? {} : { images: said.images }),
-        ...(said.shared === undefined ? {} : { shared: said.shared }),
-        ...(said.asks === undefined ? {} : { asks: said.asks }),
-        ...(said.invites === undefined ? {} : { invites: said.invites }),
+          : { contributors: decoded.contributors }),
+        ...(decoded.command === undefined
+          ? {}
+          : { command: decoded.command.name }),
+        ...(decoded.images === undefined ? {} : { images: decoded.images }),
+        ...(decoded.shared === undefined ? {} : { shared: decoded.shared }),
+        ...(decoded.asks === undefined ? {} : { asks: decoded.asks }),
+        ...(decoded.invites === undefined ? {} : { invites: decoded.invites }),
       }
 }
 
@@ -460,8 +463,8 @@ export function renderableMessage(message: unknown): AgentMessageLike {
  * anything else.
  */
 export function promptAuthor(message: unknown): WriterId | null {
-  const said = decodeMessage(message)
-  if (said !== undefined) return said.author
+  const decoded = decodeMessage(message)
+  if (decoded !== undefined) return decoded.author
   return (
     decodeLand(message)?.by ??
     decodeStack(message)?.by ??
@@ -544,23 +547,20 @@ export type MessageDecision =
   | Refusal
 
 /**
- * Whether a message with no mention asks the agent: in a thread with a lane,
- * or from a column that asks the agent with nothing typed. A branch is a new
- * thread, with no lane of its own yet, so only such a column makes it ask. A
- * branch from an agent thread, and a new canvas, ask through the `@agent `
- * their composer starts with.
+ * Whether a message with no mention asks the agent: in a thread with a lane
+ * alone. A branch is a new thread, with no lane of its own yet, so it asks
+ * only through a mention: a branch from an agent thread, a new canvas's thread
+ * and ＋'s agent thread ask through the `@agent ` their composer starts with.
  */
 export const agentByDefault = (send: {
   readonly mode: PlanMode
   readonly lane: ThreadLane
-  readonly asksAgent: boolean
-}): boolean =>
-  (send.mode !== "branch" && send.lane.kind === "lane") || send.asksAgent
+}): boolean => send.mode !== "branch" && send.lane.kind === "lane"
 
 /**
  * Who a chat is for, as the host decides it and the composer foresees it:
  * its mentions, else the thread's default (the agent
- * where the thread has a lane or the column asks the agent with nothing typed). A
+ * where the thread has a lane). A
  * command is for the agent, as `@agent` is, whoever else it names. The people
  * it names are kept either way: the composer shows them.
  */
@@ -571,7 +571,6 @@ export function addressMessage(input: {
   readonly agents: readonly AgentCandidate[]
   readonly mode: PlanMode
   readonly lane: ThreadLane
-  readonly asksAgent: boolean
   readonly command: boolean
 }): Recipients {
   const to = address({
@@ -672,7 +671,6 @@ export function planMessage(input: {
   readonly participants: readonly string[]
   /** Other threads' agents on open canvases. */
   readonly agents: readonly AgentCandidate[]
-  readonly asksAgent: boolean
   readonly sendId: string
   /** The other people who wrote in its card; empty for a message written alone. */
   readonly contributors: readonly WriterId[]
@@ -725,7 +723,6 @@ export function planMessage(input: {
     agents: input.agents,
     mode,
     lane,
-    asksAgent: input.asksAgent,
     command: command !== null,
   })
   const details: MessageDetails = {

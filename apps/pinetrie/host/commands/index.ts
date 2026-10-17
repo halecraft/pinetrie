@@ -152,7 +152,7 @@ export interface Commands {
   sendPoppedQueuedCard(
     writer: WriterId,
     sendId: string,
-    said: Send,
+    outgoing: Send,
   ): Promise<Outcome>
 }
 
@@ -263,7 +263,7 @@ export function createCommands(deps: CommandDeps): Commands {
           writer,
           intent,
           canvases,
-          said => send(writer, newId(), said),
+          outgoing => send(writer, newId(), outgoing),
           fact => queueFact(deps, fact),
         )
       case "paste":
@@ -272,7 +272,7 @@ export function createCommands(deps: CommandDeps): Commands {
         return cardCommands.spinOff(
           writer,
           intent,
-          said => send(writer, newId(), said),
+          outgoing => send(writer, newId(), outgoing),
           canvases,
         )
       case "queue-card":
@@ -351,9 +351,9 @@ export function createCommands(deps: CommandDeps): Commands {
   async function send(
     writer: WriterId,
     sendId: string,
-    said: Send,
+    outgoing: Send,
   ): Promise<Outcome> {
-    const gate = await clear(deps, said, canvasesNow(deps.basics))
+    const gate = await clear(deps, outgoing, canvasesNow(deps.basics))
     return gate.kind === "cleared"
       ? sendMessage(deps, writer, sendId, gate.command)
       : gate

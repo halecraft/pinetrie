@@ -40,7 +40,6 @@ const said = (at: SendAt): Gated => ({
   text: "x",
   root: ROOT,
   at,
-  asksAgent: false,
   mentions: [],
   card: null,
   pinned: [],

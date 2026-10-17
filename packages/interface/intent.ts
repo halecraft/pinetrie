@@ -934,7 +934,7 @@ function planAddColumn(
         minted.thread,
         minted.root,
         { kind: "new-root", after },
-        make.asksAgent ? { asksAgent: true } : {},
+        make.opens === "agent" ? { prefill: AGENT_PREFILL } : {},
         state,
       )
   }

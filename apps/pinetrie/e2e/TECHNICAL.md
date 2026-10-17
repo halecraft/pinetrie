@@ -154,8 +154,10 @@ here, so a superseded ADR leads to the scenarios to revisit.
 | `browser/page` | who you are (ADR-0037) and your profile (ADR-0098); a canvas of columns, their folds and moves (ADR-0116, ADR-0134, ADR-0137); the sidebar (ADR-0030, ADR-0122), the board and its archive (ADR-0029, ADR-0122), the inbox (ADR-0091); the dock's queue (ADR-0113); cards, your inventory and undo (ADR-0048, ADR-0052, ADR-0127); copy, cut and paste (ADR-0132); the rail's outline of a column (ADR-0058); a second window's presence (ADR-0024); what a reload keeps (ADR-0027) |
 | `browser/tools` | asks (ADR-0106), where a new thread starts (ADR-0104), lanes for every agent (ADR-0102), search (ADR-0101), commands (ADR-0036), tool rows (ADR-0114, ADR-0123, S142), the dock's queue (ADR-0113), the header and the work strip (ADR-0039, ADR-0040, ADR-0105), the review (ADR-0047; render counts, S54), the board's work (ADR-0091), the rail's capsules (ADR-0031), digests (ADR-0071), threads and their tracks (ADR-0117, ADR-0125), your list (ADR-0030), a proposal's card, Open and Send (ADR-0157); a column's height and width while its agent works (S35, S37), following past a pick (S33) |
 
-The helpers rest on these too: a start's modes (`START_AGENT`,
-`START_CHAT`, ADR-0021); a lane starts from your committed `@-`, so a
+The helpers rest on these too: a start's modes (`START_AGENT`, which
+sends `@agent ` before its text as a new canvas's box holds it, and
+`START_CHAT`, ADR-0164), and a message found by what a scenario typed after
+that prefill (`idOfText`, `laneHolding`); a lane starts from your committed `@-`, so a
 project's files are committed (`committedProject`, ADR-0032); a person is
 their email, so each scenario joins on a domain of its own (`join`,
 ADR-0037); the suites' scripted model and the browser in the lane's image

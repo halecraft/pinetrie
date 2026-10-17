@@ -27,12 +27,12 @@ export const HOST_PRINCIPAL = "pinetrie-host"
  * array is the only place a kind is declared: adding one here reaches the
  * wire, and nothing else needs editing.
  *
- *   - `chat` is a human message. `mode` says how it joins the tree:
+ *   - `send` is a person's message. `mode` says how it joins the tree:
  *     `reply` at the end of the thread `lane` names, whose end its sender saw
  *     at `parentId`; `branch` starts the thread `lane` names, minted by the
  *     sender's column, at `parentId` (`""`: the root). See `MessageAt` in
  *     @pinetrie/core;
- *     `asksAgent` marks a column that asks the agent with nothing typed; `cardId` names the card its text
+ *     `cardId` names the card its text
  *     was sent from, which the host spends once it is sent, and
  *     `pinned` the versions of the thread's pinned cards its run waits for.
  *     It runs the agent only when the agent is its addressee (`address`).
@@ -191,8 +191,6 @@ export interface Command {
    * thread whose lane it acts on.
    */
   readonly lane: string
-  /** `send`: a column that asks the agent with nothing typed. */
-  readonly asksAgent: boolean
   /**
    * `proposed` `accept`: the destination bookmark, `""`
    * for the default; `workflow`: the state; `queue-card`: the command of
@@ -313,7 +311,6 @@ export const EMPTY_COMMAND: Command = Object.freeze({
   here: "",
   mode: "",
   lane: "",
-  asksAgent: false,
   targetId: "",
   cardId: "",
   base: "",

@@ -821,9 +821,9 @@ export function referencedBlobs(facts: {
   const shas = new Set<Sha256>()
   for (const banner of facts.banners) shas.add(banner.sha)
   for (const message of facts.messages) {
-    const said = decodeMessage(message)
-    for (const image of said?.images ?? []) shas.add(image.sha256)
-    for (const share of said?.shared ?? []) {
+    const details = decodeMessage(message)
+    for (const image of details?.images ?? []) shas.add(image.sha256)
+    for (const share of details?.shared ?? []) {
       shas.add(share.original.sha256)
       if (share.shown !== null) shas.add(share.shown.sha256)
     }

@@ -691,7 +691,6 @@ export function Column(p: ColumnProps) {
   // What every send from this column carries, from any card at its end.
   const how: ColumnHow = {
     column: p.column.key,
-    asksAgent: p.column.asksAgent === true,
     thread,
     canvas: p.canvas,
     ...(opening?.root === undefined ? {} : { root: opening.root }),

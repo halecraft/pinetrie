@@ -11,6 +11,7 @@ import {
   type EntryId,
   entryId,
   isThreadId,
+  THE_AGENT,
   type ThreadId,
   type ThreadName,
 } from "./index.ts"
@@ -183,12 +184,18 @@ export function baseOf(message: string, wipPrefix: string): BaseTrailer | null {
 // ── proposed changes' message
 // ────────────────────────────────────────────────────
 
+/** The mention a first message asks the agent with, as a composer starts with it. */
+const ASKED = `@${THE_AGENT} `
+
 /**
  * The one line proposed changes carry until an agent describes it: a work in
- * progress, named by its thread and the thread's own first message.
+ * progress, named by its thread and the thread's own first message, less the
+ * `@agent ` it starts with, which says only who was asked.
  */
-export const wipDescription = (name: ThreadName, first: string): string =>
-  `WIP (${name}): ${firstLine(first, 60) || "this thread's work"}`
+export const wipDescription = (name: ThreadName, first: string): string => {
+  const said = first.startsWith(ASKED) ? first.slice(ASKED.length) : first
+  return `WIP (${name}): ${firstLine(said, 60) || "this thread's work"}`
+}
 
 /** Whether a first line is still the WIP line (`wipDescription`): no agent described it. */
 export const isWipLine = (name: ThreadName, line: string): boolean =>

@@ -188,14 +188,12 @@ describe("layoutReducer", () => {
         card: T,
         pending,
         prefill,
-        asksAgent: true,
       }),
     )
     expect(opened.canvases.get(TK("1-r1"))?.cards.get(T)).toEqual({
       unfolded: true,
       pending,
       prefill,
-      asksAgent: true,
     })
     const read = layoutReducer(
       opened,
@@ -205,7 +203,6 @@ describe("layoutReducer", () => {
     expect(sent.canvases.get(TK("1-r1"))?.cards.get(T)).toEqual({
       unfolded: true,
       details: true,
-      asksAgent: true,
     })
     expect(layoutReducer(sent, view("1-r1", { kind: "sent", card: T }))).toBe(
       sent,
@@ -506,7 +503,6 @@ describe("encodeLayout / decodeLayout", () => {
         {
           unfolded: true,
           prefill: { text: "@agent ", blank: true },
-          asksAgent: true,
         },
       ],
     ]),
@@ -580,7 +576,8 @@ describe("encodeLayout / decodeLayout", () => {
       { ...good, canvases: { [TK("1-r1")]: [TRUNK, C] } },
       { ...good, active: { kind: "root", root: "1-r1" } },
       { ...good, active: { kind: "new", key: NEW_THREAD } },
-      { v: 9, active: null, canvases: {} },
+      // The version before canvases, otherwise whole.
+      { ...good, v: 9 },
       "layout",
       null,
     ])

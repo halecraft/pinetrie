@@ -946,7 +946,6 @@ describe("a chat from a card that found its lane busy", () => {
     text: "@bob look",
     root: TEST_ROOT,
     at: { kind: "end", thread: LANE, seen: E1 },
-    asksAgent: false,
     mentions: [],
     card: { id: C1, seen: "" },
     pinned: [],
@@ -988,12 +987,11 @@ test("setCommand: the command set, its place and placer kept", async () => {
   })
 })
 
-const sentSend = {
+const aSend = {
   kind: "send",
   text: "hi",
   root: TEST_ROOT,
   at: { kind: "end", thread: LANE, seen: E1 },
-  asksAgent: false,
   mentions: [],
   card: { id: C1, seen: "" },
   pinned: [],
@@ -1004,7 +1002,7 @@ const sentSend = {
 test("spend: the record goes, then its text; a card already gone answers the current rev", async () => {
   const { b, cards, commands, put } = setUp()
   put()
-  const sent = { sendId: "s-1", send: sentSend }
+  const sent = { sendId: "s-1", send: aSend }
   expect(await commands.spend(ADA, C1, sent)).toBe(4)
   expect(await commands.spend(ADA, C1, sent)).toBe(4)
   expect(textsIn(b.places)).toEqual([])
@@ -1090,7 +1088,7 @@ describe("every command that moves a card records it", () => {
       b.root,
       row(sent, E1, { role: "user", content: "hi", sendId: "s-1" }),
     )
-    await commands.spend(BEA, C1, { sendId: "s-1", send: sentSend })
+    await commands.spend(BEA, C1, { sendId: "s-1", send: aSend })
     expect(readCardHistories(b.session).has(C1)).toBe(false)
     expect(tracesOf(b)).toMatchObject([
       { for: ADA, by: BEA, to: null, message: sent },
@@ -1101,7 +1099,7 @@ describe("every command that moves a card records it", () => {
     const { b, commands, put } = setUp()
     put()
     beginRun(b.live, LANE, runId("r-1"))
-    await commands.queueBusy(ADA, { ...sentSend, card: { id: C1, seen: "" } })
+    await commands.queueBusy(ADA, { ...aSend, card: { id: C1, seen: "" } })
     expect(eventsOf(b)).toEqual([["moved", ADA, "queued"]])
   })
 
@@ -1207,7 +1205,6 @@ describe("a card made a thread, and lifted back", () => {
         text: "plan this @agent with @Bea",
         root: THREAD,
         at: { kind: "branch", thread: STARTS, at: null, canvas: SPUN_CANVAS },
-        asksAgent: false,
         mentions: [{ kind: "person", name: "Bea" }],
         card: { id: C1 },
         state: null,

@@ -34,7 +34,6 @@ const send = (at: SendAt): Send => ({
   text: "x",
   root: ROOT,
   at,
-  asksAgent: false,
   mentions: [],
   card: null,
   pinned: [],

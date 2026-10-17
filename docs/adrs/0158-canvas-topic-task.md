@@ -24,6 +24,8 @@
     Topics, Active and Archive, and its stacks of moves are deleted. An
     entry's `content` is never rewritten. The Area gains
     `apps/pinetrie/host/TECHNICAL.md`, where the migrations are.
+- **Amended by:**
+  - ADR-0164: a new canvas and ＋'s agent thread start the same way.
 
 **Context.**
 
