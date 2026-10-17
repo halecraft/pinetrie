@@ -203,12 +203,6 @@ describe("your repo's names", () => {
       ["wip.prefix", "malformed"],
     ])
   })
-
-  test("the old `offers` key is refused as unknown", () => {
-    expect(
-      user({ offers: { onto: "trunk" } }).refusals.map(r => [r.key, r.why]),
-    ).toEqual([["offers", "unknown"]])
-  })
 })
 
 describe("grants", () => {

@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Collaborative agentic harness — pi's agent core on Kyneta's CRDT substrate. Walking skeleton.",
+  "description": "Collaborative agentic harness — pi's agent core on Kyneta's CRDT substrate.",
   "scripts": {
     "format": "biome format . --write",
     "lint": "biome check .",

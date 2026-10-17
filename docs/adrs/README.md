@@ -77,8 +77,9 @@ amendments into one text: the living docs say what holds now.
 
 **Numbering.** Take the next number free both on the trunk, counting
 `archive/`, and in the plans in flight, which may have written theirs
-already. Two files with the same number and different slugs merge without a
-conflict, so `scripts/numbering.test.ts` is what catches a clash, in the
+already. A number a plan took for an ADR that never landed stays unused,
+so the series has gaps, and nothing records them. Two files with the same
+number and different slugs merge without a conflict, so `scripts/numbering.test.ts` is what catches a clash, in the
 first `pnpm test` after both have landed. Whoever finds the clash fixes it:
 the file that landed second (by jj ancestry, the one whose adding commit
 descends from the other's) takes the next free number, with its title and

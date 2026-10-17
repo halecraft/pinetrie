@@ -121,7 +121,7 @@ export function planProposedRename(facts: ProposedRenameFacts): {
 /** Every row of `jj bookmark list -a` under the old prefix: name, remote, conflicted. */
 const ROW = 'name ++ "\\t" ++ remote ++ "\\t" ++ conflict ++ "\\n"'
 
-/** The facts from `jj bookmark list` rows and the two config values, pure. */
+/** The facts from `jj bookmark list` rows and the two config values. */
 export function proposedRenameFacts(input: {
   readonly retiredRows: string
   readonly currentRows: string

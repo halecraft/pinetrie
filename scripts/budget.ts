@@ -30,7 +30,7 @@ export interface LayerCounts {
   readonly browser: number
 }
 
-/** What breaks the square-root rule, worded; empty when nothing does. Pure. */
+/** What breaks the square-root rule, worded; empty when nothing does. */
 export function budgetBreaches(c: LayerCounts): readonly string[] {
   const allowed = (below: number) => Math.floor(Math.sqrt(below))
   return [

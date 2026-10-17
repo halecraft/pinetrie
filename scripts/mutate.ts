@@ -125,7 +125,7 @@ export function judge(
 
 /**
  * The lines of a run's output that name a failing check: a suite's `FAIL`,
- * Vitest's `×`, or an assertion's error. Pure.
+ * Vitest's `×`, or an assertion's error.
  */
 export const failingChecks = (output: string): string[] =>
   output

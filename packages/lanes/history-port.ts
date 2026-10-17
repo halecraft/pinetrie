@@ -191,7 +191,10 @@ export type Resolved =
 
 /** A lane's history, on its queue. */
 export interface LaneHistory {
-  /** A fork's setup on a disk cloned from its fork point. Pure. */
+  /**
+   * A fork's setup on a disk cloned from its fork point, planned from `start`
+   * alone with no I/O: the fork runs its steps.
+   */
   forkSteps(start: ForkStart): ForkSetup
   /**
    * What the lane records once, after its fork made its disk (`forkSteps`'

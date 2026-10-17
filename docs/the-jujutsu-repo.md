@@ -44,9 +44,6 @@ accept your commits first (ADR-0099):
   "publish": { "bookmark": "master", "catchUp": true } }
 ```
 
-A config that still has `offers`, the key these replaced, is not read for
-it, and the host says so at startup.
-
 **The rename from `pinetrie-offer/*`** (ADR-0156, S217) is the first thing a
 starting host does in your repo: each `pinetrie-offer/<name>` becomes
 `pinetrie-proposed/<name>` (`jj bookmark rename`, as the host, one operation
