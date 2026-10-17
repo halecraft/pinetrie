@@ -13,42 +13,6 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "laneFacts: a lane is told each grant its config holds",
   },
-  // 0019 to 0021: deleted with their migrations once Duane's store has run them.
-  {
-    name: "0019 leaves a trashed pinned-to-the-task row",
-    file: "apps/pinetrie/host/migrations/0019-canvas-places.ts",
-    from: '  "discarded-task-pinned": "discarded-canvas-pinned",\n',
-    to: "",
-    command: unit,
-    expect:
-      "a pinned-to-the-task row, trashed or not, becomes pinned-to-the-canvas",
-  },
-  {
-    name: "0019 renames a state that only starts with a default's name",
-    file: "apps/pinetrie/host/migrations/0019-canvas-places.ts",
-    from: "    const name = STATE_NAMES[s.name]\n",
-    to: "    const name = Object.entries(STATE_NAMES).find(([k]) => s.name.startsWith(k))?.[1]\n",
-    command: unit,
-    expect:
-      "default state names become Topics, Active and Archive, and no other name changes",
-  },
-  {
-    name: "0021 rewrites what the model read",
-    file: "apps/pinetrie/host/migrations/0021-entry-words.ts",
-    from: "    : { ...message, customType, details: next }\n",
-    to: '    : { ...message, customType, details: next, content: "" }\n',
-    command: unit,
-    expect:
-      "a person's message is stored as pinetrie.message, its content and details untouched",
-  },
-  {
-    name: "0021 writes when nothing is old",
-    file: "apps/pinetrie/host/migrations/0021-entry-words.ts",
-    from: "    if (planned.length === 0) return null\n",
-    to: "",
-    command: unit,
-    expect: "a second run writes nothing",
-  },
   {
     name: "the open list's field is renamed with no migration",
     file: "packages/schema/open.ts",

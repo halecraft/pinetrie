@@ -263,21 +263,17 @@ until the next compaction (S120), and the host compacts at startup. So
 - **Each stored schema's hash is pinned** (`migrations/index.test.ts`):
   a change to one fails that test until a migration from the old hash is
   registered, so no schema changes by accident.
-- **Registered now, from ADR-0158's rename:** `0019-canvas-places` (the
-  places, from their hash while rows named a task): each row's `task`
-  becomes `canvas` and a card pinned to a task, trashed or not, is pinned to
-  its canvas; each undelivered fact names its canvas; each card-history
-  event and trace in the session names its places the same way; a state
-  still named Backlog, Doing or Done becomes Topics, Active or Archive; and
-  every stack of moves is retired (`MigrationRun.storedIds`), since a whole
-  undo would restore a row of the old shape. And `0020-canvas-open` (each
-  person's open list, its `tasks` now `canvases`). A Yjs document keys each
-  field by an identity hash, not its name, so each reads the old field from
-  a snapshot opened under the old schema (`PlacesDocBeforeCanvas`,
-  `OpenDocBeforeCanvas`, `@pinetrie/schema`): a probe showed the current
-  schema reads a stored row's `task` as nothing. `0012-unstarted-threads`
-  and `0013-task-cards` (the places) and `0018-dismissed-ready`, the one
-  earlier write to a person's document, ran, and were deleted.
+- **None is registered now.** ADR-0158's rename ran on Duane's store and
+  was deleted: `0019-canvas-places` (each places row's `task` named
+  `canvas`, the cards pinned to a task pinned to its canvas, card
+  histories and traces the same, default states renamed Topics, Active
+  and Archive, every stack of moves retired) and `0020-canvas-open` (each
+  open list's `tasks` named `canvases`). A Yjs document keys each field by
+  an identity hash, not its name, so a renamed field is read from a
+  snapshot opened under the old schema (`createDoc` over `exportEntirety`):
+  a probe showed the current schema reads a stored row's old field as
+  nothing. `0012-unstarted-threads`, `0013-task-cards` and
+  `0018-dismissed-ready` ran before them, and were deleted.
 - **None with no `run` is registered now:** `0001-live-row`, `0002-records` (ADR-0095),
   `0005-tasks`' places and sidebars (ADR-0116) and `0008-entry-thread`
   (every root's rows given the thread column, a context entry in the
@@ -290,15 +286,12 @@ until the next compaction (S120), and the host compacts at startup. So
   second start finds nothing to do. It writes under the document's current
   schema, so its hash stays. The backup is taken after the reads, before
   the first write. Each is deleted, with its mutations, once Duane's store
-  has run it. Registered now: `0021-entry-words` (ADR-0158): every root's
-  stored entries are read raw, by `customType`, and those in an old shape
-  are written whole: a person's message is stored as `pinetrie.message`
-  (was `pinetrie.chat`), the cards pinned to a canvas as
-  `pinetrie.canvas-pinned` (was `pinetrie.canvas-pinned`), and a canvas list,
-  a canvas's news, those pinned cards and an undelivered fact name their
-  canvas in `details`. An entry's `content`, the text the model read, its
-  id and its parent are never rewritten, so a thread's history and its
-  prompt cache are as they were. `0009-card-content`, `0011-thread-origin`,
+  has run it. None is registered now: `0021-entry-words` (ADR-0158) renamed
+  each root's stored entries raw, by `customType` (a person's message
+  `pinetrie.chat` to `pinetrie.message`, the cards pinned to a task to
+  `pinetrie.canvas-pinned`, and `details` naming a canvas), and never an
+  entry's `content`, id or parent, so a thread's history and its prompt
+  cache stayed as they were. It, `0009-card-content`, `0011-thread-origin`,
   `0014-trash-left`, `0015-lane-history` and `0016-revision-point` ran, and
   were deleted. A migration that only
   reshapes one namespace's records, record by record, is a pure rewrite

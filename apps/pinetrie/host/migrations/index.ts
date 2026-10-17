@@ -11,16 +11,11 @@
 import type { Exchange, Store } from "@kyneta/exchange"
 import { PRODUCT_NAME } from "@pinetrie/core"
 import { SCHEMA_OF, type StoredKind, storedKind } from "../policy.ts"
-import { canvasPlaces } from "./0019-canvas-places.ts"
-import { canvasOpen } from "./0020-canvas-open.ts"
-import { entryWords } from "./0021-entry-words.ts"
 
 /** What a migration reads with, and writes with once every read loaded. */
 export interface MigrationRun {
   readonly exchange: Exchange
   readonly docIds: readonly string[]
-  /** Every stored document's id, whatever its kind. */
-  readonly storedIds: readonly string[]
   /**
    * Wait for a document the migration has got (`exchange.get`) to load. A
    * read-only open leaves its stored schema hash as it was; a record that fails
@@ -44,14 +39,12 @@ export interface Migration {
 }
 
 /**
- * Every migration this build carries, oldest first: 0019-canvas-places (the
- * places, and with them the session's card histories, traces and workflow,
- * and every stack of moves) and 0020-canvas-open (each person's open list). A
- * store opens through the one migration from its stored hash. Each one
- * Duane's store ran before these was deleted; restore one from the revision
- * that deleted it for a store still on its hash.
+ * Every migration this build carries, oldest first: none. A store opens
+ * through the one migration from its stored hash. Each one Duane's store ran
+ * was deleted; restore one from the revision that deleted it for a store still
+ * on its hash.
  */
-export const MIGRATIONS: readonly Migration[] = [canvasPlaces, canvasOpen]
+export const MIGRATIONS: readonly Migration[] = []
 
 /**
  * A one-time change to stored contents that keeps every schema's hash: a
@@ -71,11 +64,10 @@ export interface RecordMigration {
 }
 
 /**
- * Every one-time record migration this build carries, oldest first:
- * 0021-entry-words (the words each root's entries carry for pine·trie to read
- * back). Each one Duane's store ran before it was deleted.
+ * Every one-time record migration this build carries, oldest first: none.
+ * Each one Duane's store ran was deleted.
  */
-export const RECORD_MIGRATIONS: readonly RecordMigration[] = [entryWords]
+export const RECORD_MIGRATIONS: readonly RecordMigration[] = []
 
 /**
  * A one-time deletion of stored documents no schema of ours opens, run on the
@@ -270,18 +262,12 @@ export async function migrate(input: {
         writes.push({
           name: migration.name,
           docs: docIds.length,
-          write: await migration.run({
-            exchange,
-            docIds,
-            storedIds: input.storedIds,
-            hydrated,
-          }),
+          write: await migration.run({ exchange, docIds, hydrated }),
         })
     for (const migration of input.records) {
       const write = await migration.run({
         exchange,
         docIds: input.storedIds,
-        storedIds: input.storedIds,
         hydrated,
       })
       if (write !== null)

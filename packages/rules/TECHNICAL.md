@@ -1898,8 +1898,8 @@ reads, `details` what pine·trie reads back.
   leaves it out (core's `renderableMessage` drops a `custom` message it was
   not given a role for), and the model still reads its `content`. When a
   stored word changes, a record migration renames `customType` and
-  `details` in every root, raw, and never `content` (the host's
-  `0021-entry-words`, `apps/pinetrie/host/TECHNICAL.md`). Its
+  `details` in every root, raw, and never `content`
+  (`apps/pinetrie/host/TECHNICAL.md`, "The stored schemas"). Its
   `merged` or `behind.to` no longer counts either, so a lane may hear its
   base's news once more (`baseKnown`), and a branch read its parent as
   ahead (`parentNow`) until the parent commits again.

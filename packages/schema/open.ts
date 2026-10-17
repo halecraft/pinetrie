@@ -13,15 +13,6 @@ export const OpenDoc = yjs.bind(
   Schema.struct({ canvases: Schema.record(Schema.string()) }),
 )
 
-/**
- * The schema before canvases were named: its hash is what a stored document
- * written under it carries, and the host's `0020-canvas-open` migration reads
- * `tasks` through it. Delete with that migration.
- */
-export const OpenDocBeforeCanvas = yjs.bind(
-  Schema.struct({ tasks: Schema.record(Schema.string()) }),
-)
-
 /** An open-canvases document, as the Exchange gives it. */
 export type OpenDocHandle =
   typeof OpenDoc extends BoundSchema<infer S, infer N> ? DocRef<S, N> : never

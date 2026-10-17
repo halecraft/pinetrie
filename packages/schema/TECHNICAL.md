@@ -251,8 +251,8 @@ document.
 record of flat string rows (`owner`, `kind`, `root`, `at`, `lane`,
 `column`, `order`, `by`, `seen`, `command`, `unsent`, `placer`,
 `holder`, `canvas`, `width`, "" for none; `width` from migration
-`0005-tasks`, ADR-0116, and `canvas`, named `task` until `0019-canvas-places`,
-ADR-0158), decoded in `@pinetrie/rules` (`decodeCard`),
+`0005-tasks`, ADR-0116, and `canvas`, named `task` until ADR-0158's
+migration), decoded in `@pinetrie/rules` (`decodeCard`),
 and `rev`. Its id is `pinetrie:card-places` (`PLACES_DOC_ID`). Only the host
 writes it, each write one change of its writer (`apps/pinetrie/host/places.ts`).
 

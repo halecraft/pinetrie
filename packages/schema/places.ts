@@ -79,47 +79,6 @@ export const PlacesDoc = yjs.bind(placesSchema)
 export type PlacesDocHandle =
   typeof PlacesDoc extends BoundSchema<infer S, infer N> ? DocRef<S, N> : never
 
-/** The fields a row had while it named a task: `task` where `canvas` is now. */
-const BEFORE_CANVAS_FIELDS = [
-  "owner",
-  "kind",
-  "at",
-  "lane",
-  "column",
-  "order",
-  "by",
-  "seen",
-  "command",
-  "fact",
-  "relay",
-  "unsent",
-  "placer",
-  "holder",
-  "task",
-  "width",
-  "state",
-  "address",
-  "quote",
-  "origin",
-] as const
-
-/**
- * The schema before rows named a canvas: its hash is what a stored document
- * written under it carries, and the host's `0019-canvas-places` migration
- * reads each row's `task` through it, since the current schema drops it.
- * Delete with that migration.
- */
-export const PlacesDocBeforeCanvas = yjs.bind(
-  Schema.struct({
-    rev: Schema.number(),
-    cards: Schema.record(
-      Schema.struct.json(
-        Object.fromEntries(BEFORE_CANVAS_FIELDS.map(f => [f, Schema.string()])),
-      ),
-    ),
-  }),
-)
-
 const CARD_PREFIX = "card:"
 
 /** The document holding a text card's text. */
