@@ -98,6 +98,16 @@ wires them.
   that ran over a second is logged too (`onSlow`), and so is a command or a
   drain that waited over one; upkeep's wait is not, since waiting is what
   upkeep does.
+- **A stall of the event loop over half a second is logged** (`stalls.ts`):
+  `[host] the event loop stalled for <n> ms: …`, at the first check after
+  it, from the time the host serves until it stops. Anything awaited across
+  a stall is timed that much longer, so this line tells a slow command
+  (`[host] your repo: … ran <n> ms`) from a stalled host. Node samples the
+  loop from a native timer (`monitorEventLoopDelay`), and a check reads it
+  once a second. A sample is the time since the last one, so the sampling
+  interval is taken off. The histogram is reset only after a logged stall:
+  a reset drops the sample that spans it (measured, Node 24), so a reset on
+  every check would miss a stall that began just after one.
 - **One seat's commands run in the order sent, by a chain, not by timing**
   (`control.ts`). Each is queued on the keeper only once the one before it
   has replied, so what that one queued is ahead of it: a queue's drain runs

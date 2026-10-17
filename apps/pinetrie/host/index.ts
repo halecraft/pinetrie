@@ -167,6 +167,7 @@ import { createSettle } from "./settle.ts"
 import { planSetupRecord } from "./setup-record.ts"
 import { planShutdown, type ShutdownStep } from "./shutdown.ts"
 import { createSplitCall } from "./split-call.ts"
+import { watchStalls } from "./stalls.ts"
 import { recover, recoverRoot } from "./startup.ts"
 import { agentReadyLine, reportLines, startupLaps } from "./startup-lines.ts"
 import { openStore } from "./store.ts"
@@ -1000,12 +1001,16 @@ export async function startHost({
     log,
   })
 
+  // From here, not the start: a slow phase of the start is its lap's line.
+  const stalls = watchStalls(log)
+
   const stop = async (): Promise<void> => {
     const carry = async (step: ShutdownStep): Promise<void> => {
       switch (step) {
         case "intake":
           seats.stop()
           control.stop()
+          stalls.stop()
           return
         case "close":
           keeper.close()

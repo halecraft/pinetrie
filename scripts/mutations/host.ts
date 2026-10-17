@@ -2854,4 +2854,21 @@ export const mutations: readonly Mutation[] = [
     expect:
       "a root with no message is not recorded: a tab's new root is not started",
   },
+  // ── the event loop's stalls ──
+  {
+    name: "a stall counts the sampling interval as stalled",
+    file: "apps/pinetrie/host/stalls.ts",
+    from: "  const stalled = input.maxNs / 1e6 - input.resolutionMs\n",
+    to: "  const stalled = input.maxNs / 1e6\n",
+    command: unit,
+    expect: "a stall is the longest sample less the sampling interval",
+  },
+  {
+    name: "every check clears the delay histogram",
+    file: "apps/pinetrie/host/stalls.ts",
+    from: "  if (stalled === null) return\n  log(stallWords(stalled))\n  histogram.reset()\n",
+    to: "  histogram.reset()\n  if (stalled === null) return\n  log(stallWords(stalled))\n",
+    command: unit,
+    expect: "a check that finds no stall leaves the histogram as it is",
+  },
 ]
