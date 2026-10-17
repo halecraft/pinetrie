@@ -507,8 +507,10 @@ any refresh they queued.
   - **A host with tools that cannot run lanes does not start** (ADR-0102):
     `projectAdapter` (`project.ts`) and `findProject` return the refusal as
     a value, worded with its fix, and `startHost` throws it as
-    `HostRefused`; `server.ts` prints it and exits 1. The refusals: a folder
-    with no jj repo (`folderRefusal`, asked first, before any runtime), and
+    `HostRefused`; `server.ts` prints it and exits 1. The refusals: the
+    project's, asked first, before any runtime (`ProjectDirRefusal`, worded
+    by `projectDirWords`: no such directory, your home directory or the
+    file system's root, a jj repo with no git directory beside it), and
     the runtime's: no docker CLI or daemon, no buildx, a lanes directory not on
     btrfs with `user_subvol_rm_allowed` (Linux), and on the Mac the VM's
     (no image, no Xcode tools, not Apple silicon or older than macOS 13, a
@@ -1122,7 +1124,7 @@ queued cards, which `planArchive` refuses.
   a branch's first message, whose thread has no card yet, names them too.
 - **Reach is read before any root is opened.** Each step gathers both
   threads' `threadReach` from the session and the places, and refuses one
-  out of reach (`unreachableRefusal`) before `threadNow`, which opens a
+  out of reach (`unreachableRefusal`) before `threadsNow`, which opens a
   root only for a live thread (`threads-now.ts`): an archived task's root
   stays let go.
   `planRelay` and `planAnswer` take the reaches too, so an ask card whose
@@ -1596,7 +1598,7 @@ adapter's.
 ## Testing the shell
 
 - **Test a decision as a value** where the shell has one: `planRunEnd`,
-  `planInvites`, `draftSent`, the responses, `planSettle`, `planInvocation`,
+  `planInvites`, the responses, `planSettle`, `planInvocation`,
   `storeChoice`, the startup lines' words (`startup-lines.ts`), `isHeld`, and
   `planStartup` (`@pinetrie/rules`).
 - **Otherwise, drive a module with `record<T>()`** for exactly the port it

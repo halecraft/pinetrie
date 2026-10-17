@@ -161,8 +161,8 @@ function is proven by a unit test in a second.
   (a card's column, the task column), and a message's `MessageAct`s are
   among them. What one kind alone does is an intent of its own naming a key
   of that kind: `moveColumn` a card's (`CardKey`), so moving the task
-  column does not compile; `closeUnstarted` and `sentFirst` name an
-  unstarted thread's card (ADR-0126). `Column` takes one `onIntent`, which `App`
+  column does not compile; `sentFirst` names a thread's card, once
+  its first message is sent (ADR-0126). `Column` takes one `onIntent`, which `App`
   makes once with `useStable`, so it never redraws a list.
 - **`planIntent` turns an intent into `Effect`s**, from the layout, the
   index and the archive of the render it was made in. It owns what a click
@@ -217,7 +217,7 @@ rules' `TaskIndex`, and each task's threads and roots (`byId`).
 `entriesOf(tasks, directory)` is each task's first root's root entry: what
 the sidebar's `data-root` and the board's `data-entry` carry, which the
 browser suite selects by. The rail draws one tree for each root of the
-task's threads (`hereRail`). A task's signals are its threads', whatever roots they are in
+task's threads (`taskRail`). A task's signals are its threads', whatever roots they are in
 (*Attention*, below).
 
 - **`Layout.open` is drawn, never stored** (`drawnList`): the sidebar, less
@@ -228,7 +228,7 @@ task's threads (`hereRail`). A task's signals are its threads', whatever roots t
   (`intent.ts`'s `show`, a `list` effect), so every way of opening goes
   through it: the board, your inbox, `openAt`. A root you
   start joins it in the session, as its send is answered (`startsRoot`). ×
-  is a `list` close and a `closeRoot`, which moves you on only if you were
+  is a `list` close and a `closeTask` (`closeTaskEffects`), which moves you on only if you were
   on it: `afterClosing`'s choice, the sidebar's next item below, else above,
   else nothing. `moveInList` places a root before another, or at the end.
   The session's repair deletes archived roots but the one the page reports
@@ -355,26 +355,26 @@ task's threads (`hereRail`). A task's signals are its threads', whatever roots t
 - **What the board shows is `boardView`'s**, over `boardOf` (`@pinetrie/rules`):
   the strip (each state's name, count, `markOf` and signals), each open state
   as a column of the cards the search keeps, the archive's
-  `closedRows`, and `shown`, what the whole board shows (`BoardShown`: all,
+  `archiveRows`, and `shown`, what the whole board shows (`BoardShown`: all,
   or filtered with the search, kept and total). A card's
   `moves` are its `⋯`'s Move to ▸, one per other state, with the busy reason
   into the archive; `up` and `down` its Move up and Move down within
   its state, among the cards shown (`stepsIn`, given a predicate, so the
   shown cards are always cut from the state's order), so the keyboard
   reaches every move a drag makes. Its words are worded beside it, one
-  function each (`removeWords`, `rootsWords`, `keptWords`, `searchWords`,
+  function each (`removeWords`, `tasksWords`, `keptWords`, `searchWords`,
   `stateWords`, `filterWords`, `filterTitle`).
 - **One search filters every state in place** (ADR-0109, ADR-0115). What
   was typed and "mine" are parsed once (`parseSearch`) into a
   `BoardSearch`, or null for none: the one place an empty search is
-  decided, which the filter, `closedRows`' cap, `shown` and Escape all
+  decided, which the filter, `archiveRows`' cap, `shown` and Escape all
   read. `boardFilter` keeps every word in the label, "mine" being the roots
   `RootSummary.writers` holds you in. A state's roots are listed with their
   entries, filtered, and only the kept ones become cards, steps and all, so
   no card exists with placeholder moves. A state's head reads its `Count`
   (all, or kept of total) and its `signals`; the archive's
-  `closedRows` are its kept cards newest first, and with no words (none, or
-  "mine" alone) its `CLOSED_RECENT` newest.
+  `archiveRows` are its kept cards newest first, and with no words (none, or
+  "mine" alone) its `ARCHIVE_RECENT` newest.
 - **A state's signals are counted by one function**, `stateSignals`
   (`StateSignals`: ◌, ⇡, and the roots whose readers show), over every root
   for the strip and over the shown roots for a column's head. The mark is
@@ -716,8 +716,8 @@ pending.
   host's refusal is the toast, so there is one path and one source of words.
   `publishToast` is accepted work's one place for a refusal or failure
   (`outcomeWords`), from the session's `acting` store, until dismissed or
-  your next setup or publish command; `resolve` is set only by a refusal's
-  `yours_conflict` code (`Unsuccessful.code`), and opens `resolveIntent`.
+  your next setup or publish command. A conflict in the working copy is
+  said there, and left to jj.
 - **The inbox** (`inbox.ts`, pure): `mentionsOf` is every chat, from each
   root's directory record (`RootRecord.mentions`), whose mentions
   `address` resolves to your display name, never your own; `InboxItem` is one
@@ -926,9 +926,9 @@ the columns read one. `segmentPath` (`ask-segments.ts`) decides what a column fo
   `PLACED`, so a column at its end stays there and no floor holds the
   change. Whether its thread's details are open (`Column.details`,
   ADR-0073) is kept the same way.
-- **Both are `ReaderAction`s, by the column's key** (`readerAction`,
-  `intent.ts`), as `sent` is: `planColumn` sends them
-  through `onColumn`, as your view of the column's card.
+- **Both are `ReaderAction`s** (`columns.ts`), acts on a card's column:
+  `planColumn` sends them through `onTaskYouAreOn`, as `sent` is, as your
+  view of the column's card.
 - **`workWords` counts what the work's records say** (`statsOf`): the
   files its turns changed, the local files they wrote ("3 local files",
   each record's topmost and how many more), the directories made from
@@ -1138,7 +1138,8 @@ which names the entry and its thread (`packages/rules/TECHNICAL.md`,
 - **A comment's ⋯ has *Queue a reference*** (`queueReference`): a
   reference to it (`{ kind: "card" }`) queued on its thread. Its quote is
   the comment's text as it is then, under a link to its entry
-  (`commentMarkdown`), kept as a blob (`queueComment`, `perform`). The
+  (`commentMarkdown`), kept as a blob (`planQueueReference`'s `paste`,
+  which `perform` keeps before it sends). The
   agent reads the quote, and the entry under the link (the host's
   `linkedQuotes`), so it reads the comment under what it is about. The
   comment stays where it is.
@@ -1335,7 +1336,7 @@ composer*).
     by a key, which would draw the mark again and fade a new banner in again.
   - **It spins only when opened here.** `Column` keeps `openedHere`, set by
     the opening click; details mounted open, by a reload or a tab switch,
-    are still, as `mountedBanner` keeps a banner there at mount from fading.
+    are still, as `mountedIcon` keeps an icon there at mount from fading.
   - **Toggling dispatches no `PLACED`**, unlike density: it changes the
     view's height, not the content's, and `useFollow` follows that.
 - **A thread's icon is one rule, `threadIcon`** (`thread-icon.ts`,
@@ -1485,7 +1486,8 @@ composer*).
   back. The close ask's discard is the same move, with the thread's card. The session keeps your accepted discard as a notice where you made
   it (`CardNotice`, `noticeWords`), as it keeps a refusal.
 - **A queued or pinned card moves one place** with its ↑ and ↓
-  (`ReorderButtons`) or Alt+↑/↓ in its box (`card-keys.ts`, `cardKeyAct`).
+  (its frame's `tools`, `CardTool`, `card-frame.ts`) or Alt+↑/↓ in its box
+  (`card-keys.ts`, `cardKeyAct`).
   Both are the `reorder` act, carrying the card's list as drawn, by id;
   `planIntent` finds the new neighbours with `reorderOf` (`card-intents.ts`),
   which gives nothing at an edge or past a fact, and the session tracks the
@@ -1607,7 +1609,7 @@ composer*).
 - **A task's avatars in the sidebar** are `readersByTask(peopleHere(…))`
   (`here.ts`): the header's people turned around, each item's `Readers`
   taking its task's.
-- **`core/presence.ts` decides everything shown**, from one field's read
+- **`presence.ts` decides everything shown**, from one field's read
   (`readReading` and `readTyping` in `@pinetrie/reads`) and the
   tree: rings (`readingAt`), a header's avatars (`seenBy`, others whose
   thread end lies on one path with this column's), and who is typing

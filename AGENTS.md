@@ -58,7 +58,9 @@ spent spikes: history, which search skips unless you name the folder.
   clock reading subtracted in a test or scenario.
 - A `TECHNICAL.md` states rules, invariants and gotchas, and names the
   module they live in; a function's name in its prose goes stale on the
-  next rename.
+  next rename. `scripts/prose-names.test.ts` fails on a code name that a
+  `TECHNICAL.md`, the glossary or a code comment cites and no code holds; a
+  name from outside (Kyneta, pi, OpenSSH) goes in its `OUTSIDE_NAMES`.
 - Functional core, imperative shell: gather, then plan (pure, returning values),
   then execute. Decisions are values, and tests exercise them without I/O.
 - Precise types inside; awkward representations only at the edges (wire,

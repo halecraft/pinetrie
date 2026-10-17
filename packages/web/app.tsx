@@ -1382,7 +1382,7 @@ export function App({
   // runs `useReveal`'s wait once it has.
   const [, setOpened] = useState(0)
   const foldOpened = useRef(false)
-  // An entry to show once this tab holds its root (`openIn`).
+  // An entry to show once this tab holds its root (`planOpenIn`).
   const [whenHeld, setWhenHeld] = useState<EntryId | null>(null)
   const ports: AppPorts = {
     dispatch,
@@ -1462,7 +1462,6 @@ export function App({
       cards: {
         cards,
         lanes,
-        laneRecords: workFacts.lanes,
         me: session.writer,
         filled,
         slots,

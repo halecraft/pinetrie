@@ -312,7 +312,7 @@ export type UpdateRefusal =
  * merged. A WIP thread merges a fresh copy of its WIP, on the lane's
  * previous copy, unless the lane's base already names the WIP's commit now. A
  * thread on accepted work, a lane with no base, and a landed WIP merge accepted work's commit.
- * A WIP gone without landing refuses (`base_gone`) until `toLine` ("continue
+ * A WIP gone without landing refuses (`base_gone`) until `toAccepted` ("continue
  * on accepted work") moves the thread to accepted work, marking the move even when
  * nothing is merged. With no line, refused (`not_set_up`).
  */

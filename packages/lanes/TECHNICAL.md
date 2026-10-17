@@ -180,7 +180,7 @@ paths are its diff." would compare a function with itself.
   included) `folder`; or it refuses the folder (`ProjectDirRefusal`, worded
   by `projectDirWords`). The kind is that one fact, read once, where the
   host chooses the project's adapter (`apps/pinetrie/host/project.ts`).
-  `folderRefusal` words why a folder has no lanes yet. `planShared` and `sharedCandidates` decide the shared
+  `planShared` and `sharedCandidates` decide the shared
   directories, which `@pinetrie/jj`'s `prepareShared` carries out.
   `sessionFiles` is the layout of a session's data directory
   (`$XDG_DATA_HOME/pinetrie/sessions/<name>/`, ADR-0149, ADR-0150): the
@@ -222,8 +222,7 @@ paths are its diff." would compare a function with itself.
   are the host's (`apps/pinetrie/host/TECHNICAL.md`, Lane work).
 - **pine·trie runs no command of a project's.** Nothing installs or builds
   for a lane: its agent runs `pnpm install` as a developer would after a
-  clone. There is no declared recipe; `lanes.install`, `installWhen` and
-  `installCaches` are not read.
+  clone. There is no declared recipe, and no setting for one.
 - **Every run starts on a disk whose recipes hold.** At each container
   start, whatever made the disk (a fork, a restore, a merge, another image,
   which a key holds), and right after an update's merge, since an agent's
@@ -539,8 +538,8 @@ paths are its diff." would compare a function with itself.
   read removes what it made, its cache kept.
   It runs on Docker, and where Docker cannot run lanes, each scenario
   reports SKIP with the host's own reason (`runtimeProblem`).
-  Its hosts pass their own `userConfig`, so the person's own lane config
-  never applies. Each
+  Its hosts read the suite's own config (`suitePlaces`), so the person's
+  own config never applies. Each
   suite-level mutation in `scripts/mutations/lanes.ts`, `jj.ts` and
   `docker.ts`, among others, runs only the scenario its check is in, and
   stops at that check. Each on `plan.ts` proves a fact about a real lane

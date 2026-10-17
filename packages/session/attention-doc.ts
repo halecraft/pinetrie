@@ -56,7 +56,7 @@ export function attentionStore(
   me: WriterId,
   host: string,
   /**
-   * Where a person with no document starts (`startInbox`): every verdict
+   * Where a person with no document starts (`startOf`): every verdict
    * and mention up to it was before them. Null until the session's
    * directory has arrived, when no start can be told.
    */

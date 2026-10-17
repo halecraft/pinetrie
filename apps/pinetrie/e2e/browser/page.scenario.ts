@@ -1874,7 +1874,7 @@ async function run(check: Checks["check"]): Promise<void> {
           .catch(() => null)
       const messagesIn = (root: string) =>
         projectRail(treeOf(host), entryId(root)).length
-      // 1. Which tree a root's rail draws is `hereRail`'s, proven by its unit test.
+      // 1. Which tree a root's rail draws is `taskRail`'s, proven by its unit test.
       await page.click(itemSel(taskOf(firstRoot)))
       await page
         .waitForFunction(

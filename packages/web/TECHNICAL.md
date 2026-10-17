@@ -342,8 +342,10 @@ colour. There are no connector lines, so sibling branches never cross.
   one root share one; the rail shows them the same way. `data-track` stays
   the track itself, which the browser suite matches between a column, its
   fork dot and the rail.
-- **A root's colour is its trunk's** (`rootSlot`): a folded list's tile
-  (ADR-0088), the rail's trunk and the first column all take it.
+- **A root's colour is its trunk's** (`trackSlot` of its `rootSeed`, track
+  0): the rail's trunk and the first column take it. A folded list's tile
+  (ADR-0088) takes its task's (`taskSlot`), seeded the same way by the
+  task's id.
 
 ## Layout: columns scroll independently
 
@@ -1101,9 +1103,9 @@ the session sends moves and draws them until its copy holds them
 - **A move is planned once.** `planIntent` builds each `Move` with core's
   `moveOf` (an unqueue's target is `noteOf`, the thread's nearest notes),
   from the cards as drawn, and the session sends it.
-- **Refusals are worded here** (`refusalWords`), from the session's
-  `CardRefusal`: an unqueue the pop beat says "already sent", a move
-  someone made first names them. A column draws its own, and the panel the
+- **Refusals are worded in `@pinetrie/interface`** (`noticeWords`), from
+  the session's `CardNotice`: an unqueue the pop beat says "already sent",
+  a move someone made first names them. A column draws its own, and the panel the
   inventory's.
 
 - **Where the column's cards are.** `Column`'s anchor is its thread's end
@@ -1145,7 +1147,7 @@ the session sends moves and draws them until its copy holds them
   in view once they scroll.
 - **`CardGrid`** (`card-grid.tsx`) draws your inventory's `GridView` as
   index cards, each cell a button (the drop target, `dropProps`, and the
-  card's drag) holding its `CardFace`. Its keys are `gridKeyAct`'s, on the
+  card's drag) holding its face (`DrawFace`). Its keys are `gridKeyAct`'s, on the
   grid; the open card is the caller's (`renderOpen`), drawn over its
   neighbours from its cell, towards the grid's middle (`data-side`), at
   least as tall as the cell, which it hides (`data-open`, by opacity so
@@ -1233,10 +1235,9 @@ the session sends moves and draws them until its copy holds them
   someone who undid everything they wrote is still named. It stays until
   Kyneta can name the writers whose text still stands
   (ADR-0048, *Who contributed*); marks do not use it.
-- **Closing an unstarted thread's column whose message holds text** asks
-  in its header: keep in inventory, the default, or discard (`closeUnstarted`):
-  one move, its thread's card to your trash with your message kept or
-  trashed, undone by the undo key (ADR-0126).
+- **× on an unstarted thread's column trashes it, asking nothing**
+  (ADR-0134): one move (`planDiscard`), its thread's card to the trash with
+  your message on it, undone by the undo key.
 
 ## Pinned cards (ADR-0048 step 5)
 
@@ -1508,7 +1509,7 @@ the email is the only thing pine·trie chooses.
 - **Presence is ephemeral, written by each client for its open columns**
   (ADR-0024), each naming the root it is in (ADR-0063, `use-presence.ts`).
 - **Presence is per seat** (`presence-seat.ts`, `@pinetrie/session`), so
-  your tabs never overwrite or clear each other's; `core/presence.ts` shows
+  your tabs never overwrite or clear each other's; `presence.ts` (`@pinetrie/interface`) shows
   each person once, and never you.
 - **The host is found by principal** (`@pinetrie/session`): its seat is
   Kyneta's to issue.
@@ -1551,7 +1552,7 @@ plain `#setup` anchor: `usePage` hears the hash change.
 ## The clipboard (`clipboard.ts`, `focus.ts`, ADR-0132)
 
 `clipboard.ts` is the one file that touches the clipboard
-(`clipboard-boundary.test.ts` keeps it so): the page's `copy`, `cut` and
+(`boundaries.test.ts` keeps it so): the page's `copy`, `cut` and
 `paste` events, a paste's files (`pastedFilesOf`, which the card boxes
 call, and `pastedImages`, the picture field's), and a button's copy
 (`writeTextByButton`, `useCopy`'s). Each handler gathers where focus is

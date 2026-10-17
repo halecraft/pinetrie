@@ -10,7 +10,6 @@ import type {
   CardRecord,
   ChatAt,
   EntryId,
-  LaneRecord,
   LaneView,
   MoveDirection,
   MoveTarget,
@@ -288,8 +287,6 @@ export interface CardFacts {
   /** Every card as drawn. */
   readonly cards: readonly CardRecord[]
   readonly lanes: readonly LaneView[]
-  /** Every lane's record: a queue takes its lane's root (`queueRoot`). */
-  readonly laneRecords: ReadonlyMap<ThreadId, LaneRecord>
   readonly me: WriterId
   /** Your cards that hold text (`holdsText`): an empty message gives way to a put. */
   readonly filled: ReadonlySet<CardId>

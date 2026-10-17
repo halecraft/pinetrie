@@ -15,9 +15,9 @@ What the session document says, read once, by the host and the client alike.
   `readRoots`, the singletons…), `readRunningLanes` with `pinetrie:live`, and
   `readReferencedBlobs`, which takes each root's images from its directory
   record, so no root is opened to sweep.
-- **A read of several takes a `RootView`** (`{ root, doc, session, live }`):
-  `workAt` and `worksOwn`. `readLanes` and `readAgentActivity` take its
-  `doc` and `live`.
+- **A read of several documents takes a `RootView`** (`{ root, doc,
+  session, live }`): `readLanes` and `readAgentActivity` take its `doc` and
+  `live`.
 - **`readRecords(doc, spec)` takes the document the spec's home names**
   (`HomeDoc<H>`), so a session record cannot be read from a root: the two
   documents have their own schemas (ADR-0095).
@@ -48,7 +48,7 @@ archive, from the board's cards and their histories, derived and kept
 while the same, since every write to the session's values wakes it),
 `readMarks` (each task's title, ADR-0045, ADR-0116), `readReadingTasks` (each followed end's task, from
 presence), `readDigests` (ADR-0106), and
-where lanes work (ADR-0032, ADR-0034): `readLaneRecords`, `readRevisions`, `readLandings`,
+where lanes work (ADR-0032, ADR-0034): `readLaneRecords`, `readRevisions`,
 `readProject` (the project's root, written only by a host with tools).
 `worksOwn` says whether a send's thread works, or will work, in a copy of
 its own (the lane's `history` is not null, or, for a lane to be made, whether the host
@@ -84,7 +84,7 @@ cached by the stored namespace object, which keeps its identity while the
 namespace is unchanged (S120): a write decodes only its own namespace again,
 and every other reader returns the same map.
 A reader keeps its own name and return type, and shapes the map only where
-its readers want something else: `readSeats` and `readLandings` sort,
+its readers want something else: `readSeats` sorts,
 `readNames` and `readParticipantNames` give the name alone, and the
 singletons (`readAccepted`, `readProject`, `readCommands`, `readIcons`) take
 their one key; `readIcons` is null before a host wrote it, which the page
@@ -116,9 +116,8 @@ The records it reads, and the decisions that made them:
 | `readCommands` | `pinetrie.commands` | ADR-0036 |
 | `readIcons` | `pinetrie.icons` | ADR-0143 |
 
-The lanes' records and revisions (`readLaneRecords`, `readRevisions`,
-`readLandings`) are where lanes work (ADR-0032, ADR-0033); `worksOwn`
-decides whether a send's paths are written as its lane sees them (ADR-0034,
+The lanes' records and revisions (`readLaneRecords`, `readRevisions`)
+are where lanes work (ADR-0032, ADR-0033); `worksOwn` decides whether a send's paths are written as its lane sees them (ADR-0034,
 ADR-0036, ADR-0102). A renderable entry is the stored row's typed columns
 with pi's message lifted out of `payload` (ADR-0015).
 
@@ -164,7 +163,7 @@ Kyneta has let go.
   reads it, and pops none of them.
 - **A presence read gives one entry per key** (`readReading`, `readTyping`), as
   `[writer, value]` pairs: a person here from two seats
-  appears twice (ADR-0037), and `core/presence.ts` shows them once. Each
+  appears twice (ADR-0037), and `presence.ts` in `@pinetrie/interface` shows them once. Each
   read is of one field, so Kyneta wakes it only for writes to that field, and
   each keeps its last array while the entries are the same: the page's
   refresh writes the same values again, and Kyneta's record is then a new

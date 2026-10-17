@@ -90,6 +90,9 @@ words they were written with.
 | **queued card** | A text card above the line, which the agent reads once, when the host pops it. | `queued`, `queuedOn`, `QueuedCardEditor` | |
 | **pinned card** | A text card the agent reads on every run, at the top of its thread's column. | `pinned`, `pinnedOf`, `PinnedCardEditor` | |
 | **inventory** | Your own grid of cards, text cards and thread cards, on every task and device. A thread there is yours alone, read only and run by nobody (ADR-0124). | `inventory`, `InventoryPanel`, `holdingOf`, `ThreadPreview` | |
+| **consume** | What a thread's live end does to a card: a send, a fact popped. The card ends; the entry it became is the record. A spin sends its card to the trash instead, so it can be undone (ADR-0126). | | |
+| **face**, **normal**, **whole** | The three levels of detail every kind is drawn at, chosen by the surface it is on: a strip, a grid cell or a mark; the card itself, bounded; all of it, as a column or in the pane. Width is the place's, not a level (ADR-0126). | `Detail`, `DETAIL_ON`, `Face`, `faceOf`, `RENDERINGS` | |
+| **preview** | A selected card in the inventory, drawn normal, one column wide, read only (ADR-0126). | `InventoryView.preview`, `threadPreview` | |
 | **the line** | What divides a thread's queued cards, which the agent reads, from your message, which it does not. | | |
 | **the dock** | A column's foot: the queue, the line and your message (ADR-0113). | | |
 | **the sidebar** | The column down the left of the page, of your open tasks. | `Sidebar`, `sidebarView`, `OpenThreads` | your list |
@@ -152,7 +155,7 @@ a value is stored.
 | **fold** (a column) | Hide a column for yourself; it keeps its place as a narrow strip with its title. Every column is folded until you open it. | `CardView.unfolded`, `FoldedColumn` | close (a column) |
 | **pinned to the task** | A text card every thread's agent in the task reads on every run, in the task column. | `task-pinned`, `taskPinnedOf` | |
 
-## Accepted, not yet built: tasks, the canvas and sources
+## Accepted, not yet built: file and media cards, sources and runners
 
 Words of ADR-0116 to ADR-0119 and ADR-0126, accepted and not yet built.
 Nothing in the code uses them yet, beyond a reserved id (`MediaId`,
@@ -165,15 +168,13 @@ Nothing in the code uses them yet, beyond a reserved id (`MediaId`,
 | **source** | A folder the host's owner registers, which a thread's lane gets in one of three modes. | ADR-0118 | the host's one project |
 | **branched**, **live**, **read-only** | A source's modes: its own copy in the lane, whose work comes back as proposed changes; a read-write mount, never branched; a read-only mount. | ADR-0118 | |
 | **runner** | Where a lane runs: the host that holds it, that host's machine, and the model of each run. | ADR-0119 | |
-| **consume** | What a thread's live end does to a card: a send, a fact popped. The card ends; the entry it became is the record. A spin sends its card to the trash instead, so it can be undone. | ADR-0126 | |
 | **party** | A person or a team: what owns a surface that no content does (an inventory, a trash, a board). | ADR-0126 | |
 | **stack** | A card holding two or more threads of one root, one on top, drawn as one column: only the top runs, and which is on top is shared. Not built with the rest. | ADR-0126 | |
-| **face**, **normal**, **whole** | The three levels of detail every kind is drawn at, chosen by the surface it is on: a strip, a grid cell or a mark; the card itself, bounded; all of it, as a column or in the pane. Width is the place's, not a level. | ADR-0126 | |
-| **preview** | A selected card in the inventory, drawn normal, one column wide, read only. | ADR-0126 | |
 
-(**thread card**, **copy**, **root**, **note** and **note column** are
-built: threads are cards, notes are in note columns, and "root" is a code
-word alone.)
+(**thread card**, **copy**, **root**, **note**, **note column**,
+**consume**, **face**, **normal**, **whole** and **preview** are built, and
+listed above: threads are cards, notes are in note columns, and "root" is a
+code word alone.)
 
 ## Words that look alike and are not these
 
@@ -185,6 +186,10 @@ word alone.)
 - **take**: take a card into your inventory (ADR-0083); a thread's run
   stops as it is taken (ADR-0124). Nothing is done to proposed changes by taking
   it.
+- **source**: a path `.gitignore` does not ignore (ADR-0135), which is
+  built; and a folder the host's owner registers for lanes (ADR-0118),
+  which is not. Plain English uses it too: a commit's `Pinetrie-Source`,
+  an icon's `icons.source`.
 - **close**: what × does in the sidebar, for you alone, writing nothing
   shared. Nothing archives by closing.
 - **done**: a run's verdict, a ✓ that fades when it ends with nothing to

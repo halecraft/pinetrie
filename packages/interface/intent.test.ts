@@ -154,7 +154,6 @@ const linkOn = (task: TaskId) =>
 const NO_CARDS: CardFacts = {
   cards: [],
   lanes: [],
-  laneRecords: new Map(),
   me: ME,
   slots: {},
   selected: 0,
@@ -793,10 +792,6 @@ describe("planIntent", () => {
     }
     const here = { kind: "column", key: F } as const
     const inColumn = { actedAt: here, slot: null }
-    const OTHER_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-0000000000ff")
-    const laneRecords = new Map([
-      [lane, { lane, root: OTHER_ROOT, history: null, by: ada, createdAt: 0 }],
-    ])
     const atEnd = {
       kind: "composing",
       thread: lane,
@@ -808,11 +803,10 @@ describe("planIntent", () => {
       by: ada,
       seen: "v",
     } as const
-    const withCard = (place: TextPlace, records = laneRecords) =>
+    const withCard = (place: TextPlace) =>
       ({
         ...NO_CARDS,
         cards: [{ ...yours, id: c, place }],
-        laneRecords: records,
       }) satisfies CardFacts
     test("a queue is one queueCard, onto its lane, with the hold change asked, said in the column; with no card, nothing", () => {
       const queue = column({

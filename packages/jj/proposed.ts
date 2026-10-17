@@ -455,7 +455,7 @@ export async function readProposedChanges(
 /**
  * A range's files, each as one JSON object per line: a `TreeDiffEntry` has
  * a path, how it is shown and its status, but no line counts, which
- * `spanRead` takes from the range's git diff. A change to it bumps
+ * `spanFiles` takes from the range's git diff. A change to it bumps
  * `REVIEW_WIRE`.
  */
 const RANGE_FILES =

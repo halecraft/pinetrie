@@ -27,6 +27,13 @@ const proofs = [
 const numbering = ["pnpm", "exec", "vitest", "run", "scripts/numbering.test.ts"]
 const record = ["pnpm", "exec", "vitest", "run", "scripts/record.test.ts"]
 const laws = ["pnpm", "exec", "vitest", "run", "scripts/laws.test.ts"]
+const proseNames = [
+  "pnpm",
+  "exec",
+  "vitest",
+  "run",
+  "scripts/prose-names.test.ts",
+]
 const gate = ["pnpm", "exec", "vitest", "run", "apps/pinetrie/e2e/gate.test.ts"]
 const words = ["pnpm", "exec", "vitest", "run", "scripts/words.test.ts"]
 const scenarios = [
@@ -424,5 +431,58 @@ export const mutations: readonly Mutation[] = [
     to: "",
     command: laws,
     expect: "every package doc's section of laws is a checked set",
+  },
+  {
+    name: "a table's retired names are cited",
+    file: "scripts/prose-names.ts",
+    from: "        .filter((_, k) => !kept.has(k))\n",
+    to: "",
+    command: proseNames,
+    expect: "a table's retired column, and its header, are not cited",
+  },
+  {
+    name: "a name in the code is stale",
+    file: "scripts/prose-names.ts",
+    from: "  cited.filter(c => !code.has(c.name) && !outside.has(c.name))",
+    to: "  cited.filter(c => !outside.has(c.name))",
+    command: proseNames,
+    expect: "a cited name neither the code nor the outside names hold is stale",
+  },
+  {
+    name: "a living doc cites a name the source does not hold",
+    file: "packages/web/TECHNICAL.md",
+    from: "(`noticeWords`), from",
+    // Split in two, so this file does not hold the name it cites.
+    to: "(`refusalWords" + "OfNotice`), from",
+    command: proseNames,
+    expect:
+      "every code name a living doc or a comment cites is in the code, or an outside name",
+  },
+  {
+    name: "an outside name the code holds is not spent",
+    file: "scripts/prose-names.ts",
+    from: "  return [...outside].filter(n => !named.has(n) || code.has(n)).sort()",
+    to: "  return [...outside].filter(n => !named.has(n)).sort()",
+    command: proseNames,
+    expect: "an outside name no prose cites, or the code holds, is spent",
+  },
+  {
+    name: "a comment's names vouch for prose",
+    file: "scripts/prose-names.ts",
+    from: "    code += text.slice(at, pos) + blanked(text.slice(pos, end))\n",
+    to: "    code += text.slice(at, end)\n",
+    command: proseNames,
+    expect:
+      "a TypeScript file's comments leave its code, a string's slashes stay, and its lines hold",
+  },
+  {
+    name: "a comment cites a name the code does not hold",
+    file: "packages/core/edits.ts",
+    from: "// deltas and a tool's output, goes through here.",
+    // Split in two, so this file does not hold the name it cites.
+    to: "// deltas and a tool's output, goes through `tail" + "EditsOf`.",
+    command: proseNames,
+    expect:
+      "every code name a living doc or a comment cites is in the code, or an outside name",
   },
 ]

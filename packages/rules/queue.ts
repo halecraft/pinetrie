@@ -231,7 +231,7 @@ export const planUnqueueAll = (
  * A popped card the host could not send, written back saying why, its
  * command and placer kept, since the host's own write is nobody's move: a
  * note in the column nearest its thread, made in this step when its task
- * has none (`notesOf`); for a thread in an inventory, in that
+ * has none (`nearestNoteColumn`); for a thread in an inventory, in that
  * inventory. Never queued again, or the next drain would pop it
  * and fail the same way (answer 5). Where it cannot go (that
  * inventory full, or a thread with no card), it stays queued, saying why,

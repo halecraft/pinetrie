@@ -333,7 +333,7 @@ export const LAST_ORDER = "\uffff"
  * one is gone by you, in no history until the host names it one
  * (`historyOf`); a discard records where it was, and a restore goes back
  * there. A thread's nearest notes are the note column the host
- * would choose from `cards` (`notesOf`); undefined, drawn where it was,
+ * would choose from `cards` (`nearestNoteColumn`, `@pinetrie/rules`); undefined, drawn where it was,
  * when the host would make one, or the thread has no card. A spot on a
  * canvas is drawn at the rank the host would give it (`rankOfDrop`).
  */

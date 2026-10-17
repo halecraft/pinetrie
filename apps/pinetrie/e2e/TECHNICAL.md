@@ -126,10 +126,12 @@ here, so a superseded ADR leads to the scenarios to revisit.
 
 | scenario | decisions |
 |---|---|
+| `host/admission` | the invite key, off loopback, for a request and an upgrade (ADR-0107), and Vite's HMR socket on the host's own port, behind admission (S112) |
 | `host/agents` | an agent invited into another task's thread, its budget (ADR-0128) |
 | `host/banners`, `browser/banner` | a thread's banner (ADR-0050, ADR-0053), drawn before its first message (ADR-0057) |
 | `host/board` | the board (ADR-0122), the archive (ADR-0029), a root's title (ADR-0045), a task as a card (ADR-0116, ADR-0126) |
 | `host/cards` | cards and their queue, pinned cards, traces and a held queue (ADR-0048; what the agent reads of pinned cards, S92), undo per card (ADR-0052; a spent card's copy, S64), the places' one owner (ADR-0059, S76), moves' history per person and root (ADR-0066, S91), a thread's card in an inventory (ADR-0117, ADR-0124), paste (ADR-0132), a note column on the canvas (ADR-0126) |
+| `host/chat` | people and the agent in one tree (ADR-0018), who a message is for and whether the agent is asked (ADR-0021), and a host whose config names no model (ADR-0146) |
 | `host/commands`, `lanes/commands` | your pi skills and prompts as commands, at `/mnt/host` in a lane (ADR-0036); what a lane is told of itself (ADR-0121), which names no bookmark, since a rename would change the prompt and drop the agent's earlier thinking (S85) |
 | `host/images`, `browser/images`, `images.ts` | a pasted image as a blob (ADR-0042), kept while a card shows it (ADR-0048); the pane (ADR-0078), the list's icons (ADR-0088), your picture (ADR-0098), copy and paste (ADR-0132; the clipboard in headless Chromium, S68) |
 | `host/tool-images`, `browser/images` | a tool's image as a blob (ADR-0051); pi's pending entry holds its bytes until a compaction (S93) |
@@ -140,12 +142,16 @@ here, so a superseded ADR leads to the scenarios to revisit.
 | `host/tools` | the host (ADR-0107), a lane's own copy (ADR-0034), compaction (ADR-0023, ADR-0063), Stop as a fact (ADR-0106, ADR-0126), Resume (ADR-0082) |
 | `lanes/catch-up` | catching up mid-run (ADR-0080, S103), a publish that accepts (ADR-0099) and moves main (ADR-0090) |
 | `lanes/contract` | the Docker runtime (ADR-0130), lanehost's roles and diffs (ADR-0129), the Mac's fence (S136) |
+| `lanes/folder` | a folder project: its lanes, proposed changes, catch-ups and their conflicts (ADR-0142), and a folder lane refused once the folder is a jj repo (ADR-0150) |
 | `lanes/images` | the default image's browser (ADR-0041) |
 | `lanes/proposal` | an agent's proposal of branches, Start's lanes, order and messages, and its fact (ADR-0157, S218) |
 | `lanes/main` | lane containers (ADR-0034), proposed changes (ADR-0105), thread names (ADR-0039), the review (ADR-0047), accepted work (ADR-0104), publish (ADR-0090), the repo's owner (ADR-0065), commands on a thread (ADR-0080); a lane's jj config for its own repo (S50), an agent's own commit (S56) |
 | `lanes/recipe` | derived state rebuilt from its key (ADR-0131) |
 | `lanes/shared` | shared directories (ADR-0035) |
+| `lanes/ssh` | a lane's ssh through its host: service identities, the owner's approval, the broker and a revoke (ADR-0140, S174) |
 | `lanes/vm-image` | the lane VM's image built on the Mac in a VM of its own, and booted (ADR-0147) |
+| `observer/kernel` | the observer that attributes a lane's file calls to its runs, on the lane VM's own kernel (ADR-0135; S172, S176) |
+| `browser/page` | who you are (ADR-0037) and your profile (ADR-0098); a task's canvas of columns, their folds and moves (ADR-0116, ADR-0134, ADR-0137); the sidebar (ADR-0030, ADR-0122), the board and its archive (ADR-0029, ADR-0122), the inbox (ADR-0091); the dock's queue (ADR-0113); cards, your inventory and undo (ADR-0048, ADR-0052, ADR-0127); copy, cut and paste (ADR-0132); the rail's outline of a column (ADR-0058); a second window's presence (ADR-0024); what a reload keeps (ADR-0027) |
 | `browser/tools` | asks (ADR-0106), where a new thread starts (ADR-0104), lanes for every agent (ADR-0102), search (ADR-0101), commands (ADR-0036), tool rows (ADR-0114, ADR-0123, S142), the dock's queue (ADR-0113), the header and the work strip (ADR-0039, ADR-0040, ADR-0105), the review (ADR-0047; render counts, S54), the board's work (ADR-0091), the rail's capsules (ADR-0031), digests (ADR-0071), threads and their tracks (ADR-0117, ADR-0125), your list (ADR-0030), a proposal's card, Open and Send (ADR-0157); a column's height and width while its agent works (S35, S37), following past a pick (S33) |
 
 The helpers rest on these too: a start's modes (`START_AGENT`,

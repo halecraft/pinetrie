@@ -1548,8 +1548,8 @@ commit-message request `request.ts` (`describeRequest`).
   start, is built (ADR-0067): one built from less would be empty, or bring
   back what you accepted, and withdrawn after a build it would be built again on
   the next poll. `unknown` keeps proposed changes that are there, and builds none. Where it starts is compared as a set
-  (`sameStart`): a merge's parents come in any order. `rebuild` is not `update`, which is "update from
-  my work" (`planUpdate`). Proposed changes are edited (`isProposedEdited`) when its
+  (`sameStart`): a merge's parents come in any order. `rebuild` is not the work strip's
+  `update`, which catches the thread up (`planUpdateFrom`, `base.ts`). Proposed changes are edited (`isProposedEdited`) when its
   bottom's parent is not an ancestor of the target (S48 item 7), a commit of
   yours sits between its revisions, or any revision is edited
   (`revisionEdited`): a version an operation not the host's made changed it

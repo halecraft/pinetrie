@@ -161,9 +161,10 @@ session or someone else's inventory throws before it is made.
   placer kept, until the copy reaches the reply's `rev`. A refused one draws
   nothing, and its refusal is kept where you acted. It is not a
   `HostRequest`, so the page cannot send one untracked.
-- **Several cards move as one** (`moveCards`, a keep): never none. A keep
-  with no card left is the page's to settle (`planKeep` closes the column),
-  so the session's moves always name a card.
+- **Several cards move as one** (`moveCards`, a keep), which the host
+  accepts or refuses whole: never none, since it takes a non-empty tuple.
+  What the page closes after one (`afterKeep`, `@pinetrie/interface`)
+  closes only once the host accepts it.
 - **A discard names no history** (ADR-0116): `moveCard` and `moveCards`
   take `here`, the task the tab is on, which the `move` carries; the host
   names the history from it for a card leaving your inventory. Until the

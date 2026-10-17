@@ -121,7 +121,6 @@ const card = (id: typeof C1, place: TextPlace): TextCard => ({
 const facts = (over: Partial<CardFacts> = {}): CardFacts => ({
   cards: [],
   lanes: [],
-  laneRecords: new Map(),
   me: ADA,
   filled: new Set(),
   slots: {},

@@ -1,7 +1,7 @@
 // host/setup-record — what the setup page shows, decided from the settled
 // config and what the model setup loaded: the one `pinetrie.setup` value.
 // The startup lines word the same report (`startup-lines.ts`), with the same
-// words (`@pinetrie/interface`'s `setupWords`).
+// words (`setup-words.ts` in `@pinetrie/interface`).
 
 import type {
   ConfigOrigin,

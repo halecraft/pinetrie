@@ -18,7 +18,7 @@ export interface ThreadMove {
   readonly name: string
   /** To the archive: it archives the task. */
   readonly closes: boolean
-  /** Why it is refused now (`ROOT_BUSY_REASON`'s key), into the archive only. */
+  /** Why it is refused now (`TASK_BUSY_REASON`'s key, `@pinetrie/rules`), into the archive only. */
   readonly busy: AgentWork | null
   /** Into the archive, the threads whose proposed changes it withdraws. */
   readonly drops: readonly string[]
