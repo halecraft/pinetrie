@@ -24,7 +24,6 @@ export {
   planSetup,
   setupProposal,
 } from "./plan.ts"
-export { renameProposed } from "./pre-proposed.ts"
 export {
   type CommitSpan,
   fileDiff,

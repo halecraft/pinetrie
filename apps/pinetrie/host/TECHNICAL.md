@@ -1511,9 +1511,8 @@ adapter's.
 - **`startJjProject` takes a jj project alone** (`JjProjectDir`,
   `Extract<ProjectDir, { kind: "jj" }>`, `project.test.ts`). Opened, it
   takes your repo's names as settled (`repoNames`, from your files and the
-  working copy's `pinetrie.json`), starts the owner of your repo,
-  renames the proposed changes' old bookmarks (`pre-proposed:`), and reads files at
-  a point (`readRepoFile`, `@pinetrie/jj`). Started, it makes accepted work
+  working copy's `pinetrie.json`), starts the owner of your repo, and
+  reads files at a point (`readRepoFile`, `@pinetrie/jj`). Started, it makes accepted work
   (`jj/accepted.ts`), the proposed changes (`jj/proposed/`), the fetches (`jj/fetch.ts`)
   and the splits (`jj/split.ts`), and each lane's history (`jjLaneHistory`),
   whose `follow` is the lane's fetch into your repo.

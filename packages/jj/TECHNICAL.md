@@ -364,30 +364,6 @@ update's merge will change.**
   their files back over yours (`repo.test.ts`, pre-rename). A `Pineta-Base`
   on `pineta-onto` reads as accepted work, as any base off the WIP prefix
   does (`messageBase`, ADR-0100).
-- **`pre-proposed:` renames each `pinetrie-offer/<name>` to
-  `pinetrie-proposed/<name>`, once** (`pre-proposed.ts`, ADR-0156, S217):
-  the first command a starting host puts on the owner, before its first
-  observation, so the renames mark no refresh. Gathered from one `jj
-  bookmark list -a` of the old prefix (a local row, its conflict, and each
-  remote's) and the two config values; planned pure
-  (`planProposedRename`); executed in this order:
-  - one `jj bookmark rename` per old local bookmark whose new name is
-    absent. It keeps a conflicted bookmark's sides and adds no evolog
-    entry. A name held under both is left, and the startup line says so.
-  - `markSteps` of the renamed ones that had a host version and are not
-    conflicted, then `forgetSteps` of every old host version whose local
-    bookmark was renamed or is gone. A rename leaves the tracked remote
-    bookmark under the old name; deleting its ref in git instead would
-    abandon what only it held. A conflicted one is marked by its refresh
-    once repaired.
-  - the old glob (`RETIRED_OFFER_BOOKMARKS`, built as setup built it)
-    replaced by `PROPOSED_BOOKMARKS` in `immutable_heads()` and
-    `revsets.log`, as you.
-
-  A bookmark under the old prefix on any other remote is yours, pushed:
-  left, and named on the startup line. Each step is planned from what the
-  repo holds, so a start that stopped part way finishes on the next.
-  Delete it once Duane's repo has passed it.
 - **A source accepted below the base's source is not part of the start**
   (S81). A base's `source` (`CommitBase`) is the commit of yours the lane merged whole:
   the one its `Pinetrie-Base` names (the WIP's commit, never the copy, which

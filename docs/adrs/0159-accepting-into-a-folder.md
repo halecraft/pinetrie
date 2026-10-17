@@ -110,8 +110,8 @@
 - An accept costs a tar stream of its changed files across the lane VM's
   channel on the Mac, and one copy into the folder's file system; large
   media costs its size twice, once each way of the stream.
-- **Left open:** bundles (`.app`, `.logicx`) written as one value, and
-  the history page's design, which restore's command waits for.
+- **Left open:** bundles (`.app`, `.logicx`) written as one value. The
+  history page and restore's command are ADR-0165's.
 
 **Alternatives rejected.**
 

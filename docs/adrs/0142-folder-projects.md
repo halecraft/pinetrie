@@ -467,7 +467,7 @@ has not seen.*
     treats as one document, which should merge as one value;
   - conflict records for jj projects, which keep jj's markers until a
     decision of their own;
-  - the history page's design.
+  - the history page's design: decided by ADR-0165.
 
 **Alternatives rejected.**
 

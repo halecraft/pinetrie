@@ -45,19 +45,6 @@ accept your commits first (ADR-0099):
   "publish": { "bookmark": "master", "catchUp": true } }
 ```
 
-**The rename from `pinetrie-offer/*`** (ADR-0156, S217) is the first thing a
-starting host does in your repo: each `pinetrie-offer/<name>` becomes
-`pinetrie-proposed/<name>` (`jj bookmark rename`, as the host, one operation
-each, which `jj op revert` undoes); the host's version of each moves with it
-(one import, then one `jj bookmark forget` of the old names); and the
-`bookmarks(glob:"pinetrie-offer/*")` setup wrote into your `immutable_heads()`
-and `revsets.log` names `pinetrie-proposed/*` instead (`jj config set --repo`,
-a file write, which the op log does not show). A name held under both is
-left, and so is a `pinetrie-offer/<name>` you pushed to a remote of your own:
-the startup line names each. A jjui revset of your own that names
-`pinetrie-offer/*` needs the same edit by hand. (Accepted work's bookmark was
-renamed from `pinetrie-onto` the same way, by ADR-0100.)
-
 **An acceptance** moves one bookmark forward to proposed changes:
 `pinetrie-accepted`, or the thread's `wip/` bookmark. It never rebases, and never
 touches `@`. jj itself refuses a move that is not forward, so a stale

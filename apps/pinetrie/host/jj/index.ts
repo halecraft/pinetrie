@@ -31,7 +31,6 @@ import {
   readOpLog,
   readRepoFile,
   readWipState,
-  renameProposed,
   revsetName,
   startRepoOwner,
   TIDY_DAYS,
@@ -84,17 +83,6 @@ export function startJjProject(dir: JjProjectDir): ProjectAdapter {
         onSlow: slow(basics, "your repo"),
         onSlowCommand: slowCommand(basics, "your repo"),
       })
-      // pre-proposed: the owner's first command, before its first
-      // observation, so its renames mark no refresh. Delete with
-      // `renameProposed`.
-      await owner
-        .command(ops => renameProposed(ops))
-        .then(
-          lines => {
-            for (const line of lines) log(`[host] ${line}`)
-          },
-          failed(basics, "renaming the proposed changes' bookmarks"),
-        )
       // Read beside the start, never awaited: the whole op log, once, to say
       // when `pnpm tidy` would cut it.
       void owner.track(
