@@ -304,7 +304,7 @@ export function Column(p: ColumnProps) {
   // anchor, its thread's first message.
   const unstarted = branchesAt(p.column)
   const opening = unstartedOf(p.column)
-  // A card's column folds and moves; an unstarted one closes too.
+  // A card's column moves; a started one folds, an unstarted one closes.
   const { columnKey } = p
   const card = columnKey.kind === "card" ? columnKey.card : null
   // Where a send attaches: an unstarted thread's fork, else the column's end.
@@ -990,6 +990,7 @@ export function Column(p: ColumnProps) {
                 <ColumnHeadEnd
                   card={card}
                   onIntent={p.onIntent}
+                  unstarted={unstarted}
                   width={p.width}
                   writable={writable}
                 />

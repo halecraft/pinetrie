@@ -167,7 +167,6 @@ export {
   pinnedMarkerWords,
   retiredWords,
   sizeWords,
-  TRASH_COLUMN,
   taskPinnedMarkerWords,
   traceWords,
   writtenWords,
@@ -190,9 +189,8 @@ export {
 export type { Codec } from "./codec.ts"
 export {
   COLUMN_MENU_LABEL,
-  type ColumnMenuItem,
   type ColumnMenuSection,
-  columnMenu,
+  columnHeadEnd,
 } from "./column-menu.ts"
 export {
   branchColors,
@@ -305,7 +303,6 @@ export {
   type Rect,
 } from "./fold-motion.ts"
 export {
-  FOLD,
   type FoldedFace,
   type FoldedMark,
   foldedMark,

@@ -399,13 +399,15 @@ type (`Strip = [TaskColumn, ...CardColumn[]]`), so no strip lacks one.
 - **`data-position` is a column's index among whole thread columns**
   (`drawnAt`), which the suite's `col(n)` selects by; `position`, its index
   on the canvas, is what Alt+arrows move by.
-- **A column's ⋯** (`column-menu.tsx`, `columnMenu`) is its card's, for
-  everyone: its width, one column or two (`cardWidth`); a thread's adds a
-  section of Copy to this task, Copy to your inventory and Move to your
-  inventory, and no task (ADR-0127). `columnMenu` returns the sections,
-  and each item's class is `column-<key>` (`.column-copy`,
-  `.column-copy-inventory`, `.column-take`). Neither it nor the task
-  column makes a column: ＋ past the last column does (ADR-0138).
+- **A column's ⋯** (`column-menu.tsx`, `columnHeadEnd`'s `menu`) is its
+  card's, for everyone: its width, one column or two (`cardWidth`); a
+  thread's adds a section of Copy to this task, Copy to your inventory
+  and Move to your inventory, and no task (ADR-0127); and, for a reader
+  who may write, it ends in a `trash` section, Move to trash, on every
+  column (ADR-0161). Each item's class is `column-<key>`
+  (`.column-width`, `.column-copy`, `.column-copy-inventory`,
+  `.column-take`, `.column-trash`). Neither it nor the task column makes
+  a column: ＋ past the last column does (ADR-0138).
 - **Every ＋ is one split button** (`AddButton`, `add-button.tsx`): it
   draws a `StartButton`, its main item and a `Menu` of the rest, with no
   words of its own; each button's class is `add-<key>`. The sidebar's and
@@ -424,10 +426,14 @@ type (`Strip = [TaskColumn, ...CardColumn[]]`), so no strip lacks one.
   on the canvas you are on. A thread taken into an inventory stops, and its
   holder sees it there read only (ADR-0124): a mention of it opens nowhere
   while someone else holds it (`inbox-menu.tsx`).
-- **Every unfolded column's header ends in ⋯ and ×** (`.column-menu`,
-  `.close`), a note column's too, drawn by one component
-  (`column-menu.tsx`): × is the `discard` intent of its card, and
-  Fold is the ⋯'s first item (`.column-fold`). A note column's header is a
+- **Every unfolded column's header ends in ⋯ and one button**
+  (`.column-menu`, then `.fold` or `.close`, ADR-0161), a note column's
+  too, drawn by one component (`column-menu.tsx`) from one
+  `columnHeadEnd` value: ⇤ is the `fold` intent of its card, on a started
+  thread or a note column, and × the same `discard` intent as the ⋯'s
+  Move to trash, on a thread not yet started. On such a thread both are
+  there on purpose: ⋯ is everyone's and reads the same on every column.
+  The page draws whichever button it is given, never asking which. A note column's header is a
   `.column-head` with a thread's `.head-row`, so it takes the same button
   reset, row height and top border (its `--track` is grey), and its ▤ sits
   in the square a thread's mark takes: a rule written for `.note-column-*`
@@ -1647,9 +1653,10 @@ What S151 measured, and these handlers rest on:
   selected item's fill covers: a descendant's background paints over an
   ancestor's inset shadow. The item reaches the list's right edge (the list
   has no right padding), so it meets the rail.
-- **A column's × (`.close`) is `closable`** (`ColumnSlot`, `appView`):
-  only an unstarted thread's column closes (a branch not yet sent, a new
-  tab's); every column folds (⇤, `.fold`).
+- **A thread not yet started has × and no ⇤** (`columnHeadEnd`): only
+  it closes from its head (a branch not yet sent, a new tab's, a copy
+  before its first send), and every other card column folds by ⇤
+  (`.fold`). A browser check that folds must fold a started column.
 - **A popover opens above its trigger in the window's lower half, and from
   its left edge in the left half** (`placeBox`, `popover-place.ts`). A
   composer's `▾`, and the footer, are at the window's foot, so a list below

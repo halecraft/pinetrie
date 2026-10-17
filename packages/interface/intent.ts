@@ -111,8 +111,8 @@ import { openOf, type ThreadLink } from "./thread-link.ts"
 /**
  * What a reader asks of one column, whatever its kind. A message's acts are
  * among them. What only one kind of column does (a card's moves, an
- * unstarted thread's close and first send) is an intent of its own that
- * names a key of that kind (`ColumnKey`), so it cannot be asked of another.
+ * unstarted thread's first send) is an intent of its own that names a key
+ * of that kind (`ColumnKey`), so it cannot be asked of another.
  */
 export type ColumnAct =
   | MessageAct

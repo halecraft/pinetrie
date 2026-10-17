@@ -491,8 +491,14 @@ task's threads (`taskRail`). A task's signals are its threads', whatever roots t
   column you made.
 - **A column moves for everyone**: `moveColumn` is a reorder of its card
   on the canvas (`planColumnMove`), host-ordered and undone by the undo
-  key; its width is the card's too (`cardWidth`, `columnMenu`).
-- **A thread column's ⋯ copies and takes it** (`columnMenu`'s `thread`
+  key; its width is the card's too (`cardWidth`, `columnHeadEnd`).
+- **A card column's head ends in ⋯ and one button** (`columnHeadEnd`,
+  `column-menu.ts`, ADR-0161): ⇤, the `fold` intent, on a started thread
+  or a note column; × on a thread not yet started for a reader who may
+  write, and nothing for one who may not. The ⋯ ends in a `trash`
+  section, Move to trash, on every column for a reader who may write; ×
+  and it ask one `discard` intent, built once.
+- **A thread column's ⋯ copies and takes it** (`columnHeadEnd`'s `thread`
   section, ADR-0127): `copyThread` (a `copy-thread` request at the
   source's end, `threadAnchor`, its id `Minted.thread`), `here` just after
   the source on its canvas (`taskOfCard`) or into your inventory, and
@@ -504,10 +510,11 @@ task's threads (`taskRail`). A task's signals are its threads', whatever roots t
   first send) is a column of mode `unstarted` (`UnstartedMode`), from
   `unstartedThreads` (`@pinetrie/rules`): ending at its fork, or, a new
   tab's, at its root (anchor null), its next send a branch there
-  (`branchesAt`). Shared as any card, and trashed by × as any column is
-  (`planDiscard`), your message staying on it; a new tab's only thread,
-  so trashed, takes its task out of the sidebar in the same move, and the
-  host trashes the task's card.
+  (`branchesAt`). Shared as any card, and trashed by its × or its ⋯'s
+  Move to trash as any column is (`planDiscard`), your message staying on
+  it; a new tab's only thread, so trashed, takes its task out of the
+  sidebar in the same move, and the host trashes the task's card. Its
+  head has no ⇤: it is about to be sent or dropped.
 - **A thread whose parent thread is on no column of the canvas** carries
   `foldAbove`, its own thread: `projectColumns` folds the path above the
   first node in that thread into `ColumnView.above` when no column to its

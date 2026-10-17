@@ -4331,13 +4331,22 @@ export const mutations: readonly Mutation[] = [
       "a link to a trashed thread names the task it left, says so, and restores it",
   },
   {
-    name: "a column's ⋯ has no fold",
+    name: "a column's ⋯ offers no trash",
     file: "packages/interface/column-menu.ts",
-    from: "  if (!isThreadId(input.card)) return [yours, canvas]",
-    to: "  if (!isThreadId(input.card)) return [canvas]",
+    from: "  const trash: readonly ColumnMenuSection[] = input.writable\n",
+    to: "  const trash: readonly ColumnMenuSection[] = false\n",
     command: unit,
     expect:
-      "a column's ⋯ holds its fold first, yours alone, for a thread and a note column alike",
+      "a column's ⋯ ends in Move to trash for a reader who may write, and offers none to one who may not",
+  },
+  {
+    name: "a thread not yet started folds",
+    file: "packages/interface/column-menu.ts",
+    from: "    button: !input.unstarted\n",
+    to: "    button: true\n",
+    command: unit,
+    expect:
+      "a column's head folds a started thread or a note column, and closes a thread not yet started",
   },
   {
     name: "a drop's kind of target is never round-tripped",

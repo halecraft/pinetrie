@@ -1,8 +1,11 @@
-// interface/column-menu — a card column's ⋯, as values: first what is yours
-// alone, its fold; then what changes the canvas everyone shares.
+// interface/column-menu — what a card column's head ends in, as values: its
+// ⋯, what changes the canvas everyone shares, ending in its trash; then one
+// button that is yours or loses nothing: ⇤, or × on a thread not yet
+// started.
 
 import { type CardId, type CardWidth, isThreadId } from "@pinetrie/core"
 import { moveWords } from "./card-frame.ts"
+import type { ControlWords } from "./card-words.ts"
 import { FOLD } from "./folded-column-view.ts"
 import type { Intent } from "./intent.ts"
 
@@ -13,32 +16,79 @@ export interface ColumnMenuItem {
   readonly intent: Intent
 }
 
-/** A run of a column's ⋯: yours alone, the canvas's own items, or a thread's. */
+/** A run of a column's ⋯: the canvas's own items, a thread's, or its trash. */
 export interface ColumnMenuSection {
-  readonly key: "yours" | "canvas" | "thread"
+  readonly key: "canvas" | "thread" | "trash"
   readonly items: readonly ColumnMenuItem[]
 }
 
+/** A button of a head: what it says, and what a press asks. */
+export interface HeadButton {
+  readonly words: ControlWords
+  readonly intent: Intent
+}
+
+/** What a card column's head ends in, after its name: its ⋯, then one button or none. */
+export interface HeadEnd {
+  readonly menu: readonly ColumnMenuSection[]
+  readonly button: HeadButton | null
+}
+
+/** The title of × and of Move to trash: the card goes to the task's trash, for everyone. */
+const TRASH_COLUMN =
+  "trash this column, for everyone: anyone on the task restores it from the task's trash"
+
+/** × on a thread not yet started: the ⋯'s Move to trash, in one click. */
+const CLOSE: ControlWords = {
+  label: "×",
+  title: TRASH_COLUMN,
+  className: "close",
+}
+
+/** What the ⋯'s Move to trash and × both ask, built once so the two cannot differ. */
+const trashIntent = (card: CardId): Intent => ({
+  kind: "discard",
+  card,
+  // A card's column is keyed by its card.
+  at: { kind: "column", key: card },
+})
+
 /**
- * What a column's ⋯ offers for its card `card`, now `width` columns wide.
- * It lists no task: a thread reaches another task through your inventory.
+ * What a card column's head ends in, for its card `card`, now `width`
+ * columns wide. ⋯ holds what is everyone's; the button is yours or loses
+ * nothing, so a thread not yet started closes there and does not fold.
  */
-export function columnMenu(input: {
+export function columnHeadEnd(input: {
   readonly card: CardId
   readonly width: CardWidth
+  /** Whether the reader may trash it: no trash in ⋯, and no ×, otherwise. */
+  readonly writable: boolean
+  /** A thread not yet started (`branchesAt`); false for a note column. */
+  readonly unstarted: boolean
+}): HeadEnd {
+  const { card } = input
+  return {
+    menu: columnMenu(input),
+    button: !input.unstarted
+      ? { words: FOLD, intent: { kind: "fold", card, unfolded: false } }
+      : input.writable
+        ? { words: CLOSE, intent: trashIntent(card) }
+        : null,
+  }
+}
+
+/**
+ * What a column's ⋯ offers, all of it everyone's. It lists no task: a
+ * thread reaches another task through your inventory. It ends in Move to
+ * trash on every column, even where × repeats it, so it reads the same on
+ * each.
+ */
+function columnMenu(input: {
+  readonly card: CardId
+  readonly width: CardWidth
+  readonly writable: boolean
 }): readonly ColumnMenuSection[] {
   const wide = input.width === 2
-  const yours: ColumnMenuSection = {
-    key: "yours",
-    items: [
-      {
-        key: "fold",
-        label: "Fold",
-        title: FOLD.title,
-        intent: { kind: "fold", card: input.card, unfolded: false },
-      },
-    ],
-  }
   const canvas: ColumnMenuSection = {
     key: "canvas",
     items: [
@@ -52,10 +102,24 @@ export function columnMenu(input: {
       },
     ],
   }
-  if (!isThreadId(input.card)) return [yours, canvas]
+  const trash: readonly ColumnMenuSection[] = input.writable
+    ? [
+        {
+          key: "trash",
+          items: [
+            {
+              key: "trash",
+              label: "Move to trash",
+              title: TRASH_COLUMN,
+              intent: trashIntent(input.card),
+            },
+          ],
+        },
+      ]
+    : []
+  if (!isThreadId(input.card)) return [canvas, ...trash]
   const source = input.card
   return [
-    yours,
     canvas,
     {
       key: "thread",
@@ -81,6 +145,7 @@ export function columnMenu(input: {
         },
       ],
     },
+    ...trash,
   ]
 }
 

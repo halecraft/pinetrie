@@ -736,7 +736,7 @@ async function run(check: Checks["check"]): Promise<void> {
             }),
           [col(0), card] as const,
         )
-        await chooseFromMenu(page, `${col(0)} .column-menu`, ".column-fold")
+        await page.click(`${col(0)} .fold`)
         const t = await turn
         const off =
           t?.last == null || t.strip === null
@@ -1185,7 +1185,7 @@ async function run(check: Checks["check"]): Promise<void> {
       // A fold lands once its column has moved into its strip: the second
       // waits for the first.
       const whole = await page.$$eval(".column", cs => cs.length)
-      await chooseFromMenu(page, `${col(1)} .column-menu`, ".column-fold")
+      await page.click(`${col(1)} .fold`)
       await page
         .waitForFunction(
           n => document.querySelectorAll(".column").length === n,
@@ -1193,7 +1193,7 @@ async function run(check: Checks["check"]): Promise<void> {
           { timeout: 15_000 },
         )
         .catch(() => {})
-      await chooseFromMenu(page, `${col(1)} .column-menu`, ".column-fold")
+      await page.click(`${col(1)} .fold`)
       await page.waitForFunction(
         () => document.querySelectorAll(".column").length === 1,
         undefined,
@@ -1737,7 +1737,7 @@ async function run(check: Checks["check"]): Promise<void> {
           (await texts(before)).includes("say exactly: DOWN-TWO"),
         `"${editStart}", its fork dot on the parent: ${forkOnParent}`,
       )
-      await chooseFromMenu(page, `${editCol} .column-menu`, ".column-fold")
+      await page.click(`${editCol} .fold`)
       await page.waitForFunction(
         () => document.querySelectorAll(".column").length === 2,
         undefined,
@@ -4020,8 +4020,9 @@ async function run(check: Checks["check"]): Promise<void> {
       await page.click(".inventory .discard-card")
       await waitFor(() => placeOf(parked)?.kind === "trash", 5_000)
       const columnsBefore = await page.locator(".column").count()
-      // × on an unstarted branch with text trashes it; the task column's
-      // trash lists it, and restore brings it back, its text with it.
+      // Move to trash, from its ⋯, on an unstarted branch with text trashes
+      // it; the task column's trash lists it, and restore brings it back,
+      // its text with it.
       const branchable = page
         .locator(
           `${col(columnsBefore - 1)} .msg[data-entry]:has(> .tools > .branch)`,
@@ -4041,7 +4042,11 @@ async function run(check: Checks["check"]): Promise<void> {
       )
       const thought = (await page.getAttribute(unstartedBox, "data-card")) ?? ""
       const branchCard = (await page.getAttribute(branch, "data-card")) ?? ""
-      await page.click(`${branch} .close`)
+      const trashed = await chooseFromMenu(
+        page,
+        `${branch} .column-menu`,
+        ".column-trash",
+      )
       const columnsAre = (n: number) =>
         page
           .waitForFunction(
@@ -4068,13 +4073,14 @@ async function run(check: Checks["check"]): Promise<void> {
       await press(`${trashRow} .trash-restore`).catch(() => {})
       const restored = await columnsAre(columnsBefore + 1)
       check(
-        "× on an unstarted branch trashes it, the task's trash lists it, and restore brings it back with its text",
-        closedFresh &&
+        "Move to trash on a branch trashes it, the task's trash lists it, and restore brings it back with its text",
+        trashed &&
+          closedFresh &&
           listed &&
           restored &&
           placeOf(branchCard)?.kind === "canvas" &&
           placeOf(thought)?.kind === "composing",
-        `closed ${closedFresh}, listed ${listed}, restored ${restored}, ${placeOf(branchCard)?.kind}`,
+        `chosen ${trashed}, closed ${closedFresh}, listed ${listed}, restored ${restored}, ${placeOf(branchCard)?.kind}`,
       )
       // Its text taken into slot 5, which a reload below keeps.
       await page.click('.inventory .slot[data-slot="5"]')

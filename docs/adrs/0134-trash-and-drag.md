@@ -13,6 +13,8 @@
     canvas and keeps running; Fold joins the column's ⋯.
 - **Amended by:**
   - ADR-0138: a column's ⋯ no longer adds a note column after it.
+  - ADR-0161: a column's header ends in ⋯ and ⇤, or ⋯ and × on a thread not
+    yet started; Fold leaves ⋯, and Move to trash ends it.
 
 **Context.**
 

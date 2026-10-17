@@ -2,7 +2,7 @@
 // canvas: its card's face, worded for a strip (`foldedWords`), in its
 // thread's colour, drawn by `FoldedStrip`. Its head is a drag handle, as an
 // unfolded column's is (`use-drag.ts`): folds are yours, the order
-// everyone's. It has no ⋯ and no ×: a column is unfolded to act on it.
+// everyone's. It has no ⋯ and no ⇤ or ×: a column is unfolded to act on it.
 
 import {
   cardOfFace,

@@ -135,7 +135,7 @@ export const branchesAt = (column: Pick<Column, "mode">): boolean =>
 /**
  * Which column something is said or done in, by kind, carried
  * in an intent so what each kind allows is the type's: a card's column on
- * the canvas folds, moves and, unstarted, closes; the task column holds the
+ * the canvas moves, and folds or, unstarted, closes; the task column holds the
  * task's pins. `keyText` is its key as the page draws it.
  */
 export type ColumnKey =

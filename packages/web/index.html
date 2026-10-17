@@ -319,8 +319,9 @@
       .column-head .earlier:hover, .column-head .earlier:focus-visible { color: #d0d4da; }
       .column-head .origin-dot { display: inline-block; width: 8px; height: 8px; margin-right: .35rem;
         border-radius: 50%; vertical-align: middle; background: var(--track, #777); }
-      .column-head .close { padding: 0 .2rem; font-size: 1rem; line-height: 1; color: #8b93a1; }
-      .column-head .close:hover, .column-head .close:focus-visible { color: #e6e6e6; }
+      /* A head's one button: ⇤, which folds it for you, or × on a thread not yet started. */
+      .column-head :is(.close, .fold) { padding: 0 .2rem; font-size: 1rem; line-height: 1; color: #8b93a1; }
+      .column-head :is(.close, .fold):hover, .column-head :is(.close, .fold):focus-visible { color: #e6e6e6; }
       /* Every handle a drag starts from (use-drag.ts): a column's header, a
          card's, a slot's, a task's. */
       .column-head { user-select: none; }

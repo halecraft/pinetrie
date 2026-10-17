@@ -190,14 +190,25 @@ export const mutations: readonly Mutation[] = [
     expect:
       "selecting a slot previews its card beside the grid, read only, and Enter opens it in place instead",
   },
+  // ⇤ and × are one button, its words and intent from `columnHeadEnd`:
+  // each mutant skips its own intent.
   {
     name: "a column's × does nothing",
     file: "packages/web/column-menu.tsx",
-    from: '            p.onIntent({\n              kind: "discard",\n              card: p.card,\n',
-    to: '            void ({\n              kind: "discard",\n              card: p.card,\n',
+    from: "          onClick={() => p.onIntent(button.intent)}\n",
+    to: '          onClick={() => button.intent.kind === "discard" || p.onIntent(button.intent)}\n',
     suite: "browser",
     scenario: "page",
     expect: "× on a branch's column takes it off the canvas",
+  },
+  {
+    name: "a column's ⇤ does nothing",
+    file: "packages/web/column-menu.tsx",
+    from: "          onClick={() => p.onIntent(button.intent)}\n",
+    to: '          onClick={() => button.intent.kind === "fold" || p.onIntent(button.intent)}\n',
+    suite: "browser",
+    scenario: "page",
+    expect: "a fold turns the column's name onto its strip's, in its colour",
   },
   {
     name: "a card's × does nothing",
@@ -2105,7 +2116,7 @@ export const mutations: readonly Mutation[] = [
     suite: "browser",
     scenario: "page",
     expect:
-      "× on an unstarted branch trashes it, the task's trash lists it, and restore brings it back with its text",
+      "Move to trash on a branch trashes it, the task's trash lists it, and restore brings it back with its text",
   },
   {
     name: "the host neither stores nor relays an inventory",
@@ -2478,6 +2489,16 @@ export const mutations: readonly Mutation[] = [
     scenario: "page",
     expect:
       "Copy to this task makes a copy beside its source, its fork row naming what it was copied from",
+  },
+  {
+    name: "a column's Move to trash does nothing",
+    file: "packages/web/column-menu.tsx",
+    from: "          onChoose: () => p.onIntent(item.intent),\n",
+    to: '          onChoose: () => item.intent.kind === "discard" || p.onIntent(item.intent),\n',
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "Move to trash on a branch trashes it, the task's trash lists it, and restore brings it back with its text",
   },
   // Out of the top layer, a box opened in a column's header is drawn in
   // `.column-head`'s stacking context, under the column's messages. Caught

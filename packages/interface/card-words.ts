@@ -188,9 +188,6 @@ export const PUT_TITLE =
 export const DISCARD_CARD = "×"
 export const DISCARD_CARD_TITLE =
   "discard (Ctrl+Shift+Backspace) · the undo key brings it back"
-/** A column's ×: its card to the trash of the task, which anyone on it restores from. */
-export const TRASH_COLUMN =
-  "trash this column, for everyone: anyone on the task restores it from the task's trash"
 
 /** A notice's React key: what it is about, and why. */
 export const noticeKey = (notice: CardNotice): string =>

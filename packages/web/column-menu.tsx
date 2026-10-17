@@ -1,14 +1,13 @@
 // web/column-menu — how a card column's head ends, a thread's and a note
-// column's alike: its ⋯, what `columnMenu` offers, then its ×,
-// which trashes the card.
+// column's alike, as `columnHeadEnd` decides: its ⋯, then one button, ⇤,
+// which folds it for you, or × on a thread not yet started.
 
 import type { CardId, CardWidth } from "@pinetrie/core"
 import {
   COLUMN_MENU_LABEL,
   type ColumnMenuSection,
-  columnMenu,
+  columnHeadEnd,
   type Intent,
-  TRASH_COLUMN,
 } from "@pinetrie/interface"
 import { InventoryIcon } from "./icons.tsx"
 import { Menu } from "./menu.tsx"
@@ -16,32 +15,26 @@ import { Menu } from "./menu.tsx"
 export function ColumnHeadEnd(p: {
   card: CardId
   width: CardWidth
-  /** Whether the reader may trash it: no × otherwise. */
+  /** Whether the reader may trash it: no trash in ⋯, and no ×, otherwise. */
   writable: boolean
+  /** A thread not yet started: × in place of ⇤. */
+  unstarted: boolean
   onIntent: (intent: Intent) => void
 }) {
+  const end = columnHeadEnd(p)
+  const { button } = end
   return (
     <>
-      <ColumnMenu
-        onIntent={p.onIntent}
-        sections={columnMenu({ card: p.card, width: p.width })}
-      />
-      {p.writable && (
+      <ColumnMenu onIntent={p.onIntent} sections={end.menu} />
+      {button !== null && (
         <button
-          aria-label={TRASH_COLUMN}
-          className="close"
-          onClick={() =>
-            p.onIntent({
-              kind: "discard",
-              card: p.card,
-              // A card's column is keyed by its card.
-              at: { kind: "column", key: p.card },
-            })
-          }
-          title={TRASH_COLUMN}
+          aria-label={button.words.title}
+          className={button.words.className}
+          onClick={() => p.onIntent(button.intent)}
+          title={button.words.title}
           type="button"
         >
-          ×
+          {button.words.label}
         </button>
       )}
     </>

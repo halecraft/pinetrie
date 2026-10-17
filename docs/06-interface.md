@@ -372,9 +372,9 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
 - **A task opens on its canvas**: every card on it, as columns, in an order
   everyone shares. A thread card's column is its thread's path; a note
   column's is its notes. Each is **folded** for you until you open it: a
-  narrow strip in its place, which a click unfolds. Folding (**Fold**,
-  first in a column's ⋯) is yours alone, and moves nothing for anyone
-  else.
+  narrow strip in its place, which a click unfolds. Folding (**⇤**, at
+  the end of a column's header) is yours alone, and moves nothing for
+  anyone else.
 - **A strip is its column's header turned on its side** (ADR-0137): a
   thread's mark, then its name at the header's size, in its colour. Folding
   turns the name 90° into the strip, its mark moving with it, while the
@@ -444,10 +444,14 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
 - **A column grows as replies arrive.** It shows one thread to its end,
   including the agent's reply (`threadEnd`, ADR-0117). A branch, which
   starts another thread, however new, never pulls it away.
-- **Every unfolded column's header ends in ⋯ and ×** (ADR-0134), threads,
-  sent or not, and note columns alike. Its ⋯ holds **Fold** first, yours
-  alone, then what changes the canvas for everyone: its width, one or two
-  columns wide; a thread's adds its copies and its take. A folded strip has neither: unfold it first.
+- **Every unfolded column's header ends in ⋯ and one button** (ADR-0161,
+  ADR-0134): **⇤** on a started thread or a note column, which folds it
+  for you, and **×** on a thread not yet started, which does not fold.
+  Its ⋯ holds what changes the canvas for everyone: its width, one or two
+  columns wide; a thread's copies and its take; and last **Move to
+  trash**, on every column, even where × repeats it. ⋯ is everyone's, and
+  the head's button is yours or loses nothing. A folded strip has
+  neither: unfold it first.
 - **Columns are reordered by dragging their headers, for everyone**: the
   canvas's order is shared, and a drag moves a card on it. Whichever column
   is first shows its whole path, so moving a branch to the far left makes it
@@ -490,7 +494,8 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   above its own first message folded behind "↑ N earlier messages" when
   the thread it forks from is on no column of the canvas. A canvas with
   threads of several roots draws each root's tree on the rail.
-- **× trashes any column, for everyone, asking nothing** (ADR-0134): a
+- **Move to trash, or × on a thread not yet started, trashes a column,
+  for everyone, asking nothing** (ADR-0134, ADR-0161): a
   thread, running or not, sent or not, and a note column with its notes.
   A running thread's run stops, as a take's does ("Ada stopped it"). The
   cards at a thread's end, your message among them, stay with the thread,

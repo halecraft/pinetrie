@@ -22,7 +22,7 @@ import type {
 import { NEW_NOTES_TITLE, trashDeadline, trashedAt } from "@pinetrie/rules"
 import { type ControlWords, who } from "./card-words.ts"
 import { agoWords, spanWords, until } from "./counts.ts"
-import { UNNAMED_THREAD } from "./folded-column-view.ts"
+import { FOLD, UNFOLD, UNNAMED_THREAD } from "./folded-column-view.ts"
 import { NO_TEXT, type TaskSummary } from "./root-label.ts"
 import type { Reader } from "./send.ts"
 import type { ThreadCardHead, ThreadMove } from "./thread-card.ts"
@@ -194,19 +194,17 @@ export function taskColumnView(input: {
   }
 }
 
-/** The task column's ⇤, which folds it to a strip. */
+/** The task column's ⇤, which folds it to a strip: a card column's, titled for the task. */
 export const FOLD_TASK: ControlWords = {
-  label: "⇤",
+  ...FOLD,
   title: "fold the task's column: only you see your folds",
-  className: "fold",
 }
 
-/** The task column folded: its button, which unfolds it. */
+/** The task column folded: its button, which unfolds it, a card column's strip's. */
 export const UNFOLD_TASK: ControlWords = {
-  label: "⇥",
+  ...UNFOLD,
   title:
     "the task: its title, its state, who is here, its pins and what its agents are told",
-  className: "unfold",
 }
 
 /** The task column's rename, on its title. */

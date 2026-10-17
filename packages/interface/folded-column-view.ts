@@ -77,7 +77,9 @@ export const UNFOLD: ControlWords = {
   className: "unfold",
 }
 
-/** A column's fold, an item of its ⋯: what it does, for you alone. */
-export const FOLD = {
+/** An unfolded column's own button, which folds it, for you alone. */
+export const FOLD: ControlWords = {
+  label: "⇤",
   title: "fold this column to a strip: only you see your folds",
-} as const
+  className: "fold",
+}
