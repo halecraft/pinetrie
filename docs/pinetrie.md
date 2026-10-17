@@ -72,7 +72,7 @@ lanes, and their proposed changes, once accepted, are its accepted work.
 ```
 browser page ── Kyneta Line (websocket) ── Node host ── pi-agent-core, one harness a root
                                               │                 │
-          documents, replicated back ──────────┤        KynetaStorage (ADR-0013)
+          documents, replicated back ──────────┤        KynetaStorage (ADR-0003)
                                               │
                                               └── lanes: a container, disk and copy of your repo each
 ```
@@ -85,7 +85,7 @@ what they print.
 | gate | command | what it covers |
 |---|---|---|
 | lint + format | `pnpm run lint` | Biome, Kyneta's settings |
-| types | `pnpm run typecheck` | strict, the page's DOM checked apart |
+| types | `pnpm run typecheck` | strict; the interface and the shell package checked again without the DOM |
 | unit | `pnpm test` | Vitest, beside the code; `workspace.test.ts` holds the package boundaries, and `scripts/*.test.ts` the record, the budget and the mutation lists |
 | mutations | `pnpm mutate scripts/mutations/<list>.ts` | a deliberate bug for each check; `pnpm run proofs:unit` holds every unit mutation's `expect` to a test that runs |
 | pi's own Storage suite | `pnpm run conformance` | against `KynetaStorage`, with pi's `MemoryStorage` as the control |
@@ -106,12 +106,12 @@ Playwright.
 apps/pinetrie/         @pinetrie/app          host and e2e suites (run, never imported)
 apps/conformance/      @pinetrie/conformance  pi's Storage suite vs our adapter
 packages/core/         @pinetrie/core         declares NOTHING
-packages/schema/       @pinetrie/schema       Kyneta only; the document shape
+packages/schema/       @pinetrie/schema       core and Kyneta only; the document shape
 packages/pi/           @pinetrie/pi           THE pi boundary
 packages/protocol/     @pinetrie/protocol     the wire contract and its codec
 packages/rules/        @pinetrie/rules        each stored shape and the pure rules about it
 packages/reads/        @pinetrie/reads        document reads shared by host and client
-packages/lanes/        @pinetrie/lanes        what a lane is and runs; the LaneRuntime and LaneHistory ports, no runtime (ADR-0032–0034, 0103)
+packages/lanes/        @pinetrie/lanes        what a lane is and runs; the LaneRuntime and LaneHistory ports, no runtime (ADR-0032–0034, ADR-0130)
 packages/lanehost/     @pinetrie/lanehost     core and channel only; the lanes' machine, outside any lane, by role (ADR-0129)
 packages/channel/      @pinetrie/channel      declares NOTHING; a held JSON-lines channel to a server process
 packages/ssh/          @pinetrie/ssh          declares NOTHING; a lane's ssh through its host (ADR-0140)
@@ -120,7 +120,7 @@ packages/vm/           @pinetrie/vm           the Mac's lane VM: image, launcher
 packages/folder/       @pinetrie/folder       core only; a folder project's history as values (ADR-0142)
 packages/keeper/       @pinetrie/keeper       declares NOTHING; one step at a time on a resource
 packages/config/       @pinetrie/config       core only; settings declared with their rules, layers decoded, one settle (ADR-0146)
-packages/jj/           @pinetrie/jj           your repo: reads, steps, the owner (ADR-0038, 0060, 0065); each lane's jj history
+packages/jj/           @pinetrie/jj           your repo: reads, steps, the owner (ADR-0065, ADR-0104, ADR-0105); each lane's jj history
 packages/session/      @pinetrie/session      one client's connection to a host; no React
 packages/shell/        @pinetrie/shell        unbash only; shell source as structure (ADR-0114)
 packages/interface/    @pinetrie/interface    what a person sees and does, for any client; no React, no DOM (ADR-0093)
@@ -128,8 +128,11 @@ packages/web/          @pinetrie/web          the browser page: React and the DO
 (root)                                        development tooling only
 ```
 
-Dependency direction is physical: **core → schema, protocol → pi, session, shell → interface → web → app**.
-The root declares only tooling, so a package can import only what it declares
+Dependency direction is physical: **core → schema, protocol, rules → reads →
+session → interface → web → app**, with `shell` under the interface. `pi`,
+`config` and the lanes' packages (`lanes`, `lanehost`, `channel`, `docker`,
+`vm`, `jj`, `folder`, `keeper`, `ssh`) sit beside that line: the app and
+each other declare them, and no client package does. The root declares only tooling, so a package can import only what it declares
 (`workspace.test.ts` holds each package's manifest, `ARCHITECTURE.md` says
 what each is).
 
@@ -176,8 +179,9 @@ measured**, and each time it produced a confident wrong answer:
 - A probe "proved" pnpm strictness while its install had silently failed.
 
 **The defence that works is a negative control: prove the check can still fail.**
-Every check now has one: a deliberate bug in `scripts/mutations/` that it
-catches (`AGENTS.md`, Gates). The spikes' property tests for convergence,
+Every new check comes with one: a deliberate bug in `scripts/mutations/`
+that it catches (`AGENTS.md`, Gates). The suite checks still without one
+are listed in `scripts/unproven.ts`, a list that only shrinks. The spikes' property tests for convergence,
 `seq` and trunk semantics, with their controls, stayed in `sandbox/`: none
 is a gate.
 *A check without a proof that it can fail is not yet a check.*
@@ -189,7 +193,7 @@ The local checkout, at `~/halecraft/kyneta`, wired by `link:` deps to its
 O(δ) write fix and what the host imports. A stale build is refused at
 load: Node refuses a module whose named import is missing before any of
 it runs (S47), and the host imports what v4 added (`whenPeer`,
-`yjsClientId`). pine·trie tracks the local checkout's `needed-by-pinetrie`
+`yjsClientId`). pine·trie tracks the local checkout's `needed-by-pineta`
 bookmark.
 
 Three issues were filed to the Kyneta team (`docs/findings/archive/kyneta-issues-verification.md`):
@@ -201,7 +205,8 @@ primitive).
 
 ### pi
 
-Pinned exactly at **0.87.1** across three packages. pi is mid-rewrite into a
+Pinned exactly at **0.87.1**: pi's three packages, declared by `packages/pi`,
+and `pi-agent-core` by `apps/conformance` too. pi is mid-rewrite into a
 distributed architecture (coordinator → server → worker-per-session → N
 clients) behind `PI_EXPERIMENTAL=1`; we deliberately embed `pi-agent-core`
 directly and use none of it (ADR-0001). `Storage` is a real supported port with
@@ -220,14 +225,15 @@ that **all three evaded**. Every other package boundary now works the same way:
 the root declares only tooling, so a package can import only what it declares.
 `workspace.test.ts` checks the manifests. See `docs/01-architecture.md`.
 
-**ADRs are encoded as types where possible.** Entry ids, run ids and lane
-names are branded (`EntryId`, `RunId`, `ThreadId`), so a swapped argument is
-a compile error. They are minted where they enter: the protocol codec, the
+**ADRs are encoded as types where possible.** Entry ids, run ids and thread
+ids, which name lanes, are branded (`EntryId`, `RunId`, `ThreadId`), so a
+swapped argument is a compile error. They are minted where they enter: the protocol codec, the
 reads (`renderableEntry`), the schema's readers, `@pinetrie/rules`' decoders, a
 commit's trailer (`packages/core/trailers.ts`), the pi adapter, the page's
 stored forms, and the host's id generator. Biome's `noRestrictedImports`
-(`biome.json`) refuses `entryId` in core, the interface, the page and the
-host, and `runId` in all of them but the host (S95). A `LocalSeq` brand was deleted (ADR-0013
+(`biome.json`) refuses `entryId` and `threadIdFor` in core, the interface,
+the page and the host, and `runId` in all of them but the host (S95): a new
+thread's id is minted by `newThreadId`, in `@pinetrie/session`, alone. A `LocalSeq` brand was deleted (ADR-0013
 above); `projectTranscript(entries, tipId)` cannot even accept a seq.
 
 **FC/IS — gather → plan → execute. Decisions are values.** `packages/core` is
@@ -252,7 +258,7 @@ column is a card on the task's canvas, a thread's one path on its own
 scroll; a branch opens beside its parent in its rail track's colour, and
 the rail draws the tree of each root the task's threads are in, with each
 uneventful stretch drawn as one capsule (ADR-0031), a long ask's work a
-capsule of its own (ADR-0056).
+capsule of its own (ADR-0106).
 Views are pure functions over one `indexTree` (`packages/core/tree.ts`,
 `roots.ts`); which task you are on and your view of each task's canvas are
 a reducer in `packages/interface/layout.ts`, the sidebar is your `open:`
@@ -264,13 +270,17 @@ what people edit together is a note, in a note column (ADR-0116). The
 composer is one uncontrolled textarea, bound with Kyneta's `attach` to the
 card's text from the keystroke that creates it (`packages/web/card-box.ts`).
 
-**An image pasted into a composer reaches the agent** (ADR-0042): uploaded
-to `POST /blob`, kept by SHA-256 in `pinetrie_blobs` beside the session in
-the host's SQLite file, referred to by the message's markdown and its
-`details.images`, and handed to the model as image parts by pi's
-`toProviderMessages`. Admission now also refuses another origin, and on
-loopback a rebound name. Images in tool results, workspace paths and remote
-images are still to do.
+**A file dropped, pasted or chosen in a card box is shared in the
+conversation** (ADR-0042, ADR-0151): uploaded to `POST /blob`, kept by
+SHA-256 in `pinetrie_blobs` beside the session in the host's SQLite file,
+and linked from the message's markdown. The message's `details.shared`
+names its shares, and `details.images` the images among them, each at its
+fitted size, which pi's `toProviderMessages` hands to the model as image
+parts. An agent saves a share into its own lane with `save_blob`. A tool's
+images are blobs too: what pi stores holds their reference, and the
+rejoin restores their bytes (ADR-0051). Admission refuses another origin,
+and on loopback a rebound name. An image a message names by URL, or by a
+path in a lane, is not handed to the model.
 
 **Live work hands over to its entry in one render** (ADR-0044). A reply is
 its lane's current reply while the lane's tip is where it opened, and its
@@ -291,7 +301,8 @@ the task's label everywhere it is named, the board's search included.
 - yours, `$XDG_CONFIG_HOME/pinetrie/pinetrie.json` (`~/.config/pinetrie/`);
 - the project's `pinetrie.json`, as accepted work holds it (your repo's
   names are read from the working copy, since they find accepted work);
-- yours for one project, `$XDG_CONFIG_HOME/pinetrie/sessions/<folder>/pinetrie.json`;
+- yours for one project, `$XDG_CONFIG_HOME/pinetrie/sessions/<session>/pinetrie.json`,
+  by the session's name (ADR-0149);
 - the environment: `PINETRIE_MODEL`.
 
 Each setting says which of them may set it and how they combine: most
@@ -389,7 +400,7 @@ A drawn or pasted image is stored as a pasted image is, under a
 agent's `set_banner` sets a pasted image under any source, and a new one from
 your words only under `drawn`.
 
-**A column folds each ask's work** (ADR-0056). An ask is a message that
+**A column folds each ask's work** (ADR-0106). An ask is a message that
 started a run, with that run, read from the tree (`indexAsks`,
 `packages/core/asks.ts`). A column is read in outline, story or raw: story
 shows each ask's message, one digest line folding its work, and its last
@@ -458,9 +469,10 @@ Decided, and waiting for their turn:
 - **Kyneta cannot compact a live Yjs document**, so a card's text and the
   places are never compacted live: their storage is compacted, and nothing
   in memory is trimmed (`apps/pinetrie/host/housekeeping.ts`).
-- **A client's command Line is stored and never compacted.** Each Line document
-  grows about 1 KB per command, and the host cannot compact the half a client
-  writes. Line's pruning should compact it: to file upstream.
+- **A client's command Line is stored and not compacted while the host
+  runs.** Each Line document grows about 1 KB per command, and the host
+  cannot compact the half a client writes; only a starting host deletes the
+  stored Lines. Line's pruning should compact it: to file upstream.
 - **While a tool runs, its output is stored twice:** the live stream in
   `pinetrie:live`, and pi's checkpoint (its crash recovery) in its root's
   document. So a client holding that root receives it twice.
@@ -469,7 +481,7 @@ Decided, and waiting for their turn:
   key (`operationId`/`invocationId`): an upstream request to pi, low priority.
 - **Identity is not authenticated.** The invite key decides who gets in; a
   person is the email their client names, unverified, so a collaborator can
-  pose as another (ADR-0022, ADR-0037). Next: an email with a generated token.
+  pose as another (ADR-0107, ADR-0037). Next: an email with a generated token.
 
 - **The open spikes** (`rg -l '^- \*\*Status:\*\* Open' docs/findings`):
   - **S15**: the trunk winner rule uses wall-clock `ts`; clock skew is
@@ -482,13 +494,10 @@ Decided, and waiting for their turn:
   - **S154**: a touch drag on iOS Safari, deferred until an iPhone is at
     hand.
   - **S197**: building the lane VM's image on Linux, in QEMU.
-- **The suites and their mutations spend most of their time waiting** (S65).
-  What remains after the dead waits were removed, and the suites became
-  scenarios (S94): the image clean-up delay and presence expiry as host
-  options, short in the suites; mutants run in parallel, each in its own
-  copy of the repository; and the suite checks listed in
-  `scripts/unproven.ts` proved by a mutation, or deleted (the `lanes/*`
-  ones on the Mac).
+- **Suite checks no mutation proves yet** are listed in
+  `scripts/unproven.ts`, by scenario: each waits to be proved by a
+  mutation, or deleted once a unit test proves its rule (`AGENTS.md`,
+  Gates).
 - **A run's refusal cannot reach its author.** The host replies `started`
   before pi admits the run, so a refusal is only logged; the message is kept
   in the tree (`settleRun`), with no reply. A second reply, sent once the run
@@ -527,8 +536,10 @@ Decided, and waiting for their turn:
   proposed changes are reviewed as files; accepting one is not built yet. The
   agent has its tools, and each
   thread's agent works in its own Linux container (ADR-0034), on a disk
-  cloned from the turn it branched at: a root thread's starts from your
-  committed work (`@-`), so commit what it should see. Nothing installs its
+  cloned from the turn it branched at. A root thread's starts from its
+  base, accepted work or a copy of a WIP, which the send button's
+  "starts from" chooses when you have WIP bookmarks (ADR-0104): your
+  working copy reaches a thread only through one of them. Nothing installs its
   dependencies: it does, as you would after a clone. It sees its own directory at `/workspace` and your working copy at
   `/mnt/host-working-copy`, read-only, and nothing else of your machine unless
   accepted work's `pinetrie.json` grants it: a grant you add applies once you
@@ -576,7 +587,7 @@ Decided, and waiting for their turn:
   its turn (ADR-0135). A project can share a directory for everyone in `pinetrie.json`'s
   `lanes.shared`, once accepted work holds it. A changed config reaches
   existing threads at their next run, after a host restart.
-- **Accepting a thread's work** (ADR-0038 to ADR-0040, ADR-0047, ADR-0100;
+- **Accepting a thread's work** (ADR-0105, ADR-0100;
   the words are `docs/glossary.md`): each thread has a two-word name, shown
   in its column's header from before its first message (ADR-0057), and
   keeps its **proposed changes** in your repo, on the thread's base, under the bookmark
@@ -587,9 +598,9 @@ Decided, and waiting for their turn:
   files (flagging those that conflict with your committed work, and those
   you are editing) and every file's diff. Or find its bookmark, which a
   press copies, in jj or jjui. **accept changes** (or **accept changes into wip/…**), in the
-  work strip at its column's foot, moves **accepted work**
+  work strip, a row of its column's header, moves **accepted work**
   (`pinetrie-accepted`) or the WIP forward to it, and your `@` stays where
-  it is (ADR-0060). Reword, squash or split the proposed changes like any commit of
+  it is (ADR-0104). Reword, squash or split the proposed changes like any commit of
   yours before then; the host then leaves it alone. **split into a stack**
   has the agent rewrite it as reviewable revisions, in a run of its own:
   while the thread works it waits in the queue, and the agent can ask for
@@ -599,15 +610,17 @@ Decided, and waiting for their turn:
   accepted work (ADR-0090, ADR-0099). Set `accepted.bookmark` in
   `pinetrie.json` to have proposed changes land on another bookmark instead;
   `jj git push --all` would push it: push by name.
-- **Sending your work to a thread:** the work strip's `⋯` offers **update
-  from my work**: your `@`, uncommitted edits included, merged into the
-  thread's own copy. The thread gets a note of what changed, and your
-  composer a line you may send. When it conflicts, the agent resolves it, or
-  asks you (ADR-0033). A new root thread starts from your `@` as it is,
-  uncommitted edits included. A thread's own history is in your repo out of
-  sight:
+- **Catching a thread up:** the work strip's `⋯` offers **catch up with**
+  the thread's base (accepted work, or its WIP), **continue from accepted
+  work** once its WIP is gone, and **catch up with** the thread it branched
+  from while that thread has new work (ADR-0072). Each queues a card
+  holding the command, which the host pops when the lane is free
+  (ADR-0108). When it conflicts, the agent resolves it, or asks you
+  (ADR-0033). Your own work reaches a thread the same way: publish it into
+  accepted work, or put it on a WIP, then catch the thread up. A thread's
+  own history is in your repo out of sight:
   `jj log -r '::remote_bookmarks(remote=glob:"pinetrie-*") ~ ::@'`.
-- **Summaries of asks** (ADR-0056, on by default since ADR-0071, shaped by
+- **Summaries of asks** (ADR-0106, on by default since ADR-0071, shaped by
   ADR-0075): a model, the one commit messages use, writes each long ask's
   work a headline and a few points while someone reads the running thread,
   at most once a minute, and once more when its run ends. An ask of one or
@@ -625,8 +638,10 @@ Decided, and waiting for their turn:
   prints an invite link per network address, with its key; `PINETRIE_KEY` fixes
   the key. Everyone with the link gets in, and with tools on, can run commands
   on this machine as you. Use a trusted network or a tunnel.
-- `PINETRIE_MODEL` (`provider/id`) overrides the model. A root schema change
-  cannot open an existing store: move the session's `pinetrie.db` aside.
+- `PINETRIE_MODEL` (`provider/id`) overrides the model. A starting host
+  checks every stored document's schema before it opens any: it runs the
+  migrations registered for a stored schema, and refuses to start, naming
+  the document and both schema hashes, when none is (ADR-0096).
 
 ## 7. Working agreements
 
