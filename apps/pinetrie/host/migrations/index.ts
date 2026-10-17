@@ -18,6 +18,7 @@ import { CONTROL_TOPIC } from "@pinetrie/protocol/messages"
 import { lineDocPrefix } from "../lines.ts"
 import { SCHEMA_OF, type StoredKind, storedKind } from "../policy.ts"
 import type { OpenedStore } from "../store.ts"
+import { REPLY_DIAGNOSTICS } from "./0001-reply-diagnostics.ts"
 import type { MigrationLedger } from "./ledger.ts"
 
 /** What a migration reads with, and writes with once every read loaded. */
@@ -71,8 +72,8 @@ export interface RecordMigration {
   readonly run: (input: MigrationRun) => Promise<(() => Promise<void>) | null>
 }
 
-/** Every one-time record migration this build carries, oldest first: none. */
-export const RECORD_MIGRATIONS: readonly RecordMigration[] = []
+/** Every one-time record migration this build carries, oldest first. */
+export const RECORD_MIGRATIONS: readonly RecordMigration[] = [REPLY_DIAGNOSTICS]
 
 /**
  * A one-time deletion of stored documents no schema of ours opens, planned

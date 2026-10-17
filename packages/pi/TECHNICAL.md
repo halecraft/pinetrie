@@ -79,7 +79,10 @@ kept, so the next call asks again. That stays sound because the host runs
 | `tools.ts` | the tools registered, each that takes an intent wrapped (`assembleTools`), and whether a stored lane's list differs from `TOOL_IDS` (`toolsChanged`) |
 | `intent.ts` | which tools take a required `intent` (`TAKES_INTENT`, a record of every tool), and `requireIntent`, which adds it to a tool's schema and drops it before pi's `execute` (ADR-0173) |
 | `search.ts` | the `grep` and `find` tools: rg and fd through the lane's `env` (ADR-0064) |
-| `lanes.ts` | where a lane's tools work (`laneToolContext`), and what it is told (`systemPromptFor`, `laneGuidelines`) |
+| `lanes.ts` | where a lane's tools work (`laneToolContext`), and what it is told (`promptSectionsFor`, `systemPromptFor`, `laneGuidelines`) |
+| `transcript-prompt.ts` | a lane's prompt in its transcript: the sections in view (`sectionsInView`), what a run writes (`promptPatch`), and every request led by it (`transcriptPromptModels`) |
+| `carry.ts` | what a compaction carries past its cut: the prompt (`carryPrompt`) and the context entries (`carryContext`) |
+| `diagnostics.ts` | a reply's dropped-thinking report kept as a count (`countedDiagnostics`) |
 | `stream.ts` | pi's events as `StreamEvent`s (`harnessStreamEvent`) |
 | `commands.ts` | the commands pi loaded, and a command's file as the model reads it (`CommandFiles`) |
 | `banner.ts` | `set_banner`, and drawing a banner (`Banners`) |
@@ -92,6 +95,8 @@ kept, so the next call asks again. That stays sound because the host runs
 
 The decisions in them are pure and tested without a harness:
 `toolsChanged`, `laneToolContext`, `harnessStreamEvent`,
+`leadWithTranscriptPrompt`, `sectionsInView`, `promptPatch`, `carryPrompt`,
+`countedDiagnostics`,
 `expandCommand`, `parseSkill`, and the search tools' `grepArgs`, `findArgs`,
 `searchOutcome` and `searchText`.
 
@@ -301,15 +306,16 @@ ADR-0098).
 ### Pinned cards: what the model reads (ADR-0048, S92)
 
 - **A run's prompt can come with entries before it.** `ThreadLaneHandle.run(message,
-  before)` passes `lane.prompt([...before, message])`: a base's news
+  before)` passes `lane.prompt([...patch, ...before, message])`: what of the
+  lane's prompt changed (a system message, below), a base's news
   (`BehindMessage`, ADR-0080) and a cards entry (`PinnedMessage`,
   `@pinetrie/rules`), in that order, so the cards entry stays the prompt's
   parent. pi writes them all in the commit that admits the run, or none, so
   a refused run writes no cards entry. Only this keeps the prompt cache when a card changes: cards in the
-  system prompt, or in pi's mid-conversation system messages (which pi-ai
-  folds into the system prompt on most Anthropic models), lose the whole
-  conversation's cache; cards moved to the end of each request lose it on
-  every request (S92).
+  system prompt lose the whole conversation's cache, and so do cards in
+  pi's mid-conversation system messages on a model that folds them into
+  its leading prompt (most Anthropic models, when S92 measured it); cards
+  moved to the end of each request lose it on every request (S92).
 - **Every thread's `<rules>` holds the context rules first**
   (`CONTEXT_RULES`, `systemPromptFor`), for a direct thread too:
   `PINNED_RULE` (a thread's and a canvas's pinned cards) and `CANVAS_RULE`
@@ -317,10 +323,15 @@ ADR-0098).
   constant, so a lane's prompt stays the same between runs; each lane's
   prompt changed once when each was added. pi drops a guideline equal to
   another, so the lane's own lines stay distinct.
-- **pi's compaction carries the context entries** (`before_compaction`,
-  `agent.ts`; `pinned.ts`). pi compacts in the middle of a run, and a
-  context entry summarised away (a thread's cards, a canvas's cards, the
-  canvas list) would leave the model without it. `carryContext` decides,
+- **pi's compaction carries the lane's prompt and the context entries**
+  (`before_compaction`, `agent.ts`; `carry.ts`). pi compacts in the middle
+  of a run, and replaces everything before its cut with its summary. The
+  lane's prompt summarised away would leave the next request without it,
+  and the run after it would write every section again; a context entry
+  (a thread's cards, a canvas's cards, the canvas list) would leave the
+  model without it. `carryPrompt` folds every system message summarised
+  into one (pi-ai's `getCurrentSystemMessage`), which goes first; a later
+  patch the tail keeps applies after it. `carryContext` decides,
   pure, for every kind in the rules' context table (`CONTEXT_KINDS`): the
   newest of each kind among the summarised messages, when the retained tail
   has none of it. The hook then runs pi's own `compact()` and returns
@@ -350,7 +361,10 @@ no processor and behaves as pi's own.
 
 The scripted model's `reply` shows an image part as
 `[image <mimeType> <sha256 of its bytes>]`, so a suite can check which image
-the model was given.
+the model was given, and a system message as the prompt it renders (pi-ai's
+`getSystemMessageText`), so `context[0]` is a lane's prompt. A text step's
+`dropped` gives the reply Anthropic's report of that many dropped thinking
+blocks.
 
 ### Compaction, and the land message's budget (`compaction.ts`, ADR-0084)
 
@@ -464,9 +478,10 @@ result the model reads; the run goes on. The scripted model gives a step
 for one of them an intent of its own when the step names none
 (`scriptedArgs`). Context files load from `PiSetupOptions.project`, with tools on or
 off (ADR-0086); with none, from the process's working directory. The system
-prompt is pi's `buildSystemPrompt`, with the loader's context files and
-skills: the section layout `pi-anthropic-auth` shapes. Its `cwd` is the
-lane's directory.
+prompt is pi's named sections (`buildSystemPromptSections`,
+`promptSectionsFor`), with the loader's context files and skills: the
+section layout `pi-anthropic-auth` shapes. Its `cwd` is the lane's
+directory.
 
 `ThreadLaneHandle.abort()` is pi's `lane.abort`: a running tool is aborted and
 its result recorded as aborted, and the lane takes its next message (S22).
@@ -685,11 +700,60 @@ item 18, and in `lanes.test.ts` against the harness.
   interrupted, never running it again, and the rest of the run uses the
   directory in `resume`'s `Context`. `lanes.test.ts` reproduces the crash with
   two agents over one document.
-- **A lane's tool list and system prompt never change between its runs**
-  (S85). Anthropic drops an earlier thinking block when anything before it
-  in the request changed since it was written, and pi asks it to
-  (`drop_block`): a changed tool list or prompt costs the lane its earlier
-  reasoning, and its cache from the top.
+- **A lane's prefix never changes between its runs** (S85, ADR-0176, S244).
+  Anthropic drops an earlier thinking block when anything before it in the
+  request changed since it was written, and pi asks it to (`drop_block`): a
+  changed tool list or prompt costs the lane its earlier reasoning, and its
+  cache from the top. Every provider that caches by prefix loses its cache
+  the same way.
+  - **A lane's prompt lives in its transcript** (`transcript-prompt.ts`).
+    The prompt is pi's named sections (`promptSectionsFor`, `lanes.ts`),
+    built from `AGENTS.md` and the skills a host process reads once, so a
+    host started after either changed builds another. A run therefore
+    starts with what changed: `run` reads the entries its first request
+    reads (`findEntries` back to the newest compaction, as pi scans them),
+    folds their system messages into the sections in view
+    (`sectionsInView`), and writes the difference as one system message
+    in the run's commit (`promptPatch`, over pi's
+    `diffSystemPromptSections`); every section when none is in view. The
+    run's outcome names the sections it changed (`promptChanged`), and the
+    host logs them.
+  - **Every request leads with that prompt and the tools.** The harness
+    hands `models.streamSimple` its own `systemPrompt` and tool list
+    beside the messages, whatever the transcript holds; its
+    `transform_context` hook cannot drop the tools, and a lane with no
+    active tools could call none. So the `Models` the harness gets is
+    wrapped (`transcriptPromptModels`, a `Proxy`, since the models object
+    is a class instance whose methods a spread would drop): a context
+    holding a system message is sent with that message leading, the tools
+    as its `toolsAdded`, and no separate prompt or tools
+    (`leadWithTranscriptPrompt`). Only that shape is right on every model
+    (S244): pi-ai sends a later system message where it stands to a model
+    that takes mid-conversation system messages, prefix byte for byte as
+    before, and folds it into the leading prompt by section name for any
+    other, which a prompt sent as one string would have duplicated; and
+    sections beside a separate tool list are sent after the first user
+    message. A context with none (a lane from before ADR-0176, resumed
+    after a crash) is sent as the harness made it, with `systemPromptFor`,
+    the same sections rendered. A compaction's and a branch summary's
+    requests call `completeSimple`, unwrapped; titles, describes, digests
+    and focuses use `setup.models`.
+  - **A changed prefix shows in the replies.** pi-ai stores Anthropic's
+    report of the thinking a request dropped on the reply (`diagnostics`),
+    and the dropped blocks are sent again on every later request, so every
+    later reply would list them all again. An `after_response` hook stores
+    each list as its count (`countedDiagnostics`, `diagnostics.ts`); no
+    provider is sent a reply's diagnostics, so that moves no prefix. A
+    reply whose `dropped` rose over the reply before it on its branch is
+    where the prefix changed, across host starts, which an in-memory check
+    could not see.
+  - **Gotchas.** A run resumed after a crash continues on the prompt its
+    path holds until its next run. A branch inherits its parent's prompt,
+    and its first run writes what differs for it (its `cwd`, its
+    guidelines). On a model that folds system messages, a section new to a
+    lane comes after the others rather than in its usual place. A tool
+    whose definition changes still changes the prefix: pi-ai sends a
+    redefined tool whole.
   - **Tools register from one table keyed by `ToolId`** (`TOOLS`,
     `tools.ts`, ADR-0114), in `TOOL_IDS`' order (core), which is the order
     of every request's list: a reordered `TOOL_IDS` changes every lane's
@@ -715,10 +779,6 @@ item 18, and in `lanes.test.ts` against the harness.
     pi's `lane.setActiveTools`, which pi stores in the lane's configuration.
   - **The guidelines name nothing that changes**, the proposed changes' bookmark among
     them: it changes when a thread is named. `lane.md` says how it is named.
-  - **A change is logged.** A `before_payload` hook hashes each request
-    without its messages (`requestPrefix`, `prefix.ts`), and calls
-    `onPrefixChange(lane)` when it differs from the lane's last request
-    (`prefixChange`). The host logs it.
 - **`catch_up` and `split_proposed_changes`** (`thread-tools.ts`, ADR-0080) read their
   arguments (`parseCatchUpArgs`) and hand the call to the host
   (`LaneHooks.catchUp`, `LaneHooks.askSplit`), whose `ToolAnswer`
@@ -953,7 +1013,8 @@ a counter.
 Reaches pi entry points that are absent from its `exports` map, by relative path
 into `node_modules`: `createAgentHarness`, `addUsage`/`emptyUsage`,
 `ModelRuntime`, `SettingsManager` and `DefaultResourceLoader` (only
-through `openRuntime` and `openLoader`), and `buildSystemPrompt`. For commands:
+through `openRuntime` and `openLoader`), and `buildSystemPromptSections` and
+`diffSystemPromptSections`. For commands:
 `loadSkillsFromDir`, `loadPromptTemplates`, `substituteArgs`
 and `parseCommandArgs`. For images (ADR-0042):
 `detectSupportedImageMimeType`, `resizeImage` and `formatDimensionNote`. Those paths are depth-sensitive: they broke when this

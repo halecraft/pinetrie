@@ -30,19 +30,20 @@ import {
   withMessageImages,
 } from "@pinetrie/rules"
 import { type RootDocHandle, readLaneTip } from "@pinetrie/schema"
+import { carryContext, carryPrompt, withCarried } from "./carry.ts"
 import { PINETRIE_COMPACTION } from "./compaction.ts"
 import { NO_MODEL_STAND_IN } from "./config.ts"
 import { createAgentHarness } from "./deep.ts"
+import { countedDiagnostics } from "./diagnostics.ts"
 import {
   type LaneAccess,
   type LaneHooks,
   laneToolContext,
+  promptSectionsFor,
   systemPromptFor,
   type ToolContext,
 } from "./lanes.ts"
 import { type PiSetup, setupInside } from "./pi-setup.ts"
-import { carryContext, withCarried } from "./pinned.ts"
-import { prefixChange, requestPrefix } from "./prefix.ts"
 import { type Scribe, scribeInside } from "./scribe.ts"
 import { harnessStreamEvent, STREAM_SOURCES } from "./stream.ts"
 import { threadOfContext } from "./thread-context.ts"
@@ -54,6 +55,7 @@ import {
   threadLanes,
 } from "./thread-lanes.ts"
 import { assembleTools } from "./tools.ts"
+import { transcriptPromptModels } from "./transcript-prompt.ts"
 
 const CTX = BACKGROUND_CONTEXT
 
@@ -104,11 +106,6 @@ export interface CreateAgentOptions {
    */
   readonly blobs?: Pick<BlobStore, "get" | "put" | "ref">
   readonly onStream?: (event: StreamEvent) => void
-  /**
-   * A lane's request starts otherwise than its last one did: its earlier
-   * thinking is dropped, and its prompt cached again (`prefix.ts`).
-   */
-  readonly onPrefixChange?: (lane: ThreadId) => void
   /**
    * Each model request's tokens, per lane: what a budget for agents talking
    * spends from (`addedTokens`).
@@ -213,8 +210,10 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
   const accessFor = (lane: ThreadId | undefined): LaneAccess | null =>
     tools === null || lane === undefined ? null : tools.access(lane)
   const systemPrompt = systemPromptFor(setup, assembled.files, project)
-  // Each lane's last request's prefix, in memory: a restart starts fresh.
-  const prefixes = new Map<string, string>()
+  const promptSections = promptSectionsFor(setup, assembled.files, project)
+  // Every request leads with its lane's own prompt and the tools; titles,
+  // describes, digests and focuses use `setup.models` as it is.
+  const harnessModels = transcriptPromptModels(setup.models)
 
   /** The lane's last turn, recorded at its tip as its root's document has it. */
   async function recordTurn(lane: ThreadId): Promise<void> {
@@ -234,7 +233,7 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
     const { harness } = await createAgentHarness(
       {
         session,
-        models: setup.models,
+        models: harnessModels,
         model: resolved,
         tools: [...assembled.registered] as never[],
         activeToolNames: activeTools,
@@ -289,13 +288,17 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
               output,
             })
           })
-    // A compaction keeps the context the model last read in view: the
-    // newest entry of each kind summarised is carried into pi's
-    // retained tail. Nothing is thrown: if `compact` fails, pi compacts on
-    // its own, and only the context is lost, until the next run restates it.
+    // A compaction keeps the lane's prompt and the context the model last
+    // read in view: the prompt summarised, folded, then the newest context
+    // entry of each kind summarised, at the head of pi's retained tail.
+    // Nothing is thrown: if `compact` fails, pi compacts on its own, and the
+    // next run writes the prompt and restates the context.
     harness.hooks.on("before_compaction", async event => {
-      const cards = carryContext(event.preparation)
-      if (cards.length === 0) return undefined
+      const carried = [
+        ...carryPrompt(event.preparation),
+        ...carryContext(event.preparation),
+      ]
+      if (carried.length === 0) return undefined
       const done = await compact(
         event.preparation,
         setup.models,
@@ -307,18 +310,20 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
         CTX,
       )
       return done.ok
-        ? { compaction: withCarried(done.value, cards) }
+        ? { compaction: withCarried(done.value, carried) }
         : undefined
     })
-    harness.hooks.on("before_payload", async event => {
-      const next = requestPrefix(event.payload)
-      if (
-        prefixChange(prefixes.get(event.lane), next) &&
-        isThreadId(event.lane)
-      )
-        options.onPrefixChange?.(event.lane)
-      prefixes.set(event.lane, next)
-      return undefined
+    // A reply is stored with each list of dropped thinking as its count.
+    harness.hooks.on("after_response", async event => {
+      const diagnostics = countedDiagnostics(event.message.diagnostics)
+      return diagnostics === event.message.diagnostics
+        ? undefined
+        : {
+            message: {
+              ...event.message,
+              diagnostics: diagnostics as typeof event.message.diagnostics,
+            },
+          }
     })
     const offs = STREAM_SOURCES.map(type =>
       harness.events.on(type, event => {
@@ -331,6 +336,8 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
       doc,
       recordTurn,
       activeTools: tools === null ? null : activeTools,
+      promptSections: lane =>
+        promptSections(laneToolContext(accessFor(lane), project)),
     })
     return {
       lanes,

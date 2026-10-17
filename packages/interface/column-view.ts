@@ -1054,8 +1054,12 @@ export function pinnedMarker(
     : { cards: entry.cards, retired }
 }
 
-/** The roles of the entries a run's prompt is written after, in its commit. */
+/**
+ * The roles of the entries a run's prompt is written after, in its commit:
+ * `system` is the lane's prompt, written when it changed.
+ */
 const BEFORE_PROMPT: ReadonlySet<string> = new Set([
+  "system",
   "pinned",
   "canvas-pinned",
   "canvas",
@@ -1064,8 +1068,9 @@ const BEFORE_PROMPT: ReadonlySet<string> = new Set([
 
 /**
  * What a message was sent after, as a person sees it: its parent, past the
- * context entries its run wrote just above it (a canvas list, pinned cards,
- * a base's news), which the column draws as markers, not messages. An edit
+ * entries its run wrote just above it (the lane's prompt when it changed,
+ * which the column does not draw, and a canvas list, pinned cards, a base's
+ * news, which it draws as markers, not messages). An edit
  * sends again from there, beside the original, and its own run writes what
  * context it needs. Null at a root's first message.
  */

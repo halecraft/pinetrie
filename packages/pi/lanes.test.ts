@@ -420,10 +420,15 @@ describe("lanes in a harness", () => {
       return made.lane
     }
     /** Every stored message's text, in id order. */
+    // The lane's prompt, which a run writes before its first request, is
+    // left out: `agent.test.ts` checks it.
     const texts = () =>
       Object.values(readEntries(doc))
         .sort((a, b) => (a.id < b.id ? -1 : 1))
         .map(row => ({ id: row.id, message: rowMessage(row) }))
+        .filter(
+          t => (t.message as { role?: string } | undefined)?.role !== "system",
+        )
     return { agent, script, newLane, texts, doc }
   }
 
@@ -733,6 +738,7 @@ describe("lanes in a harness", () => {
     const failing = await newLane(where(dir))
     expect(await agent.lane(failing).run(prompt("failing"), [])).toEqual({
       kind: "ok",
+      promptChanged: [],
     })
     expect(lastIsNewest()).toBe(true)
     await agent.close()

@@ -3,7 +3,7 @@ import { canvasIdFor, threadIdFor, writerId } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
 import { encodeCanvas, encodeCanvasPinned, encodePinned } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
-import { carryContext, withCarried } from "./pinned.ts"
+import { carryContext, carryPrompt, withCarried } from "./carry.ts"
 
 const read = (text: string) => [
   { id: cardIdFor("c1"), text, by: writerId("ada@x.io") },
@@ -82,5 +82,35 @@ test("withCarried puts the entries at the head of the tail, and changes nothing 
   expect(withCarried(result, carried)).toEqual({
     ...result,
     retainedTail: [...carried, user("c")],
+  })
+})
+
+describe("carryPrompt: the lane's prompt a compaction summarises", () => {
+  const system = (sections: Record<string, string | null>) =>
+    ({
+      role: "system",
+      content: "",
+      sections,
+      timestamp: 0,
+    }) as unknown as AgentMessage
+
+  test("every summarised system message, folded in order into one", () => {
+    const carried = carryPrompt({
+      messagesToSummarize: [
+        system({ preamble: "P", project_context: "v1" }),
+        user("a"),
+        system({ project_context: "v2" }),
+      ],
+      turnPrefixMessages: [system({ cwd: "/w" })],
+    })
+    expect(carried.map(m => m.sections)).toEqual([
+      { preamble: "P", project_context: "v2", cwd: "/w" },
+    ])
+  })
+
+  test("nothing summarised is a system message: nothing", () => {
+    expect(
+      carryPrompt({ messagesToSummarize: [user("a")], turnPrefixMessages: [] }),
+    ).toEqual([])
   })
 })

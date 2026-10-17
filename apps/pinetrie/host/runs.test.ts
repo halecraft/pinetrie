@@ -28,6 +28,7 @@ import {
   hostRoots,
   methods,
   putLane,
+  RAN,
   ROOT_ID,
   record,
   row,
@@ -157,7 +158,7 @@ describe("a run's end", () => {
     })
     streamInto(b, runDocs)({ kind: "text", lane: LANE, delta: "hello" })
     expect(readStreams(b.live).filter(s => s.lane === LANE)).toHaveLength(1)
-    lane.finish({ kind: "ok" })
+    lane.finish(RAN)
     expect(await ended).toEqual({
       running: false,
       open: 0,
@@ -178,7 +179,7 @@ describe("a run's end", () => {
       row(entryId("p-1"), null, { role: "person", content: "hi" }),
     )
     writeLaneTip(b.root, LANE, entryId("p-1"))
-    lane.finish({ kind: "ok" })
+    lane.finish(RAN)
     await ended
     expect(pending).toEqual([{ prompt: "p-1", running: true }])
   })
@@ -199,7 +200,7 @@ describe("a run's end", () => {
       row(entryId("a-1"), "p-1", { role: "assistant", content: "hello" }),
     )
     writeLaneTip(b.root, LANE, entryId("a-1"))
-    lane.finish({ kind: "ok" })
+    lane.finish(RAN)
     expect((await ended).prompt).toBe("p-1")
   })
 
@@ -217,9 +218,25 @@ describe("a run's end", () => {
       row(entryId("p-1"), null, { role: "stack", content: "stack" }),
     )
     writeLaneTip(b.root, LANE, entryId("p-1"))
-    lane.finish({ kind: "ok" })
+    lane.finish(RAN)
     expect((await ended).running).toBe(false)
     expect(b.lines).toContain("[host] run end failed: pi is gone")
+  })
+
+  test("a run that wrote its lane's prompt anew logs the sections it changed, and one that did not logs none", async () => {
+    const { b, lane, runs, ended } = setUp()
+    runs.start(runnableFor(LANE), {
+      kind: "prompt",
+      message: said,
+      pinnedSeen: [],
+    })
+    lane.finish({ kind: "ok", promptChanged: ["project_context", "skills"] })
+    await ended
+    expect(
+      b.lines.filter(l => l.includes("the model's prompt changed")),
+    ).toEqual([
+      `[host] ${LANE.slice(-8)}: the model's prompt changed: project_context, skills`,
+    ])
   })
 
   test("a compelled chat pi refuses to run is appended, not lost", async () => {
@@ -279,7 +296,7 @@ describe("a run's pinned cards", () => {
       message: said,
       pinnedSeen: seen,
     })
-    lane.finish({ kind: "ok" })
+    lane.finish(RAN)
     await ended
     expect(asked).toEqual([[LANE, seen]])
     expect(lane.calls.filter(c => c.method === "run").map(c => c.args)).toEqual(
@@ -323,7 +340,7 @@ describe("a run's pinned cards", () => {
       message: said,
       pinnedSeen: [],
     })
-    lane.finish({ kind: "ok" })
+    lane.finish(RAN)
     await ended
     expect(asked).toEqual([LANE])
     expect(lane.calls.filter(c => c.method === "run").map(c => c.args)).toEqual(
@@ -358,7 +375,7 @@ describe("a run's pinned cards", () => {
       message: stack,
       pinnedSeen: [],
     })
-    lane.finish({ kind: "ok" })
+    lane.finish(RAN)
     await ended
     expect(asked).toEqual([])
   })
@@ -370,7 +387,7 @@ describe("a run's pinned cards", () => {
       return pinned
     })
     runs.start(runnableFor(LANE), { kind: "resume" })
-    lane.finish({ kind: "ok" })
+    lane.finish(RAN)
     await ended
     expect(read).toBe(0)
   })
@@ -418,7 +435,7 @@ describe("a run's pinned cards", () => {
       pinnedSeen: [],
     })
     expect(runs.cancel(LANE)).toBe(false)
-    lane.finish({ kind: "ok" })
+    lane.finish(RAN)
     await ended
     expect(methods(lane.calls)).toEqual(["run"])
   })
@@ -432,7 +449,7 @@ describe("a run's pinned cards", () => {
     })
     await untilRun(lane)
     expect(runs.cancel(LANE)).toBe(false)
-    lane.finish({ kind: "ok" })
+    lane.finish(RAN)
     await ended
   })
 })
@@ -468,7 +485,7 @@ test("a run's end forgets the lane's base news as the lane stops, before ended",
     message: said,
     pinnedSeen: [],
   })
-  lane.finish({ kind: "ok" })
+  lane.finish(RAN)
   await ended.promise
   expect(order).toEqual([`work ${LANE}`, `news ${LANE}`, `ended ${LANE}`])
 })
@@ -507,7 +524,7 @@ test("a run holds its lane's root from its start until its end's last step, thro
   await keeper.idle()
   expect(roots.loaded()).toEqual([ROOT_ID])
   expect(runDocs.docOf(LANE)).not.toBeNull()
-  lane.finish({ kind: "ok" })
+  lane.finish(RAN)
   expect(await loadedAtEnded.promise).toBe(true)
   await new Promise(r => setTimeout(r, 0))
   await keeper.idle()

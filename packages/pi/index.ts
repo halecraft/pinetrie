@@ -27,6 +27,7 @@ export {
   NO_RESOURCES,
   type ResourceLists,
 } from "./config.ts"
+export { countedDiagnostics } from "./diagnostics.ts"
 export {
   blobSha256,
   type PreparedImage,
@@ -56,6 +57,7 @@ export {
 export { KynetaStorage } from "./storage.ts"
 export type {
   BeforePrompt,
+  RunOutcome,
   ThreadLaneHandle,
   WriteOutcome,
 } from "./thread-lanes.ts"

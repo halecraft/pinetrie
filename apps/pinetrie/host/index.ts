@@ -54,7 +54,6 @@ import {
   readRoots,
   readRunning,
   readSetup,
-  readThreadName,
   readThreads,
   readTreeIndex,
 } from "@pinetrie/reads"
@@ -720,10 +719,6 @@ export async function startHost({
             },
           },
     onStream: streamInto(basics, runDocs),
-    onPrefixChange: lane =>
-      log(
-        `[host] ${readThreadName(session, lane)}: the model's prompt or tools changed`,
-      ),
     onUsage: (lane, tokens) => budgets.onUsage(lane, tokens),
     mayRequest: lane => budgets.mayRequest(lane),
   })

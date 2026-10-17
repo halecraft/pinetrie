@@ -1440,6 +1440,17 @@ describe("where the agent read pinned cards", () => {
     ])
   })
 
+  test("promptParent: an edit sends again from above the lane's prompt its run wrote", () => {
+    const index = indexEntries([
+      entry("1-q", null, said("q")),
+      entry("2-r", "1-q", { role: "assistant", content: "r" }),
+      entry("3-s", "2-r", { role: "system", content: "" }),
+      entry("4-c", "3-s", { role: "canvas", content: "", canvas: undefined }),
+      entry("5-p", "4-c", said("again", true)),
+    ])
+    expect(promptParent(index, entryId("5-p"))).toBe("2-r")
+  })
+
   test("pinnedMarkers: a run's canvas pins and canvas list, above its prompt, mark it too", () => {
     const K = canvasIdFor("k")
     const canvas = { canvas: K, title: "T", lines: ["thread a"], more: 0 }

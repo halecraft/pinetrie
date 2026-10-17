@@ -14,8 +14,8 @@
 //   @earendil-works/pi-coding-agent -> ".", "./rpc-entry", "./client",
 //        "./experimental/plugin"
 // Neither root exports `createAgentHarness`, `addUsage`, `emptyUsage`,
-// `buildSystemPrompt`, `loadPromptTemplates` or `detectSupportedImageMimeType`,
-// so every name here comes from its file, `ModelRuntime` and the pieces that
+// `buildSystemPromptSections`, `diffSystemPromptSections`,
+// `loadPromptTemplates` or `detectSupportedImageMimeType`, so every name here comes from its file, `ModelRuntime` and the pieces that
 // load skills, prompts, extensions and context files (`SettingsManager`,
 // `DefaultResourceLoader`) with them.
 // `openLoader` and `openRuntime` are the only ways out for those three,
@@ -96,7 +96,8 @@ export const { loadPromptTemplates, parseCommandArgs, substituteArgs } =
   promptTemplates
 export const { detectSupportedImageMimeType } = mime
 export const { resizeImage, formatDimensionNote } = imageResize
-export const { buildSystemPrompt } = systemPrompt
+export const { buildSystemPromptSections, diffSystemPromptSections } =
+  systemPrompt
 export const { createAgentHarness } = runtime
 
 /** What `openLoader` is given: every option it may vary, decided by `planModelSetup`. */

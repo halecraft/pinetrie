@@ -103,6 +103,7 @@ describe("one session per document", () => {
     if (made.kind !== "created") throw new Error("no lane")
     expect(await pi.agent.lane(made.lane).run(said("one"), [])).toEqual({
       kind: "ok",
+      promptChanged: [],
     })
     await pi.scribe.release(ONE_ROOT)
     await pi.scribe.appendToTree(
@@ -112,6 +113,7 @@ describe("one session per document", () => {
     )
     expect(await pi.agent.lane(made.lane).run(said("two"), [])).toEqual({
       kind: "ok",
+      promptChanged: [],
     })
     await pi.close()
   })

@@ -1,0 +1,40 @@
+appended system entry 01a14ccb-d168-75f6-ac61-dbb82d77165a
+stored entries: message:assistant message:user message:system message:assistant message:user
+compaction: {"ok":true,"value":{"compaction":{"operationId":"01a14ccb-d16d-75f6-ac61-dbf7a339d5d0","kind":"compaction","status":"completed","fromTipId":"01a14ccb-d16c-75f6-ac61-dbf3fc0c3282","tipId":"01a14ccb-d16
+
+[1 first prompt] provider saw: system+1tools user
+   first: {"role":"system","content":"FRESH PROMPT","toolsAdded":[{"name":"noop","description":"does nothing","parameters":{"type":"object","properties":{}}}],"timestamp"
+
+[2 after a system entry] provider saw: system+1tools user assistant system{project_context} user
+   first: {"role":"system","content":"FRESH PROMPT","toolsAdded":[{"name":"noop","description":"does nothing","parameters":{"type":"object","properties":{}}}],"timestamp"
+
+[3 a branch from the tip] provider saw: system+1tools user assistant system{project_context} user assistant user
+   first: {"role":"system","content":"FRESH PROMPT","toolsAdded":[{"name":"noop","description":"does nothing","parameters":{"type":"object","properties":{}}}],"timestamp"
+
+[turn 5] provider saw: system+1tools user assistant system{project_context} user assistant user
+   first: {"role":"system","content":"FRESH PROMPT","toolsAdded":[{"name":"noop","description":"does nothing","parameters":{"type":"object","properties":{}}}],"timestamp"
+
+[turn 6] provider saw: system+1tools user assistant system{project_context} user assistant user assistant user
+   first: {"role":"system","content":"FRESH PROMPT","toolsAdded":[{"name":"noop","description":"does nothing","parameters":{"type":"object","properties":{}}}],"timestamp"
+
+[turn 7] provider saw: system+1tools user assistant system{project_context} user assistant user assistant user assistant user
+   first: {"role":"system","content":"FRESH PROMPT","toolsAdded":[{"name":"noop","description":"does nothing","parameters":{"type":"object","properties":{}}}],"timestamp"
+
+[turn 8] provider saw: system+1tools user assistant system{project_context} user assistant user assistant user assistant user assistant user
+   first: {"role":"system","content":"FRESH PROMPT","toolsAdded":[{"name":"noop","description":"does nothing","parameters":{"type":"object","properties":{}}}],"timestamp"
+
+[4 compaction's own request] provider saw: system user
+   first: {"role":"system","content":"You are a context summarization assistant. Your task is to read a conversation between a user and an AI assistant, then produce a st
+
+[5 after compaction] provider saw: system+1tools user user assistant user assistant user
+   first: {"role":"system","content":"FRESH PROMPT","toolsAdded":[{"name":"noop","description":"does nothing","parameters":{"type":"object","properties":{}}}],"timestamp"
+
+what the harness handed streamSimple:
+  [1 first prompt] systemPrompt="FRESH PROMPT" tools=1 messages=user
+  [2 after a system entry] systemPrompt="FRESH PROMPT" tools=1 messages=user assistant system user
+  [3 a branch from the tip] systemPrompt="FRESH PROMPT" tools=1 messages=user assistant system user assistant user
+  [turn 5] systemPrompt="FRESH PROMPT" tools=1 messages=user assistant system user assistant user
+  [turn 6] systemPrompt="FRESH PROMPT" tools=1 messages=user assistant system user assistant user assistant user
+  [turn 7] systemPrompt="FRESH PROMPT" tools=1 messages=user assistant system user assistant user assistant user assistant user
+  [turn 8] systemPrompt="FRESH PROMPT" tools=1 messages=user assistant system user assistant user assistant user assistant user assistant user
+  [5 after compaction] systemPrompt="FRESH PROMPT" tools=1 messages=user user assistant user assistant user

@@ -1,6 +1,7 @@
 # S221 — Duane's store is 38% bookkeeping: shared-file tracking of scratch folders and pi's per-message diagnostics, both in the documents the host reads most
 
 - **Status:** Answered
+- **Led to:** ADR-0176
 
 Read from a copy of Duane's `pinetrie.db` (2026-10-17, 1.0 GB), opened
 read-only with Python's `sqlite3`; each document's compacted record

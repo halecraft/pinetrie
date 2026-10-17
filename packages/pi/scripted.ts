@@ -16,6 +16,7 @@ import {
   fauxProvider,
   fauxText,
   fauxToolCall,
+  getSystemMessageText,
   type ImageApi,
   type ImageModel,
   type Provider,
@@ -31,12 +32,19 @@ import { TAKES_INTENT } from "./intent.ts"
 
 /**
  * One scripted reply: text; text made from the context the model was given,
- * each message's text in order (an image as `[image <mime> <sha256>]`), so
- * a suite can see what the model saw; or a tool call with optional text
- * before it.
+ * each message's text in order (a system message as the prompt it renders,
+ * an image as `[image <mime> <sha256>]`), so a suite can see what the model
+ * saw; or a tool call with optional text before it.
  */
 export type ScriptStep =
-  | { readonly text: string }
+  | {
+      readonly text: string
+      /**
+       * Thinking blocks the reply reports Anthropic dropped, as pi-ai stores
+       * a request whose prefix changed: one listed per block.
+       */
+      readonly dropped?: number
+    }
   | { readonly reply: (context: readonly string[]) => string }
   | {
       readonly tool: ToolId
@@ -379,10 +387,36 @@ function render(
     )
   if ("reply" in step)
     return fauxAssistantMessage(
-      step.reply(context.messages.map(m => textOf(m.content))),
+      step.reply(
+        context.messages.map(m =>
+          m.role === "system" ? getSystemMessageText(m) : textOf(m.content),
+        ),
+      ),
     )
-  return fauxAssistantMessage(step.text)
+  const reply = fauxAssistantMessage(step.text)
+  return step.dropped === undefined ? reply : withDropped(reply, step.dropped)
 }
+
+/** `reply` with Anthropic's report of `count` dropped thinking blocks, as pi-ai stores it. */
+const withDropped = (
+  reply: AssistantMessage,
+  count: number,
+): AssistantMessage => ({
+  ...reply,
+  diagnostics: [
+    {
+      type: "anthropic_input_transformations",
+      timestamp: 0,
+      details: {
+        transformations: Array.from({ length: count }, (_, i) => ({
+          type: "thinking_dropped",
+          path: `messages.${i}.content.0`,
+          reason: "prefix_binding_mismatch",
+        })),
+      },
+    },
+  ],
+})
 
 /**
  * A tool step's arguments as a model gives them: with an intent, when its

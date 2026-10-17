@@ -33,6 +33,11 @@ import {
 import type { createAgentHarness } from "./deep.ts"
 import { threadContext } from "./thread-context.ts"
 import { toolsChanged } from "./tools.ts"
+import {
+  type PromptSections,
+  promptPatch,
+  sectionsInView,
+} from "./transcript-prompt.ts"
 
 const CTX = BACKGROUND_CONTEXT
 
@@ -45,8 +50,17 @@ export interface LaneRefusal {
   readonly code: ErrCode
 }
 
-/** The result of a run: pi may refuse to admit it. */
+/** The result of a write that runs or queues: pi may refuse to admit it. */
 export type WriteOutcome = { readonly kind: "ok" } | LaneRefusal
+
+/** The result of a run: refused, or ran, naming the prompt's sections it changed. */
+export type RunOutcome =
+  | {
+      readonly kind: "ok"
+      /** The sections of the lane's prompt the run wrote anew; empty when none, or when the lane held no prompt before. */
+      readonly promptChanged: readonly string[]
+    }
+  | LaneRefusal
 
 export type AppendOutcome =
   | { readonly kind: "appended"; readonly id: EntryId }
@@ -130,14 +144,16 @@ export interface ThreadLaneHandle {
     message: PersonMessage | UpdateMessage | FactMessage | AnswerMessage,
   ): Promise<AppendOutcome>
   /**
-   * Run one turn with `message` as the prompt itself. `before` goes in first,
-   * in order: a base's news and a cards entry, which stays the prompt's
-   * parent. pi writes them all in the commit that admits the run, or none.
+   * Run one turn with `message` as the prompt itself. What of the lane's
+   * prompt changed goes in first, as a system message (`promptPatch`), then
+   * `before`, in order: a base's news and a cards entry, which stays the
+   * prompt's parent. pi writes them all in the commit that admits the run, or
+   * none.
    */
   run(
     message: PromptMessage,
     before: readonly BeforePrompt[],
-  ): Promise<WriteOutcome>
+  ): Promise<RunOutcome>
   /**
    * Tell a running lane something that changed while it runs: its base has
    * new work, a card was added to or taken from its canvas, or an agent it
@@ -178,6 +194,8 @@ export function threadLanes(input: {
   readonly recordTurn: (lane: ThreadId) => Promise<void>
   /** The tools every lane's runs may call; null when the agent has no tools. */
   readonly activeTools: readonly string[] | null
+  /** The prompt a run of the lane is told now, as its named sections. */
+  readonly promptSections: (lane: ThreadId) => PromptSections
 }): ThreadLanes {
   const { harness, doc } = input
   const held = new Map<ThreadId, PiLane>()
@@ -212,12 +230,16 @@ export function threadLanes(input: {
     const ctx = threadContext(name, CTX)
     // A run that pi admitted and that then failed is still "ok" here: it
     // ran. Only an admission refusal is `refused`.
-    const turn = (start: (lane: PiLane) => Promise<PiResult>) =>
-      onLane<WriteOutcome>(name, async lane => {
-        const result = await start(lane)
+    const turn = <T>(
+      start: (
+        lane: PiLane,
+      ) => Promise<{ readonly result: PiResult; readonly ok: T }>,
+    ) =>
+      onLane<T | LaneRefusal>(name, async lane => {
+        const { result, ok } = await start(lane)
         if (!result.ok) return refusedBy(result.error._tag)
         await input.recordTurn(name)
-        return OK
+        return ok
       })
     return {
       name,
@@ -229,12 +251,30 @@ export function threadLanes(input: {
           })),
         ),
       run: (message, before) =>
-        turn(lane =>
-          lane.prompt(
-            before.length === 0 ? message : [...before, message],
+        turn<RunOutcome>(async lane => {
+          // gather: the entries the run's first request reads, as pi scans them
+          const entries = await lane.findEntries(
+            { stopAtType: "compaction", order: "newestFirst" },
             ctx,
-          ),
-        ),
+          )
+          // plan
+          const patch = promptPatch(
+            sectionsInView(entries.reverse()),
+            input.promptSections(name),
+            Date.now(),
+          )
+          const first = patch === null ? [] : [patch.message]
+          // execute
+          const messages = [...first, ...before]
+          const result = await lane.prompt(
+            messages.length === 0 ? message : [...messages, message],
+            ctx,
+          )
+          return {
+            result,
+            ok: { kind: "ok", promptChanged: patch?.changed ?? [] },
+          }
+        }),
       steer: message =>
         onLane<WriteOutcome>(name, async lane => {
           const queued = await lane.steer(message, undefined, ctx)
@@ -242,7 +282,8 @@ export function threadLanes(input: {
         }),
       // pi records a tool call the crash interrupted as interrupted, never
       // running it again; the run then continues in the lane's directory.
-      resume: () => turn(lane => lane.resume(ctx)),
+      resume: () =>
+        turn(async lane => ({ result: await lane.resume(ctx), ok: OK })),
       async abort() {
         const lane = await existing(name)
         if (lane !== undefined) await lane.abort(ctx)

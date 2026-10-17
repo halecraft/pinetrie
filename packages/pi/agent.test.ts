@@ -3,6 +3,9 @@
 // In packages/pi because it drives pi's harness, which only this package may
 // import.
 
+import { mkdtemp, writeFile } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import path from "node:path"
 import {
   atEntry,
   ERR,
@@ -46,6 +49,7 @@ import {
 import { newRootDoc, newSessionDoc } from "@pinetrie/schema/fixtures"
 import { describe, expect, test } from "vitest"
 import { type CreateAgentOptions, newId } from "./agent.ts"
+import { NO_RESOURCES } from "./config.ts"
 import { ONE_ROOT, oneRoot } from "./one-root.ts"
 import { scriptedModel } from "./scripted.ts"
 import { startPi } from "./start-pi.ts"
@@ -196,6 +200,7 @@ describe("a pi session per root", () => {
       ])
       expect(await first.agent.lane(lane).run(said(`in ${root}`), [])).toEqual({
         kind: "ok",
+        promptChanged: [],
       })
     }
     await first.close()
@@ -215,6 +220,7 @@ describe("a pi session per root", () => {
     for (const lane of lanes)
       expect(await second.agent.lane(lane).run(said("again"), [])).toEqual({
         kind: "ok",
+        promptChanged: [],
       })
     expect(await second.agent.interrupted([ONE_ROOT, OTHER])).toEqual([])
     await second.close()
@@ -288,6 +294,7 @@ describe("pinned cards: what the model reads", () => {
     const pinned = cardsOf(lane, "ship the sync fix")
     expect(await agent.lane(lane).run(asked("go"), [pinned])).toEqual({
       kind: "ok",
+      promptChanged: [],
     })
     await agent.close()
     const cards = rows(doc).find(r => messageOf(r)?.customType === PINNED_TYPE)
@@ -327,6 +334,7 @@ describe("pinned cards: what the model reads", () => {
     const handle = agent.lane(lane)
     expect(await handle.run(asked(pad("go")), [behind, pinned])).toEqual({
       kind: "ok",
+      promptChanged: [],
     })
     await handle.run(asked(pad("again")), [])
     await agent.close()
@@ -407,6 +415,122 @@ describe("pinned cards: what the model reads", () => {
     const summary = seen.findIndex(t => t.includes("summary"))
     expect(summary).toBeGreaterThanOrEqual(0)
     expect(seen.indexOf(pinned.content)).toBeGreaterThan(summary)
+  })
+
+  test("pi's compaction carries the lane's prompt: the request after it leads with the prompt the first one led with", async () => {
+    const contexts: (readonly string[])[] = []
+    const script = scriptedModel({
+      answer: {
+        reply: context => {
+          contexts.push(context)
+          return "ok"
+        },
+      },
+      contextWindow: 30_000,
+    })
+    const { agent, doc, lane } = await laneOver(script)
+    const big = (s: string) => `${s} ${"words ".repeat(10_000)}`
+    const handle = agent.lane(lane)
+    await handle.run(asked(big("one")), [])
+    await handle.run(asked(big("two")), [])
+    await handle.run(asked("three"), [])
+    await agent.close()
+    const compaction = rows(doc).find(r => r.type === "compaction")
+    const tail = compaction === undefined ? [] : rowRetainedTail(compaction)
+    expect((tail[0] as { role?: string } | undefined)?.role).toBe("system")
+    // A run after the compaction finds the prompt in view, and writes none.
+    expect(rows(doc).filter(r => messageOf(r)?.role === "system")).toHaveLength(
+      1,
+    )
+    // The summaries' own requests lead with pi's summarising prompt.
+    const asks = contexts.filter(c => c[0]?.includes("<cwd>"))
+    expect(asks.length).toBeGreaterThan(1)
+    expect(asks.at(-1)?.[0]).toBe(asks[0]?.[0])
+    expect(contexts.at(-1)).toBe(asks.at(-1))
+  })
+
+  test("a host started after AGENTS.md changed leads with the lane's prompt as it was, and its next run writes the change alone", async () => {
+    const project = await mkdtemp(path.join(tmpdir(), "pinetrie-prompt-"))
+    const agents = path.join(project, "AGENTS.md")
+    await writeFile(agents, "Follow rule one.\n")
+    // A listed package makes pi load the project's context files.
+    const lists = {
+      ...NO_RESOURCES,
+      packages: [path.join(import.meta.dirname, "fixtures", "fixture-pkg")],
+    }
+    const contexts: (readonly string[])[] = []
+    const script = scriptedModel({
+      answer: {
+        reply: context => {
+          contexts.push(context)
+          return "ok"
+        },
+      },
+    })
+    const doc = newRootDoc()
+    const options = {
+      model: { kind: "scripted", script },
+      project,
+      lists,
+    } as const
+    const first = await startPi(oneRoot(doc), {
+      ...options,
+      replicaId: "first",
+    })
+    const made = await first.agent.createThreadLane(
+      { root: ONE_ROOT, at: ROOT },
+      threadIdFor(newId()),
+    )
+    if (made.kind !== "created") throw new Error("no lane")
+    const { lane } = made
+    expect(await first.agent.lane(lane).run(asked("one"), [])).toEqual({
+      kind: "ok",
+      promptChanged: [],
+    })
+    await first.close()
+    await writeFile(agents, "Follow rule two.\n")
+    const second = await startPi(oneRoot(doc), {
+      ...options,
+      replicaId: "second",
+    })
+    expect(await second.agent.lane(lane).run(asked("two"), [])).toEqual({
+      kind: "ok",
+      promptChanged: ["project_context"],
+    })
+    expect(await second.agent.lane(lane).run(asked("three"), [])).toEqual({
+      kind: "ok",
+      promptChanged: [],
+    })
+    await second.close()
+    const [one, two] = contexts
+    expect(one?.[0]).toContain("Follow rule one.")
+    // The prompt leads as the first request had it; the change comes later.
+    expect(two?.[0]).toBe(one?.[0])
+    const change = two?.findIndex(t => t.includes("Follow rule two.")) ?? -1
+    expect(change).toBeGreaterThan(two?.indexOf("ok") ?? Infinity)
+    expect(rows(doc).filter(r => messageOf(r)?.role === "system")).toHaveLength(
+      2,
+    )
+  })
+
+  test("a reply is stored with the thinking it reports dropped as a count", async () => {
+    const script = scriptedModel()
+    script.use([{ text: "ok", dropped: 3 }])
+    const { agent, doc, lane } = await laneOver(script)
+    await agent.lane(lane).run(asked("go"), [])
+    await agent.close()
+    const replies = rows(doc)
+      .map(r => messageOf(r) as { role?: string; diagnostics?: unknown } | null)
+      .filter(m => m?.role === "assistant")
+    expect(replies.map(m => m?.diagnostics)).toEqual([
+      [
+        {
+          type: "anthropic_input_transformations",
+          timestamp: 0,
+          details: { dropped: 3 },
+        },
+      ],
+    ])
   })
 
   test("a branch's run writes in the branch, and the trunk carrying on from the same fork in the trunk", async () => {
@@ -548,7 +672,10 @@ describe("agents talking", () => {
       },
       1,
     )
-    expect(await agent.lane(lane).run(relay, [heard])).toEqual({ kind: "ok" })
+    expect(await agent.lane(lane).run(relay, [heard])).toEqual({
+      kind: "ok",
+      promptChanged: [],
+    })
     await agent.close()
     expect(seen.at(-2)).toBe(heard.content)
     expect(seen.at(-1)).toBe(relay.content)

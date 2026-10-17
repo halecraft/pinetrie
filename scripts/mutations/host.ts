@@ -3151,4 +3151,22 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "an allowed host with no known key is said at start",
   },
+  // ── a lane's prompt ──
+  {
+    name: "a run's prompt change is never logged",
+    file: "apps/pinetrie/host/runs.ts",
+    from: '          if (ran.kind === "ok" && ran.promptChanged.length > 0)\n',
+    to: '          if (ran.kind === "ok" && ran.promptChanged.length > 99)\n',
+    command: unit,
+    expect:
+      "a run that wrote its lane's prompt anew logs the sections it changed, and one that did not logs none",
+  },
+  {
+    name: "the reply migration rewrites a counted reply again",
+    file: "apps/pinetrie/host/migrations/0001-reply-diagnostics.ts",
+    from: "    return diagnostics === message.diagnostics\n      ? []\n",
+    to: "    return false\n      ? []\n",
+    command: unit,
+    expect: "a second plan over its own output finds nothing",
+  },
 ]

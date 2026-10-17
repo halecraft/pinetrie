@@ -23,7 +23,7 @@ import type { GatheredCommand, ModelRef } from "@pinetrie/rules"
 import type { AgentDirBinding } from "./agent-dir.ts"
 import { gatherCommands, type Listing, pinetrieCommands } from "./commands.ts"
 import {
-  type buildSystemPrompt,
+  type buildSystemPromptSections,
   type LoaderOptions,
   openLoader,
   openRuntime,
@@ -185,7 +185,7 @@ export function registerProviders(
 type Models = Runtime | ReturnType<typeof createModels>
 export type Model = NonNullable<ReturnType<Models["getModel"]>>
 
-type PromptInput = Parameters<typeof buildSystemPrompt>[0]
+type PromptInput = Parameters<typeof buildSystemPromptSections>[0]
 
 /**
  * What a harness holds on a host with no model. Never asked: every run is

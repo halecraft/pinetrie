@@ -157,6 +157,11 @@ wires them.
   split again. They carry no `seen`, so their window is as short as
   before. A carry-on's start cannot be cancelled either, for the same
   reason: a Stop in its window reaches nothing.
+- **A run that wrote its lane's prompt anew is logged** (ADR-0176): its
+  outcome names the sections of pi's prompt it changed (`promptChanged`,
+  `packages/pi/TECHNICAL.md`), and `promptChangedLine` words them:
+  `[host] <thread>: the model's prompt changed: project_context`. A lane's
+  first prompt changes nothing, and is not logged.
 
 ## A run's end
 
@@ -396,7 +401,12 @@ reading the store once, planning once, then acting:
   backup is taken after the reads, before the first write. One that reads
   every root (as one built on `recordDocs` over the roots does) loads them
   all, once per store.
-- **None of any kind is registered now**, and none is retired.
+- **`0001-reply-diagnostics` is registered** (ADR-0176): each stored
+  reply's list of the thinking Anthropic dropped becomes its count, by the
+  rule a new reply is stored by (`countedDiagnostics`, `@pinetrie/pi`).
+  It reads every root's entries raw and writes only the rows that change,
+  never an entry's `content`, id or parent; over its own output it plans
+  nothing (`planCountedDiagnostics`). None is retired.
 - **A migration that only reshapes one namespace's records,** record by
   record, is a pure rewrite over `rewriteRecords` (`migrations/rewrite.ts`,
   over `recordDocs`, which any record migration reads a home's documents

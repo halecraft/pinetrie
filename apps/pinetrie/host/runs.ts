@@ -17,7 +17,7 @@ import {
   type ThreadId,
 } from "@pinetrie/core"
 import type { Agent } from "@pinetrie/pi"
-import { readLatestPrompt } from "@pinetrie/reads"
+import { readLatestPrompt, readThreadName } from "@pinetrie/reads"
 import {
   foreignRefusal,
   type HeardMessage,
@@ -303,6 +303,13 @@ export function createRuns(deps: {
             pinned,
           ].filter(m => m !== null)
           const ran = await handle.run(start.message, before)
+          if (ran.kind === "ok" && ran.promptChanged.length > 0)
+            log(
+              promptChangedLine(
+                readThreadName(basics.session, lane),
+                ran.promptChanged,
+              ),
+            )
           if (personMessage !== null && settleRun(ran) === "keep") {
             // The reply was already `started`, so the author cannot be told;
             // at least their message is not lost.
@@ -330,6 +337,17 @@ export function createRuns(deps: {
     },
   }
 }
+
+/**
+ * The line a run that wrote its lane's prompt anew logs: the sections of
+ * pi's prompt that changed since the lane last had it (`project_context` for
+ * `AGENTS.md`, `skills`).
+ */
+export const promptChangedLine = (
+  thread: string,
+  sections: readonly string[],
+): string =>
+  `[host] ${thread}: the model's prompt changed: ${sections.join(", ")}`
 
 /**
  * A run on `lane`, proven runnable first (`LaneWork.runnable`); on a lane of

@@ -525,8 +525,9 @@ canvas's threads (`canvasRail`). A canvas's signals are its threads', whatever r
   (`TranscriptMessage.thread`): the thread's first entry is often a
   context entry, which is no node.
 - **Gotcha: a thread's first entry is not always a message** (ADR-0125). A
-  branch's first run writes its context entries (canvas, canvas cards,
-  pinned cards, base news) above its prompt, in its own thread, and no
+  branch's first run writes its prompt when it differs (a `system` entry,
+  ADR-0176) and its context entries (canvas, canvas cards, pinned cards,
+  base news) above its prompt, in its own thread, and no
   column or rail row draws them. Read a thread's shape (its fork, whether
   it started) from `firstOf`; read what a person sees first from
   `threadFirstMessage` (core), as `threadFace` and `canvasRail`'s stubs do.
@@ -1152,6 +1153,10 @@ cut and paste* below is the rest.
   sibling, since entries are immutable. The parent comes from the index, not
   the column: a branch column's first message has its parent in another
   column. A root's first message has none, so its edit is a new canvas.
+  The parent is the prompt's, past what its run wrote just above it
+  (`promptParent`): the lane's prompt when it changed (a `system` entry,
+  ADR-0176, which nothing draws) and the context entries; the branch's own
+  run writes its own.
 - **An edit asks the agent exactly when the original did.** A branch or a
   new canvas asks only through a mention (`agentByDefault`), so a message its
   thread's default compelled gets `@agent ` in front. The unit test checks this through

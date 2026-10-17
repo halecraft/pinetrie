@@ -119,6 +119,7 @@ export const OUTSIDE_NAMES: ReadonlySet<string> = new Set([
   "EntryType",
   "executionMode",
   "InMemoryStorageState",
+  "ModelsImpl",
   "OPENROUTER_API_KEY",
   "pendingToolOutput",
   "toolExecution",

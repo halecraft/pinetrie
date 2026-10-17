@@ -7,6 +7,7 @@
 // `access(lane)`. pi's hooks see the lane's name directly.
 
 import type { ExecutionEnv } from "@earendil-works/pi-agent-core"
+import { getSystemMessageText } from "@earendil-works/pi-ai"
 import {
   CONFLICT_TOOL,
   type EntryId,
@@ -22,10 +23,11 @@ import {
 import { AGENTS_RULE, CONTEXT_RULES, type ToolAnswer } from "@pinetrie/rules"
 import { Type } from "typebox"
 import type { ModelSetup } from "./config.ts"
-import { buildSystemPrompt } from "./deep.ts"
+import { buildSystemPromptSections } from "./deep.ts"
 import { type LaneChannel, laneEnv, refusingEnv } from "./lane-env.ts"
 import type { BlobAnswer } from "./save-blob.ts"
 import { threadOfContext } from "./thread-context.ts"
+import type { PromptSections } from "./transcript-prompt.ts"
 
 type Context = Parameters<typeof threadOfContext>[0]
 
@@ -279,19 +281,20 @@ export function skillsInLane<S extends { filePath: string; baseDir: string }>(
 }
 
 /**
- * pi's own prompt, with the repo's context files and the person's skills, so
- * an extension that shapes pi's prompt sections finds them. It names the
- * lane's directory, and does not wait for its setup.
+ * pi's own prompt as its named sections, with the repo's context files and
+ * the person's skills, so an extension that shapes pi's prompt sections finds
+ * them. It names the lane's directory, and does not wait for its setup. A run
+ * writes what of it changed into the lane (`promptPatch`).
  */
-export const systemPromptFor =
+export const promptSectionsFor =
   (
     setup: Pick<ModelSetup, "contextFiles" | "skills">,
     selectedTools: readonly string[],
     /** The project's root: its own skills are read in a lane's copy. */
     project: string | null = null,
   ) =>
-  (toolContext: ToolContext): string =>
-    buildSystemPrompt({
+  (toolContext: Pick<ToolContext, "dir" | "lane">): PromptSections =>
+    buildSystemPromptSections({
       cwd: toolContext.dir,
       selectedTools: [...selectedTools],
       contextFiles: setup.contextFiles,
@@ -307,6 +310,25 @@ export const systemPromptFor =
               AGENTS_RULE,
               ...laneGuidelines(toolContext.lane.facts),
             ],
+    })
+
+/**
+ * The same sections rendered as one prompt, as pi-ai renders a system
+ * message. The harness's `systemPrompt`: a request leads with it only when
+ * its lane holds no prompt of its own (`leadWithTranscriptPrompt`).
+ */
+export const systemPromptFor =
+  (
+    setup: Pick<ModelSetup, "contextFiles" | "skills">,
+    selectedTools: readonly string[],
+    project: string | null = null,
+  ) =>
+  (toolContext: Pick<ToolContext, "dir" | "lane">): string =>
+    getSystemMessageText({
+      role: "system",
+      content: "",
+      sections: promptSectionsFor(setup, selectedTools, project)(toolContext),
+      timestamp: 0,
     })
 
 export const NO_CONFLICTS =

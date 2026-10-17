@@ -1,0 +1,7 @@
+prompt([system,user]) ok: true
+in view before compaction: {"types":"message message message message message message","sections":{"preamble":"P","project_context":"v2"}}
+stored diagnostics: [{"type":"anthropic_input_transformations","timestamp":1,"details":{"dropped":2}}]
+compaction ok true carried calls 1
+compaction entry keys: id,parentId,type,summary,retainedTail,tokensBefore,details,usage,fromHook,seq,timestamp
+in view after compaction: {"types":"compaction","sections":{"preamble":"P","project_context":"v2"}}
+provider saw, last: system{}+tools user system{preamble,project_context} user assistant user assistant user

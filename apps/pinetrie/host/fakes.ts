@@ -31,7 +31,7 @@ import {
   writerId,
 } from "@pinetrie/core"
 import { createKeeper } from "@pinetrie/keeper"
-import type { ThreadLaneHandle, WriteOutcome } from "@pinetrie/pi"
+import type { RunOutcome, ThreadLaneHandle } from "@pinetrie/pi"
 import {
   readLaneRecords,
   readPlaces,
@@ -154,6 +154,9 @@ export function deferred<T>(): {
   return { promise, resolve, reject }
 }
 
+/** A run that ran and wrote nothing of its lane's prompt anew. */
+export const RAN: RunOutcome = { kind: "ok", promptChanged: [] }
+
 /**
  * A lane whose `run` and `resume` wait for `finish`, so a test sees the run in
  * progress for as long as it needs.
@@ -164,9 +167,9 @@ export function fakeLane(
 ): {
   readonly lane: ThreadLaneHandle
   readonly calls: Call[]
-  readonly finish: (outcome: WriteOutcome) => void
+  readonly finish: (outcome: RunOutcome) => void
 } {
-  const ran = deferred<WriteOutcome>()
+  const ran = deferred<RunOutcome>()
   const { port, calls } = record<ThreadLaneHandle>({
     name,
     run: async () => ran.promise,

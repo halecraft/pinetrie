@@ -4698,4 +4698,14 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "a lane refused only for a host outside has a row",
   },
+  // ── a lane's prompt ──
+  {
+    name: "an edit sends again from below the lane's prompt its run wrote",
+    file: "packages/interface/column-view.ts",
+    from: 'const BEFORE_PROMPT: ReadonlySet<string> = new Set([\n  "system",\n',
+    to: "const BEFORE_PROMPT: ReadonlySet<string> = new Set([\n",
+    command: unit,
+    expect:
+      "promptParent: an edit sends again from above the lane's prompt its run wrote",
+  },
 ]
