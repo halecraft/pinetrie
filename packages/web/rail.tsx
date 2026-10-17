@@ -65,7 +65,7 @@ const x = (across: number) => PAD + across * GAP
 const y = (slot: number) => PAD + slot * ROW
 
 /** A rail stub as drawn: where it forks, where it leads, and its words. */
-export interface DrawnStub {
+interface DrawnStub {
   readonly stub: RailStub
   readonly label: string
   readonly title: string

@@ -127,7 +127,7 @@ export const launcherArgs = (f: LauncherFacts): readonly string[] => [
 export const GVPROXY_HOST_ADDRESS = "192.168.127.254"
 
 /** Where a slot's directories are in the VM. */
-export const SHARES_ROOT = "/mnt/host-shares"
+const SHARES_ROOT = "/mnt/host-shares"
 
 /** A host directory lanes may mount, and whether they may write it. */
 export interface ShareDir {
@@ -339,7 +339,7 @@ export function planVmBuild(f: VmBuildFacts): VmBuildPlan {
 }
 
 /** What a build must do before its 20 s: each worded in `vmBuildWords`. */
-export interface VmBuildFirst {
+interface VmBuildFirst {
   readonly compile: boolean
   readonly fetch: boolean
 }
@@ -414,7 +414,7 @@ export const staleVmWords = (leases: number, image: string): string =>
   `the lane VM runs an older image or launcher, and ${leases - 1} other ${leases === 2 ? "host holds a lease" : "hosts hold leases"} on it: this host joins it, and the VM is replaced with ${image} when the last of them stops`
 
 /** What a build does with `images/<key>.lock`. */
-export type LockStep = "take" | "wait" | "break"
+type LockStep = "take" | "wait" | "break"
 
 /**
  * One build at a time per image: take a lock no one holds, wait on one a

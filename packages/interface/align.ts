@@ -8,7 +8,7 @@
 // be off screen, behind blank space.
 
 /** What alignment measures, in px from the top of the new column's body. */
-export interface Placing {
+interface Placing {
   /**
    * The fork point's top, and the bottom of the viewport of the column that
    * shows it. Null when no other column shows it.

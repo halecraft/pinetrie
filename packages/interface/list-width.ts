@@ -25,7 +25,7 @@ export const otherWidth = (width: ListWidth): ListWidth =>
   width === "full" ? "icons" : "full"
 
 /** The key that folds and unfolds the list, from anywhere (`keyAct`). */
-export const FOLD_KEY = "Ctrl+Shift+L"
+const FOLD_KEY = "Ctrl+Shift+L"
 
 /** The control at the list's foot, by what it does from `shown`. */
 export function listFoldWords(shown: ListWidth): {

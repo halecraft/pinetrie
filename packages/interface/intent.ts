@@ -875,7 +875,7 @@ function planOpenIn(
  * orders and the undo key takes back. Nothing for a card on no
  * canvas of `canvas`, or one already at `to`.
  */
-export function planColumnMove(
+function planColumnMove(
   card: CardId,
   to: number,
   canvas: CanvasId,

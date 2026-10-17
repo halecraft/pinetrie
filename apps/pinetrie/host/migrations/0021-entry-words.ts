@@ -46,7 +46,7 @@ const isRaw = (v: unknown): v is Raw =>
   typeof v === "object" && v !== null && !Array.isArray(v)
 
 /** A stored message renamed; the same value when nothing in it is old. */
-export function renamedMessage(message: unknown): unknown {
+function renamedMessage(message: unknown): unknown {
   if (!isRaw(message) || typeof message.customType !== "string") return message
   const type = message.customType
   const details = message.details

@@ -43,7 +43,7 @@ export const NO_MEMORY: RowMemory = { revealed: false, open: false }
  * only says an image was read. `note` is that text: the caption, and pi's
  * note of a resize.
  */
-export type ToolBody =
+type ToolBody =
   | {
       readonly kind: "images"
       readonly images: readonly ImageRef[]
@@ -57,7 +57,7 @@ export const toolBody = (result: ToolResult | undefined): ToolBody =>
     : { kind: "text" }
 
 /** Whether a call is still running (or was cut off), failed, or worked. */
-export type CallStatus = "pending" | "error" | "ok"
+type CallStatus = "pending" | "error" | "ok"
 
 export const callStatus = (result: ToolResult | undefined): CallStatus =>
   result === undefined ? "pending" : result.isError ? "error" : "ok"
@@ -104,7 +104,7 @@ export interface RowSummary {
  * of the Mac's SF Mono at a row's .8rem (0.6em each). Only its first line runs
  * beside the tag and status, and wraps once when long.
  */
-export const LAYOUT_WIDTH = 55
+const LAYOUT_WIDTH = 55
 
 /** The tools whose subject reads other than as plain text, by id; any other reads plain. */
 const VIEWS: Readonly<Partial<Record<ToolId, (subject: string) => Run[]>>> = {

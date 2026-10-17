@@ -74,7 +74,7 @@ export type FollowEvent =
   /** Work at the end started or stopped. */
   | { readonly kind: "holding"; readonly value: boolean; readonly at: Metrics }
 
-export interface FollowPlan {
+interface FollowPlan {
   readonly state: FollowState
   /** Set `scrollTop` to this, or leave it. Set after `floor`. */
   readonly scrollTo: number | null

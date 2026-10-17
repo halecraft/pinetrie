@@ -49,7 +49,7 @@ export type CardState =
 export type CardPrimary = "put" | "send"
 
 /** Where a Move to ▸ item takes a card: a place, or a new thread in a state. */
-export type CardMoveTo =
+type CardMoveTo =
   | "message"
   | "note"
   | "queue"
@@ -317,13 +317,13 @@ export function cardFrame(
 }
 
 /** A Move to ▸ item's words. */
-export interface MoveWords {
+interface MoveWords {
   readonly label: string
   readonly title: string
 }
 
 /** A frame in words. */
-export interface CardFrameWords {
+interface CardFrameWords {
   /** Its place, always shown: the frame says where a card is before it exists. */
   readonly place: string
   readonly state: string | null

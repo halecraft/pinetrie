@@ -24,7 +24,7 @@ import { textClients } from "@pinetrie/schema"
 import type { SessionClient } from "@pinetrie/session"
 import { createContext, useContext } from "react"
 
-export interface CardHistoryFacts {
+interface CardHistoryFacts {
   readonly histories: ReadonlyMap<CardId, CardHistoryRecord>
   /** Every seat the host has seen: who has text in a card. */
   readonly seats: readonly SeatRecord[]

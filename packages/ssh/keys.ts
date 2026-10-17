@@ -5,7 +5,7 @@
 import { ascii, wireReader } from "./wire.ts"
 
 /** A key pair's files, as the host read them. */
-export interface ServiceKeyFiles {
+interface ServiceKeyFiles {
   /** Its file name in the folder: the identity's name. */
   readonly name: string
   readonly path: string

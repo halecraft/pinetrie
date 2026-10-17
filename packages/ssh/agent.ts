@@ -40,7 +40,7 @@ const SESSION_BIND = "session-bind@openssh.com"
 /** SSH2_MSG_USERAUTH_REQUEST, which follows the session id in a login's data. */
 const USERAUTH_REQUEST = 50
 /** OpenSSH's agent refuses a longer message (`AGENT_MAX_LEN`). */
-export const AGENT_MAX_LENGTH = 256 * 1024
+const AGENT_MAX_LENGTH = 256 * 1024
 
 /** A message body (type and fields) as it goes on the wire. */
 export const frame = (body: Uint8Array): Uint8Array =>

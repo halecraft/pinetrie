@@ -18,7 +18,7 @@ export interface SshBlock {
 }
 
 /** How deep `Include`s nest before ssh refuses the file. */
-export const INCLUDE_DEPTH = 16
+const INCLUDE_DEPTH = 16
 
 /**
  * A line's words after its keyword, as OpenSSH's `argv_split` makes them:
@@ -98,16 +98,13 @@ export function configPath(p: string, base: string, home: string): string {
  * `base` is `~/.ssh` for a person's config: ssh reads a relative `Include`
  * there, and silently skips one it does not find.
  */
-export interface IncludeRoots {
+interface IncludeRoots {
   readonly base: string
   readonly home: string
 }
 
 /** Every file pattern a text's `Include`s name, in order. */
-export const includesIn = (
-  text: string,
-  roots: IncludeRoots,
-): readonly string[] =>
+const includesIn = (text: string, roots: IncludeRoots): readonly string[] =>
   text.split("\n").flatMap(raw => {
     const line = parseLine(raw)
     return line?.keyword === "include"

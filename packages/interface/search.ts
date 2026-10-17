@@ -111,7 +111,7 @@ const literal = (s: string) => s.replace(/[.*+?^${}()|[\]\\/-]/g, "\\$&")
  * A last word ending in one runs on to its word's end, so a match, and what
  * a snippet marks, is the whole word: "colum" matches "columns".
  */
-export function queryPattern(query: Query): RegExp {
+function queryPattern(query: Query): RegExp {
   const first = query.words[0]
   const last = query.words[query.words.length - 1] ?? first
   const body = query.words.map(literal).join("\\s+")

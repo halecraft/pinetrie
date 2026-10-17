@@ -80,7 +80,6 @@
         "!packages/core/places.ts",
         "!packages/core/address.ts",
         "!packages/interface/fixtures.ts",
-        "!apps/pinetrie/host/fakes.ts",
         "!packages/web/use-ask-bar.ts",
         "!packages/interface/clip.ts"
       ],

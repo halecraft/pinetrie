@@ -33,7 +33,7 @@ import type { CardPort } from "./cards.ts"
  * After it, the run reads what the host holds, and the column marks a card
  * whose edit came too late as changed since the agent read it.
  */
-export const PINNED_WAIT_MS = 2000
+const PINNED_WAIT_MS = 2000
 
 /**
  * Resolves once every text holds what its sender had, after `ms`, or once

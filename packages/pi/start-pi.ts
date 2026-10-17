@@ -17,7 +17,7 @@ import type { ModelPlaces } from "./config.ts"
 import { loadPiSetup, type PiSetup, type PiSetupOptions } from "./pi-setup.ts"
 import { createScribe, type Scribe } from "./scribe.ts"
 
-export interface StartedPi {
+interface StartedPi {
   readonly scribe: Scribe
   readonly setup: PiSetup
   readonly agent: Agent

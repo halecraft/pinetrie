@@ -88,7 +88,7 @@ export function catchUpTool(
 }
 
 /** `resolve_conflict`'s `choose` as the agent passed it; null for anything else. */
-export const parseResolveChoice = (
+const parseResolveChoice = (
   choose: string,
 ): "ours" | "theirs" | "base" | null =>
   choose === "ours" || choose === "theirs" || choose === "base" ? choose : null

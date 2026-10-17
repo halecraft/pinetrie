@@ -27,7 +27,7 @@ export const pageDir = (): string =>
     createRequire(import.meta.url).resolve("@pinetrie/web/package.json"),
   )
 
-export const pageDistDir = (): string => path.join(pageDir(), "dist")
+const pageDistDir = (): string => path.join(pageDir(), "dist")
 
 /** The mode a host builds and serves the page in: React's production build. */
 const MODE = "production"

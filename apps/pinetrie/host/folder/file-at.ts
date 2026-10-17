@@ -19,7 +19,7 @@ const FILE_LIMIT = 1024 * 1024
  * first read, or a lane with no work of its own yet (its newest is its
  * start), as a jj lane has no tip until its first turn.
  */
-export function siteState(
+function siteState(
   states: readonly StateRecord[],
   site: ReadSite,
 ): PointId | null {

@@ -112,7 +112,7 @@ export function planFolderRecords(input: {
   }
 }
 
-export interface FolderProposedChanges extends ProposedChangesActs {
+interface FolderProposedChanges extends ProposedChangesActs {
   /** Every folder lane's proposed changes and base built again: accepted work moved. */
   rebuildAll(): Promise<void>
   /** `lane`'s proposed changes built again, or withdrawn, on the project's queue. */
@@ -123,7 +123,7 @@ export interface FolderProposedChanges extends ProposedChangesActs {
 }
 
 /** What the folder's proposed changes read and merge on. */
-export type ShownReader = StateReader & {
+type ShownReader = StateReader & {
   readonly runtime: Pick<LaneRuntime, "diff" | "disk" | "snapshotExists">
   readonly disks: Pick<
     FolderDisks,

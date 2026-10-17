@@ -52,7 +52,7 @@ export async function readOpLog(jj: Runner): Promise<OpLogFacts> {
  * it: 21,822 kept in 135 s. It rewrites every operation it keeps, whatever
  * it cuts, so a tidy's time follows the window, not the log's length.
  */
-export const MS_PER_KEPT_OPERATION = 6
+const MS_PER_KEPT_OPERATION = 6
 
 const DAY = 86_400
 

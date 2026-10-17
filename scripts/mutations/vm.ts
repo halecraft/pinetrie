@@ -83,10 +83,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "vm declares lanes",
     file: "packages/vm/package.json",
-    from: '    "@pinetrie/core": "workspace:*"\n',
-    to: '    "@pinetrie/core": "workspace:*",\n    "@pinetrie/lanes": "workspace:*"\n',
+    from: '    ".": "./index.ts"\n  }\n',
+    to: '    ".": "./index.ts"\n  },\n  "dependencies": { "@pinetrie/lanes": "workspace:*" }\n',
     command: ["pnpm", "exec", "vitest", "run", "workspace.test.ts"],
-    expect: "vm declares only core: it knows nothing of lanes",
+    expect: "vm declares nothing: it knows nothing of lanes",
   },
   {
     name: "a source given read-only and read-write is shared read-only",

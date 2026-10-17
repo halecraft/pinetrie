@@ -18,7 +18,7 @@ import { count } from "./counts.ts"
 import { outcomeWords } from "./outcome-words.ts"
 
 /** The publish button as the footer shows it. */
-export type PublishView =
+type PublishView =
   /**
    * No lanes of their own here, or a folder project: its folder is
    * accepted work, with nothing to set up or publish to.
@@ -68,7 +68,7 @@ const JJUI_NOTE =
   'jjui with a revset of its own: add | bookmarks(glob:"pinetrie-proposed/*") to it'
 
 /** The button's text, and its title: what it does, in words and in jj, a refusal first. */
-export type PublishWords =
+type PublishWords =
   | {
       readonly kind: "publish"
       readonly label: string
@@ -163,7 +163,7 @@ export function publishWords(
  * What a toast says of your last setup or publish command: its refusal or
  * failure. A conflict in the working copy is said, and left to jj.
  */
-export interface PublishToast {
+interface PublishToast {
   readonly text: string
 }
 

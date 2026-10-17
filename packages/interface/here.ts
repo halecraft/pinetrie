@@ -13,7 +13,7 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 
-export interface PersonHere {
+interface PersonHere {
   readonly writer: WriterId
   /** Each thread end they read, with its canvas. */
   readonly threads: readonly {
@@ -94,7 +94,7 @@ export function readersByCanvas(
 }
 
 /** A person shown on the board: here, or gone and kept while their menu is open. */
-export interface PersonShown {
+interface PersonShown {
   readonly person: PersonHere
   readonly gone: boolean
 }

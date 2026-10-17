@@ -12,7 +12,7 @@ const isField = (field: string): field is Field =>
   (FIELDS as readonly string[]).includes(field)
 
 /** What one replayed change leaves to re-index. */
-export type Dirty =
+type Dirty =
   | { readonly kind: "none" }
   | { readonly kind: "all" }
   | {

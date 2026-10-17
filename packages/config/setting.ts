@@ -27,9 +27,7 @@ export type AdmissibleLayers<K> = K extends { readonly reach: "host" }
   : LayerRef
 
 /** The layer a reference names. */
-export type LayerName<R> = R extends { readonly project: CopyName }
-  ? "project"
-  : R
+type LayerName<R> = R extends { readonly project: CopyName } ? "project" : R
 
 export type Rule =
   /** The most specific layer in `order` that sets it decides. */

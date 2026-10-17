@@ -26,7 +26,7 @@ const text = (t: string) => ({
 })
 
 /** `save_blob`'s answer once written: where, and how many bytes. */
-export const savedText = (at: string, bytes: number): string =>
+const savedText = (at: string, bytes: number): string =>
   `Saved ${bytes} bytes to ${at}.`
 
 export function saveBlobTool(

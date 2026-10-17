@@ -17,7 +17,7 @@ import path from "node:path"
 import ts from "typescript"
 
 /** What a living doc cites: a backticked code name, at its file's line. */
-export interface Citation {
+interface Citation {
   /** Repository-relative. */
   readonly file: string
   /** 1-based. */

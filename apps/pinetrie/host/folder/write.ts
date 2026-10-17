@@ -53,7 +53,7 @@ const allLinked = (journal: AcceptJournal): AllLinked =>
   ({ accept: journal.id }) as AllLinked
 
 /** How an accept's writes ended. */
-export type WritesDone =
+type WritesDone =
   | { readonly kind: "linked"; readonly proof: AllLinked }
   /** A check or a link failed at `path`: the accept is to be put back. */
   | { readonly kind: "failed"; readonly path: string; readonly why: string }
@@ -308,7 +308,7 @@ export async function isCaseFolding(stage: string): Promise<boolean> {
 const RECOVERY_TRIES = 5
 
 /** How an accept that did not end, ended. */
-export type Recovered =
+type Recovered =
   /** Every path was linked: the accept is to be committed. */
   | { readonly kind: "finish"; readonly proof: AllLinked }
   /** Put back; the journal as it ends, its kept asides' `keptOn` set. */

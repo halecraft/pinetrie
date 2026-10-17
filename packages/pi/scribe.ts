@@ -53,7 +53,7 @@ export interface Scribe {
 }
 
 /** Sealed into the scribe; `createAgent` is its one reader. */
-export interface ScribeInside {
+interface ScribeInside {
   /**
    * The stack built over `root`'s one session: made once, by the first
    * caller's `build`, and closed with the session. Two callers asking at

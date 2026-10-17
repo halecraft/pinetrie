@@ -10,7 +10,7 @@ import { slotColor } from "./colors.ts"
 /** The palette slot the root you are on starts from (`rootSeed`). */
 export const TrackSeed = createContext(0)
 
-export interface TrackColors {
+interface TrackColors {
   readonly color: (track: number) => string
   /**
    * A track's slot as `data-color`, so CSS can link a column header with its

@@ -85,7 +85,7 @@ function sendIntent(input: {
 }
 
 /** What sending a chat does: what the host is asked, under which id, and what is drawn meanwhile. */
-export interface SendRequestPlan {
+interface SendRequestPlan {
   readonly intent: Extract<Intent, { kind: "send" }>
   /** The request id, stored as the message's `sendId`. */
   readonly id: string

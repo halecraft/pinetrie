@@ -50,7 +50,7 @@ export interface ProposedChangesInput {
 }
 
 /** A split's stack, after its run: where it starts and ends, and its bookmark's commit. */
-export interface StackSpan {
+interface StackSpan {
   readonly start: readonly CommitId[]
   readonly tip: CommitId
   /** The stack's bookmark's commit; null when the run never set it. */
@@ -58,7 +58,7 @@ export interface StackSpan {
 }
 
 /** What a refresh plans from (`planRefresh`), and the lane's base record. */
-export type RefreshGather =
+type RefreshGather =
   /** No name yet, a lane not placed here: nothing moves. */
   | { readonly kind: "none" }
   /** A WIP gone without landing: nothing moves, and the page is told. */

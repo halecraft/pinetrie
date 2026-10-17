@@ -172,7 +172,7 @@ export const decodeCarryOn = CARRY_ON.decode
 export const carryOnLine = (d: CarryOnDetails): string =>
   `↻ resumed by ${d.name}`
 
-export type CarryOnState =
+type CarryOnState =
   | { readonly kind: "ok" }
   | { readonly kind: "refused"; readonly code: ErrCode }
 

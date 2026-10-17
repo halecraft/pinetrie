@@ -18,7 +18,7 @@ import type { Minted } from "./columns.ts"
 import { type Effect, type IntentState, layout, list } from "./effects.ts"
 
 /** Where a card becomes a thread: a state on the board, or a place in the sidebar. */
-export type SpinTarget =
+type SpinTarget =
   | { readonly kind: "state"; readonly state: WorkflowStateId }
   /** Before canvas `before` in the sidebar, or at its end. */
   | { readonly kind: "sidebar"; readonly before: CanvasId | null }

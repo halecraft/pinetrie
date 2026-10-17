@@ -339,11 +339,7 @@ importers:
 
   packages/ssh: {}
 
-  packages/vm:
-    dependencies:
-      '@pinetrie/core':
-        specifier: workspace:*
-        version: link:../core
+  packages/vm: {}
 
   packages/web:
     dependencies:

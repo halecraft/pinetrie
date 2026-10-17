@@ -85,7 +85,7 @@ export const at = (id: string | null): Position =>
   id === null ? ROOT : atEntry(entryId(id))
 
 /** How a scenario's client sends a message (`join`'s `chat`). */
-export type ScenarioHow = SendHow & {
+type ScenarioHow = SendHow & {
   readonly mode?: SendMode
   /** The thread it starts or continues; else a new one, or its entry's. */
   readonly thread?: ThreadId
@@ -97,7 +97,7 @@ export type ScenarioHow = SendHow & {
 }
 
 /** The canvas of the thread `entry` is in, as `client` holds the places. */
-export function entryCanvas(
+function entryCanvas(
   client: Pick<SessionClient, "session" | "cards" | "roots" | "live">,
   entry: EntryId,
 ): CanvasId | undefined {
@@ -316,7 +316,7 @@ const NO_CANVAS: Outcome = {
 }
 
 /** A session client whose `chat` sends as a column would (`join`). */
-export type ScenarioClient = Omit<SessionClient, "send"> & {
+type ScenarioClient = Omit<SessionClient, "send"> & {
   readonly send: (
     text: string,
     at: Position,
@@ -490,7 +490,7 @@ export function suiteSshPlaces(): {
  * anywhere. A host with tools comes only from `LaneHosts`
  * (`lane-hosts.ts`), given to a scenario that declares `lanes: true`.
  */
-export type SuiteHostOptions = Omit<StartHostOptions, "project" | "binding"> & {
+type SuiteHostOptions = Omit<StartHostOptions, "project" | "binding"> & {
   readonly project?: { readonly dir: string; readonly tools: false } | null
 }
 
@@ -661,7 +661,7 @@ export function unqueueCard(
  * scenario's session reads and writes in any root, as a page holds the roots
  * of its tabs.
  */
-export function holdEvery(client: Omit<SessionClient, "send">): () => void {
+function holdEvery(client: Omit<SessionClient, "send">): () => void {
   const follow = () =>
     client.holdRoots(new Set(readRoots(client.session).keys()))
   follow()

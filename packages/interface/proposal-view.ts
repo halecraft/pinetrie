@@ -120,7 +120,7 @@ export const NO_PROPOSAL_MEMORY: ProposalMemory = {
 }
 
 /** One row of a proposal's card. */
-export interface ProposalRowView {
+interface ProposalRowView {
   readonly row: number
   readonly title: string
   /** Its brief as it would be sent: the edit, else the agent's. */
@@ -139,7 +139,7 @@ export interface ProposalButton {
   readonly press: ProposalPress | null
 }
 
-export interface ProposalView {
+interface ProposalView {
   readonly proposal: EntryId
   readonly rows: readonly ProposalRowView[]
   /** Rows can be edited and dropped: before any press, where you may write. */
@@ -235,7 +235,7 @@ export function proposalView(input: {
 }
 
 /** What a proposal's card says, worded in one place. */
-export function proposalWords(
+function proposalWords(
   said:
     | { readonly kind: "start" | "open" | "send"; readonly count: number }
     | { readonly kind: "running" }

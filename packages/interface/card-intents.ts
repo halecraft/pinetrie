@@ -836,7 +836,7 @@ export function planToNote(
  * A text card of yours holding `text`, made at the end of the list `to`, in
  * no history: drawn last until the host gives it its order.
  */
-export function newCardEffects(
+function newCardEffects(
   card: TextCardId,
   to: ListKey,
   text: string,

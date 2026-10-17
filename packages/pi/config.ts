@@ -102,7 +102,7 @@ export function modelState<M>(input: {
 }
 
 /** What `planModelSetup` decides: every path pi's code is given. */
-export interface ModelSetupPlan {
+interface ModelSetupPlan {
   readonly runtime: { readonly authPath: string; readonly modelsPath: string }
   /** Null when there is nothing to load: no package, skill or prompt listed. */
   readonly loader: LoaderOptions | null

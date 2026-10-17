@@ -5,8 +5,5 @@
   "type": "module",
   "exports": {
     ".": "./index.ts"
-  },
-  "dependencies": {
-    "@pinetrie/core": "workspace:*"
   }
 }

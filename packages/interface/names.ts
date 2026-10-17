@@ -13,7 +13,7 @@ import { displayName } from "@pinetrie/rules"
  * A message written together names its sender, then the others who wrote it:
  * "Ada, with Bea". Each by their current name.
  */
-export const withContributors = (speaker: string, others: readonly string[]) =>
+const withContributors = (speaker: string, others: readonly string[]) =>
   others.length === 0 ? speaker : `${speaker}, with ${others.join(", ")}`
 
 /** "Duane (duane)" when the name has changed since; "Duane" when it has not. */

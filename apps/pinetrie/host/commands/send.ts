@@ -162,7 +162,7 @@ const shareQuotes = (
   )
 
 /** What `executeSend` needs besides the decision: the facts the send was planned from. */
-export interface SendContext {
+interface SendContext {
   /** The root's documents the send was planned from. */
   readonly view: RootView
   readonly writer: WriterId

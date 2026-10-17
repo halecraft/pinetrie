@@ -47,7 +47,7 @@ import {
   splitTool,
 } from "./thread-tools.ts"
 
-export interface ToolsInput {
+interface ToolsInput {
   readonly hooks: LaneHooks
   readonly blobs: Pick<BlobStore, "put"> | undefined
   /** Where `set_banner` sends its asks: the host answers each. */

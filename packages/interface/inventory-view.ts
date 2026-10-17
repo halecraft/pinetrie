@@ -24,7 +24,7 @@ export interface CardPreview {
   readonly width: CardWidth
 }
 
-export interface InventoryView {
+interface InventoryView {
   readonly grid: GridView
   /** How many slots are empty. */
   readonly free: number

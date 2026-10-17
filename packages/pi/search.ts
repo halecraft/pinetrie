@@ -19,7 +19,7 @@ import { FIND_TOOL, GREP_TOOL, shellWord } from "@pinetrie/core"
 import { Type } from "typebox"
 import type { SearchProgram, ToolContext } from "./lanes.ts"
 
-export type SearchTool = typeof GREP_TOOL | typeof FIND_TOOL
+type SearchTool = typeof GREP_TOOL | typeof FIND_TOOL
 
 const PROGRAM: Readonly<Record<SearchTool, SearchProgram>> = {
   grep: "rg",
@@ -31,7 +31,7 @@ const FIND_LIMIT = 1000
 /** rg prints this much of a long line, and marks the rest omitted. */
 const MAX_COLUMNS = 500
 
-export interface GrepParams {
+interface GrepParams {
   readonly pattern: string
   readonly path?: string
   readonly glob?: string
@@ -42,7 +42,7 @@ export interface GrepParams {
   readonly limit?: number
 }
 
-export interface FindParams {
+interface FindParams {
   readonly pattern: string
   readonly path?: string
   /** Results at most. */
@@ -54,8 +54,7 @@ const atLeast = (min: number, n: number | undefined, otherwise: number) =>
     ? otherwise
     : Math.max(min, Math.floor(n))
 
-export const grepLimit = (p: GrepParams): number =>
-  atLeast(1, p.limit, GREP_LIMIT)
+const grepLimit = (p: GrepParams): number => atLeast(1, p.limit, GREP_LIMIT)
 export const findLimit = (p: FindParams): number =>
   atLeast(1, p.limit, FIND_LIMIT)
 
@@ -149,7 +148,7 @@ export type SearchOutcome =
     }
 
 /** A finished `exec`: its exit code and captured text, or why it did not finish. */
-export type SearchRun =
+type SearchRun =
   | {
       readonly ok: true
       readonly exit: number

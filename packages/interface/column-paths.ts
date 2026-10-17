@@ -84,7 +84,7 @@ export function projectColumns(
 /** A column with no messages of its own yet: a fresh branch. */
 export const PENDING_TRACK = -1
 
-export interface BranchColors {
+interface BranchColors {
   /** Per column: the rail track of its last message, or PENDING_TRACK. */
   readonly track: readonly number[]
   /** Fork dots: at each `forkFrom` message, the tracks of the columns forking there. */
@@ -92,7 +92,7 @@ export interface BranchColors {
 }
 
 /** Each rail entry's track, built once per rail: what `threadTrack` and `branchColors` read. */
-export type TrackIndex = ReadonlyMap<EntryId, number>
+type TrackIndex = ReadonlyMap<EntryId, number>
 
 export const trackIndex = (rail: readonly RailRow[]): TrackIndex =>
   new Map(rail.map(r => [r.id, r.track]))

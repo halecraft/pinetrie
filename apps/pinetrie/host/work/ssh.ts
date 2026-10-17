@@ -72,7 +72,7 @@ import type { Records } from "../records.ts"
 import { sshLines } from "../startup-lines.ts"
 
 /** Where a lane finds the host's socket. */
-export const HOST_SOCKET_IN_LANE = "/run/pinetrie/ssh-host.sock"
+const HOST_SOCKET_IN_LANE = "/run/pinetrie/ssh-host.sock"
 /** The hop, in pine·trie's install as every lane mounts it. */
 export const HOP_IN_LANE = `${PINETRIE_MOUNT}/packages/ssh/hop.ts`
 

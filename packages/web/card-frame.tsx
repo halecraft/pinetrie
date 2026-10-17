@@ -250,7 +250,7 @@ function ShareFileButton(p: {
 }
 
 /** A card's ×: discards it, and the undo key outside a box brings it back. */
-export function DiscardButton(p: { onDiscard: () => void }) {
+function DiscardButton(p: { onDiscard: () => void }) {
   return (
     <button
       aria-label={DISCARD_CARD_TITLE}

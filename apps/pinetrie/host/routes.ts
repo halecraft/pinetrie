@@ -81,7 +81,7 @@ const CONTENT_TYPES: Readonly<Record<string, string>> = {
 }
 
 /** What answers a request for the built page: a file of `dist/`, with its headers, or a 404. */
-export type PageAnswer =
+type PageAnswer =
   | {
       readonly kind: "file"
       /** Relative to `dist/`. */

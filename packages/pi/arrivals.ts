@@ -130,7 +130,7 @@ export class ArrivalLine {
   }
 }
 
-export interface Known {
+interface Known {
   readonly lastSeq: number
   hasEntry(id: string): boolean
   hasUsage(id: string): boolean

@@ -56,7 +56,7 @@ const toHast = unified()
  * What a message holds of the blobs its text names: its images, by hash, and
  * the files it shares, by their originals' hashes.
  */
-export interface BlobLookup {
+interface BlobLookup {
   readonly images: ReadonlyMap<Sha256, ImageRef>
   readonly shares: ReadonlyMap<Sha256, Share>
 }

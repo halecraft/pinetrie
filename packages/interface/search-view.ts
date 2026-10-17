@@ -20,7 +20,7 @@ import { speakerWords } from "./names.ts"
 import { type SearchResult, type SnippetPart, snippet } from "./search.ts"
 
 /** How long a match's snippet is, in characters, before "…". */
-export const SNIPPET = 140
+const SNIPPET = 140
 
 export type MatchRow =
   | {

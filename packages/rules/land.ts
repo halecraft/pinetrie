@@ -84,7 +84,7 @@ const SHOWN_FULLEST_FIRST = ["whole", "sections", "names"] as const
 type FileShown = (typeof SHOWN_FULLEST_FIRST)[number]
 
 /** One conflict in a file: its lines with jj's markers, 1-based and inclusive. */
-export interface ConflictSection {
+interface ConflictSection {
   readonly from: number
   readonly to: number
   readonly text: string

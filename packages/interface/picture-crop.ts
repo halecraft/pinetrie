@@ -9,7 +9,7 @@ export const PICTURE_SIZE = 256
 /** How far in a crop zooms: its side is at least the shorter side over this. */
 export const MOST_ZOOM = 4
 
-export interface ImageSize {
+interface ImageSize {
   readonly width: number
   readonly height: number
 }

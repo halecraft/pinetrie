@@ -190,7 +190,7 @@ export async function sameContent(
 }
 
 /** A merge into a disk, checked and planned: the trees it reads and writes, where it stages, its ops in order. */
-export interface ApplyPlanned {
+interface ApplyPlanned {
   readonly disk: string
   /** Null for an empty base. */
   readonly base: string | null
@@ -354,7 +354,7 @@ async function mergeText(
 }
 
 /** A states op, checked and planned into the paths it touches. */
-export type StatesPlanned =
+type StatesPlanned =
   | {
       readonly kind: "start"
       readonly dir: string
@@ -465,7 +465,7 @@ export async function executeStates(planned: StatesPlanned): Promise<void> {
 }
 
 /** A read of the project's folder into its line, checked and planned into absolute paths. */
-export interface ReadInPlanned {
+interface ReadInPlanned {
   /** The project's folder, as the disks role sees it, read-only. */
   readonly folder: string
   /** The line's disk, made from `from` (null: empty) and dropped after. */

@@ -16,7 +16,7 @@ export type AccountItem =
   | { readonly kind: "setup" }
   | { readonly kind: "signOut" }
 
-export interface AccountView {
+interface AccountView {
   readonly items: readonly AccountItem[]
   /** The inbox's badge on your avatar: only while folded, and only above 0. */
   readonly badge: number | null

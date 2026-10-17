@@ -10,7 +10,7 @@ import { JJ_FLAGS } from "./lane/run.ts"
 import type { RepoStep } from "./step.ts"
 
 /** Who runs a command on your repo: jj as the host, as you, or pinned to an operation; or git. */
-export type RepoRunner = "host" | "you" | "git" | { readonly at: string }
+type RepoRunner = "host" | "you" | "git" | { readonly at: string }
 
 const HOST_FLAGS = [
   "--ignore-working-copy",
@@ -19,7 +19,7 @@ const HOST_FLAGS = [
 ] as const
 
 /** One command on your repo, as a process runs it. */
-export interface RepoCommand {
+interface RepoCommand {
   readonly program: "jj" | "git"
   readonly args: readonly string[]
   /** Where it runs from; null for the host's own directory. */

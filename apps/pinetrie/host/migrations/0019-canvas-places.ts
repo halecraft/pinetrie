@@ -54,7 +54,7 @@ const KINDS: Readonly<Record<string, string>> = {
  * A place's flat fields with `task` named `canvas` and its kind renamed: the
  * same value when it is no object, or nothing in it is old.
  */
-export function renamedFields(fields: unknown): unknown {
+function renamedFields(fields: unknown): unknown {
   if (!isRaw(fields)) return fields
   const kind = typeof fields.kind === "string" ? KINDS[fields.kind] : undefined
   if (!("task" in fields) && kind === undefined) return fields
@@ -111,7 +111,7 @@ const STATE_NAMES: Readonly<Record<string, string>> = {
 }
 
 /** `workflow` with its default names renamed; null when none is a default. */
-export function renamedWorkflow(workflow: Workflow): Workflow | null {
+function renamedWorkflow(workflow: Workflow): Workflow | null {
   const open = workflow.open.map(s => {
     const name = STATE_NAMES[s.name]
     return name === undefined ? s : { ...s, name }
@@ -127,7 +127,7 @@ export function renamedWorkflow(workflow: Workflow): Workflow | null {
 }
 
 /** What the migration writes. */
-export interface CanvasPlacesPlan {
+interface CanvasPlacesPlan {
   /** Each row that changed, whole, by its card's id. */
   readonly rows: Readonly<Record<string, Raw>>
   readonly records: readonly ValueWrite[]

@@ -10,7 +10,7 @@ import { readFile, writeFile } from "node:fs/promises"
 import path from "node:path"
 
 /** `moby/profiles`' default, at the commit `seccomp-default.json` was fetched from. */
-export const UPSTREAM =
+const UPSTREAM =
   "https://raw.githubusercontent.com/moby/profiles/6fe7deb1b9fb7c0397a4593480d7d22b9ee8caef/seccomp/default.json"
 
 /** The calls a user namespace, its mounts and rootless Docker need. */

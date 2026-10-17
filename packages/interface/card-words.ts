@@ -111,7 +111,7 @@ export const reorderWords = (step: -1 | 1): ControlWords =>
 export const unsentWords = (reason: string): string => `not sent: ${reason}`
 
 /** What a discard of yours says where you made it, until your next move there. */
-export const DISCARDED_NOTICE =
+const DISCARDED_NOTICE =
   "discarded · the undo key (⌘Z outside a box) brings it back"
 
 /**

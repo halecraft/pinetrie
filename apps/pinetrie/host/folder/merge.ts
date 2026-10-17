@@ -23,13 +23,13 @@ import { type StateReader, sourceDiff } from "./changes.ts"
 import { baseState } from "./virtual-base.ts"
 
 /** What a merge did: its plan, and each text step answered clean or not. */
-export interface MergeApplied {
+interface MergeApplied {
   readonly plan: MergePlanned
   readonly texts: readonly TextMerged[]
 }
 
 /** The paths a merge left conflicted: the plan's, and its text steps that did not merge clean. */
-export const conflictedPaths = (m: MergeApplied): readonly string[] => [
+const conflictedPaths = (m: MergeApplied): readonly string[] => [
   ...new Set([
     ...m.plan.conflicts,
     ...m.texts.filter(t => !t.clean).map(t => t.path),

@@ -45,7 +45,7 @@ async function filesUnder(dir: string): Promise<string[]> {
     .map(e => path.join(e.parentPath, e.name))
 }
 
-export interface SharedWatch {
+interface SharedWatch {
   /** Watch `dirs`, and only them: at the start, and when accepted work's list moves. */
   sync(dirs: readonly SharedDir[]): Promise<void>
   close(): Promise<void>

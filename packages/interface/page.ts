@@ -36,7 +36,7 @@ export function planLeave(historyState: unknown): "back" | "replace" {
     : "replace"
 }
 
-export interface PageWords {
+interface PageWords {
   /** The page's heading, and the window's title while it shows. */
   readonly title: string
   readonly back: string

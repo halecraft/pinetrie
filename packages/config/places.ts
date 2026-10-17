@@ -6,7 +6,7 @@ import path from "node:path"
 import type { SessionName } from "./sessions.ts"
 
 /** The name every layer's file has. */
-export const CONFIG_FILE = "pinetrie.json"
+const CONFIG_FILE = "pinetrie.json"
 
 export interface ConfigPlaces {
   /**

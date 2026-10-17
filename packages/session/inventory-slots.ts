@@ -19,7 +19,7 @@ import {
 import { personDoc } from "./person-doc.ts"
 import type { Readable } from "./store.ts"
 
-export interface InventorySlots {
+interface InventorySlots {
   /** The slots as your document holds them. */
   readonly slots: Readable<Slots>
   /** The slots as the document holds them now. */

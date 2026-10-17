@@ -124,7 +124,7 @@ function writeOp(d: RootDocHandle, op: DocOp): void {
   }
 }
 
-export interface KynetaStorageOptions {
+interface KynetaStorageOptions {
   readonly doc?: RootDocHandle
   readonly peerId?: string
   readonly now?: () => number

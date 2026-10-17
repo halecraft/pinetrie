@@ -254,7 +254,7 @@ export function doneThreads(input: AttentionInput): ReadonlySet<ThreadId> {
 }
 
 /** What each change of a canvas's status draws, seen live. */
-export interface Arrivals {
+interface Arrivals {
   /** Canvases whose status rose to needs you: their mark pulses, then stays. */
   readonly arrived: ReadonlySet<CanvasId>
   /** Canvases that stopped working with a run done: a ✓ fades. */
@@ -284,7 +284,7 @@ export function arrivals(
 }
 
 /** How long an arrival's mark moves: the pulse's three beats, and the ✓'s fade (`index.html`). */
-export const ARRIVAL_MS = 3_000
+const ARRIVAL_MS = 3_000
 
 /** When each canvas's mark last arrived, and its ✓ last showed (ms since the epoch). */
 export interface Moments {

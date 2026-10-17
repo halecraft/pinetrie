@@ -92,12 +92,8 @@ const imageResize = (await deep(
 
 export const { addUsage, emptyUsage } = usage
 export const { loadSkillsFromDir } = skills
-export const {
-  loadPromptTemplates,
-  expandPromptTemplate,
-  parseCommandArgs,
-  substituteArgs,
-} = promptTemplates
+export const { loadPromptTemplates, parseCommandArgs, substituteArgs } =
+  promptTemplates
 export const { detectSupportedImageMimeType } = mime
 export const { resizeImage, formatDimensionNote } = imageResize
 export const { buildSystemPrompt } = systemPrompt

@@ -111,7 +111,7 @@ export function labelsOf(input: {
   )
 }
 
-export type TitlePlan =
+type TitlePlan =
   | { readonly kind: "refuse" }
   | { readonly kind: "unchanged" }
   | { readonly kind: "send"; readonly title: string | null }

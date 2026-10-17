@@ -190,7 +190,7 @@ export function refusingEnv(cwd: string, why: string): ExecutionEnv {
 }
 
 /** How a lane command ended; the shape `@pinetrie/lanes` reads as `Ran`. */
-export interface LaneRan<Out = string> {
+interface LaneRan<Out = string> {
   readonly ok: boolean
   readonly code: number
   readonly stdout: Out

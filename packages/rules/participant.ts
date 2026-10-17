@@ -77,7 +77,7 @@ export const PICTURE: RecordSpec<PictureRecord, WriterId, "session"> = {
  */
 export const PICTURE_MOST = 512
 
-export type PicturePlan =
+type PicturePlan =
   | { readonly kind: "clear" }
   | { readonly kind: "set"; readonly sha256: Sha256 }
   /** Fit the blob within `PICTURE_MOST`, keep the copy, and set that. */

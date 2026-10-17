@@ -37,7 +37,7 @@ export function foldedView(
 }
 
 /** A folded column's words: its title, and what it holds under it, or null. */
-export interface FoldedWords {
+interface FoldedWords {
   readonly title: string
   readonly detail: string | null
 }

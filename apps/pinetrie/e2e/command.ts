@@ -27,7 +27,7 @@ export class CommandFailed extends Error {
   }
 }
 
-export interface CommandOptions {
+interface CommandOptions {
   readonly cwd?: string
   readonly env?: NodeJS.ProcessEnv
   /** Written to its stdin, which is then closed. */

@@ -205,10 +205,7 @@ const set = <K extends keyof CardView>(
 }
 
 /** `view` changed by `change`; the same view when nothing changes. */
-export function changeView(
-  view: YourCanvasView,
-  change: ViewChange,
-): YourCanvasView {
+function changeView(view: YourCanvasView, change: ViewChange): YourCanvasView {
   switch (change.kind) {
     case "fold":
       return withCard(view, change.card, c =>

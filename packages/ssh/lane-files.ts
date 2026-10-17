@@ -22,7 +22,7 @@ export const LANE_SSH_DIR = "/pinetrie-ssh"
  * line written. Anything else, `ProxyCommand`, `LocalCommand` and `Match`
  * above all, runs or decides on the host and is not the lane's to read.
  */
-export const CARRIED = {
+const CARRIED = {
   hostname: "HostName",
   port: "Port",
   user: "User",
@@ -34,12 +34,12 @@ export const CARRIED = {
   serveraliveinterval: "ServerAliveInterval",
   serveralivecountmax: "ServerAliveCountMax",
 } as const
-export type CarriedKeyword = keyof typeof CARRIED
+type CarriedKeyword = keyof typeof CARRIED
 
 const isCarried = (k: string): k is CarriedKeyword => Object.hasOwn(CARRIED, k)
 
 /** The folders a config's paths are read against. */
-export interface SshDirs {
+interface SshDirs {
   readonly home: string
   /** The service folder: where a relative service `IdentityFile` is. */
   readonly service: string
@@ -64,7 +64,7 @@ export interface DroppedIdentity {
   readonly why: DroppedWhy
 }
 
-export type IdentityRef =
+type IdentityRef =
   | { readonly kind: "path"; readonly path: string }
   | { readonly kind: "dropped"; readonly why: Exclude<DroppedWhy, "no-pub"> }
 
@@ -136,7 +136,7 @@ export interface HostKeyFacts {
   readonly names: ReadonlyMap<string, string>
 }
 
-export interface LaneSshFiles {
+interface LaneSshFiles {
   readonly config: string
   readonly knownHosts: string
   /** File name under `keys/` → public key line. */

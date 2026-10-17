@@ -8,7 +8,7 @@ import { decodePinned, PINNED_RULE, PINNED_TYPE } from "./pinned.ts"
 
 export type ContextKind = "pinned-cards" | "canvas-pinned-cards" | "canvas"
 
-export interface ContextSpec {
+interface ContextSpec {
   readonly customType: string
   /** A stored message -> what it says, or undefined if it is not this kind. */
   readonly decode: (message: unknown) => unknown

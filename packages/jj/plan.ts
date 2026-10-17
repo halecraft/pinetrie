@@ -47,7 +47,7 @@ export function immutableHeads(
 }
 
 /** What `immutableHeads` adds for accepted work's `bookmark`: it and the proposed changes on it. */
-export const acceptedHeads = (bookmark: string): string => {
+const acceptedHeads = (bookmark: string): string => {
   const accepted = `present(${revsetName(bookmark)})`
   return `${accepted} | (${PROPOSED_BOOKMARKS} & children(${accepted}))`
 }
@@ -373,7 +373,7 @@ export function walkToHost(
 }
 
 /** What a revision's read since the host needs next, or what it found (`planSinceHost`). */
-export type SinceHostRead =
+type SinceHostRead =
   | { readonly kind: "known"; readonly facts: RevisionFacts }
   /** Walk its evolog back to a version the host made (`walkToHost`). */
   | { readonly kind: "walk" }

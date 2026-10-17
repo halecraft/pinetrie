@@ -16,7 +16,7 @@ import type { SessionClient } from "@pinetrie/session"
 import { type RefObject, useState } from "react"
 
 /** A box files can be shared into. */
-export interface ShareTarget {
+interface ShareTarget {
   readonly box: RefObject<HTMLTextAreaElement | null>
   readonly session: SessionClient
   /** The card the box is bound to now; null while it holds only its sender's typing. */

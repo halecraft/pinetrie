@@ -68,11 +68,11 @@ export function chooseScenarios(
   return [...all].filter(n => asked.includes(n)).sort()
 }
 
-export type SuiteStep =
+type SuiteStep =
   | { readonly name: string; readonly run: true }
   | { readonly name: string; readonly run: false; readonly why: string }
 
-export type SuitePlan =
+type SuitePlan =
   | { readonly kind: "unknown"; readonly names: readonly string[] }
   | { readonly kind: "run"; readonly steps: readonly SuiteStep[] }
 

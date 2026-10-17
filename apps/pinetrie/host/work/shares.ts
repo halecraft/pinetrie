@@ -54,7 +54,7 @@ export const NO_SHARES: Shares = {
 }
 
 /** What sharing and granting says, worded by `sharesWords`. */
-export type SharesWords =
+type SharesWords =
   | {
       readonly kind: "widened"
       readonly slot: number
@@ -85,7 +85,7 @@ export function sharesWords(w: SharesWords): string {
 }
 
 /** What to do for `wanted`, given what was shared and granted. */
-export interface SharesPlan {
+interface SharesPlan {
   /** Directories to fill a slot with: the host's own first, then a new one. */
   readonly fill: {
     readonly into: "host" | "extra"

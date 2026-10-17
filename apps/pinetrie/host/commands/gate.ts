@@ -23,7 +23,7 @@ import {
 import type { Basics } from "../basics.ts"
 import type { LaneWork } from "../work/index.ts"
 
-export interface GateDeps {
+interface GateDeps {
   readonly basics: Pick<Basics, "session" | "places" | "docs">
   readonly work: Pick<LaneWork, "project">
 }

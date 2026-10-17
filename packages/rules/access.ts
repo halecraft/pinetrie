@@ -159,7 +159,7 @@ export const planAccessRecovery = (
     .map(r => planAccessTimeout(r, now))
 
 /** The most names a record keeps of the hosts a lane connected. */
-export const ACCESS_HOSTS = 8
+const ACCESS_HOSTS = 8
 
 /**
  * A use recorded: a name is added once, in first-use order, so a lane that

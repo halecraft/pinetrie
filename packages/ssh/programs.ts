@@ -39,7 +39,7 @@ export const runProgram: Run = ([program, ...args], env) =>
     child.stdin?.end()
   })
 
-export interface ServiceAgent {
+interface ServiceAgent {
   readonly socket: string
   readonly added: readonly UsableServiceKey[]
   /** Keys `ssh-add` refused, with what it said. */

@@ -6,7 +6,7 @@ import type { Codec } from "./codec.ts"
 
 export type Dock = "left" | "centre" | "right"
 
-export const DOCKS: readonly Dock[] = ["left", "centre", "right"]
+const DOCKS: readonly Dock[] = ["left", "centre", "right"]
 
 /** The third of a `width`-wide screen that `x` falls in. */
 export function snapTo(x: number, width: number): Dock {

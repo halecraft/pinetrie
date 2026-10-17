@@ -25,7 +25,7 @@ import {
 } from "react"
 import { type Placement, placeBox } from "./popover-place.ts"
 
-export interface PopoverApi {
+interface PopoverApi {
   /** Close the box, and give the trigger focus back if `refocus`. */
   readonly close: (refocus: boolean) => void
   /** The heading's id, for whatever the heading names; none without one. */

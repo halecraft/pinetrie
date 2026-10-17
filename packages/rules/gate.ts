@@ -62,7 +62,7 @@ export interface GateFacts {
 }
 
 /** The gate's refusals, before they are worded (`gateRefusal`). */
-export type GateRefusal =
+type GateRefusal =
   | { readonly kind: "archived"; readonly canvas: ArchivedCanvas }
   | {
       readonly kind: "held"
@@ -71,7 +71,7 @@ export type GateRefusal =
     }
   | { readonly kind: "foreign"; readonly lane: ForeignLane }
 
-export type GatePlan<C extends Gated> =
+type GatePlan<C extends Gated> =
   | { readonly kind: "cleared"; readonly command: Cleared<C> }
   | GateRefusal
   /** Read these roots, and plan again: a branch's thread is its root's tree's. */

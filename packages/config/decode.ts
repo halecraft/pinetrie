@@ -44,7 +44,7 @@ export interface DecodedLayer<Table, L extends ConfigLayer> {
 }
 
 /** One copy of the project's `pinetrie.json`, named for the copy it is. */
-export interface ProjectCopy<C extends CopyName> {
+interface ProjectCopy<C extends CopyName> {
   readonly copy: C
   /** How the copy is named in a refusal: `pinetrie.json at accepted work`. */
   readonly file: string

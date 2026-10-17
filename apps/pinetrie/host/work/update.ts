@@ -95,7 +95,7 @@ function updateRefusal(code: UpdateRefusal): string {
  * Why a catch-up was refused before it merged: the smallest resolution prompt
  * for it would not fit what a run keeps when pi compacts.
  */
-export function unfittableWords(tokens: number, budget: number): string {
+function unfittableWords(tokens: number, budget: number): string {
   return `a resolution's prompt would need ${tokens} tokens, over the ${budget} a run keeps: shorten the card's text or the resolve-conflicts skill`
 }
 
@@ -182,7 +182,7 @@ export async function withLaneStarted(
 }
 
 /** What a merge found, with what a resolution's prompt needs when it conflicted. */
-export type SettleFacts =
+type SettleFacts =
   | Exclude<Merged, { readonly kind: "conflicted" | "refused" }>
   | (Extract<Merged, { readonly kind: "conflicted" }> & {
       /** What the prompt must fit, settled before the merge (`planCatchUp`). */

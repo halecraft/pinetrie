@@ -16,7 +16,7 @@ export interface Answered {
   readonly rev: number | null
 }
 
-export interface HostLine {
+interface HostLine {
   /**
    * Send `intent` under `id`, and resolve with the host's answer. The id
    * must be unique among every message stored: a chat's request id is

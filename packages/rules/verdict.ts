@@ -147,7 +147,7 @@ export function endReplyOf(reply: string, answer: Answer): EndReply {
 // ── the decision ──────────────────────────────────────────────────────────
 
 /** What to ask the model at a run's end, and from which lines. */
-export interface EndRequest {
+interface EndRequest {
   readonly answer: Answer
   readonly lines: AskLines
   /** The stored digest, as `digestText` words it, when a digest is asked for. */
@@ -155,7 +155,7 @@ export interface EndRequest {
 }
 
 /** What a run's end does (`planRunEnded`). */
-export interface RunEndedPlan {
+interface RunEndedPlan {
   /** Written now, from the facts; null when the model is asked for it. */
   readonly verdict: Verdict | null
   /** What to ask, or null for nothing. */

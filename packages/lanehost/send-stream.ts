@@ -47,7 +47,7 @@ const C = {
 const A = { PATH: 15, PATH_TO: 16 } as const
 
 /** One command and the paths it names. */
-export interface SendCommand {
+interface SendCommand {
   readonly cmd: number
   readonly path: string | null
   readonly pathTo: string | null
@@ -59,7 +59,7 @@ const HEADER = 17
 const COMMAND_HEADER = 10
 
 /** A send stream read as it arrives, one chunk at a time. */
-export interface SendReader {
+interface SendReader {
   /**
    * The commands this chunk completes, in order. Throws as soon as the
    * stream's header shows it is no version 1 stream. Chunks after `END`
@@ -163,7 +163,7 @@ const CHANGES: ReadonlySet<number> = new Set([
 ])
 
 /** The fold of a send stream's commands, one at a time. */
-export interface SendFold {
+interface SendFold {
   add(command: SendCommand): void
   /**
    * One change per path, sorted by path. Throws when a path is still under

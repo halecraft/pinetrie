@@ -147,7 +147,7 @@ export interface ViewItem {
  * Whole rail items of one branch a column's view touches, in slots: a dot's
  * centre is its slot.
  */
-export interface Band {
+interface Band {
   readonly track: number
   readonly across: number
   readonly top: number
@@ -169,7 +169,7 @@ export interface Tick {
   readonly to: number
 }
 
-export interface RailView {
+interface RailView {
   readonly bands: readonly Band[]
   readonly ticks: readonly Tick[]
   /**

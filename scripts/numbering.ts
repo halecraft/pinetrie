@@ -12,7 +12,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs"
 import path from "node:path"
 
 /** A numbered docs directory: how its files and titles carry a number. */
-export interface Numbering {
+interface Numbering {
   /** Repository-relative. */
   readonly dir: string
   /** A numbered file's name; its first group is the number's digits. */
@@ -41,7 +41,7 @@ export interface RecordFile {
   readonly text: string
 }
 
-export interface NumberingGaps {
+interface NumberingGaps {
   /** Numbers that name more than one file, each with its files. */
   readonly clashes: readonly {
     readonly number: number
@@ -86,7 +86,7 @@ export function numberingGaps(
 }
 
 /** The folders of the record, repo-relative: each numbering's, and its archive. */
-export const RECORD_DIRS: readonly string[] = NUMBERINGS.flatMap(n => [
+const RECORD_DIRS: readonly string[] = NUMBERINGS.flatMap(n => [
   n.dir,
   `${n.dir}/archive`,
 ])

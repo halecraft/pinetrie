@@ -47,7 +47,7 @@ browser ──commands (Kyneta Line)──▶ host ──▶ pi agent core
 | `jj` | jj's adapter: your repo as the host reads and writes it (its one owner, proposed changes, accepted work and lanes' refs in it), each lane's own repo as a `LaneHistory`, your repo at startup, and every jj name |
 | `folder` | a folder project's history as values (ADR-0142): its graph of states and their merge bases, the path merge's plan, and the snapshots kept; it declares only `core`, does no I/O, and lanehost carries out what it decides |
 | `docker` | running lanes on Docker: the `LaneRuntime` over the docker CLI, btrfs disks in a helper container, Docker's startup refusals, lanes inside a lane; beside it a folder project's `FolderDisks` |
-| `vm` | a Linux machine on the Mac: the image's build, the launcher, a host's lease on a slot; it knows nothing of lanes |
+| `vm` | a Linux machine on the Mac: the image's build, the launcher, a host's lease on a slot; it declares nothing, and knows nothing of lanes |
 | `session` | one client's connection to a host, its own documents and what it has in flight |
 | `shell` | shell source as structure: a command's words by role, and a one-line command laid out to a width; it declares only `unbash` (ADR-0114) |
 | `interface` | what a person sees and can do, decided, for any client: no React, no DOM (ADR-0093). A tool keeps its id for the model and has a word for people (`shell`, `search`), which interface gives; core holds only what a call is (ADR-0114) |

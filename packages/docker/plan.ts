@@ -43,7 +43,7 @@ export const INNER_DOCKER_HOST = `unix:///run/user/${ROOTLESS_UID}/docker.sock`
  * inner Docker starts in a subshell that exits at once, so `--init` adopts
  * it and reaps it when it ends: `sleep` would leave it a zombie.
  */
-export const NESTED_COMMAND = "(pinetrie-inner-docker &); exec sleep infinity"
+const NESTED_COMMAND = "(pinetrie-inner-docker &); exec sleep infinity"
 
 /**
  * A lane's command: each start in the background, in a subshell that exits
@@ -67,8 +67,8 @@ export function laneCommand(lane: {
 export const projectNetwork = (key: string): string => `pinetrie-${key}`
 
 /** The variables a lane is told the host's granted ports by. */
-export const HOST_ENV = "PINETRIE_HOST"
-export const HOST_PORTS_ENV = "PINETRIE_HOST_PORTS"
+const HOST_ENV = "PINETRIE_HOST"
+const HOST_PORTS_ENV = "PINETRIE_HOST_PORTS"
 
 /** A project's key on Docker's machine: a hash of its root. */
 export const projectKey = (root: string): string =>
@@ -204,7 +204,7 @@ export function renderRun(
 }
 
 /** Every container made for a project carries its key, and the target's labels. */
-export const projectLabels = (
+const projectLabels = (
   project: string,
   target: Pick<DockerTarget, "labels">,
   more: Readonly<Record<string, string>> = {},
@@ -225,7 +225,7 @@ export const lanehostContainer = (
 }
 
 /** What a lanehost role's container is made from. */
-export interface HelperShape {
+interface HelperShape {
   readonly role: Role
   readonly project: string
   readonly image: string
@@ -305,7 +305,7 @@ export const observerImage = (version: string): string =>
  * profile; the machine's pids, which the loader reads; no
  * network, no lanes directory, a read-only root.
  */
-export const OBSERVER_GRANT = {
+const OBSERVER_GRANT = {
   capAdd: ["BPF", "PERFMON", "SYS_PTRACE"],
   network: "none",
   // The kernel's ring of 64 MiB is charged to it.

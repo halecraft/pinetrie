@@ -90,7 +90,7 @@ export interface FoldMotion {
   readonly clamp: number
 }
 
-export const FOLD_MS = 200
+const FOLD_MS = 200
 
 /** Samples after the first. The edge is kept clear of the turn at each, and played linearly between. */
 const SAMPLES = 8

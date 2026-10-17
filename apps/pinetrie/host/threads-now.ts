@@ -28,14 +28,14 @@ import type { Basics } from "./basics.ts"
 import { lateAwayNow } from "./later.ts"
 
 /** What a thread is, read now: its root's index, its end, and its lane. */
-export interface ThreadNow {
+interface ThreadNow {
   readonly thread: ThreadId
   readonly index: TreeIndex
   readonly end: EntryId | null
   readonly lane: ThreadLane
 }
 
-export interface ThreadsNow {
+interface ThreadsNow {
   /**
    * `thread` as it is now; null for a thread no root holds, or one whose card
    * is not at a live place (`lateAway`). Its root is opened if it is not

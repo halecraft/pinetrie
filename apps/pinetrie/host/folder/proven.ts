@@ -19,7 +19,7 @@ export type FolderLane = OwnLane & {
 }
 
 /** A lane's record proven folder: `proveFolderLane`'s answer. */
-export interface ProvenFolderLane {
+interface ProvenFolderLane {
   readonly kind: "folder"
   readonly lane: FolderLane
 }

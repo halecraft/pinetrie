@@ -12,7 +12,7 @@ import {
 } from "./agent.ts"
 import type { HostKeyFacts } from "./lane-files.ts"
 
-export interface ConnectionState {
+interface ConnectionState {
   /** Session id (hex) → the host key (base64 blob) bound to it. */
   readonly bound: ReadonlyMap<string, string>
 }
@@ -29,7 +29,7 @@ export interface RelayFacts {
   readonly newestName: string | null
 }
 
-export type RelayStep =
+type RelayStep =
   /** Service keys, then personal ones, each blob once. */
   | { readonly kind: "list" }
   | {

@@ -60,7 +60,7 @@ import type { FolderLane } from "./proven.ts"
 import { baseMissing } from "./virtual-base.ts"
 
 /** A folder project's records of its history, as lane work reads and writes them. */
-export interface FolderStore {
+interface FolderStore {
   readonly states: () => readonly StateRecord[]
   /** The lane's open conflicts. */
   readonly conflicts: (lane: FolderLane["lane"]) => readonly ConflictRecord[]
@@ -68,7 +68,7 @@ export interface FolderStore {
 }
 
 /** What a folder lane's history runs on. */
-export interface FolderHistoryDeps {
+interface FolderHistoryDeps {
   readonly runtime: LaneRuntime
   readonly disks: FolderDisks
   /** The project's one queue, the folder's line's reads on it too: a virtual base is made, merged over and deleted on it. */

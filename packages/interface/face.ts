@@ -173,7 +173,7 @@ export const KIND_ICON: Readonly<Record<DrawnKind, string>> = {
 }
 
 /** A text card's face in words: its command's chip, and whose it is. */
-export interface TextFaceWords {
+interface TextFaceWords {
   readonly command: string | null
   /** Whose it is, for its title and its avatar's label. */
   readonly owner: string

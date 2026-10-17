@@ -135,7 +135,7 @@ function actingStep(state: ActingState, on: ActingOn): ActingState {
 }
 
 /** A command to send and track: an action on proposed changes on a lane, or a line action. */
-export type ActingCommand =
+type ActingCommand =
   | {
       readonly kind: "proposed"
       readonly lane: ThreadId

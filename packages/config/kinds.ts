@@ -27,7 +27,7 @@ export interface Kind<T, R extends Reach = Reach> {
 }
 
 /** A kind whose values narrow: it can be limited. */
-export interface Meets<T> {
+interface Meets<T> {
   readonly meet: (a: T, b: T) => T
 }
 
@@ -48,7 +48,7 @@ export const decoded = <T>(value: T): Decoded<T> => ({ ok: true, value })
 export const refused = (why: string): Decoded<never> => ({ ok: false, why })
 
 /** Two JSON-shaped values are the same: same type, same fields, in any order. */
-export function sameValue(a: unknown, b: unknown): boolean {
+function sameValue(a: unknown, b: unknown): boolean {
   if (a === b) return true
   if (Array.isArray(a) && Array.isArray(b))
     return a.length === b.length && a.every((x, i) => sameValue(x, b[i]))

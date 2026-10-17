@@ -316,7 +316,7 @@ export type RegistryProblem =
   /** Another process held the lock for longer than the wait. */
   | { readonly kind: "locked"; readonly file: string; readonly pid: number }
 
-export type SessionSaid = SessionRefusal | RenameRefusal | RegistryProblem
+type SessionSaid = SessionRefusal | RenameRefusal | RegistryProblem
 
 const BROKEN: Readonly<Record<BrokenRegistry, string>> = {
   "not-json": "it is not JSON",

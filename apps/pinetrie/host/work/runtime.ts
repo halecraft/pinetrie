@@ -73,19 +73,19 @@ export interface Refused {
 }
 
 /** What decides which runtime lanes run on. */
-export interface RuntimeFacts {
+interface RuntimeFacts {
   readonly platform: NodeJS.Platform
   /** Inside a lane granted lanes of its own: its inner lanes' directory is mounted. */
   readonly nestedMount: boolean
   readonly stateHome: string
 }
 
-export type RuntimePlan =
+type RuntimePlan =
   | { readonly kind: "docker-vm"; readonly lanesDir: string }
   | { readonly kind: "docker-host"; readonly lanesDir: string }
 
 /** The data disk's mount in the lane VM (`packages/vm/image/init`). */
-export const VM_LANES_DIR = "/var/lib/lanehost"
+const VM_LANES_DIR = "/var/lib/lanehost"
 
 /**
  * Docker: in the lane VM on the Mac, and the host's own on Linux. Inside a

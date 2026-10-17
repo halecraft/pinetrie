@@ -39,7 +39,7 @@ export function bindText(
   }
 }
 
-export interface CardBox {
+interface CardBox {
   /** The textarea: give it as its `ref`. */
   readonly box: RefObject<HTMLTextAreaElement | null>
   readonly state: EditorState

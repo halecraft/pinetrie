@@ -24,9 +24,7 @@ export const planCanvasOpen = (
   Object.entries(old).filter(([canvas, key]) => now[canvas] !== key)
 
 /** `doc`'s open list as the old schema stored it. */
-export const storedTasks = (
-  doc: OpenDocHandle,
-): Readonly<Record<string, string>> =>
+const storedTasks = (doc: OpenDocHandle): Readonly<Record<string, string>> =>
   createDoc(OpenDocBeforeCanvas, exportEntirety(doc)).tasks()
 
 export const canvasOpen: Migration = {

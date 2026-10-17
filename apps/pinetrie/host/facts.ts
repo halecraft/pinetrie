@@ -7,7 +7,7 @@ import { planFactCard } from "@pinetrie/rules"
 import type { Basics } from "./basics.ts"
 import type { Places } from "./places.ts"
 
-export interface FactDeps {
+interface FactDeps {
   readonly basics: Pick<Basics, "places" | "session" | "newId" | "log">
   readonly placesWriter: Places
   /** Ask for a lane's drain: an idle lane appends the fact at once. */

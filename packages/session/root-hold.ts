@@ -4,7 +4,7 @@
 import type { RootId } from "@pinetrie/core"
 
 /** What holding changes: the roots to open, and those to let go. */
-export interface HoldPlan {
+interface HoldPlan {
   /** The roots this client started that the page does not yet ask for. */
   readonly minted: ReadonlySet<RootId>
   /** Every root to hold. */

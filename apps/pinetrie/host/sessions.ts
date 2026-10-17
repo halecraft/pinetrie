@@ -89,7 +89,7 @@ const readPid = async (file: string): Promise<number | null> => {
 }
 
 /** The live pid in `file`, or null when there is none or it names no process. */
-export async function livePid(file: string): Promise<number | null> {
+async function livePid(file: string): Promise<number | null> {
   const pid = await readPid(file)
   return pid !== null && isAlive(pid) ? pid : null
 }
@@ -101,7 +101,7 @@ export async function livePid(file: string): Promise<number | null> {
  * hold it, which needs a host to have died holding it first. Held for
  * longer than `LOCK_WAIT`, it is a problem, naming the lock's file.
  */
-export async function withRegistryLock<T>(
+async function withRegistryLock<T>(
   data: string,
   work: () => Promise<T>,
 ): Promise<T | { readonly refused: RegistryProblem }> {

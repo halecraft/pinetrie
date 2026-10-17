@@ -116,7 +116,7 @@ packages/lanehost/     @pinetrie/lanehost     core and channel only; the lanes' 
 packages/channel/      @pinetrie/channel      declares NOTHING; a held JSON-lines channel to a server process
 packages/ssh/          @pinetrie/ssh          declares NOTHING; a lane's ssh through its host (ADR-0140)
 packages/docker/       @pinetrie/docker       lanes on Docker, on btrfs subvolumes (ADR-0130)
-packages/vm/           @pinetrie/vm           the Mac's lane VM: image, launcher, a host's lease on a slot (ADR-0130)
+packages/vm/           @pinetrie/vm           declares NOTHING; the Mac's lane VM: image, launcher, a host's lease on a slot (ADR-0130)
 packages/folder/       @pinetrie/folder       core only; a folder project's history as values (ADR-0142)
 packages/keeper/       @pinetrie/keeper       declares NOTHING; one step at a time on a resource
 packages/config/       @pinetrie/config       core only; settings declared with their rules, layers decoded, one settle (ADR-0146)

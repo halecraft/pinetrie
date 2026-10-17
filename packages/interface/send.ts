@@ -52,7 +52,7 @@ export type ColumnHow = Pick<SendHow, "base" | "root" | "pinned"> & {
  * before it failed. A send that found its lane busy is queued by the host in
  * the same step (`queued`): the card has left the composer, as a sent one has.
  */
-export interface SendSettled {
+interface SendSettled {
   readonly status: string
   /**
    * A reply that lost a race: the sender chooses to queue or branch. `line`
@@ -257,7 +257,7 @@ export function planSend(input: {
 }
 
 /** What the editor is doing, apart from what its text says. */
-export interface EditorBusy {
+interface EditorBusy {
   readonly uploading: boolean
   readonly sending: boolean
 }
@@ -269,7 +269,7 @@ export interface ButtonWords {
   readonly title: string | null
 }
 
-export interface SendButton extends ButtonWords {
+interface SendButton extends ButtonWords {
   readonly disabled: boolean
   /** The send needs a model the host has not: the setup page says why. */
   readonly setup: boolean
@@ -341,7 +341,7 @@ function sendWords(
  * The send button of a card with a command: the command, then the card's text
  * if it has some. Where it waits goes in its title.
  */
-export function commandSendWords(
+function commandSendWords(
   command: NonNullable<SendPlan["command"]>,
   queue: QueuePlace,
 ): ButtonWords {
@@ -453,7 +453,7 @@ export const startWords = (base: string | null): string =>
     : `starts from your unfinished work: ${base}`
 
 /** A row of the where menu that picks a new lane's base. */
-export interface BaseChoice {
+interface BaseChoice {
   readonly key: string
   /** The WIP bookmark it picks; null for accepted work. */
   readonly base: string | null

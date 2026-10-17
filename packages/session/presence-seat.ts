@@ -14,7 +14,7 @@ import {
   seatKey,
 } from "@pinetrie/schema"
 
-export interface PresenceSeat {
+interface PresenceSeat {
   /** Who is here: read it through `@pinetrie/reads`; write it only here. */
   readonly handle: PresenceDocHandle
   /**

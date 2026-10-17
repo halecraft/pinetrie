@@ -32,7 +32,7 @@ import {
 import type { RepoStep } from "./step.ts"
 
 /** Who proposed changes' messages name: the host's trailers (`proposedMessage`). */
-export interface ProposedChangesAt {
+interface ProposedChangesAt {
   readonly lane: ThreadId
   readonly name: ThreadName
   /** The lane's tip entry, for `Pinetrie-Entry`. */
@@ -40,7 +40,7 @@ export interface ProposedChangesAt {
 }
 
 /** What a build needs besides: the WIP line, and a fresh nonce its commits are named by (`nonceRevset`). */
-export interface BuildAt extends ProposedChangesAt {
+interface BuildAt extends ProposedChangesAt {
   /** The WIP line proposed changes carry until an agent describes it (`wipDescription`). */
   readonly wip: string
   /** `pinetrie-proposed-<uuid>`, fresh for each build: the host makes it. */

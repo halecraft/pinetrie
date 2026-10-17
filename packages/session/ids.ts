@@ -16,7 +16,7 @@ import {
 } from "@pinetrie/core"
 
 /** A uuidv7: 48 bits of milliseconds, the version, the variant, randomness. */
-export function newUuidv7(): string {
+function newUuidv7(): string {
   const time = Date.now().toString(16).padStart(12, "0")
   const rand = [...crypto.getRandomValues(new Uint8Array(10))]
     .map(b => b.toString(16).padStart(2, "0"))

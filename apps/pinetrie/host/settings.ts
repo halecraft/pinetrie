@@ -301,7 +301,7 @@ export const SETTINGS = defineTable({
 })
 
 export type HostSettings = typeof SETTINGS
-export type HostSettled = Settled<HostSettings>
+type HostSettled = Settled<HostSettings>
 export type HostReport = ConfigReport<HostSettings>
 
 // ── the project's copies ─────────────────────────────────────────────────

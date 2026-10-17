@@ -18,7 +18,7 @@ import { forgetSteps, markSteps } from "./plan.ts"
 import { host, type RepoStep, you } from "./step.ts"
 
 /** The bookmarks' prefix before the rename. */
-export const RETIRED_OFFER_PREFIX = "pinetrie-offer/"
+const RETIRED_OFFER_PREFIX = "pinetrie-offer/"
 
 /** The glob setup wrote before the rename, built as setup built it. */
 export const RETIRED_OFFER_BOOKMARKS = `bookmarks(glob:${revsetName(`${RETIRED_OFFER_PREFIX}*`)})`
@@ -51,7 +51,7 @@ const retired = (name: ThreadName) => `${RETIRED_OFFER_PREFIX}${name}`
 const proposed = (name: ThreadName) => `${PROPOSED_PREFIX}${name}`
 
 /** `value` with the old glob replaced, or null when it holds none. */
-export const withProposedGlob = (value: string | null): string | null =>
+const withProposedGlob = (value: string | null): string | null =>
   value?.includes(RETIRED_OFFER_BOOKMARKS) === true
     ? value.replaceAll(RETIRED_OFFER_BOOKMARKS, PROPOSED_BOOKMARKS)
     : null

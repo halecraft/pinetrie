@@ -21,7 +21,7 @@ import { globSync, readFileSync } from "node:fs"
 import path from "node:path"
 import { scenarioNames } from "../apps/pinetrie/e2e/scenario.ts"
 
-export interface LayerCounts {
+interface LayerCounts {
   /** Static `test(`/`it(` calls in Vitest's include globs: `test.each` counts once. */
   readonly unit: number
   /** `host/*.scenario.ts`, `lanes/*.scenario.ts` and `observer/*.scenario.ts`. */
@@ -51,7 +51,7 @@ export function budgetBreaches(c: LayerCounts): readonly string[] {
  * The unit test files, by path from `root`: `vitest.config.mjs`'s own
  * `test.include`, so the list follows the config.
  */
-export async function unitTestFiles(root: string): Promise<readonly string[]> {
+async function unitTestFiles(root: string): Promise<readonly string[]> {
   const config = (await import(path.join(root, "vitest.config.mjs"))) as {
     default: {
       test: { include: readonly string[]; exclude: readonly string[] }
@@ -71,7 +71,7 @@ export async function unitTestFiles(root: string): Promise<readonly string[]> {
 const SUITES = ["host", "lanes", "observer", "browser"] as const
 
 /** Every suite's scenario files, by path from `root`. */
-export const scenarioFiles = (root: string): readonly string[] =>
+const scenarioFiles = (root: string): readonly string[] =>
   SUITES.flatMap(suite => {
     const dir = path.join("apps/pinetrie/e2e", suite)
     return scenarioNames(path.join(root, dir)).map(name =>

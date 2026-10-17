@@ -84,7 +84,7 @@ export interface ProvenanceHooks {
   taken(threads: readonly ThreadId[], by: WriterId): Promise<void>
 }
 
-export interface ProvenanceDeps {
+interface ProvenanceDeps {
   readonly basics: Pick<Basics, "places" | "session" | "now">
   readonly presence: PresenceDocHandle
   readonly records: Pick<Records, "writeValues">

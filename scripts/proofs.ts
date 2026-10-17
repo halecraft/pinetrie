@@ -11,9 +11,9 @@
 import type { Mutation, SuiteMutation } from "./mutate.ts"
 
 /** A scenario, as `<suite directory>/<file stem>`: `host/send`. */
-export type ScenarioKey = string
+type ScenarioKey = string
 
-export interface ProofGaps {
+interface ProofGaps {
   /** Labels no suite mutation expects. */
   readonly unproven: readonly {
     readonly scenario: ScenarioKey
@@ -34,7 +34,7 @@ export interface ProofGaps {
 }
 
 /** The scenario a suite mutation names, as a key. */
-export const scenarioKey = (
+const scenarioKey = (
   dirOf: (m: SuiteMutation) => string,
   m: SuiteMutation,
 ): ScenarioKey => `${dirOf(m)}/${m.scenario}`

@@ -13,7 +13,7 @@ export type Refusal =
   | { readonly kind: "extra"; readonly args: readonly string[] }
   | { readonly kind: "project"; readonly refusal: ProjectDirRefusal }
 
-export type Invocation =
+type Invocation =
   | { readonly kind: "start"; readonly folder: string }
   | { readonly kind: "refused"; readonly refusal: Refusal }
 
@@ -41,14 +41,14 @@ export function planInvocation(
  * The folder a command names: pinetrie's own repo without one, else the one
  * named, a relative one read from `base`.
  */
-export const folderOf = (
+const folderOf = (
   arg: string | undefined,
   base: string,
   pinetrieRoot: string,
 ): string => (arg === undefined ? pinetrieRoot : path.resolve(base, arg))
 
 /** `pnpm tidy [folder] [--days N] [--dry-run]`: what to tidy, and how. */
-export type TidyInvocation =
+type TidyInvocation =
   | {
       readonly kind: "tidy"
       readonly folder: string

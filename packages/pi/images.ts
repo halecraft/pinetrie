@@ -37,7 +37,7 @@ export type PreparedImage =
   | { readonly ok: false; readonly reason: "not an image" | "unreadable" }
 
 /** The box an image is fitted within, in pixels, its ratio kept. */
-export interface ImageFit {
+interface ImageFit {
   readonly maxWidth: number
   readonly maxHeight: number
 }

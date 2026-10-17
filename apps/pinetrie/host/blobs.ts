@@ -219,7 +219,7 @@ export function sqliteBlobs(
 // --- the upload ----------------------------------------------------------
 
 /** An upload as it is kept: the blob as it came, and an image's fitted copy. */
-export interface ClassifiedUpload {
+interface ClassifiedUpload {
   readonly blob: StoredBlob
   /** Undefined unless it is an image that did not fit as it came. */
   readonly fitted: StoredImage | undefined
@@ -250,7 +250,7 @@ export async function classifyUpload(
   }
 }
 
-export type UploadHeaders =
+type UploadHeaders =
   | { readonly kind: "accept" }
   | { readonly kind: "refuse"; readonly status: 413; readonly reason: string }
 

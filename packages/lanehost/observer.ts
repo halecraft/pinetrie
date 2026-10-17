@@ -409,7 +409,7 @@ export function translatedCandidate(
 }
 
 /** What a registration does to the namespace's registration as it stands. */
-export type Ownership = "install" | "refresh" | "reclaim"
+type Ownership = "install" | "refresh" | "reclaim"
 
 const sameOrigin = (a: Registration["origin"], b: Registration["origin"]) =>
   a.kind === b.kind &&

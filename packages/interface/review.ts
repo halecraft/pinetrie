@@ -24,7 +24,7 @@ export type Loaded<T> =
     }
 
 /** A file changing more lines than this waits to be opened. */
-export const COLLAPSE_OVER = 400
+const COLLAPSE_OVER = 400
 /** A section draws at most this many lines of its diff. */
 export const DIFF_LINES_SHOWN = 5000
 
@@ -47,7 +47,7 @@ export interface FileRow {
   readonly estimate: number
 }
 
-export interface RevisionShown {
+interface RevisionShown {
   readonly title: string
   /** The description after its first line, the host's trailers removed; "" when none. */
   readonly body: string
@@ -56,7 +56,7 @@ export interface RevisionShown {
   readonly files: readonly FileRow[]
 }
 
-export interface ReviewView {
+interface ReviewView {
   /**
    * Whether the file list shows: not for one revision of at most one file,
    * nor while that one revision is unread.
@@ -157,7 +157,7 @@ export function reviewView(
   }
 }
 
-export type SectionState =
+type SectionState =
   | "waiting"
   | "loading"
   | "shown"
@@ -183,7 +183,7 @@ export function sectionState(
   return diff.status === 413 ? "too-large" : "failed"
 }
 
-export interface DiffLine {
+interface DiffLine {
   readonly kind: "meta" | "hunk" | "add" | "del" | "same"
   readonly text: string
 }

@@ -143,7 +143,7 @@ const parentOfLane = (
 // ── which lane worked where ───────────────────────────────────────────────
 
 /** A run of a path worked by one lane, from the asked message that started it. */
-export interface LaneStretch {
+interface LaneStretch {
   readonly start: EntryId
   readonly lane: ThreadId
 }
@@ -264,7 +264,7 @@ export interface WorkStripWords {
   readonly menu: readonly LabelledButton[]
 }
 
-export interface LabelledButton {
+interface LabelledButton {
   readonly button: WorkStripButton
   readonly label: string
   /** What it does in jj, for whoever works there too; or why it is disabled. */
@@ -712,7 +712,7 @@ const proposedReview = (record: ProposedChangesRecord): ReviewTarget =>
       }
 
 /** What a lane runs now, as its proposed changes cares: a turn, a resolution, a split. */
-export function activityOf(
+function activityOf(
   index: TreeIndex,
   view: LaneView | undefined,
 ): Exclude<WorkStripActivity, "catch-up"> {

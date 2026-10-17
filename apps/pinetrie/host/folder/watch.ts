@@ -15,7 +15,7 @@ import {
 import { watchDir } from "../watch-dir.ts"
 
 /** How long the project's folder stays quiet before a change to it is read: a burst of saves is one read. */
-export const FOLDER_QUIET_MS = 10_000
+const FOLDER_QUIET_MS = 10_000
 
 /**
  * Whether any of `paths` (from the folder's root) is a source path: one

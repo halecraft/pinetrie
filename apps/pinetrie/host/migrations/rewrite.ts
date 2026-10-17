@@ -29,7 +29,7 @@ import type { RecordMigration } from "./index.ts"
 export type Rewrite = (contents: unknown) => object | null
 
 /** Each stored record `rewrite` changes, as its write to `target`. */
-export const planRewrites = (
+const planRewrites = (
   namespace: HostNamespace,
   target: Target,
   stored: Readonly<Record<string, unknown>>,

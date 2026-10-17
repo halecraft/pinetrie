@@ -29,7 +29,7 @@ export interface HeadButton {
 }
 
 /** What a card column's head ends in, after its name: its ⋯, then one button or none. */
-export interface HeadEnd {
+interface HeadEnd {
   readonly menu: readonly ColumnMenuSection[]
   readonly button: HeadButton | null
 }

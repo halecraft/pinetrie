@@ -142,14 +142,14 @@ export type NextButton = "stop" | "send-queue" | "resume"
 export type NextItem = "resume" | "hold" | "release" | "unqueue-all"
 
 /** Where ▸ sits: the run, a queued card, or your message's send. */
-export type NextMark =
+type NextMark =
   | { readonly kind: "run" }
   | { readonly kind: "card"; readonly card: CardId }
   | { readonly kind: "message" }
   | { readonly kind: "none" }
 
 /** What a queue header shows, decided: its button, its ⋯, and ▸. */
-export interface QueueHeadPlan {
+interface QueueHeadPlan {
   readonly button: NextButton | null
   readonly items: readonly NextItem[]
   readonly mark: NextMark

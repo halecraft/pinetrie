@@ -28,7 +28,7 @@ import {
 import { planPageRequest, planRequest, planUpgrade } from "./routes.ts"
 import type { LaneWork } from "./work/index.ts"
 
-export interface RunningHttp {
+interface RunningHttp {
   readonly port: number
   readonly httpUrl: string
   readonly wsUrl: string

@@ -88,7 +88,7 @@ export interface Opening {
 }
 
 /** A press planned: Start alone carries sends. */
-export type BranchOutPlan =
+type BranchOutPlan =
   | {
       readonly how: "open"
       readonly opening: Opening

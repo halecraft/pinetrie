@@ -16,7 +16,7 @@ export type RoundNext =
 export const NOTHING_NEXT: RoundNext = { kind: "nothing" }
 
 /** The request's characters for the thread's tail. */
-export const ROUND_ROOM = 12_000
+const ROUND_ROOM = 12_000
 
 /**
  * The round's request: the skill, the members by name, and the thread's

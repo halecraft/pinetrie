@@ -46,7 +46,7 @@ import { useCardTexts } from "./use-card-texts.ts"
 import { useFetched } from "./use-fetched.ts"
 
 /** What a surface gives the cards it draws, beyond each card. */
-export interface RenderingContext {
+interface RenderingContext {
   readonly session: SessionClient
   readonly reader: Reader
   readonly colorOf: (writer: WriterId) => string

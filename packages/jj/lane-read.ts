@@ -156,7 +156,7 @@ function parseLaneRows(stdout: string): LaneRow[] {
 }
 
 /** What one lane's read says, before the reads it may still need. */
-export type LanePlan =
+type LanePlan =
   /** No tip, or no accepted commit in its history: nothing moves. */
   | { readonly kind: "none" }
   /** On a WIP: the separate reads. */
@@ -307,7 +307,7 @@ function proposedFromRows(
 }
 
 /** What a refresh plans from, for a lane on accepted work, as `gatherLane` reads it. */
-export interface LaneGather {
+interface LaneGather {
   readonly tip: CommitId
   readonly base: CommitBase
   /** Where accepted work is: the proposed changes' target. */

@@ -49,7 +49,7 @@ import { NoteColumn } from "./note-column.tsx"
 import type { ReadersProps } from "./root-signals.tsx"
 
 /** What every thread column shares, whichever canvas or tab draws it. */
-export type SharedColumnProps = Omit<
+type SharedColumnProps = Omit<
   ColumnProps,
   | "column"
   | "columnKey"

@@ -3,7 +3,7 @@
 
 import type { SshName, SshPort } from "./names.ts"
 
-export type BrokerTarget =
+type BrokerTarget =
   | { readonly kind: "connect"; readonly host: string; readonly port: number }
   /** The host's config runs a program for this name, which a lane may not. */
   | { readonly kind: "refused"; readonly why: "proxycommand" | "unresolved" }

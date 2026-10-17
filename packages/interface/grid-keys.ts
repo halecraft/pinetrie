@@ -5,7 +5,7 @@
 import { type Grid, type GridStep, step } from "@pinetrie/core"
 import type { KeyLike } from "./page-keys.ts"
 
-export type GridAct =
+type GridAct =
   | { readonly kind: "select"; readonly cell: number }
   /** The selected card to `to`: a swap with a card there. */
   | { readonly kind: "move"; readonly from: number; readonly to: number }

@@ -141,7 +141,7 @@ export function urlHost(bind: string): string {
 }
 
 /** A network interface's address, as `os.networkInterfaces()` lists it. */
-export interface InterfaceAddress {
+interface InterfaceAddress {
   readonly family: string
   readonly address: string
   readonly internal: boolean

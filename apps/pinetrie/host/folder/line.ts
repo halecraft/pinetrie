@@ -24,7 +24,7 @@ import { scanFolder } from "./scan.ts"
 const READ_TRIES = 5
 
 /** What a read does, decided from what it gathered. */
-export type LineRead =
+type LineRead =
   /** The project's folder holds what accepted work's newest state holds. */
   | { readonly kind: "current"; readonly newest: PointId }
   | {

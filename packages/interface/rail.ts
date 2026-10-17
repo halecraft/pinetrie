@@ -84,7 +84,7 @@ export function railLandmarks(
 }
 
 /** What the rail reads besides the rows: the asks, and the turns' revisions. */
-export interface RailAsks {
+interface RailAsks {
   readonly asks: AskIndex
   readonly revisions: ReadonlyMap<EntryId, RevisionRecord>
 }

@@ -90,7 +90,7 @@ export type Clip =
   | { readonly kind: "card"; readonly of: CardClip; readonly cut: boolean }
 
 /** pine·trie's data on the clipboard: `application/x-pinetrie`, and `data-pinetrie`. */
-export interface Carrier {
+interface Carrier {
   /** This copy's, so two copies of one thing are told apart. */
   readonly nonce: string
   /**
@@ -103,7 +103,7 @@ export interface Carrier {
   readonly text: string
 }
 
-export interface ClipWrite {
+interface ClipWrite {
   readonly plain: string
   readonly html: string
   /** `application/x-pinetrie`'s value, and `data-pinetrie`'s. */
@@ -130,7 +130,7 @@ export interface ClipFacts {
 }
 
 /** The text a clip holds, as another app gets it. */
-export function clipText(clip: Clip): string {
+function clipText(clip: Clip): string {
   switch (clip.kind) {
     case "text":
       return clip.text

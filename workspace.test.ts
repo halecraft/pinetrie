@@ -168,8 +168,8 @@ test("a runtime declares only core, lanes, and lanehost with its channel; never 
   }
 })
 
-test("vm declares only core: it knows nothing of lanes", () => {
-  assert.deepEqual(deps(read("packages/vm")), ["@pinetrie/core"])
+test("vm declares nothing: it knows nothing of lanes", () => {
+  assert.deepEqual(allDeps(read("packages/vm")), [])
 })
 
 test("only the app declares a runtime: it is the one place that picks one", () => {

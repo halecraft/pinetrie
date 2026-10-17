@@ -60,7 +60,7 @@ export type EditorEvent =
  * - `attach`: bind the element to the card, which exists;
  * - `detach`: unbind it, and empty it.
  */
-export type EditorAct = "create" | "attach" | "detach"
+type EditorAct = "create" | "attach" | "detach"
 
 export interface EditorStep {
   readonly state: EditorState

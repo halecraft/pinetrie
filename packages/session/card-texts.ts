@@ -7,7 +7,7 @@ import type { CardId, TextCardId } from "@pinetrie/core"
 import { cardDocId, TextDoc, type TextDocHandle } from "@pinetrie/schema"
 import { hostLetGo, spentCards } from "./card-copies.ts"
 
-export interface CardTexts {
+interface CardTexts {
   /** A card's text: the same document for every caller. */
   text(id: TextCardId): TextDocHandle
   /** Destroy each copy the host let go of whose card's record has gone. */

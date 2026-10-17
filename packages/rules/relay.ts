@@ -101,17 +101,14 @@ export const AGENTS_RULE =
   "Other threads' agents can be members of this thread. Ask one with the ask tool, by its thread's name: it does not wait, and the answer arrives later as a message. An @name you write asks nobody. When another thread's agent or person asks you, your last message of that run is your answer there."
 
 /** What the asked agent reads of what it heard: one line per message. */
-export const heardContent = (
-  fromName: string,
-  lines: readonly string[],
-): string =>
+const heardContent = (fromName: string, lines: readonly string[]): string =>
   [
     `What was said in the thread ${fromName} since you last heard from it:`,
     ...lines.map(l => `- ${l}`),
   ].join("\n")
 
 /** What the asked agent reads of the ask: who asked, where, and what. */
-export const relayContent = (d: RelayDetails): string =>
+const relayContent = (d: RelayDetails): string =>
   `${d.askerName}, in the thread ${d.fromName}, asks you: ${d.text}\n\n(Your last message of this run is posted in ${d.fromName} as your answer.)`
 
 /** What the asking thread's agent reads of an answer. */

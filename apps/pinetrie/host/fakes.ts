@@ -165,7 +165,7 @@ export function fakeLane(
 }
 
 /** The thread a fixture's row is in when its test names none. */
-export const ROW_THREAD = threadIdFor("row")
+const ROW_THREAD = threadIdFor("row")
 
 /** A stored entry row, as `packages/reads/index.test.ts` writes them. */
 export const row = (
@@ -208,7 +208,7 @@ export const threadRow = (
 const STARTER = writerId("starter@example.com")
 
 /** The documents a write may go to: the session's, and the test's root. */
-export type WriteDocs = Pick<FakeBasics, "session" | "root">
+type WriteDocs = Pick<FakeBasics, "session" | "root">
 
 /** The document `target` names, among `docs`. */
 const docOf = (docs: WriteDocs, target: Target): RecordsDocHandle =>
@@ -246,7 +246,7 @@ export const ROOT_ID: RootId = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
  * writes a tip there needs no `LANE` record; a root a test asks for that it
  * did not give is made empty.
  */
-export function fakeDocuments(input: {
+function fakeDocuments(input: {
   readonly session: SessionDocHandle
   readonly live: LiveDocHandle
   readonly places: PlacesDocHandle
@@ -303,7 +303,7 @@ export function fakeDocuments(input: {
   }
 }
 
-export type FakeBasics = Basics & {
+type FakeBasics = Basics & {
   /** The document of `ROOT_ID`, where a test's entries and pi's values go. */
   readonly root: RootDocHandle
   readonly lines: string[]
@@ -475,13 +475,13 @@ export function placeCanvas(
 }
 
 /** The board state `putCanvas` puts a canvas's card in, by default. */
-export const CANVAS_STATE = workflowStateIdFor("open")
+const CANVAS_STATE = workflowStateIdFor("open")
 
 /** The archive's state in the workflow `archiveCanvas` writes. */
-export const ARCHIVE_STATE = workflowStateIdFor("done")
+const ARCHIVE_STATE = workflowStateIdFor("done")
 
 /** Who archives a canvas in `archiveCanvas`, unless a test names another. */
-export const ARCHIVER = writerId("archiver@example.com")
+const ARCHIVER = writerId("archiver@example.com")
 
 /**
  * `canvas` moved into the archive by `by`: the workflow of `CANVAS_STATE` and

@@ -154,7 +154,7 @@ const takenBy = (
     ? null
     : { threads, by: cause.by }
 
-export interface PlacesDeps {
+interface PlacesDeps {
   readonly basics: Pick<
     Basics,
     "places" | "session" | "now" | "newId" | "log"

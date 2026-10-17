@@ -41,7 +41,7 @@ import {
   useSyncExternalStore,
 } from "react"
 
-export interface AttentionView {
+interface AttentionView {
   /** Everything raised for you (`attentionOf`). */
   readonly items: readonly Item[]
   /** Each canvas's (`canvasStatus`). */

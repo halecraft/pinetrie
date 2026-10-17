@@ -6,7 +6,7 @@ import { factLine } from "./fact.ts"
 import { askLine } from "./relay.ts"
 
 /** Where a reader of card words reads a document's text and a blob's, each loaded first. */
-export interface WordReaders {
+interface WordReaders {
   readonly doc: (card: TextCardId) => string
   /** A reference's quote; "" for a blob not loaded. */
   readonly blob: (sha: Sha256) => string

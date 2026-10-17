@@ -24,7 +24,7 @@ export const LAW_SETS = [
   },
 ] as const
 
-export type LawGap =
+type LawGap =
   | { readonly kind: "untested"; readonly law: string }
   | { readonly kind: "tested-twice"; readonly law: string }
   | { readonly kind: "no-law"; readonly title: string }
@@ -45,7 +45,7 @@ export function lawsInDoc(doc: string, section: string): readonly string[] {
 const regexpText = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 
 /** Each title `suite` gives a test: the first argument of `test`, `it` or `withRig`, quoted. */
-export const testTitles = (suite: string): readonly string[] =>
+const testTitles = (suite: string): readonly string[] =>
   [
     ...suite.matchAll(
       /\b(?:test|it|withRig)\(\s*(["'`])((?:(?!\1)[^\\]|\\.)*)\1/g,

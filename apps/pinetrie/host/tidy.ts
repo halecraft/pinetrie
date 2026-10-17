@@ -57,7 +57,7 @@ async function sizeOf(dir: string): Promise<number> {
 }
 
 /** What a tidy reports of the repo before and after. */
-export interface TidySizes {
+interface TidySizes {
   /** `.jj/repo`'s operations, views and index, in bytes. */
   readonly jj: number
   readonly git: number
@@ -75,7 +75,7 @@ export const sizesOf = async (
 })
 
 /** What `pnpm tidy` says, from values (`tidyWords`). */
-export type TidySaying =
+type TidySaying =
   | {
       readonly kind: "refused"
       readonly root: string
