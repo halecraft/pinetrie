@@ -2,6 +2,6 @@
   "publish": { "catchUp": true },
   "lanes": {
     "nested": true,
-    "shared": [".plans", "sandbox"]
+    "shared": [".plans", "sandbox", "media"]
   }
 }
