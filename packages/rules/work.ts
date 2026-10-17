@@ -53,18 +53,12 @@ const ListedSchema = Type.Object({
   more: Type.Integer({ minimum: 0 }),
 })
 
-const TouchSchema = Type.Object({
-  path: Type.String(),
-  version: Type.Integer({ minimum: 1 }),
-})
-
 const TurnDiskSchema = Type.Object({
   derived: ListedSchema,
   local: ListedSchema,
   unignored: Type.Array(Type.String()),
   leftovers: Type.Array(Type.String()),
   shared: Type.Object({
-    read: Type.Array(TouchSchema),
     wrote: Type.Array(
       Type.Object({
         path: Type.String(),

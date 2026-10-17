@@ -1422,7 +1422,7 @@ export interface TurnDisk {
   readonly unignored: readonly string[]
   /** Source files it wrote that its commit left out: jj's size limit, for one. */
   readonly leftovers: readonly string[]
-  /** The shared files' versions it read and wrote (`SharedLineage`). */
+  /** The shared files' versions it wrote (`SharedLineage`). */
   readonly shared: TurnShared
 }
 

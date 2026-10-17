@@ -51,6 +51,8 @@ export type LaneWork = Pick<
   Pick<Updates, "prepareUpdate"> &
   Pick<Splits, "prepareSplit" | "splitEnded"> &
   Archive & {
+    /** Threads deleted for good: their lanes leave the shared files' lineages. */
+    forgetReaders(lanes: ReadonlySet<ThreadId>): Promise<void>
     /** What the host found where it runs; null when it has no tools. */
     readonly project: ProjectRecord | null
     /** pi's hooks lane work answers; `askSplit` is the documents' (`host/split-call.ts`). */
@@ -166,6 +168,7 @@ export async function startLaneWork(input: {
   const sharedLineages = createSharedLineages({
     basics,
     records: input.records,
+    startedAt: basics.now() * 1000,
   })
   const sharedWatch = startSharedWatch({
     lineages: sharedLineages,
@@ -250,6 +253,7 @@ export async function startLaneWork(input: {
     splitEnded: splits.splitEnded,
     destination,
     teardown: archive.teardown,
+    forgetReaders: lanes => sharedLineages.forgetReaders(lanes),
     async quiet() {
       await keeper.idle()
       await destination.quiet()
@@ -293,6 +297,8 @@ const NO_LANES: LaneWork = {
   splitEnded: async () => null,
   destination: null,
   teardown: async () => {},
+  // No lineage is written without tools: there is no lane to forget.
+  forgetReaders: async () => {},
   quiet: async () => {},
   close: async () => {},
   onBaseChanged: () => {},

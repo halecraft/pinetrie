@@ -82,7 +82,6 @@ describe("workStats", () => {
       unignored: ["dist"],
       leftovers: ["big.bin"],
       shared: {
-        read: [],
         wrote: [{ path: ".plans/p.md", version: 2, concurrent: true }],
       },
     }),

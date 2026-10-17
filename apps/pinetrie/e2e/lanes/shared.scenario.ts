@@ -233,8 +233,21 @@ async function sharedSection(
     )
     await h.user.actOnAccepted("publish")
     await h.idle()
+    // A file read in a turn, then deleted while no host serves: the next
+    // host's scan lets its lineage go.
+    const lineagePaths = () => [...readSharedLineages(h.host.session).keys()]
+    const hadLater = lineagePaths().includes(".plans/later.md")
+    rmSync(path.join(dir, ".plans", "later.md"))
     await h.close(true)
     h = await lanes.sectionHost({ dir, store, places, logs })
+    await waitFor(() => !lineagePaths().includes(".plans/later.md"), 30_000)
+    check(
+      "a host's start lets go of the lineage of a shared file deleted before it, and keeps the others",
+      hadLater &&
+        !lineagePaths().includes(".plans/later.md") &&
+        lineagePaths().includes(".plans/mine.md"),
+      lineagePaths().join(" "),
+    )
     h.script.use([
       {
         tool: "bash",

@@ -5,7 +5,9 @@
 // (`planSharedLineages`). Lanes' writes come by here too, through virtiofs or
 // a bind mount; they are claimed when their turns are recorded. A dropped
 // events error, and the start, scan each directory instead: what changed
-// unseen is then a version too.
+// unseen is then a version too, and a file the scan does not find has its
+// lineage let go (`SharedLineages.scanned`). A delete event lets nothing go:
+// the next scan does, at the latest the next host's.
 
 import { lstat, readdir } from "node:fs/promises"
 import path from "node:path"
@@ -34,16 +36,28 @@ async function fileStamp(file: string): Promise<Stamp | null> {
   return st?.isFile() ? statStamp(st) : null
 }
 
-/** Every regular file under `dir`. */
-async function filesUnder(dir: string): Promise<string[]> {
+/**
+ * Every regular file under `dir`; none when `dir` is gone. Any other failure
+ * throws: a listing that failed must never read as every file gone.
+ */
+export async function filesUnder(dir: string): Promise<string[]> {
   const entries = await readdir(dir, {
     recursive: true,
     withFileTypes: true,
-  }).catch(() => [])
+  }).catch((error: unknown) => {
+    if (isMissing(error)) return []
+    throw error
+  })
   return entries
     .filter(e => e.isFile())
     .map(e => path.join(e.parentPath, e.name))
 }
+
+const isMissing = (error: unknown): boolean =>
+  typeof error === "object" &&
+  error !== null &&
+  "code" in error &&
+  error.code === "ENOENT"
 
 interface SharedWatch {
   /** Watch `dirs`, and only them: at the start, and when accepted work's list moves. */
@@ -52,25 +66,27 @@ interface SharedWatch {
 }
 
 export function startSharedWatch(deps: {
-  readonly lineages: Pick<SharedLineages, "seen">
+  readonly lineages: Pick<SharedLineages, "seen" | "scanned">
   readonly failed: (what: string) => (error: unknown) => void
 }): SharedWatch {
   const watching = new Map<string, { unsubscribe(): Promise<void> }>()
   let dirs: readonly SharedDir[] = []
 
-  async function seenFiles(files: readonly string[]) {
+  /** Each of `files` under a shared directory, stamped; a file gone by now is left out. */
+  async function stamped(files: readonly string[]): Promise<SharedRead[]> {
     const seen: SharedRead[] = []
     for (const file of files) {
       const at = sharedPath(dirs, file)
       const s = at === null ? null : await fileStamp(file)
       if (at !== null && s !== null) seen.push({ path: at, stamp: s })
     }
-    await deps.lineages.seen(seen)
+    return seen
   }
 
   const scan = (d: SharedDir) =>
     filesUnder(d.source)
-      .then(seenFiles)
+      .then(stamped)
+      .then(seen => deps.lineages.scanned(d.path, seen))
       .catch(deps.failed(`scanning ${d.path}/`))
 
   return {
@@ -91,9 +107,11 @@ export function startSharedWatch(deps: {
               void scan(d)
               return
             }
-            void seenFiles(
+            void stamped(
               change.events.filter(e => e.type !== "delete").map(e => e.path),
-            ).catch(deps.failed(`watching ${d.path}/`))
+            )
+              .then(seen => deps.lineages.seen(seen))
+              .catch(deps.failed(`watching ${d.path}/`))
           },
         })
         watching.set(d.source, sub)

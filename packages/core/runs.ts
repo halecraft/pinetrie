@@ -540,16 +540,15 @@ export interface SharedLineage {
 /** How many versions a shared file's lineage keeps. */
 export const SHARED_KEPT = 100
 
-/** A version of a shared file a turn read or wrote. */
+/** A version of a shared file a turn wrote. */
 export interface SharedTouch {
   readonly path: string
   readonly version: number
 }
 
-/** What a turn did to the shared files. */
+/** What a turn wrote to the shared files. */
 export interface TurnShared {
-  readonly read: readonly SharedTouch[]
   readonly wrote: readonly (SharedTouch & { readonly concurrent: boolean })[]
 }
 
-export const NO_SHARED: TurnShared = { read: [], wrote: [] }
+export const NO_SHARED: TurnShared = { wrote: [] }

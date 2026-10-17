@@ -1,20 +1,23 @@
 import {
   cardIdOfKind,
+  livePlaceOf,
   makeCard,
   rootIdFor,
   type Sha256,
   storedText,
+  type ThreadId,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
 import { readRootRecord } from "@pinetrie/reads"
 import { ROOT, setRecord } from "@pinetrie/rules"
+import { threadCardOf } from "@pinetrie/rules/fixtures"
 import { newRootDoc } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import { memoryBlobs } from "./blobs.ts"
-import { basics, putValue, seedPlaces } from "./fakes.ts"
-import { sweepBlobs } from "./housekeeping.ts"
+import { basics, CANVAS_ID, placesFor, putValue, seedPlaces } from "./fakes.ts"
+import { sweepBlobs, sweepTrash } from "./housekeeping.ts"
 
 // A 1×1 PNG: what the store keeps is only its bytes, type and size.
 const ADA = writerId("ada@x.io")
@@ -122,4 +125,34 @@ test("the blob sweep keeps a reference's quote, and deletes one no card holds", 
   const left = blobs.list().map(x => x.sha256)
   expect(left).toContain(kept.sha256)
   expect(left).not.toContain(dropped.sha256)
+})
+
+test("a thread deleted from the trash leaves the shared files' lineages it read", async () => {
+  const b = basics()
+  const thread = threadIdFor("0123456789abcdef")
+  const card = threadCardOf({ thread, canvas: CANVAS_ID, by: ADA, cards: [] })
+  // In the trash with no history to tell: its deadline is now.
+  seedPlaces(b.places, [
+    {
+      kind: "write",
+      record: {
+        ...card,
+        place: { kind: "trash", left: livePlaceOf(card.place) },
+      },
+    },
+  ])
+  const { placesWriter } = placesFor(b)
+  const forgotten: ReadonlySet<ThreadId>[] = []
+  await sweepTrash({
+    basics: b,
+    placesWriter,
+    work: {
+      destination: null,
+      teardown: async () => {},
+      forgetReaders: async lanes => {
+        forgotten.push(lanes)
+      },
+    },
+  })
+  expect(forgotten).toEqual([new Set([thread])])
 })

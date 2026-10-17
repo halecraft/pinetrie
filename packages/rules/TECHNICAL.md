@@ -1439,8 +1439,9 @@ Host-written records, each a `RecordSpec` (above) with a total decoder:
       as well. Matching them would mean resolving links.
     - A prompt's record and an update's have none.
     - **What a turn did to shared files** (`disk.shared`, `shared.ts`):
-      the versions it read and wrote, each write flagged concurrent when
-      another version landed after the one it was based on and before it.
+      the versions it wrote, each flagged concurrent when another version
+      landed after the one it was based on and before it. What it read
+      is not recorded: nothing read it back (S224).
       - **A version is a stamp, size and ctime** (core's `Stamp`), which a
         lane and the host read alike (S169), and versions order by its
         ctime (`stampTimeUs`), the host's clock for every writer, not by
@@ -1466,6 +1467,21 @@ Host-written records, each a `RecordSpec` (above) with a total decoder:
         version. It keeps its first writer, both writes are concurrent
         (the first named in `revised`), and so is any write based on it.
         One turn's writes leaving one stamp contest nothing.
+      - **A lineage goes when its file is gone** (`planGoneLineages`): a
+        full scan of its shared directory did not find it, and every
+        version is older than the host's start. A turn the host records
+        began after its start, so none of its writes lands between those
+        versions, and a stamp it reports of the gone file comes back as a
+        version made outside at its ctime, ordered as before. A lineage
+        begun again numbers from 1; no record is misread, since a record
+        names a version with its writer's turn, and a turn's writes are
+        planned once (S224). A lineage with a newer version waits for the
+        next host's scan.
+      - **A lane leaves the lineages it read only when its thread is
+        deleted for good** (`planForgottenReaders`), from the trash. An
+        archived or trashed thread can be restored, and its next write must
+        still be based on what it read; once its files are gone, their
+        lineages take its entries with them.
     - **The registry** (`.pinetrie-lane/recipes.json`) decodes totally:
       a broken file is an empty registry (`decodeRegistry`). A recipe's
       outputs are `DiskPath`s (core), checked as the file is read: what

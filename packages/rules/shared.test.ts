@@ -10,6 +10,8 @@ import { describe, expect, test } from "vitest"
 import { setRecord } from "./records.ts"
 import {
   laneReads,
+  planForgottenReaders,
+  planGoneLineages,
   planSharedLineages,
   SHARED_LINEAGE,
   type SharedWrite,
@@ -192,7 +194,6 @@ describe("planSharedLineages", () => {
       [2, "lane", 200],
     ])
     expect(planned.turn).toEqual({
-      read: [{ path: P, version: 1 }],
       wrote: [{ path: P, version: 2, concurrent: false }],
     })
   })
@@ -328,7 +329,7 @@ describe("planSharedLineages", () => {
   test("nothing touched: no lineage changes", () => {
     expect(plan(empty, {})).toEqual({
       lineages: [],
-      turn: { read: [], wrote: [] },
+      turn: { wrote: [] },
       revised: [],
     })
   })
@@ -359,5 +360,79 @@ describe("planSharedLineages", () => {
     if (lineage === undefined) throw new Error("no lineage")
     const w = setRecord(SHARED_LINEAGE, lineage)
     expect(SHARED_LINEAGE.decode(w.value, w.key)).toEqual(lineage)
+  })
+})
+
+describe("planGoneLineages: a full scan lets go of lineages whose file is gone", () => {
+  /** A lineage at `path` whose versions were made at each of `ats` µs. */
+  const lineage = (path: string, ats: readonly number[]): SharedLineage => ({
+    path,
+    versions: ats.map((at, i) => ({
+      version: i + 1,
+      stamp: st(at),
+      at,
+      writer: { kind: "outside" },
+      baseAt: null,
+      contested: false,
+      concurrent: false,
+    })),
+    next: ats.length + 1,
+    read: {},
+  })
+  const lineages = (...ls: SharedLineage[]) => new Map(ls.map(l => [l.path, l]))
+  const gone = (
+    ls: ReadonlyMap<string, SharedLineage>,
+    found: readonly string[],
+    startedAt = 1_000,
+  ) =>
+    planGoneLineages({
+      lineages: ls,
+      dir: "sandbox",
+      found: new Set(found),
+      startedAt,
+    })
+
+  test("a file the scan did not find goes; one it found stays", () => {
+    expect(
+      gone(lineages(lineage("sandbox/a", [100]), lineage("sandbox/b", [100])), [
+        "sandbox/b",
+      ]),
+    ).toEqual(["sandbox/a"])
+  })
+
+  test("a lineage with a version from the host's start or later stays", () => {
+    expect(
+      gone(lineages(lineage("sandbox/a", [100, 1_000])), [], 1_000),
+    ).toEqual([])
+  })
+
+  test("only the scanned directory's lineages go", () => {
+    expect(
+      gone(
+        lineages(lineage(".plans/a", [100]), lineage("sandboxed/a", [100])),
+        [],
+      ),
+    ).toEqual([])
+  })
+})
+
+describe("planForgottenReaders", () => {
+  const read = (lanes: readonly string[]): SharedLineage => ({
+    path: P,
+    versions: [],
+    next: 1,
+    read: Object.fromEntries(lanes.map(l => [l, st(100)])),
+  })
+
+  test("a deleted thread's lane leaves every lineage it read; others stay", () => {
+    const ls = new Map([[P, read([A.lane, B.lane])]])
+    expect(planForgottenReaders(ls, new Set([A.lane]))).toEqual([
+      { ...read([B.lane]) },
+    ])
+  })
+
+  test("a lineage no forgotten lane read is not rewritten", () => {
+    const ls = new Map([[P, read([B.lane])]])
+    expect(planForgottenReaders(ls, new Set([A.lane]))).toEqual([])
   })
 })

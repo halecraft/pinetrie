@@ -246,12 +246,7 @@ export function planSharedLineages(input: {
     add(path, { stamp: s, writer: { kind: "outside" }, baseAt: null })
 
   for (const s of input.seen) known(s.path, s.stamp)
-  const read: SharedTouch[] = []
-  for (const r of input.reads) {
-    const v = known(r.path, r.stamp)
-    if (!read.some(t => t.path === r.path && t.version === v.version))
-      read.push({ path: r.path, version: v.version })
-  }
+  for (const r of input.reads) known(r.path, r.stamp)
   const made: SharedTouch[] = []
   const revised: {
     path: string
@@ -321,7 +316,6 @@ export function planSharedLineages(input: {
   return {
     lineages: out,
     turn: {
-      read,
       wrote: made.map(m => ({ ...m, concurrent: isConcurrentWrite(m) })),
     },
     revised,
@@ -339,6 +333,52 @@ export const laneReads = (
       return s === undefined ? [] : [[path, s] as const]
     }),
   )
+
+/**
+ * The lineages a full scan of the shared directory `dir` lets go: each under
+ * it whose file the scan did not find, once every version is older than the
+ * host's start (`startedAt`, in µs by the host's clock). Only then can no
+ * turn the host has yet to record land a write among them.
+ */
+export function planGoneLineages(input: {
+  readonly lineages: ReadonlyMap<string, SharedLineage>
+  /** From the disk's root: `.plans`. */
+  readonly dir: string
+  /** Every regular file the scan found under `dir`. */
+  readonly found: ReadonlySet<string>
+  readonly startedAt: number
+}): readonly string[] {
+  const under = `${input.dir}/`
+  return [...input.lineages.values()]
+    .filter(
+      l =>
+        l.path.startsWith(under) &&
+        !input.found.has(l.path) &&
+        l.versions.every(v => v.at < input.startedAt),
+    )
+    .map(l => l.path)
+    .sort()
+}
+
+/**
+ * Each lineage that names one of `lanes` among its readers, without them:
+ * the lanes of threads deleted for good, which never write again. An
+ * archived or trashed thread's lane is kept, since it can be restored, and
+ * its next write is then based on what it read.
+ */
+export function planForgottenReaders(
+  lineages: ReadonlyMap<string, SharedLineage>,
+  lanes: ReadonlySet<ThreadId>,
+): readonly SharedLineage[] {
+  return [...lineages.values()].flatMap(l => {
+    const kept = Object.entries(l.read).filter(
+      ([lane]) => !(isThreadId(lane) && lanes.has(lane)),
+    )
+    return kept.length === Object.keys(l.read).length
+      ? []
+      : [{ ...l, read: Object.fromEntries(kept) }]
+  })
+}
 
 const VersionSchema = Type.Object({
   version: Type.Integer({ minimum: 1 }),

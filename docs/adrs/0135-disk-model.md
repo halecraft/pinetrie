@@ -3,7 +3,7 @@
 - **Status:** Accepted (Duane, 2026-10-12)
 - **Area:** `packages/lanes/TECHNICAL.md`, `docs/01-architecture.md`
 - **Evidence:** S146, S147, S148, S155, S156, S157, S158, S159, S160, S161,
-  S162, S169, S170, S171, S172, S173, S175, S176, S177, S179
+  S162, S169, S170, S171, S172, S173, S175, S176, S177, S179, S224
 - **Supersedes:**
   - ADR-0131: derived state is learned from what each tool call's commands
     read and wrote, not declared (`lanes.install`, `installWhen` and
@@ -23,6 +23,10 @@
     longer current is shown as concurrent. The directory stays live, with no
     history, and is never branched.
 - **Revised:**
+  - 2026-10-17 (S224): a turn's record names only the shared versions it
+    wrote; a lineage goes when a full scan of its directory does not find its
+    file and every version is older than the host's start; and a thread
+    deleted for good leaves every lineage it read.
   - 2026-10-13 (S179): a path through a symlink stands, for `.gitignore`, as
     the first symlink on its way, which is what git is asked about: git
     refuses a whole batch over one path beyond a symlink, and a run's failed
@@ -272,7 +276,22 @@ The spikes behind this decision:
     window is not caught: it claims no version. A release whose size or
     inode, read then, is not the kernel's at the release is raced, and its
     version contested as a claimed one is.
-  - **A turn's record names the versions it read and wrote.**
+  - **A turn's record names the versions it wrote.** What it read was
+    never read back (S224).
+  - **What a lane last read is kept on each file's lineage,** the base of
+    its next write there. A thread deleted from the trash never writes
+    again, and leaves every lineage it read; an archived or trashed one
+    is kept, since it can be restored, and its next write must still be
+    based on what it read.
+  - **A lineage goes when its file is gone.** A full scan of a shared
+    directory (each host's start, and a dropped-events error) lets go of
+    each lineage under it whose file it did not find, once every version
+    is older than the host's start: a turn the host records later began
+    after it, so none of its writes lands between them, and a stamp it
+    reports of the gone file comes back as a version made outside, at its
+    own ctime. A lineage begun again numbers from 1; a record finds a
+    version by its writer's turn as well, and a turn is planned once
+    (S224). A listing that fails lets nothing go.
   - **Versions order by their ctime, not by when they are learnt.** ctime
     is the host's clock for a lane's write and for yours alike, on the Mac
     and on Linux (S169); a step back of that clock would misorder the

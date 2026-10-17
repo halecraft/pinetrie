@@ -2880,6 +2880,41 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "a check that finds no stall leaves the histogram as it is",
   },
+  // ── shared files' lineages ──
+  {
+    name: "a listing that fails reads as every file gone",
+    file: "apps/pinetrie/host/work/shared-watch.ts",
+    from: "    if (isMissing(error)) return []\n    throw error\n",
+    to: "    return []\n",
+    command: unit,
+    expect: "a listing that fails throws: no file reads as gone",
+  },
+  {
+    name: "a scan lets no lineage go",
+    file: "apps/pinetrie/host/work/shared.ts",
+    from: "        if (gone.length === 0) return\n",
+    to: "        if (gone.length >= 0) return\n",
+    command: unit,
+    expect:
+      "a scan lets go of the lineage of a file it did not find, and says so",
+  },
+  {
+    name: "a thread deleted from the trash keeps its lane on the lineages",
+    file: "apps/pinetrie/host/housekeeping.ts",
+    from: "  await input.work.forgetReaders(new Set(swept.threads))\n",
+    to: "",
+    command: unit,
+    expect:
+      "a thread deleted from the trash leaves the shared files' lineages it read",
+  },
+  {
+    name: "the migration keeps a turn's shared reads",
+    file: "apps/pinetrie/host/migrations/0022-turn-shared-reads.ts",
+    from: "  const { read: _, ...kept } = shared\n",
+    to: "  const kept = shared\n",
+    command: unit,
+    expect: "a turn's shared reads are dropped; its writes and the rest stay",
+  },
   // ── the roots' trace ──
   {
     name: "the roots' trace says a use of a loaded root loaded it",

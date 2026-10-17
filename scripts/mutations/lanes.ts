@@ -261,6 +261,16 @@ export const mutations: readonly Mutation[] = [
       "your writes are versions as you make them, and a lane's write over one it never read is concurrent",
   },
   {
+    name: "the host's start is taken in ms, older than every version",
+    file: "apps/pinetrie/host/work/index.ts",
+    from: "    startedAt: basics.now() * 1000,\n",
+    to: "    startedAt: basics.now(),\n",
+    suite: "lanes",
+    scenario: "shared",
+    expect:
+      "a host's start lets go of the lineage of a shared file deleted before it, and keeps the others",
+  },
+  {
     name: "a shared write is never concurrent",
     file: "packages/rules/shared.ts",
     from: "  (v.baseAt !== null &&\n",

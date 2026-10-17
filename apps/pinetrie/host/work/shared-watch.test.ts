@@ -3,7 +3,7 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import type { SharedRead } from "@pinetrie/rules"
 import { afterAll, beforeAll, describe, expect, test } from "vitest"
-import { sharedPath, startSharedWatch } from "./shared-watch.ts"
+import { filesUnder, sharedPath, startSharedWatch } from "./shared-watch.ts"
 
 describe("sharedPath", () => {
   const dirs = [
@@ -22,9 +22,14 @@ describe("sharedPath", () => {
 describe("the watcher on a shared directory", () => {
   let dir = ""
   const seen: SharedRead[] = []
+  const scans: { dir: string; stamps: readonly SharedRead[] }[] = []
   const watch = startSharedWatch({
     lineages: {
       seen: async stamps => {
+        seen.push(...stamps)
+      },
+      scanned: async (d, stamps) => {
+        scans.push({ dir: d, stamps })
         seen.push(...stamps)
       },
     },
@@ -55,5 +60,30 @@ describe("the watcher on a shared directory", () => {
     await until(() => seen.some(s => s.path === ".plans/yours.md"))
     expect(seen.find(s => s.path === ".plans/before.md")).toBeDefined()
     expect(seen.find(s => s.path === ".plans/yours.md")?.stamp).toBe(want)
+  })
+
+  test("the start scans the directory whole, as the scan of its path", async () => {
+    await until(() => scans.length > 0)
+    expect(scans[0]?.dir).toBe(".plans")
+    expect(scans[0]?.stamps.map(s => s.path)).toContain(".plans/before.md")
+  })
+})
+
+describe("filesUnder", () => {
+  test("a directory that is gone holds no file", async () => {
+    expect(
+      await filesUnder(path.join(tmpdir(), "pinetrie-no-such-dir")),
+    ).toEqual([])
+  })
+
+  test("a listing that fails throws: no file reads as gone", async () => {
+    const dir = await realpath(
+      await mkdtemp(path.join(tmpdir(), "pinetrie-watch-")),
+    )
+    // A file where the directory should be: readdir fails with ENOTDIR.
+    const notADir = path.join(dir, "plans")
+    await writeFile(notADir, "")
+    await expect(filesUnder(notADir)).rejects.toThrow(/ENOTDIR/)
+    await rm(dir, { recursive: true, force: true })
   })
 })

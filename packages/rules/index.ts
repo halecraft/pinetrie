@@ -580,6 +580,8 @@ export { planSeatSweep, planSeats, SEAT, writersOfClients } from "./seat.ts"
 export { SETUP, SETUP_KEY } from "./setup.ts"
 export {
   laneReads,
+  planForgottenReaders,
+  planGoneLineages,
   planSharedLineages,
   SHARED_LINEAGE,
   type SharedRead,

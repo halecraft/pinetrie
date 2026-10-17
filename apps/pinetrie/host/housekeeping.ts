@@ -157,8 +157,9 @@ export async function sweepHolds(input: {
  * owns (`planTrashSweep`): gather the places, the cards' histories and, for the
  * threads among them, their lanes of their own with their roots' revisions and
  * trees; plan; then delete each record, then its text, then the deleted
- * threads' lanes, as an archive's teardown removes them (`planLanesGone`).
- * Their messages stay in their roots. The records, their texts and their
+ * threads' lanes, as an archive's teardown removes them (`planLanesGone`),
+ * and the lanes from the shared files' lineages they read. Their messages
+ * stay in their roots. The records, their texts and their
  * histories go in one change of the host's.
  */
 export async function sweepTrash(input: {
@@ -167,7 +168,7 @@ export async function sweepTrash(input: {
     "session" | "places" | "leases" | "log" | "now"
   >
   readonly placesWriter: Places
-  readonly work: Pick<LaneWork, "teardown" | "destination">
+  readonly work: Pick<LaneWork, "teardown" | "destination" | "forgetReaders">
 }): Promise<void> {
   const { session, places, leases, log, now } = input.basics
   // gather
@@ -201,5 +202,6 @@ export async function sweepTrash(input: {
     open.apply(swept.cards.map(id => ({ kind: "remove", id }))),
   )
   await input.work.teardown(teardown)
+  await input.work.forgetReaders(new Set(swept.threads))
   log(`[host] deleted ${swept.cards.length} card(s) trashed over a week ago`)
 }
