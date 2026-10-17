@@ -13,6 +13,9 @@
     a file held across an accept is kept as a state of its own beside the
     accept, not on accepted work's line; restore is the same write, on the
     page's plan.
+- **Amended by:**
+  - ADR-0165: the history page it left open is this one; its journal records a
+    restore as well as an accept.
 
 **Context.**
 

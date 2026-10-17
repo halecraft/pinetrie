@@ -45,6 +45,12 @@
     a file held across an accept is kept as a state of its own beside the
     accept, not on accepted work's line; restore is the same write, on the
     page's plan.
+  - ADR-0165: its history page is designed. A restore is written by the same
+    steps as an accept, and refused unless accepted work is still what the
+    person was shown. A review tells text, images and other files apart by
+    their content. A rename is inferred only where a file's bytes are
+    unchanged, and only to show it. A conflict's version can be chosen on the
+    page. A resolution is a state of the lane's own.
 
 **Context.**
 

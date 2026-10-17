@@ -114,6 +114,9 @@ flows, merged by `git merge-file` as lanehost merges.
   its inode, size and mtime are as moved, else a concurrent save of its
   path on the line state its journal kept it on (`keptOn`).
 
+ADR-0165, accepted and not yet built, extends these to a restore: the
+same steps and journal, with an earlier kept state as the content.
+
 ## The accept's laws
 
 Each is one test in `apps/pinetrie/host/folder/accept.test.ts` titled by

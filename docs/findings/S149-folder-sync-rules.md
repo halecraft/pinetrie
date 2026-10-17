@@ -1,7 +1,7 @@
 # S149 — What syncing a person's folder with a thread must get right, read from Mutagen and Syncthing: twelve rules for the scan, the reconcile and the write
 
 - **Status:** Answered (from reading; nothing here was run)
-- **Led to:** ADR-0142, ADR-0159
+- **Led to:** ADR-0142, ADR-0159, ADR-0165
 
 **Question.** A person's folder on the Mac would sync with their own thread,
 both ways: their saves become states of that thread, and what reaches the

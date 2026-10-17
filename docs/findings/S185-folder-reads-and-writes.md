@@ -1,7 +1,7 @@
 # S185 — Reading your folder into a state in the lane VM, and writing an accept into it on the Mac: cost, stability, and what the watcher sees of pine·trie's own writes
 
 - **Status:** Answered
-- **Led to:** ADR-0142, ADR-0159
+- **Led to:** ADR-0142, ADR-0159, ADR-0165
 
 **Question.** ADR-0142 reads the folder into a state at a thread's start,
 each catch-up and each accept, and writes an accept into it, staged and
