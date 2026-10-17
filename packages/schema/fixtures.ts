@@ -7,7 +7,14 @@ import type { EntryId, RunId, ThreadId } from "@pinetrie/core"
 import {
   applyLiveOps,
   LANE_TIP,
+  LiveDoc,
   type LiveDocHandle,
+  OpenDoc,
+  type OpenDocHandle,
+  PlacesDoc,
+  type PlacesDocHandle,
+  PresenceDoc,
+  type PresenceDocHandle,
   physicalKey,
   RootDoc,
   type RootDocHandle,
@@ -22,6 +29,18 @@ export const newRootDoc = (): RootDocHandle => createDoc(RootDoc)
 
 /** The session's document with no Exchange. */
 export const newSessionDoc = (): SessionDocHandle => createDoc(SessionDoc)
+
+/** A person's open-tasks document with no Exchange. */
+export const newOpenDoc = (): OpenDocHandle => createDoc(OpenDoc)
+
+/** The live document with no Exchange. */
+export const newLiveDoc = (): LiveDocHandle => createDoc(LiveDoc)
+
+/** The places document with no Exchange. */
+export const newPlacesDoc = (): PlacesDocHandle => createDoc(PlacesDoc)
+
+/** The presence document with no Exchange. */
+export const newPresenceDoc = (): PresenceDocHandle => createDoc(PresenceDoc)
 
 /**
  * Write one entry row, as pi's storage does. The caller supplies `id`: a

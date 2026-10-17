@@ -43,13 +43,3 @@ export async function setBookmark(
   ])
   if (!ran.ok) throw new Error(describeFailure("jj bookmark set", ran))
 }
-
-/** Delete a lane's bookmark, if it has one; its commits stay. */
-export async function deleteBookmark(
-  jj: Runner,
-  lane: ThreadId,
-): Promise<void> {
-  if ((await bookmarkOf(jj, lane)) === null) return
-  const ran = await jj(["bookmark", "delete", bookmarkName(lane)])
-  if (!ran.ok) throw new Error(describeFailure("jj bookmark delete", ran))
-}

@@ -7,12 +7,7 @@
 // written whenever a column reaches its thread's end, slots only when a card
 // moves, and each keeps its own history.
 
-import {
-  type BoundSchema,
-  createDoc,
-  type DocRef,
-  Schema,
-} from "@kyneta/schema"
+import { type BoundSchema, type DocRef, Schema } from "@kyneta/schema"
 import { yjs } from "@kyneta/yjs-schema"
 import {
   type EntryId,
@@ -66,9 +61,6 @@ export type AttentionDocHandle =
   typeof AttentionDoc extends BoundSchema<infer S, infer N>
     ? DocRef<S, N>
     : never
-
-/** An attention document on its own, with no Exchange: for tests. */
-export const newAttentionDoc = (): AttentionDocHandle => createDoc(AttentionDoc)
 
 /** What a person has dealt with, as the document holds it, read. */
 export interface Attention {

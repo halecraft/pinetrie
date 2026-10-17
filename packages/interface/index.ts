@@ -108,7 +108,6 @@ export {
   type CardView,
   defaultView,
   heldByOthers,
-  keyOfColumn,
   openColumns,
   type Strip,
   stripCards,
@@ -168,7 +167,6 @@ export {
   pinnedMarkerWords,
   retiredWords,
   sizeWords,
-  TAKE,
   TRASH_COLUMN,
   taskPinnedMarkerWords,
   traceWords,
@@ -654,7 +652,6 @@ export {
   elsewhereWords,
   holdsText,
   ownCards,
-  SIGNALS,
   type Signal,
   signalOfLevel,
   signalWords,
@@ -689,7 +686,6 @@ export {
   UNFOLD_TASK,
 } from "./task-column-view.ts"
 export {
-  NO_TASKS,
   type Tasks,
   type TaskThreads,
   tasksOf,

@@ -338,7 +338,7 @@ export function messageImages(
  * `toolResult` included: a result belongs to its call, which `projectSpine`
  * pairs it with. An assistant message carries its tool
  * calls. A `chat` message is a human's, already decoded by the reader
- * (`readRenderableEntries` in `@pinetrie/reads`); core only admits the role, so it
+ * (`readTreeIndex` in `@pinetrie/reads`); core only admits the role, so it
  * needs no schema library.
  */
 function renderableMessage(entry: EntryLike): TranscriptMessage | null {
@@ -700,7 +700,8 @@ export interface TreeIndex {
   readonly firstOf: ReadonlyMap<ThreadId, EntryId>
   /**
    * Each thread's end: its entry with no child in its own thread. Two such
-   * entries keep the newer, as `latestTip` does.
+   * entries keep the newer by id (uuidv7), never by the order they are read
+   * in, so every client picks the same one.
    */
   readonly endOf: ReadonlyMap<ThreadId, EntryId>
 }
@@ -921,23 +922,6 @@ function summarizeBranch(index: TreeIndex, rootId: EntryId): BranchSummary {
   return { rootId, messageCount }
 }
 
-// ── following a thread ────────────────────────────────────────────────────
-
-/**
- * The most recently advanced tip among `tips`, or null if none has one.
- *
- * Entry ids are uuidv7, so the greatest id is the newest. Chosen by comparing
- * ids, never by position in `tips`: two clients reading the same document in a
- * different order must pick the same one.
- */
-export function latestTip(tips: Iterable<EntryId | null>): EntryId | null {
-  let latest: EntryId | null = null
-  for (const tip of tips) {
-    if (tip !== null && (latest === null || tip > latest)) latest = tip
-  }
-  return latest
-}
-
 // ── the rail: one root's tree ─────────────────────────────────────────────
 
 export interface RailRow {
@@ -1050,8 +1034,8 @@ export type ThreadLane =
 
 /**
  * A lane is busy while it runs or has cards queued: the agent works there, or
- * will once its queue is released. A root with a busy lane is not archived
- * (`rootWork`), and a stopped thread does not carry on behind cards waiting.
+ * will once its queue is released. A task with a busy lane is not archived
+ * (`threadsWork`), and a stopped thread does not carry on behind cards waiting.
  */
 export const isBusy = (lane: LaneView): boolean =>
   lane.running || lane.waiting > 0

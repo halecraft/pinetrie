@@ -2,6 +2,7 @@
 // writes in, which the gate (`gate.ts`) keeps out of an archived task.
 
 import {
+  type AgentWork,
   type ArchivedTask,
   atEntry,
   type CardId,
@@ -16,7 +17,6 @@ import {
   type Refusal,
   type RevisionRecord,
   type RootId,
-  type RootWork,
   refused,
   type SnapshotId,
   type TaskId,
@@ -69,7 +69,7 @@ export const TASK_BUSY_REASON = {
   running: "an agent is working here",
   waiting: "cards are queued here",
   held: "cards are queued here",
-} as const satisfies Record<RootWork, string>
+} as const satisfies Record<AgentWork, string>
 
 /**
  * Decide what crossing the archive's edge does for a task. A task an agent

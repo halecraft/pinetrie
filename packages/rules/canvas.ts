@@ -1,10 +1,10 @@
 // canvas — what a run's agent is told of its task's canvas.
 
 import type {
+  AgentWork,
   CanvasView,
   CardRecord,
   NoteColumnId,
-  RootWork,
   TaskId,
   ThreadId,
   ThreadName,
@@ -56,7 +56,7 @@ export interface CanvasFacts {
   readonly reading: ThreadId | null
   readonly names: ReadonlyMap<ThreadId, ThreadName>
   /** What each thread's agent is doing; a thread absent is idle. */
-  readonly work: ReadonlyMap<ThreadId, RootWork>
+  readonly work: ReadonlyMap<ThreadId, AgentWork>
   /** Each note column's title, else `NEW_NOTES_TITLE`. */
   readonly noteTitles: ReadonlyMap<NoteColumnId, string>
   /** How many notes each note column holds. */
@@ -64,7 +64,7 @@ export interface CanvasFacts {
   readonly nameOf: (writer: WriterId) => string
 }
 
-const STATE_WORDS: Readonly<Record<RootWork, string>> = {
+const STATE_WORDS: Readonly<Record<AgentWork, string>> = {
   running: "running",
   waiting: "waiting",
   held: "held",

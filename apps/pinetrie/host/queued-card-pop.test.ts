@@ -28,8 +28,12 @@ import {
   QUEUE_HOLD,
   setRecord,
 } from "@pinetrie/rules"
-import { newPlacesDoc, newPresenceDoc, seatKey } from "@pinetrie/schema"
-import { beginRun } from "@pinetrie/schema/fixtures"
+import { seatKey } from "@pinetrie/schema"
+import {
+  beginRun,
+  newPlacesDoc,
+  newPresenceDoc,
+} from "@pinetrie/schema/fixtures"
 import { describe, expect, test } from "vitest"
 import { memoryBlobs } from "./blobs.ts"
 import type { CardPort } from "./cards.ts"

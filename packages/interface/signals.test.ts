@@ -23,13 +23,23 @@ import {
   elsewhereWords,
   holdsText,
   ownCards,
-  SIGNALS,
+  type Signal,
   signalOfLevel,
   signalWords,
   statusSignal,
   unsentSignals,
   withFilled,
 } from "./signals.ts"
+
+/** Every signal: a key missing here, or one that is no signal, does not compile. */
+const EVERY_SIGNAL: Record<Signal, true> = {
+  unsent: true,
+  "needs-you": true,
+  "worth-a-read": true,
+  running: true,
+  done: true,
+}
+const SIGNALS = Object.keys(EVERY_SIGNAL) as Signal[]
 
 const _TEST_THREAD = threadIdFor("e")
 const _TEST_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")

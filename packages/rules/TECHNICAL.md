@@ -513,8 +513,8 @@ which are swept.
   inventory the task its sender is on (`here`, which a `move` carries),
   or, on none, its sender's history outside any task. A spin-off's `here`
   is the task its sender will be on: the new one for a drop in the
-  sidebar, else the tab's. A queueing passes `NO_DISCARDS`, since its
-  target is a queue. A card in a trash keeps its record and text, is drawn
+  sidebar, else the tab's. A queueing passes no task here (`here` null),
+  since its target is a queue. A card in a trash keeps its record and text, is drawn
   nowhere (every read of a place names the kinds it draws), and moves only
   by an undo or `planFromTrash`: `planMove` refuses any other handoff from
   a trash `gone`. `planFromTrash` takes a card out for its cutter's paste
@@ -726,7 +726,7 @@ not `pinetrie:live`, so it lasts until a release, across a restart.
   so a swept hold held nothing.
 - **`isBusy` is unchanged, and a held queue is not work.** A held queue
   with no card is not busy: it blocks no archiving. A busy lane that is not
-  running and whose queue is held is `held` in `rootWork` (core), which
+  running and whose queue is held is `held` in `threadsWork` (core), which
   refuses archiving as `waiting` does but draws no ring (`threadStatus`):
   nothing happens there until a person acts (ADR-0113).
 - **`planQueueCard`** (ADR-0113): every queue is one request, `queue-card`,

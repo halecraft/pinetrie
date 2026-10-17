@@ -9,12 +9,7 @@ import type {
   ThreadId,
   ThreadRecord,
 } from "@pinetrie/core"
-import {
-  boardTasks,
-  indexTasks,
-  NO_TASK_INDEX,
-  type TaskIndex,
-} from "@pinetrie/rules"
+import { boardTasks, indexTasks, type TaskIndex } from "@pinetrie/rules"
 
 /** One task, as the page reads it. */
 export interface TaskThreads {
@@ -30,8 +25,6 @@ export interface Tasks {
   readonly index: TaskIndex
   readonly byId: ReadonlyMap<TaskId, TaskThreads>
 }
-
-export const NO_TASKS: Tasks = { index: NO_TASK_INDEX, byId: new Map() }
 
 /**
  * Every task whose card is on the board (`boardTasks`), its canvas read

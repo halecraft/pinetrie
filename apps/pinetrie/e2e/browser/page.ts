@@ -1,7 +1,7 @@
 // e2e/browser/page — what the browser scenarios share: the send button's
 // words, menus, frames and render counts, a page made a person, and selectors.
 
-import { errorText, NOBODY, THE_AGENT } from "@pinetrie/core"
+import { errorText, NOBODY } from "@pinetrie/core"
 import {
   identityCodec,
   type ListWidth,
@@ -12,13 +12,7 @@ import { IDENTITY_KEY } from "@pinetrie/web/storage-keys"
 import type { Browser } from "@playwright/test"
 import { chromium, type Page } from "@playwright/test"
 
-// The send button's labels, from the words the composer draws them with.
-export const TO_AGENT = recipientWords({
-  compels: { kind: "agent", agent: THE_AGENT },
-  people: [],
-  asks: [],
-  invites: [],
-}).label
+// The send button's label to nobody, from the words the composer draws it with.
 export const TO_NOBODY = recipientWords({
   compels: NOBODY,
   people: [],

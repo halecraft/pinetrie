@@ -1,6 +1,7 @@
 import { taskIdFor, writerId } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
-import { newPresenceDoc, readingKey, seatKey } from "@pinetrie/schema"
+import { readingKey, seatKey } from "@pinetrie/schema"
+import { newPresenceDoc } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import {
   readReading,

@@ -26,8 +26,7 @@ import {
   setRecord,
   VERDICT,
 } from "@pinetrie/rules"
-import { newPlacesDoc } from "@pinetrie/schema"
-import { writeLaneTip } from "@pinetrie/schema/fixtures"
+import { newPlacesDoc, writeLaneTip } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import {
   basics,

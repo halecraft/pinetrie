@@ -206,21 +206,6 @@ export function decodeRunEvent(line: string): RunEvent | null {
   }
 }
 
-/**
- * A run's notice as one line: its run, a tab, its event's line. Run ids
- * hold no tab or newline.
- */
-export const encodeRunNotice = (n: RunNotice): string =>
-  `${n.run}\t${encodeRunEvent(n.event)}`
-
-/** A line `encodeRunNotice` writes, or null for any other. */
-export function decodeRunNotice(line: string): RunNotice | null {
-  const tab = line.indexOf("\t")
-  if (tab <= 0) return null
-  const event = decodeRunEvent(line.slice(tab + 1))
-  return event === null ? null : { run: line.slice(0, tab), event }
-}
-
 /** What a run did to one path, since it first named it. */
 export interface PathTrace {
   /** Something was at the path when the run first named it. */

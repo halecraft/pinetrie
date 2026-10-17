@@ -1,6 +1,7 @@
 import { taskIdFor } from "@pinetrie/core"
 import { orderKeys } from "@pinetrie/rules"
-import { newOpenDoc, readOpenKeys } from "@pinetrie/schema"
+import { readOpenKeys } from "@pinetrie/schema"
+import { newOpenDoc } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import { orderOpen, placeInList, planOpenRepair } from "./open-repair.ts"
 

@@ -14,8 +14,13 @@ import {
   setRecord,
   VERDICT,
 } from "@pinetrie/rules"
-import { newPresenceDoc, readingKey, seatKey } from "@pinetrie/schema"
-import { beginRun, writeEntry, writeLaneTip } from "@pinetrie/schema/fixtures"
+import { readingKey, seatKey } from "@pinetrie/schema"
+import {
+  beginRun,
+  newPresenceDoc,
+  writeEntry,
+  writeLaneTip,
+} from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import { createDigests, writePendingVerdict } from "./digests.ts"
 import {

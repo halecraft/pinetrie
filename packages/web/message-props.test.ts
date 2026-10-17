@@ -6,7 +6,7 @@ import {
   screenMemory,
 } from "@pinetrie/interface"
 import { entry, indexOf } from "@pinetrie/interface/fixtures"
-import { newLiveDoc } from "@pinetrie/schema"
+import { newLiveDoc } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import { type MessageProps, sameMessageProps } from "./message-props.ts"
 

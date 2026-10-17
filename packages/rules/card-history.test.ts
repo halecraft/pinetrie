@@ -31,7 +31,6 @@ import {
   planTrashSweep,
   TRACE_MAX_AGE_MS,
   TRACED,
-  TRACED_PLACES,
   TRASH_KEEP_MS,
   trashDeadline,
   verbOf,
@@ -315,7 +314,7 @@ describe("planProvenance: traces", () => {
       ),
     ).toEqual([])
     // Only a thread's queue and pinned cards are traced, each with its drawer.
-    expect([...TRACED_PLACES].sort()).toEqual(["pinned", "queued"])
+    expect(Object.keys(TRACED).sort()).toEqual(["pinned", "queued"])
     // @ts-expect-error: a trace is left only where a column draws it
     const fromNote: TraceRecord["from"] = { kind: "note", column: NOTES }
     // @ts-expect-error: and a traced place has its drawer

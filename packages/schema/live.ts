@@ -1,7 +1,13 @@
 // schema/live — what is streaming now, `pinetrie:live`: its schema, the
 // stream row's codec, its one writer and its readers.
 
-import { batch, createDoc, json, Schema } from "@kyneta/schema"
+import {
+  type BoundSchema,
+  batch,
+  type DocRef,
+  json,
+  Schema,
+} from "@kyneta/schema"
 import {
   entryId,
   isThreadId,
@@ -43,10 +49,9 @@ export const LiveDoc = json.bind(
   }),
 )
 
-export const newLiveDoc = () => createDoc(LiveDoc)
-
 /** A live handle on what is streaming now. */
-export type LiveDocHandle = ReturnType<typeof newLiveDoc>
+export type LiveDocHandle =
+  typeof LiveDoc extends BoundSchema<infer S, infer N> ? DocRef<S, N> : never
 
 type StoredStream = ReturnType<LiveDocHandle["streams"]>[string]
 

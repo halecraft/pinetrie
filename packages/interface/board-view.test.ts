@@ -1,7 +1,7 @@
 import {
+  type AgentWork,
   type CardRecord,
   entryId,
-  type RootWork,
   type TaskId,
   taskIdFor,
   threadIdFor,
@@ -78,7 +78,7 @@ type Facts = Omit<BoardViewInput, "heads"> & {
   readonly status: ReadonlyMap<TaskId, Status>
   readonly cardRoots: ReadonlySet<TaskId>
   readonly ready: ReadonlyMap<TaskId, readonly string[]>
-  readonly work: ReadonlyMap<TaskId, RootWork>
+  readonly work: ReadonlyMap<TaskId, AgentWork>
 }
 const input = (over: Partial<Facts> = {}): BoardViewInput => {
   const f: Facts = {

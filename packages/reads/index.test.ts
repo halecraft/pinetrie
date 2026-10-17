@@ -10,9 +10,10 @@ import {
 } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
 import { encodePinned } from "@pinetrie/rules"
-import { newLiveDoc, type StoredEntryRow } from "@pinetrie/schema"
+import type { StoredEntryRow } from "@pinetrie/schema"
 import {
   beginRun,
+  newLiveDoc,
   newRootDoc,
   writeEntry,
   writeLaneTip,

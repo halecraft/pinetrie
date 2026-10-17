@@ -1,9 +1,7 @@
 import { describe, expect, test } from "vitest"
 import {
   decodeRunEvent,
-  decodeRunNotice,
   encodeRunEvent,
-  encodeRunNotice,
   type RunEvent,
   stamp,
 } from "./index.ts"
@@ -56,11 +54,6 @@ describe("a run's events as lines", () => {
       { kind: "lost", at: 7, count: 12 },
     ]
     for (const e of events) expect(decodeRunEvent(encodeRunEvent(e))).toEqual(e)
-    expect(
-      decodeRunNotice(
-        encodeRunNotice({ run: "r1", event: { kind: "end", at: 1 } }),
-      ),
-    ).toEqual({ run: "r1", event: { kind: "end", at: 1 } })
   })
 
   test("a line no observer writes is null", () => {
@@ -69,6 +62,5 @@ describe("a run's events as lines", () => {
     expect(decodeRunEvent("open\t1\t2")).toBeNull()
     expect(decodeRunEvent("open\t1a\t2\t0\tf\t/w/a\t-\t\t")).toBeNull()
     expect(decodeRunEvent("")).toBeNull()
-    expect(decodeRunNotice("\tend\t1")).toBeNull()
   })
 })

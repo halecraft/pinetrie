@@ -19,8 +19,6 @@ export const LAW_SETS = [
   },
 ] as const
 
-export type LawSet = (typeof LAW_SETS)[number]
-
 export type LawGap =
   | { readonly kind: "untested"; readonly law: string }
   | { readonly kind: "tested-twice"; readonly law: string }

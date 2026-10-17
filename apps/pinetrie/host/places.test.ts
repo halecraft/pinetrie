@@ -19,8 +19,12 @@ import {
   readTraces,
 } from "@pinetrie/reads"
 import type { Cause } from "@pinetrie/rules"
-import { newPresenceDoc, readingKey, seatKey } from "@pinetrie/schema"
-import { writeEntry, writeLaneTip } from "@pinetrie/schema/fixtures"
+import { readingKey, seatKey } from "@pinetrie/schema"
+import {
+  newPresenceDoc,
+  writeEntry,
+  writeLaneTip,
+} from "@pinetrie/schema/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   basics,

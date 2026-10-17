@@ -1,5 +1,4 @@
 import {
-  ACCEPTED_ACTIONS,
   commitId,
   type EntryLike,
   ERR,
@@ -108,10 +107,6 @@ describe("accepted work", () => {
       planAcceptedAction("setup", record({ commit: commitId("c1") })).kind,
     ).toBe("refused")
   })
-  test("land and follow are no setup or publish command", () => {
-    expect(ACCEPTED_ACTIONS).toEqual(["setup", "publish"])
-  })
-
   describe("publish", () => {
     const main = commitId("m1")
     const yours = (

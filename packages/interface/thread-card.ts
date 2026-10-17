@@ -4,7 +4,7 @@
 // together, whatever roots they are in. Neutral: never in the thread's colour.
 
 import type {
-  RootWork,
+  AgentWork,
   TaskId,
   Workflow,
   WorkflowStateId,
@@ -19,7 +19,7 @@ export interface ThreadMove {
   /** To the archive: it archives the task. */
   readonly closes: boolean
   /** Why it is refused now (`ROOT_BUSY_REASON`'s key), into the archive only. */
-  readonly busy: RootWork | null
+  readonly busy: AgentWork | null
   /** Into the archive, the threads whose proposed changes it withdraws. */
   readonly drops: readonly string[]
   readonly intent: Intent
@@ -56,7 +56,7 @@ export interface ThreadCardFacts {
   /** The threads with open proposed changes, by task (`openProposedByTask`). */
   readonly proposed: ReadonlyMap<TaskId, readonly string[]>
   /** The agent's work in each task, held or not (`taskWork`). */
-  readonly work: ReadonlyMap<TaskId, RootWork>
+  readonly work: ReadonlyMap<TaskId, AgentWork>
 }
 
 export function threadCardHead(

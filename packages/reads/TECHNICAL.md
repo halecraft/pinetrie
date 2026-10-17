@@ -5,7 +5,7 @@ What the session document says, read once, by the host and the client alike.
 ## Which document a read takes (ADR-0063)
 
 - **A root's reads take its `RootDocHandle`**: `readTreeIndex`,
-  `readRenderableEntries`, `readLatestPrompt`, `readRevisions`,
+  `readLatestPrompt`, `readRevisions`,
   `readDigests`, and `readRootRecord`, the root's directory
   record as the host writes it.
 - **The session's reads take its `SessionDocHandle`**: every record read
@@ -36,7 +36,7 @@ functions.
 ## What belongs here
 
 Reads the host decides from, or that more than one reader needs:
-`readRenderableEntries`, `readTreeIndex`, `readLanes`, `readRunning`, `readLatestPrompt` (what a lane's run is: a
+`readTreeIndex`, `readLanes`, `readRunning`, `readLatestPrompt` (what a lane's run is: a
 run's end and `split_proposed_changes` decide by it), `readRunAuthor` (the person
 behind it, `promptAuthor`, ADR-0080),
 `readParticipantNames`, `readParticipantPictures` (ADR-0098), `readParticipants`, `readReading`, `readTyping`,
@@ -133,7 +133,7 @@ Kyneta has let go.
   costs no indexing, and the host's many reads within one command share one
   index. Every caller shares it: copy a list before sorting it
   (`packages/core/roots.ts` does).
-- **`readRenderableEntries` returns the same entry for the same stored row**,
+- **`readTreeIndex`'s entries are the same for the same stored row**,
   frozen. Kyneta gives an unchanged row the same object across writes, so a
   new entry decodes only itself.
 
@@ -183,7 +183,7 @@ Kyneta has let go.
   `readRevisions`, `readProposedByLane`…). A `string`-keyed map still accepts an
   `EntryId`, so a key type left `string` compiles and leaves its lookups
   unchecked (S95).
-- **`readRenderableEntries` decodes chat** (`renderableMessage`), so the index
+- **`readTreeIndex` decodes chat** (`renderableMessage`), so the index
   carries each chat's writer, whether it compelled the agent, and its send
   id: `threadOfSend`'s race reads the first two, a sender that names its send the third.
 - **Each entry's thread is its row's** (ADR-0125), from which `indexTree`

@@ -22,12 +22,7 @@ import {
 } from "@pinetrie/core"
 import { transitionOf } from "./board.ts"
 import type { MoveStep } from "./moves.ts"
-import {
-  NO_TASK_INDEX,
-  type TaskIndex,
-  taskOfPlace,
-  taskOfTarget,
-} from "./task.ts"
+import { type TaskIndex, taskOfPlace, taskOfTarget } from "./task.ts"
 
 // ── moves' history ─────────────────────────────────────────────
 
@@ -39,9 +34,6 @@ export interface Discards {
   readonly tasks: TaskIndex
   readonly here: TaskId | null
 }
-
-/** For moves that discard nothing: a queueing, whose target is a queue. */
-export const NO_DISCARDS: Discards = { tasks: NO_TASK_INDEX, here: null }
 
 /**
  * The history a card leaving `from` for gone is in: the task it leaves,

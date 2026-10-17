@@ -6,9 +6,9 @@
 // encode; `runs.ts` writes them before the run's prompt.
 
 import {
+  type AgentWork,
   canvasInView,
   type NoteColumnId,
-  type RootWork,
   type TaskId,
   type ThreadId,
   taskPinnedInView,
@@ -89,7 +89,7 @@ export function createTaskContext(deps: {
     const names = readParticipantNames(session)
     const nameOf = (w: WriterId) => displayName(w, names.get(w))
     const canvas = tasks.canvases.get(task) ?? []
-    const work = new Map<ThreadId, RootWork>(
+    const work = new Map<ThreadId, AgentWork>(
       readRunningLanes(session, live).map(r => [r.lane, "running"] as const),
     )
     const noteColumns = readNoteColumns(session)

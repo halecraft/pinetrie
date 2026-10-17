@@ -9,8 +9,13 @@ import {
 import { createKeeper } from "@pinetrie/keeper"
 import { readRoots } from "@pinetrie/reads"
 import { ROOT } from "@pinetrie/rules"
-import { applyRecordWrites, newLiveDoc, newPlacesDoc } from "@pinetrie/schema"
-import { newSessionDoc, writeEntry } from "@pinetrie/schema/fixtures"
+import { applyRecordWrites } from "@pinetrie/schema"
+import {
+  newLiveDoc,
+  newPlacesDoc,
+  newSessionDoc,
+  writeEntry,
+} from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import type { HostKey } from "./basics.ts"
 import { startDirectory } from "./directory.ts"

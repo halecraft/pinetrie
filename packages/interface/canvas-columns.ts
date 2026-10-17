@@ -115,10 +115,6 @@ export const stripOf = (
 /** A strip's card columns: all but its task column. */
 export const stripCards = ([, ...cards]: Strip): readonly CardColumn[] => cards
 
-/** The key a strip column is drawn by: its card's. */
-export const keyOfColumn = (c: CardColumn): string =>
-  c.kind === "thread" ? c.column.key : c.card
-
 /** How a column is read, as your view of its card says. */
 const readerOf = (
   view: CardView | undefined,

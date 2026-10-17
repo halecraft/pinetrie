@@ -443,5 +443,3 @@ export interface Spot {
   readonly root: RootId
   readonly at: Position
 }
-export const samePosition = (a: Position, b: Position): boolean =>
-  a.kind === "root" ? b.kind === "root" : b.kind === "entry" && a.id === b.id

@@ -57,9 +57,6 @@ import {
 import {
   applyRecordWrites,
   type LiveDocHandle,
-  newLiveDoc,
-  newPlacesDoc,
-  newPresenceDoc,
   type PlacesDocHandle,
   type PresenceDocHandle,
   type RecordsDocHandle,
@@ -68,6 +65,9 @@ import {
   type StoredEntryRow,
 } from "@pinetrie/schema"
 import {
+  newLiveDoc,
+  newPlacesDoc,
+  newPresenceDoc,
   newRootDoc,
   newSessionDoc,
   writeLaneTip,

@@ -42,15 +42,6 @@ export type Signal =
   | "running"
   | "done"
 
-/** Every signal, so a table over them is total. */
-export const SIGNALS: readonly Signal[] = [
-  "unsent",
-  "needs-you",
-  "worth-a-read",
-  "running",
-  "done",
-]
-
 const SIGNAL_WORDS: Readonly<Record<Signal, string>> = {
   unsent: "your unsent card is here",
   "needs-you": "needs you",

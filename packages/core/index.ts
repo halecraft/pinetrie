@@ -150,17 +150,6 @@ export const ROOT_ORIGIN: ThreadOrigin = { kind: "root" }
 export const forkEntry = (origin: ThreadOrigin): EntryId | null =>
   origin.kind === "fork" ? origin.at : null
 
-/**
- * A task as the host records it (`pinetrie.task`, keyed by its id): who
- * opened it, and when. Its cards are where the places document puts them.
- */
-export interface TaskRecord {
-  readonly task: TaskId
-  readonly by: WriterId
-  /** When, in ms since the epoch. */
-  readonly createdAt: number
-}
-
 // --- commands ---------------------------------------------------------------
 
 /** Error codes the host may return. Kept here so both sides agree without I/O. */
@@ -635,7 +624,6 @@ export const PROPOSED_CHANGES_ACTIONS: readonly ProposedChangesAction[] = [
  * repo's immutable heads, or publish it.
  */
 export type AcceptedAction = "setup" | "publish"
-export const ACCEPTED_ACTIONS: readonly AcceptedAction[] = ["setup", "publish"]
 
 // --- the board --------------------------------------------------------------
 
@@ -673,20 +661,6 @@ export const WORKFLOW_ACTIONS: readonly WorkflowAction[] = [
   "move",
   "remove",
 ]
-
-/**
- * A task's place on the board: a host-written `pinetrie.board` value keyed by
- * its `TaskId`. A task has one, written as it starts and as it moves.
- */
-export interface BoardPlace {
-  readonly task: TaskId
-  readonly state: WorkflowStateId
-  /** Its order within the state: an order key. */
-  readonly rank: string
-  /** Who moved it there, and when, in ms since the epoch. */
-  readonly by: WriterId
-  readonly at: number
-}
 
 /**
  * A task in the archive, derived from its place and never stored: who

@@ -69,10 +69,3 @@ function splice(prev: string, next: string): TextEdit {
     insert: next.slice(p, next.length - s),
   }
 }
-
-/** `text` with `edits` applied in order: what a Kyneta text holds afterwards. */
-export const applyEdits = (text: string, edits: readonly TextEdit[]): string =>
-  edits.reduce(
-    (t, e) => t.slice(0, e.at) + e.insert + t.slice(e.at + e.remove),
-    text,
-  )

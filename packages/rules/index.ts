@@ -178,7 +178,6 @@ export {
   TRACE,
   TRACE_MAX_AGE_MS,
   TRACED,
-  TRACED_PLACES,
   TRASH_KEEP_MS,
   type TrashSweep,
   traceEnd,
@@ -231,7 +230,6 @@ export {
   CONTEXT_KINDS,
   CONTEXT_RULES,
   type ContextKind,
-  contextKindOf,
   contextOf,
 } from "./context.ts"
 export { type CopyPlan, type CopyThread, planCopy } from "./copy.ts"
@@ -342,7 +340,6 @@ export {
   crossesArchive,
   type Discards,
   historyOf,
-  NO_DISCARDS,
   planHistorySweep,
   type UndoResult,
   undoAnswer,

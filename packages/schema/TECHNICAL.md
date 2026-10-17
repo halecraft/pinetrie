@@ -13,7 +13,7 @@ picture, and it is worth protecting.
 | `live.ts` | `LiveDoc`: the stream row's codec, `applyLiveOps` (its one writer), and its readers |
 | `pi-layout.ts` | how pi's data is laid out in a root: the entry row, `physicalKey`, `StoredValueRecord`, a lane's tip, `rowMessage`, `rowRetainedTail` |
 | `places.ts`, `text.ts`, `presence.ts`, `inventory.ts`, `attention.ts`, `open.ts` | one document each, below |
-| `fixtures.ts` | `@pinetrie/schema/fixtures`: documents written as pi and the host write them, for tests only |
+| `fixtures.ts` | `@pinetrie/schema/fixtures`: documents written as pi and the host write them, and each document with no Exchange (`newPlacesDoc`, `newLiveDoc` …), for tests only |
 | `index.ts` | re-exports, and nothing else |
 
 ## The entry row (ADR-0015)
@@ -315,7 +315,6 @@ would refuse each whole undo of a move (S82).
   `readPlaces` relies on.
 - **Its storage is compacted after each run** (`planCompaction`); nothing
   in memory is trimmed (S90).
-- **`newPlacesDoc()`** is one with no Exchange, for tests.
 - **A store from before ADR-0059 holds a `pinetrie:cards` document**, and one
   from before ADR-0066 a `json` `pinetrie:places` document, that no code
   opens; delete them by hand. The startup sweep removes the texts no record

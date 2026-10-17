@@ -4,12 +4,7 @@
 // Your tabs may arrange it at once, so it merges; each tab then repairs it
 // from the host's record (`planSlots` in @pinetrie/session).
 
-import {
-  type BoundSchema,
-  createDoc,
-  type DocRef,
-  Schema,
-} from "@kyneta/schema"
+import { type BoundSchema, type DocRef, Schema } from "@kyneta/schema"
 import { yjs } from "@kyneta/yjs-schema"
 import { type CardId, parseCardId } from "@pinetrie/core"
 
@@ -23,9 +18,6 @@ export type InventoryDocHandle =
   typeof InventoryDoc extends BoundSchema<infer S, infer N>
     ? DocRef<S, N>
     : never
-
-/** An inventory document on its own, with no Exchange: for tests. */
-export const newInventoryDoc = (): InventoryDocHandle => createDoc(InventoryDoc)
 
 /** The slots as stored, read as card ids. */
 export const readSlots = (

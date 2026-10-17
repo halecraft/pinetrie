@@ -47,10 +47,6 @@ export const CONTEXT = {
 /** The kinds, in the table's order. */
 export const CONTEXT_KINDS = Object.keys(CONTEXT) as readonly ContextKind[]
 
-/** The kind of context entry `message` is; null for any other message. */
-export const contextKindOf = (message: unknown): ContextKind | null =>
-  CONTEXT_KINDS.find(k => CONTEXT[k].decode(message) !== undefined) ?? null
-
 /** The rules `<rules>` holds for context entries, each once, in the table's order. */
 export const CONTEXT_RULES: readonly string[] = [
   ...new Set(CONTEXT_KINDS.map(k => CONTEXT[k].rule)),

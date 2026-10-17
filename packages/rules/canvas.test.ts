@@ -20,13 +20,7 @@ import {
   planCanvasFacts,
   planCanvasRead,
 } from "./canvas.ts"
-import {
-  CONTEXT,
-  CONTEXT_KINDS,
-  CONTEXT_RULES,
-  contextKindOf,
-  contextOf,
-} from "./context.ts"
+import { CONTEXT, CONTEXT_KINDS, CONTEXT_RULES, contextOf } from "./context.ts"
 import { encodePinned, PINNED_RULE } from "./pinned.ts"
 import { planFactCard } from "./queue.ts"
 import { type CanvasCard, canvasOf } from "./task.ts"
@@ -184,12 +178,14 @@ describe("the context table", () => {
   const list = encodeCanvas(canvasList(facts()), 1)
 
   test("each kind is known by its decoder; every rule is in <rules> once", () => {
-    expect([list, taskPinned, pinned].map(contextKindOf)).toEqual([
-      "canvas",
-      "task-pinned-cards",
-      "pinned-cards",
+    const kindsOf = (message: unknown) =>
+      CONTEXT_KINDS.filter(k => CONTEXT[k].decode(message) !== undefined)
+    expect([list, taskPinned, pinned].map(kindsOf)).toEqual([
+      ["canvas"],
+      ["task-pinned-cards"],
+      ["pinned-cards"],
     ])
-    expect(contextKindOf({ role: "user", content: "x" })).toBeNull()
+    expect(kindsOf({ role: "user", content: "x" })).toEqual([])
     expect(CONTEXT_RULES).toEqual([CANVAS_RULE, PINNED_RULE])
     // A thread's cards are written last, the prompt's parent.
     expect(CONTEXT_KINDS.at(-1)).toBe("pinned-cards")

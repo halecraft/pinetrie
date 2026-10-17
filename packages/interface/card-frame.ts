@@ -22,6 +22,7 @@ import {
   commandWords,
   pinnedStatusWords,
   reorderWords,
+  TAKE,
   unsentWords,
 } from "./card-words.ts"
 import type { ColumnAct } from "./intent.ts"
@@ -369,7 +370,7 @@ const MOVE: Readonly<Record<Exclude<CardMoveTo, object>, MoveWords>> = {
   },
   inventory: {
     label: "Move to your inventory",
-    title: "take into your inventory (Ctrl+Shift+I)",
+    title: TAKE,
   },
   reference: {
     label: "Queue a reference",

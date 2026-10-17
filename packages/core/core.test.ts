@@ -24,7 +24,6 @@ import {
   keyOf,
   keyOfFields,
   kindOfCard,
-  latestTip,
   livePlaceOf,
   type MoveTarget,
   messageText,
@@ -109,30 +108,6 @@ describe("who a principal is", () => {
 test("shellWord: one word, whatever it holds", () => {
   expect(shellWord("abc/d.e")).toBe("abc/d.e")
   expect(shellWord('it\'s "x"')).toBe(`'it'\\''s "x"'`)
-})
-
-test("latestTip: the newest tip by id, independent of input order", () => {
-  // Out of id order on purpose: a helper that returned the first or last tip
-  // would pass an in-order input.
-  assert.equal(
-    latestTip([
-      entryId("b-2"),
-      null,
-      entryId("c0000000-0000-7000-8000-000000000003"),
-      entryId("a-1"),
-    ]),
-    "c0000000-0000-7000-8000-000000000003",
-  )
-  assert.equal(
-    latestTip([
-      entryId("c0000000-0000-7000-8000-000000000003"),
-      entryId("a-1"),
-      entryId("b-2"),
-    ]),
-    "c0000000-0000-7000-8000-000000000003",
-  )
-  assert.equal(latestTip([null, null]), null, "lanes with no tip are ignored")
-  assert.equal(latestTip([]), null, "an empty session has no view")
 })
 
 test("writerId and threadIdFor: a person and a thread are never confused", () => {

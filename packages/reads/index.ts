@@ -182,7 +182,13 @@ function renderableEntry(row: StoredEntryRow): EntryLike | null {
   return entry
 }
 
-/** Keyed by each entry's own id: `Object.entries` would give plain strings. */
+/**
+ * Stored rows -> the shape the projections read, keyed by each entry's own
+ * id (`Object.entries` would give plain strings). `message` is pi's variant
+ * data, lifted by `rowMessage`; a human's chat is decoded here, by
+ * `renderableMessage`, into role `chat` with its author and writer. An
+ * unchanged row gives the same entry, frozen.
+ */
 function renderableEntries(
   rows: Readonly<Record<string, StoredEntryRow>>,
 ): Record<EntryId, EntryLike> {
@@ -193,16 +199,6 @@ function renderableEntries(
   }
   return out
 }
-
-/**
- * Stored rows -> the shape the projections read. `message` is pi's
- * variant data, lifted by `rowMessage`; a human's chat is decoded here, by
- * `renderableMessage`, into role `chat` with its author and writer. An
- * unchanged row gives the same entry, frozen.
- */
-export const readRenderableEntries = (
-  doc: RootDocHandle,
-): Record<EntryId, EntryLike> => renderableEntries(readEntries(doc))
 
 /**
  * The tree, indexed once per change of its entries (`indexTree`): a document

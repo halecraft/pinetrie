@@ -382,12 +382,20 @@ export const mutations: readonly Mutation[] = [
     expect: "newest is the largest id",
   },
   {
-    name: "a root with cards queued is not work",
+    name: "a task with cards queued is not work",
     file: roots,
-    from: "    if (lane.tip === null || !isBusy(lane)) continue",
-    to: "    if (lane.tip === null || !lane.running) continue",
+    from: "    if (threads.has(lane.name) && isBusy(lane))",
+    to: "    if (threads.has(lane.name) && lane.running)",
     command: unit,
-    expect: "running and waiting lanes resolve to their roots",
+    expect: "running and waiting lanes of the threads are work",
+  },
+  {
+    name: "the lesser work wins",
+    file: roots,
+    from: "  was !== undefined && WORK_RANK[was] >= WORK_RANK[now] ? was : now",
+    to: "  was !== undefined && WORK_RANK[was] <= WORK_RANK[now] ? was : now",
+    command: unit,
+    expect: "running and waiting lanes of the threads are work",
   },
   {
     name: "cards behind a held queue are waiting",
@@ -395,8 +403,7 @@ export const mutations: readonly Mutation[] = [
     from: '  lane.running ? "running" : lane.heldBy !== null ? "held" : "waiting"',
     to: '  lane.running ? "running" : "waiting"',
     command: unit,
-    expect:
-      "cards behind a held queue are held, below waiting and running in the same root",
+    expect: "cards behind a held queue are held, below waiting and running",
   },
   {
     name: "compel the agent on any mention",

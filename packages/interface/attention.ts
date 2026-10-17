@@ -3,9 +3,9 @@
 // by "not needed".
 
 import type {
+  AgentWork,
   EntryId,
   RootRecord,
-  RootWork,
   TaskId,
   ThreadId,
   Verdict,
@@ -210,7 +210,7 @@ const withItem = (now: Status | undefined, next: Status): Status => {
 export function threadStatus(input: {
   readonly items: readonly Item[]
   /** Threads whose agent works, held by this tab or not (`threadWork`). */
-  readonly work: ReadonlyMap<ThreadId, RootWork>
+  readonly work: ReadonlyMap<ThreadId, AgentWork>
   readonly verdicts: ReadonlyMap<ThreadId, VerdictRecord>
 }): ReadonlyMap<ThreadId, Status> {
   const out = new Map<ThreadId, Status>()

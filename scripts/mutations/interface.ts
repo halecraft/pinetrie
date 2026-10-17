@@ -3530,8 +3530,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a task's work is its last thread's",
     file: "packages/interface/app-view.ts",
-    from: "    if (was === undefined || WORK_ORDER.indexOf(work) > WORK_ORDER.indexOf(was))",
-    to: "    if (true)",
+    from: "    if (task !== undefined) out.set(task, moreWork(out.get(task), work))",
+    to: "    if (task !== undefined) out.set(task, work)",
     command: unit,
     expect: "threadWork and taskWork",
   },

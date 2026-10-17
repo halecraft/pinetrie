@@ -1,7 +1,11 @@
 import { cardIdFor } from "@pinetrie/core/fixtures"
 import { CARD_HISTORY, setRecord } from "@pinetrie/rules"
-import { applyRecordWrites, newLiveDoc } from "@pinetrie/schema"
-import { newRootDoc, newSessionDoc } from "@pinetrie/schema/fixtures"
+import { applyRecordWrites } from "@pinetrie/schema"
+import {
+  newLiveDoc,
+  newRootDoc,
+  newSessionDoc,
+} from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import { readSessionFacts } from "./projection.ts"
 

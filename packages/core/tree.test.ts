@@ -10,7 +10,6 @@ import {
 import {
   agentActivity,
   ancestry,
-  applyEdits,
   atEntry,
   baseKnown,
   type ChatAt,
@@ -32,6 +31,7 @@ import {
   rootOf,
   startsRun,
   subjectOf,
+  type TextEdit,
   type ThreadId,
   TOOL_IDS,
   tailEdit,
@@ -629,6 +629,13 @@ describe("subjectOf, toolIdOf and tailEdit", () => {
     expect(toolIdOf("mystery")).toBeUndefined()
     expect(toolIdOf("constructor")).toBeUndefined()
   })
+
+  // `text` with `edits` applied in order: what a Kyneta text holds afterwards.
+  const applyEdits = (text: string, edits: readonly TextEdit[]): string =>
+    edits.reduce(
+      (t, e) => t.slice(0, e.at) + e.insert + t.slice(e.at + e.remove),
+      text,
+    )
 
   // A tail-kept view: lines 1..n, keeping the last `keep` lines.
   const view = (n: number, keep: number) =>

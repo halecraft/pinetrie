@@ -1021,9 +1021,6 @@ export type PlaceOf<K extends CardKind> = Extract<
 /** The places a text card is ever in. */
 export type TextPlace = PlaceOf<"text">
 
-/** The places a thread card is ever in. */
-export type HeldPlace = PlaceOf<"thread">
-
 /** A canvas card's place: a task and a rank there. */
 export type CanvasPlace = Extract<CardPlace, { readonly kind: "canvas" }>
 

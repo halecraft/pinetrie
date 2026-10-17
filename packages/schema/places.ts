@@ -7,12 +7,7 @@
 // client's write throws before it is made, where it would otherwise fork that
 // client's copy for good.
 
-import {
-  type BoundSchema,
-  createDoc,
-  type DocRef,
-  Schema,
-} from "@kyneta/schema"
+import { type BoundSchema, type DocRef, Schema } from "@kyneta/schema"
 import { yjs } from "@kyneta/yjs-schema"
 import { type TextCardId, textCardId } from "@pinetrie/core"
 
@@ -83,9 +78,6 @@ export const PlacesDoc = yjs.bind(placesSchema)
 /** The places document, as the Exchange gives it. */
 export type PlacesDocHandle =
   typeof PlacesDoc extends BoundSchema<infer S, infer N> ? DocRef<S, N> : never
-
-/** A places document on its own, with no Exchange: for tests. */
-export const newPlacesDoc = (): PlacesDocHandle => createDoc(PlacesDoc)
 
 const CARD_PREFIX = "card:"
 

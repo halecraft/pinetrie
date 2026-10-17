@@ -19,7 +19,12 @@
 // The writer must be in the key: a browser sees only the host among its
 // peers, so it cannot look another tab's person up from its seat.
 
-import { createDoc, ephemeral, Schema } from "@kyneta/schema"
+import {
+  type BoundSchema,
+  type DocRef,
+  ephemeral,
+  Schema,
+} from "@kyneta/schema"
 
 export interface PresenceDecay {
   /** How long reading and editing last without a refresh. */
@@ -64,10 +69,11 @@ export const presenceDoc = (d: PresenceDecay = PRESENCE_DECAY) =>
 
 export const PresenceDoc = presenceDoc()
 
-export const newPresenceDoc = () => createDoc(PresenceDoc)
-
 /** A live handle on the presence document. */
-export type PresenceDocHandle = ReturnType<typeof newPresenceDoc>
+export type PresenceDocHandle =
+  typeof PresenceDoc extends BoundSchema<infer S, infer N>
+    ? DocRef<S, N>
+    : never
 
 /**
  * The key of one seat's entries: its person, then the seat. A

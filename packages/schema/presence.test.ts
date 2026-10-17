@@ -2,13 +2,8 @@
 // was measured through Exchanges (`TECHNICAL.md`, "Presence").
 import { batch, createDoc, SUBSTRATE } from "@kyneta/schema"
 import { describe, expect, test } from "vitest"
-import {
-  newPresenceDoc,
-  presenceDoc,
-  readingKey,
-  seatKey,
-  writerOfKey,
-} from "./index.ts"
+import { newPresenceDoc } from "./fixtures.ts"
+import { presenceDoc, readingKey, seatKey, writerOfKey } from "./index.ts"
 
 const tick = (doc: object, now: number) =>
   (doc as Record<symbol, { tick?: (n: number) => void }>)[SUBSTRATE]?.tick?.(

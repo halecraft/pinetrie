@@ -7,7 +7,7 @@ import {
 } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
 import { encodeCard } from "@pinetrie/rules"
-import { newPlacesDoc } from "@pinetrie/schema"
+import { newPlacesDoc } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import { readPlaces, readPlacesRev } from "./index.ts"
 

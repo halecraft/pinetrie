@@ -7,6 +7,7 @@
 
 import {
   type AccessRecord,
+  type AgentWork,
   type ArchivedTask,
   ancestry,
   type EntryId,
@@ -15,11 +16,11 @@ import {
   type LaneRecord,
   type LaneView,
   laneWork,
+  moreWork,
   type ProposedChangesRecord,
   projectRail,
   type RailRow,
   type RootId,
-  type RootWork,
   type TaskId,
   type ThreadId,
   type ThreadName,
@@ -108,8 +109,8 @@ export function threadWork(input: {
   readonly lanes: readonly LaneView[]
   /** Lanes running in any root (`readRunningLanes`). */
   readonly running: readonly { readonly lane: ThreadId }[]
-}): ReadonlyMap<ThreadId, RootWork> {
-  const work = new Map<ThreadId, RootWork>()
+}): ReadonlyMap<ThreadId, AgentWork> {
+  const work = new Map<ThreadId, AgentWork>()
   for (const lane of input.lanes)
     if (isBusy(lane)) work.set(lane.name, laneWork(lane))
   for (const { lane } of input.running) work.set(lane, "running")
@@ -121,22 +122,16 @@ export function threadWork(input: {
  * waiting over held. A thread in no task counts for none.
  */
 export function taskWork(
-  threads: ReadonlyMap<ThreadId, RootWork>,
+  threads: ReadonlyMap<ThreadId, AgentWork>,
   taskOfThread: ReadonlyMap<ThreadId, TaskId>,
-): ReadonlyMap<TaskId, RootWork> {
-  const out = new Map<TaskId, RootWork>()
+): ReadonlyMap<TaskId, AgentWork> {
+  const out = new Map<TaskId, AgentWork>()
   for (const [thread, work] of threads) {
     const task = taskOfThread.get(thread)
-    if (task === undefined) continue
-    const was = out.get(task)
-    if (was === undefined || WORK_ORDER.indexOf(work) > WORK_ORDER.indexOf(was))
-      out.set(task, work)
+    if (task !== undefined) out.set(task, moreWork(out.get(task), work))
   }
   return out
 }
-
-/** Least first: `taskWork` keeps the most. */
-const WORK_ORDER: readonly RootWork[] = ["held", "waiting", "running"]
 
 /**
  * Open proposed changes (`proposedChangesStatus`), for your inbox and the

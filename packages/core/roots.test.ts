@@ -5,9 +5,9 @@ import {
   indexTree,
   type LaneView,
   projectRail,
-  rootWork,
   summarizeRoots,
   threadIdFor,
+  threadsWork,
   type WriterId,
   writerId,
 } from "./index.ts"
@@ -60,39 +60,36 @@ describe("summarizeRoots", () => {
   })
 })
 
-describe("rootWork", () => {
-  test("running and waiting lanes resolve to their roots; running wins", () => {
-    const work = rootWork(index, [
-      lane("2-a", { waiting: 1 }),
-      lane("4-b", { running: true }),
-      lane("6-d", { waiting: 2 }),
-    ])
-    expect([...work]).toEqual([
-      ["1-r1", "running"],
-      ["3-r2", "waiting"],
-    ])
+describe("threadsWork", () => {
+  const threads = (...tips: string[]) => new Set(tips.map(t => threadIdFor(t)))
+  test("running and waiting lanes of the threads are work; running wins, and other lanes count for nothing", () => {
+    const lanes = [lane("2-a", { waiting: 1 }), lane("4-b", { running: true })]
+    expect(threadsWork(lanes, threads("2-a", "4-b"))).toBe("running")
+    expect(threadsWork(lanes, threads("2-a"))).toBe("waiting")
+    expect(threadsWork(lanes, threads("6-d"))).toBeUndefined()
   })
-  test("cards behind a held queue are held, below waiting and running in the same root", () => {
+  test("cards behind a held queue are held, below waiting and running", () => {
     const held = { waiting: 2, heldBy: ADA }
-    expect([...rootWork(index, [lane("2-a", held)])]).toEqual([
-      ["1-r1", "held"],
-    ])
-    expect([
-      ...rootWork(index, [lane("2-a", held), lane("4-b", { waiting: 1 })]),
-    ]).toEqual([["1-r1", "waiting"]])
-    expect([
-      ...rootWork(index, [
-        lane("2-a", { ...held, running: true }),
-        lane("4-b", held),
-      ]),
-    ]).toEqual([["1-r1", "running"]])
+    expect(threadsWork([lane("2-a", held)], threads("2-a"))).toBe("held")
+    expect(
+      threadsWork(
+        [lane("2-a", held), lane("4-b", { waiting: 1 })],
+        threads("2-a", "4-b"),
+      ),
+    ).toBe("waiting")
+    expect(
+      threadsWork(
+        [lane("2-a", { ...held, running: true }), lane("4-b", held)],
+        threads("2-a", "4-b"),
+      ),
+    ).toBe("running")
   })
-  test("a held queue with nothing in it is no work", () => {
-    expect([...rootWork(index, [lane("2-a", { heldBy: ADA })])]).toEqual([])
-  })
-  test("an idle lane is no work, and a lane with no tip is in no root", () => {
-    expect([
-      ...rootWork(index, [lane("2-a"), lane(null, { running: true })]),
-    ]).toEqual([])
+  test("a held queue with nothing in it is no work, nor is an idle lane", () => {
+    expect(
+      threadsWork(
+        [lane("2-a", { heldBy: ADA }), lane("4-b")],
+        threads("2-a", "4-b"),
+      ),
+    ).toBeUndefined()
   })
 })

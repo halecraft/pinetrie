@@ -173,9 +173,6 @@ export type FactCard = Card<"fact">
 /** A reference to an address. */
 export type ReferenceCard = Card<"reference">
 
-/** An ask from another thread for a busy agent: only ever queued. */
-export type AskCard = Card<"ask">
-
 /**
  * A card's record, by kind, so a text card on a canvas, a thread's card in a
  * queue or a fact anywhere but a queue does not compile.

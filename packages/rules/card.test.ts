@@ -66,7 +66,6 @@ import { planReorder, planSetCommand, planWidth, REORDERS } from "./in-place.ts"
 import {
   crossesArchive,
   historyOf,
-  NO_DISCARDS,
   planHistorySweep,
   undoAnswer,
 } from "./move-history.ts"
@@ -95,7 +94,7 @@ import {
   queuedOn,
   taskPinnedOf,
 } from "./queue.ts"
-import { canvasOf, indexTasks } from "./task.ts"
+import { canvasOf, indexTasks, NO_TASK_INDEX } from "./task.ts"
 
 const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 
@@ -929,14 +928,16 @@ describe("note columns", () => {
         ADA,
       ),
     ).toEqual({ kind: "refused", code: "no-place", now: null })
-    expect(
-      historyOf([{ card: id, from: null, to }], [], NO_DISCARDS, "move"),
-    ).toEqual(historyScope(TEST_TASK))
+    // Moves from nowhere discard nothing: no task's index, and no task here.
+    const none = { tasks: NO_TASK_INDEX, here: null }
+    expect(historyOf([{ card: id, from: null, to }], [], none, "move")).toEqual(
+      historyScope(TEST_TASK),
+    )
     expect(
       historyOf(
         [{ card: C1, from: null, to: { kind: "note", column: NOTES } }],
         [],
-        NO_DISCARDS,
+        none,
         "move",
       ),
     ).toBeNull()

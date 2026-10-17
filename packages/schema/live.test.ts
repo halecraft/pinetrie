@@ -1,8 +1,8 @@
 import { entryId, runId, streamId, threadIdFor } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
+import { newLiveDoc } from "./fixtures.ts"
 import {
   applyLiveOps,
-  newLiveDoc,
   readActiveLanes,
   readActiveRun,
   readStreamIds,

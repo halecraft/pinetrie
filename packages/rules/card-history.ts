@@ -188,9 +188,6 @@ export const TRACED: {
   pinned: (from, index) => placeEnd(from, index),
 }
 
-/** The places a trace is left at (`TRACED`). */
-export const TRACED_PLACES = Object.keys(TRACED) as readonly TracedKind[]
-
 /**
  * A place a card moved out of leaves a trace at (`TracedKind`), as its key;
  * null for one it leaves none at.

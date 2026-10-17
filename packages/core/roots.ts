@@ -12,7 +12,6 @@ import {
   type LaneView,
   messageText,
   projectRail,
-  rootOf,
   type TreeIndex,
   writersOf,
 } from "./tree.ts"
@@ -55,57 +54,38 @@ export function summarizeRoots(index: TreeIndex): readonly RootSummary[] {
 }
 
 /**
- * What a root's lanes hold: the agent running there, cards it will be sent when
- * it is free (`waiting`), or cards that wait for someone to release the queue
- * (`held`).
+ * What the agent has in a busy lane: a run (`running`), cards it will be sent
+ * when it is free (`waiting`), or cards that wait for someone to release the
+ * queue (`held`).
  */
-export type RootWork = "running" | "waiting" | "held"
+export type AgentWork = "running" | "waiting" | "held"
 
-const WORK_RANK: Record<RootWork, number> = { held: 0, waiting: 1, running: 2 }
+const WORK_RANK: Record<AgentWork, number> = { held: 0, waiting: 1, running: 2 }
+
+/** The more of `was` and `now`, running over waiting over held: `now` with no `was`. */
+export const moreWork = (
+  was: AgentWork | undefined,
+  now: AgentWork,
+): AgentWork =>
+  was !== undefined && WORK_RANK[was] >= WORK_RANK[now] ? was : now
 
 /** A busy lane's work: running, else held while its queue is held, else waiting. */
-export const laneWork = (lane: LaneView): RootWork =>
+export const laneWork = (lane: LaneView): AgentWork =>
   lane.running ? "running" : lane.heldBy !== null ? "held" : "waiting"
 
 /**
- * The agent's work in each root, by the root that holds each lane's tip. A
- * lane with no tip is in no root; running wins over waiting, and waiting
- * over held. The one rule for when a root cannot be archived: `planArchive`
- * refuses from any of them, and Move to the archive is disabled from
- * it. Only running and waiting ring a root (`rootStatus`): a held queue
- * waits for a person.
- */
-export function rootWork(
-  index: TreeIndex,
-  lanes: readonly LaneView[],
-): ReadonlyMap<EntryId, RootWork> {
-  const work = new Map<EntryId, RootWork>()
-  for (const lane of lanes) {
-    if (lane.tip === null || !isBusy(lane)) continue
-    const root = rootOf(index, lane.tip)
-    if (root === null) continue
-    const now = laneWork(lane)
-    const was = work.get(root)
-    if (was === undefined || WORK_RANK[now] > WORK_RANK[was])
-      work.set(root, now)
-  }
-  return work
-}
-
-/**
  * The agent's work among `threads`' lanes: a task's, whatever roots its threads
- * are in. Undefined when none is busy. The one rule for when a task cannot be
- * archived.
+ * are in. Running wins over waiting, and waiting over held; undefined when
+ * none is busy. The one rule for when a task cannot be archived.
  */
 export function threadsWork(
   lanes: readonly LaneView[],
   threads: ReadonlySet<ThreadId>,
-): RootWork | undefined {
-  let work: RootWork | undefined
+): AgentWork | undefined {
+  let work: AgentWork | undefined
   for (const lane of lanes) {
-    if (!threads.has(lane.name) || !isBusy(lane)) continue
-    const now = laneWork(lane)
-    if (work === undefined || WORK_RANK[now] > WORK_RANK[work]) work = now
+    if (threads.has(lane.name) && isBusy(lane))
+      work = moreWork(work, laneWork(lane))
   }
   return work
 }

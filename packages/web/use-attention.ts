@@ -4,12 +4,12 @@
 // move (`moving`). The decisions are `attention.ts`'s.
 
 import {
+  type AgentWork,
   isBusy,
   type LaneView,
   laneWork,
   type RootId,
   type RootRecord,
-  type RootWork,
   type TaskId,
   type ThreadId,
   type VerdictRecord,
@@ -72,7 +72,7 @@ export function useAttention(input: {
   /** Each thread's task: a task's status is its threads'. */
   readonly taskOfThread: ReadonlyMap<ThreadId, TaskId>
   /** Threads whose agent works, held or not (`threadWork`). */
-  readonly work: ReadonlyMap<ThreadId, RootWork>
+  readonly work: ReadonlyMap<ThreadId, AgentWork>
   readonly layout: Pick<Layout, "open">
   /** The session has settled: before, a change is data arriving, not news. */
   readonly settled: boolean

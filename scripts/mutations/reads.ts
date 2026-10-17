@@ -71,7 +71,7 @@ export const mutations: readonly Mutation[] = [
     expect: "readTreeIndex keeps the index",
   },
   {
-    name: "readRenderableEntries decodes every row again",
+    name: "the index's entries decode every row again",
     file: "packages/reads/index.ts",
     from: "  const known = entryOfRow.get(row)",
     to: "  const known = undefined",
