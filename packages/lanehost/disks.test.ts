@@ -113,6 +113,35 @@ describe.skipIf(!onBtrfs)(
         ),
       ).toBe(false)
     })
+    test("a lane restored from another's snapshot is apart from it: neither's writes reach the other", async () => {
+      await disk({
+        kind: "disk",
+        project: KEY,
+        op: { kind: "create", lane: "parent" },
+      })
+      await writeFile(path.join(disks.lane("parent"), "f"), "turn")
+      await disk({
+        kind: "disk",
+        project: KEY,
+        op: { kind: "snapshot", lane: "parent", snapshot: "at-turn" },
+      })
+      await disk({
+        kind: "disk",
+        project: KEY,
+        op: { kind: "restore", lane: "branch", from: "at-turn" },
+      })
+      await writeFile(path.join(disks.lane("parent"), "f"), "parent later")
+      await writeFile(path.join(disks.lane("branch"), "f"), "branch")
+      expect(
+        await Promise.all(
+          [
+            disks.lane("parent"),
+            disks.lane("branch"),
+            disks.snapshot("at-turn"),
+          ].map(d => readFile(path.join(d, "f"), "utf8").catch(() => null)),
+        ),
+      ).toEqual(["parent later", "branch", "turn"])
+    })
     test("the walk's diff of the recorded turn, between two snapshots, is what send's stream says", async () => {
       const lane = disks.lane("turn")
       await disk({

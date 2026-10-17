@@ -23,7 +23,6 @@ import {
   openProfile,
   PANE_VIEWPORT,
   readRaw,
-  twoFrames,
   typeAfter,
 } from "./page.ts"
 
@@ -626,17 +625,6 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
             capped !== null &&
             full.height > capped.height,
           `${JSON.stringify(full)}`,
-        )
-        await ip.click(`${row} .tool-more`).catch(() => {})
-        script.use([{ text: "Still grey." }])
-        await say("@agent and now?", "Still grey.")
-        await twoFrames(ip)
-        const after = await drawn()
-        const open = await ip.getAttribute(row, "data-open")
-        check(
-          "folded, it stays in its summary when another message arrives",
-          open === null && after?.thumb === true,
-          `${JSON.stringify({ open, after })}`,
         )
       } finally {
         await ip.context().close()

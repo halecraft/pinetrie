@@ -176,6 +176,16 @@ export const mutations: readonly Mutation[] = [
       "a lane's delete takes a nested disk holding read-only snapshots, and a lane disk holding one",
   },
   {
+    // Proven in a lane: `disks.test.ts` skips where `/workspace` is no btrfs.
+    name: "a restore takes its snapshot's subvolume, not a snapshot of it",
+    file: "packages/lanehost/disks.ts",
+    from: '        {\n          kind: "snapshot",\n          from: disks.snapshot(call.from),\n          to: disks.lane(call.lane),\n          readonly: false,\n        },\n',
+    to: '        { kind: "move", from: disks.snapshot(call.from), to: disks.lane(call.lane) },\n',
+    command: unit("packages/lanehost"),
+    expect:
+      "a lane restored from another's snapshot is apart from it: neither's writes reach the other",
+  },
+  {
     name: "a lane's delete leaves its inner lanes' disk",
     file: "packages/lanehost/disks.ts",
     from: '        { kind: "drop", path: disks.nested(call.lane) },\n',

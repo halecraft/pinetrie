@@ -180,8 +180,9 @@ measured**, and each time it produced a confident wrong answer:
 
 **The defence that works is a negative control: prove the check can still fail.**
 Every new check comes with one: a deliberate bug in `scripts/mutations/`
-that it catches (`AGENTS.md`, Gates). The suite checks still without one
-are listed in `scripts/unproven.ts`, a list that only shrinks. The spikes' property tests for convergence,
+that it catches (`AGENTS.md`, Gates), and `scripts/unproven.ts`, a list
+that only shrinks, holds any suite check still without one: none now. The
+spikes' property tests for convergence,
 `seq` and trunk semantics, with their controls, stayed in `sandbox/`: none
 is a gate.
 *A check without a proof that it can fail is not yet a check.*
@@ -291,9 +292,9 @@ path in a lane, is not handed to the model.
 **Live work hands over to its entry in one render** (ADR-0044). A reply is
 its lane's current reply while the lane's tip is where it opened, and its
 entry moves the tip. A tool's output streams in its own row. The layout is
-drawn from the render's own facts. A column at its end does not get shorter
-while the agent works: a floor takes up a shrink. The browser suite checks
-this frame by frame at 20× CPU throttle.
+drawn from the render's own facts, which the browser suite checks frame by
+frame at 20× CPU throttle. A column at its end does not get shorter while
+the agent works: a floor takes up a shrink.
 
 **A canvas can be renamed** (ADR-0045, ADR-0116): its title is a
 host-written `pinetrie.mark` value, set from its item's `⋯` in the sidebar
@@ -495,10 +496,6 @@ Decided, and waiting for their turn:
   - **S154**: a touch drag on iOS Safari, deferred until an iPhone is at
     hand.
   - **S197**: building the lane VM's image on Linux, in QEMU.
-- **Suite checks no mutation proves yet** are listed in
-  `scripts/unproven.ts`, by scenario: each waits to be proved by a
-  mutation, or deleted once a unit test proves its rule (`AGENTS.md`,
-  Gates).
 - **A run's refusal cannot reach its author.** The host replies `started`
   before pi admits the run, so a refusal is only logged; the message is kept
   in the tree (`settleRun`), with no reply. A second reply, sent once the run

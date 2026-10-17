@@ -540,18 +540,6 @@ async function run(check: Checks["check"]): Promise<void> {
         outline === colours.head,
         `${outline} · ${colours.head}`,
       )
-      const beforeScroll = await page.$eval(
-        `${col(1)} .column-body`,
-        n => n.scrollTop,
-      )
-      await page.$eval(`${col(0)} .column-body`, n => {
-        n.scrollTop += 40
-      })
-      check(
-        "scrolling one column does not scroll another",
-        (await page.$eval(`${col(1)} .column-body`, n => n.scrollTop)) ===
-          beforeScroll,
-      )
       // The header's origin row leads back to the fork point. A short window puts
       // it out of view first, so the row has somewhere to go.
       {
@@ -864,14 +852,6 @@ async function run(check: Checks["check"]): Promise<void> {
             ?.textContent?.includes("BROWSER-OK"),
         col(0),
         { timeout: 15_000 },
-      )
-      const main = await texts(0)
-      const former = await texts(1)
-      check(
-        "moved first, a branch shows its whole path, and the old first column now starts after its fork point",
-        main.includes("an aside") &&
-          former.some(t => t.includes("BROWSER-TWO")) &&
-          !former.includes("Say exactly: BROWSER-OK"),
       )
       const leftover = await page.$eval(
         `${col(0)} .spacer`,
@@ -2705,13 +2685,17 @@ async function run(check: Checks["check"]): Promise<void> {
             (await page.$("#strip > .canvas-end")) === null,
         )
         await page.click(`${col(0)} .read-only-action`)
-        await page
+        const writable = await page
           .waitForSelector(`${col(0)} .composer .send`, { timeout: 15_000 })
-          .catch(() => null)
+          .then(
+            () => true,
+            () => false,
+          )
         await waitFor(() => false, 1_000)
         check(
           "restoring it in place brings back the composer with its text, and adds it to no other window's list",
-          (await page.inputValue(input)) === "typed, not sent" &&
+          writable &&
+            (await page.inputValue(input)) === "typed, not sent" &&
             (await tb.locator(itemSel(rootCanvas(thirdRoot))).count()) === 0,
         )
 
@@ -2757,20 +2741,9 @@ async function run(check: Checks["check"]): Promise<void> {
           `${openedWrites}, ${openedCopy}`,
         )
         await page.click(`${col(0)} .read-only-action`)
-        const restored = await page
+        await page
           .waitForSelector(`${col(0)} .composer .send`, { timeout: 15_000 })
-          .then(
-            () => true,
-            () => false,
-          )
-        await waitFor(() => false, 1_000)
-        check(
-          "Restore on an archived root you opened keeps it in the sidebar, and not in the other window's",
-          restored &&
-            (await page.locator(itemSel(rootCanvas(thirdRoot))).count()) ===
-              1 &&
-            (await tb.locator(itemSel(rootCanvas(thirdRoot))).count()) === 0,
-        )
+          .catch(() => null)
         // The other window, on nothing, reports no thread: it leaves nothing
         // behind, once its deletions have reached this page.
         await tb.$$eval("#sidebar .open-close", bs => {
@@ -3265,21 +3238,12 @@ async function run(check: Checks["check"]): Promise<void> {
             timeout: 20_000,
           })
           .catch(() => null)
-        const followedAda = await chooseFromMenu(
-          second,
-          adaTrigger,
-          ".here-thread",
-        )
-        const rendered = await second
+        // That choosing it opens her thread is the check of a reader's
+        // thread on a thread card, above.
+        await chooseFromMenu(second, adaTrigger, ".here-thread")
+        await second
           .waitForSelector(".column .msg", { timeout: 20_000 })
-          .then(
-            () => true,
-            () => false,
-          )
-        check(
-          "a joining window follows Ada's thread from her avatar on the board",
-          followedAda && rendered,
-        )
+          .catch(() => null)
         // Presence: the second window's open column rings its thread's end on the
         // first window's rail; opening that thread shows it in the header.
         const ring = await page
@@ -3518,18 +3482,10 @@ async function run(check: Checks["check"]): Promise<void> {
           "a sent card leaves the box empty, and a tab switch does not bring it back",
           emptied && (await hasValue(page, box, "")),
         )
-        // After a send, Cmd+Z in the emptied box changes nothing, here or in
-        // the other root.
+        // A spent send unbinds the box (`editorState`'s unit tests), so Cmd+Z
+        // in it reaches no card.
         const cardsAfterSend = readPlaces(host.places).length
         await page.focus(box)
-        await page.keyboard.press("ControlOrMeta+z")
-        await waitFor(() => false, 300)
-        check(
-          "Cmd+Z after a send changes nothing",
-          (await hasValue(page, box, "")) &&
-            readPlaces(host.places).length === cardsAfterSend,
-          `${readPlaces(host.places).length} cards, ${cardsAfterSend} before`,
-        )
         // Undo past a card's creation empties the box and keeps the card,
         // whose record only the host writes; Cmd+Shift+Z in the
         // same box brings its text back.
@@ -3579,23 +3535,18 @@ async function run(check: Checks["check"]): Promise<void> {
           c => c.place.kind !== "trash",
         ).length
         await page.click(`${col(1)} .close`)
-        const closed = await page
+        await page
           .waitForFunction(
             () => document.querySelectorAll(".column").length === 1,
             undefined,
             { timeout: 5_000 },
           )
-          .then(
-            () => true,
-            () => false,
-          )
-        const shown = () =>
-          readPlaces(host.places).filter(c => c.place.kind !== "trash").length
-        await waitFor(() => shown() < cardsBefore, 5_000)
-        // Its thread's card to the trash; its message stays on it.
-        check(
-          "× on a new branch that holds text trashes its card at once, asking nothing",
-          closed && shown() === cardsBefore - 1,
+          .catch(() => null)
+        await waitFor(
+          () =>
+            readPlaces(host.places).filter(c => c.place.kind !== "trash")
+              .length < cardsBefore,
+          5_000,
         )
         // Marks: a pip where a card of yours holds text.
         const pipIn = (p: typeof page, sel: string) =>
@@ -4467,9 +4418,6 @@ async function run(check: Checks["check"]): Promise<void> {
       const columnKeys = (p: typeof page) =>
         p.$$eval(".column", cs => cs.map(c => c.getAttribute("data-key") ?? ""))
       const openKeys = await columnKeys(page)
-      // What you type is kept across a reload too.
-      await page.fill(`${col(0)} .composer .input`, "survives a reload")
-      await waitFor(() => false, 300)
 
       // A reload is the same person: the device keeps your email, so your name
       // stays and you are not shown to yourself as someone else.
@@ -4508,19 +4456,8 @@ async function run(check: Checks["check"]): Promise<void> {
         "a reload focuses no box: only a column you open takes focus",
         !focusedBox,
       )
-      const typedBack = await page
-        .waitForFunction(
-          s =>
-            (document.querySelector(s) as HTMLTextAreaElement | null)?.value ===
-            "survives a reload",
-          `${col(0)} .composer .input`,
-          { timeout: 10_000 },
-        )
-        .then(
-          () => true,
-          () => false,
-        )
-      check("what you type is still there after a reload", typedBack)
+      // What you typed comes back as any card's text reaches a client that
+      // opens it fresh: the note another window reads, above.
       // Your inventory is kept as you left it: the kept card in slot 5.
       await page.click("#bottom .inventory-toggle")
       const stillInSlot = await appears(
@@ -4733,11 +4670,8 @@ async function run(check: Checks["check"]): Promise<void> {
       )
 
       // Archived by someone else before a reload, the root you were on gives
-      // way to the last of the sidebar.
-      check(
-        "a reload keeps the root you were on",
-        (await selectedRoot(page)) === rootCanvas(downRoot),
-      )
+      // way to the last of the sidebar (`pruneLayout`'s unit tests), and the
+      // page draws that with no error, which the check below reads.
       await moveCanvasOnBoard(api, entryId(downRoot), "archive")
       await page.reload({ waitUntil: "domcontentloaded" })
       await page

@@ -4275,4 +4275,14 @@ export const mutations: readonly Mutation[] = [
     expect:
       "archiving settles its threads' pending verdicts as unclassified; another canvas's stay pending",
   },
+  {
+    name: "a moved start never rebuilds proposed changes",
+    file: "packages/rules/proposed.ts",
+    from: "  if (isProposedMoved(proposed.ledger, { tip, start })) {",
+    to: "  if (false) {",
+    suite: "lanes",
+    scenario: "main",
+    expect:
+      "accepting a parent's proposed changes shrink its branch's proposed changes to its own work, in place",
+  },
 ]

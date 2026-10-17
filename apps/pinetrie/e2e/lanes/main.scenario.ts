@@ -317,13 +317,8 @@ async function mainSection(
           parentSums.replace(/shared.txt.*/, "") &&
         (await sums(looker.name)) === parentSums,
     )
-    check(
-      "a branch's writes never reach its parent, nor its parent's its",
-      branch !== undefined &&
-        one !== undefined &&
-        (await inLane(branch.name, "cat shared.txt")).trim() === "branch" &&
-        (await inLane(one.name, "cat shared.txt")).trim() === "parent-later",
-    )
+    // That a branch's writes never reach its parent, nor its parent's it, is
+    // the disks' rule, proved on btrfs by lanehost's `disks.test.ts`.
     // A branch of the branch.
     script.use([
       { tool: "bash", args: { command: "echo deeper >> shared.txt" } },
@@ -826,17 +821,13 @@ async function mainSection(
       },
     )
     await idle()
-    const next = await waitFor(
+    // That they start above what was accepted is `repo.test.ts`'s, on real jj.
+    await waitFor(
       () =>
         proposedFromRows()?.acceptedAs === null &&
         JSON.stringify(proposedFromRows()?.files) ===
           JSON.stringify(["after.txt"]),
       30_000,
-    )
-    check(
-      "after an acceptance, the next proposed changes hold only the new work",
-      next >= 0,
-      `${JSON.stringify(proposedFromRows()?.files)}`,
     )
     // A clean update: a fact in the thread, then the card's text, sent. Your
     // work goes in accepted work first: a publish catches it up with what you

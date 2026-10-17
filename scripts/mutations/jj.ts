@@ -1403,4 +1403,53 @@ export const mutations: readonly Mutation[] = [
     to: '  readonly history: "jj"\n',
     command: ["pnpm", "exec", "tsc", "--noEmit"],
   },
+  {
+    name: "a fork at a recorded turn works on that turn's parent",
+    file: "packages/jj/lane/plan.ts",
+    from: '            inLane("jj", "new", ...recorded),',
+    to: '            inLane("jj", "new", ...recorded.map(c => `${c}-`)),',
+    suite: "lanes",
+    scenario: "main",
+    expect: "a branch at the turn the agent committed in has its file",
+  },
+  {
+    name: "your log is left as jj's own, without the proposed changes",
+    file: "packages/jj/plan.ts",
+    from: '  const added = PROPOSED_BOOKMARKS\n  const base = (current ?? "builtin_log()").trim()\n  return base.endsWith(added) ? base : `${base} | ${added}`',
+    to: '  const added = PROPOSED_BOOKMARKS\n  const base = (current ?? "builtin_log()").trim()\n  return base.endsWith(added) ? base : base',
+    suite: "lanes",
+    scenario: "main",
+    expect:
+      "a turn's work is proposed changes in your repo, described, and its turns are not in your log",
+  },
+  {
+    name: "jj's own rebase of proposed changes reads as your edit",
+    file: "packages/jj/proposed.ts",
+    from: "    if (!step.sameDescription || !step.sameChange) yoursChanged = true",
+    to: "    if (step) yoursChanged = true",
+    suite: "lanes",
+    scenario: "main",
+    expect:
+      "the proposed changes' record names its commit as it is now, after jj rebased it under the host, and the host wrote nothing",
+  },
+  {
+    name: "a lane's read finds none of the accepted thread commits it holds, so its start never reaches its tip",
+    file: "packages/jj/lane-read.ts",
+    from: "        .flatMap(t => t.sources),",
+    to: "        .flatMap(() => []),",
+    suite: "lanes",
+    scenario: "main",
+    expect:
+      "accepting a branch that holds all its parent's work withdraws the parent's proposed changes: no record, no bookmark",
+  },
+  {
+    name: "proposed changes rebuilt while their lane runs keep the agent's message",
+    file: "packages/jj/proposed-steps.ts",
+    from: "          description: proposedMessage(at.wip, {",
+    to: '          description: proposedMessage("proposed changes: scripted", {',
+    suite: "lanes",
+    scenario: "main",
+    expect:
+      "a run that moves the lane keeps the proposed changes' change id; it is a WIP line until each run ends",
+  },
 ]
