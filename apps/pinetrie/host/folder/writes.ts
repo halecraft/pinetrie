@@ -20,7 +20,6 @@ import { pipeline } from "node:stream/promises"
 import {
   concurrentStateId,
   ERR,
-  type ErrCode,
   FOLDER_RESERVED,
   type FolderProposedChangesRecord,
   type FolderStamp,
@@ -38,10 +37,10 @@ import {
   writeStageDir,
 } from "@pinetrie/core"
 import {
-  acceptWrites,
   checkStage,
   journalPaths,
   keptAsides,
+  pathWrites,
   planAccept,
   planAsides,
   planNames,
@@ -58,6 +57,7 @@ import {
   STATE,
   setRecord,
 } from "@pinetrie/rules"
+import type { ActRefusal } from "../work/destination.ts"
 import { type StateReader, sourceChanges } from "./changes.ts"
 import type { FolderLine } from "./line.ts"
 import { folderStamp } from "./scan.ts"
@@ -72,14 +72,8 @@ import {
   walkStage,
 } from "./write.ts"
 
-/** What a write answered: refused, with the path it names if any, or done. */
-export type WriteAnswer<Done> =
-  | {
-      readonly kind: "refused"
-      readonly code: ErrCode
-      readonly path?: string
-    }
-  | Done
+/** What a write answered: refused, or done. */
+export type WriteAnswer<Done> = ActRefusal | Done
 
 export interface FolderWrites {
   /** `lane`'s proposed changes, as `seen`, written into the project's folder. */
@@ -126,7 +120,7 @@ export async function extractTar(
   const code = await exited
   const failed = await fed
   if (code !== 0)
-    throw new Error(`extracting an accept's files failed: ${stderr.trim()}`)
+    throw new Error(`extracting a write's files failed: ${stderr.trim()}`)
   // tar stops reading at the archive's end marker and closes its input
   // before the stream's last padding: that close is its success. A failure
   // of the stream's source (a path `tarOut` refused) is not.
@@ -267,7 +261,7 @@ export function createFolderWrites(deps: {
   > {
     const content = writeContent(record)
     const changed = await sourceChanges(reader, newest, content)
-    const writes = acceptWrites(
+    const writes = pathWrites(
       changed,
       await reader.disks.pathFacts(content, changed),
       read,

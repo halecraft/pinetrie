@@ -49,7 +49,7 @@ wires them.
 | `admission.ts`, `policy.ts`, `lines.ts`, `blobs.ts`, `store.ts` | the invite key and links (ADR-0107; a blob, like the page, is admitted only from this host's own page on loopback, ADR-0042), the write policy, departed seats (a seat is fresh per page load, ADR-0037), the blob store (images, ADR-0042, and references' quotes as markdown, ADR-0126), the SQLite store, on `node:sqlite`, so with no native dependency (S22), which owns its file: it takes the file's lock, and a second connection, process or reader is refused (S47) |
 | `work/` | lane containers and disks (§ Lane work: ADR-0032, ADR-0033, ADR-0034), through the project's adapter, whose kind it never names (ADR-0142) |
 | `project.ts` | the project's adapter, chosen once by its kind (`projectAdapter`: an exhaustive switch, `assertNever` its default): jj's for a jj workspace, the folder's for any other folder; a folder lanes cannot serve (`projectDirWords`) is refused before any runtime is asked |
-| `folder/` | a folder project's adapter, as it is built (§ A folder project's adapter): the project's folder's reads (`scan.ts`, `line.ts`) and watcher (`watch.ts`), its writes (`writes.ts`, `write.ts`), what is kept (`sweep.ts`), its reviews (`review.ts`), the only code that touches the project's folder (ADR-0142) |
+| `folder/` | a folder project's adapter, as it is built (§ A folder project's adapter): the project's folder's reads (`scan.ts`, `line.ts`) and watcher (`watch.ts`), its writes (`writes.ts`, `write.ts`), what is kept (`keep.ts`), its reviews (`review.ts`), the only code that touches the project's folder (ADR-0142) |
 | `watch-dir.ts` | one directory watched with `@parcel/watcher` (FSEvents on the Mac, inotify on Linux), its events handed on after a quiet window (`quietWindow`; 0 for the shared directories, 10 s for the project's folder), a dropped-events error at once |
 | `jj/` | jj's adapter (`startJjProject`, § jj's adapter): each lane's proposed changes in your repo (ADR-0105), on the owner of your repo (§ Proposed changes), and the reviews and diffs a page reads of it (ADR-0047); accepted work's record and commands (`jj/accepted.ts`); each lane's fetch into your repo (`jj/fetch.ts`); splits (`jj/split.ts`) |
 | `names.ts` | every thread's name (ADR-0039, ADR-0117): `ensure` for the lanes pi holds and the threads recorded, `reserve` for a thread a column opened before its first message (ADR-0057), on one queue |
@@ -1620,7 +1620,7 @@ adapter's.
   lands nowhere else; the accept's own read leaves asides alone, being
   never quiet. The scan never enters either reserved name at the root
   (`FOLDER_RESERVED`).
-- **What is kept is said once** (`planKeep`, `sweep.ts`): from one
+- **What is kept is said once** (`planKeep`, `keep.ts`): from one
   `liveStates` call and one listing of the project's snapshots
   (`LaneRuntime.snapshots`), the states whose snapshots exist and the live
   set keeps not go, and accepted work's line states and concurrent saves
@@ -1634,11 +1634,13 @@ adapter's.
 - **A person's choice of a conflict's version is a resolution, as the
   agent's is** (`LaneWork.resolve`, `work/index.ts`): refused while the
   thread runs or for a lane not the host's own (`planResolveCommand`);
-  else the idle lane's container started for the resolution's snapshot,
-  which syncs inside it, then stopped; the conflict closed by the
-  history's `resolve`, which records a `resolve` state; the proposed
-  changes rebuilt (`act(lane, "refresh")`, its fact dropped); and the
-  `resolved` fact queued on the thread.
+  else the conflict closed by the history's `resolve`, which records a
+  `resolve` state. Its snapshot is the disks role's, with no `sync` in
+  the lane's container, which may be stopped: a btrfs snapshot holds
+  what its kernel wrote, flushed or not (S225). The agent's own
+  resolution, in its run, syncs first, as every turn does. Then the
+  proposed changes are rebuilt (`act(lane, "refresh")`, its fact dropped),
+  and the `resolved` fact is queued on the thread.
 
 ## Proposed changes (`jj/proposed/`)
 

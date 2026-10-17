@@ -181,6 +181,15 @@ export interface TurnMade {
 export type MergeDone = Merged & { readonly follow: Follow }
 
 /**
+ * Who closes a conflict: the agent, in its run, whose container is up; or a
+ * person, only while the thread is idle (`planResolveCommand`), its
+ * container perhaps stopped.
+ */
+export type Resolver =
+  | { readonly kind: "agent" }
+  | { readonly kind: "person"; readonly by: WriterId }
+
+/**
  * What `resolve` did: the path closed, or why not: no open conflict there,
  * or a history whose conflicts are markers in the file (jj's).
  */
@@ -219,14 +228,11 @@ export interface LaneHistory {
   ): Promise<MergeDone>
   /** The files conflicted in the lane's working copy. */
   conflicts(): Promise<readonly string[]>
-  /**
-   * A conflicted `path` closed with `choose`'s version in the lane, by a
-   * person (`by`) or the agent (null).
-   */
+  /** A conflicted `path` closed with `choose`'s version in the lane, by `who`. */
   resolve(
     path: string,
     choose: ConflictChoice,
-    by: WriterId | null,
+    who: Resolver,
   ): Promise<Resolved>
   /**
    * What a disk restored from a snapshot needs before its first command:

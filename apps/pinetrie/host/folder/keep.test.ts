@@ -6,7 +6,7 @@ import {
   threadIdFor,
 } from "@pinetrie/core"
 import { expect, test } from "vitest"
-import { planKeep } from "./sweep.ts"
+import { planKeep } from "./keep.ts"
 
 const LANE = threadIdFor("1")
 const state = (

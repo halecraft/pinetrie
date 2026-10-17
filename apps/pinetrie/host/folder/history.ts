@@ -325,7 +325,7 @@ export function folderHistory(
 
     conflicts: async () => openConflicts(),
 
-    async resolve(path, choose, by) {
+    async resolve(path, choose, who) {
       // gather
       const open = store.conflicts(lane).find(c => c.path === path)
       const [chosen] =
@@ -342,7 +342,7 @@ export function folderHistory(
         chosen: chosen ?? null,
         id: resolveStateId(input.newId()),
         at: input.now(),
-        by,
+        by: who.kind === "person" ? who.by : null,
       })
       if (planned.kind === "no-conflict")
         return { kind: "refused", why: "no-conflict" }
@@ -356,7 +356,16 @@ export function folderHistory(
           steps: [step],
           markers: false,
         })
-      await snapshot(record.id)
+      // A person's choice comes only while the lane is idle, its container
+      // perhaps stopped: a btrfs snapshot holds what its kernel wrote,
+      // flushed or not, so no container is started for a `sync`.
+      if (who.kind === "agent") await snapshot(record.id)
+      else
+        await runtime.disk({
+          kind: "snapshot",
+          lane,
+          snapshot: snapshotId(record.id),
+        })
       await store.write([
         setRecord(STATE, record),
         deleteRecord(CONFLICT, conflictKey(lane, path)),

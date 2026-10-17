@@ -2483,8 +2483,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "readers are told apart by nobody, so you are one",
     file: "packages/web/use-presence.ts",
-    from: "  return useMemo(() => readingAt(reading, me), [reading, me])",
-    to: '  return useMemo(() => readingAt(reading, "nobody" as WriterId), [reading, me])',
+    from: "  return useMemo(() => othersReading(reading, me), [reading, me])",
+    to: '  return useMemo(() => othersReading(reading, "nobody" as WriterId), [reading, me])',
     suite: "browser",
     scenario: "page",
     expect:

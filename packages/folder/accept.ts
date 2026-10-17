@@ -7,7 +7,6 @@
 
 import path from "node:path/posix"
 import {
-  type AcceptWrite,
   ERR,
   type ErrCode,
   type FolderProposedChangesRecord,
@@ -15,6 +14,7 @@ import {
   type InodeStat,
   isFolderReserved,
   type PathFact,
+  type PathWrite,
   type PointId,
   type ProposedChangesSeen,
   restoreStateId,
@@ -144,15 +144,15 @@ export function planRestore(input: {
  * the shown merge holds something no folder save can be (a device, a
  * socket, a fifo).
  */
-export function acceptWrites(
+export function pathWrites(
   /** The source paths between accepted work's newest and the shown merge. */
   changed: readonly string[],
   /** Each changed path's fact in the shown merge, in order. */
   facts: readonly PathFact[],
   /** The stamps of the accept's own read. */
   read: ReadonlyMap<string, FolderStamp>,
-): readonly AcceptWrite[] | { readonly unwritable: string } {
-  const writes: AcceptWrite[] = []
+): readonly PathWrite[] | { readonly unwritable: string } {
+  const writes: PathWrite[] = []
   for (const [i, p] of changed.entries()) {
     const fact = facts[i]
     if (fact === undefined || fact.kind === "other") return { unwritable: p }
@@ -199,10 +199,10 @@ export type WriteStep =
  * anything is made there. A staged file is at its own path under `stage`.
  */
 export function planWriteSteps(
-  writes: readonly AcceptWrite[],
+  writes: readonly PathWrite[],
   stage: string,
 ): readonly WriteStep[] {
-  const to = (w: AcceptWrite): WriteTo | null =>
+  const to = (w: PathWrite): WriteTo | null =>
     w.to === null
       ? null
       : w.to.kind === "file"
@@ -248,7 +248,7 @@ export type NameRefusal =
  * `EEXIST` half way through the writes.
  */
 export function planNames(
-  writes: readonly AcceptWrite[],
+  writes: readonly PathWrite[],
   /** The source paths of the accept's read. */
   folderPaths: Iterable<string>,
   foldsCase: boolean,
@@ -332,7 +332,7 @@ export type StageChecked =
  */
 export function checkStage(
   walk: readonly StageEntry[],
-  writes: readonly AcceptWrite[],
+  writes: readonly PathWrite[],
 ): StageChecked {
   const planned = new Set(
     writes.filter(w => w.to?.kind === "file").map(w => w.path),

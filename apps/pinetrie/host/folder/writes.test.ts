@@ -1,7 +1,7 @@
-// The accept's laws (`packages/folder/TECHNICAL.md`, "The accept's laws"),
+// The write's laws (`packages/folder/TECHNICAL.md`, "The write's laws"),
 // each one test titled by its sentence (`scripts/laws.ts`), over a plain
-// temp directory: the executor and recovery of `write.ts` as the accept runs
-// them. A save races the accept at every boundary between its sub-steps
+// temp directory: the executor and recovery of `write.ts` as an accept and
+// a restore run them. A save races the write at every boundary between its sub-steps
 // (after a path's check, after its move aside and the aside's check, after
 // its link), so each interleaving is run, none left to a clock.
 
@@ -18,8 +18,8 @@ import {
 import { tmpdir } from "node:os"
 import path from "node:path"
 import {
-  type AcceptWrite,
   type InodeStat,
+  type PathWrite,
   pointId,
   type StateRecord,
   threadIdFor,
@@ -63,7 +63,7 @@ const WRITERS: readonly StateRecord[] = [
 
 let root = ""
 beforeEach(async () => {
-  root = await mkdtemp(path.join(tmpdir(), "pinetrie-accept-"))
+  root = await mkdtemp(path.join(tmpdir(), "pinetrie-write-"))
 })
 afterEach(async () => {
   await rm(root, { recursive: true, force: true })
@@ -82,13 +82,13 @@ const fresh = async () => {
   await mkdir(root)
 }
 
-/** An accept of `shown` (null deletes a path) planned over the folder as it is now, staged as the tar stream stages it. */
+/** A write of `shown` (null deletes a path) planned over the folder as it is now, staged as the tar stream stages it. */
 async function planned(
   record: StateRecord,
   shown: Record<string, string | null>,
 ) {
   const scan = await scanFolder({ root, own: "" })
-  const writes: AcceptWrite[] = Object.entries(shown).map(([p, v]) => ({
+  const writes: PathWrite[] = Object.entries(shown).map(([p, v]) => ({
     path: p,
     expected: scan.get(p) ?? null,
     to: v === null ? null : { kind: "file" },
@@ -114,20 +114,20 @@ async function planned(
 }
 
 /**
- * The accept run to its end with `race` at its `n`th sub-step boundary
+ * The write run to its end with `race` at its `n`th sub-step boundary
  * (0: after its read, before its first step);
- * then a failure put back, as the host does. Answers whether it accepted,
+ * then a failure put back, as the host does. Answers whether it was written,
  * the journal as it ended, and how many boundaries it reached and journal
  * writes it made.
  */
-async function acceptRacing(
+async function writeRacing(
   record: StateRecord,
   shown: Record<string, string | null>,
   n: number,
   race: () => Promise<void>,
 ) {
   const { steps, journal } = await planned(record, shown)
-  // Boundary 0: after the read the accept is planned from, before it writes.
+  // Boundary 0: after the read the write is planned from, before it writes.
   if (n === 0) await race()
   let saves = 0
   let boundaries = 0
@@ -150,11 +150,11 @@ async function acceptRacing(
         p.moved === null ? p : { ...p, keptOn: after.record.id },
       ),
     }
-    return { accepted: true, journal: ended, saves, boundaries }
+    return { written: true, journal: ended, saves, boundaries }
   }
   const recovered = await recoverWrite(root, after)
   return {
-    accepted: false,
+    written: false,
     journal: recovered.kind === "put-back" ? recovered.journal : after,
     saves,
     boundaries,
@@ -179,33 +179,33 @@ const keptContent = async (journal: WriteJournal) =>
 
 const SHOWN = { "a.txt": "a-new", "b.txt": "b-new", "c.txt": null }
 const BEFORE = { "a.txt": "a-old", "b.txt": "b-old", "c.txt": "c-old" }
-/** How many journal writes the accept of `SHOWN` makes: one before each move, one after each link or delete. */
+/** How many journal writes the write of `SHOWN` makes: one before each move, one after each link or delete. */
 const WRITES = 6
 /** How many sub-step boundaries it reaches: checked, moved and linked for each path. */
 const BOUNDARIES = 9
 
-test("An accept never replaces a file it has not checked.", () =>
+test("A write never replaces a file it has not checked.", () =>
   eachWriter(async record => {
-    // Your write in place, by path: before the accept, or at any boundary.
+    // Your write in place, by path: before the write, or at any boundary.
     for (const target of ["a.txt", "b.txt"])
       for (let n = 0; n <= BOUNDARIES; n++) {
         await fresh()
         await put(BEFORE)
         const yours = `yours, in place, at ${n}`
-        const { accepted } = await acceptRacing(record, SHOWN, n, () =>
+        const { written } = await writeRacing(record, SHOWN, n, () =>
           writeFile(path.join(root, target), yours),
         )
         const where = `${target} at boundary ${n}`
-        // Either the accept saw your write and put everything back, or your
+        // Either the write saw yours and put everything back, or your
         // write came after its link, into what it wrote: never under it.
         expect(await read(target), where).toBe(yours)
-        if (!accepted)
+        if (!written)
           for (const [p, v] of Object.entries(BEFORE))
             if (p !== target) expect(await read(p), where).toBe(v)
       }
   }))
 
-test("A save made by name during an accept survives it.", () =>
+test("A save made by name during a write survives it.", () =>
   eachWriter(async record => {
     for (const kind of ["rename", "in place"] as const)
       for (const target of Object.keys(BEFORE))
@@ -213,7 +213,7 @@ test("A save made by name during an accept survives it.", () =>
           await fresh()
           await put(BEFORE)
           const yours = `yours, ${kind}, at boundary ${n}`
-          const { accepted, journal } = await acceptRacing(
+          const { written, journal } = await writeRacing(
             record,
             SHOWN,
             n,
@@ -229,26 +229,26 @@ test("A save made by name during an accept survives it.", () =>
           // At its path, or kept aside, never lost.
           const held = [await read(target), ...(await keptContent(journal))]
           expect(held, where).toContain(yours)
-          if (!accepted)
+          if (!written)
             for (const [p, v] of Object.entries(BEFORE))
               if (p !== target) expect(await read(p), where).toBe(v)
         }
   }))
 
-test("A write through a file held across an accept is kept as a concurrent save.", () =>
+test("A save through a file held across a write is kept as a concurrent save.", () =>
   eachWriter(async record => {
     await put(BEFORE)
     const held = await open(path.join(root, "a.txt"), "r+")
     try {
-      const { accepted, journal } = await acceptRacing(
+      const { written, journal } = await writeRacing(
         record,
         SHOWN,
         -1,
         async () => {},
       )
-      expect(accepted).toBe(true)
+      expect(written).toBe(true)
       expect(await read("a.txt")).toBe("a-new")
-      // The app writes through the file it held, after the accept.
+      // The app writes through the file it held, after the write.
       await held.write("yours, late", 0)
       const kept = keptAsides([journal])
       const now = await Promise.all(
@@ -273,12 +273,12 @@ test("A write through a file held across an accept is kept as a concurrent save.
     }
   }))
 
-test("An accept writes exactly the paths whose content changed.", () =>
+test("A write changes exactly the paths whose content changed.", () =>
   eachWriter(async record => {
     await put({ ...BEFORE, "same.txt": "same", "d/kept.txt": "kept" })
     const before = await scanFolder({ root, own: "" })
-    const { accepted } = await acceptRacing(record, SHOWN, -1, async () => {})
-    expect(accepted).toBe(true)
+    const { written } = await writeRacing(record, SHOWN, -1, async () => {})
+    expect(written).toBe(true)
     const after = await scanFolder({ root, own: "" })
     const touched = [...new Set([...before.keys(), ...after.keys()])]
       .filter(
@@ -288,7 +288,7 @@ test("An accept writes exactly the paths whose content changed.", () =>
     expect(touched).toEqual(Object.keys(SHOWN).sort())
   }))
 
-test("A host that stops during an accept finishes or puts it back at its next start.", () =>
+test("A host that stops during a write finishes or puts it back at its next start.", () =>
   eachWriter(async record => {
     const done = { "a.txt": "a-new", "b.txt": "b-new", "c.txt": null }
     for (let n = 1; n <= WRITES + 1; n++) {
@@ -323,6 +323,6 @@ test("the accept of the laws' changes writes its journal before each move and af
   await put(BEFORE)
   const [accept] = WRITERS
   if (accept === undefined) throw new Error("no writer")
-  const ran = await acceptRacing(accept, SHOWN, -1, async () => {})
+  const ran = await writeRacing(accept, SHOWN, -1, async () => {})
   expect([ran.saves, ran.boundaries]).toEqual([WRITES, BOUNDARIES])
 })

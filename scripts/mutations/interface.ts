@@ -555,9 +555,9 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a setup or publish's refusal is not said",
-    file: "packages/interface/publish-view.ts",
-    from: '  acting === null || acting.kind === "sent"',
-    to: '  acting === null || acting.kind !== "failed"',
+    file: "packages/interface/outcome-words.ts",
+    from: '  acting === null || acting === undefined || acting.kind === "sent"',
+    to: '  acting === null || acting === undefined || acting.kind !== "failed"',
     command: unit,
     expect: "a refusal",
   },

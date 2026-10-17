@@ -303,6 +303,7 @@ async function folderSection(
         readFileSync(path.join(dir, "b.txt"), "utf8") === "lane's\n" &&
         readFileSync(path.join(dir, "a.txt"), "utf8") ===
           "one\nyours\nthree\n" &&
+        readFileSync(path.join(dir, "f.txt"), "utf8") === "yours f\n" &&
         JSON.stringify(listing(dir)) ===
           JSON.stringify([...before, "b.txt", "c.txt", "f.txt"].sort()),
       `${JSON.stringify(accepted)} ${JSON.stringify(listing(dir))}`,

@@ -19,14 +19,12 @@ import {
 import { type ReviewFacts, readableSpan } from "@pinetrie/rules"
 import type { RestoreActing } from "@pinetrie/session"
 import { count, whenWords } from "./counts.ts"
-import { outcomeWords } from "./outcome-words.ts"
+import { actingSaid } from "./outcome-words.ts"
 
 /** One state of accepted work as the history shows it. */
 export interface HistoryEntry {
   readonly id: PointId
   readonly made: StateMade
-  readonly at: number
-  readonly by: WriterId | null
   /** What it was, worded (`madeWords`). */
   readonly words: string
   /** Who made it, by name; null for the host's own read. */
@@ -98,8 +96,6 @@ export function historyView(input: {
     return {
       id: r.id,
       made: r.made,
-      at: r.at,
-      by: r.by,
       words: madeWords(r.made, input.laneName, states),
       who: r.by === null ? null : input.personName(r.by),
       when: whenWords(r.at),
@@ -150,5 +146,5 @@ export const restoreStatus = (
   acting: RestoreActing | null,
 ): { readonly waiting: boolean; readonly said: string | null } => ({
   waiting: acting?.kind === "sent",
-  said: acting === null || acting.kind === "sent" ? null : outcomeWords(acting),
+  said: actingSaid(acting),
 })

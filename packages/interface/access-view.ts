@@ -11,7 +11,7 @@ import type {
 } from "@pinetrie/core"
 import { answersFor, displayName } from "@pinetrie/rules"
 import type { AccessActing } from "@pinetrie/session"
-import { outcomeWords } from "./outcome-words.ts"
+import { actingSaid } from "./outcome-words.ts"
 
 export interface AccessView {
   /** The lane's own identity's state; null when it never asked for it. */
@@ -95,7 +95,6 @@ export function accessWords(
     line: `🔑 ${holds.join(", ")}${hosts}`,
     answers: view.answers.map(answer => ({ answer, label: answer })),
     waiting: acting?.kind === "sent",
-    note:
-      acting === null || acting.kind === "sent" ? null : outcomeWords(acting),
+    note: actingSaid(acting),
   }
 }

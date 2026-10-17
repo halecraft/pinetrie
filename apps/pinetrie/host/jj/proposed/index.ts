@@ -31,6 +31,7 @@ import {
   laneRefSteps,
   type RepoOwner,
   revisionRead,
+  sideRev,
 } from "@pinetrie/jj"
 import type { PiSetup } from "@pinetrie/pi"
 import { readLaneRecords, readNames, readProposedByLane } from "@pinetrie/reads"
@@ -261,16 +262,8 @@ export function startProposedChanges(input: {
             await owner.read(ops => fileDiff(ops.jj, span, read.path)),
           )
         case "file": {
-          const rev =
-            span.kind === "revision"
-              ? read.side === "before"
-                ? `${span.commit}-`
-                : span.commit
-              : read.side === "before"
-                ? span.from
-                : span.to
           const file = await owner.read(ops =>
-            jjFileBytes(ops.jjBytes, rev, read.path),
+            jjFileBytes(ops.jjBytes, sideRev(span, read.side), read.path),
           )
           return file === null
             ? { kind: "refused", status: 404, reason: "no file there" }

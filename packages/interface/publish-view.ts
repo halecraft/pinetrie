@@ -15,7 +15,7 @@ import {
 } from "@pinetrie/rules"
 import type { AcceptedActing } from "@pinetrie/session"
 import { count } from "./counts.ts"
-import { outcomeWords } from "./outcome-words.ts"
+import { actingSaid } from "./outcome-words.ts"
 import { hashOfPage } from "./page.ts"
 
 /** The publish button as the footer shows it. */
@@ -179,13 +179,13 @@ interface PublishToast {
 }
 
 /**
- * The toast your last setup or publish command leaves (`outcomeWords`): none while it is
+ * The toast your last setup or publish command leaves (`actingSaid`): none while it is
  * out, or once it was carried out, since the button then says how things
  * stand.
  */
 export const publishToast = (
   acting: AcceptedActing | null,
-): PublishToast | null =>
-  acting === null || acting.kind === "sent"
-    ? null
-    : { text: outcomeWords(acting) }
+): PublishToast | null => {
+  const text = actingSaid(acting)
+  return text === null ? null : { text }
+}

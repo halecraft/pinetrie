@@ -22,7 +22,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "planKeep sweeps what the live set keeps not, whether or not it exists",
-    file: "apps/pinetrie/host/folder/sweep.ts",
+    file: "apps/pinetrie/host/folder/keep.ts",
     from: "      id => input.exists.has(id) && !live.has(id),\n",
     to: "      id => !live.has(id),\n",
     command: unit,
@@ -31,7 +31,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "planKeep keeps a live state whose snapshot is gone",
-    file: "apps/pinetrie/host/folder/sweep.ts",
+    file: "apps/pinetrie/host/folder/keep.ts",
     from: "  const has = (id: PointId) => live.has(id) && input.exists.has(id)\n",
     to: "  const has = (id: PointId) => live.has(id)\n",
     command: unit,
@@ -40,7 +40,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "planKeep's kept drops a concurrent save",
-    file: "apps/pinetrie/host/folder/sweep.ts",
+    file: "apps/pinetrie/host/folder/keep.ts",
     from: '    r => r.made.kind === "concurrent" && has(r.id),\n',
     to: "    () => false,\n",
     command: unit,
@@ -2827,7 +2827,7 @@ export const mutations: readonly Mutation[] = [
     from: "      ? link(path.join(root, step.to.staged), target)\n",
     to: "      ? rename(path.join(root, step.to.staged), target)\n",
     command: unit,
-    expect: "A save made by name during an accept survives it.",
+    expect: "A save made by name during a write survives it.",
   },
   {
     name: "the executor never checks the aside after its move",
@@ -2835,7 +2835,7 @@ export const mutations: readonly Mutation[] = [
     from: "      if (after === null || !isSameInode(inodeStat(after), before))\n",
     to: "      if (after === null)\n",
     command: unit,
-    expect: "An accept never replaces a file it has not checked.",
+    expect: "A write never replaces a file it has not checked.",
   },
   {
     name: "the executor deletes a replaced file at once",
@@ -2844,7 +2844,7 @@ export const mutations: readonly Mutation[] = [
     to: '    if (!linked) return failed(step.path, "taken")\n    if (entry.aside !== null) await unlink(path.join(root, entry.aside))\n',
     command: unit,
     expect:
-      "A write through a file held across an accept is kept as a concurrent save.",
+      "A save through a file held across a write is kept as a concurrent save.",
   },
   {
     name: "recovery skips its put-back",
@@ -2853,7 +2853,7 @@ export const mutations: readonly Mutation[] = [
     to: "        if (back) await unlink(aside)\n        else held = false\n        if (back) await unlink(at)\n",
     command: unit,
     expect:
-      "A host that stops during an accept finishes or puts it back at its next start.",
+      "A host that stops during a write finishes or puts it back at its next start.",
   },
   {
     name: "the executor deletes without checking the stamp",
@@ -2861,7 +2861,7 @@ export const mutations: readonly Mutation[] = [
     from: '      if (before === null) return failed(step.path, "changed")\n',
     to: "",
     command: unit,
-    expect: "An accept never replaces a file it has not checked.",
+    expect: "A write never replaces a file it has not checked.",
   },
   {
     name: "a folder accept's moved refusal is worded as the generic one",

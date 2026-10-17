@@ -30,6 +30,7 @@ export {
   fileDiff,
   readProposedChanges,
   revisionRead,
+  sideRev,
   startOfProposed,
 } from "./proposed.ts"
 export {

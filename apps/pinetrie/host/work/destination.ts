@@ -49,6 +49,17 @@ export interface BaseNow {
   } | null
 }
 
+/**
+ * An act on your repo or the project's folder refused, with the path it
+ * names, for a folder write's refusal: what an act on proposed changes, a
+ * restore and a choice of a conflict's version each answer when refused.
+ */
+export interface ActRefusal {
+  readonly kind: "refused"
+  readonly code: ErrCode
+  readonly path?: string
+}
+
 /** What any kind of project does with a lane's proposed changes. */
 export interface ProposedChangesActs {
   /** A run on `lane` ended: refresh its proposed changes, then describe it if it is still a WIP. */
@@ -65,13 +76,7 @@ export interface ProposedChangesActs {
     to?: string | null,
     seen?: ProposedChangesSeen | null,
   ): Promise<
-    | {
-        readonly kind: "refused"
-        readonly code: ErrCode
-        /** The path it names, for a folder accept's refusal. */
-        readonly path?: string
-      }
-    | { readonly kind: "done"; readonly fact: ProposedChangesFact }
+    ActRefusal | { readonly kind: "done"; readonly fact: ProposedChangesFact }
   >
   /** A review, a diff or a file's bytes a page asked for, of a span `planReviewRead` finds. */
   read(ask: ReviewAsk): Promise<ReviewAnswer>
@@ -83,14 +88,8 @@ export type AcceptedAnswer = {
   readonly message: string
 } | null
 
-/** A restore's answer: done, or refused with the path it names, if any. */
-export type RestoreAnswer =
-  | {
-      readonly kind: "refused"
-      readonly code: ErrCode
-      readonly path?: string
-    }
-  | { readonly kind: "done" }
+/** A restore's answer: done, or refused. */
+export type RestoreAnswer = ActRefusal | { readonly kind: "done" }
 
 /**
  * Accepted work's own acts, by the project's kind: a jj project's setup

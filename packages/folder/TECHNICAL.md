@@ -100,7 +100,7 @@ flows, merged by `git merge-file` as lanehost merges.
   conflicted shown merge has no destination, a folder having no WIP.
 - **What it writes is a value:** each source path between accepted work's
   newest and the shown merge, with the stamp the accept's own read took
-  there and what the shown merge holds (`acceptWrites`), never a scan of
+  there and what the shown merge holds (`pathWrites`), never a scan of
   its own. `planWriteSteps` makes each one step, every delete first, so a
   file that becomes a directory frees its name before anything is made.
 - **What the folder cannot hold is refused before anything is written**
@@ -158,7 +158,7 @@ flows, merged by `git merge-file` as lanehost merges.
   Two copies of one file pair with nothing. A move's row is `{old => new}`
   (`renameShown`, as jj writes one), its lines 0 and 0.
 
-## The accept's laws
+## The write's laws
 
 Each is one test in `apps/pinetrie/host/folder/writes.test.ts` titled by
 its sentence, over a plain temp directory, with the host's executor
@@ -167,11 +167,11 @@ so a law cannot hold for one and drift for the other. A save races the accept at
 every boundary between its sub-steps (S192's protocol, its interleavings
 run as values rather than by a clock).
 
-- **An accept never replaces a file it has not checked.**
-- **A save made by name during an accept survives it.**
-- **A write through a file held across an accept is kept as a concurrent save.**
-- **An accept writes exactly the paths whose content changed.**
-- **A host that stops during an accept finishes or puts it back at its next start.**
+- **A write never replaces a file it has not checked.**
+- **A save made by name during a write survives it.**
+- **A save through a file held across a write is kept as a concurrent save.**
+- **A write changes exactly the paths whose content changed.**
+- **A host that stops during a write finishes or puts it back at its next start.**
 
 ## A read of the project's folder (`read.ts`)
 

@@ -4,7 +4,7 @@
 // been quiet after a change (`watch.ts`); each lane's history is states of the
 // graph (`history.ts`); its proposed changes are the lane's newest state
 // merged onto accepted work's newest (`proposed.ts`); what is kept is said
-// once (`sweep.ts`, `refreshKept`). Nothing is written into the project's
+// once (`keep.ts`, `refreshKept`). Nothing is written into the project's
 // folder but the shared directories its config asks for and what an accept
 // or a restore writes (`writes.ts`).
 
@@ -45,10 +45,10 @@ import type { ProjectAdapter } from "../work/adapter.ts"
 import type { Destination } from "../work/destination.ts"
 import { readFolderSiteFile } from "./file-at.ts"
 import { folderHistory } from "./history.ts"
+import { planKeep } from "./keep.ts"
 import { createFolderLine } from "./line.ts"
 import { startFolderProposedChanges } from "./proposed.ts"
 import { proveFolderLane } from "./proven.ts"
-import { planKeep } from "./sweep.ts"
 import { watchFolder } from "./watch.ts"
 import { createFolderWrites } from "./writes.ts"
 

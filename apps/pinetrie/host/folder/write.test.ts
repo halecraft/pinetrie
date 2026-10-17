@@ -13,7 +13,7 @@ import {
 import { tmpdir } from "node:os"
 import path from "node:path"
 import {
-  type AcceptWrite,
+  type PathWrite,
   pointId,
   threadIdFor,
   type WriteJournal,
@@ -66,7 +66,7 @@ const read = (p: string) =>
  */
 async function planned(shown: Record<string, string | null>) {
   const scan = await scanFolder({ root, own: "" })
-  const writes: AcceptWrite[] = Object.entries(shown).map(([p, v]) => ({
+  const writes: PathWrite[] = Object.entries(shown).map(([p, v]) => ({
     path: p,
     expected: scan.get(p) ?? null,
     to:

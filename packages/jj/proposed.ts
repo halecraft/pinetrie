@@ -525,10 +525,8 @@ export async function revisionRead(
   const { jj } = reads
   const read = await spanFiles(jj, span)
   if (read === null) return null
-  const [from, to] =
-    span.kind === "revision"
-      ? [`${span.commit}-`, span.commit]
-      : [span.from, span.to]
+  const from = sideRev(span, "before")
+  const to = sideRev(span, "after")
   const stats = read.files.map(f => fileStat(f, span.kind))
   if (stats.some(s => s === null)) return null
   const known = stats.filter((s): s is JjFileStat => s !== null)
@@ -653,6 +651,16 @@ async function spanFiles(
     return null
   }
 }
+
+/** The commit a span's side is read at: a revision's parent before it, a range's ends. */
+export const sideRev = (span: CommitSpan, side: "before" | "after"): string =>
+  span.kind === "revision"
+    ? side === "before"
+      ? `${span.commit}-`
+      : span.commit
+    : side === "before"
+      ? span.from
+      : span.to
 
 /**
  * One file's git diff in a span; null when jj fails. `root-file:` names

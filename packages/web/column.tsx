@@ -39,6 +39,7 @@ import {
 import {
   type AccessView,
   accessWords,
+  actingSaid,
   agentsRow,
   agentsWords,
   askLine,
@@ -84,7 +85,6 @@ import {
   noticeKey,
   noticeWords,
   opens,
-  outcomeWords,
   type Pending,
   type ProposalMemory,
   type ReadOnly,
@@ -799,12 +799,9 @@ export function Column(p: ColumnProps) {
     (on: ThreadId, path: string, choose: ConflictChoice) =>
       act({ kind: "resolve", lane: on, path, choose }),
   )
-  const resolveActing =
-    lane.kind === "lane" ? acting.resolveByLane.get(lane.name) : undefined
-  const resolveSaid =
-    resolveActing === undefined || resolveActing.kind === "sent"
-      ? null
-      : outcomeWords(resolveActing)
+  const resolveSaid = actingSaid(
+    lane.kind === "lane" ? acting.resolveByLane.get(lane.name) : undefined,
+  )
   // Reset in render, not an effect: no frame draws a pane that is gone.
   if (pane !== null && paneShows === null) setPane(null)
   const paneId = `pane-${p.column.key}`

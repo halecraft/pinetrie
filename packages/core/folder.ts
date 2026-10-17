@@ -299,7 +299,7 @@ export interface DiffStat {
  * One path a write into the project's folder writes: what the folder held
  * there when the write read it, and what the written state holds.
  */
-export interface AcceptWrite {
+export interface PathWrite {
   readonly path: string
   /** Null for none. */
   readonly expected: FolderStamp | null

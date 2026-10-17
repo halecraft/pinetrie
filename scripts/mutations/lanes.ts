@@ -751,6 +751,16 @@ export const mutations: readonly Mutation[] = [
       "a person's choice of a conflict's version closes it as a state of the lane's, and tells the thread",
   },
   {
+    name: "a person's choice of a version syncs in the lane's stopped container",
+    file: "apps/pinetrie/host/folder/history.ts",
+    from: '      if (who.kind === "agent") await snapshot(record.id)\n',
+    to: "      if (true) await snapshot(record.id)\n",
+    suite: "lanes",
+    scenario: "folder",
+    expect:
+      "a person's choice of a conflict's version closes it as a state of the lane's, and tells the thread",
+  },
+  {
     name: "a restore writes accepted work's newest back",
     file: "apps/pinetrie/host/commands/lane.ts",
     from: "  const done = await destination.accepted.restore(intent.of, intent.seen, by)\n",

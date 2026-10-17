@@ -82,7 +82,7 @@ describe("reviewView", () => {
     expect(new Set(keys).size).toBe(3)
     expect(second?.files[0]?.letter).toBe("A")
   })
-  test("a media row has its sides' URLs and sizes and no lines; a renamed row with no lines is moved, unchanged", () => {
+  test("a media row has its sides' URLs and sizes and no lines; a renamed row with no lines is moved, unchanged, media or not", () => {
     const view = reviewView({ ...target, spans: [span(C1)] }, [
       ready({
         description: "feat: media\n",
@@ -109,6 +109,16 @@ describe("reviewView", () => {
             shown: "{old.txt => new.txt}",
             change: "renamed",
           },
+          {
+            ...file("new.png", 0, 0),
+            shown: "{old.png => new.png}",
+            change: "renamed",
+            content: {
+              kind: "media",
+              before: { content: "image/png", size: 10 },
+              after: { content: "image/png", size: 10 },
+            },
+          },
         ],
         widenings: [],
       }),
@@ -121,6 +131,8 @@ describe("reviewView", () => {
       ["a.png", "image", false],
       ["b.bin", "file", false],
       ["new.txt", null, true],
+      // A moved image is a move, never a side drawn as added.
+      ["new.png", null, true],
     ])
     expect(rows[0]?.media).toEqual({
       kind: "image",

@@ -124,52 +124,20 @@ export function jjReviewContent(
 }
 
 /**
- * One side of a file read from your repo at `rev`: its first bytes, kept
- * for `fileContent`, and with `whole` every byte counted; else the read
- * stops once it has the window.
+ * `path`'s bytes at `rev`: its first window read, so what it holds is
+ * known, then every byte from the first, the rest streamed on from where
+ * the window stopped; `stop` ends the read early. Throws when jj cannot
+ * show it (no file there).
  */
-export async function readJjSide(
-  bytes: BytesStream,
-  rev: string,
-  path: string,
-  whole: boolean,
-): Promise<SideRead> {
-  const head: Uint8Array[] = []
-  let kept = 0
-  let size = 0
-  for await (const chunk of bytes([
-    "file",
-    "show",
-    "-r",
-    rev,
-    `root-file:${JSON.stringify(path)}`,
-  ])) {
-    size += chunk.byteLength
-    if (kept < FILE_CONTENT_WINDOW) {
-      head.push(chunk.subarray(0, FILE_CONTENT_WINDOW - kept))
-      kept = Math.min(FILE_CONTENT_WINDOW, kept + chunk.byteLength)
-    }
-    if (!whole && kept >= FILE_CONTENT_WINDOW) break
-  }
-  return {
-    content: fileContent(Buffer.concat(head)),
-    size: whole ? size : null,
-  }
-}
-
-/**
- * A file's bytes at `rev`, as they come, with what its first bytes hold:
- * its window read before the answer is typed, then the rest streamed on.
- * Null when jj cannot show it (no file there).
- */
-export async function jjFileBytes(
+async function openSide(
   bytes: BytesStream,
   rev: string,
   path: string,
 ): Promise<{
   readonly content: FileContent
-  readonly bytes: AsyncIterable<Uint8Array>
-} | null> {
+  readonly all: AsyncIterable<Uint8Array>
+  stop(): Promise<void>
+}> {
   const stream = bytes([
     "file",
     "show",
@@ -180,20 +148,16 @@ export async function jjFileBytes(
   const head: Uint8Array[] = []
   let kept = 0
   let done = false
-  try {
-    while (kept < FILE_CONTENT_WINDOW) {
-      const next = await stream.next()
-      if (next.done === true) {
-        done = true
-        break
-      }
-      head.push(next.value)
-      kept += next.value.byteLength
+  while (kept < FILE_CONTENT_WINDOW) {
+    const next = await stream.next()
+    if (next.done === true) {
+      done = true
+      break
     }
-  } catch {
-    return null
+    head.push(next.value)
+    kept += next.value.byteLength
   }
-  async function* rest(): AsyncIterable<Uint8Array> {
+  async function* all(): AsyncIterable<Uint8Array> {
     yield* head
     if (done) return
     for (let next = await stream.next(); next.done !== true; ) {
@@ -201,5 +165,48 @@ export async function jjFileBytes(
       next = await stream.next()
     }
   }
-  return { content: fileContent(Buffer.concat(head)), bytes: rest() }
+  return {
+    content: fileContent(Buffer.concat(head)),
+    all: all(),
+    stop: async () => {
+      await stream.return?.()
+    },
+  }
+}
+
+/**
+ * One side of a file read from your repo at `rev`: what its first bytes
+ * hold, and with `whole` every byte counted; else the read stops once it
+ * has the window.
+ */
+export async function readJjSide(
+  bytes: BytesStream,
+  rev: string,
+  path: string,
+  whole: boolean,
+): Promise<SideRead> {
+  const side = await openSide(bytes, rev, path)
+  if (!whole) {
+    await side.stop()
+    return { content: side.content, size: null }
+  }
+  let size = 0
+  for await (const chunk of side.all) size += chunk.byteLength
+  return { content: side.content, size }
+}
+
+/**
+ * A file's bytes at `rev`, as they come, with what its first bytes hold.
+ * Null when jj cannot show it (no file there).
+ */
+export async function jjFileBytes(
+  bytes: BytesStream,
+  rev: string,
+  path: string,
+): Promise<{
+  readonly content: FileContent
+  readonly bytes: AsyncIterable<Uint8Array>
+} | null> {
+  const side = await openSide(bytes, rev, path).catch(() => null)
+  return side === null ? null : { content: side.content, bytes: side.all }
 }

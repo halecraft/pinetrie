@@ -1581,7 +1581,8 @@ composer*).
 - **A review row shown as a file** (`reviewView`'s `media`): an image row
   draws both sides, any other each side's size (`byteWords`) and a link to
   open it, every URL the review's own `fileUrl`; a move with no lines says
-  "moved, unchanged" (`MOVED_UNCHANGED`). Neither has a diff section.
+  "moved, unchanged" (`MOVED_UNCHANGED`), media or not, since its before
+  is at a path its row does not name. Neither has a diff section.
 - **No label a folder project's views produce names jj's words** (the
   words check, `folder-words.test.ts`, over `jjWordsIn`): commit,
   bookmark, revision, repo, stack, WIP or publish, in the work strip's

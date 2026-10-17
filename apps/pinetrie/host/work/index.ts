@@ -14,7 +14,6 @@ import type { ConfigPlaces } from "@pinetrie/config"
 import {
   type ConflictChoice,
   ERR,
-  type ErrCode,
   type ForeignLane,
   PROJECT_CONFIG_FILE,
   type ProjectRecord,
@@ -40,7 +39,7 @@ import type { Splits, StartedProject } from "./adapter.ts"
 import { type Archive, createArchive } from "./archive.ts"
 import { type Containers, createContainers } from "./containers.ts"
 import { createNewLanes, type NewLanes, recordLane } from "./create.ts"
-import type { Destination } from "./destination.ts"
+import type { ActRefusal, Destination } from "./destination.ts"
 import { createRegistry } from "./registry.ts"
 import { type OpenedProject, startSetup } from "./setup.ts"
 import { createSharedLineages } from "./shared.ts"
@@ -88,8 +87,7 @@ export type LaneWork = Pick<
       choose: ConflictChoice,
       by: WriterId,
     ): Promise<
-      | { readonly kind: "refused"; readonly code: ErrCode }
-      | { readonly kind: "done"; readonly fact: ResolvedFact }
+      ActRefusal | { readonly kind: "done"; readonly fact: ResolvedFact }
     >
     /**
      * `lane` proven to be one a run may start on (`proveRunnable`), or why
@@ -254,7 +252,9 @@ export async function startLaneWork(input: {
           return resolveAnswer(path, { kind: "refused", why: "no-copy" })
         return resolveAnswer(
           path,
-          await registry.withHistory(lane, h => h.resolve(path, choose, null)),
+          await registry.withHistory(lane, h =>
+            h.resolve(path, choose, { kind: "agent" }),
+          ),
         )
       },
       async configWritten(lane) {
@@ -276,16 +276,9 @@ export async function startLaneWork(input: {
       })
       if (planned.kind === "refused") return planned
       // execute
-      // The lane is idle, its container stopped: started for the
-      // resolution's snapshot, which syncs inside it, then stopped again.
-      const done = await registry.withHistory(lane, async h => {
-        await containers.startContainer(lane, h)
-        try {
-          return await h.resolve(path, choose, by)
-        } finally {
-          await registry.handleOf(lane).stop()
-        }
-      })
+      const done = await registry.withHistory(lane, h =>
+        h.resolve(path, choose, { kind: "person", by }),
+      )
       if (done.kind === "refused")
         return {
           kind: "refused",

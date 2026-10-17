@@ -478,7 +478,7 @@ export {
   type NoteColumnView,
   noteCountWords,
 } from "./note-column-view.ts"
-export { outcomeWords } from "./outcome-words.ts"
+export { actingSaid } from "./outcome-words.ts"
 export {
   BACK,
   hashOfPage,

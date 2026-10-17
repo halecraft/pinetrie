@@ -354,7 +354,9 @@ withJjRig(
   async rig => {
     const lane = await rig.lane()
     expect(
-      await lane.withHistory(h => h.resolve("a.txt", "theirs", null)),
+      await lane.withHistory(h =>
+        h.resolve("a.txt", "theirs", { kind: "agent" }),
+      ),
     ).toEqual({
       kind: "refused",
       why: "markers",

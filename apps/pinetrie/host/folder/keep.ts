@@ -1,4 +1,4 @@
-// host/folder/sweep — what a folder project keeps of its states, said once:
+// host/folder/keep — what a folder project keeps of its states, said once:
 // the snapshots nothing needs any more, to delete, and accepted work's
 // states the history may show, from one `liveStates` call over the records
 // and one listing of the snapshots there are. A state's record stays: merge

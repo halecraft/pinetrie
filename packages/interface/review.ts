@@ -76,9 +76,18 @@ export interface FileRow {
 /** What a renamed row with no lines says in place of a diff. */
 export const MOVED_UNCHANGED = "moved, unchanged"
 
-/** A file's sides as a media row, each side's URL its span's (`fileUrl`). */
+/**
+ * A file's sides as a media row, each side's URL its span's (`fileUrl`).
+ * None for a move or a copy: its before is at another path, which its row
+ * does not name, and a move is shown as one ("moved, unchanged").
+ */
 function mediaRow(span: DiffSpan, f: ReviewFile): MediaRow | null {
-  if (f.content.kind === "lines") return null
+  if (
+    f.content.kind === "lines" ||
+    f.change === "renamed" ||
+    f.change === "copied"
+  )
+    return null
   const { before, after } = f.content
   const side = (s: MediaSide | null, which: "before" | "after") =>
     s === null
@@ -86,15 +95,8 @@ function mediaRow(span: DiffSpan, f: ReviewFile): MediaRow | null {
       : { url: fileUrl(span, f.path, which), size: byteWords(s.size) }
   const isImage = (s: MediaSide | null) => s === null || isImageMime(s.content)
   return {
-    kind:
-      isImage(before) && isImage(after) && (before ?? after) !== null
-        ? "image"
-        : "file",
-    before:
-      // A move's before is at its old path.
-      f.change === "renamed" || f.change === "copied"
-        ? null
-        : side(before, "before"),
+    kind: isImage(before) && isImage(after) ? "image" : "file",
+    before: side(before, "before"),
     after: side(after, "after"),
   }
 }

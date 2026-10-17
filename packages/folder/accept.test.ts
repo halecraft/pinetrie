@@ -1,9 +1,9 @@
 import {
-  type AcceptWrite,
   ERR,
   type FolderProposedChangesRecord,
   type FolderStamp,
   type InodeStat,
+  type PathWrite,
   type PointId,
   pointId,
   type StateRecord,
@@ -13,10 +13,10 @@ import {
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
-  acceptWrites,
   checkStage,
   journalPaths,
   keptAsides,
+  pathWrites,
   planAccept,
   planAsides,
   planNames,
@@ -142,14 +142,14 @@ const stamp = (size = 1, ctimeNs = "1"): FolderStamp => ({
   exec: false,
 })
 
-test("acceptWrites: each changed path with the read's stamp and the shown merge's content", () => {
+test("pathWrites: each changed path with the read's stamp and the shown merge's content", () => {
   const read = new Map([
     ["a.txt", stamp()],
     ["gone.txt", stamp(2)],
     ["d", stamp(3)],
   ])
   expect(
-    acceptWrites(
+    pathWrites(
       ["a.txt", "new.txt", "gone.txt", "l", "d"],
       [
         { kind: "file", exec: false, content: "text", size: 4 },
@@ -167,13 +167,13 @@ test("acceptWrites: each changed path with the read's stamp and the shown merge'
     { path: "l", expected: null, to: { kind: "symlink", target: "a.txt" } },
     { path: "d", expected: stamp(3), to: null },
   ])
-  expect(acceptWrites(["fifo"], [{ kind: "other" }], read)).toEqual({
+  expect(pathWrites(["fifo"], [{ kind: "other" }], read)).toEqual({
     unwritable: "fifo",
   })
 })
 
 test("planWriteSteps: a new path is created, a changed one replaced, a deleted one deleted, every delete first", () => {
-  const writes: AcceptWrite[] = [
+  const writes: PathWrite[] = [
     { path: "a", expected: stamp(), to: { kind: "file" } },
     { path: "b", expected: null, to: { kind: "symlink", target: "a" } },
     { path: "d/x", expected: stamp(), to: null },
@@ -193,7 +193,7 @@ test("planWriteSteps: a new path is created, a changed one replaced, a deleted o
 })
 
 describe("planNames", () => {
-  const file = (p: string): AcceptWrite => ({
+  const file = (p: string): PathWrite => ({
     path: p,
     expected: null,
     to: { kind: "file" },
@@ -232,7 +232,7 @@ describe("planNames", () => {
     })
   })
   test("a symlink that climbs out, or is absolute, leaves the folder", () => {
-    const link = (target: string): AcceptWrite => ({
+    const link = (target: string): PathWrite => ({
       path: "d/l",
       expected: null,
       to: { kind: "symlink", target },
@@ -250,7 +250,7 @@ describe("planNames", () => {
 })
 
 describe("checkStage", () => {
-  const writes: AcceptWrite[] = [
+  const writes: PathWrite[] = [
     { path: "d/a", expected: null, to: { kind: "file" } },
     { path: "l", expected: null, to: { kind: "symlink", target: "d/a" } },
   ]

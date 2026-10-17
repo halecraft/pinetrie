@@ -70,11 +70,11 @@ import { afterAll, describe, expect, test } from "vitest"
 import { sourceChanges } from "./changes.ts"
 import { readFolderSiteFile } from "./file-at.ts"
 import { folderHistory } from "./history.ts"
+import { type KeepPlanned, planKeep } from "./keep.ts"
 import { createFolderLine } from "./line.ts"
 import { makeShownMerge } from "./proposed.ts"
 import type { FolderLane } from "./proven.ts"
 import { readFolderFile, readFolderReview } from "./review.ts"
-import { type KeepPlanned, planKeep } from "./sweep.ts"
 import { createFolderWrites } from "./writes.ts"
 
 const BTRFS_MAGIC = 0x9123683e
@@ -475,7 +475,9 @@ describe.skipIf(!onBtrfs)(
           await readFile(path.join(versions, "conflicts/a.txt/theirs"), "utf8"),
         ).toBe("one\ntwo (yours)\nthree\n")
         expect(
-          await lane.withHistory(h => h.resolve("a.txt", "theirs", null)),
+          await lane.withHistory(h =>
+            h.resolve("a.txt", "theirs", { kind: "agent" }),
+          ),
         ).toEqual({ kind: "resolved" })
         expect(await lane.read("a.txt")).toBe("one\ntwo (yours)\nthree\n")
         const resolved = laneNewest(rig.graph(), lane.lane)
@@ -492,7 +494,9 @@ describe.skipIf(!onBtrfs)(
         ).toBeNull()
         expect(await lane.withHistory(h => h.conflicts())).toEqual([])
         expect(
-          await lane.withHistory(h => h.resolve("a.txt", "ours", null)),
+          await lane.withHistory(h =>
+            h.resolve("a.txt", "ours", { kind: "agent" }),
+          ),
         ).toEqual({ kind: "refused", why: "no-conflict" })
       } finally {
         await rig.close()
@@ -632,7 +636,9 @@ describe.skipIf(!onBtrfs)(
       const theirs = await rig.yoursOnAccepted({ "a.txt": files.accepted })
       const first = await merge(lane, withAccepted(yours))
       if (first.kind === "conflicted")
-        await lane.withHistory(h => h.resolve("a.txt", "ours", null))
+        await lane.withHistory(h =>
+          h.resolve("a.txt", "ours", { kind: "agent" }),
+        )
       const caughtUp = laneNewest(rig.graph(), lane.lane)
       if (caughtUp === null) throw new Error("the lane has no state")
       const plan = planBase(rig.graph(), caughtUp, theirs)
