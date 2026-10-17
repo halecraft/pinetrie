@@ -23,23 +23,23 @@ Make the tree the primary object, and make it **multi-writer**.
 3. **Merge.** When an exploration proves valuable, fold it back into the trunk
    — mediated by an LLM with full access to both divergent branches.
 
-## Branch kinds
+## Two kinds of thread
 
 Branches are not one thing. Cost and machinery follow from *capability*:
 
 | Kind | Context | Tools | Workspace | Merge |
 |---|---|---|---|---|
-| **Aside** | full prefix | none | none | fold-in (optional) |
-| **Scout** | full prefix | read-only | shared, read-only | fold-in |
-| **Worktree** | full prefix | full | isolated (jj) | fold-in **+** file merge |
+| **conversation** | its path | none | none | fold-in (optional) |
+| **agent's thread** | its path | full | a lane of its own | fold-in **+** its proposed changes |
 
-Aside and Scout are pure conversation-tree operations and need no effect-merge.
-They cover most daily use. **Worktree is deliberately out of v1.**
-*Superseded by ADR-0032 and ADR-0034: every agent lane is a Linux container
-on its own disk, holding its own jj repo, and a branch clones its parent's
-disk at the turn it branched from. So every agent lane is a Worktree and an
-Aside is a conversation thread. Its effect merge is a jj merge whose
-conflicts the agent resolves (ADR-0033).*
+A conversation is people talking in the tree, with no agent asked there;
+it costs nothing. An agent's thread has a lane (ADR-0032, ADR-0034): a
+Linux container on its own disk, holding its own copy of your repo, and a
+branch clones its parent's disk at the turn it branched from. Its file
+changes come back as proposed changes, which you review and accept; a
+catch-up that conflicts is resolved by the agent, or by you (ADR-0033).
+There is no read-only kind between the two: every agent's lane has its own
+copy, so none needs a shared one.
 
 ## Merge is three problems, not one
 
@@ -51,8 +51,10 @@ This distinction drives the whole architecture:
    lands. *The actual product problem.* Solved by a destination-aware,
    LLM-mediated three-way fold (see `01-architecture.md` § Fold).
 3. **Effect merge** — filesystem/world side effects of a branch that ran tools.
-   *Genuinely hard.* Requires isolated workspaces and a real jj merge, coupled
-   atomically to the conversation merge. **Out of v1.**
+   Each agent's thread works in its own lane, and its work reaches your repo
+   as proposed changes; catching up merges what moved on, by jj, or by
+   pine·trie's own path merge in a folder project (ADR-0142). Coupling a
+   file merge to a fold's context merge waits for fold.
 
 ## References, not annotations
 
@@ -87,27 +89,29 @@ A thread's mode is whether the agent works in it. Where it does, it answers
 every message that names no one else; in a **conversation** it answers when
 mentioned. Nothing sets the mode: it is whether the agent has been asked there
 (ADR-0021). Each step up in cost is deliberate: a message costs nothing, asking
-the agent spends time and money, and a workspace spends disk. So a session
-begins with a choice, **Start Chat** or **Start Agent**, and a branch starts as
+the agent spends time and money, and a lane spends disk. So a thread
+begins with a choice, **＋ agent** or a conversation, and a branch starts as
 a conversation.
 
 The composer says what will happen **before** sending: whether the agent will
-reply, or who the message is for. Writing alone or together is a
-separate choice from who must answer; a note is just a message that compels
-nobody.
+reply, or who the message is for. Writing together is a separate choice
+from who must answer: a note, in a note column on the task's canvas, is
+read by everyone in the task and by no agent (ADR-0116).
 
-## v1 scope
+## Scope
 
-**In:** browser client over Kyneta against a local pi host; tree visualisation
-and navigation; Aside and Scout branches running concurrently; references as a
-first-class entry type; multi-writer composer and references.
+**Built:** a browser client over Kyneta against one pi host; the tree,
+drawn as a rail beside columns; threads of people and agents running at
+once, each agent's in a lane of its own; their proposed changes, reviewed
+and accepted into accepted work; a team's board of tasks, live across devices.
 
-**Out:** Worktree branches and effect merge; remote/team networking (designed
-for, not shipped); replacing pi's TUI.
+**Out:** replacing pi's TUI. Hosted, authenticated teams are designed for
+and not shipped: today the invite key decides who gets in.
 
-**Designed for but not built:** fold. The tree must be able to *represent* a
-merge node (`fromId` alongside `parentId`) from day one — retrofitting a second
-parent edge is painful; allowing it now is free.
+**Designed for but not built:** fold. The tree can *represent* a merge
+node (`fromId` alongside `parentId`): retrofitting a second parent edge
+would be painful, allowing it was free. References were built and
+withdrawn (ADR-0043), so nothing points into the tree yet.
 
 ## What the tree adds, stated precisely
 
@@ -122,7 +126,7 @@ it. There is no way to have something exist without it costing tokens and
 steering the next reply.
 
 pine·trie's purpose is to let them differ, and to let you control what moves
-between them. An Aside is an entry in `E` but not in `T` — real, shared,
+between them. A side conversation is an entry in `E` but not in `T` — real, shared,
 durable, costing the trunk nothing. A fold is the deliberate act of moving part
 of `E` into `T`.
 
@@ -134,12 +138,12 @@ devices. `parentId` defines which subset counts as `T`. ADR-0010's three-way
 fold is the rule for moving something from `E` into `T` well. The UI draws `T`
 onto `E` so the boundary is visible before you spend anything.
 
-## The v1 demo
+## The demo
 
 Two browser windows, one pi host, one conversation tree. Window A runs a long
-task on trunk. Window B branches an Aside off an assistant message three turns
-back, asks a clarifying question, gets an answer, attaches a reference — and it
-appears live in Window A's tree **without a single token entering A's context.**
+task on trunk. Window B branches off an assistant message three turns back,
+asks a clarifying question and gets an answer, and it appears live on
+Window A's rail **without a single token entering A's context.**
 
 Multi-writer, live presence, concurrent lanes, and context isolation, all in one
-frame. Reachable without solving merge.
+frame, with no merge.

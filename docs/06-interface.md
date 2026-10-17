@@ -1,7 +1,7 @@
 # Interface: the sidebar down the left, columns for reading, a rail for shape, a board for everyone
 
-The backend can now hold a conversation as a tree, with people and an agent in
-it (ADR-0018). The first interface drew that tree as a chat list: one path, with
+The backend holds a conversation as a tree, with people and agents in it
+(ADR-0018). The first interface drew that tree as a chat list: one path, with
 every other branch reduced to a "⑂ 1 branch" marker. That was honest about
 context (T) but hid everything else (E), which is the product. Play-testing it
 also showed two controls that confuse people:
@@ -12,7 +12,7 @@ also showed two controls that confuse people:
 - **"Make this a conversation"** changed a rule without showing where the rule
   starts, or saying what it does.
 
-This document fixes the design before any code. It draws E and T directly.
+This document says what the interface is now. It draws E and T directly.
 
 ## Principles
 
@@ -56,32 +56,33 @@ search's bar while you search (below). The page's
 one row of chrome is the footer, and it splits where the sidebar's edge does:
 under the sidebar, what is yours; to the right, what is everyone's (ADR-0122).
 
-### The sidebar: the roots you have open (ADR-0030, ADR-0045, ADR-0077, ADR-0122)
+### The sidebar: the tasks you have open (ADR-0030, ADR-0045, ADR-0077, ADR-0122)
 
-Down the left edge: the roots you have open, in your order, then ＋. It is darker than the page, and the root you are on is the page's
+Down the left edge: the tasks you have open, in your order, then ＋. It is darker than the page, and the task you are on is the page's
 colour, with a light edge on its left, and opens into the rail and columns
 beside it (ADR-0081, turned sideways).
 
-- **The root you are on shows one root's tree**: its rail, and its columns.
-  Every column there shares the root.
+- **The task you are on shows its canvas**: its rail, and its columns
+  (ADR-0116, below).
 - **The sidebar is yours, on every device of yours**: your own document, which
-  only your tabs write. Top to bottom is your order. Opening a root adds it at
+  only your tabs write. Top to bottom is your order. Opening a task adds it at
   the bottom; drag an item to reorder: dragged over another, it goes above
-  or below it, never into it, and opens nothing. **×** closes a root for you and
-  writes nothing shared; opening it again brings its columns back. A root
-  you start joins the sidebar; a root someone else starts does not, and
+  or below it, never into it, and opens nothing. **×** closes a task for you and
+  writes nothing shared; opening it again brings its columns back. A task
+  you start joins the sidebar; a task someone else starts does not, and
   reaches you through the board or your inbox.
-- **An item's label** is the root's title, else its first message's first
-  line, wrapped to two lines before it is cut; a root only people have
-  written in, untitled, is **Chat**. When the agent is first asked in a root
-  with no title, a model titles it in one to three words (ADR-0074).
+- **An item's label** is the task's title, else its first root's first
+  message's first line, wrapped to two lines before it is cut; a task only
+  people have written in, untitled, is **Chat**. When the agent is first
+  asked in a task with no title, a model titles it in one to three words
+  (ADR-0074).
   **Rename** in the item's `⋯` turns the label into a field: Enter or
   leaving it saves the title for everyone, Escape cancels, and an empty title
   brings back the first line. **Auto-update title**, beside it, asks the
   model again from what was said in the thread, and replaces the title for
-  everyone. A title is a mark on the root (ADR-0045), and names the root
+  everyone. A title is a mark on the task (ADR-0045), and names the task
   wherever it is shown: the sidebar, the board, your inbox.
-- **An item shows what happens in its root while you are elsewhere**
+- **An item shows what happens in its task while you are elsewhere**
   (ADR-0077), before its label: a still blue ring while the agent works
   there, cards wait to be sent to it, or it is finishing its summary, which
   needs nothing from you (cards behind a held queue wait for a person, and
@@ -94,18 +95,18 @@ beside it (ADR-0081, turned sideways).
   ready to accept clears when it is accepted, or with **Not needed** in the item's
   `⋯`. A page that loads draws every mark still: only a change you see
   moves. After the label, small avatars of the others reading there, and a
-  small dot in your colour when the root holds something you typed and have
+  small dot in your colour when the task holds something you typed and have
   not sent.
-- **Move to ▸** in an item's `⋯` moves the root on the board, for everyone
+- **Move to ▸** in an item's `⋯` moves the task on the board, for everyone
   (below). Moved to the archive, it is archived: the item says so
   ("archive: read-only for everyone until moved out"), is disabled while
-  the agent works in that root or cards are queued there, with the reason,
+  the agent works in that task or cards are queued there, with the reason,
   and names the threads whose proposed changes it withdraws from your repo ("work not
   accepted goes: amber-fox"); moving it out builds them again
-  (ADR-0061). **×** is for putting a root away yourself.
+  (ADR-0061). **×** is for putting a task away yourself.
 - **Archiving closes it for you** once the host accepts it, as **×** does,
   showing its neighbour below, else above, else nothing.
-- **If someone else archives the root you are on**, it stays while you are
+- **If someone else archives the task you are on**, it stays while you are
   there, read-only, saying who archived it, with **Restore**. It leaves your
   list when you switch away.
 - **`⋯` and ×** show while an item is hovered or focused, the one you are on
@@ -113,17 +114,17 @@ beside it (ADR-0081, turned sideways).
 - **＋ agent**, at the foot of the sidebar, is a split button with
   **conversation** in its menu: a conversation at the root is the rarer
   start, so it is the one behind the menu. What each does is under
-  "Starting" below. A board column has its own ＋, which lands the new root
+  "Starting" below. A board column has its own ＋, which lands the new task
   in that column's state.
 - **The sidebar folds to icons** (ADR-0088), about 3rem wide, from **«** at
   its foot or Ctrl+Shift+L; **»** shows its titles again. Which you chose is
   this browser tab's, and a new tab starts from your latest. Until you
   choose, a window under 56rem shows icons. Nothing folds it by itself.
-  - **An item's icon** is the icon of its root's earliest thread that has
-    one (ADR-0143), else two initials on the root's colour, the colour of
-    its trunk (ADR-0089): "Kanban outside click" is **KO**, "Sidebar" is
-    **SI**. Under built-in icons every named thread has one, so initials
-    show only for a root whose threads have no names yet.
+  - **An item's icon** is the icon of its task's earliest thread that has
+    one (ADR-0143), else two initials on a colour seeded by the task's id
+    (ADR-0089): "Kanban outside click" is **KO**, "Sidebar" is **SI**.
+    Under built-in icons every named thread has one, so initials show only
+    for a task whose threads have no names yet.
   - **Its signals stay on it:** the blue ring round it while the agent
     works, the amber dot and the fading ✓ on its top-right corner, your
     dot on its bottom-right. Hovering or focusing it shows its label and
@@ -160,7 +161,7 @@ While the page syncs, "syncing…" leads its right end.
   amber badge counts what the threads you follow need from you (a run that
   ended asking something, failing, or that no one could tell; work ready to
   accept) plus the mentions you have not seen; the page's title carries the
-  same count, before the root you are on: "(2) Fix the sync bug · pine·trie".
+  same count, before the task you are on: "(2) Fix the sync bug · pine·trie".
   Its sections, each shown only with rows: **Needs you** (each thread's
   reason, in amber), **Ready to accept** (threads you follow with open
   proposed changes), **Worth a read** (listed, not counted) and **Mentions of you**.
@@ -172,7 +173,7 @@ While the page syncs, "syncing…" leads its right end.
   with who, the thread, and the start of the message. A row opens that
   thread in the sidebar, with a column on the message, archived or not. The
   badge counts the mentions you have not seen. One is seen when you open it
-  from the inbox, when it is drawn in a column of the root you are on, or
+  from the inbox, when it is drawn in a column of the task you are on, or
   when you **mark all seen**. A seen mention stays in the inbox; a filter
   shows only the unseen.
 - **The inbox is yours**, the same on every device of yours (ADR-0077). You
@@ -181,13 +182,13 @@ While the page syncs, "syncing…" leads its right end.
   when it holds cards, titled "your inventory: 1 card"; in the account menu
   while the sidebar is folded.
 - **The board's strip**: ▦ **Board**, then each workflow state's name and
-  count, avatars of the people reading in its roots, an amber dot when a
-  root there needs you, and, only when there are any, **◌n**, its roots the
-  agent works in, and **⇡n**, its roots with changes ready to accept (ADR-0091).
+  count, avatars of the people reading in its tasks, an amber dot when a
+  task there needs you, and, only when there are any, **◌n**, its tasks the
+  agent works in, and **⇡n**, its tasks with changes ready to accept (ADR-0091).
   Those two are facts for everyone: never a badge, never moving. While the
   board is open, the board's search and **mine** take the states' place,
   since each column's head shows the same (ADR-0115). ▦ carries
-  the highest mark of the roots not in the sidebar, a dot in your colour
+  the highest mark of the tasks not in the sidebar, a dot in your colour
   when one of them holds something you typed, and a blue ⌕ while a filter
   is on and the board is closed; its title is the session's
   message count, "2 in the threads this tab has loaded, of 4 in the
@@ -230,18 +231,18 @@ While the page syncs, "syncing…" leads its right end.
   (ADR-0102).
 - **A menu you opened stays open until you close it.** The footer's and the
   board's avatars and counts come from live data, but when what one stands
-  for goes while its menu is open (a person leaves the root, the last thing
+  for goes while its menu is open (a person leaves the task, the last thing
   in a section of your inbox is dealt with), the menu says so ("Bea has
   left", "Nothing left to accept.") and its trigger stays until you close it
   (principle 6). Escape closes a menu open on the board, and then the board.
-- **Nothing opens a root by itself.** A mention is a notification: you
+- **Nothing opens a task by itself.** A mention is a notification: you
   choose to open it.
 
 ### Pages (ADR-0098)
 
 A page covers the stage: the sidebar and the footer stay, and the
 stage stays as you left it under the page. It opens with **← back** and
-its title. Back, the browser's Back, and choosing a root, a new tab, ＋, ▦
+its title. Back, the browser's Back, and choosing a task, a new tab, ＋, ▦
 or a row of your inbox all return to the stage. The page is in the
 URL (`#profile`), so a reload stays on it; the window's title names it,
 "(2) Profile · pine·trie". While a page shows, the card and undo keys do
@@ -291,49 +292,49 @@ footer's edge: it moves none of them. ▦ again, Escape (once a filter is
 cleared), or a click outside it and its strip closes it, and so does choosing something to work in. Whether it is open is this browser
 tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
 
-- **Every root is in one workflow state.** Each open state is a column of
+- **Every task is in one workflow state.** Each open state is a column of
   the board, in order; the archive is last. A new session has
   **Backlog**, **Doing** and **Done**.
-- **A thread card** (ADR-0111) is a root, on the board and in the sidebar
-  alike: its header, the same in both, shows its label, its status (with
-  the agent's ring in any root, opened in this browser tab or not), a
+- **A task card** (ADR-0111, ADR-0126) is a task, on the board and in the
+  sidebar alike: its header, the same in both, shows its label, its status
+  (with the agent's ring in any task, opened in this browser tab or not), a
   blue **⇡** for everyone when a thread of it has changes ready to accept (its
   title names the threads; the thread's followers have it in their inbox),
   and a dot in your colour when it holds something you typed. On the board,
-  a titled root's first line is its body, and its foot shows who wrote in
+  a titled task's first line is its body, and its foot shows who wrote in
   it and the others reading there: each reader's avatar is a menu of the
   threads they read there, a row of which opens that thread in the sidebar.
-  Selecting the item opens the root in the sidebar and shows it.
-- **Anyone moves a root, for everyone**: drag an item to another column, or
+  Selecting the item opens the task in the sidebar and shows it.
+- **Anyone moves a task, for everyone**: drag an item to another column, or
   before another item, or use its `⋯`'s **Move to ▸**, **Move up** and
   **Move down**. Dropped on your
-  list, it opens there. Nothing moves a root by itself: proposed changes ready, or a
-  run that needs you, is a mark, never a move. A move from a state the root
+  list, it opens there. Nothing moves a task by itself: proposed changes ready, or a
+  run that needs you, is a mark, never a move. A move from a state the task
   has left is refused, naming who moved it and where ("not moved: Bea moved
   it to Doing first").
 - **A column's head** shows the state's name, its count, the readers'
-  avatars of its roots, its highest mark, and, only when there are any,
+  avatars of its tasks, its highest mark, and, only when there are any,
   **◌n** and **⇡n**, as the strip's button does (ADR-0115).
 - **One search for the whole board** (ADR-0109, ADR-0115), in the footer's
-  strip while the board is open, with **mine** (the roots you wrote in),
-  filters every state in place: a root is kept when its label holds every
+  strip while the board is open, with **mine** (the tasks you wrote in),
+  filters every state in place: a task is kept when its label holds every
   word typed, in any order (labels, not every message, which would load
   every root, ADR-0063). The states keep their places and the items their
   order. While a filter is on, each head's count says how many it shows
   ("12 of 96"), its ◌, ⇡ and readers count those, and the count and the
   field's border are blue; its mark, Remove's refusal and the strip count
-  every root. A banner at the board's foot names the filter ("Filtered by
-  "parser" and mine: 14 of 140 roots") with **Clear**, which lifts the words
+  every task. A banner at the board's foot names the filter ("Filtered by
+  "parser" and mine: 14 of 140 tasks") with **Clear**, which lifts the words
   and mine; the field's **×** clears only the words. Move up and Move down
   step among the items shown. Opening the board with ▦ or a state's button
   focuses the field; the board opening by itself does not. `/` focuses it
   while the board is open; Escape clears the filter before it closes the
   board. The filter outlives closing the board, not a reload.
-- **A root in the archive is archived** (ADR-0029): it is read-only for
+- **A task in the archive is archived** (ADR-0029): it is read-only for
   everyone until it is moved out, the host lets go of it, and its threads'
   proposed changes leave your repo. Its column, as wide as the others and marked ✓,
-  shows a count and its most recent roots, or every root the search keeps,
-  newest first. An archived root opened from it
+  shows a count and its most recent tasks, or every task the search keeps,
+  newest first. An archived task opened from it
   is read-only, with **Restore** in its composer's place, which moves it to
   the first open state; it leaves the sidebar when you switch away unless you
   restore it.
@@ -348,18 +349,18 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   field (Enter or leaving it saves; Escape keeps the old name); its `⋯`
   moves it left or right, adds a state left or right of it (a name field
   stands where it will go), or removes it, which is refused, with the
-  reason, while it holds a root or is the only open state. Adding a state is
+  reason, while it holds a task or is the only open state. Adding a state is
   rare, so it takes no room on the board. The archive can be renamed, never moved or
   removed.
-- **A backlog item is a conversation root**: an idea not started is a root
-  with no agent (ADR-0021); people discuss it below its first message, and
+- **A backlog item is a task with a conversation**: an idea not started is
+  a task whose thread no agent works in (ADR-0021); people discuss it below its first message, and
   asking `@agent` in it starts the work.
 - **A text card becomes a thread** (ADR-0111): dropped on an open state, in
-  the board's column or the footer's strip, or among the sidebar's roots,
-  it starts a conversation root there whose first message is its text, by
+  the board's column or the footer's strip, or among the sidebar's tasks,
+  it starts a task there with a conversation whose first message is its text, by
   you; a note's and your message's ⋯ have **Move to a new thread in
   Backlog** (and each open state) for the keyboard. Dropped in the
-  sidebar, the new root opens there for you. It never asks the agent,
+  sidebar, the new task opens there for you. It never asks the agent,
   even with `@agent` in it. While a card is dragged, those places are
   outlined, and a card held over ▦ opens the board. The undo key lifts the
   thread back into the card, where it was, while the thread holds that
@@ -724,7 +725,7 @@ the tree.
   to a thread elsewhere is a stub, `↳ amber-fox`, titled where it is: a
   click opens that task, or your inventory's preview; one someone else
   holds says "Bea has it" and opens nothing.
-- A strip beside the sidebar draws every branch in the root you are on as a line,
+- A strip beside the sidebar draws every branch of a tree as a line,
   and every message as a dot, except for uneventful stretches (below). A row
   is a depth, not a turn in one order: a branch starts on the row under its
   fork, beside the messages it diverged from, in the leftmost place free for
@@ -906,8 +907,8 @@ The rail is E; the column is T. Seeing both at once is the product.
     alone;
   - the **composer** says "Bea is typing…".
 
-  Presence is thread-level: every column of the root you are on reports the
-  thread it shows. Columns of other roots report nothing, so a root's
+  Presence is thread-level: every column of the task you are on reports the
+  thread it shows. Columns of other tasks report nothing, so a task's
   avatars, in the sidebar and on the board, are the people looking at it now.
   Which message someone has on screen waits until thread-level proves too
   coarse.
@@ -931,8 +932,8 @@ The rail is E; the column is T. Seeing both at once is the product.
   and the undo key, on no task, brings both back.
 - **An empty session** shows the board, with nothing in it, and ＋.
 - **A page with nothing in the sidebar** (a first visit, or a list you
-  emptied) opens on the board, which shows every root to open: nothing opens
-  a root by itself (ADR-0030).
+  emptied) opens on the board, which shows every task to open: nothing opens
+  a task by itself (ADR-0030).
 - **`→` in a message's right margin opens a branch** as a column to its right,
   empty until something is sent there. What it opens appears to the right, so
   the button sits on that side. A branch starts as a conversation; `@agent`
@@ -1017,7 +1018,7 @@ The rail is E; the column is T. Seeing both at once is the product.
   outlined instead, with how long it has run beside its tag ("12s",
   "1m 05s"), and accepted work hides: the wait is the machine's, not the
   model's. A quicker command changes neither.
-- **A root shown again draws its tool rows as they were left** (ADR-0123):
+- **A task shown again draws its tool rows as they were left** (ADR-0123):
   a running command's row outlined, a row whose detail you opened or folded
   the same way.
 - **A file dropped on a card, pasted into its box, or chosen with "share a
@@ -1098,7 +1099,7 @@ The rail is E; the column is T. Seeing both at once is the product.
 - **What you type in a composer is your message**, a card on its thread
   that only you see. The first keystroke worth keeping (anything but a
   branch's `@agent `) makes it. It belongs to the thread, not the column:
-  switching roots, reloading, closing and reopening the column, or the
+  switching tasks, reloading, closing and reopening the column, or the
   host restarting, you find it where you left it, and it follows the
   thread as the thread grows, a thread not yet started's too (ADR-0126). Others writing at the
   thread's end show above it as "Bea is writing…".
@@ -1129,10 +1130,10 @@ The rail is E; the column is T. Seeing both at once is the product.
   new branch, a message with text takes a card only from your inventory
   ("not moved: your message here holds text").
 - **Marks say where you left something unsent** (ADR-0048): a small dot in
-  your colour on its root's item in the sidebar, and on the rail at its
-  thread's end, whether or not that thread's column is open. A root you
-  closed is marked on ▦ and its thread card; an archived root only on its
-  thread card, since its work is done. A note you own marks its task, not a
+  your colour on its task's item in the sidebar, and on the rail at its
+  thread's end, whether or not that thread's column is open. A task you
+  closed is marked on ▦ and its task card; an archived task only on its
+  task card, since its work is done. A note you own marks its task, not a
   thread's end. Only your own message and the notes you own count, and only while they hold text: emptied, sent or
   discarded, the dot goes. A bare `@agent ` is nothing typed.
 - **Sending spends the card.** The box stays as it was until the host
@@ -1329,12 +1330,12 @@ The rail is E; the column is T. Seeing both at once is the product.
   in: Ctrl+Shift+O, the panel's **put** button, or a drag out
   of the panel onto a column: a note in the note column nearest its thread,
   or, onto a note column, at its end. Dropped on a
-  composer, it becomes your message there. Held over a root in the sidebar,
+  composer, it becomes your message there. Held over a task in the sidebar,
   or over ▦, a drag opens it while a ring around it fills. The open card's **×** discards it; the undo key brings
   it back.
 - **Undo a move** with Cmd+Z (Ctrl+Z elsewhere) while no box has focus;
   Cmd+Shift+Z, Ctrl+Shift+Z or Ctrl+Y redo it (ADR-0066). It undoes your
-  newest move in the root you are on, from any of your tabs, after a reload
+  newest move in the task you are on, from any of your tabs, after a reload
   or a restart too. As it acts it shows where the card went back: the
   panel, the thread's column, or, for a thread not yet started, its card's
   column unfolded. If anyone moved the card since, it is refused, saying
@@ -1343,7 +1344,7 @@ The rail is E; the column is T. Seeing both at once is the product.
   Sends are final; a paste, **Copy to this task**, **Copy to your
   inventory**, **Edit as text** and **Queue a reference** are each undone
   whole, and a copy to the clipboard changes nothing to undo. On no task, the undo key undoes your moves
-  outside any task: a discard from your inventory. An archived root's moves cannot be
+  outside any task: a discard from your inventory. An archived task's moves cannot be
   undone, and are forgotten 7 days after it was archived.
 - **Undo a swap** with the same keys while the panel has focus: this tab's
   newest swap goes back, unless those slots have changed since.
@@ -1360,20 +1361,19 @@ The rail is E; the column is T. Seeing both at once is the product.
 | "make this a conversation" in a bar | nothing: a thread's mode is whether the agent works in it (ADR-0021) |
 | "⑂ 1 branch · 2 messages" with a hidden list | the rail, and a coloured fork dot in the column |
 | "switch to this path" (`navigate`) | nothing: sending attaches where you are reading |
-| every tree in one rail, one after another | one root at a time, with its own rail (ADR-0029) |
-| a column on another root, with no stripe and no fork dot | nothing: the columns you see share their root |
+| every tree in one rail, one after another | one task at a time, with its own rail (ADR-0029, ADR-0116) |
+| a column on another root, with no stripe and no fork dot | a column from another root has its root's tree on the rail beside the others (ADR-0116) |
 | the rail's `+`, and Start Chat and Start Agent in place of a composer | ＋: agent, or conversation |
 | a tab bar shared by everyone, with no close for yourself | the sidebar, yours on every device, with **×** (ADR-0030, ADR-0122) |
-| a new root by anyone appearing as a tab | the board shows it, and who is in it; you open it (ADR-0122) |
-| the Archive tab, and the header's people | the board: every root in a workflow state, Done the archive (ADR-0122) |
+| a new root by anyone appearing as a tab | the board shows its task, and who is in it; you open it (ADR-0122) |
+| the Archive tab, and the header's people | the board: every task in a workflow state, Done the archive (ADR-0122) |
 | Cmd+C taking a reference into your inventory; a message's **take**; a table's or an image's ❝ | Cmd+C copies to the clipboard alone; keep, from the clipboard cell (ADR-0132) |
 | Cmd+X taking a card into your inventory | Cmd+X cuts it: a copy, then a discard (ADR-0132) |
 | a reference staying in your hand when put, and the put key in a text box | every card leaves your hand when put; Cmd+V types a link (ADR-0132) |
 | a drop on a filled slot landing in the first empty one | the drop replaces the slot's card (ADR-0133) |
 
-The last row mattered for `PLAN-2026-09-26-thread-lanes`: with no control moving
-a lane, the `navigate` command had no caller and was deleted with `prompt` and
-`branch`. Lanes now never move at all (ADR-0120).
+With no control moving a lane, the `navigate` command had no caller and was
+deleted with `prompt` and `branch`. Lanes now never move at all (ADR-0120).
 
 ## Data
 
@@ -1386,10 +1386,11 @@ board's records (ADR-0122); a card's text is its own document (ADR-0048).
 - **The rail** is the tree itself, from `parentId`, drawn in id order, which is
   creation order (uuidv7).
 - **A thread's mode** is its lane; **names** are `pinetrie.participant` values.
-- **A root** is a root of the tree index (an orphan counts as one). **Your
-  list** is your own document (`open:<you>`, ADR-0122), each root's id to an
-  order key, written only by your tabs: the roots in it that are not
-  archived, plus the root you are on.
+- **A root** is a root of the tree index (an orphan counts as one); a task's
+  canvas holds threads of one root or several (ADR-0116). **Your list** is
+  your own document (`open:<you>`, ADR-0122), each task's id to an order
+  key, written only by your tabs: the tasks in it that are not archived,
+  plus the task you are on.
 - **The board and the footer** read presence (people, and the thread each
   is in) and the lanes (the agent's running threads). **Mentions of you** are the chats whose
   mentions `address` resolves to you. **What you have seen** is kept in your
@@ -1420,15 +1421,16 @@ board's records (ADR-0122); a card's text is its own document (ADR-0048).
   its first line, under a title); and who is in a note column now, which
   needs a presence field of its own.
 - **Narrow screens**: the stacked sequence described above, with the sidebar
-  collapsed to each root's icon (ADR-0088, ADR-0143) and the footer to ▦,
+  collapsed to each task's icon (ADR-0088, ADR-0143) and the footer to ▦,
   what needs you and you (ADR-0122); built after the wide layout works. The
   column's pane is its first step (ADR-0078): over a narrow window it covers
   the page, and ← goes back to the thread. Below 56rem the sidebar narrows and
   the strip shows its first states only.
-- **What's new since you looked** (ADR-0030 defers it): a last-read position
-  per root gives unread marks on the sidebar's items, a "3 new" count on ▦, and a
-  "what's happening" panel listing roots by activity. It can reuse the
-  inbox's storage and its rule for "seen".
+- **What's new since you looked** (ADR-0030 defers it): how far you read
+  each thread is kept, in your attention document (ADR-0077), and a column
+  draws its "since you were here" line from it. Still to do: unread marks on
+  the sidebar's items, a "3 new" count on ▦, and a "what's happening" panel
+  listing tasks by activity, from the same marks.
 - **The inbox, grown:** **done** to take a handled mention off it; browser or
   system notifications, which need permission. (How runs end, work ready,
   and one inbox per person on every device came with ADR-0077 and
@@ -1446,8 +1448,9 @@ board's records (ADR-0122); a card's text is its own document (ADR-0048).
    scrolls horizontally.
 2. **A branch opens next to the column it forks from**, so its colour link is
    short to follow.
-3. **Unread tracking** needs a per-person "last read" position. That is presence
-   state, so it arrives with presence; until then the rail shows activity only.
+3. **Unread tracking** is a per-person "last read" position: how far you read
+   each thread, in your attention document on every device of yours
+   (ADR-0077), not presence, which decays.
 4. **Columns scroll independently.** A shared vertical scroll kept every branch
    level with its fork point, but could not show forks far apart together, and
    its connector lines crossed sibling columns.

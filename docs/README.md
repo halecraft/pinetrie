@@ -1,4 +1,4 @@
-# pine·trie — Plans
+# pine·trie — the docs
 
 A collaborative agentic harness: pi's agent core + Kyneta's CRDT substrate,
 with a conversation **tree** as the primary object rather than a transcript.
@@ -10,7 +10,6 @@ with a conversation **tree** as the primary object rather than a transcript.
 | `00-vision.md` | What we are building and why. Product thesis. |
 | `01-architecture.md` | Layer cake, thin waist, data model, evidence base. |
 | `adrs/` | ADRs, one file each: decisions already made, with rationale. |
-| `04-roadmap.md` | Sequencing: spikes → walking skeleton → v1 demo. |
 | `05-stack.md` | Stack decisions and why: TypeScript on Node, pnpm, Vite, React. |
 | `06-interface.md` | The interface: columns for reading paths, a rail for the tree's shape. |
 | `the-jujutsu-repo.md` | The jj repo the host serves: what pine·trie writes there, and how jj and jjui see it. |
@@ -46,10 +45,9 @@ ADR is written, amended, restated and archived: `adrs/README.md`.
 
 ## Status
 
-The walking skeleton runs end to end and the stack is complete (TypeScript,
-pnpm workspace, Vite, React, Vitest, Biome, Playwright). Four spikes are
-open, none blocking: S6, S10, S15 and S100. `rg -l '^- \*\*Status:\*\* Open' docs/findings`
-lists them. Next is the roadmap's thickening sequence in `04-roadmap.md`.
+Six spikes are open, none blocking: S6, S10, S15, S100, S154 and S197.
+`rg -l '^- \*\*Status:\*\* Open' docs/findings` lists them. What is built,
+and what is not yet, is in `pinetrie.md` § 6.
 
 ## Where documents live
 

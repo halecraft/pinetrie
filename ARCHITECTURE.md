@@ -25,8 +25,8 @@ browser ──commands (Kyneta Line)──▶ host ──▶ pi agent core
   directly in a directory (ADR-0102). A branch clones its parent's disk. Lanes run
   on Docker, on btrfs snapshots: in pine·trie's own VM on the Mac, on the
   host on Linux (ADR-0130). A host with tools that cannot run them does not
-  start. A lane's work
-  reaches your repo as proposed changes, a single commit you can review first.
+  start. A lane's work reaches your repo as proposed changes, a revision
+  or a stack you review before you accept it.
 
 ## Packages
 
@@ -40,6 +40,10 @@ browser ──commands (Kyneta Line)──▶ host ──▶ pi agent core
 | `rules` | each stored shape and the pure rules about it |
 | `reads` | document reads shared by host and client |
 | `lanes` | what a lane is and what runs in it: its container's shape, mounts, grants, disks, forks and snapshots; it defines the `LaneRuntime` port and a kind of project's ports (`LaneHistory`), implements neither, and runs no jj |
+| `lanehost` | what the host asks of the machine its lanes' disks are on, outside any lane (ADR-0129): one protocol, server and client, a module per role; it declares only `core` and `channel`, and knows nothing of lanes or Docker |
+| `channel` | a held channel to a server process, one JSON line per message: lanehost's server and a lane's helper speak it; it declares nothing, since both run it from pine·trie's install |
+| `ssh` | a lane's ssh through its host (ADR-0140): settings, the files every lane is given, the agent protocol and the relay's decisions; it declares nothing, and only the app declares it |
+| `keeper` | one step at a time on a resource that needs exclusive access, in an order the caller can reason about; it declares nothing |
 | `jj` | jj's adapter: your repo as the host reads and writes it (its one owner, proposed changes, accepted work and lanes' refs in it), each lane's own repo as a `LaneHistory`, your repo at startup, and every jj name |
 | `folder` | a folder project's history as values (ADR-0142): its graph of states and their merge bases, the path merge's plan, and the snapshots kept; it declares only `core`, does no I/O, and lanehost carries out what it decides |
 | `docker` | running lanes on Docker: the `LaneRuntime` over the docker CLI, btrfs disks in a helper container, Docker's startup refusals, lanes inside a lane; beside it a folder project's `FolderDisks` |

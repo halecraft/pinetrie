@@ -5,9 +5,9 @@ picking the project up cold. The detailed record lives in `docs/`; this
 file exists to tell you what matters, what is decided, and what to do next.
 
 > The architectural record lives alongside this file in `docs/` and is
-> **tracked**. `00`–`05` are the standing documents; `findings/` holds the 21
-> spike reports that are the evidence behind them. This file is the orientation
-> layer over the top.
+> **tracked**: the living docs say what is true now, the ADRs why, and the
+> spikes in `findings/` the evidence (`docs/README.md`). This file is the
+> orientation layer over the top.
 >
 > **Implementation plans are not here.** They live in `.plans/`, one per
 > change, and are untracked — see `docs/README.md` § Where documents live.
@@ -39,20 +39,13 @@ by an LLM that sees both divergent branches).
 
 Full statement: `docs/00-vision.md`.
 
-### Branch kinds — the scope lever
+### Two kinds of thread
 
-| kind | context | tools | workspace | merge |
-|---|---|---|---|---|
-| **Aside** | full prefix | none | none | fold-in (optional) |
-| **Scout** | full prefix | read-only | shared, read-only | fold-in |
-| **Worktree** | full prefix | full | isolated (jj) | fold-in **+** file merge |
-
-Aside and Scout are pure conversation-tree operations and cover most daily use.
-**Worktree is out of v1** — it needs effect-merge, which is genuinely hard.
-*Since ADR-0032 and ADR-0034, every agent lane is a Worktree: a Linux
-container on its own disk, with its own jj repo, and a branch clones its
-parent's disk. An Aside is a conversation thread. ADR-0033 resolves the
-effect merge.*
+A **conversation** is people talking in the tree, with no tools and no
+lane. An **agent's thread** has a lane of its own (ADR-0032, ADR-0034): a
+Linux container on its own disk, with its own copy of your repo, and a
+branch clones its parent's disk. Whether a thread is one or the other is
+whether the agent has been asked there (ADR-0021).
 
 ### Merge is three problems
 
@@ -62,55 +55,55 @@ Conflating these wasted time early, so keep them separate:
    converges. *Free from CRDTs. Not where the work is.*
 2. **Context** — what text enters the model's window when a branch lands.
    *The actual product problem.* Solved by a destination-aware three-way fold.
-3. **Effect** — filesystem side effects of a branch that ran tools. *Unsolved,
-   out of v1,* needs isolated workspaces + a real jj merge, committed atomically
-   with the conversation merge. *Decided in ADR-0032 (a revision per turn,
-   landing as a jj merge), ADR-0033 (the agent resolves conflicts, and the
-   repository decides the outcome) and ADR-0034 (a container and disk per
-   lane). Landing is built; folds' file merges are not.*
+3. **Effect** — filesystem side effects of a branch that ran tools. Each
+   agent's thread works in its own lane (ADR-0034), a revision per turn
+   (ADR-0032), and its work reaches your repo as proposed changes you
+   accept; a catch-up that conflicts is resolved by the agent, and the
+   repository decides the outcome (ADR-0033). Built, but for coupling a
+   file merge to a fold, which waits for fold.
 
 ---
 
 ## 2. Where we are
 
-**The walking skeleton walks all five layers**, with automated coverage at each:
+pine·trie runs, and builds itself: its own threads' agents work on it in
+lanes, and their proposed changes, once accepted, are its accepted work.
 
 ```
-browser page ─┐
-              ├─ Kyneta Line (websocket) ─ Node host ─ pi-agent-core AgentHarness
-Node client ──┘                                              │
-                                                     KynetaStorage (ADR-0013)
-                                                             │
-                    json.bind doc ── replicated back ── ┘
+browser page ── Kyneta Line (websocket) ── Node host ── pi-agent-core, one harness a root
+                                              │                 │
+          documents, replicated back ──────────┤        KynetaStorage (ADR-0013)
+                                              │
+                                              └── lanes: a container, disk and copy of your repo each
 ```
 
-Twelve spikes resolved, fourteen ADRs, **no open blockers**. The gate was fully
-discharged before any non-disposable code was written.
+### The gates
 
-### Current state
+Each is in `AGENTS.md`, Gates, with what it needs to run. Their counts are
+what they print.
 
-| gate | command | status |
+| gate | command | what it covers |
 |---|---|---|
-| lint + format | `pnpm run lint` | clean (Biome, Kyneta's settings) |
-| module boundaries | `workspace.test.ts` (in `pnpm test`) | ok |
-| unit (pure core) | `pnpm test` | 1875/1875 (Vitest) |
-| mutations | `pnpm mutate scripts/mutations/<list>.ts` | 1172 listed; anchors checked in `pnpm test` |
-| pi's own Storage suite | `pnpm run conformance` | 21/21 + 21/21 control |
-| end-to-end | `pnpm run e2e` | 13 scenarios, 46 checks, on the scripted model (S94) |
-| with a real model | `pnpm run e2e:live` | the `live` scenario: 3 checks |
-| **real browser** | `pnpm run e2e:browser` | 4 scenarios, 167 checks; in a lane with no containers, the 6 that need one report SKIP |
-| test budget | `scripts/budget.test.ts` (in `pnpm test`) | 18 host and lanes scenarios ≤ ⌊√1875⌋; 4 browser ≤ ⌊√18⌋ |
-| types | `pnpm run typecheck` | clean (strict) |
-| all-but-browser cascade | `pnpm run verify` | green |
+| lint + format | `pnpm run lint` | Biome, Kyneta's settings |
+| types | `pnpm run typecheck` | strict, the page's DOM checked apart |
+| unit | `pnpm test` | Vitest, beside the code; `workspace.test.ts` holds the package boundaries, and `scripts/*.test.ts` the record, the budget and the mutation lists |
+| mutations | `pnpm mutate scripts/mutations/<list>.ts` | a deliberate bug for each check; `pnpm run proofs:unit` holds every unit mutation's `expect` to a test that runs |
+| pi's own Storage suite | `pnpm run conformance` | against `KynetaStorage`, with pi's `MemoryStorage` as the control |
+| end-to-end | `pnpm run e2e`, `pnpm run e2e:lanes` | the host's scenarios, and the lanes' under Docker, on the scripted model (S94); one scenario per file (`apps/pinetrie/e2e/TECHNICAL.md`) |
+| with a real model | `pnpm run e2e:live` | the `live` scenario |
+| **real browser** | `pnpm run e2e:browser` | the page in Chromium's headless shell |
+| the observer | `pnpm run e2e:observer` | the eBPF observer in a QEMU guest on the lane VM's kernel |
+| test budget | `scripts/budget.test.ts` (in `pnpm test`) | host and lanes scenarios ≤ √ of the unit tests, the browser's ≤ √ of those |
+| the cascade | `pnpm run verify` | lint, types, unit, `proofs:unit`, conformance, `e2e` and `e2e:lanes` |
 
-41 TypeScript files, ~8 500 lines. Stack: pnpm workspace · TypeScript (strict,
-**no build step** — Node 24 strips types natively) · Vite · Vitest · Biome ·
+The stack is `docs/05-stack.md`: a pnpm workspace, TypeScript (strict, **no
+build step**: Node 24 strips types natively), Vite, React, Vitest, Biome and
 Playwright.
 
 ### Layout
 
 ```
-apps/pinetrie/           @pinetrie/app          host and e2e suites (run, never imported)
+apps/pinetrie/         @pinetrie/app          host and e2e suites (run, never imported)
 apps/conformance/      @pinetrie/conformance  pi's Storage suite vs our adapter
 packages/core/         @pinetrie/core         declares NOTHING
 packages/schema/       @pinetrie/schema       Kyneta only; the document shape
@@ -118,21 +111,27 @@ packages/pi/           @pinetrie/pi           THE pi boundary
 packages/protocol/     @pinetrie/protocol     the wire contract and its codec
 packages/rules/        @pinetrie/rules        each stored shape and the pure rules about it
 packages/reads/        @pinetrie/reads        document reads shared by host and client
-packages/lanes/        @pinetrie/lanes        what a lane is and runs; the LaneRuntime port, no runtime (ADR-0032–0034, 0103)
+packages/lanes/        @pinetrie/lanes        what a lane is and runs; the LaneRuntime and LaneHistory ports, no runtime (ADR-0032–0034, 0103)
+packages/lanehost/     @pinetrie/lanehost     core and channel only; the lanes' machine, outside any lane, by role (ADR-0129)
+packages/channel/      @pinetrie/channel      declares NOTHING; a held JSON-lines channel to a server process
+packages/ssh/          @pinetrie/ssh          declares NOTHING; a lane's ssh through its host (ADR-0140)
 packages/docker/       @pinetrie/docker       lanes on Docker, on btrfs subvolumes (ADR-0130)
 packages/vm/           @pinetrie/vm           the Mac's lane VM: image, launcher, a host's lease on a slot (ADR-0130)
+packages/folder/       @pinetrie/folder       core only; a folder project's history as values (ADR-0142)
 packages/keeper/       @pinetrie/keeper       declares NOTHING; one step at a time on a resource
 packages/config/       @pinetrie/config       core only; settings declared with their rules, layers decoded, one settle (ADR-0146)
-packages/jj/         @pinetrie/jj         your repo: reads, steps, the owner (ADR-0038, 0060, 0065)
+packages/jj/           @pinetrie/jj           your repo: reads, steps, the owner (ADR-0038, 0060, 0065); each lane's jj history
 packages/session/      @pinetrie/session      one client's connection to a host; no React
 packages/shell/        @pinetrie/shell        unbash only; shell source as structure (ADR-0114)
 packages/interface/    @pinetrie/interface    what a person sees and does, for any client; no React, no DOM (ADR-0093)
 packages/web/          @pinetrie/web          the browser page: React and the DOM; owns its Vite build
-(root)                                      development tooling only
+(root)                                        development tooling only
 ```
 
 Dependency direction is physical: **core → schema, protocol → pi, session, shell → interface → web → app**.
-The root declares only tooling, so a package can import only what it declares.
+The root declares only tooling, so a package can import only what it declares
+(`workspace.test.ts` holds each package's manifest, `ARCHITECTURE.md` says
+what each is).
 
 ---
 
@@ -177,34 +176,28 @@ measured**, and each time it produced a confident wrong answer:
 - A probe "proved" pnpm strictness while its install had silently failed.
 
 **The defence that works is a negative control: prove the check can still fail.**
-There are permanent ones for convergence, seq, trunk semantics, and boundaries.
+Every check now has one: a deliberate bug in `scripts/mutations/` that it
+catches (`AGENTS.md`, Gates). The spikes' property tests for convergence,
+`seq` and trunk semantics, with their controls, stayed in `sandbox/`: none
+is a gate.
 *A check without a proof that it can fail is not yet a check.*
-
-### Sandbox (`~/.config/pi-jail/policy.json`)
-
-`allowWrite` is a **whitelist** (`"."` = the session's cwd); `denyWrite` carves
-exceptions *inside* it; reads are open with a `denyRead` blacklist.
-
-- **pnpm 12 cannot reach the registry** — its Rust fetcher validates through the
-  macOS keychain and cannot see the sandbox CA. `packageManager: "pnpm@10.18.0"`
-  routes through corepack's Node fetcher. **Do not remove that pin.**
 
 ### Kyneta
 
-Local workspace at `~/halecraft/kyneta`, wired by `link:` deps. **Published
-`@kyneta/*` 3.0.0 is unusable** — it predates the O(δ) write fix and declares a
-`loro-crdt` floor of `>=1.8.0` where the real floor is `>=1.13.4`. A stale
-build is refused at load: Node refuses a module whose named import is missing
-before any of it runs (S47), and the host imports what v4 added (`whenPeer`,
+The local checkout, at `~/halecraft/kyneta`, wired by `link:` deps to its
+`pineta` workspace. **Published `@kyneta/*` is unusable**: it predates the
+O(δ) write fix and what the host imports. A stale build is refused at
+load: Node refuses a module whose named import is missing before any of
+it runs (S47), and the host imports what v4 added (`whenPeer`,
 `yjsClientId`). pine·trie tracks the local checkout's `needed-by-pinetrie`
-bookmark, Kyneta v4 as of `PLAN-2026-09-28-kyneta-v4`.
+bookmark.
 
 Three issues were filed to the Kyneta team (`docs/findings/archive/kyneta-issues-verification.md`):
-`compact()` throws on live Loro docs (**moot for pine·trie** since ADR-0023: the
-session is `json.bind`, compacted live, and ADR-0014's ~5.6 KB residue per
-message is gone); the `Line` schemaHash collision (**fixed**); and
-the ephemeral wire cost (**withdrawn — our error**, we used `Schema.string()`
-where `Schema.text()` was the right primitive).
+`compact()` throws on live Loro docs (**moot for pine·trie**, which uses no
+Loro: the session is `json.bind`, compacted live, ADR-0023); the `Line`
+schemaHash collision (**fixed**); and the ephemeral wire cost (**withdrawn —
+our error**, we used `Schema.string()` where `Schema.text()` was the right
+primitive).
 
 ### pi
 
@@ -231,15 +224,16 @@ the root declares only tooling, so a package can import only what it declares.
 names are branded (`EntryId`, `RunId`, `ThreadId`), so a swapped argument is
 a compile error. They are minted where they enter: the protocol codec, the
 reads (`renderableEntry`), the schema's readers, `@pinetrie/rules`' decoders, a
-commit's trailer (`packages/lanes`), the pi adapter, the client's stored forms,
-and the host's id generator. Biome's `noRestrictedImports` (`biome.json`)
-refuses `entryId` in core, the client and the host, and `runId` in core and
-the client (S95). A `LocalSeq` brand was deleted (ADR-0013
+commit's trailer (`packages/core/trailers.ts`), the pi adapter, the page's
+stored forms, and the host's id generator. Biome's `noRestrictedImports`
+(`biome.json`) refuses `entryId` in core, the interface, the page and the
+host, and `runId` in all of them but the host (S95). A `LocalSeq` brand was deleted (ADR-0013
 above); `projectTranscript(entries, tipId)` cannot even accept a seq.
 
 **FC/IS — gather → plan → execute. Decisions are values.** `packages/core` is
-pure and imports nothing; the shell in `host/` performs the decision. This
-mirrors pi's own lane loop.
+pure and imports nothing, and `@pinetrie/rules` decides from what
+`@pinetrie/reads` and the adapters gather; the shell in `apps/pinetrie/host/`
+performs the decision. This mirrors pi's own lane loop.
 
 **No build step.** Node 24 strips types natively, so imports name the real file
 (`./index.ts`). Native stripping does **not** support enums, namespaces,
@@ -247,34 +241,28 @@ parameter properties, or decorators.
 
 ---
 
-## 6. What to do next
+## 6. What is built, and what is next
 
-**The stack is complete.** `packages/web/app.tsx` is React, rendering from the same
-Exchange `connectSession` (`@pinetrie/session`) already owns (handed to `ExchangeProvider`), so Node
-and browser still share one connection story and `e2e` drives the real thing.
-Hook names, verified against source: **`useTracked(thunk)`** for a derived
-read — *not* `useValue`, which takes a `CallableRef`; `useDocStatus` returns the
-string union `"pending" | "empty" | "populated"`, not an object.
-
-**The interface is the sidebar of roots down the left, and the root you are
-on, a rail beside columns** (`docs/06-interface.md`,
-`packages/interface/TECHNICAL.md`, ADR-0029, ADR-0122), over a footer showing
+**The interface is the sidebar of tasks down the left, and the task you
+are on, its canvas drawn as a rail beside columns** (`docs/06-interface.md`,
+`packages/interface/TECHNICAL.md`, ADR-0116, ADR-0122), over a footer showing
 who is here, what needs you and the board, which slides up over the columns
-with every root in its workflow state: each
-column is one path on its own scroll, a branch opens beside its parent in its
-rail track's colour, and the rail draws the root, with each uneventful
-stretch drawn as one capsule (ADR-0031), a long ask's work a capsule of its
-own (ADR-0056).
+with every task in its workflow state: each
+column is a card on the task's canvas, a thread's one path on its own
+scroll; a branch opens beside its parent in its rail track's colour, and
+the rail draws the tree of each root the task's threads are in, with each
+uneventful stretch drawn as one capsule (ADR-0031), a long ask's work a
+capsule of its own (ADR-0056).
 Views are pure functions over one `indexTree` (`packages/core/tree.ts`,
-`roots.ts`); which root you are on and each root's columns are a reducer in
-`packages/interface/layout.ts`, the sidebar is your `open:` document
-(`packages/session/open-threads.ts`), and the inbox is
+`roots.ts`); which task you are on and your view of each task's canvas are
+a reducer in `packages/interface/layout.ts`, the sidebar is your `open:`
+document (`packages/session/open-threads.ts`), and the inbox is
 `packages/interface/inbox.ts`.
 
 The composer is your message (ADR-0048, ADR-0113), which only you see;
-what people edit together before it is sent is a note. The composer is one
-uncontrolled textarea, bound with Kyneta's `attach` to the card's text
-from the keystroke that creates it (`packages/web/card-editor.tsx`).
+what people edit together is a note, in a note column (ADR-0116). The
+composer is one uncontrolled textarea, bound with Kyneta's `attach` to the
+card's text from the keystroke that creates it (`packages/web/card-box.ts`).
 
 **An image pasted into a composer reaches the agent** (ADR-0042): uploaded
 to `POST /blob`, kept by SHA-256 in `pinetrie_blobs` beside the session in
@@ -291,11 +279,10 @@ drawn from the render's own facts. A column at its end does not get shorter
 while the agent works: a floor takes up a shrink. The browser suite checks
 this frame by frame at 20× CPU throttle.
 
-**A root's tab can be renamed** (ADR-0045). A title is a mark on the root:
-a host-written `pinetrie.mark` value keyed by the entry, set from the tab's
-`⋯`, the last write winning, and deleted when cleared. It is the root's
-label everywhere it is named, the Archive search included. ADR-0028's
-descriptions, section headers and boundaries are still to do.
+**A task can be renamed** (ADR-0045, ADR-0116): its title is a
+host-written `pinetrie.mark` value, set from its item's `⋯` in the sidebar
+or its task column, the last write winning, and deleted when cleared. It is
+the task's label everywhere it is named, the board's search included.
 
 **Your config** (ADR-0146). pine·trie reads only its own files, each a
 `pinetrie.json`, from the broadest to the most specific:
@@ -423,8 +410,8 @@ under it in story, or nothing when the agent's last message says it all.
 thread once you have written on it (`RootRecord.threads`). At each run's end
 the same request asks a model for a verdict, digests on or off: needs you,
 worth a read, or done, with a one-line reason (`pinetrie.verdict`, one per
-lane); a failed or stopped run's verdict is its facts. A tab's mark says
-what its threads need of you: a still ring while the agent works, an amber
+lane); a failed or stopped run's verdict is its facts. A task's item in
+the sidebar says what its threads need of you: a still ring while the agent works, an amber
 dot that pulses as it arrives when something needs you (a question, an
 error, work ready to add), a dim one when something is worth a read, a ✓
 that fades when a run ends with nothing to do. What you have dealt with is
@@ -434,25 +421,26 @@ needed", and the mentions you have seen.
 
 **The rail outlines what each column shows** (ADR-0058), in the column's
 colour, and scrolls to keep the outline of the column you move in view. A
-column of a tab shown again comes back where you left it, by message: the
+column of a task shown again comes back where you left it, by message: the
 same measurement (`packages/interface/viewport.ts`). Spots last the page's
 life; keeping them for a person across devices is the next step.
 
-**Steps 1–5 are done** (ADR-0018). Now continue thickening (`docs/04-roadmap.md`), each step
-independently shippable:
+### Not built yet
 
-1. ~~tree read~~ — done: `projectSpine`, spine + branch markers, navigation is client-local state
-2. branch write — create a branch from any entry; Aside first
-3. ~~concurrent lanes~~ — done; since ADR-0120, a lane per thread, not per writer
-4. ~~references~~ — done, then withdrawn (ADR-0043): nothing read them
-5. ~~humans in the tree~~ (ADR-0018) — done: chat and compelled responders, presence (ADR-0024), notes (ADR-0025, since removed), and cards (ADR-0048)
-6. Scout — read-only tools
-7. fold — three-way merge producing a `fromId` node
+Decided, and waiting for their turn:
 
-**v1 demo:** two browser windows, one host, one tree. A runs a long task on
-trunk; B branches an Aside three turns back, asks, gets an answer, attaches a
-reference — and it appears live in A's tree **with zero tokens entering A's
-context.**
+- **Fold** (ADR-0005, ADR-0010): the context merge, an LLM's three-way
+  fold into a merge entry with a `fromId` (`docs/01-architecture.md`,
+  Fold). The tree can already represent the entry.
+- **Accepting a folder project's proposed changes** (ADR-0142): reviewed as
+  files today; the accept is refused with words.
+- **What else a canvas holds** (ADR-0116, ADR-0118, ADR-0119, ADR-0126):
+  file cards, media cards, sources a lane mounts, runners, stacks of
+  threads (`docs/glossary.md`, "Accepted, not yet built").
+- **Narrow screens**, beyond the pane (`docs/06-interface.md`, Deferred).
+- **`read_thread`** (ADR-0128, ADR-0160): an agent's tool to read another
+  thread in reach. The rest of agents talking is built, or shelved.
+- **Authenticated identity**, below.
 
 ### Open, non-blocking
 
@@ -467,13 +455,9 @@ context.**
   deletion; that wait is listed in `FIXED_WAITS` (`scripts/budget.ts`)
   until Kyneta orders a peer's own operations.
 
-- ~~**Kyneta's store repeats bytes when commits overlap**~~ — fixed in Kyneta
-  (locally, unreleased), verified from pine·trie: 0 overlapping records, where one
-  tool run had 133 KB of 345 KB (S22 addendum). pine·trie needs the Kyneta release
-  that carries it.
-- ~~**`compact()` on a live Loro substrate throws**~~ — moot: the session is
-  `json.bind`, which compacts live (S24, ADR-0023). It still throws on Loro and
-  Yjs; **live Yjs compaction** is what collaborative documents wait for.
+- **Kyneta cannot compact a live Yjs document**, so a card's text and the
+  places are never compacted live: their storage is compacted, and nothing
+  in memory is trimmed (`apps/pinetrie/host/housekeeping.ts`).
 - **A client's command Line is stored and never compacted.** Each Line document
   grows about 1 KB per command, and the host cannot compact the half a client
   writes. Line's pruning should compact it: to file upstream.
@@ -487,17 +471,17 @@ context.**
   person is the email their client names, unverified, so a collaborator can
   pose as another (ADR-0022, ADR-0037). Next: an email with a generated token.
 
-- **S15** — the trunk winner rule uses wall-clock `ts`; clock skew is
-  adversarial. Needs a Lamport clock (S1 deliberately built none).
-- ~~**S16**~~ — moot: compaction removes ADR-0014's residue (ADR-0023).
-- **S10 remainder** — snapshot/sync-payload size at scale.
-- **S6** — file-range reference anchoring (only matters for Worktree branches).
-- ~~`scripts/check-boundaries.ts` has no tests~~ — deleted. Boundaries are
-  now enforced by resolution; see `docs/01-architecture.md`.
-  It has now failed the same way twice (`.mjs`-blind, then `.tsx`-blind) while
-  reporting "all boundary rules hold".
-- ~~Multi-writer is proven only at the *storage* layer.~~ Since ADR-0120, two
-  threads' lanes run at once, and one thread's writers queue.
+- **The open spikes** (`rg -l '^- \*\*Status:\*\* Open' docs/findings`):
+  - **S15**: the trunk winner rule uses wall-clock `ts`; clock skew is
+    adversarial. Needs a Lamport clock (S1 deliberately built none).
+  - **S10**: snapshot and sync-payload size at scale.
+  - **S6**: anchoring a reference to a file range, once something points
+    into files (references were withdrawn, ADR-0043).
+  - **S100**: one parameterized read for every lane's proposed changes,
+    a lane on a WIP's included.
+  - **S154**: a touch drag on iOS Safari, deferred until an iPhone is at
+    hand.
+  - **S197**: building the lane VM's image on Linux, in QEMU.
 - **The suites and their mutations spend most of their time waiting** (S65).
   What remains after the dead waits were removed, and the suites became
   scenarios (S94): the image clean-up delay and presence expiry as host
@@ -512,12 +496,8 @@ context.**
 
 ### Standing chores
 
-- Republish `@kyneta/*` **and raise the declared loro floor** — shipping the code
-  fix with `>=1.8.0` lets consumers install a 17×-slow combination silently.
-  (pine·trie no longer uses Loro, but other Kyneta users do.)
-- Exercise `@kyneta/react` + `@kyneta/devtools` against Kyneta's in-place
-  mutation change (they are the likeliest holders of an object-identity
-  assumption).
+- Republish `@kyneta/*`, so pine·trie can depend on a release rather than
+  a local checkout.
 - Periodically diff pi upstream; `pnpm run conformance` is the gate.
 - At each milestone, sweep the record: for each living doc, check the ADRs
   whose Area it is against the code, and supersede any whose decision no
@@ -599,9 +579,9 @@ context.**
 - **Accepting a thread's work** (ADR-0038 to ADR-0040, ADR-0047, ADR-0100;
   the words are `docs/glossary.md`): each thread has a two-word name, shown
   in its column's header from before its first message (ADR-0057), and
-  keeps an **proposed changes** in your repo, on the thread's base, under the bookmark
+  keeps its **proposed changes** in your repo, on the thread's base, under the bookmark
   `pinetrie-proposed/<name>`. While the thread works, the proposed changes read
-  `WIP (<name>): <its first message>` and grows in place; when a run ends,
+  `WIP (<name>): <its first message>` and grow in place; when a run ends,
   an agent writes its commit message. Before you accept it, press the
   proposed changes' line in the work strip: the column's pane shows its message, its
   files (flagging those that conflict with your committed work, and those
@@ -676,11 +656,10 @@ Adopted from Kyneta's `AGENTS.md` because they match how this project has run:
 
 | file | what |
 |---|---|
-| `docs/00-vision.md` | product thesis, branch kinds, v1 scope |
+| `docs/00-vision.md` | product thesis, the two kinds of thread, scope |
 | `docs/01-architecture.md` | evidence base, layer cake, data model, module layout |
 | `docs/adrs/` | the ADRs in force, one file each, with rationale; superseded ones in `docs/adrs/archive/` |
-| `docs/04-roadmap.md` | sequencing, invariants, action items |
-| `docs/05-stack.md` | stack decisions, sandbox constraints |
+| `docs/05-stack.md` | the stack, and why |
 | `docs/findings/` | the spikes, one file each: briefs, answers, evidence; spent ones in `docs/findings/archive/` |
 | `docs/record.md` | not tracked: the index of the record by living doc, written by `pnpm run record` |
 | `sandbox/` | disposable spike code (gitignored), kept for reproduction |

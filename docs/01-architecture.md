@@ -45,25 +45,24 @@ and version-locked across seven packages — treat all of it as churning.**
 
 ### Kyneta facts established
 
+Paths here are in Kyneta's repository.
+
 - **`Line`** (`packages/exchange/src/line.ts`) — reliable bidirectional message
   stream: two `json.bind()` authoritative docs (one per direction), seq
   numbering, ack-based pruning, policy routing. `Line.protocol()` reifies
   schema+topic; `open()` = client, `listen()` = server.
-- **Substrate-agnostic** `@kyneta/schema`: plain JS, Loro, Yjs.
-- **The Loro backend exposes `version()` → `VersionVector` for sync only.** No
-  `checkout`, `detach`, or `frontiers` in `packages/schema/backends/loro/src`.
+- **Substrate-agnostic** `@kyneta/schema`: plain JS, Loro, Yjs. pine·trie
+  uses `json.bind` for its documents and Yjs for what people edit together
+  and for the places (ADR-0023, ADR-0048, ADR-0066), and no Loro.
 - Transports available: websocket, SSE, WebRTC, unix socket, in-process bridge.
   **They live at `packages/exchange/transports/*`, not `packages/*`** (stores
   likewise at `packages/exchange/stores/*`) — `ls packages/` makes them look
   absent. Declared via `pnpm-workspace.yaml`. (S4 correction.)
-- **Wiring recipe** (S12/S4): `link:` is a pnpm/yarn protocol and npm rejects it
-  (`EUNSUPPORTEDPROTOCOL`). **Symlink the local workspace packages into
-  `node_modules/@kyneta/`** — Node resolves through realpath, so each package
-  picks up its own workspace deps, and `workspace:^` never has to resolve.
-  Note `npm install` **deletes the symlinks**; re-link afterwards.
-- ~~**Gotcha:** `Line.protocol({client, server})` … schemaHash collision~~ —
-  **fixed upstream.** `exchange.get()` now compares what a schema can *read*,
-  not object identity. Verified.
+- **Wired with pnpm's `link:`** to the local checkout (`docs/05-stack.md`):
+  npm rejects the protocol.
+- **`exchange.get()` compares what a schema can *read***, not object
+  identity: the `Line.protocol` schemaHash collision we reported is fixed
+  upstream.
 - **Line API renamed** (same window): `open()` → `sender()`, `listen()` →
   `claimReceiver()`, plus a new `manager()`.
 
@@ -71,7 +70,7 @@ and version-locked across seven packages — treat all of it as churning.**
 
 ```
 ┌──────────────────────────────────────────────┐
-│ Browser client — tree UI, composer, refs     │
+│ Browser page — rail, columns, cards, board   │
 └───────────────┬──────────────────────────────┘
                 │  Kyneta Line (commands)
                 │  Kyneta docs  (state, replicated)
@@ -104,13 +103,13 @@ Five contracts. Fix these and everything else proceeds in parallel.
 | 2 | Kyneta session document schema | Design — the core one |
 | 3 | Reference union | Withdrawn (ADR-0043): nothing read references |
 | 4 | Merge node shape (`parentId` + `fromId`) | Decided; one field |
-| 5 | Host↔client boundary | **Given.** Kyneta Line + replicated docs |
+| 5 | Host↔client boundary | **Given.** Commands over a Kyneta Line, state in replicated documents, no bespoke protocol (ADR-0007) |
 
 ## Module layout (as built)
 
 ```
 apps/         things you RUN; nothing imports them
-  pinetrie/        @pinetrie/app          the host (server) and its e2e suites
+  pinetrie/      @pinetrie/app          the host (server) and its e2e suites
   conformance/   @pinetrie/conformance  pi's own Storage suite vs our adapter
 
 packages/     libraries; their boundaries are enforced by resolution
@@ -122,11 +121,14 @@ packages/     libraries; their boundaries are enforced by resolution
   reads/         @pinetrie/reads        document reads shared by the host and the client
   channel/       @pinetrie/channel      declares NOTHING; a held JSON-lines channel to a server process (TECHNICAL.md)
   ssh/           @pinetrie/ssh          declares NOTHING; a lane's ssh through its host, the only code that knows ssh (TECHNICAL.md)
-  lanes/         @pinetrie/lanes        a lane's container and disk, and jj and git in it (TECHNICAL.md)
+  lanes/         @pinetrie/lanes        core only; what a lane is and runs: the LaneRuntime and LaneHistory ports, no runtime, no jj (TECHNICAL.md)
   lanehost/      @pinetrie/lanehost     the lanes' machine: disks, diffs, merges, grants, by role (TECHNICAL.md)
+  docker/        @pinetrie/docker       lanes on Docker, on btrfs subvolumes (TECHNICAL.md)
+  vm/            @pinetrie/vm           core only; the Mac's lane VM: image, launcher, a host's lease on a slot (TECHNICAL.md)
   folder/        @pinetrie/folder       core only; a folder project's history as values: states, merge bases, the path merge (TECHNICAL.md)
   keeper/        @pinetrie/keeper       declares NOTHING; one step at a time on a resource (TECHNICAL.md)
-  repo/          @pinetrie/jj         your repo: reads, steps, the owner; proposed changes, accepted work, lanes' refs (TECHNICAL.md)
+  jj/            @pinetrie/jj           your repo: reads, steps, the owner; proposed changes, accepted work, lanes' refs; each lane's jj history (TECHNICAL.md)
+  config/        @pinetrie/config       core only; settings declared with their rules, layers decoded, one settle (TECHNICAL.md)
   session/       @pinetrie/session      one client's connection to a host; no React (TECHNICAL.md)
   shell/         @pinetrie/shell        unbash only; shell source as structure (TECHNICAL.md)
   interface/     @pinetrie/interface    what a person sees and does, for any client; no React, no DOM (ADR-0093)
@@ -177,10 +179,11 @@ declared them.
 
 `workspace.test.ts` checks the manifest rules resolution cannot express: the
 root's tooling allowlist, that only `packages/pi` and `apps/conformance` declare
-pi, that `core` declares nothing, that `protocol` declares only Kyneta and core,
-that `client` declares no server package, that `session` declares no React,
-that nothing depends on an app. It also re-measures the resolution claim
-itself in a child process. Each rule has been shown to fail when violated.
+pi, what each package may declare (`core`, `keeper`, `channel` and `ssh`
+nothing; `protocol` only Kyneta and core; `session` no React; `interface`
+no React and no DOM), that the page declares no server package, that only
+the app declares a runtime, config or ssh, and that nothing depends on an
+app. It also re-measures the resolution claim itself in a child process.
 
 Node builtins always resolve, so resolution cannot keep them out of the
 page, and Vite's build only warns, stubbing one with code that throws when
@@ -194,7 +197,7 @@ depend on fails until the rule covers it. The page's build-time files,
 
 - Every package can reach the root's development tooling (Biome, TypeScript,
   Vitest, Playwright). The test holds that list to an exact allowlist.
-- `client` can reach `vite`, its own devDependency for the build.
+- `web` can reach `vite`, its own devDependency for the build.
 - **Under Vitest, anything resolves.** It runs under a pnpm shim that sets
   `NODE_PATH` to pnpm's hidden hoist, so a unit test could import an
   undeclared package and still run. `typecheck`, which is in `verify`, still
@@ -203,8 +206,9 @@ depend on fails until the rule covers it. The page's build-time files,
   package declares only Kyneta and core".
 
 Dependency direction is physical: `core → schema → pi → app`, and
-`session → client → app`. A package cannot reach up into the app, which is
-what forced `core` and `schema` to become packages — pi depends on them.
+`session → interface → web → app`. A package cannot reach up into the app,
+which is what forced `core` and `schema` to become packages — pi depends on
+them.
 
 ### Writers, lanes and the host
 
@@ -296,12 +300,13 @@ replies into an `Outcome` union, and nothing past it sees `""`. Likewise pi's
 
 ### Branching
 
-A branch command names a parent. The host navigates the lane there with pi's
-`navigateTree`, then prompts, so the turn forks from that entry. pi owns the
-tree operation; we do not reimplement it. One `run` decision carries
-`parentId: string | null` — a branch is a run with a different attachment
-point, so there is no second decision variant. See `packages/pi/TECHNICAL.md`
-for the limits, including that a foreign-written entry is not navigable.
+A branch is a new thread whose first entry's parent is an earlier entry
+(ADR-0125). Its pi lane is created at that entry
+(`harness.lane(id, { createAt })`, `createThreadLane`) and never moves
+(ADR-0120): no lane is navigated, and nothing calls pi's `navigateTree`.
+pi owns the tree operation; we do not reimplement it. See
+`packages/pi/TECHNICAL.md` for the limits, including that a foreign-written
+entry is refused (`unknown_target`).
 
 ### Two projections over the same `parentId` edges
 
@@ -316,13 +321,13 @@ They answer different questions, so both exist:
 | `projectTranscript` | what will the model see? (the context window) |
 | `projectSpine` | what exists around that path? (the shared reality) |
 
-The difference between those two sets is the product. An Aside is an entry that
-exists without being in context. Both share `renderableMessage`, so they cannot
-disagree about which entries are messages.
+The difference between those two sets is the product. A side conversation is
+an entry that exists without being in context. Both share `renderableMessage`,
+so they cannot disagree about which entries are messages.
 
 `projectSpine` is deliberately not a generic tree. Almost every node has one
-child, so an n-ary tree would be an intermediate structure the UI discards; the
-UI renders a linear spine with branches hanging off it.
+child, so an n-ary tree would be an intermediate structure the page discards:
+a column draws one path, its forks marked, and the rail draws the tree.
 
 ## Data model
 
@@ -346,7 +351,7 @@ pinetrie:session   SessionDoc               session-wide host records:
                                           the board, names, proposed changes, banners
 root:<RootId>    RootDoc, one a root      that root's pi storage (entries,
                                           values, lists) and the records keyed
-                                          by its entries (revision, mark, stop)
+                                          by its entries (revision, digest)
 pinetrie:live      LiveDoc                  streams and active runs: compacted
                                           at every run's end, needed by no
                                           restarted host
@@ -366,8 +371,8 @@ presence         ephemeral                who reads which thread, in which root
 
 The host holds the session, `live`, the places and every root not archived
 (not in the board's archive, ADR-0122).
-A client holds the session, `live`, the places and only the roots its tabs
-show; it reads every other root through its directory record. pi runs one
+A client holds the session, `live`, the places and only the roots of the
+tasks it shows; it reads every other root through its directory record. pi runs one
 session and one harness per root (ADR-0092, ADR-0095).
 
 ### Document shape (entries: settled by S7; rest sketch)
@@ -386,7 +391,7 @@ The shape of a `RootDoc`: pi's storage and the host's `records`. A
   the host alone and compacted between runs: since ADR-0063, only the
   documents a run touched.
 
-  > **Load-bearing invariant (ADR-0009): entry ids must be unique.** A Loro map
+  > **Load-bearing invariant (ADR-0009): entry ids must be unique.** A CRDT map
   > is a per-key LWW register; grow-only-set semantics emerge *only* because
   > every key is written exactly once and therefore never contended. S7 §3.4
   > confirms a same-key concurrent write **silently discards one entry with no
@@ -433,13 +438,14 @@ The shape of a `RootDoc`: pi's storage and the host's `records`. A
 References were withdrawn (ADR-0043): nothing read them. What follows is kept
 for whatever points into the tree next. It is determined by target mutability:
 
-- **Entries are immutable** → plain offsets are permanently stable. No Loro
+- **Entries are immutable** → plain offsets are permanently stable. No CRDT
   cursor needed. A gift from pi's data model.
 - **Files are mutable** → need content addressing (blob hash or jj change ID),
   or pointers rot silently. A pasted image is content-addressed by
   construction: `/blob/<sha256>` names bytes that never change (ADR-0042).
-- **Composer text is mutable and multi-writer** → the one place that genuinely
-  needs `Schema.text()` + Loro cursors.
+- **A card's text is mutable and multi-writer** → the one place that genuinely
+  needs a text CRDT's own positions: it is a Yjs `Schema.text()` per card
+  (ADR-0048).
 
 ### Dissolving `seq`
 
@@ -473,7 +479,7 @@ thirds of it.** Kept here because the refutation is the useful part.
 
 ## Fold (context merge)
 
-Destination-aware and lazy (ADR-0005). pi summarizes on *leaving* a branch, with no
+Decided, and not built yet. Destination-aware and lazy (ADR-0005). pi summarizes on *leaving* a branch, with no
 knowledge of where the summary will land. We summarize on *landing*, knowing the
 destination — strictly more information, and it preserves optionality (an eager
 summary can never be re-folded differently).
@@ -521,10 +527,10 @@ a "landed" signal for the tree UI.
 
 | Risk | Mitigation |
 |---|---|
-| pi 0.85 experimental APIs churn | Pin exact versions; vendor types; keep `Storage` the *only* deep coupling; periodic upstream diff chore |
-| ~~`seq` collides across replicas~~ | **RESOLVED (S1 → ADR-0013).** `seq` is now a derived replica-local **arrival** index; the shared counter is gone. All three defects cleared (0 collisions, no regression, 0 skipped), conformance 21/21, property 1000/1000 vs control 0/300. Cold index rebuild 57 ms @ n=10 000; incremental reconcile O(δ), 0 ms. **New constraint:** `seq` must never cross a replica boundary or survive a restart — see ADR-0013 and ADR-0007 |
-| ~~Harness assumes a private world~~ | **Resolved by S3 + ADR-0011.** The harness caches (`Lane`, not `StorageBackedSession`) and assumes monotonic local growth, but does not crash or corrupt — and lane-per-writer avoids every tip-level failure. **T5 answered: the admission mutex CAN be per-replica.** Multi-writer stays a *storage* project. Caveat: the drive/inference loop was stubbed, not exercised |
-| ~~Fold output is mush~~ | **Retired.** S5 — not observed across four scenarios plus ablation |
-| ~~`@kyneta/schema` writes are O(n²)~~ | **RESOLVED (S14).** Fixed upstream in `da978ec` (2026-09-19): `step` = copy ∘ core, `stepInPlace` = core, `applyChange` uses the dual. **Requires `loro-crdt >= 1.13.4`.** pine·trie shape n=10 000: entries **38 444 → 93 ms**, lists **12 731 → 92 ms**; linear to **n=50 000** (626 ms / 739 ms). **Residual: none — S13 closed.** Remaining exposure is *distribution*, not design: published 3.0.0 is stale **and** declares `loro-crdt >= 1.8.0`, so a consumer can install a supported-looking combination that is 17× slow |
-| Loro `fork_at` immaturity | Not on the critical path; we do not build the tree on version history |
-| ~~List cursors `{seq}` break under CRDT semantics~~ | **Retired.** S2/T7's prediction did not hold — S1 keeps `ListReadOptions` unchanged with no Loro `Cursor` |
+| pi's experimental APIs churn (pinned at 0.87.1) | Pin exact versions; keep `Storage` the *only* deep coupling; diff upstream periodically, with `pnpm run conformance` as the gate |
+| Kyneta is consumed from a local checkout | Published `@kyneta/*` predates what pine·trie imports, and a stale build is refused at load (S47): a missing named import stops the module before it runs |
+| `seq` escapes its replica | `seq` is a derived replica-local **arrival** index (S1, ADR-0013): it must never cross a replica boundary or survive a restart |
+
+The early risks the spikes retired (fold output (S5), a harness that
+assumes a private world (S3), quadratic `@kyneta/schema` writes (S14),
+list cursors under CRDT semantics (S1)) are in their findings.
