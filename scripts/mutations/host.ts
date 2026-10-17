@@ -2854,6 +2854,15 @@ export const mutations: readonly Mutation[] = [
     expect:
       "a root with no message is not recorded: a tab's new root is not started",
   },
+  {
+    name: "a host in use keeps every root's last copy",
+    file: "apps/pinetrie/host/roots.ts",
+    from: "    if (input.keepLastRead === true) newest.set(root, doc)\n",
+    to: "    newest.set(root, doc)\n",
+    command: unit,
+    expect:
+      "a root let go reads its last value through its newest handle, kept only when asked",
+  },
   // ── the event loop's stalls ──
   {
     name: "a stall counts the sampling interval as stalled",

@@ -89,12 +89,11 @@ import {
   type Provenance,
   type ProvenanceHooks,
 } from "./provenance.ts"
-import type { Records } from "./records.ts"
+import { createStepRecords, type Records } from "./records.ts"
 import {
   createRoots,
   type Lease,
   type Leases,
-  type PeerState,
   type PeerStates,
   queueUpkeepOn,
   type StepDocs,
@@ -296,21 +295,14 @@ export function fakeRoots(input: {
   }
   const rootOfLane = (lane: ThreadId): RootId =>
     readLaneRecords(session).get(lane)?.root ?? ROOT_ID
+  const records = createStepRecords({ session, root: async r => open(r) })
   const lease = (root: RootId): Lease => {
     const doc = open(root)
     return {
       root,
       doc,
       ready: Promise.resolve(doc),
-      records: {
-        writeValues: async writes => {
-          for (const [target, group] of byTarget(writes))
-            applyRecordWrites(
-              target.kind === "session" ? session : open(target.root),
-              group,
-            )
-        },
-      },
+      records,
       async [Symbol.asyncDispose]() {},
     }
   }
@@ -326,15 +318,7 @@ export function fakeRoots(input: {
         roots.delete(root)
         input.destroyed?.(root)
       },
-      records: {
-        writeValues: async writes => {
-          for (const [target, group] of byTarget(writes))
-            applyRecordWrites(
-              target.kind === "session" ? session : open(target.root),
-              group,
-            )
-        },
-      },
+      records,
     },
     leases: {
       root: lease,
@@ -349,7 +333,7 @@ export type FakeBasics = Basics & {
   /** Leases over the same roots. */
   readonly leases: Leases
   /** The roots `roots` holds now: a destroyed one is gone. */
-  readonly rootsHeld: () => readonly RootId[]
+  readonly rootsLoaded: () => readonly RootId[]
   /** The document of `ROOT_ID`, where a test's entries and pi's values go. */
   readonly root: RootDocHandle
   readonly lines: string[]
@@ -405,7 +389,7 @@ export function basics(
     docs: fakeDocuments({ session, live, places }),
     roots: held.step,
     leases: held.leases,
-    rootsHeld: () => [...rootDocs.keys()],
+    rootsLoaded: () => [...rootDocs.keys()],
     places,
     log: m => lines.push(m),
     // A uuidv7's shape, as the host's minter gives: a card's id is parsed.
@@ -707,6 +691,7 @@ export function hostRoots(
     readonly session?: ReturnType<typeof basics>["session"]
     readonly peers?: PeerStates
     readonly failed?: (error: unknown) => void
+    readonly keepLastRead?: boolean
   } = {},
 ) {
   const exchange = new Exchange({
@@ -730,6 +715,9 @@ export function hostRoots(
       }),
     ...(input.peers === undefined ? {} : { peers: input.peers }),
     ...(input.failed === undefined ? {} : { failed: input.failed }),
+    ...(input.keepLastRead === undefined
+      ? {}
+      : { keepLastRead: input.keepLastRead }),
   })
   const keeper = createKeeper<HostKey, StepDocs>({ context: roots.context })
   return {
@@ -741,22 +729,23 @@ export function hostRoots(
   }
 }
 
-/** Peer states a test sets by hand: `none` for a root it names nothing for. */
+/** Whether a tab holds each root, set by hand: no tab for a root it names nothing for. */
 export function handPeers(): PeerStates & {
-  set(doc: RootDocHandle, state: PeerState): void
+  set(doc: RootDocHandle, held: boolean): void
 } {
-  const states = new Map<RootDocHandle, PeerState>()
+  const held = new Set<RootDocHandle>()
   const watchers = new Map<RootDocHandle, Set<() => void>>()
   return {
-    state: doc => states.get(doc) ?? "none",
+    held: doc => held.has(doc),
     watch(doc, changed) {
       const set = watchers.get(doc) ?? new Set()
       set.add(changed)
       watchers.set(doc, set)
       return () => set.delete(changed)
     },
-    set(doc, state) {
-      states.set(doc, state)
+    set(doc, now) {
+      if (now) held.add(doc)
+      else held.delete(doc)
       for (const changed of watchers.get(doc) ?? []) changed()
     },
   }

@@ -1276,7 +1276,7 @@ describe("a card made a thread, and lifted back", () => {
     expect(readRoots(b.session).has(THREAD)).toBe(false)
     expect(readPlaces(b.places).some(c => c.id === SPUN_CANVAS)).toBe(false)
     expect(readPlaces(b.places).some(c => c.id === STARTS)).toBe(false)
-    expect(b.rootsHeld()).not.toContain(THREAD)
+    expect(b.rootsLoaded()).not.toContain(THREAD)
   })
 
   test("once someone replied, the undo is refused, naming them, and nothing is reverted", async () => {

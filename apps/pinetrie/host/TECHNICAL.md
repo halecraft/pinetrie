@@ -282,6 +282,8 @@ same for every run (`packages/pi/TECHNICAL.md`, S85).
   (`Roots.lastRead`): each root this host has loaded, by its newest
   handle. A handle Kyneta has let go reads its last value, and only the
   host writes a root, while it is loaded, so that value is the stored one.
+  Only a suite's host keeps them (`keepRootsRead`): a handle kept keeps its
+  root's last value in memory, which is what letting a root go saves.
 
 - **A command names its root and its canvas** (`Command.root`,
   `Command.canvas`, ADR-0063, ADR-0116): a chat writes in its root, and a

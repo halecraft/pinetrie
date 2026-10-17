@@ -82,17 +82,17 @@ async function run(events: readonly Event[]): Promise<readonly string[]> {
         // A tab asks for A: Kyneta loads it behind the store's back, and
         // the tab is taking it.
         const doc = exchange.get(rootDocId(A), RootDoc)
-        peers.set(doc, "pending")
+        peers.set(doc, true)
         shown = true
         break
       }
       case "synced":
-        if (shown) peers.set(exchange.get(rootDocId(A), RootDoc), "synced")
+        if (shown) peers.set(exchange.get(rootDocId(A), RootDoc), true)
         break
       case "drop":
         // The tab lets A go: the host hears its copy destroyed.
         if (shown) {
-          peers.set(exchange.get(rootDocId(A), RootDoc), "none")
+          peers.set(exchange.get(rootDocId(A), RootDoc), false)
           shown = false
         }
         break

@@ -257,6 +257,11 @@ export interface StartHostOptions {
   readonly now?: () => number
   /** How long presence lasts without a refresh; a suite shortens it. */
   readonly presenceDecay?: PresenceDecay
+  /**
+   * Keep each root's last copy for `rootsRead`, so a suite reads a root the
+   * host let go. Never in use: it keeps every root ever loaded in memory.
+   */
+  readonly keepRootsRead?: boolean
   readonly log?: (message: string) => void
 }
 
@@ -280,7 +285,8 @@ export interface RunningHost {
   /** The roots loaded now: for a suite to check what the upkeep let go. */
   rootsLoaded(): readonly RootId[]
   /**
-   * Each root this host has loaded, as it last held it (`Roots.lastRead`):
+   * With `keepRootsRead`, each root this host has loaded, as it last held it
+   * (`Roots.lastRead`):
    * what the suites read synchronously, loaded or not now.
    */
   rootsRead(): ReadonlyMap<RootId, RootDocHandle>
@@ -334,6 +340,7 @@ export async function startHost({
   blobs: givenBlobs,
   now = Date.now,
   presenceDecay = PRESENCE_DECAY,
+  keepRootsRead = false,
   log = console.log,
 }: StartHostOptions): Promise<RunningHost> {
   const key = isLoopback(bind) ? null : (givenKey ?? newKey())
@@ -468,6 +475,7 @@ export async function startHost({
     session,
     queueUpkeep: () => void queueUpkeepLate(),
     failed: error => failed(basics, "compaction")(error),
+    keepLastRead: keepRootsRead,
   })
   // Each root's first load is recovered (`recoverRoot`) in a step of its own,
   // once the agent and the runs exist: the roots that load before are held

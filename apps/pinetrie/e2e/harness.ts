@@ -520,6 +520,7 @@ export const startSuiteHost = async (
       ssh: suiteSshPlaces(),
       binding: suiteBinding(),
       env: {},
+      keepRootsRead: true,
       ...options,
     }),
   )

@@ -213,15 +213,18 @@ describe("the upkeep", () => {
   })
 })
 
-test("a root let go reads its last value through its newest handle", async () => {
-  const { keeper, roots, exchange } = hostRoots()
-  await keeper.run(async step =>
-    writeEntry(await step.root(A), threadRow("e-1", null, threadIdFor("t"))),
-  )
-  await keeper.idle()
-  expect(exchange.documents.get(rootDocId(A))?.mode).toBe("unloaded")
-  const doc = roots.lastRead().get(A)
-  expect(doc?.entries.get("e-1")?.id).toBe("e-1")
+test("a root let go reads its last value through its newest handle, kept only when asked", async () => {
+  const kept = hostRoots({ keepLastRead: true })
+  const plain = hostRoots()
+  for (const { keeper } of [kept, plain]) {
+    await keeper.run(async step =>
+      writeEntry(await step.root(A), threadRow("e-1", null, threadIdFor("t"))),
+    )
+    await keeper.idle()
+  }
+  expect(kept.exchange.documents.get(rootDocId(A))?.mode).toBe("unloaded")
+  expect(kept.roots.lastRead().get(A)?.entries.get("e-1")?.id).toBe("e-1")
+  expect(plain.roots.lastRead().size).toBe(0)
 })
 
 describe("the host's sources", () => {

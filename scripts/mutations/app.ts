@@ -2724,8 +2724,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the host hears no tab hold a root",
     file: "apps/pinetrie/host/roots.ts",
-    from: '    if (states.some(s => s.state === "pending")) return "pending"\n',
-    to: '    if (states.length >= 0) return "none"\n',
+    from: '      s => s.state === "pending" || s.state === "synced",\n',
+    to: "      () => false,\n",
     suite: "host",
     scenario: "board",
     expect:

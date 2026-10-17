@@ -149,6 +149,7 @@ const startLaneHost = async (options: LaneHostOptions): Promise<RunningHost> =>
       ssh: suiteSshPlaces(),
       binding: suiteBinding(),
       env: {},
+      keepRootsRead: true,
       ...options,
       project: {
         ...options.project,

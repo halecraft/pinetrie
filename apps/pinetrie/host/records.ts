@@ -8,7 +8,7 @@
 // write's home is in its type (`ValueWrite<H>`), so one into a root outside a
 // step does not compile.
 
-import type { Home, ValueWrite } from "@pinetrie/core"
+import type { Home, RootId, ValueWrite } from "@pinetrie/core"
 import { byTarget } from "@pinetrie/rules"
 import {
   applyRecordWrites,
@@ -43,9 +43,7 @@ export function createRecords(session: SessionDocHandle): Records {
 /** Every record's writer, a root's loaded through `root`. */
 export function createStepRecords(input: {
   readonly session: SessionDocHandle
-  readonly root: (
-    root: ValueWrite<"root">["target"]["root"],
-  ) => Promise<RootDocHandle>
+  readonly root: (root: RootId) => Promise<RootDocHandle>
 }): StepRecords {
   return {
     async writeValues(writes) {

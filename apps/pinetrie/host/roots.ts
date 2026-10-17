@@ -152,26 +152,19 @@ export function planUpkeep(input: {
   }
 }
 
-/**
- * Where the tabs holding a root are: one still taking it (`pending`), else
- * one holding it (`synced`), else none.
- */
-export type PeerState = "pending" | "synced" | "none"
-
-/** The tabs' states for a root, and a way to hear them change. */
+/** Whether a tab holds a root, taking it or having it, and a way to hear that change. */
 export interface PeerStates {
-  state(doc: RootDocHandle): PeerState
+  held(doc: RootDocHandle): boolean
   /** Call `changed` at each change of the root's peers; returns the stop. */
   watch(doc: RootDocHandle, changed: () => void): () => void
 }
 
-/** Kyneta's peer states. */
-export const kynetaPeers: PeerStates = {
-  state(doc) {
-    const states = sync(doc).peerStates
-    if (states.some(s => s.state === "pending")) return "pending"
-    return states.some(s => s.state === "synced") ? "synced" : "none"
-  },
+/** Kyneta's peers: a tab is `pending` while it takes a root, `synced` once it has it. */
+const kynetaPeers: PeerStates = {
+  held: doc =>
+    sync(doc).peerStates.some(
+      s => s.state === "pending" || s.state === "synced",
+    ),
   watch: (doc, changed) => sync(doc).onPeerSyncChange(() => changed()),
 }
 
@@ -221,10 +214,12 @@ export interface Roots {
   /** The roots loaded now, by id. */
   loaded(): readonly RootId[]
   /**
-   * Each root loaded in this host's life, by id, with its newest handle: a
-   * handle Kyneta has let go reads its last value, and only the host writes
-   * a root, only while it is loaded, so that value is the stored one. For
-   * the suites' synchronous reads; a destroyed root is not among them.
+   * With `keepLastRead`, each root loaded in this host's life, by id, with
+   * its newest handle: a handle Kyneta has let go reads its last value, and
+   * only the host writes a root, only while it is loaded, so that value is
+   * the stored one. For the suites' synchronous reads; empty without it,
+   * since a handle kept keeps the root's last value in memory. A destroyed
+   * root is not among them.
    */
   lastRead(): ReadonlyMap<RootId, RootDocHandle>
   /** Stop following the documents Kyneta loads. */
@@ -243,6 +238,8 @@ export function createRoots(input: {
    */
   readonly failed?: (error: unknown) => void
   readonly peers?: PeerStates
+  /** Keep each root's newest handle for `lastRead`: a suite's, never a host's in use. */
+  readonly keepLastRead?: boolean
 }): Roots {
   const { exchange, session } = input
   const peers = input.peers ?? kynetaPeers
@@ -267,7 +264,7 @@ export function createRoots(input: {
     if (known !== undefined) return known
     const id = rootDocId(root)
     const doc = exchange.get(id, RootDoc)
-    newest.set(root, doc)
+    if (input.keepLastRead === true) newest.set(root, doc)
     const entry: Loaded = {
       doc,
       ready: exchange.whenHydrated(id).then(() => {
@@ -450,9 +447,9 @@ export function createRoots(input: {
           shown.add(root)
           continue
         }
-        const state = peers.state(entry.doc)
-        if (state !== "none") entry.asked = false
-        if (state !== "none" || entry.asked) shown.add(root)
+        const held = peers.held(entry.doc)
+        if (held) entry.asked = false
+        if (held || entry.asked) shown.add(root)
       }
       const settled = settledRoots
       settledRoots = null
