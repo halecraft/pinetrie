@@ -36,7 +36,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "nothing in your repo is immutable",
     file: "packages/jj/plan.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: '  const base = (current ?? "builtin_immutable_heads()").trim()\n  return base.endsWith(added) ? base : `${base} | ${added}`',
     to: '  return "none()"',
     suite: "lanes",
@@ -152,7 +151,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the preview counts no other head",
     file: "packages/jj/accepted.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "    heads: await count(jj, `heads(roots(${acceptedBookmark}..@)::) ~ @`),",
     to: "    heads: 0,",
     command: repoTest,
@@ -179,9 +177,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "proposed changes are its bookmark's commit alone",
     file: "packages/jj/proposed.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "    `(::${bookmark} ~ ::(${input.target})) & (${thread} | ${bookmark})`,",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
     to: "    `(::${bookmark} ~ ::(${input.target})) & ${bookmark}`,",
     command: unit,
     expect: "proposed changes on accepted work: built, immutable",
@@ -189,9 +185,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "proposed changes' revisions include what is already under its base",
     file: "packages/jj/proposed.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "    `(::${bookmark} ~ ::(${input.target})) & (${thread} | ${bookmark})`,",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
     to: "    `(::${bookmark}) & (${thread} | ${bookmark})`,",
     command: unit,
     expect: "proposed changes on accepted work: built, immutable",
@@ -207,9 +201,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the proposed changes are added to your log again at each setup",
     file: "packages/jj/plan.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "  return base.endsWith(added) ? base : `${base} | ${added}`\n}\n\n/**\n * Set up",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
     to: "  return `${base} | ${added}`\n}\n\n/**\n * Set up",
     command: unit,
     expect: "added to jj's default when the repo defines none, and idempotent",
@@ -243,7 +235,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "accepted work's record counts none of your commits conflicted",
     file: "packages/jj/accepted.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "        commits: await count(jj, `(::@ ~ ::${acceptedBookmark}) & conflicts()`),",
     to: "        commits: 0,",
     command: repoTest,
@@ -269,7 +260,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a new thread begins at your @-",
     file: "packages/jj/accepted.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "  const [acceptedCommit] = await commitsOf(jj, `present(${acceptedBookmark})`)",
     to: '  const [acceptedCommit] = await commitsOf(jj, "@-")',
     suite: "lanes",
@@ -280,9 +270,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "accepted work's heads fail a repo with no accepted work",
     file: "packages/jj/plan.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "  const accepted = `present(${revsetName(bookmark)})`",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
     to: "  const accepted = `${revsetName(bookmark)}`",
     command: unit,
     expect: "added to jj's builtin when the repo defines none, with present()",
@@ -290,7 +278,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "proposed changes start at its base, ignoring what you accepted",
     file: "packages/jj/plan.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: '  const had = sources === "" ? input.start : `${input.start} | ::(${sources})`',
     to: "  const had = input.start",
     command: unit,
@@ -300,9 +287,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a source accepted below the base still starts the proposed changes",
     file: "packages/jj/plan.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: " ~ ::present(${input.base.source})) & ${ACCEPTED_THREAD_COMMITS}",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     to: ") & ${ACCEPTED_THREAD_COMMITS}",
     command: unit,
     expect:
@@ -311,9 +296,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a WIP lane holds its copy",
     file: "packages/jj/plan.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: " ~ ::present(${input.base.source})) & ${ACCEPTED_THREAD_COMMITS}",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     to: " ~ ::present(${input.base.start})) & ${ACCEPTED_THREAD_COMMITS}",
     command: unit,
     expect:
@@ -340,9 +323,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a tidy's abandon leaves your working copy behind",
     file: "packages/jj/tidy.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: '      you("op", "abandon", `..${cut.id}`),',
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     to: '      you("--ignore-working-copy", "op", "abandon", `..${cut.id}`),',
     command: tidyTest,
     expect: "your working copy is not stale after",
@@ -523,7 +504,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a move of main is not watched",
     file: "packages/jj/observe.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "    `present(${revsetName(repoConfig.publish)})`,\n",
     to: "",
     command: unit,
@@ -565,7 +545,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "no operation reads as the host's",
     file: "packages/jj/plan.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "  user.startsWith(`${HOST_OPERATOR}@`)",
     to: "  false",
     command: unit,
@@ -599,7 +578,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a conflicted join is kept",
     file: "packages/jj/lane/merge.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "    if ((await commitsOf(jj, `${at} & conflicts()`)).length > 0) {",
     to: "    if (false) {",
     command: repoTest,
@@ -609,7 +587,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an update lists the accepted thread commits it joined as come in",
     file: "packages/jj/lane/merge.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: '  joined.length === 0 ? range : `(${range}) ~ (${joined.join(" | ")})`',
     to: "  range",
     command: repoTest,
@@ -635,9 +612,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the fork's immutable_heads() is not written",
     file: "packages/jj/lane/plan.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "      `mkdir -p ${LANE_CONFIG_DIR} && printf ${shellWord(FORK_CONFIG_TEMPLATE)} ${WORKSPACE_ROOT} ${immutable} > ${LANE_JJ_CONFIG}`,",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
     to: "      `mkdir -p ${LANE_CONFIG_DIR}`,",
     command: repoTest,
     expect: "the whole life of a lane",
@@ -645,9 +620,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the fork's config applies to every repo",
     file: "packages/jj/lane/plan.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: '  `[[--scope]]\\n--when.repositories = ["${repo}"]\\n[--scope.revset-aliases]\\n"immutable_heads()" = "builtin_immutable_heads() | ${commits.join(" | ")}"\\n`',
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
     to: '  `[revset-aliases]\\n"immutable_heads()" = "builtin_immutable_heads() | ${commits.join(" | ")}"\\n`',
     command: unit,
     expect: "the whole life of a lane",
@@ -655,9 +628,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the fork's config names another repo",
     file: "packages/jj/lane/plan.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "      `mkdir -p ${LANE_CONFIG_DIR} && printf ${shellWord(FORK_CONFIG_TEMPLATE)} ${WORKSPACE_ROOT} ${immutable} > ${LANE_JJ_CONFIG}`,",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
     to: "      `mkdir -p ${LANE_CONFIG_DIR} && printf ${shellWord(FORK_CONFIG_TEMPLATE)} /nowhere ${immutable} > ${LANE_JJ_CONFIG}`,",
     command: unit,
     expect: "the whole life of a lane",
@@ -698,9 +669,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a lane's tip is fetched as a local bookmark",
     file: "packages/jj/plan.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: '    git("fetch", "-q", input.bundle, `+refs/heads/${bookmark}:${to}`),',
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
     to: '    git("fetch", "-q", input.bundle, `+refs/heads/${bookmark}:refs/heads/${bookmark}`),',
     command: unit,
     expect: "planImport: git fetches the bundle",
@@ -724,9 +693,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a diff matches a path prefix",
     file: "packages/jj/proposed.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "    `root-file:${JSON.stringify(path)}`,",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
     to: "    `root:${JSON.stringify(path)}`,",
     command: repoTest,
     expect: "a review reads proposed changes' commit",
@@ -742,7 +709,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a revision lists every file it touched",
     file: "packages/jj/lane/merge.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "self.diff(${JSON.stringify(fileset)})",
     to: "self.diff()",
     command: unit,
@@ -1092,9 +1058,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a fork's inherited history is not made immutable",
     file: "packages/jj/lane/plan.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "${WORKSPACE_ROOT} ${immutable} >",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
     to: "${WORKSPACE_ROOT} none\\\\(\\\\) >",
     suite: "lanes",
     scenario: "main",
@@ -1147,9 +1111,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an acceptance finds no destination below the proposed changes",
     file: "packages/jj/proposed-gather.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "          `present(${revsetName(bookmark)}) & ::parents(${bottom.commit})`,",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     to: "          `present(${revsetName(bookmark)}) & ${bottom.commit}::`,",
     suite: "lanes",
     scenario: "main",
@@ -1175,7 +1137,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "planBundle drops the ^<have> exclusion",
     file: "packages/jj/lane/plan.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "    ...input.have.map(c => `^${c}`),",
     to: "",
     command: unit,
@@ -1184,7 +1145,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "fetchById fetches with no destination ref",
     file: "packages/jj/lane/plan.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: '  const refs = commits.map((c, i) => `+${c}:${FETCHED_REF}/${i}`).join(" ")',
     to: '  const refs = commits.join(" ")',
     command: unit,
@@ -1193,9 +1153,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a lane's scratch repo breaks",
     file: "packages/jj/lane/plan.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: '  `[[--scope]]\\n--when.repositories = ["${repo}"]\\n[--scope.revset-aliases]\\n"immutable_heads()" = "builtin_immutable_heads() | ${commits.join(" | ")}"\\n`',
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
     to: '  `[revset-aliases]\\n"immutable_heads()" = "builtin_immutable_heads() | ${commits.join(" | ")}"\\n`',
     suite: "lanes",
     scenario: "main",

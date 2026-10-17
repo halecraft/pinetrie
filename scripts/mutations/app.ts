@@ -292,7 +292,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the model is not told who spoke",
     file: "packages/rules/chat.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "  `${d.authorName}: ${d.command?.expanded ?? d.text}`",
     to: "  d.command?.expanded ?? d.text",
     suite: "host",
@@ -360,7 +359,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a drag opens no gap to land in",
     file: "packages/web/use-drag.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: '        write(c, "transform", shift === 0 ? "" : `translateX(${shift}px)`)',
     to: "        void shift",
     suite: "browser",
@@ -2014,9 +2012,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the drain waits behind a move that came after the queue",
     file: "apps/pinetrie/host/index.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "    void keeper.once(`drain:${lane}`, () => drain(lane))",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
     to: "    setTimeout(() => void keeper.once(`drain:${lane}`, () => drain(lane)), 300)",
     suite: "host",
     scenario: "cards",

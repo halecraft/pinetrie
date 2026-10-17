@@ -10,20 +10,13 @@ sandbox/
 
 # build
 node_modules/
-client/app.bundle.js
-client/loro_wasm_bg.wasm
 
-# pnpm's content-addressable store falls back into the repo because the
-# default global location (~/Library/pnpm/store) is outside pi-jail's
-# allowWrite set. See docs/05-stack.md § sandbox.
+# pnpm's store, where pnpm puts it in the repo: at the root of a lane's disk,
+# and wherever a sandbox cannot write its global store.
 .pnpm-store/
-
-# Browser e2e artifact (regenerated each run)
-browser-screenshot.png
 
 # vite production build output
 dist/
-client/dist/
 
 # The record's index, written by `pnpm run record` (scripts/record.ts)
 docs/record.md

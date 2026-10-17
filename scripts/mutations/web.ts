@@ -236,9 +236,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the pane names a table by its message alone",
     file: "packages/web/pane.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "      return `block:${printAddress(subject.address)}`",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
     to: "      return `block:${subject.address.entry}`",
     command: unit,
     expect: "anything else replaces it: another kind, table or message",

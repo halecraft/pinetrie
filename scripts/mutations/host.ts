@@ -17,9 +17,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "every start-up phase is said, however quick",
     file: "apps/pinetrie/host/startup-lines.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "  ms < 1000 ? null : `[host] starting: ${what} took ${Math.round(ms)} ms`",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     to: "  `[host] starting: ${what} took ${Math.round(ms)} ms`",
     command: unit,
     expect: "startupLaps: a phase of a second or more is said",
@@ -519,7 +517,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a root's refreshes are not merged",
     file: "apps/pinetrie/host/directory.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "    keeper.once(`root:${root}`, () =>",
     to: "    keeper.run(() =>",
     command: unit,
@@ -727,9 +724,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a failure's log loses its thread",
     file: "apps/pinetrie/host/basics.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "        : `[host] ${readThreadName(basics.session, lane)}: ${what} failed: ${errorText(error)}`,",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     to: "        : `[host] ${what} failed: ${errorText(error)}`,",
     command: unit,
     expect: "failed logs the host's line",
@@ -745,9 +740,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "invites leave out the key",
     file: "apps/pinetrie/host/admission.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: '      `http://${a}:${port}/${key === null ? "" : `?key=${encodeURIComponent(key)}`}`,',
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     to: "      `http://${a}:${port}/`,",
     command: unit,
     expect: "each with the key",
@@ -900,9 +893,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "startup settles before it resumes",
     file: "apps/pinetrie/host/startup.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: '  for (const lane of planned.resume) {\n    log(\n      `[host] resuming ${readThreadName(doc, lane)}, which a crash interrupted`,\n    )\n    deps.start(lane, { kind: "resume" })\n  }\n',
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     to: '  void settle(planned.drain)\n  for (const lane of planned.resume) {\n    log(\n      `[host] resuming ${readThreadName(doc, lane)}, which a crash interrupted`,\n    )\n    deps.start(lane, { kind: "resume" })\n  }\n',
     command: unit,
     expect: "recover resumes each interrupted lane before it settles",
@@ -1941,7 +1932,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a missing config file is worded as read",
     file: "packages/interface/setup-words.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "      return `${file} (none)`",
     to: "      return file",
     command: unit,
@@ -2401,9 +2391,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the watcher's stamp is not the lane's",
     file: "packages/core/runs.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "}): Stamp => stamp(`${st.size}:${st.ctimeNs}`)\n",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     to: "}): Stamp => stamp(`${st.ctimeNs}`)\n",
     command: unit,
     expect:

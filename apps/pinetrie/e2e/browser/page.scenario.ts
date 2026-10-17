@@ -181,10 +181,6 @@ async function run(check: Checks["check"]): Promise<void> {
       // browser cannot run fails exactly here, which a browser-free check cannot
       // see.
       await connected(page)
-      check(
-        "page loaded, wasm instantiated, client connected to the host",
-        true,
-      )
       // The render checks count React's development-build measures, and
       // against the production build every count is 0 and passes: refuse it.
       const devReact = await page
@@ -216,20 +212,6 @@ async function run(check: Checks["check"]): Promise<void> {
         "no page errors during load",
         errors.length === 0,
         `${errors[0] === undefined ? "" : ` — ${errors[0].slice(0, 90)}`}`,
-      )
-      // The session is plain JSON: the page loads no Loro and no wasm.
-      // In development Vite pre-bundles loro-crdt with its wasm inside a JS module,
-      // so a check for `.wasm` files alone would pass with Loro loaded.
-      const heavy = await page.evaluate(() =>
-        performance
-          .getEntriesByType("resource")
-          .map(e => e.name)
-          .filter(n => /loro|\.wasm/i.test(n)),
-      )
-      check(
-        "the page loads no Loro and no wasm",
-        heavy.length === 0,
-        `${heavy[0] === undefined ? "" : ` — ${heavy[0].split("/").at(-1)}`}`,
       )
 
       // ── helpers ──────────────────────────────────────────────────────────────

@@ -59,7 +59,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a built image whose file differs from its sum is used",
     file: "packages/vm/plan.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "    if (have !== want) return `${name} does not match SHA256SUMS`\n",
     to: "",
     command: unit,
@@ -68,7 +67,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a build is renamed into place unchecked",
     file: "packages/vm/build.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "  if (refused !== null) throw new Error(`the built VM image: ${refused}`)\n",
     to: "",
     command: unit,

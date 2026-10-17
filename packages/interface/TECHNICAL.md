@@ -135,7 +135,7 @@ results before the next reply, and a reply's tip held until its entry
 as an `EntryId`, and every lane as a `ThreadId` (`packages/reads/TECHNICAL.md`),
 so the client never mints one but where an id comes back in from elsewhere:
 its stored form (`layout.ts`'s `decodeLayout`), your attention document
-(`readAttention`, in `@pinetrie/schema`), and ids read back from the page (`use-ask-bar.ts`, from `data-ask-of`; `root-target.ts`, from a root's drag and its drop marks).
+(`readAttention`, in `@pinetrie/schema`), an id read back from the page (`use-ask-bar.ts`, from `data-ask-of`), and a copied thread's end read back from the clipboard (`clip.ts`).
 `biome.json` refuses an `entryId` or `runId` import anywhere else in the
 client; tests build entries and trees through `fixtures.ts`, which mints.
 

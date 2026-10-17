@@ -70,7 +70,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a line that is no reply ends the channel",
     file: "packages/channel/client.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "    } catch {\n      stderr = `${stderr}${line}\\n`.slice(-4000)\n      return\n    }\n",
     to: "    } catch {\n      child.stdin.end()\n      return\n    }\n",
     command: ["pnpm", "exec", "vitest", "run", "packages/channel"],
@@ -263,7 +262,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the lane is not told its grants",
     file: "packages/pi/lanes.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: '` except ${allowed.join(", ")}`',
     to: '""',
     command: unit,
@@ -677,7 +675,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a lane is not told the runtime's programs for bash",
     file: "packages/pi/lanes.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "    `Search with the ${GREP_TOOL} and ${FIND_TOOL} tools. In bash, ${listed(Object.keys(PREFERRED_OVER))} are on PATH: prefer them to ${listed(Object.values(PREFERRED_OVER))}.`,\n",
     to: "",
     command: unit,
@@ -695,7 +692,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a lane's search tools run a bare program name",
     file: "packages/pi/lanes.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "    programs: async program => `${programs}/${program}`,",
     to: "    programs: async program => program,",
     command: unit,
@@ -834,7 +830,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a lane is not told nothing installs for it",
     file: "packages/pi/lanes.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "    `Nothing installs dependencies for you. After a catch up, ${PRODUCT_NAME} removes what commands made from files that changed (node_modules, a build): make them again as you would after a pull.`,\n",
     to: "",
     command: unit,

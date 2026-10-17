@@ -18,9 +18,7 @@ export const UNPROVEN: Readonly<Record<string, readonly string[]>> = {
   ],
   "browser/page": [
     "a first visit asks for your email and name, and refuses what is not an email",
-    "page loaded, wasm instantiated, client connected to the host",
     "no page errors during load",
-    "the page loads no Loro and no wasm",
     "＋ agent's new tab is ready to type in: its box has focus",
     "the column reads Ada's asked message, then the agent",
     "the branch opened as a second column, to the right of its parent",

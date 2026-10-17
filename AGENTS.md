@@ -91,6 +91,7 @@ spent spikes: history, which search skips unless you name the folder.
 | with a real model | `pnpm run e2e:live` (the `live` scenario alone; needs a model key) |
 | in a real browser | `pnpm run e2e:browser` (its scenarios with lanes need Docker, as `e2e:lanes` does; on the Mac, `pnpm --filter @pinetrie/app exec playwright install chromium-headless-shell` once) |
 | lanes of their own, in containers | `pnpm run e2e:lanes` under Docker: in a lane whose project grants `lanes.nested` (pine·trie's does), on the Mac the lane VM, whose image the first lease builds with no Docker engine (ADR-0147), on Linux Docker with a btrfs lanes directory. Where Docker cannot run lanes, every scenario with lanes reports SKIP with why |
+| the observer's kernel side and loader, in a QEMU guest | `pnpm run e2e:observer`: needs `qemu-system-aarch64` and an arm64 Docker for the builds (a lane's, or the Mac's lane VM's); without them every scenario reports SKIP with why |
 | deliberate bugs | `pnpm mutate scripts/mutations/<list>.ts [name]` |
 
 A check without a proof it can fail is not yet a check. A new check comes with a

@@ -411,7 +411,6 @@ export const mutations: readonly Mutation[] = [
     name: "each project's host makes an observer of its own",
     file: "packages/docker/runtime.ts",
     from: "    const v = await version\n",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
     to: "    const v = `${await version}-${key}`\n",
     expect:
       "two projects' lanes are observed by at most one observer, the machine's, each run attributed",

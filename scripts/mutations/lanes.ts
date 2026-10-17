@@ -311,7 +311,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a shared directory inside .jj is shared",
     file: "packages/lanes/plan.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "  return NEVER_SHARED.includes(top) ? `it is inside ${top}` : null",
     to: "  return null",
     suite: "lanes",
@@ -332,7 +331,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "pre-rename: a fork keeps the old config folder",
     file: plan,
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "  laneShell(`rm -rf ${OLD_LANE_CONFIG_DIR}`),\n  ...input.setup.steps,\n",
     to: "  ...input.setup.steps,\n",
     command: unit,
@@ -386,7 +384,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the helper is started with the image's node",
     file: "packages/lanes/runtime.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: '  `${RUNTIME_MOUNT}/node/${LOADER}`,\n  "--library-path",\n  `${RUNTIME_MOUNT}/node/lib`,\n  `${RUNTIME_MOUNT}/node/node`,',
     to: '  "node",',
     suite: "lanes",
@@ -396,7 +393,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the lane's ignore file leaves out the shared directories",
     file: plan,
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "    ...shared.map(p => `/${p}/`),\n",
     to: "",
     command: unit,
@@ -441,7 +437,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the image ignores pinetrie's Playwright version",
     file: plan,
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "      `PLAYWRIGHT_VERSION=${input.playwrightVersion}`,",
     to: "",
     command: unit,
@@ -450,7 +445,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the image's browser is not the one pinetrie's Playwright drives",
     file: plan,
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "      `PLAYWRIGHT_VERSION=${input.playwrightVersion}`,",
     to: '      "PLAYWRIGHT_VERSION=1.55.0",',
     suite: "lanes",
@@ -460,9 +454,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the lane note is not where the prompt says",
     file: "packages/lanes/lane.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "    ? `${PINETRIE_MOUNT}/packages/pi/lane.md`",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
     to: "    ? `${PINETRIE_MOUNT}/packages/pi/lane-notes.md`",
     command: unit,
     expect: "every pinetrie file a lane is pointed at exists",
@@ -470,9 +462,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the folder's lane note is not where the prompt says",
     file: "packages/lanes/lane.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "    : `${PINETRIE_MOUNT}/packages/pi/lane-folder.md`",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
     to: "    : `${PINETRIE_MOUNT}/packages/pi/lane-folders.md`",
     command: unit,
     expect: "every pinetrie file a lane is pointed at exists",
@@ -480,9 +470,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the lane note is not where the prompt says, in a real lane",
     file: "packages/lanes/lane.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "    ? `${PINETRIE_MOUNT}/packages/pi/lane.md`",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
     to: "    ? `${PINETRIE_MOUNT}/packages/pi/lane-notes.md`",
     suite: "lanes",
     scenario: "commands",
@@ -685,9 +673,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "lanes do not trust the working copy's .git, which a fetch reads",
     file: plan,
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "  `[safe]\\n\\tdirectory = ${HOST_WORKING_COPY}\\n\\tdirectory = ${HOST_WORKING_COPY}/.git\\n`",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
     to: "  `[safe]\\n\\tdirectory = ${HOST_WORKING_COPY}\\n`",
     command: unit,
     expect:

@@ -497,7 +497,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a registry is keyed with an input never hashed",
     file: "packages/rules/disk.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "      if (unasked !== undefined) throw new Error(`${unasked} was never hashed`)\n",
     to: "",
     command: unit,
@@ -1129,9 +1128,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an acceptance's line names no change",
     file: "packages/rules/fact.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "      return `✓ accepted${into(fact.to)} as ${fact.as.slice(0, 8)}`",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
     to: "      return `✓ accepted${into(fact.to)}`",
     command: unit,
     expect: "factLine",
@@ -1445,7 +1442,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the model reads no speaker",
     file: "packages/rules/chat.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "  `${d.authorName}: ${d.command?.expanded ?? d.text}`",
     to: "  d.command?.expanded ?? d.text",
     command: unit,
@@ -1599,9 +1595,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a tight budget drops the destination's side",
     file: "packages/rules/land.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "  `### ${f.ours.label}: ${f.ours.who}\\n${reasonLines(f.ours.reasons, k)}\\n` +",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     to: '  (shown === "whole" ? `### ${f.ours.label}: ${f.ours.who}\\n${reasonLines(f.ours.reasons, k)}\\n` : "") +',
     command: unit,
     expect:
@@ -1660,7 +1654,6 @@ export const mutations: readonly Mutation[] = [
     name: "an unnamed writer is a guest again",
     file: "packages/rules/participant.ts",
     from: "): string => set ?? emailLocalPart(writer)",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     to: "): string => set ?? `guest-${writer.slice(-4)}`",
     command: unit,
     expect: "the unnamed by their email",
@@ -1901,9 +1894,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a review URL carries no version",
     file: "packages/rules/review.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "  `${REVIEW_PREFIX}${REVIEW_WIRE}/review/${spanKey(span)}`",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     to: "  `${REVIEW_PREFIX}review/${spanKey(span)}`",
     command: unit,
     expect: "the wire: every URL parses back",
@@ -2161,7 +2152,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the resolution leaves out what the person asked",
     file: "packages/rules/land.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: '  intent === "" ? "" : `\\n\\n## What the person asked\\n\\n${intent}`',
     to: '  ""',
     command: unit,
@@ -2662,9 +2652,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a title request leaves out how the thread began",
     file: "packages/rules/title.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: '  const head = `${TITLE_REQUEST_HEAD}\\n- ${(first ?? "").trim()}\\n\\n`',
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
     to: "  const head = `${TITLE_REQUEST_HEAD}\\n\\n`",
     command: unit,
     expect: "titleRequest: the first line always, then the newest that fit",
@@ -3148,7 +3136,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the archive can be removed",
     file: "packages/rules/board.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "      if (isArchive)\n        return refused(ERR.STATE_ARCHIVE, `${archive.name} cannot be removed`)",
     to: "",
     command: unit,
@@ -3549,9 +3536,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the reading thread is not marked on the canvas",
     file: "packages/rules/canvas.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "      if (c.id === f.reading) return `thread ${name} (this thread), ${by}`",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     to: "      if (false) return `thread ${name} (this thread), ${by}`",
     command: unit,
     expect: "one line per card in the canvas's order",
@@ -3912,9 +3897,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a link's label keeps its brackets",
     file: "packages/rules/links.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: '  `[${label.replace(/[[\\]]/g, "")}](${addressUrl(address)})`',
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
     to: "  `[${label}](${addressUrl(address)})`",
     command: unit,
     expect:

@@ -19,6 +19,7 @@
     "sign-in": "node scripts/sign-in.ts in",
     "sign-out": "node scripts/sign-in.ts out"
   },
+  "//dependencies": "@kyneta/sql-store-core is never imported here. It is a PEER dependency of @kyneta/sqlite-store, declared to meet it: a linked sqlite-store finds it in Kyneta's own install, but one installed from the registry would find it only here.",
   "dependencies": {
     "@kyneta/exchange": "link:../../../kyneta/workspace/pineta/packages/exchange",
     "@kyneta/schema": "link:../../../kyneta/workspace/pineta/packages/schema",
@@ -45,7 +46,7 @@
     "@pinetrie/vm": "workspace:*",
     "@pinetrie/web": "workspace:*",
     "vite": "7.1.11",
-    "ws": "^8.18.0"
+    "ws": "8.21.3"
   },
   "devDependencies": {
     "@playwright/test": "1.56.0",

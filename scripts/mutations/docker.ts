@@ -270,7 +270,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a refusal drops what the command said",
     file: plan,
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: '  said === "" ? "" : ` (it said: ${said})`',
     to: '  said === "" ? "" : ""',
     command: unit("packages/docker"),
@@ -319,9 +318,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a project's grant applies to every project's lanes",
     file: "packages/lanehost/grants.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "          `-I DOCKER-USER -s ${subnet} -j ${chain}`,",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
     to: "          `-I DOCKER-USER -j ${chain}`,",
     command: unit("packages/lanehost"),
     expect: "the rules accept each port only from the project's network",
@@ -394,9 +391,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "(Mac) a project's grant reaches every project's lanes",
     file: "packages/lanehost/grants.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "          `-I DOCKER-USER -s ${subnet} -j ${chain}`,",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
     to: "          `-I DOCKER-USER -j ${chain}`,",
     suite: "lanes",
     scenario: "contract",

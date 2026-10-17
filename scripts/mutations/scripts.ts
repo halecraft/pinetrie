@@ -91,7 +91,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a gate's feed writes a file where its FIFO never came",
     file: "apps/pinetrie/e2e/gate.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "done; [ -p ${f} ] && printf",
     to: "done; printf",
     command: gate,
@@ -239,7 +238,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "proofGaps reports no unproven label",
     file: "scripts/proofs.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "      .filter(label => !expected.has(`${scenario}\\n${label}`))",
     to: "      .filter(() => false)",
     command: proofs,

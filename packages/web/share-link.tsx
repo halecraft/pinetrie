@@ -26,7 +26,6 @@ export function ShareLink(
     (opens !== "image" && opens !== "text") ||
     reach === null
   )
-    // biome-ignore lint/a11y/useAnchorContent: its content is its children, in props
     return <a {...props} />
   const mine: PaneSubject = {
     kind: "share",

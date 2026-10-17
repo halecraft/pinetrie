@@ -8,7 +8,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "expandSkill drops pi's references line",
     file: commands,
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "\\nReferences are relative to ${input.dir}.\\n",
     to: "\\n",
     command: vitest("packages/rules"),

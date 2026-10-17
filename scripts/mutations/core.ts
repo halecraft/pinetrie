@@ -211,7 +211,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "another thread's WIP line counts as this one's",
     file: trailers,
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "  line.startsWith(`WIP (${name}): `)",
     to: '  line.startsWith("WIP (")',
     command: unit,
@@ -220,9 +219,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the trailers leave out the thread's name",
     file: trailers,
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "  `${message.trim()}\\n\\n${TRAILERS.thread}: ${at.name}\\n${TRAILERS.lane}: ${at.lane}\\n${TRAILERS.entry}: ${at.entry}\\n`",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     to: "  `${message.trim()}\\n\\n${TRAILERS.lane}: ${at.lane}\\n${TRAILERS.entry}: ${at.entry}\\n`",
     command: unit,
     expect: "withTrailers and the WIP line",
@@ -682,7 +679,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a lane is told host paths as the host's",
     file: core,
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "  `${HOST_MOUNT}${hostPath}`",
     to: "  hostPath",
     command: unit,
@@ -782,9 +778,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a shell word keeps its quotes unescaped",
     file: core,
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "  /^[A-Za-z0-9_./:=@+-]+$/.test(s) ? s : `'${s.replaceAll(\"'\", `'\\\\''`)}'`",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     to: "  /^[A-Za-z0-9_./:=@+-]+$/.test(s) ? s : `'${s}'`",
     command: unit,
     expect: "shellWord: one word, whatever it holds",

@@ -439,9 +439,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "several traces read as one",
     file: "packages/interface/card-words.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "  if (n > 1) return `${n} cards ${PARTICIPLE[group.verb]} by ${name}`",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
     to: "  if (n > 99) return `${n} cards ${PARTICIPLE[group.verb]} by ${name}`",
     command: unit,
     expect: "traceWords",
@@ -533,9 +531,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the publish title names no file the catch-up changes",
     file: "packages/interface/publish-view.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: '      `catches the working copy up with accepted work (changes ${count(preview?.changes ?? 0, "file", "files")}${moves})`,',
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
     to: "      `catches the working copy up with accepted work${moves}`,",
     command: unit,
     expect: "your commits are accepted, then main moves",
@@ -648,7 +644,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a command's button never says it sends the text",
     file: "packages/interface/send.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: '      command.command === "split" || !command.text ? verb : `${verb} and send`,',
     to: "      verb,",
     command: unit,
@@ -683,7 +678,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an acceptance does not say where it goes",
     file: "packages/interface/column-view.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "        : ` into ${first.bookmark}`",
     to: '        : ""',
     command: unit,
@@ -693,7 +687,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "edited proposed changes hide their conflicts",
     file: "packages/interface/column-view.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: '                ? `you edited these changes${conflicts === "" ? "" : ` · ${conflicts}`}`',
     to: '                ? "you edited these changes"',
     command: unit,
@@ -703,7 +696,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a renamed writer shows only the name they sent under",
     file: "packages/interface/names.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "  return now === undefined || now === asSent ? asSent : `${now} (${asSent})`",
     to: "  return asSent",
     command: unit,
@@ -1058,9 +1050,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a stack reads as one proposed changes",
     file: "packages/interface/column-view.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "                      ? `a stack of ${facts.size} · ${files} changed${yours}`",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     to: "                      ? `${files} changed${yours}`",
     command: unit,
     expect: "a stack",
@@ -1116,9 +1106,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the others are left off",
     file: "packages/interface/send.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "        label: `send to ${first} +${others.length}`,",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     to: "        label: `send to ${first}`,",
     command: unit,
     expect: "to several, naming them all in the title",
@@ -1229,9 +1217,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the whole label drops a command's later lines",
     file: "packages/interface/tool-words.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: '  if (length === "whole") return `${word} ${subject}`',
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     to: '  if (length === "whole") return `${word} ${subject.split("\\n")[0]}`',
     command: unit,
     expect:
@@ -1280,7 +1266,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the detail's output keeps its start",
     file: "packages/interface/tool-row.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: '  return `… ${plural(left, "earlier character")}\\n${text.slice(left)}`',
     to: "  return text.slice(0, SHOWN)",
     command: unit,
@@ -1370,7 +1355,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an edit never adds @agent",
     file: "packages/interface/message-tools.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "      text: compelled && !named ? `${AGENT_PREFIX}${node.text}` : node.text,",
     to: "      text: node.text,",
     command: unit,
@@ -1379,9 +1363,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an edit always adds @agent",
     file: "packages/interface/message-tools.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "      text: compelled && !named ? `${AGENT_PREFIX}${node.text}` : node.text,",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
     to: "      text: `${AGENT_PREFIX}${node.text}`,",
     command: unit,
     expect: "asks the agent exactly when the original did",
@@ -1663,7 +1645,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a running column's mark does not name its ask",
     file: "packages/interface/column-view.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "      : `the agent is working on ${ask}`",
     to: '      : "the agent is working"',
     command: unit,
@@ -2164,7 +2145,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the window's title names no root",
     file: "packages/interface/sidebar-view.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "  const place = shown === null ? PRODUCT_NAME : `${shown} · ${PRODUCT_NAME}`",
     to: "  const place = PRODUCT_NAME",
     command: unit,
@@ -2173,9 +2153,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the window's title counts nothing needing you",
     file: "packages/interface/sidebar-view.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "  return count === 0 ? place : `(${count}) ${place}`",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     to: "  return `(${count}) ${place}`",
     command: unit,
     expect: "0 needing you, on nothing",
@@ -2559,7 +2537,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a refused move names nobody",
     file: "packages/interface/card-words.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "        : `not moved: ${who(by, reader)} moved it first`",
     to: '        : "not moved: someone moved it first"',
     command: unit,
@@ -3304,7 +3281,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a search finds a word inside a longer one",
     file: "packages/interface/search.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: '  const before = isWordChar(first[0]) ? `(?<![${WORD}])` : ""',
     to: '  const before = ""',
     command: unit,
@@ -3314,7 +3290,6 @@ export const mutations: readonly Mutation[] = [
     name: "every word of a search may start a longer word",
     file: "packages/interface/search.ts",
     from: '  const body = query.words.map(literal).join("\\\\s+")',
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     to: "  const body = query.words.map(literal).join(`[${WORD}]*\\\\s+`)",
     command: unit,
     expect: "a word before the last is whole",
@@ -3322,9 +3297,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a search's last word is whole",
     file: "packages/interface/search.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: '  const rest = isWordChar(last.at(-1)) ? `[${WORD}]*` : ""',
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     to: '  const rest = isWordChar(last.at(-1)) ? `(?![${WORD}])` : ""',
     command: unit,
     expect: "the last word may start a longer word",
@@ -3332,7 +3305,6 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a match stops where the last word typed does",
     file: "packages/interface/search.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: '  const rest = isWordChar(last.at(-1)) ? `[${WORD}]*` : ""',
     to: '  const rest = ""',
     command: unit,
@@ -3341,9 +3313,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a search minds case",
     file: "packages/interface/search.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: '  return new RegExp(`${before}${body}${rest}`, "giu")',
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     to: '  return new RegExp(`${before}${body}${rest}`, "gu")',
     command: unit,
     expect: "matching ignores case",
@@ -3359,9 +3329,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a search's edge needs a boundary where it is no word character",
     file: "packages/interface/search.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: '  const before = isWordChar(first[0]) ? `(?<![${WORD}])` : ""',
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     to: "  const before = `(?<![${WORD}])`",
     command: unit,
     expect: "a query edge that is no word character needs no boundary",
@@ -4512,9 +4480,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a chosen command is followed by no space",
     file: "packages/interface/commands.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "          insert: `/${c.name} `,\n",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
     to: "          insert: `/${c.name}`,\n",
     command: unit,
     expect:
