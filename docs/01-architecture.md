@@ -228,6 +228,7 @@ import each other, and the host only connects them.
 ADR-0119, accepted and not yet built, keeps a thread, its lane and the host the lane runs
 on apart, so a lane at rest could later be rebuilt on another machine:
 one host holds a lane at a time, and the model is each run's choice.
+ADR-0164, proposed, would shelve what of it is unbuilt.
 
 ADR-0135 has pine·trie learn a lane's disk by watching it rather than from
 what a project declares. Every tool call's command is a run, and one
@@ -482,7 +483,7 @@ thirds of it.** Kept here because the refutation is the useful part.
 
 ## Fold (context merge)
 
-Decided, and not built yet. Destination-aware and lazy (ADR-0005). pi summarizes on *leaving* a branch, with no
+Decided, and not built yet; ADR-0164, proposed, would shelve it. Destination-aware and lazy (ADR-0005). pi summarizes on *leaving* a branch, with no
 knowledge of where the summary will land. We summarize on *landing*, knowing the
 destination — strictly more information, and it preserves optionality (an eager
 summary can never be re-folded differently).
@@ -513,12 +514,13 @@ a "landed" signal for the tree UI.
 - Fold is an **LLM call** — it has cost and is nondeterministic. Two peers
   folding B concurrently produce two different merge nodes. Both are valid and
   immutable; the UI must expect this rather than assume idempotence.
-- **Two peers folding into the same trunk tip additionally contend for trunk
-  *succession*, which a linear path cannot grant to both** (S12). This is a
-  semantic conflict in *any* representation, not an artefact of our data model.
-  ADR-0012 makes it fail **loudly**: `leaves.length > 1` on the promotion DAG is
-  a queryable "unresolved trunk fork", and the repair is a re-fold at the new
-  tip — which ADR-0010 already prescribes. The UI must render the fork state.
+- **Two folds into one thread's end contend for what comes after it, and a
+  linear path cannot give it to both** (S12). This is a semantic conflict in
+  *any* representation, not an artefact of our data model. No trunk is
+  stored (ADR-0163): the host is the only writer of each thread's end
+  (ADR-0120), so the second fold is a race like any other. Nothing is
+  written, and it is folded again at the new end, as ADR-0010 prescribes, or
+  it lands on a branch.
 - Budget ladder when raw context does not fit: raw → per-leg compaction → pi's
   existing branch summary. Degrade knowingly.
 - Undecided: fold a *path* or a *subtree*? Default to the subtree's active path,

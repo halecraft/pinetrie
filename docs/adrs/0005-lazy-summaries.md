@@ -3,6 +3,8 @@
 - **Status:** Accepted
 - **Area:** `docs/01-architecture.md`
 - **Evidence:** S5
+- **Amended by:**
+  - ADR-0164: lazy, destination-aware summarizing is shelved with fold.
 
 **Context.** pi generates `BranchSummaryEntry` on *leaving* a branch — it
 summarizes without knowing where the summary will land, and destroys the raw

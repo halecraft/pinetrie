@@ -45,7 +45,7 @@ ADR is written, amended, restated and archived: `adrs/README.md`.
 
 ## Status
 
-Six spikes are open, none blocking: S6, S10, S15, S100, S154 and S197.
+Four spikes are open, none blocking: S6, S100, S154 and S197.
 `rg -l '^- \*\*Status:\*\* Open' docs/findings` lists them. What is built,
 and what is not yet, is in `pinetrie.md` § 6.
 

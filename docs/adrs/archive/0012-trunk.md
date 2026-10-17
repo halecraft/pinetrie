@@ -1,8 +1,12 @@
 # ADR-0012 — The trunk is a derived value over an append-only promotion DAG
 
-- **Status:** Accepted
+- **Status:** Superseded
 - **Area:** `docs/01-architecture.md`, `packages/schema/TECHNICAL.md`
 - **Evidence:** S12
+- **Superseded by:**
+  - ADR-0163: no trunk and no promotion are stored. The host is the only
+    writer of each thread's end, so two folds into one end race like two
+    messages (ADR-0120), and nothing derives a winner.
 
 **Context.** ADR-0011 gives every writer its own lane, so no lane is canonical —
 yet the product is built on a trunk (`docs/00-vision.md`: *"fold an exploration back

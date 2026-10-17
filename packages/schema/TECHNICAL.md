@@ -24,7 +24,7 @@ plus one sealed `payload`.
 | column | why it is typed |
 |---|---|
 | `id` | entry identity; ADR-0009 makes uniqueness a safety invariant |
-| `parentId` | the tree edge — ADR-0004, ADR-0008, ADR-0010, ADR-0012 |
+| `parentId` | the tree edge — ADR-0004, ADR-0008, ADR-0010 |
 | `type` | every projection filters on it |
 | `timestamp` | ordering diagnostics |
 | `fromId` | the merge node (ADR-0004), needed by fold (ADR-0010) |

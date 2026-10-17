@@ -488,9 +488,6 @@ Decided, and waiting for their turn:
   pose as another (ADR-0107, ADR-0037). Next: an email with a generated token.
 
 - **The open spikes** (`rg -l '^- \*\*Status:\*\* Open' docs/findings`):
-  - **S15**: the trunk winner rule uses wall-clock `ts`; clock skew is
-    adversarial. Needs a Lamport clock (S1 deliberately built none).
-  - **S10**: snapshot and sync-payload size at scale.
   - **S6**: anchoring a reference to a file range, once something points
     into files (references were withdrawn, ADR-0043).
   - **S100**: one parameterized read for every lane's proposed changes,

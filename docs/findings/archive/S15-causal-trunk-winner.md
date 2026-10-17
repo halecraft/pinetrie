@@ -1,8 +1,8 @@
 # S15 — Should the trunk winner rule be causal rather than wall-clock?
 
-- **Status:** Open
+- **Status:** Moot
 
-Not urgent: replicas converge either way.
+Moot: ADR-0163 supersedes ADR-0012, so there is no winner rule to order.
 
 ## Brief
 
@@ -25,3 +25,13 @@ since S1 left no causal clock to share.
 
 **Not urgent:** replicas converge either way; this is about picking the *right*
 winner, not a correct one.
+
+## Answers
+
+**Moot (2026-10-17), and never run.** The rule it questions was never
+built: no promotion record, trunk pointer or winner exists in the code or
+the schema. The writers it ordered are gone. The host is every lane's only
+writer and runs every command in one serial executor (ADR-0120), and one
+host alone writes a thread's end (ADR-0119). ADR-0163 supersedes
+ADR-0012. Two folds into one end race as two messages do, and the host's
+write order is the only order there is.
