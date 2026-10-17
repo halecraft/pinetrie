@@ -78,8 +78,8 @@ kept, so the next call asks again. That stays sound because the host runs
 | `thread-lanes.ts` | each thread's pi lane, held, and its handle (`ThreadLanes`) |
 | `tools.ts` | the tools registered, and whether a stored lane's list differs from `TOOL_IDS` (`toolsChanged`) |
 | `search.ts` | the `grep` and `find` tools: rg and fd through the lane's `env` (ADR-0064) |
-| `lanes.ts` | where a lane's tools work (`toolContextOf`), and what it is told (`systemPromptFor`, `laneGuidelines`) |
-| `stream.ts` | pi's events as `StreamEvent`s (`streamEventOf`) |
+| `lanes.ts` | where a lane's tools work (`laneToolContext`), and what it is told (`systemPromptFor`, `laneGuidelines`) |
+| `stream.ts` | pi's events as `StreamEvent`s (`harnessStreamEvent`) |
 | `commands.ts` | the commands pi loaded, and a command's file as the model reads it (`CommandFiles`) |
 | `banner.ts` | `set_banner`, and drawing a banner (`Banners`) |
 | `config.ts` | the model, its setup (`loadModelSetup`), and `complete` |
@@ -90,8 +90,8 @@ kept, so the next call asks again. That stays sound because the host runs
 | `inside.ts` | a facade's inside, reachable only in this package (`sealed`) |
 
 The decisions in them are pure and tested without a harness:
-`toolsChanged`, `toolContextOf`, `streamEventOf`,
-`expandCommand`, `skillOf`, and the search tools' `grepArgs`, `findArgs`,
+`toolsChanged`, `laneToolContext`, `harnessStreamEvent`,
+`expandCommand`, `parseSkill`, and the search tools' `grepArgs`, `findArgs`,
 `searchOutcome` and `searchText`.
 
 ## `storage.ts` — our implementation of pi's `Storage` port
@@ -145,7 +145,7 @@ Five rules hold them together:
    wrote. The same pair runs on `pi.pending.entry` values, pi's copy of a
    message before its entry, since a deleted value stays in the history until
    compaction (S93); `stored-values.ts` decides which namespaces. Before its
-   batch, `#applyCommit` gathers the lookups for the images `imagesOf` finds:
+   batch, `#applyCommit` gathers the lookups for the images `committedImages` finds:
    the SHA-256 of each part's bytes, and `blobs.ref`. A part the store lacks stays
    inline, which is every part without `KynetaStorageOptions.blobs`, as
    conformance runs. A blob gone from the store rejoins as "[image <sha256>
@@ -182,7 +182,7 @@ thread, under its thread's id (`t-…`, minted by the column that opened the
 thread, ADR-0057, ADR-0117), and never navigated. People own no lanes; a
 message records its writer (`details.author`, from the transport). A lane's
 tip is therefore always its thread's end, and a thread's lane is the one its
-id names (`laneOf`), with no stored mapping.
+id names (`threadLane`), with no stored mapping.
 
 The facade has no way to move a lane: `ThreadLaneHandle` offers `append`,
 `run`, `resume` and `abort`, none of which navigates. Nor is
@@ -257,7 +257,7 @@ the lane is `LaneBusy` until resumed (below).
 `createAgent` takes one `onStream(event: StreamEvent)`. `StreamEvent` is
 declared in `@pinetrie/core`, so pi's events never leave this package. Every pi
 `HarnessEvent` carries `lane`, so concurrent threads stay apart. The mapping
-is `streamEventOf` (`stream.ts`), which drops an event on a lane that is
+is `harnessStreamEvent` (`stream.ts`), which drops an event on a lane that is
 not a thread's.
 
 | pi's event | `StreamEvent` |
@@ -488,7 +488,7 @@ item 18, and in `lanes.test.ts` against the harness.
   from the host's `RUNTIME_BIN`). A tool never runs a bare program name, so no lane runs whatever
   its `PATH` happens to hold.
 - **An agent without tools, or a lane with no copy of its own,** gets no
-  access (`toolContextOf(null, project)`): `refusingEnv`, whose every method
+  access (`laneToolContext(null, project)`): `refusingEnv`, whose every method
   answers `not_supported`, and a prompt naming the project's root, every
   skill at its own path, and `PINNED_RULE` alone. A call with no lane named
   is the same.
@@ -676,7 +676,7 @@ item 18, and in `lanes.test.ts` against the harness.
     `ask_for_guidance` by ADR-0080) is taken while jj finds a conflict in the
     lane's copy, in any run (`LaneHooks.askedAboutConflict`, async). Taken,
     its result's `details` are `{ asked: true }`, which the page reads
-    (`renderableMessage`, `conflictAskedAt`), never its text. Refused, it
+    (`renderableMessage`, `conflictAskTime`), never its text. Refused, it
     answers `NO_CONFLICTS`.
   - **The list is `TOOL_IDS`, the same in every run** (`agent.ts`), and set
     once where a lane is held (`existing()` in `thread-lanes.ts`). A new
@@ -686,7 +686,7 @@ item 18, and in `lanes.test.ts` against the harness.
   - **The guidelines name nothing that changes**, the proposed changes' bookmark among
     them: it changes when a thread is named. `lane.md` says how it is named.
   - **A change is logged.** A `before_payload` hook hashes each request
-    without its messages (`prefixOf`, `prefix.ts`), and calls
+    without its messages (`requestPrefix`, `prefix.ts`), and calls
     `onPrefixChange(lane)` when it differs from the lane's last request
     (`prefixChange`). The host logs it.
 - **`catch_up` and `split_proposed_changes`** (`thread-tools.ts`, ADR-0080) read their
@@ -735,7 +735,7 @@ item 18, and in `lanes.test.ts` against the harness.
   `resolve-conflicts` (ADR-0033), `commit-message` and `proposed-changes-stack`
   (ADR-0105), `column-banner` (ADR-0053), whose whole body is the image
   model's prompt, and `ask-digest` (ADR-0106), whose reply has a shape the
-  host reads (`digestOf`, ADR-0075): a replacement must ask for it too. So
+  host reads (`parseDigest`, ADR-0075): a replacement must ask for it too. So
   one of yours or the repo's of the same name replaces pine·trie's; a
   replacement goes by the skill's name, so one still named `offer-stack`,
   the stack skill's name before ADR-0156, replaces nothing. All five are
@@ -806,7 +806,7 @@ item 18, and in `lanes.test.ts` against the harness.
   qualified name: a conflicted update asks for
   `pinetrie:skill:resolve-conflicts`.
 - **`expand(command, args, inLane)`** reads the file now, then runs the pure
-  `expandCommand`, which hashes it. `skill(name)` reads, then runs `skillOf`.
+  `expandCommand`, which hashes it. `skill(name)` reads, then runs `parseSkill`.
   Both strip frontmatter with `withoutFrontmatter`, which never parses it: a
   file whose YAML broke after pi loaded it still expands.
   - a skill becomes pi's block through `expandSkill` (`@pinetrie/rules`), which
@@ -859,7 +859,7 @@ ignore, which had to name every non-pi field: one it missed (after `activeRunId`
 became `activeRuns`) made a replayed change to it re-index everything. That cost
 only work, never correctness, and never touched the host's own stream writes.
 
-`scopeOf` folds a changeset's changes into one `Scope`. Kyneta's `merge` names
+`dirtyScope` folds a changeset's changes into one `Scope`. Kyneta's `merge` names
 the keys it sets and deletes (`["usageRows"] {type:"map", set:{u1:…}}`,
 `["lists","l"] {type:"sequence"}`), so a merged usage row is re-indexed alone,
 as an entry is. The replay test in `storage.test.ts` relies on this.
@@ -1010,7 +1010,7 @@ the root its label. A scripted model answers it from its own provider
   page no longer documents it, and the model's OpenRouter description
   names it.
 - **`drawBanner` never rejects**: `drawn` with an image, or `failed` and
-  why. A request may take 120 s; one takes about 9 s (S60). The image is fitted in pi, as `read`'s are (`drawnOf` runs
+  why. A request may take 120 s; one takes about 9 s (S60). The image is fitted in pi, as `read`'s are (`fitDrawnImage` runs
   `prepareImage`), so the host stores what it is given; bytes that are not an
   image are a failure, and the host tries again. `canDrawBanners` is asked
   first, so a host with no key reads no skill and asks no model.

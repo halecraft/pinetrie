@@ -11,7 +11,7 @@ import {
   type ThreadName,
 } from "@pinetrie/core"
 import { Type } from "typebox"
-import { decodeAt, threadKey } from "./decode.ts"
+import { decodeRecord, threadKey } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 
 /**
@@ -35,7 +35,7 @@ export function threadNameFor(
  * last eight characters of its id. The one rule for a thread named in a
  * sentence or a mark, on the host and the page.
  */
-export const threadNameOf = (
+export const readableThreadName = (
   names: ReadonlyMap<ThreadId, ThreadName>,
   lane: ThreadId,
 ): string => names.get(lane) ?? lane.slice(-8)
@@ -100,7 +100,7 @@ export const NAME: RecordSpec<NameRecord, ThreadId, "session"> = {
   keyOf: r => r.lane,
   encode: ({ lane, ...contents }) => contents,
   decode: (contents, key) =>
-    decodeAt(NameRecordSchema, contents, threadKey(key), (r, lane) => ({
+    decodeRecord(NameRecordSchema, contents, threadKey(key), (r, lane) => ({
       lane,
       name: r.name as ThreadName,
       at: r.at,

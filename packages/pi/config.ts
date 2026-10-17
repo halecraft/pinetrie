@@ -29,8 +29,8 @@ import {
   openRuntime,
 } from "./deep.ts"
 import {
-  describeFauxOf,
-  fauxOf,
+  describeFaux,
+  runFaux,
   type ScriptedModel,
   scriptedImages,
 } from "./scripted.ts"
@@ -362,8 +362,8 @@ export async function loadModelSetup(
   const refusedPackages = plan.refused
   switch (choice.kind) {
     case "scripted": {
-      const faux = fauxOf(choice.script)
-      const describe = describeFauxOf(choice.script)
+      const faux = runFaux(choice.script)
+      const describe = describeFaux(choice.script)
       const models = createModels()
       models.setProvider(faux.provider)
       models.setProvider(describe.provider)

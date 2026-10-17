@@ -5,7 +5,7 @@
 // the weight.
 
 import { describe, expect, test } from "vitest"
-import { entriesOf, entry } from "./fixtures.ts"
+import { entriesById, entry } from "./fixtures.ts"
 import { entryId, indexTree, projectSpine, projectTranscript } from "./index.ts"
 
 const msg = (id: string, parentId: string | null, text: string) =>
@@ -15,7 +15,7 @@ const msg = (id: string, parentId: string | null, text: string) =>
   })
 
 /** A chain a -> b -> c, with d and e forking off b. */
-const forked = entriesOf([
+const forked = entriesById([
   msg("a1", null, "root"),
   msg("b1", "a1", "trunk one"),
   msg("c1", "b1", "trunk two"),
@@ -25,7 +25,7 @@ const forked = entriesOf([
 
 describe("projectSpine", () => {
   test("a linear chain has a spine and no branches", () => {
-    const linear = entriesOf([
+    const linear = entriesById([
       msg("a1", null, "root"),
       msg("b1", "a1", "trunk one"),
       msg("c1", "b1", "trunk two"),
@@ -69,7 +69,7 @@ describe("projectSpine", () => {
   })
 
   test("branches sort by ascending rootId, not insertion order", () => {
-    const many = entriesOf([
+    const many = entriesById([
       msg("a1", null, "root"),
       msg("b1", "a1", "trunk"),
       msg("z9", "a1", "z"),
@@ -83,7 +83,7 @@ describe("projectSpine", () => {
   })
 
   test("an orphan parent is reported, not silently dropped", () => {
-    const orphaned = entriesOf([
+    const orphaned = entriesById([
       msg("a1", null, "root"),
       msg("x1", "missing", "lost"),
     ])
@@ -92,13 +92,13 @@ describe("projectSpine", () => {
   })
 
   test("a cycle is reported and the walk terminates", () => {
-    const cyclic = entriesOf([msg("p", "q", "p"), msg("q", "p", "q")])
+    const cyclic = entriesById([msg("p", "q", "p"), msg("q", "p", "q")])
     const { cycles } = projectSpine(indexTree(cyclic), entryId("p"))
     expect(cycles.length).toBeGreaterThan(0)
   })
 
   test("non-message entries are dropped from the spine", () => {
-    const mixed = entriesOf([
+    const mixed = entriesById([
       msg("a1", null, "root"),
       entry("s1", "a1", undefined, { type: "compaction" }),
       msg("c1", "s1", "after"),

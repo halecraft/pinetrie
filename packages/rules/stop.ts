@@ -11,10 +11,10 @@ import {
   type FactCardId,
   isBusy,
   type LaneView,
-  promptOf,
   type QueueHold,
   type Refusal,
   refused,
+  runPrompt,
   type ThreadId,
   type TreeIndex,
   type WriterId,
@@ -83,7 +83,7 @@ export function planStop(
 ): StopPlan {
   if (!lane.running) return { kind: "idle" }
   const queue = queuedOn(facts.cards, lane.name)
-  const prompt = promptOf(facts.index, lane.tip)
+  const prompt = runPrompt(facts.index, lane.tip)
   const named =
     prompt === null ||
     facts.asks.stoppedBy.has(prompt) ||
@@ -122,7 +122,7 @@ export function planStop(
  * (`stoppedBy`), or still queued on its lane, as it is from Stop until the
  * run's end appends it; null for nobody named.
  */
-export const stopperOf = (
+export const runStopper = (
   asks: AskIndex,
   queue: readonly QueuedCard[],
   prompt: EntryId,
@@ -130,7 +130,7 @@ export const stopperOf = (
 
 /**
  * How `prompt`'s run ended, as its run's end reads it: who stopped it named
- * by `stopperOf`, since its fact is still queued then.
+ * by `runStopper`, since its fact is still queued then.
  */
 export function endedOutcome(
   index: TreeIndex,
@@ -140,7 +140,7 @@ export function endedOutcome(
 ): AskOutcome {
   const outcome = askOutcome(index, asks, prompt, { running: false })
   return outcome.kind === "stopped"
-    ? { kind: "stopped", by: stopperOf(asks, queue, prompt) }
+    ? { kind: "stopped", by: runStopper(asks, queue, prompt) }
     : outcome
 }
 
@@ -182,7 +182,7 @@ const refusedFor = (code: ErrCode): CarryOnState => ({ kind: "refused", code })
 /**
  * Whether `lane` may carry on: it is not running, has no cards waiting
  * unless its queue is held, and the ask at its tip ended stopped. A stop's
- * fact at the tip is no ask (`promptOf` passes it), so the stopped ask is
+ * fact at the tip is no ask (`runPrompt` passes it), so the stopped ask is
  * still found. A message written after the stop is the tip's ask, with no
  * work, so it refuses; an update is no ask, so it does not.
  */
@@ -194,7 +194,7 @@ export function carryOnState(
   // A held queue waits for a release, not for this turn.
   if (lane.running || (isBusy(lane) && lane.heldBy === null))
     return refusedFor(ERR.BUSY)
-  const prompt = promptOf(facts.index, lane.tip)
+  const prompt = runPrompt(facts.index, lane.tip)
   if (prompt === null) return refusedFor(ERR.REFUSED)
   const outcome = askOutcome(facts.index, facts.asks, prompt, {
     running: false,

@@ -32,7 +32,7 @@ export const mutations: readonly Mutation[] = [
     expect: "a reply and a tool round-trip, null fields included",
   },
   {
-    name: "seatOf hashes the principal, not the seat",
+    name: "seatIdentity hashes the principal, not the seat",
     file: "packages/schema/text.ts",
     from: "    : { peer: peerId, clientId: yjsClientId(peerId), writer }",
     to: "    : { peer: peerId, clientId: yjsClientId(principal), writer }",
@@ -40,12 +40,12 @@ export const mutations: readonly Mutation[] = [
     expect: "each seat's person",
   },
   {
-    name: "seatOf gives the host a person",
+    name: "seatIdentity gives the host a person",
     file: "packages/schema/text.ts",
     from: "  const writer = writerOfPrincipal(principal)\n  return writer === undefined\n",
     to: "  const writer = writerOfPrincipal(principal) ?? (principal as WriterId)\n  return writer === undefined\n",
     command: unit,
-    expect: "seatOf",
+    expect: "seatIdentity",
   },
   {
     name: "textClients keeps Kyneta's seed clientID",

@@ -9,7 +9,7 @@ import {
   type SetupRecord,
 } from "@pinetrie/core"
 import { Type } from "typebox"
-import { decodeAt, fixedKey } from "./decode.ts"
+import { decodeRecord, fixedKey } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 
 /** The one `pinetrie.setup` value's key. */
@@ -86,5 +86,5 @@ export const SETUP: RecordSpec<SetupRecord, typeof SETUP_KEY, "session"> = {
   keyOf: () => SETUP_KEY,
   encode: r => ({ ...r }),
   decode: (contents, key) =>
-    decodeAt(SetupRecordSchema, contents, fixedKey(SETUP_KEY, key), r => r),
+    decodeRecord(SetupRecordSchema, contents, fixedKey(SETUP_KEY, key), r => r),
 }

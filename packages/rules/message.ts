@@ -20,7 +20,7 @@ import {
   type Position,
   PROPOSE_TOOL,
   type Proposal,
-  planModeOf,
+  planMode,
   pointId,
   type Recipients,
   type Refusal,
@@ -707,7 +707,7 @@ export function planMessage(input: {
 }): MessageDecision {
   const { lane, end, race } = input.thread
   const { at } = input
-  const mode = planModeOf(at)
+  const mode = planMode(at)
   const branch = at.kind === "branch"
   const { command } = input
   if (command !== null && "unknown" in command)

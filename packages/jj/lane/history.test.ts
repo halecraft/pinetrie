@@ -44,7 +44,7 @@ import {
   type RigLane,
 } from "@pinetrie/lanes/testing"
 import { afterAll, beforeAll, expect, test } from "vitest"
-import { fileAt } from "../file-at.ts"
+import { readRepoFile } from "../file-at.ts"
 import {
   acceptedIn,
   acceptProposedChanges,
@@ -53,11 +53,11 @@ import {
   proposedTip,
 } from "../fixtures.ts"
 import { hostJj } from "../run.ts"
-import { historyOf } from "./history.ts"
+import { jjLaneHistory } from "./history.ts"
 import { DEFAULT_REPO } from "./names.ts"
 import { planBaseCheckout, planForkSetup } from "./plan.ts"
 import { commitFromPoint } from "./points.ts"
-import { commitsOf, isAncestor } from "./revisions.ts"
+import { isAncestor, readCommits } from "./revisions.ts"
 import { laneJj } from "./run.ts"
 
 let top = ""
@@ -166,7 +166,7 @@ async function makeRig(): Promise<
         "-r",
         "@-",
       ])
-      const [commit] = await commitsOf(yours, "@-")
+      const [commit] = await readCommits(yours, "@-")
       if (commit === undefined) throw new Error("nothing accepted")
       return pointFromCommit(commit)
     },
@@ -209,7 +209,7 @@ async function makeRig(): Promise<
           })(),
         )
       }
-      const history = historyOf({
+      const history = jjLaneHistory({
         lane: jjLaneFor(lane),
         runners,
         repoConfig: DEFAULT_REPO,
@@ -245,7 +245,7 @@ async function makeRig(): Promise<
       }
     },
 
-    fileAt: (point, file) => fileAt(yours, DEFAULT_REPO, point, file),
+    fileAt: (point, file) => readRepoFile(yours, DEFAULT_REPO, point, file),
 
     isAncestor(lane, a, b) {
       const { jj, commit } = inLane(lane)

@@ -7,7 +7,7 @@ import {
 } from "@pinetrie/core"
 import { PICTURE_MOST, pictureWrites } from "@pinetrie/rules"
 import { expect, test } from "vitest"
-import { methods, record, writesOf } from "../fakes.ts"
+import { methods, record, writtenValues } from "../fakes.ts"
 import { handlePicture, type PictureDeps } from "./picture.ts"
 
 const ADA = writerId("ada@example.com")
@@ -65,7 +65,7 @@ test("a stored picture is set for its sender, and null removes it", async () => 
   expect(
     await handlePicture(d.port, ADA, { kind: "picture", sha256: null }),
   ).toEqual({ kind: "pictured" })
-  expect(writesOf(d.records.calls)).toEqual([
+  expect(writtenValues(d.records.calls)).toEqual([
     pictureWrites(ADA, SMALL),
     pictureWrites(ADA, null),
   ])
@@ -88,7 +88,7 @@ test("an oversized picture is fitted within PICTURE_MOST, kept, and its copy set
   ).toEqual({ kind: "pictured" })
   expect(d.fits).toEqual([{ bytes: BYTES, most: PICTURE_MOST }])
   expect(methods(d.blobs.calls)).toEqual(["ref", "get", "put"])
-  expect(writesOf(d.records.calls)).toEqual([pictureWrites(ADA, FITTED)])
+  expect(writtenValues(d.records.calls)).toEqual([pictureWrites(ADA, FITTED)])
 })
 
 test("a picture pi cannot fit is refused, and nothing is written", async () => {

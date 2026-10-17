@@ -65,7 +65,7 @@ interface TidySizes {
 }
 
 /** The sizes of the repo at `root`, with its op log's length. */
-export const sizesOf = async (
+export const readRepoSizes = async (
   root: string,
   operations: number,
 ): Promise<TidySizes> => ({

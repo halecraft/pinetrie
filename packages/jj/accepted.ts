@@ -12,14 +12,14 @@ import {
 } from "@pinetrie/core"
 import { lines, type Runner } from "@pinetrie/lanes"
 import { revsetName } from "./lane/names.ts"
-import { commitsOf, conflictedFilesAt } from "./lane/revisions.ts"
-import { changeOf } from "./proposed.ts"
+import { readCommits, readConflictedFiles } from "./lane/revisions.ts"
+import { readChangeId } from "./proposed.ts"
 
 /** What `planPublishCatchUp`'s rebase would do to the working copy: `AcceptedRecord`'s shape. */
 type CatchUpPreview = NonNullable<AcceptedFacts["yours"]["catchUp"]>
 
 const count = async (jj: Runner, revset: string): Promise<number> =>
-  (await commitsOf(jj, revset)).length
+  (await readCommits(jj, revset)).length
 
 /**
  * Read accepted work's facts from your repo (`jj` as the host reads it, `git` on
@@ -31,7 +31,7 @@ export async function acceptedFacts(
   repoConfig: RepoConfig,
 ): Promise<AcceptedFacts> {
   const acceptedBookmark = revsetName(repoConfig.acceptedBookmark)
-  const [commit] = await commitsOf(jj, `present(${acceptedBookmark})`)
+  const [commit] = await readCommits(jj, `present(${acceptedBookmark})`)
   const heads = await jj([
     "config",
     "get",
@@ -97,7 +97,7 @@ export async function acceptedFacts(
         behind === 0 ? null : await catchUpPreview(jj, git, acceptedBookmark),
       conflicts: {
         commits: await count(jj, `(::@ ~ ::${acceptedBookmark}) & conflicts()`),
-        files: await conflictedFilesAt(jj, "@").catch(() => []),
+        files: await readConflictedFiles(jj, "@").catch(() => []),
       },
     },
   }
@@ -112,7 +112,7 @@ async function publishedFacts(
   acceptedBookmark: string,
   publish: string,
 ): Promise<AcceptedFacts["published"]> {
-  const [commit] = await commitsOf(jj, `present(${publish})`)
+  const [commit] = await readCommits(jj, `present(${publish})`)
   if (commit === undefined) return { commit: null, behind: 0, ahead: 0 }
   return {
     commit,
@@ -133,9 +133,9 @@ async function catchUpPreview(
 ): Promise<CatchUpPreview | null> {
   if ((await count(jj, `(::@ & ::${acceptedBookmark}) ~ root()`)) === 0)
     return null
-  const [base] = await commitsOf(jj, `fork_point(${acceptedBookmark} | @)`)
-  const [line] = await commitsOf(jj, acceptedBookmark)
-  const [at] = await commitsOf(jj, "@")
+  const [base] = await readCommits(jj, `fork_point(${acceptedBookmark} | @)`)
+  const [line] = await readCommits(jj, acceptedBookmark)
+  const [at] = await readCommits(jj, "@")
   if (base === undefined || line === undefined || at === undefined) return null
   const merged = await git([
     "merge-tree",
@@ -174,18 +174,18 @@ export async function beginFacts(
   readonly wip: { readonly commit: CommitId; readonly under: CommitId } | null
 }> {
   const acceptedBookmark = revsetName(repoConfig.acceptedBookmark)
-  const [acceptedCommit] = await commitsOf(jj, `present(${acceptedBookmark})`)
+  const [acceptedCommit] = await readCommits(jj, `present(${acceptedBookmark})`)
   if (acceptedCommit === undefined || base === null)
     return { acceptedCommit: acceptedCommit ?? null, wip: null }
   const wip = revsetName(base)
-  const [commit] = await commitsOf(
+  const [commit] = await readCommits(
     jj,
     `present(${wip}) ~ ::${acceptedBookmark}`,
   )
   const [under] =
     commit === undefined
       ? []
-      : await commitsOf(
+      : await readCommits(
           jj,
           `latest(heads(::${commit} & ::${acceptedBookmark}))`,
         )
@@ -213,9 +213,9 @@ async function wipFacts(
   const { source } = base
   const { bookmark } = base.base
   const acceptedBookmark = `::present(${revsetName(repoConfig.acceptedBookmark)})`
-  const [target] = await commitsOf(jj, `present(${revsetName(bookmark)})`)
+  const [target] = await readCommits(jj, `present(${revsetName(bookmark)})`)
   const inAccepted = async (revset: string) =>
-    (await commitsOf(jj, `(${revset}) & ${acceptedBookmark}`)).length > 0
+    (await readCommits(jj, `(${revset}) & ${acceptedBookmark}`)).length > 0
   return {
     bookmark: target ?? null,
     bookmarkInAccepted: target === undefined ? false : await inAccepted(target),
@@ -223,7 +223,7 @@ async function wipFacts(
       target !== undefined
         ? false
         : await inAccepted(
-            `present(${source}) | present(change_id(${await changeOf(jj, source)}))`,
+            `present(${source}) | present(change_id(${await readChangeId(jj, source)}))`,
           ),
   }
 }

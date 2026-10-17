@@ -11,7 +11,7 @@ import {
 } from "@pinetrie/core"
 import { FIXTURE_THREAD } from "@pinetrie/core/fixtures"
 import type { ReviewTarget } from "@pinetrie/interface"
-import { entry, indexOf } from "@pinetrie/interface/fixtures"
+import { entry, indexEntries } from "@pinetrie/interface/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   ASK_REVIEW_LINE,
@@ -187,7 +187,7 @@ describe("paneView", () => {
 })
 
 describe("askReviewTarget", () => {
-  const index = indexOf([
+  const index = indexEntries([
     entry("p", null, { role: "person", content: "do it" }),
     entry("a", "p", {
       role: "assistant",

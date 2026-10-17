@@ -398,14 +398,14 @@ const textOf = (content: unknown): string =>
           .join("")
       : ""
 
-export function fauxOf(model: ScriptedModel): FauxProviderHandle {
+export function runFaux(model: ScriptedModel): FauxProviderHandle {
   const faux = handles.get(model)
   if (faux === undefined) throw new Error("not a scripted model")
   return faux.run
 }
 
 /** The faux provider that answers a scripted model's describe requests. */
-export function describeFauxOf(model: ScriptedModel): FauxProviderHandle {
+export function describeFaux(model: ScriptedModel): FauxProviderHandle {
   const faux = handles.get(model)
   if (faux === undefined) throw new Error("not a scripted model")
   return faux.describe

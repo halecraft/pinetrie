@@ -140,7 +140,7 @@ type ShownReader = StateReader & {
  * The state a folder proposed changes record shows: its shown merge, or
  * its tip when it holds no work, which has none.
  */
-export const shownOf = (r: FolderProposedChangesRecord): PointId =>
+export const shownPoint = (r: FolderProposedChangesRecord): PointId =>
   r.files.length === 0 ? r.tip : shownMergeId(r.start, r.tip)
 
 /**
@@ -279,7 +279,7 @@ export function startFolderProposedChanges(deps: {
         : shownMergeId(before.start, before.tip)
     if (
       was !== null &&
-      was !== shownOf(planned.proposed) &&
+      was !== shownPoint(planned.proposed) &&
       !stateGraph(deps.states()).states.has(was)
     )
       await reader.runtime.disk({
@@ -317,7 +317,7 @@ export function startFolderProposedChanges(deps: {
           if (diff.length > DESCRIBE_DIFF_BYTES) break
           diff += await reader.disks.fileDiff(
             proposed.start,
-            shownOf(proposed),
+            shownPoint(proposed),
             path,
             DESCRIBE_DIFF_BYTES,
           )
@@ -386,7 +386,7 @@ export function startFolderProposedChanges(deps: {
         o => o.kind === "folder" && o.start === from && o.tip === asked,
       )
       // Proposed changes are reviewed as their shown merge; any other span as it is.
-      const to = proposed?.kind === "folder" ? shownOf(proposed) : asked
+      const to = proposed?.kind === "folder" ? shownPoint(proposed) : asked
       switch (read.kind) {
         case "diff":
           return answerDiff(

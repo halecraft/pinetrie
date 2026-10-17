@@ -13,7 +13,7 @@ import {
 import { planThreadOpen } from "./canvas-index.ts"
 
 /** A thread's card as it first lands on `canvas`'s canvas: at its end. */
-export function threadCardOf(input: {
+export function landedThreadCard(input: {
   readonly thread: ThreadId
   readonly canvas: CanvasId
   readonly by: WriterId

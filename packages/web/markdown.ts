@@ -44,7 +44,7 @@ export const REMEND: RemendOptions = {
 const toHast = unified()
   .use(remarkParse)
   .use(remarkGfm, { singleTilde: false })
-  // Every block numbered by the walk an address counts with (`blocksOf`),
+  // Every block numbered by the walk an address counts with (`textBlocks`),
   // carried onto its element as `data-block`.
   .use(() => (tree: unknown) => markBlocks(tree as BlockNode))
   // Raw HTML arrives as `raw` nodes, which become text below rather than
@@ -96,12 +96,15 @@ export function messageTree(
 }
 
 /** The element of a tree `messageTree` made that draws block `ref`, or null. */
-export function blockAt(node: Root | Element, ref: BlockRef): Element | null {
+export function findBlockElement(
+  node: Root | Element,
+  ref: BlockRef,
+): Element | null {
   const key = blockKey(ref)
   for (const child of node.children) {
     if (child.type !== "element") continue
     if (child.properties[BLOCK_PROPERTY] === key) return child
-    const found = blockAt(child, ref)
+    const found = findBlockElement(child, ref)
     if (found !== null) return found
   }
   return null

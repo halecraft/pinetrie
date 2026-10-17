@@ -1,21 +1,21 @@
 import { describe, expect, test } from "vitest"
-import { entriesOf, entry } from "./fixtures.ts"
+import { entriesById, entry } from "./fixtures.ts"
 import {
   atEntry,
-  conflictsAt,
   type EntryId,
   entryId,
   firstLine,
-  firstPromptOf,
   forkParent,
   hostPathInLane,
   indexTree,
   isBusy,
+  laneFirstPrompt,
   nearestRevision,
+  pointConflicts,
   pointId,
-  promptOf,
   type RevisionRecord,
   ROOT,
+  runPrompt,
   sendWaits,
   snapshotId,
   threadIdFor,
@@ -49,7 +49,7 @@ const SB = snapshotId("6-pb")
 // commit and a snapshot) and m2 (a snapshot only).
 // Below m1: a chat (x1), and lane B's prompt pb with its answer mb.
 // Below mb: lane D, working directly, with its prompt pd and answer md.
-const entries = entriesOf([
+const entries = entriesById([
   at("1-p1", null, "person"),
   at("2-m1", "1-p1", "assistant", {
     content: [{ type: "toolCall", id: "call-1", name: "write" }],
@@ -126,17 +126,17 @@ const revisions: ReadonlyMap<EntryId, RevisionRecord> = new Map(
 const near = (id: string) =>
   nearestRevision(index, revisions, atEntry(entryId(id)))
 
-describe("firstPromptOf: a lane's own first prompt", () => {
+describe("laneFirstPrompt: a lane's own first prompt", () => {
   test("a branch's first prompt is its own, below its parent's", () => {
-    expect(firstPromptOf(index, revisions, B, entryId("7-mb"))).toBe("6-pb")
-    expect(firstPromptOf(index, revisions, D, entryId("a-ld"))).toBe("8-pd")
+    expect(laneFirstPrompt(index, revisions, B, entryId("7-mb"))).toBe("6-pb")
+    expect(laneFirstPrompt(index, revisions, D, entryId("a-ld"))).toBe("8-pd")
   })
   test("the root lane's first prompt is the root's", () => {
-    expect(firstPromptOf(index, revisions, A, entryId("4-m2"))).toBe("1-p1")
+    expect(laneFirstPrompt(index, revisions, A, entryId("4-m2"))).toBe("1-p1")
   })
   test("no run of the lane on the path, or no tip: none", () => {
-    expect(firstPromptOf(index, revisions, B, entryId("4-m2"))).toBeNull()
-    expect(firstPromptOf(index, revisions, B, null)).toBeNull()
+    expect(laneFirstPrompt(index, revisions, B, entryId("4-m2"))).toBeNull()
+    expect(laneFirstPrompt(index, revisions, B, null)).toBeNull()
   })
 })
 
@@ -244,7 +244,7 @@ describe("nearestRevision: the lane, commit and disk above an entry", () => {
   })
 })
 
-describe("forkParent and conflictsAt: what a lane's copy was cloned from", () => {
+describe("forkParent and pointConflicts: what a lane's copy was cloned from", () => {
   test("a branch's parent is the lane whose commit is above its first prompt", () => {
     expect(forkParent(index, revisions, B, entryId("7-mb"))).toEqual({
       lane: A,
@@ -265,7 +265,7 @@ describe("forkParent and conflictsAt: what a lane's copy was cloned from", () =>
     expect(forkParent(index, revisions, A, entryId("4-m2"))).toBeNull()
     expect(forkParent(index, revisions, B, null)).toBeNull()
   })
-  test("conflictsAt unions what every record naming a commit says", () => {
+  test("pointConflicts unions what every record naming a commit says", () => {
     const rec = (entry: string, point: typeof C1, conflicts: string[]) =>
       [
         entryId(entry),
@@ -284,8 +284,8 @@ describe("forkParent and conflictsAt: what a lane's copy was cloned from", () =>
       rec("2-m1", C1, ["a.txt", "b.txt"]),
       rec("4-m2", C2, ["c.txt"]),
     ])
-    expect(conflictsAt(records, C1)).toEqual(["a.txt", "b.txt"])
-    expect(conflictsAt(records, CB)).toEqual([])
+    expect(pointConflicts(records, C1)).toEqual(["a.txt", "b.txt"])
+    expect(pointConflicts(records, CB)).toEqual([])
   })
 })
 
@@ -295,11 +295,11 @@ describe("a turn's entry, and a run's prompt", () => {
     expect(turnEntry(index, entryId("1-p1"))).toBe("1-p1")
     expect(turnEntry(index, entryId("4-m2"))).toBe("4-m2")
   })
-  test("promptOf: the nearest person's, user or land message at or above", () => {
-    expect(promptOf(index, entryId("4-m2"))).toBe("1-p1")
-    expect(promptOf(index, entryId("9-md"))).toBe("8-pd")
-    expect(promptOf(index, entryId("a-ld"))).toBe("a-ld")
-    expect(promptOf(index, null)).toBeNull()
+  test("runPrompt: the nearest person's, user or land message at or above", () => {
+    expect(runPrompt(index, entryId("4-m2"))).toBe("1-p1")
+    expect(runPrompt(index, entryId("9-md"))).toBe("8-pd")
+    expect(runPrompt(index, entryId("a-ld"))).toBe("a-ld")
+    expect(runPrompt(index, null)).toBeNull()
   })
 })
 

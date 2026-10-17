@@ -19,7 +19,7 @@ import type { ConflictShown, ReviewTarget } from "@pinetrie/interface"
 import type { Element, Root } from "hast"
 import {
   blobLookup,
-  blockAt,
+  findBlockElement,
   messageTree,
   ORIGINAL_PROPERTY,
   tableHeads,
@@ -154,7 +154,7 @@ export function paneView(
       const { address } = subject
       const node = facts.nodes.find(n => n.id === address.entry)
       if (node === undefined) return null
-      const block = blockAt(treeOf(node), address.block)
+      const block = findBlockElement(treeOf(node), address.block)
       if (block === null) return null
       const { alt, title } = block.properties
       // A fitted image opens as its original.

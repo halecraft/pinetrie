@@ -14,18 +14,18 @@ import { cardIdFor } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   type ActedAt,
-  answerOf,
   drawnPlace,
-  intentsOf,
   type LocalState,
   localStep,
   type MovesEvent,
   type MovesState,
+  moveAnswer,
   movesStep,
   NO_MOVES,
   type Pending,
-  pendingOf,
+  pendingMove,
   queuedDraft,
+  slotIntents,
   slotOnAccept,
   stampSeen,
   withPending,
@@ -199,7 +199,7 @@ describe("the tab's moves", () => {
       content: { command: "split", unsent: null, origin: null },
     })
     const s = run([
-      sent(pendingOf("m-2", made, { actedAt: COLUMN, slot: null }, draft)),
+      sent(pendingMove("m-2", made, { actedAt: COLUMN, slot: null }, draft)),
     ])
     expect(withPending([], s, ME).map(c => c.place.kind)).toEqual(["queued"])
     expect(queuedDraft(queueIt.move, ME, "split")).toBeNull()
@@ -242,7 +242,7 @@ describe("the tab's moves", () => {
   })
 })
 
-describe("answerOf", () => {
+describe("moveAnswer", () => {
   const context = { card: C1, actedAt: COLUMN, queuedBy: null }
 
   test("a send: written, running or queued is accepted at the reply's rev; the rest dropped unworded", () => {
@@ -251,7 +251,7 @@ describe("answerOf", () => {
       { kind: "queued" },
       { kind: "moved" },
     ] as const)
-      expect(answerOf(outcome, 6, context)).toEqual({
+      expect(moveAnswer(outcome, 6, context)).toEqual({
         kind: "accepted",
         rev: 6,
       })
@@ -260,7 +260,7 @@ describe("answerOf", () => {
       { kind: "conflict", by: null },
       { kind: "failed", message: "x" },
     ] as const)
-      expect(answerOf(outcome, null, context)).toEqual({
+      expect(moveAnswer(outcome, null, context)).toEqual({
         kind: "refused",
         refusal: null,
       })
@@ -268,7 +268,7 @@ describe("answerOf", () => {
 
   test("an unqueue the pop beat: gone, naming who queued it", () => {
     expect(
-      answerOf({ kind: "unmoved", code: "gone", place: null, by: null }, 3, {
+      moveAnswer({ kind: "unmoved", code: "gone", place: null, by: null }, 3, {
         ...context,
         queuedBy: BEA,
       }),
@@ -286,7 +286,7 @@ describe("answerOf", () => {
 
   test("a move someone made first: moved, naming its placer", () => {
     expect(
-      answerOf(
+      moveAnswer(
         { kind: "unmoved", code: "moved", place: atEnd, by: BEA },
         3,
         context,
@@ -367,7 +367,7 @@ describe("acted with no host to ask", () => {
   })
 })
 
-describe("intentsOf", () => {
+describe("slotIntents", () => {
   test("each take into the inventory in flight's slot, a creation's too, until its copy holds it", () => {
     const intoInventory: Pending = {
       ...sentAs,
@@ -388,13 +388,13 @@ describe("intentsOf", () => {
       sent(create),
       sent({ ...queueIt, id: "m-9" }),
     ])
-    expect(intentsOf(s)).toEqual(
+    expect(slotIntents(s)).toEqual(
       new Map([
         [C1, 3],
         [cardIdFor("c2"), 7],
       ]),
     )
-    expect(intentsOf(run([accepted("m-1", 5), changed(5)], s))).toEqual(
+    expect(slotIntents(run([accepted("m-1", 5), changed(5)], s))).toEqual(
       new Map([[cardIdFor("c2"), 7]]),
     )
   })
@@ -402,7 +402,7 @@ describe("intentsOf", () => {
 
 describe("a move's decisions, before and after it is sent", () => {
   const inventory = { kind: "inventory", holder: ME } as const
-  const intoInventory = pendingOf(
+  const intoInventory = pendingMove(
     "m-1",
     { card: C1, from: atEnd, to: inventory },
     { actedAt: { kind: "inventory" }, slot: 4 },

@@ -14,7 +14,7 @@ import {
   type WorkflowStateId,
 } from "@pinetrie/core"
 import type { Intent } from "./intent.ts"
-import { gapAt } from "./reorder.ts"
+import { pointerGap } from "./reorder.ts"
 
 /** A canvas being dragged: which, and the state it is in. */
 export interface RootDrag {
@@ -98,7 +98,7 @@ export function landingIn<Z>(
   end: Z,
   y: number,
 ): Z {
-  const gap = gapAt(
+  const gap = pointerGap(
     items.map(i => i.mid),
     y,
   )

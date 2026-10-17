@@ -22,11 +22,11 @@ import {
   type Runner,
   type TurnCommittedOf,
 } from "@pinetrie/lanes"
-import { bookmarkOf, setBookmark } from "./bookmarks.ts"
+import { readLaneBookmark, setBookmark } from "./bookmarks.ts"
 import { type OldNamesOnDisk, planTurnCommit } from "./plan.ts"
 import { laneJj } from "./run.ts"
 /** The commit ids a revset names, in jj's order. */
-export async function commitsOf(
+export async function readCommits(
   jj: Runner,
   revset: string,
 ): Promise<CommitId[]> {
@@ -77,7 +77,7 @@ export const isAncestor = async (
   ancestor: CommitId,
   commit: CommitId,
 ): Promise<boolean> =>
-  (await commitsOf(jj, `${ancestor} & ::${commit}`)).length > 0
+  (await readCommits(jj, `${ancestor} & ::${commit}`)).length > 0
 
 /**
  * Snapshot the lane's working copy and record the turn's revision: what
@@ -168,7 +168,7 @@ export async function copyFacts(
   ])
   if (!at.ok) throw new Error(describeFailure("jj log", at))
   const parents = lines(at.stdout).map(commitId)
-  const bookmark = await bookmarkOf(jj, lane)
+  const bookmark = await readLaneBookmark(jj, lane)
   const [parent] = parents
   const descends =
     parents.length === 1 &&
@@ -221,14 +221,17 @@ export async function commitToBookmark(
 ): Promise<CommitId> {
   const commit = await jj(["commit", "-m", message])
   if (!commit.ok) throw new Error(describeFailure("jj commit", commit))
-  const [id] = await commitsOf(jj, "@-")
+  const [id] = await readCommits(jj, "@-")
   if (id === undefined) throw new Error("jj commit made no parent to read")
   await setBookmark(jj, lane, id)
   return id
 }
 
 /** The first line of each description in `revset`, in jj's order; empty ones dropped. */
-export async function titlesOf(jj: Runner, revset: string): Promise<string[]> {
+export async function readTitles(
+  jj: Runner,
+  revset: string,
+): Promise<string[]> {
   const ran = await jj([
     "log",
     "--ignore-working-copy",
@@ -266,7 +269,7 @@ export async function changedPaths(
 }
 
 /** The files with conflicts in `rev`. */
-export async function conflictedFilesAt(
+export async function readConflictedFiles(
   jj: Runner,
   rev: string,
 ): Promise<string[]> {

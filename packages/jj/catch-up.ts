@@ -68,7 +68,7 @@ export function catchUpHolds(input: {
  * between proposing it and its acceptance, whose start has two heads. In
  * the first diff's order.
  */
-export function catchUpFilesOf(input: {
+export function catchUpChangedFiles(input: {
   readonly moved: NonEmpty<readonly string[]>
   readonly lacking: readonly string[]
 }): string[] {
@@ -82,7 +82,7 @@ export function catchUpFilesOf(input: {
  * The files catching up with a base would change in the lane, or null when
  * jj cannot say: one diff from each commit the lane holds of the base's
  * history (`holds`, from `catchUpHolds`) to the base's commit `to`, and one
- * from the lane's `tip`, decided by `catchUpFilesOf`. Two diffs for one held
+ * from the lane's `tip`, decided by `catchUpChangedFiles`. Two diffs for one held
  * commit. Read as `mergeUpdate` reads the files a merge changed
  * (`changedPaths`), so the two compare.
  */
@@ -101,7 +101,10 @@ export async function catchUpFiles(
       await changedPaths(jj, first, to),
     ]
     for (const held of rest) moved.push(await changedPaths(jj, held, to))
-    return catchUpFilesOf({ moved, lacking: await changedPaths(jj, tip, to) })
+    return catchUpChangedFiles({
+      moved,
+      lacking: await changedPaths(jj, tip, to),
+    })
   } catch {
     return null
   }

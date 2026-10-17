@@ -16,7 +16,7 @@ import { encodeMessage } from "@pinetrie/rules"
 import { newRootDoc } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import { newId } from "./agent.ts"
-import { prepareImage, readImageProcessor, sha256Of } from "./images.ts"
+import { blobSha256, prepareImage, readImageProcessor } from "./images.ts"
 import { ONE_ROOT, oneRoot } from "./one-root.ts"
 import { scriptedModel } from "./scripted.ts"
 import { startPi } from "./start-pi.ts"
@@ -179,7 +179,7 @@ function recording() {
       put(image: StoredImage): ImageRef {
         put.push(image)
         return {
-          sha256: sha256Of(image.bytes),
+          sha256: blobSha256(image.bytes),
           mimeType: image.mimeType,
           width: image.width,
           height: image.height,
@@ -205,8 +205,8 @@ test("read's processor stores the image it returns", async () => {
     if (!result.ok) throw new Error(result.message)
     expect(put).toHaveLength(1)
     expect(put[0]?.mimeType).toBe(result.mimeType)
-    expect(sha256Of(Buffer.from(result.data, "base64"))).toBe(
-      sha256Of(put[0]?.bytes ?? new Uint8Array()),
+    expect(blobSha256(Buffer.from(result.data, "base64"))).toBe(
+      blobSha256(put[0]?.bytes ?? new Uint8Array()),
     )
   }
 })

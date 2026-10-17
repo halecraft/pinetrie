@@ -2,7 +2,7 @@
 
 import type { NoteColumnId, NoteColumnRecord, WriterId } from "@pinetrie/core"
 import { Type } from "typebox"
-import { decodeAt, noteColumnKey } from "./decode.ts"
+import { decodeRecord, noteColumnKey } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 
 // The shape only: the host stores only titles `parseTitle` accepted.
@@ -23,10 +23,15 @@ export const NOTE_COLUMN: RecordSpec<
   keyOf: r => r.column,
   encode: ({ column, ...contents }) => contents,
   decode: (contents, key) =>
-    decodeAt(NoteColumnSchema, contents, noteColumnKey(key), (r, column) => ({
-      column,
-      title: r.title,
-      by: r.by as WriterId,
-      at: r.at,
-    })),
+    decodeRecord(
+      NoteColumnSchema,
+      contents,
+      noteColumnKey(key),
+      (r, column) => ({
+        column,
+        title: r.title,
+        by: r.by as WriterId,
+        at: r.at,
+      }),
+    ),
 }

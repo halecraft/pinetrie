@@ -6,7 +6,7 @@ import {
   CATCH_UP_TOOL,
   type CardRecord,
   type CatchUpCommand,
-  commandOf,
+  cardCommand,
   type MoveRefusal,
   makeCard,
   type PointId,
@@ -232,7 +232,7 @@ export function planSplitCall(input: {
   if (input.running && input.prompt === "stack")
     return { kind: "refused", why: "splitting" }
   const queued = queuedOn(input.cards, input.lane)
-  if (queued.some(c => commandOf(c) === "split"))
+  if (queued.some(c => cardCommand(c) === "split"))
     return { kind: "refused", why: "queued" }
   const step = planMake(
     input.cards,

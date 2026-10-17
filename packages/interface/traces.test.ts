@@ -8,7 +8,7 @@ import {
 } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
 import { expect, test } from "vitest"
-import { keptTraces, seenBatches, traceGroups, tracesAt } from "./traces.ts"
+import { endTraces, keptTraces, seenBatches, traceGroups } from "./traces.ts"
 
 const _ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 const ADA = writerId("ada@x.io")
@@ -37,7 +37,7 @@ const trace = (over: Partial<TraceRecord>): TraceRecord => ({
   ...over,
 })
 
-test("tracesAt: yours, whose place resolves to this end, oldest first", () => {
+test("endTraces: yours, whose place resolves to this end, oldest first", () => {
   const endOf = (from: TracedPlace) =>
     from.kind === "pinned" ? entryId(from.thread.slice(2)) : null
   const traces = [
@@ -46,7 +46,7 @@ test("tracesAt: yours, whose place resolves to this end, oldest first", () => {
     trace({ id: "not-yours", for: BEA }),
     trace({ id: "elsewhere", from: at("e-other") }),
   ]
-  expect(tracesAt(traces, ADA, HERE, endOf).map(t => t.id)).toEqual([
+  expect(endTraces(traces, ADA, HERE, endOf).map(t => t.id)).toEqual([
     "early",
     "late",
   ])

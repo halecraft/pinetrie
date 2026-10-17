@@ -10,7 +10,7 @@
 // follows the session's name for you: `reconcileName` decides which way a
 // difference goes.
 
-import { handleOf, normalizeEmail, normalizeName } from "@pinetrie/core"
+import { mentionHandle, normalizeEmail, normalizeName } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import { Type } from "typebox"
 import { Value } from "typebox/value"
@@ -106,7 +106,7 @@ export const pictureProblem = (outcome: Outcome): string | null =>
 /** The handle a typed name gives you, or null when the name is refused. */
 export function nameHint(draft: string): string | null {
   const name = normalizeName(draft)
-  return name === undefined ? null : handleOf(name)
+  return name === undefined ? null : mentionHandle(name)
 }
 
 const StoredIdentity = Type.Object({

@@ -56,7 +56,7 @@ import {
   type LaneConfigs,
   startLaneConfigs,
 } from "./config.ts"
-import { openLinkOf } from "./registry.ts"
+import { laneLinkOpener } from "./registry.ts"
 import type { Found } from "./runtime.ts"
 import type { Wanted } from "./shares.ts"
 import { type LaneSsh, type PersonalSshPlaces, startLaneSsh } from "./ssh.ts"
@@ -382,7 +382,7 @@ export async function startSetup(input: {
     runtime,
     spec: specOf(BASE_LANE, r, true),
     env: process.env,
-    open: openLinkOf(runtime),
+    open: laneLinkOpener(runtime),
   })
 
   // --- the images, runtime and base snapshot, in the background ----------

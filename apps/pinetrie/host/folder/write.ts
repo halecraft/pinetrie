@@ -72,7 +72,7 @@ const inodeStat = (s: {
 })
 
 /** What `lstat` says of `at` as an `InodeStat`; null for nothing there. */
-export const inodeStatAt = async (at: string): Promise<InodeStat | null> => {
+export const readInodeStat = async (at: string): Promise<InodeStat | null> => {
   const s = await lstatBig(at)
   return s === null ? null : inodeStat(s)
 }

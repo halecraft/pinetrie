@@ -48,7 +48,7 @@ export const decodeCanvas = (message: unknown): CanvasView | undefined =>
 /** What one card of a canvas list is drawn from. */
 export interface CanvasFacts {
   readonly canvas: CanvasId
-  /** The canvas's title, else its first card's line (`labelsOf`). */
+  /** The canvas's title, else its first card's line (`taskLabels`). */
   readonly title: string
   /** Its cards, in order. */
   readonly onCanvas: readonly CardOnCanvas[]

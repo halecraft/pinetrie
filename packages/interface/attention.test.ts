@@ -16,16 +16,16 @@ import type { OpenProposedChanges } from "./app-view.ts"
 import {
   type AttentionInput,
   arrivals,
-  attentionOf,
+  attentionItems,
   attentionWords,
   canvasStatus,
   doneThreads,
   follows,
   highest,
-  levelOf,
-  markOf,
+  markLevel,
   type Status,
   threadStatus,
+  verdictLevel,
 } from "./attention.ts"
 
 const ADA = writerId("ada@x.io")
@@ -105,16 +105,16 @@ test.each<[string, Verdict, "needsYou" | "worthARead" | null]>([
   ["stopped by you", { kind: "stopped", by: ADA }, null],
   ["stopped by someone else", { kind: "stopped", by: BEA }, "worthARead"],
   ["pending", { kind: "pending" }, null],
-])("levelOf: %s", (_, v, level) => {
-  expect(levelOf(v, ADA)).toBe(level)
+])("verdictLevel: %s", (_, v, level) => {
+  expect(verdictLevel(v, ADA)).toBe(level)
 })
 
-describe("attentionOf", () => {
+describe("attentionItems", () => {
   test("a lane waiting on your ssh needs you, its owner, even unfollowed and running", () => {
     const C = threadIdFor("c")
     const asks = [{ lane: C, end: entryId("e-c"), host: "pop" }]
     expect(
-      attentionOf(
+      attentionItems(
         input({
           verdicts: new Map(),
           sshAsks: asks,
@@ -131,11 +131,11 @@ describe("attentionOf", () => {
       },
     ])
     expect(
-      attentionOf(input({ verdicts: new Map(), sshAsks: asks, owner: BEA })),
+      attentionItems(input({ verdicts: new Map(), sshAsks: asks, owner: BEA })),
     ).toEqual([])
   })
   test("a verdict on a thread you follow, ended after where you read, is raised", () => {
-    expect(attentionOf(input())).toEqual([
+    expect(attentionItems(input())).toEqual([
       {
         lane: A,
         end: "e-5",
@@ -147,7 +147,7 @@ describe("attentionOf", () => {
 
   test("a thread you do not follow raises nothing, its proposed changes included", () => {
     expect(
-      attentionOf(
+      attentionItems(
         input({
           verdicts: new Map([[B, verdict(B, said("needsYou"))]]),
           openProposed: [proposed(B, cardIdFor("c1"))],
@@ -158,27 +158,29 @@ describe("attentionOf", () => {
 
   test("reading to the run's end, on any device, clears its verdict", () => {
     expect(
-      attentionOf(
+      attentionItems(
         input({ person: person({ read: new Map([[A, entryId("e-5")]]) }) }),
       ),
     ).toEqual([])
     expect(
-      attentionOf(
+      attentionItems(
         input({ person: person({ read: new Map([[A, entryId("e-4")]]) }) }),
       ),
     ).toHaveLength(1)
   })
 
   test("a verdict from before you started is not raised; nothing is before your document's first write", () => {
-    expect(attentionOf(input({ person: person({ since: "e-9" }) }))).toEqual([])
-    expect(attentionOf(input({ person: person({ since: "" }) }))).toEqual([])
+    expect(attentionItems(input({ person: person({ since: "e-9" }) }))).toEqual(
+      [],
+    )
+    expect(attentionItems(input({ person: person({ since: "" }) }))).toEqual([])
   })
 
   test("not needed clears a verdict until the next run's", () => {
     const dismissed = person({ dismissed: new Map([[A, entryId("p-1")]]) })
-    expect(attentionOf(input({ person: dismissed }))).toEqual([])
+    expect(attentionItems(input({ person: dismissed }))).toEqual([])
     expect(
-      attentionOf(
+      attentionItems(
         input({
           person: dismissed,
           verdicts: new Map([[A, verdict(A, said("needsYou"), "e-9", "p-2")]]),
@@ -188,13 +190,13 @@ describe("attentionOf", () => {
   })
 
   test("a busy lane, or a thread of an archived canvas, raises nothing", () => {
-    expect(attentionOf(input({ busy: new Set([A]) }))).toEqual([])
-    expect(attentionOf(input({ archived: new Set([A]) }))).toEqual([])
+    expect(attentionItems(input({ busy: new Set([A]) }))).toEqual([])
+    expect(attentionItems(input({ archived: new Set([A]) }))).toEqual([])
   })
 
   test("proposed changes you follow needs you until not needed, which holds until new work", () => {
     const read = person({ read: new Map([[A, entryId("e-9")]]) })
-    const items = attentionOf(
+    const items = attentionItems(
       input({
         verdicts: new Map(),
         openProposed: [proposed(A, cardIdFor("c1"))],
@@ -208,7 +210,7 @@ describe("attentionOf", () => {
       dismissedReady: new Map([[A, cardIdFor("c1")]]),
     })
     expect(
-      attentionOf(
+      attentionItems(
         input({
           verdicts: new Map(),
           openProposed: [proposed(A, cardIdFor("c1"))],
@@ -217,7 +219,7 @@ describe("attentionOf", () => {
       ),
     ).toEqual([])
     expect(
-      attentionOf(
+      attentionItems(
         input({
           verdicts: new Map(),
           openProposed: [proposed(A, cardIdFor("c2"))],
@@ -231,7 +233,7 @@ describe("attentionOf", () => {
 describe("threadStatus and canvasStatus", () => {
   const facts = { work: new Map(), verdicts: new Map() }
   test("working wins, and a pending verdict is working; else the highest item", () => {
-    const items = attentionOf(
+    const items = attentionItems(
       input({ openProposed: [proposed(A, cardIdFor("c1"))] }),
     )
     const status = threadStatus({
@@ -251,7 +253,7 @@ describe("threadStatus and canvasStatus", () => {
   })
 
   test("cards behind a held queue are not working: the thread shows what was raised there, or nothing", () => {
-    const items = attentionOf(
+    const items = attentionItems(
       input({ openProposed: [proposed(A, cardIdFor("c1"))] }),
     )
     const work = new Map([
@@ -268,7 +270,7 @@ describe("threadStatus and canvasStatus", () => {
   })
 
   test("a canvas's status is its threads' together: working wins, else the highest", () => {
-    const [item] = attentionOf(input())
+    const [item] = attentionItems(input())
     if (item === undefined) throw new Error("no item")
     const C = threadIdFor("c")
     // The higher first, so a later, lower thread cannot win by coming last.
@@ -298,7 +300,7 @@ describe("threadStatus and canvasStatus", () => {
 describe("arrivals", () => {
   const needs: Status = {
     kind: "needsYou",
-    item: attentionOf(input())[0] as never,
+    item: attentionItems(input())[0] as never,
   }
   const working: Status = { kind: "working" }
   test("a first render arrives at nothing: a load draws every mark still", () => {
@@ -367,7 +369,7 @@ test("attentionWords: each reason, as a value worded once", () => {
   )
 })
 
-test("markOf: the highest level among the canvases it covers; working raises nothing", () => {
+test("markLevel: the highest level among the canvases it covers; working raises nothing", () => {
   const item = (level: "needsYou" | "worthARead") => ({
     lane: threadIdFor("m"),
     end: entryId("e"),
@@ -380,8 +382,8 @@ test("markOf: the highest level among the canvases it covers; working raises not
     [b, { kind: "worthARead", item: item("worthARead") }],
     [c, { kind: "needsYou", item: item("needsYou") }],
   ])
-  expect(markOf(status, [a])).toBeNull()
-  expect(markOf(status, [a, b])).toBe("worthARead")
-  expect(markOf(status, [b, c])).toBe("needsYou")
-  expect(markOf(status, [])).toBeNull()
+  expect(markLevel(status, [a])).toBeNull()
+  expect(markLevel(status, [a, b])).toBe("worthARead")
+  expect(markLevel(status, [b, c])).toBe("needsYou")
+  expect(markLevel(status, [])).toBeNull()
 })

@@ -31,7 +31,7 @@ function siteState(
   return g.states.get(newest)?.made.kind === "start" ? null : newest
 }
 
-export async function folderFileAt(
+export async function readFolderSiteFile(
   input: {
     readonly states: () => readonly StateRecord[]
     readonly disks: Pick<FolderDisks, "read">

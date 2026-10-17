@@ -274,8 +274,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a new thread begins at your @-",
     file: "packages/jj/accepted.ts",
-    from: "  const [acceptedCommit] = await commitsOf(jj, `present(${acceptedBookmark})`)",
-    to: '  const [acceptedCommit] = await commitsOf(jj, "@-")',
+    from: "  const [acceptedCommit] = await readCommits(jj, `present(${acceptedBookmark})`)",
+    to: '  const [acceptedCommit] = await readCommits(jj, "@-")',
     suite: "lanes",
     scenario: "main",
     expect:
@@ -535,7 +535,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "accepted proposed changes' sources are not read",
     file: "packages/jj/proposed.ts",
-    from: "    sources: [...new Set(accepted.flatMap(t => sourcesOf(t.description)))],\n",
+    from: "    sources: [...new Set(accepted.flatMap(t => messageSources(t.description)))],\n",
     to: "    sources: [] as CommitId[],\n",
     command: unit,
     expect: "proposed changes on accepted work: built, immutable",
@@ -592,7 +592,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a conflicted join is kept",
     file: "packages/jj/lane/merge.ts",
-    from: "    if ((await commitsOf(jj, `${at} & conflicts()`)).length > 0) {",
+    from: "    if ((await readCommits(jj, `${at} & conflicts()`)).length > 0) {",
     to: "    if (false) {",
     command: repoTest,
     expect:
@@ -611,7 +611,7 @@ export const mutations: readonly Mutation[] = [
     name: "an update's merge is left uncommitted",
     file: "packages/jj/lane/merge.ts",
     from: "  return commitToBookmark(jj, lane, message)",
-    to: '  return (await commitsOf(jj, "@"))[0] as CommitId',
+    to: '  return (await readCommits(jj, "@"))[0] as CommitId',
     command: unit,
     expect: "the whole life of a lane",
   },
@@ -900,7 +900,7 @@ export const mutations: readonly Mutation[] = [
     from: "  return first.filter(f => lacking.has(f) && others.every(o => o.has(f)))\n",
     to: "  return first.filter(f => others.every(o => o.has(f)))\n",
     command: catchUpTest,
-    expect: "catchUpFilesOf: one held commit: the files the tip lacks too",
+    expect: "catchUpChangedFiles: one held commit: the files the tip lacks too",
   },
   {
     name: "catching up counts a file any held commit has differently",
@@ -964,7 +964,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "proposed changes' start conflicts go unread",
     file: "packages/jj/lane-read.ts",
-    from: "    startConflicts: await startConflictsOf(jj, ledger, conflicts),",
+    from: "    startConflicts: await readStartConflicts(jj, ledger, conflicts),",
     to: "    startConflicts: [],",
     command: repoTest,
     expect: "a branch cloned from a conflicted catch-up",
@@ -1276,8 +1276,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a lane's working copy reads as holding no conflict",
     file: "packages/jj/lane/merge.ts",
-    from: '  return conflictedFilesAt(jj, "@")\n',
-    to: '  return conflictedFilesAt(jj, "root()")\n',
+    from: '  return readConflictedFiles(jj, "@")\n',
+    to: '  return readConflictedFiles(jj, "root()")\n',
     command: portSuite,
     expect:
       "a catch-up that changed a line the lane changed differently is conflicted there",
@@ -1310,7 +1310,7 @@ export const mutations: readonly Mutation[] = [
     name: "an update's merge is left uncommitted (port suite)",
     file: "packages/jj/lane/merge.ts",
     from: "  return commitToBookmark(jj, lane, message)",
-    to: '  return (await commitsOf(jj, "@"))[0] as CommitId',
+    to: '  return (await readCommits(jj, "@"))[0] as CommitId',
     command: portSuite,
     expect: "a turn that committed, and a clean merge, each schedule one fetch",
   },
@@ -1327,7 +1327,7 @@ export const mutations: readonly Mutation[] = [
     name: "an update's merge is left uncommitted (port suite: a merge of what the lane holds merges nothing)",
     file: "packages/jj/lane/merge.ts",
     from: "  return commitToBookmark(jj, lane, message)",
-    to: '  return (await commitsOf(jj, "@"))[0] as CommitId',
+    to: '  return (await readCommits(jj, "@"))[0] as CommitId',
     command: portSuite,
     expect: "A merge of what the lane holds merges nothing.",
   },

@@ -30,12 +30,12 @@ import {
   type CardId,
   canvasPinnedInView,
   type EntryId,
+  entryThread,
   isPastAddress,
   parseAddress,
   pathIds,
   type TextCard,
   type ThreadId,
-  threadAt,
   type WorkflowState,
   type WorkflowStateId,
 } from "@pinetrie/core"
@@ -49,6 +49,7 @@ import {
   canvasColumnView,
   canvasesOnBoard,
   canvasIcons,
+  canvasNoteColumns,
   canvasRail,
   canvasStrip,
   canvasTrash,
@@ -61,6 +62,7 @@ import {
   columnMatches,
   composerPlacesStore,
   type Dock,
+  directoryRootEntries,
   type Effect,
   type Focus,
   type FocusKey,
@@ -72,19 +74,17 @@ import {
   type Intent,
   type IntentState,
   inboxCount,
+  inboxMentions,
   initialLayout,
   inventoryThreads,
   keyAct,
   type Layout,
   type ListWidth,
-  labelsOf,
-  laneRootsOf,
+  laneRootEntries,
   layoutReducer,
-  mentionsOf,
   messageCount,
   NO_TEXT,
   nameEffects,
-  noteColumnsOf,
   openColumns,
   openProposedByCanvas,
   ownCards,
@@ -93,7 +93,6 @@ import {
   parseQuery,
   parseSearch,
   perform,
-  placeAt,
   placement,
   planHeldRoots,
   planIntent,
@@ -107,7 +106,6 @@ import {
   reconcileName,
   resolveLayout,
   restoreStatus,
-  rootEntriesOf,
   rootSeed,
   type SearchState,
   type SeenEnd,
@@ -123,12 +121,14 @@ import {
   shownWidth,
   sidebarView,
   spotFor,
+  spotScrollTop,
   spotStore,
   storedLayout,
   stripCards,
-  summariesOf,
   type ThreadLink,
   type TypedLast,
+  taskLabels,
+  taskSummaries,
   threadAnchor,
   threadCardHeads,
   threadFace,
@@ -140,7 +140,7 @@ import {
   trackIndex,
   typingDue,
   unsentSignals,
-  unstartedOf,
+  unstartedMode,
   uploadBlob,
   viewportStore,
 } from "@pinetrie/interface"
@@ -152,20 +152,19 @@ import {
   readRoots,
 } from "@pinetrie/reads"
 import {
-  archivedOf,
-  boardOf,
   type CardOnCanvas,
   canvasLines,
   canvasList,
-  canvasPinnedOf,
+  canvasPinnedCards,
   displayName,
   reachableAgents,
   TRASH_KEEP_MS,
+  taskBoard,
+  tasksInArchive,
   unstartedThreads,
 } from "@pinetrie/rules"
 import {
   heldBy,
-  intentsOf,
   newCanvasId,
   newCardId,
   newNoteColumnId,
@@ -174,6 +173,7 @@ import {
   newThreadId,
   type SessionClient,
   settleSlots,
+  slotIntents,
 } from "@pinetrie/session"
 import {
   useCallback,
@@ -202,7 +202,7 @@ import { Pictures } from "./pictures-context.ts"
 import { nameFor, presenceColors, writerOrder } from "./presence.tsx"
 import { ProfilePage } from "./profile-page.tsx"
 import { EmptyRail, LiveRail } from "./rail.tsx"
-import { quoteOf } from "./renderings.tsx"
+import { fetchedQuote } from "./renderings.tsx"
 import {
   NO_PREFS,
   type ReviewPrefs,
@@ -224,7 +224,7 @@ import { useFoldMotion } from "./use-fold-motion.ts"
 import { PLACED } from "./use-follow.ts"
 import { useInbox } from "./use-inbox.ts"
 import { NarrowContext, useStripNarrow } from "./use-narrow.ts"
-import { goTo, usePage } from "./use-page.ts"
+import { showPage, usePage } from "./use-page.ts"
 import { useLanding, useReveal, useRevealCard } from "./use-reveal.ts"
 import { useSameData } from "./use-same-data.ts"
 import { useSmallWindow } from "./use-small-window.ts"
@@ -288,7 +288,7 @@ function alignOnOpen(strip: HTMLElement, key: string, forkFrom: string | null) {
 const settle = (body: HTMLElement) => body.dispatchEvent(new Event(PLACED))
 
 /**
- * Bring a column shown again back to where it was left (`placeAt`,
+ * Bring a column shown again back to where it was left (`spotScrollTop`,
  * `viewport.ts`), then tell it it was placed. False when its spot's message
  * is not drawn, or its content fits its view: alignment places it then.
  */
@@ -308,7 +308,7 @@ function placeOnReturn(
   if (message === null || message === undefined) return false
   const at = message.getBoundingClientRect()
   const top = at.top - body.getBoundingClientRect().top + body.scrollTop
-  const to = placeAt(spot, {
+  const to = spotScrollTop(spot, {
     top,
     bottom: top + at.height,
     scrollHeight: body.scrollHeight,
@@ -471,7 +471,7 @@ export function App({
       () =>
         workflow === null
           ? NO_ARCHIVED
-          : archivedOf(workflow, cards, histories),
+          : tasksInArchive(workflow, cards, histories),
       [workflow, cards, histories],
     ),
   )
@@ -485,11 +485,11 @@ export function App({
   // title, else its first card's. Which canvases are in the sidebar
   // is yours (`openThreads`).
   const summaries = useMemo(
-    () => summariesOf(canvases, directory),
+    () => taskSummaries(canvases, directory),
     [canvases, directory],
   )
   const labels = useMemo(
-    () => labelsOf({ canvases, marks, directory, lanes: workFacts.lanes }),
+    () => taskLabels({ canvases, marks, directory, lanes: workFacts.lanes }),
     [canvases, marks, directory, workFacts.lanes],
   )
   // Who a mention can name: the names, and every writer held or in the
@@ -506,7 +506,10 @@ export function App({
   )
   // Each root's root entry, held or not: where a lane running in a root this
   // tab does not hold rings it, and where its proposed changes' ⇡ goes.
-  const rootEntries = useMemo(() => rootEntriesOf(directory), [directory])
+  const rootEntries = useMemo(
+    () => directoryRootEntries(directory),
+    [directory],
+  )
   // The canvases in the archive.
   const archivedCanvases = useMemo(() => new Set(archived.keys()), [archived])
   // The sidebar: your own document; a canvas the session does not
@@ -521,13 +524,13 @@ export function App({
   )
   // The board: each canvas's state.
   const board = useMemo(
-    () => (workflow === null ? null : boardOf(workflow, cards)),
+    () => (workflow === null ? null : taskBoard(workflow, cards)),
     [workflow, cards],
   )
   const stateOf: ReadonlyMap<CanvasId, WorkflowStateId> =
     board?.stateOf ?? NO_STATE_OF
   const laneRoots = useMemo(
-    () => laneRootsOf(workFacts.lanes, rootEntries),
+    () => laneRootEntries(workFacts.lanes, rootEntries),
     [workFacts.lanes, rootEntries],
   )
   // The agent's work in every thread, held or not, and so in every canvas:
@@ -739,7 +742,7 @@ export function App({
       projectColumns(
         index,
         columns.map(c => {
-          const held = unstartedOf(c)?.held
+          const held = unstartedMode(c)?.held
           return {
             anchor: c.anchor,
             ...(c.foldAbove === undefined ? {} : { foldAbove: c.foldAbove }),
@@ -753,7 +756,7 @@ export function App({
   const canvasPins = useMemo(
     () =>
       active?.kind === "canvas"
-        ? canvasPinnedOf(cards, active.canvas)
+        ? canvasPinnedCards(cards, active.canvas)
         : NO_PINS,
     [active, cards],
   )
@@ -779,9 +782,11 @@ export function App({
   const noteViews = useMemo(
     () =>
       new Map(
-        noteColumnsOf({ onCanvas: onCanvas, cards, titles: noteTitles }).map(
-          v => [v.column, v] as const,
-        ),
+        canvasNoteColumns({
+          onCanvas: onCanvas,
+          cards,
+          titles: noteTitles,
+        }).map(v => [v.column, v] as const),
       ),
     [onCanvas, cards, noteTitles],
   )
@@ -1038,7 +1043,7 @@ export function App({
                   view: columnView,
                   path: paths[i] ?? new Set<EntryId>(),
                   track: slot.track,
-                  heldBy: unstartedOf(column)?.held?.by ?? null,
+                  heldBy: unstartedMode(column)?.held?.by ?? null,
                   foreign: columnForeign(column, index, workFacts),
                   matches: search === null ? null : (matches?.[i] ?? null),
                 },
@@ -1056,7 +1061,7 @@ export function App({
   // Your inbox: the messages that mention you, and which you have seen.
   const mentions = useMemo(
     () =>
-      mentionsOf({
+      inboxMentions({
         roots: directory.values(),
         me: session.writer,
         myName: nameFor(nameOf, session.writer),
@@ -1318,7 +1323,7 @@ export function App({
     () => heldBy(cards, session.writer),
     [cards, session.writer],
   )
-  const intents = useMemo(() => intentsOf(moves), [moves])
+  const intents = useMemo(() => slotIntents(moves), [moves])
   // A thread's face: its slot's, and its column's when folded.
   const threadFaceOf = useCallback(
     (thread: ThreadId) =>
@@ -1429,7 +1434,7 @@ export function App({
       setChosenWidth(width)
       stores.list.save(width)
     },
-    page: goTo,
+    page: showPage,
     search: act => {
       // Closed from the bar, focus goes back to its 🔍; closed by a pick,
       // it stays where the pick left it.
@@ -1493,7 +1498,7 @@ export function App({
       searching: searchOpen,
       clips: {
         textOf: card => session.cardText(card).text(),
-        quoteOf,
+        quoteOf: fetchedQuote,
         cell,
       },
     }),
@@ -1654,7 +1659,7 @@ export function App({
   const readerRow = (end: EntryId, canvas: CanvasId) => {
     const first = cardsOn.get(canvas)?.find(c => c.kind === "thread")
     const at =
-      threadAt(index, end) ?? (first?.kind === "thread" ? first.id : null)
+      entryThread(index, end) ?? (first?.kind === "thread" ? first.id : null)
     return at === null ? null : thread(end, end, linkOf(at))
   }
   return (

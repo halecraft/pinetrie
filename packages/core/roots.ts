@@ -2,7 +2,7 @@
 // into its directory record (`readRootRecord` in @pinetrie/reads), which the
 // sidebar, your inbox and the board read.
 //
-// A root is found by walking up (`rootOf`), and a thread started at the root is
+// A root is found by walking up (`treeRoot`), and a thread started at the root is
 // rooted at its first message, so a root's id is its tab's key.
 
 import type { EntryId, ThreadId, WriterId } from "./index.ts"
@@ -11,9 +11,9 @@ import {
   isBusy,
   type LaneView,
   messageText,
+  messageWriters,
   projectRail,
   type TreeIndex,
-  writersOf,
 } from "./tree.ts"
 
 export interface RootSummary {
@@ -47,7 +47,7 @@ export function summarizeRoots(index: TreeIndex): readonly RootSummary[] {
         first,
         messages: rows.length,
         newest: ids.at(-1) ?? first,
-        writers: writersOf(index, ids),
+        writers: messageWriters(index, ids),
       },
     ]
   })
@@ -94,7 +94,10 @@ export function threadsWork(
 export const NO_TEXT = "(no text)"
 
 /** A root's first message's first line: its label while it has no title. */
-export const firstLineOf = (index: TreeIndex, first: EntryId | null): string =>
+export const rootFirstLine = (
+  index: TreeIndex,
+  first: EntryId | null,
+): string =>
   (first === null
     ? ""
     : firstLine(messageText(index.entries[first]?.message), 40)) || NO_TEXT

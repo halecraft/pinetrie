@@ -28,7 +28,7 @@ import {
   signalOfLevel,
   type ThreadLink,
 } from "@pinetrie/interface"
-import { threadNameOf } from "@pinetrie/rules"
+import { readableThreadName } from "@pinetrie/rules"
 import { useState } from "react"
 import { InboxIcon } from "./icons.tsx"
 import { Menu, type MenuItem, type MenuSection } from "./menu.tsx"
@@ -134,7 +134,7 @@ export function useInboxMenu({
         `${item.lane}:${item.raised.kind}`,
         item.end,
         linkOf(item.lane),
-        threadNameOf(names, item.lane),
+        readableThreadName(names, item.lane),
         attentionWords(item.raised, w => nameFor(nameOf, w)),
       ),
       className: `here-thread raised ${signalOfLevel(item.level)}`,

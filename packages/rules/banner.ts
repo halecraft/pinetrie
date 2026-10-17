@@ -15,7 +15,7 @@ import {
 } from "@pinetrie/core"
 import { Type } from "typebox"
 import type { ModelRef } from "./config.ts"
-import { decodeAt, fixedKey, threadKey } from "./decode.ts"
+import { decodeRecord, fixedKey, threadKey } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 
 const BannerRecordSchema = Type.Object({
@@ -30,7 +30,7 @@ export const BANNER: RecordSpec<BannerRecord, ThreadId, "session"> = {
   keyOf: r => r.lane,
   encode: ({ lane, ...contents }) => contents,
   decode: (contents, key) =>
-    decodeAt(BannerRecordSchema, contents, threadKey(key), (r, lane) =>
+    decodeRecord(BannerRecordSchema, contents, threadKey(key), (r, lane) =>
       isSha256(r.sha) ? { lane, sha: r.sha, at: r.at } : undefined,
     ),
 }
@@ -74,7 +74,7 @@ export const ICONS: RecordSpec<IconsRecord, typeof ICONS_KEY, "session"> = {
   keyOf: () => ICONS_KEY,
   encode: r => ({ source: r.source }),
   decode: (contents, key) =>
-    decodeAt(IconsRecordSchema, contents, fixedKey(ICONS_KEY, key), r => r),
+    decodeRecord(IconsRecordSchema, contents, fixedKey(ICONS_KEY, key), r => r),
 }
 
 // ── the decision ──────────────────────────────────────────────────────────
@@ -139,7 +139,7 @@ export type BannerAnswer =
     }
 
 /** A plan as the tool's answer, given once it is planned. */
-export const answerOf = (plan: AskPlan): BannerAnswer =>
+export const bannerAnswer = (plan: AskPlan): BannerAnswer =>
   plan.kind === "generate"
     ? { kind: "requested" }
     : plan.kind === "write"

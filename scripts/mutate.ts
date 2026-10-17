@@ -88,7 +88,7 @@ export const SUITES: Readonly<
 }
 
 /** The command a mutation runs. */
-export const commandOf = (m: Mutation): readonly string[] =>
+export const mutationCommand = (m: Mutation): readonly string[] =>
   "suite" in m ? SUITES[m.suite].command : m.command
 
 export type Verdict = "KILLED" | "SURVIVED" | "BROKEN" | "ELSEWHERE" | "ANCHOR"
@@ -266,7 +266,7 @@ const apply = (
   readonly failing: readonly string[]
 }> =>
   withMutant(root, m, async () => {
-    const [cmd, ...args] = commandOf(m)
+    const [cmd, ...args] = mutationCommand(m)
     if (cmd === undefined) return { verdict: "BROKEN" as const, failing: [] }
     const ran = await run(
       cmd,

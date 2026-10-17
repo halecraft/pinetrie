@@ -21,13 +21,14 @@ import {
   type CardCommand,
   type CardId,
   type CardRecord,
+  cardMove,
   type EntryId,
   entryId,
+  entryThread,
   type JjAcceptedRecord,
   type JjProposedChangesRecord,
   type LaneView,
-  moveOf,
-  noteOf,
+  notesTarget,
   type Position,
   parseMentions,
   projectTranscript,
@@ -36,7 +37,6 @@ import {
   type SendMode,
   type ThreadId,
   type TreeIndex,
-  threadAt,
   type WorkflowStateId,
 } from "@pinetrie/core"
 import { type AgentDirBinding, bindAgentDir, scriptedModel } from "@pinetrie/pi"
@@ -54,7 +54,7 @@ import {
   readThreads,
   readWorkflow,
 } from "@pinetrie/reads"
-import { archivedOf, indexCanvases, NONE_BLANK } from "@pinetrie/rules"
+import { indexCanvases, NONE_BLANK, tasksInArchive } from "@pinetrie/rules"
 import {
   hasLaneRecord,
   type LiveDocHandle,
@@ -68,7 +68,7 @@ import {
 } from "@pinetrie/schema"
 import {
   type ConnectOptions,
-  columnMessageAt,
+  columnMessageTarget,
   connectSession,
   newCanvasId,
   newCardId,
@@ -109,7 +109,7 @@ function entryCanvas(
   client: Pick<SessionClient, "session" | "cards" | "roots" | "live">,
   entry: EntryId,
 ): CanvasId | undefined {
-  const thread = threadAt(treeOf(client), entry)
+  const thread = entryThread(heldTree(client), entry)
   if (thread === null) return undefined
   return indexCanvases(
     client.cards.current(),
@@ -118,7 +118,7 @@ function entryCanvas(
 }
 
 /** The board state `canvas`'s card is in, as `cards` say; undefined for none on the board. */
-export const boardStateOf = (
+export const taskBoardState = (
   cards: readonly CardRecord[],
   canvas: CanvasId,
 ): WorkflowStateId | undefined => {
@@ -126,14 +126,14 @@ export const boardStateOf = (
   return card?.place.kind === "board" ? card.place.state : undefined
 }
 
-/** The canvases in the archive as `client` holds the board (`archivedOf`). */
+/** The canvases in the archive as `client` holds the board (`tasksInArchive`). */
 export const archivedFor = (
   client: Pick<SessionClient, "session" | "cards">,
 ): ReadonlyMap<CanvasId, ArchivedCanvas> => {
   const workflow = readWorkflow(client.session)
   return workflow === null
     ? new Map()
-    : archivedOf(
+    : tasksInArchive(
         workflow,
         client.cards.current(),
         readCardHistories(client.session),
@@ -284,7 +284,7 @@ export const join = async (
         thread ??
         (branch
           ? newThreadId()
-          : (threadAt(treeOf(client), at.id) ?? newThreadId()))
+          : (entryThread(heldTree(client), at.id) ?? newThreadId()))
       // A thread's canvas comes with its card, which can reach this copy of
       // the places after its first message reaches the tree.
       if (canvas === undefined && at.kind === "entry")
@@ -300,7 +300,7 @@ export const join = async (
         parseMentions(text).some(m => m.kind === "agent")
       return said(
         agent === true && !asks ? `@agent ${text}` : text,
-        columnMessageAt(branch ? "branch" : "reply", resolved, at, into),
+        columnMessageTarget(branch ? "branch" : "reply", resolved, at, into),
         rest,
       )
     },
@@ -580,17 +580,17 @@ export function held(
 }
 
 /** The tree of every root `x` holds, as one index. */
-export const treeOf = (x: Parameters<typeof held>[0]): TreeIndex =>
+export const heldTree = (x: Parameters<typeof held>[0]): TreeIndex =>
   readHeldIndex(held(x).roots)
 
 /** Every stored entry row of every root `x` holds, by id. */
-export const entriesOf = (
+export const heldEntries = (
   x: Parameters<typeof held>[0],
 ): Readonly<Record<string, StoredEntryRow>> =>
   Object.assign({}, ...held(x).roots.map(readEntries))
 
 /** A record read from each root `x` holds, as one map. */
-export const rootRecordsOf = <K, V>(
+export const heldRootRecords = <K, V>(
   x: Parameters<typeof held>[0],
   read: (doc: RootDocHandle) => ReadonlyMap<K, V>,
 ): ReadonlyMap<K, V> => readHeld(held(x).roots, read)
@@ -604,7 +604,7 @@ export function idOfText(
   x: Parameters<typeof held>[0],
   text: string,
 ): EntryId | null {
-  const index = treeOf(x)
+  const index = heldTree(x)
   return (
     Object.values(index.entries).find(e => {
       const sent = projectTranscript(index, e.id).at(-1)?.text
@@ -620,13 +620,13 @@ export function laneHolding(
   text: string,
 ): LaneView | undefined {
   const id = idOfText(x, text)
-  const index = treeOf(x)
-  return lanesOf(x, index, cards).find(
+  const index = heldTree(x)
+  return heldLanes(x, index, cards).find(
     l => id !== null && ancestry(index, l.tip).path.includes(id),
   )
 }
 
-export const lanesOf = (
+export const heldLanes = (
   x: Parameters<typeof held>[0],
   index: TreeIndex,
   cards: readonly CardRecord[],
@@ -640,7 +640,7 @@ export const lanesOf = (
 }
 
 /** Every lane name pi holds, in the roots `x` holds. */
-export const laneNamesOf = (
+export const heldLaneNames = (
   x: Parameters<typeof held>[0],
 ): readonly ThreadId[] => held(x).roots.flatMap(readLaneNames)
 
@@ -673,7 +673,7 @@ export function moveCanvasOnBoard(
   const first = workflow?.open[0]
   if (workflow === null || canvas === undefined || first === undefined)
     throw new Error(`no board place for ${entry}`)
-  const from = boardStateOf(client.cards.current(), canvas) ?? first.id
+  const from = taskBoardState(client.cards.current(), canvas) ?? first.id
   return client.request({
     kind: "move-canvas",
     canvas,
@@ -696,7 +696,7 @@ export function queueCard(
   const card = drawnCard(client, id)
   if (card.kind !== "text") throw new Error(`${id} is no text card`)
   return client.queueCard(
-    moveOf(card, { kind: "queued", thread: lane, seen: "" }),
+    cardMove(card, { kind: "queued", thread: lane, seen: "" }),
     "keep",
   )
 }
@@ -710,7 +710,7 @@ export function unqueueCard(
   if (card.kind !== "text" || card.place.kind !== "queued")
     throw new Error(`${id} is not queued`)
   return client.moveCard(
-    moveOf(card, noteOf(card.place)),
+    cardMove(card, notesTarget(card.place)),
     undefined,
     card.place.by,
   )
@@ -772,17 +772,17 @@ export function rootHolding(
 
 /** The thread `entry` is in, as the host holds the tree. */
 export function threadHolding(
-  host: Parameters<typeof treeOf>[0],
+  host: Parameters<typeof heldTree>[0],
   entry: EntryId | null,
 ): ThreadId {
-  const thread = entry === null ? null : threadAt(treeOf(host), entry)
+  const thread = entry === null ? null : entryThread(heldTree(host), entry)
   if (thread === null) throw new Error(`no thread holds the entry ${entry}`)
   return thread
 }
 
 /** The canvas the thread `entry` is in holds, as the host reads it. */
 export function canvasHolding(
-  host: Parameters<typeof treeOf>[0] & Pick<RunningHost, "places">,
+  host: Parameters<typeof heldTree>[0] & Pick<RunningHost, "places">,
   entry: EntryId | null,
 ): CanvasId {
   const thread = threadHolding(host, entry)
@@ -813,7 +813,7 @@ async function rootHeldWithin(
 /**
  * The root holding `entry` in the client's copy, once that copy has it
  * (`rootHeldWithin`). Throws after `timeoutMs`, or when there is no entry.
- * Scenarios reach it through `composeAt`.
+ * Scenarios reach it through `composeCard`.
  */
 export async function waitForRootHolding(
   client: Pick<SessionClient, "rootOf">,
@@ -832,7 +832,7 @@ export async function waitForRootHolding(
  * entry, so its place names the root holding it. The caller queues it
  * (`queueCard`) when the card is to be sent.
  */
-export async function composeAt(
+export async function composeCard(
   client: Pick<
     SessionClient,
     "rootOf" | "createCard" | "session" | "roots" | "live"
@@ -848,7 +848,7 @@ export async function composeAt(
   if (entry === null) throw new Error("no entry to compose a card at")
   await waitForRootHolding(client, entry)
   // A lane is named by its thread; with none, the entry's thread.
-  const thread = place.lane ?? threadAt(treeOf(client), entry)
+  const thread = place.lane ?? entryThread(heldTree(client), entry)
   if (thread === null) throw new Error("no thread to compose a card in")
   const id = newCardId()
   void client.createCard(

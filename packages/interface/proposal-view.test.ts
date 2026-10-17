@@ -9,7 +9,7 @@ import {
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
-import { entriesOf, entry } from "@pinetrie/core/fixtures"
+import { entriesById, entry } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   columnProposals,
@@ -36,7 +36,7 @@ const PROPOSAL: Proposal = {
 const on = (id: string, parent: string | null, m: Message) =>
   entry(id, parent, m, { thread: P })
 const index = indexTree(
-  entriesOf([
+  entriesById([
     on("1-p", null, { role: "person", content: "split it" }),
     on("2-a", "1-p", {
       role: "assistant",

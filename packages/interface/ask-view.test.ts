@@ -16,7 +16,7 @@ import {
   columnRows,
   lastEndedAsk,
 } from "./ask-view.ts"
-import { entry, indexOf } from "./fixtures.ts"
+import { entry, indexEntries } from "./fixtures.ts"
 
 type Message = NonNullable<EntryLike["message"]>
 const personMessage: Message = {
@@ -28,7 +28,7 @@ const said = (text: string): Message => ({
   role: "assistant",
   content: [{ type: "text", text }],
 })
-const index = indexOf([
+const index = indexEntries([
   entry("1-p", null, personMessage),
   entry("2-a", "1-p", said("looking")),
   entry("3-a", "2-a", {
@@ -73,7 +73,7 @@ test("columnRows: an ask's work is one row, its prompt and what follows rows of 
 })
 
 test("columnRows: a base's news steered into a run is drawn in its ask's row", () => {
-  const steered = indexOf([
+  const steered = indexEntries([
     entry("1-p", null, personMessage),
     entry("2-a", "1-p", said("looking")),
     entry("3-a", "2-a", said("still looking")),
@@ -222,7 +222,7 @@ describe("askView", () => {
     })
   })
   test("a stop names who stopped it", () => {
-    const stopped = indexOf([
+    const stopped = indexEntries([
       entry("1-p", null, personMessage),
       entry("2-a", "1-p", { ...said("wo"), stopReason: "aborted" }),
       entry("3-f", "2-a", {

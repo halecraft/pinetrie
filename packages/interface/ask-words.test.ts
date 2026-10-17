@@ -8,7 +8,7 @@ import {
   outcomeWords,
   workWords,
 } from "./ask-words.ts"
-import { entry, indexOf } from "./fixtures.ts"
+import { entry, indexEntries } from "./fixtures.ts"
 import type { WorkStats } from "./work-stats.ts"
 
 const ada = writerId("ada@example.com")
@@ -186,7 +186,7 @@ describe("foldWords", () => {
 })
 
 test("askLine: a prompt by a person, by the host, and none", () => {
-  const index = indexOf([
+  const index = indexEntries([
     entry("1", null, { role: "person", content: "Fix the rail", writer: ada }),
     entry("2", "1", { role: "land", content: "✓ catching up" }),
   ])

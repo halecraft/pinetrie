@@ -13,9 +13,9 @@ import type {
   WorkflowState,
   WriterId,
 } from "@pinetrie/core"
-import { commandOf, fitsPlace, KINDS } from "@pinetrie/core"
+import { cardCommand, fitsPlace, KINDS } from "@pinetrie/core"
 import { displayName, type PinnedStatus } from "@pinetrie/rules"
-import { reorderOf } from "./card-intents.ts"
+import { reorderByStep } from "./card-intents.ts"
 import {
   type CatchUps,
   commandNote,
@@ -26,7 +26,7 @@ import {
   unsentWords,
 } from "./card-words.ts"
 import type { ColumnAct } from "./intent.ts"
-import { namesOf } from "./names.ts"
+import { writerNames } from "./names.ts"
 import { lineWords, type Reader } from "./send.ts"
 
 /**
@@ -289,7 +289,7 @@ export function cardFrame(
     tone,
     state: stateOf(card, tone, facts),
     by: byOf(card, facts.me),
-    command: commandOf(card),
+    command: cardCommand(card),
     primary,
     tools:
       !movable || among === null
@@ -297,7 +297,7 @@ export function cardFrame(
         : ([-1, 1] as const).map(step => ({
             step,
             act:
-              reorderOf(card, among, step) === null
+              reorderByStep(card, among, step) === null
                 ? null
                 : {
                     kind: "reorder",
@@ -424,7 +424,7 @@ const whoWords = (
       const others = writers.filter(w => w !== by)
       return others.length === 0
         ? `${name}'s note`
-        : `${name}'s note · with ${namesOf(reader.nameOf, others)}`
+        : `${name}'s note · with ${writerNames(reader.nameOf, others)}`
     }
     // Your message is only yours: nobody else's is drawn.
     case "composing":

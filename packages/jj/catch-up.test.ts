@@ -1,6 +1,10 @@
 import { commitId } from "@pinetrie/core"
 import { expect, test } from "vitest"
-import { catchUpFilesOf, catchUpHolds, planCatchUpRead } from "./catch-up.ts"
+import {
+  catchUpChangedFiles,
+  catchUpHolds,
+  planCatchUpRead,
+} from "./catch-up.ts"
 
 const C1 = commitId("c1")
 const C2 = commitId("c2")
@@ -80,6 +84,6 @@ test.each([
     { moved: [["a"], []], lacking: ["a"] },
     [],
   ],
-] as const)("catchUpFilesOf: %s", (_, input, expected) => {
-  expect(catchUpFilesOf(input)).toEqual(expected)
+] as const)("catchUpChangedFiles: %s", (_, input, expected) => {
+  expect(catchUpChangedFiles(input)).toEqual(expected)
 })

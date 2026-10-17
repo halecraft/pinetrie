@@ -37,7 +37,7 @@ import {
   RUNS_ANY,
   record,
   stepKeeper,
-  writesOf,
+  writtenValues,
 } from "./fakes.ts"
 import { recover, recoverRoot, type StartupDeps } from "./startup.ts"
 
@@ -229,7 +229,7 @@ test("recover deletes the proposed changes, accepted work and bases of another k
       }).port,
     }),
   )
-  expect(writesOf(agent.calls).filter(w => w.kind === "delete")).toEqual([
+  expect(writtenValues(agent.calls).filter(w => w.kind === "delete")).toEqual([
     {
       kind: "delete",
       target: SESSION_TARGET,
@@ -265,14 +265,16 @@ test("recover writes the project, icon and setup records only when they changed,
   }
   const fresh = await run(basics())
   expect(fresh.map(c => (c.args[0] as unknown[]).length)).toEqual([4])
-  expect(writesOf(fresh).map(w => w.namespace)).toContain("pinetrie.icons")
-  expect(writesOf(fresh).map(w => w.namespace)).toContain("pinetrie.setup")
+  expect(writtenValues(fresh).map(w => w.namespace)).toContain("pinetrie.icons")
+  expect(writtenValues(fresh).map(w => w.namespace)).toContain("pinetrie.setup")
   const b = basics()
   putValue(b, setRecord(PROJECT, project))
   putValue(b, setRecord(ICONS, { source: "built-in" }))
   putValue(b, setRecord(SETUP, deps().setup))
   const again = await run(b)
-  expect(writesOf(again).map(w => w.namespace)).toEqual(["pinetrie.commands"])
+  expect(writtenValues(again).map(w => w.namespace)).toEqual([
+    "pinetrie.commands",
+  ])
 })
 
 test("recover writes unclassified over a verdict a stopped host left pending", async () => {
@@ -283,7 +285,7 @@ test("recover writes unclassified over a verdict a stopped host left pending", a
   const agent = fakePi()
   await recover(deps({ basics: b, ...ports(agent) }))
   expect(
-    writesOf(agent.calls).filter(w => w.namespace === VERDICT.namespace),
+    writtenValues(agent.calls).filter(w => w.namespace === VERDICT.namespace),
   ).toEqual([
     setRecord(VERDICT, { ...pending, verdict: { kind: "unclassified" } }),
   ])

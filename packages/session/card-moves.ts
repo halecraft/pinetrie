@@ -260,7 +260,7 @@ export const cardOfPending = (p: Pending): CardId => {
 }
 
 /** A move sent as `id`, unanswered; with `draft`, a creation drawn as that record. */
-export function pendingOf(
+export function pendingMove(
   id: string,
   move: Move,
   how: MoveHow,
@@ -278,7 +278,7 @@ export function pendingOf(
 }
 
 /** A send of `card` as `id`, unanswered: the card is drawn nowhere until then. */
-export const sendPendingOf = (
+export const pendingSend = (
   id: string,
   card: CardId,
   how: MoveHow,
@@ -319,7 +319,7 @@ export const stampSeen = (move: QueueMove, seen: string): QueueMove => ({
 })
 
 /** The slot each take into the inventory this tab has in flight chose, by card. */
-export function intentsOf(state: MovesState): Intents {
+export function slotIntents(state: MovesState): Intents {
   const intents = new Map<CardId, number>()
   for (const p of state.pending) {
     if (p.slot === null || !drawn(p, state.rev)) continue
@@ -336,7 +336,7 @@ export const LAST_ORDER = "\uffff"
  * waits for the host to give it an order, so it is drawn last among its
  * kind, a queued one queued by you, a canvas card one column wide; a gone
  * one is gone by you, in no history until the host names it one
- * (`historyOf`); a discard records where it was, and a restore goes back
+ * (`movesHistory`); a discard records where it was, and a restore goes back
  * there. A thread's nearest notes are the note column the host
  * would choose from `cards` (`nearestNoteColumn`, `@pinetrie/rules`); undefined, drawn where it was,
  * when the host would make one, or the thread has no card. A spot on a
@@ -517,7 +517,7 @@ export function localStep(
  * refusal to word. Anything else (busy, a conflict, a refusal or a failure)
  * left the card where it was, and the sender words it.
  */
-export function answerOf(
+export function moveAnswer(
   outcome: Outcome,
   rev: number | null,
   context: {

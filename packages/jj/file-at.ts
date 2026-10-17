@@ -5,10 +5,10 @@ import type { RepoConfig } from "@pinetrie/core"
 import type { FileAt, ReadSite, Runner } from "@pinetrie/lanes"
 import { laneBase } from "./lane/base.ts"
 import { laneTipName, revsetName } from "./lane/names.ts"
-import { commitsOf, fileText } from "./lane/revisions.ts"
+import { fileText, readCommits } from "./lane/revisions.ts"
 
 /** `path` at `site` in the repo `jj` reads. */
-export async function fileAt(
+export async function readRepoFile(
   jj: Runner,
   repoConfig: RepoConfig,
   site: ReadSite,
@@ -18,7 +18,7 @@ export async function fileAt(
     `present(${revsetName(repoConfig.acceptedBookmark)})`
   if (site.kind !== "accepted") {
     const tip = laneTipName(site.lane)
-    ;[at] = await commitsOf(jj, `present(${tip})`)
+    ;[at] = await readCommits(jj, `present(${tip})`)
     if (at !== undefined && site.kind === "start")
       at = (await laneBase(jj, tip, repoConfig))?.start
   }

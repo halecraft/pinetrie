@@ -13,7 +13,7 @@ wires them.
 | `dev.ts`, `serve.ts`, `server.ts`, `invocation.ts` | `pnpm dev [folder]` and `pnpm serve [folder]` (ADR-0086, ADR-0148), each a few lines over `runHost` (`server.ts`): `planInvocation` (the folder), `storeChoice` (the session's file, and whether `PINETRIE_STORE` named it; else the session's own, in its data directory for every kind of project, ADR-0150), `refusalText` (a refusal's words, with its command's usage). A relative folder is read from `INIT_CWD`, pinetrie's root, not the shell's directory (S108); `pnpm dev:react` serves React's development build, for its warnings and render timeline (S59) |
 | `page.ts` | the page a host serves (ADR-0148): Vite under `pnpm dev`, else the built page in the page's `dist/`, which `pnpm serve` rebuilds first when its stamp no longer matches its inputs (`ensurePage`), and whose files it reads once at start (`readBuiltPage`); where the page's package is (`pageDir`) |
 | `sessions.ts`; and `sessionOfFolder`, a read of the registry alone, for `pnpm tidy` | the session a host serves (`openSession`, ADR-0149): the folder's real path looked up in the registry under its lock, the registry written, the session's data directory made and its `host.pid` taken; and `renameSession`, for `pnpm session rename` (`apps/pinetrie/scripts/session.ts`); and `sessionOfFolder`, a read of the registry alone, for `pnpm tidy` |
-| `tidy.ts` | `pnpm tidy`'s shell (`apps/pinetrie/scripts/tidy.ts`, ADR-0155): `takeTidyLock`, the session store's own lock taken without waiting, so a host serving the folder refuses the tidy and a host starting during it is refused; the sizes it reports (`sizesOf`); and every line it prints, and the startup line, from values (`tidyWords`). What a tidy does is `@pinetrie/jj`'s `planTidy`. The folder is `invocation.ts`' `planTidyInvocation`, which reads one as `pnpm dev` does (`folderOf`) |
+| `tidy.ts` | `pnpm tidy`'s shell (`apps/pinetrie/scripts/tidy.ts`, ADR-0155): `takeTidyLock`, the session store's own lock taken without waiting, so a host serving the folder refuses the tidy and a host starting during it is refused; the sizes it reports (`readRepoSizes`); and every line it prints, and the startup line, from values (`tidyWords`). What a tidy does is `@pinetrie/jj`'s `planTidy`. The folder is `invocation.ts`' `planTidyInvocation`, which reads one as `pnpm dev` does (`invokedFolder`) |
 | `startup-lines.ts` | the words of what a starting host logs about its inputs: the project, the session (`sessionLines`), the store, each config file and what it refused (`reportLines`, in the setup page's words), the agent's model and where it came from or why there is none, the URL and invites, and the setup page's URL with no model |
 | `settings.ts` | every setting the host reads, declared once (`SETTINGS`, ADR-0146) with the layers that may set it and how they combine; the project's copies as values (`laneAuthority`, `decodeAuthority`, `laneCopy`), `settleHost`, `folderReport` for a host without lane work, and the settled values as the deciding packages take them (`repoNames`, `iconSettings`, `titleSettings`, `sshChoice`, `listedFolders`) |
 | `setup-record.ts` | `planSetupRecord`: the `pinetrie.setup` value, from the config's report and what the model setup loaded |
@@ -60,7 +60,7 @@ wires them.
 | `threads-now.ts` | a thread as it is now, for the relays, the answers and the late steps: its reach, its tree, end and lane (`thread`, which opens only a live thread's root), and the names a message uses |
 | `budgets.ts` | what agents talking spend (ADR-0128): the budget a run spends, read from its prompt (`promptBudget`), counted per request, written when it goes over and at a run's end, and the gate before each request |
 | `later.ts` | `Later`: every write the host decides before a gap and makes after it (§ Late writes), its gate (`lateAway`), and a model request outside the keeper (`outside`) |
-| `fakes.ts` | test support: `record<T>()`, `fakeLane`, `row`, `putValue` and `applyWrites` (each write to the document its target names, through the real `applyRecordWrites`), `writesOf`, `basics` (one root, `ROOT_ID`, in `fakeDocuments`), `putLane`, `writeDirectory` |
+| `fakes.ts` | test support: `record<T>()`, `fakeLane`, `row`, `putValue` and `applyWrites` (each write to the document its target names, through the real `applyRecordWrites`), `writtenValues`, `basics` (one root, `ROOT_ID`, in `fakeDocuments`), `putLane`, `writeDirectory` |
 
 ## The documents' keeper
 
@@ -136,7 +136,7 @@ wires them.
 - **A prompt's run reads its pinned cards first** (`readPinned`,
   `pinned.ts`): a chat's, a popped queued card's, a resolution's, a split's
   and a carry-on's. It
-  gathers the thread's pinned cards at the lane's tip (`pinnedAt`), loads
+  gathers the thread's pinned cards at the lane's tip (`pinnedCardsAtEnd`), loads
   their texts, waits for each as the chat's sender had it (`seen`, at most
   `PINNED_WAIT_MS`, 2 s), gathers again (a card may have been pinned or
   unpinned meanwhile), and plans against what the model last read on the
@@ -405,7 +405,7 @@ until the next compaction (S120), and the host compacts at startup. So
   as HTML; an opaque file as an attachment, which the chip's `download`
   names (S208).
 - **The sweep keeps a reference's quote** (`sweepBlobs`): every card's
-  words that are a blob (`textSourceOf`) count as referenced. It keeps
+  words that are a blob (`cardTextSource`) count as referenced. It keeps
   each referenced original's fitted copy too: a draft names the original,
   and its message will show the copy.
 - **The sweep reads the host's clock, and so do the blobs** (ADR-0139):
@@ -906,7 +906,7 @@ rejects `shutdown()`.
   only the host writes `places`, so the stacks are the host's: `policy.ts`
   shares them with no one and rejects one a client announces, and
   `writersPolicy` gives them to the host alone.
-- **Which history a move enters is the host's** (`historyOf`): the canvas the
+- **Which history a move enters is the host's** (`movesHistory`): the canvas the
   card goes to, else the one it leaves, read from its record; a discard's,
   the canvas it leaves, else, from an inventory, the canvas its sender is on
   (`here`), else, on none, its sender's history outside any canvas; a
@@ -1125,7 +1125,7 @@ queued cards, which `planArchive` refuses.
     became of its thread, so a restored canvas's agents cannot spend it
     again;
   - the drain: a popped card's send is cleared by `planGate` (`writesIn`'s
-    `queue` case), its `away` is `holdingOf`, and no fact is queued in an
+    `queue` case), its `away` is `threadCardHolding`, and no fact is queued in an
     archived canvas;
   - `relays.ts`' `ask`, `leave`, `relayMessage`, `relayCard` and `deliver`:
     each reads both threads' reach and refuses with `unreachableRefusal`
@@ -1170,7 +1170,7 @@ queued cards, which `planArchive` refuses.
   (`planStartup`), unless its lane is resumed.
 - **Asked on events, each naming an entry**: the tip the lane's `turnDone`
   hook is given (wrapped in `startHost` after lane work records the turn),
-  and the prompt each run's end is given. The ask is `promptOf` that entry,
+  and the prompt each run's end is given. The ask is `runPrompt` that entry,
   which never changes: entries are written once (ADR-0004). No step reads
   a lane's tip. At a run's end the tip is already past the ask: a plain
   queued card popped there would lose the ask its final digest, and a next
@@ -1184,7 +1184,7 @@ queued cards, which `planArchive` refuses.
   last entry, newest first within the budget, its last word, and the last
   digest. No agent reads the answer.
 - **The reply is read in `request`, as a title's is** (`titles.ts`):
-  `endReplyOf` there, and each refused half logged ("the model's digest is
+  `parseEndReply` there, and each refused half logged ("the model's digest is
   not one", "the model's verdict is not one"). The answer's `plan` gets
   the parsed reply, never raw model text. A live digest writes what `digestToWrite`
   returns; a run's end, what `runEndedToWrite` returns.
@@ -1292,7 +1292,7 @@ queued cards, which `planArchive` refuses.
   nothing.
 - **Only an unasked request is `held`**: a person's Auto-update goes out
   even while an unasked one is out for the same canvas.
-- A missing `tab-title` skill, or a reply `titleOf` refuses, is logged, and
+- A missing `tab-title` skill, or a reply `replyTitle` refuses, is logged, and
   nothing is written.
 
 ## HTTP
@@ -1337,7 +1337,7 @@ adapter's.
 | `shared-watch.ts` | your writes to the shared directories as they are made (S169): each directory of accepted work's watched (`watch-dir.ts`, with no quiet window), each file an event names stat'ed into the stamp a lane would read, and handed to `shared.ts`. A scan at each start, and after a dropped-events error, finds what changed unseen, and what is gone. A listing that fails throws, so it never reads as every file gone; only a missing directory lists none. A delete event lets nothing go: the next scan does. It follows accepted work's list (`LaneConfigs.onShared`). Lanes' writes come by here too, and are claimed when their turns are recorded |
 | `registry.ts` | `LaneRegistry`: each lane's handle, its record, whether it is a lane of its own; the only module that touches the handles; `withHistory`, the one way to a lane's `LaneHistory`, which queues its function on the lane's queue with the history, the handle and the lane's record; refused, with nothing queued, for a lane with no record, no copy of its own, or a history the adapter does not keep |
 | `containers.ts` | `access` (its prompt's facts from the lane's grants, `laneFacts`, pure), a container's start (`planContainer`, `planStartFrom`; after a restore from a snapshot, the history's `afterRestore`, for jj `pre-rename:`, since a snapshot made before the rename holds the old names (S114); run from a queued step, which hands it the history; every start loses stale outputs, `removeStaleOutputs`), `beforeRun`, `runEnded` |
-| `turns.ts` | pi's `turnDone`: the turn's revision (`recordTurn`), its classes and snapshot (`disk.ts`), its whole-disk diff, and what follows its commit (`follow`, for jj its fetch), fired once the snapshot step is queued (`queueTurnEnd`); the turn records still being written (`pendingRecords`). A revision is titled by its message's first line, else its first call in a person's words (`titleOf`, `callLabel` from `@pinetrie/interface`, ADR-0114: `shell pnpm test`, not `bash …`). A lane is fetched into your repo only after a turn that commits, so a lane that never changed a file has no `tip@pinetrie-<lane>`, no refresh and no `pinetrie.base` until it catches up (a clean merge is fetched) |
+| `turns.ts` | pi's `turnDone`: the turn's revision (`recordTurn`), its classes and snapshot (`disk.ts`), its whole-disk diff, and what follows its commit (`follow`, for jj its fetch), fired once the snapshot step is queued (`queueTurnEnd`); the turn records still being written (`pendingRecords`). A revision is titled by its message's first line, else its first call in a person's words (`revisionTitle`, `callLabel` from `@pinetrie/interface`, ADR-0114: `shell pnpm test`, not `bash …`). A lane is fetched into your repo only after a turn that commits, so a lane that never changed a file has no `tip@pinetrie-<lane>`, no refresh and no `pinetrie.base` until it catches up (a clean merge is fetched) |
 | `create.ts` | a new lane: `checkBegin`, its record and name (`recordLane`, its `history` the kind of the disk it will clone, `sourceHistory`), its fork (`forkFacts` waits for `pendingRecords`; `forkSource` refuses a disk of another kind than the record's, thrown with `foreignLaneWords`) |
 | `update.ts` | an update (`withLaneStarted`, then one queued step, `planSettle` and `applySettle`, which fires the merge's `follow` after `recordUpdate`); `catchUpInRun`, the agent's `catch_up`; `askedAboutConflict`, which asks the lane's history for conflicts in its copy |
 | `archive.ts` | a close's or a reopen's teardown (`planArchive`'s), off the documents' keeper; its lanes' history moved in the destination (`lanesMoved`) |
@@ -1489,9 +1489,9 @@ adapter's.
   takes your repo's names as settled (`repoNames`, from your files and the
   working copy's `pinetrie.json`), starts the owner of your repo,
   renames the proposed changes' old bookmarks (`pre-proposed:`), and reads files at
-  a point (`fileAt`, `@pinetrie/jj`). Started, it makes accepted work
+  a point (`readRepoFile`, `@pinetrie/jj`). Started, it makes accepted work
   (`jj/accepted.ts`), the proposed changes (`jj/proposed/`), the fetches (`jj/fetch.ts`)
-  and the splits (`jj/split.ts`), and each lane's history (`historyOf`),
+  and the splits (`jj/split.ts`), and each lane's history (`jjLaneHistory`),
   whose `follow` is the lane's fetch into your repo.
 - **Each jj or git command on your repo over half a second is logged**
   (`onSlowCommand`, `slowCommand`): `[host] your repo: <command> ran <n>
@@ -1772,7 +1772,7 @@ adapter's.
   `@pinetrie/schema/fixtures`'.
 - **A port's writes are values.** Every record goes through one
   `Records.writeValues` (ADR-0062, ADR-0095), so a test asserts what was
-  written: `expect(writesOf(records.calls)).toEqual([deleteRecord(MARK, entry)])`.
+  written: `expect(writtenValues(records.calls)).toEqual([deleteRecord(MARK, entry)])`.
   A test that needs the order of calls across the records, the scribe, pi's
   setup and the agent gives one `record` as each of them. `applyWrites`
   applies writes to the test's documents through the real writer, as

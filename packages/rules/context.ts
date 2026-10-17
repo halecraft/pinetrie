@@ -56,7 +56,7 @@ export const CONTEXT_RULES: readonly string[] = [
  * What `messages` carry, the newest of each kind (a compaction's retained
  * tail, read as `ContextInView`); empty when none is one.
  */
-export function contextOf(messages: readonly unknown[]): ContextInView {
+export function contextInView(messages: readonly unknown[]): ContextInView {
   const out: Partial<Record<keyof ContextInView, unknown>> = {}
   for (const message of messages)
     for (const kind of CONTEXT_KINDS) {

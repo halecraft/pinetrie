@@ -4,12 +4,12 @@
 
 import {
   type EntryId,
-  laneOf,
   type Reach,
   type ThreadId,
   type ThreadLane,
   type TreeIndex,
   threadEnd,
+  threadLane,
   type WriterId,
 } from "@pinetrie/core"
 import {
@@ -63,7 +63,7 @@ export function threadsNow(
       if (lateAwayNow(basics, { kind: "thread", thread }) !== null) return null
       const doc = await roots.root(root)
       const index = readTreeIndex(doc)
-      const lane = laneOf(
+      const lane = threadLane(
         readLanes(
           { doc, live },
           index,

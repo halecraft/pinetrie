@@ -102,7 +102,7 @@ export type Spot =
   | { readonly kind: "end"; readonly id: string }
 
 /** The spot a column leaves: its end while it followed it, else its view's top. */
-export function spotOf(
+export function columnSpot(
   span: Span | null,
   following: boolean,
   lastId: string | undefined,
@@ -152,7 +152,7 @@ export function spotFor(
  * at the column's last message is the column's end. Null when its content
  * fits the view: then only alignment, with its spacer, can place it.
  */
-export function placeAt(
+export function spotScrollTop(
   spot: Spot,
   m: {
     /** The message's top and bottom, in px from the top of the content. */

@@ -22,7 +22,7 @@ import {
   type TurnCommittedOf,
 } from "@pinetrie/lanes"
 import { laneBase } from "./base.ts"
-import { bookmarkOf } from "./bookmarks.ts"
+import { readLaneBookmark } from "./bookmarks.ts"
 import { type LaneMove, planFetch } from "./fetch-plan.ts"
 import { conflictsIn, mergeUpdate } from "./merge.ts"
 import { bookmarkName, bookmarkRevset } from "./names.ts"
@@ -36,9 +36,9 @@ import {
 import {
   changedPaths,
   commitTurn,
-  conflictedFilesAt,
   copyFacts,
   oldNamesOnDisk,
+  readConflictedFiles,
 } from "./revisions.ts"
 import { laneJj } from "./run.ts"
 
@@ -47,7 +47,7 @@ import { laneJj } from "./run.ts"
  * (`proveJjLane`), so every point it reads is a commit. `fetch` schedules
  * the lane's fetch into your repo, excluding those of `have` your repo holds.
  */
-export function historyOf(input: {
+export function jjLaneHistory(input: {
   readonly lane: JjLane
   readonly runners: LaneRunners
   /** Your repo's names: a lane's base is found by them. */
@@ -66,7 +66,7 @@ export function historyOf(input: {
   async function committed(
     edits: Edits,
   ): Promise<{ made: TurnCommittedOf<CommitId>; before: CommitId | null }> {
-    const before = await bookmarkOf(jj, lane)
+    const before = await readLaneBookmark(jj, lane)
     const made = await commitTurn(jj, { ...edits, lane, bookmark: before })
     return { made, before }
   }
@@ -90,7 +90,7 @@ export function historyOf(input: {
       const named = made.point ?? before
       const conflicts =
         made.conflicted && named !== null
-          ? await conflictedFilesAt(jj, named)
+          ? await readConflictedFiles(jj, named)
           : []
       return {
         committed: made.point === null ? null : pointFromCommit(made.point),

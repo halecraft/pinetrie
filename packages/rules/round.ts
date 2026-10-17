@@ -39,7 +39,7 @@ export function roundRequest(input: {
  * member; or `people: <line>`. Anything else, an `ask` naming no member or
  * with nothing to ask included, is nothing.
  */
-export function roundReplyOf(
+export function parseRoundReply(
   reply: string,
   members: ReadonlyMap<string, ThreadId>,
 ): RoundNext {

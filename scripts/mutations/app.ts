@@ -523,8 +523,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the screen shows me as someone else",
     file: "packages/web/use-presence.ts",
-    from: "  return useMemo(() => readingAt(reading, me), [reading, me])",
-    to: '  return useMemo(() => readingAt(reading, "w-nobody" as never), [reading, me])',
+    from: "  return useMemo(() => othersReading(reading, me), [reading, me])",
+    to: '  return useMemo(() => othersReading(reading, "w-nobody" as never), [reading, me])',
     suite: "browser",
     scenario: "page",
     expect: "another window shows on its root's thread card, and you never do",
@@ -877,8 +877,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a capsule ignores where it is clicked",
     file: "packages/web/rail.tsx",
-    from: "        p.onPick(pickAt(stretch.ids, at))",
-    to: "        p.onPick(pickAt(stretch.ids, at === null ? null : 0))",
+    from: "        p.onPick(capsulePick(stretch.ids, at))",
+    to: "        p.onPick(capsulePick(stretch.ids, at === null ? null : 0))",
     suite: "browser",
     scenario: "tools",
     expect:
@@ -2647,8 +2647,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the host records no paste",
     file: "apps/pinetrie/host/commands/cards.ts",
-    from: '      const scope = historyOf(moves, readPlaces(places), discards, "paste")',
-    to: '      const scope = historyOf(moves, readPlaces(places), discards, "move")',
+    from: '      const scope = movesHistory(moves, readPlaces(places), discards, "paste")',
+    to: '      const scope = movesHistory(moves, readPlaces(places), discards, "move")',
     suite: "host",
     scenario: "cards",
     expect:

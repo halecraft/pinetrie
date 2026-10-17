@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest"
 import {
   cardIdFor,
-  entriesOf,
+  entriesById,
   entry,
   FIXTURE_THREAD,
   fromParents,
@@ -12,40 +12,40 @@ import {
   ancestry,
   atEntry,
   baseKnown,
+  callSubject,
   canvasIdFor,
-  conflictAskedAt,
+  conflictAskTime,
   type EntryLike,
   entryId,
-  firstMessageOf,
+  entryMessage,
+  entryThread,
   indexTree,
+  knownToolId,
   type MessageAt,
-  messageAt,
   messageImages,
+  messageWriters,
   newestOnPath,
   type PinnedView,
   pinnedInView,
   projectRail,
   projectSpine,
   projectTranscript,
-  promptOf,
   ROOT,
-  rootOf,
+  runPrompt,
   startsRun,
-  subjectOf,
   type TextEdit,
   type ThreadId,
   TOOL_IDS,
   tailEdit,
   textCardId,
-  threadAt,
   threadEnd,
+  threadFirstMessage,
   threadIdFor,
   threadOfSend,
-  toolIdOf,
+  treeRoot,
   turnEntry,
   turnMerged,
   writerId,
-  writersOf,
 } from "./index.ts"
 
 /**
@@ -70,7 +70,7 @@ const ids = (nodes: readonly { id: string }[]) => nodes.map(n => n.id)
 
 describe("indexTree and ancestry", () => {
   test("children are sorted by id, whatever the insertion order", () => {
-    const shuffled = entriesOf(Object.values(forks).toReversed())
+    const shuffled = entriesById(Object.values(forks).toReversed())
     expect(indexTree(shuffled).childrenOf.get(entryId("1-t1"))).toEqual([
       "2-t2",
       "4-a1",
@@ -83,15 +83,15 @@ describe("indexTree and ancestry", () => {
     })
     expect([i.roots, i.orphans]).toEqual([["1-t1", "8-r"], ["9-x"]])
   })
-  test("rootOf walks up to the root; an orphan is its own root", () => {
+  test("treeRoot walks up to the root; an orphan is its own root", () => {
     const i = indexTree({
       ...forks,
       ...tree({ "9-x": "missing", "a-y": "9-x" }),
     })
-    expect(rootOf(i, entryId("7-b2"))).toBe("1-t1")
-    expect(rootOf(i, entryId("1-t1"))).toBe("1-t1")
-    expect(rootOf(i, entryId("a-y"))).toBe("9-x")
-    expect(rootOf(i, entryId("nope"))).toBeNull()
+    expect(treeRoot(i, entryId("7-b2"))).toBe("1-t1")
+    expect(treeRoot(i, entryId("1-t1"))).toBe("1-t1")
+    expect(treeRoot(i, entryId("a-y"))).toBe("9-x")
+    expect(treeRoot(i, entryId("nope"))).toBeNull()
   })
   test("a cycle stops ancestry and is reported", () => {
     const cyclic = tree({ x: "y", y: "x" })
@@ -102,13 +102,13 @@ describe("indexTree and ancestry", () => {
   })
 })
 
-describe("writersOf", () => {
+describe("messageWriters", () => {
   test("each writer once, in order of their first message", () => {
     const ada = writerId("w-ada")
     const bea = writerId("w-bea")
     const by = (writer: typeof ada) => ({ role: "person", author: "", writer })
     const i = indexTree(
-      entriesOf([
+      entriesById([
         entry("1-a", null, by(bea)),
         entry("2-b", "1-a", by(ada)),
         entry("3-c", "2-b", by(bea)),
@@ -116,14 +116,17 @@ describe("writersOf", () => {
       ]),
     )
     expect(
-      writersOf(i, [
+      messageWriters(i, [
         entryId("4-d"),
         entryId("3-c"),
         entryId("2-b"),
         entryId("1-a"),
       ]),
     ).toEqual([bea, ada])
-    expect(writersOf(i, [entryId("3-c"), entryId("2-b")])).toEqual([ada, bea])
+    expect(messageWriters(i, [entryId("3-c"), entryId("2-b")])).toEqual([
+      ada,
+      bea,
+    ])
   })
 })
 
@@ -171,7 +174,7 @@ describe("projectRail", () => {
     expect(rows.find(r => r.id === "3-t3")).toMatchObject({ head: false })
   })
   test("the same entries in another insertion order give the same rows", () => {
-    const shuffled = entriesOf(Object.values(forks).toReversed())
+    const shuffled = entriesById(Object.values(forks).toReversed())
     expect(projectRail(indexTree(shuffled), entryId("1-t1"))).toEqual(rows)
   })
   test("draws only its root's tree, from track 0", () => {
@@ -188,7 +191,7 @@ describe("projectRail", () => {
     const trunk = threadOfEntry("1-t1")
     const withCompaction = {
       ...forks,
-      ...entriesOf([
+      ...entriesById([
         entry("8-c", "3-t3", undefined, { type: "compaction", thread: trunk }),
         entry(
           "9-after",
@@ -246,7 +249,7 @@ describe("threads: where each starts and ends, and where a send lands", () => {
       { thread: threadIdFor(extra.thread ?? "q") },
     )
   const Q = threadIdFor("q")
-  const entries = entriesOf([
+  const entries = entriesById([
     say("1-q", null, { writer: "wu", compelled: true }),
     entry("2-r", "1-q", { role: "assistant", content: "r" }, { thread: Q }),
     say("3-plain", "2-r", { writer: "bo", compelled: false }),
@@ -279,7 +282,7 @@ describe("threads: where each starts and ends, and where a send lands", () => {
   test("threadEnd: the thread's entry with no child in its own thread, past a newer branch", () => {
     const i = indexTree({
       ...entries,
-      ...entriesOf([
+      ...entriesById([
         say("5-next", "4-mine", { writer: "wu", compelled: false }),
         say("6-b", "4-mine", { writer: "bo", compelled: false, thread: "b" }),
         say("7-b2", "6-b", { writer: "bo", compelled: false, thread: "b" }),
@@ -300,7 +303,7 @@ describe("threads: where each starts and ends, and where a send lands", () => {
       entry(id, parentId, { role: "canvas", content: "<canvas>" }, { thread })
     const i = indexTree({
       ...entries,
-      ...entriesOf([
+      ...entriesById([
         canvasEntry("5-cb", "4-mine", B),
         say("6-b", "5-cb", { writer: "bo", compelled: true, thread: "b" }),
         canvasEntry("7-cq", "4-mine", Q),
@@ -315,11 +318,11 @@ describe("threads: where each starts and ends, and where a send lands", () => {
     })
     expect(threadEnd(i, Q)).toBe("9-a")
     expect(threadEnd(i, B)).toBe("6-b")
-    expect(threadAt(i, entryId("5-cb"))).toBe(B)
+    expect(entryThread(i, entryId("5-cb"))).toBe(B)
     expect(i.firstOf.get(B)).toBe("5-cb")
-    expect(firstMessageOf(i, B)).toBe("6-b")
-    expect(firstMessageOf(i, Q)).toBe("1-q")
-    expect(firstMessageOf(i, threadIdFor("none"))).toBeNull()
+    expect(threadFirstMessage(i, B)).toBe("6-b")
+    expect(threadFirstMessage(i, Q)).toBe("1-q")
+    expect(threadFirstMessage(i, threadIdFor("none"))).toBeNull()
     // On the rail the trunk carries on in its own track, the branch in one
     // of its own, though the branch's first entry is the older child.
     const rail = projectRail(i, entryId("1-q"))
@@ -332,33 +335,33 @@ describe("threads: where each starts and ends, and where a send lands", () => {
 
   test("a cycle inside a thread gives it no first entry and no end", () => {
     const i = indexTree(
-      entriesOf([
+      entriesById([
         say("1-x", "2-y", { writer: "wu", compelled: false, thread: "c" }),
         say("2-y", "1-x", { writer: "wu", compelled: false, thread: "c" }),
       ]),
     )
     expect(threadEnd(i, threadIdFor("c"))).toBeNull()
-    expect(firstMessageOf(i, threadIdFor("c"))).toBeNull()
+    expect(threadFirstMessage(i, threadIdFor("c"))).toBeNull()
   })
 
-  test("threadAt: the thread its row names; null for an entry the index lacks", () => {
+  test("entryThread: the thread its row names; null for an entry the index lacks", () => {
     const i = indexTree({
       ...entries,
-      ...entriesOf([
+      ...entriesById([
         say("6-b", "2-r", { writer: "bo", compelled: false, thread: "b" }),
         say("7-b2", "6-b", { writer: "bo", compelled: false, thread: "b" }),
       ]),
     })
-    expect(threadAt(i, entryId("4-mine"))).toBe(Q)
-    expect(threadAt(i, entryId("2-r"))).toBe(Q)
-    expect(threadAt(i, entryId("7-b2"))).toBe(threadIdFor("b"))
-    expect(threadAt(i, entryId("9-gone"))).toBeNull()
+    expect(entryThread(i, entryId("4-mine"))).toBe(Q)
+    expect(entryThread(i, entryId("2-r"))).toBe(Q)
+    expect(entryThread(i, entryId("7-b2"))).toBe(threadIdFor("b"))
+    expect(entryThread(i, entryId("9-gone"))).toBeNull()
   })
 
   test("a thread with two first entries keeps the older, and with two ends the newer, so replicas agree", () => {
     const i = indexTree({
       ...entries,
-      ...entriesOf([
+      ...entriesById([
         say("5-dup", null, { writer: "bo", compelled: false }),
         say("6-also", "3-plain", { writer: "bo", compelled: false }),
       ]),
@@ -400,7 +403,7 @@ describe("threads: where each starts and ends, and where a send lands", () => {
   test("threadOfSend: what the sender saw off its thread is refused", () => {
     const i = indexTree({
       ...entries,
-      ...entriesOf([
+      ...entriesById([
         say("6-b", "2-r", { writer: "bo", compelled: false, thread: "b" }),
       ]),
     })
@@ -424,7 +427,7 @@ describe("threads: where each starts and ends, and where a send lands", () => {
   test("threadOfSend race: another writer's compelled message on the thread is; in a branch, not; a queued card's never", () => {
     const raced = indexTree({
       ...entries,
-      ...entriesOf([
+      ...entriesById([
         say("5-theirs", "4-mine", { writer: "bo", compelled: true }),
       ]),
     })
@@ -440,7 +443,7 @@ describe("threads: where each starts and ends, and where a send lands", () => {
     // Bob asks in a branch at 2-r; my thread continues through 6-mine.
     const forked = indexTree({
       ...entries,
-      ...entriesOf([
+      ...entriesById([
         say("5-fork", "2-r", { writer: "bo", compelled: true, thread: "b" }),
         say("6-mine", "4-mine", { writer: "wu", compelled: false }),
       ]),
@@ -459,7 +462,7 @@ describe("tool calls: paired with their results on the path", () => {
     name,
     arguments: args,
   })
-  const entries = entriesOf([
+  const entries = entriesById([
     entry("1-q", null, { role: "user", content: "what is in notes?" }),
     entry("2-a", "1-q", {
       role: "assistant",
@@ -504,7 +507,7 @@ describe("tool calls: paired with their results on the path", () => {
     }
     const read = indexTree({
       ...entries,
-      ...entriesOf([
+      ...entriesById([
         entry("6-a", "4-a", {
           role: "assistant",
           content: [call("c6", "read", { path: "shot.png" })],
@@ -545,7 +548,7 @@ describe("tool calls: paired with their results on the path", () => {
     const command = "pnpm test\necho done"
     const long = indexTree({
       ...entries,
-      ...entriesOf([
+      ...entriesById([
         entry("9-a", "4-a", {
           role: "assistant",
           content: [call("c9", "bash", { command })],
@@ -610,7 +613,7 @@ describe("messageImages: only stored references", () => {
   })
 })
 
-describe("subjectOf, toolIdOf and tailEdit", () => {
+describe("callSubject, knownToolId and tailEdit", () => {
   test.each([
     ["read", { path: "a.ts" }, "a.ts"],
     ["bash", { command: "pnpm test\necho done" }, "pnpm test\necho done"],
@@ -620,14 +623,14 @@ describe("subjectOf, toolIdOf and tailEdit", () => {
     ["split_proposed_changes", {}, undefined],
     ["mystery", { path: "a" }, undefined],
     ["constructor", { path: "a" }, undefined],
-  ])("subjectOf(%s, %o) is %s", (name, args, subject) => {
-    expect(subjectOf(name, args)).toBe(subject)
+  ])("callSubject(%s, %o) is %s", (name, args, subject) => {
+    expect(callSubject(name, args)).toBe(subject)
   })
 
-  test("toolIdOf knows every registered tool, and nothing else", () => {
-    for (const id of TOOL_IDS) expect(toolIdOf(id)).toBe(id)
-    expect(toolIdOf("mystery")).toBeUndefined()
-    expect(toolIdOf("constructor")).toBeUndefined()
+  test("knownToolId knows every registered tool, and nothing else", () => {
+    for (const id of TOOL_IDS) expect(knownToolId(id)).toBe(id)
+    expect(knownToolId("mystery")).toBeUndefined()
+    expect(knownToolId("constructor")).toBeUndefined()
   })
 
   // `text` with `edits` applied in order: what a Kyneta text holds afterwards.
@@ -707,7 +710,7 @@ describe("pinned cards in the tree", () => {
     entry("6-p2", "5-cards", { role: "person", content: "p2", author: "A" }),
     entry("7-r2", "6-p2", { role: "assistant", content: "r2" }),
   ]
-  const index = indexTree(entriesOf(list))
+  const index = indexTree(entriesById(list))
 
   test("a cards entry is no message: not in the transcript, nor the spine, nor a prompt", () => {
     const tip = entryId("7-r2")
@@ -726,7 +729,7 @@ describe("pinned cards in the tree", () => {
       "7-r2",
     ])
     expect(startsRun(index.entries[entryId("5-cards")])).toBe(false)
-    expect(promptOf(index, tip)).toBe("6-p2")
+    expect(runPrompt(index, tip)).toBe("6-p2")
   })
 
   test("pinnedInView: the newest cards entry on the path; none above the first", () => {
@@ -753,7 +756,7 @@ describe("pinned cards in the tree", () => {
       author: "A",
     })
     const grown = indexTree(
-      entriesOf([...list, carried, after, bare, afterBare]),
+      entriesById([...list, carried, after, bare, afterBare]),
     )
     expect(pinnedInView(grown, entryId("9-p3"))).toEqual(first)
     // An entry above the compaction was summarised: out of view.
@@ -762,7 +765,7 @@ describe("pinned cards in the tree", () => {
 
   test("pinnedInView on a branch's path: the parent's entry, read by another lane", () => {
     const branch = indexTree(
-      entriesOf([
+      entriesById([
         ...list,
         entry("8-b", "3-p1", { role: "person", content: "b", author: "A" }),
       ]),
@@ -771,7 +774,7 @@ describe("pinned cards in the tree", () => {
   })
 })
 
-describe("conflictAskedAt", () => {
+describe("conflictAskTime", () => {
   const asked = (id: string, parent: string | null, at: number) =>
     entry(
       id,
@@ -787,16 +790,16 @@ describe("conflictAskedAt", () => {
     asked("5-a", "4-r", 50),
     entry("6-q", "5-a", { role: "person", content: "q", author: "A" }),
   ]
-  const index = indexTree(entriesOf(list))
+  const index = indexTree(entriesById(list))
 
   test("the newest ask on the path, by its time; none before the first", () => {
-    expect(conflictAskedAt(index, entryId("6-q"))).toBe(50)
-    expect(conflictAskedAt(index, entryId("1-p"))).toBeNull()
-    expect(conflictAskedAt(index, null)).toBeNull()
+    expect(conflictAskTime(index, entryId("6-q"))).toBe(50)
+    expect(conflictAskTime(index, entryId("1-p"))).toBeNull()
+    expect(conflictAskTime(index, null)).toBeNull()
   })
 
   test("an ask stays a fact past a compaction, and a result that did not ask is none", () => {
-    expect(conflictAskedAt(index, entryId("4-r"))).toBe(20)
+    expect(conflictAskTime(index, entryId("4-r"))).toBe(20)
   })
 })
 
@@ -806,7 +809,7 @@ describe("newestOnPath", () => {
     entry("2-c", "1-a", undefined, { type: "compaction" }),
     entry("3-b", "2-c", { role: "person", content: "b", author: "B" }),
   ]
-  const index = indexTree(entriesOf(list))
+  const index = indexTree(entriesById(list))
   const author = (e: EntryLike) => e.message?.author
 
   test("the newest entry read, below a compaction", () => {
@@ -826,7 +829,7 @@ describe("newestOnPath", () => {
 describe("one-line messages (LINE_ROLES)", () => {
   test("a host's fact and its base's news show as their one line; a pinned entry does not", () => {
     const index = indexTree(
-      entriesOf([
+      entriesById([
         entry("1-p", null, { role: "person", content: "p", author: "A" }),
         entry("2-f", "1-p", { role: "fact", content: "✓ added" }),
         entry("3-b", "2-f", { role: "behind", content: "↓ new work" }),
@@ -867,7 +870,7 @@ describe("baseKnown", () => {
     entry("5-c", "4-r", undefined, { type: "compaction" }),
     entry("6-q", "5-c", { role: "person", content: "q", author: "A" }),
   ]
-  const index = indexTree(entriesOf(list))
+  const index = indexTree(entriesById(list))
 
   test("the newest base commit heard of or merged on the path: an update's, a behind entry's, a catch_up result's", () => {
     expect(baseKnown(index, entryId("2-u"))).toEqual(["l1"])
@@ -900,7 +903,7 @@ describe("a turn's tail", () => {
       content: "ok",
     }),
   ]
-  const index = indexTree(entriesOf(list))
+  const index = indexTree(entriesById(list))
 
   test("turnEntry climbs past a steered fact to the message whose calls it follows", () => {
     expect(turnEntry(index, entryId("4-b"))).toBe("2-a")
@@ -914,19 +917,19 @@ describe("a turn's tail", () => {
   })
 })
 
-test("messageAt: the host's own messages show as their line; other roles are none", () => {
+test("entryMessage: the host's own messages show as their line; other roles are none", () => {
   const index = indexTree(
-    entriesOf([
+    entriesById([
       entry("1-p", null, { role: "person", content: "hi", author: "A" }),
       entry("2-c", "1-p", { role: "carry-on", content: "↻ resumed by Ada" }),
       entry("3-x", "2-c", { role: "custom", content: "raw" }),
     ]),
   )
-  expect(messageAt(index, entryId("2-c"))).toEqual({
+  expect(entryMessage(index, entryId("2-c"))).toEqual({
     id: "2-c",
     thread: FIXTURE_THREAD,
     role: "carry-on",
     text: "↻ resumed by Ada",
   })
-  expect(messageAt(index, entryId("3-x"))).toBeNull()
+  expect(entryMessage(index, entryId("3-x"))).toBeNull()
 })

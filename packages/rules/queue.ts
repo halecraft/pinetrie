@@ -9,6 +9,7 @@ import {
   type CardPlace,
   type CardRecord,
   type CatchUpCommand,
+  cardMove,
   type FactCard,
   type FactCardId,
   hasPlaceKind,
@@ -16,9 +17,8 @@ import {
   isTextCard,
   type Move,
   makeCard,
-  moveOf,
   type NoteColumnId,
-  noteOf,
+  notesTarget,
   type QueuedFact,
   type RelayDetails,
   type TextCard,
@@ -81,7 +81,7 @@ export type CanvasPinnedCard = TextCard & {
 }
 
 /** The cards pinned to `canvas`, in the order they were pinned: by `order`, then id. */
-export const canvasPinnedOf = (
+export const canvasPinnedCards = (
   cards: readonly CardRecord[],
   canvas: CanvasId,
 ): readonly CanvasPinnedCard[] =>
@@ -176,7 +176,7 @@ export function planNextQueuedCardPop(
   facts: {
     readonly running: boolean
     /**
-     * Its thread is in someone's inventory or a trash (`holdingOf`), or its
+     * Its thread is in someone's inventory or a trash (`threadCardHolding`), or its
      * lane keeps a history of another kind (`proveRunnable`): nothing runs
      * there.
      */
@@ -225,7 +225,7 @@ export const planUnqueueAll = (
 ): readonly Move[] =>
   queuedOn(cards, lane)
     .filter(isQueuedMessage)
-    .map(c => moveOf(c, noteOf(c.place)))
+    .map(c => cardMove(c, notesTarget(c.place)))
 
 /**
  * A popped card the host could not send, written back saying why, its
@@ -414,7 +414,7 @@ export type CarryPlan =
   | { readonly kind: "relay"; readonly relay: RelayDetails }
 
 /**
- * A popped card and its words (`textSourceOf`: a text card's document, a
+ * A popped card and its words (`cardTextSource`: a text card's document, a
  * reference's quote, a fact's fact) -> what the drain does with it: a
  * reference's quote is sent as a message, with no command, and one with no
  * quote is skipped rather than sent empty.

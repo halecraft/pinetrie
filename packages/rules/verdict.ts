@@ -15,14 +15,14 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import { Type } from "typebox"
-import { decodeAt, threadKey } from "./decode.ts"
+import { decodeRecord, threadKey } from "./decode.ts"
 import {
   type Answer,
   type AskLines,
   DIGEST,
   type DigestPlan,
-  digestOf,
   digestToWrite,
+  parseDigest,
 } from "./digest.ts"
 import { type RecordSpec, setRecord } from "./records.ts"
 import { bareLine } from "./request.ts"
@@ -58,7 +58,7 @@ export const VERDICT: RecordSpec<VerdictRecord, ThreadId, "session"> = {
   keyOf: r => r.lane,
   encode: ({ lane, ...contents }) => contents,
   decode: (contents, key) =>
-    decodeAt(VerdictSchema, contents, threadKey(key), (r, lane) => ({
+    decodeRecord(VerdictSchema, contents, threadKey(key), (r, lane) => ({
       lane,
       ask: entryId(r.ask),
       end: entryId(r.end),
@@ -104,9 +104,9 @@ export interface SaidLine {
 /**
  * One verdict line: `needs you: <reason>`, `worth a read: <reason>`
  * or `done`, in any case. Null for any other line, a missing reason, or a
- * reason over `REASON_WORDS` words: never cut, as `digestOf` never cuts.
+ * reason over `REASON_WORDS` words: never cut, as `parseDigest` never cuts.
  */
-export function verdictOf(line: string): SaidLine | null {
+export function parseVerdictLine(line: string): SaidLine | null {
   const bare = bareLine(line)
   const colon = bare.indexOf(":")
   const head = (colon < 0 ? bare : bare.slice(0, colon)).trim().toLowerCase()
@@ -130,18 +130,21 @@ export interface EndReply {
  * survives a bad verdict line and the other way round. A verdict alone must
  * be the reply's only line.
  */
-export function endReplyOf(reply: string, answer: Answer): EndReply {
-  if (answer === "digest") return { verdict: null, digest: digestOf(reply) }
+export function parseEndReply(reply: string, answer: Answer): EndReply {
+  if (answer === "digest") return { verdict: null, digest: parseDigest(reply) }
   const [first = "", ...rest] = reply
     .split("\n")
     .map(l => l.trim())
     .filter(l => l !== "")
   if (answer === "verdict")
     return {
-      verdict: rest.length === 0 ? verdictOf(first) : null,
+      verdict: rest.length === 0 ? parseVerdictLine(first) : null,
       digest: null,
     }
-  return { verdict: verdictOf(first), digest: digestOf(rest.join("\n")) }
+  return {
+    verdict: parseVerdictLine(first),
+    digest: parseDigest(rest.join("\n")),
+  }
 }
 
 // ── the decision ──────────────────────────────────────────────────────────

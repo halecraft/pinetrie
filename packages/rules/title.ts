@@ -150,7 +150,7 @@ const TITLE_WORDS = 5
  * or too long): the root keeps its label. It never cuts a reply, which could
  * leave "Fixing the".
  */
-export function titleOf(reply: string): string | null {
+export function replyTitle(reply: string): string | null {
   const bare = bareLine(reply)
   if (bare.split(/\s+/).length > TITLE_WORDS) return null
   const parsed = parseTitle(bare)

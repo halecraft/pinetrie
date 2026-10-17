@@ -1,13 +1,13 @@
 import { expect, test } from "vitest"
 import {
+  columnSpot,
   keepSpot,
-  placeAt,
   RAIL_HOLD_MS,
   RAIL_MARGIN,
   railScroll,
   sameSpan,
   spotFor,
-  spotOf,
+  spotScrollTop,
   viewportStore,
   visibleSpan,
 } from "./viewport.ts"
@@ -77,16 +77,16 @@ test("sameSpan: a change under 1% of a message is the same", () => {
   expect(sameSpan(null, span)).toBe(false)
 })
 
-test("spotOf: following leaves the end, at the last message; else the view's top", () => {
+test("columnSpot: following leaves the end, at the last message; else the view's top", () => {
   const span = visibleSpan(boxes, 150)
-  expect(spotOf(span, true, "c")).toEqual({ kind: "end", id: "c" })
-  expect(spotOf(span, false, "c")).toEqual({
+  expect(columnSpot(span, true, "c")).toEqual({ kind: "end", id: "c" })
+  expect(columnSpot(span, false, "c")).toEqual({
     kind: "at",
     id: "a",
     at: 0.5,
     past: 0,
   })
-  expect(spotOf(null, false, "c")).toBeNull()
+  expect(columnSpot(null, false, "c")).toBeNull()
 })
 
 test("keepSpot: one spot per column, at a message it shows", () => {
@@ -117,7 +117,7 @@ test("keepSpot: one spot per column, at a message it shows", () => {
   expect(keepSpot(spots, ["a"], { kind: "end", id: "z" }).has("z")).toBe(false)
 })
 
-test("placeAt: as far into the message as the view's top was; an end at the bottom", () => {
+test("spotScrollTop: as far into the message as the view's top was; an end at the bottom", () => {
   const m = {
     top: 400,
     bottom: 600,
@@ -125,20 +125,20 @@ test("placeAt: as far into the message as the view's top was; an end at the bott
     clientHeight: 500,
     lastId: "z",
   }
-  expect(placeAt({ kind: "at", id: "a", at: 0.25, past: 0 }, m)).toBe(450)
+  expect(spotScrollTop({ kind: "at", id: "a", at: 0.25, past: 0 }, m)).toBe(450)
   // Left between two messages: as far past its end as it was.
-  expect(placeAt({ kind: "at", id: "a", at: 1, past: 12 }, m)).toBe(612)
+  expect(spotScrollTop({ kind: "at", id: "a", at: 1, past: 12 }, m)).toBe(612)
   // Its old end, with more below it now: that message's bottom at the view's bottom.
-  expect(placeAt({ kind: "end", id: "a" }, m)).toBe(100)
+  expect(spotScrollTop({ kind: "end", id: "a" }, m)).toBe(100)
   // Still the last message: the column's end.
-  expect(placeAt({ kind: "end", id: "z" }, m)).toBe(1500)
+  expect(spotScrollTop({ kind: "end", id: "z" }, m)).toBe(1500)
   // Clamped to what can scroll.
   expect(
-    placeAt({ kind: "at", id: "a", at: 0, past: 0 }, { ...m, top: 1900 }),
+    spotScrollTop({ kind: "at", id: "a", at: 0, past: 0 }, { ...m, top: 1900 }),
   ).toBe(1500)
   // Content that fits its view is left to alignment.
   expect(
-    placeAt(
+    spotScrollTop(
       { kind: "at", id: "a", at: 0, past: 0 },
       { ...m, scrollHeight: 500 },
     ),

@@ -1,6 +1,6 @@
 // cards — what a card is: an identity, one place and content; each kind's
 // content, the one maker of a record (`makeCard`), where a card's words are
-// read (`textSourceOf`), a text card's commands, and a card's history and
+// read (`cardTextSource`), a text card's commands, and a card's history and
 // traces. Where cards are, and how they move, is `places.ts`'.
 
 import type { Address } from "./address.ts"
@@ -110,7 +110,7 @@ export type QueuedFact =
   | BranchedFact
 
 /** A card's command, or null: only a text card has one. */
-export const commandOf = (card: CardRecord): CardCommand | null =>
+export const cardCommand = (card: CardRecord): CardCommand | null =>
   card.kind === "text" ? card.content.command : null
 
 /**
@@ -218,7 +218,7 @@ export type TextSource =
   | { readonly kind: "ask"; readonly relay: RelayDetails }
   | { readonly kind: "none" }
 
-export function textSourceOf(card: CardRecord): TextSource {
+export function cardTextSource(card: CardRecord): TextSource {
   switch (card.kind) {
     case "text":
       return { kind: "doc", card: card.id }
@@ -252,7 +252,7 @@ export const makeCard = <K extends PlacedKind>(
 /**
  * One change to a living card's place: who made it, from where to where, and
  * when. What the change was called (queued, took into the inventory, pinned) is
- * read from the two places when it is worded (`verbOf`).
+ * read from the two places when it is worded (`changeVerb`).
  */
 export interface CardEvent {
   readonly kind: "created" | "moved" | "undone" | "redone" | "unsent"

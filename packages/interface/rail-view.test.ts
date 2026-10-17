@@ -1,7 +1,7 @@
 import { entryId, threadIdFor } from "@pinetrie/core"
 import { expect, test } from "vitest"
 import {
-  pickAt,
+  capsulePick,
   railItems,
   railKeep,
   railView,
@@ -38,17 +38,17 @@ test("stretchWords: a long ask's capsule leads with its ask, then its digest as 
   )
 })
 
-test("pickAt: the message as far through the run as the click is down it", () => {
+test("capsulePick: the message as far through the run as the click is down it", () => {
   const ids = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"].map(entryId)
   const [first] = ids
   if (first === undefined) throw new Error("no ids")
   const run = [first, ...ids.slice(1)] as const
-  expect(pickAt(run, 0)).toBe("a")
-  expect(pickAt(run, 0.55)).toBe("f")
-  expect(pickAt(run, 0.999)).toBe("j")
+  expect(capsulePick(run, 0)).toBe("a")
+  expect(capsulePick(run, 0.55)).toBe("f")
+  expect(capsulePick(run, 0.999)).toBe("j")
   // The edges of the border can measure just outside.
-  expect([pickAt(run, -0.01), pickAt(run, 1)]).toEqual(["a", "j"])
-  expect(pickAt(run, null)).toBe("a")
+  expect([capsulePick(run, -0.01), capsulePick(run, 1)]).toEqual(["a", "j"])
+  expect(capsulePick(run, null)).toBe("a")
 })
 
 test("stretchFill: the agent alone, people alone, or both", () => {

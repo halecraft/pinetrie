@@ -66,8 +66,8 @@ import {
   type AllLinked,
   dropEmptyTree,
   executeWriteSteps,
-  inodeStatAt,
   isCaseFolding,
+  readInodeStat,
   recoverWrite,
   walkStage,
 } from "./write.ts"
@@ -229,7 +229,7 @@ export function createFolderWrites(deps: {
       journal.paths.map(async p =>
         p.aside !== null &&
         p.keptOn !== null &&
-        (await inodeStatAt(at(p.aside))) !== null
+        (await readInodeStat(at(p.aside))) !== null
           ? p
           : null,
       ),
@@ -436,7 +436,7 @@ export function createFolderWrites(deps: {
       // gather, plan
       const planned = planAsides(
         kept,
-        await Promise.all(kept.map(k => inodeStatAt(at(k.aside)))),
+        await Promise.all(kept.map(k => readInodeStat(at(k.aside)))),
       )
       // execute
       for (const a of planned.drop) await unlink(at(a)).catch(() => {})

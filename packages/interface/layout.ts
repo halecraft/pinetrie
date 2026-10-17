@@ -18,13 +18,13 @@ import {
   type CanvasId,
   type CardId,
   type EntryId,
+  entryThread,
   isCanvasId,
   type LaneView,
   parseCardId,
   pathIds,
   type ThreadId,
   type TreeIndex,
-  threadAt,
   type WriterId,
 } from "@pinetrie/core"
 import type { CanvasIndex, CardOnCanvas, ThreadOpening } from "@pinetrie/rules"
@@ -32,13 +32,13 @@ import { type Static, Type } from "typebox"
 import { Value } from "typebox/value"
 import type { Density } from "./ask-words.ts"
 import {
+  buildTaskStrip,
   type CardView,
   canvasColumns,
   defaultView,
+  keptTaskView,
   openColumns,
   type Strip,
-  stripOf,
-  viewOf,
   type YourCanvasView,
 } from "./canvas-columns.ts"
 import { projectColumns } from "./column-paths.ts"
@@ -253,7 +253,7 @@ const sameList = (a: readonly CanvasId[], b: readonly CanvasId[]): boolean =>
  * else above, else nothing. `layout` is before the close.
  */
 export function afterClosing(layout: Layout, closed: Here): Here {
-  const items = listOf(layout)
+  const items = sidebarList(layout)
   const at = items.findIndex(t => sameHere(t, closed))
   const next = items[at + 1] ?? items[at - 1]
   return at < 0 || next === undefined ? NOTHING : next
@@ -385,7 +385,7 @@ export function storedLayout(
  * The sidebar as drawn: what the sidebar shows. An archived canvas you are on
  * is still in `open` (`resolveLayout` keeps it), so it keeps its place.
  */
-export function listOf(
+export function sidebarList(
   layout: Layout,
 ): readonly Extract<Here, { kind: "canvas" }>[] {
   return layout.open.map(canvas => ({ kind: "canvas", canvas }) as const)
@@ -415,7 +415,7 @@ export const drawnColumns = (
   const here = facts.cardsOn.get(canvas) ?? []
   return canvasColumns({
     onCanvas: here,
-    view: viewOf(layout.canvases, canvas, here),
+    view: keptTaskView(layout.canvases, canvas, here),
     index: facts.index,
     lanes: facts.lanes,
     unstarted: facts.unstarted,
@@ -429,9 +429,9 @@ export const canvasStrip = (
   canvas: CanvasId,
   facts: CanvasFacts,
 ): Strip =>
-  stripOf(
+  buildTaskStrip(
     canvas,
-    viewOf(layout.canvases, canvas, facts.cardsOn.get(canvas) ?? []),
+    keptTaskView(layout.canvases, canvas, facts.cardsOn.get(canvas) ?? []),
     drawnColumns(layout, canvas, facts),
   )
 
@@ -448,7 +448,7 @@ export type OpenPlan =
 
 /**
  * Show entry `id`, wherever it is, in the canvas its thread is in
- * (`threadAt`, then `canvasOfThread`): an archived canvas opens as any other,
+ * (`entryThread`, then `canvasOfThread`): an archived canvas opens as any other,
  * read only (`appView`). A message on a shared stretch of paths is drawn
  * once, in the leftmost unfolded column showing it, so every such column's
  * path is searched; with none, its thread's own column is unfolded. Null
@@ -462,7 +462,7 @@ export function planOpen(
   lanes: readonly LaneView[],
   holders: ReadonlyMap<ThreadId, WriterId>,
 ): OpenPlan | null {
-  const thread = threadAt(index, id)
+  const thread = entryThread(index, id)
   if (thread === null || index.entries[id] === undefined) return null
   const canvas = canvases.canvasOfThread.get(thread)
   if (canvas === undefined) return null

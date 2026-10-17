@@ -14,7 +14,7 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import { type Static, Type } from "typebox"
-import { decodeAt, threadKey } from "./decode.ts"
+import { decodeRecord, threadKey } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 
 const ThreadRecordSchema = Type.Object({
@@ -71,7 +71,7 @@ export const THREAD: RecordSpec<ThreadRecord, ThreadId, "session"> = {
   keyOf: r => r.thread,
   encode: ({ thread, ...contents }) => contents,
   decode: (contents, key) =>
-    decodeAt(ThreadRecordSchema, contents, threadKey(key), (r, thread) => {
+    decodeRecord(ThreadRecordSchema, contents, threadKey(key), (r, thread) => {
       if (!isRootId(r.root)) return undefined
       const { origin } = r
       const spun =

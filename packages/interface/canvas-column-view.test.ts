@@ -19,10 +19,10 @@ import {
   trashWords,
 } from "./canvas-column-view.ts"
 import {
+  buildTaskStrip,
   type CardColumn,
   defaultView,
   type Strip,
-  stripOf,
 } from "./canvas-columns.ts"
 import { NO_TEXT } from "./root-label.ts"
 import { threadCardHead } from "./thread-card.ts"
@@ -136,7 +136,7 @@ describe("canvasColumnView", () => {
 })
 
 test("a strip's canvas column is first, folded by default, and no card's column", () => {
-  const strip = stripOf(K, defaultView(null), [])
+  const strip = buildTaskStrip(K, defaultView(null), [])
   expect(strip[0]).toEqual({ kind: "canvas", canvas: K, folded: true })
   const card = {
     kind: "notes",

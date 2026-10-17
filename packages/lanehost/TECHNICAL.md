@@ -12,7 +12,7 @@ responsibility. It declares `@pinetrie/core` and `@pinetrie/channel` only
 |---|---|
 | `protocol.ts` | `LanehostCall` and each call's result (`LanehostResults`) |
 | `layout.ts` | where a project's disks are (`projectDisks`), and which names may stand for a project or a disk |
-| `roles.ts` | `ROLES`, each role's grant; `moduleOf`, a call's module; `planRoles`, which role serves each module |
+| `roles.ts` | `ROLES`, each role's grant; `callModule`, a call's module; `planRoles`, which role serves each module |
 | `answer.ts` | one call answered by its module, refused when another role serves it |
 | `server.ts` | a role's process: `answer` served over `@pinetrie/channel` |
 | `once.ts` | one call answered and printed, for the suites |
@@ -24,7 +24,7 @@ responsibility. It declares `@pinetrie/core` and `@pinetrie/channel` only
 | `grants.ts` | a project's grant of the Mac's ports in the lane VM's firewall |
 | `diff.ts` | what differs between two snapshots: by `btrfs send`, or by a walk |
 | `send-stream.ts` | btrfs's send stream read as one change per path, pure |
-| `walk.ts` | two trees' entries compared, pure; and the walk that reads them; an entry's kind (`kindOf`) |
+| `walk.ts` | two trees' entries compared, pure; and the walk that reads them; an entry's kind (`statKind`) |
 | `lanehost.Containerfile` | a role's image: Alpine, `btrfs-progs`, `git`, `iptables` |
 | `observer/` | the observer: its BPF program (`observe.bpf.c`), the kernel's structs it reads (`kernel.h`), the event both sides share (`observe.h`), the loader (`observe.c`), their Containerfile, and the suite's guest (`suite/`) |
 | `observer.ts` | the machine role: the loader's lines and commands, and every decision of the role's, pure |
@@ -251,7 +251,7 @@ out, every call checked and planned into paths first (`planApply`,
   `fileContent` over the first 8,000 bytes: text where no NUL is among
   them, as git decides (S181), else an image by its magic bytes, else
   binary; an SVG is text); its kind from the `lstat` the walk reads
-  (`kindOf`). A path under a symlink is absent.
+  (`statKind`). A path under a symlink is absent.
 - **`sameContent`** answers the pairs of paths, one in each snapshot,
   whose files hold the same bytes: a path with itself for a merge, a path
   gone with a path added for a move. Sizes first, then a read of both.

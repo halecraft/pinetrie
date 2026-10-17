@@ -28,7 +28,7 @@ import {
   type ThreadId,
   type WriterId,
 } from "./index.ts"
-import { subjectOf } from "./tools.ts"
+import { callSubject } from "./tools.ts"
 
 // ── entries and messages ──────────────────────────────────────────────────
 
@@ -248,7 +248,7 @@ export interface ToolCall {
   readonly id: string
   /** The tool's name as the model called it: a `ToolId`, or a tool pine·trie does not register. */
   readonly name: string
-  /** What it touched, whole: a path, a command, or a search's pattern and path (`subjectOf`). */
+  /** What it touched, whole: a path, a command, or a search's pattern and path (`callSubject`). */
   readonly subject?: string
   /** Its result, when the result is on the same path. */
   readonly result?: ToolResult
@@ -405,7 +405,7 @@ function renderableMessage(entry: EntryLike): TranscriptMessage | null {
   const heard = entry.message?.heard
   if (role === "heard" && heard !== undefined)
     return { ...message, from: heard.from }
-  const calls = role === "assistant" ? toolCallsOf(entry.message) : []
+  const calls = role === "assistant" ? messageToolCalls(entry.message) : []
   return calls.length === 0 ? message : { ...message, toolCalls: calls }
 }
 
@@ -428,7 +428,7 @@ export const LINE_ROLES: ReadonlySet<string> = new Set([
 ])
 
 /** The message a reader sees at `id`, or null (`renderableMessage`). */
-export function messageAt(
+export function entryMessage(
   index: TreeIndex,
   id: EntryId,
 ): TranscriptMessage | null {
@@ -438,12 +438,14 @@ export function messageAt(
 
 /** One call, before its result is paired with it. */
 function callOf(id: string, name: string, args: unknown): ToolCall {
-  const subject = subjectOf(name, args)
+  const subject = callSubject(name, args)
   return subject === undefined ? { id, name } : { id, name, subject }
 }
 
 /** The tool calls an assistant message makes, from its `toolCall` content parts; none for any other message. */
-export function toolCallsOf(message: AgentMessageLike | undefined): ToolCall[] {
+export function messageToolCalls(
+  message: AgentMessageLike | undefined,
+): ToolCall[] {
   const content = message?.content
   if (!Array.isArray(content)) return []
   return content.flatMap(part =>
@@ -544,7 +546,7 @@ export const startsRun = (entry: EntryLike | undefined): boolean => {
  * sits between a run's prompt and its tip. `indexAsks` finds every run's prompt
  * at once.
  */
-export function promptOf(
+export function runPrompt(
   index: TreeIndex,
   tip: EntryId | null,
 ): EntryId | null {
@@ -643,7 +645,7 @@ export const baseKnown = (
  * `ask_about_conflict` the host took), or null. An ask stays a fact after pi
  * summarises it, so a compaction does not end the walk.
  */
-export const conflictAskedAt = (
+export const conflictAskTime = (
   index: TreeIndex,
   tip: EntryId | null,
 ): number | null =>
@@ -694,7 +696,7 @@ export interface TreeIndex {
   /**
    * Each thread's first entry: its entry whose parent is in another thread, or
    * absent. Its parent is the thread's fork. Often a context entry no column
-   * draws: what a person reads first is `firstMessageOf`'s. Two such entries
+   * draws: what a person reads first is `threadFirstMessage`'s. Two such entries
    * keep the older.
    */
   readonly firstOf: ReadonlyMap<ThreadId, EntryId>
@@ -788,7 +790,7 @@ export function ancestry(index: TreeIndex, id: EntryId | null): Ancestry {
  * own root, since `ancestry` stops where a parent is missing. Null for an id
  * the index lacks.
  */
-export function rootOf(index: TreeIndex, id: EntryId): EntryId | null {
+export function treeRoot(index: TreeIndex, id: EntryId): EntryId | null {
   return ancestry(index, id).path.at(-1) ?? null
 }
 
@@ -802,7 +804,7 @@ export const pathIds = (
  * Who wrote `ids`' messages, in order of first message: ids are uuidv7, so
  * sorting them is creation order.
  */
-export function writersOf(
+export function messageWriters(
   index: TreeIndex,
   ids: Iterable<EntryId>,
 ): readonly WriterId[] {
@@ -1050,8 +1052,10 @@ export const sendWaits = (lane: LaneView): boolean =>
 /**
  * The thread `entry` is in: its row's. Null only for an entry the index lacks.
  */
-export const threadAt = (index: TreeIndex, entry: EntryId): ThreadId | null =>
-  index.entries[entry]?.thread ?? null
+export const entryThread = (
+  index: TreeIndex,
+  entry: EntryId,
+): ThreadId | null => index.entries[entry]?.thread ?? null
 
 /**
  * A thread's end: its entry with no child in its own thread
@@ -1066,7 +1070,7 @@ export const threadEnd = (index: TreeIndex, thread: ThreadId): EntryId | null =>
  * above its prompt, so its first entry is often one no column draws. Null for a
  * thread with no message yet.
  */
-export function firstMessageOf(
+export function threadFirstMessage(
   index: TreeIndex,
   thread: ThreadId,
 ): EntryId | null {
@@ -1079,13 +1083,13 @@ export function firstMessageOf(
     )
   ) {
     seen.add(id)
-    if (messageAt(index, id) !== null) return id
+    if (entryMessage(index, id) !== null) return id
   }
   return null
 }
 
 /** A thread's lane: the one named by its id, if it has one. */
-export const laneOf = (
+export const threadLane = (
   lanes: readonly LaneView[],
   thread: ThreadId,
 ): ThreadLane => {
@@ -1140,7 +1144,7 @@ export function threadOfSend(
       race: null,
     }
   }
-  const lane = laneOf(lanes, at.thread)
+  const lane = threadLane(lanes, at.thread)
   const end =
     threadEnd(index, at.thread) ?? (lane.kind === "lane" ? lane.tip : null)
   if (end === null) return { kind: "unknown" }

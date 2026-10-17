@@ -11,6 +11,7 @@ import {
   type CanvasId,
   type CardRecord,
   type EntryId,
+  entryThread,
   type NonEmpty,
   nonEmpty,
   type Proposal,
@@ -23,7 +24,6 @@ import {
   type ThreadId,
   type ThreadRecord,
   type TreeIndex,
-  threadAt,
   type ValueWrite,
   type WriterId,
 } from "@pinetrie/core"
@@ -138,7 +138,7 @@ export function planBranchOut(input: {
   if (state === null || proposal === undefined)
     return { kind: "refused", why: "no-proposal" }
   if (state.kind !== "ready") return { kind: "refused", why: state.kind }
-  const lane = threadAt(index, press.proposal)
+  const lane = entryThread(index, press.proposal)
   if (lane === null || input.canvasOfThread.get(lane) !== press.canvas)
     return { kind: "refused", why: "unknown" }
   const last = press.branches.at(-1)

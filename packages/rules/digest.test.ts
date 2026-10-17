@@ -18,12 +18,12 @@ import {
 } from "./digest.ts"
 import {
   DIGEST,
-  digestOf,
+  decodeRecords,
   digestRequest,
   digestText,
   digestToWrite,
+  parseDigest,
   planDigest,
-  recordsOf,
   setRecord,
 } from "./index.ts"
 
@@ -65,7 +65,7 @@ describe("digestDue", () => {
   })
 })
 
-describe("digestOf and digestText", () => {
+describe("parseDigest and digestText", () => {
   const words = (n: number) => Array.from({ length: n }, () => "w").join(" ")
   const list = (n: number) =>
     Array.from({ length: n }, (_, i) => `- point ${i}`).join("\n")
@@ -136,8 +136,8 @@ describe("digestOf and digestText", () => {
     ["refused: a bullet for a headline", "- a\n- b", null],
     ["refused: an empty reply", "  \n ", null],
   ])("%s", (_, reply, body) => {
-    expect(digestOf(reply)).toEqual(body)
-    if (body !== null) expect(digestOf(digestText(body))).toEqual(body)
+    expect(parseDigest(reply)).toEqual(body)
+    if (body !== null) expect(parseDigest(digestText(body))).toEqual(body)
   })
   test("digestText words no headline as nothing to add", () => {
     expect(digestText({ headline: null, points: [] })).toBe(NOTHING_TO_ADD)
@@ -206,7 +206,7 @@ test("the record round-trips; a malformed one, or one stored as text, is dropped
   expect(DIGEST.decode(structuredClone(DIGEST.encode(none)), P)).toEqual(none)
   expect(DIGEST.decode({ text: "done", at: 1, final: true }, P)).toBeUndefined()
   expect([
-    ...recordsOf(DIGEST, [
+    ...decodeRecords(DIGEST, [
       setRecord(DIGEST, r, rootIdFor("test-root")),
       { key: "p-2", value: null },
     ]),

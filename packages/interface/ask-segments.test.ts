@@ -14,7 +14,7 @@ import {
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { askStats, type Segment, segmentPath } from "./ask-segments.ts"
-import { entriesOf, entry } from "./fixtures.ts"
+import { entriesById, entry } from "./fixtures.ts"
 import { compactRail, railLandmarks } from "./rail.ts"
 import { workStats } from "./work-stats.ts"
 
@@ -40,7 +40,7 @@ const result = (call: string, text = "ok", isError = false): Message => ({
   isError,
 })
 const build = (rows: readonly EntryLike[]): TreeIndex =>
-  indexTree(entriesOf(rows))
+  indexTree(entriesById(rows))
 
 describe("workStats", () => {
   const index = build([

@@ -18,10 +18,10 @@ import { newCanvasId, newRootId, newThreadId } from "@pinetrie/session"
 import type { Checks } from "../checks.ts"
 import {
   archivedFor,
-  boardStateOf,
   canvasHolding,
   join,
   START_CHAT,
+  taskBoardState,
   waitFor,
   withHost,
 } from "../harness.ts"
@@ -63,7 +63,7 @@ async function run(check: Checks["check"]): Promise<void> {
         canvasHolding(host, entryId(r2)),
       ]
       const cards = readPlaces(host.places)
-      const states = [boardStateOf(cards, id1), boardStateOf(cards, id2)]
+      const states = [taskBoardState(cards, id1), taskBoardState(cards, id2)]
       check(
         "a new root lands in the state its chat names, else the first open one",
         states[0] === doing.id && states[1] === backlog.id,
@@ -144,7 +144,7 @@ async function run(check: Checks["check"]): Promise<void> {
         "a move on the board is undone by its mover's undo key outside any canvas, the canvas back in its state",
         forward.kind === "moved" &&
           back.kind === "undone" &&
-          boardStateOf(readPlaces(host.places), id2) === backlog.id,
+          taskBoardState(readPlaces(host.places), id2) === backlog.id,
         `${forward.kind} ${back.kind}`,
       )
 
@@ -180,7 +180,7 @@ async function run(check: Checks["check"]): Promise<void> {
           shut.kind === "accepted" &&
           trashed?.kind === "trash" &&
           undone.kind === "undone" &&
-          boardStateOf(now, tabCanvas) === backlog.id &&
+          taskBoardState(now, tabCanvas) === backlog.id &&
           now.find(c => c.id === tab)?.place.kind === "canvas",
         `${opened.kind} ${shut.kind} ${trashed?.kind} ${undone.kind}`,
       )

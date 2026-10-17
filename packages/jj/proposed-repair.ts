@@ -6,7 +6,7 @@
 
 import type { RepoOps } from "./owner.ts"
 import { planRepair } from "./plan.ts"
-import { hostCommitIn, hostVersionOf } from "./proposed.ts"
+import { hostCommitIn, readHostVersion } from "./proposed.ts"
 
 /**
  * Each of proposed changes' divergent changes, bottom first: the host's commit
@@ -19,7 +19,7 @@ export async function repairProposedChanges(
 ): Promise<void> {
   const last = input.changeIds.length - 1
   // A repair moves the bookmark, never the host's version: read it once.
-  const host = await hostVersionOf(ops.jj, input.bookmark)
+  const host = await readHostVersion(ops.jj, input.bookmark)
   for (const [i, changeId] of input.changeIds.entries()) {
     const split = await hostCommitIn(ops.jj, changeId, host)
     if (split === null) continue

@@ -26,8 +26,8 @@ import {
 import {
   planMark,
   planTitling,
+  replyTitle,
   type TitleTrigger,
-  titleOf,
   titleRequest,
   titleStillWanted,
 } from "@pinetrie/rules"
@@ -117,7 +117,7 @@ export function createTitles(deps: {
           purpose: "title",
         })
         if (reply === null) return null
-        const title = titleOf(reply)
+        const title = replyTitle(reply)
         if (title === null) {
           log(`[host] the model's title is not one: ${JSON.stringify(reply)}`)
           return null

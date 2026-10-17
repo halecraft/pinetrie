@@ -1,6 +1,6 @@
 import {
   cardIdOfKind,
-  livePlaceOf,
+  livePlace,
   makeCard,
   rootIdFor,
   type Sha256,
@@ -12,7 +12,7 @@ import {
 import { cardIdFor } from "@pinetrie/core/fixtures"
 import { readRootRecord } from "@pinetrie/reads"
 import { ROOT, setRecord } from "@pinetrie/rules"
-import { threadCardOf } from "@pinetrie/rules/fixtures"
+import { landedThreadCard } from "@pinetrie/rules/fixtures"
 import { newRootDoc } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import { memoryBlobs } from "./blobs.ts"
@@ -130,14 +130,19 @@ test("the blob sweep keeps a reference's quote, and deletes one no card holds", 
 test("a thread deleted from the trash leaves the shared files' lineages it read", async () => {
   const b = basics()
   const thread = threadIdFor("0123456789abcdef")
-  const card = threadCardOf({ thread, canvas: CANVAS_ID, by: ADA, cards: [] })
+  const card = landedThreadCard({
+    thread,
+    canvas: CANVAS_ID,
+    by: ADA,
+    cards: [],
+  })
   // In the trash with no history to tell: its deadline is now.
   seedPlaces(b.places, [
     {
       kind: "write",
       record: {
         ...card,
-        place: { kind: "trash", left: livePlaceOf(card.place) },
+        place: { kind: "trash", left: livePlace(card.place) },
       },
     },
   ])

@@ -5,7 +5,7 @@ import {
   type RowMemory,
   screenMemory,
 } from "@pinetrie/interface"
-import { entry, indexOf } from "@pinetrie/interface/fixtures"
+import { entry, indexEntries } from "@pinetrie/interface/fixtures"
 import { newLiveDoc } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import { type MessageProps, sameMessageProps } from "./message-props.ts"
@@ -19,7 +19,7 @@ const props = (
   text: string,
   over: Partial<MessageProps> = {},
 ): MessageProps => {
-  const index = indexOf([
+  const index = indexEntries([
     entry("a", null, { role: "user", content: "first" }),
     entry("b", "a", { role: "user", content: text }),
   ])

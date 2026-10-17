@@ -3,7 +3,7 @@ import {
   canvasIdFor,
   entryId,
   type Gated,
-  livePlaceOf,
+  livePlace,
   NO_CONTENT,
   rootIdFor,
   type SendAt,
@@ -15,21 +15,21 @@ import { describe, expect, test } from "vitest"
 import {
   foreignIn,
   heldIn,
-  holdingOf,
   holdingWords,
   runsIn,
+  runThreads,
   TRASHED_WORDS,
   takenIn,
-  threadsOf,
+  threadCardHolding,
 } from "./held.ts"
 
-/** `heldIn` over `threadsOf`: the gate's two steps, as it takes them. */
+/** `heldIn` over `runThreads`: the gate's two steps, as it takes them. */
 const heldAt = (
-  at: Parameters<typeof threadsOf>[0],
+  at: Parameters<typeof runThreads>[0],
   cards: Parameters<typeof heldIn>[1],
-  threadAt: Parameters<typeof threadsOf>[1],
-  forkOf: Parameters<typeof threadsOf>[2],
-) => heldIn(threadsOf(at, threadAt, forkOf), cards)
+  entryThread: Parameters<typeof runThreads>[1],
+  forkOf: Parameters<typeof runThreads>[2],
+) => heldIn(runThreads(at, entryThread, forkOf), cards)
 
 const T = threadIdFor("t")
 const ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
@@ -215,12 +215,12 @@ test("a trashed thread is held by nobody, but its discard stops its run and a co
   }
   const trashed: CardRecord = {
     ...on,
-    place: { kind: "trash", left: livePlaceOf(on.place) },
+    place: { kind: "trash", left: livePlace(on.place) },
   }
   expect(takenIn([on], [trashed])).toEqual([T])
   expect(takenIn([trashed], [trashed])).toEqual([])
-  expect(holdingOf([trashed], T)).toEqual({ kind: "trashed" })
-  expect(holdingOf([on], T)).toEqual({ kind: "free" })
+  expect(threadCardHolding([trashed], T)).toEqual({ kind: "trashed" })
+  expect(threadCardHolding([on], T)).toEqual({ kind: "free" })
   expect(
     heldAt([{ kind: "thread", thread: T }], [trashed], () => null, new Map()),
   ).toEqual({ thread: T, holding: { kind: "trashed" } })

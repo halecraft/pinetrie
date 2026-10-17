@@ -1,7 +1,7 @@
 // kinds — every kind of card, once: its id's prefix, the places it is ever in,
 // whether it is reordered where it is, and where what it says is read. One row
 // per kind, so a kind added to `CardKind` does not compile until each is said.
-// `PLACES_OF`, `kindOfCard` and `textSourceOf` read it.
+// `PLACES_OF`, `kindOfCard` and `cardTextSource` read it.
 
 import type { CardKind } from "./ids.ts"
 import type { CardPlace } from "./places.ts"
@@ -20,7 +20,7 @@ export interface KindSpec {
   /** Whether it may be reordered among its neighbours where it is. */
   readonly reordered: boolean
   /**
-   * Where what it says is read (`textSourceOf`): its own text document, a
+   * Where what it says is read (`cardTextSource`): its own text document, a
    * blob, the fact it holds, the ask it relays, or nowhere (it says
    * nothing a reader takes as text).
    */

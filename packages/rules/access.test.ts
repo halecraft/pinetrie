@@ -8,8 +8,8 @@ import {
 import { describe, expect, test } from "vitest"
 import {
   ACCESS_ANSWERS,
-  accessOf,
   answersFor,
+  emptyAccess,
   planAccessAnswer,
   planAccessAsk,
   planAccessChange,
@@ -29,7 +29,7 @@ const STATES: Record<PersonalAccess["kind"], PersonalAccess> = {
   unanswered: { kind: "unanswered", host: "pop", at: 1 },
 }
 const at = (personal: PersonalAccess | null): AccessRecord => ({
-  ...accessOf(LANE),
+  ...emptyAccess(LANE),
   personal,
 })
 const answer = (record: AccessRecord, a: AccessAnswer, sender = DUANE) =>
@@ -113,11 +113,11 @@ describe("asking", () => {
 })
 
 test("a use is recorded once, in first-use order", () => {
-  const once = planAccessUse(accessOf(LANE), { kind: "host", name: "pop" })
+  const once = planAccessUse(emptyAccess(LANE), { kind: "host", name: "pop" })
   expect(once?.hosts).toEqual(["pop"])
   expect(once && planAccessUse(once, { kind: "host", name: "pop" })).toBeNull()
   expect(
-    planAccessUse(accessOf(LANE), { kind: "service", name: "deploy" })
+    planAccessUse(emptyAccess(LANE), { kind: "service", name: "deploy" })
       ?.services,
   ).toEqual(["deploy"])
 })

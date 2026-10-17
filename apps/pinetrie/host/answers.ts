@@ -9,10 +9,10 @@ import {
   type Away,
   askOutcome,
   type EntryId,
+  entryMessage,
   indexAsks,
   isRoundAnswered,
   lastWord,
-  messageAt,
   projectTranscript,
   type QueuedFact,
   type RelayDetails,
@@ -26,9 +26,9 @@ import {
   type AnswerPlan,
   decodeRelay,
   encodeAnswer,
+  parseRoundReply,
   planAnswer,
   planDelivery,
-  roundReplyOf,
   roundRequest,
   transcriptLines,
 } from "@pinetrie/rules"
@@ -231,7 +231,7 @@ export function createAnswers(deps: {
       const asks = indexAsks(index)
       const outcome = askOutcome(index, asks, prompt, { running: false })
       const word = lastWord(index, asks, prompt)
-      const text = word === null ? "" : (messageAt(index, word)?.text ?? "")
+      const text = word === null ? "" : (entryMessage(index, word)?.text ?? "")
       return answerWrite(
         lane,
         relay,
@@ -296,7 +296,7 @@ export function createAnswers(deps: {
         return text
       },
       plan: reply => {
-        const next = roundReplyOf(reply, members)
+        const next = parseRoundReply(reply, members)
         switch (next.kind) {
           case "people":
             return {

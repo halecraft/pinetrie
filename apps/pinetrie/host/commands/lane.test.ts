@@ -13,8 +13,8 @@ import type { Agent } from "@pinetrie/pi"
 import { readCardHistories, readPlaces, readRecords } from "@pinetrie/reads"
 import {
   ACCESS,
-  accessOf,
   deleteRecord,
+  emptyAccess,
   encodeCard,
   PARTICIPANT,
   PROJECT,
@@ -222,7 +222,7 @@ test("the owner's answer to a lane's ssh is written; anyone else's is refused", 
   applyWrites(b, [
     setRecord(PROJECT, { root: "/p", kind: "jj", owner: ada }),
     setRecord(ACCESS, {
-      ...accessOf(lane),
+      ...emptyAccess(lane),
       personal: { kind: "waiting", host: "pop", since: 1 },
     }),
   ])

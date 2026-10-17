@@ -194,7 +194,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a thread's writers are the whole root's",
     file: "packages/reads/index.ts",
-    from: "        writersOf(index, ancestry(index, readLaneTip(doc, lane)).path),",
+    from: "        messageWriters(index, ancestry(index, readLaneTip(doc, lane)).path),",
     to: "        summary?.writers ?? [],",
     command: unit,
     expect: "each thread's writers are those on its path",

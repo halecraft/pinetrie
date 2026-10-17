@@ -9,9 +9,9 @@ import {
   cardIdOfKind,
   type EntryId,
   entryId,
-  keyOf,
   NO_CONTENT,
   type PlaceKey,
+  placeKey,
   rootIdFor,
   type TextCard,
   type TextPlace,
@@ -24,6 +24,7 @@ import { cardIdFor } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   type Cause,
+  changeVerb,
   HISTORY_EVENTS,
   movedBackBy,
   planProvenance,
@@ -33,7 +34,6 @@ import {
   TRACED,
   TRASH_KEEP_MS,
   trashDeadline,
-  verbOf,
 } from "./card-history.ts"
 
 const _TEST_THREAD = threadIdFor("e")
@@ -376,7 +376,7 @@ test.each([
   [DRAFTING, BEAS, "took-into-inventory"],
   [BEAS, ELSEWHERE, "put"],
   [DRAFTING, ELSEWHERE, "moved"],
-] as const)("verbOf(%o, %o): %s", (from, to, verb) => {
+] as const)("changeVerb(%o, %o): %s", (from, to, verb) => {
   const key = (p: CardPlace | null): PlaceKey | null =>
     p === null
       ? null
@@ -387,7 +387,7 @@ test.each([
           : p.kind === "canvas-pinned"
             ? { kind: "canvas-pinned", canvas: p.canvas }
             : p
-  expect(verbOf(key(from), key(to))).toBe(verb)
+  expect(changeVerb(key(from), key(to))).toBe(verb)
 })
 
 describe("movedBackBy", () => {
@@ -448,8 +448,8 @@ test("planTrashSweep: a card discarded a week ago or more, or with no history to
   const event = (when: number) => ({
     kind: "moved" as const,
     by: ADA,
-    from: keyOf(DRAFTING),
-    to: keyOf(discarded),
+    from: placeKey(DRAFTING),
+    to: placeKey(discarded),
     at: when,
   })
   const now = TRASH_KEEP_MS + 100
@@ -489,8 +489,8 @@ test("planTrashSweep: a card is kept as long as it is told, whatever that is", (
   const at = (when: number) => ({
     kind: "moved" as const,
     by: ADA,
-    from: keyOf(DRAFTING),
-    to: keyOf(discarded),
+    from: placeKey(DRAFTING),
+    to: placeKey(discarded),
     at: when,
   })
   const hour = 60 * 60 * 1000

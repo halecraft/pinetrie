@@ -44,7 +44,7 @@ export function inventorySlots(
      * and a refused put finds it there.
      */
     readonly held: () => readonly CardId[]
-    /** The slots this tab's takes into the inventory in flight chose (`intentsOf`). */
+    /** The slots this tab's takes into the inventory in flight chose (`slotIntents`). */
     readonly intents: () => Intents
   },
 ): InventorySlots {

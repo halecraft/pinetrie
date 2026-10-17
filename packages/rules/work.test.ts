@@ -11,12 +11,12 @@ import {
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
+  decodeRecords,
   forkSource,
   LANE as LANE_RECORD,
   PROJECT,
   planTurnRecord,
   REVISION,
-  recordsOf,
   setRecord,
   sourceHistory,
 } from "./index.ts"
@@ -91,7 +91,7 @@ describe("records: one spec each, total decoders", () => {
     const stored = LANE_RECORD.encode(lane) as Record<string, unknown>
     const other = threadIdFor("other")
     expect([
-      ...recordsOf(LANE_RECORD, [
+      ...decodeRecords(LANE_RECORD, [
         {
           key: other,
           value: { ...stored, history: "svn" },

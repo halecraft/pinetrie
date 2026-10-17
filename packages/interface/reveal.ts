@@ -9,12 +9,12 @@ import { placeEnd } from "@pinetrie/rules"
 import { type ActedAt, AT_INVENTORY } from "@pinetrie/session"
 import { heldByOthers } from "./canvas-columns.ts"
 import {
-  changeViewOf,
   type Effect,
   type IntentState,
   layout,
-  planOpenAt,
+  planOpenEntry,
   showCanvas,
+  viewChangeEffect,
 } from "./effects.ts"
 import { planOpen } from "./layout.ts"
 
@@ -27,7 +27,7 @@ const at = (key: string): ActedAt => ({ kind: "column", key })
  * card, unfolded in its canvas; a canvas's card, the board. A queued `card` is
  * scrolled to in its column's dock, which scrolls apart from the thread.
  */
-export function revealOf(
+export function revealEffects(
   place: PlaceKey,
   state: IntentState,
   card: CardId | null = null,
@@ -46,7 +46,7 @@ export function revealOf(
             ? showCanvas(place.canvas)
             : [
                 ...showCanvas(place.canvas),
-                changeViewOf(state, place.canvas, {
+                viewChangeEffect(state, place.canvas, {
                   kind: "fold",
                   card,
                   unfolded: true,
@@ -63,7 +63,7 @@ export function revealOf(
             ? []
             : [
                 ...showCanvas(canvas),
-                changeViewOf(state, canvas, {
+                viewChangeEffect(state, canvas, {
                   kind: "fold",
                   card: place.column,
                   unfolded: true,
@@ -77,7 +77,7 @@ export function revealOf(
       return {
         effects: [
           ...showCanvas(place.canvas),
-          changeViewOf(state, place.canvas, {
+          viewChangeEffect(state, place.canvas, {
             kind: "foldCanvas",
             unfolded: true,
           }),
@@ -113,7 +113,7 @@ export function revealOf(
               ? []
               : [
                   ...showCanvas(canvas),
-                  changeViewOf(state, canvas, {
+                  viewChangeEffect(state, canvas, {
                     kind: "fold",
                     card: place.thread,
                     unfolded: true,
@@ -132,7 +132,7 @@ export function revealOf(
       )
       return {
         effects: [
-          ...planOpenAt(end, state),
+          ...planOpenEntry(end, state),
           ...(place.kind === "queued" && card !== null
             ? [{ kind: "revealCard", card } as const]
             : []),

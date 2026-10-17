@@ -8,20 +8,20 @@ import {
   type BaseRecord,
   type CommitId,
   commitId,
-  conflictsAt,
   type EntryId,
   ERR,
   type ErrCode,
   type FolderBaseRecord,
   type ForkStart,
-  firstPromptOf,
   forkParent,
   type JjAcceptedRecord,
   type JjBaseRecord,
   type LaneBase,
+  laneFirstPrompt,
   nearestRevision,
   type ParentThread,
   type PointId,
+  pointConflicts,
   pointFromCommit,
   type RevisionRecord,
   type ThreadBase,
@@ -30,7 +30,7 @@ import {
   type TreeIndex,
 } from "@pinetrie/core"
 import { Type } from "typebox"
-import { CommitSchema, decodeAt, PointSchema, threadKey } from "./decode.ts"
+import { CommitSchema, decodeRecord, PointSchema, threadKey } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 
 const WorkSchema = Type.Union([
@@ -104,7 +104,7 @@ export const BASE: RecordSpec<BaseRecord, ThreadId, "session"> = {
         }
   },
   decode: (contents, key) =>
-    decodeAt(
+    decodeRecord(
       Type.Union([JjBaseSchema, FolderBaseSchema]),
       contents,
       threadKey(key),
@@ -162,7 +162,7 @@ interface BaseMove {
  * caught up, or null: the commit its newest `Pinetrie-Base` names
  * (`start`) against where the base is now, accepted work's `commit` or the WIP's.
  * Never for a WIP gone, which only "continue on accepted work" moves. Commits
- * only: whether catching up would change a file is `catchUpOf`'s, which
+ * only: whether catching up would change a file is `catchUpNow`'s, which
  * also decides what a missing record or line means.
  */
 function baseMoved(
@@ -216,7 +216,7 @@ export type CatchUpNow =
  * when it was made at the state the base is at now; else what it would
  * change is unknown.
  */
-export function catchUpOf(
+export function catchUpNow(
   base: BaseRecord | undefined,
   accepted: AcceptedRecord | null,
 ): CatchUpNow {
@@ -361,7 +361,7 @@ export interface ParentNow extends ParentThread {
   readonly newest: PointId
   /** The newest of its states this lane holds: its fork state, or what a catch-up merged. */
   readonly caughtUpWith: PointId
-  /** The files conflicted in `newest` (`conflictsAt`). */
+  /** The files conflicted in `newest` (`pointConflicts`). */
   readonly conflicts: readonly string[]
 }
 
@@ -400,7 +400,7 @@ export function parentNow(input: {
       r.lane === fork.lane && r.point !== null ? [r.point] : [],
     ),
   )
-  const first = firstPromptOf(index, revisions, input.lane, tip)
+  const first = laneFirstPrompt(index, revisions, input.lane, tip)
   let caughtUpWith = fork.point
   for (const id of ancestry(index, tip).path) {
     // An update, a resolution or a `catch_up` result says what it merged.
@@ -417,7 +417,7 @@ export function parentNow(input: {
     name,
     newest,
     caughtUpWith,
-    conflicts: conflictsAt(revisions, newest),
+    conflicts: pointConflicts(revisions, newest),
   }
 }
 

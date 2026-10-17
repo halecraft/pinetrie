@@ -7,7 +7,7 @@ import type {
   CommandsRecord,
 } from "@pinetrie/core"
 import { Type } from "typebox"
-import { decodeAt, fixedKey } from "./decode.ts"
+import { decodeRecord, fixedKey } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 
 /** The one `pinetrie.commands` value's key: what the host's pi loaded. */
@@ -35,7 +35,7 @@ export const COMMANDS: RecordSpec<
   keyOf: () => COMMANDS_KEY,
   encode: r => ({ commands: r.commands.map(c => ({ ...c })) }),
   decode: (contents, key) =>
-    decodeAt(
+    decodeRecord(
       CommandsRecordSchema,
       contents,
       fixedKey(COMMANDS_KEY, key),

@@ -14,11 +14,11 @@ import {
 import type { PiSetup } from "@pinetrie/pi"
 import { readBanners, readNames } from "@pinetrie/reads"
 import {
-  answerOf,
   BANNER,
   BANNER_ATTEMPTS,
   type BannerAnswer,
   type BannerAsk,
+  bannerAnswer,
   bannerDue,
   bannerPrompt,
   bannerStillWanted,
@@ -122,7 +122,7 @@ export function createBanners(deps: {
       let answer: BannerAnswer = { kind: "refused", reason: "no_thread" }
       await later.step(scope(lane), "a banner", () => {
         const plan = planAsk(ask, sha => blobs.ref(sha) !== undefined, draws)
-        answer = answerOf(plan)
+        answer = bannerAnswer(plan)
         if (plan.kind === "generate") start(lane, plan.direction, true)
         return plan.kind === "write" ? banner(lane, plan.sha) : null
       })

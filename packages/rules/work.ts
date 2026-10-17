@@ -24,7 +24,7 @@ import {
 import { Type } from "typebox"
 import type { ForkBegin } from "./base.ts"
 import {
-  decodeAt,
+  decodeRecord,
   entryKey,
   fixedKey,
   PointSchema,
@@ -94,7 +94,7 @@ export const LANE: RecordSpec<LaneRecord, ThreadId, "session"> = {
   keyOf: r => r.lane,
   encode: ({ lane, ...contents }) => contents,
   decode: (contents, key) =>
-    decodeAt(LaneRecordSchema, contents, threadKey(key), (r, lane) =>
+    decodeRecord(LaneRecordSchema, contents, threadKey(key), (r, lane) =>
       isRootId(r.root)
         ? {
             lane,
@@ -118,7 +118,7 @@ export const REVISION: RecordSpec<RevisionRecord, EntryId, "root"> = {
     conflicts: [...contents.conflicts],
   }),
   decode: (contents, key) =>
-    decodeAt(RevisionRecordSchema, contents, entryKey(key), (r, entry) =>
+    decodeRecord(RevisionRecordSchema, contents, entryKey(key), (r, entry) =>
       isThreadId(r.lane)
         ? {
             entry,
@@ -141,7 +141,7 @@ export const PROJECT: RecordSpec<ProjectRecord, typeof PROJECT_KEY, "session"> =
     keyOf: () => PROJECT_KEY,
     encode: r => ({ ...r }),
     decode: (contents, key) =>
-      decodeAt(
+      decodeRecord(
         ProjectRecordSchema,
         contents,
         fixedKey(PROJECT_KEY, key),
@@ -316,7 +316,7 @@ export const FILES_LOST: RecordSpec<FilesLostRecord, ThreadId, "session"> = {
   keyOf: r => r.lane,
   encode: ({ lane, ...contents }) => contents,
   decode: (contents, key) =>
-    decodeAt(FilesLostSchema, contents, threadKey(key), (r, lane) => ({
+    decodeRecord(FilesLostSchema, contents, threadKey(key), (r, lane) => ({
       lane,
       snapshot: snapshotId(r.snapshot),
     })),

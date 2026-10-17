@@ -3,7 +3,7 @@ import {
   canvasIdFor,
   entryId,
   indexTree,
-  livePlaceOf,
+  livePlace,
   rootIdFor,
   type ThreadRecord,
   threadIdFor,
@@ -13,7 +13,7 @@ import {
 import { canvasCard, fromParents, threadOfEntry } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import { unstartedThreads } from "./canvas-index.ts"
-import { threadCardOf } from "./fixtures.ts"
+import { landedThreadCard } from "./fixtures.ts"
 import { planOpenThread } from "./open.ts"
 import { emptiedCanvases, planCanvasesTrashed } from "./root.ts"
 
@@ -33,7 +33,12 @@ const record = (thread: typeof R, root = ROOT): ThreadRecord => ({
   createdAt: 1,
   origin: { kind: "root" },
 })
-const onCanvas = threadCardOf({ thread: R, canvas: CANVAS, by: ADA, cards: [] })
+const onCanvas = landedThreadCard({
+  thread: R,
+  canvas: CANVAS,
+  by: ADA,
+  cards: [],
+})
 const STATE = workflowStateIdFor("d")
 const WORKFLOW = {
   open: [{ id: STATE, name: "Doing" }],
@@ -223,7 +228,7 @@ describe("unstartedThreads", () => {
 })
 
 describe("closing a new canvas before its first send", () => {
-  const tab = threadCardOf({
+  const tab = landedThreadCard({
     thread: NEW,
     canvas: NEW_CANVAS,
     by: ADA,
@@ -231,7 +236,7 @@ describe("closing a new canvas before its first send", () => {
   })
   const trashed = {
     ...tab,
-    place: { kind: "trash", left: livePlaceOf(tab.place) },
+    place: { kind: "trash", left: livePlace(tab.place) },
   } as const
   const threads = new Map([[NEW, record(NEW, NEW_ROOT)]])
   test("its thread trashed, the empty canvas's card goes to the closer's trash, remembering the canvas", () => {
@@ -251,14 +256,14 @@ describe("closing a new canvas before its first send", () => {
         kind: "write",
         record: {
           ...card,
-          place: { kind: "trash", left: livePlaceOf(card.place) },
+          place: { kind: "trash", left: livePlace(card.place) },
           placer: ADA,
         },
       },
     ])
   })
   test("never a canvas that holds another card, nor one whose root has started, nor a branch's", () => {
-    const other = threadCardOf({
+    const other = landedThreadCard({
       thread: R,
       canvas: NEW_CANVAS,
       by: ADA,

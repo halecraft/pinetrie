@@ -34,14 +34,14 @@ export function planInvocation(
   const [folder, ...extra] = args
   if (extra.length > 0)
     return { kind: "refused", refusal: { kind: "extra", args } }
-  return { kind: "start", folder: folderOf(folder, base, pinetrieRoot) }
+  return { kind: "start", folder: invokedFolder(folder, base, pinetrieRoot) }
 }
 
 /**
  * The folder a command names: pinetrie's own repo without one, else the one
  * named, a relative one read from `base`.
  */
-const folderOf = (
+const invokedFolder = (
   arg: string | undefined,
   base: string,
   pinetrieRoot: string,
@@ -91,7 +91,7 @@ export function planTidyInvocation(
     }
   return {
     kind: "tidy",
-    folder: folderOf(folders[0], base, pinetrieRoot),
+    folder: invokedFolder(folders[0], base, pinetrieRoot),
     days,
     dryRun,
   }

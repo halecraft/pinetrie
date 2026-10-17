@@ -138,7 +138,7 @@ const kinds = (
 ) => (r?.kind === "canvas" ? r.menu.map(i => i.kind) : null)
 
 describe("sidebarView", () => {
-  test("your canvases, in listOf's order", () => {
+  test("your canvases, in sidebarList's order", () => {
     expect(items().map(t => t.kind)).toEqual(["canvas", "canvas", "canvas"])
     expect(items().map(t => t.selected)).toEqual([true, false, false])
   })

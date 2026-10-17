@@ -24,7 +24,7 @@ import { type RootDocHandle, readEntries, rowMessage } from "@pinetrie/schema"
 import { newRootDoc } from "@pinetrie/schema/fixtures"
 import { afterAll, beforeAll, describe, expect, test } from "vitest"
 import { newId } from "./agent.ts"
-import { bannerImageConfig, drawnOf, parseBannerArgs } from "./banner.ts"
+import { bannerImageConfig, fitDrawnImage, parseBannerArgs } from "./banner.ts"
 import { ONE_ROOT, oneRoot } from "./one-root.ts"
 import {
   SCRIPTED_IMAGE_PNG,
@@ -74,13 +74,13 @@ describe("parseBannerArgs", () => {
   })
 })
 
-test("drawnOf: a model's image is fitted as an upload is; bytes that are not one are refused", async () => {
-  expect(await drawnOf(SCRIPTED_IMAGE_PNG)).toMatchObject({
+test("fitDrawnImage: a model's image is fitted as an upload is; bytes that are not one are refused", async () => {
+  expect(await fitDrawnImage(SCRIPTED_IMAGE_PNG)).toMatchObject({
     kind: "drawn",
     image: { mimeType: "image/png", width: 4, height: 4 },
   })
   expect(
-    await drawnOf(Buffer.from("not an image at all").toString("base64")),
+    await fitDrawnImage(Buffer.from("not an image at all").toString("base64")),
   ).toEqual({ kind: "failed", reason: "not an image" })
 })
 

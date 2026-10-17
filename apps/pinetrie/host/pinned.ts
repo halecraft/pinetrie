@@ -20,7 +20,7 @@ import {
   displayName,
   encodePinned,
   type PinnedMessage,
-  pinnedAt,
+  pinnedCardsAtEnd,
   pinnedReads,
   planPinnedRead,
 } from "@pinetrie/rules"
@@ -69,7 +69,7 @@ export function createPinned(deps: {
     if (doc === null || tip === null) return null
     const index = readTreeIndex(doc)
     const records = readPlaces(places)
-    return { index, tip, pinned: pinnedAt(tip, records, index) }
+    return { index, tip, pinned: pinnedCardsAtEnd(tip, records, index) }
   }
 
   /**

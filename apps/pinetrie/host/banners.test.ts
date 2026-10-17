@@ -1,5 +1,5 @@
 import { type Sha256, type ThreadName, threadIdFor } from "@pinetrie/core"
-import { type Drawn, type PiSetup, sha256Of } from "@pinetrie/pi"
+import { blobSha256, type Drawn, type PiSetup } from "@pinetrie/pi"
 import { readBanners } from "@pinetrie/reads"
 import { type BannerAsk, NAME as NAME_RECORD, setRecord } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
@@ -21,7 +21,7 @@ import type { StepRecords } from "./records.ts"
 const LANE = threadIdFor("1")
 const NAME = "clear-zebra" as ThreadName
 const BYTES = new Uint8Array([1, 2, 3])
-const SHA = sha256Of(BYTES)
+const SHA = blobSha256(BYTES)
 const DRAWN: Drawn = {
   kind: "drawn",
   image: { bytes: BYTES, mimeType: "image/png", width: 1, height: 1 },

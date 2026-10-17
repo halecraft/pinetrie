@@ -7,7 +7,7 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import { writerId } from "@pinetrie/core"
 import { UPLOADING } from "@pinetrie/interface"
-import { scriptedModel, sha256Of } from "@pinetrie/pi"
+import { blobSha256, scriptedModel } from "@pinetrie/pi"
 import type { Page } from "@playwright/test"
 import type { Checks } from "../checks.ts"
 import { idleNow, startSuiteHost, suiteModel, waitFor } from "../harness.ts"
@@ -102,7 +102,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
             () => false,
           )
         release()
-        const sha = sha256Of(RED_PNG)
+        const sha = blobSha256(RED_PNG)
         const markdown = `![red.png](/blob/${sha})`
         const inserted = await pp
           .waitForFunction(
@@ -392,7 +392,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         // the box, and sent, it is a chip naming it. The drop is the
         // browser's own, through CDP, as one from the desktop is.
         const notes = Buffer.from("the notes\n")
-        const notesSha = sha256Of(notes)
+        const notesSha = blobSha256(notes)
         const notesFile = path.join(
           mkdtempSync(path.join(tmpdir(), "pinetrie-drop-")),
           "notes.txt",
@@ -545,7 +545,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         ])
         await say("what is tall.png?", "A grey rectangle.")
         const row = `${col(0)} .tool[data-tool="read"]`
-        const sha = sha256Of(tall)
+        const sha = blobSha256(tall)
         const img = `${row} .tool-images img[src="/blob/${sha}"]`
         /** The row's size, and its image once loaded: shown size, alt, title. */
         const drawn = () =>

@@ -1,6 +1,6 @@
 import { canvasIdFor, entryId, projectRail } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
-import { entry, indexOf } from "./fixtures.ts"
+import { entry, indexEntries } from "./fixtures.ts"
 import {
   parseQuery,
   type Query,
@@ -102,7 +102,7 @@ test("every match in a message is found, in order", () => {
 })
 
 test("searchCorpus: every message of the root, as a reader sees its text", () => {
-  const index = indexOf([
+  const index = indexEntries([
     entry("1", null, { role: "person", content: "Fix the rail" }),
     entry("2", "1", {
       role: "assistant",

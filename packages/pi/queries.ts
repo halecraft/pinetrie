@@ -39,7 +39,7 @@ export const inBounds = (seq: number, bounds: Bounds): boolean =>
   (bounds.to === undefined || seq <= bounds.to)
 
 /** pi's limit: none, or a count of at least zero. */
-export const limitOf = (limit: number | undefined): number =>
+export const piLimit = (limit: number | undefined): number =>
   limit === undefined
     ? Number.POSITIVE_INFINITY
     : Math.max(0, Math.trunc(limit) || 0)
@@ -92,11 +92,11 @@ export function selectBranch(
   const selected = (stop === -1 ? ordered : ordered.slice(0, stop + 1)).filter(
     ({ row, seq }) => rowMatches(row, query) && inBounds(seq, bounds),
   )
-  return selected.slice(0, limitOf(query.limit))
+  return selected.slice(0, piLimit(query.limit))
 }
 
 /** A row's structure, without its payload's variant data. */
-export function structureOf({ row, seq }: Located): EntryStructure {
+export function entryStructure({ row, seq }: Located): EntryStructure {
   const customType = rowCustomType(row)
   return {
     id: row.id,

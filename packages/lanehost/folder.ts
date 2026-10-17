@@ -42,7 +42,7 @@ import {
   checkedDiskName as named,
   type ProjectDisks,
 } from "./layout.ts"
-import { kindOf, walkTree } from "./walk.ts"
+import { statKind, walkTree } from "./walk.ts"
 
 const inside = (p: string): string => {
   if (!isPathInside(p))
@@ -84,7 +84,7 @@ async function factAt(root: string, p: string): Promise<PathFact> {
   const at = path.join(root, p)
   const s = await lstatOrNull(at)
   if (s === null) return { kind: "absent" }
-  switch (kindOf(s)) {
+  switch (statKind(s)) {
     case "dir":
       return { kind: "dir" }
     case "symlink":
@@ -130,7 +130,7 @@ export async function filesUnder(
     const s = await lstatOrNull(path.join(root, p))
     if (s === null) continue
     if (!s.isDirectory()) {
-      if (kindOf(s) !== "other") out.add(p)
+      if (statKind(s) !== "other") out.add(p)
       continue
     }
     for (const [rel, e] of await walkTree(path.join(root, p)))

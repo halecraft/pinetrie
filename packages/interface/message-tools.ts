@@ -17,7 +17,7 @@ import {
 } from "@pinetrie/core"
 import type { Taken } from "./clip.ts"
 import type { Prefill } from "./columns.ts"
-import { markdownOf } from "./markdown-of.ts"
+import { addressMarkdown } from "./markdown-of.ts"
 
 /** The mention that asks the agent, as a composer starts with it. */
 const AGENT_PREFIX = agentAsk("")
@@ -172,10 +172,10 @@ export function selectionReference(
   })
 }
 
-/** `address` in `node` taken: its markdown `markdownOf`'s, so a reference's quote and the clipboard say the same. */
+/** `address` in `node` taken: its markdown `addressMarkdown`'s, so a reference's quote and the clipboard say the same. */
 const takenAt = (node: TranscriptMessage, address: Address): Taken => ({
   address,
-  markdown: markdownOf(address, {
+  markdown: addressMarkdown(address, {
     messageOf: entry => (entry === node.id ? node : undefined),
   }),
 })

@@ -16,7 +16,7 @@ export interface Selection {
  * where it would touch other text. Returns the text and the cursor, after
  * the snippet. A selection past the text's end is clamped to it.
  */
-export function insertAt(
+export function insertSnippet(
   text: string,
   selection: Selection,
   snippet: string,

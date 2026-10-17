@@ -10,7 +10,7 @@ import {
 } from "@pinetrie/core"
 import {
   cardIdFor,
-  entriesOf,
+  entriesById,
   entry,
   fromParents,
   threadOfEntry,
@@ -192,7 +192,7 @@ test("a thread's face reads its first message, not the context entry its first r
   const T = threadIdFor("t")
   const B = threadIdFor("b")
   const index = indexTree(
-    entriesOf([
+    entriesById([
       entry("1-r", null, { role: "person", content: "plan" }, { thread: T }),
       entry(
         "2-cb",

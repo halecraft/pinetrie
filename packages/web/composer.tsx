@@ -25,7 +25,7 @@ import {
 import type { SessionClient } from "@pinetrie/session"
 import { CardEditor, type Where } from "./card-editor.tsx"
 import { nameFor } from "./presence.tsx"
-import { useTypingAt } from "./use-presence.ts"
+import { useOthersTyping } from "./use-presence.ts"
 
 /**
  * The column's foot. What you type here is your message at this thread's end,
@@ -122,7 +122,7 @@ function TypingLine(p: {
   end: EntryId
   reader: Reader
 }) {
-  const typing = useTypingAt(p.session.presence, p.reader.me, p.end)
+  const typing = useOthersTyping(p.session.presence, p.reader.me, p.end)
   if (typing.length === 0) return null
   const names = typing.map(w => nameFor(p.reader.nameOf, w))
   return (

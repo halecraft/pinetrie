@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest"
-import { entriesOf, entry } from "./fixtures.ts"
+import { entriesById, entry } from "./fixtures.ts"
 import {
   type EntryLike,
   entryId,
@@ -19,7 +19,7 @@ const owl = threadIdFor("owl")
 const here = threadIdFor("here")
 const ada = writerId("ada@example.com")
 const build = (rows: readonly EntryLike[]): TreeIndex =>
-  indexTree(entriesOf(rows))
+  indexTree(entriesById(rows))
 const personMessage = (extra: Partial<Message> = {}): Message => ({
   role: "person",
   content: "hi",

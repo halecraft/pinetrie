@@ -139,7 +139,7 @@ function carrierAttribute(html: string): string | null {
 }
 
 /** Every file a paste brings (`pastedFiles`): what a card box shares. */
-export const pastedFilesOf = (e: {
+export const eventPastedFiles = (e: {
   readonly clipboardData: DataTransfer | null
 }): File[] => (e.clipboardData === null ? [] : pastedFiles(e.clipboardData))
 

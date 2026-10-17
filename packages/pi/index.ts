@@ -28,10 +28,10 @@ export {
   type ResourceLists,
 } from "./config.ts"
 export {
+  blobSha256,
   type PreparedImage,
   prepareImage,
   readImageProcessor,
-  sha256Of,
 } from "./images.ts"
 export {
   type LaneChannel,

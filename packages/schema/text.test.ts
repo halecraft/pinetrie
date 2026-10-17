@@ -8,9 +8,15 @@ import {
 import { textCardId, writerId } from "@pinetrie/core"
 import { expect, test } from "vitest"
 import { cardDocId, cardIdOfDoc } from "./places.ts"
-import { seatOf, TextDoc, textClients, textHolds, textVersion } from "./text.ts"
+import {
+  seatIdentity,
+  TextDoc,
+  textClients,
+  textHolds,
+  textVersion,
+} from "./text.ts"
 
-test("seatOf: each seat's person, by the clientID its document carries", () => {
+test("seatIdentity: each seat's person, by the clientID its document carries", () => {
   // Pinned to real documents, so a change in how Kyneta derives a clientID
   // from a seat fails here.
   const seats = [
@@ -20,7 +26,7 @@ test("seatOf: each seat's person, by the clientID its document carries", () => {
   ]
   const authors = new Map(
     seats.flatMap(s => {
-      const seat = seatOf(s.peerId, s.principal)
+      const seat = seatIdentity(s.peerId, s.principal)
       return seat === null ? [] : [[seat.clientId, seat.writer] as const]
     }),
   )

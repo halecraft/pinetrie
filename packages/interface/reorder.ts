@@ -5,7 +5,7 @@
 // the last of n. A column dropped in the gap either side of itself does not move.
 
 /** The gap a pointer at `x` is in: the number of columns whose centre is left of it. */
-export function gapAt(mids: readonly number[], x: number): number {
+export function pointerGap(mids: readonly number[], x: number): number {
   return mids.filter(mid => mid < x).length
 }
 

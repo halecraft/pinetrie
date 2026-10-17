@@ -29,7 +29,7 @@ import {
   type CanvasMessage,
   type CanvasPinnedMessage,
   canvasList,
-  canvasPinnedOf,
+  canvasPinnedCards,
   displayName,
   encodeCanvas,
   encodeCanvasPinned,
@@ -87,7 +87,7 @@ export function createCanvasContext(deps: {
     const tip = doc === null ? null : readLaneTip(doc, lane)
     if (canvas === undefined || doc === null || tip === null) return []
     const cards = readPlaces(places)
-    const pins = canvasPinnedOf(cards, canvas)
+    const pins = canvasPinnedCards(cards, canvas)
     await deps.cards.hydrate(pins.map(c => c.id))
     const index = readTreeIndex(doc)
     const names = readParticipantNames(session)

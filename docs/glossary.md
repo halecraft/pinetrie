@@ -25,11 +25,11 @@ words they were written with.
 |---|---|---|---|
 | **base** | Where a thread started: accepted work, or a copy of a WIP. Its first commit's `Pinetrie-Base` trailer says which (`accepted@<commit>`, or `<wip>@<commit>`). | `base`, `LaneBase`, `BaseTrailer` | the line (as a base) |
 | **catch up** | Bring the working copy, or a thread's copy, up to date with what it is based on. Its commit is titled `catch up: accepted work`, `catch up: <thread>`, or `copy of <wip>`. | `catchUp`, `CatchUpFrom`, `catchUpName` | update, follow, bring up to date |
-| **lane** | A thread's own copy of your repo, in a container of its own (ADR-0034), named by its thread's id (ADR-0117). | `lane`, `ThreadId`, `laneOf` | |
+| **lane** | A thread's own copy of your repo, in a container of its own (ADR-0034), named by its thread's id (ADR-0117). | `lane`, `ThreadId`, `threadLane` | |
 | **work strip** | The row of a column's header that says what became of its thread's files, with its buttons and its ⋯ (ADR-0153). | `WorkStripView`, `workStripView`, `WorkStripButton`, `WorkStripWords`, `.work-strip` | offer view, offer strip |
 | **review** | The pane that shows proposed changes' or an ask's revisions, files and diffs, read by commit id (`/review/…`, ADR-0047, ADR-0153). | `ReviewAsk`, `ReviewAnswer`, `parseReviewPath`, `REVIEW_WIRE` | offer read, `/offer/` |
 | **ready** | An inbox item for proposed changes you follow, waiting to be accepted; "not needed" dismisses it (ADR-0091, ADR-0153). | raised kind `ready`, `dismissReady`, `dismissedReady` | |
-| **change id** | jj's id of a revision, kept across its rewrites; never called "change" alone (ADR-0153). | `changeId`, `changeIdsOf` | change (for the id) |
+| **change id** | jj's id of a revision, kept across its rewrites; never called "change" alone (ADR-0153). | `changeId`, `revisionChangeIds` | change (for the id) |
 | **files touched** | Whether a lane's work since its start changes any file: `none`, `some` or `unknown` (ADR-0067, ADR-0153). | `FilesTouched`, `filesTouched` | `WorkChanges` |
 
 ## A folder project
@@ -69,7 +69,7 @@ words they were written with.
 |---|---|---|---|
 | **card** | Something present: an identity, one place, and content, which the host keeps; its content's kind decides where it can be, what can be done with it, and how it is drawn (ADR-0126). A text card, a thread card, a note column or a fact card (ADR-0111, ADR-0116, ADR-0117). Every card is made by one rule. | `CardRecord`, `Card<K>`, `CardId`, `CardKind`, `KINDS`, `makeCard`, `planMake` | |
 | **surface** | Where cards are put, which some content or a party has: a team's board, a canvas, a thread's dock, a note column's list, a person's inventory. A card is placed on one surface, and has the surfaces its content gives; a surface is data, never a view (ADR-0111, ADR-0126). | `CardPlace` | |
-| **content** | What a card holds, beside its identity and its place: a text card's command, a fact, nothing for a thread's card or a note column; later a canvas, a reference. Its kind decides the card's places, acts and renderings (ADR-0126). | `Card<K>`, `ContentOf`, `KINDS`, `textSourceOf` | the card's kind (as where it may be), `CardCarries` |
+| **content** | What a card holds, beside its identity and its place: a text card's command, a fact, nothing for a thread's card or a note column; later a canvas, a reference. Its kind decides the card's places, acts and renderings (ADR-0126). | `Card<K>`, `ContentOf`, `KINDS`, `cardTextSource` | the card's kind (as where it may be), `CardCarries` |
 | **fact card** | A fact on its way into a thread: a card of its own kind, only ever queued, until the thread's end consumes it (ADR-0080, ADR-0126). | `FactCard`, `FactCardId` (`x-`), `planFactCard` | a text card carrying a fact |
 | **reference** | A card holding an address and its quote, kept as a blob: a link, a quote, or whole, by where it is drawn. What a paste of a message or a block makes on a surface; edited as text, it becomes a text card that keeps its origin, a paste replacing it (ADR-0126, ADR-0132). | `ReferenceCard` (`q-`), `planPaste`, `planEditAsText`, `messageReference` | taking a copy of a message as bare text; taking a reference from the past |
 | **origin** | Where a copy came from: an address a text card made from a reference keeps; a thread's copy keeps its fork (ADR-0126). | `ContentOf.text.origin`, `ThreadOrigin` | |
@@ -86,15 +86,15 @@ words they were written with.
 | **text card** | Unsent text, with a place, drawn in one frame coloured by that place. | `TextCard`, `TextCardId`, `CardPlace`, `CardFrame`, `cardFrame` | |
 | **thread card** | A thread, as a card: on a canvas, in someone's inventory or a trash, one place either way (ADR-0117, ADR-0124). A thread is a card from the moment its column opens, before its first entry (ADR-0126). | `ThreadCard`, `threadFace`, `planThreadOpen`, `unstartedThreads` | a root, as the board and the sidebar draw it; board item; a fresh column, a new tab's column |
 | **your message** | The text card in your composer at a thread's end, which only you see; at a thread not yet started too (ADR-0126). | `composing` (stored as `drafting`), `yourCard` | the composer's card, drafting card (yours); a fresh card |
-| **trash** | Not a place of its own: a discarded card records where it was, and is in the trash of what it left, a canvas's for a column, a note column's for a note, a thread's for your message, your own for your inventory; seen by whoever saw it there, until restored, undone or deleted a week on (ADR-0134). | `trash` (`{ kind: "trash", left }`, stored as `discarded-<kind>`), `DISCARDED`, `ownerOf`, `planTrashSweep`, `trashDeadline` | the `gone` place; a person's trash |
+| **trash** | Not a place of its own: a discarded card records where it was, and is in the trash of what it left, a canvas's for a column, a note column's for a note, a thread's for your message, your own for your inventory; seen by whoever saw it there, until restored, undone or deleted a week on (ADR-0134). | `trash` (`{ kind: "trash", left }`, stored as `discarded-<kind>`), `DISCARDED`, `surfaceOwner`, `planTrashSweep`, `trashDeadline` | the `gone` place; a person's trash |
 | **restore** (a trashed card) | Bring a trashed card back where it was, at its rank: from a canvas column's trash, or by following a link to a trashed thread; anyone who could see it there may (ADR-0134). Refused when that place is gone or taken. Not a canvas's restore from the archive. | `planFromTrash`'s `restore`, `BACK`, `planRestore` | undo |
-| **note** | A text card in a note column, which everyone on the canvas sees and no agent reads (ADR-0116). | `note`, `noteOf`, `notesIn`, `NoteCardEditor` | drafting card, draft; a note below the line on its thread's notes board |
+| **note** | A text card in a note column, which everyone on the canvas sees and no agent reads (ADR-0116). | `note`, `notesTarget`, `notesIn`, `NoteCardEditor` | drafting card, draft; a note below the line on its thread's notes board |
 | **note column** | A card on a canvas whose content is a list of notes, titled or "Notes" (ADR-0116). Named by how it is drawn (ADR-0126). | `NoteColumnId`, `NoteColumnCard`, `NOTE_COLUMN`, `nearestNoteColumn`, `NoteColumn` | notes board |
 | **queued card** | A text card above the line, which the agent reads once, when the host pops it. | `queued`, `queuedOn`, `QueuedCardEditor` | |
-| **pinned card** | A text card the agent reads on every run, at the top of its thread's column. | `pinned`, `pinnedOf`, `PinnedCardEditor` | |
-| **inventory** | Your own grid of cards, text cards and thread cards, on every canvas and device. A thread there is yours alone, read only and run by nobody (ADR-0124). | `inventory`, `InventoryPanel`, `holdingOf`, `ThreadPreview` | |
+| **pinned card** | A text card the agent reads on every run, at the top of its thread's column. | `pinned`, `pinTargetKey`, `PinnedCardEditor` | |
+| **inventory** | Your own grid of cards, text cards and thread cards, on every canvas and device. A thread there is yours alone, read only and run by nobody (ADR-0124). | `inventory`, `InventoryPanel`, `threadCardHolding`, `ThreadPreview` | |
 | **consume** | What a thread's live end does to a card: a send, a fact popped. The card ends; the entry it became is the record. A spin sends its card to the trash instead, so it can be undone (ADR-0126). | | |
-| **face**, **normal**, **whole** | The three levels of detail every kind is drawn at, chosen by the surface it is on: a strip, a grid cell or a mark; the card itself, bounded; all of it, as a column or in the pane. Width is the place's, not a level (ADR-0126). | `Detail`, `DETAIL_ON`, `Face`, `faceOf`, `RENDERINGS` | |
+| **face**, **normal**, **whole** | The three levels of detail every kind is drawn at, chosen by the surface it is on: a strip, a grid cell or a mark; the card itself, bounded; all of it, as a column or in the pane. Width is the place's, not a level (ADR-0126). | `Detail`, `DETAIL_ON`, `Face`, `cardFace`, `RENDERINGS` | |
 | **preview** | A selected card in the inventory, drawn normal, one column wide, read only (ADR-0126). | `InventoryView.preview`, `threadPreview` | |
 | **the line** | What divides a thread's queued cards, which the agent reads, from your message, which it does not. | | |
 | **the dock** | A column's foot: the queue, the line and your message (ADR-0113). | | |
@@ -107,7 +107,7 @@ words they were written with.
 
 | word | what it is | in code | retired |
 |---|---|---|---|
-| **thread** | A line of conversation, from where it forks to its end, with an id of its own, which each of its entries names (ADR-0125) and its lane is named by (ADR-0117). Its context is its path to its root. | `ThreadId`, `ThreadRecord`, `threadEnd`, `threadAt`, `MessageAt` | a thread known by its lane, or by its end; `LaneName` |
+| **thread** | A line of conversation, from where it forks to its end, with an id of its own, which each of its entries names (ADR-0125) and its lane is named by (ADR-0117). Its context is its path to its root. | `ThreadId`, `ThreadRecord`, `threadEnd`, `entryThread`, `MessageAt` | a thread known by its lane, or by its end; `LaneName` |
 | **chat** | A thread nobody's agent works in: no lane, so a message naming no one goes to the people in it, and `@agent` asks the agent. Not stored (ADR-0021, ADR-0158). | `CHAT_LABEL`, a `NewColumn` that `opens` `"chat"` | conversation; `chat` for a person's message (`ChatAt`, `ChatDetails`, role `chat`) |
 | **agent thread** | A thread whose agent works in it: it has a lane, and a message naming no one asks the agent. Not stored (ADR-0021, ADR-0158). | `agentByDefault`, `AGENT_PREFILL`, `branchPrefill` | agent work (as a kind of thread) |
 | **copy** (a thread) | A new thread branched at a thread's end as its copier saw it, put as its own card; its fork row leads back to the original (ADR-0117). | `copy-thread`, `planCopy`, `ThreadOrigin` | |
@@ -128,11 +128,11 @@ a value is stored.
 | word | what it is | in code | retired |
 |---|---|---|---|
 | **entry** | Anything in a thread's past: immutable, with an author and a time. A message or a fact. To change one, fork. | `EntryId`, `EntryLike` | row (as a kind of thing) |
-| **block** | Part of a message: a paragraph, a table, code, an image, numbered once by its kind in document order (ADR-0126). | `BlockRef`, `blocksOf`, `markBlocks`, `data-block` | |
+| **block** | Part of a message: a paragraph, a table, code, an image, numbered once by its kind in document order (ADR-0126). | `BlockRef`, `textBlocks`, `markBlocks`, `data-block` | |
 | **address** | What names a thread, an entry, a block, a range of text or a card; of the past, both a snapshot and a link (ADR-0126). | `Address`, `printAddress`, `parseAddress`, `/a/<address>` | |
 | **message** | An entry a person or the agent wrote; a person's is stored as `pinetrie.message`, and sending one is a **send**. | `TranscriptMessage`, roles `person` and `assistant`, `MessageAt`, `MessageDetails`, the `send` command | a chat (as a person's message) |
 | **fact** | An entry the host wrote: a catch-up, an acceptance, the base's news (ADR-0080), who stopped a run (ADR-0126). | roles `fact`, `update`, `land`, `behind`; `ProposedChangesFact`, `StopFact`, `QueuedFact`, `AskIndex.stoppedBy` | `pinetrie.stop` |
-| **run** | The agent's work in answer to an ask: the entries it wrote, and any fact steered into it. A run has an ask (ADR-0106). | `AskIndex.work`, `runOf` | |
+| **run** | The agent's work in answer to an ask: the entries it wrote, and any fact steered into it. A run has an ask (ADR-0106). | `AskIndex.work`, `entryAsk` | |
 | **ask** | The message that started a run (ADR-0106). | `askOf`, `indexAsks` (by prompt) | |
 | **fork** | The point, at an entry, where threads diverge; not an entry. Forking before an entry edits it (ADR-0043); after it, branches. | `ThreadOrigin.fork` | |
 | **margin** | An entry's surface, for comments on it; shut, a count beside the entry; open, the comments under it (ADR-0126). | place `margin`, `marginCards`, `marginCounts`, `Margin`, `MarginFace` | |
@@ -146,10 +146,10 @@ a value is stored.
 | **canvas** | The card the board, the sidebar and ＋ hold, and its surface: threads and note columns in an order everyone shares, each one or two columns wide, drawn as the strip when it opens (ADR-0116, ADR-0126, ADR-0158). On the board in a workflow state, at its rank there; who moved it there and when is its card's history. | `CanvasId`, `CanvasCard`, `KINDS.canvas`, `CanvasIndex`, `BoardCard`, `planBoardMove`, `boardCanvases`; `canvas` (a `CardPlace`), `CardOnCanvas`, `cardsOnCanvas`, `canvasColumns`, `Strip` (the view) | task (as the card), task card; the root as what the board holds; "the root you are on"; the board place, the task's record (`pinetrie.board`, `pinetrie.task`) |
 | **topic** | A canvas in the board's first open state, there so teammates find it. A word for where a canvas is, never stored (ADR-0158). | `CanvasRole` `"topic"`, `canvasRole` | backlog item |
 | **task** | A canvas in any open state after the first: work the board tracks. A word for where a canvas is, never stored (ADR-0158). | `CanvasRole` `"task"`, `canvasRole` | task (as the board's card) |
-| **workflow state** | A column of the board: Topics, Active, or any a team makes. Every canvas on the board is in one. Topics is the first open state by convention, not a kind of state (ADR-0158). | `WorkflowState`, `Workflow`, `boardOf`, `defaultWorkflow` | Backlog, Doing (as defaults) |
+| **workflow state** | A column of the board: Topics, Active, or any a team makes. Every canvas on the board is in one. Topics is the first open state by convention, not a kind of state (ADR-0158). | `WorkflowState`, `Workflow`, `taskBoard`, `defaultWorkflow` | Backlog, Doing (as defaults) |
 | **team** | The people who share a board, its canvases and, later, its sources and runners: today, everyone in the session (ADR-0126). | the session | the host's session, as the board's owner |
 | **the archive** | The board's last workflow state, always there, named Archive in a new session and renamed as any state is (ADR-0158). | `Workflow.archive` | the closed state, the Archive tab; Done (as its default name) |
-| **archived** | In the archive: read-only for everyone, unloaded by the host, its threads' proposed changes withdrawn, until moved out (**restore**). | `archivedOf`, `archivedIn`, `planArchive`, `readArchived` | closed |
+| **archived** | In the archive: read-only for everyone, unloaded by the host, its threads' proposed changes withdrawn, until moved out (**restore**). | `tasksInArchive`, `archivedIn`, `planArchive`, `readArchived` | closed |
 
 ## The canvas
 
@@ -158,7 +158,7 @@ a value is stored.
 | **column** | A view, not a card: a card on a canvas, drawn whole, such as a thread's path or a note column (ADR-0116, ADR-0126). | `CardColumn`, `Column`, `ColumnKey` | a column as only a thread's path |
 | **canvas column** | The strip's first column, outside the canvas's order: the canvas's title, where it is on the board (a topic, a task, archived), readers, the cards pinned to the canvas and the canvas list. | `CanvasColumn`, `canvasColumnView`, `boardPlaceWords` | task column |
 | **fold** (a column) | Hide a column for yourself; it keeps its place as a narrow strip with its title. Every column is folded until you open it. | `CardView.unfolded`, `FoldedColumn` | close (a column) |
-| **pinned to the canvas** | A text card every thread's agent on the canvas reads on every run, in the canvas column. | `canvas-pinned`, `canvasPinnedOf` | pinned to the task |
+| **pinned to the canvas** | A text card every thread's agent on the canvas reads on every run, in the canvas column. | `canvas-pinned`, `canvasPinnedCards` | pinned to the task |
 
 ## Accepted, not yet built: file and media cards, sources and runners
 

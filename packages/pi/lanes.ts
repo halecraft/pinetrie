@@ -224,7 +224,7 @@ export type ProgramPath = (program: SearchProgram) => Promise<string>
  * an agent without tools, or a lane with no copy of its own, whose prompt
  * names `project` and whose every call is refused.
  */
-export function toolContextOf(
+export function laneToolContext(
   access: LaneAccess | null,
   project: string,
 ): ToolContext {

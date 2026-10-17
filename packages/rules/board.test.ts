@@ -7,7 +7,7 @@ import {
   canvasIdFor,
   cardIdOfKind,
   ERR,
-  livePlaceOf,
+  livePlace,
   type Workflow,
   type WorkflowEdit,
   type WorkflowStateId,
@@ -17,16 +17,16 @@ import {
 import { canvasCard } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import {
-  archivedOf,
   boardCanvases,
   boardEnd,
-  boardOf,
   canvasRole,
   defaultWorkflow,
   planBoardMove,
   planWorkflowEdit,
   planWorkflowSeed,
-  transitionOf,
+  stateTransition,
+  taskBoard,
+  tasksInArchive,
   WORKFLOW as WORKFLOW_SPEC,
 } from "./board.ts"
 import { orderKey } from "./order.ts"
@@ -58,12 +58,12 @@ const card = (
   ...canvasCard(canvas, orderKey(rank), state, ADA),
   placer: by,
 })
-const columns = (board: ReturnType<typeof boardOf>) =>
+const columns = (board: ReturnType<typeof taskBoard>) =>
   Object.fromEntries(
     [...board.open, board.archive].map(c => [c.state.name, c.canvases]),
   )
 
-describe("boardOf", () => {
+describe("taskBoard", () => {
   test("each canvas's card by rank, then id; one in a state gone at the end of the first open state", () => {
     const cards = [
       card(R(1), DOING, 20),
@@ -72,7 +72,7 @@ describe("boardOf", () => {
       card(R(4), workflowStateIdFor("gone"), 1),
       card(R(6), BACKLOG, 3),
     ]
-    expect(columns(boardOf(WORKFLOW, cards))).toEqual({
+    expect(columns(taskBoard(WORKFLOW, cards))).toEqual({
       Backlog: [R(6), R(4)],
       Doing: [R(2), R(1)],
       Done: [R(3)],
@@ -82,10 +82,10 @@ describe("boardOf", () => {
     const onBoard = card(R(1), DOING, 1)
     const trashed: CardRecord = {
       ...onBoard,
-      place: { kind: "trash", left: livePlaceOf(onBoard.place) },
+      place: { kind: "trash", left: livePlace(onBoard.place) },
       placer: ADA,
     }
-    expect(columns(boardOf(WORKFLOW, [trashed]))).toEqual({
+    expect(columns(taskBoard(WORKFLOW, [trashed]))).toEqual({
       Backlog: [],
       Doing: [],
       Done: [],
@@ -96,7 +96,7 @@ describe("boardOf", () => {
   })
 })
 
-describe("archivedOf", () => {
+describe("tasksInArchive", () => {
   const history = (
     canvas: CanvasId,
     ...events: [WorkflowStateId, typeof ADA, number][]
@@ -115,7 +115,7 @@ describe("archivedOf", () => {
   ]
   test("only the archive's canvases, with who moved each there and when, from its card's newest event into it", () => {
     expect(
-      archivedOf(
+      tasksInArchive(
         WORKFLOW,
         [card(R(1), DOING, 1), card(R(2), DONE, 1)],
         new Map([
@@ -126,7 +126,7 @@ describe("archivedOf", () => {
     ).toEqual(new Map([[R(2), { canvas: R(2), by: ADA, at: 7 }]]))
   })
   test("a card with no such event: its placer, at 0", () => {
-    expect(archivedOf(WORKFLOW, [card(R(2), DONE, 1)], new Map())).toEqual(
+    expect(tasksInArchive(WORKFLOW, [card(R(2), DONE, 1)], new Map())).toEqual(
       new Map([[R(2), { canvas: R(2), by: BEA, at: 0 }]]),
     )
   })
@@ -137,8 +137,8 @@ test.each([
   [DOING, DONE, "archive"],
   [DONE, BACKLOG, "restore"],
   [DONE, DONE, "within"],
-] as const)("transitionOf %s to %s: %s", (from, to, want) => {
-  expect(transitionOf(WORKFLOW, from, to)).toBe(want)
+] as const)("stateTransition %s to %s: %s", (from, to, want) => {
+  expect(stateTransition(WORKFLOW, from, to)).toBe(want)
 })
 
 describe("planBoardMove", () => {
@@ -232,7 +232,7 @@ describe("planBoardMove", () => {
     const records = written(plan)
     expect(records[0]).toMatchObject({ id: R(3), placer: ADA })
     expect(records.slice(1).every(c => c.placer === BEA)).toBe(true)
-    const after = boardOf(WORKFLOW, [
+    const after = taskBoard(WORKFLOW, [
       ...tight.filter(c => !records.some(r => r.id === c.id)),
       ...records,
     ])
@@ -254,7 +254,7 @@ describe("boardEnd", () => {
 })
 
 describe("planWorkflowEdit", () => {
-  const board = boardOf(WORKFLOW, [card(R(1), DOING, 1)])
+  const board = taskBoard(WORKFLOW, [card(R(1), DOING, 1)])
   const edit = (e: Partial<WorkflowEdit>) =>
     planWorkflowEdit(
       WORKFLOW,
@@ -337,7 +337,7 @@ describe("planWorkflowEdit", () => {
     expect(
       planWorkflowEdit(
         one,
-        boardOf(one, []),
+        taskBoard(one, []),
         { action: "remove", state: BACKLOG, name: "", before: null },
         () => "x",
       ),

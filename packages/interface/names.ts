@@ -55,7 +55,7 @@ export function speakerWords(
 }
 
 /** "Ada, Bea": each writer by their current name, in the order given. */
-export const namesOf = (
+export const writerNames = (
   nameOf: ReadonlyMap<WriterId, string>,
   writers: readonly WriterId[],
 ): string => writers.map(w => displayName(w, nameOf.get(w))).join(", ")

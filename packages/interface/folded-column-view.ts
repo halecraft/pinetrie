@@ -17,7 +17,7 @@ export type FoldedFace = FaceOf<"thread" | "note-column">
 export const UNNAMED_THREAD = "a thread"
 
 /**
- * A folded column's face (`faceOf`), the same value a grid's cell
+ * A folded column's face (`cardFace`), the same value a grid's cell
  * draws for its card; null for a branch not yet on the canvas, which never
  * folds.
  */

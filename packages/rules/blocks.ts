@@ -71,7 +71,7 @@ export interface Block {
 }
 
 /** The blocks of `text`, as `markBlocks` numbers them. */
-export function blocksOf(text: string): readonly Block[] {
+export function textBlocks(text: string): readonly Block[] {
   const tree = parseMarkdown(text) as BlockNode
   return numberBlocks(tree).flatMap(({ node, ref }) => {
     const from = node.position?.start.offset
@@ -82,7 +82,7 @@ export function blocksOf(text: string): readonly Block[] {
 
 /** A block's source slice of `text`: its markdown; null when it has none. */
 export function blockSource(text: string, ref: BlockRef): string | null {
-  const block = blocksOf(text).find(
+  const block = textBlocks(text).find(
     b => b.ref.kind === ref.kind && b.ref.n === ref.n,
   )
   return block === undefined ? null : text.slice(block.from, block.to)

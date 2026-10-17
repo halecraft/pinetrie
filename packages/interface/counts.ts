@@ -24,7 +24,8 @@ export function byteWords(bytes: number): string {
 const names = new Intl.ListFormat("en", { style: "long", type: "conjunction" })
 
 /** "Ada", "Ada and Bea", "Ada, Bea, and Cat". */
-export const listOf = (items: readonly string[]): string => names.format(items)
+export const listPhrase = (items: readonly string[]): string =>
+  names.format(items)
 
 /** How long ago `ms` was, roughly: "just now", "5 min ago", "3 h ago", "2 d ago". */
 export const ago = (ms: number, now: number): string => agoWords(now - ms)

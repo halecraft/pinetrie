@@ -11,7 +11,7 @@ import {
 } from "@pinetrie/core"
 import { Type } from "typebox"
 import {
-  decodeAt,
+  decodeRecord,
   decodeWith,
   EntryIdSchema,
   List,
@@ -63,7 +63,7 @@ export const STATE: RecordSpec<StateRecord, StateRecord["id"], "session"> = {
     made: { ...contents.made },
   }),
   decode: (contents, key) =>
-    decodeAt(StateSchema, contents, textKey(key), (r, id) => ({
+    decodeRecord(StateSchema, contents, textKey(key), (r, id) => ({
       id: id as StateRecord["id"],
       parents: r.parents,
       made: r.made,
@@ -110,7 +110,7 @@ export const FOLDER_WRITE_JOURNAL: RecordSpec<WriteJournal, string, "session"> =
     keyOf: j => j.id,
     encode: ({ id, ...contents }) => JSON.parse(JSON.stringify(contents)),
     decode: (contents, key) =>
-      decodeAt(WriteJournalSchema, contents, textKey(key), (r, id) => ({
+      decodeRecord(WriteJournalSchema, contents, textKey(key), (r, id) => ({
         id,
         record: r.record,
         paths: r.paths,
@@ -149,7 +149,7 @@ export const CONFLICT: RecordSpec<ConflictRecord, string, "session"> = {
   keyOf: r => conflictKey(r.lane, r.path),
   encode: ({ lane, path, ...contents }) => ({ ...contents }),
   decode: (contents, key) =>
-    decodeAt(ConflictSchema, contents, conflictAddress(key), (r, at) => ({
+    decodeRecord(ConflictSchema, contents, conflictAddress(key), (r, at) => ({
       ...at,
       base: r.base,
       ours: r.ours,

@@ -3,7 +3,7 @@
 // how to leave are `page.ts`'s (`@pinetrie/interface`); this reads `location`
 // and moves `history`.
 //
-// `pushState` and `replaceState` fire no event, so `goTo` tells the
+// `pushState` and `replaceState` fire no event, so `showPage` tells the
 // subscribers itself. Back fires `popstate`, and a hash typed in the address
 // bar `hashchange`.
 
@@ -32,7 +32,7 @@ const subscribe = (change: () => void): (() => void) => {
 const current = (): PageName | null => pageOfHash(location.hash)
 
 /** Show `to` over the stage, or, with null, leave the page shown. */
-export function goTo(to: PageName | null): void {
+export function showPage(to: PageName | null): void {
   if (to === current()) return
   if (to !== null) history.pushState(PAGE_STATE, "", hashOfPage(to))
   else if (planLeave(history.state) === "back") {

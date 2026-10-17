@@ -1,6 +1,6 @@
 import { PRODUCT_NAME, writerId } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
-import { namesOf, speakerLabel, speakerWords } from "./names.ts"
+import { speakerLabel, speakerWords, writerNames } from "./names.ts"
 
 describe("speakerLabel: the current name, and the one it was sent under", () => {
   const names = new Map([["w-duane", "Duane"]])
@@ -18,11 +18,11 @@ describe("speakerLabel: the current name, and the one it was sent under", () => 
   })
 })
 
-test("namesOf: each writer by their current name, in order", () => {
+test("writerNames: each writer by their current name, in order", () => {
   const nameOf = new Map([[writerId("ada@x.io"), "Ada"]])
   const ADA = writerId("ada@x.io")
   const BEA = writerId("bea@x.io")
-  expect(namesOf(nameOf, [ADA, BEA])).toBe("Ada, bea")
+  expect(writerNames(nameOf, [ADA, BEA])).toBe("Ada, bea")
 })
 
 describe("speakerWords: who a message is from, as its column names it", () => {

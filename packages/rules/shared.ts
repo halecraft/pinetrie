@@ -23,7 +23,7 @@ import {
   type TurnShared,
 } from "@pinetrie/core"
 import { Type } from "typebox"
-import { decodeAt, textKey } from "./decode.ts"
+import { decodeRecord, textKey } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 
 /** A lane's write of a shared file: the version it was based on, and the one it left. */
@@ -410,7 +410,7 @@ export const SHARED_LINEAGE: RecordSpec<SharedLineage, string, "session"> = {
   keyOf: l => l.path,
   encode: ({ path: _, ...contents }) => contents,
   decode: (contents, key) =>
-    decodeAt(LineSchema, contents, textKey(key), (l, path) => {
+    decodeRecord(LineSchema, contents, textKey(key), (l, path) => {
       const versions: SharedVersion[] = []
       for (const v of l.versions) {
         const writer: SharedWriter | null =

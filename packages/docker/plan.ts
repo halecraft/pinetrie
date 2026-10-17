@@ -356,7 +356,7 @@ const STANDARD_PATH =
   "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 /** The image's `PATH`, from its own environment (`Config.Env`). */
-export function imagePathOf(env: readonly string[] | null): string {
+export function imageEnvPath(env: readonly string[] | null): string {
   const found = (env ?? []).find(e => e.startsWith("PATH="))
   return found === undefined ? STANDARD_PATH : found.slice("PATH=".length)
 }

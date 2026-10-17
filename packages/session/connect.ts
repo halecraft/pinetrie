@@ -26,12 +26,12 @@ import {
   type Intent,
   isTextCard,
   isTextCardId,
-  keyOf,
   type MessageAt,
   type MoveDirection,
   type MoveTarget,
   type Paste,
   type ProposedChangesAction,
+  placeKey,
   type QueueHoldChange,
   type QueueMove,
   type Reorder,
@@ -82,28 +82,28 @@ import { type ActingState, NO_ACTING, sendActing } from "./acting.ts"
 import {
   type AttentionStore,
   attentionStore,
-  startOf,
+  startingSince,
 } from "./attention-doc.ts"
 import {
   type ActedAt,
   AT_INVENTORY,
-  answerOf,
   type CardNotice,
   cardOfPending,
   drawnPlace,
-  intentsOf,
   type LocalEvent,
   type LocalState,
   localStep,
   type MoveAnswer,
   type MoveHow,
   type MovesState,
+  moveAnswer,
   NO_MOVES,
   OFF_PAGE,
   type Pending,
-  pendingOf,
+  pendingMove,
   queuedDraft,
   type SlotMove,
+  slotIntents,
   slotOnAccept,
   stampSeen,
 } from "./card-moves.ts"
@@ -458,13 +458,13 @@ export async function connectSession(
   const acting = snapshotStore<ActingState>(NO_ACTING)
   const inventory = inventorySlots(exchange, me, host.peerId, {
     held: () => heldBy(local.current().records, me).map(c => c.id),
-    intents: () => intentsOf(local.current().moves),
+    intents: () => slotIntents(local.current().moves),
   })
   // Before the directory arrives, a start would leave out every root not yet
   // read, and their verdicts and mentions would count as new.
   const attention = attentionStore(exchange, me, host.peerId, () =>
     sync(session).readyFor(p => p.peerId === host.peerId)
-      ? startOf(readRoots(session).values())
+      ? startingSince(readRoots(session).values())
       : null,
   )
   const open = openThreads(exchange, me, host.peerId, () => {
@@ -540,7 +540,7 @@ export async function connectSession(
     const [first] = pending
     step({ kind: "sent", pending })
     return line.request(intent, first.id).then(({ outcome, rev }) => {
-      const answer = answerOf(outcome, rev, {
+      const answer = moveAnswer(outcome, rev, {
         card: cardOfPending(first),
         queuedBy,
         actedAt: first.actedAt,
@@ -577,7 +577,7 @@ export async function connectSession(
   ): Promise<MoveAnswer> {
     return tracked(
       { kind: "move", moves: [move], here },
-      [pendingOf(crypto.randomUUID(), move, how, draft)],
+      [pendingMove(crypto.randomUUID(), move, how, draft)],
       queuedBy,
     ).then(r => r.answer)
   }
@@ -651,7 +651,7 @@ export async function connectSession(
       // Made plain: its command is set by a request of its own, after it.
       const { command } = card.content
       const answer = sendMove(
-        { card: card.id, from: null, to: keyOf(card.place) },
+        { card: card.id, from: null, to: placeKey(card.place) },
         how,
         null,
         {
@@ -676,8 +676,13 @@ export async function connectSession(
       const id = crypto.randomUUID()
       const main: Pending =
         paste.kind === "uncut"
-          ? pendingOf(id, { card: paste.card, from: DISCARDED, to }, how, null)
-          : pendingOf(
+          ? pendingMove(
+              id,
+              { card: paste.card, from: DISCARDED, to },
+              how,
+              null,
+            )
+          : pendingMove(
               id,
               { card: paste.card, from: null, to },
               how,
@@ -687,7 +692,7 @@ export async function connectSession(
         replacing === null
           ? []
           : [
-              pendingOf(
+              pendingMove(
                 id,
                 { ...replacing, to: DISCARDED },
                 { actedAt: how.actedAt, slot: null },
@@ -713,7 +718,7 @@ export async function connectSession(
           hold,
           command: move.from === null ? command : null,
         },
-        [pendingOf(crypto.randomUUID(), move, how, draft)],
+        [pendingMove(crypto.randomUUID(), move, how, draft)],
         null,
       ).then(r => r.answer)
     },
@@ -733,7 +738,7 @@ export async function connectSession(
     moveCards(moves, actedAt, here = null) {
       const id = crypto.randomUUID()
       const pending = ({ move, slot }: SlotMove) =>
-        pendingOf(id, move, { actedAt, slot }, null)
+        pendingMove(id, move, { actedAt, slot }, null)
       const [first, ...rest] = moves
       return tracked(
         { kind: "move", moves: moves.map(m => m.move), here },

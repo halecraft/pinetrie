@@ -168,7 +168,7 @@ export function planCommit(
 }
 
 /** The inline images (base64) in a write that `planCommit` may store as references. */
-export function imagesOf(write: CommittedWrite): readonly string[] {
+export function committedImages(write: CommittedWrite): readonly string[] {
   if (write.kind === "entry")
     return write.type === "message" ? inlineImages(write.message) : []
   if (write.kind === "value" && write.op !== "delete")

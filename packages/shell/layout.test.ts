@@ -1,9 +1,10 @@
 import { parse } from "unbash"
 import { describe, expect, test } from "vitest"
-import { layoutOf, sameProgram } from "./layout.ts"
+import { sameProgram, shellLayout } from "./layout.ts"
 
 const WIDTH = 56
-const laidOut = (source: string) => layoutOf(source, parse(source), WIDTH)?.text
+const laidOut = (source: string) =>
+  shellLayout(source, parse(source), WIDTH)?.text
 
 /** Agents' one-line commands, and the shapes a chain breaks around. */
 const CASES: readonly (readonly [string, string])[] = [
@@ -81,7 +82,7 @@ fi`,
   ],
 ]
 
-describe("layoutOf", () => {
+describe("shellLayout", () => {
   test.each(CASES)("%s", (source, expected) => {
     expect(laidOut(source)).toBe(expected)
   })

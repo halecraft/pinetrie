@@ -23,7 +23,7 @@ import {
   row,
   stepKeeper,
   writeDirectory,
-  writesOf,
+  writtenValues,
 } from "../fakes.ts"
 import { type BoardDeps, handleCanvasMove, handleWorkflow } from "./board.ts"
 import { type CardCommands, settled } from "./cards.ts"
@@ -141,7 +141,7 @@ test("an idle canvas moved to Done with its last run's verdict pending leaves it
   const pending = pendingVerdict(THREAD_1, entryId("e-1"), entryId("e-1"))
   putValue(b, setRecord(VERDICT, pending))
   await handleCanvasMove(deps, ADA, toDone)
-  expect(writesOf(records.calls)).toEqual([
+  expect(writtenValues(records.calls)).toEqual([
     setRecord(VERDICT, { ...pending, verdict: { kind: "unclassified" } }),
   ])
 })
@@ -189,7 +189,7 @@ test("a workflow edit writes the workflow; a refusal writes nothing", async () =
       edit: { action: "rename", state: DONE, name: "Shipped", before: null },
     }),
   ).toEqual({ kind: "workflow-changed" })
-  expect(writesOf(records.calls)).toMatchObject([
+  expect(writtenValues(records.calls)).toMatchObject([
     { namespace: "pinetrie.workflow", value: { archive: { name: "Shipped" } } },
   ])
 })

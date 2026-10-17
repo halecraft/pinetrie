@@ -76,7 +76,7 @@ export const DRAG_START = 5
 
 /** What a card's drag can be over, as the engine read it. */
 export type CardOver =
-  /** The strip, between its columns: `gap` is `gapAt`'s. */
+  /** The strip, between its columns: `gap` is `pointerGap`'s. */
   | { readonly kind: "strip"; readonly gap: number }
   | { readonly kind: "put"; readonly target: PutTarget }
   /** ▦, which opens the board when held over; nothing lands on it. */
@@ -211,7 +211,7 @@ const NO_HOVER: HoverOver = { kind: "none" }
 
 /**
  * What holding the drag where it is opens: the sidebar canvas a card is onto
- * (a row's middle, `sidebarSpotAt`), or the board from ▦. A canvas's drag
+ * (a row's middle, `sidebarSpot`), or the board from ▦. A canvas's drag
  * lands only between canvases, never onto one, so it opens nothing.
  */
 function heldOpens(at: DragAt): HoverOver {
@@ -248,7 +248,7 @@ export function hoverOpens(over: HoverOver): Intent | null {
  * quarter, and between it and the one below in its bottom quarter. A
  * canvas's drag has no put target (`CanvasOver`), so it never reads one.
  */
-export function sidebarSpotAt(
+export function sidebarSpot(
   y: number,
   row: { readonly top: number; readonly height: number },
   canvas: CanvasId,

@@ -8,7 +8,7 @@ import {
   putLane,
   ROOT_ID,
   record,
-  writesOf,
+  writtenValues,
 } from "./fakes.ts"
 import { createNames } from "./names.ts"
 import type { Records } from "./records.ts"
@@ -32,7 +32,7 @@ test("two ensures called together write each lane's name once, and no two lanes 
     onNamed: lane => named.push(lane),
   })
   await Promise.all([names.ensure(), names.ensure()])
-  const written = writesOf(scribe.calls)
+  const written = writtenValues(scribe.calls)
   expect(written).toHaveLength(2)
   const given = written.map(w =>
     w.kind === "set" ? (w.value as { name: string }).name : null,
@@ -65,7 +65,7 @@ test("a reservation is named on the same queue as new lanes, and starts its bann
     names.reserve(lane),
   ])
   expect([first, again, held]).toEqual(["name", "known", "known"])
-  const written = writesOf(scribe.calls)
+  const written = writtenValues(scribe.calls)
   const all = written.map(w =>
     w.kind === "set" ? (w.value as { name: string }).name : null,
   )

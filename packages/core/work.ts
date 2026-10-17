@@ -88,7 +88,7 @@ export function forkParent(
   lane: ThreadId,
   tip: EntryId | null,
 ): ForkParent | null {
-  const first = firstPromptOf(index, revisions, lane, tip)
+  const first = laneFirstPrompt(index, revisions, lane, tip)
   const above = first === null ? null : index.parentOf(first)
   if (above === null) return null
   const { point, pointLane } = nearestRevision(index, revisions, {
@@ -101,7 +101,7 @@ export function forkParent(
 }
 
 /** The files conflicted at `point`, as the records naming it say. */
-export function conflictsAt(
+export function pointConflicts(
   revisions: ReadonlyMap<EntryId, RevisionRecord>,
   point: PointId,
 ): readonly string[] {
@@ -117,7 +117,7 @@ export function conflictsAt(
  * prompts first, which name the parent's lane, so this is the branch's own.
  * Null when no run of the lane is on the path.
  */
-export function firstPromptOf(
+export function laneFirstPrompt(
   index: TreeIndex,
   revisions: ReadonlyMap<EntryId, RevisionRecord>,
   lane: ThreadId,

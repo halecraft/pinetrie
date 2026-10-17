@@ -7,7 +7,7 @@ import {
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
-import { entry, indexOf } from "./fixtures.ts"
+import { entry, indexEntries } from "./fixtures.ts"
 import { parseQuery, searchCorpus, searchTexts } from "./search.ts"
 import {
   columnMatches,
@@ -25,7 +25,7 @@ const said = (text: string) => ({
   content: [{ type: "text", text }],
 })
 // 1 Ada asks; 2–3 the agent works; 4 Ada again; 5 a branch off 1.
-const index = indexOf([
+const index = indexEntries([
   entry(
     "1",
     null,

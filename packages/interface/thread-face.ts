@@ -6,16 +6,16 @@
 import {
   type EntryId,
   firstLine,
-  firstMessageOf,
   indexAsks,
   type LaneView,
   messageText,
   projectSpine,
-  promptOf,
+  runPrompt,
   type ThreadId,
   type ThreadName,
   type TreeIndex,
   threadEnd,
+  threadFirstMessage,
 } from "@pinetrie/core"
 import type { IconLookup, ThreadIcon } from "./thread-icon.ts"
 
@@ -51,10 +51,10 @@ export function threadFace(input: {
   const { thread, index } = input
   // Its first message, not its first entry, which is often a context entry
   // its branch's first run wrote above its prompt.
-  const firstId = firstMessageOf(index, thread)
+  const firstId = threadFirstMessage(index, thread)
   const end = threadEnd(index, thread)
   const lane = input.lanes.find(l => l.name === thread)
-  const prompt = end === null ? null : promptOf(index, end)
+  const prompt = end === null ? null : runPrompt(index, end)
   const line = (id: EntryId | undefined | null) =>
     id === undefined || id === null
       ? ""

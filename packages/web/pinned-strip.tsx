@@ -4,7 +4,7 @@
 // is a drop zone that pins the first card, shown only while a card is dragged
 // (`data-card-drag`): an empty strip that took room would move where a column
 // shown again puts its reader. So "+ pin" is in the column's header until the
-// strip has a card (`newPinAt`), and in the strip after; the box it opens is
+// strip has a card (`newPinPlace`), and in the strip after; the box it opens is
 // drawn last in the strip.
 
 import type { CardId, PinnedView, TextCard } from "@pinetrie/core"
@@ -36,7 +36,7 @@ export function PinnedStrip(p: {
   putKey: string | null
   /** The box "+ pin" opened, drawn last; null while none is open. */
   box: ReactElement | null
-  /** The strip's own "+ pin", when it offers it (`newPinAt`). */
+  /** The strip's own "+ pin", when it offers it (`newPinPlace`). */
   onNewPin: (() => void) | null
   /** Where a queue from this column puts a card; null where nothing can be queued. */
   queueOn: CardFrameFacts["queueOn"]

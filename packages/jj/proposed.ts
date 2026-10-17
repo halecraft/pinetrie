@@ -8,6 +8,7 @@ import {
   type DiffSpan,
   type FileChange,
   type FilesTouched,
+  messageSources,
   type NonEmpty,
   nonEmpty,
   PROJECT_CONFIG_FILE,
@@ -18,7 +19,6 @@ import {
   type RepoConfig,
   type RevisionFacts,
   type StartRead,
-  sourcesOf,
   type ThreadId,
   type ThreadName,
   trailerRevset,
@@ -39,11 +39,11 @@ import {
 } from "./lane/names.ts"
 import {
   ACCEPTED_THREAD_COMMIT_ROW,
-  commitsOf,
-  conflictedFilesAt,
   fileText,
   parseAcceptedThreadCommits,
   REVISION_READ,
+  readCommits,
+  readConflictedFiles,
 } from "./lane/revisions.ts"
 import {
   acceptedThreadCommitsRevset,
@@ -96,7 +96,7 @@ export async function laneTipIn(
   jj: Runner,
   lane: ThreadId,
 ): Promise<CommitId | null> {
-  const [tip] = await commitsOf(jj, `present(${laneTipName(lane)})`)
+  const [tip] = await readCommits(jj, `present(${laneTipName(lane)})`)
   return tip ?? null
 }
 
@@ -128,7 +128,7 @@ async function acceptedThreadCommitFacts(
   if (!ran.ok) throw new Error(describeFailure("jj log", ran))
   const accepted = parseAcceptedThreadCommits(ran.stdout)
   return {
-    sources: [...new Set(accepted.flatMap(t => sourcesOf(t.description)))],
+    sources: [...new Set(accepted.flatMap(t => messageSources(t.description)))],
     untraced: accepted
       .filter(t => untracedLanes(t.description).includes(input.lane))
       .map(t => t.commit),
@@ -173,7 +173,7 @@ export async function readStart(
   jj: Runner,
   input: Parameters<typeof proposedStart>[0],
 ): Promise<NonEmpty<CommitId>> {
-  return nonEmpty(await commitsOf(jj, proposedStart(input))) ?? [input.start]
+  return nonEmpty(await readCommits(jj, proposedStart(input))) ?? [input.start]
 }
 
 /**
@@ -320,11 +320,11 @@ export async function revisionSinceHost(
 }
 
 /** The host's version of the proposed changes under `bookmark`; null when it has none. */
-export async function hostVersionOf(
+export async function readHostVersion(
   jj: Runner,
   bookmark: string,
 ): Promise<CommitId | null> {
-  const [host] = await commitsOf(jj, hostProposedRevset(bookmark))
+  const [host] = await readCommits(jj, hostProposedRevset(bookmark))
   return host ?? null
 }
 
@@ -365,7 +365,7 @@ export async function proposedRevisions(
  * have come with the lane's copy (`conflictCause`). A start your repo no longer
  * has names none.
  */
-export async function startConflictsOf(
+export async function readStartConflicts(
   jj: Runner,
   ledger: ProposedLedger | null,
   conflicts: readonly string[],
@@ -373,7 +373,7 @@ export async function startConflictsOf(
   if (conflicts.length === 0 || ledger === null) return []
   const files = new Set<string>()
   for (const commit of ledger.start)
-    for (const f of await conflictedFilesAt(jj, commit).catch(() => []))
+    for (const f of await readConflictedFiles(jj, commit).catch(() => []))
       files.add(f)
   return [...files].sort()
 }
@@ -391,7 +391,7 @@ export async function readProposedChanges(
   jj: Runner,
   input: { readonly name: ThreadName; readonly target: string },
 ): Promise<ProposedChangesInRepo | null> {
-  const heads = await commitsOf(
+  const heads = await readCommits(
     jj,
     `present(${bookmarkRevset(proposedBookmark(input.name))})`,
   )
@@ -400,13 +400,13 @@ export async function readProposedChanges(
   const [bottom] = found
   if (top === undefined || bottom === undefined) return null
   const changeIds = [...new Set(found.map(r => r.changeId))]
-  const visible = await commitsOf(
+  const visible = await readCommits(
     jj,
     changeIds.map(c => `change_id(${c})`).join(" | "),
   )
   if (heads.length > 1 || visible.length > changeIds.length)
     return { kind: "divergent", changeIds }
-  const host = await hostVersionOf(jj, proposedBookmark(input.name))
+  const host = await readHostVersion(jj, proposedBookmark(input.name))
   const marked = host === top
   const revisions: ProposedRevision[] = []
   for (const r of found)
@@ -423,20 +423,20 @@ export async function readProposedChanges(
     (
       await Promise.all(
         found.slice(1).map(async (r, i) => {
-          const parents = await commitsOf(jj, `parents(${r.commit})`)
+          const parents = await readCommits(jj, `parents(${r.commit})`)
           return parents.length === 1 && parents[0] === found[i]?.commit
         }),
       )
     ).every(Boolean)
-  const parents = await commitsOf(jj, `parents(${bottom.commit})`)
+  const parents = await readCommits(jj, `parents(${bottom.commit})`)
   const placed =
-    (await commitsOf(jj, `parents(${bottom.commit}) & ::(${input.target})`))
+    (await readCommits(jj, `parents(${bottom.commit}) & ::(${input.target})`))
       .length === parents.length
-  const target = await commitsOf(jj, input.target)
+  const target = await readCommits(jj, input.target)
   const onTarget =
     parents.length === target.length && parents.every(p => target.includes(p))
   const files = await proposedFiles(jj, bottom.commit, top)
-  const conflicts = await conflictedFilesAt(jj, top)
+  const conflicts = await readConflictedFiles(jj, top)
   const message = await query(jj, [
     "log",
     "--no-graph",
@@ -458,7 +458,7 @@ export async function readProposedChanges(
     onTarget,
     files,
     conflicts,
-    startConflicts: await startConflictsOf(jj, ledger, conflicts),
+    startConflicts: await readStartConflicts(jj, ledger, conflicts),
   }
 }
 
@@ -690,11 +690,11 @@ export async function hostCommitIn(
   changeId: string,
   host: CommitId | null,
 ): Promise<{ readonly hosts: CommitId; readonly yours: CommitId } | null> {
-  const commits = await commitsOf(jj, `present(change_id(${changeId}))`)
+  const commits = await readCommits(jj, `present(change_id(${changeId}))`)
   const inHost =
     host === null
       ? []
-      : await commitsOf(jj, `present(change_id(${changeId})) & ::${host}`)
+      : await readCommits(jj, `present(change_id(${changeId})) & ::${host}`)
   const byHost: CommitId[] = []
   const byYou: CommitId[] = []
   for (const c of commits) {
@@ -712,7 +712,10 @@ export async function hostCommitIn(
     : null
 }
 
-export async function changeOf(jj: Runner, commit: string): Promise<string> {
+export async function readChangeId(
+  jj: Runner,
+  commit: string,
+): Promise<string> {
   return (
     await query(jj, ["log", "--no-graph", "-r", commit, "-T", "change_id"])
   ).trim()

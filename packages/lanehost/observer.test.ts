@@ -16,10 +16,10 @@ import {
   isStrictDescendant,
   type LaneNamespace,
   loaderRefusal,
-  noticeOf,
   type ObserverCall,
   type ObserverHello,
   type ObserverNotice,
+  observerNotice,
   observerVersion,
   planHeld,
   planIdle,
@@ -130,7 +130,7 @@ describe("a remote release", () => {
   })
   test("keeps the kernel's stamp only when raced", () => {
     const line = (inodes: { kernel: number; lstat: number }) =>
-      noticeOf({
+      observerNotice({
         kind: "event",
         lane: "21",
         run: "3",

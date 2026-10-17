@@ -9,11 +9,11 @@ import type { CommitId, ThreadId } from "@pinetrie/core"
 import type { RepoOwner } from "@pinetrie/jj"
 import {
   bookmarkName,
-  bookmarkOf,
   bookmarkRevset,
-  commitsOf,
   laneJj,
   planBundle,
+  readCommits,
+  readLaneBookmark,
   stackBookmark,
 } from "@pinetrie/jj"
 import type { Keeper } from "@pinetrie/keeper"
@@ -77,10 +77,10 @@ export function createFetches(deps: {
           const jj = laneJj(handle.runners.lane)
           const name = stack ? stackBookmark(lane) : bookmarkName(lane)
           const bookmark = stack
-            ? await commitsOf(jj, `present(${bookmarkRevset(name)})`).then(
+            ? await readCommits(jj, `present(${bookmarkRevset(name)})`).then(
                 c => c[0] ?? null,
               )
-            : await bookmarkOf(jj, lane)
+            : await readLaneBookmark(jj, lane)
           if (bookmark === null) return null
           const dir = await mkdtemp(path.join(tmpdir(), "pinetrie-bundle-"))
           const bundle = path.join(dir, "lane.bundle")

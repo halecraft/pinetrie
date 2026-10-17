@@ -3,7 +3,7 @@
 
 import type { EntryId, ThreadId, ValueWrite, WriterId } from "@pinetrie/core"
 import { Type } from "typebox"
-import { decodeAt, entryKey } from "./decode.ts"
+import { decodeRecord, entryKey } from "./decode.ts"
 import { type RecordSpec, setRecord } from "./records.ts"
 
 /** A budget, at the message that set it. */
@@ -37,7 +37,7 @@ export const BUDGET: RecordSpec<BudgetRecord, EntryId, "session"> = {
   keyOf: r => r.message,
   encode: ({ message, ...contents }) => contents,
   decode: (contents, key) =>
-    decodeAt(BudgetSchema, contents, entryKey(key), (r, message) => ({
+    decodeRecord(BudgetSchema, contents, entryKey(key), (r, message) => ({
       message,
       thread: r.thread as ThreadId,
       by: r.by as WriterId,

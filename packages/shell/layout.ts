@@ -38,7 +38,7 @@ export interface Layout {
  * the source is its own layout: it has lines of its own (the agent laid it
  * out, and a heredoc needs its lines), does not parse, or fits.
  */
-export function layoutOf(
+export function shellLayout(
   source: string,
   parsed: ParsedScript,
   width: number,

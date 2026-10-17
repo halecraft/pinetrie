@@ -13,7 +13,7 @@ import {
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
-import { cardIdFor, entriesOf, entry } from "@pinetrie/core/fixtures"
+import { cardIdFor, entriesById, entry } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   type AppViewInput,
@@ -248,7 +248,7 @@ test("a rail stub opens at its branch's first message, below a context entry", (
   const T = threadIdFor("t")
   const B = threadIdFor("b")
   const index = indexTree(
-    entriesOf([
+    entriesById([
       entry("1-r", null, { role: "person", content: "1-r" }, { thread: T }),
       entry(
         "2-cb",

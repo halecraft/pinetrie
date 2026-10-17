@@ -6,8 +6,8 @@ import { readCommands } from "@pinetrie/reads"
 import { rowMessage } from "@pinetrie/schema"
 import type { Checks } from "../checks.ts"
 import {
-  entriesOf,
   FIXTURE_PACKAGES,
+  heldEntries,
   START_CHAT,
   SUITE_CONFIG,
   suitePlaces,
@@ -68,7 +68,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     // As the lane reads it, under /mnt/host.
     const [fixturePkg] = FIXTURE_PACKAGES
     const hello = `/mnt/host${path.join(fixturePkg ?? "", "skills", "hello")}`
-    const typed = Object.values(entriesOf(ch))
+    const typed = Object.values(heldEntries(ch))
       .map(
         r =>
           rowMessage(r) as {

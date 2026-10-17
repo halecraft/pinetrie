@@ -13,12 +13,12 @@ import {
 } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
-import { entry, indexOf } from "./fixtures.ts"
+import { entry, indexEntries } from "./fixtures.ts"
 import {
+  laneNext,
   type Next,
   type NextFacts,
   nextButtonWords,
-  nextOf,
   nextWords,
   type QueueHead,
   queueHead,
@@ -31,7 +31,7 @@ const BEA = writerId("bea@x.io")
 
 /** A prompt and its reply, stopped or answered; stopped, its stop's fact names `by`. */
 const index = (stopped: boolean, by: WriterId | null = null) =>
-  indexOf([
+  indexEntries([
     entry("1", null, { role: "person", content: "go" }),
     entry("2", "1", {
       role: "assistant",
@@ -97,7 +97,7 @@ const facts = (
   }
 }
 
-describe("nextOf: what the thread does next, as the host decides it", () => {
+describe("laneNext: what the thread does next, as the host decides it", () => {
   test.each<[string, Partial<LaneView>, Parameters<typeof facts>[0], Next]>([
     [
       "running",
@@ -152,7 +152,7 @@ describe("nextOf: what the thread does next, as the host decides it", () => {
       { kind: "sending", top: C2, typing: false },
     ],
   ])("%s", (_, over, f, next) => {
-    expect(nextOf(lane(over), facts(f))).toEqual(next)
+    expect(laneNext(lane(over), facts(f))).toEqual(next)
   })
 })
 

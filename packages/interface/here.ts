@@ -2,14 +2,14 @@
 //
 // Presence is thread-level: each column of the canvas a person is on reports
 // the end of its thread. `peopleHere` groups those by person, where
-// `readingAt` groups them by thread end; "never you" is `readingAt`'s.
+// `othersReading` groups them by thread end; "never you" is `othersReading`'s.
 
 import {
   type CanvasId,
   type EntryId,
+  entryThread,
   type ThreadId,
   type TreeIndex,
-  threadAt,
   type WriterId,
 } from "@pinetrie/core"
 
@@ -23,14 +23,14 @@ interface PersonHere {
 }
 
 /**
- * `readingAt` (thread end -> the others there, you left out)
+ * `othersReading` (thread end -> the others there, you left out)
  * grouped by person, in `order` (`writerOrder`, so every window agrees).
- * An end's canvas is its thread's (`threadAt`, `canvasOfThread`), else what its
+ * An end's canvas is its thread's (`entryThread`, `canvasOfThread`), else what its
  * reader reported (`readReadingCanvases`), for a root this window does not
  * hold. An end with neither, not arrived yet, is left out.
  */
 export function peopleHere(
-  readingAt: ReadonlyMap<EntryId, readonly WriterId[]>,
+  othersReading: ReadonlyMap<EntryId, readonly WriterId[]>,
   index: TreeIndex,
   order: readonly WriterId[],
   facts: {
@@ -39,8 +39,8 @@ export function peopleHere(
   },
 ): readonly PersonHere[] {
   const threads = new Map<WriterId, { end: EntryId; canvas: CanvasId }[]>()
-  for (const [end, writers] of readingAt) {
-    const thread = threadAt(index, end)
+  for (const [end, writers] of othersReading) {
+    const thread = entryThread(index, end)
     const canvas =
       (thread === null ? undefined : facts.canvasOfThread.get(thread)) ??
       facts.reported.get(end)

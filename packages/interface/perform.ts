@@ -11,7 +11,7 @@ import { afterKeep } from "./card-intents.ts"
 import type { Clip } from "./clip.ts"
 import type { Effect } from "./effects.ts"
 import type { FocusKey } from "./focus-claim.ts"
-import { type ColumnMotion, foldOf } from "./fold-motion.ts"
+import { type ColumnMotion, foldMotion } from "./fold-motion.ts"
 import type { Identity } from "./identity.ts"
 import { afterCanvasMove, type Intent } from "./intent.ts"
 import type { LayoutAction } from "./layout.ts"
@@ -167,7 +167,7 @@ function paste(
 function performOne(effect: Effect, ports: AppPorts): void {
   switch (effect.kind) {
     case "layout": {
-      const motion = effect.moves ? foldOf(effect.action) : null
+      const motion = effect.moves ? foldMotion(effect.action) : null
       if (motion === null) ports.dispatch(effect.action)
       else ports.foldColumn(motion, () => ports.dispatch(effect.action))
       return

@@ -4,14 +4,14 @@ import path from "node:path"
 import { entryId, threadIdFor } from "@pinetrie/core"
 import { type Runner, run } from "@pinetrie/lanes"
 import { expect, test } from "vitest"
-import { bookmarkOf } from "./bookmarks.ts"
+import { readLaneBookmark } from "./bookmarks.ts"
 import {
   changedPaths,
-  commitsOf,
   commitToBookmark,
   commitTurn,
-  conflictedFilesAt,
   copyFacts,
+  readCommits,
+  readConflictedFiles,
 } from "./revisions.ts"
 
 test("changedPaths: each path as it is named, a conflicted commit's included", async () => {
@@ -29,35 +29,35 @@ test("changedPaths: each path as it is named, a conflicted commit's included", a
     const jjAt: Runner = args => run("jj", ["-R", dir, ...args], { env })
     await writeFile(path.join(dir, "a.txt"), "a\n")
     await jj(["commit", "-m", "one"])
-    const [from] = await commitsOf(jjAt, "@-")
+    const [from] = await readCommits(jjAt, "@-")
     await mkdir(path.join(dir, "d"), { recursive: true })
     await writeFile(path.join(dir, "d", "c é.txt"), "c\n")
     await jj(["commit", "-m", "two"])
-    const [to] = await commitsOf(jjAt, "@-")
+    const [to] = await readCommits(jjAt, "@-")
     if (from === undefined || to === undefined) throw new Error("no commits")
     expect(await changedPaths(jjAt, from, to)).toEqual(["d/c é.txt"])
     // Two sides change one file; their merge conflicts, and a commit
     // resolves it. Git would list every side's tree under `.jjconflict-*`.
     await writeFile(path.join(dir, "a.txt"), "left\n")
     await jj(["commit", "-m", "left"])
-    const [left] = await commitsOf(jjAt, "@-")
+    const [left] = await readCommits(jjAt, "@-")
     await jj(["new", from])
     await writeFile(path.join(dir, "a.txt"), "right\n")
     await jj(["commit", "-m", "right"])
-    const [right] = await commitsOf(jjAt, "@-")
+    const [right] = await readCommits(jjAt, "@-")
     if (left === undefined || right === undefined) throw new Error("no sides")
     await jj(["new", left, right])
     await jj(["commit", "-m", "merge"])
-    const [merged] = await commitsOf(jjAt, "@-")
+    const [merged] = await readCommits(jjAt, "@-")
     if (merged === undefined) throw new Error("no merge")
-    expect(await conflictedFilesAt(jjAt, merged)).toEqual(["a.txt"])
+    expect(await readConflictedFiles(jjAt, merged)).toEqual(["a.txt"])
     await writeFile(path.join(dir, "a.txt"), "both\n")
     await jj(["commit", "-m", "resolved"])
-    const [resolved] = await commitsOf(jjAt, "@-")
+    const [resolved] = await readCommits(jjAt, "@-")
     if (resolved === undefined) throw new Error("no resolution")
     expect(await changedPaths(jjAt, merged, resolved)).toEqual(["a.txt"])
     expect(await changedPaths(jjAt, null, resolved)).toEqual(["a.txt"])
-    expect(await conflictedFilesAt(jjAt, resolved)).toEqual([])
+    expect(await readConflictedFiles(jjAt, resolved)).toEqual([])
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
@@ -77,7 +77,7 @@ test("copyFacts: on its bookmark, after a merge, on the agent's own commit, on a
     const jj: Runner = args => run("jj", ["-R", dir, ...args], { env })
     const lane = threadIdFor("0123456789abcdef")
     const head = async (rev: string) => {
-      const [id] = await commitsOf(jj, rev)
+      const [id] = await readCommits(jj, rev)
       if (id === undefined) throw new Error(`no ${rev}`)
       return id
     }
@@ -98,7 +98,13 @@ test("copyFacts: on its bookmark, after a merge, on the agent's own commit, on a
     })
     // The merge as `mergeUpdate` makes it: the bookmark moves to it, and the
     // next turn has no commit of its own to record.
-    await jj(["new", (await bookmarkOf(jj, lane)) ?? "", line, "-m", "merge"])
+    await jj([
+      "new",
+      (await readLaneBookmark(jj, lane)) ?? "",
+      line,
+      "-m",
+      "merge",
+    ])
     const merge = await commitToBookmark(jj, lane, "merge")
     expect(
       await commitTurn(jj, {

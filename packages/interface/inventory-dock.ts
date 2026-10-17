@@ -9,7 +9,7 @@ export type Dock = "left" | "centre" | "right"
 const DOCKS: readonly Dock[] = ["left", "centre", "right"]
 
 /** The third of a `width`-wide screen that `x` falls in. */
-export function snapTo(x: number, width: number): Dock {
+export function snappedDock(x: number, width: number): Dock {
   if (width <= 0 || x < width / 3) return "left"
   return x < (2 * width) / 3 ? "centre" : "right"
 }

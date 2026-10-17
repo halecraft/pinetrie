@@ -2324,8 +2324,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the drain pops a held thread's card",
     file: "apps/pinetrie/host/queued-card-pop.ts",
-    from: "          away:\n            holdingOf(",
-    to: "          away:\n            false &&\n            holdingOf(",
+    from: "          away:\n            threadCardHolding(",
+    to: "          away:\n            false &&\n            threadCardHolding(",
     command: unit,
     expect:
       "pops nothing while its thread is in an inventory: its cards stay queued",
@@ -2386,7 +2386,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a board move refused says nowhere",
     file: "apps/pinetrie/host/commands/board.ts",
-    from: "          place: moved.now === null ? null : keyOf(moved.now.place),",
+    from: "          place: moved.now === null ? null : placeKey(moved.now.place),",
     to: "          place: null,",
     command: unit,
     expect: "refused `moved`, saying where it is",
@@ -2414,7 +2414,7 @@ export const mutations: readonly Mutation[] = [
     name: "lane work imports jj's adapter",
     file: "apps/pinetrie/host/work/turns.ts",
     from: 'import { callLabel } from "@pinetrie/interface"\n',
-    to: 'import { callLabel } from "@pinetrie/interface"\nimport { bookmarkOf } from "@pinetrie/jj"\nvoid bookmarkOf\n',
+    to: 'import { callLabel } from "@pinetrie/interface"\nimport { readLaneBookmark } from "@pinetrie/jj"\nvoid readLaneBookmark\n',
     command: unit,
     expect: "no file of lane work, tests included, imports jj's adapter",
   },

@@ -33,7 +33,7 @@ import {
 import { unclassifiedPending } from "./verdict.ts"
 import { planRetention } from "./work.ts"
 
-/** Into the archive, or out of it: `transitionOf`'s crossings. */
+/** Into the archive, or out of it: `stateTransition`'s crossings. */
 export type Crossing = "archive" | "restore"
 
 /**

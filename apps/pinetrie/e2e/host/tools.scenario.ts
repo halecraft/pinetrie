@@ -25,17 +25,17 @@ import { gateClose, gateCommand, gateFeed, newGate } from "../gate.ts"
 import {
   at,
   committedProject,
-  composeAt,
-  entriesOf,
+  composeCard,
+  heldEntries,
+  heldLanes,
+  heldTree,
   idleNow,
   idOfText,
   join,
-  lanesOf,
   noQueued,
   queueCard,
   START_AGENT,
   setUpAccepted,
-  treeOf,
   waitFor,
 } from "../harness.ts"
 import { cleanUp, inLane, inLaneQuiet, type LaneHosts } from "../lane-hosts.ts"
@@ -79,8 +79,8 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       })
     let th = await open(() => {})
     const tidle = () => waitFor(() => idleNow(th), 60_000)
-    const ttree = () => treeOf(th)
-    const tlane = () => lanesOf(th, ttree(), readPlaces(th.places))[0]
+    const ttree = () => heldTree(th)
+    const tlane = () => heldLanes(th, ttree(), readPlaces(th.places))[0]
     // Every open stream at each change of the host's document.
     const watched: ReturnType<typeof readStreams>[] = []
     const watch = () =>
@@ -296,8 +296,8 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     // end will. The run is the document's record alone, which a stopping
     // host leaves and a starting one clears (`planClear`).
     const before = {
-      entries: Object.keys(entriesOf(th)).length,
-      lanes: lanesOf(th, ttree(), readPlaces(th.places)).map(
+      entries: Object.keys(heldEntries(th)).length,
+      lanes: heldLanes(th, ttree(), readPlaces(th.places)).map(
         l => `${l.name}@${l.tip}`,
       ),
       names: [...readParticipantNames(th.session).values()].sort(),
@@ -306,7 +306,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     const heldText = "@Bob queued across a restart"
     if (l6 !== undefined && l6.tip !== null) {
       beginRun(th.live, l6.name, runId("r-held"))
-      const held = await composeAt(
+      const held = await composeCard(
         u,
         { entry: l6.tip, lane: l6.name },
         heldText,
@@ -363,8 +363,8 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       `${beforeRestart.records} records -> ${afterRestart.records}`,
     )
     const after = {
-      entries: Object.keys(entriesOf(th)).length - 1,
-      lanes: lanesOf(th, ttree(), readPlaces(th.places)).map(
+      entries: Object.keys(heldEntries(th)).length - 1,
+      lanes: heldLanes(th, ttree(), readPlaces(th.places)).map(
         l => `${l.name}@${l.tip}`,
       ),
       names: [...readParticipantNames(th.session).values()].sort(),

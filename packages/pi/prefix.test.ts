@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest"
-import { prefixChange, prefixOf } from "./prefix.ts"
+import { prefixChange, requestPrefix } from "./prefix.ts"
 
 const payload = (over: Record<string, unknown> = {}) => ({
   model: "m",
@@ -12,7 +12,7 @@ const payload = (over: Record<string, unknown> = {}) => ({
 
 describe("prefixChange", () => {
   test("a first request is no change", () => {
-    expect(prefixChange(undefined, prefixOf(payload()))).toBe(false)
+    expect(prefixChange(undefined, requestPrefix(payload()))).toBe(false)
   })
 
   test("the same prefix with more messages is no change", () => {
@@ -22,16 +22,18 @@ describe("prefixChange", () => {
         { role: "assistant", content: "hello" },
       ],
     })
-    expect(prefixChange(prefixOf(payload()), prefixOf(later))).toBe(false)
+    expect(prefixChange(requestPrefix(payload()), requestPrefix(later))).toBe(
+      false,
+    )
   })
 
   test("tools, the system prompt or the thinking settings changing is a change", () => {
-    const before = prefixOf(payload())
+    const before = requestPrefix(payload())
     for (const over of [
       { tools: [{ name: "read" }, { name: "ask_about_conflict" }] },
       { system: [{ type: "text", text: "you are, named" }] },
       { thinking: { type: "enabled" } },
     ])
-      expect(prefixChange(before, prefixOf(payload(over)))).toBe(true)
+      expect(prefixChange(before, requestPrefix(payload(over)))).toBe(true)
   })
 })

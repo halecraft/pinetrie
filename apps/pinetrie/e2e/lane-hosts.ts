@@ -25,7 +25,8 @@ import { findProject } from "../host/work/runtime.ts"
 import { CommandFailed, command } from "./command.ts"
 import {
   committedProject,
-  entriesOf,
+  heldEntries,
+  heldTree,
   idleNow,
   join,
   laneHolding,
@@ -35,7 +36,6 @@ import {
   suiteDirsNow,
   suitePlaces,
   suiteSshPlaces,
-  treeOf,
   waitFor,
 } from "./harness.ts"
 import {
@@ -201,9 +201,9 @@ async function sectionHost(input: SectionInput) {
   /** Every tool result's text in the thread holding `text`, oldest first. */
   const results = async (text: string) => {
     await idle()
-    const index = treeOf(host)
+    const index = heldTree(host)
     const onPath = new Set(ancestry(index, laneWith(text)?.tip ?? null).path)
-    return Object.values(entriesOf(host))
+    return Object.values(heldEntries(host))
       .filter(r => onPath.has(entryId(r.id)))
       .sort((a, b) => (a.id < b.id ? -1 : 1))
       .map(r => rowMessage(r) as { role?: string })

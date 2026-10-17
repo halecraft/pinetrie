@@ -25,7 +25,7 @@ import { cardIdFor, FIXTURE_THREAD } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import { archivedIn, planArchive, planLanesGone, writesIn } from "./archive.ts"
 import { indexCanvases } from "./canvas-index.ts"
-import { threadCardOf } from "./fixtures.ts"
+import { landedThreadCard } from "./fixtures.ts"
 
 const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 const OTHER_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000b")
@@ -219,8 +219,13 @@ const NOTES_X = cardIdOfKind(
 describe("writesIn: the canvases a command writes in", () => {
   // LANE_X's card is on OTHER_CANVAS, T_B's on CANVAS.
   const cards: CardRecord[] = [
-    threadCardOf({ thread: LANE_X, canvas: OTHER_CANVAS, by: BEA, cards: [] }),
-    threadCardOf({ thread: T_B, canvas: CANVAS, by: BEA, cards: [] }),
+    landedThreadCard({
+      thread: LANE_X,
+      canvas: OTHER_CANVAS,
+      by: BEA,
+      cards: [],
+    }),
+    landedThreadCard({ thread: T_B, canvas: CANVAS, by: BEA, cards: [] }),
     {
       kind: "text",
       id: cardIdFor("c106"),

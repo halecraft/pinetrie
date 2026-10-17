@@ -6,17 +6,17 @@
 import {
   type AskIndex,
   type EntryId,
+  entryAsk,
+  entryThread,
   type LaneView,
-  laneOf,
   type Proposal,
   type ProposalState,
   type ProposedThread,
-  promptOf,
   proposalState,
-  runOf,
+  runPrompt,
   type ThreadId,
   type TreeIndex,
-  threadAt,
+  threadLane,
   type WriterId,
 } from "@pinetrie/core"
 
@@ -71,16 +71,18 @@ export function columnProposals(input: {
   const { index, asks } = input
   const out = new Map<EntryId, ProposalFacts[]>()
   for (const id of input.nodes) {
-    const prompt = runOf(asks, id)
+    const prompt = entryAsk(asks, id)
     if (prompt === undefined) continue
     // A tool's result is no node: it is a child of the message holding its call.
     for (const entry of index.childrenOf.get(id) ?? []) {
       const content = index.entries[entry]?.message?.proposal
       if (content === undefined) continue
-      const lane = threadAt(index, entry)
-      const view = lane === null ? undefined : laneOf(input.lanes, lane)
+      const lane = entryThread(index, entry)
+      const view = lane === null ? undefined : threadLane(input.lanes, lane)
       const runningAsk =
-        view?.kind === "lane" && view.running ? promptOf(index, view.tip) : null
+        view?.kind === "lane" && view.running
+          ? runPrompt(index, view.tip)
+          : null
       const state = proposalState({
         index,
         asks,

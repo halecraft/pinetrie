@@ -13,7 +13,7 @@ import {
 import { cardIdFor, fromParents, threadOfEntry } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import { type CopyThread, planCopy } from "./copy.ts"
-import { threadCardOf } from "./fixtures.ts"
+import { landedThreadCard } from "./fixtures.ts"
 
 const ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 const CANVAS = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000c")
@@ -31,7 +31,7 @@ const record = (thread: typeof SOURCE): ThreadRecord => ({
   origin: { kind: "root" },
 })
 const threads = new Map([[SOURCE, record(SOURCE)]])
-const onCanvas = threadCardOf({
+const onCanvas = landedThreadCard({
   thread: SOURCE,
   canvas: CANVAS,
   by: ADA,

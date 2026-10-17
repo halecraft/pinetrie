@@ -26,7 +26,8 @@ export function clockedStore(file: string, clock: SuiteClock) {
   } as const
 }
 
-export const runOf = (o: Outcome) => (o.kind === "started" ? o.runId : "")
+export const startedRunId = (o: Outcome) =>
+  o.kind === "started" ? o.runId : ""
 /**
  * A document's records in a Kyneta store, their payloads' size, and how many
  * hold the whole document (a compaction's), read

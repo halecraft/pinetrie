@@ -8,21 +8,21 @@ import { type ImageRef, projectTranscript, ROOT } from "@pinetrie/core"
 import { readBanners } from "@pinetrie/reads"
 import type { Checks } from "../checks.ts"
 import {
+  heldLaneNames,
+  heldTree,
   idleNow,
   join,
-  laneNamesOf,
   START_AGENT,
   SUITE_CONFIG,
   startSuiteHost,
   suitePlaces,
   tipIn,
-  treeOf,
   waitFor,
 } from "../harness.ts"
 import { imageSize, RED_PNG } from "../images.ts"
 import type { Scenario } from "../scenario.ts"
 
-import { runOf } from "./support.ts"
+import { startedRunId } from "./support.ts"
 
 export const scenario: Scenario = {
   needs: async () =>
@@ -63,9 +63,9 @@ async function run(check: Checks["check"]): Promise<void> {
   const asker = await join(live, "asker", "live")
   await asker.send(PROMPT, ROOT, START_AGENT)
   await waitFor(() => idleNow(live), 120_000)
-  const [lane] = laneNamesOf(live)
+  const [lane] = heldLaneNames(live)
   const last = projectTranscript(
-    treeOf(live),
+    heldTree(live),
     lane === undefined ? null : tipIn(live, lane),
   ).at(-1)
   console.log(`  model said: ${JSON.stringify(last?.text)}`)
@@ -87,15 +87,15 @@ async function run(check: Checks["check"]): Promise<void> {
   )
   await waitFor(() => idleNow(live), 120_000)
   // A message at the root begins a thread of its own: its lane is the new one.
-  const imageLane = laneNamesOf(live).find(l => l !== lane)
+  const imageLane = heldLaneNames(live).find(l => l !== lane)
   const seenBy = projectTranscript(
-    treeOf(live),
+    heldTree(live),
     imageLane === undefined ? null : tipIn(live, imageLane),
   ).at(-1)
   console.log(`  model said of the image: ${JSON.stringify(seenBy?.text)}`)
   check(
     "a real model reads a pasted image: it names its colour",
-    runOf(shown) !== "" &&
+    startedRunId(shown) !== "" &&
       seenBy?.role === "assistant" &&
       /red/i.test(seenBy.text),
   )

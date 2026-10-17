@@ -40,7 +40,7 @@ import {
 import { readRecords } from "@pinetrie/reads"
 import {
   ACCESS,
-  accessOf,
+  emptyAccess,
   planAccessAsk,
   planAccessChange,
   planAccessTimeout,
@@ -294,7 +294,7 @@ export async function startLaneSsh(input: {
   /** Each ask's deadline: cleared at close, so none writes after the documents close. */
   const timers = new Set<NodeJS.Timeout>()
   const readAccess = (lane: ThreadId): AccessRecord =>
-    readRecords(basics.session, ACCESS).get(lane) ?? accessOf(lane)
+    readRecords(basics.session, ACCESS).get(lane) ?? emptyAccess(lane)
   const write = (record: AccessRecord) =>
     records.writeValues([setRecord(ACCESS, record)])
   const settle = (lane: ThreadId, may: boolean) => {

@@ -9,8 +9,8 @@ import type {
   WorkflowStateId,
   WriterId,
 } from "@pinetrie/core"
-import { boardOf } from "@pinetrie/rules"
-import { type Level, markOf } from "./attention.ts"
+import { taskBoard } from "@pinetrie/rules"
+import { type Level, markLevel } from "./attention.ts"
 import { count } from "./counts.ts"
 import type { Intent } from "./intent.ts"
 import type { KeyLike } from "./page-keys.ts"
@@ -62,7 +62,7 @@ export interface BoardColumnView {
   /** The cards of the roots the search keeps, in their order. */
   readonly items: readonly ThreadCard[]
   readonly count: Count
-  /** Its highest mark over every root, kept or not (`markOf`): a filter hides no warning. */
+  /** Its highest mark over every root, kept or not (`markLevel`): a filter hides no warning. */
   readonly mark: Level | null
   /** Over the roots the search keeps, as its cards show them. */
   readonly signals: StateSignals
@@ -128,7 +128,7 @@ export interface BoardViewInput {
   readonly workflow: Workflow
   /** Every card: the board's are each canvas's. */
   readonly cards: readonly CardRecord[]
-  /** Each canvas with a message (`summariesOf`): its first line is a titled card's body. */
+  /** Each canvas with a message (`taskSummaries`): its first line is a titled card's body. */
   readonly summaries: ReadonlyMap<CanvasId, CanvasSummary>
   /** Each canvas's thread card header (`threadCardHeads`), which the sidebar reads too. */
   readonly heads: ReadonlyMap<CanvasId, ThreadCardHead>
@@ -147,7 +147,7 @@ const bodyOf = (label: string, line: string | undefined): string | null =>
  */
 export function boardView(input: BoardViewInput): BoardView {
   const { workflow, search, summaries } = input
-  const board = boardOf(workflow, input.cards)
+  const board = taskBoard(workflow, input.cards)
   const keeps = search === null ? null : boardFilter(search, input.me)
   const headOf = (canvas: CanvasId): ThreadCardHead =>
     input.heads.get(canvas) ?? {
@@ -246,7 +246,7 @@ export function boardView(input: BoardViewInput): BoardView {
     const next = board.open[i + 1]
     const afterNext = board.open[i + 2]
     const previous = board.open[i - 1]
-    const mark = markOf(status, all)
+    const mark = markLevel(status, all)
     const view: BoardColumnView = {
       state,
       items: cards,
@@ -332,7 +332,7 @@ export const searchedText = (label: string): string =>
   label.replace(ADDRESS_LINK, "$1")
 
 /**
- * What `search` keeps: the canvases whose label (`labelsOf`, so a title is
+ * What `search` keeps: the canvases whose label (`taskLabels`, so a title is
  * found) holds every word, in any order, and with `mine`, those `me` wrote a
  * chat in. Labels, not messages: a search of every message would hold every
  * root's document.

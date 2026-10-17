@@ -35,6 +35,7 @@ import {
   CONFLICT,
   DIGEST,
   decodeFolderStamps,
+  decodeRecords,
   deleteRecord,
   encodeFolderStamps,
   FOLDER_WRITE_JOURNAL,
@@ -53,7 +54,6 @@ import {
   REVISION,
   type RecordSpec,
   ROOT,
-  recordsOf,
   SEAT,
   STATE,
   setIfChanged,
@@ -427,7 +427,7 @@ describe.each(SAMPLES)("%s", (_, spec, record, keyField) => {
     const write = writeOf(spec, record)
     expect(write.key).toBe(spec.keyOf(record))
     const stored = JSON.parse(JSON.stringify(write))
-    expect(recordsOf(spec, [stored]).get(write.key)).toEqual(record)
+    expect(decodeRecords(spec, [stored]).get(write.key)).toEqual(record)
   })
 
   test("its stored contents never repeat its key", () => {
@@ -446,7 +446,7 @@ describe.each(SAMPLES)("%s", (_, spec, record, keyField) => {
       key: write.key,
       value: { ...(write.value as object), [keyField]: "a-stale-copy" },
     }
-    expect(recordsOf(spec, [old]).get(write.key)).toEqual(record)
+    expect(decodeRecords(spec, [old]).get(write.key)).toEqual(record)
   })
 })
 
@@ -488,7 +488,9 @@ test("a root record's thread that is no lane is dropped, and the record kept", (
 
 test("a record keyed by lane does not read at an address that is no lane", () => {
   const write = setRecord(PROPOSED_CHANGES, proposed)
-  expect(recordsOf(PROPOSED_CHANGES, [{ ...write, key: "main" }]).size).toBe(0)
+  expect(
+    decodeRecords(PROPOSED_CHANGES, [{ ...write, key: "main" }]).size,
+  ).toBe(0)
 })
 
 test("each record lives where it is read: across roots in the session, by entry in its root", () => {

@@ -17,6 +17,7 @@ import {
   type CardCommand,
   type CardId,
   type CommitId,
+  chatMode,
   commitId,
   DISCARDED,
   type EntryId,
@@ -28,14 +29,13 @@ import {
   isFolderStateId,
   isNoteColumnId,
   isReferenceCardId,
-  isReorderAt,
+  isReorderPlace,
   isRootId,
   isSha256,
   isTextCardId,
   isThreadId,
   isWorkflowStateId,
   keyFieldsFrom,
-  keyFieldsOf,
   keyOfFields,
   kindOfCard,
   MAX_TITLE,
@@ -45,7 +45,6 @@ import {
   type Move,
   type MoveDirection,
   type MoveTarget,
-  modeOf,
   type NonEmpty,
   nonEmpty,
   normalizeName,
@@ -88,6 +87,7 @@ import {
   type WorkflowAction,
   type WorkflowStateId,
   type WriterId,
+  wireKeyFields,
 } from "@pinetrie/core"
 import { type Command, command, type Reply, reply } from "./messages.ts"
 
@@ -851,7 +851,7 @@ const isCardCommand = (c: string): c is CardCommand =>
 
 /** A place's key, or a move's target, as a JSON value: its flat fields, null for none. */
 const keyToJson = (key: MoveTarget | null) =>
-  key === null ? null : keyFieldsOf(placeFields(key))
+  key === null ? null : wireKeyFields(placeFields(key))
 
 /** A place's key -> the wire: its flat fields as JSON, `""` for none. */
 export const encodeKey = (key: PlaceKey | null): string =>
@@ -999,7 +999,7 @@ export function decodeReorder(text: string, s: string): Reorder | string {
     return "a reorder must name its place"
   const v = value as Record<string, unknown>
   const at = keyFromJson(v.at ?? null)
-  if (at === null || at === undefined || !isReorderAt(at))
+  if (at === null || at === undefined || !isReorderPlace(at))
     return "a reorder stays in a queue, among the pinned cards, in a note column or on a canvas"
   const neighbour = (k: unknown): string =>
     typeof k === "string" ? k.trim() : ""
@@ -1093,7 +1093,7 @@ export function encodeIntent(id: string, intent: Intent): Command {
           intent.at.kind === "end" ? intent.at.seen : (intent.at.at ?? ""),
         root: intent.root,
         canvas: intent.at.kind === "branch" ? intent.at.canvas : "",
-        mode: modeOf(intent.at),
+        mode: chatMode(intent.at),
         lane: intent.at.thread,
         cardId: intent.card?.id ?? "",
         seen: intent.card?.seen ?? "",

@@ -4,11 +4,11 @@ import { describe, expect, test } from "vitest"
 import { stopMessage } from "../apps/pinetrie/e2e/checks.ts"
 import {
   choose,
-  commandOf,
   failingChecks,
   judge,
   type Mutation,
   mutantEnv,
+  mutationCommand,
   run as runGroup,
   SUITES,
 } from "./mutate.ts"
@@ -137,7 +137,7 @@ test("SUITES: each suite's scenario directory exists, and its command runs it", 
     expect(suite.command.slice(0, 2)).toEqual(["pnpm", "run"])
   }
   expect(
-    commandOf({
+    mutationCommand({
       name: "x",
       file: "f",
       from: "a",

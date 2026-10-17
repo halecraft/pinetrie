@@ -1,16 +1,16 @@
 import { describe, expect, test } from "vitest"
 import {
   baseMessage,
-  baseOf,
   commitId,
   entryId,
   entryOfMessage,
   hasTrailer,
   isWipLine,
+  messageBase,
+  messageSources,
   proposedLedger,
   proposedMessage,
   revisionMessage,
-  sourcesOf,
   type ThreadName,
   TRAILERS,
   threadIdFor,
@@ -79,7 +79,7 @@ test("untracedLanes: only accepted proposed changes' paragraph that names no sou
   ).toEqual([])
 })
 
-test("sourcesOf reads every paragraph of a squash, each source once", () => {
+test("messageSources reads every paragraph of a squash, each source once", () => {
   const ledger = (source: string) => ({
     source: commitId(source),
     start: [commitId("s1")],
@@ -96,8 +96,8 @@ test("sourcesOf reads every paragraph of a squash, each source once", () => {
     entry: "e2",
     ledger: ledger("bbbb"),
   })
-  expect(sourcesOf(`${one}\n${two}\n${one}`)).toEqual(["aaaa", "bbbb"])
-  expect(sourcesOf("your commit")).toEqual([])
+  expect(messageSources(`${one}\n${two}\n${one}`)).toEqual(["aaaa", "bbbb"])
+  expect(messageSources("your commit")).toEqual([])
 })
 
 describe("what is written reads back", () => {
@@ -110,39 +110,39 @@ describe("what is written reads back", () => {
     expect(entryOfMessage(message)).toBe("e-1")
     expect(entryOfMessage("your commit")).toBeNull()
   })
-  test("baseMessage and baseOf round-trip a Pinetrie-Base, the newest of them; a malformed one reads as none", () => {
+  test("baseMessage and messageBase round-trip a Pinetrie-Base, the newest of them; a malformed one reads as none", () => {
     const m = baseMessage("copy of wip/a@b", {
       kind: "wip",
       bookmark: "wip/a@b",
       commit: C1,
     })
     expect(m).toBe("copy of wip/a@b\n\nPinetrie-Base: wip/a@b@c1\n")
-    expect(baseOf("x\n\nPinetrie-Base: nope\n", "wip/")).toBeNull()
-    expect(baseOf(m, "wip/")).toEqual({
+    expect(messageBase("x\n\nPinetrie-Base: nope\n", "wip/")).toBeNull()
+    expect(messageBase(m, "wip/")).toEqual({
       kind: "wip",
       bookmark: "wip/a@b",
       commit: C1,
     })
     const later = baseMessage("catch up", { kind: "accepted", commit: C1 })
     expect(later).toBe("catch up\n\nPinetrie-Base: accepted@c1\n")
-    expect(baseOf(`${m}\n${later}`, "wip/")).toEqual({
+    expect(messageBase(`${m}\n${later}`, "wip/")).toEqual({
       kind: "accepted",
       commit: C1,
     })
-    expect(baseOf("your commit", "wip/")).toBeNull()
+    expect(messageBase("your commit", "wip/")).toBeNull()
   })
   test("a base is a WIP by its prefix, else accepted work, whatever name accepted work's bookmark had", () => {
     for (const name of ["accepted", "pinetrie-onto", "trunk"])
-      expect(baseOf(`b\n\nPinetrie-Base: ${name}@c1\n`, "wip/")).toEqual({
+      expect(messageBase(`b\n\nPinetrie-Base: ${name}@c1\n`, "wip/")).toEqual({
         kind: "accepted",
         commit: C1,
       })
-    expect(baseOf("b\n\nPinetrie-Base: draft/x@c1\n", "draft/")).toEqual({
+    expect(messageBase("b\n\nPinetrie-Base: draft/x@c1\n", "draft/")).toEqual({
       kind: "wip",
       bookmark: "draft/x",
       commit: C1,
     })
-    expect(baseOf("b\n\nPinetrie-Base: accepted@c1\n", "")).toEqual({
+    expect(messageBase("b\n\nPinetrie-Base: accepted@c1\n", "")).toEqual({
       kind: "accepted",
       commit: C1,
     })
@@ -262,7 +262,7 @@ describe("pre-rename: what the host wrote as Pineta is read", () => {
       source: commitId("aaaa"),
       start: [commitId("s1")],
     })
-    expect(sourcesOf(proposed)).toEqual([commitId("aaaa")])
+    expect(messageSources(proposed)).toEqual([commitId("aaaa")])
     expect(withoutTrailers(proposed)).toBe("feat: x")
     expect(
       entryOfMessage(`turn\n\nPineta-Entry: e2\nPineta-Lane: ${LANE}\n`),
@@ -275,13 +275,18 @@ describe("pre-rename: what the host wrote as Pineta is read", () => {
   })
 
   test("a base on a WIP is read; a base on pineta-onto reads as accepted work", () => {
-    expect(baseOf("copy of wip/a\n\nPineta-Base: wip/a@c1\n", "wip/")).toEqual({
+    expect(
+      messageBase("copy of wip/a\n\nPineta-Base: wip/a@c1\n", "wip/"),
+    ).toEqual({
       kind: "wip",
       bookmark: "wip/a",
       commit: C1,
     })
     expect(
-      baseOf("update: pineta-onto\n\nPineta-Base: pineta-onto@c1\n", "wip/"),
+      messageBase(
+        "update: pineta-onto\n\nPineta-Base: pineta-onto@c1\n",
+        "wip/",
+      ),
     ).toEqual({ kind: "accepted", commit: C1 })
   })
 

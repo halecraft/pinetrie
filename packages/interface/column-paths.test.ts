@@ -1,9 +1,9 @@
 import {
   entryId,
+  entryThread,
   indexTree,
   projectRail,
   type ThreadId,
-  threadAt,
   threadEnd,
   threadIdFor,
 } from "@pinetrie/core"
@@ -15,7 +15,7 @@ import {
   threadTrack,
   trackIndex,
 } from "./column-paths.ts"
-import { entriesOf, entry, fromParents, threadOfEntry } from "./fixtures.ts"
+import { entriesById, entry, fromParents, threadOfEntry } from "./fixtures.ts"
 
 /**
  * A tree from `child: parent` pairs. Ids are uuidv7-like: the digit prefix
@@ -81,7 +81,7 @@ describe("projectColumns", () => {
     expect([shared?.forkFrom, ids(shared?.above ?? [])]).toEqual(["1-t1", []])
   })
   test("a branch not yet sent from a held thread leaves that thread's entries out", () => {
-    const held = threadAt(i, entryId("6-b1"))
+    const held = entryThread(i, entryId("6-b1"))
     expect(held).not.toBeNull()
     const [c] = projectColumns(i, [
       { anchor: entryId("7-b2"), ...(held === null ? {} : { hide: held }) },
@@ -162,7 +162,7 @@ describe("a branch whose first entry is a context entry no column draws", () => 
   const said = (id: string, parent: string | null, thread: ThreadId) =>
     entry(id, parent, { role: "person", content: id, author: "A" }, { thread })
   const i = indexTree(
-    entriesOf([
+    entriesById([
       said("1-t1", null, T),
       said("2-t2", "1-t1", T),
       canvas("3-cb", "2-t2", B),

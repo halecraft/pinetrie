@@ -10,7 +10,7 @@ import { describeFailure, lines, type Runner } from "@pinetrie/lanes"
 import { bookmarkName, bookmarkRevset } from "./names.ts"
 
 /** The commit a lane's bookmark points at, or null. */
-export async function bookmarkOf(
+export async function readLaneBookmark(
   jj: Runner,
   lane: ThreadId,
 ): Promise<CommitId | null> {

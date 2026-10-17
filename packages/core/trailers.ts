@@ -171,7 +171,10 @@ function parseBase(
  * written under an older name of accepted work's bookmark (`pinetrie-onto`,
  * `pineta-onto`) still reads as accepted work.
  */
-export function baseOf(message: string, wipPrefix: string): BaseTrailer | null {
+export function messageBase(
+  message: string,
+  wipPrefix: string,
+): BaseTrailer | null {
   const value = trailerValues(message, "base").at(-1)
   const parsed = value === undefined ? null : parseBase(value)
   if (parsed === null) return null
@@ -283,7 +286,7 @@ export function proposedLedger(message: string): ProposedLedger | null {
  * paragraph, once each: a squash of two accepted proposed changes keep both
  * ledgers.
  */
-export const sourcesOf = (message: string): CommitId[] =>
+export const messageSources = (message: string): CommitId[] =>
   [...new Set(trailerValues(message, "source"))].map(commitId)
 
 /**

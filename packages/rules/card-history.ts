@@ -11,16 +11,16 @@ import {
   type EntryId,
   entryId,
   isThreadId,
-  keyOf,
   keyOfFields,
-  livePlaceOf,
+  livePlace,
   ownerCard,
-  ownerOf,
   type PlaceFields,
   type PlaceKey,
   parseCardId,
   placeFields,
+  placeKey,
   sameKey,
+  surfaceOwner,
   type ThreadId,
   type TracedKind,
   type TracedPlace,
@@ -30,7 +30,7 @@ import {
 } from "@pinetrie/core"
 import { Type } from "typebox"
 import { placeEnd } from "./card.ts"
-import { decodeAt, textKey } from "./decode.ts"
+import { decodeRecord, textKey } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 
 /** The most events a card's history keeps: its first, and the newest. */
@@ -108,7 +108,7 @@ export const CARD_HISTORY: RecordSpec<CardHistoryRecord, CardId, "session"> = {
     })),
   }),
   decode: (contents, key) =>
-    decodeAt(HistorySchema, contents, textKey(key), (r, id) => {
+    decodeRecord(HistorySchema, contents, textKey(key), (r, id) => {
       const card = parseCardId(id)
       return card === undefined
         ? undefined
@@ -136,7 +136,7 @@ export const TRACE: RecordSpec<TraceRecord, string, "session"> = {
     to: keyFields(t.to),
   }),
   decode: (contents, key) =>
-    decodeAt(TraceSchema, contents, textKey(key), (r, id) => {
+    decodeRecord(TraceSchema, contents, textKey(key), (r, id) => {
       const key = keyOfFields(asPlaceFields(r.from))
       // A trace is left only at a traced place (`TRACED`).
       const from = key === undefined ? null : tracedKey(key)
@@ -234,7 +234,7 @@ function movedBack(
 }
 
 /** The one rule for what a change is called, from its two places. */
-export function verbOf(from: PlaceKey | null, to: PlaceKey | null): Verb {
+export function changeVerb(from: PlaceKey | null, to: PlaceKey | null): Verb {
   if (to === null) return "sent"
   if (from === null) return "created"
   const back = movedBack(from, to)
@@ -362,7 +362,7 @@ export function planProvenance(input: {
 
   for (const [id, is] of after) {
     const was = before.get(id)
-    const to = keyOf(is.place)
+    const to = placeKey(is.place)
     if (was === undefined) {
       histories.push({
         kind: "set",
@@ -373,7 +373,7 @@ export function planProvenance(input: {
       })
       continue
     }
-    const from = keyOf(was.place)
+    const from = placeKey(was.place)
     if (sameKey(from, to)) continue
     histories.push({
       kind: "set",
@@ -400,7 +400,7 @@ export function planProvenance(input: {
     // A trace: someone else moved it out of a traced place, unseen.
     const from = tracedKey(was.place)
     if (by === null || by === was.placer || from === null) continue
-    const to = is === undefined ? null : keyOf(is.place)
+    const to = is === undefined ? null : placeKey(is.place)
     if (to !== null && (sameKey(from, to) || movedBack(from, to) !== null))
       continue
     if (watched(was.placer, id)) continue
@@ -433,7 +433,7 @@ export const TRASH_KEEP_MS = 7 * 24 * 60 * 60 * 1000
  * When a trashed card was trashed: its newest history event (its discard, or
  * what came after); `now` for one with no history to tell.
  */
-export function trashedAt(
+export function trashedTime(
   card: CardId,
   histories: ReadonlyMap<CardId, CardHistoryRecord>,
   now: number,
@@ -454,7 +454,7 @@ export function trashDeadline(
 ): number {
   return histories.get(card) === undefined
     ? now
-    : trashedAt(card, histories, now) + keepMs
+    : trashedTime(card, histories, now) + keepMs
 }
 
 /** What the trash sweep deletes: the cards, and among them the threads, whose lanes go too. */
@@ -466,7 +466,7 @@ export interface TrashSweep {
 /**
  * The cards to delete, record and text: each trashed card past its
  * `trashDeadline`, and with it every card on a surface it owns
- * (`ownerOf`), trashed or not, and so on down: a note column's notes, a
+ * (`surfaceOwner`), trashed or not, and so on down: a note column's notes, a
  * thread's message, pinned, queued and margin cards.
  */
 export function planTrashSweep(input: {
@@ -491,7 +491,7 @@ export function planTrashSweep(input: {
     grew = false
     for (const c of input.cards) {
       if (doomed.has(c.id)) continue
-      const owner = ownerCard(ownerOf(livePlaceOf(c.place)))
+      const owner = ownerCard(surfaceOwner(livePlace(c.place)))
       if (owner !== null && doomed.has(owner)) {
         doomed.add(c.id)
         grew = true

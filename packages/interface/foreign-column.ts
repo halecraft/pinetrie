@@ -16,7 +16,7 @@ import {
 } from "@pinetrie/core"
 import { foreignIn, type RunAt } from "@pinetrie/rules"
 import type { ReadOnly } from "./app-view.ts"
-import { type Column, unstartedOf } from "./columns.ts"
+import { type Column, unstartedMode } from "./columns.ts"
 import type { Reader } from "./send.ts"
 import { heldWords } from "./thread-link.ts"
 
@@ -37,7 +37,7 @@ export function columnForeign(
     readonly revisions: ReadonlyMap<EntryId, RevisionRecord>
   },
 ): ForeignLane | null {
-  const unstarted = unstartedOf(column)
+  const unstarted = unstartedMode(column)
   const at: readonly RunAt[] =
     unstarted === undefined
       ? [{ kind: "thread", thread: column.thread }]

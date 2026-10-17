@@ -4,10 +4,10 @@ import { describe, expect, test } from "vitest"
 import {
   boundsAfter,
   compareKeys,
+  entryStructure,
   inBounds,
   type Located,
   selectBranch,
-  structureOf,
 } from "./queries.ts"
 
 const at = (
@@ -85,9 +85,9 @@ describe("selectBranch", () => {
   })
 })
 
-test("structureOf keeps customType only where the payload has one", () => {
+test("entryStructure keeps customType only where the payload has one", () => {
   expect(
-    structureOf(at("c", 3, "custom", { customType: "note", data: 1 })),
+    entryStructure(at("c", 3, "custom", { customType: "note", data: 1 })),
   ).toEqual({
     id: "c",
     parentId: null,
@@ -96,7 +96,7 @@ test("structureOf keeps customType only where the payload has one", () => {
     type: "custom",
     customType: "note",
   })
-  expect(Object.hasOwn(structureOf(at("a", 1)), "customType")).toBe(false)
+  expect(Object.hasOwn(entryStructure(at("a", 1)), "customType")).toBe(false)
 })
 
 test("compareKeys orders by code point, so an astral character sorts after U+FFFF", () => {

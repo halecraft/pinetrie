@@ -10,7 +10,7 @@ import {
   type ProposedChangesRecord,
 } from "@pinetrie/core"
 import { Type } from "typebox"
-import { catchUpOf } from "./base.ts"
+import { catchUpNow } from "./base.ts"
 import { baseMovedOn, CatchUpFromSchema } from "./catch-up-from.ts"
 import { List, PointSchema } from "./decode.ts"
 import { type HistoryMessage, historyMessage } from "./history.ts"
@@ -84,7 +84,7 @@ export type BaseNews =
 
 /**
  * Whether a thread's base has news for it, and what to do with it: from the
- * lane's base record and accepted work's (`catchUpOf`), its proposed changes,
+ * lane's base record and accepted work's (`catchUpNow`), its proposed changes,
  * the base states it last heard of or merged (`baseKnown`), and the one the
  * host told it while it runs (`told`). Only a lane of its own has a base.
  * `unknown` work never acts, nor a gone base.
@@ -104,7 +104,7 @@ export function planBaseNews(input: {
     (base.kind === "jj" && base.state === "gone")
   )
     return { kind: "nothing" }
-  const now = catchUpOf(base, input.accepted)
+  const now = catchUpNow(base, input.accepted)
   if (now.kind !== "brings") return { kind: "nothing" }
   if (base.work === "none") return { kind: "catch-up" }
   const { to } = now.move

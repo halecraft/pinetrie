@@ -13,11 +13,11 @@ import type { NoteCard } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
 import type { Column } from "./columns.ts"
 import {
+  cardDetail,
+  cardFace,
   DETAIL_ON,
   type Detail,
-  detailOf,
   type FaceFacts,
-  faceOf,
   textFaceWords,
 } from "./face.ts"
 import { tree } from "./fixtures.ts"
@@ -74,9 +74,9 @@ const facts: FaceFacts = {
   ]),
 }
 
-describe("faceOf", () => {
+describe("cardFace", () => {
   test("a text card: its first three lines, a short command chip, whose", () => {
-    const face = faceOf(text, facts)
+    const face = cardFace(text, facts)
     expect(face).toEqual({
       kind: "text",
       card: C,
@@ -101,8 +101,8 @@ describe("faceOf", () => {
       place: { kind: "inventory", holder: ADA },
       content: NO_CONTENT,
     } as const
-    expect(faceOf(card, facts)).toBe(threadFaceOfT)
-    expect(faceOf(card, { ...facts, threads: new Map() })).toMatchObject({
+    expect(cardFace(card, facts)).toBe(threadFaceOfT)
+    expect(cardFace(card, { ...facts, threads: new Map() })).toMatchObject({
       kind: "thread",
       thread: T,
       name: null,
@@ -110,13 +110,13 @@ describe("faceOf", () => {
   })
 
   test("a note column: its title and how many notes it holds; unread, none", () => {
-    expect(faceOf(notes, facts)).toEqual({
+    expect(cardFace(notes, facts)).toEqual({
       kind: "note-column",
       card: N,
       title: "Ideas",
       notes: 2,
     })
-    expect(faceOf(notes, { ...facts, notes: new Map() })).toMatchObject({
+    expect(cardFace(notes, { ...facts, notes: new Map() })).toMatchObject({
       notes: null,
     })
   })
@@ -197,13 +197,13 @@ describe("foldedMark", () => {
   })
 })
 
-describe("detailOf", () => {
+describe("cardDetail", () => {
   test("a canvas draws whole, a dock or a list normal, an inventory faces; a fold is a face", () => {
-    expect(detailOf("canvas", false)).toBe("whole")
-    expect(detailOf("canvas", true)).toBe("face")
-    expect(detailOf("queued", false)).toBe("normal")
-    expect(detailOf("note", false)).toBe("normal")
-    expect(detailOf("inventory", false)).toBe("face")
+    expect(cardDetail("canvas", false)).toBe("whole")
+    expect(cardDetail("canvas", true)).toBe("face")
+    expect(cardDetail("queued", false)).toBe("normal")
+    expect(cardDetail("note", false)).toBe("normal")
+    expect(cardDetail("inventory", false)).toBe("face")
   })
 
   test("the table is total over places", () => {

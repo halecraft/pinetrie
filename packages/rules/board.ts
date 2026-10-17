@@ -24,7 +24,7 @@ import {
 } from "@pinetrie/core"
 import { Type } from "typebox"
 import { byOrder } from "./card.ts"
-import { decodeAt, fixedKey } from "./decode.ts"
+import { decodeRecord, fixedKey } from "./decode.ts"
 import type { PlaceStep } from "./moves.ts"
 import { orderAfter } from "./order.ts"
 import { rankAfter } from "./rank.ts"
@@ -55,7 +55,7 @@ export const WORKFLOW: RecordSpec<Workflow, typeof WORKFLOW_KEY, "session"> = {
     archive: { ...w.archive },
   }),
   decode: (contents, key) =>
-    decodeAt(WorkflowSchema, contents, fixedKey(WORKFLOW_KEY, key), w => {
+    decodeRecord(WorkflowSchema, contents, fixedKey(WORKFLOW_KEY, key), w => {
       const open = w.open.map(stateOf)
       const archive = stateOf(w.archive)
       if (archive === undefined || open.some(s => s === undefined))
@@ -82,7 +82,7 @@ export type CanvasRole = "topic" | "task" | "archived"
 
 /**
  * The role of a canvas in `state`. A state the workflow no longer holds is
- * read as the first open state, as `boardOf` places its canvases there.
+ * read as the first open state, as `taskBoard` places its canvases there.
  */
 export function canvasRole(w: Workflow, state: WorkflowStateId): CanvasRole {
   if (state === w.archive.id) return "archived"
@@ -102,7 +102,7 @@ export const planWorkflowSeed = (
   workflow === null ? [setRecord(WORKFLOW, defaultWorkflow(newId))] : []
 
 /** Every state, open then the archive: the board's columns. */
-export const statesOf = (w: Workflow): readonly WorkflowState[] => [
+export const boardStates = (w: Workflow): readonly WorkflowState[] => [
   ...w.open,
   w.archive,
 ]
@@ -111,7 +111,7 @@ export const statesOf = (w: Workflow): readonly WorkflowState[] => [
 export const stateIn = (
   w: Workflow,
   id: WorkflowStateId,
-): WorkflowState | undefined => statesOf(w).find(s => s.id === id)
+): WorkflowState | undefined => boardStates(w).find(s => s.id === id)
 
 /** A canvas's card on the board. */
 export type BoardCard = CardInPlace<"board">
@@ -170,7 +170,7 @@ function columnsOf(
  * Every canvas's card on the board, in its state by rank, then by id; one in
  * a state the workflow lacks after them at the end of the first open state.
  */
-export function boardOf(
+export function taskBoard(
   workflow: Workflow,
   cards: readonly CardRecord[],
 ): Board {
@@ -195,7 +195,7 @@ export function boardOf(
  * history always keeps (`HISTORY_EVENTS`); its placer at 0 for a card with
  * none.
  */
-export function archivedOf(
+export function tasksInArchive(
   workflow: Workflow,
   cards: readonly CardRecord[],
   histories: ReadonlyMap<CardId, CardHistoryRecord>,
@@ -219,7 +219,7 @@ export function archivedOf(
 /** Whether a move crosses the archive's edge: what the host must gather. */
 export type Transition = "within" | "archive" | "restore"
 
-export function transitionOf(
+export function stateTransition(
   workflow: Workflow,
   from: WorkflowStateId,
   to: WorkflowStateId,
@@ -292,7 +292,7 @@ export function planBoardMove(input: {
   const place: CardPlace = { kind: "board", state: to, order }
   return {
     kind: within ? "reorder" : "move",
-    transition: transitionOf(workflow, at, to),
+    transition: stateTransition(workflow, at, to),
     steps: [
       {
         kind: "write",

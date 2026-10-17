@@ -105,7 +105,7 @@ export function dirtyFrom(
 }
 
 /** One changeset's replayed changes, folded into a scope. */
-export function scopeOf(
+export function dirtyScope(
   changes: Iterable<{
     readonly path?: { readonly segments: readonly Segment[] }
     readonly change: unknown

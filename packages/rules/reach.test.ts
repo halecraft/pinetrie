@@ -10,7 +10,7 @@ import {
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { indexCanvases } from "./canvas-index.ts"
-import { threadCardOf } from "./fixtures.ts"
+import { landedThreadCard } from "./fixtures.ts"
 import {
   awayWords,
   lateAway,
@@ -33,9 +33,9 @@ for (const [thread, canvas] of [
   [unnamed, open],
   [owl, done],
 ] as const)
-  cards.push(threadCardOf({ thread, canvas, by: ada, cards }))
+  cards.push(landedThreadCard({ thread, canvas, by: ada, cards }))
 const held: CardRecord = {
-  ...threadCardOf({ thread: elk, canvas: open, by: ada, cards }),
+  ...landedThreadCard({ thread: elk, canvas: open, by: ada, cards }),
   place: { kind: "inventory", holder: bea, slot: 0 },
 } as CardRecord
 const all = [...cards, held]

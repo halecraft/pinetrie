@@ -8,14 +8,14 @@ import { BLOB_GRACE_MS } from "../../host/index.ts"
 import type { Checks } from "../checks.ts"
 import {
   at,
-  entriesOf,
+  heldEntries,
+  heldLanes,
+  heldTree,
   idOfText,
-  lanesOf,
   START_AGENT,
   SUITE_CONFIG,
   suiteClock,
   suitePlaces,
-  treeOf,
   waitFor,
 } from "../harness.ts"
 import { RED_PNG } from "../images.ts"
@@ -56,7 +56,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     await bu.send("@agent plan the parser", ROOT, START_AGENT)
     await waitFor(() => planning.reached, 10_000)
     const bannerOfFirst = () => {
-      const [first] = lanesOf(bh, treeOf(bh), readPlaces(bh.places))
+      const [first] = heldLanes(bh, heldTree(bh), readPlaces(bh.places))
       return first === undefined
         ? undefined
         : readBanners(bh.session).get(first.name)
@@ -65,7 +65,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       (await waitFor(() => bannerOfFirst() !== undefined, 10_000)) >= 0
     planning.finish()
     await bidle()
-    const [lane] = lanesOf(bh, treeOf(bh), readPlaces(bh.places)).map(
+    const [lane] = heldLanes(bh, heldTree(bh), readPlaces(bh.places)).map(
       l => l.name,
     )
     const made =
@@ -103,7 +103,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       { mode: "reply" },
     )
     await bidle()
-    const toolSaid = Object.values(entriesOf(bh))
+    const toolSaid = Object.values(heldEntries(bh))
       .map(rowMessage)
       .filter(m => (m as { role?: string }).role === "toolResult")
       .map(m => messageText(m as never))

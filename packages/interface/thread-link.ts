@@ -108,7 +108,7 @@ export type LinkOpen =
   | { readonly kind: "nothing" }
 
 /** What following `link` to `entry` does. */
-export function openOf(link: ThreadLink, entry: EntryId): LinkOpen {
+export function linkOpen(link: ThreadLink, entry: EntryId): LinkOpen {
   switch (link.kind) {
     case "open":
       return { kind: "canvas", canvas: link.canvas, entry }

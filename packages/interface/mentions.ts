@@ -3,8 +3,8 @@
 
 import {
   type AgentCandidate,
-  handleOf,
   type MentionTarget,
+  mentionHandle,
   mentionTargets,
   typedMention,
 } from "@pinetrie/core"
@@ -30,11 +30,11 @@ export function mentionCompletion(input: {
 }): Completion | null {
   const at = typedMention(input.text, input.caret)
   if (at === null) return null
-  const typed = handleOf(at.typed)
+  const typed = mentionHandle(at.typed)
   const targets = mentionTargets(input.participants, input.agents)
   if (targets.has(typed)) return null
   const { me, nameOf } = input.reader
-  const mine = handleOf(displayName(me, nameOf.get(me)))
+  const mine = mentionHandle(displayName(me, nameOf.get(me)))
   const holding = [...targets]
     .filter(([handle]) => handle !== mine && handle.includes(typed))
     .sort(([, a], [, b]) => rank(a) - rank(b))

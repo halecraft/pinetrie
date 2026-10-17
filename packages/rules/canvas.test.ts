@@ -22,7 +22,12 @@ import {
 } from "./canvas.ts"
 import { type CardOnCanvas, cardsOnCanvas } from "./canvas-index.ts"
 import { encodeCanvasPinned, planCanvasPinnedRead } from "./canvas-pinned.ts"
-import { CONTEXT, CONTEXT_KINDS, CONTEXT_RULES, contextOf } from "./context.ts"
+import {
+  CONTEXT,
+  CONTEXT_KINDS,
+  CONTEXT_RULES,
+  contextInView,
+} from "./context.ts"
 import { encodePinned, PINNED_RULE } from "./pinned.ts"
 import { planFactCard } from "./queue.ts"
 
@@ -200,12 +205,12 @@ describe("the context table", () => {
 
   test("what a run carries: the newest of each kind", () => {
     const newer = encodeCanvas({ ...canvasList(facts()), title: "newer" }, 2)
-    expect(contextOf([list, pinned, newer, { role: "user" }])).toEqual({
+    expect(contextInView([list, pinned, newer, { role: "user" }])).toEqual({
       canvas: { ...canvasList(facts()), title: "newer" },
       pinned: { lane: A, cards: [read2("c1")], retired: [] },
     })
-    expect(contextOf([canvasPinned]).canvasPinned?.canvas).toBe(K)
-    expect(contextOf([])).toEqual({})
+    expect(contextInView([canvasPinned]).canvasPinned?.canvas).toBe(K)
+    expect(contextInView([])).toEqual({})
   })
 })
 

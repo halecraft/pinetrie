@@ -4,7 +4,7 @@
 // `satisfies`, so a kind added later does not compile until it draws all three.
 // A card on a canvas is drawn whole by its column (`Strip`'s switch, total by
 // kind too); a folded one by its face (`FoldedColumn`). What each draws is the
-// interface's values (`faceOf`, `cardFrame`, `threadPreview`); what a row needs
+// interface's values (`cardFace`, `cardFrame`, `threadPreview`); what a row needs
 // beyond its card comes from the surface drawing it (`RenderingContext`).
 
 import {
@@ -291,7 +291,7 @@ function NoteList(p: {
 const fetchedQuotes = new Map<Sha256, string>()
 
 /** A reference's quote if this page has fetched it (`useQuote`); null otherwise. */
-export const quoteOf = (quote: Sha256): string | null =>
+export const fetchedQuote = (quote: Sha256): string | null =>
   fetchedQuotes.get(quote) ?? null
 
 /** A reference's quote, fetched from its blob: it never changes. */

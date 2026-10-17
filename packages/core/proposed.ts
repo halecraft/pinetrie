@@ -144,7 +144,7 @@ export interface ProposedSource {
 }
 
 /** Each revision's change id, bottom first: what jj steps on it name. */
-export const changeIdsOf = (
+export const revisionChangeIds = (
   proposed: ProposedChangesInRepo,
 ): readonly string[] =>
   proposed.kind === "divergent"

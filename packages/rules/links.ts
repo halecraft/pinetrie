@@ -51,7 +51,7 @@ export const addressLink = (address: Address, label: string): string =>
  * The markdown of a past address from its message's text as stored: the
  * whole text for an entry, a block's source slice, a range's slice. Null
  * when the block is not there. Tool calls are the interface's to add
- * (`markdownOf`): the host quotes the text alone.
+ * (`addressMarkdown`): the host quotes the text alone.
  */
 export function pastMarkdown(
   address: PastAddress,

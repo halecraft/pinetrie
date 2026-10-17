@@ -11,14 +11,14 @@ import { describe, expect, test } from "vitest"
 import type { AskLines, DigestPlan } from "./digest.ts"
 import {
   DIGEST,
+  decodeRecords,
   digestRequest,
-  endReplyOf,
+  parseEndReply,
+  parseVerdictLine,
   pendingVerdict,
   planRunEnded,
-  recordsOf,
   runEndedToWrite,
   VERDICT,
-  verdictOf,
 } from "./index.ts"
 import { REASON_WORDS } from "./verdict.ts"
 
@@ -28,7 +28,7 @@ const ASK = entryId("p-1")
 const END = entryId("w-3")
 const ADA = writerId("ada@x.io")
 
-describe("verdictOf", () => {
+describe("parseVerdictLine", () => {
   const long = Array.from({ length: REASON_WORDS + 1 }, () => "word").join(" ")
   test.each([
     [
@@ -53,17 +53,17 @@ describe("verdictOf", () => {
     ["finished: all good", null],
     ["", null],
   ])("%j", (line, expected) => {
-    expect(verdictOf(line)).toEqual(expected)
+    expect(parseVerdictLine(line)).toEqual(expected)
   })
 })
 
-describe("endReplyOf", () => {
+describe("parseEndReply", () => {
   test("a verdict alone is the reply's only line", () => {
-    expect(endReplyOf("needs you: pick a name", "verdict")).toEqual({
+    expect(parseEndReply("needs you: pick a name", "verdict")).toEqual({
       verdict: { said: "needsYou", reason: "pick a name" },
       digest: null,
     })
-    expect(endReplyOf("done\nAll tests pass.", "verdict")).toEqual({
+    expect(parseEndReply("done\nAll tests pass.", "verdict")).toEqual({
       verdict: null,
       digest: null,
     })
@@ -71,7 +71,7 @@ describe("endReplyOf", () => {
 
   test("a verdict and a digest: the first line, then the rest", () => {
     expect(
-      endReplyOf(
+      parseEndReply(
         "worth a read: why the rail drifts\n\nRail drift traced to rounding\n- `rail.tsx` rounds twice",
         "verdict and digest",
       ),
@@ -86,18 +86,18 @@ describe("endReplyOf", () => {
 
   test("each half is refused on its own", () => {
     expect(
-      endReplyOf("I think it is done\nFixed the rail", "verdict and digest"),
+      parseEndReply("I think it is done\nFixed the rail", "verdict and digest"),
     ).toEqual({
       verdict: null,
       digest: { headline: "Fixed the rail", points: [] },
     })
     expect(
-      endReplyOf("done\n- a point with no headline", "verdict and digest"),
+      parseEndReply("done\n- a point with no headline", "verdict and digest"),
     ).toEqual({ verdict: { said: "done", reason: null }, digest: null })
   })
 
   test("a digest alone is read as a digest", () => {
-    expect(endReplyOf("Fixed the rail", "digest")).toEqual({
+    expect(parseEndReply("Fixed the rail", "digest")).toEqual({
       verdict: null,
       digest: { headline: "Fixed the rail", points: [] },
     })
@@ -204,8 +204,8 @@ describe("runEndedToWrite", () => {
         w.kind === "set" && w.namespace === namespace ? [w] : [],
       )
     return {
-      verdict: recordsOf(VERDICT, sets(VERDICT.namespace)).get(LANE),
-      digest: recordsOf(DIGEST, sets(DIGEST.namespace)).get(ASK),
+      verdict: decodeRecords(VERDICT, sets(VERDICT.namespace)).get(LANE),
+      digest: decodeRecords(DIGEST, sets(DIGEST.namespace)).get(ASK),
     }
   }
 

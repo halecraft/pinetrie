@@ -7,18 +7,18 @@ import {
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
-import { threadCardOf } from "@pinetrie/rules/fixtures"
+import { landedThreadCard } from "@pinetrie/rules/fixtures"
 import { describe, expect, test } from "vitest"
 import { canvasesWith } from "./fixtures.ts"
 import {
   CHAT_LABEL,
-  initialsOf,
-  labelsOf,
+  labelInitials,
   messageCount,
   messageCountTitle,
   planTitle,
   renameKey,
-  summariesOf,
+  taskLabels,
+  taskSummaries,
 } from "./root-label.ts"
 
 const record = (
@@ -63,7 +63,7 @@ const threads = new Map(
 const canvases = canvasesWith({
   known: ["1", "2", "3"].map(K),
   cards: ["1", "2", "3"].map(n =>
-    threadCardOf({
+    landedThreadCard({
       thread: thread(n),
       canvas: K(n),
       by: writerId("p-ada"),
@@ -96,14 +96,14 @@ describe("labels and summaries, from the directory", () => {
   const worked = new Map([laneIn("1"), laneIn("2")])
 
   test("a titled canvas is called by its title, another by its first root's first line; a canvas whose root has no message yet by neither", () => {
-    const labels = labelsOf({ canvases, marks, directory, lanes: worked })
+    const labels = taskLabels({ canvases, marks, directory, lanes: worked })
     expect(labels.get(K("1"))).toBe("Tab names")
     expect(labels.get(K("2"))).toBe("Plan the release")
     expect(labels.get(K("3"))).toBe(CHAT_LABEL)
   })
 
   test("an untitled canvas no lane works in is a chat; a title still names it", () => {
-    const labels = labelsOf({
+    const labels = taskLabels({
       canvases,
       marks,
       directory,
@@ -131,7 +131,7 @@ describe("labels and summaries, from the directory", () => {
   })
 
   test("summaries: each canvas whose first root has a message, its first line, writers and newest message", () => {
-    expect(summariesOf(canvases, directory)).toEqual(
+    expect(taskSummaries(canvases, directory)).toEqual(
       new Map([
         [
           K("1"),
@@ -157,7 +157,7 @@ describe("labels and summaries, from the directory", () => {
     const two = canvasesWith({
       known: [K("1")],
       cards: ["1", "2"].map((n, i) =>
-        threadCardOf({
+        landedThreadCard({
           thread: thread(n),
           canvas: K("1"),
           by: writerId("p-ada"),
@@ -165,7 +165,7 @@ describe("labels and summaries, from the directory", () => {
             i === 0
               ? []
               : [
-                  threadCardOf({
+                  landedThreadCard({
                     thread: thread("1"),
                     canvas: K("1"),
                     by: writerId("p-ada"),
@@ -186,7 +186,7 @@ describe("labels and summaries, from the directory", () => {
         },
       ],
     ])
-    expect(summariesOf(two, both).get(K("1"))).toEqual({
+    expect(taskSummaries(two, both).get(K("1"))).toEqual({
       line: "I'd like to start talking about a change",
       writers: [writerId("p-ada"), writerId("p-bea")],
       newest: entryId("f-2"),
@@ -219,7 +219,7 @@ test("renameKey: Enter saves, Escape leaves the title as it was; both refocus", 
   expect(renameKey("a")).toBe(null)
 })
 
-describe("initialsOf", () => {
+describe("labelInitials", () => {
   test.each<[string, string]>([
     ["Kanban outside click", "KO"],
     ["Sidebar", "SI"],
@@ -229,6 +229,6 @@ describe("initialsOf", () => {
     ["(no text)", "NT"],
     ["…", ""],
   ])("%s → %s", (label, letters) => {
-    expect(initialsOf(label)).toBe(letters)
+    expect(labelInitials(label)).toBe(letters)
   })
 })

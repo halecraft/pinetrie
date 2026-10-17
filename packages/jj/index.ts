@@ -7,7 +7,7 @@
 // the one-read path stay inside.
 
 export { beginFacts, readWipState } from "./accepted.ts"
-export { fileAt } from "./file-at.ts"
+export { readRepoFile } from "./file-at.ts"
 export * from "./lane/index.ts"
 export type { Moved } from "./observe.ts"
 export {

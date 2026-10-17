@@ -2,7 +2,7 @@
 
 import type { SeatRecord, WriterId } from "@pinetrie/core"
 import { Type } from "typebox"
-import { decodeAt, textKey } from "./decode.ts"
+import { decodeRecord, textKey } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 
 const SeatSchema = Type.Object({
@@ -14,7 +14,7 @@ const SeatSchema = Type.Object({
 /**
  * Each seat, at its Kyneta peer id: the seat's identity, as presence's
  * `seatKey` has it. The `clientID` is in the contents, since a text's
- * operations carry it and Yjs derives it from the peer (`seatOf`, in
+ * operations carry it and Yjs derives it from the peer (`seatIdentity`, in
  * `@pinetrie/schema`), which this package cannot.
  */
 export const SEAT: RecordSpec<SeatRecord, string, "session"> = {
@@ -23,7 +23,7 @@ export const SEAT: RecordSpec<SeatRecord, string, "session"> = {
   keyOf: s => s.peer,
   encode: ({ peer, ...contents }) => contents,
   decode: (contents, key) =>
-    decodeAt(SeatSchema, contents, textKey(key), (s, peer) => ({
+    decodeRecord(SeatSchema, contents, textKey(key), (s, peer) => ({
       peer,
       clientId: s.clientId,
       writer: s.writer as WriterId,
@@ -33,7 +33,7 @@ export const SEAT: RecordSpec<SeatRecord, string, "session"> = {
 
 /**
  * The connected seats with no record yet, to write. `connected` is each seat
- * as `seatOf` (`@pinetrie/schema`) gives it: a seat that is nobody is not in it.
+ * as `seatIdentity` (`@pinetrie/schema`) gives it: a seat that is nobody is not in it.
  */
 export function planSeats(
   connected: readonly {

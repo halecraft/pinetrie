@@ -4,10 +4,10 @@
 import { type CommitId, errorText, type ThreadId } from "@pinetrie/core"
 import type { RepoOwner } from "@pinetrie/jj"
 import {
-  bookmarkOf,
-  commitsOf,
   laneJj,
   laneStackName,
+  readCommits,
+  readLaneBookmark,
   stackBookmark,
 } from "@pinetrie/jj"
 import type { PiSetup } from "@pinetrie/pi"
@@ -95,14 +95,14 @@ export function createSplits(deps: {
             stackTop: l =>
               owner.read(
                 async ({ jj }) =>
-                  (await commitsOf(jj, `present(${laneStackName(l)})`))[0] ??
+                  (await readCommits(jj, `present(${laneStackName(l)})`))[0] ??
                   null,
               ),
             stackEnded: (l, stack) => proposed.stackEnded(l, stack),
             backToTip: async l => {
               await registry.withHistory(l, async (_h, handle) => {
                 const jj = laneJj(handle.runners.lane)
-                const tip = await bookmarkOf(jj, l)
+                const tip = await readLaneBookmark(jj, l)
                 if (tip !== null) await jj(["new", tip])
               })
             },

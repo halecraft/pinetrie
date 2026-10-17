@@ -16,7 +16,7 @@ import {
   dropIntents,
   dropMark,
   hoverOpens,
-  sidebarSpotAt,
+  sidebarSpot,
   sourceOfElement,
 } from "./drag.ts"
 import type { IntentState } from "./effects.ts"
@@ -123,16 +123,16 @@ test("held over a sidebar canvas it opens that canvas, over ▦ the board", () =
 
 test("a sidebar row: between rows in its top and bottom quarters, onto its canvas in between", () => {
   const row = { top: 100, height: 40 }
-  expect(sidebarSpotAt(105, row, K, NEXT)).toEqual({
+  expect(sidebarSpot(105, row, K, NEXT)).toEqual({
     kind: "sidebar",
     before: K,
   })
-  expect(sidebarSpotAt(120, row, K, NEXT)).toEqual({ kind: "item", canvas: K })
-  expect(sidebarSpotAt(138, row, K, NEXT)).toEqual({
+  expect(sidebarSpot(120, row, K, NEXT)).toEqual({ kind: "item", canvas: K })
+  expect(sidebarSpot(138, row, K, NEXT)).toEqual({
     kind: "sidebar",
     before: NEXT,
   })
-  expect(sidebarSpotAt(138, row, K, null)).toEqual({
+  expect(sidebarSpot(138, row, K, null)).toEqual({
     kind: "sidebar",
     before: null,
   })

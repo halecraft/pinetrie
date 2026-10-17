@@ -23,7 +23,7 @@ export interface NoteColumnView {
 }
 
 /** `canvas`'s note columns, in its order, each with its notes from `cards`. */
-export function noteColumnsOf(input: {
+export function canvasNoteColumns(input: {
   readonly onCanvas: readonly CardOnCanvas[]
   readonly cards: readonly CardRecord[]
   readonly titles: ReadonlyMap<NoteColumnId, NoteColumnRecord>

@@ -92,7 +92,7 @@ export function BoardStrip({
   onIntent: (intent: Intent) => void
   /** The session's message count: ▦'s title and `data-messages`. */
   count: MessageCount
-  /** The highest a root not in the sidebar raises (`markOf`). */
+  /** The highest a root not in the sidebar raises (`markLevel`). */
   elsewhere: Level | null
   /** A root not in the sidebar holds an unsent card of yours. */
   pip: React.ReactNode | null

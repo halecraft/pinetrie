@@ -8,7 +8,7 @@ import path from "node:path"
 import {
   ancestry,
   commitId,
-  conflictAskedAt,
+  conflictAskTime,
   type EntryId,
   entryId,
   HOST_OPERATOR,
@@ -16,8 +16,8 @@ import {
   nearestRevision,
   projectTranscript,
   ROOT,
-  rootOf,
   type ThreadId,
+  treeRoot,
 } from "@pinetrie/core"
 import { DEFAULT_REPO, laneBase, startOfProposed } from "@pinetrie/jj"
 import { type Runner, run } from "@pinetrie/lanes"
@@ -35,21 +35,21 @@ import {
   at,
   BRANCH,
   committedProject,
-  entriesOf,
   entryMessageIn,
   filterAsync,
+  heldEntries,
+  heldLanes,
+  heldRootRecords,
+  heldTree,
   idleNow,
   idOfText,
   join,
   laneHolding,
-  lanesOf,
   moveCanvasOnBoard,
   readJjAccepted,
   readJjProposedByLane,
-  rootRecordsOf,
   START_AGENT,
   setUpAccepted,
-  treeOf,
   waitFor,
 } from "../harness.ts"
 import { cleanUp, inLane, inLaneQuiet, type LaneHosts } from "../lane-hosts.ts"
@@ -97,7 +97,7 @@ async function mainSection(
   })
   const wu = await join(wh, "uma", "lanes")
   await wu.request({ kind: "name", name: "Uma" })
-  const tree = () => treeOf(wh)
+  const tree = () => heldTree(wh)
   const idle = async () => {
     await waitFor(() => idleNow(wh), 180_000)
     await wh.quiet()
@@ -108,17 +108,17 @@ async function mainSection(
     laneHolding(wh, readPlaces(wh.places), text)
   const tipOf = (text: string) => laneWith(text)?.tip ?? null
   const laneTip = (lane: ThreadId) =>
-    lanesOf(wh, tree(), readPlaces(wh.places)).find(l => l.name === lane)
+    heldLanes(wh, tree(), readPlaces(wh.places)).find(l => l.name === lane)
       ?.tip ?? null
   /** Every tool result's text in a lane's thread, oldest first. */
   const toolResults = (lane: ThreadId | undefined): string[] => {
     if (lane === undefined) return []
     const index = tree()
     const tip =
-      lanesOf(wh, index, readPlaces(wh.places)).find(l => l.name === lane)
+      heldLanes(wh, index, readPlaces(wh.places)).find(l => l.name === lane)
         ?.tip ?? null
     const onPath = new Set(ancestry(index, tip).path)
-    return Object.values(entriesOf(wh))
+    return Object.values(heldEntries(wh))
       .filter(r => onPath.has(entryId(r.id)))
       .sort((a, b) => (a.id < b.id ? -1 : 1))
       .map(r => rowMessage(r) as { role?: string })
@@ -227,7 +227,7 @@ async function mainSection(
     // Lane one's first run committed who.txt; its prompt and that message each
     // have a record with a snapshot, and your repo holds its history as a
     // remote bookmark.
-    const ofOne = [...rootRecordsOf(wh, readRevisions).values()].filter(
+    const ofOne = [...heldRootRecords(wh, readRevisions).values()].filter(
       r => r.lane === one?.name,
     )
     const bookmark = async (lane: ThreadId | undefined) =>
@@ -358,7 +358,7 @@ async function mainSection(
     // The commit the branches forked at, which every one of them inherits.
     const inherited = nearestRevision(
       tree(),
-      rootRecordsOf(wh, readRevisions),
+      heldRootRecords(wh, readRevisions),
       at(setUp),
     ).point
     script.use([
@@ -539,7 +539,7 @@ async function mainSection(
       lane === undefined
         ? ""
         : `pinetrie-proposed/${readNames(wh.session).get(lane) ?? ""}`
-    const allNamed = lanesOf(wh, tree(), readPlaces(wh.places)).every(l =>
+    const allNamed = heldLanes(wh, tree(), readPlaces(wh.places)).every(l =>
       names.has(l.name),
     )
     check(
@@ -743,7 +743,7 @@ async function mainSection(
       : undefined
     // A resolution ends as any run: no ask about a conflict.
     const askedAt =
-      two === undefined ? null : conflictAskedAt(tree(), laneTip(two.name))
+      two === undefined ? null : conflictAskTime(tree(), laneTip(two.name))
     check(
       "a card that brings the thread up to date runs the resolution when it conflicts, with the card's text, and the proposed changes come back clean",
       landMessage?.text.includes("1 file conflicts") === true &&
@@ -1118,15 +1118,15 @@ async function mainSection(
     const rootOne =
       one?.tip === undefined || one.tip === null
         ? null
-        : rootOf(tree(), one.tip)
+        : treeRoot(tree(), one.tip)
     const inRootOne = (records: ReturnType<typeof readRevisions>) =>
       [...records.values()].filter(
         r =>
           rootOne !== null &&
-          rootOf(tree(), r.entry) === rootOne &&
+          treeRoot(tree(), r.entry) === rootOne &&
           r.snapshot !== null,
       )
-    const before = inRootOne(rootRecordsOf(wh, readRevisions))
+    const before = inRootOne(heldRootRecords(wh, readRevisions))
     // The root's open proposed changes, by lane: archiving withdraws them, and
     // restoring builds them again.
     const proposedInRootOne = [...readJjProposedByLane(wh.session).values()]
@@ -1136,7 +1136,7 @@ async function mainSection(
           o.acceptedAs === null &&
           rootOne !== null &&
           tip !== null &&
-          rootOf(tree(), tip) === rootOne
+          treeRoot(tree(), tip) === rootOne
         )
       })
       .map(o => o.lane)
@@ -1217,7 +1217,7 @@ async function mainSection(
     if (two !== undefined) {
       await wh.quiet()
       await removeLane(project, two.name)
-      for (const r of rootRecordsOf(wh, readRevisions).values())
+      for (const r of heldRootRecords(wh, readRevisions).values())
         if (r.lane === two.name && r.snapshot !== null)
           await deleteSnapshot(project, r.snapshot)
     }

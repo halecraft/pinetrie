@@ -7,7 +7,6 @@
 
 import {
   type AcceptanceDecision,
-  changeIdsOf,
   type DescribeDecision,
   type Placed,
   type ProposedChangesRecord,
@@ -15,6 +14,7 @@ import {
   proposedMessage,
   type Rebuild,
   type RefreshDecision,
+  revisionChangeIds,
   type ThreadId,
   type ThreadName,
 } from "@pinetrie/core"
@@ -130,7 +130,7 @@ export function proposedChangesEffects(
         built: false,
       }
     case "withdraw": {
-      const changeIds = changeIdsOf(decision.proposed)
+      const changeIds = revisionChangeIds(decision.proposed)
       return changeIds.length === 0
         ? NOTHING
         : {
@@ -156,7 +156,7 @@ export function proposedChangesEffects(
       // It holds more now: a work in progress again, its ledger the new tip
       // and start.
       const { place, proposed } = decision
-      const [bottom] = changeIdsOf(proposed)
+      const [bottom] = revisionChangeIds(proposed)
       if (bottom === undefined) return NOTHING
       return {
         steps: [
@@ -177,7 +177,7 @@ export function proposedChangesEffects(
       }
     }
     case "refresh": {
-      const [bottom] = changeIdsOf(decision.proposed)
+      const [bottom] = revisionChangeIds(decision.proposed)
       if (bottom === undefined) return NOTHING
       return {
         steps: [

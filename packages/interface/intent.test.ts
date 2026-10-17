@@ -23,7 +23,7 @@ import {
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
-import { cardIdFor, entriesOf, entry } from "@pinetrie/core/fixtures"
+import { cardIdFor, entriesById, entry } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import type { ColumnKey } from "./columns.ts"
 import type { CardFacts, Effect, IntentState } from "./effects.ts"
@@ -1210,7 +1210,7 @@ describe("a press on a proposal", () => {
     ],
   } as const
   const proposed = indexTree(
-    entriesOf([
+    entriesById([
       ...Object.values(index.entries),
       entry(
         "9-res",

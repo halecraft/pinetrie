@@ -5,18 +5,18 @@
 
 import { useSelector } from "@kyneta/react"
 import type { CanvasId, EntryId, TreeIndex, WriterId } from "@pinetrie/core"
-import { readingAt, seenBy, whoIsAt } from "@pinetrie/interface"
+import { othersReading, othersWithValue, seenBy } from "@pinetrie/interface"
 import { readReading, readReadingCanvases, readTyping } from "@pinetrie/reads"
 import type { PresenceDocHandle } from "@pinetrie/schema"
 import { useMemo } from "react"
 
-/** Others reading each thread end, you left out (`readingAt`). */
-export function useReadingAt(
+/** Others reading each thread end, you left out (`othersReading`). */
+export function useOthersReading(
   presence: PresenceDocHandle,
   me: WriterId,
 ): ReadonlyMap<EntryId, readonly WriterId[]> {
   const reading = useSelector(presence, readReading)
-  return useMemo(() => readingAt(reading, me), [reading, me])
+  return useMemo(() => othersReading(reading, me), [reading, me])
 }
 
 /** The canvas each thread end being read was reported on. */
@@ -40,12 +40,12 @@ export function useSeenBy(
   )
 }
 
-/** Others typing in the composer at the thread end `end`, each once (`whoIsAt`). */
-export function useTypingAt(
+/** Others typing in the composer at the thread end `end`, each once (`othersWithValue`). */
+export function useOthersTyping(
   presence: PresenceDocHandle,
   me: WriterId,
   end: EntryId,
 ): readonly WriterId[] {
   const entries = useSelector(presence, readTyping)
-  return useMemo(() => whoIsAt(entries, end, me), [entries, end, me])
+  return useMemo(() => othersWithValue(entries, end, me), [entries, end, me])
 }

@@ -16,12 +16,12 @@ import {
   firstLine,
   indexTree,
   messageText,
+  messageToolCalls,
   type OwnLane,
   type PointId,
   snapshotId,
   type ThreadId,
   type TreeIndex,
-  toolCallsOf,
   turnEntry,
   type WriterId,
 } from "@pinetrie/core"
@@ -47,7 +47,7 @@ import {
 import {
   catchUpAnswer,
   catchUpName,
-  catchUpOf,
+  catchUpNow,
   catchUpRefusal,
   encodeUpdate,
   type Floor,
@@ -135,7 +135,7 @@ export function planCatchUp(
  * Why one side changed a file: the message a revision's trailer names,
  * attributed, else the description's first line.
  */
-export function reasonOf(index: TreeIndex, description: string): string {
+export function changeReason(index: TreeIndex, description: string): string {
   const entry = entryOfMessage(description)
   const message = entry === null ? undefined : index.entries[entry]?.message
   if (message === undefined) return firstLine(description, 200)
@@ -252,7 +252,7 @@ export function planSettle(
               label: "ours",
               who: "this thread",
               reasons: touching(facts.ours, path).map(d =>
-                reasonOf(ctx.index, d),
+                changeReason(ctx.index, d),
               ),
             },
             theirs: {
@@ -537,8 +537,9 @@ export function createUpdates(deps: {
         calls:
           tip === null
             ? 0
-            : toolCallsOf(index.entries[turnEntry(index, tip)]?.message).length,
-        base: catchUpOf(
+            : messageToolCalls(index.entries[turnEntry(index, tip)]?.message)
+                .length,
+        base: catchUpNow(
           readBases(docs.session).get(lane),
           readAccepted(docs.session),
         ),

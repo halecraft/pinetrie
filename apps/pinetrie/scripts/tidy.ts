@@ -15,7 +15,7 @@ import {
 } from "@pinetrie/jj"
 import { planTidyInvocation, TIDY_USAGE } from "../host/invocation.ts"
 import {
-  sizesOf,
+  readRepoSizes,
   type TidyLock,
   takeTidyLock,
   tidyWords,
@@ -70,7 +70,7 @@ async function tidy(
   }
   console.log(tidyWords({ kind: "plan", root, plan, days, now, dryRun }))
   if (plan.kind === "nothing" || dryRun) return 0
-  const before = await sizesOf(root, facts.ops.ops.length)
+  const before = await readRepoSizes(root, facts.ops.ops.length)
   const failed = await executeTidy(root, plan.steps, (step, ms) =>
     console.log(tidyWords({ kind: "step", step, ms })),
   )
@@ -83,7 +83,7 @@ async function tidy(
     tidyWords({
       kind: "done",
       before,
-      after: await sizesOf(root, after),
+      after: await readRepoSizes(root, after),
       raced: isTidyRaced({ kept: plan.kept, after }),
     }),
   )

@@ -5,7 +5,7 @@ import type { CommitBase, RepoConfig } from "@pinetrie/core"
 import type { Runner } from "@pinetrie/lanes"
 import { newestBase } from "./merge.ts"
 import { revsetName } from "./names.ts"
-import { commitsOf } from "./revisions.ts"
+import { readCommits } from "./revisions.ts"
 
 /**
  * A lane's base, from the newest `Pinetrie-Base` in the history of `tip`, a
@@ -21,7 +21,7 @@ export async function laneBase(
 ): Promise<CommitBase | null> {
   const newest = await newestBase(jj, tip, repoConfig.wipPrefix)
   if (newest === null) {
-    const [start] = await commitsOf(
+    const [start] = await readCommits(
       jj,
       `latest(heads(::(${tip}) & ::present(${revsetName(repoConfig.acceptedBookmark)})))`,
     )

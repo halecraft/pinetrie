@@ -137,7 +137,7 @@ export type Drawn =
   | { readonly kind: "failed"; readonly reason: string }
 
 /** A model's image, as base64, fitted as an upload is, or why it is not one. */
-export async function drawnOf(data: string): Promise<Drawn> {
+export async function fitDrawnImage(data: string): Promise<Drawn> {
   const prepared = await prepareImage(
     new Uint8Array(Buffer.from(data, "base64")),
   )
@@ -202,7 +202,7 @@ export function banners(
         if (reply.stopReason !== "stop")
           return failed(reply.errorMessage ?? reply.stopReason)
         if (image?.type !== "image") return failed("the reply held no image")
-        return await drawnOf(image.data)
+        return await fitDrawnImage(image.data)
       } catch (error) {
         return failed(errorText(error))
       }

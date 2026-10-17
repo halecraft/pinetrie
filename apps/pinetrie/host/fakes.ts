@@ -244,7 +244,7 @@ export function applyWrites(
 }
 
 /** Every write a port's `writeValues` calls were given, in order. */
-export const writesOf = (calls: readonly Call[]): ValueWrite[] =>
+export const writtenValues = (calls: readonly Call[]): ValueWrite[] =>
   calls.flatMap(c =>
     c.method === "writeValues" ? (c.args[0] as ValueWrite[]) : [],
   )

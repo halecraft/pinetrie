@@ -11,7 +11,7 @@ import {
   type TreeIndex,
 } from "@pinetrie/core"
 import { Type } from "typebox"
-import { decodeAt, entryKey } from "./decode.ts"
+import { decodeRecord, entryKey } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 import {
   bareLine,
@@ -36,7 +36,7 @@ export const DIGEST: RecordSpec<DigestRecord, EntryId, "root"> = {
   keyOf: r => r.prompt,
   encode: ({ prompt, ...contents }) => contents,
   decode: (contents, key) =>
-    decodeAt(DigestSchema, contents, entryKey(key), (r, prompt) => ({
+    decodeRecord(DigestSchema, contents, entryKey(key), (r, prompt) => ({
       prompt,
       headline: r.headline,
       points: r.points,
@@ -68,7 +68,7 @@ const BULLET = /^[-*] +/
  * or with a headline, a point or a list too long: the stored digest stays.
  * It never cuts a reply, since a cut list says something the model did not.
  */
-export function digestOf(reply: string): DigestBody | null {
+export function parseDigest(reply: string): DigestBody | null {
   if (bareLine(reply).toLowerCase() === NOTHING_TO_ADD) return NO_DIGEST
   const [first, ...rest] = reply
     .split("\n")
@@ -89,7 +89,7 @@ export const pointsText = (points: readonly string[]): string =>
 
 /**
  * A digest in the shape the model is asked to answer in, so
- * `digestOf(digestText(b))` is `b`: the request's summary so far, and the
+ * `parseDigest(digestText(b))` is `b`: the request's summary so far, and the
  * rail's tooltip.
  */
 export const digestText = (body: DigestBody): string =>
@@ -207,7 +207,7 @@ export function planDigest(input: {
 export function digestToWrite(input: {
   readonly stored: DigestRecord | undefined
   readonly asked: { readonly final: boolean }
-  /** The reply as `digestOf` read it; null when refused. */
+  /** The reply as `parseDigest` read it; null when refused. */
   readonly body: DigestBody | null
   readonly prompt: EntryId
   readonly at: number

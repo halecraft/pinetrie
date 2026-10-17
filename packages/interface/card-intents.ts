@@ -2,7 +2,7 @@
 // discard and undo do, as effects.
 //
 // Each move says where it was made, so a refusal is said there. Which
-// history a move enters is the host's to decide (`historyOf`); an undo names
+// history a move enters is the host's to decide (`movesHistory`); an undo names
 // only the canvas you are on.
 
 import {
@@ -13,24 +13,24 @@ import {
   type CardId,
   type CardRecord,
   cardFitsPlace,
+  cardMove,
   DISCARDED,
   type EntryId,
   isMovable,
-  isReorderAt,
-  isTargetOf,
+  isReorderPlace,
+  isTargetForKind,
   KINDS,
-  keyOf,
   type ListKey,
   type MoveDirection,
   type MoveTarget,
-  moveOf,
   type NoteColumnCard,
-  noteOf,
+  notesTarget,
   type PlaceKey,
   type Position,
   parseCardId,
   parseTextCardId,
-  pinnedOf,
+  pinTargetKey,
+  placeKey,
   placeOfKind,
   type QueueMove,
   type ReferenceCardId,
@@ -66,11 +66,11 @@ import type { Minted } from "./columns.ts"
 import { type Discardable, isDiscardable } from "./discardable.ts"
 import {
   type CardFacts,
-  changeViewOf,
   closeCanvasEffects,
   type Effect,
   type IntentState,
-  planOpenAt,
+  planOpenEntry,
+  viewChangeEffect,
 } from "./effects.ts"
 import type { ColumnAct } from "./intent.ts"
 import type { MessageAct } from "./message-tools.ts"
@@ -80,7 +80,7 @@ import {
   type PutTarget,
   placeOfTarget,
 } from "./put-target.ts"
-import { revealOf } from "./reveal.ts"
+import { revealEffects } from "./reveal.ts"
 import { newCanvasEffects, planSpinOff } from "./spin-off.ts"
 
 /**
@@ -102,7 +102,7 @@ export const moveCard = (
 export const queueMove = (
   card: TextCard,
   to: { readonly lane: ThreadId; readonly at: Position },
-): QueueMove => moveOf(card, { kind: "queued", thread: to.lane, seen: "" })
+): QueueMove => cardMove(card, { kind: "queued", thread: to.lane, seen: "" })
 
 /**
  * A card made in `to.lane`'s queue: a move with no `from`, so
@@ -123,13 +123,13 @@ export const queueNew = (
  * neighbours. Null at an edge, for a card in neither kind of place, or when
  * the card it would pass is a fact, which keeps its place.
  */
-export function reorderOf(
+export function reorderByStep(
   card: CardRecord,
   among: readonly CardRecord[],
   step: -1 | 1,
 ): Reorder | null {
-  const at = keyOf(card.place)
-  if (!isReorderAt(at)) return null
+  const at = placeKey(card.place)
+  if (!isReorderPlace(at)) return null
   const from = among.findIndex(c => c.id === card.id)
   const to = from + step
   const passed = among[to]
@@ -144,22 +144,22 @@ export function reorderOf(
   }
 }
 
-export const slotOf = (slots: Slots, card: CardId): number | null => {
+export const cardSlot = (slots: Slots, card: CardId): number | null => {
   const found = Object.entries(slots).find(([, c]) => c === card)
   return found === undefined ? null : Number(found[0])
 }
 
-export const cardOf = (
+export const findCard = (
   facts: Pick<CardFacts, "cards">,
   card: CardId,
 ): CardRecord | undefined => facts.cards.find(c => c.id === card)
 
 /** `card`'s record when it is a text card's: what moves between a thread's places. */
-export const textCardOf = (
+export const findTextCard = (
   facts: Pick<CardFacts, "cards">,
   card: CardId,
 ): TextCard | undefined => {
-  const now = cardOf(facts, card)
+  const now = findCard(facts, card)
   return now?.kind === "text" ? now : undefined
 }
 
@@ -287,7 +287,7 @@ export function putLanding(
 ): Landing {
   const facts = state.cards
   if (source.kind === "card") {
-    const now = cardOf(facts, source.card)
+    const now = findCard(facts, source.card)
     if (now === undefined) return { kind: "none" }
     if (how === "copy") {
       const clip = clipOfCard(now, state)
@@ -300,7 +300,7 @@ export function putLanding(
       return { kind: "move", card: now.id, to: target }
     if (!cardFitsPlace(now, "inventory"))
       return { kind: "refused", code: "no-place", card: now.id }
-    const from = slotOf(facts.slots, now.id)
+    const from = cardSlot(facts.slots, now.id)
     if (from !== null && now.place.kind === "inventory") {
       if (target.slot === null || from === target.slot) return { kind: "none" }
       return { kind: "swap", a: from, b: target.slot }
@@ -362,7 +362,7 @@ function intoSlot(
     return { ...at, card: lands.kind === "move" ? lands.card : null }
   const into = { ...lands, to: { kind: "inventory", slot: at.slot } } as const
   if (at.taken === null) return into
-  const old = cardOf(state.cards, at.taken)
+  const old = findCard(state.cards, at.taken)
   if (old === undefined) return into
   return isDiscardable(old, state.cards.me)
     ? { kind: "replace", old: old.id, landing: into }
@@ -391,7 +391,7 @@ function clipLanding(
       }
     case "card": {
       const { of } = clip
-      const cut = cardOf(state.cards, of.card)
+      const cut = findCard(state.cards, of.card)
       if (
         clip.cut &&
         cut !== undefined &&
@@ -499,18 +499,18 @@ function effectsOfLanding(
     case "insert":
       return [{ kind: "insertText", text: landing.text }]
     case "replace": {
-      const old = cardOf(state.cards, landing.old)
+      const old = findCard(state.cards, landing.old)
       return old === undefined || !isDiscardable(old, state.cards.me)
         ? []
         : effectsOfLanding(landing.landing, state, minted, old)
     }
     case "move": {
-      const now = cardOf(state.cards, landing.card)
+      const now = findCard(state.cards, landing.card)
       if (now === undefined) return []
       if (landing.to.kind !== "inventory")
         return putCard(now, landing.to, state, minted)
       if (!cardFitsPlace(now, "inventory")) return []
-      const into = moveOf(now, { kind: "inventory", holder: state.cards.me })
+      const into = cardMove(now, { kind: "inventory", holder: state.cards.me })
       const how = { actedAt: AT_INVENTORY, slot: landing.to.slot }
       if (replacing === null) return [...show, moveCard(into, how, true)]
       // One move set, the slot's card to your trash first, so the host
@@ -520,7 +520,7 @@ function effectsOfLanding(
         {
           kind: "moveCards",
           moves: [
-            { move: moveOf(replacing, DISCARDED), slot: null },
+            { move: cardMove(replacing, DISCARDED), slot: null },
             { move: into, slot: landing.to.slot },
           ],
           actedAt: AT_INVENTORY,
@@ -562,7 +562,7 @@ function effectsOfLanding(
           replacing:
             replacing === null
               ? null
-              : { card: replacing.id, from: keyOf(replacing.place) },
+              : { card: replacing.id, from: placeKey(replacing.place) },
           how,
           here: canvasOfTab(state),
         },
@@ -632,7 +632,7 @@ function putCard(
         kind: "moveCards",
         moves: [
           {
-            move: moveOf(now, { kind: "new-canvas", canvas: minted.canvas }),
+            move: cardMove(now, { kind: "new-canvas", canvas: minted.canvas }),
             slot: null,
           },
         ],
@@ -656,7 +656,7 @@ function putCard(
       ? []
       : [
           moveCard(
-            moveOf(now, { kind: "canvas-at", ...spot }),
+            cardMove(now, { kind: "canvas-at", ...spot }),
             { actedAt: actedAtOf(target), slot: null },
             true,
           ),
@@ -671,12 +671,12 @@ function putCard(
     return putInMessage(now, target.key, state)
   const to = placeOfTarget(target, state.cards.composers, state.cards.me)
   // A note put on its own column stays where it is: a reorder moves it there.
-  if (to === null || (to.kind !== "notes" && sameKey(keyOf(now.place), to)))
+  if (to === null || (to.kind !== "notes" && sameKey(placeKey(now.place), to)))
     return []
   const how = { actedAt: actedAtOf(target), slot: null }
-  if (now.kind === "text") return [moveCard(moveOf(now, to), how, true)]
-  return isTargetOf("reference", to)
-    ? [moveCard(moveOf(now, to), how, true)]
+  if (now.kind === "text") return [moveCard(cardMove(now, to), how, true)]
+  return isTargetForKind("reference", to)
+    ? [moveCard(cardMove(now, to), how, true)]
     : []
 }
 
@@ -729,11 +729,11 @@ function putOnCanvas(
   if (now.place.kind === "canvas" && now.place.canvas === spot.canvas) return []
   return [
     moveCard(
-      moveOf(now, { kind: "canvas-at", ...spot }),
+      cardMove(now, { kind: "canvas-at", ...spot }),
       { actedAt: AT_INVENTORY, slot: null },
       false,
     ),
-    changeViewOf(state, spot.canvas, {
+    viewChangeEffect(state, spot.canvas, {
       kind: "fold",
       card: now.id,
       unfolded: true,
@@ -790,17 +790,17 @@ function putInMessage(
   const facts = state.cards
   const spot = facts.composers.get(key)
   if (spot === undefined || spot.message === now.id) return []
-  const to = keyOf(spot.place)
-  const from = keyOf(now.place)
+  const to = placeKey(spot.place)
+  const from = placeKey(now.place)
   if (sameKey(from, to)) return []
   const actedAt = atColumn(key)
-  const into = { move: moveOf(now, to), slot: null }
+  const into = { move: cardMove(now, to), slot: null }
   const message =
-    spot.message === null ? undefined : textCardOf(facts, spot.message)
+    spot.message === null ? undefined : findTextCard(facts, spot.message)
   if (message === undefined)
     return [moveCard(into.move, { actedAt, slot: null }, true)]
   if (!facts.filled.has(message.id)) {
-    const away = moveOf(message, DISCARDED)
+    const away = cardMove(message, DISCARDED)
     return [
       {
         kind: "moveCards",
@@ -812,8 +812,8 @@ function putInMessage(
     ]
   }
   const back = {
-    move: moveOf(message, from),
-    slot: now.place.kind === "inventory" ? slotOf(facts.slots, now.id) : null,
+    move: cardMove(message, from),
+    slot: now.place.kind === "inventory" ? cardSlot(facts.slots, now.id) : null,
   }
   return [
     { kind: "moveCards", moves: [into, back], actedAt, close: [], here: null },
@@ -826,9 +826,9 @@ export function planToNote(
   key: string,
   state: IntentState,
 ): readonly Effect[] {
-  const now = textCardOf(state.cards, card)
+  const now = findTextCard(state.cards, card)
   return now?.place.kind === "composing"
-    ? [moveCard(moveOf(now, noteOf(now.place)), IN_COLUMN(key), true)]
+    ? [moveCard(cardMove(now, notesTarget(now.place)), IN_COLUMN(key), true)]
     : []
 }
 
@@ -900,9 +900,9 @@ export function planEditAsText(
   state: IntentState,
 ): readonly Effect[] {
   const facts = state.cards
-  const now = cardOf(facts, edit.reference)
+  const now = findCard(facts, edit.reference)
   if (now?.kind !== "reference" || !isDiscardable(now, facts.me)) return []
-  const from = keyOf(now.place)
+  const from = placeKey(now.place)
   return [
     {
       kind: "paste",
@@ -917,7 +917,7 @@ export function planEditAsText(
       how: {
         actedAt: AT_INVENTORY,
         slot:
-          now.place.kind === "inventory" ? slotOf(facts.slots, now.id) : null,
+          now.place.kind === "inventory" ? cardSlot(facts.slots, now.id) : null,
       },
       here: canvasOfTab(state),
     },
@@ -974,11 +974,11 @@ export function planPin(
   key: string,
   state: IntentState,
 ): readonly Effect[] {
-  const now = textCardOf(state.cards, card)
-  const to = now === undefined ? null : pinnedOf(now.place)
+  const now = findTextCard(state.cards, card)
+  const to = now === undefined ? null : pinTargetKey(now.place)
   return now === undefined || to === null
     ? []
-    : [moveCard(moveOf(now, to), IN_COLUMN(key), true)]
+    : [moveCard(cardMove(now, to), IN_COLUMN(key), true)]
 }
 
 /**
@@ -990,13 +990,15 @@ export function planUnpin(
   key: string,
   state: IntentState,
 ): readonly Effect[] {
-  const now = textCardOf(state.cards, card)
+  const now = findTextCard(state.cards, card)
   if (now?.place.kind === "pinned")
-    return [moveCard(moveOf(now, noteOf(now.place)), IN_COLUMN(key), true)]
+    return [
+      moveCard(cardMove(now, notesTarget(now.place)), IN_COLUMN(key), true),
+    ]
   if (now?.place.kind === "canvas-pinned")
     return [
       moveCard(
-        moveOf(now, {
+        cardMove(now, {
           kind: "notes",
           near: "canvas",
           canvas: now.place.canvas,
@@ -1018,7 +1020,7 @@ export function planPinToCanvas(
   key: string,
   state: IntentState,
 ): readonly Effect[] {
-  const now = textCardOf(state.cards, card)
+  const now = findTextCard(state.cards, card)
   if (now === undefined || now.place.kind === "canvas-pinned") return []
   const active = state.layout.active
   const canvas =
@@ -1028,7 +1030,7 @@ export function planPinToCanvas(
     ? []
     : [
         moveCard(
-          moveOf(now, { kind: "canvas-pinned", canvas }),
+          cardMove(now, { kind: "canvas-pinned", canvas }),
           IN_COLUMN(key),
           true,
         ),
@@ -1045,9 +1047,9 @@ export function planDiscard(
   how: MoveHow,
   state: IntentState,
 ): readonly Effect[] {
-  const now = cardOf(state.cards, card)
+  const now = findCard(state.cards, card)
   if (now === undefined || !isDiscardable(now, state.cards.me)) return []
-  const move = moveOf(now, DISCARDED)
+  const move = cardMove(now, DISCARDED)
   const emptied = emptiedNewTab(now, state)
   if (emptied === null)
     return [moveCard(move, how, false, null, canvasOfTab(state))]
@@ -1087,14 +1089,14 @@ export function planRestore(
   how: MoveHow,
   state: IntentState,
 ): readonly Effect[] {
-  const now = cardOf(state.cards, card)
+  const now = findCard(state.cards, card)
   if (now === undefined || now.place.kind !== "trash") return []
   switch (now.kind) {
     case "text":
     case "reference":
     case "thread":
     case "note-column":
-      return [moveCard(moveOf(now, BACK), how, false)]
+      return [moveCard(cardMove(now, BACK), how, false)]
     default:
       return []
   }
@@ -1145,7 +1147,7 @@ export function afterUndo(
       for (const { card, place } of outcome.cards)
         if (place !== null && !places.some(p => sameKey(p.place, place)))
           places.push({ place, card })
-      return places.flatMap(p => revealOf(p.place, state, p.card).effects)
+      return places.flatMap(p => revealEffects(p.place, state, p.card).effects)
     }
     case "unmoved": {
       const shown =
@@ -1154,7 +1156,7 @@ export function afterUndo(
               effects: [{ kind: "showInventory", brief: false }] as const,
               actedAt: AT_INVENTORY,
             }
-          : revealOf(outcome.place, state)
+          : revealEffects(outcome.place, state)
       return [
         ...shown.effects,
         {
@@ -1185,8 +1187,8 @@ export function planOpenTrace(
 ): readonly Effect[] {
   const now = state.cards.cards.find(c => c.id === trace.card)
   if (now === undefined)
-    return trace.message === null ? [] : planOpenAt(trace.message, state)
+    return trace.message === null ? [] : planOpenEntry(trace.message, state)
   if (now.place.kind === "inventory" && now.place.holder !== state.cards.me)
     return []
-  return revealOf(keyOf(now.place), state, now.id).effects
+  return revealEffects(placeKey(now.place), state, now.id).effects
 }

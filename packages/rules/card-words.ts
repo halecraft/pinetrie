@@ -1,5 +1,5 @@
 // card-words — what a card says, read from where its kind keeps its words
-// (`textSourceOf`).
+// (`cardTextSource`).
 
 import type { Sha256, TextCardId, TextSource } from "@pinetrie/core"
 import { factLine } from "./fact.ts"
@@ -13,12 +13,12 @@ interface WordReaders {
 }
 
 /**
- * What a card says, from where its words are (`textSourceOf`): a text
+ * What a card says, from where its words are (`cardTextSource`): a text
  * card's document; a reference's quote, a blob; a fact's line; an ask's
  * line; nothing for a card with no words. Every reader of card words reads
  * through it.
  */
-export function wordsOf(source: TextSource, read: WordReaders): string {
+export function sourceWords(source: TextSource, read: WordReaders): string {
   switch (source.kind) {
     case "doc":
       return read.doc(source.card)

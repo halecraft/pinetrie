@@ -2,7 +2,7 @@
 // accepted work a bookmark in your repo and each lane's history a jj repo of
 // its own. `startJjProject` takes only a jj project's folder
 // (`JjProjectDir`), and gives lane work its `Destination` and each lane's
-// `LaneHistory` (`@pinetrie/jj`'s `historyOf`). What only a jj project has
+// `LaneHistory` (`@pinetrie/jj`'s `jjLaneHistory`). What only a jj project has
 // stays here: publish and setup (`accepted.ts`), WIPs, splits and stacks
 // (`split.ts`, `proposed/stack.ts`), and each lane's fetch into your repo
 // (`fetch.ts`), which `LaneHistory`'s moves hand back as `follow`.
@@ -20,16 +20,16 @@ import {
   baseInCommits,
   beginFacts,
   commitFromPoint,
-  commitsOf,
-  fileAt,
-  historyOf,
   type JjProjectDir,
   jjIn,
+  jjLaneHistory,
   planBaseCheckout,
   planTidyHint,
   prepareShared,
   proveJjLane,
+  readCommits,
   readOpLog,
+  readRepoFile,
   readWipState,
   renameProposed,
   revsetName,
@@ -117,7 +117,7 @@ export function startJjProject(dir: JjProjectDir): ProjectAdapter {
       const acceptedRev = `present(${revsetName(names.acceptedBookmark)})`
 
       const fileAtNow: Destination["fileAt"] = (site, path) =>
-        owner.read(({ jj }) => fileAt(jj, names, site, path))
+        owner.read(({ jj }) => readRepoFile(jj, names, site, path))
 
       return {
         kind: "jj",
@@ -137,7 +137,9 @@ export function startJjProject(dir: JjProjectDir): ProjectAdapter {
           }
         },
         async acceptedNow() {
-          const yours = await owner.read(({ jj }) => commitsOf(jj, acceptedRev))
+          const yours = await owner.read(({ jj }) =>
+            readCommits(jj, acceptedRev),
+          )
           return {
             points: yours.map(pointFromCommit),
             checkout: (fresh: boolean) =>
@@ -246,7 +248,7 @@ export function startJjProject(dir: JjProjectDir): ProjectAdapter {
               const { lane } = proved
               return {
                 kind: "history",
-                history: historyOf({
+                history: jjLaneHistory({
                   lane,
                   runners,
                   repoConfig: names,

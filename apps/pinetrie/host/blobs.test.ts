@@ -3,7 +3,7 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import { crc32, deflateSync } from "node:zlib"
 import { type BlobStore, type Sha256, storedText } from "@pinetrie/core"
-import { sha256Of } from "@pinetrie/pi"
+import { blobSha256 } from "@pinetrie/pi"
 import { describe, expect, test } from "vitest"
 import {
   classifyUpload,
@@ -72,7 +72,7 @@ function blobStoreContract(
         width: 40,
         height: 30,
       })
-      expect(sha256Of(RED.bytes)).toBe(RED_SHA)
+      expect(blobSha256(RED.bytes)).toBe(RED_SHA)
     })
 
     test("ref reads the dimensions without the bytes; get reads the bytes", () => {
@@ -115,12 +115,12 @@ function blobStoreContract(
       const ref = blobs.put(RED, fitted)
       expect(ref.sha256).toBe(RED_SHA)
       expect(blobs.fitted(RED_SHA)).toEqual({
-        sha256: sha256Of(fitted.bytes),
+        sha256: blobSha256(fitted.bytes),
         mimeType: "image/png",
         width: 4,
         height: 3,
       })
-      expect(blobs.fitted(sha256Of(fitted.bytes))).toBeUndefined()
+      expect(blobs.fitted(blobSha256(fitted.bytes))).toBeUndefined()
       expect(blobs.list()).toHaveLength(2)
     })
 

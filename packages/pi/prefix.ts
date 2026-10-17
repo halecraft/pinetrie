@@ -9,7 +9,7 @@
 import { createHash } from "node:crypto"
 
 /** What a request's prefix hashes to: the payload without its `messages`. */
-export function prefixOf(payload: unknown): string {
+export function requestPrefix(payload: unknown): string {
   const rest =
     typeof payload === "object" && payload !== null
       ? Object.fromEntries(

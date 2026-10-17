@@ -306,7 +306,7 @@ export const cardEnd = (card: CardRecord, index: TreeIndex): EntryId | null =>
  * `cardEnd` stays your message's alone, so none is ever bound to a composer
  * (`yourCard`).
  */
-export function pinnedAt(
+export function pinnedCardsAtEnd(
   end: EntryId,
   cards: readonly CardRecord[],
   index: TreeIndex,
@@ -322,12 +322,12 @@ export const isOrdered = (place: CardPlace): place is OrderedPlace =>
   "order" in place
 
 /** The order of a place that has one, else "". */
-export const orderOf = (c: CardRecord): string =>
+export const cardOrder = (c: CardRecord): string =>
   isOrdered(c.place) ? c.place.order : ""
 
 /** By `order`, then by id. */
 export const byOrder = (a: CardRecord, b: CardRecord): number => {
-  const [x, y] = [orderOf(a), orderOf(b)]
+  const [x, y] = [cardOrder(a), cardOrder(b)]
   if (x !== y) return x < y ? -1 : 1
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0
 }

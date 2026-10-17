@@ -6,10 +6,10 @@
 import {
   type AskIndex,
   type EntryId,
+  entryAsk,
   isLongAsk,
   type RailRow,
   type RevisionRecord,
-  runOf,
   type TreeIndex,
 } from "@pinetrie/core"
 import { type WorkStats, workStats } from "./work-stats.ts"
@@ -96,7 +96,7 @@ interface RailAsks {
  * A row is uneventful when it is not one of `railLandmarks`, and not the prompt
  * of a long ask (`isLongAsk`). A stretch never crosses a long ask's edge, so a
  * long ask is a dot and a capsule of its own, while short exchanges still
- * merge. A message steered into a run is in its ask's capsule (`runOf`). So a
+ * merge. A message steered into a run is in its ask's capsule (`entryAsk`). So a
  * stretch holds no structure, and the compacted rail has every branch the full
  * one has. An uneventful row's only child is the next row in depth-first order,
  * so a stretch is a run of consecutive rows. The items come back placed
@@ -122,7 +122,7 @@ export function compactRail(
     !landmarks.has(r.id) && !long.has(r.id)
   /** The long ask a row works for, or null: a stretch keeps to one. */
   const longAsk = (id: EntryId | undefined): EntryId | null => {
-    const prompt = id === undefined ? undefined : runOf(asks, id)
+    const prompt = id === undefined ? undefined : entryAsk(asks, id)
     return prompt !== undefined && long.has(prompt) ? prompt : null
   }
 

@@ -32,10 +32,10 @@ import {
   type LaneAccess,
   type LaneFacts,
   laneGuidelines,
+  laneToolContext,
   NO_CONFLICTS,
   skillsInLane,
   systemPromptFor,
-  toolContextOf,
 } from "./lanes.ts"
 import { ONE_ROOT, oneRoot } from "./one-root.ts"
 import { scriptedModel } from "./scripted.ts"
@@ -61,15 +61,15 @@ const facts = (over: Partial<LaneFacts> = {}): LaneFacts => ({
   ...over,
 })
 
-test("toolContextOf: no access is no lane, named by the project's root, whose every call is refused; a lane of its own carries its facts", async () => {
-  const none = toolContextOf(null, "/repo")
+test("laneToolContext: no access is no lane, named by the project's root, whose every call is refused; a lane of its own carries its facts", async () => {
+  const none = laneToolContext(null, "/repo")
   expect({ dir: none.dir, lane: none.lane }).toEqual({
     dir: "/repo",
     lane: null,
   })
   const ran = await none.env.exec("echo hi", undefined, BACKGROUND_CONTEXT)
   expect(ran.ok).toBe(false)
-  const own = toolContextOf(
+  const own = laneToolContext(
     {
       facts: facts(),
       hostPaths: ["/skills"],
@@ -84,8 +84,8 @@ test("toolContextOf: no access is no lane, named by the project's root, whose ev
   })
 })
 
-test("toolContextOf: a lane of its own runs the runtime's programs by path", async () => {
-  const own = toolContextOf(
+test("laneToolContext: a lane of its own runs the runtime's programs by path", async () => {
+  const own = laneToolContext(
     {
       facts: facts(),
       hostPaths: [],
@@ -131,13 +131,13 @@ test("the prompt no longer tells the model to search with bash", () => {
   const prompt = systemPromptFor(
     { contextFiles: [], skills: [] },
     files,
-  )(toolContextOf(null, "/repo"))
+  )(laneToolContext(null, "/repo"))
   expect(prompt).not.toContain("file operations like ls, rg, find")
   // pi's rule as it is without our tools, so the check above can fail.
   const without = systemPromptFor({ contextFiles: [], skills: [] }, [
     "read",
     "bash",
-  ])(toolContextOf(null, "/repo"))
+  ])(laneToolContext(null, "/repo"))
   expect(without).toContain("file operations like ls, rg, find")
 })
 
@@ -145,7 +145,7 @@ test("every thread is told what pinned cards are, once, in a line of its own", (
   const prompt = systemPromptFor(
     { contextFiles: [], skills: [] },
     [],
-  )(toolContextOf(null, "/repo"))
+  )(laneToolContext(null, "/repo"))
   expect(prompt.split(PINNED_RULE).length - 1).toBe(1)
   // pi drops a guideline equal to another: the lane's lines stay distinct.
   expect(laneGuidelines(facts())).not.toContain(PINNED_RULE)

@@ -8,20 +8,20 @@ import {
   type CardRecord,
   type CardWidth,
   KINDS,
-  keyOf,
   placed,
+  placeKey,
   type Reorder,
   type ReorderAt,
   type ReorderRefusal,
   sameKey,
 } from "@pinetrie/core"
 import { cardsOnCanvas } from "./canvas-index.ts"
-import { byOrder, isOrdered, orderOf } from "./card.ts"
+import { byOrder, cardOrder, isOrdered } from "./card.ts"
 import { marginCards } from "./margin.ts"
 import type { MoveStep, PlaceStep } from "./moves.ts"
 import { notesIn } from "./notes.ts"
 import { orderBetween, respace } from "./order.ts"
-import { canvasPinnedOf, isPinned, queuedOn } from "./queue.ts"
+import { canvasPinnedCards, isPinned, queuedOn } from "./queue.ts"
 
 // ── reorders ─────────────────────────────────────────────
 
@@ -71,7 +71,7 @@ export const REORDERS: { readonly [K in ReorderAt["kind"]]: ReorderRule<K> } = {
     passesFacts: true,
   },
   "canvas-pinned": {
-    siblings: (cards, at) => canvasPinnedOf(cards, at.canvas),
+    siblings: (cards, at) => canvasPinnedCards(cards, at.canvas),
     adjacent: true,
     passesFacts: true,
   },
@@ -155,7 +155,7 @@ export function planReorder(
   const now = cards.find(c => c.id === reorder.card)
   if (now === undefined) return { kind: "refused", code: "gone", now: null }
   if (staysPut(now)) return { kind: "refused", code: "fact", now }
-  if (!sameKey(keyOf(now.place), reorder.at))
+  if (!sameKey(placeKey(now.place), reorder.at))
     return { kind: "refused", code: "moved", now }
   const changed: ReorderStep = {
     kind: "refused",
@@ -191,11 +191,11 @@ export function planReorder(
   }
   const bound = (i: number | null): string | null => {
     const c = i === null ? undefined : siblings[i]
-    return c === undefined ? null : orderOf(c)
+    return c === undefined ? null : cardOrder(c)
   }
   const order = orderBetween(bound(after), bound(before))
   if (order !== null) return { kind: "write", record: withOrder(now, order) }
-  const made = respace(siblings.map(orderOf), index)
+  const made = respace(siblings.map(cardOrder), index)
   return {
     kind: "steps",
     steps: [
@@ -228,7 +228,7 @@ export function planWidth(
 ): MoveStep | null {
   const now = cards.find(c => c.id === change.card)
   if (now === undefined) return { kind: "refused", code: "gone", now: null }
-  if (now.place.kind !== "canvas" || !sameKey(keyOf(now.place), change.at))
+  if (now.place.kind !== "canvas" || !sameKey(placeKey(now.place), change.at))
     return { kind: "refused", code: "moved", now }
   if (now.place.width === change.width) return null
   const record = placed(now, { ...now.place, width: change.width })

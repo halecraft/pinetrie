@@ -10,7 +10,6 @@ import {
   type CardRecord,
   historyScope,
   isNoteColumnId,
-  keyOf,
   kindOfCard,
   type Move,
   type MoveHistoryScope,
@@ -18,9 +17,10 @@ import {
   movesOfDocId,
   type PlaceKey,
   parseCardId,
+  placeKey,
   type Workflow,
 } from "@pinetrie/core"
-import { transitionOf } from "./board.ts"
+import { stateTransition } from "./board.ts"
 import {
   type CanvasIndex,
   canvasOfPlace,
@@ -66,7 +66,7 @@ export const discardHistory = (
  * notes, is in its thread's canvas, a spot on a canvas in its canvas's
  * (`canvasOfTarget`).
  */
-export function historyOf(
+export function movesHistory(
   moves: readonly Move[],
   cards: readonly CardRecord[],
   discards: Discards,
@@ -141,7 +141,7 @@ export function crossesArchive(
     return (
       last?.from?.kind === "board" &&
       last.to.kind === "board" &&
-      transitionOf(workflow, last.from.state, last.to.state) !== "within"
+      stateTransition(workflow, last.from.state, last.to.state) !== "within"
     )
   })
 }
@@ -219,7 +219,7 @@ export function undoAnswer(
         kind: "undone",
         cards: cardsOfParts(result.step.parts, placesId).map(card => {
           const now = cards.find(c => c.id === card)
-          return { card, place: now === undefined ? null : keyOf(now.place) }
+          return { card, place: now === undefined ? null : placeKey(now.place) }
         }),
       }
     case "refused": {

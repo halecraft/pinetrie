@@ -4,10 +4,10 @@
 import {
   type CanvasId,
   type CardRecord,
-  livePlaceOf,
-  ownerOf,
+  livePlace,
   type RootId,
   rootDocId,
+  surfaceOwner,
   type ThreadId,
   type ThreadRecord,
   type ValueWrite,
@@ -48,7 +48,7 @@ export function emptiedCanvases(input: {
       continue
     const holds = input.after.some(d => {
       if (d.place.kind === "trash") return false
-      const owner = ownerOf(d.place)
+      const owner = surfaceOwner(d.place)
       return owner.kind === "canvas" && owner.canvas === canvas
     })
     if (!holds) out.push(canvas)
@@ -116,7 +116,7 @@ export function planRootDelete(
     cards: cards
       .filter(c => {
         if (c.id === canvas) return true
-        const owner = ownerOf(livePlaceOf(c.place))
+        const owner = surfaceOwner(livePlace(c.place))
         return owner.kind === "canvas"
           ? owner.canvas === canvas
           : owner.kind === "thread" && rootOfThread.get(owner.thread) === root

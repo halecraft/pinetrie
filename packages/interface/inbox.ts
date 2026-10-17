@@ -34,7 +34,7 @@ export interface InboxItem {
  * count, as `RootRecord.mentions` holds only sends: `address` decides who
  * a person's message is for.
  */
-export function mentionsOf(input: {
+export function inboxMentions(input: {
   /** Every root's directory record. */
   readonly roots: Iterable<RootRecord>
   readonly me: WriterId
@@ -61,7 +61,7 @@ export function mentionsOf(input: {
 
 /** What you have seen: every mention at or before `since`, and `seen` after it. */
 export interface Inbox {
-  /** An entry id, or `EARLIEST` (`@pinetrie/session`'s `startOf`). */
+  /** An entry id, or `EARLIEST` (`@pinetrie/session`'s `startingSince`). */
   readonly since: string
   readonly seen: readonly string[]
 }

@@ -10,12 +10,12 @@
 import {
   BASH_TOOL,
   type ImageRef,
+  knownToolId,
   type StreamId,
   streamStart,
   type ToolCall,
   type ToolId,
   type ToolResult,
-  toolIdOf,
 } from "@pinetrie/core"
 import { readShell, type ShellRole } from "@pinetrie/shell"
 import { elapsed, plural } from "./counts.ts"
@@ -119,7 +119,7 @@ export function rowSummary(call: ToolCall): RowSummary {
   const word = toolWord(call.name)
   if (call.subject === undefined)
     return { tag: undefined, whole: [{ text: word, role: "plain" }] }
-  const id = toolIdOf(call.name)
+  const id = knownToolId(call.name)
   const view = id === undefined ? undefined : VIEWS[id]
   return {
     tag: word,

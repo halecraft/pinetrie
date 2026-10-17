@@ -17,7 +17,7 @@ import {
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { indexCanvases } from "./canvas-index.ts"
-import { threadCardOf } from "./fixtures.ts"
+import { landedThreadCard } from "./fixtures.ts"
 import { type GateFacts, type GateRoot, gateRefusal, planGate } from "./gate.ts"
 import { HELD_WORDS, TRASHED_WORDS } from "./held.ts"
 
@@ -45,7 +45,12 @@ const popped = send({ kind: "queue", thread: T })
 const branch = (canvas: CanvasId = OTHER) =>
   send({ kind: "branch", thread: NEW, at: E, canvas })
 
-const onCanvas = threadCardOf({ thread: T, canvas: CANVAS, by: BEA, cards: [] })
+const onCanvas = landedThreadCard({
+  thread: T,
+  canvas: CANVAS,
+  by: BEA,
+  cards: [],
+})
 const inInventory: CardRecord = {
   ...onCanvas,
   place: { kind: "inventory", holder: BEA },

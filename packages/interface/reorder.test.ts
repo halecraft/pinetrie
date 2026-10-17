@@ -3,24 +3,24 @@ import {
   EDGE_SPEED,
   EDGE_ZONE,
   edgeScroll,
-  gapAt,
   keyMove,
   landing,
+  pointerGap,
 } from "./reorder.ts"
 
 // Three columns 100 wide, from 0: centres 50, 150, 250.
 const mids = [50, 150, 250]
 
-describe("gapAt", () => {
+describe("pointerGap", () => {
   test("is the number of columns whose centre is left of the pointer", () => {
-    expect(gapAt(mids, 10)).toBe(0)
-    expect(gapAt(mids, 120)).toBe(1)
-    expect(gapAt(mids, 200)).toBe(2)
-    expect(gapAt(mids, 400)).toBe(3)
+    expect(pointerGap(mids, 10)).toBe(0)
+    expect(pointerGap(mids, 120)).toBe(1)
+    expect(pointerGap(mids, 200)).toBe(2)
+    expect(pointerGap(mids, 400)).toBe(3)
   })
 
   test("a pointer on a centre is before that column", () => {
-    expect(gapAt(mids, 150)).toBe(1)
+    expect(pointerGap(mids, 150)).toBe(1)
   })
 })
 

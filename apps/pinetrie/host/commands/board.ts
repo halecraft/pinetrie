@@ -16,7 +16,7 @@ import {
   type EntryId,
   ERR,
   type Intent,
-  keyOf,
+  placeKey,
   type RevisionRecord,
   refused,
   type WriterId,
@@ -34,12 +34,12 @@ import {
 } from "@pinetrie/reads"
 import {
   type ArchiveTeardown,
-  boardOf,
   type Crossing,
   planArchive,
   planBoardMove,
   planWorkflowEdit,
   setRecord,
+  taskBoard,
   VERDICT,
   WORKFLOW,
 } from "@pinetrie/rules"
@@ -123,7 +123,7 @@ async function record(
         {
           kind: "unmoved",
           code: moved.code,
-          place: moved.now === null ? null : keyOf(moved.now.place),
+          place: moved.now === null ? null : placeKey(moved.now.place),
           by: moved.now?.placer ?? null,
         },
         places.rev(),
@@ -222,7 +222,7 @@ export async function handleWorkflow(
   const workflow = readWorkflow(session)
   if (workflow === null)
     return refused(ERR.UNKNOWN_STATE, "the board has no states yet")
-  const board = boardOf(workflow, readPlaces(deps.basics.places))
+  const board = taskBoard(workflow, readPlaces(deps.basics.places))
   const planned = planWorkflowEdit(workflow, board, intent.edit, newId)
   if (planned.kind === "refused") return planned
   if (planned.kind === "write")

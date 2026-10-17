@@ -10,7 +10,7 @@ import {
 import { describe, expect, test } from "vitest"
 import { MARK, planMark } from "./mark.ts"
 import { NOTE_COLUMN } from "./note-column.ts"
-import { deleteRecord, recordsOf, setRecord } from "./records.ts"
+import { decodeRecords, deleteRecord, setRecord } from "./records.ts"
 
 const ADA = writerId("p-ada")
 const BEA = writerId("p-bea")
@@ -54,7 +54,7 @@ describe("the records", () => {
     expect(MARK.decode({ ...r, title: "" }, r.canvas)).toBeUndefined()
     expect(MARK.decode(r, "r1")).toBeUndefined()
     expect(
-      recordsOf(MARK, [
+      decodeRecords(MARK, [
         { key: r.canvas, value: r },
         { key: K2, value: { nope: 1 } },
       ]).get(K1),

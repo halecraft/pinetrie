@@ -19,10 +19,10 @@ import type {
 } from "@pinetrie/core"
 import {
   askLine,
+  capsulePick,
   compactRail,
   matchCountWords,
   opens,
-  pickAt,
   type RailItem,
   type RailStretch,
   type RailStub,
@@ -52,7 +52,7 @@ import {
 import { useTrackColors } from "./palette-context.ts"
 import { nameFor } from "./presence.tsx"
 import { SignalMark } from "./signal-mark.tsx"
-import { useReadingAt } from "./use-presence.ts"
+import { useOthersReading } from "./use-presence.ts"
 
 const ROW = 16
 const GAP = 12
@@ -390,7 +390,7 @@ export function LiveRail({
   names: ReadonlyMap<WriterId, string>
   colorOf: (writer: WriterId) => string
 } & Omit<ComponentProps<typeof Rail>, "items" | "here" | "nameOf">) {
-  const reading = useReadingAt(session.presence, session.writer)
+  const reading = useOthersReading(session.presence, session.writer)
   const here = useMemo(
     () =>
       new Map(
@@ -520,7 +520,7 @@ const FILL: Record<StretchFill, (color: string) => string> = {
  * A stretch: a capsule in its branch's place and colour, `span` rows long
  * (one, and one more per digit of its size), filled by who wrote it
  * (`stretchFill`). A click opens the message at that point of the stretch
- * (`pickAt`), its ask's fold included; the column is where a stretch is read.
+ * (`capsulePick`), its ask's fold included; the column is where a stretch is read.
  */
 function Capsule(p: {
   stretch: RailStretch
@@ -553,7 +553,7 @@ function Capsule(p: {
         const box = e.currentTarget.getBoundingClientRect()
         // A click from the keyboard has no point: `detail` is 0.
         const at = e.detail === 0 ? null : (e.clientY - box.top) / box.height
-        p.onPick(pickAt(stretch.ids, at))
+        p.onPick(capsulePick(stretch.ids, at))
       }}
       style={{
         left: x(stretch.across) - DOT,

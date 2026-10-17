@@ -6,6 +6,7 @@ import {
   type CanvasId,
   type CardRecord,
   type EntryId,
+  entryThread,
   type Intent,
   type MoveRefusal,
   type ProposalBranch,
@@ -14,7 +15,6 @@ import {
   type ThreadRecord,
   type ThreadStart,
   type TreeIndex,
-  threadAt,
   type Workflow,
   type WriterId,
 } from "@pinetrie/core"
@@ -154,7 +154,7 @@ export function planBranchOpen(input: {
   const { thread, at, index } = input
   if (isTaken(thread, input.cards, input.threads, index))
     return { kind: "refused", why: "taken" }
-  const parent = threadAt(index, at)
+  const parent = entryThread(index, at)
   if (parent === null || !input.canvases.has(input.canvas))
     return { kind: "refused", why: "unknown" }
   return settled(

@@ -106,7 +106,7 @@ interface WorkStripFacts {
   readonly base: ThreadBase
   /** Where an acceptance goes, for titles; null for a jj project's before its record is read. */
   readonly into: AcceptsInto | null
-  /** What catching up would do (`catchUpOf`). */
+  /** What catching up would do (`catchUpNow`). */
   readonly catchUp: CatchUpNow
   /** An accepted thread commit of this thread names no source: nothing is proposed until it catches up. */
   readonly untraced: boolean
@@ -134,7 +134,7 @@ export function conflictCause(record: ProposedChangesRecord): ConflictCause {
 
 /**
  * The proposed changes' state and buttons. `asked` is when the agent last asked
- * about a conflict on the thread's path (`conflictAskedAt`); it asks for you
+ * about a conflict on the thread's path (`conflictAskTime`); it asks for you
  * only when newer than the proposed changes. `base` is the lane's
  * (`pinetrie.base`), null before the host read it, as accepted work; `into` and
  * `wipAhead` come from accepted work's record. Jj proposed changes' acceptance
@@ -150,7 +150,7 @@ export function workStripView(input: {
   /** Null for a jj project whose accepted work is not read yet: nothing to accept into. */
   readonly into: AcceptsInto | null
   readonly wipAhead: number
-  /** What catching up would do (`catchUpOf`). */
+  /** What catching up would do (`catchUpNow`). */
   readonly catchUp: CatchUpNow
   /** Accepted thread commits of this thread that name no source (`BaseRecord.untraced`). */
   readonly untraced: boolean

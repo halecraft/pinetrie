@@ -3,9 +3,10 @@ import {
   type CanvasId,
   type CardKind,
   cardIdOfKind,
+  cardTextSource,
   type FactCardId,
   fitsPlace,
-  isTargetOf,
+  isTargetForKind,
   KINDS,
   kindOfCard,
   makeCard,
@@ -17,7 +18,6 @@ import {
   type Sha256,
   type ThreadId,
   textCardId,
-  textSourceOf,
   WRAPS,
   workflowStateIdFor,
   writerId,
@@ -69,7 +69,7 @@ describe("KINDS", () => {
       after: null,
     } as const
     for (const kind of Object.keys(KINDS) as CardKind[])
-      expect([kind, isTargetOf(kind, spot)]).toEqual([
+      expect([kind, isTargetForKind(kind, spot)]).toEqual([
         kind,
         fitsPlace(kind, "canvas") || kind in WRAPS,
       ])
@@ -102,7 +102,7 @@ describe("KINDS", () => {
   })
 })
 
-test("a card's words are where its kind says (`KINDS`' text): textSourceOf agrees for every kind with records", () => {
+test("a card's words are where its kind says (`KINDS`' text): cardTextSource agrees for every kind with records", () => {
   const place = { kind: "inventory", holder: ADA } as const
   const thread = "t-1" as ThreadId
   const cards = [
@@ -156,5 +156,5 @@ test("a card's words are where its kind says (`KINDS`' text): textSourceOf agree
       .sort(),
   )
   for (const card of cards)
-    expect(textSourceOf(card).kind).toBe(KINDS[card.kind].text)
+    expect(cardTextSource(card).kind).toBe(KINDS[card.kind].text)
 })

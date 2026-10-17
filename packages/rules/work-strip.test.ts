@@ -14,7 +14,7 @@ import {
 import { describe, expect, test } from "vitest"
 import {
   type CatchUpNow,
-  catchUpOf,
+  catchUpNow,
   type ParentNow,
   proposedChangesStatus,
   workStripView,
@@ -267,9 +267,9 @@ describe("workStripView: the work strip's states", () => {
     expect(queued.quiet).toContain("split")
     expect(view(proposed, "idle", null).quiet).not.toContain("split")
   })
-  test("catchUpOf: from the commit a lane last caught up with to the base's now", () => {
-    const moved = (...args: Parameters<typeof catchUpOf>) =>
-      catchUpOf(...args).kind !== "current"
+  test("catchUpNow: from the commit a lane last caught up with to the base's now", () => {
+    const moved = (...args: Parameters<typeof catchUpNow>) =>
+      catchUpNow(...args).kind !== "current"
     const L1 = commitId("l1")
     const L2 = commitId("l2")
     const W1 = commitId("w1")
@@ -319,8 +319,8 @@ describe("workStripView: the work strip's states", () => {
     expect(moved(onAccepted, line(null))).toBe(false)
     // A lane the host never read (no record): nothing is claimed, unless
     // there is no line to catch up with.
-    expect(catchUpOf(undefined, line(L2))).toEqual({ kind: "unknown" })
-    expect(catchUpOf(undefined, line(null))).toEqual({ kind: "current" })
+    expect(catchUpNow(undefined, line(L2))).toEqual({ kind: "unknown" })
+    expect(catchUpNow(undefined, line(null))).toEqual({ kind: "current" })
     expect(moved(onWip, line(L2, [{ bookmark: "wip/a", commit: W1 }]))).toBe(
       false,
     )
@@ -330,9 +330,9 @@ describe("workStripView: the work strip's states", () => {
     // Landed: on accepted work now, and caught up with it only once merged.
     expect(moved({ ...onWip, state: "landed" }, line(L2))).toBe(true)
     expect(moved({ ...onWip, state: "gone" }, line(L2))).toBe(false)
-    expect(catchUpOf(onAccepted, line(L2))).toEqual({ kind: "unknown" })
+    expect(catchUpNow(onAccepted, line(L2))).toEqual({ kind: "unknown" })
     expect(
-      catchUpOf(
+      catchUpNow(
         {
           ...onWip,
           catchUp: { tip: commitId("t"), to: commitId("w2"), files: ["w"] },
@@ -345,7 +345,7 @@ describe("workStripView: the work strip's states", () => {
       ...onAccepted,
       catchUp: { tip: commitId("t"), to, files },
     })
-    expect(catchUpOf(read(L2, []), line(L2))).toEqual({ kind: "nothing-new" })
+    expect(catchUpNow(read(L2, []), line(L2))).toEqual({ kind: "nothing-new" })
     // Only what brings files says the move: the header's ↓ names it.
     const move = {
       base: { kind: "accepted" },
@@ -353,16 +353,16 @@ describe("workStripView: the work strip's states", () => {
       from: L1,
       to: L2,
     }
-    expect(catchUpOf(read(L2, ["a", "b"]), line(L2))).toEqual({
+    expect(catchUpNow(read(L2, ["a", "b"]), line(L2))).toEqual({
       kind: "brings",
       move,
       files: 2,
     })
-    expect(catchUpOf(read(commitId("l0"), []), line(L2))).toEqual({
+    expect(catchUpNow(read(commitId("l0"), []), line(L2))).toEqual({
       kind: "unknown",
     })
   })
-  test("catchUpOf for a folder: from the state a lane last caught up with to accepted work's newest", () => {
+  test("catchUpNow for a folder: from the state a lane last caught up with to accepted work's newest", () => {
     const FIRST = pointId("line-0192aaaa")
     const SECOND = pointId("line-0192bbbb")
     const folder = (newest: typeof FIRST): FolderAcceptedRecord => ({
@@ -382,13 +382,13 @@ describe("workStripView: the work strip's states", () => {
     })
     const read = (to: typeof FIRST, files: string[]) =>
       base({ tip: pointId("turn-0192cccc"), to, files })
-    expect(catchUpOf(base(), folder(FIRST))).toEqual({ kind: "current" })
-    expect(catchUpOf(base(), folder(SECOND))).toEqual({ kind: "unknown" })
-    expect(catchUpOf(undefined, folder(SECOND))).toEqual({ kind: "unknown" })
-    expect(catchUpOf(read(SECOND, []), folder(SECOND))).toEqual({
+    expect(catchUpNow(base(), folder(FIRST))).toEqual({ kind: "current" })
+    expect(catchUpNow(base(), folder(SECOND))).toEqual({ kind: "unknown" })
+    expect(catchUpNow(undefined, folder(SECOND))).toEqual({ kind: "unknown" })
+    expect(catchUpNow(read(SECOND, []), folder(SECOND))).toEqual({
       kind: "nothing-new",
     })
-    expect(catchUpOf(read(SECOND, ["a"]), folder(SECOND))).toEqual({
+    expect(catchUpNow(read(SECOND, ["a"]), folder(SECOND))).toEqual({
       kind: "brings",
       move: {
         base: { kind: "accepted" },
@@ -398,7 +398,7 @@ describe("workStripView: the work strip's states", () => {
       },
       files: 1,
     })
-    expect(catchUpOf(read(FIRST, ["a"]), folder(SECOND))).toEqual({
+    expect(catchUpNow(read(FIRST, ["a"]), folder(SECOND))).toEqual({
       kind: "unknown",
     })
   })

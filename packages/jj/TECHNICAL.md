@@ -70,7 +70,7 @@ translates to.
 - `catch-up.ts`: what catching up would change in a lane, its rules and
   its read (`readCatchUp`).
 - `file-at.ts`: a file at accepted work, at a lane's tip or at its start
-  (`fileAt`), the destination's read of `pinetrie.json`.
+  (`readRepoFile`), the destination's read of `pinetrie.json`.
 - `tidy.ts`: `pnpm tidy`'s core (ADR-0155): your op log as facts
   (`readOpLog`), the tidy planned from them (`planTidy`), whether a jj
   command raced it (`isTidyRaced`), the startup line's facts
@@ -93,7 +93,7 @@ translates to.
   the parser their kinds wrap. `revisionRead` compares two copies of
   `pinetrie.json` with the host's decoder (`decodeAuthority`), since jj
   declares no config.
-- `lane/`: a lane's own repo. `history.ts` (`historyOf`, the
+- `lane/`: a lane's own repo. `history.ts` (`jjLaneHistory`, the
   `LaneHistory`), `fetch-plan.ts` (`planFetch`: which commits a move's fetch
   into your repo may leave out), `plan.ts` (a fork's setup, the base's
   checkout, a merge's steps and joins, a turn's commit, a bundle, the
@@ -167,7 +167,7 @@ operation is read once and kept until the head moves.**
 - **A lane with no ref in your repo is `"none"`** to `gatherLane` and
   `gatherRefresh`: one that never committed was never fetched. No
   `pinetrie.base` is written for it, and the page reads catching up as
-  `unknown` (`catchUpOf`, `@pinetrie/rules`), never as caught up.
+  `unknown` (`catchUpNow`, `@pinetrie/rules`), never as caught up.
 - **`SharedFacts`**, per operation (`RepoOps.shared()`): accepted work's facts
   (`acceptedFacts`, for accepted work's record), the accepted thread commits on the
   line (`ACCEPTED_THREAD_COMMITS`: a `Pinetrie-Source` or `Pinetrie-Thread`
@@ -194,7 +194,7 @@ operation is read once and kept until the head moves.**
 - **What the rows cannot say is read only when needed:** the start, when a
   accepted source above the base names more (`readStart`); a stack's files,
   and the top's conflicted files when it conflicts, with the files
-  conflicted where its ledger says it starts (`startConflictsOf`,
+  conflicted where its ledger says it starts (`readStartConflicts`,
   ADR-0072): `conflictCause` reads both. An unconflicted proposed changes pays
   nothing. Proposed changes whose top are the host's version (the row's `H` flag)
   reads nothing more about who made it; any other reads each revision's
@@ -223,7 +223,7 @@ made in your repo before any update runs, and it must name the files the
 update's merge will change.**
 
 - **One module, rules beside the read** (as `planLaneRead` beside
-  `gatherLane`): `planCatchUpRead`, `catchUpHolds` and `catchUpFilesOf`
+  `gatherLane`): `planCatchUpRead`, `catchUpHolds` and `catchUpChangedFiles`
   are pure; `catchUpFiles` reads the diffs and `readCatchUp` runs the rest.
   Both gathers call `readCatchUp`: `gatherLane`, and `placeOf` for every
   other gather.
@@ -241,7 +241,7 @@ update's merge will change.**
   catching up would change in a lane: those the base's commit `to` has
   differently from each commit the lane holds of its history
   (`jj diff --from <held> --to <to>`), and from the lane's tip
-  (`jj diff --from <tip> --to <to>`), decided by `catchUpFilesOf`. On
+  (`jj diff --from <tip> --to <to>`), decided by `catchUpChangedFiles`. On
   accepted work the held commits are the proposed changes' start, which holds every
   accepted source the lane has: the sources `mergeBase` joins before it
   merges, so an acceptance of the lane's own work counts for nothing even
@@ -350,7 +350,7 @@ update's merge will change.**
   and an old lane's next proposed changes would otherwise start below them and put
   their files back over yours (`repo.test.ts`, pre-rename). A `Pineta-Base`
   on `pineta-onto` reads as accepted work, as any base off the WIP prefix
-  does (`baseOf`, ADR-0100).
+  does (`messageBase`, ADR-0100).
 - **`pre-proposed:` renames each `pinetrie-offer/<name>` to
   `pinetrie-proposed/<name>`, once** (`pre-proposed.ts`, ADR-0156, S217):
   the first command a starting host puts on the owner, before its first
@@ -464,7 +464,7 @@ update's merge will change.**
   `(::<bookmark> ~ ::<target>) & (description(regex:"(?m)^Pinetrie-Thread:
   <name>$") | <bookmark>)`. Conflicted proposed changes' `startConflicts` are the
   files conflicted at each commit its `Pinetrie-Start` names
-  (`startConflictsOf`, shared with `gatherLane`); a start your repo lacks
+  (`readStartConflicts`, shared with `gatherLane`); a start your repo lacks
   names none. Accepted proposed changes below carry the same trailer, but
   is under the target; your commits carry none. The bookmark's own commit
   is always the top. A conflicted bookmark, or a change id naming two
@@ -581,7 +581,7 @@ update's merge will change.**
 
 ## A lane's repo (`lane/`)
 
-What jj's adapter does in a lane's own repo: `historyOf` (`lane/history.ts`)
+What jj's adapter does in a lane's own repo: `jjLaneHistory` (`lane/history.ts`)
 is its `LaneHistory`, over the lane's runners, and its pure planners are
 `lane/plan.ts`'s. `@pinetrie/lanes` runs no jj: it plans a fork and the base
 with the steps this package gives it (`ForkSetup`, `BaseCheckout`).
@@ -594,13 +594,13 @@ with the steps this package gives it (`ForkSetup`, `BaseCheckout`).
   compiler. `commitFromPoint` takes a `JjLane`, so a point from a port or from
   storage is read as a commit only where the lane it belongs to keeps a jj
   history. A commit becomes a point freely (`pointFromCommit`, core).
-  `historyOf` takes a `JjLane`, proved once by the host's adapter when the
+  `jjLaneHistory` takes a `JjLane`, proved once by the host's adapter when the
   registry asks for the history, and its planners (`planForkSetup`,
   `planMerge`) convert inside.
 - **Reads of your repo stay in commits.** `laneBase`, the proposed changes' gathers,
-  `catch-up.ts` and `fileAt` read `CommitBase` (`LaneBaseOf<CommitId>`);
+  `catch-up.ts` and `readRepoFile` read `CommitBase` (`LaneBaseOf<CommitId>`);
   `commitTurn` and `mergeUpdate` answer `TurnCommittedOf<CommitId>` and
-  `MergedOf<CommitId>`. `historyOf` converts at the port (`baseFromCommits`,
+  `MergedOf<CommitId>`. `jjLaneHistory` converts at the port (`baseFromCommits`,
   `turnFromCommits`, `mergedFromCommits`); the host's adapter converts a
   base a port carried back with its lane's proof (`baseInCommits`), and a
   review's range with the lane `planReviewRead` named (`CommitSpan`).
@@ -686,7 +686,7 @@ with the steps this package gives it (`ForkSetup`, `BaseCheckout`).
   19). `laneRefSteps` (`@pinetrie/jj`) is the one writer of the ref besides
   the fetch: archiving deletes it, restoring writes it back. In the lane's
   own repo the bookmark stays a local `pinetrie/<lane>`; `laneTipIn`
-  (`@pinetrie/jj`) reads the one in yours, `bookmarkOf` the lane's.
+  (`@pinetrie/jj`) reads the one in yours, `readLaneBookmark` the lane's.
 - **Every fetch into a colocated repo ends with
   `jj --ignore-working-copy git import`**, in your repo as the host
   (`planImport`). A jj command run with
@@ -719,13 +719,13 @@ with the steps this package gives it (`ForkSetup`, `BaseCheckout`).
 - **The host's trailers** (`Pinetrie-Thread`, `Pinetrie-Lane`, `Pinetrie-Entry`,
   `Pinetrie-Base` and proposed changes' ledger) are written and read in one file,
   core's `trailers.ts`: a turn's message (`revisionMessage`,
-  `entryOfMessage`), a base's (`baseMessage`, `parseBase`, `baseOf`), proposed changes', and the revset that finds commits by one (`trailerRevset`, here
+  `entryOfMessage`), a base's (`baseMessage`, `parseBase`, `messageBase`), proposed changes', and the revset that finds commits by one (`trailerRevset`, here
   in `newestBase`). A format lanes or jj must read or write lives in
   core.
   - **The readers also read `Pineta-*`** (`READ`, `pre-rename:`): commits
     made before the rename are immutable. Writers write `Pinetrie-*` only.
   - **A base is read by kind, never by accepted work's bookmark**
-    (`baseOf`, ADR-0100): a name with the WIP prefix is that WIP, any other
+    (`messageBase`, ADR-0100): a name with the WIP prefix is that WIP, any other
     is accepted work. New bases write `accepted@<commit>`; one written as
     `pinetrie-onto@` or `pineta-onto@` reads as accepted work too, with no
     special case, and so would one under any later name of the bookmark.
@@ -759,7 +759,7 @@ with the steps this package gives it (`ForkSetup`, `BaseCheckout`).
   nothing, and cost no extra command. The same `jj log` reads `@`'s and
   each parent's `conflict`, so `commitTurn` also says whether the turn's
   commit, or the bookmark when it has none, is conflicted; only then does
-  `turnDone` list the files (`conflictedFilesAt`) into the record, which a
+  `turnDone` list the files (`readConflictedFiles`) into the record, which a
   branch's warning reads (ADR-0072).
 - **`copyFacts`** (ADR-0080) reads where the working copy sits against the
   lane's bookmark, after a snapshot: `@`'s parents, the bookmark, and
@@ -779,7 +779,7 @@ with the steps this package gives it (`ForkSetup`, `BaseCheckout`).
   commit as every side's whole tree under `.jjconflict-base-<n>/` and
   `.jjconflict-side-<n>/`, plus `JJ-CONFLICT-README`, so a turn that
   resolved one file in a repo of 694 counted 2084 (S99).
-- **`conflictedFilesAt(jj, rev)`** is the one read of a commit's conflicted
+- **`readConflictedFiles(jj, rev)`** is the one read of a commit's conflicted
   files (`jj file list -T 'if(conflict, …)'`), in a lane and in your repo;
   it throws, and a caller that reads none on failure says so at the call.
   `conflictsIn` snapshots the lane first, then reads `@`.
@@ -823,7 +823,7 @@ with the steps this package gives it (`ForkSetup`, `BaseCheckout`).
   merge with `planMerge`, then runs it): `planMerge`'s steps (a fetch of accepted work's commit,
   or of the WIP's commit and its copy), the merge, a mark naming accepted work
   when a thread moves there with nothing to merge, then what the merge left:
-  its files and the titles of what came in (`titlesOf`, one log), or each
+  its files and the titles of what came in (`readTitles`, one log), or each
   conflicted file's content and the revisions on each side that touched
   them. A WIP's copy fetches only the WIP's commit: its parent is the
   lane's own.
@@ -835,7 +835,7 @@ with the steps this package gives it (`ForkSetup`, `BaseCheckout`).
 - **The merge is committed at once,** even with nothing to resolve.
   Otherwise an empty merge stays the lane's working copy, which every snapshot
   rewrites. A mutation shows `repo.test.ts` fails without it.
-- **Conflicts** are read with `conflictedFilesAt`, and a conflicted file's
+- **Conflicts** are read with `readConflictedFiles`, and a conflicted file's
   content with `jj file show`: the host cannot read a lane's disk.
 - **A file both sides hold alike is merged as it is** (`heldAlike`): jj
   keeps a conflict when the merge's base is itself conflicted, as when a
@@ -913,7 +913,7 @@ with the steps this package gives it (`ForkSetup`, `BaseCheckout`).
   acceptance leaves neither bookmark nor version; an archived lane's
   history survives a cut and collected op log, and restores.
 - **`lane/history.test.ts`** is the port suite
-  (`@pinetrie/lanes/testing`'s `historySuite`) against `historyOf`: lanes as
+  (`@pinetrie/lanes/testing`'s `historySuite`) against `jjLaneHistory`: lanes as
   throwaway repos on the host, their runners mapping `/workspace` and
   `/mnt/host-working-copy` to directories, your repo beside them, and each
   fetch a real bundle and import. A folder project's adapter runs the same

@@ -46,7 +46,7 @@ export const ROLES: Readonly<Record<Role, RoleSpec>> = {
 }
 
 /** The module each call belongs to. */
-export function moduleOf(call: LanehostCall): Module {
+export function callModule(call: LanehostCall): Module {
   switch (call.kind) {
     case "record":
     case "projects":

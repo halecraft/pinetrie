@@ -61,7 +61,7 @@ import {
 import { dockerRootless, hostPathExists } from "./facts.ts"
 import {
   type ContainerSpec,
-  imagePathOf,
+  imageEnvPath,
   labelled,
   lanehostContainer,
   observerContainer,
@@ -427,7 +427,7 @@ export function dockerRuntime(input: {
     execArgv,
     imageExists: tag => imageExists(target, tag),
     buildImage: plan => buildImage(target, plan),
-    imagePath: async tag => imagePathOf(await imageEnv(target, tag)),
+    imagePath: async tag => imageEnvPath(await imageEnv(target, tag)),
     runInImage: (tag, argv) => runInImage(target, tag, argv),
     async sweepProjects() {
       await lanehost.call({ kind: "record", project: key, root })

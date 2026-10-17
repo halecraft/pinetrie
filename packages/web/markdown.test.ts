@@ -1,10 +1,10 @@
 import type { ImageRef, Sha256, Share } from "@pinetrie/core"
-import { blocksOf } from "@pinetrie/rules"
+import { textBlocks } from "@pinetrie/rules"
 import type { Element, ElementContent, Root } from "hast"
 import { describe, expect, test } from "vitest"
 import {
   blobLookup,
-  blockAt,
+  findBlockElement,
   messageTree,
   safeUrl,
   tableHeads,
@@ -242,16 +242,16 @@ describe("tables", () => {
     ).toEqual(["table-0", "table-1"])
   })
 
-  test("blockAt finds a block by its number, and none past the count", () => {
+  test("findBlockElement finds a block by its number, and none past the count", () => {
     const tree = committed(TWO)
-    expect(blockAt(tree, { kind: "table", n: 1 })).toBe(
+    expect(findBlockElement(tree, { kind: "table", n: 1 })).toBe(
       elements(tree, "table")[1],
     )
-    expect(blockAt(tree, { kind: "table", n: 2 })).toBeNull()
+    expect(findBlockElement(tree, { kind: "table", n: 2 })).toBeNull()
   })
 
-  test("blocksOf numbers tables as the drawn tree does, and a table's slice is its source", () => {
-    const tables = blocksOf(TWO).filter(b => b.ref.kind === "table")
+  test("textBlocks numbers tables as the drawn tree does, and a table's slice is its source", () => {
+    const tables = textBlocks(TWO).filter(b => b.ref.kind === "table")
     expect(tables.map(b => b.ref.n)).toEqual(
       elements(committed(TWO), "table").map(t =>
         Number(String(t.properties.dataBlock).slice("table-".length)),
@@ -260,7 +260,7 @@ describe("tables", () => {
     expect(
       tables[0] === undefined ? null : TWO.slice(tables[0].from, tables[0].to),
     ).toBe("| State | When |\n|---|---|\n| **Working** | a run |")
-    const paragraphs = blocksOf("one\n\n![x](/blob/a)").map(b => b.ref)
+    const paragraphs = textBlocks("one\n\n![x](/blob/a)").map(b => b.ref)
     expect(paragraphs).toEqual([
       { kind: "paragraph", n: 0 },
       { kind: "paragraph", n: 1 },
@@ -270,7 +270,7 @@ describe("tables", () => {
 
   test("tableHeads is the header row's text, and empty without one", () => {
     const tree = committed(TWO)
-    const first = blockAt(tree, { kind: "table", n: 0 })
+    const first = findBlockElement(tree, { kind: "table", n: 0 })
     expect(first === null ? null : tableHeads(first)).toEqual(["State", "When"])
     expect(
       tableHeads({

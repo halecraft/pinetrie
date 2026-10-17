@@ -31,11 +31,11 @@ import type { LaneRegistry } from "./registry.ts"
 import type { Ready } from "./setup.ts"
 import {
   applySettle,
+  changeReason,
   createUpdates,
   type Prepared,
   planCatchUp,
   planSettle,
-  reasonOf,
   type Settle,
   withLaneStarted,
 } from "./update.ts"
@@ -67,7 +67,7 @@ const registryWith = (history: LaneHistory, own = true) => {
 
 const LANE = threadIdFor("0123456789abcdef")
 
-describe("reasonOf", () => {
+describe("changeReason", () => {
   test("a revision's reason is its message, attributed to its author or the agent; else its first line", () => {
     const doc = newRootDoc()
     const ada = encodeMessage(
@@ -90,13 +90,13 @@ describe("reasonOf", () => {
     )
     const index = readTreeIndex(doc)
     const of = (entry: string) =>
-      reasonOf(
+      changeReason(
         index,
         revisionMessage({ title: "t", entry: entryId(entry), lane: LANE }),
       )
     expect(of("e1")).toBe("Ada: rename the flag")
     expect(of("e2")).toBe("agent: renamed it")
-    expect(reasonOf(index, "a commit of yours\n\nwith a body")).toBe(
+    expect(changeReason(index, "a commit of yours\n\nwith a body")).toBe(
       "a commit of yours",
     )
   })

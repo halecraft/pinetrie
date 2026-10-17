@@ -13,7 +13,7 @@ import { buildError } from "./cli.ts"
 import {
   type DockerHostFacts,
   dockerWords,
-  imagePathOf,
+  imageEnvPath,
   isRootless,
   type Listed,
   labelled,
@@ -399,9 +399,9 @@ describe("the sweeps", () => {
   })
 })
 
-test("imagePathOf: an image's PATH, else the standard one", () => {
-  expect(imagePathOf(["A=1", "PATH=/a:/b"])).toBe("/a:/b")
-  expect(imagePathOf(null)).toBe(
+test("imageEnvPath: an image's PATH, else the standard one", () => {
+  expect(imageEnvPath(["A=1", "PATH=/a:/b"])).toBe("/a:/b")
+  expect(imageEnvPath(null)).toBe(
     "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
   )
 })

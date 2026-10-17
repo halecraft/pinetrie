@@ -10,6 +10,7 @@ import {
   type CardRecord,
   type EntryId,
   ERR,
+  entryThread,
   type ForeignLane,
   type Gated,
   type LaneRecord,
@@ -21,7 +22,6 @@ import {
   refused,
   type ThreadId,
   type TreeIndex,
-  threadAt,
   type WriterId,
 } from "@pinetrie/core"
 import { archivedIn, writesIn } from "./archive.ts"
@@ -32,8 +32,8 @@ import {
   heldIn,
   holdingWords,
   runsIn,
+  runThreads,
   type ThreadHolding,
-  threadsOf,
 } from "./held.ts"
 
 declare const clearedBrand: unique symbol
@@ -103,11 +103,11 @@ export function planGate<C extends Gated>(
   ]
   if (unread.length > 0) return { kind: "read", roots: unread }
   const held = heldIn(
-    threadsOf(
+    runThreads(
       at,
       (root, entry) => {
         const read = facts.roots.get(root)
-        return read === undefined ? null : threadAt(read.index, entry)
+        return read === undefined ? null : entryThread(read.index, entry)
       },
       facts.canvases.forkOf,
     ),

@@ -46,7 +46,7 @@ export const mutations: readonly Mutation[] = [
     to: "          ok: true,\n          value: undefined,",
     command: unit,
     expect:
-      "toolContextOf: no access is no lane, named by the project's root, whose every call is refused",
+      "laneToolContext: no access is no lane, named by the project's root, whose every call is refused",
   },
   // ── the lanes suite, proven in a lane ──
   {

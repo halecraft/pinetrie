@@ -54,7 +54,7 @@ test("@pinetrie/lanes names jj as a command nowhere but its image check", () => 
 test("@pinetrie/lanes exports none of jj's names", () => {
   const moved = [
     "bookmarkName",
-    "bookmarkOf",
+    "readLaneBookmark",
     "commitTurn",
     "conflictsIn",
     "copyFacts",

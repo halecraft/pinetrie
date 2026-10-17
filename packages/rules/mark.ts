@@ -15,7 +15,7 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import { Type } from "typebox"
-import { decodeAt, parseCanvasKey } from "./decode.ts"
+import { decodeRecord, parseCanvasKey } from "./decode.ts"
 import { NOTE_COLUMN } from "./note-column.ts"
 import { deleteRecord, type RecordSpec, setRecord } from "./records.ts"
 
@@ -34,7 +34,7 @@ export const MARK: RecordSpec<MarkRecord, CanvasId, "session"> = {
   keyOf: r => r.canvas,
   encode: ({ canvas, ...contents }) => contents,
   decode: (contents, key) =>
-    decodeAt(MarkSchema, contents, parseCanvasKey(key), (r, canvas) => ({
+    decodeRecord(MarkSchema, contents, parseCanvasKey(key), (r, canvas) => ({
       canvas,
       title: r.title,
       // A writer id always starts `w-` (`writerId`), so neither is read as the other.

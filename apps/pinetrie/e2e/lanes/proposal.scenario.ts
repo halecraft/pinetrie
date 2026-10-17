@@ -4,11 +4,11 @@
 // presser's message; the press leaves a fact in the proposing thread.
 
 import {
+  entryThread,
   PROPOSE_TOOL,
   projectTranscript,
   ROOT,
   type ThreadId,
-  threadAt,
   threadEnd,
 } from "@pinetrie/core"
 import { scriptedModel } from "@pinetrie/pi"
@@ -16,7 +16,7 @@ import { readPlaces, readThreads } from "@pinetrie/reads"
 import { cardsOnCanvas } from "@pinetrie/rules"
 import { newThreadId } from "@pinetrie/session"
 import type { Checks } from "../checks.ts"
-import { canvasHolding, START_AGENT, treeOf, waitFor } from "../harness.ts"
+import { canvasHolding, heldTree, START_AGENT, waitFor } from "../harness.ts"
 import { inLane, type LaneHosts } from "../lane-hosts.ts"
 import type { Scenario } from "../scenario.ts"
 
@@ -48,11 +48,11 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     ])
     await user.send("@agent split it", ROOT, START_AGENT)
     await idle()
-    const tree = treeOf(host)
+    const tree = heldTree(host)
     const result = Object.values(tree.entries).find(
       e => e.message?.proposal !== undefined,
     )?.id
-    const parent = result === undefined ? null : threadAt(tree, result)
+    const parent = result === undefined ? null : entryThread(tree, result)
     const root =
       parent === null ? undefined : readThreads(host.session).get(parent)?.root
     if (result === undefined || parent === null || root === undefined)
@@ -75,7 +75,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       ],
     })
     await idle()
-    const after = treeOf(host)
+    const after = heldTree(host)
     const ids = cardsOnCanvas(readPlaces(host.places), canvas).map(c => c.id)
     const at = ids.indexOf(parent)
     const prompts = threads.map(t => {
@@ -102,7 +102,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     // The fact reaches the proposing thread once it is idle.
     let said: readonly string[] = []
     await waitFor(() => {
-      const now = treeOf(host)
+      const now = heldTree(host)
       said = projectTranscript(now, threadEnd(now, parent))
         .filter(m => m.role === "fact")
         .map(m => m.text)

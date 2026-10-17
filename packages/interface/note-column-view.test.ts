@@ -14,7 +14,7 @@ import {
   NEW_NOTES_TITLE,
 } from "@pinetrie/rules"
 import { expect, test } from "vitest"
-import { noteColumnsOf } from "./note-column-view.ts"
+import { canvasNoteColumns } from "./note-column-view.ts"
 
 const ADA = writerId("ada@x.io")
 const CANVAS = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000c")
@@ -53,7 +53,7 @@ const cardsFor = (...ids: (typeof A | typeof N1)[]): readonly CardOnCanvas[] =>
     CANVAS,
   )
 
-test("noteColumnsOf: each note column in the canvas's order, its title or Notes, its notes in order", () => {
+test("canvasNoteColumns: each note column in the canvas's order, its title or Notes, its notes in order", () => {
   const note = (id: string, column: typeof N1, order: string): CardRecord => ({
     kind: "text",
     id: textCardId(id),
@@ -64,7 +64,7 @@ test("noteColumnsOf: each note column in the canvas's order, its title or Notes,
   })
   const n1 = note(cardIdFor("c1"), N1, "b")
   const n2 = note(cardIdFor("c2"), N1, "a")
-  const views = noteColumnsOf({
+  const views = canvasNoteColumns({
     onCanvas: cardsFor(A, N2, N1),
     cards: [n1, n2],
     titles: new Map([[N1, { column: N1, title: "Ideas", by: ADA, at: 1 }]]),

@@ -40,15 +40,15 @@ import {
   canvasHolding,
   committedProject,
   FIXTURE_PACKAGES,
+  heldLanes,
+  heldTree,
   idleNow,
   idOfText,
   join,
-  lanesOf,
   readJjProposedByLane,
   SUITE_CONFIG,
   setUpAccepted,
   suitePlaces,
-  treeOf,
   waitFor,
 } from "../harness.ts"
 import { inLaneQuiet, type LaneHosts } from "../lane-hosts.ts"
@@ -313,9 +313,9 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         await visibility("hidden")
         const bo = await join(askHost, "bo", "asks")
         script.use([{ text: "Back to you." }])
-        const lane = lanesOf(
+        const lane = heldLanes(
           askHost,
-          treeOf(askHost),
+          heldTree(askHost),
           readPlaces(askHost.places),
         )[0]
         await bo.send(
@@ -595,7 +595,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         )
         await pp.click(`${card} .proposal-send`)
         const started = () => {
-          const index = treeOf(proposeHost)
+          const index = heldTree(proposeHost)
           return Object.values(index.entries)
             .filter(e => e.message?.role === "person")
             .map(e => messageText(e.message))
@@ -2045,7 +2045,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           await starter.send("@agent a long one elsewhere", ROOT, {
             mode: "branch",
           })
-          const newRoot = treeOf(toolHost).roots.at(-1) ?? ""
+          const newRoot = heldTree(toolHost).roots.at(-1) ?? ""
           await appears("#bottom .state-working")
           const newCanvas = canvasHolding(toolHost, entryId(newRoot))
           await openBoard(tp)
@@ -2075,7 +2075,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         ])
         await say("read notes, again and again")
         await toolIdle()
-        const loopIndex = treeOf(toolHost)
+        const loopIndex = heldTree(toolHost)
         const loopRows = projectRail(
           loopIndex,
           loopIndex.roots.at(-1) ?? entryId(""),
@@ -2163,7 +2163,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
             `${col(0)} .msg[data-entry="${aside === null ? "none" : (trunk ?? "none")}"]`,
             { timeout: 15_000 },
           )
-          const rows = projectRail(treeOf(toolHost), railRoot)
+          const rows = projectRail(heldTree(toolHost), railRoot)
           // Later's first message begins its branch, a dot of its own; its
           // capsule starts at the message after.
           const laterHead = rows.find(r => r.parentId === trunk && r.head)

@@ -19,7 +19,7 @@ import {
   ROOT_ID,
   record,
   row,
-  writesOf,
+  writtenValues,
 } from "./fakes.ts"
 import type { Records } from "./records.ts"
 import { queueUpkeepOn } from "./roots.ts"
@@ -57,11 +57,11 @@ test("a root's record follows its document: a new entry refreshes it, once per b
   const { b, keeper, records, doc } = await setUp()
   // The refresh as the directory starts is over before the root changes.
   await keeper.idle()
-  const before = writesOf(records.calls).length
+  const before = writtenValues(records.calls).length
   writeEntry(doc, row("e1", null, said("plan the rail")))
   writeEntry(doc, row("e2", "e1", said("and the tabs")))
   await keeper.idle()
-  expect(writesOf(records.calls)).toHaveLength(before + 1)
+  expect(writtenValues(records.calls)).toHaveLength(before + 1)
   expect(readRoots(b.session).get(ROOT_ID)).toMatchObject({
     entry: "e1",
     firstLine: "plan the rail",
@@ -147,9 +147,12 @@ test("five changes to one root before its refresh starts read it once and write 
     return reads
   }
   const one = await readsFor(1, 1)
-  const written = writesOf(records.calls).length
+  const written = writtenValues(records.calls).length
   const five = await readsFor(5, 2)
-  expect([five, writesOf(records.calls).length]).toEqual([one, written + 1])
+  expect([five, writtenValues(records.calls).length]).toEqual([
+    one,
+    written + 1,
+  ])
 })
 
 test("a root loaded when the directory starts is refreshed, and an unchanged record is not written again", async () => {

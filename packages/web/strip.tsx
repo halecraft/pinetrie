@@ -22,9 +22,9 @@ import {
   type ColumnMatches,
   type Column as ColumnSpec,
   type ColumnView,
+  cardDetail,
   cardOfFace,
   columnReadOnly,
-  detailOf,
   dropProps,
   foldedView,
   type Intent,
@@ -164,7 +164,7 @@ export function Strip(p: {
   const endDrop = canvasDrop(p.onCanvas.at(-1)?.id ?? null)
   const cardColumn = (item: CardColumn): ReactElement | null => {
     const folded =
-      detailOf("canvas", item.folded) === "face"
+      cardDetail("canvas", item.folded) === "face"
         ? foldedView(item, {
             threadFaceOf: p.threadFaceOf,
             notes: p.noteViews,

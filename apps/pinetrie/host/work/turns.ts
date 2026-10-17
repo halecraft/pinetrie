@@ -7,16 +7,16 @@ import {
   type EntryId,
   firstLine,
   messageText,
+  messageToolCalls,
   NO_SHARED,
   nearestRevision,
   type PointId,
-  promptOf,
   type RevisionRecord,
+  runPrompt,
   type SnapshotId,
   snapshotId,
   type ThreadId,
   type TreeIndex,
-  toolCallsOf,
   turnEntry,
   turnMerged,
 } from "@pinetrie/core"
@@ -37,13 +37,13 @@ import type { SharedLineages } from "./shared.ts"
 const TITLE_LENGTH = 72
 
 /** The title a revision is described with: the message's first line, or its first call in words (`callLabel`). */
-export function titleOf(index: TreeIndex, entry: EntryId): string {
+export function revisionTitle(index: TreeIndex, entry: EntryId): string {
   const text = firstLine(
     messageText(index.entries[entry]?.message),
     TITLE_LENGTH,
   )
   if (text !== "") return text
-  const call = toolCallsOf(index.entries[entry]?.message)[0]
+  const call = messageToolCalls(index.entries[entry]?.message)[0]
   return call === undefined ? "turn" : callLabel(call, "cut")
 }
 
@@ -129,8 +129,9 @@ export function createTurns(deps: {
         const doc = await held.ready
         const index = readTreeIndex(doc)
         const entry = turnEntry(index, tip)
-        const isPrompt = promptOf(index, entry) === entry
-        const toolCalls = toolCallsOf(index.entries[entry]?.message).length > 0
+        const isPrompt = runPrompt(index, entry) === entry
+        const toolCalls =
+          messageToolCalls(index.entries[entry]?.message).length > 0
         // A `catch_up` in the turn moved the bookmark: read from the tree, so a
         // restart before this record changes nothing.
         const merged = turnMerged(index, tip)
@@ -161,7 +162,10 @@ export function createTurns(deps: {
           conflicts,
           follow,
         } = await registry.withHistory(lane, h =>
-          h.recordTurn({ title: titleOf(readTreeIndex(doc), entry), entry }),
+          h.recordTurn({
+            title: revisionTitle(readTreeIndex(doc), entry),
+            entry,
+          }),
         )
         const planned = planTurnRecord({
           entry,

@@ -280,7 +280,7 @@ export const mutations: readonly Mutation[] = [
     from: '  [...new Set(trailerValues(message, "source"))].map(commitId)',
     to: '  [...new Set(trailerValues(message, "source").slice(-1))].map(commitId)',
     command: unit,
-    expect: "sourcesOf reads every paragraph of a squash",
+    expect: "messageSources reads every paragraph of a squash",
   },
   {
     name: "an ask of LONG_ASK agent messages is short",
@@ -400,12 +400,12 @@ export const mutations: readonly Mutation[] = [
     expect: "draws only its root's tree",
   },
   {
-    name: "rootOf stops one below the root",
+    name: "treeRoot stops one below the root",
     file: tree,
     from: "  return ancestry(index, id).path.at(-1) ?? null",
     to: "  return ancestry(index, id).path.at(-2) ?? null",
     command: unit,
-    expect: "rootOf walks up to the root",
+    expect: "treeRoot walks up to the root",
   },
   {
     name: "a summary's newest is its first message",
@@ -691,7 +691,7 @@ export const mutations: readonly Mutation[] = [
     from: "  return TOOL_IDS.find(id => id === name)",
     to: "  return (name in SUBJECTS ? name : undefined) as ToolId | undefined",
     command: unit,
-    expect: "toolIdOf knows every registered tool, and nothing else",
+    expect: "knownToolId knows every registered tool, and nothing else",
   },
   {
     name: "a title keeps its line break",
@@ -737,7 +737,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a thread's first message is its first entry, drawn or not",
     file: "packages/core/tree.ts",
-    from: "    if (messageAt(index, id) !== null) return id\n",
+    from: "    if (entryMessage(index, id) !== null) return id\n",
     to: "    return id\n",
     command: unit,
     expect:
@@ -795,7 +795,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a move goes from nowhere",
     file: places,
-    from: "  return { card: card.id, from: keyOf(card.place), to }",
+    from: "  return { card: card.id, from: placeKey(card.place), to }",
     to: "  return { card: card.id, from: null, to }",
     command: unit,
     expect: "a move goes from where the card is",
@@ -830,7 +830,7 @@ export const mutations: readonly Mutation[] = [
     from: "  [GREP_TOOL]: searched,\n  [FIND_TOOL]: searched,\n",
     to: "  [GREP_TOOL]: undefined,\n  [FIND_TOOL]: undefined,\n",
     command: unit,
-    expect: "subjectOf(grep",
+    expect: "callSubject(grep",
   },
   {
     name: "an acceptance need not say what it was shown",
@@ -939,7 +939,7 @@ export const mutations: readonly Mutation[] = [
     from: '  "stack",\n  "carry-on",\n  "fact",\n',
     to: '  "stack",\n  "fact",\n',
     command: unit,
-    expect: "messageAt: the host's own messages show as their line",
+    expect: "entryMessage: the host's own messages show as their line",
   },
   // ── paths compared as strings ──
   {
@@ -1189,7 +1189,7 @@ export const mutations: readonly Mutation[] = [
     to: '    reordered: true,\n    text: "doc",',
     command: unit,
     expect:
-      "a card's words are where its kind says (`KINDS`' text): textSourceOf agrees for every kind with records",
+      "a card's words are where its kind says (`KINDS`' text): cardTextSource agrees for every kind with records",
   },
   {
     name: "an ask's id is no card's",

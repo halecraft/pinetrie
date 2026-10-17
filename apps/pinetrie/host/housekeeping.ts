@@ -6,12 +6,12 @@
 import type { Store } from "@kyneta/exchange"
 import {
   type BlobStore,
+  cardTextSource,
   type EntryId,
   isTextCard,
   MOVES_DOC_PREFIX,
   type RevisionRecord,
   type Sha256,
-  textSourceOf,
 } from "@pinetrie/core"
 import {
   planSweep,
@@ -45,7 +45,7 @@ import type { LaneWork } from "./work/index.ts"
 /**
  * Delete the blobs nothing shows or quotes any more: gather every card's text
  * (`CardPort.texts` of the cards `places` holds) and every reference's quote
- * (`textSourceOf`), then the store's list and the session's references
+ * (`cardTextSource`), then the store's list and the session's references
  * (`readReferencedBlobs`: roots' blobs, banners and people's pictures), with
  * each one's fitted copy, with no await between them, `planSweep`, delete.
  */
@@ -63,7 +63,7 @@ export async function sweepBlobs(input: {
   const texts = (await input.texts(ids)).map(t => t.text)
   // A reference's quote is a blob its card holds.
   const quotes = cards.flatMap(c => {
-    const source = textSourceOf(c)
+    const source = cardTextSource(c)
     return source.kind === "blob" ? [source.sha] : []
   })
   const shown = new Set([...readReferencedBlobs(doc, texts), ...quotes])

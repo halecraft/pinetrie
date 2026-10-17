@@ -33,7 +33,7 @@ import {
 } from "./layout.ts"
 import { listProjects, recordProject, removeProject } from "./projects.ts"
 import type { LanehostCall, LanehostResult } from "./protocol.ts"
-import { moduleOf, planRoles, type Role, type RoleFacts } from "./roles.ts"
+import { callModule, planRoles, type Role, type RoleFacts } from "./roles.ts"
 
 /** Where a server runs: its role, the lanes directory, and what its machine grants. */
 export interface Serving {
@@ -55,7 +55,7 @@ export async function answer<C extends LanehostCall>(
   call: C,
   serving: Serving,
 ): Promise<LanehostResult<C>> {
-  const module = moduleOf(call)
+  const module = callModule(call)
   const role = planRoles(serving.facts).get(module)
   if (role !== serving.role)
     throw new Error(

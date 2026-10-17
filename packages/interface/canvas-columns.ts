@@ -10,11 +10,11 @@ import {
   type CardRecord,
   type CardWidth,
   type EntryId,
+  entryThread,
   type LaneView,
   type NoteColumnId,
   type ThreadId,
   type TreeIndex,
-  threadAt,
   type WriterId,
 } from "@pinetrie/core"
 import type { CardOnCanvas, ThreadOpening } from "@pinetrie/rules"
@@ -67,7 +67,7 @@ export const defaultView = (first: CardId | null): YourCanvasView => ({
 })
 
 /** The view of a canvas: as kept, else `defaultView` for its canvas. */
-export const viewOf = (
+export const keptTaskView = (
   views: ReadonlyMap<string, YourCanvasView>,
   canvas: string,
   cards: readonly CardOnCanvas[],
@@ -104,7 +104,7 @@ export interface CanvasColumn {
 export type Strip = readonly [CanvasColumn, ...CardColumn[]]
 
 /** `canvas`'s strip: its canvas column, folded as `view` says, then `columns`. */
-export const stripOf = (
+export const buildTaskStrip = (
   canvas: CanvasId,
   view: YourCanvasView,
   columns: readonly CardColumn[],
@@ -238,7 +238,7 @@ function foldAboveOf(
   const parent =
     first === undefined ? undefined : index.entries[first]?.parentId
   if (parent === undefined || parent === null) return null
-  const from = threadAt(index, parent)
+  const from = entryThread(index, parent)
   return from === null || onCanvas.has(from) ? null : thread
 }
 
@@ -248,7 +248,7 @@ const heldAt = (
   at: EntryId,
   holders: ReadonlyMap<ThreadId, WriterId>,
 ): Pick<UnstartedMode, "held"> => {
-  const thread = threadAt(index, at)
+  const thread = entryThread(index, at)
   const by = thread === null ? undefined : holders.get(thread)
   return thread === null || by === undefined ? {} : { held: { thread, by } }
 }

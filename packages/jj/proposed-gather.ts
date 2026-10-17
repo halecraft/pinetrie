@@ -27,14 +27,14 @@ import { readWipState } from "./accepted.ts"
 import { type CatchUpTarget, readCatchUp } from "./catch-up.ts"
 import { laneBase } from "./lane/base.ts"
 import { proposedBookmark, revsetName } from "./lane/names.ts"
-import { commitsOf, titlesOf } from "./lane/revisions.ts"
+import { readCommits, readTitles } from "./lane/revisions.ts"
 import { gatherLane } from "./lane-read.ts"
 import type { RepoOps, RepoReads } from "./owner.ts"
 import {
   filesTouched,
-  hostVersionOf,
   laneTipIn,
   query,
+  readHostVersion,
   readProposedChanges,
   startOfProposed,
 } from "./proposed.ts"
@@ -125,7 +125,7 @@ const placeFrom = (input: {
 }
 
 const commitOf = async (jj: Runner, bookmark: string) =>
-  (await commitsOf(jj, `present(${revsetName(bookmark)})`))[0] ?? null
+  (await readCommits(jj, `present(${revsetName(bookmark)})`))[0] ?? null
 
 /** A target of `kind` at `commit`; null when the bookmark names none. */
 const targetOf = (
@@ -229,7 +229,7 @@ async function readProposedAndHost(
     proposed,
     hostLeft:
       proposed === null &&
-      (await hostVersionOf(jj, proposedBookmark(name))) !== null,
+      (await readHostVersion(jj, proposedBookmark(name))) !== null,
   }
 }
 
@@ -336,7 +336,7 @@ export async function gatherAcceptance(
   const wipAhead =
     base.kind === "wip"
       ? (
-          await commitsOf(
+          await readCommits(
             jj,
             `::present(${revsetName(base.bookmark)}) ~ ::present(${revsetName(repoConfig.acceptedBookmark)})`,
           )
@@ -349,7 +349,7 @@ export async function gatherAcceptance(
   ])
     if (
       (
-        await commitsOf(
+        await readCommits(
           jj,
           `present(${revsetName(bookmark)}) & ::parents(${bottom.commit})`,
         )
@@ -370,7 +370,7 @@ export async function gatherStack(
 ): Promise<StackFacts | "no-top"> {
   const { jj } = ops
   if (stack.top === null) return "no-top"
-  const commits = await commitsOf(
+  const commits = await readCommits(
     jj,
     `(${stack.start.join(" | ")})..${stack.top}`,
   )
@@ -411,6 +411,6 @@ export async function gatherDescribe(
   const diff = (
     await reads.jj(["diff", "-r", commit, "--git"]).catch(() => null)
   )?.stdout
-  const recent = await titlesOf(reads.jj, "ancestors(@-, 20)").catch(() => [])
+  const recent = await readTitles(reads.jj, "ancestors(@-, 20)").catch(() => [])
   return { diff: diff ?? "", recent }
 }

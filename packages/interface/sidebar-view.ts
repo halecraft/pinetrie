@@ -10,7 +10,7 @@ import type {
   Workflow,
 } from "@pinetrie/core"
 import { PRODUCT_NAME } from "@pinetrie/core"
-import { threadNameOf } from "@pinetrie/rules"
+import { readableThreadName } from "@pinetrie/rules"
 import type { Moments, Status } from "./attention.ts"
 import {
   boardPlaceWords,
@@ -18,10 +18,10 @@ import {
   placeOnBoard,
 } from "./canvas-column-view.ts"
 import type { Intent } from "./intent.ts"
-import { type Here, type Layout, listOf, sameHere } from "./layout.ts"
+import { type Here, type Layout, sameHere, sidebarList } from "./layout.ts"
 import { type PageName, pageWords } from "./page.ts"
 import { type ColorSlot, canvasSlot } from "./palette.ts"
-import { type CanvasSummary, initialsOf, NO_TEXT } from "./root-label.ts"
+import { type CanvasSummary, labelInitials, NO_TEXT } from "./root-label.ts"
 import { newCanvasButton, type StartButton } from "./start-button.ts"
 import type { ThreadCardHead, ThreadMove } from "./thread-card.ts"
 import type { IconLookup, ThreadIcon } from "./thread-icon.ts"
@@ -92,7 +92,7 @@ export type ItemView = ItemCommon & {
 }
 
 export interface SidebarView {
-  /** The sidebar (`listOf`). */
+  /** The sidebar (`sidebarList`). */
   readonly items: readonly ItemView[]
   /** The item you are on, or null when the list lacks it. */
   readonly selected: ItemView | null
@@ -105,7 +105,7 @@ export interface SidebarViewInput {
   readonly active: Here
   /** Each canvas's thread card header (`threadCardHeads`), which the board reads too. */
   readonly heads: ReadonlyMap<CanvasId, ThreadCardHead>
-  /** Each canvas's summary (`summariesOf`): the rename field's placeholder. */
+  /** Each canvas's summary (`taskSummaries`): the rename field's placeholder. */
   readonly summaries: ReadonlyMap<CanvasId, CanvasSummary>
   readonly marks: ReadonlyMap<CanvasId, MarkRecord>
   /** Canvases in the archive. */
@@ -119,7 +119,7 @@ export interface SidebarViewInput {
 }
 
 export function sidebarView(input: SidebarViewInput): SidebarView {
-  const all = listOf(input.layout)
+  const all = sidebarList(input.layout)
   const items = all.map(here => itemView(here, input))
   return {
     items,
@@ -179,7 +179,7 @@ function itemIcon(head: ThreadCardHead, input: SidebarViewInput): ItemIcon {
   if (icon !== undefined) return { kind: "icon", icon }
   return {
     kind: "initials",
-    letters: initialsOf(head.label),
+    letters: labelInitials(head.label),
     slot: canvasSlot(head.canvas),
   }
 }
@@ -248,7 +248,7 @@ export const pageTitle = (
 
 /**
  * The threads with open proposed changes, by their canvas, each as people read it
- * (`threadNameOf`), named or not: what archiving that canvas withdraws, and what
+ * (`readableThreadName`), named or not: what archiving that canvas withdraws, and what
  * a thread card's ⇡ names. `openProposed` are the open proposed changes
  * (`appView`'s); one whose thread is in no canvas is left out.
  */
@@ -263,7 +263,7 @@ export function openProposedByCanvas(
     if (canvas !== undefined)
       byCanvas.set(canvas, [
         ...(byCanvas.get(canvas) ?? []),
-        threadNameOf(names, lane),
+        readableThreadName(names, lane),
       ])
   }
   return byCanvas

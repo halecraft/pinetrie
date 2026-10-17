@@ -14,10 +14,10 @@ import {
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
-import { threadCardOf } from "@pinetrie/rules/fixtures"
+import { landedThreadCard } from "@pinetrie/rules/fixtures"
 import { describe, expect, test } from "vitest"
 import { LEVELS, type Status } from "./attention.ts"
-import { canvasesWith, entry, indexOf } from "./fixtures.ts"
+import { canvasesWith, entry, indexEntries } from "./fixtures.ts"
 import { initialLayout, type Layout } from "./layout.ts"
 import {
   elsewhereWords,
@@ -55,7 +55,7 @@ const said = (id: string, parentId: string | null): EntryLike =>
   entry(id, parentId, { role: "user", content: `text of ${id}` })
 /** Two roots: e1 -> e2, and g1. */
 const tree = (...more: EntryLike[]): TreeIndex =>
-  indexOf([said("e1", null), said("e2", "e1"), said("g1", null), ...more])
+  indexEntries([said("e1", null), said("e2", "e1"), said("g1", null), ...more])
 /** The thread an entry of the fixtures is in; `gone` is in none. */
 const threadOf = (at: string) =>
   at.startsWith("e")
@@ -111,7 +111,7 @@ const canvases = canvasesWith({
     ).map(
       ([thread, r], i) =>
         ({
-          ...threadCardOf({ thread, canvas: K(r), by: ADA, cards: [] }),
+          ...landedThreadCard({ thread, canvas: K(r), by: ADA, cards: [] }),
           place: { kind: "canvas", canvas: K(r), order: `a${i}`, width: 1 },
         }) as CardRecord,
     ),

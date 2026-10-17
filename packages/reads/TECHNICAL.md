@@ -145,7 +145,7 @@ Kyneta has let go.
   a read that needs only runs and tips uses `readRunning` and
   `readLaneNames`, as `readAgentActivity` does.
 - **`readLanes`' `askedBy`** is the writer of the message a running lane is
-  answering, its run's prompt (`promptOf`, the ask, ADR-0106), when a
+  answering, its run's prompt (`runPrompt`, the ask, ADR-0106), when a
   person's message started it; or else who queued its first card. A land,
   stack or carry-on message names no one. It is what a `conflict` names.
 - **`readLanes`' `lastWaiting`** is who queued the lane's last card: a card

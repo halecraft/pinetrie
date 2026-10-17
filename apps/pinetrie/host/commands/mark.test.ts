@@ -8,7 +8,7 @@ import {
   putNoteColumn,
   putValue,
   record,
-  writesOf,
+  writtenValues,
 } from "../fakes.ts"
 import { handleMark, type MarkDeps } from "./mark.ts"
 
@@ -27,7 +27,7 @@ test("clearing a canvas's title removes its mark", async () => {
     title: null,
   })
   expect(out).toEqual({ kind: "marked" })
-  expect(writesOf(scribe.calls)).toEqual([deleteRecord(MARK, CANVAS_ID)])
+  expect(writtenValues(scribe.calls)).toEqual([deleteRecord(MARK, CANVAS_ID)])
 })
 
 test("a canvas the session does not hold takes no title", async () => {
@@ -58,7 +58,7 @@ test("a note column on a canvas takes its title in its own record", async () => 
     title: "Ideas",
   })
   expect(out).toEqual({ kind: "marked" })
-  expect(writesOf(scribe.calls)).toEqual([
+  expect(writtenValues(scribe.calls)).toEqual([
     setRecord(NOTE_COLUMN, { column, title: "Ideas", by: ada, at: 1_000 }),
   ])
 })

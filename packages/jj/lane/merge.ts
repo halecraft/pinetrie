@@ -12,9 +12,9 @@
 
 import {
   type BaseTrailer,
-  baseOf,
   type CommitId,
-  sourcesOf,
+  messageBase,
+  messageSources,
   type ThreadId,
   trailerRevset,
 } from "@pinetrie/core"
@@ -37,16 +37,16 @@ import {
 import {
   ACCEPTED_THREAD_COMMIT_ROW,
   changedPaths,
-  commitsOf,
   commitToBookmark,
-  conflictedFilesAt,
   parseAcceptedThreadCommits,
-  titlesOf,
+  readCommits,
+  readConflictedFiles,
+  readTitles,
 } from "./revisions.ts"
 
 /** The lane's bookmark's commit; throws when it has none. */
 async function laneHead(jj: Runner, lane: ThreadId): Promise<CommitId> {
-  const [ours] = await commitsOf(jj, bookmarkRevset(bookmarkName(lane)))
+  const [ours] = await readCommits(jj, bookmarkRevset(bookmarkName(lane)))
   if (ours === undefined) throw new Error(`lane ${lane} has no bookmark`)
   return ours
 }
@@ -59,7 +59,7 @@ async function newOn(
 ): Promise<CommitId> {
   const made = await jj(["new", ...parents, "-m", message])
   if (!made.ok) throw new Error(describeFailure("jj new", made))
-  const [at] = await commitsOf(jj, "@")
+  const [at] = await readCommits(jj, "@")
   if (at === undefined) throw new Error("jj new left no working copy")
   return at
 }
@@ -105,11 +105,11 @@ async function acceptedThreadCommitsAbove(
   if (!ran.ok) throw new Error(describeFailure("jj log", ran))
   const accepted = parseAcceptedThreadCommits(ran.stdout).map(t => ({
     acceptedThreadCommit: t.commit,
-    sources: sourcesOf(t.description),
+    sources: messageSources(t.description),
   }))
   const named = [...new Set(accepted.flatMap(t => t.sources))]
   if (named.length === 0) return { accepted, held: new Set() }
-  const held = await commitsOf(
+  const held = await readCommits(
     jj,
     `(${named.map(s => `present(${s})`).join(" | ")}) & ::${ours}`,
   )
@@ -143,7 +143,7 @@ async function joinAcceptedThreadCommits(
       ],
       join.message,
     )
-    if ((await commitsOf(jj, `${at} & conflicts()`)).length > 0) {
+    if ((await readCommits(jj, `${at} & conflicts()`)).length > 0) {
       const dropped = await jj(["abandon", at])
       if (!dropped.ok) throw new Error(describeFailure("jj abandon", dropped))
       continue
@@ -176,7 +176,7 @@ export async function mergeBase(
 }> {
   // gather
   const ours = await laneHead(jj, lane)
-  const missing = await commitsOf(jj, `${from} ~ ::${ours}`)
+  const missing = await readCommits(jj, `${from} ~ ::${ours}`)
   if (missing.length === 0) return { ours, merge: null, joined: [] }
   const { accepted, held } = await acceptedThreadCommitsAbove(jj, ours, from)
   // plan
@@ -204,7 +204,7 @@ async function markBase(
  * A lane's base as its history says it: the newest commit in
  * `::rev` whose message carries a base trailer, read with `jj` (the lane's,
  * or your repo's on the lane's tip). Its value names accepted work, or a WIP
- * by its bookmark (`baseOf`, by `wipPrefix`), and the commit it pointed at;
+ * by its bookmark (`messageBase`, by `wipPrefix`), and the commit it pointed at;
  * null for a lane with none, one from before accepted work.
  */
 export async function newestBase(
@@ -217,7 +217,7 @@ export async function newestBase(
     } & BaseTrailer)
   | null
 > {
-  const [at] = await commitsOf(
+  const [at] = await readCommits(
     jj,
     `latest(heads(::(${rev}) & ${trailerRevset(["base"])}))`,
   )
@@ -232,7 +232,7 @@ export async function newestBase(
     "description",
   ])
   if (!ran.ok) throw new Error(describeFailure("jj log", ran))
-  const base = baseOf(ran.stdout, wipPrefix)
+  const base = messageBase(ran.stdout, wipPrefix)
   return base === null ? null : { at, ...base }
 }
 
@@ -270,7 +270,7 @@ async function restoreInto(
 export async function conflictsIn(jj: Runner): Promise<string[]> {
   const snap = await jj(["util", "snapshot"])
   if (!snap.ok) throw new Error(describeFailure("jj util snapshot", snap))
-  return conflictedFilesAt(jj, "@")
+  return readConflictedFiles(jj, "@")
 }
 
 /**
@@ -347,7 +347,7 @@ export async function mergeUpdate(
 ): Promise<MergedOf<CommitId>> {
   await executeOrThrow(plan.steps, runners)
   const [from] =
-    plan.source === "copy" ? await commitsOf(jj, "@-") : [plan.source]
+    plan.source === "copy" ? await readCommits(jj, "@-") : [plan.source]
   if (from === undefined) throw new Error("the WIP's copy is missing")
   const {
     ours,
@@ -378,7 +378,7 @@ export async function mergeUpdate(
       ours,
       merge,
       files: await changedPaths(jj, ours, merge),
-      commits: await titlesOf(
+      commits: await readTitles(
         jj,
         withoutAcceptedThreadCommits(
           `${plan.came.from ?? ours}..${plan.came.to}`,

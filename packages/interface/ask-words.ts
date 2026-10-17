@@ -3,14 +3,14 @@
 import {
   type AskOutcome,
   type EntryId,
+  entryMessage,
   firstLine,
-  messageAt,
   type TranscriptMessage,
   type TreeIndex,
   type WriterId,
 } from "@pinetrie/core"
 import type { AskView } from "./ask-view.ts"
-import { count, listOf, plural } from "./counts.ts"
+import { count, listPhrase, plural } from "./counts.ts"
 import type { WorkStats } from "./work-stats.ts"
 
 /** How long an ask's first line is shown. */
@@ -39,7 +39,7 @@ export function askLine(
   ask: EntryId | null,
   nameOf: (writer: WriterId) => string,
 ): string | null {
-  const prompt = ask === null ? null : messageAt(index, ask)
+  const prompt = ask === null ? null : entryMessage(index, ask)
   return prompt === null ? null : askWords(prompt, nameOf)
 }
 
@@ -66,7 +66,7 @@ export function workWords(
   const from =
     stats.writers.length === 0
       ? ""
-      : ` from ${listOf(stats.writers.map(nameOf))}`
+      : ` from ${listPhrase(stats.writers.map(nameOf))}`
   const took = stats.last - stats.first
   return [
     stats.people > 0 ? `${plural(stats.people, "message")}${from}` : "",

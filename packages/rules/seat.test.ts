@@ -1,6 +1,6 @@
 import { type SeatRecord, writerId } from "@pinetrie/core"
 import { expect, test } from "vitest"
-import { recordsOf, setRecord } from "./records.ts"
+import { decodeRecords, setRecord } from "./records.ts"
 import { planSeatSweep, planSeats, SEAT, writersOfClients } from "./seat.ts"
 
 const ADA = writerId("ada@x.io")
@@ -47,11 +47,11 @@ test("a seat round-trips at its peer; a malformed one is dropped", () => {
     SEAT.decode({ clientId: "7", writer: "x", at: 1 }, "p-7"),
   ).toBeUndefined()
   expect([
-    ...recordsOf(SEAT, [w, { key: "p-8", value: "junk" }]).values(),
+    ...decodeRecords(SEAT, [w, { key: "p-8", value: "junk" }]).values(),
   ]).toEqual([seat(7)])
 })
 
 test("a seat stored under its clientId reads with that address as its peer, where a delete finds it", () => {
   const old = { key: "7", value: { clientId: 7, writer: ADA, at: 7 } }
-  expect(recordsOf(SEAT, [old]).get("7")).toEqual({ ...seat(7), peer: "7" })
+  expect(decodeRecords(SEAT, [old]).get("7")).toEqual({ ...seat(7), peer: "7" })
 })

@@ -5,7 +5,7 @@
 import { hasPosition, POSITION, type Position } from "@kyneta/schema"
 import type { TextCardId } from "@pinetrie/core"
 import {
-  insertAt,
+  insertSnippet,
   type Selection,
   shareSelection,
   shareStatus,
@@ -79,13 +79,13 @@ export function useShareFiles(target: ShareTarget | null): {
     setRefused(uploads.flatMap(u => (u.ok ? [] : [u.reason])))
     const now = t.box.current
     if (snippets.length === 0 || now === null) return
-    // `insertAt` decides the text, a line of its own for each share; the
+    // `insertSnippet` decides the text, a line of its own for each share; the
     // element is given it as one edit over the place, as typing would.
     const before = now.value
     const place = anchor(before.length)
     const start = Math.min(place.start, before.length)
     const end = Math.min(Math.max(place.end, start), before.length)
-    const after = insertAt(before, place, snippets.join("\n")).text
+    const after = insertSnippet(before, place, snippets.join("\n")).text
     now.setRangeText(
       after.slice(start, after.length - (before.length - end)),
       start,

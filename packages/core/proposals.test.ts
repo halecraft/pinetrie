@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest"
-import { entriesOf, entry } from "./fixtures.ts"
+import { entriesById, entry } from "./fixtures.ts"
 import {
   branchesByProposal,
   type EntryLike,
@@ -48,7 +48,7 @@ const ADA = writerId("ada@x.io")
 const RESULT = entryId("3-r")
 /** A run that proposes, then answers; then a later run of the same thread. */
 const answered = indexTree(
-  entriesOf([
+  entriesById([
     entry("1-p", null, personMessage()),
     entry("2-a", "1-p", calls("c1")),
     entry("3-r", "2-a", proposed("c1")),
@@ -59,7 +59,7 @@ const answered = indexTree(
 )
 /** A run a Stop ended right after the proposal's result. */
 const stopped = indexTree(
-  entriesOf([
+  entriesById([
     entry("1-p", null, personMessage()),
     entry("2-a", "1-p", calls("c1")),
     entry("3-r", "2-a", proposed("c1")),
@@ -112,7 +112,7 @@ describe("proposalState", () => {
 
   test("is spent once a thread record names it, with the presser and each branch by row", () => {
     const started = indexTree(
-      entriesOf([
+      entriesById([
         ...Object.values(answered.entries),
         entry("7-c", "4-a", personMessage("@agent do two"), {
           thread: threadIdFor("b"),

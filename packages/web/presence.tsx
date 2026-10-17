@@ -8,10 +8,10 @@
 
 import {
   blobUrl,
+  messageWriters,
   type Sha256,
   type TreeIndex,
   type WriterId,
-  writersOf,
 } from "@pinetrie/core"
 import { stringHash } from "@pinetrie/interface"
 import { displayName } from "@pinetrie/rules"
@@ -31,7 +31,7 @@ const hashed = (writer: WriterId): string =>
 
 /**
  * Writers in the order they joined: by their first message in the session
- * (`writersOf`), then those who have only named themselves, by id. Every
+ * (`messageWriters`), then those who have only named themselves, by id. Every
  * window reads the same document, so every window gives each person the same
  * colour.
  */
@@ -39,7 +39,7 @@ export function writerOrder(
   index: TreeIndex,
   named: Iterable<WriterId>,
 ): readonly WriterId[] {
-  const wrote = writersOf(
+  const wrote = messageWriters(
     index,
     Object.values(index.entries).map(e => e.id),
   )

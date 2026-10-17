@@ -25,7 +25,7 @@ import {
   canvasRole,
   NEW_NOTES_TITLE,
   trashDeadline,
-  trashedAt,
+  trashedTime,
 } from "@pinetrie/rules"
 import { type ControlWords, who } from "./card-words.ts"
 import { agoWords, spanWords, until } from "./counts.ts"
@@ -58,7 +58,7 @@ export function placeOnBoard(
 export interface CanvasColumnView {
   readonly canvas: CanvasId
   readonly folded: boolean
-  /** Its label: its title, else its first card's (`labelsOf`). */
+  /** Its label: its title, else its first card's (`taskLabels`). */
   readonly label: string
   /** Its stored title, or null: what the rename field starts with. */
   readonly titled: string | null
@@ -92,7 +92,7 @@ export interface TrashRow {
   readonly title: string
   /** Who trashed it: its placer. */
   readonly by: WriterId
-  /** How long ago it was trashed (`trashedAt`). */
+  /** How long ago it was trashed (`trashedTime`). */
   readonly ageMs: number
   /**
    * How long until the sweep deletes it (`trashDeadline`), at least 0, once
@@ -142,7 +142,7 @@ export function canvasTrash(input: {
           card,
           title,
           by: c.placer,
-          ageMs: now - trashedAt(c.id, input.histories, now),
+          ageMs: now - trashedTime(c.id, input.histories, now),
           deletesInMs: left <= trashWarnMs(keepMs) ? left : null,
         },
       },

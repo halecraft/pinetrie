@@ -43,7 +43,7 @@ export function decodeWith<S extends TSchema, T>(
  * the address as one of the key readers below gives it, or undefined when
  * the address is malformed, and then so is the record.
  */
-export function decodeAt<S extends TSchema, K, T>(
+export function decodeRecord<S extends TSchema, K, T>(
   schema: S,
   contents: unknown,
   key: K | undefined,

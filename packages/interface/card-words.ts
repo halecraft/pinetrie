@@ -14,10 +14,10 @@ import type {
 } from "@pinetrie/core"
 import {
   catchUpName,
+  changeVerb,
   displayName,
   type PinnedStatus,
   type Verb,
-  verbOf,
 } from "@pinetrie/rules"
 import type { CardNotice } from "@pinetrie/session"
 import type { CardTone } from "./card-frame.ts"
@@ -316,7 +316,7 @@ export function historyWords(event: CardEvent, reader: Reader): string {
     case "moved":
     case "undone":
     case "redone": {
-      const verb = PARTICIPLE[verbOf(event.from, event.to)]
+      const verb = PARTICIPLE[changeVerb(event.from, event.to)]
       const undo =
         event.kind === "undone"
           ? " (an undo)"

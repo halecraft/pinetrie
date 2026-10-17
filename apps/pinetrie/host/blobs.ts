@@ -23,7 +23,7 @@ import {
   storedText,
   TEXT_MIME,
 } from "@pinetrie/core"
-import { prepareImage, sha256Of } from "@pinetrie/pi"
+import { blobSha256, prepareImage } from "@pinetrie/pi"
 import { isUtf8Text } from "@pinetrie/rules"
 
 /** The largest body `POST /blob` reads. */
@@ -47,7 +47,7 @@ export function memoryBlobs(now: () => number = Date.now): BlobStore {
   const blobs = new Map<Sha256, StoredBlob & { touched: number }>()
   const fits = new Map<Sha256, Sha256>()
   const keep = (blob: StoredBlob): BlobRef => {
-    const sha = sha256Of(blob.bytes)
+    const sha = blobSha256(blob.bytes)
     const held = blobs.get(sha) ?? blob
     blobs.set(sha, { ...held, touched: now() })
     return refOf(sha, held)
@@ -157,7 +157,7 @@ export function sqliteBlobs(
   const unfit = db.prepare("DELETE FROM pinetrie_blob_fits WHERE original = ?")
   const refOfSha = (sha: Sha256) => rowRef(ref.get(sha) as Row | undefined)
   const keep = (blob: StoredBlob): BlobRef => {
-    const sha = sha256Of(blob.bytes)
+    const sha = blobSha256(blob.bytes)
     put.run(
       sha,
       blob.mimeType,

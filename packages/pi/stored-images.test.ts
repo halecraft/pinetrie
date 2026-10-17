@@ -17,7 +17,7 @@ import {
 } from "@pinetrie/core"
 import { newRootDoc } from "@pinetrie/schema/fixtures"
 import { describe, expect, test } from "vitest"
-import { sha256Of } from "./images.ts"
+import { blobSha256 } from "./images.ts"
 import { KynetaStorage } from "./storage.ts"
 import { rejoinImages, splitImages } from "./stored-images.ts"
 import {
@@ -58,7 +58,7 @@ function mapBlobs(): {
   })
   return {
     put(image) {
-      const sha = sha256Of(image.bytes)
+      const sha = blobSha256(image.bytes)
       blobs.set(sha, image)
       return refOf(sha, image)
     },

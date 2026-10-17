@@ -3,13 +3,13 @@
 
 import {
   type EntryId,
-  messageAt,
+  entryMessage,
+  messageWriters,
   type RevisionRecord,
   resultsOn,
   type ToolCall,
   type TreeIndex,
   type WriterId,
-  writersOf,
 } from "@pinetrie/core"
 
 /**
@@ -66,7 +66,7 @@ export function workStats(
     )
       between.push(at)
   }
-  return statsOf(index, ids, between, revisions)
+  return entriesWorkStats(index, ids, between, revisions)
 }
 
 /**
@@ -74,7 +74,7 @@ export function workStats(
  * message (tool results), for their failures and their times. Files are the
  * paths the messages' turns' revision records name.
  */
-export function statsOf(
+export function entriesWorkStats(
   index: TreeIndex,
   messages: readonly EntryId[],
   others: readonly EntryId[],
@@ -94,7 +94,7 @@ export function statsOf(
     if (t !== undefined) times.push(t)
   }
   for (const id of messages) {
-    const message = messageAt(index, id)
+    const message = entryMessage(index, id)
     if (message?.role !== "assistant") people += 1
     calls.push(...(message?.toolCalls ?? []))
     const record = revisions.get(id)
@@ -109,7 +109,7 @@ export function statsOf(
   const results = resultsOn(index, others)
   return {
     people,
-    writers: writersOf(index, messages),
+    writers: messageWriters(index, messages),
     agent: messages.length - people,
     calls: calls.length,
     failed: calls.filter(c => results.get(c.id)?.isError === true).length,

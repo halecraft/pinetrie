@@ -356,7 +356,7 @@ export type MessageAt =
     }
 
 /** A send's mode, from where it goes. */
-export const modeOf = (at: MessageAt): SendMode =>
+export const chatMode = (at: MessageAt): SendMode =>
   at.kind === "end" ? "reply" : "branch"
 
 /**
@@ -384,8 +384,8 @@ export type Send = Omit<Extract<Intent, { readonly kind: "send" }>, "at"> & {
 export type Gated = Intent | Send
 
 /** How the host plans a send, from where it goes. */
-export const planModeOf = (at: SendAt): PlanMode =>
-  at.kind === "queue" ? "queue" : modeOf(at)
+export const planMode = (at: SendAt): PlanMode =>
+  at.kind === "queue" ? "queue" : chatMode(at)
 
 /**
  * How an opened thread starts. A branch at `at` in its root, its card just
@@ -557,7 +557,7 @@ export type Intent =
   /**
    * Move cards, create one, or remove one: one move, or a keep's several,
    * accepted whole or refused. The host records it in a canvas's history of the
-   * sender's moves (`historyOf`); `here`, the canvas its sender is on, is a
+   * sender's moves (`movesHistory`); `here`, the canvas its sender is on, is a
    * discard's from an inventory.
    */
   | {
@@ -949,7 +949,7 @@ export type Said = "needsYou" | "worthARead" | "done"
 
 /**
  * How a thread's last run ended: what happened, never what it asks of whom.
- * Each client decides that for its person (`levelOf`).
+ * Each client decides that for its person (`verdictLevel`).
  */
 export type Verdict =
   /** The run has stopped running, and the model has not answered yet. */
@@ -2057,7 +2057,7 @@ export const NOBODY: Responder = { kind: "none" }
 
 /**
  * The characters of a mention's handle: any letter or digit, in any script,
- * and `_` or `-`. `parseMentions` and `handleOf` share it, so every name that
+ * and `_` or `-`. `parseMentions` and `mentionHandle` share it, so every name that
  * can be shown can be typed as a mention.
  */
 const HANDLE_CHARS = "\\p{L}\\p{N}_\\-"
@@ -2153,7 +2153,7 @@ export function typedMention(text: string, caret: number): TypedMention | null {
  * characters only. "Ada Lovelace" is `@adalovelace`, "O'Brien" is `@obrien`,
  * "José" is `@josé`, "日本" is `@日本`.
  */
-export const handleOf = (name: string): string =>
+export const mentionHandle = (name: string): string =>
   name
     .normalize("NFC")
     .toLowerCase()
@@ -2257,9 +2257,9 @@ export function mentionTargets(
     [THE_AGENT, { kind: "agent" }],
   ])
   for (const agent of agents)
-    targets.set(handleOf(agent.name), { kind: "thread", agent })
+    targets.set(mentionHandle(agent.name), { kind: "thread", agent })
   for (const name of participants) {
-    const handle = handleOf(name)
+    const handle = mentionHandle(name)
     if (targets.get(handle)?.kind !== "thread")
       targets.set(handle, { kind: "person", name })
   }
@@ -2295,7 +2295,7 @@ export function address(input: {
   for (const m of input.mentions) {
     // Only `@agent` as typed names the agent (`parseMentions`).
     if (m.kind !== "person") continue
-    const target = targets.get(handleOf(m.name))
+    const target = targets.get(mentionHandle(m.name))
     if (target?.kind === "thread") {
       const { member, thread } = target.agent
       const into = member ? asks : invites
@@ -2327,7 +2327,7 @@ export const MAX_NAME_LENGTH = 40
  */
 export function normalizeName(name: string): string | undefined {
   const n = name.trim()
-  const handle = handleOf(n)
+  const handle = mentionHandle(n)
   return n.length === 0 ||
     n.length > MAX_NAME_LENGTH ||
     handle === "" ||

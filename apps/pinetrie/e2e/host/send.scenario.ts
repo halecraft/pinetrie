@@ -13,13 +13,13 @@ import { readStreams } from "@pinetrie/schema"
 import type { Checks } from "../checks.ts"
 import {
   at,
+  heldLanes,
+  heldTree,
   idleNow,
   join,
-  lanesOf,
   START_AGENT,
   START_CHAT,
   suiteModel,
-  treeOf,
   waitFor,
   withHost,
 } from "../harness.ts"
@@ -34,7 +34,7 @@ async function run(check: Checks["check"]): Promise<void> {
   await withHost(
     { model: { kind: "scripted", script }, log: () => {} },
     async host => {
-      const tree = () => treeOf(host)
+      const tree = () => heldTree(host)
       const idle = () => waitFor(() => idleNow(host), 60_000)
       /** The path to `tip`, as "role:text" (chat as "Name:text"). */
       const shape = (tip: EntryId | null) =>
@@ -53,7 +53,7 @@ async function run(check: Checks["check"]): Promise<void> {
       await client.send("@agent hello", ROOT, START_AGENT)
       await idle()
       unsample()
-      const lane = lanesOf(host, tree(), readPlaces(host.places))[0]
+      const lane = heldLanes(host, tree(), readPlaces(host.places))[0]
       const first = shape(lane?.tip ?? null)
       check(
         "the thread reads the message, then the agent's reply",
@@ -88,7 +88,7 @@ async function run(check: Checks["check"]): Promise<void> {
         at(one.kind === "appended" ? one.id : null),
       )
       await idle()
-      const asked = lanesOf(host, tree(), readPlaces(host.places)).find(l =>
+      const asked = heldLanes(host, tree(), readPlaces(host.places)).find(l =>
         projectTranscript(tree(), l.tip).some(m =>
           m.text.includes("who told us"),
         ),

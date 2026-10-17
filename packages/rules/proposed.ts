@@ -5,7 +5,6 @@ import {
   type AcceptanceDecision,
   type AcceptanceFacts,
   type CommitId,
-  changeIdsOf,
   commitId,
   type DescribeDecision,
   ERR,
@@ -23,13 +22,14 @@ import {
   type RefreshDecision,
   type RefreshFacts,
   type RevisionFacts,
+  revisionChangeIds,
   type StackFacts,
   type ThreadBase,
   type ThreadId,
   type ThreadName,
 } from "@pinetrie/core"
 import { type Static, Type } from "typebox"
-import { CommitSchema, decodeAt, PointSchema, threadKey } from "./decode.ts"
+import { CommitSchema, decodeRecord, PointSchema, threadKey } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 
 const JjProposedChangesSchema = Type.Object({
@@ -97,7 +97,7 @@ export const PROPOSED_CHANGES: RecordSpec<
                 },
         },
   decode: (contents, key) =>
-    decodeAt(
+    decodeRecord(
       Type.Union([JjProposedChangesSchema, FolderProposedChangesSchema]),
       contents,
       threadKey(key),
@@ -563,7 +563,7 @@ export function planStackEnded(input: {
       target: place.target,
       start: input.stack.start,
     },
-    changeIds: proposed === null ? [] : changeIdsOf(proposed),
+    changeIds: proposed === null ? [] : revisionChangeIds(proposed),
     sources: facts.revisions,
   }
 }
@@ -586,7 +586,7 @@ export function planRebuild(
     kind: "rebuild",
     name,
     place,
-    changeIds: changeIdsOf(proposed),
+    changeIds: revisionChangeIds(proposed),
     sources,
   }
 }

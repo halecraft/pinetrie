@@ -12,9 +12,9 @@ import {
 } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
 import { expect, test } from "vitest"
-import { IN_COLUMN, sendPendingOf } from "./card-moves.ts"
+import { IN_COLUMN, pendingSend } from "./card-moves.ts"
 import { TEST_ROOT } from "./fixtures.ts"
-import { columnMessageAt, planSendRequest, startsRoot } from "./send.ts"
+import { columnMessageTarget, planSendRequest, startsRoot } from "./send.ts"
 
 const TEST_THREAD = threadIdFor("e")
 const TEST_CANVAS = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000c")
@@ -87,20 +87,20 @@ test("a chat fills in what its column left out, and carries each card's version 
   })
 })
 
-test("columnMessageAt: a reply continues its thread from the end it shows; a branch, or a send at the root, starts it", () => {
+test("columnMessageTarget: a reply continues its thread from the end it shows; a branch, or a send at the root, starts it", () => {
   const thread = threadIdFor("x")
-  expect(columnMessageAt("reply", thread, at, TEST_CANVAS)).toEqual({
+  expect(columnMessageTarget("reply", thread, at, TEST_CANVAS)).toEqual({
     kind: "end",
     thread,
     seen: "e-1",
   })
-  expect(columnMessageAt("branch", thread, at, TEST_CANVAS)).toEqual({
+  expect(columnMessageTarget("branch", thread, at, TEST_CANVAS)).toEqual({
     kind: "branch",
     thread,
     at: "e-1",
     canvas: TEST_CANVAS,
   })
-  expect(columnMessageAt("reply", thread, ROOT, TEST_CANVAS)).toEqual({
+  expect(columnMessageTarget("reply", thread, ROOT, TEST_CANVAS)).toEqual({
     kind: "branch",
     thread,
     at: null,
@@ -130,7 +130,7 @@ test("a send with no card is not drawn; one from a card draws the card out of it
   })
   expect(fromCard.id).toBe("f-1")
   expect(fromCard.pending).toEqual(
-    sendPendingOf("f-1", card.id, IN_COLUMN("col-1")),
+    pendingSend("f-1", card.id, IN_COLUMN("col-1")),
   )
 })
 

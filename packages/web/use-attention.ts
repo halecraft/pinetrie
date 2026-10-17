@@ -17,14 +17,14 @@ import {
 } from "@pinetrie/core"
 import {
   arrivals,
-  attentionOf,
+  attentionItems,
   canvasStatus,
   doneThreads,
   type Item,
   type Layout,
   type Level,
   type Moments,
-  markOf,
+  markLevel,
   type OpenProposedChanges,
   type SshAsk,
   type Status,
@@ -42,11 +42,11 @@ import {
 } from "react"
 
 interface AttentionView {
-  /** Everything raised for you (`attentionOf`). */
+  /** Everything raised for you (`attentionItems`). */
   readonly items: readonly Item[]
   /** Each canvas's (`canvasStatus`). */
   readonly status: ReadonlyMap<CanvasId, Status>
-  /** ▦'s: the highest status of canvases not in the sidebar (`markOf`). */
+  /** ▦'s: the highest status of canvases not in the sidebar (`markLevel`). */
   readonly elsewhere: Level | null
   readonly arrivals: Moments
 }
@@ -122,7 +122,7 @@ export function useAttention(input: {
     const ended = new Set(
       [...doneThreads(facts)].flatMap(t => input.canvasOfThread.get(t) ?? []),
     )
-    return { items: attentionOf(facts), done: ended }
+    return { items: attentionItems(facts), done: ended }
   }, [
     input.me,
     writers,
@@ -144,7 +144,8 @@ export function useAttention(input: {
     [items, input.work, input.verdicts, input.canvasOfThread],
   )
   const elsewhere = useMemo(
-    () => markOf(status, unlisted(input.layout, input.archived, status.keys())),
+    () =>
+      markLevel(status, unlisted(input.layout, input.archived, status.keys())),
     [input.layout, input.archived, status],
   )
   return {

@@ -79,7 +79,7 @@ const KEYWORDS: ReadonlySet<string> = new Set([
 ])
 
 /** The source in runs by role; their texts join to `source`. */
-export function spansOf(
+export function roleSpans(
   source: string,
   parsed: ParsedScript,
 ): readonly ShellSpan[] {

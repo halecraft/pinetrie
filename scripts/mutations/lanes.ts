@@ -536,7 +536,7 @@ export const mutations: readonly Mutation[] = [
     from: "): string => specHash(runtime.runSpec(shape))",
     to: "): string => specHash([shape.name])",
     command: unit,
-    expect: "specHashOf: the hash of the runtime's spec",
+    expect: "shapeSpecHash: the hash of the runtime's spec",
   },
   {
     name: "a lane's home is the image's",

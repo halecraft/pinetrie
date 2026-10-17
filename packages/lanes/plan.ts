@@ -336,7 +336,7 @@ export const specHash = (spec: unknown): string =>
   createHash("sha256").update(JSON.stringify(spec)).digest("hex").slice(0, 16)
 
 /** The spec hash `runtime` labels `shape`'s container with. */
-export const specHashOf = (
+export const shapeSpecHash = (
   runtime: Pick<LaneRuntime, "runSpec">,
   shape: ContainerShape,
 ): string => specHash(runtime.runSpec(shape))

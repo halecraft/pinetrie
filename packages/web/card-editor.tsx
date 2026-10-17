@@ -27,7 +27,7 @@ import type {
   ThreadLane,
 } from "@pinetrie/core"
 import {
-  commandOf,
+  cardCommand,
   type ListKey,
   type TextCard,
   type TextCardId,
@@ -66,12 +66,12 @@ import {
   spent,
   startText,
   startWords,
-  tokensOf,
+  textTokens,
 } from "@pinetrie/interface"
 import { type QueuedText, writersOfClients } from "@pinetrie/rules"
 import { textClients } from "@pinetrie/schema"
 import {
-  columnMessageAt,
+  columnMessageTarget,
   IN_COLUMN,
   newCardId,
   type SessionClient,
@@ -86,7 +86,7 @@ import {
 } from "react"
 import { bindText, useCardBox } from "./card-box.ts"
 import { CardFrame } from "./card-frame.tsx"
-import { pastedFilesOf } from "./clipboard.ts"
+import { eventPastedFiles } from "./clipboard.ts"
 import { useFocusClaim } from "./focus-claim.ts"
 import { Menu } from "./menu.tsx"
 import { useThreadStates } from "./thread-states.ts"
@@ -124,7 +124,7 @@ export function CardEditor(p: {
   place: TextPlace | undefined
   /** Where the message attaches: the column's end, or its branch point. */
   at: Position
-  /** The thread's lane (`laneOf`): whether the agent is busy there. */
+  /** The thread's lane (`threadLane`): whether the agent is busy there. */
   lane: ThreadLane
   /**
    * What every send from this column carries: its thread, and a new canvas's
@@ -203,7 +203,7 @@ export function CardEditor(p: {
   } | null>(null)
   /** The WIP a new lane of its own starts from; null for accepted work. */
   const [base, setBase] = useState<string | null>(null)
-  const command = card === undefined ? null : commandOf(card)
+  const command = card === undefined ? null : cardCommand(card)
   const plan = planSend({
     text,
     unstarted: p.unstarted,
@@ -283,7 +283,7 @@ export function CardEditor(p: {
     const id = p.onSend()
     const outcome = await session.send(
       message,
-      columnMessageAt(as, thread, p.at, canvas),
+      columnMessageTarget(as, thread, p.at, canvas),
       {
         ...how,
         ...(id === undefined ? {} : { id }),
@@ -656,12 +656,12 @@ export function BoundCardEditor(p: {
   )
 }
 
-/** A paste that brings files shares them instead (`pastedFilesOf`). */
+/** A paste that brings files shares them instead (`eventPastedFiles`). */
 function sharePasted(
   e: ClipboardEvent<HTMLTextAreaElement>,
   share: ((files: readonly File[]) => void) | null,
 ): void {
-  const files = pastedFilesOf(e)
+  const files = eventPastedFiles(e)
   if (files.length === 0 || share === null) return
   e.preventDefault()
   share(files)
@@ -933,7 +933,7 @@ export function PinnedCardEditor(p: {
       among={p.among}
       card={card}
       catchUps={p.catchUps}
-      foot={<span className="pinned-size">{sizeWords(tokensOf(text))}</span>}
+      foot={<span className="pinned-size">{sizeWords(textTokens(text))}</span>}
       onAct={p.onAct}
       onDiscard={() => p.onAct({ kind: "discard", card: card.id })}
       onText={setText}

@@ -1,14 +1,14 @@
 // Which of pi's indexes a replayed change invalidates (`dirtyFrom`), and how
-// one changeset's changes fold into a scope (`scopeOf`, `join`).
+// one changeset's changes fold into a scope (`dirtyScope`, `join`).
 import { describe, expect, test } from "vitest"
 import {
   CLEAN,
   dirtyFrom,
+  dirtyScope,
   EVERYTHING,
   isClean,
   join,
   type Scope,
-  scopeOf,
 } from "./dirty.ts"
 
 /** A path, as Kyneta's segments present one: each answers `coord()`. */
@@ -69,7 +69,7 @@ describe("dirtyFrom: only pi's fields are re-indexed", () => {
   })
 })
 
-describe("scopeOf and join", () => {
+describe("dirtyScope and join", () => {
   const change = (field: string, set: Record<string, unknown>) => ({
     path: { segments: at(field) },
     change: map(set),
@@ -85,21 +85,21 @@ describe("scopeOf and join", () => {
   test("a changeset's keys are united per field; a whole-document change is everything", () => {
     expect(
       keys(
-        scopeOf([
+        dirtyScope([
           change("entries", { b: 1 }),
           change("entries", { a: 1 }),
           change("streams", { s: 1 }),
         ]),
       ),
     ).toEqual({ entries: ["a", "b"], usageRows: [], values: [], lists: [] })
-    expect(scopeOf([change("values", { v: 1 }), { change: {} }])).toBe(
+    expect(dirtyScope([change("values", { v: 1 }), { change: {} }])).toBe(
       EVERYTHING,
     )
   })
 
   test("join unites keys; all absorbs keys on either side; CLEAN changes nothing", () => {
-    const some = scopeOf([change("values", { v1: 1 })])
-    const more = scopeOf([change("values", { v2: 1 })])
+    const some = dirtyScope([change("values", { v1: 1 })])
+    const more = dirtyScope([change("values", { v2: 1 })])
     expect(keys(join(some, more)).values).toEqual(["v1", "v2"])
     expect(join(some, EVERYTHING).values).toBe("all")
     expect(join(EVERYTHING, some).values).toBe("all")

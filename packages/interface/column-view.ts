@@ -14,10 +14,11 @@ import {
   type CardRecord,
   type CommandSummary,
   type ConflictRecord,
-  commandOf,
-  conflictAskedAt,
+  cardCommand,
+  conflictAskTime,
   type DiffSpan,
   type EntryId,
+  entryThread,
   firstLine,
   type IconsRecord,
   type LaneRecord,
@@ -30,8 +31,8 @@ import {
   type ProjectRecord,
   type ProposedChangesRecord,
   pinnedInView,
-  promptOf,
   type RevisionRecord,
+  runPrompt,
   type SetupRecord,
   type StateRecord,
   type TextPlace,
@@ -40,7 +41,6 @@ import {
   type ThreadLane,
   type ThreadName,
   type TreeIndex,
-  threadAt,
   type WriterId,
 } from "@pinetrie/core"
 import {
@@ -48,7 +48,7 @@ import {
   baseMovedOn,
   type CatchUpNow,
   catchUpName,
-  catchUpOf,
+  catchUpNow,
   displayName,
   type FilesLostRecord,
   type ParentNow,
@@ -313,7 +313,7 @@ export interface ColumnFacts {
   /** Every ask (`indexAsks`), from the same moment as `index`. */
   readonly asks: AskIndex
   readonly view: ColumnView
-  /** The column's thread's lane (`laneOf`). */
+  /** The column's thread's lane (`threadLane`). */
   readonly lane: ThreadLane
   /** The composer's next send would create a lane. */
   readonly createsLane: boolean
@@ -347,7 +347,7 @@ export interface ColumnShows {
   readonly reserve: ReserveStep
   /** The thread's base when it is not accepted work, worded; null otherwise. */
   readonly base: string | null
-  /** Catching up would change files in the thread (`catchUpOf`'s `brings`). */
+  /** Catching up would change files in the thread (`catchUpNow`'s `brings`). */
   readonly behind: { readonly mark: string; readonly title: string } | null
   /** The thread this one branched from, and where both stand; null for none. */
   readonly parent: ParentNow | null
@@ -420,14 +420,14 @@ export function columnView(f: ColumnFacts): ColumnShows {
 
 /**
  * The header's mark for a thread whose base has new work for it: catching
- * up would change files (`catchUpOf`'s `brings`). Its title says how many,
+ * up would change files (`catchUpNow`'s `brings`). Its title says how many,
  * and adds the jj facts, the bookmark and both commits.
  */
 export function behindMark(
   base: BaseRecord | undefined,
   accepted: AcceptedRecord | null,
 ): ColumnShows["behind"] {
-  const now = catchUpOf(base, accepted)
+  const now = catchUpNow(base, accepted)
   if (now.kind !== "brings") return null
   const { move } = now
   return {
@@ -597,7 +597,7 @@ function proposedItem(
   const { entry, row } = fork.proposal
   const title = f.index.entries[entry]?.message?.proposal?.branches[row]?.title
   if (title === undefined) return null
-  const lane = threadAt(f.index, entry)
+  const lane = entryThread(f.index, entry)
   const agent = (lane === null ? undefined : f.work.names.get(lane)) ?? "agent"
   return { speaker: `${agent}'s proposal`, text: title }
 }
@@ -611,7 +611,7 @@ function sourceOf(f: ColumnFacts): HeadOrigin | null {
   const parentAt =
     fork?.at ?? (first === undefined ? null : index.parentOf(first))
   if (parentAt === null || index.entries[parentAt] === undefined) return null
-  const parent = threadAt(index, parentAt)
+  const parent = entryThread(index, parentAt)
   if (parent === null) return null
   const link = origins.linkOf(parent)
   const copied = fork?.how === "copy"
@@ -668,8 +668,8 @@ function workStrip(f: ColumnFacts, parent: ParentNow | null): WorkStrip | null {
   const accepted = work.accepted?.kind === "jj" ? work.accepted : null
   const view = workStripView({
     proposed,
-    activity: activityOf(f.index, lane),
-    asked: conflictAskedAt(f.index, lane.tip),
+    activity: laneActivity(f.index, lane),
+    asked: conflictAskTime(f.index, lane.tip),
     base,
     into:
       project.kind === "folder"
@@ -681,10 +681,10 @@ function workStrip(f: ColumnFacts, parent: ParentNow | null): WorkStrip | null {
       accepted?.wips.find(
         w => jjBase?.base.kind === "wip" && w.bookmark === jjBase.base.bookmark,
       )?.ahead ?? 0,
-    catchUp: catchUpOf(base ?? undefined, work.accepted),
+    catchUp: catchUpNow(base ?? undefined, work.accepted),
     untraced: (jjBase?.untraced.length ?? 0) > 0,
     queued: f.queued.flatMap(c => {
-      const command = commandOf(c)
+      const command = cardCommand(c)
       return command === null ? [] : [command]
     }),
     parent,
@@ -716,12 +716,12 @@ const proposedReview = (record: ProposedChangesRecord): ReviewTarget =>
       }
 
 /** What a lane runs now, as its proposed changes cares: a turn, a resolution, a split. */
-function activityOf(
+function laneActivity(
   index: TreeIndex,
   view: LaneView | undefined,
 ): Exclude<WorkStripActivity, "catch-up"> {
   if (view === undefined || !view.running) return "idle"
-  const prompt = promptOf(index, view.tip)
+  const prompt = runPrompt(index, view.tip)
   const role =
     prompt === null ? undefined : index.entries[prompt]?.message?.role
   return role === "land" ? "resolution" : role === "stack" ? "split" : "turn"
@@ -987,7 +987,7 @@ export function composerPlace(
  * shows only while a card is dragged; in the strip once it has one. None
  * while that box is open, and none where no card can be pinned.
  */
-export const newPinAt = (f: {
+export const newPinPlace = (f: {
   readonly canPin: boolean
   readonly pinning: boolean
   readonly pinned: number
@@ -1117,4 +1117,4 @@ export const pinnedStatus = (
 }
 
 /** A text's size in tokens, as pi estimates it: four characters a token. */
-export const tokensOf = (text: string): number => Math.ceil(text.length / 4)
+export const textTokens = (text: string): number => Math.ceil(text.length / 4)

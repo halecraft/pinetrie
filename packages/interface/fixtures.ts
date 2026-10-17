@@ -13,18 +13,18 @@ import {
   indexTree,
   NO_CONTENT,
   rootIdFor,
-  rootOf,
   type ThreadCard,
   type ThreadId,
   type ThreadRecord,
   type TreeIndex,
   textCardId,
   threadIdFor,
+  treeRoot,
   writerId,
 } from "@pinetrie/core"
 import {
   canvasCard,
-  entriesOf,
+  entriesById,
   entry,
   withThreads,
 } from "@pinetrie/core/fixtures"
@@ -32,7 +32,7 @@ import type { ClipLookups } from "./effects.ts"
 import type { Focus } from "./focus.ts"
 
 export {
-  entriesOf,
+  entriesById,
   entry,
   fromParents,
   threadOfEntry,
@@ -45,8 +45,8 @@ import { type Canvases, canvasesOnBoard } from "./canvases.ts"
  * The index of `list`, keyed by each entry's own id as the reads key them,
  * in threads as a branch writes them (`withThreads`).
  */
-export const indexOf = (list: Iterable<EntryLike>): TreeIndex =>
-  indexTree(withThreads(entriesOf(list)))
+export const indexEntries = (list: Iterable<EntryLike>): TreeIndex =>
+  indexTree(withThreads(entriesById(list)))
 
 /**
  * A tree of chat messages from `child: parent` pairs, each message's text its
@@ -56,7 +56,7 @@ export const tree = (
   parents: Record<string, string | null>,
   sends: Record<string, string> = {},
 ): TreeIndex =>
-  indexOf(
+  indexEntries(
     Object.entries(parents).map(([id, parentId]) =>
       entry(id, parentId, {
         role: "person",
@@ -129,7 +129,7 @@ export function canvasesFor(
   for (const [thread, first] of [...index.firstOf].sort(([a], [b]) =>
     a < b ? -1 : a > b ? 1 : 0,
   )) {
-    const root = rootOf(index, first)
+    const root = treeRoot(index, first)
     const canvas = pairs.find(([, entry]) => entry === root)?.[0]
     if (canvas === undefined) continue
     cards.push({

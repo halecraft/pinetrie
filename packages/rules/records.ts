@@ -104,7 +104,7 @@ export function deleteRecord<R, K extends string>(
 }
 
 /** Stored values -> each decoded record, by its address; malformed ones dropped. */
-export function recordsOf<R, K extends string>(
+export function decodeRecords<R, K extends string>(
   spec: RecordSpec<R, K>,
   values: Iterable<{ readonly key: string; readonly value: unknown }>,
 ): ReadonlyMap<K, R> {
@@ -121,7 +121,7 @@ export const recordsIn = <R, K extends string>(
   spec: RecordSpec<R, K>,
   namespace: Readonly<Record<string, unknown>>,
 ): ReadonlyMap<K, R> =>
-  recordsOf(
+  decodeRecords(
     spec,
     Object.entries(namespace).map(([key, value]) => ({ key, value })),
   )

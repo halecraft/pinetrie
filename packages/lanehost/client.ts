@@ -6,7 +6,7 @@
 
 import type { Channel } from "@pinetrie/channel"
 import type { LanehostCall, LanehostHello, LanehostResult } from "./protocol.ts"
-import { moduleOf, planRoles, type Role, type RoleFacts } from "./roles.ts"
+import { callModule, planRoles, type Role, type RoleFacts } from "./roles.ts"
 
 export type LanehostChannel = Channel<
   LanehostHello,
@@ -58,7 +58,7 @@ export function lanehostClient(input: {
     roles.catch(() => {
       roles = null
     })
-    const role = (await roles).get(moduleOf(call))
+    const role = (await roles).get(callModule(call))
     if (role === undefined) throw new Error(`no role serves ${call.kind}`)
     return role
   }

@@ -10,10 +10,10 @@ import {
   DISCARDED,
   type EntryId,
   entryId,
+  entryThread,
   ROOT,
   type TextCardId,
   type ThreadId,
-  threadAt,
 } from "@pinetrie/core"
 import { scriptedModel } from "@pinetrie/pi"
 import { PLACES_DOC_ID } from "@pinetrie/protocol/messages"
@@ -42,9 +42,10 @@ import type { Checks } from "../checks.ts"
 import {
   at,
   canvasHolding,
+  heldLaneNames,
+  heldTree,
   idleNow,
   join,
-  laneNamesOf,
   lateFor,
   queueCard,
   refusedWrite,
@@ -52,7 +53,6 @@ import {
   startSuiteHost,
   threadHolding,
   tipIn,
-  treeOf,
   unqueueCard,
   waitFor,
 } from "../harness.ts"
@@ -85,7 +85,7 @@ async function run(check: Checks["check"]): Promise<void> {
       bea.request({ kind: "name", name: "Bea" }),
     ])
     const tipOf = () => {
-      const l = laneNamesOf(ch)[0]
+      const l = heldLaneNames(ch)[0]
       return l === undefined ? null : tipIn(ch, l)
     }
     const cIdle = () => waitFor(() => idleNow(ch), 30_000)
@@ -147,7 +147,7 @@ async function run(check: Checks["check"]): Promise<void> {
     await bea.send("@Ada two", at(tipOf()), { mode: "reply" })
     await cIdle()
     const grown = tipOf()
-    const idx = treeOf(ch)
+    const idx = heldTree(ch)
     const found = yourCard(
       ada.writer,
       { kind: "end", end: grown ?? entryId("") },
@@ -225,7 +225,7 @@ async function run(check: Checks["check"]): Promise<void> {
     // 4. The busy lane's queue. Bea sends Ada's card
     // there: the host queues it in the same step, as Bea's. Ada edits it while
     // it waits; Ada queues another and unqueues it.
-    const lane = (laneNamesOf(ch)[0] ?? "") as ThreadId
+    const lane = (heldLaneNames(ch)[0] ?? "") as ThreadId
     const c3 = newCard(ada, busyEnd, "@Ada the plan")
     await waitFor(
       () =>
@@ -251,7 +251,7 @@ async function run(check: Checks["check"]): Promise<void> {
     longOne.finish()
     await cIdle()
     await ch.quiet()
-    const index3 = treeOf(ch)
+    const index3 = heldTree(ch)
     const sent3 = Object.values(index3.entries).find(
       e =>
         e.message?.role === "person" &&
@@ -285,7 +285,7 @@ async function run(check: Checks["check"]): Promise<void> {
     void queueCard(ada, c6, lane)
     const popped = await waitFor(
       () =>
-        Object.values(treeOf(ch).entries).some(
+        Object.values(heldTree(ch).entries).some(
           e =>
             e.message?.role === "person" &&
             e.message.content === "@Bea while it is quiet",
@@ -315,7 +315,7 @@ async function run(check: Checks["check"]): Promise<void> {
       5_000,
     )
     await ch.quiet()
-    const sent7 = Object.values(treeOf(ch).entries).some(
+    const sent7 = Object.values(heldTree(ch).entries).some(
       e =>
         e.message?.role === "person" && e.message.content === "@Bea too quick",
     )
@@ -341,7 +341,7 @@ async function run(check: Checks["check"]): Promise<void> {
     const sent8 = await waitFor(
       () =>
         onHost(c8) === undefined &&
-        Object.values(treeOf(ch).entries).some(
+        Object.values(heldTree(ch).entries).some(
           e =>
             e.message?.role === "person" &&
             e.message.content === "@Bea wait for me",
@@ -387,11 +387,13 @@ async function run(check: Checks["check"]): Promise<void> {
     ])
     await ada.send("@agent go on", at(pinEnd), { pinned: [pin] })
     await cIdle()
-    const prompt = Object.values(treeOf(ch).entries).find(
+    const prompt = Object.values(heldTree(ch).entries).find(
       e => e.message?.role === "person" && e.message.content === "@agent go on",
     )
     const parent =
-      prompt?.parentId == null ? undefined : treeOf(ch).entries[prompt.parentId]
+      prompt?.parentId == null
+        ? undefined
+        : heldTree(ch).entries[prompt.parentId]
     // The system prompt names the block too (`PINNED_RULE`): the entry starts with it.
     const cardsAt = readCards.findIndex(t => t.startsWith("<pinned-cards>"))
     check(
@@ -905,7 +907,7 @@ async function run(check: Checks["check"]): Promise<void> {
       card: c4,
     })
     await ch.quiet()
-    const index4 = treeOf(ch)
+    const index4 = heldTree(ch)
     const wrote4 = index4.bySend.get(SEND4)
     const msg4 = wrote4 === undefined ? undefined : index4.entries[wrote4]
     check(
@@ -977,7 +979,7 @@ async function run(check: Checks["check"]): Promise<void> {
     const released = await waitFor(
       () =>
         onHost(c9) === undefined &&
-        Object.values(treeOf(ch).entries).some(
+        Object.values(heldTree(ch).entries).some(
           e =>
             e.message?.role === "person" &&
             e.message.content === "@Ada after the restart",
@@ -1024,17 +1026,17 @@ async function run(check: Checks["check"]): Promise<void> {
       canvas: here,
     })
     const copyRecord = readThreads(ch.session).get(COPY)
-    const copyFirst = treeOf(ch).firstOf.get(COPY)
+    const copyFirst = heldTree(ch).firstOf.get(COPY)
     check(
       "a copy forks at its source's end, its card where it was dropped, and its first send branches there, its record naming its source",
       copied.kind === "moved" &&
         onHost(COPY)?.place.kind === "canvas" &&
         firstOfCopy.kind === "appended" &&
         copyFirst !== undefined &&
-        treeOf(ch).parentOf(copyFirst) === tipNow &&
+        heldTree(ch).parentOf(copyFirst) === tipNow &&
         copyRecord?.origin.kind === "fork" &&
         copyRecord.origin.how === "copy" &&
-        threadAt(treeOf(ch), copyRecord.origin.at) === lane,
+        entryThread(heldTree(ch), copyRecord.origin.at) === lane,
       `${copied.kind}; ${firstOfCopy.kind}; ${JSON.stringify(copyRecord?.origin)}`,
     )
     const put = await eve.moveCard(

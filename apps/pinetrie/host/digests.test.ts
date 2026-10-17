@@ -7,8 +7,8 @@ import {
 import { readVerdicts } from "@pinetrie/reads"
 import {
   DIGEST,
-  digestOf,
-  endReplyOf,
+  parseDigest,
+  parseEndReply,
   pendingVerdict,
   setRecord,
   VERDICT,
@@ -33,7 +33,7 @@ import {
   record,
   row,
   stepKeeper,
-  writesOf,
+  writtenValues,
 } from "./fakes.ts"
 import { createLater } from "./later.ts"
 import type { StepRecords } from "./records.ts"
@@ -122,7 +122,7 @@ test("a live digest waits for someone to read the thread", async () => {
   await digests.step(lane, entryId("e-2"), failed)
   await keeper.idle()
   expect(methods(pi.calls)).toEqual(["skill", "complete", "writeValues"])
-  expect(writesOf(pi.calls)).toEqual([
+  expect(writtenValues(pi.calls)).toEqual([
     setRecord(
       DIGEST,
       {
@@ -204,7 +204,7 @@ test.each([
     if (next) beginRun(b.live, lane, runId("r-2"))
     await digests.ended(ROOT_ID, lane, entryId("e-1"), failed)
     await keeper.idle()
-    expect(writesOf(pi.calls)).toEqual([FINAL])
+    expect(writtenValues(pi.calls)).toEqual([FINAL])
     const asked = pi.calls.find(c => c.method === "complete")?.args[0] as {
       user: string
     }
@@ -258,7 +258,7 @@ test.each([
       },
       ROOT_ID,
     )
-    expect(writesOf(pi.calls)).toEqual([cleared])
+    expect(writtenValues(pi.calls)).toEqual([cleared])
     putValue(b, cleared)
     const before = pi.calls.length
     await digests.ended(ROOT_ID, lane, entryId("e-1"), failed)
@@ -281,7 +281,7 @@ test("a short ask is not asked about", async () => {
 })
 
 test("the scripted model's answer is a digest, so the suites have one", () => {
-  expect(digestOf(SCRIPTED_DESCRIPTION)?.headline).toBe(SCRIPTED_DESCRIPTION)
+  expect(parseDigest(SCRIPTED_DESCRIPTION)?.headline).toBe(SCRIPTED_DESCRIPTION)
 })
 
 // ── a run's verdict ──────────────────────────────────────────────────────────
@@ -293,7 +293,10 @@ async function stopping(
 ) {
   const set = running(answer, enabled)
   await set.pending(lane, entryId("e-1"))
-  putValue(set.b, writesOf(set.pi.calls)[0] as Parameters<typeof putValue>[1])
+  putValue(
+    set.b,
+    writtenValues(set.pi.calls)[0] as Parameters<typeof putValue>[1],
+  )
   endRun(set.b.live, lane, runId("r-1"))
   return set
 }
@@ -349,7 +352,7 @@ test("with digests off, a run's end asks for its verdict alone, and no live dige
   expect(pi.calls.length).toBe(before)
   await digests.ended(ROOT_ID, lane, entryId("e-1"), failed)
   await keeper.idle()
-  expect(writesOf(pi.calls).at(-1)).toEqual(
+  expect(writtenValues(pi.calls).at(-1)).toEqual(
     setRecord(VERDICT, {
       lane,
       ask: entryId("e-1"),
@@ -372,7 +375,7 @@ test.each([
     const { pi, keeper, digests } = await stopping(answer, false)
     await digests.ended(ROOT_ID, lane, entryId("e-1"), failed)
     await keeper.idle()
-    expect(writesOf(pi.calls).at(-1)).toEqual(
+    expect(writtenValues(pi.calls).at(-1)).toEqual(
       setRecord(VERDICT, {
         lane,
         ask: entryId("e-1"),
@@ -396,11 +399,14 @@ test("a failed run's verdict is its error, and no verdict is asked for", async (
   )
   writeLaneTip(set.b.root, lane, entryId("e-5"))
   await set.pending(lane, entryId("e-1"))
-  putValue(set.b, writesOf(set.pi.calls)[0] as Parameters<typeof putValue>[1])
+  putValue(
+    set.b,
+    writtenValues(set.pi.calls)[0] as Parameters<typeof putValue>[1],
+  )
   await set.digests.ended(ROOT_ID, lane, entryId("e-1"), failed)
   await set.keeper.idle()
   expect(methods(set.pi.calls)).not.toContain("complete")
-  expect(writesOf(set.pi.calls).at(-1)).toEqual(
+  expect(writtenValues(set.pi.calls).at(-1)).toEqual(
     setRecord(VERDICT, {
       lane,
       ask: entryId("e-1"),
@@ -412,7 +418,7 @@ test("a failed run's verdict is its error, and no verdict is asked for", async (
 
 test("the scripted model answers a run's end with a verdict and a digest, so the suites have both", () => {
   expect(
-    endReplyOf(
+    parseEndReply(
       `${SCRIPTED_VERDICT}\n${SCRIPTED_DESCRIPTION}`,
       "verdict and digest",
     ),
@@ -433,10 +439,10 @@ test("a run's end answered after its canvas was archived writes nothing and open
     opened.push(id)
     return root(id)
   }
-  const written = writesOf(pi.calls).length
+  const written = writtenValues(pi.calls).length
   // Its canvas is archived while the model writes.
   archiveCanvas(b)
   answer.resolve("done\nFixed the rail.\n- `rail.tsx` draws it")
   await keeper.idle()
-  expect([writesOf(pi.calls).length, opened]).toEqual([written, []])
+  expect([writtenValues(pi.calls).length, opened]).toEqual([written, []])
 })

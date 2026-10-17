@@ -35,9 +35,9 @@ import {
   planStartFrom,
   type Step,
   sessionFiles,
+  shapeSpecHash,
   slotMounts,
   specHash,
-  specHashOf,
 } from "./plan.ts"
 
 const LANE = threadIdFor("1")
@@ -290,15 +290,15 @@ describe("planShape: a lane's container, as any runtime would make it", () => {
   })
 })
 
-test("specHashOf: the hash of the runtime's spec, changed when it changes", () => {
+test("shapeSpecHash: the hash of the runtime's spec, changed when it changes", () => {
   const runtime = { runSpec: (s: { image: string }) => ["run", s.image] }
   const shape = planShape(spec, {})
-  expect(specHashOf(runtime, shape)).toBe(
+  expect(shapeSpecHash(runtime, shape)).toBe(
     specHash(["run", "pinetrie-lane:abc"]),
   )
   expect(
-    specHashOf(runtime, { ...shape, image: "pinetrie-lane:def" }),
-  ).not.toBe(specHashOf(runtime, shape))
+    shapeSpecHash(runtime, { ...shape, image: "pinetrie-lane:def" }),
+  ).not.toBe(shapeSpecHash(runtime, shape))
 })
 
 describe("planShared: which shared directories apply, and what the host does for them", () => {

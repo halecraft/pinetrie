@@ -1,10 +1,11 @@
 import { describe, expect, test } from "vitest"
-import { entriesOf, entry } from "./fixtures.ts"
+import { entriesById, entry } from "./fixtures.ts"
 import {
   askOutcome,
   askSpan,
   type EntryId,
   type EntryLike,
+  entryAsk,
   entryId,
   indexAsks,
   indexTree,
@@ -13,7 +14,6 @@ import {
   lastWord,
   pointId,
   type RevisionRecord,
-  runOf,
   startsRun,
   type TreeIndex,
   threadIdFor,
@@ -42,7 +42,7 @@ const result = (call: string, text = "ok", isError = false): Message => ({
   isError,
 })
 const build = (rows: readonly EntryLike[]): TreeIndex =>
-  indexTree(entriesOf(rows))
+  indexTree(entriesById(rows))
 
 describe("indexAsks", () => {
   const index = build([
@@ -82,9 +82,9 @@ test("a base's news steered in between a run's entries is steered into it; one a
   ])
   const asks = indexAsks(index)
   expect([...asks.steered]).toEqual([["5-b", "2-p"]])
-  expect(runOf(asks, entryId("5-b"))).toBe("2-p")
-  expect(runOf(asks, entryId("4-r"))).toBe("2-p")
-  expect(runOf(asks, entryId("7-b"))).toBeUndefined()
+  expect(entryAsk(asks, entryId("5-b"))).toBe("2-p")
+  expect(entryAsk(asks, entryId("4-r"))).toBe("2-p")
+  expect(entryAsk(asks, entryId("7-b"))).toBeUndefined()
   expect(asks.askOf.has(entryId("5-b"))).toBe(false)
 })
 

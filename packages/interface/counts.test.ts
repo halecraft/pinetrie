@@ -1,5 +1,5 @@
 import { expect, test } from "vitest"
-import { ago, elapsed, listOf, plural, spanWords, until } from "./counts.ts"
+import { ago, elapsed, listPhrase, plural, spanWords, until } from "./counts.ts"
 
 test("plural: one is singular, anything else takes an s", () => {
   expect([0, 1, 2].map(n => plural(n, "card"))).toEqual([
@@ -9,10 +9,10 @@ test("plural: one is singular, anything else takes an s", () => {
   ])
 })
 
-test("listOf: names joined as a sentence would", () => {
-  expect(listOf(["Ada"])).toBe("Ada")
-  expect(listOf(["Ada", "Bea"])).toBe("Ada and Bea")
-  expect(listOf(["Ada", "Bea", "Cat"])).toBe("Ada, Bea, and Cat")
+test("listPhrase: names joined as a sentence would", () => {
+  expect(listPhrase(["Ada"])).toBe("Ada")
+  expect(listPhrase(["Ada", "Bea"])).toBe("Ada and Bea")
+  expect(listPhrase(["Ada", "Bea", "Cat"])).toBe("Ada, Bea, and Cat")
 })
 
 const NOW = 1_000_000_000

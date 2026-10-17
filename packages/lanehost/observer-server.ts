@@ -22,10 +22,10 @@ import {
   heldNotices,
   type LaneNamespace,
   type LoaderCommand,
-  noticeOf,
   type ObserverCall,
   type ObserverHello,
   type ObserverNotice,
+  observerNotice,
   planHeld,
   planIdle,
   planLookup,
@@ -144,7 +144,7 @@ readline.createInterface({ input: loader.stdout }).on("line", text => {
       readyHook()
       return
     case "event":
-      route(noticeOf(line))
+      route(observerNotice(line))
       return
     case "candidate": {
       const { kind: _, token, ...candidate } = line

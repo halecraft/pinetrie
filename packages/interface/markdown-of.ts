@@ -12,7 +12,7 @@ import { copyText } from "./copy-text.ts"
  * range's slice of the text as stored. "" for a thread or a card, which are
  * linked, not quoted, and for an entry this tab does not hold.
  */
-export function markdownOf(
+export function addressMarkdown(
   address: Address,
   facts: {
     readonly messageOf: (entry: EntryId) => TranscriptMessage | undefined

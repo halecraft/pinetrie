@@ -25,10 +25,9 @@ Where a rule lives, as `packages/rules/TECHNICAL.md` and
 > `@pinetrie/interface`'s, for any client; how the page draws it is
 > `@pinetrie/web`'s (ADR-0093).
 
-So `answerOf`, `withPending`, `settleSlots` and `nextActing` are here, while
+So `moveAnswer`, `withPending`, `settleSlots` and `nextActing` are here, while
 the host's command rules (`planMessage`, `planMove`, `planStop`) are
-`@pinetrie/rules`'. This package's `answerOf` (a move's answer) shares its
-name with `@pinetrie/rules`' banner rule; `index.ts` does not export it.
+`@pinetrie/rules`'. `index.ts` does not export `moveAnswer`.
 
 `index.ts` lists every name another package imports; a name only this
 package and its tests use is not exported there.
@@ -120,7 +119,7 @@ so a refusal added to the plan must move the minting after it.
 
 A chat goes to a `MessageAt` (ADR-0117): the end of a thread its sender saw, or
 a branch starting a thread its column minted (`newThreadId`, `ids.ts`, the
-one minter of a thread's id). `columnMessageAt` makes one from a column's mode, its
+one minter of a thread's id). `columnMessageTarget` makes one from a column's mode, its
 thread, where it is and its canvas: a reply continues its thread from the end
 it shows; a branch, or a send at the root, starts it in the canvas it names
 (ADR-0116), a new canvas's minted with it (`newCanvasId`).
@@ -186,7 +185,7 @@ session or someone else's inventory throws before it is made.
   replaces, if any, and makes the pasted card, or moves a cut card out of
   your trash. A card that may not be discarded is not replaced, and says so
   (`not-replaced`, ADR-0133).
-- **A send is pending as a send** (`sendPendingOf`): its card is drawn
+- **A send is pending as a send** (`pendingSend`): its card is drawn
   nowhere until the copy holds what the host did with it. A move always
   names where the card goes.
 - **An undo of moves waits for the copy** (`whenRev`): the history of
@@ -260,7 +259,7 @@ the two merge (S101), so a writer asks `ready()` first.
   them). Nothing is written before `ready()`; a click before then is
   dropped.
 - **Its first write sets where you start**: `since` and `mentionsSince`
-  from `startOf`, the directory's newest entry, or `EARLIEST` in an empty
+  from `startingSince`, the directory's newest entry, or `EARLIEST` in an empty
   session, and only once the session document has arrived (S29). Until
   then `since` is "", which the page raises nothing against.
 - **Read marks are timed by `readStep`**, pure, as the repair is by

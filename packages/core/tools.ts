@@ -67,7 +67,7 @@ export type ToolId = (typeof TOOL_IDS)[number]
  * A stored call's name as a tool id; undefined for a tool pine·trie does not
  * register. A lookup in the list, not on an object, so `constructor` is no id.
  */
-export function toolIdOf(name: string): ToolId | undefined {
+export function knownToolId(name: string): ToolId | undefined {
   return TOOL_IDS.find(id => id === name)
 }
 
@@ -117,7 +117,7 @@ const SUBJECTS: Readonly<
  * what `catch_up` merges from, or the thread `ask` asks and `leave` leaves.
  * Undefined for any other tool.
  */
-export function subjectOf(name: string, args: unknown): string | undefined {
-  const id = toolIdOf(name)
+export function callSubject(name: string, args: unknown): string | undefined {
+  const id = knownToolId(name)
   return id === undefined ? undefined : SUBJECTS[id]?.(args)
 }

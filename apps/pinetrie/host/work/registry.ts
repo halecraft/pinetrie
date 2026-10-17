@@ -37,7 +37,7 @@ import type { HistoryAnswer } from "./adapter.ts"
  * observer to a host inside the lane, relayed by this one, while the
  * channel is open.
  */
-export const openLinkOf =
+export const laneLinkOpener =
   (runtime: LaneRuntime): OpenLink<LaneChannel> =>
   async container => {
     const channel = openChannel(helperCommand(runtime, container))
@@ -108,7 +108,7 @@ export function createRegistry(input: {
   const { runtime } = input
   const handles = new Map<ThreadId, LaneHandle<LaneChannel>>()
   const recordOf = (lane: ThreadId) => readLaneRecords(input.session).get(lane)
-  const open = openLinkOf(runtime)
+  const open = laneLinkOpener(runtime)
   function handleOf(lane: ThreadId): LaneHandle<LaneChannel> {
     let handle = handles.get(lane)
     if (handle === undefined) {

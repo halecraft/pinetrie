@@ -16,7 +16,7 @@ import {
 } from "./deep.ts"
 
 /** The lower-case hex SHA-256 of `bytes`: a blob's key in the store. */
-export const sha256Of = (bytes: Uint8Array): Sha256 =>
+export const blobSha256 = (bytes: Uint8Array): Sha256 =>
   createHash("sha256").update(bytes).digest("hex") as Sha256
 
 export type PreparedImage =

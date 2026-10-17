@@ -157,7 +157,7 @@ export function toNotes(input: {
     case "inventory":
       return { place: { kind: "inventory", holder: near.holder }, first: [] }
     case "column":
-      return { place: noteAt(input.cards, near.column), first: [] }
+      return { place: noteColumnEnd(input.cards, near.column), first: [] }
     case "make": {
       const renumbered = near.renumbered.map(
         (record): PlaceStep => ({ kind: "write", record }),
@@ -199,7 +199,7 @@ export function makeNoteColumn(
 }
 
 /** A note at the end of `column`. */
-export const noteAt = (
+export const noteColumnEnd = (
   cards: readonly CardRecord[],
   column: NoteColumnId,
 ): Extract<CardPlace, { kind: "note" }> => ({

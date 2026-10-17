@@ -10,7 +10,7 @@ import {
   type RevisionRecord,
   type TreeIndex,
 } from "@pinetrie/core"
-import { statsOf, type WorkStats } from "./work-stats.ts"
+import { entriesWorkStats, type WorkStats } from "./work-stats.ts"
 
 /** What a column draws, in order: an entry as itself, or part of an ask's work folded. */
 export type Segment =
@@ -64,7 +64,7 @@ export function segmentPath(
 }
 
 /**
- * What an ask's work holds (`statsOf`): every agent message and tool result
+ * What an ask's work holds (`entriesWorkStats`): every agent message and tool result
  * its run wrote, wherever its column shows them. A long ask's capsule counts
  * the same messages (`compactRail`).
  */
@@ -79,5 +79,5 @@ export function askStats(
   const results = [...asks.askOf]
     .filter(([id, ask]) => ask === prompt && !mine.has(id))
     .map(([id]) => id)
-  return statsOf(index, work, results, revisions)
+  return entriesWorkStats(index, work, results, revisions)
 }

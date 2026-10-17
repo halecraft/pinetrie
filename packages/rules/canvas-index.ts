@@ -13,15 +13,15 @@ import {
   forkEntry,
   hasPlaceKind,
   isThreadId,
-  livePlaceOf,
+  livePlace,
   type MoveTarget,
   makeCard,
   NO_CONTENT,
-  ownerOf,
   type PlaceKey,
   type PlaceOf,
   type RootId,
   type SurfaceOwner,
+  surfaceOwner,
   type ThreadFork,
   type ThreadId,
   type ThreadOrigin,
@@ -177,7 +177,7 @@ export const rootOfPlace = (
 export const NO_CANVAS_INDEX: CanvasIndex = indexCanvases([], new Map())
 
 /**
- * The canvas a place is in: its surface's owner's (`ownerOf`). A canvas's own;
+ * The canvas a place is in: its surface's owner's (`surfaceOwner`). A canvas's own;
  * a note column's or a thread's canvas; none for an inventory, or the board
  * (a canvas's card is in no canvas: the board is the team's). A trashed card's
  * is the place it left's; a trash key names none, since the host fills in
@@ -189,7 +189,7 @@ export function canvasOfPlace(
 ): CanvasId | null {
   if (place.kind === "trash")
     return "left" in place ? canvasOfPlace(canvases, place.left) : null
-  return canvasOfOwner(canvases, ownerOf(place))
+  return canvasOfOwner(canvases, surfaceOwner(place))
 }
 
 /** The canvas a surface's owner is in: a canvas itself, a note column's or a thread's. */
@@ -471,7 +471,7 @@ export function isLivePlace(
   place: CardPlace,
   archived: { readonly has: (canvas: CanvasId) => boolean },
 ): boolean {
-  const left = livePlaceOf(place)
+  const left = livePlace(place)
   return (
     left.kind === "inventory" ||
     (left.kind === "canvas" && !archived.has(left.canvas))

@@ -14,11 +14,11 @@ import {
   type CardRecord,
   type EntryId,
   entryId,
+  entryMessage,
   isPastAddress,
   isSha256,
   kindedId,
   type LaneView,
-  messageAt,
   type NoteColumnId,
   type PastAddress,
   parseAddress,
@@ -38,7 +38,7 @@ import { isDiscardable } from "./discardable.ts"
 import type { Focus } from "./focus.ts"
 import { messageReference, selectionReference } from "./message-tools.ts"
 
-/** What copying from the past takes: an address, and its markdown (`markdownOf`). */
+/** What copying from the past takes: an address, and its markdown (`addressMarkdown`). */
 export interface Taken {
   readonly address: Address
   readonly markdown: string
@@ -115,7 +115,7 @@ export const CLIP_MIME = "application/x-pinetrie"
 /** The attribute it rides in, in `text/html`. */
 export const CLIP_ATTRIBUTE = "data-pinetrie"
 
-/** What `clipOfFocus` and `cardClip` read: lookups, as `markdownOf`'s `messageOf` is. */
+/** What `clipOfFocus` and `cardClip` read: lookups, as `addressMarkdown`'s `messageOf` is. */
 export interface ClipFacts {
   readonly me: WriterId
   readonly cards: readonly CardRecord[]
@@ -236,7 +236,7 @@ export function clipOfFocus(
     const id = (Object.keys(facts.index.entries) as EntryId[]).find(
       e => e === entry,
     )
-    return id === undefined ? null : messageAt(facts.index, id)
+    return id === undefined ? null : entryMessage(facts.index, id)
   }
   const past = (taken: Taken): CopyPlan =>
     isPastAddress(taken.address)

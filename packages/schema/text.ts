@@ -26,7 +26,7 @@ export type TextDocHandle =
  * a person; the host's seat records (`pinetrie.seat`) come from it, and a
  * card's writers from those.
  */
-export const seatOf = (
+export const seatIdentity = (
   peerId: string,
   principal: string,
 ): {

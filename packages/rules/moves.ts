@@ -12,8 +12,8 @@ import {
   fitsPlace,
   isNoteColumnId,
   isTextCardId,
+  isWhereSenderSaw,
   KINDS,
-  keyOf,
   kindOfCard,
   type LivePlace,
   type Move,
@@ -22,17 +22,17 @@ import {
   NO_CONTENT,
   type NoteColumnId,
   ownerCard,
-  ownerOf,
   type Paste,
   type PlaceKey,
   placed,
+  placeKey,
   placeOfKind,
   type RankedCanvas,
   type Replacing,
   type ResolvedMove,
   type ResolvedTarget,
   sameKey,
-  seenAt,
+  surfaceOwner,
   type ThreadId,
   type Workflow,
   type WriterId,
@@ -40,9 +40,14 @@ import {
 } from "@pinetrie/core"
 import { cardsOnCanvas, planCanvasOpening } from "./canvas-index.ts"
 import { marginEnd } from "./margin.ts"
-import { makeNoteColumn, noteAt, toNotes } from "./notes.ts"
+import { makeNoteColumn, noteColumnEnd, toNotes } from "./notes.ts"
 import { orderAfter } from "./order.ts"
-import { canvasPinnedOf, inventoryFull, isPinned, queuedOn } from "./queue.ts"
+import {
+  canvasPinnedCards,
+  inventoryFull,
+  isPinned,
+  queuedOn,
+} from "./queue.ts"
 import { rankAfter, rankOfDrop } from "./rank.ts"
 
 // ── handoffs ───────────────────────────────────────────────────
@@ -99,10 +104,10 @@ function placeAt(
     case "canvas-pinned":
       return {
         ...key,
-        order: orderAfter(canvasPinnedOf(cards, key.canvas)),
+        order: orderAfter(canvasPinnedCards(cards, key.canvas)),
       }
     case "note":
-      return noteAt(
+      return noteColumnEnd(
         cards.filter(c => c.id !== now?.id),
         key.column,
       )
@@ -166,7 +171,7 @@ export function planMake(
 ): MakeStep {
   const now = cards.find(c => c.id === card.id)
   if (now !== undefined) return { kind: "refused", code: "exists", now }
-  const to = keyOf(card.place)
+  const to = placeKey(card.place)
   const refusal =
     sender === "host"
       ? to.kind === "inventory" && inventoryFull(cards, to.holder, card.id)
@@ -315,7 +320,7 @@ function refuseBack(
     )
     if (newer) return "left-taken"
   }
-  const owner = ownerCard(ownerOf(left))
+  const owner = ownerCard(surfaceOwner(left))
   if (owner === null) return null
   const holds = cards.find(c => c.id === owner)
   return holds === undefined || holds.place.kind === "trash"
@@ -327,7 +332,7 @@ function refuseBack(
 const isBack = (left: LivePlace, to: ResolvedTarget): boolean =>
   left.kind !== "board" &&
   sameKey(
-    keyOf(left),
+    placeKey(left),
     to.kind === "canvas" ? { kind: "canvas", canvas: to.canvas } : to,
   )
 
@@ -337,7 +342,7 @@ const backTo = (
 ): ResolvedTarget =>
   left.kind === "canvas"
     ? { kind: "canvas", canvas: left.canvas, order: left.order }
-    : keyOf(left)
+    : placeKey(left)
 
 /** `planMove`'s and `planFromTrash`'s checks once each has found the card where it may leave. */
 function handoff(
@@ -346,7 +351,7 @@ function handoff(
   move: ResolvedMove & { readonly from: PlaceKey },
   sender: WriterId,
 ): MoveStep {
-  if (!seenAt(keyOf(now.place), move.from))
+  if (!isWhereSenderSaw(placeKey(now.place), move.from))
     return { kind: "refused", code: "moved", now }
   // A move to where the card is would requeue it last, under its sender's
   // name: a card changes its place in line by a reorder (`planReorder`).
@@ -413,7 +418,7 @@ export function planPaste(
     }
   }
   const place =
-    old !== undefined && sameKey(keyOf(old.place), move.to)
+    old !== undefined && sameKey(placeKey(old.place), move.to)
       ? old.place
       : placeAt(move.to, before, sender, undefined)
   const made =
@@ -471,7 +476,7 @@ export function pastedCard(
  * planned, each against the cards as the ones before it left
  * them, so a column made for the first takes the rest:
  *
- * - a thread's nearest notes (`notes`, `noteOf`), through `toNotes`, a note
+ * - a thread's nearest notes (`notes`, `notesTarget`), through `toNotes`, a note
  *   column made for it written first; refused `no-place`, naming the card,
  *   for a thread with no card;
  * - a spot on a canvas (`canvas-at`), ranked just after its `after` there,

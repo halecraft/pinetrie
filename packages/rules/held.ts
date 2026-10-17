@@ -33,7 +33,7 @@ const FREE: ThreadHolding = { kind: "free" }
 const TRASHED: ThreadHolding = { kind: "trashed" }
 
 /** Where `thread`'s card leaves it (`ThreadHolding`). */
-export function holdingOf(
+export function threadCardHolding(
   cards: readonly CardRecord[],
   thread: ThreadId,
 ): ThreadHolding {
@@ -157,14 +157,14 @@ export function runsIn(command: Gated): readonly RunAt[] {
 
 /**
  * The thread each place in `at` is in, whose holder a command there answers
- * to. An entry's thread is `threadAt`'s, from its root's tree; but a copy's
+ * to. An entry's thread is `entryThread`'s, from its root's tree; but a copy's
  * first send, at its record's fork (`forkOf`), runs in the copy, whose
  * copier was shown the entries it forks from. An entry no tree holds is in
  * none.
  */
-export function threadsOf(
+export function runThreads(
   at: readonly RunAt[],
-  threadAt: (root: RootId, entry: EntryId) => ThreadId | null,
+  entryThread: (root: RootId, entry: EntryId) => ThreadId | null,
   forkOf: ReadonlyMap<ThreadId, ThreadFork>,
 ): readonly ThreadId[] {
   return at.flatMap(a => {
@@ -173,7 +173,7 @@ export function threadsOf(
         ? a.thread
         : forkOf.get(a.starts)?.at === a.entry
           ? a.starts
-          : threadAt(a.root, a.entry)
+          : entryThread(a.root, a.entry)
     return thread === null ? [] : [thread]
   })
 }
@@ -190,7 +190,7 @@ export function heldIn(
   readonly holding: Exclude<ThreadHolding, { readonly kind: "free" }>
 } | null {
   for (const thread of threads) {
-    const holding = holdingOf(cards, thread)
+    const holding = threadCardHolding(cards, thread)
     if (holding.kind !== "free") return { thread, holding }
   }
   return null

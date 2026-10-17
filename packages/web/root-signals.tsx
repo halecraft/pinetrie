@@ -31,7 +31,7 @@ import { useMemo, useState } from "react"
 import { Menu, type MenuItem } from "./menu.tsx"
 import { Avatar, Avatars, nameFor } from "./presence.tsx"
 import { SignalMark } from "./signal-mark.tsx"
-import { useReadingAt, useReadingCanvases } from "./use-presence.ts"
+import { useOthersReading, useReadingCanvases } from "./use-presence.ts"
 
 /**
  * A root's status, before its label: a still ring while its agent works, its
@@ -78,7 +78,7 @@ export interface ReadersProps {
 
 /** The people reading now, grouped by person (`peopleHere`). */
 function usePeople(p: ReadersProps) {
-  const reading = useReadingAt(p.session.presence, p.session.writer)
+  const reading = useOthersReading(p.session.presence, p.session.writer)
   const reported = useReadingCanvases(p.session.presence)
   return useMemo(
     () =>

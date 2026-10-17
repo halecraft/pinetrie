@@ -28,7 +28,7 @@ import {
   parseCommandArgs,
   substituteArgs,
 } from "./deep.ts"
-import { sha256Of } from "./images.ts"
+import { blobSha256 } from "./images.ts"
 
 type Loader = Awaited<ReturnType<typeof openLoader>>
 type Skill = ReturnType<Loader["getSkills"]>["skills"][number]
@@ -239,10 +239,10 @@ export function withoutFrontmatter(text: string): string {
 }
 
 const hashOf = (text: string): string =>
-  sha256Of(new TextEncoder().encode(text))
+  blobSha256(new TextEncoder().encode(text))
 
 /** A skill file's text -> its instructions, as the host reads it, and its hash. */
-export const skillOf = (file: string, text: string) => ({
+export const parseSkill = (file: string, text: string) => ({
   path: file,
   content: withoutFrontmatter(text),
   hash: hashOf(text),
@@ -295,7 +295,7 @@ export interface CommandFiles {
    * A skill by its qualified name, e.g. `pinetrie:skill:resolve-conflicts`,
    * read now. Null if no command has that name, or its file is unreadable.
    */
-  skill(name: string): Promise<ReturnType<typeof skillOf> | null>
+  skill(name: string): Promise<ReturnType<typeof parseSkill> | null>
   /** `expandCommand` over the command's file as it is now; null if unreadable. */
   expand(
     command: CommandSource,
@@ -325,7 +325,7 @@ export function commandFiles(
       const file = resolveCommand(name, labelled.commands)?.file
       if (file === undefined) return null
       const text = await readText(file)
-      return text === null ? null : skillOf(file, text)
+      return text === null ? null : parseSkill(file, text)
     },
     async expand(command, args, inLane) {
       const text = await readText(command.file)

@@ -38,7 +38,7 @@ export const inboxCount = (items: readonly Item[], unseen: number): number =>
 export interface InboxView {
   /** `inboxCount`, as given. */
   readonly badge: number
-  /** Each thread section's items, in `attentionOf`'s order. */
+  /** Each thread section's items, in `attentionItems`'s order. */
   readonly items: Readonly<Record<ThreadSection, readonly Item[]>>
   /** Mentions of you, seen or not. */
   readonly mentions: number
@@ -48,7 +48,7 @@ export interface InboxView {
 }
 
 export function inboxView(input: {
-  /** What the threads you follow raise for you (`attentionOf`). */
+  /** What the threads you follow raise for you (`attentionItems`). */
   readonly items: readonly Item[]
   readonly badge: number
   readonly mentions: number

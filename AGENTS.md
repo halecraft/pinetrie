@@ -71,8 +71,9 @@ spent spikes: history, which search skips unless you name the folder.
   what it builds (`threadLink`, `threadReach`), a verb for what it does
   (`planRelay`), `is` for a yes or no (`isRoundAnswered`). Never end one in
   a bare *of*, *to* or *at* (`linkTo`, `reachOf`) that leans on its
-  arguments to finish the phrase. Older names that do are renamed when
-  their code is next changed for its own reasons.
+  arguments to finish the phrase. `scripts/function-names.test.ts` fails
+  on an exported one; a module's own helper that does is renamed when its
+  code is next changed for its own reasons.
 - Only `packages/pi` imports pi (ADR-0003). Package boundaries are enforced by
   resolution; `workspace.test.ts` checks the manifests.
 - Verify, don't assume: read the source of pi and Kyneta, or measure with a

@@ -3,7 +3,7 @@
 // page and the host read it alike, so the buttons and the host's refusals
 // agree.
 
-import { type AskIndex, runOf } from "./asks.ts"
+import { type AskIndex, entryAsk } from "./asks.ts"
 import type { EntryId, ThreadId, ThreadRecord, WriterId } from "./index.ts"
 import type { TreeIndex } from "./tree.ts"
 
@@ -70,7 +70,7 @@ export function proposalState(input: {
 }): ProposalState | null {
   const { index, asks, proposal } = input
   if (index.entries[proposal]?.message?.proposal === undefined) return null
-  const prompt = runOf(asks, proposal)
+  const prompt = entryAsk(asks, proposal)
   if (prompt === undefined) return null
   const fork = asks.last.get(prompt)
   if (fork === undefined) return null

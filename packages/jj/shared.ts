@@ -5,8 +5,8 @@
 import {
   type AcceptedFacts,
   type CommitId,
+  messageSources,
   type RepoConfig,
-  sourcesOf,
   type ThreadId,
   untracedLanes,
 } from "@pinetrie/core"
@@ -64,7 +64,7 @@ export async function readShared(
   const accepted = parseAcceptedThreadCommits(ran.stdout).map(
     ({ commit, description }) => ({
       commit,
-      sources: sourcesOf(description),
+      sources: messageSources(description),
       lanes: untracedLanes(description),
     }),
   )

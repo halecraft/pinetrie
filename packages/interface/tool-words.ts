@@ -12,6 +12,7 @@ import {
   EDIT_TOOL,
   FIND_TOOL,
   GREP_TOOL,
+  knownToolId,
   LEAVE_TOOL,
   PROPOSE_TOOL,
   READ_TOOL,
@@ -20,7 +21,6 @@ import {
   SPLIT_TOOL,
   type ToolCall,
   type ToolId,
-  toolIdOf,
   WRITE_TOOL,
 } from "@pinetrie/core"
 
@@ -45,7 +45,7 @@ const TOOL_WORDS: Readonly<Record<ToolId, string>> = {
 
 /** A tool's word; a tool pine·trie does not register goes by its own name. */
 export function toolWord(name: string): string {
-  const id = toolIdOf(name)
+  const id = knownToolId(name)
   return id === undefined ? name : TOOL_WORDS[id]
 }
 

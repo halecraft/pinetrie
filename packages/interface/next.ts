@@ -8,7 +8,7 @@ import {
   type CardId,
   type CardRecord,
   type LaneView,
-  promptOf,
+  runPrompt,
   type ThreadId,
   type TreeIndex,
   type WriterId,
@@ -19,7 +19,7 @@ import {
   isQueuedMessage,
   planNextQueuedCardPop,
   queuedOn,
-  stopperOf,
+  runStopper,
 } from "@pinetrie/rules"
 import type { ControlWords } from "./card-words.ts"
 import type { Reader } from "./send.ts"
@@ -77,7 +77,7 @@ export interface NextFacts {
  * passes it (`blankQueued`); else a stop `carryOnState` lets carry on;
  * else idle.
  */
-export function nextOf(lane: LaneView, facts: NextFacts): Next {
+export function laneNext(lane: LaneView, facts: NextFacts): Next {
   if (lane.running) return { kind: "running" }
   const queue = queuedOn(facts.cards, lane.name)
   const { blank } = facts
@@ -113,23 +113,23 @@ export function nextOf(lane: LaneView, facts: NextFacts): Next {
       typing: step.kind === "typing",
     }
   if (resumable) {
-    const prompt = promptOf(facts.index, lane.tip)
+    const prompt = runPrompt(facts.index, lane.tip)
     return {
       kind: "stopped",
       by:
         prompt === null
           ? null
-          : stopperOf(facts.asks, queuedOn(facts.cards, lane.name), prompt),
+          : runStopper(facts.asks, queuedOn(facts.cards, lane.name), prompt),
     }
   }
   return { kind: "idle" }
 }
 
-/** `lane`'s queue header (`nextOf`), with what its ⋯ acts on. */
+/** `lane`'s queue header (`laneNext`), with what its ⋯ acts on. */
 export function queueHead(lane: LaneView, facts: NextFacts): QueueHead {
   return {
     lane: lane.name,
-    next: nextOf(lane, facts),
+    next: laneNext(lane, facts),
     heldBy: lane.heldBy,
     messages: queuedOn(facts.cards, lane.name).filter(isQueuedMessage).length,
   }

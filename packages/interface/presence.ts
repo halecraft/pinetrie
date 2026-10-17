@@ -22,7 +22,7 @@ type Entries = readonly (readonly [WriterId, EntryId])[]
  * Everyone but `me` whose value is `value`, each once: a person here from two
  * seats has two entries: who types at a thread end.
  */
-export function whoIsAt(
+export function othersWithValue(
   entries: Entries,
   value: EntryId,
   me: WriterId,
@@ -34,7 +34,7 @@ export function whoIsAt(
 }
 
 /** Others following each thread end, you left out: the rail's rings. */
-export function readingAt(
+export function othersReading(
   reading: Entries,
   me: WriterId,
 ): ReadonlyMap<EntryId, readonly WriterId[]> {

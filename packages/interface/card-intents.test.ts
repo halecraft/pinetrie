@@ -9,7 +9,7 @@ import {
   INVENTORY_SLOTS,
   indexAsks,
   KINDS,
-  livePlaceOf,
+  livePlace,
   NO_CONTENT,
   type PlacedKind,
   rootIdFor,
@@ -1191,7 +1191,7 @@ describe("landing a copy", () => {
     const trashed = {
       ...atCard,
       placer: ADA,
-      place: { kind: "trash", left: livePlaceOf(atCard.place) },
+      place: { kind: "trash", left: livePlace(atCard.place) },
     } as const
     expect(land(cut, column, state({ cards: [trashed] }))).toEqual({
       kind: "uncut",

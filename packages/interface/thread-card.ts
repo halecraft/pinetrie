@@ -45,9 +45,9 @@ export interface ThreadCardHead {
 export interface ThreadCardFacts {
   /** The board's states, or null before the host wrote them. */
   readonly workflow: Workflow | null
-  /** Each canvas's state on the board (`boardOf`). */
+  /** Each canvas's state on the board (`taskBoard`). */
   readonly stateOf: ReadonlyMap<CanvasId, WorkflowStateId>
-  /** Each canvas's label (`labelsOf`). */
+  /** Each canvas's label (`taskLabels`). */
   readonly labels: ReadonlyMap<CanvasId, string>
   /** Each canvas's status (`canvasStatus`). */
   readonly status: ReadonlyMap<CanvasId, Status>

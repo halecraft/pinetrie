@@ -20,15 +20,15 @@ import {
   at,
   BRANCH,
   committedProject,
-  entriesOf,
+  heldEntries,
+  heldLanes,
+  heldRootRecords,
+  heldTree,
   idleNow,
   join,
   laneHolding,
-  lanesOf,
-  rootRecordsOf,
   START_AGENT,
   setUpAccepted,
-  treeOf,
   waitFor,
 } from "../harness.ts"
 import { cleanUp, type LaneHosts } from "../lane-hosts.ts"
@@ -60,13 +60,13 @@ async function catchUpSection(
   })
   const wu = await join(wh, "uma", "catch-up")
   await wu.request({ kind: "name", name: "Uma" })
-  const tree = () => treeOf(wh)
+  const tree = () => heldTree(wh)
   const idle = async () => {
     await waitFor(() => idleNow(wh), 180_000)
     await wh.quiet()
   }
   const laneTip = (lane: ThreadId) =>
-    lanesOf(wh, tree(), readPlaces(wh.places)).find(l => l.name === lane)
+    heldLanes(wh, tree(), readPlaces(wh.places)).find(l => l.name === lane)
       ?.tip ?? null
   /** The lane whose thread's end holds `text`. */
   const laneWith = (text: string) =>
@@ -75,7 +75,7 @@ async function catchUpSection(
   const toolResults = (lane: ThreadId | undefined): string[] => {
     if (lane === undefined) return []
     const onPath = new Set(ancestry(tree(), laneTip(lane)).path)
-    return Object.values(entriesOf(wh))
+    return Object.values(heldEntries(wh))
       .filter(r => onPath.has(entryId(r.id)))
       .sort((a, b) => (a.id < b.id ? -1 : 1))
       .map(r => rowMessage(r) as { role?: string })
@@ -130,7 +130,7 @@ async function catchUpSection(
     const recorded =
       call === undefined
         ? undefined
-        : rootRecordsOf(wh, readRevisions).get(call as EntryId)
+        : heldRootRecords(wh, readRevisions).get(call as EntryId)
     script.use([
       { tool: "bash", args: { command: "cat landed.txt" } },
       { text: "branched" },

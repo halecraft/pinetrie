@@ -343,7 +343,7 @@ const viewAction = (
 })
 
 /** A change to your view of `canvas` (`ViewChange`), as an effect. */
-export const changeViewOf = (
+export const viewChangeEffect = (
   state: Pick<IntentState, "canvases">,
   canvas: CanvasId,
   change: ViewChange,
@@ -351,9 +351,9 @@ export const changeViewOf = (
 
 /**
  * A fold or unfold of a column of `canvas` that the reader asked for: as
- * `changeViewOf`, and the column moves as it folds.
+ * `viewChangeEffect`, and the column moves as it folds.
  */
-export const foldViewOf = (
+export const foldViewEffect = (
   state: Pick<IntentState, "canvases">,
   canvas: CanvasId,
   change: Extract<ViewChange, { kind: "fold" | "foldCanvas" }>,
@@ -369,7 +369,10 @@ export const foldViewOf = (
  * fold first, whatever the column's density, so it is drawn to be revealed:
  * forks, branch starts and people's messages are never in one.
  */
-export function planOpenAt(id: EntryId, state: IntentState): readonly Effect[] {
+export function planOpenEntry(
+  id: EntryId,
+  state: IntentState,
+): readonly Effect[] {
   const plan = planOpen(
     state.layout,
     state.index,
@@ -394,7 +397,7 @@ export function planOpenAt(id: EntryId, state: IntentState): readonly Effect[] {
         ...fold,
         { kind: "reveal", entry: id },
         ...showCanvas(plan.canvas),
-        changeViewOf(state, plan.canvas, {
+        viewChangeEffect(state, plan.canvas, {
           kind: "fold",
           card: plan.card,
           unfolded: true,

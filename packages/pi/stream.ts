@@ -32,7 +32,7 @@ function firstText(result: unknown): string {
  * One harness event as a `StreamEvent`, or null: for an event on a lane that
  * is not a thread's, and for a message update that adds no text.
  */
-export function streamEventOf(event: StreamSource): StreamEvent | null {
+export function harnessStreamEvent(event: StreamSource): StreamEvent | null {
   const lane = event.lane
   if (!isThreadId(lane)) return null
   switch (event.type) {

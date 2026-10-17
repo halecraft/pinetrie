@@ -13,7 +13,7 @@ import type {
   WriterId,
 } from "@pinetrie/core"
 import { Type } from "typebox"
-import { decodeAt, threadKey } from "./decode.ts"
+import { decodeRecord, threadKey } from "./decode.ts"
 import { type MovesStep, planMoveCommand } from "./moves.ts"
 import { isQueuedMessage, type QueuedCard } from "./queue.ts"
 import { deleteRecord, type RecordSpec, setRecord } from "./records.ts"
@@ -30,7 +30,7 @@ export const QUEUE_HOLD: RecordSpec<QueueHold, ThreadId, "session"> = {
   keyOf: r => r.lane,
   encode: ({ lane, ...contents }) => contents,
   decode: (contents, key) =>
-    decodeAt(QueueHoldSchema, contents, threadKey(key), (r, lane) => ({
+    decodeRecord(QueueHoldSchema, contents, threadKey(key), (r, lane) => ({
       lane,
       by: r.by as WriterId,
       at: r.at,

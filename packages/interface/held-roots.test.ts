@@ -7,7 +7,7 @@ import {
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
-import { threadCardOf } from "@pinetrie/rules/fixtures"
+import { landedThreadCard } from "@pinetrie/rules/fixtures"
 import { describe, expect, test } from "vitest"
 import { canvasesWith } from "./fixtures.ts"
 import { planHeldRoots } from "./held-roots.ts"
@@ -32,7 +32,7 @@ const K = (n: string) => canvasIdFor(n)
 const canvases = canvasesWith({
   known: ["1", "2", "3", "4"].map(K),
   cards: ["1", "2", "3", "4"].map(n =>
-    threadCardOf({
+    landedThreadCard({
       thread: threadIdFor(n),
       canvas: K(n),
       by: writerId("a"),

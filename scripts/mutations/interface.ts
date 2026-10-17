@@ -240,7 +240,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the rail splits a long ask's capsule at a base's news",
     file: "packages/interface/rail.ts",
-    from: "    const prompt = id === undefined ? undefined : runOf(asks, id)\n",
+    from: "    const prompt = id === undefined ? undefined : entryAsk(asks, id)\n",
     to: "    const prompt = id === undefined ? undefined : asks.askOf.get(id)\n",
     command: unit,
     expect: "a long ask with a base's news steered in is one capsule",
@@ -427,7 +427,7 @@ export const mutations: readonly Mutation[] = [
     from: "    .filter(t => t.for === me && endOf(t.from) === end)",
     to: "    .filter(t => endOf(t.from) === end)",
     command: unit,
-    expect: "tracesAt: yours",
+    expect: "endTraces: yours",
   },
   {
     name: "traces by one person group whatever they did",
@@ -448,8 +448,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a trace opens someone else's inventory",
     file: "packages/interface/card-intents.ts",
-    from: '    return trace.message === null ? [] : planOpenAt(trace.message, state)\n  if (now.place.kind === "inventory" && now.place.holder !== state.cards.me)\n    return []\n',
-    to: "    return trace.message === null ? [] : planOpenAt(trace.message, state)\n",
+    from: '    return trace.message === null ? [] : planOpenEntry(trace.message, state)\n  if (now.place.kind === "inventory" && now.place.holder !== state.cards.me)\n    return []\n',
+    to: "    return trace.message === null ? [] : planOpenEntry(trace.message, state)\n",
     command: unit,
     expect: "a card in someone else's inventory",
   },
@@ -512,7 +512,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a base's news steered into a run splits its ask's row in two",
     file: "packages/interface/ask-view.ts",
-    from: '    const ask = s.kind === "fold" ? s.ask : runOf(asks, s.id)\n',
+    from: '    const ask = s.kind === "fold" ? s.ask : entryAsk(asks, s.id)\n',
     to: '    const ask = s.kind === "fold" ? s.ask : asks.askOf.get(s.id)\n',
     command: unit,
     expect:
@@ -858,7 +858,7 @@ export const mutations: readonly Mutation[] = [
     from: "  const i = Math.floor(fraction * ids.length)",
     to: "  const i = Math.floor((1 - fraction) * ids.length)",
     command: unit,
-    expect: "pickAt: the message as far through the run",
+    expect: "capsulePick: the message as far through the run",
   },
   {
     name: "a stretch fills by a threshold, not by whether anyone wrote",
@@ -1503,8 +1503,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a filtered head's mark counts only the shown",
     file: "packages/interface/board-view.ts",
-    from: "    const mark = markOf(status, all)",
-    to: "    const mark = markOf(status, cards.map(t => t.canvas))",
+    from: "    const mark = markLevel(status, all)",
+    to: "    const mark = markLevel(status, cards.map(t => t.canvas))",
     command: unit,
     expect: "a filtered head counts what it shows",
   },
@@ -1841,20 +1841,20 @@ export const mutations: readonly Mutation[] = [
       "a box releasing its card detaches, and one with none stays as it is",
   },
   {
-    name: "newPinAt: + pin stays in the header once a card is pinned",
+    name: "newPinPlace: + pin stays in the header once a card is pinned",
     file: "packages/interface/column-view.ts",
     from: '  !f.canPin || f.pinning ? null : f.pinned === 0 ? "header" : "strip"',
     to: '  !f.canPin || f.pinning ? null : "header"',
     command: unit,
-    expect: "newPinAt(",
+    expect: "newPinPlace(",
   },
   {
-    name: "newPinAt: + pin shows while its box is open",
+    name: "newPinPlace: + pin shows while its box is open",
     file: "packages/interface/column-view.ts",
     from: '  !f.canPin || f.pinning ? null : f.pinned === 0 ? "header" : "strip"',
     to: '  !f.canPin ? null : f.pinned === 0 ? "header" : "strip"',
     command: unit,
-    expect: "newPinAt(",
+    expect: "newPinPlace(",
   },
   {
     name: "a person who leaves takes their open menu with them",
@@ -2345,8 +2345,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an unqueue removes its card",
     file: "packages/interface/intent.ts",
-    from: "      const move = moveOf(now, noteOf(now.place))",
-    to: "      const move = moveOf(now, null)",
+    from: "      const move = cardMove(now, notesTarget(now.place))",
+    to: "      const move = cardMove(now, null)",
     command: unit,
     expect: "an unqueue puts the card back where it was queued",
   },
@@ -2428,8 +2428,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a folded column draws whole",
     file: "packages/interface/face.ts",
-    from: '  folded ? "face" : DETAIL_ON[place]',
-    to: "  DETAIL_ON[place]",
+    from: '): Detail => (folded ? "face" : DETAIL_ON[place])',
+    to: "): Detail => DETAIL_ON[place]",
     command: unit,
     expect:
       "a canvas draws whole, a dock or a list normal, an inventory faces; a fold is a face",
@@ -2597,7 +2597,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a put where the card already is moves it",
     file: "packages/interface/card-intents.ts",
-    from: '  if (to === null || (to.kind !== "notes" && sameKey(keyOf(now.place), to)))\n    return []',
+    from: '  if (to === null || (to.kind !== "notes" && sameKey(placeKey(now.place), to)))\n    return []',
     to: "  if (to === null) return []",
     command: unit,
     expect:
@@ -2665,7 +2665,7 @@ export const mutations: readonly Mutation[] = [
     from: '  return x < (2 * width) / 3 ? "centre" : "right"',
     to: '  return x < width / 2 ? "centre" : "right"',
     command: unit,
-    expect: "snapTo: the nearest third",
+    expect: "snappedDock: the nearest third",
   },
   {
     name: "a selection of only space is a range",
@@ -2773,7 +2773,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a pin goes nowhere",
     file: "packages/interface/card-intents.ts",
-    from: "  const to = now === undefined ? null : pinnedOf(now.place)",
+    from: "  const to = now === undefined ? null : pinTargetKey(now.place)",
     to: "  const to = null",
     command: unit,
     expect: "pin: your message to the top of the same thread's column",
@@ -2789,7 +2789,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a drop on the strip lands below the line",
     file: "packages/interface/put-target.ts",
-    from: '  if (target.kind === "pinned") return pinnedOf(place)\n',
+    from: '  if (target.kind === "pinned") return pinTargetKey(place)\n',
     to: "",
     command: unit,
     expect: "a column's pinned strip lands pinned",
@@ -3024,7 +3024,7 @@ export const mutations: readonly Mutation[] = [
     from: '      return verdict.by === me ? null : "worthARead"',
     to: '      return "worthARead"',
     command: unit,
-    expect: "levelOf: stopped by you",
+    expect: "verdictLevel: stopped by you",
   },
   {
     name: "proposed changes are counted twice",
@@ -3175,12 +3175,12 @@ export const mutations: readonly Mutation[] = [
     expect: "the archive apart; the strip says each",
   },
   {
-    name: "markOf counts a working root as raised",
+    name: "markLevel counts a working root as raised",
     file: "packages/interface/attention.ts",
     from: '      return s === undefined || s.kind === "working" ? null : s.kind',
     to: '      return s === undefined ? null : s.kind === "working" ? "needsYou" : s.kind',
     command: unit,
-    expect: "markOf: the highest level among the canvases it covers",
+    expect: "markLevel: the highest level among the canvases it covers",
   },
   {
     name: "a drop moves a canvas before itself",
@@ -3595,7 +3595,7 @@ export const mutations: readonly Mutation[] = [
     from: "      ? m.top + spot.at * (m.bottom - m.top) + spot.past",
     to: "      ? m.top + spot.at * (m.bottom - m.top)",
     command: unit,
-    expect: "placeAt: as far into the message as the view's top was",
+    expect: "spotScrollTop: as far into the message as the view's top was",
   },
   {
     name: "a view's top between two messages is at the first's end",
@@ -3942,7 +3942,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a thread's face reads its first entry",
     file: "packages/interface/thread-face.ts",
-    from: "  const firstId = firstMessageOf(index, thread)\n",
+    from: "  const firstId = threadFirstMessage(index, thread)\n",
     to: "  const firstId = index.firstOf.get(thread) ?? null\n",
     command: unit,
     expect: "a thread's face reads its first message",
@@ -3950,7 +3950,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a rail stub opens at its thread's first entry",
     file: "packages/interface/app-view.ts",
-    from: "            at: firstMessageOf(index, thread) ?? child,\n",
+    from: "            at: threadFirstMessage(index, thread) ?? child,\n",
     to: "            at: child,\n",
     command: unit,
     expect:
@@ -4208,8 +4208,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a drop's replacement discards the slot's card last",
     file: "packages/interface/card-intents.ts",
-    from: "            { move: moveOf(replacing, DISCARDED), slot: null },\n            { move: into, slot: landing.to.slot },",
-    to: "            { move: into, slot: landing.to.slot },\n            { move: moveOf(replacing, DISCARDED), slot: null },",
+    from: "            { move: cardMove(replacing, DISCARDED), slot: null },\n            { move: into, slot: landing.to.slot },",
+    to: "            { move: into, slot: landing.to.slot },\n            { move: cardMove(replacing, DISCARDED), slot: null },",
     command: unit,
     expect:
       "a replaced slot's card goes to your trash first: a drop's move set, a paste's `replacing`",
@@ -4441,7 +4441,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a fold that moves lands without its motion",
     file: "packages/interface/perform.ts",
-    from: "      const motion = effect.moves ? foldOf(effect.action) : null\n",
+    from: "      const motion = effect.moves ? foldMotion(effect.action) : null\n",
     to: "      const motion = null\n",
     command: unit,
     expect:
@@ -4450,8 +4450,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a fold you ask for does not move",
     file: "packages/interface/intent.ts",
-    from: "            foldViewOf(\n",
-    to: "            changeViewOf(\n",
+    from: "            foldViewEffect(\n",
+    to: "            viewChangeEffect(\n",
     command: unit,
     expect:
       "a fold you ask for is your view of the canvas you are on, and moves; off a canvas, nothing",
@@ -4502,8 +4502,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an unnamed you is offered as a mention",
     file: "packages/interface/mentions.ts",
-    from: "  const mine = handleOf(displayName(me, nameOf.get(me)))\n",
-    to: '  const mine = handleOf(nameOf.get(me) ?? "")\n',
+    from: "  const mine = mentionHandle(displayName(me, nameOf.get(me)))\n",
+    to: '  const mine = mentionHandle(nameOf.get(me) ?? "")\n',
     command: unit,
     expect: "you are not offered, by your name or your e-mail's",
   },

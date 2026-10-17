@@ -36,15 +36,15 @@ import { createAgentHarness } from "./deep.ts"
 import {
   type LaneAccess,
   type LaneHooks,
+  laneToolContext,
   systemPromptFor,
   type ToolContext,
-  toolContextOf,
 } from "./lanes.ts"
 import { type PiSetup, setupInside } from "./pi-setup.ts"
 import { carryContext, withCarried } from "./pinned.ts"
-import { prefixChange, prefixOf } from "./prefix.ts"
+import { prefixChange, requestPrefix } from "./prefix.ts"
 import { type Scribe, scribeInside } from "./scribe.ts"
-import { STREAM_SOURCES, streamEventOf } from "./stream.ts"
+import { harnessStreamEvent, STREAM_SOURCES } from "./stream.ts"
 import { threadOfContext } from "./thread-context.ts"
 import {
   type CreateOutcome,
@@ -209,7 +209,7 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
   // An agent with no tools registers none, so its lanes may call none.
   const activeTools: string[] = tools === null ? [] : [...TOOL_IDS]
   // No tools, or a call with no lane named: no access, and every call is
-  // refused (`toolContextOf`).
+  // refused (`laneToolContext`).
   const accessFor = (lane: ThreadId | undefined): LaneAccess | null =>
     tools === null || lane === undefined ? null : tools.access(lane)
   const systemPrompt = systemPromptFor(setup, assembled.files, project)
@@ -239,7 +239,7 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
         tools: [...assembled.registered] as never[],
         activeToolNames: activeTools,
         toolContext: (context: typeof CTX): ToolContext =>
-          toolContextOf(accessFor(threadOfContext(context)), project),
+          laneToolContext(accessFor(threadOfContext(context)), project),
         systemPrompt,
         toProviderMessages: messages =>
           providerMessages(messages, options.blobs ?? NO_BLOBS),
@@ -311,7 +311,7 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
         : undefined
     })
     harness.hooks.on("before_payload", async event => {
-      const next = prefixOf(event.payload)
+      const next = requestPrefix(event.payload)
       if (
         prefixChange(prefixes.get(event.lane), next) &&
         isThreadId(event.lane)
@@ -322,7 +322,7 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
     })
     const offs = STREAM_SOURCES.map(type =>
       harness.events.on(type, event => {
-        const stream = streamEventOf(event)
+        const stream = harnessStreamEvent(event)
         if (stream !== null) options.onStream?.(stream)
       }),
     )

@@ -12,7 +12,6 @@ import {
   ancestry,
   type CanvasId,
   type EntryId,
-  firstMessageOf,
   isBusy,
   type LaneRecord,
   type LaneView,
@@ -25,6 +24,7 @@ import {
   type ThreadId,
   type ThreadName,
   type TreeIndex,
+  threadFirstMessage,
   type Workflow,
   type WriterId,
 } from "@pinetrie/core"
@@ -81,12 +81,12 @@ export interface AppViewInput {
   readonly access: ReadonlyMap<ThreadId, AccessRecord>
   /** The lanes of the roots this tab holds. */
   readonly lanes: readonly LaneView[]
-  /** Every lane's root entry (`laneRootsOf`), held or not. */
+  /** Every lane's root entry (`laneRootEntries`), held or not. */
   readonly laneRoots: ReadonlyMap<ThreadId, EntryId>
 }
 
 /** Every lane's root entry: its `LaneRecord`'s root, through `rootEntries`. */
-export const laneRootsOf = (
+export const laneRootEntries = (
   records: ReadonlyMap<ThreadId, LaneRecord>,
   rootEntries: ReadonlyMap<RootId, EntryId>,
 ): ReadonlyMap<ThreadId, EntryId> =>
@@ -290,7 +290,7 @@ export function canvasRail(input: {
         if (link.kind !== "gone")
           stubs.push({
             from: row.id,
-            at: firstMessageOf(index, thread) ?? child,
+            at: threadFirstMessage(index, thread) ?? child,
             thread,
             link,
           })

@@ -166,7 +166,7 @@ export function planMerge(lane: JjLane, from: BaseMerge): MergePlan {
   }
 }
 
-/** An accepted thread commit on accepted work the lane lacks, and the sources its message names (`sourcesOf`). */
+/** An accepted thread commit on accepted work the lane lacks, and the sources its message names (`messageSources`). */
 export interface AcceptedThreadCommitAbove {
   readonly acceptedThreadCommit: CommitId
   readonly sources: readonly CommitId[]

@@ -1,6 +1,6 @@
 import { entryId, rootIdFor, type TextCard, threadIdFor } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
-import { composeAt, rootHolding, waitForRootHolding } from "./harness.ts"
+import { composeCard, rootHolding, waitForRootHolding } from "./harness.ts"
 
 const R1 = rootIdFor("one")
 const R2 = rootIdFor("two")
@@ -50,7 +50,7 @@ describe("rootHolding", () => {
   })
 })
 
-test("composeAt: a composing card at the entry, in the root the client came to hold", async () => {
+test("composeCard: a composing card at the entry, in the root the client came to hold", async () => {
   const made: Pick<TextCard, "place" | "content">[] = []
   const client = {
     ...lateClient(3),
@@ -58,9 +58,9 @@ test("composeAt: a composing card at the entry, in the root the client came to h
       made.push(card)
       return Promise.resolve({ kind: "moved" })
     },
-  } as unknown as Parameters<typeof composeAt>[0]
+  } as unknown as Parameters<typeof composeCard>[0]
   const lane = threadIdFor("1")
-  await composeAt(client, { entry: E, lane, command: "split" }, "hi")
+  await composeCard(client, { entry: E, lane, command: "split" }, "hi")
   expect(made.map(c => [c.place, c.content.command])).toEqual([
     [{ kind: "composing", thread: lane }, "split"],
   ])

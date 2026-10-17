@@ -17,7 +17,7 @@ import { laneBase } from "./lane/base.ts"
 import { bookmarkName, proposedBookmark, revsetName } from "./lane/names.ts"
 import { planBundle } from "./lane/plan.ts"
 import { type JjLane, proveJjLane } from "./lane/points.ts"
-import { commitsOf } from "./lane/revisions.ts"
+import { readCommits } from "./lane/revisions.ts"
 import {
   markSteps,
   planAcceptanceSteps,
@@ -74,7 +74,7 @@ export async function acceptedIn(
   ops: Runner,
   repoConfig: RepoConfig,
 ): Promise<CommitId> {
-  const [c] = await commitsOf(
+  const [c] = await readCommits(
     ops,
     `present(${revsetName(repoConfig.acceptedBookmark)})`,
   )

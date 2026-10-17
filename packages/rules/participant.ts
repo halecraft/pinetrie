@@ -14,7 +14,7 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import { Type } from "typebox"
-import { decodeAt, writerKey } from "./decode.ts"
+import { decodeRecord, writerKey } from "./decode.ts"
 import { deleteRecord, type RecordSpec, setRecord } from "./records.ts"
 
 /**
@@ -27,7 +27,7 @@ export const PARTICIPANT: RecordSpec<ParticipantRecord, WriterId, "session"> = {
   keyOf: r => r.writer,
   encode: r => r.name,
   decode: (contents, key) =>
-    decodeAt(Type.String(), contents, writerKey(key), (name, writer) => ({
+    decodeRecord(Type.String(), contents, writerKey(key), (name, writer) => ({
       writer,
       name,
     })),
@@ -66,7 +66,7 @@ export const PICTURE: RecordSpec<PictureRecord, WriterId, "session"> = {
   keyOf: r => r.writer,
   encode: r => r.sha256,
   decode: (contents, key) =>
-    decodeAt(Type.String(), contents, writerKey(key), (sha, writer) =>
+    decodeRecord(Type.String(), contents, writerKey(key), (sha, writer) =>
       isSha256(sha) ? { writer, sha256: sha } : undefined,
     ),
 }

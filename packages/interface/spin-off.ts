@@ -7,13 +7,13 @@
 import {
   type CanvasId,
   type CardId,
+  cardMove,
   DISCARDED,
-  moveOf,
   type WorkflowStateId,
 } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import type { HostRequest } from "@pinetrie/session"
-import { canvasOfTab, cardOf } from "./card-intents.ts"
+import { canvasOfTab, findCard } from "./card-intents.ts"
 import type { Minted } from "./columns.ts"
 import { type Effect, type IntentState, layout, list } from "./effects.ts"
 
@@ -38,14 +38,14 @@ export function planSpinOff(
   minted: Minted,
   state: IntentState,
 ): readonly Effect[] {
-  const now = cardOf(state.cards, card)
+  const now = findCard(state.cards, card)
   if (now === undefined || now.kind !== "text") return []
   const { place } = now
   if (place.kind === "inventory" && place.holder !== state.cards.me) return []
   if (place.kind === "trash") return []
   const request: Extract<HostRequest, { kind: "spin-off" }> = {
     kind: "spin-off",
-    move: moveOf(now, DISCARDED),
+    move: cardMove(now, DISCARDED),
     root: minted.root,
     thread: minted.thread,
     canvas: minted.canvas,

@@ -58,7 +58,7 @@ import {
   proposedTip,
 } from "./fixtures.ts"
 import { laneBase } from "./lane/base.ts"
-import { bookmarkOf } from "./lane/bookmarks.ts"
+import { readLaneBookmark } from "./lane/bookmarks.ts"
 import {
   conflictContent,
   conflictsIn,
@@ -88,12 +88,12 @@ import {
 import {
   ACCEPTED_THREAD_COMMIT_ROW,
   changedPaths,
-  commitsOf,
   commitTurn,
-  conflictedFilesAt,
   copyFacts,
   oldNamesOnDisk,
   parseAcceptedThreadCommits,
+  readCommits,
+  readConflictedFiles,
 } from "./lane/revisions.ts"
 import { gatherLane } from "./lane-read.ts"
 import {
@@ -115,13 +115,13 @@ import {
   planSetup,
 } from "./plan.ts"
 import {
-  changeOf,
   fileDiff,
   filesTouched,
   hostCommitIn,
-  hostVersionOf,
   laneTipIn,
   proposedRevisions,
+  readChangeId,
+  readHostVersion,
   readProposedChanges,
   revisionRead,
   startOfProposed,
@@ -162,7 +162,7 @@ const turnOn = async (
   (
     await commitTurn(jj, {
       ...input,
-      bookmark: await bookmarkOf(jj, input.lane),
+      bookmark: await readLaneBookmark(jj, input.lane),
     })
   ).point
 
@@ -290,7 +290,7 @@ describe("a lane's repo, with jj", () => {
     // Your committed work: a file with three lines.
     await writeFile(path.join(yoursDir, "shared.txt"), "one\ntwo\nthree\n")
     await yoursJj(["commit", "-m", "your base"])
-    const base = await commitsOf(yoursJj, "@-")
+    const base = await readCommits(yoursJj, "@-")
     expect(base).toHaveLength(1)
 
     // The base disk: git and jj initialized, your @- fetched by id, jj new.
@@ -305,10 +305,10 @@ describe("a lane's repo, with jj", () => {
     expect(await readFile(path.join(laneDir, "shared.txt"), "utf8")).toContain(
       "two",
     )
-    expect(await bookmarkOf(laneJj, LANE)).toBe(base[0])
+    expect(await readLaneBookmark(laneJj, LANE)).toBe(base[0])
     // The same change ids on both sides.
-    expect(await changeOf(laneJj, base[0] ?? "")).toBe(
-      await changeOf(yoursOps, base[0] ?? ""),
+    expect(await readChangeId(laneJj, base[0] ?? "")).toBe(
+      await readChangeId(yoursOps, base[0] ?? ""),
     )
 
     // A turn that changed nothing records nothing; one that did, commits.
@@ -323,7 +323,7 @@ describe("a lane's repo, with jj", () => {
     await writeFile(path.join(laneDir, ".plans", "a.md"), "a plan\n")
     const r1 = await turnOn(laneJj, turn)
     if (r1 === null) throw new Error("the turn committed nothing")
-    expect(await bookmarkOf(laneJj, LANE)).toBe(r1)
+    expect(await readLaneBookmark(laneJj, LANE)).toBe(r1)
     const committed = await laneJj([
       "file",
       "list",
@@ -350,7 +350,9 @@ describe("a lane's repo, with jj", () => {
       (await yoursOps(["op", "log", "--no-graph", "-n", "1", "-T", "user"]))
         .stdout,
     ).toMatch(/^pinetrie-host@/)
-    expect(await commitsOf(yoursJj, 'bookmarks(glob:"pinetrie/*")')).toEqual([])
+    expect(await readCommits(yoursJj, 'bookmarks(glob:"pinetrie/*")')).toEqual(
+      [],
+    )
     expect(await defaultLog(yoursJj)).not.toContain("edit line two")
     expect((await yoursJj(["describe", "-r", r1, "-m", "rewritten"])).ok).toBe(
       false,
@@ -369,7 +371,7 @@ describe("a lane's repo, with jj", () => {
     await yoursJj(["commit", "-m", "you edit line two"])
     await yoursJj(["bookmark", "create", "wip/x", "-r", "@-"])
     const wipNow = async () => {
-      const [commit] = await commitsOf(yoursJj, "wip/x")
+      const [commit] = await readCommits(yoursJj, "wip/x")
       if (commit === undefined) throw new Error("no wip")
       return { bookmark: "wip/x", commit, under: base[0] ?? commit }
     }
@@ -381,13 +383,13 @@ describe("a lane's repo, with jj", () => {
       fetchById([wip1.commit, wip1.under]),
       ...planWipCopy(wip1, wip1.under),
     ])
-    const [copy] = await commitsOf(laneJj, "@-")
+    const [copy] = await readCommits(laneJj, "@-")
     if (copy === undefined) throw new Error("no copy")
     expect(
       (await laneJj(["file", "show", "-r", copy, 'root:"shared.txt"'])).stdout,
     ).toContain("two (you)")
     // The copy is no commit of yours: your WIP stays yours.
-    expect(await commitsOf(laneJj, `${copy} & ${wip1.commit}`)).toEqual([])
+    expect(await readCommits(laneJj, `${copy} & ${wip1.commit}`)).toEqual([])
     expect(await newestBase(laneJj, copy, "wip/")).toEqual({
       at: copy,
       kind: "wip",
@@ -440,15 +442,15 @@ describe("a lane's repo, with jj", () => {
       fetchById([wip2.commit]),
       ...planWipCopy(wip2, copy),
     ])
-    const [cleanCopy] = await commitsOf(laneJj, "@-")
+    const [cleanCopy] = await readCommits(laneJj, "@-")
     if (cleanCopy === undefined) throw new Error("no copy")
     const updated = await mergeBase(laneJj, LANE, cleanCopy, "update: wip/x")
     expect(updated.merge).not.toBeNull()
     expect(await conflictsIn(laneJj)).toEqual([])
-    const newest = await bookmarkOf(laneJj, LANE)
+    const newest = await readLaneBookmark(laneJj, LANE)
     expect(
       (
-        await commitsOf(
+        await readCommits(
           laneJj,
           `(${cleanCopy} | ${updated.ours}) & ::${newest}`,
         )
@@ -491,7 +493,7 @@ describe("a lane's repo, with jj", () => {
     await fetchInto(laneDir, LANE, [point])
     await fetchInto(forkDir, FORK, [point])
     // Your repo sees two changes, never one divergent change.
-    expect(await commitsOf(yoursJj, "divergent()")).toEqual([])
+    expect(await readCommits(yoursJj, "divergent()")).toEqual([])
     expect(await laneTipIn(yoursOps, FORK)).toBe(forkNext)
     // The fork's writes never reach its parent.
     expect(await readFile(path.join(laneDir, "shared.txt"), "utf8")).toBe(
@@ -511,7 +513,7 @@ describe("a lane's repo, with jj", () => {
     expect(await readFile(path.join(rootDir, "yours-only.txt"), "utf8")).toBe(
       "yours\n",
     )
-    const [rootCopy] = await commitsOf(
+    const [rootCopy] = await readCommits(
       rootJj,
       `bookmarks(exact:"pinetrie/${ROOT}")`,
     )
@@ -534,7 +536,7 @@ describe("a lane's repo, with jj", () => {
     await writeFile(path.join(rootDir, "root.txt"), "root\n")
     await turnOn(rootJj, { ...turn, lane: ROOT, entry: entryId("e-7") })
     await fetchInto(rootDir, ROOT, [])
-    expect(await commitsOf(yoursJj, "divergent()")).toEqual([])
+    expect(await readCommits(yoursJj, "divergent()")).toEqual([])
   }, 60_000)
 
   /**
@@ -569,12 +571,12 @@ describe("a lane's repo, with jj", () => {
         expect(made.ok, made.stderr).toBe(true)
       }
       const turn = await turnOn(laneJj, { ...TURN, entry: entryId("e-2") })
-      const [mine] = await commitsOf(
+      const [mine] = await readCommits(
         laneJj,
         `description(exact:"mine\n") & ::@`,
       )
       expect(turn).toBe(mine)
-      expect(await bookmarkOf(laneJj, LANE)).toBe(mine)
+      expect(await readLaneBookmark(laneJj, LANE)).toBe(mine)
 
       // The proposed changes: your repo fetches the lane's bookmark, which
       // holds b.txt.
@@ -643,7 +645,7 @@ describe("a lane's repo, with jj", () => {
       })
     /** The lane's head now. */
     const head = async (): Promise<CommitId> => {
-      const at = await bookmarkOf(laneJj, LANE)
+      const at = await readLaneBookmark(laneJj, LANE)
       if (at === null) throw new Error("no lane head")
       return at
     }
@@ -652,7 +654,7 @@ describe("a lane's repo, with jj", () => {
     await edit(yoursDir, "b.txt", "b\n")
     await yours("c.txt", "c\n", "your base")
     await setUpAccepted()
-    const [base] = await commitsOf(yoursJj, "@-")
+    const [base] = await readCommits(yoursJj, "@-")
     if (base === undefined) throw new Error("no base")
     await executeOrThrow(
       planBaseCheckout({ yours: [base], fresh: true }),
@@ -737,7 +739,7 @@ describe("a lane's repo, with jj", () => {
     await edit(laneDir, "a.txt", "a (both)\n")
     await edit(laneDir, "b.txt", "b (both)\n")
     await turnOn(laneJj, { ...TURN, title: "resolved", entry: entryId("e-4") })
-    const ours = await bookmarkOf(laneJj, LANE)
+    const ours = await readLaneBookmark(laneJj, LANE)
     expect(
       await mergeUpdate(laneJj, runners, LANE, await acceptedMerge()),
     ).toEqual({ kind: "nothing", ours, mark: null })
@@ -749,7 +751,7 @@ describe("a lane's repo, with jj", () => {
     )
     if (moved.kind !== "nothing" || moved.mark === null)
       throw new Error("no mark")
-    expect(await bookmarkOf(laneJj, LANE)).toBe(moved.mark)
+    expect(await readLaneBookmark(laneJj, LANE)).toBe(moved.mark)
     expect(
       await newestBase(laneJj, bookmarkRevset(bookmarkName(LANE)), "wip/"),
     ).toEqual({
@@ -763,7 +765,7 @@ describe("a lane's repo, with jj", () => {
     await yoursJj(["new", line2])
     await yours("w.txt", "w1\n", "wip one")
     await yoursJj(["bookmark", "create", "wip/x", "-r", "@-"])
-    const [w1] = await commitsOf(yoursJj, "@-")
+    const [w1] = await readCommits(yoursJj, "@-")
     if (w1 === undefined) throw new Error("no wip")
     const wipMerge = (commit: CommitId, on: CommitId) =>
       planMerge(jjLaneFor(LANE), {
@@ -790,9 +792,9 @@ describe("a lane's repo, with jj", () => {
     ).toEqual(["w.txt"])
     await yours("w.txt", "w2\n", "wip two")
     await yoursJj(["bookmark", "move", "wip/x", "--to", "@-"])
-    const [w2] = await commitsOf(yoursJj, "@-")
+    const [w2] = await readCommits(yoursJj, "@-")
     if (w2 === undefined) throw new Error("no wip")
-    expect(await commitsOf(yoursJj, `present(${first.from})`)).toEqual([])
+    expect(await readCommits(yoursJj, `present(${first.from})`)).toEqual([])
     const beforeNext = await head()
     const next = await mergeUpdate(
       laneJj,
@@ -806,7 +808,7 @@ describe("a lane's repo, with jj", () => {
       commits: ["wip two", "wip one"],
     })
     if (next.kind !== "clean") throw new Error("not clean")
-    expect(await commitsOf(laneJj, `${next.from}-`)).toEqual([first.from])
+    expect(await readCommits(laneJj, `${next.from}-`)).toEqual([first.from])
     // From the lane's copy, the WIP's base start, to the WIP's commit.
     expect(
       await catchUpFiles(laneRoot, {
@@ -854,7 +856,7 @@ describe("a lane's repo, with jj", () => {
     await laneJj(["commit", "-m", "s1: s.txt"])
     await laneJj(["bookmark", "set", stackBookmark(LANE), "-r", "@-"])
     expect(await turnOn(laneJj, { ...TURN, entry: entryId("e-3") })).toBeNull()
-    expect(await bookmarkOf(laneJj, LANE)).toBe(merge)
+    expect(await readLaneBookmark(laneJj, LANE)).toBe(merge)
   }, 60_000)
 
   test("a review reads proposed changes' commit: its description, files and one file's diff", async () => {
@@ -978,7 +980,7 @@ describe("a lane's repo, with jj", () => {
 
     // A range reads the same files, with no description, its counts from
     // the range's git diff: here the range is the revision.
-    const [parent] = await commitsOf(ops, `${w}-`)
+    const [parent] = await readCommits(ops, `${w}-`)
     if (parent === undefined) throw new Error("no parent")
     const range = { kind: "range", from: parent, to: w } as const
     const byPath = (r: unknown) =>
@@ -1173,7 +1175,7 @@ describe("a lane's repo, with jj", () => {
         proposed,
         hostLeft:
           proposed === null &&
-          (await hostVersionOf(ops, proposedBookmark(NAME))) !== null,
+          (await readHostVersion(ops, proposedBookmark(NAME))) !== null,
         work: await filesTouched(ops, { start, tip }),
         catchUp: await readCatchUp(ops, {
           base,
@@ -1199,7 +1201,7 @@ describe("a lane's repo, with jj", () => {
       return {
         built,
         conflicted:
-          (await commitsOf(ops, `${commit} & conflicts()`)).length > 0,
+          (await readCommits(ops, `${commit} & conflicts()`)).length > 0,
         files: lines((await ops(["diff", "-r", commit, "--name-only"])).stdout),
       }
     }
@@ -1243,7 +1245,7 @@ describe("a lane's repo, with jj", () => {
     const rig = await proposedRig(tag)
     await rig.edit(rig.yoursDir, "base.txt", "base\n")
     await rig.yoursJj(["commit", "-m", "your base"])
-    const base = await commitsOf(rig.yoursJj, "@-")
+    const base = await readCommits(rig.yoursJj, "@-")
     const [line] = base
     if (line === undefined) throw new Error("no base")
     await rig.setUpAccepted()
@@ -1319,11 +1321,11 @@ describe("a lane's repo, with jj", () => {
       ).stdout,
     ).toContain("proposed changes: lane")
     expect(
-      (await commitsOf(yoursJj, `${c1} & immutable()`)).length,
+      (await readCommits(yoursJj, `${c1} & immutable()`)).length,
     ).toBeGreaterThan(0)
     expect(
       (
-        await commitsOf(
+        await readCommits(
           yoursJj,
           `description(exact:"yours: c.txt\n") & mutable()`,
         )
@@ -1389,7 +1391,7 @@ describe("a lane's repo, with jj", () => {
     const split = await hostCommitIn(
       ops,
       c1,
-      await hostVersionOf(ops, bookmark),
+      await readHostVersion(ops, bookmark),
     )
     if (split === null) throw new Error("no split")
     await repairProposedChanges(
@@ -1398,10 +1400,10 @@ describe("a lane's repo, with jj", () => {
     )
     // Repaired: yours, edited.
     await agrees()
-    expect(await commitsOf(yoursJj, "divergent()")).toEqual([])
-    expect(await commitsOf(yoursJj, `bookmarks(exact:"${bookmark}")`)).toEqual([
-      split.yours,
-    ])
+    expect(await readCommits(yoursJj, "divergent()")).toEqual([])
+    expect(
+      await readCommits(yoursJj, `bookmarks(exact:"${bookmark}")`),
+    ).toEqual([split.yours])
     await yoursJj([
       "describe",
       "--ignore-immutable",
@@ -1416,13 +1418,13 @@ describe("a lane's repo, with jj", () => {
     // Accept: accepted work moved forward to the proposed changes, as the host;
     // your @ and the working copy untouched; the proposed changes' bookmark
     // gone.
-    const atBefore = await commitsOf(yoursJj, "@")
+    const atBefore = await readCommits(yoursJj, "@")
     await accept({ built: one })
-    expect(await commitsOf(yoursJj, "@")).toEqual(atBefore)
+    expect(await readCommits(yoursJj, "@")).toEqual(atBefore)
     expect(await readFile(path.join(yoursDir, "wip.txt"), "utf8")).toBe("wip\n")
-    expect(await changeOf(ops, await acceptedNow())).toBe(c1)
+    expect(await readChangeId(ops, await acceptedNow())).toBe(c1)
     expect(
-      await commitsOf(ops, `present(bookmarks(exact:"${bookmark}"))`),
+      await readCommits(ops, `present(bookmarks(exact:"${bookmark}"))`),
     ).toEqual([])
     // jj itself refuses an acceptance that is not forward.
     expect(
@@ -1484,11 +1486,11 @@ describe("a lane's repo, with jj", () => {
         description: `WIP\n\nPinetrie-Source: ${t3}\n`,
       }),
     )
-    const [followed] = await commitsOf(ops, `change_id(${nc})`)
+    const [followed] = await readCommits(ops, `change_id(${nc})`)
     expect(
       lines((await ops(["diff", "-r", followed ?? "", "--name-only"])).stdout),
     ).toEqual(["b.txt", "f.txt"])
-    expect(await commitsOf(ops, `${followed} & conflicts()`)).toEqual([])
+    expect(await readCommits(ops, `${followed} & conflicts()`)).toEqual([])
     await agrees()
 
     // A stack: one revision per lane revision, each with its own file.
@@ -1498,8 +1500,8 @@ describe("a lane's repo, with jj", () => {
     await laneJj(["commit", "-m", "s1: d.txt"])
     await edit(laneDir, "e.txt", "e\n")
     await laneJj(["commit", "-m", "s2: e.txt"])
-    const [s1] = await commitsOf(laneJj, "@--")
-    const [s2] = await commitsOf(laneJj, "@-")
+    const [s1] = await readCommits(laneJj, "@--")
+    const [s2] = await readCommits(laneJj, "@-")
     if (s1 === undefined || s2 === undefined) throw new Error("no stack")
     await laneJj([
       "bookmark",
@@ -1569,7 +1571,7 @@ describe("a lane's repo, with jj", () => {
     await edit(laneDir, "c.txt", "c\n")
     await turn()
     expect((await proposed([t2])).files).toEqual(["c.txt"])
-    expect(await commitsOf(ops, "divergent()")).toEqual([])
+    expect(await readCommits(ops, "divergent()")).toEqual([])
   }, 60_000)
 
   test("proposed changes after a catch-up start at accepted work it merged, not at what you accepted below it", async () => {
@@ -1650,7 +1652,7 @@ describe("a lane's repo, with jj", () => {
       }),
     )
     if (merge === null) throw new Error("nothing merged")
-    expect(await conflictedFilesAt(rig.laneJj, merge)).toEqual(["base.txt"])
+    expect(await readConflictedFiles(rig.laneJj, merge)).toEqual(["base.txt"])
     // A prompt on it commits nothing, and its record names the merge: the
     // turn says it is conflicted, as a branch from it would start.
     expect(
@@ -1692,7 +1694,7 @@ describe("a lane's repo, with jj", () => {
       title: "resolve",
       entry: entryId("e-fork-1"),
       lane: FORK,
-      bookmark: await bookmarkOf(forkJj, FORK),
+      bookmark: await readLaneBookmark(forkJj, FORK),
     })
     expect(resolving.conflicted).toBe(false)
     await fetchFork(rig.base)
@@ -1809,7 +1811,7 @@ describe("a lane's repo, with jj", () => {
     }
     /** The commit tracked as the host's version, or none. */
     const tracked = (rig: Awaited<ReturnType<typeof turnRig>>) =>
-      commitsOf(
+      readCommits(
         rig.ops,
         `tracked_remote_bookmarks(exact:${revsetName(BOOKMARK)}, remote=exact:${revsetName(HOST_REMOTE)})`,
       )
@@ -1897,7 +1899,7 @@ describe("a lane's repo, with jj", () => {
         git("update-ref", "-d", hostProposedRef(BOOKMARK)),
         IMPORT,
       ])
-      expect(await hostVersionOf(rig.ops, BOOKMARK)).toBeNull()
+      expect(await readHostVersion(rig.ops, BOOKMARK)).toBeNull()
       const read = await proposedNow(rig)
       expect([read.marked, read.revisions.map(r => r.since)]).toEqual([
         false,
@@ -1920,7 +1922,7 @@ describe("a lane's repo, with jj", () => {
         ...planDescribe(bottom.changeId, "the host's\n"),
         ...markSteps(BOOKMARK),
       ])
-      const marked = await hostVersionOf(rig.ops, BOOKMARK)
+      const marked = await readHostVersion(rig.ops, BOOKMARK)
       await rig.yoursJj([
         "--at-operation",
         op,
@@ -1936,7 +1938,7 @@ describe("a lane's repo, with jj", () => {
       const split = await hostCommitIn(
         rig.ops,
         bottom.changeId,
-        await hostVersionOf(rig.ops, BOOKMARK),
+        await readHostVersion(rig.ops, BOOKMARK),
       )
       expect(split?.hosts).toBe(marked)
     }, 60_000)
@@ -1944,17 +1946,17 @@ describe("a lane's repo, with jj", () => {
     test("you delete the proposed changes' bookmark and build on its commit: the host's forget leaves your commits where they are", async () => {
       const rig = await turnRig("host-forget")
       await rig.proposed(rig.base)
-      const proposed = (await commitsOf(rig.ops, BOOKMARK))[0]
+      const proposed = (await readCommits(rig.ops, BOOKMARK))[0]
       await rig.yoursJj(["bookmark", "delete", BOOKMARK])
       await rig.yoursJj(["new", "--ignore-immutable", proposed ?? ""])
       await rig.edit(rig.yoursDir, "mine.txt", "mine\n")
       await rig.yoursJj(["commit", "-m", "mine, on the old proposed changes"])
-      const mine = await commitsOf(rig.ops, "@-")
-      const below = await commitsOf(rig.ops, "::@-")
+      const mine = await readCommits(rig.ops, "@-")
+      const below = await readCommits(rig.ops, "::@-")
       await executeRepo(rig.yoursDir, forgetSteps(BOOKMARK))
-      expect(await hostVersionOf(rig.ops, BOOKMARK)).toBeNull()
-      expect(await commitsOf(rig.ops, "@-")).toEqual(mine)
-      expect(await commitsOf(rig.ops, "::@-")).toEqual(below)
+      expect(await readHostVersion(rig.ops, BOOKMARK)).toBeNull()
+      expect(await readCommits(rig.ops, "@-")).toEqual(mine)
+      expect(await readCommits(rig.ops, "::@-")).toEqual(below)
     }, 60_000)
 
     test("an acceptance forgets the proposed changes' bookmark and the host's version, and accepted work holds the commit", async () => {
@@ -1962,9 +1964,9 @@ describe("a lane's repo, with jj", () => {
       const proposed = await rig.proposed(rig.base)
       const [top] = proposed.built.commits
       await rig.accept(proposed)
-      expect(await hostVersionOf(rig.ops, BOOKMARK)).toBeNull()
+      expect(await readHostVersion(rig.ops, BOOKMARK)).toBeNull()
       expect(
-        await commitsOf(rig.ops, `present(${bookmarkRevset(BOOKMARK)})`),
+        await readCommits(rig.ops, `present(${bookmarkRevset(BOOKMARK)})`),
       ).toEqual([])
       expect(await rig.acceptedNow()).toBe(top)
     }, 60_000)
@@ -2002,10 +2004,10 @@ describe("a lane's repo, with jj", () => {
     await edit(yoursDir, "mine.txt", "mine\n")
     await yoursJj(["commit", "-m", "mine on accepted work"])
     await yoursJj(["bookmark", "move", "pinetrie-accepted", "--to", "@-"])
-    const before = await commitsOf(ops, "::@-")
+    const before = await readCommits(ops, "::@-")
     await executeRepo(yoursDir, laneRefSteps([{ lane: LANE, commit: null }]))
-    expect(await commitsOf(ops, "::@-")).toEqual(before)
-    expect(await commitsOf(ops, "conflicts()")).toEqual([])
+    expect(await readCommits(ops, "::@-")).toEqual(before)
+    expect(await readCommits(ops, "conflicts()")).toEqual([])
   }, 60_000)
 
   test("a publish's catch-up: a preview that writes nothing, then your work rebased onto accepted work, conflicts recorded", async () => {
@@ -2076,7 +2078,7 @@ describe("a lane's repo, with jj", () => {
       "a\nB\nc\n",
     )
     expect(
-      await commitsOf(
+      await readCommits(
         ops,
         `description(exact:"sibling\\n") & ${revsetName(line.acceptedBookmark)}::`,
       ),
@@ -2175,11 +2177,11 @@ describe("a lane's repo, with jj", () => {
     const after = await acceptedFacts(ops, git, line)
     expect(after.published).toMatchObject({ behind: 0, ahead: 0 })
     expect(after.yours).toMatchObject({ behind: 0, ahead: 0 })
-    expect(await commitsOf(ops, "main")).toEqual(
-      await commitsOf(ops, revsetName(line.acceptedBookmark)),
+    expect(await readCommits(ops, "main")).toEqual(
+      await readCommits(ops, revsetName(line.acceptedBookmark)),
     )
-    expect(await commitsOf(ops, "@-")).toEqual(await commitsOf(ops, "main"))
-    expect(await commitsOf(ops, "@ & empty()")).toHaveLength(1)
+    expect(await readCommits(ops, "@-")).toEqual(await readCommits(ops, "main"))
+    expect(await readCommits(ops, "@ & empty()")).toHaveLength(1)
     expect(await readFile(path.join(yoursDir, "b.txt"), "utf8")).toBe("b\n")
   }, 60_000)
 
@@ -2223,11 +2225,11 @@ describe("a lane's repo, with jj", () => {
     expect(
       ops1.stdout.split("\n").length - ops0.stdout.split("\n").length,
     ).toBe(1)
-    const mine = await commitsOf(ops, 'description(exact:"mine\\n")')
-    expect(await commitsOf(ops, revsetName(line.acceptedBookmark))).toEqual(
+    const mine = await readCommits(ops, 'description(exact:"mine\\n")')
+    expect(await readCommits(ops, revsetName(line.acceptedBookmark))).toEqual(
       mine,
     )
-    expect(await commitsOf(ops, "main")).toEqual(mine)
+    expect(await readCommits(ops, "main")).toEqual(mine)
   }, 60_000)
 
   test("a publish's second round reads your commits conflicted by the catch-up, and its revert keeps your edit", async () => {
@@ -2257,7 +2259,7 @@ describe("a lane's repo, with jj", () => {
     const before = await acceptedFacts(ops, git, line)
     expect(before.yours.catchUp?.conflicts).toEqual([])
     expect(before.yours.conflicts.commits).toBe(0)
-    const commitsBefore = await commitsOf(ops, "::@- ~ ::main")
+    const commitsBefore = await readCommits(ops, "::@- ~ ::main")
     await executeRepo(
       yoursDir,
       planPublishCatchUp({ acceptedBookmark: line.acceptedBookmark }),
@@ -2281,8 +2283,8 @@ describe("a lane's repo, with jj", () => {
     const undone = await acceptedFacts(ops, git, line)
     expect(undone.yours.behind).toBe(1)
     expect(undone.yours.conflicts.commits).toBe(0)
-    expect(await commitsOf(ops, "::@- ~ ::main")).toEqual(commitsBefore)
-    expect(await commitsOf(ops, "@ & divergent()")).toEqual([])
+    expect(await readCommits(ops, "::@- ~ ::main")).toEqual(commitsBefore)
+    expect(await readCommits(ops, "@ & divergent()")).toEqual([])
     expect(await readFile(path.join(yoursDir, "e.txt"), "utf8")).toBe(
       "edited\n",
     )
@@ -2497,7 +2499,7 @@ describe("a lane's repo, with jj", () => {
         ])
       ).stdout,
     )
-    const found = await commitsOf(ops, trailerRevset(["thread"], NAME))
+    const found = await readCommits(ops, trailerRevset(["thread"], NAME))
     expect(found.length).toBeGreaterThan(0)
     expect(
       all
@@ -2715,7 +2717,7 @@ describe("a lane's repo, with jj", () => {
         title: "branch work",
         entry: entryId("e-past-parent-fork"),
         lane: FORK,
-        bookmark: await bookmarkOf(laneJjAt(forkDir), FORK),
+        bookmark: await readLaneBookmark(laneJjAt(forkDir), FORK),
       })
       // The parent's proposed changes are accepted, and you edit it on accepted
       // work.
@@ -2767,7 +2769,7 @@ describe("a lane's repo, with jj", () => {
         "--use-destination-message",
       ])
       expect(
-        await commitsOf(
+        await readCommits(
           rig.ops,
           `${bookmarkRevset(proposedBookmark(NAME))} & ${trailerRevset(["source"])}`,
         ),
@@ -2777,7 +2779,7 @@ describe("a lane's repo, with jj", () => {
       // Merged as before the joins: no join is left in the lane's history.
       expect(merged.kind).toBe("conflicted")
       expect(
-        await commitsOf(rig.laneJj, 'description(regex:"^join: ")'),
+        await readCommits(rig.laneJj, 'description(regex:"^join: ")'),
       ).toEqual([])
     }, 60_000)
   })
@@ -2830,14 +2832,14 @@ describe("a lane's repo, with jj", () => {
     const rig = await proposedRig("wipcopy")
     await rig.edit(rig.yoursDir, "base.txt", "base\n")
     await rig.yoursJj(["commit", "-m", "your base"])
-    const base = await commitsOf(rig.yoursJj, "@-")
+    const base = await readCommits(rig.yoursJj, "@-")
     const [line] = base
     if (line === undefined) throw new Error("no base")
     await rig.setUpAccepted()
     await rig.edit(rig.yoursDir, "wip.txt", "half done\n")
     await rig.yoursJj(["commit", "-m", "wip: half done"])
     await rig.yoursJj(["bookmark", "create", "wip/search", "-r", "@-"])
-    const [wip] = await commitsOf(rig.yoursJj, "wip/search")
+    const [wip] = await readCommits(rig.yoursJj, "wip/search")
     if (wip === undefined) throw new Error("no wip")
     await rig.inLane(planBaseCheckout({ yours: base, fresh: true }))
     await rig.inLane(
@@ -2855,7 +2857,9 @@ describe("a lane's repo, with jj", () => {
     await rig.turn()
     await rig.fetch(base)
     // The lane's tip is immutable in your repo; your WIP is not.
-    expect((await commitsOf(rig.yoursJj, `${wip} & mutable()`)).length).toBe(1)
+    expect((await readCommits(rig.yoursJj, `${wip} & mutable()`)).length).toBe(
+      1,
+    )
     const tip = await laneTipIn(rig.ops, LANE)
     if (tip === null) throw new Error("no tip")
     expect(await laneBase(rig.ops, tip, rig.line)).toMatchObject({
@@ -2873,7 +2877,7 @@ describe("a lane's repo, with jj", () => {
       base: b,
       repoConfig: rig.line,
     })
-    const [target] = await commitsOf(rig.ops, "wip/search")
+    const [target] = await readCommits(rig.ops, "wip/search")
     if (target === undefined) throw new Error("no wip")
     await executeRepo(
       rig.yoursDir,
@@ -2928,7 +2932,7 @@ describe("a lane's repo, with jj", () => {
         destination: "wip/search",
       }),
     )
-    expect(await commitsOf(rig.ops, "wip/search & mutable()")).toEqual([o])
+    expect(await readCommits(rig.ops, "wip/search & mutable()")).toEqual([o])
     // The WIP's bookmark deleted, its work never on accepted work: gone.
     await rig.yoursJj(["bookmark", "delete", "wip/search"])
     expect(await gatherPlace({ jj: rig.ops }, input)).toEqual({
@@ -2970,7 +2974,9 @@ describe("a lane's repo, with jj", () => {
       expect(
         await readFile(path.join(laneDir, ".pinetrie-lane", "jj.toml"), "utf8"),
       ).toContain("immutable_heads()")
-      expect(await commitsOf(laneJj, 'bookmarks(glob:"pineta/*")')).toEqual([])
+      expect(await readCommits(laneJj, 'bookmarks(glob:"pineta/*")')).toEqual(
+        [],
+      )
       expect(planOldNamesOnDisk(await oldNamesOnDisk(lane), LANE)).toEqual([])
     }, 60_000)
 
@@ -3000,7 +3006,9 @@ describe("a lane's repo, with jj", () => {
       })
       if (turned === null) throw new Error("the fork's turn committed nothing")
       expect(await changedPaths(forkJj, first, turned)).toEqual(["f.txt"])
-      expect(await commitsOf(forkJj, 'files(root:".pineta-lane")')).toEqual([])
+      expect(await readCommits(forkJj, 'files(root:".pineta-lane")')).toEqual(
+        [],
+      )
     }, 60_000)
 
     test("an old lane on accepted work: its Pineta-Base on pineta-onto reads as accepted work, the batched read and the separate reads alike; its proposed changes start above what it had accepted", async () => {
@@ -3052,7 +3060,7 @@ describe("a lane's repo, with jj", () => {
           description: `WIP\n\nPineta-Thread: ${NAME}\nPineta-Lane: ${LANE}\nPineta-Entry: e\nPineta-Source: ${t1}\nPineta-Start: ${onAccepted}\n`,
         },
       ])
-      const [accepted] = await commitsOf(
+      const [accepted] = await readCommits(
         ops,
         bookmarkRevset(proposedBookmark(NAME)),
       )
@@ -3100,12 +3108,12 @@ describe("a lane's repo, with jj", () => {
       )
     await writeFile(path.join(yoursDir, "a.txt"), "first\n")
     await yoursJj(["commit", "-m", "yours"])
-    const first = await commitsOf(yoursJj, "@-")
+    const first = await readCommits(yoursJj, "@-")
     await inBase(planBaseCheckout({ yours: first, fresh: true }))
     // Your @- rewritten in place: the base's commit is no ancestor of it.
     await writeFile(path.join(yoursDir, "a.txt"), "rewritten\n")
     await yoursJj(["squash", "--into", "@-"])
-    const rewritten = await commitsOf(yoursJj, "@-")
+    const rewritten = await readCommits(yoursJj, "@-")
     expect(rewritten).not.toEqual(first)
     await inBase(planBaseCheckout({ yours: rewritten, fresh: false }))
     expect(await readFile(path.join(baseDir, "a.txt"), "utf8")).toBe(

@@ -9,8 +9,8 @@ import {
 import { expect, test } from "vitest"
 import {
   crossCanvasLinks,
+  linkOpen,
   linkWords,
-  openOf,
   opens,
   threadLink,
 } from "./thread-link.ts"
@@ -38,18 +38,22 @@ test("a link opens a thread's canvas, your own held thread's preview, and nothin
     at({ kind: "canvas", canvas: CANVAS, order: "1", width: 1 }),
     ADA,
   )
-  expect(openOf(open, E)).toEqual({ kind: "canvas", canvas: CANVAS, entry: E })
+  expect(linkOpen(open, E)).toEqual({
+    kind: "canvas",
+    canvas: CANVAS,
+    entry: E,
+  })
   expect(linkWords(open, reader, () => "Fix the sync bug")).toBe(
     "Fix the sync bug",
   )
   const mine = threadLink(T, at({ kind: "inventory", holder: ADA }), ADA)
-  expect(openOf(mine, E)).toEqual({ kind: "preview", thread: T })
+  expect(linkOpen(mine, E)).toEqual({ kind: "preview", thread: T })
   expect(linkWords(mine, reader, () => "")).toBe("in your inventory")
   const held = threadLink(T, at({ kind: "inventory", holder: BEA }), ADA)
-  expect([openOf(held, E), opens(held)]).toEqual([{ kind: "nothing" }, false])
+  expect([linkOpen(held, E), opens(held)]).toEqual([{ kind: "nothing" }, false])
   expect(linkWords(held, reader, () => "")).toBe("Bea has it")
   const gone = threadLink(T, [], ADA)
-  expect([openOf(gone, E), opens(gone)]).toEqual([{ kind: "nothing" }, false])
+  expect([linkOpen(gone, E), opens(gone)]).toEqual([{ kind: "nothing" }, false])
   expect(linkWords(gone, reader, () => "")).toBe("deleted")
 })
 
@@ -63,7 +67,7 @@ test("a link to a trashed thread names the canvas it left, says so, and restores
     ADA,
   )
   expect(trashed).toMatchObject({ kind: "trashed", thread: T, canvas: CANVAS })
-  expect([openOf(trashed, E), opens(trashed)]).toEqual([
+  expect([linkOpen(trashed, E), opens(trashed)]).toEqual([
     { kind: "restore", thread: T },
     true,
   ])
@@ -72,7 +76,7 @@ test("a link to a trashed thread names the canvas it left, says so, and restores
 
 test("a link is made only by threadLink", () => {
   // @ts-expect-error: a link is threadLink's to make, so none reaches a held thread
-  const forged: Parameters<typeof openOf>[0] = {
+  const forged: Parameters<typeof linkOpen>[0] = {
     kind: "open",
     thread: T,
     canvas: CANVAS,

@@ -5,9 +5,9 @@
 import {
   atEntry,
   entryId,
-  handleOf,
   isTextCard,
-  keyOf,
+  mentionHandle,
+  placeKey,
   projectRail,
   ROOT,
   type ThreadId,
@@ -36,25 +36,25 @@ import {
   readTyping,
   readWorkflow,
 } from "@pinetrie/reads"
-import { cardsOnCanvas, indexCanvases, titleOf } from "@pinetrie/rules"
+import { cardsOnCanvas, indexCanvases, replyTitle } from "@pinetrie/rules"
 import { COPIED } from "@pinetrie/web/copy"
 import { IDENTITY_KEY } from "@pinetrie/web/storage-keys"
 import type { Page } from "@playwright/test"
 import type { Checks } from "../checks.ts"
 import {
-  boardStateOf,
   canvasHolding,
-  composeAt,
-  entriesOf,
+  composeCard,
+  heldEntries,
+  heldLanes,
+  heldTree,
   idleNow,
   join,
-  lanesOf,
   moveCanvasOnBoard,
   queueCard,
   startSuiteHost,
   suiteModel,
+  taskBoardState,
   threadHolding,
-  treeOf,
   waitFor,
 } from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
@@ -385,9 +385,9 @@ async function run(check: Checks["check"]): Promise<void> {
       // the model says is `e2e:live`'s to check.
       await idle()
       {
-        const [lane, ...others] = lanesOf(
+        const [lane, ...others] = heldLanes(
           host,
-          treeOf(host),
+          heldTree(host),
           readPlaces(host.places),
         )
         const laneName =
@@ -965,7 +965,7 @@ async function run(check: Checks["check"]): Promise<void> {
         | ThreadId
         | undefined
       const beaTip = entryId(await tipOf0())
-      const again = await composeAt(
+      const again = await composeCard(
         other,
         { entry: beaTip, lane: beaLane ?? null },
         "@agent Bea again",
@@ -1206,7 +1206,7 @@ async function run(check: Checks["check"]): Promise<void> {
         { timeout: 15_000 },
       )
       const forAdaId =
-        Object.values(entriesOf(host)).find(e =>
+        Object.values(heldEntries(host)).find(e =>
           JSON.stringify(e).includes("just a note"),
         )?.id ?? ""
       const pulse = script.hold("say exactly: PULSE")
@@ -1413,7 +1413,7 @@ async function run(check: Checks["check"]): Promise<void> {
       check("a rename on another device is kept on this one", followed >= 0)
 
       // ── ＋ canvas: an agent thread at the root, and stepping down ──
-      const firstRoot = treeOf(host).roots[0] ?? ""
+      const firstRoot = heldTree(host).roots[0] ?? ""
       // A new canvas holds one column, so the thread's columns count from 0.
       const before = 0
       await page.click("#sidebar .add-canvas")
@@ -1707,7 +1707,7 @@ async function run(check: Checks["check"]): Promise<void> {
         (await page.getAttribute(person, "data-entry")) ?? "",
       )
       // Past the context its run wrote above it: a canvas list.
-      const parentId = promptParent(treeOf(host), askedId) ?? ""
+      const parentId = promptParent(heldTree(host), askedId) ?? ""
       await page.hover(person)
       await page.click(`${person} > .tools > .edit`)
       const editCol = col(before + 1)
@@ -1733,8 +1733,8 @@ async function run(check: Checks["check"]): Promise<void> {
       await page.fill(`${editCol} .composer .input`, "say exactly: DOWN-2B")
       await page.click(`${editCol} .composer .send`)
       await shows("say exactly: DOWN-2B", editCol)
-      const edited = [...treeOf(host).bySend.values()]
-        .map(id => treeOf(host).entries[id])
+      const edited = [...heldTree(host).bySend.values()]
+        .map(id => heldTree(host).entries[id])
         .find(e => e?.message?.content === "say exactly: DOWN-2B")
       check(
         "edit sends again beside the original: a branch at its parent, starting with its text",
@@ -1862,7 +1862,7 @@ async function run(check: Checks["check"]): Promise<void> {
         timeout: 15_000,
       })
       await page.click(`${col(0)} .close`)
-      const agentRoot = treeOf(host).roots.at(-1) ?? ""
+      const agentRoot = heldTree(host).roots.at(-1) ?? ""
       await page.click(itemSel(rootCanvas(agentRoot)))
       await page.waitForFunction(
         () => document.querySelectorAll(".column").length === 2,
@@ -1871,7 +1871,7 @@ async function run(check: Checks["check"]): Promise<void> {
       )
 
       // ── the sidebar, the board and the inbox ───────────
-      const downRoot = treeOf(host).roots.at(-1) ?? ""
+      const downRoot = heldTree(host).roots.at(-1) ?? ""
       const selectedRoot = (p: Page) =>
         p
           .$eval('#sidebar [aria-current="true"]', n =>
@@ -1879,7 +1879,7 @@ async function run(check: Checks["check"]): Promise<void> {
           )
           .catch(() => null)
       const messagesIn = (root: string) =>
-        projectRail(treeOf(host), entryId(root)).length
+        projectRail(heldTree(host), entryId(root)).length
       // 1. Which tree a root's rail draws is `canvasRail`'s, proven by its unit test.
       await page.click(itemSel(rootCanvas(firstRoot)))
       await page
@@ -2234,7 +2234,7 @@ async function run(check: Checks["check"]): Promise<void> {
         // 4c. Auto-update title: the model's title arrives as the
         // label. The suites' scripted model answers every request outside a
         // thread with `SCRIPTED_DESCRIPTION`.
-        const auto = titleOf(SCRIPTED_DESCRIPTION) ?? ""
+        const auto = replyTitle(SCRIPTED_DESCRIPTION) ?? ""
         const retitled =
           (await chooseFromMenu(page, OWN_MENU, ".retitle-root")) &&
           (await labelIs(page, thirdRoot, auto))
@@ -2273,7 +2273,7 @@ async function run(check: Checks["check"]): Promise<void> {
             "dragging a thread card to another state moves it for the other window",
             theirs &&
               id !== undefined &&
-              boardStateOf(readPlaces(host.places), id) === doing,
+              taskBoardState(readPlaces(host.places), id) === doing,
             `${theirs}`,
           )
           await page.click("#bottom .board-toggle")
@@ -2403,7 +2403,7 @@ async function run(check: Checks["check"]): Promise<void> {
             )
             .catch(() => 0)
         // The page's handle, from its name as it is now (it was renamed above).
-        const handle = `@${handleOf(await shownName(page))}`
+        const handle = `@${mentionHandle(await shownName(page))}`
         const before = await unseen()
         const mention = await api.send(
           `${handle} a look at this?`,
@@ -3930,7 +3930,7 @@ async function run(check: Checks["check"]): Promise<void> {
       const landed =
         thread === undefined
           ? undefined
-          : boardStateOf(readPlaces(host.places), thread)
+          : taskBoardState(readPlaces(host.places), thread)
       await page.evaluate(() =>
         (document.activeElement as HTMLElement | null)?.blur(),
       )
@@ -4418,7 +4418,7 @@ async function run(check: Checks["check"]): Promise<void> {
             } as const)
       if (tracedFrom?.kind === "pinned" && pinTo !== null)
         await api.moveCard(
-          { card: traced, from: keyOf(tracedFrom), to: pinTo },
+          { card: traced, from: placeKey(tracedFrom), to: pinTo },
           { actedAt: { kind: "column", key: "k-api" }, slot: null },
         )
       await stepBack(page, rootCanvas(downRoot))

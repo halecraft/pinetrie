@@ -12,7 +12,7 @@ import type { WriterId } from "@pinetrie/core"
 
 import { readSeats } from "@pinetrie/reads"
 import { planSeats, SEAT, setRecord } from "@pinetrie/rules"
-import { seatOf } from "@pinetrie/schema"
+import { seatIdentity } from "@pinetrie/schema"
 import type { Basics, HostKeeper } from "./basics.ts"
 import type { MoveHistories } from "./move-history.ts"
 import type { Records } from "./records.ts"
@@ -44,7 +44,7 @@ export function startSeats(input: {
     keeper.run(async () => {
       // gather
       const connected = [...exchange.peers.current.values()].flatMap(p => {
-        const seat = seatOf(p.peerId, p.principal)
+        const seat = seatIdentity(p.peerId, p.principal)
         return seat === null ? [] : [seat]
       })
       // plan, then execute

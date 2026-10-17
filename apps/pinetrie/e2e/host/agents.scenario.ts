@@ -21,12 +21,12 @@ import { BUDGET } from "@pinetrie/rules"
 import type { Checks } from "../checks.ts"
 import {
   at,
-  boardStateOf,
   canvasHolding,
+  heldTree,
   START_AGENT,
   SUITE_CONFIG,
   suitePlaces,
-  treeOf,
+  taskBoardState,
 } from "../harness.ts"
 import type { LaneHosts, SectionHost } from "../lane-hosts.ts"
 import type { Scenario } from "../scenario.ts"
@@ -55,7 +55,7 @@ const placesWith = (budget: number) =>
  */
 async function twoThreads(section: SectionHost) {
   const { user, idle, host } = section
-  const threadsNow = () => [...treeOf(host).endOf.keys()]
+  const threadsNow = () => [...heldTree(host).endOf.keys()]
   await user.send("@agent you are A", ROOT, START_AGENT)
   await idle()
   const [a] = threadsNow()
@@ -68,7 +68,7 @@ async function twoThreads(section: SectionHost) {
 
 /** The transcript of `thread`, as its texts with their roles. */
 const said = (host: SectionHost["host"], thread: ThreadId) => {
-  const tree = treeOf(host)
+  const tree = heldTree(host)
   return projectTranscript(tree, threadEnd(tree, thread)).map(
     m => `${m.role}: ${m.text}`,
   )
@@ -88,7 +88,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     const { user, idle, host, close } = section
     try {
       const { a, b, bName } = await twoThreads(section)
-      const end = threadEnd(treeOf(host), a)
+      const end = threadEnd(heldTree(host), a)
       script.use([{ tool: "ask", args: { to: bName, text: "queue or not?" } }])
       await user.send(`Please talk to @${bName} about queues`, at(end), {
         thread: a,
@@ -96,7 +96,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       await idle()
       const inA = said(host, a)
       const inB = said(host, b)
-      const invited = Object.values(treeOf(host).entries).some(e =>
+      const invited = Object.values(heldTree(host).entries).some(e =>
         (e.message?.invites ?? []).includes(b),
       )
       check(
@@ -128,9 +128,9 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       // B's canvas archived: its root is let go, and A's ask of it is
       // refused with why, never opening that root again.
       const done = readWorkflow(host.session)?.archive
-      const bCanvas = canvasHolding(host, threadEnd(treeOf(host), b))
+      const bCanvas = canvasHolding(host, threadEnd(heldTree(host), b))
       const bRoot = readThreads(host.session).get(b)?.root
-      const state = boardStateOf(readPlaces(host.places), bCanvas)
+      const state = taskBoardState(readPlaces(host.places), bCanvas)
       if (done === undefined || state === undefined || bRoot === undefined)
         throw new Error("B's canvas is on the board")
       await user.request({
@@ -142,12 +142,12 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       })
       await idle()
       script.use([{ tool: "ask", args: { to: bName, text: "and now?" } }])
-      await user.send("@agent ask it again", at(threadEnd(treeOf(host), a)), {
+      await user.send("@agent ask it again", at(threadEnd(heldTree(host), a)), {
         thread: a,
       })
       await idle()
       // A tool's result is no transcript message: read the results stored.
-      const refused = Object.values(treeOf(host).entries).flatMap(e =>
+      const refused = Object.values(heldTree(host).entries).flatMap(e =>
         e.message?.role === "toolResult" &&
         messageText(e.message).includes("archived by")
           ? [messageText(e.message)]
@@ -177,7 +177,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     const { user, idle, host, close } = section
     try {
       const { a, bName } = await twoThreads(section)
-      const end = threadEnd(treeOf(host), a)
+      const end = threadEnd(heldTree(host), a)
       script.use([{ tool: "ask", args: { to: bName, text: "queue or not?" } }])
       await user.send(`Please talk to @${bName} about queues`, at(end), {
         thread: a,

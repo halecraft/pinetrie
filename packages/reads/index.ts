@@ -27,7 +27,6 @@ import {
   type EntryId,
   type EntryLike,
   entryId,
-  firstLineOf,
   type IconsRecord,
   indexTree,
   isCanvasId,
@@ -37,6 +36,7 @@ import {
   type MarkRecord,
   messageImages,
   messageText,
+  messageWriters,
   type NoteColumnId,
   type NoteColumnRecord,
   type PlanMode,
@@ -45,11 +45,12 @@ import {
   type ProposedChangesRecord,
   parseCardId,
   parseMentions,
-  promptOf,
   type QueueHold,
   type RevisionRecord,
   type RootId,
   type RootRecord,
+  rootFirstLine,
+  runPrompt,
   type SeatRecord,
   type SetupRecord,
   type Sha256,
@@ -66,13 +67,11 @@ import {
   type VerdictRecord,
   type Workflow,
   type WriterId,
-  writersOf,
 } from "@pinetrie/core"
 import {
   ACCEPTED,
   ACCEPTED_KEY,
   ACCESS,
-  archivedOf,
   BANNER,
   BASE,
   BUDGET,
@@ -82,7 +81,7 @@ import {
   COMMANDS,
   COMMANDS_KEY,
   CONFLICT,
-  contextOf,
+  contextInView,
   DIGEST,
   decodeCard,
   decodeMessage,
@@ -107,6 +106,7 @@ import {
   REVISION,
   type RecordSpec,
   ROOT,
+  readableThreadName,
   recordsIn,
   renderableMessage,
   SEAT,
@@ -116,8 +116,8 @@ import {
   STATE,
   THREAD,
   TRACE,
+  tasksInArchive,
   textBlobs,
-  threadNameOf,
   VERDICT,
   WORKFLOW,
   WORKFLOW_KEY,
@@ -158,7 +158,7 @@ const indexOfEntries = new WeakMap<
  * each kind, which pi's compaction hook puts there; undefined for none.
  */
 function carriedBy(row: StoredEntryRow): ContextInView | undefined {
-  const carried = contextOf(rowRetainedTail(row))
+  const carried = contextInView(rowRetainedTail(row))
   return Object.keys(carried).length === 0 ? undefined : carried
 }
 
@@ -279,7 +279,7 @@ export function readLatestPrompt(
   lane: ThreadId,
 ): { readonly id: EntryId; readonly role: string | undefined } | null {
   const index = readTreeIndex(doc)
-  const id = promptOf(index, readLaneTip(doc, lane))
+  const id = runPrompt(index, readLaneTip(doc, lane))
   return id === null ? null : { id, role: index.entries[id]?.message?.role }
 }
 
@@ -318,10 +318,10 @@ export function readRunAuthor(
 
 /**
  * Who asked the run that wrote `tip`: the writer of its prompt
- * (`promptOf`), when a person's message started it.
+ * (`runPrompt`), when a person's message started it.
  */
 function askerOf(index: TreeIndex, tip: EntryId | null): WriterId | undefined {
-  const prompt = promptOf(index, tip)
+  const prompt = runPrompt(index, tip)
   const message = prompt === null ? undefined : index.entries[prompt]?.message
   return message?.role === "person" ? message.writer : undefined
 }
@@ -646,7 +646,7 @@ export const readCanvases = (places: PlacesDocHandle): ReadonlySet<CanvasId> =>
 
 /**
  * The canvases in the archive, archived, by id, from the
- * board's cards and their histories (`archivedOf`); none before a host
+ * board's cards and their histories (`tasksInArchive`); none before a host
  * wrote the workflow. The same map while the same canvases are archived by the
  * same writers at the same times: every write to the session's values
  * wakes it, the directory's included.
@@ -659,7 +659,7 @@ export const readArchived = keptWhileSame(
     const workflow = readWorkflow(doc)
     return workflow === null
       ? new Map()
-      : archivedOf(workflow, readPlaces(places), readCardHistories(doc))
+      : tasksInArchive(workflow, readPlaces(places), readCardHistories(doc))
   },
   (a, b) =>
     a.size === b.size &&
@@ -767,9 +767,9 @@ export const readBanners = (
   doc: SessionDocHandle,
 ): ReadonlyMap<ThreadId, BannerRecord> => readRecords(doc, BANNER)
 
-/** A lane as people read it (`threadNameOf`). */
+/** A lane as people read it (`readableThreadName`). */
 export const readThreadName = (doc: SessionDocHandle, lane: ThreadId): string =>
-  threadNameOf(readNames(doc), lane)
+  readableThreadName(readNames(doc), lane)
 
 /** What the host found where it runs (`pinetrie.project`); null with no tools. */
 export const readProject = (doc: SessionDocHandle): ProjectRecord | null =>
@@ -887,14 +887,14 @@ export function readRootRecord(root: RootId, doc: RootDocHandle): RootRecord {
     root,
     entry,
     first,
-    firstLine: firstLineOf(index, first),
+    firstLine: rootFirstLine(index, first),
     messages: summary?.messages ?? 0,
     newest: summary?.newest ?? null,
     writers: summary?.writers ?? [],
     threads: Object.fromEntries(
       readLaneNames(doc).map(lane => [
         lane,
-        writersOf(index, ancestry(index, readLaneTip(doc, lane)).path),
+        messageWriters(index, ancestry(index, readLaneTip(doc, lane)).path),
       ]),
     ),
     mentions: mentions.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)),

@@ -10,13 +10,13 @@ import type {
 } from "@pinetrie/core"
 import type { CardTone } from "./card-frame.ts"
 import { isDiscardable } from "./discardable.ts"
-import { type DrawnCard, type Face, faceOf } from "./face.ts"
+import { cardFace, type DrawnCard, type Face } from "./face.ts"
 import type { NoteColumnView } from "./note-column-view.ts"
 import type { ThreadFace } from "./thread-face.ts"
 
 export interface GridCell {
   readonly index: number
-  /** Its card, and the card at its least detail (`faceOf`); null for an empty cell. */
+  /** Its card, and the card at its least detail (`cardFace`); null for an empty cell. */
   readonly card: DrawnCard | null
   readonly face: Face | null
   readonly selected: boolean
@@ -63,7 +63,7 @@ export function gridView(input: {
       face:
         card === null
           ? null
-          : faceOf(card, {
+          : cardFace(card, {
               tone: input.tone,
               key: input.keyOf?.(index) ?? null,
               texts: input.texts,

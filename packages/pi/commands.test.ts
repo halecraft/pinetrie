@@ -2,7 +2,7 @@
 
 import type { CommandSource } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
-import { expandCommand, skillOf, withoutFrontmatter } from "./commands.ts"
+import { expandCommand, parseSkill, withoutFrontmatter } from "./commands.ts"
 
 test("withoutFrontmatter: a skill's instructions, not its header", () => {
   expect(withoutFrontmatter("---\nname: x\n---\n\n# Do\nit\n")).toBe("# Do\nit")
@@ -25,6 +25,6 @@ describe("a skill whose frontmatter is not YAML", () => {
   })
 
   test("is still read as a skill", () => {
-    expect(skillOf(command.file, broken).content).toBe("Do it.")
+    expect(parseSkill(command.file, broken).content).toBe("Do it.")
   })
 })

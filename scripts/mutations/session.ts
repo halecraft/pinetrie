@@ -231,7 +231,7 @@ export const mutations: readonly Mutation[] = [
     to: "  false",
     command: unit,
     expect:
-      "columnMessageAt: a reply continues its thread from the end it shows",
+      "columnMessageTarget: a reply continues its thread from the end it shows",
   },
   {
     name: "a request waiting when the host leaves hangs",

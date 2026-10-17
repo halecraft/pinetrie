@@ -10,7 +10,7 @@
 import {
   type CanvasId,
   type EntryId,
-  messageAt,
+  entryMessage,
   type RailRow,
   type TreeIndex,
 } from "@pinetrie/core"
@@ -81,7 +81,7 @@ export interface Query {
 
 /**
  * The words of a query; null when it has none, which is no search. Composed
- * (NFC), as `handleOf` composes a name; the text searched is left as stored,
+ * (NFC), as `mentionHandle` composes a name; the text searched is left as stored,
  * since composing it would move the ranges a snippet cuts by.
  */
 export function parseQuery(raw: string): Query | null {
@@ -127,7 +127,7 @@ export interface SearchText {
 }
 
 /**
- * Every message on a canvas's rail, with its text as a reader sees it (`messageAt`):
+ * Every message on a canvas's rail, with its text as a reader sees it (`entryMessage`):
  * people's, the agent's, the host's one-line messages. Tool calls and their
  * results are not searched.
  */
@@ -136,7 +136,7 @@ export const searchCorpus = (
   rows: readonly RailRow[],
 ): readonly SearchText[] =>
   rows.flatMap(r => {
-    const m = messageAt(index, r.id)
+    const m = entryMessage(index, r.id)
     return m === null ? [] : [{ id: r.id, text: m.text }]
   })
 

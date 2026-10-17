@@ -50,28 +50,28 @@ import {
 import { ArrivalIndex, type Observed, planArrivals } from "./arrivals.ts"
 import {
   type CommittedWrite,
+  committedImages,
   type DocOp,
-  imagesOf,
   planCommit,
   type StoredUsageRow,
 } from "./commit.ts"
 import {
   CLEAN,
+  dirtyScope,
   EVERYTHING,
   isClean,
   join,
   type Scope,
-  scopeOf,
 } from "./dirty.ts"
-import { sha256Of } from "./images.ts"
+import { blobSha256 } from "./images.ts"
 import {
   boundsAfter,
   compareKeys,
+  entryStructure,
   type Located,
-  limitOf,
+  piLimit,
   rowMatches,
   selectBranch,
-  structureOf,
   walkBranch,
 } from "./queries.ts"
 import type { BlobOf, RefOf } from "./stored-images.ts"
@@ -171,7 +171,7 @@ export class KynetaStorage implements Storage {
     // reset) needs reconciling. Local commits index themselves.
     this.#unsubscribe = subscribe(this.#doc, cs => {
       if (cs.replay !== true) return
-      this.#scope = join(this.#scope, scopeOf(cs.changes))
+      this.#scope = join(this.#scope, dirtyScope(cs.changes))
     })
   }
 
@@ -303,9 +303,9 @@ export class KynetaStorage implements Storage {
     const blobs = this.#blobs
     const refs = new Map<string, ImageRef>()
     if (blobs !== undefined)
-      for (const data of writes.flatMap(imagesOf)) {
+      for (const data of writes.flatMap(committedImages)) {
         if (refs.has(data)) continue
-        const ref = blobs.ref(sha256Of(Buffer.from(data, "base64")))
+        const ref = blobs.ref(blobSha256(Buffer.from(data, "base64")))
         if (ref !== undefined && isImageRef(ref)) refs.set(data, ref)
       }
     return data => refs.get(data)
@@ -421,7 +421,7 @@ export class KynetaStorage implements Storage {
     query: StorageBranchScan,
     _context: Context,
   ): Promise<EntryStructure[]> {
-    return this.#branch(query).map(structureOf)
+    return this.#branch(query).map(entryStructure)
   }
 
   async scanEntries(query: EntryScan, _context: Context): Promise<Entry[]> {
@@ -433,7 +433,7 @@ export class KynetaStorage implements Storage {
         (located): located is Located =>
           located !== undefined && rowMatches(located.row, query),
       )
-      .take(limitOf(query.limit))
+      .take(piLimit(query.limit))
       .map(located => this.#entry(located))
       .toArray()
   }
@@ -447,7 +447,7 @@ export class KynetaStorage implements Storage {
         return row === undefined ? undefined : { ...row, seq }
       })
       .filter(row => row !== undefined)
-      .take(limitOf(query.limit))
+      .take(piLimit(query.limit))
       .toArray()
   }
 

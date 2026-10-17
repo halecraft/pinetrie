@@ -19,7 +19,7 @@ import type {
   ThreadId,
   WriterId,
 } from "@pinetrie/core"
-import { commandOf } from "@pinetrie/core"
+import { cardCommand } from "@pinetrie/core"
 import { displayName } from "@pinetrie/rules"
 import type { CardTone } from "./card-frame.ts"
 import type { NoteColumnView } from "./note-column-view.ts"
@@ -114,7 +114,7 @@ const firstLines = (text: string): string =>
   text.trimStart().split("\n").slice(0, 3).join("\n").trimEnd()
 
 /** `card` at its least detail. */
-export function faceOf(card: DrawnCard, facts: FaceFacts): Face {
+export function cardFace(card: DrawnCard, facts: FaceFacts): Face {
   switch (card.kind) {
     case "text":
       return {
@@ -122,7 +122,7 @@ export function faceOf(card: DrawnCard, facts: FaceFacts): Face {
         card: card.id,
         tone: facts.tone,
         owner: card.owner,
-        command: commandOf(card),
+        command: cardCommand(card),
         lines: firstLines(facts.texts.get(card.id) ?? ""),
         key: facts.key,
       }
@@ -212,7 +212,7 @@ export type Detail = "face" | "normal" | "whole"
  * list draw normal, a canvas whole, an inventory faces in its grid (its
  * selected card normal in the preview, and whole when opened). An entry's
  * margin draws its comments normal under the entry while it is open, and a
- * face, their count, while it is shut (`detailOf`). The board draws its
+ * face, their count, while it is shut (`cardDetail`). The board draws its
  * canvas cards as faces. A discarded card is drawn nowhere; were it drawn,
  * it would be a face.
  */
@@ -230,5 +230,7 @@ export const DETAIL_ON: Readonly<Record<CardPlace["kind"], Detail>> = {
 }
 
 /** The level a card at a place of `place` is drawn at: a folded column, or a shut margin, is a face. */
-export const detailOf = (place: CardPlace["kind"], folded: boolean): Detail =>
-  folded ? "face" : DETAIL_ON[place]
+export const cardDetail = (
+  place: CardPlace["kind"],
+  folded: boolean,
+): Detail => (folded ? "face" : DETAIL_ON[place])

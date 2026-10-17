@@ -60,15 +60,15 @@ import {
 } from "@pinetrie/lanes/testing"
 import {
   CONFLICT,
+  decodeRecords,
   FOLDER_WRITE_JOURNAL,
   type ReviewAnswer,
-  recordsOf,
   STATE,
   setRecord,
 } from "@pinetrie/rules"
 import { afterAll, describe, expect, test } from "vitest"
 import { sourceChanges } from "./changes.ts"
-import { folderFileAt } from "./file-at.ts"
+import { readFolderSiteFile } from "./file-at.ts"
 import { folderHistory } from "./history.ts"
 import { createFolderLine } from "./line.ts"
 import { makeShownMerge } from "./proposed.ts"
@@ -191,10 +191,10 @@ async function makeRig(): Promise<FolderRig> {
     )
   const store = {
     states: (): readonly StateRecord[] => [
-      ...recordsOf(STATE, values(STATE.namespace)).values(),
+      ...decodeRecords(STATE, values(STATE.namespace)).values(),
     ],
     conflicts: (lane: ThreadId): readonly ConflictRecord[] =>
-      [...recordsOf(CONFLICT, values(CONFLICT.namespace)).values()].filter(
+      [...decodeRecords(CONFLICT, values(CONFLICT.namespace)).values()].filter(
         c => c.lane === lane,
       ),
     write: async (writes: readonly ValueWrite[]) => {
@@ -244,7 +244,7 @@ async function makeRig(): Promise<FolderRig> {
     proposed: lane => (shown?.lane === lane ? shown : undefined),
     kept: () => kept,
     journals: () => [
-      ...recordsOf(
+      ...decodeRecords(
         FOLDER_WRITE_JOURNAL,
         values(FOLDER_WRITE_JOURNAL.namespace),
       ).values(),
@@ -333,11 +333,11 @@ async function makeRig(): Promise<FolderRig> {
         states: store.states(),
         lanes: started.map(lane => ({ lane, history: "folder" as const })),
         conflicts: [
-          ...recordsOf(CONFLICT, values(CONFLICT.namespace)).values(),
+          ...decodeRecords(CONFLICT, values(CONFLICT.namespace)).values(),
         ],
         proposed: [],
         journals: [
-          ...recordsOf(
+          ...decodeRecords(
             FOLDER_WRITE_JOURNAL,
             values(FOLDER_WRITE_JOURNAL.namespace),
           ).values(),
@@ -361,7 +361,7 @@ async function makeRig(): Promise<FolderRig> {
     },
     recover: () => accepter.recover(),
     journals: () => [
-      ...recordsOf(
+      ...decodeRecords(
         FOLDER_WRITE_JOURNAL,
         values(FOLDER_WRITE_JOURNAL.namespace),
       ).values(),
@@ -380,7 +380,7 @@ async function makeRig(): Promise<FolderRig> {
     graph,
 
     fileAt: (site, p) =>
-      folderFileAt({ states: store.states, disks: folderDisks }, site, p),
+      readFolderSiteFile({ states: store.states, disks: folderDisks }, site, p),
 
     isAncestor: async (_lane, a, b) => isAncestor(graph(), a, b),
 
@@ -925,7 +925,9 @@ test("every folder state is snapshotted straight after its lane's sync", async (
         for (const w of writes)
           if (w.kind === "set" && w.namespace === STATE.namespace)
             records.push(
-              ...recordsOf(STATE, [{ key: w.key, value: w.value }]).values(),
+              ...decodeRecords(STATE, [
+                { key: w.key, value: w.value },
+              ]).values(),
             )
       },
     },

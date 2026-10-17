@@ -10,8 +10,8 @@
 import {
   type BaseRecord,
   type CatchUpRead,
-  firstPromptOf,
   type JjBaseRecord,
+  laneFirstPrompt,
   type ProposedChangesRecord,
   projectTranscript,
   type RepoConfig,
@@ -133,7 +133,7 @@ export function createProposedChangesDeps(input: {
       if (root === null) return wipDescription(name, "")
       const index = readTreeIndex(root)
       const tip = readLaneTip(root, lane)
-      const first = firstPromptOf(index, readRevisions(root), lane, tip)
+      const first = laneFirstPrompt(index, readRevisions(root), lane, tip)
       const text = projectTranscript(index, tip).find(m => m.id === first)?.text
       return wipDescription(name, text ?? "")
     },

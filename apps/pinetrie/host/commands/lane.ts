@@ -30,9 +30,9 @@ import {
 } from "@pinetrie/reads"
 import {
   ACCESS,
-  accessOf,
   decodeRelay,
   displayName,
+  emptyAccess,
   planAccessAnswer,
   planCarryOn,
   planQueueHold,
@@ -426,7 +426,7 @@ export async function handleSshAccess(
   const { session, now } = deps.basics
   const planned = planAccessAnswer({
     record:
-      readRecords(session, ACCESS).get(intent.lane) ?? accessOf(intent.lane),
+      readRecords(session, ACCESS).get(intent.lane) ?? emptyAccess(intent.lane),
     answer: intent.answer,
     sender,
     owner: readProject(session)?.owner ?? null,

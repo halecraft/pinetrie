@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest"
-import { entriesOf, entry } from "./fixtures.ts"
+import { entriesById, entry } from "./fixtures.ts"
 import {
   entryId,
   indexTree,
@@ -21,7 +21,7 @@ const said = (id: string, parentId: string | null, writer: WriterId) =>
 
 // Two roots: r1 (Bea replies, then Ada branches) and r2 (a compaction only
 // between two messages); and a root with no message at all.
-const entries = entriesOf([
+const entries = entriesById([
   said("1-r1", null, ADA),
   said("2-a", "1-r1", BEA),
   said("4-b", "1-r1", ADA),

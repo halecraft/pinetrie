@@ -2,14 +2,14 @@
 
 import { threadIdFor } from "@pinetrie/core"
 import { expect, test } from "vitest"
-import { type StreamSource, streamEventOf } from "./stream.ts"
+import { harnessStreamEvent, type StreamSource } from "./stream.ts"
 
 const lane = threadIdFor("0190a0a0-0000-7000-8000-000000000001")
 const event = (e: object) => e as StreamSource
 
 test("a text delta, a tool's start and its output's first text", () => {
   expect(
-    streamEventOf(
+    harnessStreamEvent(
       event({
         type: "message_update",
         lane,
@@ -18,10 +18,10 @@ test("a text delta, a tool's start and its output's first text", () => {
     ),
   ).toEqual({ kind: "text", lane, delta: "hi" })
   expect(
-    streamEventOf(event({ type: "tool_start", lane, toolCallId: "c1" })),
+    harnessStreamEvent(event({ type: "tool_start", lane, toolCallId: "c1" })),
   ).toEqual({ kind: "toolStart", lane, callId: "c1" })
   expect(
-    streamEventOf(
+    harnessStreamEvent(
       event({
         type: "tool_update",
         lane,
@@ -39,7 +39,7 @@ test("a text delta, a tool's start and its output's first text", () => {
 
 test("nothing for an empty delta, another update, or a lane that is not a thread's", () => {
   expect(
-    streamEventOf(
+    harnessStreamEvent(
       event({
         type: "message_update",
         lane,
@@ -48,11 +48,13 @@ test("nothing for an empty delta, another update, or a lane that is not a thread
     ),
   ).toBeNull()
   expect(
-    streamEventOf(
+    harnessStreamEvent(
       event({ type: "message_update", lane, event: { type: "text_start" } }),
     ),
   ).toBeNull()
   expect(
-    streamEventOf(event({ type: "tool_start", lane: "main", toolCallId: "c" })),
+    harnessStreamEvent(
+      event({ type: "tool_start", lane: "main", toolCallId: "c" }),
+    ),
   ).toBeNull()
 })

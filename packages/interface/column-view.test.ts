@@ -5,6 +5,7 @@ import {
   commitId,
   type EntryId,
   entryId,
+  entryThread,
   indexAsks,
   type JjAcceptedRecord,
   type JjBaseRecord,
@@ -22,7 +23,6 @@ import {
   type ThreadName,
   type TreeIndex,
   textCardId,
-  threadAt,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -45,18 +45,18 @@ import {
   identityWords,
   joinWords,
   lanesAlong,
-  newPinAt,
+  newPinPlace,
   pinnedMarker,
   pinnedMarkers,
   pinnedStatus,
   promptParent,
   startedWords,
-  tokensOf,
+  textTokens,
   type WorkFacts,
   workingWords,
   workStripWords,
 } from "./column-view.ts"
-import { entry, indexOf, TEST_ROOT } from "./fixtures.ts"
+import { entry, indexEntries, TEST_ROOT } from "./fixtures.ts"
 import { builtInIconUrl } from "./thread-icon.ts"
 import { threadLink } from "./thread-link.ts"
 
@@ -84,7 +84,9 @@ const reply = (text: string): AgentMessageLike => ({
   content: [{ type: "text", text }],
 })
 const tree = (lines: readonly Line[]): TreeIndex =>
-  indexOf(lines.map(([id, parentId, message]) => entry(id, parentId, message)))
+  indexEntries(
+    lines.map(([id, parentId, message]) => entry(id, parentId, message)),
+  )
 const revisions = (
   owners: Record<string, ThreadId>,
 ): ReadonlyMap<EntryId, RevisionRecord> =>
@@ -484,7 +486,7 @@ describe("columnView: the header", () => {
 
 describe("columnView: the fork row of a thread forked elsewhere", () => {
   const index = tree(BRANCH)
-  const thread = threadAt(index, entryId("b1"))
+  const thread = entryThread(index, entryId("b1"))
   const row = (how: "branch" | "copy") => {
     if (thread === null) throw new Error("no thread")
     const forks = new Map([
@@ -522,7 +524,7 @@ describe("columnView: the fork row of a branch opened from a proposal", () => {
         },
       ],
     ])
-    const thread = threadAt(index, entryId("b1"))
+    const thread = entryThread(index, entryId("b1"))
     if (thread === null) throw new Error("no thread")
     const forks = new Map([
       [
@@ -1333,7 +1335,7 @@ describe("where the agent read pinned cards", () => {
       content: "",
       pinned: view,
     })
-    const index = indexOf([
+    const index = indexEntries([
       entry("1-q", null, said("q")),
       entry("2-k", "1-q", pinned(read(A, [card(cardIdFor("c1"), "a")]))),
       entry("3-p", "2-k", said("p", true)),
@@ -1356,7 +1358,7 @@ describe("where the agent read pinned cards", () => {
     const K = canvasIdFor("k")
     const canvas = { canvas: K, title: "T", lines: ["thread a"], more: 0 }
     const canvasCards = [card(cardIdFor("c2"), "all")]
-    const index = indexOf([
+    const index = indexEntries([
       entry("1-q", null, said("q")),
       entry("2-c", "1-q", { role: "canvas", content: "", canvas }),
       entry("3-t", "2-c", {
@@ -1420,7 +1422,7 @@ test("pinnedStatus: read, changed or unread against what the agent reads", () =>
   expect(pinnedStatus(card, "ship it now", inView)).toBe("changed")
   expect(pinnedStatus(card, "ship it", null)).toBe("unread")
   expect(pinnedStatus(card, " ", inView)).toBeNull()
-  expect(tokensOf("12345")).toBe(2)
+  expect(textTokens("12345")).toBe(2)
 })
 
 test.each([
@@ -1472,6 +1474,6 @@ test.each([
     },
     null,
   ],
-] as const)("newPinAt(%o): %s", (facts, want) => {
-  expect(newPinAt(facts)).toBe(want)
+] as const)("newPinPlace(%o): %s", (facts, want) => {
+  expect(newPinPlace(facts)).toBe(want)
 })

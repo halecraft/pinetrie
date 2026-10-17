@@ -5,7 +5,7 @@ import {
   type Column,
   keyText,
   threadAnchor,
-  unstartedOf,
+  unstartedMode,
 } from "./columns.ts"
 import { TEST_CANVAS, threadOfEntry, tree } from "./fixtures.ts"
 
@@ -53,6 +53,6 @@ test("a thread not yet started closes with ×; a started one does not", () => {
       root: rootIdFor("01a0ffd2-0000-7000-8000-00000000000a"),
     },
   }
-  expect(unstartedOf(bound)).toBeUndefined()
-  expect(unstartedOf(unstarted)?.fork).toBe("1-a")
+  expect(unstartedMode(bound)).toBeUndefined()
+  expect(unstartedMode(unstarted)?.fork).toBe("1-a")
 })

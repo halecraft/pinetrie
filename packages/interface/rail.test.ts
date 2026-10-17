@@ -8,7 +8,7 @@ import {
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
-import { entriesOf, entry, fromParents } from "./fixtures.ts"
+import { entriesById, entry, fromParents } from "./fixtures.ts"
 import { compactRail, type RailItem, stretchSpan } from "./rail.ts"
 
 /**
@@ -60,7 +60,7 @@ describe("compactRail", () => {
       parent = result
     }
     out.push(entry("999-a", parent, { role: "assistant", content: "done" }))
-    return entriesOf(out)
+    return entriesById(out)
   }
   const steps = (n: number) =>
     Array.from({ length: n }, (_, k) => `${pad(2 * (k + 1))}-s`)
@@ -180,7 +180,7 @@ describe("compactRail", () => {
     })
     const agent = { role: "assistant", content: "ok" }
     const items = compact(
-      entriesOf([
+      entriesById([
         entry("01", null, said(ada)),
         entry("02", "01", said(bea)),
         entry("03", "02", agent),
@@ -287,7 +287,7 @@ describe("placeRail", () => {
     const placed = items(
       {
         ...tree({ "1-a": "0-s", "2-b": "0-s", "3-c": "1-a" }),
-        ...entriesOf([entry("0-s", null, undefined, { type: "compaction" })]),
+        ...entriesById([entry("0-s", null, undefined, { type: "compaction" })]),
       },
       "0-s",
     )

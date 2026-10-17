@@ -14,7 +14,7 @@ import { describe, expect, test } from "vitest"
 import { defaultView, type YourCanvasView } from "./canvas-columns.ts"
 import {
   canvasesFor,
-  entriesOf,
+  entriesById,
   entry,
   NEW_CANVAS,
   NEW_THREAD,
@@ -30,10 +30,10 @@ import {
   type Layout,
   type LayoutAction,
   layoutReducer,
-  listOf,
   NOTHING,
   planOpen,
   resolveLayout,
+  sidebarList,
   storedLayout,
   unlisted,
   type ViewChange,
@@ -375,11 +375,11 @@ describe("layoutReducer", () => {
   })
 })
 
-describe("listOf", () => {
+describe("sidebarList", () => {
   test("the sidebar as drawn", () => {
     const l = drawn(at(initialLayout()), listed("5-r2", "1-r1"))
-    expect(listOf(l)).toEqual([R2, R1])
-    expect(listOf(initialLayout())).toEqual([])
+    expect(sidebarList(l)).toEqual([R2, R1])
+    expect(sidebarList(initialLayout())).toEqual([])
   })
 })
 
@@ -403,7 +403,7 @@ describe("planOpen", () => {
       entry(id, parent, { role: "person", content: id }, { thread })
     const grown = indexTree({
       ...index.entries,
-      ...entriesOf([
+      ...entriesById([
         canvasEntry("7-cx", "3-b", X),
         said("8-x", "7-cx", X),
         canvasEntry("9-cq", "3-b", TRUNK),

@@ -5,7 +5,7 @@ import { ROOT } from "@pinetrie/core"
 import { PINETRIE_MOUNT } from "@pinetrie/lanes"
 import { readRevisions } from "@pinetrie/reads"
 import type { Checks } from "../checks.ts"
-import { rootRecordsOf, START_AGENT } from "../harness.ts"
+import { heldRootRecords, START_AGENT } from "../harness.ts"
 import type { LaneHosts, SectionHost } from "../lane-hosts.ts"
 import type { Scenario } from "../scenario.ts"
 import { cli, imageHost } from "./support.ts"
@@ -72,7 +72,7 @@ async function imagesSection(
         /ripgrep \d[\s\S]*fd \d[\s\S]*sd \d/.test(ran.at(-1) ?? ""),
       `${JSON.stringify(ran.slice(-3))}`.slice(0, 200),
     )
-    const recorded = [...rootRecordsOf(alpine.host, readRevisions).values()]
+    const recorded = [...heldRootRecords(alpine.host, readRevisions).values()]
     check(
       "on Alpine, under Docker's default seccomp profile, a tool call's run is attributed: what it made from source is in its turn's record",
       recorded.some(r => r.disk?.unignored.includes("built") === true),
@@ -154,7 +154,7 @@ async function imagesSection(
         .split("\n")
         .filter(n => n.startsWith("pinetrie-observer-"))
       const attributed = (host: SectionHost, dir: string) =>
-        [...rootRecordsOf(host.host, readRevisions).values()].some(
+        [...heldRootRecords(host.host, readRevisions).values()].some(
           r => r.disk?.unignored.includes(dir) === true,
         )
       check(

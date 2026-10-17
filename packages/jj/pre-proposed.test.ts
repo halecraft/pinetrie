@@ -9,7 +9,7 @@ import {
   hostProposedRevset,
   PROPOSED_BOOKMARKS,
 } from "./lane/names.ts"
-import { commitsOf } from "./lane/revisions.ts"
+import { readCommits } from "./lane/revisions.ts"
 import { immutableHeads, logRevset, markSteps } from "./plan.ts"
 import {
   type ProposedRenameFacts,
@@ -255,13 +255,13 @@ describe("renameProposed, with jj", () => {
     expect(rows).not.toContain("pinetrie-offer/")
     expect(rows).toContain("pinetrie-proposed/copper-owl@ true")
     expect(rows).toContain("pinetrie-proposed/dusty-elk@ false")
-    const marked = await commitsOf(
+    const marked = await readCommits(
       host,
       `${hostProposedRevset("pinetrie-proposed/amber-fox")} & "pinetrie-proposed/amber-fox"`,
     )
     expect(marked).toHaveLength(1)
     expect(
-      await commitsOf(
+      await readCommits(
         host,
         `parents(description(substring:"yours on top")) & "pinetrie-proposed/amber-fox"`,
       ),

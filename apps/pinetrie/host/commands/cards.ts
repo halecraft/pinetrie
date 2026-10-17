@@ -19,32 +19,32 @@ import {
   type CardCommand,
   type CardId,
   cardIdOfKind,
+  cardMove,
   DISCARDED,
   type EntryId,
   ERR,
+  entryThread,
   historyScope,
   type Intent,
   indexAsks,
   isTextCardId,
-  keyOf,
   type Move,
   type MoveDirection,
   type MoveHistoryScope,
-  moveOf,
   type NoteColumnId,
   PERSON_HISTORY,
-  promptOf,
+  placeKey,
   type QueuedFact,
   type QueueHoldChange,
   type QueueMove,
   type Reorder,
   type RootId,
+  runPrompt,
   type Send,
   type SentCard,
   type TextCardId,
   type ThreadId,
   type TreeIndex,
-  threadAt,
   threadEnd,
   threadOfSend,
   type ValueWrite,
@@ -77,11 +77,11 @@ import {
   crossesArchive,
   emptiedCanvases,
   type GatheredStart,
-  historyOf,
   type LiftPlan,
   lanesToDrain,
   type MoveStep,
   type MovesStep,
+  movesHistory,
   type Opening,
   type OpenPlan,
   type OpenThread,
@@ -186,7 +186,7 @@ export function createCardCommands(deps: CardCommandDeps) {
       {
         kind: "unmoved",
         code: refusal.code,
-        place: refusal.now === null ? null : keyOf(refusal.now.place),
+        place: refusal.now === null ? null : placeKey(refusal.now.place),
         by: refusal.now?.placer ?? null,
       },
       places.rev(),
@@ -332,7 +332,7 @@ export function createCardCommands(deps: CardCommandDeps) {
   /**
    * Handoffs, whole or refused: applied when every card is where its sender saw
    * it. Recorded as one step of the sender's history of moves in the root
-   * `historyOf` names, when it names one.
+   * `movesHistory` names, when it names one.
    */
   async function move(
     writer: WriterId,
@@ -340,7 +340,7 @@ export function createCardCommands(deps: CardCommandDeps) {
     here: CanvasId | null,
     canvases: CanvasIndex,
   ): Promise<Settled> {
-    // gather. `Discards` names a discard's history (`historyOf`).
+    // gather. `Discards` names a discard's history (`movesHistory`).
     const discards = { canvases, here }
     const entryThreads = await marginEntryThreads(moves)
     const cards = readPlaces(places)
@@ -380,7 +380,7 @@ export function createCardCommands(deps: CardCommandDeps) {
     const scope =
       emptied.length > 0
         ? PERSON_HISTORY
-        : historyOf(moves, cards, discards, "move")
+        : movesHistory(moves, cards, discards, "move")
     // gather the history's stack: nothing writes the places while it loads,
     // on the keeper
     const gesture =
@@ -405,7 +405,7 @@ export function createCardCommands(deps: CardCommandDeps) {
   ): Promise<Settled> {
     // gather: the history's stack, loaded before the places are read
     // A queueing discards nothing: its history is the queue's canvas.
-    const scope = historyOf(
+    const scope = movesHistory(
       [queued],
       readPlaces(places),
       { canvases, here: null },
@@ -578,7 +578,7 @@ export function createCardCommands(deps: CardCommandDeps) {
       await deps.cards.hydrate([card])
       const text = deps.cards.textNow(card)
       const discards = { canvases, here: request.here }
-      const scope = historyOf([move], readPlaces(places), discards, "move")
+      const scope = movesHistory([move], readPlaces(places), discards, "move")
       const gesture =
         scope === null
           ? undefined
@@ -728,10 +728,10 @@ export function createCardCommands(deps: CardCommandDeps) {
       // gather
       const index = readTreeIndex(await docs.root(press.root))
       const threads = readThreads(session)
-      const lane = threadAt(index, press.proposal)
+      const lane = entryThread(index, press.proposal)
       const runningAsk =
         lane !== null && running(lane)
-          ? promptOf(index, threadEnd(index, lane))
+          ? runPrompt(index, threadEnd(index, lane))
           : null
       // plan
       const plan = planBranchOut({
@@ -788,7 +788,7 @@ export function createCardCommands(deps: CardCommandDeps) {
           : [{ ...pasted.replacing, to: DISCARDED }]),
         main,
       ]
-      const scope = historyOf(moves, readPlaces(places), discards, "paste")
+      const scope = movesHistory(moves, readPlaces(places), discards, "paste")
       const gesture =
         scope === null
           ? undefined
@@ -839,7 +839,7 @@ export function createCardCommands(deps: CardCommandDeps) {
       canvases: CanvasIndex,
     ): Promise<Settled> {
       // gather: the history's stack, loaded before the places are read
-      const scope = historyOf(
+      const scope = movesHistory(
         [copy.move],
         readPlaces(places),
         { canvases, here: null },
@@ -941,7 +941,7 @@ export function createCardCommands(deps: CardCommandDeps) {
       const { step, drain } = planMoveCommand(
         cards,
         [
-          moveOf(now, {
+          cardMove(now, {
             kind: "queued",
             thread: thread.lane.name,
             seen: outgoing.card.seen,

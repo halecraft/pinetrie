@@ -238,7 +238,7 @@ export const isRaced = (
   kernel.ino !== lstat.ino || stampSize(kernel.stamp) !== stampSize(lstat.stamp)
 
 /** An event line as a host receives it: a remote release's kernel stamp kept only when raced. */
-export function noticeOf(
+export function observerNotice(
   line: Extract<LoaderLine, { kind: "event" }>,
 ): ObserverNotice {
   const { lane, run, event, inodes } = line

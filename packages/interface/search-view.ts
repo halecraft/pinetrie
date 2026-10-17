@@ -8,7 +8,7 @@
 import {
   type AskIndex,
   type EntryId,
-  runOf,
+  entryAsk,
   type SpineNode,
   type TreeIndex,
   type WriterId,
@@ -76,7 +76,7 @@ export function columnMatches(
     closeGap()
     found += 1
     const at = facts.index.entries[node.id]?.timestamp ?? null
-    const ask = runOf(facts.asks, node.id) ?? null
+    const ask = entryAsk(facts.asks, node.id) ?? null
     const line =
       ask === null || ask === node.id
         ? null

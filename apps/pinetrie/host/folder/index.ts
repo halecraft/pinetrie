@@ -43,7 +43,7 @@ import { failed } from "../basics.ts"
 import { createDescriber } from "../describe.ts"
 import type { ProjectAdapter } from "../work/adapter.ts"
 import type { Destination } from "../work/destination.ts"
-import { folderFileAt } from "./file-at.ts"
+import { readFolderSiteFile } from "./file-at.ts"
 import { folderHistory } from "./history.ts"
 import { createFolderLine } from "./line.ts"
 import { startFolderProposedChanges } from "./proposed.ts"
@@ -124,7 +124,7 @@ export function startFolderProject(dir: {
         log: basics.log,
       })
       const fileAt: Destination["fileAt"] = (site, p) =>
-        folderFileAt({ states: store.states, disks }, site, p)
+        readFolderSiteFile({ states: store.states, disks }, site, p)
 
       return {
         kind: "folder",

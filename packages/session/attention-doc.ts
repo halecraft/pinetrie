@@ -19,7 +19,7 @@ export const EARLIEST = "0"
  * the directory, so everything so far is before them and they start with no
  * backlog; `EARLIEST` when the directory is empty.
  */
-export function startOf(roots: Iterable<RootRecord>): string {
+export function startingSince(roots: Iterable<RootRecord>): string {
   let since = EARLIEST
   for (const { newest } of roots)
     if (newest !== null && newest > since) since = newest
@@ -56,7 +56,7 @@ export function attentionStore(
   me: WriterId,
   host: string,
   /**
-   * Where a person with no document starts (`startOf`): every verdict
+   * Where a person with no document starts (`startingSince`): every verdict
    * and mention up to it was before them. Null until the session's
    * directory has arrived, when no start can be told.
    */

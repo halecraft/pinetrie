@@ -4,7 +4,7 @@ import {
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
-import { accessOf } from "@pinetrie/rules"
+import { emptyAccess } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
 import { accessView, accessWords } from "./access-view.ts"
 
@@ -16,7 +16,7 @@ const NAMES = new Map([[DUANE, "Duane"]])
 const at = (
   personal: PersonalAccess | null,
   over: Partial<AccessRecord> = {},
-): AccessRecord => ({ ...accessOf(LANE), personal, ...over })
+): AccessRecord => ({ ...emptyAccess(LANE), personal, ...over })
 
 const row = (record: AccessRecord | undefined, me = DUANE) => {
   const view = accessView({ record, owner: DUANE, me, nameOf: NAMES })

@@ -56,7 +56,7 @@ export interface CanvasSummary {
  * directory, not the tree, so a root this tab does not hold counts too. A canvas
  * whose first root has no message yet is left out.
  */
-export function summariesOf(
+export function taskSummaries(
   canvases: Canvases,
   directory: ReadonlyMap<RootId, RootRecord>,
 ): ReadonlyMap<CanvasId, CanvasSummary> {
@@ -86,7 +86,7 @@ export const CHAT_LABEL = "Chat"
  * line. `App` builds it once per change, and the sidebar, the board and your
  * inbox look labels up in it.
  */
-export function labelsOf(input: {
+export function taskLabels(input: {
   readonly canvases: Canvases
   readonly marks: ReadonlyMap<CanvasId, MarkRecord>
   readonly directory: ReadonlyMap<RootId, RootRecord>
@@ -151,7 +151,7 @@ export function renameKey(
  * the label's first two words, or a one-word label's first two letters, in
  * capitals. A word is a run of letters and digits.
  */
-export function initialsOf(label: string): string {
+export function labelInitials(label: string): string {
   const words = label.match(/[\p{L}\p{N}]+/gu) ?? []
   const [first = "", second] = words
   const letters =

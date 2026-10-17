@@ -7,6 +7,7 @@ import {
   type CardRecord,
   canvasIdFor,
   cardIdOfKind,
+  cardTextSource,
   DISCARDED,
   type EntryLike,
   entryId,
@@ -16,7 +17,6 @@ import {
   INVENTORY_SLOTS,
   indexTree,
   KINDS,
-  keyOf,
   type Move,
   movesDocId,
   NO_CONTENT,
@@ -24,6 +24,7 @@ import {
   PERSON_HISTORY,
   type PlacedKind,
   type ProposedChangesFact,
+  placeKey,
   REORDER_PLACES,
   type ReferenceCard,
   type Replacing,
@@ -36,7 +37,6 @@ import {
   type ThreadId,
   type TreeIndex,
   textCardId,
-  textSourceOf,
   threadIdFor,
   type WorkflowStateId,
   type WriterId,
@@ -45,7 +45,7 @@ import {
 } from "@pinetrie/core"
 import {
   cardIdFor,
-  entriesOf,
+  entriesById,
   FIXTURE_THREAD,
   withThreads,
 } from "@pinetrie/core/fixtures"
@@ -59,18 +59,18 @@ import {
   cardEnd,
   decodeCard,
   encodeCard,
-  pinnedAt,
+  pinnedCardsAtEnd,
   placeEnd,
   planCardSweep,
   yourCard,
 } from "./card.ts"
-import { wordsOf } from "./card-words.ts"
+import { sourceWords } from "./card-words.ts"
 import { factLine } from "./fact.ts"
-import { threadCardOf } from "./fixtures.ts"
+import { landedThreadCard } from "./fixtures.ts"
 import { planReorder, planSetCommand, planWidth, REORDERS } from "./in-place.ts"
 import {
   crossesArchive,
-  historyOf,
+  movesHistory,
   planHistorySweep,
   undoAnswer,
 } from "./move-history.ts"
@@ -88,7 +88,7 @@ import { nearestNoteColumn, notesNear, toNotes } from "./notes.ts"
 import { orderAfter, orderKeys } from "./order.ts"
 import {
   blankQueued,
-  canvasPinnedOf,
+  canvasPinnedCards,
   isBlankMessage,
   planCarry,
   planFactCard,
@@ -125,7 +125,7 @@ const entry = (id: string, parentId: string | null): EntryLike => ({
 const tree = (...more: EntryLike[]): TreeIndex =>
   indexTree(
     withThreads(
-      entriesOf([
+      entriesById([
         entry("e1", null),
         entry("e2", "e1"),
         entry("f1", "e1"),
@@ -242,7 +242,7 @@ describe("planCarry", () => {
     expect(
       planMove(
         [fact],
-        { card: fact.id, from: keyOf(fact.place), to: DISCARDED },
+        { card: fact.id, from: placeKey(fact.place), to: DISCARDED },
         ADA,
       ),
     ).toEqual({ kind: "refused", code: "no-place", now: fact })
@@ -251,7 +251,7 @@ describe("planCarry", () => {
         [fact],
         {
           card: fact.id,
-          from: keyOf(fact.place),
+          from: placeKey(fact.place),
           to: { kind: "queued", thread: T_E, seen: "" },
         },
         ADA,
@@ -296,17 +296,21 @@ describe("planCarry", () => {
     ).toBe(true)
   })
 
-  test("wordsOf: a text card's words are its document's, a fact's its line, a thread's none", () => {
+  test("sourceWords: a text card's words are its document's, a fact's its line, a thread's none", () => {
     const docs = {
       doc: (id: TextCardId) => `text of ${id}`,
       blob: (sha: Sha256) => `quote ${sha}`,
     }
-    expect(wordsOf(textSourceOf(card()), docs)).toBe(`text of ${card().id}`)
-    expect(wordsOf(textSourceOf(factCard()), docs)).toBe(factLine(ACCEPTED))
+    expect(sourceWords(cardTextSource(card()), docs)).toBe(
+      `text of ${card().id}`,
+    )
+    expect(sourceWords(cardTextSource(factCard()), docs)).toBe(
+      factLine(ACCEPTED),
+    )
     expect(
-      wordsOf(
-        textSourceOf(
-          threadCardOf({
+      sourceWords(
+        cardTextSource(
+          landedThreadCard({
             thread: LANE,
             canvas: TEST_CANVAS,
             by: ADA,
@@ -318,10 +322,10 @@ describe("planCarry", () => {
     ).toBe("")
   })
 
-  test("wordsOf: a reference's words are its quote's blob", () => {
+  test("sourceWords: a reference's words are its quote's blob", () => {
     const quote = "a".repeat(64) as Sha256
     expect(
-      wordsOf(
+      sourceWords(
         { kind: "blob", sha: quote },
         { doc: () => "", blob: sha => `quote ${sha}` },
       ),
@@ -466,7 +470,7 @@ describe("note columns", () => {
   const keys = orderKeys(7)
   const K = (n: number) => keys[n] ?? ""
   const thread = (t: ThreadId, order: string) => ({
-    ...threadCardOf({ thread: t, canvas: TEST_CANVAS, by: ADA, cards: [] }),
+    ...landedThreadCard({ thread: t, canvas: TEST_CANVAS, by: ADA, cards: [] }),
     place: { kind: "canvas", canvas: TEST_CANVAS, order, width: 1 } as const,
   })
   const column = (id: string, order: string): CardRecord => ({
@@ -816,7 +820,7 @@ describe("note columns", () => {
   test("planMove takes no move to a thread's nearest notes: one is resolved first", () => {
     const unresolved = {
       card: C1,
-      from: keyOf(note().place),
+      from: placeKey(note().place),
       to: { kind: "notes", near: "thread", thread: LANE },
     } as const
     // @ts-expect-error a thread's nearest notes are resolved before planning
@@ -837,7 +841,7 @@ describe("note columns", () => {
       ],
       {
         card: C1,
-        from: keyOf(card().place),
+        from: placeKey(card().place),
         to: { kind: "note", column: NOTES },
       },
       ADA,
@@ -883,7 +887,7 @@ describe("note columns", () => {
     ]
     const step = planMove(
       [card({ id: cardIdFor("c5") }), ...comments],
-      { card: cardIdFor("c5"), from: keyOf(card().place), to: at },
+      { card: cardIdFor("c5"), from: placeKey(card().place), to: at },
       ADA,
     )
     const placed = step.kind === "write" ? step.record.place : null
@@ -915,7 +919,7 @@ describe("note columns", () => {
         moves: [
           {
             card: C1,
-            from: keyOf(card().place),
+            from: placeKey(card().place),
             to: { kind: "margin", entry, thread },
           },
         ],
@@ -946,11 +950,11 @@ describe("note columns", () => {
     ).toEqual({ kind: "refused", code: "no-place", now: null })
     // Moves from nowhere discard nothing: no canvas's index, and no canvas here.
     const none = { canvases: NO_CANVAS_INDEX, here: null }
-    expect(historyOf([{ card: id, from: null, to }], [], none, "move")).toEqual(
-      historyScope(TEST_CANVAS),
-    )
     expect(
-      historyOf(
+      movesHistory([{ card: id, from: null, to }], [], none, "move"),
+    ).toEqual(historyScope(TEST_CANVAS))
+    expect(
+      movesHistory(
         [{ card: C1, from: null, to: { kind: "note", column: NOTES } }],
         [],
         none,
@@ -975,7 +979,7 @@ describe("note columns", () => {
 })
 
 describe("pinned cards", () => {
-  test("pinnedAt: a thread's pinned cards by order, then id; not a sibling thread's, nor notes", () => {
+  test("pinnedCardsAtEnd: a thread's pinned cards by order, then id; not a sibling thread's, nor notes", () => {
     const cards = [
       pinned("p-3", "b"),
       pinned("p-1", "c"),
@@ -983,7 +987,7 @@ describe("pinned cards", () => {
       pinned("p-4", "a", threadIdFor("f1")),
       card(),
     ]
-    expect(pinnedAt(E2, cards, tree()).map(c => c.id)).toEqual([
+    expect(pinnedCardsAtEnd(E2, cards, tree()).map(c => c.id)).toEqual([
       "p-2",
       "p-3",
       "p-1",
@@ -993,7 +997,9 @@ describe("pinned cards", () => {
   test("a pinned card follows its thread as the thread grows", () => {
     const grown = tree(entry("e3", "e2"))
     expect(
-      pinnedAt(entryId("e3"), [pinned("p-1", "a")], grown).map(c => c.id),
+      pinnedCardsAtEnd(entryId("e3"), [pinned("p-1", "a")], grown).map(
+        c => c.id,
+      ),
     ).toEqual(["p-1"])
   })
 
@@ -1230,7 +1236,7 @@ describe("the queue", () => {
       placer: BEA,
       content: { command: "bring-up-to-date", unsent: null, origin: null },
     }
-    const onCanvas = threadCardOf({
+    const onCanvas = landedThreadCard({
       thread: LANE,
       canvas: TEST_CANVAS,
       by: ADA,
@@ -1263,7 +1269,7 @@ describe("the queue", () => {
   test("planUnsent: a thread in a full inventory keeps its card queued, saying why, and holds its queue", () => {
     const q = queued(cardIdFor("c1"), "a")
     const held = {
-      ...threadCardOf({
+      ...landedThreadCard({
         thread: LANE,
         canvas: TEST_CANVAS,
         by: BEA,
@@ -1467,7 +1473,9 @@ describe("handoffs", () => {
     "a card moves straight from $name (Move to ▸)",
     ({ place, to, lands }) => {
       const c = card({ place })
-      expect(planMove([c], { card: C1, from: keyOf(place), to }, BEA)).toEqual({
+      expect(
+        planMove([c], { card: C1, from: placeKey(place), to }, BEA),
+      ).toEqual({
         kind: "write",
         record: { ...c, place: { ...to, ...lands }, placer: BEA },
       })
@@ -1501,7 +1509,11 @@ describe("handoffs", () => {
       (_, place) => {
         const c = card({ place })
         expect(
-          planMove([c], { card: C1, from: keyOf(place), to: gone(place) }, ADA),
+          planMove(
+            [c],
+            { card: C1, from: placeKey(place), to: gone(place) },
+            ADA,
+          ),
         ).toEqual({
           kind: "write",
           record: {
@@ -1520,7 +1532,7 @@ describe("handoffs", () => {
       expect(
         planMove(
           [discarded],
-          { card: C1, from: keyOf(discarded.place), to: atEnd },
+          { card: C1, from: placeKey(discarded.place), to: atEnd },
           ADA,
         ),
       ).toEqual({ kind: "refused", code: "gone", now: null })
@@ -2036,7 +2048,7 @@ describe("cards pinned to a canvas", () => {
         pinnedTo("c2", 100),
         pinnedTo("c3", 2 ** 30, canvasIdFor("k-other")),
       ],
-      { card: cardIdFor("c1"), from: keyOf(card().place), to: at },
+      { card: cardIdFor("c1"), from: placeKey(card().place), to: at },
       BEA,
     )
     expect(step).toMatchObject({
@@ -2052,7 +2064,7 @@ describe("cards pinned to a canvas", () => {
         : ""
     expect(order > key(100) && order < key(2 ** 30)).toBe(true)
     expect(
-      canvasPinnedOf(
+      canvasPinnedCards(
         [pinnedTo("c3", 300), pinnedTo("c2", 100), card()],
         TEST_CANVAS,
       ).map(c => c.id),
@@ -2081,7 +2093,7 @@ describe("cards pinned to a canvas", () => {
 
   test("unpinned from the canvas, a card goes to its first note column, made first on the canvas when it has none", () => {
     const pin = pinnedTo("c1", 100)
-    const onCanvas = threadCardOf({
+    const onCanvas = landedThreadCard({
       thread: LANE,
       canvas: TEST_CANVAS,
       by: ADA,
@@ -2223,7 +2235,7 @@ describe("storage", () => {
   })
 
   test("a card's kind is its id's: a thread's card decodes on a canvas, a text card there does not", () => {
-    const onCanvas = threadCardOf({
+    const onCanvas = landedThreadCard({
       thread: T_E,
       canvas: TEST_CANVAS,
       by: ADA,
@@ -2236,7 +2248,7 @@ describe("storage", () => {
   })
 })
 
-describe("historyOf: the canvas a move enters the sender's history in", () => {
+describe("movesHistory: the canvas a move enters the sender's history in", () => {
   const C1 = cardIdFor("c1")
   const T_OTHER = threadIdFor("other")
   const OTHER_CANVAS = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000d")
@@ -2250,7 +2262,7 @@ describe("historyOf: the canvas a move enters the sender's history in", () => {
   } as const
   // Thread `T_E` is on TEST_CANVAS, `T_OTHER` on OTHER_CANVAS.
   const threadCard = (thread: ThreadId, canvas: CanvasId): CardRecord =>
-    threadCardOf({ thread, canvas, by: ADA, cards: [] })
+    landedThreadCard({ thread, canvas, by: ADA, cards: [] })
   const canvases = indexCanvases(
     [threadCard(T_E, TEST_CANVAS), threadCard(T_OTHER, OTHER_CANVAS)],
     new Map(),
@@ -2326,28 +2338,28 @@ describe("historyOf: the canvas a move enters the sender's history in", () => {
     ],
   ])("%s", (_, moves, cards, want) => {
     expect(
-      historyOf(moves, cards, { canvases, here: OTHER_CANVAS }, "move"),
+      movesHistory(moves, cards, { canvases, here: OTHER_CANVAS }, "move"),
     ).toEqual(want === null ? null : historyScope(want))
   })
 
   test("a discard from an inventory on no canvas: its sender's history outside any canvas", () => {
     const moves = [{ card: C1, from: inv, to: DISCARDED }]
-    expect(historyOf(moves, at(inv), { canvases, here: null }, "move")).toEqual(
-      PERSON_HISTORY,
-    )
+    expect(
+      movesHistory(moves, at(inv), { canvases, here: null }, "move"),
+    ).toEqual(PERSON_HISTORY)
   })
 
   test("a paste's creation enters the history of the canvas it lands in; a move's enters none", () => {
     const made = (to: Move["to"]) => [{ card: C1, from: null, to }]
     const notes = { kind: "notes", near: "thread", thread: T_OTHER } as const
     expect(
-      historyOf(made(notes), [], { canvases, here: null }, "paste"),
+      movesHistory(made(notes), [], { canvases, here: null }, "paste"),
     ).toEqual(historyScope(OTHER_CANVAS))
-    expect(historyOf(made(inv), [], { canvases, here: null }, "paste")).toEqual(
-      PERSON_HISTORY,
-    )
     expect(
-      historyOf(made(notes), [], { canvases, here: null }, "move"),
+      movesHistory(made(inv), [], { canvases, here: null }, "paste"),
+    ).toEqual(PERSON_HISTORY)
+    expect(
+      movesHistory(made(notes), [], { canvases, here: null }, "move"),
     ).toBeNull()
   })
 })
@@ -2663,7 +2675,7 @@ describe("out of a trash: a restore back where the card was, and a new canvas", 
     place: { kind: "canvas", canvas: TEST_CANVAS, order: "a", width: 1 },
     content: NO_CONTENT,
   }
-  const trashed = (left: Parameters<typeof keyOf>[0], placer = ADA) =>
+  const trashed = (left: Parameters<typeof placeKey>[0], placer = ADA) =>
     card({
       placer,
       place: { kind: "trash", left: left as never },
@@ -2711,7 +2723,7 @@ describe("out of a trash: a restore back where the card was, and a new canvas", 
       code: "left-gone",
     })
     const yours = { kind: "composing", thread: T_E } as const
-    const thread = threadCardOf({
+    const thread = landedThreadCard({
       thread: T_E,
       canvas: TEST_CANVAS,
       by: ADA,

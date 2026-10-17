@@ -17,7 +17,7 @@ import type { Canvases } from "./canvases.ts"
 import type { Layout } from "./layout.ts"
 
 /** Each root's root entry, by its id, from the directory; a root with no message has none. */
-export const rootEntriesOf = (
+export const directoryRootEntries = (
   directory: ReadonlyMap<RootId, RootRecord>,
 ): ReadonlyMap<RootId, EntryId> =>
   new Map(

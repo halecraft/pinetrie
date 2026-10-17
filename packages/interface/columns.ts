@@ -66,7 +66,7 @@ export interface Column {
   readonly anchor: EntryId | null
   /**
    * The thread it shows, which names its lane when it has one
-   * (`laneOf`). A column opens its thread before its first send.
+   * (`threadLane`). A column opens its thread before its first send.
    */
   readonly thread: ThreadId
   /**
@@ -118,7 +118,7 @@ export interface UnstartedMode {
 export type ColumnMode = { readonly kind: "bound" } | UnstartedMode
 
 /** A column's unstarted mode, or undefined for a bound one. */
-export const unstartedOf = (
+export const unstartedMode = (
   column: Pick<Column, "mode">,
 ): UnstartedMode | undefined =>
   column.mode.kind === "unstarted" ? column.mode : undefined
@@ -127,7 +127,7 @@ export const unstartedOf = (
 export const BOUND: ColumnMode = { kind: "bound" }
 
 /** Whether a column's next send is a branch at its anchor: its thread's first. */
-export const branchesAt = (column: Pick<Column, "mode">): boolean =>
+export const isNextSendBranch = (column: Pick<Column, "mode">): boolean =>
   column.mode.kind !== "bound"
 
 /**

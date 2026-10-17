@@ -4,7 +4,7 @@ import { describe, expect, test } from "vitest"
 import {
   type FoldMotion,
   type FoldScene,
-  foldOf,
+  foldMotion,
   planFoldMotion,
   type Rect,
 } from "./fold-motion.ts"
@@ -153,12 +153,12 @@ describe("planFoldMotion", () => {
   })
 })
 
-describe("foldOf", () => {
+describe("foldMotion", () => {
   const canvas = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000c")
   const card = cardIdFor("c1")
   test("a card's fold or the canvas column's, with which way; nothing for another action", () => {
     expect(
-      foldOf({
+      foldMotion({
         kind: "view",
         canvas,
         first: null,
@@ -166,7 +166,7 @@ describe("foldOf", () => {
       }),
     ).toEqual({ column: { kind: "card", card }, unfolded: false })
     expect(
-      foldOf({
+      foldMotion({
         kind: "view",
         canvas,
         first: null,
@@ -174,13 +174,13 @@ describe("foldOf", () => {
       }),
     ).toEqual({ column: { kind: "canvas", canvas }, unfolded: true })
     expect(
-      foldOf({
+      foldMotion({
         kind: "view",
         canvas,
         first: null,
         change: { kind: "details", card, open: true },
       }),
     ).toBeNull()
-    expect(foldOf({ kind: "closeCanvas", canvas })).toBeNull()
+    expect(foldMotion({ kind: "closeCanvas", canvas })).toBeNull()
   })
 })

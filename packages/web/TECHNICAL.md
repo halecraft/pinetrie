@@ -507,7 +507,7 @@ serves the rail's outline and the column's spot.
   edges into bands, one per branch, of whole items, each at its branch's
   `across`, so an outline keeps the
   shape of what it wraps; ticks, a line where the view's top or bottom
-  falls inside a capsule, sliced as `pickAt` reads it, at most two and one
+  falls inside a capsule, sliced as `capsulePick` reads it, at most two and one
   when both fall within `EDGE_MERGE`; and the `extent` the rail keeps in
   view. A tick never spans the part in view: seeing most of a capsule, it
   read as the capsule's fill.
@@ -703,7 +703,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
     is then its command; then `.tool-status`, ✓ or ✗ (`callMark`). A
     running call has no mark: once ringed, it has `.tool-elapsed`, how long
     it has run (below).
-  - `.tool-command`, what the call touched (`subjectOf`, core), as
+  - `.tool-command`, what the call touched (`callSubject`, core), as
     `rowSummary` reads it: a shell command highlighted, and a long one-line
     chain laid out a step a line (`@pinetrie/shell`). A `grep` or `find`
     shows its pattern and the path it searches.
@@ -873,7 +873,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   bookmark apart, which a press copies to find it in jj or jjui, its
   buttons, and a `⋯` menu for the rest
   ("catch up with accepted work", "rewrite description"). What the lane runs
-  now (`activityOf`: a turn, a resolution, or a split, from its latest
+  now (`laneActivity`: a turn, a resolution, or a split, from its latest
   prompt's role) comes first: while it runs, accepted work counts files so far
   and offers nothing. A lane with no copy of its own has no strip.
 - **Catching up and splitting are a card queued at once** (ADR-0108,
@@ -905,7 +905,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   (`.queued-fact`, worded by `factLine`), with no controls: nobody moves it
   (ADR-0080).
 - **"Needs you" comes from the tree** (ADR-0080): the strip's `needs_you`
-  is the thread's newest `ask_about_conflict` (`conflictAskedAt`) when it is
+  is the thread's newest `ask_about_conflict` (`conflictAskTime`) when it is
   newer than the proposed changes' record.
 - **Open proposed changes in your repo** ("changes ready to accept") are your inbox's
   rows for the threads you follow, each leading with the thread's name and
@@ -1086,9 +1086,9 @@ pipeline keeps the tree a pure function, testable without a DOM.
   image and paragraph, the `n`th of its kind in document order, nested ones
   included, by `@pinetrie/rules`' walk over mdast (`markBlocks`), run as a
   remark step, which `remark-rehype` carries onto each element as
-  `data-block` (`table-0`). `blocksOf` gives each block's source range
+  `data-block` (`table-0`). `textBlocks` gives each block's source range
   from the same walk, so the table drawn and the table an address names
-  cannot be counted differently (`blockAt`, `tableHeads` for a table's
+  cannot be counted differently (`findBlockElement`, `tableHeads` for a table's
   title). `drawTree` draws a tree; in a message, `<table>` is
   `MessageTable`, with its bar (⤢ opens it; Cmd+C with focus there copies
   the table, its wrap carrying its block),
@@ -1123,7 +1123,7 @@ the session sends moves and draws them until its copy holds them
 `packages/session/TECHNICAL.md`.
 
 - **A move is planned once.** `planIntent` builds each `Move` with core's
-  `moveOf` (an unqueue's target is `noteOf`, the thread's nearest notes),
+  `cardMove` (an unqueue's target is `notesTarget`, the thread's nearest notes),
   from the cards as drawn, and the session sends it.
 - **Refusals are worded in `@pinetrie/interface`** (`noticeWords`), from
   the session's `CardNotice`: an unqueue the pop beat says "already sent",
@@ -1226,7 +1226,7 @@ the session sends moves and draws them until its copy holds them
   The "+ pin" box is the one box that focuses itself as it mounts: a click
   in its column opens it, not a plan.
 - **Every write the editor makes itself goes through the element**: a command
-  chosen, an update's intent, a shared file (`insertAt` decides the text).
+  chosen, an update's intent, a shared file (`insertSnippet` decides the text).
   Each is `setRangeText` and a dispatched `input` event, so it is typing:
   local, it may create the card; bound, the binding writes it.
 - **The editor's own text** (for the button's words, `sendable` and the rows)
@@ -1274,31 +1274,31 @@ A thread's pinned cards are drawn in a strip under its column's header,
 outside the scrolling body (`pinned-strip.tsx`), so the thread's direction
 stays in view; the strip scrolls past 30vh.
 
-- **`Column` finds them with `pinnedAt(threadEnd, …)`.** An unstarted
+- **`Column` finds them with `pinnedCardsAtEnd(threadEnd, …)`.** An unstarted
   thread's column, or one with no thread end, has no strip: a card is
   pinned at a thread's end, and an unstarted thread has none until its first
   send.
 - **Each is a `PinnedCardEditor`** (`card-editor.tsx`), a `BoundCardEditor`
-  with its size (`tokensOf`, four characters a token, as pi estimates) and
+  with its size (`textTokens`, four characters a token, as pi estimates) and
   its status in its header. It has no send: Enter is a new line. Its ⋯
   moves it to the notes, to the queue or into your inventory; your
   message's, a note's and a queued card's ⋯ pin it. Pin and unpin are moves
   (`planPin`, `planUnpin`, `card-intents.ts`), so the host records them and
-  the undo key outside a box reverses them; `revealOf` shows a pinned place
+  the undo key outside a box reverses them; `revealEffects` shows a pinned place
   as a note, at its thread's end.
 - **A card's status is `pinnedStatus`** (`column-view.ts`): the card's
   entry in `pinnedDiff(pinnedInView(index, end), …)`, the walk and the
   comparison the host plans a run's entry from, so the strip and the run
   agree on what the agent read. A card with no text yet has none.
 - **"+ pin" opens a box at the strip's end** that makes a pinned card. It
-  is a `NewCardBox` whose list is the thread's pinned cards (`pinnedOf`):
+  is a `NewCardBox` whose list is the thread's pinned cards (`pinTargetKey`):
   the composer's create-on-first-keystroke rule, and the same element goes
   on editing the card, so nothing typed between the create and the binding
   is lost, which a hand-over to a `PinnedCardEditor` would. It never sends:
   Enter is a new line, it offers no commands, and Escape or blur closes
   it; Alt+↑/↓ hands the card to the strip, focused there. While it is open,
   the strip leaves out the card it shows, as the column does for the
-  composer's. `newPinAt` puts "+ pin" in the header
+  composer's. `newPinPlace` puts "+ pin" in the header
   while the thread has no pinned card, in the strip after, and nowhere while
   the box is open.
 - **The empty strip shows only while a card is dragged.** The drag engine
@@ -1345,13 +1345,13 @@ stays in view; the strip scrolls past 30vh.
   `pane-context.ts` does for a message. A prop would pass through five
   editors.
 - **A column draws your traces at its thread's end** (`traces.ts`):
-  `tracesAt` keeps yours whose place resolves to this end (`placeEnd`, as a
+  `endTraces` keeps yours whose place resolves to this end (`placeEnd`, as a
   card there would), `traceGroups` makes one line per person and verb
-  (`verbOf`), and `traceWords` words it ("Bea queued this", "3 cards moved
+  (`changeVerb`), and `traceWords` words it ("Bea queued this", "3 cards moved
   by Bea"). Only a column that can be written draws them: an archived
   root's is a glance.
 - **A click is `openTrace`** (`planOpenTrace`, `card-intents.ts`): the card's
-  place now, as an undo's answer shows it (`revealOf`); a sent card's
+  place now, as an undo's answer shows it (`revealEffects`); a sent card's
   message; nothing for a card in someone else's inventory.
 - **Seen is the host's.** An effect in `Column` sends `traces-seen` for the
   traces it draws, once each, while its `visible` state says the page can
@@ -1444,14 +1444,14 @@ board draws it (`boardView`), and an inventory never holds one
   A note column's face is its title and count, its normal its title and
   first notes, its whole all of them.
 - **A reference's quote is fetched once per page** (`useQuote`), and kept
-  by its blob for a copy to read (`quoteOf`): a quote never changes.
+  by its blob for a copy to read (`fetchedQuote`): a quote never changes.
 - **A row's components take their card and width alone**; what a surface
   gives them beyond that (the session, the reader, a thread's preview, the
   note columns, where a put lands) is `RenderingContext`, given by
   `RenderingProvider`. The inventory panel gives it.
 - **On a canvas, whole is the column**: `Strip`'s switch over
   `CardColumn` draws each kind's column, total in the same way, and a
-  folded one draws its face (`FoldedColumn`, `detailOf`). The rows' `Whole`
+  folded one draws its face (`FoldedColumn`, `cardDetail`). The rows' `Whole`
   is a card opened off a canvas: the inventory's open card.
 
 ## Selectors in the browser suite
@@ -1557,11 +1557,11 @@ plain `#setup` anchor: `usePage` hears the hash change.
 
 - **The page is in the URL's hash** (`#profile`). `usePage` reads it with
   `useSyncExternalStore`, hearing `popstate` (Back and Forward) and
-  `hashchange` (a typed URL). `goTo` is the `page` port: opening pushes an
+  `hashchange` (a typed URL). `showPage` is the `page` port: opening pushes an
   entry carrying `PAGE_STATE`; leaving goes `history.back()` over an entry
   this tab pushed, else replaces the page's entry with the bare URL
   (`planLeave`), since Back from a page loaded by its URL would leave
-  pine·trie. `pushState` and `replaceState` fire no event, so `goTo` tells
+  pine·trie. `pushState` and `replaceState` fire no event, so `showPage` tells
   the subscribers itself.
 - **A sideways scroll never goes Back.** `index.html` sets
   `overscroll-behavior-x: none` on `html` and `body`: a strip or diff
@@ -1591,7 +1591,7 @@ plain `#setup` anchor: `usePage` hears the hash change.
 
 `clipboard.ts` is the one file that touches the clipboard
 (`boundaries.test.ts` keeps it so): the page's `copy`, `cut` and
-`paste` events, a paste's files (`pastedFilesOf`, which the card boxes
+`paste` events, a paste's files (`eventPastedFiles`, which the card boxes
 call, and `pastedImages`, the picture field's), and a button's copy
 (`writeTextByButton`, `useCopy`'s). Each handler gathers where focus is
 (`focusFacts`, `focus.ts`, the one gather the keys read too) and what was
@@ -1601,7 +1601,7 @@ What S151 measured, and these handlers rest on:
 
 - **`setData` counts only inside the event**, synchronously: a copy cannot
   wait for anything, so a reference's quote is written only if this page
-  has already fetched it (`useQuote` keeps each, `quoteOf`), else its link.
+  has already fetched it (`useQuote` keeps each, `fetchedQuote`), else its link.
 - **The events fire away from a text box**, on a focused element with
   nothing selected, in Chromium, Firefox, WebKit and Safari, with no
   workaround. So a card's header (`.card-head`), the clipboard cell and a

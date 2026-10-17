@@ -2,7 +2,7 @@ import {
   type CardRecord,
   cardIdOfKind,
   entryId,
-  messageAt,
+  entryMessage,
   type Sha256,
   textCardId,
   threadIdFor,
@@ -20,7 +20,7 @@ import {
 } from "./clip.ts"
 import { NO_FOCUS, tree } from "./fixtures.ts"
 import type { Focus } from "./focus.ts"
-import { markdownOf } from "./markdown-of.ts"
+import { addressMarkdown } from "./markdown-of.ts"
 
 const ADA = writerId("ada@x.io")
 const HOST = "https://pinetrie.example"
@@ -102,8 +102,8 @@ describe("what a copy takes (`clipOfFocus`)", () => {
         kind: "past",
         taken: {
           address: entryAddress,
-          markdown: markdownOf(entryAddress, {
-            messageOf: e => messageAt(index, e) ?? undefined,
+          markdown: addressMarkdown(entryAddress, {
+            messageOf: e => entryMessage(index, e) ?? undefined,
           }),
         },
       },

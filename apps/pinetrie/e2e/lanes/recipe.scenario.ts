@@ -24,15 +24,15 @@ import type { Checks } from "../checks.ts"
 import {
   at,
   committedProject,
-  entriesOf,
+  heldEntries,
+  heldLanes,
+  heldRootRecords,
+  heldTree,
   idleNow,
   join,
   laneHolding,
-  lanesOf,
-  rootRecordsOf,
   START_AGENT,
   setUpAccepted,
-  treeOf,
   waitFor,
 } from "../harness.ts"
 import { cleanUp, type LaneHosts } from "../lane-hosts.ts"
@@ -69,13 +69,13 @@ async function recipeSection(
   })
   const wu = await join(wh, "uma", "recipe")
   await wu.request({ kind: "name", name: "Uma" })
-  const tree = () => treeOf(wh)
+  const tree = () => heldTree(wh)
   const idle = async () => {
     await waitFor(() => idleNow(wh), 180_000)
     await wh.quiet()
   }
   const laneTip = (lane: ThreadId) =>
-    lanesOf(wh, tree(), readPlaces(wh.places)).find(l => l.name === lane)
+    heldLanes(wh, tree(), readPlaces(wh.places)).find(l => l.name === lane)
       ?.tip ?? null
   /** The lane whose thread holds `text`. */
   const laneWith = (text: string) =>
@@ -85,7 +85,7 @@ async function recipeSection(
     if (lane === undefined) return ""
     const onPath = new Set(ancestry(tree(), laneTip(lane)).path)
     return (
-      Object.values(entriesOf(wh))
+      Object.values(heldEntries(wh))
         .filter(r => onPath.has(entryId(r.id)))
         .sort((a, b) => (a.id < b.id ? -1 : 1))
         .map(r => rowMessage(r) as { role?: string })
@@ -96,7 +96,7 @@ async function recipeSection(
   }
   /** The revision records of a lane's thread, oldest first. */
   const recordsOf = (lane: ThreadId): RevisionRecord[] => {
-    const records = rootRecordsOf(wh, readRevisions)
+    const records = heldRootRecords(wh, readRevisions)
     return ancestry(tree(), laneTip(lane))
       .path.map(id => records.get(id as EntryId))
       .filter((r): r is RevisionRecord => r !== undefined && r.lane === lane)

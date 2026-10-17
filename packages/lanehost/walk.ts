@@ -18,7 +18,7 @@ export interface Entry {
 }
 
 /** An entry's kind from its `lstat`: lanehost decides it here alone. */
-export const kindOf = (s: {
+export const statKind = (s: {
   isFile(): boolean
   isDirectory(): boolean
   isSymbolicLink(): boolean
@@ -44,7 +44,7 @@ export async function walkTree(
     for (const name of names) {
       const p = rel === "" ? name : `${rel}/${name}`
       const s = await lstat(path.join(root, p), { bigint: true })
-      const kind = kindOf(s)
+      const kind = statKind(s)
       out.set(p, {
         kind,
         mode: Number(s.mode),

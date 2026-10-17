@@ -2,43 +2,43 @@ import type { BlobRef, Sha256, Share } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
   imageFiles,
-  insertAt,
+  insertSnippet,
   pastedFiles,
   shareChip,
   shareSelection,
 } from "./paste.ts"
 
-describe("insertAt: a snippet on lines of its own", () => {
+describe("insertSnippet: a snippet on lines of its own", () => {
   const S = "![](/blob/x)"
   test("into nothing, at the start, and at the end", () => {
-    expect(insertAt("", { start: 0, end: 0 }, S)).toEqual({
+    expect(insertSnippet("", { start: 0, end: 0 }, S)).toEqual({
       text: S,
       cursor: S.length,
     })
-    expect(insertAt("look", { start: 0, end: 0 }, S)).toEqual({
+    expect(insertSnippet("look", { start: 0, end: 0 }, S)).toEqual({
       text: `${S}\nlook`,
       cursor: S.length,
     })
-    expect(insertAt("look", { start: 4, end: 4 }, S)).toEqual({
+    expect(insertSnippet("look", { start: 4, end: 4 }, S)).toEqual({
       text: `look\n${S}`,
       cursor: 5 + S.length,
     })
   })
 
   test("in the middle of a line, and where a newline already is", () => {
-    expect(insertAt("look here", { start: 5, end: 5 }, S).text).toBe(
+    expect(insertSnippet("look here", { start: 5, end: 5 }, S).text).toBe(
       `look \n${S}\nhere`,
     )
-    expect(insertAt("look\n\nhere", { start: 5, end: 5 }, S).text).toBe(
+    expect(insertSnippet("look\n\nhere", { start: 5, end: 5 }, S).text).toBe(
       `look\n${S}\nhere`,
     )
   })
 
   test("in place of a selection; a selection past the text is clamped", () => {
-    expect(insertAt("look XX here", { start: 5, end: 7 }, S).text).toBe(
+    expect(insertSnippet("look XX here", { start: 5, end: 7 }, S).text).toBe(
       `look \n${S}\n here`,
     )
-    expect(insertAt("ab", { start: 9, end: 12 }, S)).toEqual({
+    expect(insertSnippet("ab", { start: 9, end: 12 }, S)).toEqual({
       text: `ab\n${S}`,
       cursor: 3 + S.length,
     })

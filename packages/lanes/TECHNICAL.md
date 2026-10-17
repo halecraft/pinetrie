@@ -31,7 +31,7 @@ the helper, S122 to S131 for Docker and the lane VM.
   directory, read-only at `STATES_MOUNT`, `/pinetrie-states`: its proposed changes'
   `start` and each open conflict's versions), and no runtime's flags. A
   runtime renders it (`runSpec`); the hash of that value is its spec label
-  (`specHashOf`), and a jj lane's renders no states mount, so its hash did
+  (`shapeSpecHash`), and a jj lane's renders no states mount, so its hash did
   not move.
 - **Planners return values; a runtime turns them into commands.** A plan is a
   list of `Step`s: a `LaneStep` (a command in the lane, through its channel)
@@ -326,7 +326,7 @@ paths are its diff." would compare a function with itself.
 
 - **A container is disposable; the disk is the lane.** Each lane's container
   is labelled `pinetrie.spec=<hash>` (`SPEC_LABEL`), a hash of the runtime's
-  spec for its shape (`specHashOf`). `planContainer` decides at each start:
+  spec for its shape (`shapeSpecHash`). `planContainer` decides at each start:
   - missing: create it;
   - its label differs, or it has none: recreate it on the same disk;
   - stopped: start it;
@@ -338,7 +338,7 @@ paths are its diff." would compare a function with itself.
   `plan.ts`.
 - **A disk restored from a snapshot gets the current names**
   (`pre-rename:`). A snapshot of a lane made before b05e2252 holds
-  `pineta/<lane>` and `.pineta-lane/` (S114): `bookmarkOf` would find no
+  `pineta/<lane>` and `.pineta-lane/` (S114): `readLaneBookmark` would find no
   bookmark, and jj ignores a `JJ_CONFIG` that names no file (exit 0), so
   `immutable_heads()` would be the builtin. After the restore,
   `startContainer` reads what is there (`oldNamesOnDisk`), plans

@@ -12,14 +12,15 @@ import {
   type CardId,
   type CardWidth,
   type ConflictChoice,
+  cardMove,
   type EntryId,
+  entryThread,
   hasPlaceKind,
   type ListKey,
   type MarkTarget,
   type MoveDirection,
-  moveOf,
   nonEmpty,
-  noteOf,
+  notesTarget,
   type Position,
   type ProposedChangesAction,
   type QueueHoldChange,
@@ -28,7 +29,6 @@ import {
   type ThreadId,
   type ThreadStart,
   type TraceRecord,
-  threadAt,
   type WorkflowEdit,
   type WorkflowStateId,
   type WriterId,
@@ -46,8 +46,10 @@ import type { Raised } from "./attention.ts"
 import {
   afterUndo,
   canvasSpot,
-  cardOf,
+  cardSlot,
   clipFacts,
+  findCard,
+  findTextCard,
   moveCard,
   type PutHow,
   type PutSource,
@@ -66,9 +68,7 @@ import {
   planUnpin,
   queueMove,
   queueNew,
-  reorderOf,
-  slotOf,
-  textCardOf,
+  reorderByStep,
 } from "./card-intents.ts"
 import { type Clip, threadClip } from "./clip.ts"
 import {
@@ -81,16 +81,16 @@ import {
   type ReaderAction,
 } from "./columns.ts"
 import {
-  changeViewOf,
   closeCanvasEffects,
   type Effect,
-  foldViewOf,
+  foldViewEffect,
   type IntentState,
   layout,
   list,
-  planOpenAt,
+  planOpenEntry,
   show,
   showCanvas,
+  viewChangeEffect,
 } from "./effects.ts"
 import type { NameStep } from "./identity.ts"
 import {
@@ -107,7 +107,7 @@ import type { CanvasPut, PutTarget } from "./put-target.ts"
 import { type SearchAsk, searchActOn } from "./search.ts"
 import { planSpinOff } from "./spin-off.ts"
 import type { NewColumn } from "./start-button.ts"
-import { openOf, type ThreadLink } from "./thread-link.ts"
+import { linkOpen, type ThreadLink } from "./thread-link.ts"
 
 /**
  * What a reader asks of one column, whatever its kind. A message's acts are
@@ -506,7 +506,7 @@ function planOf(
       const active = state.layout.active
       return active?.kind === "canvas"
         ? [
-            foldViewOf(
+            foldViewEffect(
               state,
               active.canvas,
               intent.kind === "fold"
@@ -607,7 +607,7 @@ function planOf(
     case "notNeeded":
       return [{ kind: "notNeeded", lane: intent.lane, raised: intent.raised }]
     case "openAt":
-      return planOpenAt(intent.entry, state)
+      return planOpenEntry(intent.entry, state)
     case "openLink":
       return planOpenLink(intent.link, intent.entry, state)
     case "signOut":
@@ -660,7 +660,7 @@ const onCanvasYouAreOn = (
 ): readonly Effect[] => {
   const active = state.layout.active
   return active?.kind === "canvas"
-    ? [changeViewOf(state, active.canvas, change)]
+    ? [viewChangeEffect(state, active.canvas, change)]
     : []
 }
 
@@ -690,7 +690,7 @@ function planColumn(
     case "proposal":
       return planProposal(act.proposal, act.press, state, minted)
     case "openAt":
-      return planOpenAt(act.entry, state)
+      return planOpenEntry(act.entry, state)
     case "newCanvas":
       return planOf({ kind: "newCanvas", prefill: act.prefill }, state, minted)
     // A branch is keyed by the thread it minted, as its card is.
@@ -717,7 +717,7 @@ function planColumn(
     case "details":
       return reading({ kind: "details", open: act.open })
     case "queue": {
-      const now = textCardOf(state.cards, act.card)
+      const now = findTextCard(state.cards, act.card)
       return now === undefined
         ? []
         : [
@@ -732,23 +732,24 @@ function planColumn(
     }
     case "unqueue": {
       // If the host popped the card first, the refusal says it was sent.
-      const now = cardOf(state.cards, act.card)
+      const now = findCard(state.cards, act.card)
       if (
         now === undefined ||
         !hasPlaceKind(now, "queued") ||
         !isQueuedMessage(now)
       )
         return []
-      const move = moveOf(now, noteOf(now.place))
+      const move = cardMove(now, notesTarget(now.place))
       return [moveCard(move, IN_COLUMN(key), false, act.by)]
     }
     case "reorder": {
-      const now = cardOf(state.cards, act.card)
+      const now = findCard(state.cards, act.card)
       const among = act.among.flatMap(id => {
-        const c = cardOf(state.cards, id)
+        const c = findCard(state.cards, id)
         return c === undefined ? [] : [c]
       })
-      const reorder = now === undefined ? null : reorderOf(now, among, act.step)
+      const reorder =
+        now === undefined ? null : reorderByStep(now, among, act.step)
       return reorder === null
         ? []
         : [{ kind: "reorderCard", reorder, how: IN_COLUMN(key) }]
@@ -838,7 +839,7 @@ function planColumn(
 }
 
 /**
- * Follow `link` to `entry` (`openOf`): in its canvas (`planOpenIn`); a thread
+ * Follow `link` to `entry` (`linkOpen`): in its canvas (`planOpenIn`); a thread
  * in your inventory, its preview there, read only; one someone else holds,
  * or with no card, nothing.
  */
@@ -847,12 +848,12 @@ export function planOpenLink(
   entry: EntryId,
   state: IntentState,
 ): readonly Effect[] {
-  const open = openOf(link, entry)
+  const open = linkOpen(link, entry)
   switch (open.kind) {
     case "canvas":
       return planOpenIn(open.entry, open.canvas, state)
     case "preview": {
-      const slot = slotOf(state.cards.slots, open.thread)
+      const slot = cardSlot(state.cards.slots, open.thread)
       return slot === null
         ? []
         : [
@@ -874,7 +875,7 @@ export function planOpenLink(
 
 /**
  * Show `entry`, in canvas `canvas`. One this tab holds opens as
- * `planOpenAt`. Else the canvas is shown, which holds its roots, archived or
+ * `planOpenEntry`. Else the canvas is shown, which holds its roots, archived or
  * not, and the entry is shown once it has arrived.
  */
 function planOpenIn(
@@ -882,7 +883,8 @@ function planOpenIn(
   canvas: CanvasId,
   state: IntentState,
 ): readonly Effect[] {
-  if (state.index.entries[entry] !== undefined) return planOpenAt(entry, state)
+  if (state.index.entries[entry] !== undefined)
+    return planOpenEntry(entry, state)
   return [...showCanvas(canvas), { kind: "openWhenHeld", entry }]
 }
 
@@ -938,7 +940,7 @@ function planAddColumn(
           IN_COLUMN(column),
           false,
         ),
-        changeViewOf(state, canvas, {
+        viewChangeEffect(state, canvas, {
           kind: "fold",
           card: column,
           unfolded: true,
@@ -1016,7 +1018,7 @@ function planOpenBranch(
   state: IntentState,
 ): readonly Effect[] {
   const active = state.layout.active
-  const parent = threadAt(state.index, at)
+  const parent = entryThread(state.index, at)
   const root =
     parent === null ? undefined : state.canvases.index.rootOfThread.get(parent)
   if (active?.kind !== "canvas" || root === undefined) return []
@@ -1044,7 +1046,7 @@ function planProposal(
   state: IntentState,
   minted: Minted,
 ): readonly Effect[] {
-  const lane = threadAt(state.index, proposal)
+  const lane = entryThread(state.index, proposal)
   const canvas =
     lane === null ? undefined : state.canvases.index.canvasOfThread.get(lane)
   const root =
@@ -1075,7 +1077,7 @@ function planProposal(
           at: { kind: "branch", thread, at: press.fork, canvas },
           card: card?.id ?? null,
         },
-        changeViewOf(state, canvas, { kind: "sent", card: thread }),
+        viewChangeEffect(state, canvas, { kind: "sent", card: thread }),
       ]
     })
   }
@@ -1116,7 +1118,7 @@ function planProposal(
       },
     },
     ...rows.map(r =>
-      changeViewOf(state, canvas, {
+      viewChangeEffect(state, canvas, {
         kind: "opened",
         card: r.thread,
         ...(r.edited
@@ -1151,7 +1153,11 @@ function openThreadColumn(
       kind: "request",
       intent: { kind: "open-thread", thread, root, canvas, start },
     },
-    changeViewOf(state, canvas, { kind: "opened", card: thread, ...starts }),
+    viewChangeEffect(state, canvas, {
+      kind: "opened",
+      card: thread,
+      ...starts,
+    }),
   ]
 }
 

@@ -17,7 +17,7 @@ export {
   type CanvasRail,
   canvasRail,
   canvasWork,
-  laneRootsOf,
+  laneRootEntries,
   NO_RAIL,
   type OpenProposedChanges,
   type RailStub,
@@ -65,14 +65,14 @@ export {
 } from "./ask-words.ts"
 export {
   arrivals,
-  attentionOf,
+  attentionItems,
   attentionWords,
   canvasStatus,
   doneThreads,
   type Item,
   type Level,
   type Moments,
-  markOf,
+  markLevel,
   moving,
   type Status,
   threadStatus,
@@ -240,7 +240,7 @@ export {
   identityWords,
   joinWords,
   type LaneJoin,
-  newPinAt,
+  newPinPlace,
   type PinnedMarker,
   pinnedMarkers,
   pinnedStatus,
@@ -250,24 +250,24 @@ export {
   START_WORDS,
   startedWords,
   type ThreadDetails,
-  tokensOf,
+  textTokens,
   type WorkFacts,
   type WorkStrip,
   workingWords,
 } from "./column-view.ts"
 export {
   BOUND,
-  branchesAt,
   type CardKey,
   type Column,
   type ColumnKey,
   type ColumnMode,
+  isNextSendBranch,
   keyText,
   type Pending,
   type Prefill,
   threadAnchor,
   type UnstartedMode,
-  unstartedOf,
+  unstartedMode,
 } from "./columns.ts"
 export { matchCommands } from "./commands.ts"
 export {
@@ -305,20 +305,20 @@ export {
   ITEM_HOVER_MS,
   NOT_A_HANDLE,
   type Point,
-  sidebarSpotAt,
+  sidebarSpot,
   sourceOfElement,
 } from "./drag.ts"
 export type { Effect, IntentState } from "./effects.ts"
 export {
+  cardDetail,
+  cardFace,
   cardOfFace,
   DETAIL_ON,
   type Detail,
   type DrawnCard,
   type DrawnKind,
-  detailOf,
   type Face,
   type FaceOf,
-  faceOf,
   KIND_ICON,
   type NoteColumnFace,
   noteColumnFace,
@@ -362,9 +362,9 @@ export {
 export { gridKeyAct } from "./grid-keys.ts"
 export type { GridView } from "./grid-view.ts"
 export {
+  directoryRootEntries,
   inventoryThreads,
   planHeldRoots,
-  rootEntriesOf,
 } from "./held-roots.ts"
 export {
   type OpenMenus,
@@ -396,10 +396,10 @@ export {
 export {
   type Inbox,
   type InboxItem,
+  inboxMentions,
   isUnseen,
   markAllSeen,
   markSeen,
-  mentionsOf,
   seenNow,
 } from "./inbox.ts"
 export {
@@ -419,7 +419,7 @@ export {
 export {
   type Dock,
   dockCodec,
-  snapTo,
+  snappedDock,
 } from "./inventory-dock.ts"
 export { type CardPreview, inventoryView } from "./inventory-view.ts"
 export {
@@ -451,7 +451,7 @@ export {
   marginFaceWords,
   SHUT_MARGIN,
 } from "./margin.ts"
-export { markdownOf } from "./markdown-of.ts"
+export { addressMarkdown } from "./markdown-of.ts"
 export {
   type MessageAct,
   type MessageTools,
@@ -473,9 +473,9 @@ export {
   queueHeadPlan,
 } from "./next.ts"
 export {
+  canvasNoteColumns,
   NOTES_EMPTY,
   type NoteColumnView,
-  noteColumnsOf,
   noteCountWords,
 } from "./note-column-view.ts"
 export { outcomeWords } from "./outcome-words.ts"
@@ -499,7 +499,7 @@ export {
 } from "./palette.ts"
 export {
   imageFiles,
-  insertAt,
+  insertSnippet,
   pastedFiles,
   type Selection,
   SHARE_FILE,
@@ -524,9 +524,9 @@ export {
   zoomCrop,
 } from "./picture-crop.ts"
 export {
-  readingAt,
+  othersReading,
+  othersWithValue,
   seenBy,
-  whoIsAt,
 } from "./presence.ts"
 export {
   planReading,
@@ -569,8 +569,8 @@ export {
   type RailStretch,
 } from "./rail.ts"
 export {
+  capsulePick,
   columnLandmarks,
-  pickAt,
   railItems,
   railKeep,
   railView,
@@ -581,10 +581,10 @@ export {
 } from "./rail-view.ts"
 export {
   edgeScroll,
-  gapAt,
   keyMove,
   landing,
   neighbourShifts,
+  pointerGap,
 } from "./reorder.ts"
 export {
   DIFF_LINES_SHOWN,
@@ -600,14 +600,14 @@ export {
   sectionState,
 } from "./review.ts"
 export {
-  labelsOf,
   type MessageCount,
   messageCount,
   messageCountTitle,
   NO_TEXT,
   planTitle,
   renameKey,
-  summariesOf,
+  taskLabels,
+  taskSummaries,
 } from "./root-label.ts"
 export {
   landingIn,
@@ -736,8 +736,8 @@ export {
   crossCanvasLinks,
   heldWords,
   type LinkOpen,
+  linkOpen,
   linkWords,
-  openOf,
   opens,
   type ThreadLink,
   threadLink,
@@ -759,23 +759,23 @@ export {
 } from "./tool-row.ts"
 export { callLabel, toolWord } from "./tool-words.ts"
 export {
+  endTraces,
   keptTraces,
   seenBatches,
   traceGroups,
-  tracesAt,
 } from "./traces.ts"
 export { type Upload, uploadBlob } from "./upload.ts"
 export {
   type Box,
+  columnSpot,
   keepSpot,
-  placeAt,
   railScroll,
   type Span,
   type Spot,
   type SpotStore,
   sameSpan,
   spotFor,
-  spotOf,
+  spotScrollTop,
   spotStore,
   type ViewportStore,
   viewportStore,

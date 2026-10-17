@@ -17,8 +17,8 @@ import { readRevisions, readSharedLineages } from "@pinetrie/reads"
 import type { Checks } from "../checks.ts"
 import {
   BRANCH,
+  heldRootRecords,
   readJjAccepted,
-  rootRecordsOf,
   START_AGENT,
   SUITE_CONFIG,
   suitePlaces,
@@ -123,7 +123,7 @@ async function sharedSection(
       h.user.send("lane b: write the race", ROOT, START_AGENT),
     ])
     await h.idle()
-    const raced = [...rootRecordsOf(h.host, readRevisions).values()].flatMap(
+    const raced = [...heldRootRecords(h.host, readRevisions).values()].flatMap(
       r =>
         (r.disk?.shared.wrote ?? []).filter(w => w.path === ".plans/race.md"),
     )
@@ -177,7 +177,7 @@ async function sharedSection(
     const writer = h.laneWith("write a plan")
     const files = (rev: string) =>
       jj(dir, "file", "list", "--ignore-working-copy", "-r", rev)
-    const newest = [...rootRecordsOf(h.host, readRevisions).values()]
+    const newest = [...heldRootRecords(h.host, readRevisions).values()]
       .filter(r => r.lane === writer?.name && r.snapshot !== null)
       .sort((a, b) => (a.entry < b.entry ? 1 : -1))[0]
     const inSnapshot =

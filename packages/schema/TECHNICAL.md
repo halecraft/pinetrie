@@ -217,7 +217,7 @@ id `card:<card id>` (`cardDocId`, `cardIdOfDoc`, in `places.ts`). People type
 together there, so it is a CRDT (ADR-0023); a card's record is in the places
 document.
 
-- **`seatOf(peerId, principal)` is the one place a seat becomes a person**:
+- **`seatIdentity(peerId, principal)` is the one place a seat becomes a person**:
   its `clientID` (Kyneta's `yjsClientId`) and its writer, or null for a
   principal that is not an email, the host's among them. The host's seat
   records (`pinetrie.seat`) come from it, and every text's writers from those.
@@ -226,7 +226,7 @@ document.
   `clientID` 0 before anyone types, which is nobody's and left out (S58).
 
 - **A `clientID` names a seat, and the seat's principal the person**
-  (ADR-0037). `seatOf` maps a seat to Kyneta's own `yjsClientId(peerId)` (53
+  (ADR-0037). `seatIdentity` maps a seat to Kyneta's own `yjsClientId(peerId)` (53
   bits of FNV-1a-64) and `writerOfPrincipal` of its principal; a seat whose
   principal is no email, the host's included, is nobody. `text.test.ts` pins
   it to real documents' `clientID`s. The host writes a record of each seat

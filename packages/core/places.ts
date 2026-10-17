@@ -126,7 +126,7 @@ export type LivePlace =
  * Where a card is. A trashed card is drawn nowhere and records the place
  * it left, and nothing else: whose trash it is, who may restore it, where
  * a restore puts it and which history it is in all follow from `left`
- * (`ownerOf`). Who trashed it is the card's placer, as for any move. It is
+ * (`surfaceOwner`). Who trashed it is the card's placer, as for any move. It is
  * kept so a restore or the undo key can bring it back, until the host
  * sweeps it.
  */
@@ -135,7 +135,7 @@ export type CardPlace =
   | { readonly kind: "trash"; readonly left: LivePlace }
 
 /** The live place a card's surface is on: its place, or for a trashed card the place it left. */
-export const livePlaceOf = (place: CardPlace): LivePlace =>
+export const livePlace = (place: CardPlace): LivePlace =>
   place.kind === "trash" ? place.left : place
 
 /**
@@ -154,7 +154,7 @@ export type SurfaceOwner =
  * Who the surface `place` (or a key of it) is on belongs to. A trashed
  * card's trash is its `left`'s owner's.
  */
-export function ownerOf(
+export function surfaceOwner(
   place: LivePlace | Exclude<PlaceKey, { readonly kind: "trash" }>,
 ): SurfaceOwner {
   switch (place.kind) {
@@ -213,7 +213,7 @@ export type PlaceKey =
     >
   /**
    * A discard names no place left: the host fills it in from where the
-   * card is, and names its history from it (`historyOf`).
+   * card is, and names its history from it (`movesHistory`).
    */
   | { readonly kind: "trash" }
 
@@ -292,10 +292,10 @@ export interface RankedCanvas {
 }
 
 /** A place's key: the same kind of place, with what the host assigns left out. */
-export function keyOf<P extends CardPlace>(
+export function placeKey<P extends CardPlace>(
   place: P,
 ): Extract<PlaceKey, { readonly kind: P["kind"] }>
-export function keyOf(place: CardPlace): PlaceKey {
+export function placeKey(place: CardPlace): PlaceKey {
   switch (place.kind) {
     case "composing":
       return place
@@ -358,7 +358,7 @@ export function sameKey(a: PlaceKey, b: PlaceKey): boolean {
  * it, or where it was (`drawnPlace`), so its sender never sees it at a
  * target.
  */
-export const seenAt = (now: PlaceKey, from: PlaceKey): boolean =>
+export const isWhereSenderSaw = (now: PlaceKey, from: PlaceKey): boolean =>
   sameKey(now, from)
 
 /**
@@ -437,7 +437,7 @@ export type ReorderAt = Extract<
 >
 
 /** Whether a card at `key` is reordered among its neighbours there. */
-export const isReorderAt = (key: PlaceKey): key is ReorderAt => {
+export const isReorderPlace = (key: PlaceKey): key is ReorderAt => {
   const kinds: readonly PlaceKey["kind"][] = REORDER_PLACES
   return kinds.includes(key.kind)
 }
@@ -466,44 +466,44 @@ export interface Reorder {
  * spot there, where a note column is made for it (`WRAPS`). A card whose
  * kind is not known goes only where every kind may: an inventory.
  */
-export function moveOf<To extends TargetOf<"text">>(
+export function cardMove<To extends TargetOf<"text">>(
   card: TextCard,
   to: To,
 ): MoveOf<"text"> & { readonly to: To }
-export function moveOf<To extends TargetOf<"thread">>(
+export function cardMove<To extends TargetOf<"thread">>(
   card: ThreadCard,
   to: To,
 ): MoveOf<"thread"> & { readonly to: To }
-export function moveOf<To extends TargetOf<"reference">>(
+export function cardMove<To extends TargetOf<"reference">>(
   card: ReferenceCard,
   to: To,
 ): MoveOf<"reference"> & { readonly to: To }
-export function moveOf<To extends TargetOf<"note-column">>(
+export function cardMove<To extends TargetOf<"note-column">>(
   card: NoteColumnCard,
   to: To,
 ): MoveOf<"note-column"> & { readonly to: To }
-export function moveOf(
+export function cardMove(
   card: TextCard | ThreadCard | ReferenceCard,
   to: Extract<PlaceKey, { readonly kind: "inventory" }>,
 ): TypedMove
-export function moveOf(
+export function cardMove(
   card: ThreadCard | NoteColumnCard | TextCard | ReferenceCard,
   to: CanvasTarget,
 ): TypedMove
-export function moveOf(
+export function cardMove(
   card: ThreadCard | NoteColumnCard,
   to: NewCanvasTarget,
 ): TypedMove
-export function moveOf(
+export function cardMove(
   card: TextCard | ReferenceCard,
   to: NotesTarget,
 ): TypedMove
-export function moveOf(
+export function cardMove(
   card: TextCard | ReferenceCard | ThreadCard | NoteColumnCard,
   to: Extract<PlaceKey, { readonly kind: "trash" }> | BackTarget,
 ): TypedMove
-export function moveOf(card: CardRecord, to: MoveTarget): Move {
-  return { card: card.id, from: keyOf(card.place), to }
+export function cardMove(card: CardRecord, to: MoveTarget): Move {
+  return { card: card.id, from: placeKey(card.place), to }
 }
 
 /**
@@ -511,7 +511,7 @@ export function moveOf(card: CardRecord, to: MoveTarget): Move {
  * notes: the note column nearest its thread, which the host resolves (`notes`).
  * The one way a card at a thread becomes a note.
  */
-export const noteOf = (
+export const notesTarget = (
   place: Extract<CardPlace, { kind: "queued" | "pinned" | "composing" }>,
 ): NotesTarget => ({ kind: "notes", near: "thread", thread: place.thread })
 
@@ -525,7 +525,7 @@ export const threadOfPlace = (place: CardPlace | PlaceKey): ThreadId | null =>
 
 /**
  * Where a discard puts a card: a trash, the host filling in the place it
- * left, from which its history is named (`historyOf`).
+ * left, from which its history is named (`movesHistory`).
  */
 export const DISCARDED: Extract<PlaceKey, { readonly kind: "trash" }> = {
   kind: "trash",
@@ -535,7 +535,7 @@ export const DISCARDED: Extract<PlaceKey, { readonly kind: "trash" }> = {
  * Where a pin puts your message or a queued card: pinned at the same thread
  * end. Null for any other place: a note has no thread to pin it to.
  */
-export const pinnedOf = (
+export const pinTargetKey = (
   place: CardPlace | PlaceKey,
 ): Extract<PlaceKey, { readonly kind: "pinned" }> | null =>
   place.kind === "composing" || place.kind === "queued"
@@ -673,7 +673,7 @@ const inKey = (field: keyof PlaceFields, kind: string): boolean => {
 }
 
 /** A key's fields as the wire carries them: those `PLACE_FIELDS` puts in a key. */
-export const keyFieldsOf = (fields: PlaceFields): Partial<PlaceFields> =>
+export const wireKeyFields = (fields: PlaceFields): Partial<PlaceFields> =>
   Object.fromEntries(
     FIELD_NAMES.filter(f => inKey(f, fields.kind)).map(f => [f, fields[f]]),
   )
@@ -747,7 +747,9 @@ const rowOf = (f: PlaceFields): Row | undefined =>
   f.kind in ROWS ? (f as Row) : undefined
 
 /** The fields each stored kind carries (`ROWS`), for tests. */
-export const rowFieldsOf = (kind: string): readonly string[] | undefined => {
+export const storedRowFields = (
+  kind: string,
+): readonly string[] | undefined => {
   const of = kind.startsWith(TRASHED) ? kind.slice(TRASHED.length) : kind
   return of in ROWS ? ROWS[of as RowKind] : undefined
 }
@@ -1217,7 +1219,7 @@ const placeKindOfTarget = (to: MoveTarget): CardPlace["kind"] => {
 }
 
 /** Whether `to` is a target a card of `kind` may be sent to (`TargetOf`). */
-export const isTargetOf = <K extends CardKind>(
+export const isTargetForKind = <K extends CardKind>(
   kind: K,
   to: MoveTarget,
 ): to is TargetOf<K> => fitsTarget(kind, to)

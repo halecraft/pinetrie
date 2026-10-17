@@ -84,7 +84,7 @@ export function stretchFill(stats: WorkStats): StretchFill {
  * messages, so this is approximate, one message per `1 / ids.length` of its
  * height. Null, a click with no point, picks the first.
  */
-export function pickAt(
+export function capsulePick(
   ids: readonly [EntryId, ...EntryId[]],
   fraction: number | null,
 ): EntryId {
@@ -190,7 +190,7 @@ interface RailView {
  * band, whatever other branches draw beside them.
  *
  * Where the view's top or bottom falls inside a capsule, a tick crosses it
- * there, each of its messages an equal slice of it, as `pickAt` reads it.
+ * there, each of its messages an equal slice of it, as `capsulePick` reads it.
  * Only the first and last items can be cut, so a view has at most two: a
  * tick marks an edge, never the part in view, which drawn filled would read
  * as a capsule's own fill (people wrote it). Messages the rail does not draw

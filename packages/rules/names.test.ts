@@ -1,12 +1,12 @@
 import { ADJECTIVES, NOUNS, type ThreadName, threadIdFor } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
+  decodeRecords,
   NAME,
   planNames,
   planReserve,
-  recordsOf,
+  readableThreadName,
   setRecord,
-  threadNameOf,
 } from "./index.ts"
 import { threadNameFor } from "./names.ts"
 
@@ -47,10 +47,10 @@ describe("threadNameFor", () => {
   })
 })
 
-test("threadNameOf: a lane's name, else its id's last eight characters", () => {
+test("readableThreadName: a lane's name, else its id's last eight characters", () => {
   const named = new Map([[A, "amber-fox" as ThreadName]])
-  expect(threadNameOf(named, A)).toBe("amber-fox")
-  expect(threadNameOf(named, B)).toBe(B.slice(-8))
+  expect(readableThreadName(named, A)).toBe("amber-fox")
+  expect(readableThreadName(named, B)).toBe(B.slice(-8))
 })
 
 describe("planNames", () => {
@@ -111,10 +111,10 @@ describe("planReserve", () => {
 test("a name record round-trips by lane; a malformed name is dropped", () => {
   const e = setRecord(NAME, { lane: A, name: "amber-fox" as ThreadName, at: 1 })
   expect([e.namespace, e.key]).toEqual(["pinetrie.name", A])
-  expect(recordsOf(NAME, [e]).get(A)?.name).toBe("amber-fox")
+  expect(decodeRecords(NAME, [e]).get(A)?.name).toBe("amber-fox")
   expect(
-    recordsOf(NAME, [{ key: B, value: { name: "Amber Fox", at: 1 } }]).size,
+    decodeRecords(NAME, [{ key: B, value: { name: "Amber Fox", at: 1 } }]).size,
   ).toBe(0)
   // A name keyed by what is no lane is dropped.
-  expect(recordsOf(NAME, [{ ...e, key: "main" }]).size).toBe(0)
+  expect(decodeRecords(NAME, [{ ...e, key: "main" }]).size).toBe(0)
 })

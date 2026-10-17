@@ -10,10 +10,10 @@ import {
 import { describe, expect, test } from "vitest"
 import {
   type Inbox,
+  inboxMentions,
   isUnseen,
   markAllSeen,
   markSeen,
-  mentionsOf,
   seenNow,
   seenOnScreen,
 } from "./inbox.ts"
@@ -58,10 +58,10 @@ const roots = [
   record(null, null, []),
 ]
 const participants = ["Ada", "Bea", "Cy", "guest-7f1d"]
-const mine = mentionsOf({ roots, me: ADA, myName: "Ada", participants })
+const mine = inboxMentions({ roots, me: ADA, myName: "Ada", participants })
 const ids = mine.map(m => m.id)
 
-describe("mentionsOf", () => {
+describe("inboxMentions", () => {
   test("sends naming you, newest first, each with its root and writer", () => {
     expect(ids).toEqual(["7-d", "6-c", "1-r1"])
     expect(mine[1]).toMatchObject({ root: "r-4-r2", by: BEA })
@@ -71,7 +71,7 @@ describe("mentionsOf", () => {
     expect(ids).not.toContain("3-b")
   })
   test("a guest is mentioned by their guest label", () => {
-    const theirs = mentionsOf({
+    const theirs = inboxMentions({
       roots,
       me: GUEST,
       myName: "guest-7f1d",

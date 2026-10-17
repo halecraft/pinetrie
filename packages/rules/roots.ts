@@ -12,7 +12,7 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import { Type } from "typebox"
-import { decodeAt, rootKey, ThreadIdSchema } from "./decode.ts"
+import { decodeRecord, rootKey, ThreadIdSchema } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 
 const Id = Type.String({ minLength: 1 })
@@ -60,7 +60,7 @@ export const ROOT: RecordSpec<RootRecord, RootId, "session"> = {
   keyOf: r => r.root,
   encode: ({ root, ...contents }) => contents,
   decode: (contents, key) =>
-    decodeAt(RootRecordSchema, contents, rootKey(key), (r, root) => ({
+    decodeRecord(RootRecordSchema, contents, rootKey(key), (r, root) => ({
       root,
       entry: idOrNull(r.entry),
       first: idOrNull(r.first),

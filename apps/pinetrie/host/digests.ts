@@ -2,12 +2,12 @@
 // asked as its run goes, while someone reads it, at most once a `DIGEST_EVERY`,
 // unless the config turns digests off. At a run's end one request asks for
 // the verdict and the final digest together, digests on or off. `planDigest`,
-// `planRunEnded`, `digestToWrite` and `runEndedToWrite` decide, and `digestOf`
-// and `endReplyOf` read the reply; this carries them out, each step and each
+// `planRunEnded`, `digestToWrite` and `runEndedToWrite` decide, and `parseDigest`
+// and `parseEndReply` read the reply; this carries them out, each step and each
 // answer a late write (`later.ts`), so none lands in a thread archived or
 // gone meanwhile.
 //
-// Each event names an entry, and the ask is `promptOf` that entry. An entry
+// Each event names an entry, and the ask is `runPrompt` that entry. An entry
 // is written once, so its ask never changes; a lane's tip moves with every
 // append, and by a run's end the drain queued before it may have moved it
 // to the next ask. So a run's end reads its last entry from its asks, and
@@ -16,8 +16,8 @@
 import {
   type EntryId,
   indexAsks,
-  promptOf,
   type RootId,
+  runPrompt,
   type ThreadId,
 } from "@pinetrie/core"
 import type { PiSetup } from "@pinetrie/pi"
@@ -36,7 +36,7 @@ import {
   digestToWrite,
   type EndReply,
   endedOutcome,
-  endReplyOf,
+  parseEndReply,
   pendingVerdict,
   planDigest,
   planRunEnded,
@@ -136,7 +136,7 @@ export function createDigests(deps: {
     )
     deps.spent?.(ask, tokens)
     if (reply === null) return null
-    const read = endReplyOf(reply, request.answer)
+    const read = parseEndReply(reply, request.answer)
     const refused = (half: string) =>
       basics.log(
         `[host] the model's ${half} is not one: ${JSON.stringify(reply)}`,
@@ -154,7 +154,7 @@ export function createDigests(deps: {
         if (!enabled || root === null) return null
         const doc = await roots.root(root)
         const index = readTreeIndex(doc)
-        const ask = promptOf(index, at)
+        const ask = runPrompt(index, at)
         if (ask === null) return null
         const asks = indexAsks(index)
         const plan = planDigest({

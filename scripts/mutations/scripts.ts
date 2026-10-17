@@ -42,6 +42,13 @@ const suiteCommand = [
   "run",
   "apps/pinetrie/e2e/command.test.ts",
 ]
+const functionNames = [
+  "pnpm",
+  "exec",
+  "vitest",
+  "run",
+  "scripts/function-names.test.ts",
+]
 const words = ["pnpm", "exec", "vitest", "run", "scripts/words.test.ts"]
 const scenarios = [
   "pnpm",
@@ -455,6 +462,33 @@ export const mutations: readonly Mutation[] = [
     to: "",
     command: laws,
     expect: "every package doc's section of laws is a checked set",
+  },
+  {
+    name: "a name ending in At does not lean",
+    file: "scripts/function-names.ts",
+    from: "  /[a-z0-9](?:Of|To|At)$/.test(name)",
+    to: "  /[a-z0-9](?:Of|To)$/.test(name)",
+    command: functionNames,
+    expect: "a bare Of, To or At at the end leans",
+  },
+  {
+    name: "an exported arrow is no function",
+    file: "scripts/function-names.ts",
+    from: '          (v.init?.type === "ArrowFunctionExpression" ||\n',
+    to: "          (false ||\n",
+    command: functionNames,
+    expect: "exported declarations, arrows and function expressions",
+  },
+  {
+    name: "an exported function's name leans on its arguments",
+    file: "scripts/function-names.ts",
+    from: "export const isLeaningName = (name: string): boolean =>\n",
+    // Split in two, so this file does not hold the name it adds.
+    to:
+      "export const leaning" +
+      "Of = (name: string) => name\nexport const isLeaningName = (name: string): boolean =>\n",
+    command: functionNames,
+    expect: "no exported function's name ends in a bare Of, To or At",
   },
   {
     name: "a table's retired names are cited",

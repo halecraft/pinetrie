@@ -4,16 +4,16 @@ import { mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { type ImageRef, ROOT, type ThreadId } from "@pinetrie/core"
-import { scriptedModel, sha256Of } from "@pinetrie/pi"
+import { blobSha256, scriptedModel } from "@pinetrie/pi"
 import { BLOB_GRACE_MS } from "../../host/index.ts"
 import type { Checks } from "../checks.ts"
 import {
   at,
-  composeAt,
+  composeCard,
+  heldLaneNames,
   idleNow,
   idOfText,
   join,
-  laneNamesOf,
   queueCard,
   START_AGENT,
   startSuiteHost,
@@ -63,7 +63,7 @@ async function run(check: Checks["check"]): Promise<void> {
     const servedBytes = Buffer.from(await served.arrayBuffer())
     check(
       "an uploaded PNG is kept by the SHA-256 of its bytes, with its size, and served back as it was",
-      red.sha256 === sha256Of(RED_PNG) &&
+      red.sha256 === blobSha256(RED_PNG) &&
         red.mimeType === "image/png" &&
         red.width === 40 &&
         red.height === 30 &&
@@ -111,8 +111,8 @@ async function run(check: Checks["check"]): Promise<void> {
     })
     await waitFor(() => paused.reached, 10_000)
     const queuedText = `@agent and this? ![green](/blob/${green.sha256})`
-    const lane = laneNamesOf(ih)[0] as ThreadId | undefined
-    const queued = await composeAt(
+    const lane = heldLaneNames(ih)[0] as ThreadId | undefined
+    const queued = await composeCard(
       iu,
       { entry: replyId, lane: lane ?? null },
       queuedText,
@@ -143,7 +143,7 @@ async function run(check: Checks["check"]): Promise<void> {
     const blue = await upload(BLUE_PNG)
     const yellow = await upload(YELLOW_PNG)
     const draftedText = `next: ![yellow](/blob/${yellow.sha256})`
-    const drafted = await composeAt(
+    const drafted = await composeCard(
       iu,
       { entry: idOfText(ih, "a green one"), lane: null },
       draftedText,

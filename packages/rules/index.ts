@@ -22,8 +22,8 @@ export {
   ACCESS_ANSWERS,
   type AccessEffect,
   type AccessRefusal,
-  accessOf,
   answersFor,
+  emptyAccess,
   planAccessAnswer,
   planAccessAsk,
   planAccessChange,
@@ -54,11 +54,11 @@ export {
   planLanesGone,
 } from "./archive.ts"
 export {
-  answerOf,
   BANNER,
   BANNER_ATTEMPTS,
   type BannerAnswer,
   type BannerAsk,
+  bannerAnswer,
   bannerDue,
   bannerPrompt,
   bannerStillWanted,
@@ -72,7 +72,7 @@ export {
 export {
   BASE,
   type CatchUpNow,
-  catchUpOf,
+  catchUpNow,
   effectiveBase,
   type FollowedBase,
   type ForkBegin,
@@ -99,19 +99,18 @@ export {
   type BlockNode,
   blockKey,
   blockSource,
-  blocksOf,
   markBlocks,
   numberBlocks,
+  textBlocks,
 } from "./blocks.ts"
 export {
-  archivedOf,
   type Board,
   type BoardCard,
   type BoardColumn,
   type BoardMove,
   boardCanvases,
   boardEnd,
-  boardOf,
+  boardStates,
   type CanvasRole,
   canvasRole,
   defaultWorkflow,
@@ -120,9 +119,10 @@ export {
   planWorkflowEdit,
   planWorkflowSeed,
   stateIn,
-  statesOf,
+  stateTransition,
   type Transition,
-  transitionOf,
+  taskBoard,
+  tasksInArchive,
   WORKFLOW,
   WORKFLOW_KEY,
   type WorkflowPlan,
@@ -193,7 +193,7 @@ export {
   cardEnd,
   decodeCard,
   encodeCard,
-  pinnedAt,
+  pinnedCardsAtEnd,
   placeEnd,
   planCardSweep,
   yourCard,
@@ -201,6 +201,7 @@ export {
 export {
   CARD_HISTORY,
   type Cause,
+  changeVerb,
   HISTORY_EVENTS,
   movedBackBy,
   type ProvenanceSteps,
@@ -215,11 +216,10 @@ export {
   type TrashSweep,
   traceEnd,
   trashDeadline,
-  trashedAt,
+  trashedTime,
   type Verb,
-  verbOf,
 } from "./card-history.ts"
-export { wordsOf } from "./card-words.ts"
+export { sourceWords } from "./card-words.ts"
 export {
   baseMovedOn,
   catchUpName,
@@ -243,7 +243,7 @@ export {
   CONTEXT_KINDS,
   CONTEXT_RULES,
   type ContextKind,
-  contextOf,
+  contextInView,
 } from "./context.ts"
 export { type CopyPlan, type CopyThread, planCopy } from "./copy.ts"
 export {
@@ -251,10 +251,10 @@ export {
   type AskLines,
   askLines,
   DIGEST,
-  digestOf,
   digestRequest,
   digestText,
   digestToWrite,
+  parseDigest,
   planDigest,
   pointsText,
   readsAsk,
@@ -307,11 +307,11 @@ export {
   foreignLaneWords,
   foreignRefusal,
   HELD_WORDS,
-  holdingOf,
   type RunAt,
   type ThreadHolding,
   TRASHED_WORDS,
   takenIn,
+  threadCardHolding,
 } from "./held.ts"
 export {
   planReorder,
@@ -373,7 +373,7 @@ export {
   cardsOfParts,
   crossesArchive,
   type Discards,
-  historyOf,
+  movesHistory,
   planHistorySweep,
   type UndoResult,
   undoAnswer,
@@ -402,7 +402,7 @@ export {
   planNames,
   planReserve,
   type ReservePlan,
-  threadNameOf,
+  readableThreadName,
 } from "./names.ts"
 export { NOTE_COLUMN } from "./note-column.ts"
 export {
@@ -474,7 +474,7 @@ export {
   blankQueued,
   type CanvasPinnedCard,
   type CarryPlan,
-  canvasPinnedOf,
+  canvasPinnedCards,
   isQueuedMessage,
   isQueuedText,
   type NextQueuedCardPopStep,
@@ -507,11 +507,11 @@ export {
 } from "./reach.ts"
 export {
   byTarget,
+  decodeRecords,
   deleteRecord,
   type Home,
   type RecordSpec,
   recordsIn,
-  recordsOf,
   setIfChanged,
   setRecord,
 } from "./records.ts"
@@ -571,8 +571,8 @@ export {
 export { ROOT } from "./roots.ts"
 export {
   NOTHING_NEXT,
+  parseRoundReply,
   type RoundNext,
-  roundReplyOf,
   roundRequest,
 } from "./round.ts"
 export {
@@ -640,16 +640,16 @@ export {
   endedOutcome,
   planCarryOn,
   planStop,
-  stopperOf,
+  runStopper,
 } from "./stop.ts"
 
 export { THREAD } from "./thread.ts"
 export {
   planTitling,
+  replyTitle,
   TITLE_REQUEST_HEAD,
   type TitleConfig,
   type TitleTrigger,
-  titleOf,
   titleRequest,
   titleStillWanted,
 } from "./title.ts"
@@ -660,12 +660,12 @@ export {
 } from "./update.ts"
 export {
   type EndReply,
-  endReplyOf,
+  parseEndReply,
+  parseVerdictLine,
   pendingVerdict,
   planRunEnded,
   runEndedToWrite,
   VERDICT,
-  verdictOf,
 } from "./verdict.ts"
 export {
   FILES_LOST,

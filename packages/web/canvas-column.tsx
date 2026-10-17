@@ -47,7 +47,7 @@ import { TitleField } from "./title-field.tsx"
 export function CanvasColumn(p: {
   session: SessionClient
   view: CanvasColumnView
-  /** The cards pinned to the canvas, in order (`canvasPinnedOf`). */
+  /** The cards pinned to the canvas, in order (`canvasPinnedCards`). */
   pins: readonly TextCard[]
   /**
    * What the agent of the canvas's first column last read of them

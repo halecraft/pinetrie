@@ -147,7 +147,7 @@ function noteConfigWrites<T extends Executes>(
 /**
  * The file tools: pi-agent-core's `read`, `write`, `edit` and `bash`, and our
  * `grep` and `find`. Each lane uses them in its own directory
- * (`toolContextOf`, in `lanes.ts`). They are also pi's `selectedTools`, and
+ * (`laneToolContext`, in `lanes.ts`). They are also pi's `selectedTools`, and
  * naming `grep` or `find` there drops pi's rule to search with bash.
  */
 const FILE_TOOLS: readonly ToolId[] = [

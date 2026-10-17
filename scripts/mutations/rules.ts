@@ -141,7 +141,7 @@ export const mutations: readonly Mutation[] = [
     from: '    if (base.start === accepted.newest) return { kind: "current" }\n',
     to: "",
     command: unit,
-    expect: "catchUpOf for a folder",
+    expect: "catchUpNow for a folder",
   },
   {
     name: "folder proposed changes are split like a jj one",
@@ -983,8 +983,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the sweep keeps a trashed card a week, whatever it is told",
     file: "packages/rules/card-history.ts",
-    from: "    : trashedAt(card, histories, now) + keepMs",
-    to: "    : trashedAt(card, histories, now) + 7 * 24 * 60 * 60 * 1000",
+    from: "    : trashedTime(card, histories, now) + keepMs",
+    to: "    : trashedTime(card, histories, now) + 7 * 24 * 60 * 60 * 1000",
     command: unit,
     expect:
       "planTrashSweep: a card is kept as long as it is told, whatever that is",
@@ -1063,12 +1063,12 @@ export const mutations: readonly Mutation[] = [
     expect: "an undo: the event it records",
   },
   {
-    name: "verbOf calls an unqueue a move",
+    name: "changeVerb calls an unqueue a move",
     file: "packages/rules/card-history.ts",
     from: "  if (back !== null) return back\n",
     to: "",
     command: unit,
-    expect: "verbOf(",
+    expect: "changeVerb(",
   },
   {
     name: "movedBackBy names the owner's own unqueue",
@@ -1113,7 +1113,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a second split is queued",
     file: "packages/rules/agent-commands.ts",
-    from: '  if (queued.some(c => commandOf(c) === "split"))',
+    from: '  if (queued.some(c => cardCommand(c) === "split"))',
     to: "  if (false)",
     command: unit,
     expect: "refused: a split already queued",
@@ -1275,7 +1275,7 @@ export const mutations: readonly Mutation[] = [
     to: "  return true\n",
     command: unit,
     expect:
-      "catchUpOf: from the commit a lane last caught up with to the base's now",
+      "catchUpNow: from the commit a lane last caught up with to the base's now",
   },
   {
     name: "a lane the host has not read is caught up",
@@ -1284,7 +1284,7 @@ export const mutations: readonly Mutation[] = [
     to: '  if (base?.kind !== "jj") return { kind: "current" }',
     command: unit,
     expect:
-      "catchUpOf: from the commit a lane last caught up with to the base's now",
+      "catchUpNow: from the commit a lane last caught up with to the base's now",
   },
   {
     name: "a WIP thread is measured against accepted work",
@@ -1293,7 +1293,7 @@ export const mutations: readonly Mutation[] = [
     to: "    true\n      ? { bookmark: accepted.acceptedBookmark, commit }",
     command: unit,
     expect:
-      "catchUpOf: from the commit a lane last caught up with to the base's now",
+      "catchUpNow: from the commit a lane last caught up with to the base's now",
   },
   {
     name: "accepted work is named by its bookmark",
@@ -1400,7 +1400,7 @@ export const mutations: readonly Mutation[] = [
     to: '  if (read === null) return { kind: "unknown" }',
     command: unit,
     expect:
-      "catchUpOf: from the commit a lane last caught up with to the base's now",
+      "catchUpNow: from the commit a lane last caught up with to the base's now",
   },
   {
     name: "a record left from a gone proposed changes are kept",
@@ -1763,7 +1763,8 @@ export const mutations: readonly Mutation[] = [
     from: "): string => names.get(lane) ?? lane.slice(-8)",
     to: "): string => names.get(lane) ?? lane",
     command: unit,
-    expect: "threadNameOf: a lane's name, else its id's last eight characters",
+    expect:
+      "readableThreadName: a lane's name, else its id's last eight characters",
   },
   {
     name: "proposed changes ignores a moved start",
@@ -2346,7 +2347,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a move skips the compare",
     file: "packages/rules/moves.ts",
-    from: "  if (!seenAt(keyOf(now.place), move.from))",
+    from: "  if (!isWhereSenderSaw(placeKey(now.place), move.from))",
     to: "  if (false)",
     command: unit,
     expect: "the compare: gone when there is no record, moved when",
@@ -2354,8 +2355,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a creation overwrites an id in use",
     file: "packages/rules/moves.ts",
-    from: '  if (now !== undefined) return { kind: "refused", code: "exists", now }\n  const to = keyOf(card.place)',
-    to: "  const to = keyOf(card.place)",
+    from: '  if (now !== undefined) return { kind: "refused", code: "exists", now }\n  const to = placeKey(card.place)',
+    to: "  const to = placeKey(card.place)",
     command: unit,
     expect: "a creation: the sender owns and placed it",
   },
@@ -2435,8 +2436,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an old copy of the key wins",
     file: "packages/rules/mark.ts",
-    from: "    decodeAt(MarkSchema, contents, parseCanvasKey(key), (r, canvas) => ({\n      canvas,\n      title: r.title,",
-    to: "    decodeAt(MarkSchema, contents, parseCanvasKey(key), (r, canvas) => ({\n      canvas,\n      ...r,\n      title: r.title,",
+    from: "    decodeRecord(MarkSchema, contents, parseCanvasKey(key), (r, canvas) => ({\n      canvas,\n      title: r.title,",
+    to: "    decodeRecord(MarkSchema, contents, parseCanvasKey(key), (r, canvas) => ({\n      canvas,\n      ...r,\n      title: r.title,",
     command: unit,
     expect: "the address wins",
   },
@@ -2569,7 +2570,7 @@ export const mutations: readonly Mutation[] = [
     from: '    .filter(c => c.place.kind === "pinned" && placeEnd(c.place, index) === end)\n    .sort(byOrder)',
     to: '    .filter(c => c.place.kind === "pinned" && placeEnd(c.place, index) === end)',
     command: unit,
-    expect: "pinnedAt: a thread's pinned cards by order",
+    expect: "pinnedCardsAtEnd: a thread's pinned cards by order",
   },
   {
     name: "an edited pinned card reads as read",
@@ -2966,8 +2967,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a refused verdict line drops a good digest",
     file: "packages/rules/verdict.ts",
-    from: '  return { verdict: verdictOf(first), digest: digestOf(rest.join("\\n")) }',
-    to: '  return {\n    verdict: verdictOf(first),\n    digest: verdictOf(first) === null ? null : digestOf(rest.join("\\n")),\n  }',
+    from: '    verdict: parseVerdictLine(first),\n    digest: parseDigest(rest.join("\\n")),\n',
+    to: '    verdict: parseVerdictLine(first),\n    digest: parseVerdictLine(first) === null ? null : parseDigest(rest.join("\\n")),\n',
     command: unit,
     expect: "each half is refused on its own",
   },
@@ -3050,7 +3051,7 @@ export const mutations: readonly Mutation[] = [
     name: "a reorder with no room skips the renumbering",
     file: "packages/rules/in-place.ts",
     from: '  if (order !== null) return { kind: "write", record: withOrder(now, order) }',
-    to: '  return { kind: "write", record: withOrder(now, order ?? orderOf(now)) }',
+    to: '  return { kind: "write", record: withOrder(now, order ?? cardOrder(now)) }',
     command: unit,
     expect: "with no room, only the crowded siblings are written",
   },
@@ -3121,16 +3122,16 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a note arrives with no order",
     file: "packages/rules/moves.ts",
-    from: '    case "note":\n      return noteAt(',
-    to: '    case "note":\n      return { ...key, order: "" }\n      return noteAt(',
+    from: '    case "note":\n      return noteColumnEnd(',
+    to: '    case "note":\n      return { ...key, order: "" }\n      return noteColumnEnd(',
     command: unit,
     expect: "a move into a note column lands at its end",
   },
   {
     name: "unqueue all moves a fact",
     file: "packages/rules/queue.ts",
-    from: "    .filter(isQueuedMessage)\n    .map(c => moveOf(c, noteOf(c.place)))",
-    to: "    .map(c => moveOf(c as QueuedText, noteOf(c.place)))",
+    from: "    .filter(isQueuedMessage)\n    .map(c => cardMove(c, notesTarget(c.place)))",
+    to: "    .map(c => cardMove(c as QueuedText, notesTarget(c.place)))",
     command: unit,
     expect: "planUnqueueAll",
   },
@@ -3173,7 +3174,7 @@ export const mutations: readonly Mutation[] = [
     from: '  if (from === archive && to !== archive) return "restore"',
     to: '  if (from === archive && to !== archive) return "within"',
     command: unit,
-    expect: "transitionOf",
+    expect: "stateTransition",
   },
   {
     name: "a state holding a root is removed",
@@ -3431,8 +3432,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a column is minted for every note",
     file: "packages/rules/notes.ts",
-    from: "      return { place: noteAt(input.cards, near.column), first: [] }",
-    to: "      return (input.newColumn(), { place: noteAt(input.cards, near.column), first: [] })",
+    from: "      return { place: noteColumnEnd(input.cards, near.column), first: [] }",
+    to: "      return (input.newColumn(), { place: noteColumnEnd(input.cards, near.column), first: [] })",
     command: ["pnpm", "exec", "vitest", "run", "packages/rules"],
     expect: "its id minted then alone",
   },
@@ -3483,7 +3484,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a width is written over a card moved since",
     file: "packages/rules/in-place.ts",
-    from: '  if (now.place.kind !== "canvas" || !sameKey(keyOf(now.place), change.at))',
+    from: '  if (now.place.kind !== "canvas" || !sameKey(placeKey(now.place), change.at))',
     to: '  if (now.place.kind !== "canvas")',
     command: unit,
     expect: "planWidth: a card's width on its canvas",
@@ -3543,7 +3544,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a pin to a canvas goes after every canvas's pins",
     file: "packages/rules/moves.ts",
-    from: "        order: orderAfter(canvasPinnedOf(cards, key.canvas)),",
+    from: "        order: orderAfter(canvasPinnedCards(cards, key.canvas)),",
     to: '        order: orderAfter(cards.filter(c => c.place.kind === "canvas-pinned") as never),',
     command: unit,
     expect: "a pin to the canvas goes after its other pins, and only its own",
@@ -3551,8 +3552,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a canvas's pins may be reordered apart",
     file: "packages/rules/in-place.ts",
-    from: "    siblings: (cards, at) => canvasPinnedOf(cards, at.canvas),\n    adjacent: true,",
-    to: "    siblings: (cards, at) => canvasPinnedOf(cards, at.canvas),\n    adjacent: false,",
+    from: "    siblings: (cards, at) => canvasPinnedCards(cards, at.canvas),\n    adjacent: true,",
+    to: "    siblings: (cards, at) => canvasPinnedCards(cards, at.canvas),\n    adjacent: false,",
     command: unit,
     expect:
       "a reorder among the canvas's pins, the neighbours next to each other",
@@ -3572,7 +3573,7 @@ export const mutations: readonly Mutation[] = [
     from: '    case "pinned":\n    case "canvas-pinned":\n      return "unpinned"',
     to: '    case "pinned":\n      return "unpinned"',
     command: unit,
-    expect: "verbOf",
+    expect: "changeVerb",
   },
   {
     name: "a canvas's key alone lands first",
@@ -3682,8 +3683,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a thread card's moves are in no history",
     file: "packages/rules/card-history.ts",
-    from: "    const from = keyOf(was.place)\n    if (sameKey(from, to)) continue\n",
-    to: '    const from = keyOf(was.place)\n    if (sameKey(from, to) || is.kind === "thread") continue\n',
+    from: "    const from = placeKey(was.place)\n    if (sameKey(from, to)) continue\n",
+    to: '    const from = placeKey(was.place)\n    if (sameKey(from, to) || is.kind === "thread") continue\n',
     command: unit,
     expect:
       "a thread's card: each move between canvases and into an inventory is in its history",
@@ -3750,8 +3751,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a copy forks at an end in another thread",
     file: "packages/rules/copy.ts",
-    from: "    threadAt(input.index, copy.end) !== copy.source\n",
-    to: "    threadAt(input.index, copy.end) === null\n",
+    from: "    entryThread(input.index, copy.end) !== copy.source\n",
+    to: "    entryThread(input.index, copy.end) === null\n",
     command: unit,
     expect:
       "refused: an end elsewhere, an id in use, a held thread, or another's or a full inventory",
@@ -3915,7 +3916,7 @@ export const mutations: readonly Mutation[] = [
     to: '      return ""\n',
     command: unit,
     expect:
-      "wordsOf: a text card's words are its document's, a fact's its line, a thread's none",
+      "sourceWords: a text card's words are its document's, a fact's its line, a thread's none",
   },
   {
     name: "a stop's fact waits behind the queue",
@@ -4020,7 +4021,7 @@ export const mutations: readonly Mutation[] = [
     from: "      return read.blob(source.sha)\n",
     to: '      return ""\n',
     command: unit,
-    expect: "wordsOf: a reference's words are its quote's blob",
+    expect: "sourceWords: a reference's words are its quote's blob",
   },
   {
     name: "a reference with no quote is sent empty",
@@ -4066,8 +4067,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an undo crosses the archive's edge",
     file: "packages/rules/move-history.ts",
-    from: '      transitionOf(workflow, last.from.state, last.to.state) !== "within"',
-    to: '      transitionOf(workflow, last.from.state, last.to.state) === "within"',
+    from: '      stateTransition(workflow, last.from.state, last.to.state) !== "within"',
+    to: '      stateTransition(workflow, last.from.state, last.to.state) === "within"',
     command: unit,
     expect: "crossesArchive",
   },
@@ -4118,7 +4119,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a trashed thread is not live",
     file: "packages/rules/canvas-index.ts",
-    from: "  const left = livePlaceOf(place)\n",
+    from: "  const left = livePlace(place)\n",
     to: "  const left = place\n",
     command: unit,
     expect:

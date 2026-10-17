@@ -13,10 +13,10 @@ import {
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
-import { entriesOf, entry } from "@pinetrie/core/fixtures"
+import { entriesById, entry } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import { cardsOnCanvas, proposalDraft } from "./canvas-index.ts"
-import { threadCardOf } from "./fixtures.ts"
+import { landedThreadCard } from "./fixtures.ts"
 import { decodeProposal, parseProposal, planBranchOut } from "./proposal.ts"
 
 const ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
@@ -38,7 +38,7 @@ const PROPOSAL: Proposal = {
 const RESULT = entryId("3-r")
 const FORK = entryId("4-a")
 const index = indexTree(
-  entriesOf([
+  entriesById([
     entry("1-p", null, { role: "person", content: "split it" }, { thread: P }),
     entry(
       "2-a",
@@ -79,13 +79,13 @@ const record = (
   createdAt: 1,
   origin,
 })
-const proposing = threadCardOf({
+const proposing = landedThreadCard({
   thread: P,
   canvas: CANVAS,
   by: ADA,
   cards: [],
 })
-const older = threadCardOf({
+const older = landedThreadCard({
   thread: OLDER,
   canvas: CANVAS,
   by: ADA,
@@ -315,7 +315,7 @@ describe("proposalDraft", () => {
 
   test("is gone once the thread has started, and absent for a branch with no proposal", () => {
     const started = indexTree(
-      entriesOf([
+      entriesById([
         ...Object.values(index.entries),
         entry(
           "5-c",

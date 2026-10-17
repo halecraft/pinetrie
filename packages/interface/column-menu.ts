@@ -63,7 +63,7 @@ export function columnHeadEnd(input: {
   readonly width: CardWidth
   /** Whether the reader may trash it: no trash in ⋯, and no ×, otherwise. */
   readonly writable: boolean
-  /** A thread not yet started (`branchesAt`); false for a note column. */
+  /** A thread not yet started (`isNextSendBranch`); false for a note column. */
   readonly unstarted: boolean
 }): HeadEnd {
   const { card } = input

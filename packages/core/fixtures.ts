@@ -73,7 +73,7 @@ export const entry = (
 })
 
 /** Entries keyed by their own ids, as the reads key them. */
-export const entriesOf = (
+export const entriesById = (
   list: Iterable<EntryLike>,
 ): Record<EntryId, EntryLike> => {
   const out: Record<EntryId, EntryLike> = {}
@@ -94,7 +94,7 @@ export const fromParents = (
   }),
 ): Record<EntryId, EntryLike> =>
   withThreads(
-    entriesOf(
+    entriesById(
       Object.entries(parents).map(([id, parentId]) =>
         entry(id, parentId, message(id)),
       ),
@@ -142,7 +142,7 @@ export const withThreads = (
     thread.set(e.id, own)
     return own
   }
-  return entriesOf(list.map(e => ({ ...e, thread: threadOf(e) })))
+  return entriesById(list.map(e => ({ ...e, thread: threadOf(e) })))
 }
 
 type Patched = Record<PropertyKey, unknown>

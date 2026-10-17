@@ -16,7 +16,7 @@ import {
   type WorkflowStateId,
 } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
-import { IN_COLUMN, type Pending, sendPendingOf } from "./card-moves.ts"
+import { IN_COLUMN, type Pending, pendingSend } from "./card-moves.ts"
 
 /** How a chat is sent: from what column and card, and its send id. */
 export interface SendHow {
@@ -48,7 +48,7 @@ export interface SendHow {
  * canvas the column is on; any other continues its thread from the end it
  * shows.
  */
-export const columnMessageAt = (
+export const columnMessageTarget = (
   mode: SendMode,
   thread: ThreadId,
   at: Position,
@@ -131,7 +131,7 @@ export function planSendRequest(input: {
     pending:
       card === null
         ? null
-        : sendPendingOf(id, card.record.id, IN_COLUMN(how.column ?? "")),
+        : pendingSend(id, card.record.id, IN_COLUMN(how.column ?? "")),
   }
 }
 

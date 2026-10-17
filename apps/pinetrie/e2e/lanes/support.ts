@@ -15,7 +15,7 @@ import {
 } from "@pinetrie/core"
 import type { SessionClient } from "@pinetrie/session"
 import { vmStateDir } from "@pinetrie/vm"
-import { composeAt, queueCard } from "../harness.ts"
+import { composeCard, queueCard } from "../harness.ts"
 import type { LaneHosts } from "../lane-hosts.ts"
 
 /**
@@ -32,7 +32,7 @@ export const bringUpToDate = (
 
 /**
  * A card with `command` and `text`, made at the thread's end once the
- * session holds it (`composeAt`), then queued: a command button makes its
+ * session holds it (`composeCard`), then queued: a command button makes its
  * card in the queue, empty; this one carries text, which a card
  * made in the queue cannot.
  */
@@ -44,7 +44,7 @@ export async function queueCommand(
   command: CardCommand,
 ): Promise<CardId> {
   const entry = tip === null ? null : entryId(tip)
-  const id = await composeAt(session, { entry, lane, command }, text)
+  const id = await composeCard(session, { entry, lane, command }, text)
   void queueCard(session, id, lane)
   return id
 }

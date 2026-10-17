@@ -15,6 +15,7 @@ import {
   type CardId,
   type CardRecord,
   cardIdOfKind,
+  cardTextSource,
   errorText,
   parseMentions,
   type QueuedFact,
@@ -24,7 +25,6 @@ import {
   type Sha256,
   type TextCardId,
   type ThreadId,
-  textSourceOf,
 } from "@pinetrie/core"
 import type { Agent } from "@pinetrie/pi"
 import type { Outcome } from "@pinetrie/protocol/codec"
@@ -42,7 +42,6 @@ import {
   displayName,
   encodeFact,
   foreignLaneWords,
-  holdingOf,
   isQueuedText,
   planCarry,
   planNextQueuedCardPop,
@@ -52,7 +51,8 @@ import {
   type QueuedMessage,
   type QueuedText,
   queuedOn,
-  wordsOf,
+  sourceWords,
+  threadCardHolding,
 } from "@pinetrie/rules"
 import type { PlacesDocHandle, PresenceDocHandle } from "@pinetrie/schema"
 import type { Basics } from "./basics.ts"
@@ -64,7 +64,7 @@ import type { LaneWork } from "./work/index.ts"
 
 /**
  * A queued card the host popped: its record as it was, and its words at the
- * pop (`wordsOf`): a text card's text, a reference's quote, a fact's line.
+ * pop (`sourceWords`): a text card's text, a reference's quote, a fact's line.
  */
 export interface PoppedQueuedCard {
   readonly card: QueuedCard
@@ -130,7 +130,7 @@ export function popNextQueuedCard(
   const { card } = step
   if (isQueuedText(card) && !texts.holds(card.id, card.place.seen))
     return { kind: "behind", card }
-  const text = wordsOf(textSourceOf(card), {
+  const text = sourceWords(cardTextSource(card), {
     doc: texts.textNow,
     blob: sha => quotes.get(sha) ?? "",
   })
@@ -228,7 +228,7 @@ export async function drain(
   for (;;) {
     const loading = queuedOn(readPlaces(places), lane)
       .flatMap((c): TextCardId[] => {
-        const source = textSourceOf(c)
+        const source = cardTextSource(c)
         return source.kind === "doc" ? [source.card] : []
       })
       .filter(id => !loaded.has(id))
@@ -251,7 +251,7 @@ export async function drain(
           // A pop runs in its own thread: held, it has no runner, and a lane
           // of another kind runs nothing. The gate refuses both at its send.
           away:
-            holdingOf(readPlaces(places), lane).kind !== "free" ||
+            threadCardHolding(readPlaces(places), lane).kind !== "free" ||
             typeof deps.work.runnable(lane) === "object",
           held: readQueueHolds(deps.basics.session).has(lane),
           typing: readTypingIn(deps.presence),
@@ -284,7 +284,7 @@ function queuedQuotes(
 ): ReadonlyMap<Sha256, string> {
   const quotes = new Map<Sha256, string>()
   for (const c of queuedOn(cards, lane)) {
-    const source = textSourceOf(c)
+    const source = cardTextSource(c)
     if (source.kind !== "blob") continue
     const blob = blobs.get(source.sha)
     if (blob !== undefined)

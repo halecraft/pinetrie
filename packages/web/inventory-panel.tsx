@@ -26,7 +26,7 @@ import {
   noticeKey,
   noticeWords,
   type Reader,
-  snapTo,
+  snappedDock,
   type ThreadFace,
   type ThreadPreview,
 } from "@pinetrie/interface"
@@ -147,7 +147,7 @@ export function InventoryPanel(p: {
           const box = frame.current?.getBoundingClientRect()
           const centre =
             box === undefined ? e.clientX : box.left + box.width / 2
-          p.onDock(snapTo(centre, window.innerWidth))
+          p.onDock(snappedDock(centre, window.innerWidth))
         }}
         title="drag to dock left, centre or right"
       >

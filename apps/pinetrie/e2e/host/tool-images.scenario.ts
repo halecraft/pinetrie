@@ -5,7 +5,7 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import { subscribe } from "@kyneta/schema"
 import { projectSpine, ROOT } from "@pinetrie/core"
-import { scriptedModel, sha256Of } from "@pinetrie/pi"
+import { blobSha256, scriptedModel } from "@pinetrie/pi"
 import { readPlaces } from "@pinetrie/reads"
 import { BLOB_GRACE_MS } from "../../host/index.ts"
 import type { Checks } from "../checks.ts"
@@ -13,11 +13,11 @@ import {
   at,
   committedProject,
   held,
+  heldLanes,
+  heldTree,
   idleNow,
-  lanesOf,
   START_AGENT,
   suiteClock,
-  treeOf,
   waitFor,
 } from "../harness.ts"
 import { RED_PNG } from "../images.ts"
@@ -53,16 +53,16 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     let th = section.host
     const tidle = () => waitFor(() => idleNow(th), 30_000)
     const readCall = () => {
-      const tree = treeOf(th)
+      const tree = heldTree(th)
       const spine = projectSpine(
         tree,
-        lanesOf(th, tree, readPlaces(th.places))[0]?.tip ?? null,
+        heldLanes(th, tree, readPlaces(th.places))[0]?.tip ?? null,
       ).spine
       return spine
         .flatMap(n => n.toolCalls ?? [])
         .find(c => c.name === "read" && c.subject === "shot.png")
     }
-    const red = sha256Of(RED_PNG)
+    const red = blobSha256(RED_PNG)
     const tu = section.user
 
     // pi's pending entries, as each change of the document leaves them: a
@@ -128,7 +128,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     clock.advance(BLOB_GRACE_MS + 1)
     const tv = section.user
     script.use([{ text: "still red" }])
-    const tip = lanesOf(th, treeOf(th), readPlaces(th.places))[0]
+    const tip = heldLanes(th, heldTree(th), readPlaces(th.places))[0]
     await tv.send("@agent and now?", at(tip?.tip ?? null), {
       thread: tip?.name,
     })

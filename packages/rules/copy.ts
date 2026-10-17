@@ -3,17 +3,17 @@
 
 import {
   type CardRecord,
+  entryThread,
   type Intent,
   type MoveRefusal,
   type ThreadId,
   type ThreadRecord,
   type TreeIndex,
-  threadAt,
   type ValueWrite,
   type WriterId,
 } from "@pinetrie/core"
 import { planThreadOpen } from "./canvas-index.ts"
-import { holdingOf } from "./held.ts"
+import { threadCardHolding } from "./held.ts"
 import type { PlaceStep } from "./moves.ts"
 
 /** A copy as its copier asks for it: the source, the end they saw, and where its card goes. */
@@ -39,7 +39,7 @@ export type CopyPlan =
 
 /**
  * A copy of `source` at `end`, by `sender`: refused unless `end` is in the
- * source (`threadAt`), so a copy forks within what its copier saw; unless
+ * source (`entryThread`), so a copy forks within what its copier saw; unless
  * its id is new; unless the source is on a canvas or in the sender's own
  * inventory. An archived source copies: archiving freezes a thread's end,
  * not its history. Its card lands where it was dropped, ranked as a move's
@@ -60,7 +60,7 @@ export function planCopy(input: {
   if (
     source === undefined ||
     input.index.entries[copy.end] === undefined ||
-    threadAt(input.index, copy.end) !== copy.source
+    entryThread(input.index, copy.end) !== copy.source
   )
     return { kind: "refused", why: "unknown" }
   if (
@@ -69,7 +69,7 @@ export function planCopy(input: {
     cards.some(c => c.id === move.card)
   )
     return { kind: "refused", why: "taken" }
-  const holding = holdingOf(cards, copy.source)
+  const holding = threadCardHolding(cards, copy.source)
   if (holding.kind === "held" && holding.by !== sender)
     return { kind: "refused", why: "held" }
   // Onto a canvas, ranked where it was dropped; or into an inventory.

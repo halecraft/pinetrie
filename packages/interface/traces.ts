@@ -10,7 +10,7 @@ import type {
   WriterId,
 } from "@pinetrie/core"
 import { MAX_TRACES_SEEN } from "@pinetrie/protocol/codec"
-import { type Verb, verbOf } from "@pinetrie/rules"
+import { changeVerb, type Verb } from "@pinetrie/rules"
 
 /** Traces at one spot by one person, doing one thing: one line. */
 export interface TraceGroup {
@@ -24,7 +24,7 @@ export interface TraceGroup {
  * `endOf` resolves a place as a card there would (`placeEnd`), so a trace
  * follows its thread as the thread grows.
  */
-export function tracesAt(
+export function endTraces(
   traces: Iterable<TraceRecord>,
   me: WriterId,
   end: EntryId,
@@ -41,7 +41,7 @@ export function traceGroups(
 ): readonly TraceGroup[] {
   const groups: { by: WriterId; verb: Verb; traces: TraceRecord[] }[] = []
   for (const t of traces) {
-    const verb = verbOf(t.from, t.to)
+    const verb = changeVerb(t.from, t.to)
     const group = groups.find(g => g.by === t.by && g.verb === verb)
     if (group === undefined) groups.push({ by: t.by, verb, traces: [t] })
     else group.traces.push(t)

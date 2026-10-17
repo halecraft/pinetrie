@@ -13,18 +13,17 @@ import {
   type CardRecord,
   type CardWidth,
   type ConflictChoice,
-  conflictsAt,
   type DigestRecord,
   type EntryId,
   type LaneView,
-  laneOf,
   nearestRevision,
   type Position,
   type ProposedThread,
   pinnedInView,
-  pinnedOf,
-  promptOf,
+  pinTargetKey,
+  pointConflicts,
   ROOT,
+  runPrompt,
   type SeatRecord,
   type StreamRecord,
   type TextCardId,
@@ -33,6 +32,7 @@ import {
   type ThreadName,
   type TraceRecord,
   type TreeIndex,
+  threadLane,
   threadMembers,
   type WriterId,
 } from "@pinetrie/core"
@@ -43,7 +43,6 @@ import {
   agentsWords,
   askLine,
   behind,
-  branchesAt,
   type CatchUps,
   type ColumnAct,
   type ColumnHow,
@@ -53,6 +52,7 @@ import {
   type ColumnView,
   type ComposerPlacesStore,
   columnProposals,
+  columnSpot,
   columnView,
   composerPlace,
   conflictsView,
@@ -63,6 +63,7 @@ import {
   detailsTitle,
   dragProps,
   earlierWords,
+  endTraces,
   type FoldMemory,
   gridKeyAct,
   type HeadIcon,
@@ -71,13 +72,14 @@ import {
   headLane,
   type Intent,
   identityWords,
+  isNextSendBranch,
   keepSpot,
   keptTraces,
   type LiveWork,
   leftLine,
   NEW_PIN,
   NEW_PIN_TITLE,
-  newPinAt,
+  newPinPlace,
   noModelLine,
   noticeKey,
   noticeWords,
@@ -93,16 +95,14 @@ import {
   type SpotStore,
   START_WORDS,
   seenBatches,
-  spotOf,
   startedWords,
   type ThreadDetails,
   type ThreadLink,
   threadIcon,
   threadLink,
   traceGroups,
-  tracesAt,
   traceWords,
-  unstartedOf,
+  unstartedMode,
   type ViewportStore,
   type WorkFacts,
   type WorkStrip,
@@ -112,7 +112,7 @@ import {
   effectiveBase,
   marginCards,
   marginCounts,
-  pinnedAt,
+  pinnedCardsAtEnd,
   queuedOn,
   threadReach,
   traceEnd,
@@ -305,8 +305,8 @@ export function Column(p: ColumnProps) {
 
   // A thread not yet started: its next send is a branch at its
   // anchor, its thread's first message.
-  const unstarted = branchesAt(p.column)
-  const opening = unstartedOf(p.column)
+  const unstarted = isNextSendBranch(p.column)
+  const opening = unstartedMode(p.column)
   // A card's column moves; a started one folds, an unstarted one closes.
   const { columnKey } = p
   const card = columnKey.kind === "card" ? columnKey.card : null
@@ -531,7 +531,7 @@ export function Column(p: ColumnProps) {
         keepSpot(
           p.spots.load(),
           ids,
-          spotOf(span.current, left.following, ids.at(-1)),
+          columnSpot(span.current, left.following, ids.at(-1)),
         ),
       )
     },
@@ -560,11 +560,11 @@ export function Column(p: ColumnProps) {
   // An unstarted thread starts with its first send: it has no lane yet.
   const lane: ThreadLane = unstarted
     ? { kind: "none" }
-    : laneOf(p.lanes, p.column.thread)
+    : threadLane(p.lanes, p.column.thread)
   const running = lane.kind === "lane" && lane.running
   // The ask this column's lane is answering.
   const runningAsk =
-    lane.kind === "lane" && lane.running ? promptOf(index, lane.tip) : null
+    lane.kind === "lane" && lane.running ? runPrompt(index, lane.tip) : null
   const density = p.column.density ?? "story"
   const nameFn = (w: WriterId) => nameFor(p.nameOf, w)
   const askLineOf = (ask: EntryId | null): string | null =>
@@ -626,7 +626,9 @@ export function Column(p: ColumnProps) {
   // them now, from the walk the host plans a run's cards from. A unstarted
   // column has no thread, so none.
   const pinned =
-    unstarted || threadEnd === null ? [] : pinnedAt(threadEnd, p.cards, index)
+    unstarted || threadEnd === null
+      ? []
+      : pinnedCardsAtEnd(threadEnd, p.cards, index)
   const inView = threadEnd === null ? null : pinnedInView(index, threadEnd)
   // Your last command on proposed changes on this lane: in flight, refused or
   // failed.
@@ -860,7 +862,7 @@ export function Column(p: ColumnProps) {
   // What a lane this column's next send creates would start with.
   const above = nearestRevision(index, p.work.revisions, at)
   const forkConflicts =
-    above.point === null ? [] : conflictsAt(p.work.revisions, above.point)
+    above.point === null ? [] : pointConflicts(p.work.revisions, above.point)
 
   const place = composerPlace(p.column, at) ?? undefined
   // Where this composer creates your message, and the message there: what
@@ -889,14 +891,14 @@ export function Column(p: ColumnProps) {
     lane.kind === "lane" && at.kind === "entry" ? { lane: lane.name, at } : null
   // Where a drop lands: exactly where a put can.
   const putColumn = writable && place !== undefined ? key : null
-  const pinKey = writable && place !== undefined ? pinnedOf(place) : null
+  const pinKey = writable && place !== undefined ? pinTargetKey(place) : null
   const putPinned = pinKey === null ? null : key
   // "+ pin" opens a box that makes a pinned card. While it is
   // open, the strip leaves out the card it shows, as the column leaves out
   // the composer's. It closes when focus leaves it.
   const [pinning, setPinning] = useState(false)
   const [pinShown, setPinShown] = useState<TextCardId | null>(null)
-  const newPin = newPinAt({
+  const newPin = newPinPlace({
     canPin: pinKey !== null && !unstarted && threadEnd !== null,
     pinning,
     pinned: pinned.length,
@@ -911,7 +913,7 @@ export function Column(p: ColumnProps) {
   const traces =
     !watches || threadEnd === null
       ? []
-      : tracesAt(p.traces.values(), p.session.writer, threadEnd, from =>
+      : endTraces(p.traces.values(), p.session.writer, threadEnd, from =>
           traceEnd(from, index),
         )
   const [keptHere, setKeptHere] = useState<ReadonlyMap<string, TraceRecord>>(

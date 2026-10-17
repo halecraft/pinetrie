@@ -108,7 +108,7 @@ export interface ColumnMotion {
 }
 
 /** The column a layout action folds or unfolds, and which way; null for any other action. */
-export function foldOf(action: LayoutAction): ColumnMotion | null {
+export function foldMotion(action: LayoutAction): ColumnMotion | null {
   if (action.kind !== "view") return null
   const { change } = action
   switch (change.kind) {

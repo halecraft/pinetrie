@@ -45,7 +45,7 @@ export const follows = (me: WriterId, writers: readonly WriterId[]): boolean =>
  * you; a stop is done for whoever stopped it, and worth a read for the
  * rest; a pending verdict asks nothing yet.
  */
-export function levelOf(verdict: Verdict, me: WriterId): Level | null {
+export function verdictLevel(verdict: Verdict, me: WriterId): Level | null {
   switch (verdict.kind) {
     case "pending":
       return null
@@ -128,14 +128,14 @@ const followed = (input: AttentionInput, lane: ThreadId): boolean =>
  * first write (`since` ""), where you started is not known, and nothing is
  * raised.
  */
-export function attentionOf(input: AttentionInput): readonly Item[] {
+export function attentionItems(input: AttentionInput): readonly Item[] {
   const { me, person } = input
   if (person.since === "") return []
   const yours = (lane: ThreadId): boolean =>
     !input.busy.has(lane) && followed(input, lane)
   const items: Item[] = []
   for (const v of input.verdicts.values()) {
-    const level = levelOf(v.verdict, me)
+    const level = verdictLevel(v.verdict, me)
     if (!yours(v.lane) || level === null) continue
     if (v.end <= latest(person.since, person.read.get(v.lane))) continue
     if (person.dismissed.get(v.lane) === v.ask) continue
@@ -181,7 +181,7 @@ export type Status =
  * all. The one rule for a canvas's item, a board column's dot and ▦'s, which
  * covers the canvases not in the sidebar. Working raises nothing.
  */
-export const markOf = <K>(
+export const markLevel = <K>(
   status: ReadonlyMap<K, Status>,
   keys: Iterable<K>,
 ): Level | null =>
@@ -241,14 +241,14 @@ export function canvasStatus(
 }
 
 /**
- * The threads where a run you follow ended asking nothing of you (`levelOf`
+ * The threads where a run you follow ended asking nothing of you (`verdictLevel`
  * null, and not pending): what a ✓ marks as it fades (`arrivals`).
  */
 export function doneThreads(input: AttentionInput): ReadonlySet<ThreadId> {
   const out = new Set<ThreadId>()
   for (const v of input.verdicts.values()) {
     if (!followed(input, v.lane) || v.verdict.kind === "pending") continue
-    if (levelOf(v.verdict, input.me) === null) out.add(v.lane)
+    if (verdictLevel(v.verdict, input.me) === null) out.add(v.lane)
   }
   return out
 }

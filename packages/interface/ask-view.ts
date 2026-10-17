@@ -7,11 +7,11 @@ import {
   askSpan,
   type DigestRecord,
   type EntryId,
+  entryAsk,
+  entryMessage,
   firstLine,
   lastWord,
-  messageAt,
   type RevisionRecord,
-  runOf,
   type TreeIndex,
   type WriterId,
 } from "@pinetrie/core"
@@ -34,7 +34,7 @@ export type ColumnRow =
 
 /**
  * `segments` grouped: an ask's work is one row, a message steered into its
- * run included (`runOf`), and its prompt and everything else a row each.
+ * run included (`entryAsk`), and its prompt and everything else a row each.
  */
 export function columnRows(
   segments: readonly Segment[],
@@ -42,7 +42,7 @@ export function columnRows(
 ): readonly ColumnRow[] {
   const rows: ColumnRow[] = []
   for (const s of segments) {
-    const ask = s.kind === "fold" ? s.ask : runOf(asks, s.id)
+    const ask = s.kind === "fold" ? s.ask : entryAsk(asks, s.id)
     if (ask === undefined) {
       if (s.kind === "entry") rows.push({ kind: "message", id: s.id })
       continue
@@ -110,12 +110,12 @@ function liveLine(
 ): string | null {
   const work = asks.work.get(ask) ?? []
   const newest = work.at(-1)
-  const message = newest === undefined ? null : messageAt(index, newest)
+  const message = newest === undefined ? null : entryMessage(index, newest)
   const call = message?.toolCalls?.at(-1)
   if (call !== undefined && asks.last.get(ask) === newest)
     return callLabel(call, "cut")
   for (const id of work.toReversed()) {
-    const line = firstLine(messageAt(index, id)?.text ?? "", LIVE_LINE)
+    const line = firstLine(entryMessage(index, id)?.text ?? "", LIVE_LINE)
     if (line !== "") return line
   }
   return null

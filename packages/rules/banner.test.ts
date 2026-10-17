@@ -11,8 +11,8 @@ import {
   bannerDue,
   bannerPrompt,
   bannerStillWanted,
+  decodeRecords,
   planAsk,
-  recordsOf,
   setRecord,
 } from "./index.ts"
 
@@ -104,5 +104,5 @@ test("a banner record round-trips, keyed by lane", () => {
   expect(BANNER.decode({ sha: "nope", at: 1 }, LANE)).toBeUndefined()
   // Written when a banner had a crop: still shown.
   expect(BANNER.decode({ ...banner, focus: "center" }, LANE)).toEqual(banner)
-  expect(recordsOf(BANNER, [e]).get(LANE)).toEqual(banner)
+  expect(decodeRecords(BANNER, [e]).get(LANE)).toEqual(banner)
 })

@@ -15,7 +15,7 @@ import {
 import { canvasCard, cardIdFor } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import { type CanvasIndex, NO_CANVAS_INDEX } from "./canvas-index.ts"
-import { threadCardOf } from "./fixtures.ts"
+import { landedThreadCard } from "./fixtures.ts"
 import { planRootDelete } from "./root.ts"
 import { planLiftRoot, planSpinOff, type SpunThread } from "./spin-off.ts"
 
@@ -139,7 +139,7 @@ describe("planLiftRoot", () => {
     writers,
   })
   /** The spun thread's card, alone on the canvas the spin-off made. */
-  const spunCard = threadCardOf({
+  const spunCard = landedThreadCard({
     thread: STARTS,
     canvas: NEW_CANVAS,
     by: ADA,
@@ -323,7 +323,7 @@ test("planRootDelete: the root's records, its canvas's cards and title, its docu
     id: cardIdFor("c2"),
     place: { ...note, thread: STARTS },
   })
-  const onCanvas = threadCardOf({
+  const onCanvas = landedThreadCard({
     thread: STARTS,
     canvas: TEST_CANVAS,
     by: ADA,

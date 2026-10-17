@@ -9,16 +9,16 @@ import {
   baseKnown,
   blobKind,
   ERR,
+  entryThread,
   forkEntry,
   messageText,
-  planModeOf,
+  planMode,
   ROOT_ORIGIN,
   type Send,
   type SentCard,
   type Sha256,
   type Share,
   type ThreadId,
-  threadAt,
   threadMembers,
   threadOfSend,
   type WriterId,
@@ -290,7 +290,7 @@ export async function sendMessage(
   // lane sees them: your working copy's, and a command's files.
   const own = worksOwn(view.session, {
     lane: thread.lane,
-    mode: planModeOf(send.at),
+    mode: planMode(send.at),
   })
   // gather: the command its first word names, from its file as it is now
   const typed = parseCommand(send.text)
@@ -381,7 +381,7 @@ export async function sendMessage(
             canvas: begun.starts.canvas,
             parent:
               send.at.kind === "branch" && send.at.at !== null
-                ? threadAt(index, send.at.at)
+                ? entryThread(index, send.at.at)
                 : null,
           },
           opens: readCanvases(deps.basics.places).has(begun.starts.canvas)

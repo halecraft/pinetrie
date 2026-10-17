@@ -22,7 +22,7 @@ import {
   planStart,
   planStartFrom,
   RUNTIME_BIN,
-  specHashOf,
+  shapeSpecHash,
 } from "@pinetrie/lanes"
 import type { LaneAccess, LaneFacts } from "@pinetrie/pi"
 import { readLaneSnapshots, readRunning, readThreadName } from "@pinetrie/reads"
@@ -132,7 +132,7 @@ export function createContainers(deps: {
     const spec = setup.specOf(lane, r)
     const decided = planContainer({
       facts: await runtime.containerFacts(container),
-      want: specHashOf(runtime, planShape(spec, process.env)),
+      want: shapeSpecHash(runtime, planShape(spec, process.env)),
     })
     if (decided === "recreate") {
       await handle.stop()

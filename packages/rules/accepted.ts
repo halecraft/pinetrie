@@ -16,7 +16,7 @@ import {
 import { Type } from "typebox"
 import {
   CommitSchema,
-  decodeAt,
+  decodeRecord,
   fixedKey,
   List,
   PointSchema,
@@ -116,7 +116,7 @@ export const ACCEPTED: RecordSpec<
           },
         },
   decode: (contents, key) =>
-    decodeAt(
+    decodeRecord(
       Type.Union([JjAcceptedSchema, FolderAcceptedSchema]),
       contents,
       fixedKey(ACCEPTED_KEY, key),

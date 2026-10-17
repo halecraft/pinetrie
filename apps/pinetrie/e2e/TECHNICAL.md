@@ -256,7 +256,7 @@ the queue (ADR-0113); a card's ⋯ (`page.ts`, ADR-0111).
   (ADR-0162), so on the host it is every root it has loaded in its life, as
   it last held each (`rootsRead`, kept because a suite's host starts with
   `keepRootsRead`): a handle the host let go reads its last value. A root a restarted host has not loaded yet is not among them.
-  `treeOf`, `entriesOf`, `rootRecordsOf`, `lanesOf`, `laneNamesOf`, `tipIn`
+  `heldTree`, `heldEntries`, `heldRootRecords`, `heldLanes`, `heldLaneNames`, `tipIn`
   and `entryMessageIn` read across them, as one. What is loaded now is
   `rootsLoaded`.
 - **A scenario's client holds every root** (`holdEvery`, in `join`), and its
@@ -265,7 +265,7 @@ the queue (ADR-0113); a card's ⋯ (`page.ts`, ADR-0111).
   where it reads. On a timeout they send anyway, and the session's refusal
   (`NO_ROOT`) comes back as their answer, not a throw.
 - **A card's place at an entry names its root.** On the host it is
-  `rootHolding`. From a client, a card is made with `composeAt`, which waits
+  `rootHolding`. From a client, a card is made with `composeCard`, which waits
   until the client's copy has the entry (`waitForRootHolding`), then makes
   the card in that root. Never name a root from a client's copy without
   that wait: a client gets a run's entries after the host goes idle, so a
@@ -281,7 +281,7 @@ the queue (ADR-0113); a card's ⋯ (`page.ts`, ADR-0111).
   canvas (`entryCanvas`) before they name it (ADR-0116).
 - **A scenario queues and unqueues through the harness** (`queueCard`,
   `unqueueCard`), as a column's plan does: each finds the card as its client
-  draws it, builds the move with core's `moveOf` (onto its lane's thread),
+  draws it, builds the move with core's `cardMove` (onto its lane's thread),
   and sends it with `moveCard`. Each throws if the card is not
   where it expects. An action on proposed changes and a line action are `client.proposed`
   and `client.line`, which the session tracks (`acting`); anything else

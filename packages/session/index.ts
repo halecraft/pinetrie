@@ -18,11 +18,11 @@ export {
   type CardNotice,
   drawnPlace,
   IN_COLUMN,
-  intentsOf,
   LAST_ORDER,
   type MoveAnswer,
   type MoveHow,
   type SlotMove,
+  slotIntents,
 } from "./card-moves.ts"
 export {
   type ConnectOptions,
@@ -48,4 +48,4 @@ export {
   settleSlots,
 } from "./inventory.ts"
 export type { OpenThreads } from "./open-threads.ts"
-export { columnMessageAt, type SendHow } from "./send.ts"
+export { columnMessageTarget, type SendHow } from "./send.ts"

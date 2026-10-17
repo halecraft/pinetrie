@@ -50,7 +50,7 @@ export interface AskIndex {
 }
 
 /** The ask whose work `id` is drawn in: one its run wrote, or steered into it. */
-export const runOf = (asks: AskIndex, id: EntryId): EntryId | undefined =>
+export const entryAsk = (asks: AskIndex, id: EntryId): EntryId | undefined =>
   asks.askOf.get(id) ?? asks.steered.get(id)
 
 /** How an ask's run ended, or that it has not. */

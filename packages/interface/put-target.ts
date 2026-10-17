@@ -15,11 +15,11 @@ import {
   isCanvasId,
   isNoteColumnId,
   isWorkflowStateId,
-  keyOf,
   type NoteColumnId,
-  noteOf,
+  notesTarget,
   parseCardId,
-  pinnedOf,
+  pinTargetKey,
+  placeKey,
   sameKey,
   type TargetOf,
   type TextPlace,
@@ -30,7 +30,7 @@ import type { Focus } from "./focus.ts"
 
 export type PutTarget =
   /**
-   * A thread's column: a note in the note column nearest it (`noteOf`).
+   * A thread's column: a note in the note column nearest it (`notesTarget`).
    */
   | { readonly kind: "column"; readonly key: string }
   /** A column's composer: your message, which a message with text there gives way to by a swap. */
@@ -203,8 +203,8 @@ export const intoMessage = (target: PutTarget): boolean =>
 
 /**
  * The place `target` names: the note column nearest a column's thread
- * (`noteOf`), a note column's end, its composer's place, the same thread
- * end pinned (`pinnedOf`), a canvas's pinned cards, or your inventory; null
+ * (`notesTarget`), a note column's end, its composer's place, the same thread
+ * end pinned (`pinTargetKey`), a canvas's pinned cards, or your inventory; null
  * for a column no composer publishes; and for a state or the sidebar, which name a new thread, not a place
  * (`planSpinOff`); and for a spot on a canvas, which the host ranks.
  */
@@ -227,10 +227,10 @@ export function placeOfTarget(
     return null
   const place = places.get(target.key)?.place
   if (place === undefined) return null
-  if (target.kind === "pinned") return pinnedOf(place)
+  if (target.kind === "pinned") return pinTargetKey(place)
   if (target.kind === "column" && place.kind === "composing")
-    return noteOf(place)
-  return keyOf(place)
+    return notesTarget(place)
+  return placeKey(place)
 }
 
 /** A store each column writes its composer to as it renders; reading it redraws nothing. */
@@ -250,7 +250,7 @@ export function composerPlacesStore(): ComposerPlacesStore {
           ? now === undefined
           : now !== undefined &&
             now.message === spot.message &&
-            sameKey(keyOf(now.place), keyOf(spot.place))
+            sameKey(placeKey(now.place), placeKey(spot.place))
       )
         return
       const next = new Map(places)

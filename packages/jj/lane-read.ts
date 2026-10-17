@@ -4,13 +4,13 @@
 // them side by side).
 
 import {
-  baseOf,
   type CatchUpRead,
   type CommitBase,
   type CommitId,
   commitId,
   type FilesTouched,
   hasTrailer,
+  messageBase,
   type ProposedChangesInRepo,
   type ProposedRevision,
   proposedLedger,
@@ -29,13 +29,13 @@ import {
   proposedBookmark,
   revsetName,
 } from "./lane/names.ts"
-import { conflictedFilesAt } from "./lane/revisions.ts"
+import { readConflictedFiles } from "./lane/revisions.ts"
 import {
   filesTouched,
   proposedFiles,
   readStart,
+  readStartConflicts,
   revisionSinceHost,
-  startConflictsOf,
 } from "./proposed.ts"
 import type { SharedFacts } from "./shared.ts"
 
@@ -217,7 +217,7 @@ export function planLaneRead(
   const parsed =
     based === undefined
       ? null
-      : baseOf(based.description, input.repoConfig.wipPrefix)
+      : messageBase(based.description, input.repoConfig.wipPrefix)
   let base: CommitBase
   if (based !== undefined && parsed !== null) {
     if (parsed.kind === "wip") return { kind: "wip" }
@@ -433,7 +433,7 @@ async function proposedFromRead(
   const files =
     read.files ?? (await proposedFiles(jj, bottom.commit, top.commit))
   const conflicts = read.conflicted
-    ? await conflictedFilesAt(jj, top.commit)
+    ? await readConflictedFiles(jj, top.commit)
     : []
   const ledger = proposedLedger(read.description)
   return {
@@ -448,6 +448,6 @@ async function proposedFromRead(
     onTarget: parents.length === 1 && parents[0] === acceptedBookmark,
     files,
     conflicts,
-    startConflicts: await startConflictsOf(jj, ledger, conflicts),
+    startConflicts: await readStartConflicts(jj, ledger, conflicts),
   }
 }

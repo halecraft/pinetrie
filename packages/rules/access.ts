@@ -11,7 +11,7 @@ import type {
   WriterId,
 } from "@pinetrie/core"
 import { Type } from "typebox"
-import { decodeAt, threadKey, WriterIdSchema } from "./decode.ts"
+import { decodeRecord, threadKey, WriterIdSchema } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 
 const HostSchema = Type.Union([Type.String(), Type.Null()])
@@ -53,7 +53,7 @@ export const ACCESS: RecordSpec<AccessRecord, ThreadId, "session"> = {
   keyOf: r => r.lane,
   encode: ({ lane, ...contents }) => contents,
   decode: (contents, key) =>
-    decodeAt(AccessRecordSchema, contents, threadKey(key), (r, lane) => ({
+    decodeRecord(AccessRecordSchema, contents, threadKey(key), (r, lane) => ({
       lane,
       personal: r.personal,
       services: r.services,
@@ -62,7 +62,7 @@ export const ACCESS: RecordSpec<AccessRecord, ThreadId, "session"> = {
 }
 
 /** A lane that has asked nothing and used nothing. */
-export const accessOf = (lane: ThreadId): AccessRecord => ({
+export const emptyAccess = (lane: ThreadId): AccessRecord => ({
   lane,
   personal: null,
   services: [],

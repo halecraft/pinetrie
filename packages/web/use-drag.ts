@@ -27,7 +27,6 @@ import {
   drawPlan,
   dropIntents,
   edgeScroll,
-  gapAt,
   type HoverOver,
   hoverOpens,
   type Intent,
@@ -37,11 +36,12 @@ import {
   NOT_A_HANDLE,
   type PutHow,
   placeAfter,
+  pointerGap,
   ROOT_DROP_ZONE,
   ROOT_GROUP_ZONE,
   type RootTarget,
   rootTargetOfElement,
-  sidebarSpotAt,
+  sidebarSpot,
   sourceOfElement,
   targetOfElement,
 } from "@pinetrie/interface"
@@ -236,7 +236,7 @@ export function useDrag(input: {
         ) {
           const contentX = x - box.left + strip.scrollLeft
           return {
-            over: { kind: "strip", gap: gapAt(p.mids, contentX) },
+            over: { kind: "strip", gap: pointerGap(p.mids, contentX) },
             el: null,
           }
         }
@@ -253,7 +253,7 @@ export function useDrag(input: {
         return {
           over: {
             kind: "put",
-            target: sidebarSpotAt(
+            target: sidebarSpot(
               y,
               { top: box.top, height: box.height },
               target.before,

@@ -11,7 +11,7 @@ import {
   writerId,
 } from "@pinetrie/core"
 import { canvasCard } from "@pinetrie/core/fixtures"
-import { boardOf, orderKeys } from "@pinetrie/rules"
+import { orderKeys, taskBoard } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
 import type { Status } from "./attention.ts"
 import {
@@ -109,7 +109,7 @@ const input = (over: Partial<Facts> = {}): BoardViewInput => {
     work: new Map(),
     ...over,
   }
-  const board = boardOf(f.workflow, f.cards)
+  const board = taskBoard(f.workflow, f.cards)
   return {
     workflow: f.workflow,
     cards: f.cards,

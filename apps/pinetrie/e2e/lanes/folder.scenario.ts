@@ -43,13 +43,13 @@ import type { Checks } from "../checks.ts"
 import { command } from "../command.ts"
 import {
   at,
-  entriesOf,
+  heldEntries,
+  heldLanes,
+  heldTree,
   idleNow,
   join,
   laneHolding,
-  lanesOf,
   START_AGENT,
-  treeOf,
   waitFor,
 } from "../harness.ts"
 import { cleanUp, inLane, type LaneHosts } from "../lane-hosts.ts"
@@ -97,19 +97,19 @@ async function folderSection(
     })
   let wh = await start()
   let wu = await join(wh, "uma", "folder")
-  const tree = () => treeOf(wh)
+  const tree = () => heldTree(wh)
   const idle = async () => {
     await waitFor(() => idleNow(wh), 300_000)
     await wh.quiet()
   }
   const laneTip = (lane: ThreadId) =>
-    lanesOf(wh, tree(), readPlaces(wh.places)).find(l => l.name === lane)
+    heldLanes(wh, tree(), readPlaces(wh.places)).find(l => l.name === lane)
       ?.tip ?? null
   const laneWith = (text: string) =>
     laneHolding(wh, readPlaces(wh.places), text)
   const toolResults = (lane: ThreadId): string[] => {
     const onPath = new Set(ancestry(tree(), laneTip(lane)).path)
-    return Object.values(entriesOf(wh))
+    return Object.values(heldEntries(wh))
       .filter(r => onPath.has(entryId(r.id)))
       .sort((a, b) => (a.id < b.id ? -1 : 1))
       .map(r => rowMessage(r) as { role?: string })

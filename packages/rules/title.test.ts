@@ -17,7 +17,7 @@ import { FIXTURE_THREAD } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   planTitling,
-  titleOf,
+  replyTitle,
   titleRequest,
   titleStillWanted,
 } from "./index.ts"
@@ -159,21 +159,23 @@ test("titleRequest: the first line always, then the newest that fit", () => {
   ).toBe("How it began:\n- Ada: hi\n\n")
 })
 
-describe("titleOf", () => {
+describe("replyTitle", () => {
   test("bare words, without quotes or trailing punctuation", () => {
-    expect(titleOf(" Rail layout ")).toBe("Rail layout")
-    expect(titleOf('"Rail layout."')).toBe("Rail layout")
-    expect(titleOf("**Tab titles**")).toBe("Tab titles")
-    expect(titleOf("“Sync bug”")).toBe("Sync bug")
+    expect(replyTitle(" Rail layout ")).toBe("Rail layout")
+    expect(replyTitle('"Rail layout."')).toBe("Rail layout")
+    expect(replyTitle("**Tab titles**")).toBe("Tab titles")
+    expect(replyTitle("“Sync bug”")).toBe("Sync bug")
   })
   test("null for more than one line, too many words, or nothing", () => {
-    expect(titleOf("Rail layout\nBecause the thread is about the rail")).toBe(
-      null,
+    expect(
+      replyTitle("Rail layout\nBecause the thread is about the rail"),
+    ).toBe(null)
+    expect(replyTitle("one two three four five six")).toBeNull()
+    expect(replyTitle("one two three four five")).toBe(
+      "one two three four five",
     )
-    expect(titleOf("one two three four five six")).toBeNull()
-    expect(titleOf("one two three four five")).toBe("one two three four five")
-    expect(titleOf(' "" ')).toBeNull()
-    expect(titleOf("x".repeat(81))).toBeNull()
+    expect(replyTitle(' "" ')).toBeNull()
+    expect(replyTitle("x".repeat(81))).toBeNull()
   })
 })
 
