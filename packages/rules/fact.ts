@@ -1,5 +1,5 @@
 // fact — what the host records in a thread: what a command on its proposed
-// changes did, who stopped a run, a member dismissed or gone, a budget spent,
+// changes did, a conflict's version a person chose, who stopped a run, a member dismissed or gone, a budget spent,
 // an ask unanswered or an answer undelivered, a round's line, and a proposal's
 // branches opened.
 
@@ -7,6 +7,7 @@ import type {
   AcceptanceDecision,
   Away,
   CatchUpFrom,
+  ConflictChoice,
   ProposedChangesFact,
   QueuedFact,
   ThreadId,
@@ -47,6 +48,17 @@ const QueuedFactSchema = Type.Union([
     ]),
     lane: ThreadIdSchema,
     by: WriterIdSchema,
+  }),
+  Type.Object({
+    kind: Type.Literal("resolved"),
+    lane: ThreadIdSchema,
+    by: WriterIdSchema,
+    path: Type.String({ minLength: 1 }),
+    choose: Type.Union([
+      Type.Literal("ours"),
+      Type.Literal("theirs"),
+      Type.Literal("base"),
+    ]),
   }),
   Type.Object({
     kind: Type.Literal("stopped"),
@@ -166,6 +178,8 @@ export function factLine(fact: QueuedFact): string {
       return "⇣ the changes were squashed into one revision"
     case "refreshed":
       return "↻ the changes were rebuilt from this thread's work"
+    case "resolved":
+      return `✓ ${choiceWords(fact.choose)} of ${fact.path} chosen: its conflict is closed`
     case "stopped":
       return fact.budget === undefined
         ? "■ the run was stopped"
@@ -188,6 +202,14 @@ export function factLine(fact: QueuedFact): string {
       return `⑂ ${branchesWords(fact.titles.length)} ${fact.how} from the proposal`
   }
 }
+
+/** A conflict's version as a fact names it. */
+const choiceWords = (choose: ConflictChoice): string =>
+  choose === "ours"
+    ? "this thread's own version"
+    : choose === "theirs"
+      ? "the version it caught up with"
+      : "the version both sides began from"
 
 const branchesWords = (n: number): string =>
   n === 1 ? "1 branch" : `${n} branches`
@@ -213,6 +235,8 @@ export function factContent(fact: QueuedFact, name: string): string {
       return `${name} squashed this thread's proposed changes back into one revision.`
     case "refreshed":
       return `${name} rebuilt this thread's proposed changes from your work as it is now, discarding their edits to them.`
+    case "resolved":
+      return `${name} chose ${choiceWords(fact.choose)} of ${fact.path}; its conflict is closed${fact.choose === "ours" ? "" : ", and your copy holds that version now"}.`
     case "stopped":
       return fact.budget === undefined
         ? `${name} stopped this run.`

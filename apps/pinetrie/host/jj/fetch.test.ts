@@ -50,7 +50,12 @@ function setUp(tips: readonly string[]) {
   }).port
   const imported: string[] = []
   const owner = record<RepoOwner>({
-    read: go => go({ jj: async () => ok(""), git: async () => ok("") }),
+    read: go =>
+      go({
+        jj: async () => ok(""),
+        git: async () => ok(""),
+        jjBytes: async function* () {},
+      }),
     importLane: async (_lane, bundle) => {
       const { readFile } = await import("node:fs/promises")
       imported.push(await readFile(bundle, "utf8"))

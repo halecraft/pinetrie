@@ -11,6 +11,7 @@ import {
   type CardCommand,
   type CardId,
   type CardWidth,
+  type ConflictChoice,
   type EntryId,
   hasPlaceKind,
   type ListKey,
@@ -239,6 +240,13 @@ export type ColumnAct =
       readonly lane: ThreadId
       readonly action: ProposedChangesAction
       readonly to: string | null
+    }
+  /** Close a folder lane's conflict at `path` with `choose`'s version. */
+  | {
+      readonly kind: "resolve"
+      readonly lane: ThreadId
+      readonly path: string
+      readonly choose: ConflictChoice
     }
 
 export type Intent =
@@ -816,6 +824,15 @@ function planColumn(
     case "proposed":
       return [
         { kind: "proposed", lane: act.lane, action: act.action, to: act.to },
+      ]
+    case "resolve":
+      return [
+        {
+          kind: "resolve",
+          lane: act.lane,
+          path: act.path,
+          choose: act.choose,
+        },
       ]
   }
 }

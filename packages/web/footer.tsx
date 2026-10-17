@@ -11,6 +11,7 @@
 
 import type { AcceptedRecord, WriterId } from "@pinetrie/core"
 import {
+  historyLink,
   type Intent,
   publishToast,
   publishView,
@@ -84,9 +85,20 @@ export function Footer({
       {strip}
       <div className="footer-right">
         {syncing && <span className="sync-note">syncing…</span>}
+        <HistoryLink accepted={line} />
         <PublishButton accepted={line} session={session} />
       </div>
     </footer>
+  )
+}
+
+/** A folder project's way to its history, in the publish button's place. */
+function HistoryLink({ accepted }: { accepted: AcceptedRecord | null }) {
+  const link = historyLink(accepted)
+  return link === null ? null : (
+    <a className="publish-button history-link" href={link.hash}>
+      {link.label}
+    </a>
   )
 }
 

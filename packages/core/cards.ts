@@ -4,6 +4,7 @@
 // traces. Where cards are, and how they move, is `places.ts`'.
 
 import type { Address } from "./address.ts"
+import type { ConflictChoice } from "./folder.ts"
 import type { CardId, EntryId, TextCardId, ThreadId, WriterId } from "./ids.ts"
 import type { Sha256 } from "./images.ts"
 import type {
@@ -80,15 +81,26 @@ export type ProposedChangesFact =
       readonly by: WriterId
     }
 
+/** A person's choice of a version of a folder lane's conflicted path: the conflict closed. */
+export interface ResolvedFact {
+  readonly kind: "resolved"
+  readonly lane: ThreadId
+  readonly by: WriterId
+  readonly path: string
+  readonly choose: ConflictChoice
+}
+
 /**
  * A fact on its way into its thread: what a fact card holds, appended as an
  * entry when the thread's end consumes it. What a command on the proposed
- * changes did, who stopped a run, a member dismissed or gone, a budget spent,
+ * changes did, a conflict's version a person chose, who stopped a run, a
+ * member dismissed or gone, a budget spent,
  * an ask unanswered or an answer undelivered, a round's line for people, or a
  * proposal's branches opened.
  */
 export type QueuedFact =
   | ProposedChangesFact
+  | ResolvedFact
   | StopFact
   | MemberFact
   | BudgetSpentFact

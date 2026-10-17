@@ -534,7 +534,9 @@ Decided, and waiting for their turn:
   (ADR-0150). A jj repo with no git directory beside it is refused. A
   folder with no jj repo is served as a folder project (ADR-0142): its
   accepted work is the folder, a thread starts from it as it is, and its
-  proposed changes are reviewed as files; accepting one is not built yet. The
+  proposed changes are reviewed as files and accepted into the folder; its
+  page shows accepted work's history, restores a kept state, and chooses
+  a conflict's version (ADR-0165). The
   agent has its tools, and each
   thread's agent works in its own Linux container (ADR-0034), on a disk
   cloned from the turn it branched at. A root thread's starts from its

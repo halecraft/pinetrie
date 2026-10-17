@@ -3,7 +3,7 @@
 // the project's folder a directory beside it, and a lane's commands run on the
 // host in its disk. The rig's test-only hooks read the graph and a diff of
 // their own (`git diff --no-index` of two snapshots); an accept is the host's
-// own (`accept.ts`), of the proposed changes the host would show. Where there
+// own (`writes.ts`), of the proposed changes the host would show. Where there
 // is no btrfs, it skips, saying why.
 
 import { mkdir, readFile, rm, statfs, writeFile } from "node:fs/promises"
@@ -11,18 +11,22 @@ import path from "node:path"
 import {
   type BaseMerge,
   type ConflictRecord,
+  ERR,
   entryId,
   type FolderProposedChangesRecord,
   type ForkStart,
   folderCopyReady,
   lineStateId,
   type PointId,
+  pointId,
+  type RevisionReview,
   type StateRecord,
   snapshotId,
   type ThreadId,
   type ThreadName,
   threadIdFor,
   type ValueWrite,
+  type WriteJournal,
   writerId,
 } from "@pinetrie/core"
 import {
@@ -35,7 +39,11 @@ import {
   stateGraph,
 } from "@pinetrie/folder"
 import { projectDisks } from "@pinetrie/lanehost"
-import { disksInProcess, tarStream } from "@pinetrie/lanehost/fixtures"
+import {
+  disksInProcess,
+  fileStream,
+  tarStream,
+} from "@pinetrie/lanehost/fixtures"
 import {
   createQueue,
   type FolderDisks,
@@ -51,21 +59,23 @@ import {
   type RigLane,
 } from "@pinetrie/lanes/testing"
 import {
-  ACCEPT_JOURNAL,
   CONFLICT,
+  FOLDER_WRITE_JOURNAL,
+  type ReviewAnswer,
   recordsOf,
   STATE,
   setRecord,
 } from "@pinetrie/rules"
 import { afterAll, describe, expect, test } from "vitest"
-import { createFolderAccept } from "./accept.ts"
 import { sourceChanges } from "./changes.ts"
 import { folderFileAt } from "./file-at.ts"
 import { folderHistory } from "./history.ts"
 import { createFolderLine } from "./line.ts"
 import { makeShownMerge } from "./proposed.ts"
 import type { FolderLane } from "./proven.ts"
-import { planSweep } from "./sweep.ts"
+import { readFolderFile, readFolderReview } from "./review.ts"
+import { type KeepPlanned, planKeep } from "./sweep.ts"
+import { createFolderWrites } from "./writes.ts"
 
 const BTRFS_MAGIC = 0x9123683e
 const HERE = path.join(import.meta.dirname, "node_modules", ".folder-suite")
@@ -85,8 +95,27 @@ type FolderRig = HistoryRig & {
   statesDir(lane: ThreadId): Promise<string>
   /** A lane branched at `from`, another lane's state: its disk restored from that state's snapshot. */
   branch(from: PointId): Promise<RigLane>
-  /** The snapshots of every state the live set of the rig's lanes keeps not, deleted (`planSweep`). */
-  sweep(): Promise<readonly PointId[]>
+  /** The snapshots of every state the live set of the rig's lanes keeps not, deleted (`planKeep`), the newest `keep` line states kept. */
+  sweep(keep?: number): Promise<KeepPlanned>
+  /** A restore of `of`, as accepted work's newest was `seen`: what the sweep last kept may be restored. */
+  restore(
+    of: PointId,
+    seen: PointId,
+  ): ReturnType<ReturnType<typeof createFolderWrites>["restore"]>
+  /** The host stopped at its journal write after the `n`th: that write and every one after throw. Null: none. */
+  stopJournalAfter(n: number | null): void
+  /** Each write a stopped host left open, finished or put back, as at a start. */
+  recover(): Promise<void>
+  /** The writes' journals stored. */
+  journals(): readonly WriteJournal[]
+  /** A file of the project's folder; null when absent. */
+  folderFile(file: string): Promise<string | null>
+  /** Files removed from the project's folder, then the folder read. */
+  removeOnAccepted(...files: string[]): Promise<PointId>
+  /** The review of `from..to`, as every folder review is read (`readFolderReview`). */
+  review(from: PointId, to: PointId): Promise<RevisionReview>
+  /** A file's bytes in `state`, as a review serves them (`readFolderFile`). */
+  fileBytes(state: PointId, file: string): Promise<ReviewAnswer>
   snapshotExists(state: PointId): Promise<boolean>
   deleteSnapshot(state: PointId): Promise<void>
   graph(): StateGraph
@@ -112,6 +141,8 @@ async function makeRig(): Promise<FolderRig> {
     diskExists: lane => call({ kind: "diskExists", project: key, lane }),
     snapshotExists: id =>
       call({ kind: "snapshotExists", project: key, snapshot: id }),
+    snapshots: async () =>
+      (await call({ kind: "snapshots", project: key })).map(snapshotId),
     diff: (from, to) => call({ kind: "diff", project: key, from, to }),
     readLaneFile: unused("readLaneFile"),
     runSpec: unused("runSpec"),
@@ -136,18 +167,22 @@ async function makeRig(): Promise<FolderRig> {
       call({ kind: "diffStats", project: key, a, b, paths }),
     filesUnder: (snapshot, paths) =>
       call({ kind: "filesUnder", project: key, snapshot, paths }),
-    sameContent: (a, b, paths) =>
-      call({ kind: "sameContent", project: key, a, b, paths }),
+    sameContent: (a, b, pairs) =>
+      call({ kind: "sameContent", project: key, a, b, pairs }),
     applyMerge: m => call({ kind: "applyMerge", project: key, ...m }),
     read: (snapshot, p, limit) =>
       call({ kind: "read", project: key, snapshot, path: p, limit }),
     readIn: r => call({ kind: "readIn", project: key, ...r }),
     tarOut: (state, paths) =>
       tarStream(disks.snapshot(snapshotId(state)), paths),
+    fileOut: (state, p) => fileStream(disks.snapshot(snapshotId(state)), p),
     states: async (lane, op) => {
       await call({ kind: "states", project: key, lane, op })
     },
   }
+  let stopAfter: number | null = null
+  let journalWrites = 0
+  let kept: readonly PointId[] = []
   // The session's records, each namespace's values by key, as writes leave them.
   const stored = new Map<string, Map<string, unknown>>()
   const values = (namespace: string) =>
@@ -163,6 +198,12 @@ async function makeRig(): Promise<FolderRig> {
         c => c.lane === lane,
       ),
     write: async (writes: readonly ValueWrite[]) => {
+      if (
+        stopAfter !== null &&
+        writes.some(w => w.namespace === FOLDER_WRITE_JOURNAL.namespace) &&
+        ++journalWrites > stopAfter
+      )
+        throw new Error("the host stopped")
       for (const w of writes) {
         const at = stored.get(w.namespace) ?? new Map<string, unknown>()
         if (w.kind === "set") at.set(w.key, w.value)
@@ -194,15 +235,19 @@ async function makeRig(): Promise<FolderRig> {
   const reader = { runtime, disks: folderDisks, own }
   // The lane whose proposed changes the rig shows, built as the host builds them.
   let shown: FolderProposedChangesRecord | undefined
-  const accepter = createFolderAccept({
+  const accepter = createFolderWrites({
     root: folder,
     line,
     queue: project,
     reader,
     states: store.states,
     proposed: lane => (shown?.lane === lane ? shown : undefined),
+    kept: () => kept,
     journals: () => [
-      ...recordsOf(ACCEPT_JOURNAL, values(ACCEPT_JOURNAL.namespace)).values(),
+      ...recordsOf(
+        FOLDER_WRITE_JOURNAL,
+        values(FOLDER_WRITE_JOURNAL.namespace),
+      ).values(),
     ],
     write: store.write,
     newId,
@@ -283,24 +328,52 @@ async function makeRig(): Promise<FolderRig> {
     },
     branch: from => startLane(from, "branch"),
 
-    async sweep() {
-      const gone = planSweep({
+    async sweep(keep = 1) {
+      const planned = planKeep({
         states: store.states(),
         lanes: started.map(lane => ({ lane, history: "folder" as const })),
         conflicts: [
           ...recordsOf(CONFLICT, values(CONFLICT.namespace)).values(),
         ],
         proposed: [],
-        journals: [],
-        keep: 1,
+        journals: [
+          ...recordsOf(
+            FOLDER_WRITE_JOURNAL,
+            values(FOLDER_WRITE_JOURNAL.namespace),
+          ).values(),
+        ],
+        keep,
+        exists: new Set((await runtime.snapshots()).map(pointId)),
       })
-      if (gone.length > 0)
+      kept = planned.kept
+      if (planned.gone.length > 0)
         await runtime.disk({
           kind: "deleteSnapshots",
-          ids: gone.map(snapshotId),
+          ids: planned.gone.map(snapshotId),
         })
-      return gone
+      return planned
     },
+    restore: (of, seen) =>
+      accepter.restore(of, seen, writerId("rig@pinetrie.invalid")),
+    stopJournalAfter(n) {
+      stopAfter = n
+      journalWrites = 0
+    },
+    recover: () => accepter.recover(),
+    journals: () => [
+      ...recordsOf(
+        FOLDER_WRITE_JOURNAL,
+        values(FOLDER_WRITE_JOURNAL.namespace),
+      ).values(),
+    ],
+    folderFile: file =>
+      readFile(path.join(folder, file), "utf8").catch(() => null),
+    async removeOnAccepted(...files) {
+      for (const file of files) await rm(path.join(folder, file))
+      return line.read()
+    },
+    review: (from, to) => readFolderReview(reader, from, to, ""),
+    fileBytes: (state, file) => readFolderFile(reader, state, file),
     snapshotExists: state => runtime.snapshotExists(snapshotId(state)),
     deleteSnapshot: state =>
       runtime.disk({ kind: "deleteSnapshots", ids: [snapshotId(state)] }),
@@ -378,7 +451,7 @@ describe.skipIf(!onBtrfs)(
   "a folder lane's conflicts, on btrfs (skipped: not on btrfs here)",
   () => {
     const TURN = { title: "a turn", entry: entryId("e-1") }
-    test("a conflicted catch-up shows three versions; resolve_conflict writes the one chosen and closes it", async () => {
+    test("a conflicted catch-up shows three versions; resolve_conflict writes the one chosen, records a resolve state and closes it", async () => {
       const rig = await makeRig()
       try {
         await rig.yoursOnAccepted({ "a.txt": "one\ntwo\nthree\n" })
@@ -402,13 +475,25 @@ describe.skipIf(!onBtrfs)(
           await readFile(path.join(versions, "conflicts/a.txt/theirs"), "utf8"),
         ).toBe("one\ntwo (yours)\nthree\n")
         expect(
-          await lane.withHistory(h => h.resolve("a.txt", "theirs")),
+          await lane.withHistory(h => h.resolve("a.txt", "theirs", null)),
         ).toEqual({ kind: "resolved" })
         expect(await lane.read("a.txt")).toBe("one\ntwo (yours)\nthree\n")
+        const resolved = laneNewest(rig.graph(), lane.lane)
+        if (resolved === null) throw new Error("the lane has no state")
+        expect(rig.graph().states.get(resolved)?.made).toEqual({
+          kind: "resolve",
+          lane: lane.lane,
+          path: "a.txt",
+        })
+        expect(await rig.snapshotExists(resolved)).toBe(true)
+        // Nothing left for the next turn: the resolution is a state already.
+        expect(
+          (await lane.withHistory(h => h.recordTurn(TURN))).committed,
+        ).toBeNull()
         expect(await lane.withHistory(h => h.conflicts())).toEqual([])
-        expect(await lane.withHistory(h => h.resolve("a.txt", "ours"))).toEqual(
-          { kind: "refused", why: "no-conflict" },
-        )
+        expect(
+          await lane.withHistory(h => h.resolve("a.txt", "ours", null)),
+        ).toEqual({ kind: "refused", why: "no-conflict" })
       } finally {
         await rig.close()
       }
@@ -483,7 +568,7 @@ describe.skipIf(!onBtrfs)(
         await recorded(branch, 2)
         await parent.write("a.txt", lines("P", "PP", "3", "4"))
         const p2 = await recorded(parent, 3)
-        expect(await rig.sweep()).toContain(p1)
+        expect((await rig.sweep()).gone).toContain(p1)
         const merged = await merge(branch, withParent(parent, p2, p1))
         expect(merged.kind).toBe("clean")
         expect(await branch.read("a.txt")).toBe(lines("P", "PP", "3", "B"))
@@ -547,7 +632,7 @@ describe.skipIf(!onBtrfs)(
       const theirs = await rig.yoursOnAccepted({ "a.txt": files.accepted })
       const first = await merge(lane, withAccepted(yours))
       if (first.kind === "conflicted")
-        await lane.withHistory(h => h.resolve("a.txt", "ours"))
+        await lane.withHistory(h => h.resolve("a.txt", "ours", null))
       const caughtUp = laneNewest(rig.graph(), lane.lane)
       if (caughtUp === null) throw new Error("the lane has no state")
       const plan = planBase(rig.graph(), caughtUp, theirs)
@@ -605,6 +690,149 @@ describe.skipIf(!onBtrfs)(
         expect(await rig.snapshotExists(base)).toBe(true)
         expect((await merge(branch, withAccepted(theirs))).kind).toBe("clean")
         expect(await rig.snapshotExists(base)).toBe(true)
+      } finally {
+        await rig.close()
+      }
+    })
+  },
+)
+
+describe.skipIf(!onBtrfs)(
+  "a folder review, on btrfs (skipped: not on btrfs here)",
+  () => {
+    const GIF = (n: number) => `GIF89a\0${"x".repeat(n)}`
+    test("a review shows an image as media, a moved unchanged file as one row, and serves a side's bytes typed by them", async () => {
+      const rig = await makeRig()
+      try {
+        const first = await rig.yoursOnAccepted({
+          "old.txt": "moved, unchanged\n",
+          "a.gif": GIF(1),
+          "b.txt": "one\n",
+        })
+        await rig.removeOnAccepted("old.txt")
+        const second = await rig.yoursOnAccepted({
+          "docs/new.txt": "moved, unchanged\n",
+          "a.gif": GIF(3),
+          "b.txt": "two\n",
+        })
+        const { files } = await rig.review(first, second)
+        expect(files.map(f => [f.shown, f.change, f.content.kind])).toEqual([
+          ["a.gif", "modified", "media"],
+          ["b.txt", "modified", "lines"],
+          ["{old.txt => docs/new.txt}", "renamed", "lines"],
+        ])
+        expect(files[0]?.content).toEqual({
+          kind: "media",
+          before: { content: "image/gif", size: 8 },
+          after: { content: "image/gif", size: 10 },
+        })
+        const served = await rig.fileBytes(first, "a.gif")
+        if (served.kind !== "file") throw new Error(JSON.stringify(served))
+        const chunks: Uint8Array[] = []
+        for await (const c of served.bytes) chunks.push(c)
+        expect([served.content, Buffer.concat(chunks).toString()]).toEqual([
+          "image/gif",
+          GIF(1),
+        ])
+        expect((await rig.fileBytes(first, "none")).kind).toBe("refused")
+      } finally {
+        await rig.close()
+      }
+    })
+  },
+)
+
+describe.skipIf(!onBtrfs)(
+  "a restore of accepted work's kept state, on btrfs (skipped: not on btrfs here)",
+  () => {
+    test("a restore makes accepted work's newest hold its state's content, and the next read answers current", async () => {
+      const rig = await makeRig()
+      try {
+        const first = await rig.yoursOnAccepted({ "a.txt": "one\n" })
+        const second = await rig.yoursOnAccepted({
+          "a.txt": "two\n",
+          "b.txt": "new\n",
+        })
+        await rig.sweep(5)
+        expect(await rig.restore(first, second)).toEqual({ kind: "done" })
+        const newest = folderNewest(rig.graph())
+        if (newest === null) throw new Error("no accepted work")
+        expect(rig.graph().states.get(newest)?.made).toEqual({
+          kind: "restore",
+          of: first,
+        })
+        expect(await rig.snapshotExists(newest)).toBe(true)
+        expect(await rig.folderFile("a.txt")).toBe("one\n")
+        expect(await rig.folderFile("b.txt")).toBeNull()
+        expect(await rig.yoursOnAccepted({})).toBe(newest)
+      } finally {
+        await rig.close()
+      }
+    })
+
+    test("a restore not as shown, of a state not kept, or of what the folder holds is refused, making nothing", async () => {
+      const rig = await makeRig()
+      try {
+        const first = await rig.yoursOnAccepted({ "a.txt": "one\n" })
+        const second = await rig.yoursOnAccepted({ "a.txt": "two\n" })
+        const states = rig.graph().states.size
+        expect(await rig.restore(first, first)).toEqual({
+          kind: "refused",
+          code: ERR.NOT_AS_SHOWN,
+        })
+        expect(await rig.restore(first, second)).toEqual({
+          kind: "refused",
+          code: ERR.STATE_NOT_KEPT,
+        })
+        await rig.sweep(5)
+        expect(await rig.restore(second, second)).toEqual({
+          kind: "refused",
+          code: ERR.NOTHING_TO_RESTORE,
+        })
+        expect(rig.graph().states.size).toBe(states)
+        expect(rig.journals()).toEqual([])
+      } finally {
+        await rig.close()
+      }
+    })
+
+    test("a restore stopped after its last link is finished at the next start, its snapshot made then", async () => {
+      const rig = await makeRig()
+      try {
+        const first = await rig.yoursOnAccepted({ "a.txt": "one\n" })
+        const second = await rig.yoursOnAccepted({ "a.txt": "two\n" })
+        await rig.sweep(5)
+        // The journal's writes: open, then before the move and after the link.
+        rig.stopJournalAfter(2)
+        await expect(rig.restore(first, second)).rejects.toThrow("stopped")
+        rig.stopJournalAfter(null)
+        const [open] = rig.journals()
+        if (open === undefined) throw new Error("no journal kept")
+        expect(await rig.snapshotExists(open.record.id)).toBe(false)
+        await rig.recover()
+        expect(await rig.snapshotExists(open.record.id)).toBe(true)
+        expect(folderNewest(rig.graph())).toBe(open.record.id)
+        expect(await rig.folderFile("a.txt")).toBe("one\n")
+      } finally {
+        await rig.close()
+      }
+    })
+
+    test("a restore stopped before its last link is put back, leaving no snapshot its record names", async () => {
+      const rig = await makeRig()
+      try {
+        const first = await rig.yoursOnAccepted({ "a.txt": "one\n" })
+        const second = await rig.yoursOnAccepted({ "a.txt": "two\n" })
+        await rig.sweep(5)
+        rig.stopJournalAfter(1)
+        await expect(rig.restore(first, second)).rejects.toThrow("stopped")
+        rig.stopJournalAfter(null)
+        const [open] = rig.journals()
+        if (open === undefined) throw new Error("no journal kept")
+        await rig.recover()
+        expect(await rig.snapshotExists(open.record.id)).toBe(false)
+        expect(folderNewest(rig.graph())).toBe(second)
+        expect(await rig.folderFile("a.txt")).toBe("two\n")
       } finally {
         await rig.close()
       }

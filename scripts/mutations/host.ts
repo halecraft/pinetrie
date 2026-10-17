@@ -4,6 +4,66 @@ import type { Mutation } from "../mutate.ts"
 const unit = ["pnpm", "exec", "vitest", "run", "apps/pinetrie/host"]
 
 export const mutations: readonly Mutation[] = [
+  {
+    name: "bytesResponse drops nosniff",
+    file: "apps/pinetrie/host/responses.ts",
+    from: '  "x-content-type-options": "nosniff",\n',
+    to: "",
+    command: unit,
+    expect: "every blob and review file is served sandboxed and unsniffed",
+  },
+  {
+    name: "a review's binary file is drawn inline",
+    file: "apps/pinetrie/host/responses.ts",
+    from: '        isImageMime(answer.content) ? answer.content : "attachment",\n',
+    to: '        isImageMime(answer.content) ? answer.content : "text",\n',
+    command: unit,
+    expect: "every blob and review file is served sandboxed and unsniffed",
+  },
+  {
+    name: "planKeep sweeps what the live set keeps not, whether or not it exists",
+    file: "apps/pinetrie/host/folder/sweep.ts",
+    from: "      id => input.exists.has(id) && !live.has(id),\n",
+    to: "      id => !live.has(id),\n",
+    command: unit,
+    expect:
+      "planKeep: a state whose snapshot is gone already is not swept again",
+  },
+  {
+    name: "planKeep keeps a live state whose snapshot is gone",
+    file: "apps/pinetrie/host/folder/sweep.ts",
+    from: "  const has = (id: PointId) => live.has(id) && input.exists.has(id)\n",
+    to: "  const has = (id: PointId) => live.has(id)\n",
+    command: unit,
+    expect:
+      "planKeep: kept names no state whose snapshot is gone, nor one swept",
+  },
+  {
+    name: "planKeep's kept drops a concurrent save",
+    file: "apps/pinetrie/host/folder/sweep.ts",
+    from: '    r => r.made.kind === "concurrent" && has(r.id),\n',
+    to: "    () => false,\n",
+    command: unit,
+    expect:
+      "planKeep: kept is accepted work's line kept, newest first, a concurrent save before the accept it was made on",
+  },
+  {
+    name: "a restore's commit makes no snapshot",
+    file: "apps/pinetrie/host/folder/writes.ts",
+    from: "      content !== record.id &&\n",
+    to: "      false &&\n",
+    command: unit,
+    expect:
+      "a restore stopped after its last link is finished at the next start, its snapshot made then",
+  },
+  {
+    name: "withScratch keeps its scratch disk after a throw",
+    file: "apps/pinetrie/host/folder/scratch.ts",
+    from: '  } finally {\n    await runtime.disk({ kind: "delete", lane: scratch })\n  }\n',
+    to: "  } catch (e) {\n    throw e\n  }\n",
+    command: unit,
+    expect: "withScratch: a body that throws leaves no scratch disk",
+  },
   // ── what a lane is told ──
   {
     name: "a nested lane is never told of its Docker",
@@ -70,7 +130,7 @@ export const mutations: readonly Mutation[] = [
     to: "    live.add(lane.start)\n",
     command: unit,
     expect:
-      "planSweep: a lane's tip and start, and accepted work's newest states kept; older ones and a lane's past turns swept",
+      "planKeep: a lane's tip and start, and accepted work's newest states kept; older ones and a lane's past turns swept",
   },
   // ── a folder lane's history ──
   {
@@ -127,13 +187,13 @@ export const mutations: readonly Mutation[] = [
       "sourceChanges: a file rewritten as it was is dropped; one whose mode changed is kept",
   },
   {
-    name: "resolve_conflict closes a path with no open conflict",
+    name: "a resolution records no state",
     file: "apps/pinetrie/host/folder/history.ts",
-    from: '      if (open === undefined) return { kind: "refused", why: "no-conflict" }\n',
+    from: "        setRecord(STATE, record),\n",
     to: "",
     command: unit,
     expect:
-      "a conflicted catch-up shows three versions; resolve_conflict writes the one chosen and closes it",
+      "a conflicted catch-up shows three versions; resolve_conflict writes the one chosen, records a resolve state and closes it",
   },
   {
     name: "a folder lane's fork restores from its source's snapshot",
@@ -694,18 +754,18 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a blob is served unsandboxed",
     file: "apps/pinetrie/host/responses.ts",
-    from: `const BLOB_BASE = { "content-security-policy": "sandbox; default-src 'none'" }`,
-    to: `const BLOB_BASE = {}`,
+    from: `      "content-security-policy": "sandbox; default-src 'none'",\n`,
+    to: "",
     command: unit,
-    expect: "every blob is served sandboxed and unsniffed",
+    expect: "every blob and review file is served sandboxed and unsniffed",
   },
   {
     name: "an opaque blob is drawn inline",
     file: "apps/pinetrie/host/responses.ts",
-    from: '    "content-disposition": "attachment",\n',
-    to: "",
+    from: '    ? { "content-type": OPAQUE_MIME, "content-disposition": "attachment" }\n',
+    to: '    ? { "content-type": OPAQUE_MIME }\n',
     command: unit,
-    expect: "every blob is served sandboxed and unsniffed",
+    expect: "every blob and review file is served sandboxed and unsniffed",
   },
   {
     name: "sqliteBlobs.ref reads no dimensions",
@@ -742,8 +802,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a blob is served uncached",
     file: "apps/pinetrie/host/responses.ts",
-    from: "      ...IMMUTABLE,\n      ...BLOB_BASE,",
-    to: "      ...BLOB_BASE,",
+    from: '      ...IMMUTABLE,\n      "content-security-policy": "sandbox; default-src \'none\'",',
+    to: '      "content-security-policy": "sandbox; default-src \'none\'",',
     command: unit,
     expect: "a blob is its bytes, typed and immutable",
   },
@@ -2806,15 +2866,15 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a folder accept's moved refusal is worded as the generic one",
     file: "apps/pinetrie/host/commands/lane.ts",
-    from: "    case ERR.FOLDER_MOVED:\n",
-    to: '    case ERR.FOLDER_MOVED + "x":\n',
+    from: '    case ERR.FOLDER_MOVED:\n      return `${path ?? "a file"} changed in the project\'s folder while it was accepted',
+    to: '    case ERR.FOLDER_MOVED + "x":\n      return `${path ?? "a file"} changed in the project\'s folder while it was accepted',
     command: unit,
     expect:
       "proposedChangesRefusal names the path a folder accept found changed",
   },
   {
     name: "an accept takes tar's early close of its input as a failure",
-    file: "apps/pinetrie/host/folder/accept.ts",
+    file: "apps/pinetrie/host/folder/writes.ts",
     from: '  return code === "ERR_STREAM_PREMATURE_CLOSE" || code === "EPIPE"\n',
     to: "  return false\n",
     command: unit,

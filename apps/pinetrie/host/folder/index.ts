@@ -3,17 +3,18 @@
 // (`line.ts`) at a thread's first message, at each catch-up, and once it has
 // been quiet after a change (`watch.ts`); each lane's history is states of the
 // graph (`history.ts`); its proposed changes are the lane's newest state
-// merged onto accepted work's newest (`proposed.ts`). Nothing is written
-// into the project's folder but the shared directories its config asks for
-// and what an accept writes (`accept.ts`).
+// merged onto accepted work's newest (`proposed.ts`); what is kept is said
+// once (`sweep.ts`, `refreshKept`). Nothing is written into the project's
+// folder but the shared directories its config asks for and what an accept
+// or a restore writes (`writes.ts`).
 
 import { mkdir, stat } from "node:fs/promises"
 import path from "node:path"
 import {
   ERR,
-  type FolderAcceptedRecord,
   type PointId,
   PRODUCT_NAME,
+  pointId,
   snapshotId,
   type ThreadId,
 } from "@pinetrie/core"
@@ -24,30 +25,32 @@ import {
   sharedCandidates,
 } from "@pinetrie/lanes"
 import {
+  readAccepted,
   readLaneRecords,
   readProposedByLane,
   readRecords,
   readRunning,
 } from "@pinetrie/reads"
 import {
-  ACCEPT_JOURNAL,
   ACCEPTED,
   CONFLICT,
+  FOLDER_WRITE_JOURNAL,
   STATE,
+  setIfChanged,
   setRecord,
 } from "@pinetrie/rules"
 import { failed } from "../basics.ts"
 import { createDescriber } from "../describe.ts"
 import type { ProjectAdapter } from "../work/adapter.ts"
 import type { Destination } from "../work/destination.ts"
-import { createFolderAccept } from "./accept.ts"
 import { folderFileAt } from "./file-at.ts"
 import { folderHistory } from "./history.ts"
 import { createFolderLine } from "./line.ts"
 import { startFolderProposedChanges } from "./proposed.ts"
 import { proveFolderLane } from "./proven.ts"
-import { planSweep } from "./sweep.ts"
+import { planKeep } from "./sweep.ts"
 import { watchFolder } from "./watch.ts"
+import { createFolderWrites } from "./writes.ts"
 
 /** The identity a folder project's lanes write as: pine·trie's agent's, with no repo to ask. */
 const AGENT_IDENTITY = {
@@ -94,10 +97,10 @@ export function startFolderProject(dir: {
         newId: basics.newId,
         now: basics.now,
         moved,
-        recover: () => accepter.recover(),
-        asides: () => accepter.asides(),
+        recover: () => writer.recover(),
+        asides: () => writer.asides(),
       })
-      const accepter = createFolderAccept({
+      const writer = createFolderWrites({
         root,
         line,
         queue,
@@ -107,25 +110,18 @@ export function startFolderProject(dir: {
           const r = readProposedByLane(session).get(lane)
           return r?.kind === "folder" ? r : undefined
         },
-        journals: () => [...readRecords(session, ACCEPT_JOURNAL).values()],
+        kept: () => {
+          const r = readAccepted(session)
+          return r?.kind === "folder" ? r.kept : []
+        },
+        journals: () => [
+          ...readRecords(session, FOLDER_WRITE_JOURNAL).values(),
+        ],
         write: writes => records.writeValues(writes),
         newId: basics.newId,
         now: basics.now,
         moved,
         log: basics.log,
-      })
-      const writeAccepted = (newest: PointId) => {
-        const record: FolderAcceptedRecord = {
-          kind: "folder",
-          newest,
-          at: basics.now(),
-        }
-        return records.writeValues([setRecord(ACCEPTED, record)])
-      }
-      movedListeners.push(newest => {
-        void writeAccepted(newest).catch(
-          failed(basics, "the project's folder's record"),
-        )
       })
       const fileAt: Destination["fileAt"] = (site, p) =>
         folderFileAt({ states: store.states, disks }, site, p)
@@ -186,7 +182,7 @@ export function startFolderProject(dir: {
             describer: createDescriber({ basics, piSetup: parts.piSetup }),
             running: lane => readRunning(basics.live, lane),
             baseChanged: parts.baseChanged,
-            accept: accepter.accept,
+            accept: writer.accept,
           })
           // Accepted work moving is base news: every lane's proposed changes
           // and base follow it.
@@ -202,11 +198,17 @@ export function startFolderProject(dir: {
           // is, which waits for setup (`acceptedNow`); so is each change the
           // watcher saw.
           parts.acceptedMoved()
-          /** Snapshots no state needs any more, deleted; each id once per host. */
-          const swept = new Set<PointId>()
-          const sweep = async () => {
+          /**
+           * What is kept, said once: accepted work's record written with
+           * what the history may show, then the snapshots nothing keeps
+           * deleted. One at a time, so a record gathered earlier is never
+           * written over a later one.
+           */
+          const refreshKept = async () => {
             await parts.ready()
-            const gone = planSweep({
+            // gather
+            const exists = new Set((await runtime.snapshots()).map(pointId))
+            const planned = planKeep({
               states: store.states(),
               lanes: [...readLaneRecords(session).values()].flatMap(r =>
                 r.history === null
@@ -215,23 +217,47 @@ export function startFolderProject(dir: {
               ),
               conflicts: [...readRecords(session, CONFLICT).values()],
               proposed: [...readProposedByLane(session).values()],
-              journals: [...readRecords(session, ACCEPT_JOURNAL).values()],
+              journals: [
+                ...readRecords(session, FOLDER_WRITE_JOURNAL).values(),
+              ],
               keep: parts.keepStates(),
-            }).filter(id => !swept.has(id))
-            if (gone.length === 0) return
-            await runtime.disk({
-              kind: "deleteSnapshots",
-              ids: gone.map(snapshotId),
+              exists,
             })
-            for (const id of gone) swept.add(id)
-          }
-          const sweepSoon = () =>
-            void parts.keeper.track(
-              sweep().catch(
-                failed(basics, "sweeping the project's folder's states"),
+            if (planned.newest === null) return
+            // execute
+            const stored = readAccepted(session)
+            const same =
+              stored?.kind === "folder" &&
+              stored.newest === planned.newest &&
+              stored.kept.join("\n") === planned.kept.join("\n")
+            await records.writeValues(
+              setIfChanged(
+                ACCEPTED,
+                {
+                  kind: "folder",
+                  newest: planned.newest,
+                  kept: planned.kept,
+                  at: same ? stored.at : basics.now(),
+                },
+                stored ?? undefined,
               ),
             )
-          sweepSoon()
+            if (planned.gone.length > 0)
+              await runtime.disk({
+                kind: "deleteSnapshots",
+                ids: planned.gone.map(snapshotId),
+              })
+          }
+          let refreshing: Promise<void> = Promise.resolve()
+          const refreshSoon = () => {
+            refreshing = refreshing
+              .then(refreshKept)
+              .catch(failed(basics, "keeping the project's folder's states"))
+            void parts.keeper.track(refreshing)
+          }
+          refreshSoon()
+          // Accepted work's `keep` window moves with it.
+          movedListeners.push(refreshSoon)
           const watching = watchFolder({
             root,
             own,
@@ -270,18 +296,10 @@ export function startFolderProject(dir: {
               ...proposed,
               runEnded(lane) {
                 proposed.runEnded(lane)
-                sweepSoon()
+                refreshSoon()
               },
             },
-            accepted: {
-              act: async action => ({
-                code: ERR.REFUSED,
-                message:
-                  action === "setup"
-                    ? "a folder project's accepted work is its folder: there is nothing to set up"
-                    : "a folder project's accepted work is its folder: there is nothing to publish to",
-              }),
-            },
+            accepted: { kind: "folder", restore: writer.restore },
             quiet: () => parts.keeper.idle(),
             close() {
               void watching.then(w => w?.close())
@@ -310,7 +328,7 @@ export function startFolderProject(dir: {
             splits: {
               prepareSplit: async () => ({
                 refused:
-                  "a folder project's changes are its files, never a stack of revisions",
+                  "a folder project's changes are its files: they are never split",
               }),
               splitEnded: async () => null,
             },

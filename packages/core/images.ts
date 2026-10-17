@@ -5,6 +5,8 @@
 // it shares by its URL, `/blob/<sha256>`, and holds a ref for each. A
 // reference card holds its quote's hash.
 
+import type { FileContent } from "./folder.ts"
+
 declare const sha256Brand: unique symbol
 /** The lower-case hex SHA-256 of a blob's stored bytes: its key in the store. */
 export type Sha256 = string & { readonly [sha256Brand]: true }
@@ -23,6 +25,39 @@ export type ImageMime = (typeof IMAGE_MIMES)[number]
 
 export const isImageMime = (s: string): s is ImageMime =>
   (IMAGE_MIMES as readonly string[]).includes(s)
+
+/** How much of a file's start `fileContent` reads: git's own window for telling text. */
+export const FILE_CONTENT_WINDOW = 8000
+
+const startsWith = (head: Uint8Array, at: number, bytes: readonly number[]) =>
+  bytes.every((b, i) => head[at + i] === b)
+
+const ascii = (text: string) => [...text].map(c => c.charCodeAt(0))
+
+/**
+ * What a file's first bytes (up to `FILE_CONTENT_WINDOW`) say it holds:
+ * text by git's rule, no NUL byte among them; else an image by its magic
+ * bytes; else binary. An SVG is text, never an image to draw: a page
+ * drawing it would run what it holds.
+ */
+export function fileContent(head: Uint8Array): FileContent {
+  const window = head.subarray(0, FILE_CONTENT_WINDOW)
+  if (!window.includes(0)) return "text"
+  if (startsWith(window, 0, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+    return "image/png"
+  if (startsWith(window, 0, [0xff, 0xd8, 0xff])) return "image/jpeg"
+  if (
+    startsWith(window, 0, ascii("GIF87a")) ||
+    startsWith(window, 0, ascii("GIF89a"))
+  )
+    return "image/gif"
+  if (
+    startsWith(window, 0, ascii("RIFF")) &&
+    startsWith(window, 8, ascii("WEBP"))
+  )
+    return "image/webp"
+  return "binary"
+}
 
 /**
  * A blob of text: a reference's quote, or a shared file that is UTF-8. The

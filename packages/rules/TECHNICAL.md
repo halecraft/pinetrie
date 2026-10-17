@@ -161,7 +161,17 @@ root's record is written only through a step's documents (ADR-0162).
   deleted, since merge bases walk every state's parents. `CONFLICT` is
   each path a merge into a lane left conflicted, keyed by its lane and
   then its path (`conflictKey`; a lane's id holds no `:`, so the first
-  ends it), with the states of its base, ours and theirs.
+  ends it), with the states of its base, ours and theirs. A resolution,
+  the agent's or a person's, writes a `resolve` state and the conflict's
+  deletion in one write.
+- **`FOLDER_WRITE_JOURNAL`** (`folder-records.ts`, namespace
+  `pinetrie.folder-write`, ADR-0159, ADR-0165): each write into the
+  project's folder, an accept's or a restore's, from before its first move
+  until its asides are dealt with; its record says whose (`made`), and its
+  content is the record's `writeContent`, never stored. It replaced the
+  accept's own journal (`pinetrie.accept`) with no migration: the switch
+  is a host stopped with no accept in flight and no aside kept, as the
+  undeclared-namespace sweep deletes the old records.
 - **The archive gate** reads the canvases a command writes in (`writesIn`) and
   looks each up among the archived (`archivedIn`, over `archivedOf`): a
   command carries its canvases, or its places and cards, which the
@@ -1684,20 +1694,31 @@ commit-message request `request.ts` (`describeRequest`).
 - **The review's wire** (ADR-0047) is here, since the host and the page both
   import it:
   - Every read is of a span (`DiffSpan`, ADR-0106): a revision, or a range
-    from one commit to another. `reviewUrl` and `diffUrl` build
-    `/review/<REVIEW_WIRE>/review/<span>` and
-    `/review/<REVIEW_WIRE>/diff/<span>?path=…`, the span as `spanKey` writes
+    from one commit to another. `reviewUrl`, `diffUrl` and `fileUrl` build
+    `/review/<REVIEW_WIRE>/review/<span>`,
+    `/review/<REVIEW_WIRE>/diff/<span>?path=…` and
+    `/review/<REVIEW_WIRE>/file/<span>?path=…&side=before|after`, the span as `spanKey` writes
     it, `<commit>` or `<from>..<to>`; `parseReviewPath` reads them back, and
     calls anything else under `/review/` `bad`, another version included. An
     answer is cached as immutable under its URL, so a change to the
     templates (`REVISION_READ`, `RANGE_FILES`, `@pinetrie/lanes`), the schema
     or `fileDiff`'s flags bumps `REVIEW_WIRE`.
   - `decodeRevisionReview` is the one schema: the host decodes jj's JSON
-    with it, and the page the host's answer.
-  - `planReviewRead` serves only a revision in open proposed changes' `commits`,
-    or a range whose two commits one lane's `pinetrie.revision` records name
-    (an ask's work), each read from the record, never the request; and it
-    refuses an empty path or one with a control character.
+    with it, and the page the host's answer. Each file's `content` says how
+    it is shown, in either kind of project (ADR-0165): lines, or media, each
+    side's `FileContent` and size.
+  - `planReviewRead` serves only a revision in open proposed changes'
+    `commits`, or a range `readableSpan` finds; it refuses an empty path or
+    one with a control character, a file's bytes as a diff's.
+  - **`readableSpan` is the one rule of which ranges there are,** which
+    the page's `historyView` asks too, so a review is offered exactly
+    where the host answers one: an open folder proposed changes'
+    `start..tip`, read by its lane; two states accepted work's record keeps
+    (`kept`), read as accepted work's; a conflict's base and one of its
+    sides, read by its lane; two commits one lane's `pinetrie.revision`
+    records name (an ask's work). Each is read from the record, never the
+    request. A `RecordedRange` carries its `reader` (`SpanReader`), so an
+    accepted-work span is never handed to a lane's reader: jj's refuses it.
     `answerReview` and `answerDiff` settle what was read: 502 when the
     read failed, 413 past `MAX_DIFF_BYTES`.
 
@@ -1752,13 +1773,15 @@ commit-message request `request.ts` (`describeRequest`).
   reads as unknown until the host writes it again. A folder's hold only
   their own fields: proposed changes its `start` and `tip` states, files,
   conflicts and whether it is described; accepted work its
-  `newest` state; a base its `start` state and what catching up would
+  `newest` state and the states it keeps (`kept`, which the host's
+  `refreshKept` alone writes); a base its `start` state and what catching up would
   change. Every reader switches on `kind`: folder proposed changes are never a stack
   and never split (`workStripView`), starts on no conflict (`conflictCause`),
   and is reviewed as its `start..tip` range (`planReviewRead`, whose
   `parseSpan` takes a folder state's id in a range, never as a revision);
-  a folder project's accepted work has nothing to set up or publish to
-  (`acceptedActionState` refuses both); `catchUpOf` compares a folder
+  conflicted, it offers `choose-versions` (`workStripView`), which opens
+  the lane's conflicts in its pane; a folder project's accepted work has
+  nothing to set up or publish to (`acceptedActionState` refuses both); `catchUpOf` compares a folder
   base's `start` with accepted work's `newest`. At start the host deletes those of the other kind
   (`planKindSweep`, `specs.ts`); a folder's `STATE` and `CONFLICT` records
   are never among them.
@@ -1955,6 +1978,14 @@ the tip it must match, and the bookmark to leave on it.
   action has one: an acceptance (`acceptedFact`: the change, the
   bookmark, and that bookmark as the thread knows it, accepted work or a WIP),
   and a description asked for again, a squash, a refresh (`actionFact`).
+  A person's choice of a version of a folder lane's conflicted path is a
+  fact of its own (`ResolvedFact`, `resolved`): who chose which version of
+  which path, its content telling the model the conflict is closed and,
+  for any version but its own, that its copy holds the chosen one now.
+- **A person's choice of a conflict's version is decided before it is
+  read** (`planResolveCommand`, `resolve.ts`): refused `NOT_OWN_COPY` for
+  a lane not the host's own, and `THREAD_RUNNING` while its agent runs,
+  whose next write could land under the choice.
 - **A fact always reaches the thread through a fact card** (`planFactCard`,
   ADR-0126): a card of its own kind (`x-` id, `FactCard`), only ever
   queued, made by the host for whoever acted, after the cards there; popped

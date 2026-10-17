@@ -56,7 +56,7 @@ export interface LaneDeps {
   readonly records: Pick<StepRecords, "writeValues">
   /** A running lane's root, held by its run (a stop's asked runs). */
   readonly runs: RunDocs
-  readonly work: Pick<LaneWork, "destination" | "runnable">
+  readonly work: Pick<LaneWork, "destination" | "runnable" | "resolve">
   readonly start: Runs["start"]
   /** Stop a chat's run that has not reached pi yet (`Runs.cancel`). */
   readonly cancel: Runs["cancel"]
@@ -293,7 +293,7 @@ export function proposedChangesRefusal(
     case ERR.FOLDER_CANNOT_HOLD:
       return `${path ?? "a file"} cannot be written into the project's folder: another name there is the same once folded, or the folder cannot hold it`
     case ERR.NOT_A_STACK:
-      return "a folder project's changes are its files, never a stack"
+      return "a folder project's changes are its files: there is nothing to squash"
     default:
       return "this thread has no changes to accept"
   }
@@ -308,10 +308,108 @@ export async function actOnAccepted(
 ): Promise<Outcome> {
   const { destination } = deps.work
   if (destination === null) return NO_REPO
+  if (destination.accepted.kind !== "jj")
+    return {
+      kind: "refused",
+      code: ERR.REFUSED,
+      message:
+        action === "setup"
+          ? "a folder project's accepted work is its folder: there is nothing to set up"
+          : "a folder project's accepted work is its folder: there is nothing to publish to",
+    }
   const refused = await destination.accepted.act(action)
   return refused === null
     ? { kind: "accepted-moved" }
     : { kind: "refused", ...refused }
+}
+
+/**
+ * A restore of a folder project's kept state into its folder, as its
+ * preview showed it; a jj project's accepted work is restored in your repo,
+ * never here.
+ */
+export async function restoreAccepted(
+  deps: Pick<LaneDeps, "work">,
+  intent: Extract<Intent, { kind: "restore" }>,
+  by: WriterId,
+): Promise<Outcome> {
+  const { destination } = deps.work
+  if (destination === null) return NO_REPO
+  if (destination.accepted.kind !== "folder")
+    return {
+      kind: "refused",
+      code: ERR.REFUSED,
+      message:
+        "a jj project's accepted work is its repo's: restore a version there",
+    }
+  const done = await destination.accepted.restore(intent.of, intent.seen, by)
+  return done.kind === "done"
+    ? { kind: "accepted-moved" }
+    : {
+        kind: "refused",
+        code: done.code,
+        message: restoreRefusal(done.code, done.path ?? null),
+      }
+}
+
+/** Why a restore was refused, worded once; `path` is what a write's refusal names. */
+export function restoreRefusal(code: ErrCode, path: string | null): string {
+  switch (code) {
+    case ERR.NOT_AS_SHOWN:
+      return "the project's folder changed since you were shown this: look at the restore again"
+    case ERR.STATE_NOT_KEPT:
+      return "that version is no longer kept"
+    case ERR.NOTHING_TO_RESTORE:
+      return "the project's folder already holds that version"
+    case ERR.FOLDER_MOVED:
+      return `${path ?? "a file"} changed in the project's folder while it was restored: look at the restore again`
+    case ERR.FOLDER_CANNOT_HOLD:
+      return `${path ?? "a file"} cannot be written into the project's folder: another name there is the same once folded, or the folder cannot hold it`
+    default:
+      return "that version cannot be restored"
+  }
+}
+
+/**
+ * A person's choice of a version of a folder lane's conflicted path: carried
+ * out by lane work, then its fact queued on the thread, as an action on
+ * proposed changes' is.
+ */
+export async function resolveConflict(
+  deps: Pick<LaneDeps, "work" | "later"> & {
+    readonly basics: Pick<Basics, "session" | "log">
+  },
+  intent: Extract<Intent, { kind: "resolve" }>,
+  by: WriterId,
+): Promise<Outcome> {
+  const { lane, path, choose } = intent
+  const done = await deps.work.resolve(lane, path, choose, by)
+  if (done.kind === "refused")
+    return {
+      kind: "refused",
+      code: done.code,
+      message: resolveRefusal(done.code),
+    }
+  void deps.later
+    .step({ kind: "thread", thread: lane }, "a conflict's resolution", () => ({
+      facts: [done.fact],
+    }))
+    .catch(failed(deps.basics, "a conflict's resolution", lane))
+  return { kind: "proposed" }
+}
+
+/** Why a choice of a conflict's version was refused, worded once. */
+export function resolveRefusal(code: ErrCode): string {
+  switch (code) {
+    case ERR.THREAD_RUNNING:
+      return "the thread is running: choose when it stops"
+    case ERR.NO_CONFLICT:
+      return "that file's conflict is closed already"
+    case ERR.NOT_OWN_COPY:
+      return "this thread has no copy of its own here: it has no conflicts to close"
+    default:
+      return "that conflict cannot be closed here"
+  }
 }
 
 /**

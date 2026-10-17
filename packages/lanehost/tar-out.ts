@@ -14,8 +14,12 @@ import path from "node:path"
 import { commandStream } from "@pinetrie/channel"
 import { isPathInside } from "@pinetrie/core"
 
-/** Each of `paths` checked to be a regular file inside `root`, no symlink on its way; throws naming the first that is not. */
-export async function checkTarPaths(
+/**
+ * Each of `paths` checked to be a regular file inside `root`, no symlink on
+ * its way; throws naming the first that is not. Every stream out of a
+ * snapshot checks its paths here: `tarStream`'s and `file-out.ts`'s.
+ */
+export async function checkOutPaths(
   root: string,
   paths: readonly string[],
 ): Promise<void> {
@@ -47,7 +51,7 @@ export async function* tarStream(
   root: string,
   paths: readonly string[],
 ): AsyncIterable<Uint8Array> {
-  await checkTarPaths(root, paths)
+  await checkOutPaths(root, paths)
   yield* commandStream(
     [
       "tar",

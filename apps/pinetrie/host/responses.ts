@@ -1,20 +1,22 @@
 // host/responses — every answer the host gives over HTTP itself, pure: a blob,
-// an upload's outcome, proposed changes' read. `http.ts` writes each one with
+// an upload's outcome, a review's read, stored bytes (`bytesResponse`). `http.ts` writes each one with
 // `send`.
 
 import {
-  type BlobKind,
   type BlobMime,
   type BlobRef,
-  kindOfMime,
+  type ImageMime,
+  isImageMime,
   OPAQUE_MIME,
   type StoredBlob,
+  TEXT_MIME,
 } from "@pinetrie/core"
 import type { ReviewAnswer } from "@pinetrie/rules"
 
-export interface HttpAnswer<
-  Body extends string | Uint8Array = string | Uint8Array,
-> {
+/** What an answer's body may be: whole, or bytes as they come (a file of a state). */
+export type HttpBody = string | Uint8Array | AsyncIterable<Uint8Array>
+
+export interface HttpAnswer<Body extends HttpBody = HttpBody> {
   readonly status: number
   readonly headers: Readonly<Record<string, string | number>>
   readonly body: Body
@@ -32,7 +34,7 @@ const IMMUTABLE = {
   "content-security-policy": "default-src 'none'",
 }
 
-export function reviewResponse(answer: ReviewAnswer): HttpAnswer<string> {
+export function reviewResponse(answer: ReviewAnswer): HttpAnswer {
   switch (answer.kind) {
     case "review":
       return {
@@ -49,6 +51,13 @@ export function reviewResponse(answer: ReviewAnswer): HttpAnswer<string> {
         headers: { ...IMMUTABLE, "content-type": "text/plain; charset=utf-8" },
         body: answer.text,
       }
+    // A state never changes, so its file's bytes are cached as a blob's.
+    case "file":
+      return bytesResponse(
+        isImageMime(answer.content) ? answer.content : "attachment",
+        answer.bytes,
+        answer.size,
+      )
     case "refused":
       return {
         status: answer.status,
@@ -61,43 +70,54 @@ export function reviewResponse(answer: ReviewAnswer): HttpAnswer<string> {
   }
 }
 
-/** How each kind of blob is served, over `IMMUTABLE`'s and the base's headers. */
-const BLOB_HEADERS: Readonly<
-  Record<BlobKind, (mime: BlobMime) => Readonly<Record<string, string>>>
-> = {
-  image: mime => ({ "content-type": mime }),
-  text: () => ({ "content-type": "text/plain; charset=utf-8" }),
-  opaque: () => ({
-    "content-type": OPAQUE_MIME,
-    "content-disposition": "attachment",
-  }),
-}
+/**
+ * How stored bytes are served: an image as its type, inline; text as plain
+ * text, never drawn as HTML; anything else as a download, named by the link
+ * that asks for it. The kind is decided from the bytes, never a name.
+ */
+export type BytesKind = ImageMime | "text" | "attachment"
+
+const BYTES_HEADERS = (kind: BytesKind): Readonly<Record<string, string>> =>
+  kind === "attachment"
+    ? { "content-type": OPAQUE_MIME, "content-disposition": "attachment" }
+    : kind === "text"
+      ? { "content-type": "text/plain; charset=utf-8" }
+      : { "content-type": kind }
 
 /**
- * Every blob's: a shared file may be HTML or SVG, and the CSP's sandbox keeps
- * one opened on its own from running script as the page's origin.
+ * Stored bytes, a blob's or a state's file: cached as immutable, never
+ * sniffed, and sandboxed, since a file may be HTML or SVG and the CSP's
+ * sandbox keeps one opened on its own from running script as the page's
+ * origin. `size` is its length when known.
  */
-const BLOB_BASE = { "content-security-policy": "sandbox; default-src 'none'" }
-
-/**
- * `GET /blob/<sha256>`: the stored blob, or 404 for one the store lacks.
- * Text is served as plain text, never drawn as HTML; an opaque blob is a
- * download, named by the link that asks for it.
- */
-export function blobResponse(
-  blob: Pick<StoredBlob, "bytes" | "mimeType"> | undefined,
-): HttpAnswer {
-  if (blob === undefined) return { status: 404, headers: {}, body: "" }
+export function bytesResponse<
+  Body extends Uint8Array | AsyncIterable<Uint8Array>,
+>(kind: BytesKind, body: Body, size: number | null): HttpAnswer<Body> {
   return {
     status: 200,
     headers: {
       ...IMMUTABLE,
-      ...BLOB_BASE,
-      ...BLOB_HEADERS[kindOfMime(blob.mimeType)](blob.mimeType),
-      "content-length": blob.bytes.byteLength,
+      "content-security-policy": "sandbox; default-src 'none'",
+      ...BYTES_HEADERS(kind),
+      ...(size === null ? {} : { "content-length": size }),
     },
-    body: blob.bytes,
+    body,
   }
+}
+
+const BLOB_KIND = (mime: BlobMime): BytesKind =>
+  mime === TEXT_MIME ? "text" : mime === OPAQUE_MIME ? "attachment" : mime
+
+/** `GET /blob/<sha256>`: the stored blob, or 404 for one the store lacks. */
+export function blobResponse(
+  blob: Pick<StoredBlob, "bytes" | "mimeType"> | undefined,
+): HttpAnswer {
+  if (blob === undefined) return { status: 404, headers: {}, body: "" }
+  return bytesResponse(
+    BLOB_KIND(blob.mimeType),
+    blob.bytes,
+    blob.bytes.byteLength,
+  )
 }
 
 /**

@@ -111,6 +111,10 @@ export const HOST_PRINCIPAL = "pinetrie-host"
  *     of ids in `text`; the host deletes them.
  *   - `ssh-access` answers a lane's use of its owner's ssh identity: `mode`
  *     `approve`, `refuse` or `revoke`, for the thread `lane`.
+ *   - `restore` writes a folder project's kept state `targetId` into its
+ *     folder, as accepted work's newest was `seen`.
+ *   - `resolve` closes the thread `lane`'s conflict at the path `text` with
+ *     the version `mode`: `ours`, `theirs` or `base`.
  */
 export const COMMAND_KINDS = [
   "send",
@@ -138,6 +142,8 @@ export const COMMAND_KINDS = [
   "set-command",
   "setup",
   "publish",
+  "restore",
+  "resolve",
   "undo-move",
   "traces-seen",
   "ssh-access",

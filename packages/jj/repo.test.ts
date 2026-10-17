@@ -133,7 +133,8 @@ import {
   gatherStack,
 } from "./proposed-gather.ts"
 import { repairProposedChanges } from "./proposed-repair.ts"
-import { executeRepo, hostJj, hostOps, runnerFor } from "./run.ts"
+import { jjFileBytes } from "./review-content.ts"
+import { bytesFor, executeRepo, hostJj, hostOps, runnerFor } from "./run.ts"
 import { readShared } from "./shared.ts"
 import { git, host } from "./step.ts"
 
@@ -857,8 +858,23 @@ describe("a lane's repo, with jj", () => {
   }, 60_000)
 
   test("a review reads proposed changes' commit: its description, files and one file's diff", async () => {
-    const { laneDir, yoursJj, ops, laneJj, fetch, edit, build, base } =
-      await turnRig("review")
+    const {
+      laneDir,
+      yoursDir,
+      yoursJj,
+      ops,
+      laneJj,
+      fetch,
+      edit,
+      build,
+      base,
+    } = await turnRig("review")
+    const reads = { jj: ops, jjBytes: bytesFor(yoursDir, "host") }
+    // An image: its row is media, with its size, read from its bytes.
+    const PNG = Buffer.from([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 1,
+    ])
+    await writeFile(path.join(laneDir, "a.png"), PNG)
     // Names the template and the fileset must quote, a file under a
     // directory, and a rename.
     await run("mkdir", ["-p", path.join(laneDir, "dir")])
@@ -889,7 +905,7 @@ describe("a lane's repo, with jj", () => {
       throw new Error("no proposed changes")
 
     const span = { kind: "revision", commit: w } as const
-    const read = await revisionRead(ops, span, sshAuthority)
+    const read = await revisionRead(reads, span, sshAuthority)
     expect(read).toEqual({
       description: "feat: lane\n\nwhy\n",
       files: expect.arrayContaining([
@@ -899,6 +915,7 @@ describe("a lane's repo, with jj", () => {
           change: "added",
           added: 1,
           removed: 0,
+          content: { kind: "lines" },
         },
         {
           path: 'we"ird',
@@ -906,6 +923,7 @@ describe("a lane's repo, with jj", () => {
           change: "added",
           added: 1,
           removed: 0,
+          content: { kind: "lines" },
         },
         {
           path: "dir/f.txt",
@@ -913,6 +931,7 @@ describe("a lane's repo, with jj", () => {
           change: "added",
           added: 1,
           removed: 0,
+          content: { kind: "lines" },
         },
         {
           path: "a.txt",
@@ -920,6 +939,7 @@ describe("a lane's repo, with jj", () => {
           change: "added",
           added: 2,
           removed: 0,
+          content: { kind: "lines" },
         },
         {
           path: "moved.txt",
@@ -927,12 +947,31 @@ describe("a lane's repo, with jj", () => {
           change: "renamed",
           added: 0,
           removed: 0,
+          content: { kind: "lines" },
+        },
+        {
+          path: "a.png",
+          shown: "a.png",
+          change: "added",
+          added: 0,
+          removed: 0,
+          content: {
+            kind: "media",
+            before: null,
+            after: { content: "image/png", size: 10 },
+          },
         },
       ]),
       widenings: [{ kind: "ssh" }],
     })
     expect(await fileDiff(ops, span, 'we"ird')).toContain("+quote")
     expect(await fileDiff(ops, span, "a b.txt")).toContain("+space")
+    // An image's bytes, typed by them; none where the side holds no file.
+    const png = await jjFileBytes(reads.jjBytes, w, "a.png")
+    const served: Uint8Array[] = []
+    for await (const c of png?.bytes ?? []) served.push(c)
+    expect([png?.content, Buffer.concat(served)]).toEqual(["image/png", PNG])
+    expect(await jjFileBytes(reads.jjBytes, `${w}-`, "a.png")).toBeNull()
     // One file exactly: a directory's name names none of its files.
     expect(await fileDiff(ops, span, "dir")).toBe("")
     expect(await fileDiff(ops, span, "dir/f.txt")).toContain("+under")
@@ -946,7 +985,7 @@ describe("a lane's repo, with jj", () => {
       [...((r as { files: { path: string }[] } | null)?.files ?? [])].sort(
         (a, b) => a.path.localeCompare(b.path),
       )
-    const ranged = await revisionRead(ops, range, sshAuthority)
+    const ranged = await revisionRead(reads, range, sshAuthority)
     expect(ranged).toMatchObject({
       description: "",
       widenings: [{ kind: "ssh" }],
@@ -974,7 +1013,7 @@ describe("a lane's repo, with jj", () => {
     expect(now.commit).not.toBe(w)
     expect(
       await revisionRead(
-        ops,
+        reads,
         { kind: "revision", commit: now.commit },
         sshAuthority,
       ),
@@ -983,7 +1022,7 @@ describe("a lane's repo, with jj", () => {
     })
     expect(
       await revisionRead(
-        ops,
+        reads,
         { kind: "revision", commit: commitId("1".repeat(40)) },
         sshAuthority,
       ),

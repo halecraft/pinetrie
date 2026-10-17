@@ -2,8 +2,10 @@
 
 A folder project's history, decided as values (ADR-0142): its graph of
 states and their merge bases (`graph.ts`), the path merge's plan
-(`merge.ts`), the snapshots kept (`live.ts`), and an accept into the
-project's folder (`accept.ts`, ADR-0159). It declares only
+(`merge.ts`), the snapshots kept (`live.ts`), a write into the project's
+folder, an accept's or a restore's (`accept.ts`, ADR-0159, ADR-0165), a
+conflict closed by a choice (`resolve.ts`), and a review of two states
+(`review.ts`, ADR-0165). It declares only
 `@pinetrie/core` (`workspace.test.ts`) and does no I/O: lanehost's disks
 role carries out what it decides, through the folder adapter, and the
 host's `apps/pinetrie/host/folder/` is the only code that touches your
@@ -25,18 +27,24 @@ lanehost declares only core and channel.
   - **A state's id is never a jj commit's** (`isFolderStateId`, core): it
     holds a dash and is a disk name. A turn's state is `turn-<uuidv7>`
     (`turnStateId`), never its entry's id, which names the entry's own
-    snapshot; a line state `line-<uuidv7>` (`lineStateId`); each from an id
-    its caller mints; a virtual base `bases-<hash>`.
+    snapshot; a read's line state `line-<uuidv7>` (`lineStateId`), a
+    restore's `restore-<uuidv7>` (`restoreStateId`), a resolution's
+    `resolve-<uuidv7>` (`resolveStateId`); each from an id its caller
+    mints; a virtual base `bases-<hash>`.
   - **Its parents' number follows how it was made** (`StateMade`): a read
     has one, or none when the graph is empty (the first read of the project's folder); a
-    start, a turn, a restore and a concurrent save one; a catch-up and an
+    start, a turn, a restore, a resolve and a concurrent save one; a catch-up and an
     accept two; a merge of bases two or more; none repeats. A concurrent
     save's one parent is a line state (an accept's, or the read a put-back
     accept was built on), and it is never on accepted work's line itself,
     so `folderNewest` never answers one. A start's parent is the state its
     disk was restored from, and it is a state of its own. A restore's is
     accepted work's newest state, never the state restored, so accepted
-    work's line stays a line and its newest states are reached by first parents.
+    work's line stays a line and its newest states are reached by first
+    parents (core's `lineStates`, which the live set and the history page
+    both walk). A resolve's is its own lane's newest state (refused
+    `resolve-off-lane` otherwise), so a conflict closed is a state of the
+    lane's line, which `laneNewest` and `stateLane` answer.
 - **Ancestry and merge bases are the adapter's**, never a rule's: rules
   test points for equality only (`packages/core/TECHNICAL.md`). A merge
   base is a lowest common ancestor (`mergeBases`); the common ancestors are
@@ -114,14 +122,48 @@ flows, merged by `git merge-file` as lanehost merges.
   its inode, size and mtime are as moved, else a concurrent save of its
   path on the line state its journal kept it on (`keptOn`).
 
-ADR-0165, accepted and not yet built, extends these to a restore: the
-same steps and journal, with an earlier kept state as the content.
+- **A restore is an accept of an earlier state** (`planRestore`, ADR-0165):
+  refused `NOT_AS_SHOWN` unless accepted work's newest after the restore's
+  own read is the `seen` its preview was drawn from; `STATE_NOT_KEPT` for
+  a state accepted work's record does not keep, or whose snapshot is gone;
+  `NOTHING_TO_RESTORE` when no source path differs. Every refusal is
+  decided before anything is made. Its state is a line state on the newest,
+  made `restore` with `of`.
+- **A write's content is derived, never stored** (core's `writeContent`):
+  an accept writes its own state's snapshot, a restore `of`'s. The journal
+  (`WriteJournal`) names only its record, so it cannot name one snapshot
+  while its record names another. A restore's own snapshot is made only
+  at its commit, so a refusal or a put back has made nothing, and
+  `planRecovery` is the accept's.
+
+## A resolution (`resolve.ts`)
+
+- **A conflict closed is a state of the lane's** (`planResolve`): the
+  chosen side's file taken, or deleted where that side holds none, and
+  none for `ours`, which the disk holds; then a `resolve` state on the
+  lane's newest. The agent's tool and a person's choice on the page both
+  take it, so the next proposed changes, and the next turn's paths, read
+  the resolution as a state.
+
+## A review (`review.ts`)
+
+- **Each changed path is one row, shown by what its sides hold**
+  (`planFolderReview`): lines where every side is absent, a symlink or a
+  text file (`PathFact`'s `content`, from its bytes); media otherwise, each
+  side's content and size.
+- **A move is found from bytes, never guessed** (`renameCandidates`, then
+  `pairRenames`): each path gone is paired with each path added of its
+  size, the host's `sameContent` reads only those pairs, and a pair is a
+  move only when each of its two paths has exactly that one equal partner.
+  Two copies of one file pair with nothing. A move's row is `{old => new}`
+  (`renameShown`, as jj writes one), its lines 0 and 0.
 
 ## The accept's laws
 
-Each is one test in `apps/pinetrie/host/folder/accept.test.ts` titled by
+Each is one test in `apps/pinetrie/host/folder/writes.test.ts` titled by
 its sentence, over a plain temp directory, with the host's executor
-(`write.ts`). A save races the accept at every journal write, which is
+(`write.ts`), run for both writers: an accept's record and a restore's,
+so a law cannot hold for one and drift for the other. A save races the accept at every journal write, which is
 every boundary between its sub-steps (S192's protocol, its interleavings
 run as values rather than by a clock).
 
@@ -152,7 +194,8 @@ run as values rather than by a clock).
   lanehost applies them, and those join the plan's conflicts.
 - **S160's laws:** a path changed on one side takes that side; changed
   alike on both, nothing; text on both, `git merge-file` (S181: text is a
-  file with no NUL in its first 8,000 bytes); anything else changed on both (a
+  file with no NUL in its first 8,000 bytes, core's `fileContent`, which
+  names an image by its magic bytes too); anything else changed on both (a
   binary, two symlinks, a file against a directory, a deletion against a
   change) a conflict, ours kept.
 - **The executable bit is its own field:** the side that changed it wins.
@@ -176,8 +219,9 @@ run as values rather than by a clock).
   with accepted work's newest state and with its parent lane's newest,
   foreign lanes included (ADR-0150); every conflict's three states; each
   proposed changes' start, tip and shown merge; every state an accept's
-  journal pins (an open one's own, each kept aside's `keptOn`); accepted
-  work's newest `keep` line states, along first parents, its newest always;
+  journal pins (an open one's own and its content's, each kept aside's
+  `keptOn`); accepted work's newest `keep` line states (`lineStates`), its
+  newest always;
   and each concurrent save whose line state is kept.
 - **A lane's parent is read from the graph** (`parentLane`): the lane whose
   state its start state's parent is. So the sweep keeps a parent base only

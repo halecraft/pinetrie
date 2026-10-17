@@ -192,6 +192,8 @@ const work = (over: Partial<WorkFacts> = {}): WorkFacts => ({
   filesLost: new Map(),
   setup: null,
   budgets: new Map(),
+  states: new Map(),
+  conflicts: [],
   ...over,
 })
 /** Accepted work, one commit past the lane's base: `base` read what catching up brings. */
@@ -756,7 +758,6 @@ describe("columnView: the work strip", () => {
         }),
       ).strip
     const target = {
-      lane: B,
       spans: [{ kind: "revision", commit: commitId("c1") }],
       conflicts: [],
       yourEdits: ["a.txt"],

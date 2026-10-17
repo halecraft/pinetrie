@@ -13,6 +13,7 @@ import {
   type CanvasView,
   type CardRecord,
   type CommandSummary,
+  type ConflictRecord,
   commandOf,
   conflictAskedAt,
   type DiffSpan,
@@ -24,6 +25,7 @@ import {
   messageText,
   type PinnedCardRead,
   type PinnedView,
+  type PointId,
   type Position,
   type ProjectRecord,
   type ProposedChangesRecord,
@@ -31,6 +33,7 @@ import {
   promptOf,
   type RevisionRecord,
   type SetupRecord,
+  type StateRecord,
   type TextPlace,
   type ThreadFork,
   type ThreadId,
@@ -116,6 +119,10 @@ export interface WorkFacts {
   readonly budgets: ReadonlyMap<EntryId, BudgetRecord>
   /** What the host read of its config; null before a host wrote it. */
   readonly setup: SetupRecord | null
+  /** A folder project's states, by id: its history. */
+  readonly states: ReadonlyMap<PointId, StateRecord>
+  /** Every folder lane's open conflicts. */
+  readonly conflicts: readonly ConflictRecord[]
 }
 
 /**
@@ -279,7 +286,6 @@ interface LabelledButton {
  * heads a review whose spans have no description: an ask's line.
  */
 export interface ReviewTarget {
-  readonly lane: ThreadId
   readonly conflicts: readonly string[]
   /** Files you are editing in your working copy: jj proposed changes' alone. */
   readonly yourEdits: readonly string[]
@@ -699,13 +705,11 @@ function workStrip(f: ColumnFacts, parent: ParentNow | null): WorkStrip | null {
 const proposedReview = (record: ProposedChangesRecord): ReviewTarget =>
   record.kind === "folder"
     ? {
-        lane: record.lane,
         spans: [{ kind: "range", from: record.start, to: record.tip }],
         conflicts: record.conflicts,
         yourEdits: [],
       }
     : {
-        lane: record.lane,
         spans: record.commits.map(commit => ({ kind: "revision", commit })),
         conflicts: record.conflicts,
         yourEdits: record.yourEdits,
@@ -736,6 +740,7 @@ const BUTTON_LABEL: Record<
   >,
   string
 > = {
+  "choose-versions": "choose versions",
   split: "split into a stack",
   squash: "squash to one",
   describe: "rewrite description",

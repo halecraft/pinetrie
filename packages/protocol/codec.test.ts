@@ -323,6 +323,13 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
     },
     { kind: "setup" },
     { kind: "publish" },
+    { kind: "restore", of: pointId("line-1"), seen: pointId("restore-2") },
+    {
+      kind: "resolve",
+      lane: threadIdFor("abc"),
+      path: "docs/a b.md",
+      choose: "theirs",
+    },
     { kind: "reserve", lane: NEW_THREAD },
     {
       kind: "move",
@@ -647,6 +654,9 @@ test("encodeOutcome -> decodeReply round-trips every outcome", () => {
     { kind: "unmoved", code: "full", place: null, by: null },
     { kind: "refused", code: ERR.CANVAS_ARCHIVED, message: "archived by Bea" },
     { kind: "refused", code: ERR.CANVAS_BUSY, message: "busy" },
+    { kind: "refused", code: ERR.STATE_NOT_KEPT, message: "not kept" },
+    { kind: "refused", code: ERR.NOTHING_TO_RESTORE, message: "held" },
+    { kind: "refused", code: ERR.THREAD_RUNNING, message: "running" },
     { kind: "failed", message: "writeValues is not in this port" },
   ]
   for (const outcome of outcomes) {

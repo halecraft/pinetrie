@@ -11,6 +11,7 @@ import { answer } from "./answer.ts"
 import type { LanehostCall, LanehostResult } from "./protocol.ts"
 import { servingFrom } from "./serving.ts"
 
+export { fileStream } from "./file-out.ts"
 export { tarStream } from "./tar-out.ts"
 
 /** The role started on a socket of its own; `close` stops it. */

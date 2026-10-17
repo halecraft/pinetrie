@@ -977,11 +977,21 @@ heads a range, which has no description.
   estimate; scroll anchoring absorbs it, as it does any section.
 - **A 404 for a commit the proposed changes have just left is brief:** the record arrives
   with the new commits, and the review asks for their URLs.
+- **A file shown as a file draws no diff** (`review-media.tsx`): an image
+  row's two sides side by side, each an `<img>` of the review's `fileUrl`,
+  which the host serves as an image only when its bytes are one; any
+  other media row each side's size and a link to open it. A move with no
+  lines says so in place of its diff. Neither fetches a diff.
 
 ## A column's pane (`pane.ts`, `pane.tsx`, ADR-0078)
 
 Beside the thread, a column has one pane, holding one thing at a time: the
-proposed changes' review, an ask's, a table from a message, or a stored image.
+proposed changes' review, an ask's, a folder lane's conflicts
+(`conflicts-pane.tsx`, opened by the work strip's "choose versions"), a
+table from a message, or a stored image. The conflicts pane draws each
+side as a review's section for its path (`ReviewFile`, near the view at
+once), and each choice is the `resolve` command; its refusal, while the
+thread runs, is said in the pane.
 
 - **A subject is a name, never data** (`PaneSubject`): the proposed changes,
   board (drawn while the column has a thread end), an ask by
@@ -1535,9 +1545,13 @@ the email is the only thing pine·trie chooses.
 
 ## Pages (`page.tsx`, `use-page.ts`, ADR-0098)
 
-A page covers the stage: the profile, and the setup page
+A page covers the stage: the profile, the setup page
 (`setup-page.tsx`, ADR-0146), which draws `setupView` from the account
-menu's **Setup**. Which page, and how leaving treats the history, are
+menu's **Setup**, and a folder project's history (`history-page.tsx`,
+ADR-0165), which draws `historyView` from the footer's **history** link.
+An entry's review opens in place (a `ReviewPane`), fetched only then; a
+restore opens its preview, which says the folder holds the version when
+its review is empty, and offers no restore then. Which page, and how leaving treats the history, are
 `page.ts`'s (`@pinetrie/interface`). The composer's "See Setup" link is a
 plain `#setup` anchor: `usePage` hears the hash change.
 

@@ -16,12 +16,14 @@ import {
 import type { AcceptedActing } from "@pinetrie/session"
 import { count } from "./counts.ts"
 import { outcomeWords } from "./outcome-words.ts"
+import { hashOfPage } from "./page.ts"
 
 /** The publish button as the footer shows it. */
 type PublishView =
   /**
    * No lanes of their own here, or a folder project: its folder is
-   * accepted work, with nothing to set up or publish to.
+   * accepted work, with nothing to set up or publish to; its history takes
+   * the button's place (`historyLink`).
    */
   | { readonly kind: "absent" }
   /** Set up, with nothing to publish. */
@@ -40,6 +42,15 @@ type PublishView =
       /** Whether the host would carry it out now, and if not, why. */
       readonly state: AcceptedActionState
     }
+
+/** The footer's way to a folder project's history, in the publish button's place; null for any other project. */
+export function historyLink(
+  record: AcceptedRecord | null,
+): { readonly label: string; readonly hash: string } | null {
+  return record?.kind === "folder"
+    ? { label: "history", hash: hashOfPage("history") }
+    : null
+}
 
 export function publishView(record: AcceptedRecord | null): PublishView {
   if (record === null || record.kind === "folder") return { kind: "absent" }

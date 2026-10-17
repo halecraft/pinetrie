@@ -15,8 +15,11 @@ import {
   answerDiff,
   answerReview,
   diffUrl,
+  fileUrl,
   parseReviewPath,
   planReviewRead,
+  type ReviewFacts,
+  readableSpan,
   reviewUrl,
 } from "./index.ts"
 import { MAX_DIFF_BYTES, REVIEW_WIRE } from "./review.ts"
@@ -54,7 +57,7 @@ describe("the review", () => {
   const facts = (
     o: ReadonlyMap<ThreadId, JjProposedChangesRecord>,
     revisions: ReadonlyMap<EntryId, RevisionRecord> = new Map(),
-  ) => ({ proposedByLane: o, revisions })
+  ) => ({ proposedByLane: o, revisions, accepted: null, conflicts: [] })
   const rev = (c: string) => ({ kind: "revision", commit: c }) as const
   test("planReviewRead: only a commit open proposed changes hold now", () => {
     expect(
@@ -111,12 +114,22 @@ describe("the review", () => {
     }
     const read = (o: FolderProposedChangesRecord, from: string, to: string) =>
       planReviewRead(
-        { proposedByLane: new Map([[LANE, o]]), revisions: new Map() },
+        {
+          proposedByLane: new Map([[LANE, o]]),
+          revisions: new Map(),
+          accepted: null,
+          conflicts: [],
+        },
         { kind: "review", span: { kind: "range", from, to } },
       ).kind
     expect(
       planReviewRead(
-        { proposedByLane: new Map([[LANE, folder]]), revisions: new Map() },
+        {
+          proposedByLane: new Map([[LANE, folder]]),
+          revisions: new Map(),
+          accepted: null,
+          conflicts: [],
+        },
         {
           kind: "review",
           span: { kind: "range", from: folder.start, to: folder.tip },
@@ -124,7 +137,12 @@ describe("the review", () => {
       ),
     ).toEqual({
       kind: "review",
-      span: { kind: "range", from: folder.start, to: folder.tip, lane: LANE },
+      span: {
+        kind: "range",
+        from: folder.start,
+        to: folder.tip,
+        reader: { kind: "lane", lane: LANE },
+      },
     })
     expect(read(folder, folder.tip, folder.start)).toBe("refused")
     expect(read({ ...folder, files: [] }, folder.start, folder.tip)).toBe(
@@ -160,10 +178,79 @@ describe("the review", () => {
       })
     expect(read("a1", "a2")).toEqual({
       kind: "review",
-      span: { ...range("a1", "a2"), lane: LANE },
+      span: { ...range("a1", "a2"), reader: { kind: "lane", lane: LANE } },
     })
     expect(read("a1", "b1")).toMatchObject({ kind: "refused", status: 404 })
     expect(read("a1", "ffff")).toMatchObject({ kind: "refused", status: 404 })
+  })
+  describe("a folder project's history and conflicts", () => {
+    const L0 = pointId("line-0192aaaa")
+    const L1 = pointId("line-0192bbbb")
+    const L2 = pointId("line-0192cccc")
+    const kept: ReviewFacts = {
+      proposedByLane: new Map(),
+      revisions: new Map(),
+      accepted: { kind: "folder", newest: L2, kept: [L2, L1], at: 1 },
+      conflicts: [
+        {
+          lane: LANE,
+          path: "a.txt",
+          base: L0,
+          ours: pointId("turn-0192dddd"),
+          theirs: L2,
+        },
+      ],
+    }
+    const range = (from: string, to: string) =>
+      ({ kind: "range", from, to }) as const
+    test("planReviewRead: two states accepted work keeps, read as accepted work's", () => {
+      expect(
+        planReviewRead(kept, { kind: "review", span: range(L1, L2) }),
+      ).toEqual({
+        kind: "review",
+        span: { ...range(L1, L2), reader: { kind: "accepted" } },
+      })
+    })
+    test("planReviewRead: a state accepted work no longer keeps is refused", () => {
+      expect(
+        planReviewRead(kept, { kind: "review", span: range(L0, L1) }),
+      ).toMatchObject({ kind: "refused", status: 404 })
+    })
+    test("planReviewRead: a conflict's base and theirs, read as its lane", () => {
+      expect(
+        planReviewRead(kept, { kind: "review", span: range(L0, L2) }),
+      ).toEqual({
+        kind: "review",
+        span: { ...range(L0, L2), reader: { kind: "lane", lane: LANE } },
+      })
+    })
+    test("planReviewRead: a file's bytes at a side, its path checked as a diff's", () => {
+      expect(
+        planReviewRead(kept, {
+          kind: "file",
+          span: range(L1, L2),
+          path: "img/a.png",
+          side: "before",
+        }),
+      ).toEqual({
+        kind: "file",
+        span: { ...range(L1, L2), reader: { kind: "accepted" } },
+        path: "img/a.png",
+        side: "before",
+      })
+      expect(
+        planReviewRead(kept, {
+          kind: "file",
+          span: range(L1, L2),
+          path: "a\nb",
+          side: "after",
+        }),
+      ).toMatchObject({ kind: "refused", status: 400 })
+    })
+    test("readableSpan: the oldest kept state's span from its swept parent is none", () => {
+      expect(readableSpan(kept, L0, L1)).toBeNull()
+      expect(readableSpan(kept, L1, L2)).not.toBeNull()
+    })
   })
   test("answers: a review decoded, a diff within its size, else refused", () => {
     const review = {
@@ -175,6 +262,19 @@ describe("the review", () => {
           change: "renamed",
           added: 0,
           removed: 0,
+          content: { kind: "lines" },
+        },
+        {
+          path: "a.png",
+          shown: "a.png",
+          change: "modified",
+          added: 0,
+          removed: 0,
+          content: {
+            kind: "media",
+            before: { content: "image/png", size: 10 },
+            after: { content: "binary", size: 12 },
+          },
         },
       ],
       widenings: [{ kind: "env", name: "TOKEN" }],
@@ -217,7 +317,18 @@ describe("the review", () => {
       expect(at(reviewUrl(span))).toEqual({ kind: "review", span })
       for (const path of ["a b.txt", 'we"ird', "q?x&y#z", "dir/é.md"])
         expect(at(diffUrl(span, path))).toEqual({ kind: "diff", span, path })
+      for (const side of ["before", "after"] as const)
+        expect(at(fileUrl(span, "img/a b.png", side))).toEqual({
+          kind: "file",
+          span,
+          path: "img/a b.png",
+          side,
+        })
     }
+    expect(at(`/review/${REVIEW_WIRE}/file/${c.commit}?path=a`)).toBe("bad")
+    expect(
+      at(`/review/${REVIEW_WIRE}/file/${c.commit}?path=a&side=middle`),
+    ).toBe("bad")
     expect(
       at(reviewUrl(c).replace(`/${REVIEW_WIRE}/`, `/${REVIEW_WIRE + 1}/`)),
     ).toBe("bad")

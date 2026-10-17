@@ -4,7 +4,7 @@
 // size: a snapshot's own bytes need btrfs quota groups, which the disks role
 // cannot enable.
 
-import type { PointId, ProjectKind } from "@pinetrie/core"
+import { lineStates, type PointId, type ProjectKind } from "@pinetrie/core"
 import { mergeBases, type StateGraph, shownMergeId } from "./graph.ts"
 
 export interface LiveInput {
@@ -44,7 +44,7 @@ export interface LiveInput {
  * bases with accepted work's newest state and with its parent lane's newest;
  * every conflict's three states; each proposed changes' two and its shown
  * merge, which has no record until accepted; every state `pinned`; accepted
- * work's newest `keep` line states, along first parents; and each
+ * work's newest `keep` line states (`lineStates`); and each
  * concurrent save whose line state is kept. A virtual base no conflict
  * names is not kept: it is made again when a merge needs it.
  */
@@ -65,15 +65,11 @@ export function liveStates(input: LiveInput): ReadonlySet<PointId> {
     if (o.files.length > 0) live.add(shownMergeId(o.start, o.tip))
   }
   for (const p of input.pinned) live.add(p)
-  let line: PointId | undefined = input.folderNewest
-  for (
-    let kept = 0;
-    line !== undefined && kept < Math.max(input.keep, 1);
-    kept++
-  ) {
-    live.add(line)
-    line = input.graph.states.get(line)?.parents[0]
-  }
+  for (const r of lineStates(input.graph.states, input.folderNewest).slice(
+    0,
+    Math.max(input.keep, 1),
+  ))
+    live.add(r.id)
   for (const r of input.graph.states.values()) {
     const [on] = r.parents
     if (r.made.kind === "concurrent" && on !== undefined && live.has(on))

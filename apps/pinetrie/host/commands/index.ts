@@ -57,6 +57,8 @@ import {
   handleSshAccess,
   handleStop,
   type LaneDeps,
+  resolveConflict,
+  restoreAccepted,
 } from "./lane.ts"
 import { handleMark } from "./mark.ts"
 import { handlePicture, type PictureDeps } from "./picture.ts"
@@ -100,9 +102,9 @@ export interface CommandDeps {
 type CommandPlace = "documents" | "repo" | "board"
 
 /**
- * Where each kind of command runs. An action on proposed changes and a setup or
- * publish act on your repo only: they go straight to its owner, and hold no
- * other command. A move on the board is up to three parts (`handleCanvasMove`).
+ * Where each kind of command runs. An action on proposed changes, a setup or
+ * publish, a restore and a conflict's version chosen act on your repo or
+ * folder only: they go straight to its owner, and hold no other command. A move on the board is up to three parts (`handleCanvasMove`).
  * Everything else is one step on the documents' keeper. A kind with no place
  * does not compile.
  */
@@ -134,6 +136,8 @@ const COMMAND_PLACE = {
   proposed: "repo",
   setup: "repo",
   publish: "repo",
+  restore: "repo",
+  resolve: "repo",
   "move-canvas": "board",
 } as const satisfies Record<Intent["kind"], CommandPlace>
 
@@ -275,6 +279,10 @@ export function createCommands(deps: CommandDeps): Commands {
       case "setup":
       case "publish":
         return settled(await actOnAccepted(deps, command.kind))
+      case "restore":
+        return settled(await restoreAccepted(deps, command, writer))
+      case "resolve":
+        return settled(await resolveConflict(deps, command, writer))
       default:
         throw new Error(`${command.kind} is carried out in a step`)
     }
@@ -387,6 +395,8 @@ export function createCommands(deps: CommandDeps): Commands {
       case "proposed":
       case "setup":
       case "publish":
+      case "restore":
+      case "resolve":
         throw new Error(`${intent.kind} is carried out outside a step`)
       case "reserve":
         return settled(

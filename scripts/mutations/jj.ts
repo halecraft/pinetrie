@@ -32,6 +32,20 @@ const proposedRefresh = [
 ]
 
 export const mutations: readonly Mutation[] = [
+  {
+    name: "planJjReviewContent reads every side whole",
+    file: "packages/jj/review-content.ts",
+    from: '    const count = s.size.kind === "count"\n',
+    to: "    const count = true\n",
+    command: [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "packages/jj/review-content.test.ts",
+    ],
+    expect: "with a delta, a modified file is read whole on one side only",
+  },
   // ── the lanes suite, proven in a lane ──
   {
     name: "nothing in your repo is immutable",
@@ -1048,8 +1062,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a review never reads what pinetrie.json widens",
     file: "packages/jj/proposed.ts",
-    from: "  const touched = read.files.some(\n",
-    to: "  const touched = false && read.files.some(\n",
+    from: "  const touched = known.some(f => f.path === PROJECT_CONFIG_FILE)\n",
+    to: "  const touched = false && known.some(f => f.path === PROJECT_CONFIG_FILE)\n",
     command: unit,
     expect:
       "a review reads proposed changes' commit: its description, files and one file's diff",

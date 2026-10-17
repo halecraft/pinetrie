@@ -13,10 +13,15 @@ const dir: PathFact = { kind: "dir" }
 const text = (size = 3, exec = false): PathFact => ({
   kind: "file",
   exec,
-  text: true,
+  content: "text",
   size,
 })
-const binary: PathFact = { kind: "file", exec: false, text: false, size: 3 }
+const binary: PathFact = {
+  kind: "file",
+  exec: false,
+  content: "binary",
+  size: 3,
+}
 const link = (target: string): PathFact => ({ kind: "symlink", target })
 
 const change = (

@@ -135,7 +135,7 @@ function bothChanged(p: string, f: PathFacts, same: boolean): Decided {
   if (ours.kind === "file" && theirs.kind === "file") {
     const mode = modeStep(p, f)
     if (same) return { kind: "steps", steps: mode }
-    if (!ours.text || !theirs.text) return conflict
+    if (ours.content !== "text" || theirs.content !== "text") return conflict
     return { kind: "steps", steps: [{ kind: "text", path: p }, ...mode] }
   }
   return conflict

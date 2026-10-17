@@ -12,9 +12,10 @@ import {
   type RevisionRecord,
   type Sha256,
   type SpineNode,
+  type ThreadId,
   type TreeIndex,
 } from "@pinetrie/core"
-import type { ReviewTarget } from "@pinetrie/interface"
+import type { ConflictShown, ReviewTarget } from "@pinetrie/interface"
 import type { Element, Root } from "hast"
 import {
   blobLookup,
@@ -36,6 +37,8 @@ export type BlockAddress = Extract<Address, { readonly kind: "block" }>
  */
 export type PaneSubject =
   | { readonly kind: "strip" }
+  /** A folder lane's open conflicts, each version to choose. */
+  | { readonly kind: "conflicts" }
   | { readonly kind: "ask"; readonly ask: EntryId }
   | { readonly kind: "block"; readonly address: BlockAddress }
   | {
@@ -60,6 +63,8 @@ export function paneKey(subject: PaneSubject): string {
   switch (subject.kind) {
     case "strip":
       return "strip"
+    case "conflicts":
+      return "conflicts"
     case "ask":
       return `ask:${subject.ask}`
     case "block":
@@ -95,6 +100,12 @@ export type PaneView =
     }
   /** A shared text file, fetched and drawn as text. */
   | { readonly kind: "text"; readonly src: string; readonly title: string }
+  /** A folder lane's open conflicts (`conflictsView`), with what a choice is sent as. */
+  | {
+      readonly kind: "conflicts"
+      readonly lane: ThreadId
+      readonly conflicts: readonly ConflictShown[]
+    }
 
 export interface PaneFacts {
   /** The work strip's review and its line, while the strip has one. */
@@ -106,6 +117,11 @@ export interface PaneFacts {
   readonly nodes: readonly SpineNode[]
   /** An ask's review, or null when it has none (`askReviewTarget`). */
   readonly askTarget: (ask: EntryId) => ReviewTarget | null
+  /** The column's folder lane's open conflicts; null for a column with no folder lane. */
+  readonly conflicts: {
+    readonly lane: ThreadId
+    readonly shown: readonly ConflictShown[]
+  } | null
 }
 
 /**
@@ -120,6 +136,14 @@ export function paneView(
   switch (subject.kind) {
     case "strip":
       return facts.strip === null ? null : { kind: "review", ...facts.strip }
+    case "conflicts":
+      return facts.conflicts === null
+        ? null
+        : {
+            kind: "conflicts",
+            lane: facts.conflicts.lane,
+            conflicts: facts.conflicts.shown,
+          }
     case "ask": {
       const target = facts.askTarget(subject.ask)
       return target === null
@@ -215,7 +239,6 @@ export function askReviewTarget(
   const lane = revisions.get(ask)?.lane
   if (span === null || lane === undefined) return null
   return {
-    lane,
     spans: [span],
     conflicts: [],
     yourEdits: [],

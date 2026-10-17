@@ -14,7 +14,13 @@ import {
   type PublishFinish,
 } from "@pinetrie/core"
 import { Type } from "typebox"
-import { CommitSchema, decodeAt, fixedKey, PointSchema } from "./decode.ts"
+import {
+  CommitSchema,
+  decodeAt,
+  fixedKey,
+  List,
+  PointSchema,
+} from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 
 /** The one `pinetrie.accepted` value's key: a host has one repo. */
@@ -69,6 +75,7 @@ const JjAcceptedSchema = Type.Object({
 const FolderAcceptedSchema = Type.Object({
   kind: Type.Literal("folder"),
   newest: PointSchema,
+  kept: List(PointSchema),
   at: Type.Number(),
 })
 
@@ -86,7 +93,7 @@ export const ACCEPTED: RecordSpec<
   keyOf: () => ACCEPTED_KEY,
   encode: r =>
     r.kind === "folder"
-      ? { ...r }
+      ? { ...r, kept: [...r.kept] }
       : {
           ...r,
           heads: { ...r.heads },

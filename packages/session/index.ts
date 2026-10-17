@@ -5,6 +5,8 @@ export type {
   AcceptedActing,
   AccessActing,
   ProposedChangesActing,
+  ResolveActing,
+  RestoreActing,
   Unsuccessful,
 } from "./acting.ts"
 export type { AttentionStore, SeenMentions } from "./attention-doc.ts"

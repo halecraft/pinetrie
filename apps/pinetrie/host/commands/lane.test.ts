@@ -7,6 +7,7 @@ import {
   writerId,
 } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
+import { jjWordsIn } from "@pinetrie/interface"
 import { createKeeper } from "@pinetrie/keeper"
 import type { Agent } from "@pinetrie/pi"
 import { readCardHistories, readPlaces, readRecords } from "@pinetrie/reads"
@@ -49,6 +50,8 @@ import {
   handleStop,
   type LaneDeps,
   proposedChangesRefusal,
+  resolveRefusal,
+  restoreRefusal,
 } from "./lane.ts"
 
 const ada = writerId("ada@example.com")
@@ -396,4 +399,17 @@ test("proposedChangesRefusal names the path a folder accept found changed", () =
   expect(proposedChangesRefusal(ERR.FOLDER_CANNOT_HOLD, "README.md")).toMatch(
     /^README\.md cannot be written into the project's folder/,
   )
+})
+
+test("a folder project's refusals of a restore, a choice of version and an accept name none of jj's words", () => {
+  const codes = Object.values(ERR)
+  expect(
+    jjWordsIn([
+      codes.map(c => restoreRefusal(c, "a.txt")),
+      codes.map(resolveRefusal),
+      [ERR.FOLDER_MOVED, ERR.FOLDER_CANNOT_HOLD, ERR.NOT_A_STACK].map(c =>
+        proposedChangesRefusal(c, "a.txt"),
+      ),
+    ]),
+  ).toEqual([])
 })

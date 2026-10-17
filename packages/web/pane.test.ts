@@ -35,7 +35,6 @@ import {
 const SHA = "a".repeat(64) as Sha256
 const lane = threadIdFor("x")
 const target: ReviewTarget = {
-  lane,
   spans: [{ kind: "range", from: pointId("a0"), to: pointId("a1") }],
   conflicts: [],
   yourEdits: [],
@@ -52,6 +51,7 @@ const facts = (over: Partial<PaneFacts> = {}): PaneFacts => ({
   strip: null,
   nodes: [node("m1", TABLES)],
   askTarget: () => null,
+  conflicts: null,
   ...over,
 })
 

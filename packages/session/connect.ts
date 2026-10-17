@@ -20,6 +20,7 @@ import {
   type CardId,
   type CardPlace,
   type CardRecord,
+  type ConflictChoice,
   DISCARDED,
   type EntryId,
   type Intent,
@@ -35,6 +36,7 @@ import {
   type QueueMove,
   type Reorder,
   type Replacing,
+  type RestorePreview,
   type RootId,
   type TextCard,
   type TextCardId,
@@ -350,6 +352,18 @@ export interface SessionClient {
   ): Promise<Outcome>
   /** Set up accepted work, or publish it. Tracked in `acting`. */
   actOnAccepted(action: AcceptedAction): Promise<Outcome>
+  /**
+   * A folder project's kept state written back into its folder, as its
+   * preview drew it: `of` the state, `from` accepted work's newest the
+   * preview was drawn from, sent as what was shown. Tracked in `acting`.
+   */
+  restore(preview: RestorePreview): Promise<Outcome>
+  /** `lane`'s conflict at `path` closed with `choose`'s version. Tracked in `acting`. */
+  resolve(
+    lane: ThreadId,
+    path: string,
+    choose: ConflictChoice,
+  ): Promise<Outcome>
   /** Your answer to `lane`'s use of your ssh identity. Tracked in `acting`. */
   access(lane: ThreadId, answer: AccessAnswer): Promise<Outcome>
   /** Your proposed changes, setup and publish commands out now, or refused or failed (`acting.ts`). */
@@ -777,6 +791,16 @@ export async function connectSession(
     actOnAccepted(action) {
       return sendActing(acting, { kind: "accepted", action }, () =>
         send({ kind: action }),
+      )
+    },
+    restore(preview) {
+      return sendActing(acting, { kind: "restore", of: preview.of }, () =>
+        send({ kind: "restore", of: preview.of, seen: preview.from }),
+      )
+    },
+    resolve(lane, path, choose) {
+      return sendActing(acting, { kind: "resolve", lane, path }, () =>
+        send({ kind: "resolve", lane, path, choose }),
       )
     },
     access(lane, answer) {

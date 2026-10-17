@@ -7,6 +7,8 @@ import { readFile } from "node:fs/promises"
 import http, { type IncomingMessage, type ServerResponse } from "node:http"
 import { networkInterfaces } from "node:os"
 import path from "node:path"
+import { Readable } from "node:stream"
+import { pipeline } from "node:stream/promises"
 import {
   type WebsocketServerTransport,
   wrapNodeWebsocket,
@@ -40,8 +42,18 @@ interface RunningHttp {
   close(): Promise<void>
 }
 
+/**
+ * An answer written. A body that comes as a stream is piped; one that fails
+ * part way ends the connection, so a truncated file is never taken whole.
+ */
 const send = (res: ServerResponse, answer: HttpAnswer): void => {
-  res.writeHead(answer.status, answer.headers).end(answer.body)
+  const { body } = answer
+  res.writeHead(answer.status, answer.headers)
+  if (typeof body === "string" || body instanceof Uint8Array) {
+    res.end(body)
+    return
+  }
+  void pipeline(Readable.from(body), res).catch(() => res.destroy())
 }
 
 export async function startHttp(input: {

@@ -368,6 +368,7 @@ describe("workStripView: the work strip's states", () => {
     const folder = (newest: typeof FIRST): FolderAcceptedRecord => ({
       kind: "folder",
       newest,
+      kept: [newest],
       at: 1,
     })
     const base = (
@@ -401,7 +402,7 @@ describe("workStripView: the work strip's states", () => {
       kind: "unknown",
     })
   })
-  const folderView = () =>
+  const folderView = (conflicts: readonly string[] = []) =>
     workStripView({
       proposed: proposedChangesStatus({
         kind: "folder",
@@ -409,7 +410,7 @@ describe("workStripView: the work strip's states", () => {
         start: pointId("line-0192aaaa"),
         tip: pointId("turn-0192bbbb"),
         files: ["a.txt"],
-        conflicts: [],
+        conflicts,
         description: null,
         at: 10,
       }),
@@ -428,6 +429,13 @@ describe("workStripView: the work strip's states", () => {
     const v = folderView()
     expect(at(v)).toEqual(["ready", ["accept"], ["describe", "update"]])
     expect([v.facts.size, v.facts.bookmark]).toEqual([1, null])
+  })
+  test("conflicted folder proposed changes offer to choose versions first", () => {
+    expect(at(folderView(["a.txt"]))).toEqual([
+      "conflicts",
+      ["choose-versions", "update"],
+      [],
+    ])
   })
   test("folder proposed changes' accept is live, into accepted work, its one destination", () => {
     const v = folderView()

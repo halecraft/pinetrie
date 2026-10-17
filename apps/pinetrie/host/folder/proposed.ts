@@ -2,12 +2,13 @@
 // merge, its newest state merged onto accepted work's newest
 // (`shownMergeId`), made on the project's queue whenever either moves; its
 // files those whose content differs from accepted work's newest
-// (`sourceChanges`), reviewed as the range between the two, described by the
-// host's describer. With it, the lane's base record: the state of the
+// (`sourceChanges`), reviewed as the range between the two
+// (`readFolderReview`, which reads accepted work's and conflicts' spans too),
+// described by the host's describer. With it, the lane's base record: the state of the
 // project's folder its line holds, and what a catch-up would change in the
 // lane. Both are the page's caches, written from the graph and the shown
 // merge; nothing decides from them. An accept writes the shown merge into
-// the project's folder (`accept.ts`).
+// the project's folder (`writes.ts`).
 
 import {
   ERR,
@@ -28,12 +29,7 @@ import {
   stateGraph,
 } from "@pinetrie/folder"
 import type { Keeper } from "@pinetrie/keeper"
-import type {
-  FolderDisks,
-  LaneOwner,
-  LaneQueue,
-  LaneRuntime,
-} from "@pinetrie/lanes"
+import type { FolderDisks, LaneQueue, LaneRuntime } from "@pinetrie/lanes"
 import { readLaneRecords, readProposedByLane } from "@pinetrie/reads"
 import {
   answerDiff,
@@ -52,10 +48,12 @@ import {
   type ProposedChangesActs,
   reviewReadFacts,
 } from "../work/destination.ts"
-import type { FolderAccept } from "./accept.ts"
 import { type StateReader, sourceChanges } from "./changes.ts"
 import { dropUnrecordedBase, mergeToState } from "./merge.ts"
+import { readFolderFile, readFolderReview } from "./review.ts"
+import { withScratch } from "./scratch.ts"
 import { baseMissing } from "./virtual-base.ts"
+import type { FolderWrites } from "./writes.ts"
 
 /** The most of proposed changes' diff a description reads. */
 const DESCRIBE_DIFF_BYTES = 200_000
@@ -134,6 +132,7 @@ type ShownReader = StateReader & {
     | "applyMerge"
     | "filesUnder"
     | "read"
+    | "fileOut"
   >
 }
 
@@ -146,8 +145,8 @@ export const shownOf = (r: FolderProposedChangesRecord): PointId =>
 
 /**
  * `tip` merged onto `newest` as their shown merge, unless it is made
- * already and `known` holds its conflicts: in a scratch disk of its own,
- * snapshotted and deleted after, on the project's queue. Null when their
+ * already and `known` holds its conflicts: on a scratch disk
+ * (`withScratch`), on the project's queue. Null when their
  * base's snapshot is gone.
  */
 export async function makeShownMerge(
@@ -162,35 +161,33 @@ export async function makeShownMerge(
   if (made && known !== null) return { paths: known }
   const plan = planBase(stateGraph(states()), newest, tip)
   if (plan === null || (await baseMissing(reader, plan)) !== null) return null
-  const scratch = `${shown}-scratch` as LaneOwner
   if (made)
     await reader.runtime.disk({
       kind: "deleteSnapshots",
       ids: [snapshotId(shown)],
     })
-  await reader.runtime.disk({ kind: "delete", lane: scratch })
-  await reader.runtime.disk({
-    kind: "restore",
-    lane: scratch,
-    from: snapshotId(newest),
-  })
   try {
-    const { paths } = await mergeToState(reader, {
-      disk: scratch,
-      ours: newest,
-      theirs: tip,
-      plan,
-      markers: true,
-      snapshot: () =>
-        reader.runtime.disk({
-          kind: "snapshot",
-          lane: scratch,
-          snapshot: snapshotId(shown),
+    const { paths } = await withScratch(
+      reader.runtime,
+      shown,
+      newest,
+      scratch =>
+        mergeToState(reader, {
+          disk: scratch,
+          ours: newest,
+          theirs: tip,
+          plan,
+          markers: true,
+          snapshot: () =>
+            reader.runtime.disk({
+              kind: "snapshot",
+              lane: scratch,
+              snapshot: snapshotId(shown),
+            }),
         }),
-    })
+    )
     return { paths }
   } finally {
-    await reader.runtime.disk({ kind: "delete", lane: scratch })
     await dropUnrecordedBase(reader.runtime, plan, s =>
       stateGraph(states()).states.has(s),
     )
@@ -209,8 +206,8 @@ export function startFolderProposedChanges(deps: {
   readonly describer: Describe
   readonly running: (lane: ThreadId) => boolean
   readonly baseChanged: (lane: ThreadId) => void
-  /** An accept into the project's folder (`accept.ts`). */
-  readonly accept: FolderAccept["accept"]
+  /** An accept into the project's folder (`writes.ts`). */
+  readonly accept: FolderWrites["accept"]
 }): FolderProposedChanges {
   const { basics, reader } = deps
 
@@ -382,43 +379,35 @@ export function startFolderProposedChanges(deps: {
         return {
           kind: "refused",
           status: 404,
-          reason: "a folder project's proposed changes have no revisions",
+          reason: "a folder project's changes have no revisions",
         }
       const { from, to: asked } = read.span
       const proposed = [...readProposedByLane(basics.session).values()].find(
         o => o.kind === "folder" && o.start === from && o.tip === asked,
       )
-      // Proposed changes are reviewed as their shown merge; a lane's turns as they are.
+      // Proposed changes are reviewed as their shown merge; any other span as it is.
       const to = proposed?.kind === "folder" ? shownOf(proposed) : asked
-      if (read.kind === "diff")
-        return answerDiff(
-          await reader.disks.fileDiff(from, to, read.path, MAX_DIFF_BYTES),
-        )
-      const files = await sourceChanges(reader, from, to)
-      const [stats, before, after] = await Promise.all([
-        reader.disks.diffStats(from, to, files),
-        reader.disks.pathFacts(from, files),
-        reader.disks.pathFacts(to, files),
-      ])
-      return {
-        kind: "review",
-        review: {
-          description:
-            proposed?.kind === "folder" ? (proposed.description ?? "") : "",
-          files: stats.map((s, i) => ({
-            path: s.path,
-            shown: s.path,
-            change:
-              before[i]?.kind === "absent"
-                ? "added"
-                : after[i]?.kind === "absent"
-                  ? "removed"
-                  : "modified",
-            added: s.added,
-            removed: s.removed,
-          })),
-          widenings: [],
-        },
+      switch (read.kind) {
+        case "diff":
+          return answerDiff(
+            await reader.disks.fileDiff(from, to, read.path, MAX_DIFF_BYTES),
+          )
+        case "file":
+          return readFolderFile(
+            reader,
+            read.side === "before" ? from : to,
+            read.path,
+          )
+        case "review":
+          return {
+            kind: "review",
+            review: await readFolderReview(
+              reader,
+              from,
+              to,
+              proposed?.kind === "folder" ? (proposed.description ?? "") : "",
+            ),
+          }
       }
     },
   }

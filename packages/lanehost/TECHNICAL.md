@@ -247,13 +247,16 @@ out, every call checked and planned into paths first (`planApply`,
 
 - **`pathFacts`** answers what a snapshot holds at each path: absent, a
   directory, a symlink and its target, a file with its executable bit
-  (the owner's), its size, and whether it is text, no NUL in its first
-  8,000 bytes as git decides (S181); its kind from the `lstat` the walk
-  reads (`kindOf`). A path under a symlink is absent.
-- **`sameContent`** answers where two snapshots hold files of the same
-  bytes: sizes first, then a read of both. Shared extents (FIEMAP) would
-  prove a clone alike without a read (S183), but Node has no ioctl and the
-  call is asked only of the paths both sides changed, so it reads.
+  (the owner's), its size, and what it holds (`content`, core's
+  `fileContent` over the first 8,000 bytes: text where no NUL is among
+  them, as git decides (S181), else an image by its magic bytes, else
+  binary; an SVG is text); its kind from the `lstat` the walk reads
+  (`kindOf`). A path under a symlink is absent.
+- **`sameContent`** answers the pairs of paths, one in each snapshot,
+  whose files hold the same bytes: a path with itself for a merge, a path
+  gone with a path added for a move. Sizes first, then a read of both.
+  Shared extents (FIEMAP) would prove a clone alike without a read (S183),
+  but Node has no ioctl and only pairs of one size are asked, so it reads.
 - **`applyMerge`** applies a merge's steps to a disk: a lane's, or a
   virtual base's scratch disk (the host restores it, merges into it with
   `markers`, and snapshots it as the virtual base's name).
@@ -316,6 +319,13 @@ out, every call checked and planned into paths first (`planApply`,
   on its way, and a refused one exits before tar writes a byte: a lane
   controls the names in its state. Only regular files travel; an accept
   makes a symlink from its target.
+- **A review's file is a stream too** (`file-out.ts`): one regular file of
+  a snapshot, its path on stdin, its bytes on stdout, its path checked by
+  the same `checkOutPaths` as `tar-out.ts`'s, never a copy of it.
+- **One listing names every snapshot** (`snapshots`, `snapshotsIn`): each
+  subvolume under the project's snapshots directory with a disk's name,
+  so one in the making (`.tmp`) is none yet. What the host keeps is
+  decided from it, never from a check of each state.
 - **A read can copy from another path** (`ReadPath`'s `source`): a kept
   aside read into a concurrent save at its own path, `source` checked
   inside the project's folder as `path` is.

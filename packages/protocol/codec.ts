@@ -296,6 +296,28 @@ export function decodeCommand(
     }
   }
   if (kind === "setup" || kind === "publish") return { kind }
+  if (kind === "restore") {
+    const of = text(wire?.targetId)
+    const seen = text(wire?.seen)
+    return isFolderStateId(of) && isFolderStateId(seen)
+      ? { kind, of: pointId(of), seen: pointId(seen) }
+      : refused(
+          ERR.UNKNOWN_TARGET,
+          `not a folder project's states: ${of}, ${seen}`,
+        )
+  }
+  if (kind === "resolve") {
+    const lane = text(wire?.lane)
+    if (!isThreadId(lane))
+      return refused(ERR.UNKNOWN_TARGET, `not a thread's lane: ${lane}`)
+    const path = text(wire?.text)
+    const choose = text(wire?.mode)
+    if (path === "")
+      return refused(ERR.UNKNOWN_TARGET, "a resolution names no path")
+    return choose === "ours" || choose === "theirs" || choose === "base"
+      ? { kind, lane, path, choose }
+      : refused(ERR.UNKNOWN_KIND, `unknown a conflict's version: ${choose}`)
+  }
   if (kind === "move") {
     const moves = decodeMoves(text(wire?.moves))
     if (typeof moves === "string") return refused(ERR.UNKNOWN_TARGET, moves)
@@ -1151,6 +1173,21 @@ export function encodeIntent(id: string, intent: Intent): Command {
     case "setup":
     case "publish":
       return command({ id, kind: intent.kind })
+    case "restore":
+      return command({
+        id,
+        kind: "restore",
+        targetId: intent.of,
+        seen: intent.seen,
+      })
+    case "resolve":
+      return command({
+        id,
+        kind: "resolve",
+        lane: intent.lane,
+        text: intent.path,
+        mode: intent.choose,
+      })
     case "reserve":
       return command({ id, kind: "reserve", lane: intent.lane })
     case "move":

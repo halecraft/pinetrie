@@ -2,6 +2,7 @@
 // modal dialog. It draws a `PaneView`, which `paneView` decided, and owns what
 // every view needs: Escape, focus, and coming into view.
 
+import type { ConflictChoice, ThreadId } from "@pinetrie/core"
 import type { Element } from "hast"
 import {
   memo,
@@ -14,6 +15,7 @@ import {
 } from "react"
 import { createPortal } from "react-dom"
 import { BlobImage } from "./blob-image.tsx"
+import { ConflictsPane } from "./conflicts-pane.tsx"
 import { drawTree } from "./message-text.tsx"
 import { useTrackColors } from "./palette-context.ts"
 import {
@@ -32,6 +34,8 @@ export function Pane({
   view,
   track,
   close,
+  choose,
+  said,
 }: {
   /** What the strip's review line controls. */
   id: string
@@ -40,6 +44,10 @@ export function Pane({
   track: number
   /** Stable (`useStable`). */
   close: () => void
+  /** A conflict's version chosen: the conflicts view's command. */
+  choose: (lane: ThreadId, path: string, choose: ConflictChoice) => void
+  /** Your last choice of a version here, refused or failed, worded; null for none. */
+  said: string | null
 }) {
   const narrow = useNarrow()
   const shown =
@@ -56,6 +64,15 @@ export function Pane({
         narrow={narrow}
         table={view.table}
         title={view.title}
+      />
+    ) : view.kind === "conflicts" ? (
+      <ConflictsPane
+        choose={choose}
+        close={close}
+        conflicts={view.conflicts}
+        lane={view.lane}
+        narrow={narrow}
+        said={said}
       />
     ) : view.kind === "text" ? (
       <TextPane

@@ -272,10 +272,10 @@ describe.skipIf(!onBtrfs)(
       ).rejects.toThrow("not under directories")
     })
 
-    test("path facts: a file's mode, text and size, a symlink's target, a directory, nothing under a symlink", async () => {
+    test("path facts: a file's mode, content and size, a symlink's target, a directory, nothing under a symlink", async () => {
       await state(
         "facts",
-        { "bin.dat": "a\0b", "dir/f": "x", up: "->dir" },
+        { "bin.dat": "a\0b", "a.gif": "GIF89a\0", "dir/f": "x", up: "->dir" },
         "base",
       )
       expect(
@@ -283,11 +283,12 @@ describe.skipIf(!onBtrfs)(
           kind: "pathFacts",
           project: KEY,
           snapshot: "facts",
-          paths: ["clean.txt", "bin.dat", "up", "dir", "up/f", "none"],
+          paths: ["clean.txt", "bin.dat", "a.gif", "up", "dir", "up/f", "none"],
         }),
       ).toEqual([
-        { kind: "file", exec: false, text: true, size: 10 },
-        { kind: "file", exec: false, text: false, size: 3 },
+        { kind: "file", exec: false, content: "text", size: 10 },
+        { kind: "file", exec: false, content: "binary", size: 3 },
+        { kind: "file", exec: false, content: "image/gif", size: 7 },
         { kind: "symlink", target: "dir" },
         { kind: "dir" },
         { kind: "absent" },
@@ -307,18 +308,44 @@ describe.skipIf(!onBtrfs)(
           project: KEY,
           a: "base",
           b: "copy",
-          paths: ["same.txt", "clean.txt", "clash.txt", "none"],
+          pairs: ["same.txt", "clean.txt", "clash.txt", "none"].map(p => ({
+            a: p,
+            b: p,
+          })),
         }),
-      ).toEqual(["same.txt", "clean.txt"])
+      ).toEqual(["same.txt", "clean.txt"].map(p => ({ a: p, b: p })))
       expect(
         await call({
           kind: "sameContent",
           project: KEY,
           a: "ours",
           b: "theirs",
-          paths: ["clash.txt", "same.txt"],
+          pairs: [
+            { a: "clash.txt", b: "clash.txt" },
+            { a: "same.txt", b: "same.txt" },
+          ],
         }),
-      ).toEqual(["same.txt"])
+      ).toEqual([{ a: "same.txt", b: "same.txt" }])
+    })
+
+    test("alike content over a pair of two paths: a moved file equal, an edited one not", async () => {
+      await state(
+        "moved",
+        { "new.txt": "same\n", "edited.txt": "same, edited\n" },
+        "base",
+      )
+      expect(
+        await call({
+          kind: "sameContent",
+          project: KEY,
+          a: "base",
+          b: "moved",
+          pairs: [
+            { a: "same.txt", b: "new.txt" },
+            { a: "same.txt", b: "edited.txt" },
+          ],
+        }),
+      ).toEqual([{ a: "same.txt", b: "new.txt" }])
     })
 
     test("a lane's states: start moved by a rename, a conflict's versions read, then resolved, and gone with its lane", async () => {

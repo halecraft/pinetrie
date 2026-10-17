@@ -142,6 +142,26 @@ export async function isSubvolume(at: string): Promise<boolean> {
   }
 }
 
+/**
+ * The names of a project's snapshots, sorted: each a subvolume under its
+ * snapshots directory with a disk's name, so one in the making (`.tmp`)
+ * is none yet.
+ */
+export async function snapshotsIn(disks: ProjectDisks): Promise<string[]> {
+  const entries = await readdir(disks.snapshots, { withFileTypes: true }).catch(
+    () => [],
+  )
+  const found: string[] = []
+  for (const e of entries)
+    if (
+      e.isDirectory() &&
+      isDiskName(e.name) &&
+      (await isSubvolume(path.join(disks.snapshots, e.name)))
+    )
+      found.push(e.name)
+  return found.sort()
+}
+
 const btrfs = async (args: readonly string[]): Promise<void> => {
   const ran = await runCommand(["btrfs", "-q", ...args], {
     cwd: "/",

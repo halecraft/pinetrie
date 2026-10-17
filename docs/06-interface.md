@@ -576,9 +576,21 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   no stack and no split. Its words name accepted work as jj proposed changes' do,
   and its titles name no bookmark. **accept** writes the files into the
   project's folder, as its title says; conflicted proposed changes have
-  none, since a folder has no WIP, and catching up resolves them. The footer shows no publish or set up
-  button, and the composer no WIP to start from: a folder project's
+  none, since a folder has no WIP, and catching up or **choose versions**
+  resolves them: the pane shows each conflicted file's changes on both
+  sides from the version both began from, and three choices ("keep this
+  thread's", "take accepted work's", "take the version both began from"),
+  refused while the thread runs. The footer shows no publish or set up
+  button but **history** (ADR-0165): accepted work's kept states, newest
+  first, who made each, when and how, each one's changes opened in place,
+  and "restore this version", whose preview is what the folder would
+  change; "restore" writes it back, refused if the folder moved since the
+  preview. The composer has no WIP to start from: a folder project's
   accepted work is its folder.
+- **A review shows a file as a file** (ADR-0165), in either kind of
+  project: an image's before and after side by side, any other binary
+  file its sizes and both versions to open, a moved, unchanged file one
+  row `{old => new}`, "moved, unchanged".
 - **A row of the column's header, the work strip, says what became of the
   agent's files** (ADR-0040, ADR-0113): an agent on its own copy shows its proposed changes in plain words ("2
   files changed"), with **accept changes** and its bookmark, which a press copies. The

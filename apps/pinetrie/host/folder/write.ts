@@ -1,9 +1,10 @@
-// host/folder/write — an accept's writes carried out in the project's
-// folder, as `@pinetrie/folder` plans them: each path checked, moved aside,
-// checked again and linked in, its journal written before each sub-step;
-// and a failed or stopped accept put back by its recovery's steps. A link
-// fails where anything stands, so a save that lands by name during the
-// accept refuses it, and nothing is ever renamed over a file.
+// host/folder/write — a write's paths carried out in the project's folder,
+// an accept's or a restore's, as `@pinetrie/folder` plans them: each path
+// checked, moved aside, checked again and linked in, its journal written
+// before each sub-step; and a failed or stopped write put back by its
+// recovery's steps. A link fails where anything stands, so a save that
+// lands by name during the write refuses it, and nothing is ever renamed
+// over a file.
 
 import { randomUUID } from "node:crypto"
 import {
@@ -21,12 +22,12 @@ import {
 } from "node:fs/promises"
 import path from "node:path"
 import {
-  type AcceptJournal,
-  type AcceptPath,
-  acceptAsideDir,
-  acceptStageDir,
   type FolderStamp,
   type InodeStat,
+  type WriteJournal,
+  type WritePath,
+  writeAsideDir,
+  writeStageDir,
 } from "@pinetrie/core"
 import {
   isSameInode,
@@ -41,21 +42,21 @@ import {
 
 declare const allLinkedBrand: unique symbol
 /**
- * Every path of an accept linked. Only this module makes one: the one
- * proof that lets an accept's state be recorded.
+ * Every path of a write linked. Only this module makes one: the one
+ * proof that lets a write's state be recorded.
  */
 export type AllLinked = {
-  readonly accept: string
+  readonly write: string
   readonly [allLinkedBrand]: true
 }
 
-const allLinked = (journal: AcceptJournal): AllLinked =>
-  ({ accept: journal.id }) as AllLinked
+const allLinked = (journal: WriteJournal): AllLinked =>
+  ({ write: journal.id }) as AllLinked
 
-/** How an accept's writes ended. */
+/** How a write's paths ended. */
 type WritesDone =
   | { readonly kind: "linked"; readonly proof: AllLinked }
-  /** A check or a link failed at `path`: the accept is to be put back. */
+  /** A check or a link failed at `path`: the write is to be put back. */
   | { readonly kind: "failed"; readonly path: string; readonly why: string }
 
 const lstatBig = (at: string) => lstat(at, { bigint: true }).catch(() => null)
@@ -113,9 +114,9 @@ async function pruneEmpty(root: string, rel: string) {
  */
 export async function executeWriteSteps(deps: {
   readonly root: string
-  readonly journal: AcceptJournal
+  readonly journal: WriteJournal
   readonly steps: readonly WriteStep[]
-  readonly save: (journal: AcceptJournal) => Promise<void>
+  readonly save: (journal: WriteJournal) => Promise<void>
   /**
    * Each boundary between a path's sub-steps, as it is reached: the race
    * laws save there. A host passes none.
@@ -124,11 +125,11 @@ export async function executeWriteSteps(deps: {
     path: string,
     at: "checked" | "moved" | "linked",
   ) => Promise<void>
-}): Promise<{ readonly done: WritesDone; readonly journal: AcceptJournal }> {
+}): Promise<{ readonly done: WritesDone; readonly journal: WriteJournal }> {
   const { root, steps } = deps
   const reached = deps.reached ?? (async () => {})
   let journal = deps.journal
-  const update = async (i: number, change: Partial<AcceptPath>) => {
+  const update = async (i: number, change: Partial<WritePath>) => {
     journal = {
       ...journal,
       paths: journal.paths.map((p, j) => (j === i ? { ...p, ...change } : p)),
@@ -198,7 +199,7 @@ async function targetFact(at: string): Promise<TargetFact | null> {
 /** What the folder holds now at each of `journal`'s paths: its target and its aside. */
 const gatherNow = (
   root: string,
-  journal: AcceptJournal,
+  journal: WriteJournal,
 ): Promise<readonly PathNow[]> =>
   Promise.all(
     journal.paths.map(async p => {
@@ -246,11 +247,11 @@ async function executeRecovery(
         await unlink(path.join(root, step.aside)).catch(() => {})
         break
       case "drop-stage":
-        await rm(path.join(root, acceptStageDir(step.id)), {
+        await rm(path.join(root, writeStageDir(step.id)), {
           recursive: true,
           force: true,
         })
-        await dropEmptyTree(path.join(root, acceptAsideDir(step.id)))
+        await dropEmptyTree(path.join(root, writeAsideDir(step.id)))
         break
     }
   }
@@ -307,21 +308,21 @@ export async function isCaseFolding(stage: string): Promise<boolean> {
 /** How many gathers a put back makes before it gives up on a folder that keeps changing under it. */
 const RECOVERY_TRIES = 5
 
-/** How an accept that did not end, ended. */
+/** How a write that did not end, ended. */
 type Recovered =
-  /** Every path was linked: the accept is to be committed. */
+  /** Every path was linked: the write is to be committed. */
   | { readonly kind: "finish"; readonly proof: AllLinked }
   /** Put back; the journal as it ends, its kept asides' `keptOn` set. */
-  | { readonly kind: "put-back"; readonly journal: AcceptJournal }
+  | { readonly kind: "put-back"; readonly journal: WriteJournal }
 
 /**
- * An accept that failed or stopped, ended from its journal and what the
+ * A write that failed or stopped, ended from its journal and what the
  * folder holds (`planRecovery`): finished when every path is linked, else
  * put back, gathered again after any step a save since made fail.
  */
-export async function recoverAccept(
+export async function recoverWrite(
   root: string,
-  journal: AcceptJournal,
+  journal: WriteJournal,
 ): Promise<Recovered> {
   for (let tries = 0; tries < RECOVERY_TRIES; tries++) {
     const plan = planRecovery(journal, await gatherNow(root, journal))
@@ -331,6 +332,6 @@ export async function recoverAccept(
       return { kind: "put-back", journal: plan.journal }
   }
   throw new Error(
-    `the accept ${journal.id} could not be put back: the project's folder kept changing under it`,
+    `the write ${journal.id} could not be put back: the project's folder kept changing under it`,
   )
 }

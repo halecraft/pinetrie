@@ -138,6 +138,8 @@ export function runsIn(command: Gated): readonly RunAt[] {
     case "retitle":
     case "setup":
     case "publish":
+    case "restore":
+    case "resolve":
     case "reserve":
     case "move":
     case "queue-card":

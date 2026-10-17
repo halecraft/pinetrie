@@ -283,15 +283,17 @@ export async function conflictedFilesAt(
 }
 
 /**
- * A revision's description and per-file stats, printed as the JSON of
- * `RevisionReview` (`@pinetrie/core`): `json()` quotes every string. A
- * change to it bumps `REVIEW_WIRE` (`@pinetrie/rules`).
+ * A revision's description and per-file stats, printed as JSON:
+ * `json()` quotes every string. Each file's `delta` is its `bytes_delta()`,
+ * from which a review's reader has a binary's size (`JjStatSize`). A change
+ * to it bumps `REVIEW_WIRE` (`@pinetrie/rules`).
  */
 export const REVISION_READ =
   '"{\\"description\\":" ++ json(description) ++ ",\\"files\\":[" ++ ' +
   'self.diff().stat().files().map(|f| "{\\"path\\":" ++ json(f.path()) ++ ' +
   '",\\"shown\\":" ++ json(f.display_diff_path()) ++ ",\\"change\\":" ++ json(f.status()) ++ ' +
-  '",\\"added\\":" ++ f.lines_added() ++ ",\\"removed\\":" ++ f.lines_removed() ++ "}").join(",") ++ ' +
+  '",\\"added\\":" ++ f.lines_added() ++ ",\\"removed\\":" ++ f.lines_removed() ++ ' +
+  '",\\"delta\\":" ++ f.bytes_delta() ++ "}").join(",") ++ ' +
   '"]}"'
 
 /** `path`'s text at `rev` of the repo `jj` reads; null when it has no such file. */

@@ -49,7 +49,7 @@ wires them.
 | `admission.ts`, `policy.ts`, `lines.ts`, `blobs.ts`, `store.ts` | the invite key and links (ADR-0107; a blob, like the page, is admitted only from this host's own page on loopback, ADR-0042), the write policy, departed seats (a seat is fresh per page load, ADR-0037), the blob store (images, ADR-0042, and references' quotes as markdown, ADR-0126), the SQLite store, on `node:sqlite`, so with no native dependency (S22), which owns its file: it takes the file's lock, and a second connection, process or reader is refused (S47) |
 | `work/` | lane containers and disks (§ Lane work: ADR-0032, ADR-0033, ADR-0034), through the project's adapter, whose kind it never names (ADR-0142) |
 | `project.ts` | the project's adapter, chosen once by its kind (`projectAdapter`: an exhaustive switch, `assertNever` its default): jj's for a jj workspace, the folder's for any other folder; a folder lanes cannot serve (`projectDirWords`) is refused before any runtime is asked |
-| `folder/` | a folder project's adapter, as it is built (§ A folder project's adapter): the project's folder's reads (`scan.ts`, `line.ts`) and watcher (`watch.ts`), the only code that touches the project's folder (ADR-0142) |
+| `folder/` | a folder project's adapter, as it is built (§ A folder project's adapter): the project's folder's reads (`scan.ts`, `line.ts`) and watcher (`watch.ts`), its writes (`writes.ts`, `write.ts`), what is kept (`sweep.ts`), its reviews (`review.ts`), the only code that touches the project's folder (ADR-0142) |
 | `watch-dir.ts` | one directory watched with `@parcel/watcher` (FSEvents on the Mac, inotify on Linux), its events handed on after a quiet window (`quietWindow`; 0 for the shared directories, 10 s for the project's folder), a dropped-events error at once |
 | `jj/` | jj's adapter (`startJjProject`, § jj's adapter): each lane's proposed changes in your repo (ADR-0105), on the owner of your repo (§ Proposed changes), and the reviews and diffs a page reads of it (ADR-0047); accepted work's record and commands (`jj/accepted.ts`); each lane's fetch into your repo (`jj/fetch.ts`); splits (`jj/split.ts`) |
 | `names.ts` | every thread's name (ADR-0039, ADR-0117): `ensure` for the lanes pi holds and the threads recorded, `reserve` for a thread a column opened before its first message (ADR-0057), on one queue |
@@ -1556,20 +1556,41 @@ adapter's.
   end builds the lane's proposed changes and base records (`folder/proposed.ts`) and describes
   the proposed changes with the host's describer (`describe.ts`, jj's too); accepted
   work moving rebuilds every folder lane's. A squash is refused
-  (`not_a_stack`), a setup and a publish with why.
+  (`not_a_stack`). Accepted work's acts are by kind (`Destination`'s
+  `accepted`: jj's `act`, a folder's `restore`), so the command handler
+  refuses a setup or publish to a folder project, and a restore to a jj
+  one, in one place (`commands/lane.ts`).
 - **Proposed changes are the shown merge** (`folder/proposed.ts`,
   ADR-0159): the lane's tip merged onto accepted work's newest
   (`mergeToState`, `merge.ts`, shared with a catch-up), made on the
-  project's queue whenever either moves, in a scratch disk
-  `<id>-scratch`, snapshotted as `shownMergeId` and not made again while
+  project's queue whenever either moves, on a scratch disk
+  (`withScratch`, `scratch.ts`, which a virtual base and a restore's
+  snapshot use too), snapshotted as `shownMergeId` and not made again while
   kept; the one it replaces goes unless an accept made it a state. A
   conflicted one keeps git's markers. The record's files are accepted
   work's newest → the shown merge, and the base's forecast the lane's tip
-  → the shown merge: what a catch-up would change in the lane. A review
-  of open proposed changes, asked as `start..tip`, reads `start` → the
-  shown merge: its files with their line counts (`diffStats`), and one
-  file's diff (`fileDiff`), both lanehost's.
-- **An accept is one step on the project's queue** (`folder/accept.ts`):
+  → the shown merge: what a catch-up would change in the lane.
+- **Every folder review is one reader** (`readFolderReview`,
+  `folder/review.ts`): open proposed changes, asked as `start..tip`, read
+  `start` → the shown merge; two states accepted work keeps (a history
+  entry, a restore's preview) and a conflict's base and side read as they
+  are, each span found by `planReviewRead` (`readableSpan`). Its rows are
+  `planFolderReview`'s, a move found from the pairs of equal size whose
+  bytes `sameContent` proves equal. A file's diff is lanehost's `fileDiff`;
+  a side's bytes stream from its state's snapshot (`fileOut`, through the
+  disks role's `file-out.ts`), typed by `pathFacts`' `content`, never by a
+  name, and served by `bytesResponse` (`responses.ts`): an image as its
+  type, anything else an attachment, every one `nosniff` and sandboxed, as
+  a blob is.
+- **An accept and a restore are one executor** (`writeStateNow`,
+  `folder/writes.ts`): each gathers and plans (`planAccept`,
+  `planRestore`), then writes its state's content (`writeContent`) by the
+  steps below. A restore's own snapshot is made at its commit, from its
+  content on a scratch disk, before its `STATE` record: a step recovery's
+  finish finds done or does, so a restore stopped after its last link has
+  its snapshot made at the next start. A restore calls `moved`, as any
+  read of the project's folder does.
+- **An accept is one step on the project's queue** (`folder/writes.ts`):
   the project's folder read inline (`FolderLine`'s `readNow`, since a
   queued read would wait behind the step forever), so every save before
   the press is a state and refuses an accept of what was shown before it;
@@ -1578,7 +1599,7 @@ adapter's.
   case-folding a probe file answers; the shown merge's regular files
   streamed into it by `tarOut` and extracted by the system's `tar`
   (bsdtar on the Mac, GNU tar on Linux), then checked; the journal
-  (`ACCEPT_JOURNAL`) written; each path's check, move aside into
+  (`FOLDER_WRITE_JOURNAL`) written; each path's check, move aside into
   `.pinetrie-aside-<uuid>/`, check by inode, size and mtime (a rename
   changes ctime) and `link(2)` or `symlink(2)`, which fail where anything
   stands (`write.ts`). Only with every path linked (`AllLinked`, which
@@ -1599,9 +1620,25 @@ adapter's.
   lands nowhere else; the accept's own read leaves asides alone, being
   never quiet. The scan never enters either reserved name at the root
   (`FOLDER_RESERVED`).
-- **The sweep** (`sweep.ts`), at start and after each run's end, deletes the
-  snapshots of the states `liveStates` keeps not, `folder.history.states`
-  of accepted work's line among them; every `STATE` record stays.
+- **What is kept is said once** (`planKeep`, `sweep.ts`): from one
+  `liveStates` call and one listing of the project's snapshots
+  (`LaneRuntime.snapshots`), the states whose snapshots exist and the live
+  set keeps not go, and accepted work's line states and concurrent saves
+  that are kept and exist are its record's `kept`, newest first: what the
+  history lists and a restore may write. `refreshKept` (`folder/index.ts`)
+  is that record's one writer: it writes `{ newest, kept, at }` when they
+  changed, then deletes what goes, one call at a time, so an earlier
+  gather never writes over a later. It runs at start, at each run's end,
+  and on every move of accepted work, since `folder.history.states`'
+  window moves with it. Every `STATE` record stays.
+- **A person's choice of a conflict's version is a resolution, as the
+  agent's is** (`LaneWork.resolve`, `work/index.ts`): refused while the
+  thread runs or for a lane not the host's own (`planResolveCommand`);
+  else the idle lane's container started for the resolution's snapshot,
+  which syncs inside it, then stopped; the conflict closed by the
+  history's `resolve`, which records a `resolve` state; the proposed
+  changes rebuilt (`act(lane, "refresh")`, its fact dropped); and the
+  `resolved` fact queued on the thread.
 
 ## Proposed changes (`jj/proposed/`)
 

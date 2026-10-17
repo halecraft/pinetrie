@@ -20,7 +20,7 @@ import { BUDGET } from "./budget.ts"
 import { CARD_HISTORY, TRACE } from "./card-history.ts"
 import { COMMANDS } from "./commands.ts"
 import { DIGEST } from "./digest.ts"
-import { ACCEPT_JOURNAL, CONFLICT, STATE } from "./folder-records.ts"
+import { CONFLICT, FOLDER_WRITE_JOURNAL, STATE } from "./folder-records.ts"
 import { MARK } from "./mark.ts"
 import { NAME } from "./names.ts"
 import { NOTE_COLUMN } from "./note-column.ts"
@@ -44,7 +44,7 @@ export type AnyRecordSpec = Pick<
 
 /** Every record's spec. */
 export const RECORD_SPECS: readonly AnyRecordSpec[] = [
-  ACCEPT_JOURNAL,
+  FOLDER_WRITE_JOURNAL,
   ACCESS,
   BANNER,
   BASE,

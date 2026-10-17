@@ -521,9 +521,20 @@ update's merge will change.**
   `jj log -r <commit> -T REVISION_READ` and returns the parsed JSON,
   unchecked (the host decodes it), and `fileDiff` runs `jj diff --git -r
   <commit> -- root-file:"<path>"`. `REVISION_READ` prints `RevisionReview`'s
-  wire shape, `json()` quoting every string (S57). A rename reads by its
-  new path, with `{old => new}` as its display path; a binary file reads as
-  0 and 0. The diff's path is `root-file:`: a bare path is read from the
+  wire shape, `json()` quoting every string (S57), and each file's
+  `bytes_delta()`. A rename reads by its new path, with `{old => new}` as
+  its display path; a binary file reads as 0 and 0.
+- **A review says what each file holds** (`review-content.ts`, ADR-0165):
+  a file with lines, or a move, is lines. Any other is read from your repo
+  (`RepoReads.jjBytes`, `jj file show` streamed at the observed head):
+  each needed side's first 8,000 bytes for core's `fileContent`, its size
+  from the revision's delta where the stats carry one (`JjStatSize`), so
+  `planJjReviewContent` reads a modified file whole on one side only; a
+  range's `TreeDiffEntry` has no stat, so its sides are counted whole. A
+  revision's stats without a delta are a misread, and the review fails.
+- **A review serves a file's bytes** (`jjFileBytes`): `jj file show` of
+  the side's commit (a revision's parent for `before`), its first bytes
+  read to type it, then streamed on; none where the side holds no file. The diff's path is `root-file:`: a bare path is read from the
   process's directory, and `root:` matches every file under a directory of
   that name. A commit id names one commit, so neither resolves a change id
   or meets a divergent one.

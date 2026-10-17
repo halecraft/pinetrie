@@ -44,6 +44,7 @@ import {
   readBudgets,
   readCardHistories,
   readCommands,
+  readConflicts,
   readDigests,
   readFilesLost,
   readHeld,
@@ -61,6 +62,7 @@ import {
   readRunningLanes,
   readSeats,
   readSetup,
+  readStates,
   readThreads,
   readTraces,
   readVerdicts,
@@ -198,6 +200,8 @@ function readFacts(view: HeldView): SessionFacts {
       filesLost: readFilesLost(doc),
       budgets: readBudgets(doc),
       setup: readSetup(doc),
+      states: readStates(doc),
+      conflicts: readConflicts(doc),
     },
   }
 }

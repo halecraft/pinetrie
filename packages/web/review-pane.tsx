@@ -9,6 +9,7 @@ import {
   DIFF_LINES_SHOWN,
   diffLines,
   type FileRow,
+  MOVED_UNCHANGED,
   type ReviewPref,
   type ReviewTarget,
   reviewPrefWords,
@@ -18,6 +19,7 @@ import {
 import { decodeRevisionReview, diffUrl, reviewUrl } from "@pinetrie/rules"
 import { memo, useContext, useEffect, useRef, useState } from "react"
 import { PaneHead } from "./pane-head.tsx"
+import { ReviewMedia } from "./review-media.tsx"
 import { ReviewPrefsContext } from "./review-prefs.ts"
 import { sameProps } from "./same-props.ts"
 import { useFetched } from "./use-fetched.ts"
@@ -219,6 +221,8 @@ function ReviewPaneView(p: ReviewPaneProps) {
   )
 }
 
+export { readReview }
+
 export const ReviewPane = memo(
   ReviewPaneView,
   sameProps<ReviewPaneProps>(REVIEW_PANE_PROPS),
@@ -242,8 +246,10 @@ function ReviewFileView({ row, watch }: ReviewFileProps) {
     return watch(self.current, () => setWanted(true))
   }, [wanted, watch])
   const open = row.startsCollapsed === toggled
+  // A media row or a move draws no diff, so none is fetched.
+  const lined = row.media === null && !row.moved
   const [diff] = useFetched(
-    open && wanted ? [diffUrl(row.span, row.path)] : [],
+    open && wanted && lined ? [diffUrl(row.span, row.path)] : [],
     readText,
   )
   const state = sectionState(row.startsCollapsed, toggled, wanted, diff ?? null)
@@ -254,7 +260,8 @@ function ReviewFileView({ row, watch }: ReviewFileProps) {
       data-conflicts={row.conflicts || undefined}
       data-key={row.key}
       data-letter={row.letter}
-      data-state={state}
+      data-media={row.media?.kind}
+      data-state={row.media !== null || row.moved ? "shown" : state}
       data-yours={row.yours || undefined}
       ref={self}
     >
@@ -273,7 +280,11 @@ function ReviewFileView({ row, watch }: ReviewFileProps) {
         {row.conflicts && <span className="review-flag">conflicts</span>}
         {row.yours && <span className="review-flag">you're editing</span>}
       </div>
-      {state === "collapsed" ? (
+      {row.media !== null ? (
+        open && <ReviewMedia media={row.media} />
+      ) : row.moved ? (
+        <div className="review-note">{MOVED_UNCHANGED}</div>
+      ) : state === "collapsed" ? (
         row.startsCollapsed && (
           <button
             className="review-show"
@@ -316,7 +327,13 @@ function ReviewFileView({ row, watch }: ReviewFileProps) {
   )
 }
 
-const ReviewFile = memo(
+export const ReviewFile = memo(
   ReviewFileView,
   sameProps<ReviewFileProps>(REVIEW_FILE_PROPS),
 )
+
+/** A watch for a section drawn on its own, outside a review's scroll: near the view at once. */
+export const SHOWN_NOW: Watch = (_el, near) => {
+  near()
+  return () => {}
+}

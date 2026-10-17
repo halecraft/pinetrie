@@ -52,8 +52,12 @@ describe("publishView: one button, only with something to do", () => {
   })
   test("a folder project: absent, with nothing to set up or publish to", () => {
     expect(
-      publishView({ kind: "folder", newest: pointId("line-0192aaaa"), at: 1 })
-        .kind,
+      publishView({
+        kind: "folder",
+        newest: pointId("line-0192aaaa"),
+        kept: [],
+        at: 1,
+      }).kind,
     ).toBe("absent")
   })
   test("no line yet: set up at your @-, showing the heads it writes", () => {

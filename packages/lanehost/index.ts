@@ -12,6 +12,7 @@ export {
   lanehostClient,
 } from "./client.ts"
 export { ROOTLESS_UID } from "./disks.ts"
+export { FILE_OUT } from "./file-out.ts"
 export { type Grant, grantChain } from "./grants.ts"
 export {
   FOLDER_MOUNT,

@@ -288,11 +288,11 @@ export {
   tokensWords,
 } from "./fact.ts"
 export {
-  ACCEPT_JOURNAL,
   CONFLICT,
   conflictKey,
   decodeFolderStamps,
   encodeFolderStamps,
+  FOLDER_WRITE_JOURNAL,
   STATE,
 } from "./folder-records.ts"
 export {
@@ -542,18 +542,25 @@ export {
   unreachableRefusal,
 } from "./relay.ts"
 export { describeRequest, transcriptLines } from "./request.ts"
+export { planResolveCommand, type ResolveCommand } from "./resolve.ts"
 export {
   answerDiff,
   answerReview,
   decodeRevisionReview,
   diffUrl,
+  fileUrl,
   MAX_DIFF_BYTES,
   parseReviewPath,
   planReviewRead,
+  type RecordedRange,
   type RecordedSpan,
   type ReviewAnswer,
   type ReviewAsk,
+  type ReviewFacts,
+  type ReviewSide,
+  readableSpan,
   reviewUrl,
+  type SpanReader,
 } from "./review.ts"
 export {
   emptiedCanvases,

@@ -19,7 +19,7 @@ import {
   planPathMerge,
 } from "@pinetrie/folder"
 import type { FolderDisks, LaneRuntime } from "@pinetrie/lanes"
-import { type StateReader, sourceDiff } from "./changes.ts"
+import { type StateReader, samePaths, sourceDiff } from "./changes.ts"
 import { baseState } from "./virtual-base.ts"
 
 /** What a merge did: its plan, and each text step answered clean or not. */
@@ -77,11 +77,13 @@ export async function mergeInto(
       facts.set(p, { base: b, ours: o, theirs: t })
   })
   const same = new Set(
-    await r.disks.sameContent(
-      ours,
-      theirs,
-      pathsToCompare(theirsChanged, facts),
-    ),
+    (
+      await r.disks.sameContent(
+        ours,
+        theirs,
+        samePaths(pathsToCompare(theirsChanged, facts)),
+      )
+    ).map(p => p.a),
   )
   // plan
   const plan = planPathMerge({

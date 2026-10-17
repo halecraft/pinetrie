@@ -7,6 +7,47 @@ const merge = "packages/folder/merge.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "pairRenames pairs a candidate with two equal partners",
+    file: "packages/folder/review.ts",
+    from: '  return found.filter(p => count("a", p.a) === 1 && count("b", p.b) === 1)\n',
+    to: "  return found\n",
+    command: unit,
+    expect: "pairRenames: two copies of one file pair with nothing",
+  },
+  {
+    name: "planFolderReview calls an image text",
+    file: "packages/folder/review.ts",
+    from: '  (f.kind === "file" && f.content === "text")\n',
+    to: '  (f.kind === "file" && f.content !== "binary")\n',
+    command: unit,
+    expect:
+      "an image on each side is media with both sides' sizes; an image added has no before",
+  },
+  {
+    name: "resolve_conflict closes a path with no open conflict",
+    file: "packages/folder/resolve.ts",
+    from: '  if (open === undefined) return { kind: "no-conflict" }\n',
+    to: "",
+    command: unit,
+    expect: "planResolve: a path with no open conflict closes nothing",
+  },
+  {
+    name: "planRestore ignores what was shown",
+    file: "packages/folder/accept.ts",
+    from: "  if (newest === null || newest !== input.seen) return refused(ERR.NOT_AS_SHOWN)\n",
+    to: "  if (newest === null) return refused(ERR.NOT_AS_SHOWN)\n",
+    command: unit,
+    expect: "refused not as shown once accepted work moved past what was shown",
+  },
+  {
+    name: "planRestore takes a state not kept",
+    file: "packages/folder/accept.ts",
+    from: "  if (!input.kept.includes(input.of) || !input.ofMade)\n",
+    to: "  if (!input.ofMade)\n",
+    command: unit,
+    expect: "refused for a state not kept, or whose snapshot is gone",
+  },
+  {
     name: "planRead misses a deletion",
     file: "packages/folder/read.ts",
     from: "  const deleted = [...last.keys()].filter(p => !scan.has(p)).sort()",
@@ -94,8 +135,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "parentLane answers the grandparent",
     file: graph,
-    from: "  return parent === undefined ? null : laneOf(parent)\n",
-    to: "  const p = parent === undefined ? null : laneOf(parent)\n  return p === null ? null : (parentLane(g, p) ?? p)\n",
+    from: "  return parent === undefined ? null : stateLane(parent)\n",
+    to: "  const p = parent === undefined ? null : stateLane(parent)\n  return p === null ? null : (parentLane(g, p) ?? p)\n",
     command: unit,
     expect: "a branch of a branch has its own parent, not the grandparent",
   },
@@ -152,7 +193,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "isLineState takes a concurrent save",
-    file: graph,
+    file: "packages/core/folder.ts",
     from: '  r.made.kind === "read" ||\n',
     to: '  r.made.kind === "read" ||\n  r.made.kind === "concurrent" ||\n',
     command: unit,

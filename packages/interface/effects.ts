@@ -9,6 +9,7 @@ import type {
   CardCommand,
   CardId,
   CardRecord,
+  ConflictChoice,
   EntryId,
   LaneView,
   MessageAt,
@@ -206,6 +207,13 @@ export type Effect =
       readonly lane: ThreadId
       readonly action: ProposedChangesAction
       readonly to: string | null
+    }
+  /** A choice of a conflict's version, which the session tracks (`acting`). */
+  | {
+      readonly kind: "resolve"
+      readonly lane: ThreadId
+      readonly path: string
+      readonly choose: ConflictChoice
     }
   /** Once this tab holds entry `entry`, show it (`openAt`). */
   | { readonly kind: "openWhenHeld"; readonly entry: EntryId }

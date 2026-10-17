@@ -4,6 +4,7 @@
 // host's jj and git run from the repo's root, so paths they print are the
 // repo's. Only the owner and this package's tests use these.
 
+import { spawn } from "node:child_process"
 import { HOST_OPERATOR, NO_EDITOR } from "@pinetrie/core"
 import { describeFailure, type Ran, type Runner, run } from "@pinetrie/lanes"
 import { JJ_FLAGS } from "./lane/run.ts"
@@ -61,6 +62,48 @@ export function repoCommand(
         args: ["-R", root, ...JJ_FLAGS, ...HOST_FLAGS, ...args],
         cwd: root,
       }
+  }
+}
+
+/**
+ * A command's stdout as it comes, read only as fast as its reader takes it:
+ * a file's bytes. Throws at its end, with its stderr's tail, when it did not
+ * exit 0; a reader that stops early kills it.
+ */
+export type BytesStream = (args: readonly string[]) => AsyncIterable<Uint8Array>
+
+/** jj on your repo at `root`, as `as` runs it, its stdout streamed (`BytesStream`). */
+export function bytesFor(root: string, as: RepoRunner): BytesStream {
+  return async function* (args) {
+    const c = repoCommand(root, as, args)
+    const child = spawn(c.program, c.args, {
+      ...(c.cwd === null ? {} : { cwd: c.cwd }),
+      stdio: ["ignore", "pipe", "pipe"],
+    })
+    let stderr = ""
+    child.stderr.setEncoding("utf8")
+    child.stderr.on("data", (chunk: string) => {
+      stderr = (stderr + chunk).slice(-4000)
+    })
+    const exited = new Promise<number>(resolve => {
+      child.on("error", error => {
+        stderr = error.message
+        resolve(-1)
+      })
+      child.on("close", code => resolve(code ?? -1))
+    })
+    let ended = false
+    try {
+      for await (const chunk of child.stdout) yield chunk as Uint8Array
+      ended = true
+    } finally {
+      if (!ended) child.kill()
+    }
+    const code = await exited
+    if (code !== 0)
+      throw new Error(
+        `${c.program} ${args[0] ?? ""} exited ${code}: ${stderr.trim()}`,
+      )
   }
 }
 

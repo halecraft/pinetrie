@@ -2,12 +2,12 @@
 // each state with its parents, and each conflict a merge into a lane left.
 
 import {
-  type AcceptJournal,
   type ConflictRecord,
   type FolderStamp,
   isThreadId,
   type StateRecord,
   type ThreadId,
+  type WriteJournal,
 } from "@pinetrie/core"
 import { Type } from "typebox"
 import {
@@ -33,6 +33,11 @@ const StateMadeSchema = Type.Union([
   Type.Object({ kind: Type.Literal("catch-up"), lane: ThreadIdSchema }),
   Type.Object({ kind: Type.Literal("accept"), lane: ThreadIdSchema }),
   Type.Object({ kind: Type.Literal("restore"), of: PointSchema }),
+  Type.Object({
+    kind: Type.Literal("resolve"),
+    lane: ThreadIdSchema,
+    path: Type.String({ minLength: 1 }),
+  }),
   Type.Object({ kind: Type.Literal("bases-merged") }),
   Type.Object({
     kind: Type.Literal("concurrent"),
@@ -73,8 +78,7 @@ const InodeSchema = Type.Object({
   mtimeNs: Type.String({ pattern: "^[0-9]+$" }),
 })
 
-const AcceptJournalSchema = Type.Object({
-  lane: ThreadIdSchema,
+const WriteJournalSchema = Type.Object({
   record: Type.Object({ id: PointSchema, ...StateSchema.properties }),
   paths: List(
     Type.Object({
@@ -89,30 +93,30 @@ const AcceptJournalSchema = Type.Object({
   ),
   status: Type.Union([
     Type.Literal("open"),
-    Type.Literal("accepted"),
+    Type.Literal("written"),
     Type.Literal("put-back"),
   ]),
 })
 
 /**
- * Each accept into the project's folder from before its first move until
- * its asides are dealt with: what a host stopped part way finishes or puts
- * back at its next start.
+ * Each write into the project's folder (an accept's or a restore's) from
+ * before its first move until its asides are dealt with: what a host
+ * stopped part way finishes or puts back at its next start.
  */
-export const ACCEPT_JOURNAL: RecordSpec<AcceptJournal, string, "session"> = {
-  namespace: "pinetrie.accept",
-  home: "session",
-  keyOf: j => j.id,
-  encode: ({ id, ...contents }) => JSON.parse(JSON.stringify(contents)),
-  decode: (contents, key) =>
-    decodeAt(AcceptJournalSchema, contents, textKey(key), (r, id) => ({
-      id,
-      lane: r.lane,
-      record: r.record,
-      paths: r.paths,
-      status: r.status,
-    })),
-}
+export const FOLDER_WRITE_JOURNAL: RecordSpec<WriteJournal, string, "session"> =
+  {
+    namespace: "pinetrie.folder-write",
+    home: "session",
+    keyOf: j => j.id,
+    encode: ({ id, ...contents }) => JSON.parse(JSON.stringify(contents)),
+    decode: (contents, key) =>
+      decodeAt(WriteJournalSchema, contents, textKey(key), (r, id) => ({
+        id,
+        record: r.record,
+        paths: r.paths,
+        status: r.status,
+      })),
+  }
 
 /**
  * A conflict's address: its lane, then its path. A lane's id holds no `:`,

@@ -11,9 +11,10 @@ import {
   pointId,
   snapshotId,
 } from "@pinetrie/core"
-import type { FolderDisks, LaneOwner, LaneRuntime } from "@pinetrie/lanes"
+import type { FolderDisks, LaneRuntime } from "@pinetrie/lanes"
 import type { StateReader } from "./changes.ts"
 import { mergeInto } from "./merge.ts"
+import { withScratch } from "./scratch.ts"
 
 type MergeReader = StateReader & {
   readonly runtime: Pick<LaneRuntime, "diff" | "disk" | "snapshotExists">
@@ -51,43 +52,37 @@ export async function baseState(
   if (plan.kind === "state") return plan.state
   const { name } = plan
   if (await r.runtime.snapshotExists(snapshotId(name))) return name
-  const scratch = `${name}-scratch` as LaneOwner
   const step = (i: number) => pointId(`${name}-step-${i}`)
   const made: PointId[] = []
-  await r.runtime.disk({ kind: "delete", lane: scratch })
-  await r.runtime.disk({
-    kind: "restore",
-    lane: scratch,
-    from: snapshotId(plan.first),
-  })
   try {
-    let ours = plan.first
-    for (const [i, m] of plan.merges.entries()) {
-      if (m.base === null)
-        throw new Error(
-          `${plan.first} and ${m.other} share no state: every state of a folder project descends from its first read`,
-        )
-      const base = await baseState(r, m.base)
-      await mergeInto(r, {
-        disk: scratch,
-        ours,
-        theirs: m.other,
-        base,
-        markers: true,
-      })
-      const isLast = i === plan.merges.length - 1
-      const at = isLast ? name : step(i)
-      await r.runtime.disk({
-        kind: "snapshot",
-        lane: scratch,
-        snapshot: snapshotId(at),
-      })
-      if (!isLast) made.push(at)
-      ours = at
-    }
-    return name
+    return await withScratch(r.runtime, name, plan.first, async scratch => {
+      let ours = plan.first
+      for (const [i, m] of plan.merges.entries()) {
+        if (m.base === null)
+          throw new Error(
+            `${plan.first} and ${m.other} share no state: every state of a folder project descends from its first read`,
+          )
+        const base = await baseState(r, m.base)
+        await mergeInto(r, {
+          disk: scratch,
+          ours,
+          theirs: m.other,
+          base,
+          markers: true,
+        })
+        const isLast = i === plan.merges.length - 1
+        const at = isLast ? name : step(i)
+        await r.runtime.disk({
+          kind: "snapshot",
+          lane: scratch,
+          snapshot: snapshotId(at),
+        })
+        if (!isLast) made.push(at)
+        ours = at
+      }
+      return name
+    })
   } finally {
-    await r.runtime.disk({ kind: "delete", lane: scratch })
     if (made.length > 0)
       await r.runtime.disk({
         kind: "deleteSnapshots",

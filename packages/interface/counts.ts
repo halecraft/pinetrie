@@ -8,6 +8,19 @@ export const plural = (n: number, noun: string): string =>
 export const count = (n: number, one: string, many: string): string =>
   `${n} ${n === 1 ? one : many}`
 
+/** A size in bytes as people read it: "12 bytes", "340 KB", "1.2 MB", "3.4 GB". */
+export function byteWords(bytes: number): string {
+  if (bytes < 1000) return plural(bytes, "byte")
+  const units = ["KB", "MB", "GB", "TB"] as const
+  let n = bytes / 1000
+  let unit = 0
+  while (n >= 1000 && unit < units.length - 1) {
+    n /= 1000
+    unit++
+  }
+  return `${n >= 100 ? Math.round(n) : Number(n.toFixed(1))} ${units[unit]}`
+}
+
 const names = new Intl.ListFormat("en", { style: "long", type: "conjunction" })
 
 /** "Ada", "Ada and Bea", "Ada, Bea, and Cat". */
@@ -54,6 +67,28 @@ export const spanWords = (ms: number): string => {
   const unit = SPAN_UNITS.find(u => ms >= u.ms && ms % u.ms === 0) ?? MINUTE
   const n = Math.max(1, Math.round(ms / unit.ms))
   return n === 1 ? unit.one : `${n} ${unit.many}`
+}
+
+const MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+] as const
+
+/** A moment in this device's time, to the minute: "3 May, 14:02". */
+export function whenWords(ms: number): string {
+  const d = new Date(ms)
+  const pad = (n: number) => `${n < 10 ? "0" : ""}${n}`
+  return `${d.getDate()} ${MONTHS[d.getMonth()] ?? ""}, ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
 /** How long something has run, to the second: "0s", "59s", "1m 05s", "1h 02m". */

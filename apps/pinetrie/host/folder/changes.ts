@@ -5,7 +5,12 @@
 // truly differ; then the source paths alone, as the lanes' ignore rule
 // reads them.
 
-import { type DiskChange, type PointId, snapshotId } from "@pinetrie/core"
+import {
+  type DiskChange,
+  type PathPair,
+  type PointId,
+  snapshotId,
+} from "@pinetrie/core"
 import type { FolderDisks, LaneRuntime } from "@pinetrie/lanes"
 import {
   type IgnoreFile,
@@ -46,6 +51,10 @@ async function ignoreFilesIn(
   return files.flat()
 }
 
+/** Each path paired with itself: a file compared across two states at one path. */
+export const samePaths = (paths: readonly string[]): readonly PathPair[] =>
+  paths.map(p => ({ a: p, b: p }))
+
 /** The source paths that differ between states `a` and `b`, sorted. */
 export async function sourceChanges(
   r: StateReader,
@@ -80,7 +89,9 @@ export async function sourceChanges(
   ])
   for (const p of inB) inAOnly.delete(p)
   // drop the files rewritten as they were, bytes and mode
-  const alike = new Set(await r.disks.sameContent(a, b, changed))
+  const alike = new Set(
+    (await r.disks.sameContent(a, b, samePaths(changed))).map(p => p.a),
+  )
   const [factsA, factsB] = await Promise.all([
     r.disks.pathFacts(a, [...alike]),
     r.disks.pathFacts(b, [...alike]),

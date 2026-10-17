@@ -12,6 +12,7 @@
 
 import type {
   BaseMerge,
+  ConflictChoice,
   CopyRefusal,
   EntryId,
   ForkStart,
@@ -20,6 +21,7 @@ import type {
   ReadyCopy,
   SnapshotId,
   ThreadId,
+  WriterId,
 } from "@pinetrie/core"
 import type { LaneStep } from "./plan.ts"
 
@@ -178,9 +180,6 @@ export interface TurnMade {
 /** A merge's result, and what follows it. */
 export type MergeDone = Merged & { readonly follow: Follow }
 
-/** Which version of a conflicted path `resolve` keeps: the lane's own as it stands, or one of the merge's. */
-export type ConflictChoice = "ours" | "theirs" | "base"
-
 /**
  * What `resolve` did: the path closed, or why not: no open conflict there,
  * or a history whose conflicts are markers in the file (jj's).
@@ -220,8 +219,15 @@ export interface LaneHistory {
   ): Promise<MergeDone>
   /** The files conflicted in the lane's working copy. */
   conflicts(): Promise<readonly string[]>
-  /** A conflicted `path` closed with `choose`'s version in the lane. */
-  resolve(path: string, choose: ConflictChoice): Promise<Resolved>
+  /**
+   * A conflicted `path` closed with `choose`'s version in the lane, by a
+   * person (`by`) or the agent (null).
+   */
+  resolve(
+    path: string,
+    choose: ConflictChoice,
+    by: WriterId | null,
+  ): Promise<Resolved>
   /**
    * What a disk restored from a snapshot needs before its first command:
    * at each container's start, whatever made its disk.

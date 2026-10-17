@@ -49,6 +49,7 @@ export {
   proposedChangesEffects,
   rebuildEffects,
 } from "./proposed-steps.ts"
+export { jjFileBytes } from "./review-content.ts"
 export type { TimedCommand } from "./run.ts"
 export {
   type JjProjectDir,

@@ -6,6 +6,7 @@ import {
   type CommitId,
   commitId,
   type DiffSpan,
+  type FileChange,
   type FilesTouched,
   type NonEmpty,
   nonEmpty,
@@ -53,6 +54,15 @@ import {
   proposedStart,
   walkToHost,
 } from "./plan.ts"
+import {
+  type JjFileStat,
+  type JjStatSize,
+  jjReviewContent,
+  planJjReviewContent,
+  readJjSide,
+  type SideRead,
+} from "./review-content.ts"
+import type { BytesStream } from "./run.ts"
 
 /** Run a read; throws with jj's own words when it fails. */
 export async function query(
@@ -500,27 +510,56 @@ export type CommitSpan =
  * it (`answerReview`). A revision is one `REVISION_READ`, its description
  * and stats together. A range has no description: its files from
  * `RANGE_FILES`, and their counts from its git diff, which lists them in
- * the same order. Where it changes `pinetrie.json`, what that would let
- * lanes do beyond its start (`configWidenings`). Null when jj fails, prints
- * no JSON, or the two listings disagree.
+ * the same order. Each file's content: lines, or what its sides' bytes
+ * hold (`planJjReviewContent`, read from your repo). Where it changes
+ * `pinetrie.json`, what that would let lanes do beyond its start
+ * (`configWidenings`). Null when jj fails, prints no JSON, or the two
+ * listings disagree.
  */
 export async function revisionRead(
-  jj: Runner,
+  reads: { readonly jj: Runner; readonly jjBytes: BytesStream },
   span: CommitSpan,
   /** What a copy of `pinetrie.json` lets lanes do and share: the host's table decides it. */
   decodeAuthority: (text: string | null) => LaneAuthority,
 ): Promise<unknown> {
+  const { jj } = reads
   const read = await spanFiles(jj, span)
   if (read === null) return null
-  const touched = read.files.some(
-    f => (f as { readonly path?: unknown }).path === PROJECT_CONFIG_FILE,
-  )
   const [from, to] =
     span.kind === "revision"
       ? [`${span.commit}-`, span.commit]
       : [span.from, span.to]
+  const stats = read.files.map(f => fileStat(f, span.kind))
+  if (stats.some(s => s === null)) return null
+  const known = stats.filter((s): s is JjFileStat => s !== null)
+  // gather the sides the content needs
+  const sides = new Map<string, SideRead>()
+  for (const r of planJjReviewContent(known))
+    sides.set(
+      `${r.side}:${r.path}`,
+      await readJjSide(
+        reads.jjBytes,
+        r.side === "before" ? from : to,
+        r.path,
+        r.whole,
+      ),
+    )
+  const files = read.files.map((f, i) => {
+    const stat = known[i]
+    const { delta: _, ...row } = f as { readonly delta?: unknown }
+    return stat === undefined
+      ? row
+      : {
+          ...row,
+          content: jjReviewContent(stat, side =>
+            sides.get(`${side}:${stat.path}`),
+          ),
+        }
+  })
+  const touched = known.some(f => f.path === PROJECT_CONFIG_FILE)
   return {
-    ...read,
+    description: read.description,
+    files,
     widenings: touched
       ? // A widening names a mount by its target: the root does not matter.
         configWidenings(
@@ -529,6 +568,42 @@ export async function revisionRead(
         )
       : [],
   }
+}
+
+const FILE_CHANGES: readonly FileChange[] = [
+  "added",
+  "modified",
+  "removed",
+  "copied",
+  "renamed",
+]
+
+/**
+ * One file's stats as jj printed them, its size had as the span's reader
+ * has it: a revision's delta, a range's count. Null when it is not one,
+ * or a revision's has no delta.
+ */
+function fileStat(
+  printed: object,
+  kind: CommitSpan["kind"],
+): JjFileStat | null {
+  const f = printed as Record<string, unknown>
+  const { path, change, added, removed, delta } = f
+  if (
+    typeof path !== "string" ||
+    typeof change !== "string" ||
+    !(FILE_CHANGES as readonly string[]).includes(change) ||
+    typeof added !== "number" ||
+    typeof removed !== "number"
+  )
+    return null
+  // A revision's reader always prints a delta: one missing is a misread.
+  if (kind === "revision" && typeof delta !== "number") return null
+  const size: JjStatSize =
+    typeof delta === "number"
+      ? { kind: "delta", bytes: delta }
+      : { kind: "count" }
+  return { path, change: change as FileChange, added, removed, size }
 }
 
 /** A span's description and files, as jj prints them; null when it fails. */

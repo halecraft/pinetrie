@@ -214,6 +214,7 @@ test("recover deletes the proposed changes, accepted work and bases of another k
     setRecord(ACCEPTED, {
       kind: "folder",
       newest: pointId("line-0192aaaa"),
+      kept: [],
       at: 1,
     }),
   )

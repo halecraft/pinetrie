@@ -6,6 +6,34 @@ const markdown = "packages/web/markdown.ts"
 const tabState = "packages/web/tab-state.ts"
 
 export const mutations: readonly Mutation[] = [
+  // ── a folder project's history, in the browser suite ──
+  {
+    name: "the history page draws no entry's words",
+    file: "packages/web/history-page.tsx",
+    from: '        <span className="history-words">{entry.words}</span>\n',
+    to: '        <span className="history-words">{entry.when}</span>\n',
+    suite: "browser",
+    scenario: "folder-history",
+    expect: "the history lists your save in the project's folder, newest first",
+  },
+  {
+    name: "a review's image side draws nothing",
+    file: "packages/web/review-media.tsx",
+    from: "          src={side.url}\n",
+    to: '          src=""\n',
+    suite: "browser",
+    scenario: "folder-history",
+    expect: "an image's row in a review draws its two sides as images",
+  },
+  {
+    name: "a restore's confirm sends nothing",
+    file: "packages/web/history-page.tsx",
+    from: "            if (entry.restore !== null) p.restore(entry.restore)\n",
+    to: "",
+    suite: "browser",
+    scenario: "folder-history",
+    expect: "restore writes the version chosen back into the project's folder",
+  },
   // ── a proposal's card, in the browser suite ──
   {
     name: "a column draws no proposal",

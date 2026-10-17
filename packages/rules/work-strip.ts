@@ -39,6 +39,8 @@ export type WorkStripButton =
   | "refresh"
   | "update"
   | "catch-up-parent"
+  /** A folder lane's conflicts opened in its pane, each version to choose. */
+  | "choose-versions"
 
 /**
  * What the lane is running now, as far as the proposed changes cares;
@@ -286,9 +288,11 @@ export function workStripView(input: {
   if (record.conflicts.length > 0)
     return view(
       "conflicts",
-      cause === "start" && parentResolves
-        ? ["catch-up-parent", "accept"]
-        : ["update", "accept"],
+      record.kind === "folder"
+        ? ["choose-versions", "update", "accept"]
+        : cause === "start" && parentResolves
+          ? ["catch-up-parent", "accept"]
+          : ["update", "accept"],
       [],
     )
   // Folder proposed changes are its files: never split, never a stack.

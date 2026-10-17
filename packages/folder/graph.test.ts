@@ -12,6 +12,7 @@ import {
   type BasePlan,
   type DiskChange,
   entryId,
+  fileContent,
   type PathFact,
   type PointId,
   pointId,
@@ -236,7 +237,12 @@ const factOf = (files: Files, p: string): PathFact => {
   const v = files.get(p)
   return v === undefined
     ? { kind: "absent" }
-    : { kind: "file", exec: false, text: !v.includes("\0"), size: v.length }
+    : {
+        kind: "file",
+        exec: false,
+        content: fileContent(new TextEncoder().encode(v)),
+        size: v.length,
+      }
 }
 
 /** The path merge of `theirs` into `ours` over `base`, carried out on maps of files. */
@@ -645,6 +651,35 @@ describe("planState", () => {
     expect(
       planState(graph, proposed("bases-1", { kind: "bases-merged" }, first)),
     ).toEqual(refused)
+  })
+
+  test("a resolve on its lane's newest state is recorded; on another's refused", () => {
+    expect(
+      planState(
+        graph,
+        proposed("resolve-1", { kind: "resolve", lane: LANE, path: "a" }, lane),
+      ).kind,
+    ).toBe("record")
+    expect(
+      planState(
+        graph,
+        proposed(
+          "resolve-1",
+          { kind: "resolve", lane: threadIdFor("2"), path: "a" },
+          lane,
+        ),
+      ),
+    ).toEqual({ kind: "refused", why: "resolve-off-lane" })
+    expect(
+      planState(
+        graph,
+        proposed(
+          "resolve-1",
+          { kind: "resolve", lane: LANE, path: "a" },
+          first,
+        ),
+      ),
+    ).toEqual({ kind: "refused", why: "resolve-off-lane" })
   })
 
   test("the first read of the project's folder has no parent, and a restore its line's newest", () => {

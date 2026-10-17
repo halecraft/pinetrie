@@ -205,6 +205,8 @@ export function writesIn(
     // An action on proposed changes acts at its lane's tip: an archived canvas's
     // lanes offer no work out. A carry-on writes its message there.
     case "proposed":
+    // A conflict's version chosen closes its lane's conflict, and tells its thread.
+    case "resolve":
     case "carry-on":
     // A queue's hold, and its cards unqueued, are its lane's thread's.
     case "queue-hold":
@@ -271,9 +273,10 @@ export function writesIn(
     case "move-canvas":
     case "workflow":
     case "reserve":
-    // Accepted work is your repo's, in no canvas.
+    // Accepted work is your repo's, or the project's folder's, in no canvas.
     case "setup":
     case "publish":
+    case "restore":
     // A command acts only when its card is popped, its send cleared then.
     case "set-command":
     // Traces are the session's, in no canvas.

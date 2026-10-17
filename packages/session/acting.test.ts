@@ -142,8 +142,7 @@ describe("sendActing: the session's store, around one command", () => {
       "1",
     )
     expect(store.current()).toEqual({
-      proposedByLane: new Map(),
-      access: new Map(),
+      ...NO_ACTING,
       accepted: { kind: "failed", action: "publish", message: "jj said no" },
     })
   })

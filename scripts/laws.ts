@@ -20,7 +20,7 @@ export const LAW_SETS = [
   {
     doc: "packages/folder/TECHNICAL.md",
     section: "The accept's laws",
-    suite: "apps/pinetrie/host/folder/accept.test.ts",
+    suite: "apps/pinetrie/host/folder/writes.test.ts",
   },
 ] as const
 

@@ -21,6 +21,7 @@ import {
   type CardId,
   type CardRecord,
   type CommandSummary,
+  type ConflictRecord,
   type ContextInView,
   type DigestRecord,
   type EntryId,
@@ -39,6 +40,7 @@ import {
   type NoteColumnId,
   type NoteColumnRecord,
   type PlanMode,
+  type PointId,
   type ProjectRecord,
   type ProposedChangesRecord,
   parseCardId,
@@ -53,6 +55,7 @@ import {
   type Sha256,
   type SharedLineage,
   type SnapshotId,
+  type StateRecord,
   summarizeRoots,
   type ThreadId,
   type ThreadLane,
@@ -78,6 +81,7 @@ import {
   CARD_HISTORY,
   COMMANDS,
   COMMANDS_KEY,
+  CONFLICT,
   contextOf,
   DIGEST,
   decodeCard,
@@ -109,6 +113,7 @@ import {
   SETUP,
   SETUP_KEY,
   SHARED_LINEAGE,
+  STATE,
   THREAD,
   TRACE,
   textBlobs,
@@ -725,6 +730,16 @@ export const readProposedByLane = (
 /** Accepted work as the host last read it; null before it wrote one. */
 export const readAccepted = (doc: SessionDocHandle): AcceptedRecord | null =>
   readRecords(doc, ACCEPTED).get(ACCEPTED_KEY) ?? null
+
+/** A folder project's states, by id: its history's graph. */
+export const readStates = (
+  doc: SessionDocHandle,
+): ReadonlyMap<PointId, StateRecord> => readRecords(doc, STATE)
+
+/** Every folder lane's open conflicts. */
+export const readConflicts = (
+  doc: SessionDocHandle,
+): readonly ConflictRecord[] => [...readRecords(doc, CONFLICT).values()]
 
 /** Each lane's base as its history says it, by lane. */
 export const readBases = (

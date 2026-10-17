@@ -277,8 +277,16 @@ state merged onto accepted work's newest, reviewed as files. An accept
 writes the shown merge into the project's folder (ADR-0159): only if the
 folder's own read at the press finds it as shown, each file checked, moved
 aside and linked in, journalled so a stopped host finishes or puts it back,
-and a write through a file held across it kept as a concurrent save. At start the host deletes the proposed changes, accepted-work and
-base records of the other kind, and keeps every state.
+and a write through a file held across it kept as a concurrent save. The
+folder's page is built (ADR-0165): a history of accepted work's kept
+states, any of which a restore writes back by the accept's own steps and
+journal (`writeStateNow`); reviews that show images as images and other
+files by their sizes, in either kind of project, and a moved file as one
+row; and a lane's conflicts chosen on the page, each choice a `resolve`
+state of the lane's, as the agent's tool is. What is kept is said once,
+in accepted work's record (`planKeep`). At start the host deletes the
+proposed changes, accepted-work and base records of the other kind, and
+keeps every state.
 
 pine·trie reads only its own config (ADR-0146): five layers (system, user,
 project, local, env), each a `pinetrie.json` but the last, and every setting

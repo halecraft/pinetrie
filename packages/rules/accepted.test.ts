@@ -35,6 +35,7 @@ test("a folder project's accepted work refuses a setup and a publish", () => {
   const folder = {
     kind: "folder",
     newest: pointId("line-0192aaaa"),
+    kept: [],
     at: 1,
   } as const
   expect(acceptedActionState("setup", folder)).toEqual({

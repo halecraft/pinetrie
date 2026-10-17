@@ -5,6 +5,23 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/interface"]
 const workspace = ["pnpm", "exec", "vitest", "run", "workspace.test.ts"]
 
 export const mutations: readonly Mutation[] = [
+  {
+    name: "the words check's pattern drops commit",
+    file: "packages/interface/folder-words.ts",
+    from: "  /\\b(commit|commits|bookmark|",
+    to: "  /\\b(bookmark|",
+    command: unit,
+    expect: "jjWordsIn finds each of jj's words in any depth of a view",
+  },
+  {
+    name: "historyView reviews an entry whose first parent is swept",
+    file: "packages/interface/history-view.ts",
+    from: "    const span = first === undefined ? null : readableSpan(facts, first, r.id)\n",
+    to: "    const span = first === undefined ? null : { from: first, to: r.id }\n",
+    command: unit,
+    expect:
+      "lists accepted work's kept line only, newest first; the oldest kept has no review",
+  },
   // ── a proposal's card ──
   {
     name: "a proposal's buttons count dropped rows",

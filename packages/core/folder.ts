@@ -3,6 +3,7 @@
 // merge. `@pinetrie/folder` decides over them; lanehost's disks role does
 // what they say, and declares only core and channel.
 
+import type { ImageMime } from "./images.ts"
 import type { EntryId, NonEmpty, PointId, ThreadId, WriterId } from "./index.ts"
 
 /** How a folder project's state came to be: what its parents mean. */
@@ -21,11 +22,16 @@ export type StateMade =
   /** Its parents: accepted work's state before, and the lane's tip. */
   | { readonly kind: "accept"; readonly lane: ThreadId }
   /**
-   * The project's folder set back to `of`'s content. Its one parent is
-   * accepted work's newest state, never `of`, so accepted work's line stays a
-   * line.
+   * The project's folder set back to `of`'s content, by a restore of a kept
+   * state. Its one parent is accepted work's newest state, never `of`, so
+   * accepted work's line stays a line.
    */
   | { readonly kind: "restore"; readonly of: PointId }
+  /**
+   * A conflict at `path` closed by a choice, the agent's or a person's: its
+   * one parent is the lane's newest state.
+   */
+  | { readonly kind: "resolve"; readonly lane: ThreadId; readonly path: string }
   /** A virtual base a conflict names; its parents are the bases it merges. */
   | { readonly kind: "bases-merged" }
   /**
@@ -45,6 +51,60 @@ export interface StateRecord {
   readonly at: number
   readonly by: WriterId | null
 }
+
+/** Whether a state is on accepted work's line: a read, an accept or a restore. */
+export const isLineState = (r: StateRecord): boolean =>
+  r.made.kind === "read" ||
+  r.made.kind === "accept" ||
+  r.made.kind === "restore"
+
+/** The lane a state of a lane's own (a start, a turn, a catch-up, a resolve) was made in; null for any other. */
+export const stateLane = (r: StateRecord): ThreadId | null =>
+  r.made.kind === "start" ||
+  r.made.kind === "turn" ||
+  r.made.kind === "catch-up" ||
+  r.made.kind === "resolve"
+    ? r.made.lane
+    : null
+
+/**
+ * Accepted work's line from `newest` along first parents, newest first,
+ * ending at the first read or at a state that is not on the line. A state
+ * missing from `states` ends it too.
+ */
+export function lineStates(
+  states: ReadonlyMap<PointId, StateRecord>,
+  newest: PointId,
+): readonly StateRecord[] {
+  const line: StateRecord[] = []
+  for (let at = states.get(newest); at !== undefined && isLineState(at); ) {
+    line.push(at)
+    const [first] = at.parents
+    at = first === undefined ? undefined : states.get(first)
+  }
+  return line
+}
+
+/**
+ * The snapshot a write into the project's folder streams from: a restore's
+ * `of`, else the record's own (an accept's shown merge). Never stored, so a
+ * journal cannot name one snapshot while its record names another.
+ */
+export const writeContent = (r: StateRecord): PointId =>
+  r.made.kind === "restore" ? r.made.of : r.id
+
+/**
+ * A restore as its preview drew it: the kept state `of`, reviewed from
+ * accepted work's newest `from`. What it sends is this value, so what a
+ * person confirms is what they were shown.
+ */
+export interface RestorePreview {
+  readonly of: PointId
+  readonly from: PointId
+}
+
+/** Which version of a conflicted path a resolution keeps: the lane's own as it stands, or one of the merge's. */
+export type ConflictChoice = "ours" | "theirs" | "base"
 
 /** A path a merge into a lane left conflicted, with the states of its three versions. */
 export interface ConflictRecord {
@@ -66,15 +126,15 @@ export const isDiskName = (name: string): boolean =>
 
 /**
  * A folder state's id: a disk name holding a dash, so never a jj commit's
- * (40 hex digits). A lane's states are `start-`, `turn-` and
- * `catch-up-<uuidv7>`, never its entry's id, which names the entry's own
- * snapshot; accepted work's line's are `line-<uuidv7>`; a virtual base's is
- * `bases-<hash>`.
+ * (40 hex digits). A lane's states are `start-`, `turn-`, `catch-up-` and
+ * `resolve-<uuidv7>`, never its entry's id, which names the entry's own
+ * snapshot; accepted work's line's are `line-` and `restore-<uuidv7>`, or an
+ * accept's shown merge; a virtual base's is `bases-<hash>`.
  */
 export const isFolderStateId = (id: string): boolean =>
   id.includes("-") && isDiskName(id) && !/^[0-9a-f]{40}$/.test(id)
 
-/** A state of accepted work's line, from a uuidv7 its caller mints. */
+/** A read's state of accepted work's line, from a uuidv7 its caller mints. */
 export const lineStateId = (uuid: string): PointId => `line-${uuid}` as PointId
 
 /** A turn's state in a folder lane, from a uuidv7 its caller mints. */
@@ -88,22 +148,31 @@ export const startStateId = (uuid: string): PointId =>
 export const catchUpStateId = (uuid: string): PointId =>
   `catch-up-${uuid}` as PointId
 
+/** A restore's state of accepted work's line, from a uuidv7 its caller mints. */
+export const restoreStateId = (uuid: string): PointId =>
+  `restore-${uuid}` as PointId
+
+/** A folder lane's resolve state, from a uuidv7 its caller mints. */
+export const resolveStateId = (uuid: string): PointId =>
+  `resolve-${uuid}` as PointId
+
 /** A concurrent save's state, from a uuidv7 its caller mints. */
 export const concurrentStateId = (uuid: string): PointId =>
   `concurrent-${uuid}` as PointId
 
 /**
- * The prefixes of the names an accept makes at the project's folder's root,
- * and nowhere else: its staging directory and its directory of asides. A
- * scan never enters them; deeper down, such a name is an ordinary source
- * path.
+ * The prefixes of the names a write (an accept's or a restore's) makes at
+ * the project's folder's root, and nowhere else: its staging directory and
+ * its directory of asides. A scan never enters them; deeper down, such a
+ * name is an ordinary source path. The prefixes stay an accept's: a folder
+ * holding one from before keeps being read alike.
  */
 export const FOLDER_RESERVED = {
   stage: ".pinetrie-accept-",
   aside: ".pinetrie-aside-",
 } as const
 
-/** Whether a path from the folder's root lies under a name an accept reserves, or one of `which`. */
+/** Whether a path from the folder's root lies under a name a write reserves, or one of `which`. */
 export const isFolderReserved = (
   path: string,
   which: keyof typeof FOLDER_RESERVED | "any" = "any",
@@ -114,13 +183,16 @@ export const isFolderReserved = (
   ).some(p => top.startsWith(p))
 }
 
-/** The accept `id`'s staging directory, from the folder's root. */
-export const acceptStageDir = (id: string): string =>
+/** The write `id`'s staging directory, from the folder's root. */
+export const writeStageDir = (id: string): string =>
   `${FOLDER_RESERVED.stage}${id}`
 
-/** The accept `id`'s directory of asides, from the folder's root. */
-export const acceptAsideDir = (id: string): string =>
+/** The write `id`'s directory of asides, from the folder's root. */
+export const writeAsideDir = (id: string): string =>
   `${FOLDER_RESERVED.aside}${id}`
+
+/** What a file holds, by its bytes: text by git's rule, an image by its first bytes, else binary. */
+export type FileContent = "text" | "binary" | ImageMime
 
 /** What a side holds at a path. */
 export type PathFact =
@@ -128,8 +200,8 @@ export type PathFact =
   | {
       readonly kind: "file"
       readonly exec: boolean
-      /** No NUL byte in its first 8,000 bytes, as git decides. */
-      readonly text: boolean
+      /** From its first 8,000 bytes (`fileContent`). */
+      readonly content: FileContent
       readonly size: number
     }
   | { readonly kind: "symlink"; readonly target: string }
@@ -168,6 +240,12 @@ export type BasePlan =
         readonly other: PointId
       }>
     }
+
+/** A path in one state and a path in another, compared as files: the same path, or a move's two. */
+export interface PathPair {
+  readonly a: string
+  readonly b: string
+}
 
 /** A text step of a merge, as lanehost answered it. */
 export interface TextMerged {
@@ -218,8 +296,8 @@ export interface DiffStat {
 }
 
 /**
- * One path an accept writes: what the folder held there when the accept
- * read it, and what the merged state holds.
+ * One path a write into the project's folder writes: what the folder held
+ * there when the write read it, and what the written state holds.
  */
 export interface AcceptWrite {
   readonly path: string
@@ -245,11 +323,11 @@ export interface InodeStat {
 }
 
 /**
- * One path of an accept as its journal records it. Each field is written
+ * One path of a write as its journal records it. Each field is written
  * before the step it names, so a host stopped at any point finds, for
  * each path, everything it may have to undo.
  */
-export interface AcceptPath {
+export interface WritePath {
   readonly path: string
   /** Its aside, from the folder's root, once it is to be moved; null before, or for a new path. */
   readonly aside: string | null
@@ -265,23 +343,26 @@ export interface AcceptPath {
   /** Written after its link, or after its aside for a delete. */
   readonly linked: boolean
   /**
-   * Once the accept ends with its aside kept: the line state a concurrent
-   * save of it is made on (the accept's state, or on a put back accepted
+   * Once the write ends with its aside kept: the line state a concurrent
+   * save of it is made on (the write's state, or on a put back accepted
    * work's newest), and the aside is the folder's next reads' to check.
    */
   readonly keptOn: PointId | null
 }
 
-/** An accept as its journal records it, from before its first move to its end. */
-export interface AcceptJournal {
+/**
+ * A write of a state into the project's folder (an accept's or a
+ * restore's) as its journal records it, from before its first move to its
+ * end. What it writes is `writeContent(record)`.
+ */
+export interface WriteJournal {
   /** A uuid, which names its staging directory and its asides' directory. */
   readonly id: string
-  readonly lane: ThreadId
-  /** The accept's state, its snapshot made: recorded only once every path is linked. */
+  /** The write's state, made `accept` or `restore`: recorded only once every path is linked. */
   readonly record: StateRecord
-  readonly paths: readonly AcceptPath[]
-  /** `open` until it ends, accepted or put back. */
-  readonly status: "open" | "accepted" | "put-back"
+  readonly paths: readonly WritePath[]
+  /** `open` until it ends, written or put back. */
+  readonly status: "open" | "written" | "put-back"
 }
 
 /** A path a read copies into accepted work's line, with the stamp the host read. */

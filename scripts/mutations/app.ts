@@ -224,8 +224,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an acceptance's fact is never written",
     file: "apps/pinetrie/host/commands/lane.ts",
-    from: "      facts: [done.fact],",
-    to: "      facts: [],",
+    from: '    .step({ kind: "thread", thread: lane }, "proposed changes\' fact", () => ({\n      facts: [done.fact],',
+    to: '    .step({ kind: "thread", thread: lane }, "proposed changes\' fact", () => ({\n      facts: [],',
     suite: "lanes",
     scenario: "catch-up",
     expect: "an acceptance leaves a fact the thread shows",

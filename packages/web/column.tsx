@@ -12,6 +12,7 @@ import {
   type CardId,
   type CardRecord,
   type CardWidth,
+  type ConflictChoice,
   conflictsAt,
   type DigestRecord,
   type EntryId,
@@ -54,6 +55,7 @@ import {
   columnProposals,
   columnView,
   composerPlace,
+  conflictsView,
   crossCanvasLinks,
   DENSITIES,
   type Density,
@@ -80,6 +82,7 @@ import {
   noticeKey,
   noticeWords,
   opens,
+  outcomeWords,
   type Pending,
   type ProposalMemory,
   type ReadOnly,
@@ -776,7 +779,30 @@ export function Column(p: ColumnProps) {
               ask,
               askLineOf(ask),
             ),
+          conflicts:
+            lane.kind === "lane" &&
+            p.work.lanes.get(lane.name)?.history === "folder"
+              ? {
+                  lane: lane.name,
+                  shown: conflictsView({
+                    lane: lane.name,
+                    conflicts: p.work.conflicts,
+                    states: p.work.states,
+                    laneName: l => p.work.names.get(l) ?? l,
+                  }),
+                }
+              : null,
         })
+  const chooseVersion = useStable(
+    (on: ThreadId, path: string, choose: ConflictChoice) =>
+      act({ kind: "resolve", lane: on, path, choose }),
+  )
+  const resolveActing =
+    lane.kind === "lane" ? acting.resolveByLane.get(lane.name) : undefined
+  const resolveSaid =
+    resolveActing === undefined || resolveActing.kind === "sent"
+      ? null
+      : outcomeWords(resolveActing)
   // Reset in render, not an effect: no frame draws a pane that is gone.
   if (pane !== null && paneShows === null) setPane(null)
   const paneId = `pane-${p.column.key}`
@@ -801,6 +827,7 @@ export function Column(p: ColumnProps) {
         to: to.bookmark,
       })
     }
+    if (button === "choose-versions") return openPane({ kind: "conflicts" })
     if (
       button !== "update" &&
       button !== "continue" &&
@@ -1278,8 +1305,10 @@ export function Column(p: ColumnProps) {
         </div>
         {pane !== null && paneShows !== null && (
           <Pane
+            choose={chooseVersion}
             close={closePane}
             id={paneId}
+            said={resolveSaid}
             key={paneKey(pane)}
             track={p.track}
             view={paneShows}

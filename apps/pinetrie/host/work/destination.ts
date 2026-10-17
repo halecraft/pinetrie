@@ -20,16 +20,19 @@ import type {
 } from "@pinetrie/core"
 import type { FileAt, ReadSite } from "@pinetrie/lanes"
 import {
+  readAccepted,
   readLaneRecords,
   readProposedByLane,
+  readRecords,
   readRevisions,
 } from "@pinetrie/reads"
-import type {
-  ArchiveTeardown,
-  ForkBegin,
-  planReviewRead,
-  ReviewAnswer,
-  ReviewAsk,
+import {
+  type ArchiveTeardown,
+  CONFLICT,
+  type ForkBegin,
+  type ReviewAnswer,
+  type ReviewAsk,
+  type ReviewFacts,
 } from "@pinetrie/rules"
 import type { LeaseBasics } from "../basics.ts"
 
@@ -70,7 +73,7 @@ export interface ProposedChangesActs {
       }
     | { readonly kind: "done"; readonly fact: ProposedChangesFact }
   >
-  /** A review or a diff a page asked for, of a commit open proposed changes hold. */
+  /** A review, a diff or a file's bytes a page asked for, of a span `planReviewRead` finds. */
   read(ask: ReviewAsk): Promise<ReviewAnswer>
 }
 
@@ -80,10 +83,30 @@ export type AcceptedAnswer = {
   readonly message: string
 } | null
 
-/** Accepted work's own acts: a setup or a publish. */
-export interface AcceptedActs {
-  act(action: AcceptedAction): Promise<AcceptedAnswer>
-}
+/** A restore's answer: done, or refused with the path it names, if any. */
+export type RestoreAnswer =
+  | {
+      readonly kind: "refused"
+      readonly code: ErrCode
+      readonly path?: string
+    }
+  | { readonly kind: "done" }
+
+/**
+ * Accepted work's own acts, by the project's kind: a jj project's setup
+ * and publish, a folder project's restore. Neither kind carries the
+ * other's: the command handler refuses a mismatch.
+ */
+export type AcceptedActs =
+  | {
+      readonly kind: "jj"
+      act(action: AcceptedAction): Promise<AcceptedAnswer>
+    }
+  | {
+      readonly kind: "folder"
+      /** `of`'s content written into the project's folder, as accepted work's newest was `seen`. */
+      restore(of: PointId, seen: PointId, by: WriterId): Promise<RestoreAnswer>
+    }
 
 export interface Destination {
   /** `path` at `site`, read at the head the destination last observed. */
@@ -107,12 +130,14 @@ export interface Destination {
 
 /**
  * What a review may read is found in (`planReviewRead`): every proposed
- * changes, and the revisions of the roots of their lanes, each leased while
- * it is read, since a range is named by two states of one lane.
+ * changes, the revisions of the roots of their lanes, each leased while
+ * it is read, since a range is named by two states of one lane; accepted
+ * work's record, whose kept states a folder project's history reviews; and
+ * the open conflicts, whose sides a lane's pane reviews.
  */
 export async function reviewReadFacts(
   basics: Pick<LeaseBasics, "session" | "leases">,
-): Promise<Parameters<typeof planReviewRead>[0]> {
+): Promise<ReviewFacts> {
   const proposedByLane = readProposedByLane(basics.session)
   const lanes = readLaneRecords(basics.session)
   const roots = new Set(
@@ -124,5 +149,10 @@ export async function reviewReadFacts(
     for (const [entry, r] of readRevisions(await held.ready))
       revisions.set(entry, r)
   }
-  return { proposedByLane, revisions }
+  return {
+    proposedByLane,
+    revisions,
+    accepted: readAccepted(basics.session),
+    conflicts: [...readRecords(basics.session, CONFLICT).values()],
+  }
 }

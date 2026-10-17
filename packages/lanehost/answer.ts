@@ -10,6 +10,7 @@ import {
   planDisk,
   planNestedDisk,
   readSnapshotFile,
+  snapshotsIn,
 } from "./disks.ts"
 import {
   diffStats,
@@ -77,6 +78,8 @@ async function answerAny(
       return isSubvolume(
         disksOf(serving, call.project).snapshot(named(call.snapshot)),
       )
+    case "snapshots":
+      return snapshotsIn(disksOf(serving, call.project))
     case "statesDir":
       await mkdir(disksOf(serving, call.project).states(named(call.lane)), {
         recursive: true,
@@ -126,7 +129,7 @@ async function answerAny(
         disksOf(serving, call.project),
         call.a,
         call.b,
-        call.paths,
+        call.pairs,
       )
     case "applyMerge":
       return executeApply(

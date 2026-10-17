@@ -49,6 +49,8 @@ export interface LaneRuntime {
   disk(op: DiskOp): Promise<void>
   diskExists(lane: LaneOwner): Promise<boolean>
   snapshotExists(id: SnapshotId): Promise<boolean>
+  /** Every snapshot of the project's, sorted: one call, where a check of each would be many. */
+  snapshots(): Promise<readonly SnapshotId[]>
   /** What differs between two snapshots, both of this project's. */
   diff(from: SnapshotId, to: SnapshotId): Promise<DiskDiff>
   /** A file of pine·trie's own (`.pinetrie-lane/<file>`) in a snapshot; null when absent. */

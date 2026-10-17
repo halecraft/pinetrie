@@ -234,7 +234,7 @@ export function startJjProject(dir: JjProjectDir): ProjectAdapter {
               )
             },
             proposed,
-            accepted,
+            accepted: { kind: "jj", act: accepted.act },
             quiet: () => owner.idle(),
             close: () => owner.close(),
           }

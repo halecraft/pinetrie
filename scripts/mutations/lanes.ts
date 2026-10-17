@@ -134,9 +134,9 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "folder proposed changes' review lists no file",
-    file: "apps/pinetrie/host/folder/proposed.ts",
-    from: "        reader.disks.diffStats(from, to, files),",
-    to: "        reader.disks.diffStats(from, to, []),",
+    file: "apps/pinetrie/host/folder/review.ts",
+    from: "    reader.disks.diffStats(from, to, files),",
+    to: "    reader.disks.diffStats(from, to, []),",
     suite: "lanes",
     scenario: "folder",
     expect:
@@ -174,9 +174,9 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "resolve_conflict deletes the path it is asked to take",
-    file: "apps/pinetrie/host/folder/history.ts",
-    from: '              : { kind: "take", path },',
-    to: '              : { kind: "delete", path },',
+    file: "packages/folder/resolve.ts",
+    from: '        : { kind: "take", path }\n',
+    to: '        : { kind: "delete", path }\n',
     suite: "lanes",
     scenario: "folder",
     expect: "resolve_conflict writes the version chosen, and its versions go",
@@ -716,10 +716,19 @@ export const mutations: readonly Mutation[] = [
   {
     name: "tarOut skips its path check",
     file: "packages/lanehost/tar-out.ts",
-    from: "  await checkTarPaths(root, paths)\n",
+    from: "  await checkOutPaths(root, paths)\n",
     to: "",
     command: ["pnpm", "exec", "vitest", "run", "packages/lanehost"],
     expect: "tarStream writes nothing for a refused path",
+  },
+  {
+    name: "file-out.ts skips its path check",
+    file: "packages/lanehost/file-out.ts",
+    from: "  await checkOutPaths(root, [p])\n",
+    to: "",
+    command: ["pnpm", "exec", "vitest", "run", "packages/lanehost"],
+    expect:
+      "fileStream answers a file's bytes, and nothing for a path that climbs out or runs under a symlink",
   },
   {
     name: "a folder accept writes nothing",
@@ -732,10 +741,40 @@ export const mutations: readonly Mutation[] = [
       "an accept writes the shown merge into the project's folder, and leaves nothing of its own there",
   },
   {
+    name: "a person's choice of a conflict's version tells the thread nothing",
+    file: "apps/pinetrie/host/commands/lane.ts",
+    from: '    .step({ kind: "thread", thread: lane }, "a conflict\'s resolution", () => ({\n      facts: [done.fact],',
+    to: '    .step({ kind: "thread", thread: lane }, "a conflict\'s resolution", () => ({\n      facts: [],',
+    suite: "lanes",
+    scenario: "folder",
+    expect:
+      "a person's choice of a conflict's version closes it as a state of the lane's, and tells the thread",
+  },
+  {
+    name: "a restore writes accepted work's newest back",
+    file: "apps/pinetrie/host/commands/lane.ts",
+    from: "  const done = await destination.accepted.restore(intent.of, intent.seen, by)\n",
+    to: "  const done = await destination.accepted.restore(intent.seen, intent.seen, by)\n",
+    suite: "lanes",
+    scenario: "folder",
+    expect:
+      "a restore of the state before the accept writes its files back into the project's folder",
+  },
+  {
+    name: "a restore takes accepted work now as what was shown",
+    file: "apps/pinetrie/host/folder/writes.ts",
+    from: "      changes: ofMade ? await sourceChanges(reader, newest, of) : [],\n      seen,\n",
+    to: "      changes: ofMade ? await sourceChanges(reader, newest, of) : [],\n      seen: newest,\n",
+    suite: "lanes",
+    scenario: "folder",
+    expect:
+      "a restore after your save since its preview is refused as not shown, and writes nothing",
+  },
+  {
     name: "a folder accept skips its own read of the project's folder",
-    file: "apps/pinetrie/host/folder/accept.ts",
-    from: "    const newest = await deps.line.readNow()\n",
-    to: "    const newest = deps.proposed(lane)?.start ?? (await deps.line.readNow())\n",
+    file: "apps/pinetrie/host/folder/writes.ts",
+    from: "    const newest = await deps.line.readNow()\n    const proposed = deps.proposed(lane)\n",
+    to: "    const newest = deps.proposed(lane)?.start ?? (await deps.line.readNow())\n    const proposed = deps.proposed(lane)\n",
     suite: "lanes",
     scenario: "folder",
     expect:

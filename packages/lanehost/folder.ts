@@ -23,10 +23,14 @@ import path from "node:path"
 import { runCommand } from "@pinetrie/channel"
 import {
   type DiffStat,
+  FILE_CONTENT_WINDOW,
+  type FileContent,
+  fileContent,
   isPathInside,
   type LaneStatesOp,
   type MergeStep,
   type PathFact,
+  type PathPair,
   type ReadInAnswer,
   type ReadPath,
   type TextMerged,
@@ -39,9 +43,6 @@ import {
   type ProjectDisks,
 } from "./layout.ts"
 import { kindOf, walkTree } from "./walk.ts"
-
-/** How much of a file is read to tell text: git's own window. */
-const TEXT_WINDOW = 8000
 
 const inside = (p: string): string => {
   if (!isPathInside(p))
@@ -65,13 +66,13 @@ async function isUnderDirs(root: string, p: string): Promise<boolean> {
   return true
 }
 
-/** Whether a file holds a NUL byte in its first window, as git tells binary. */
-async function isText(at: string): Promise<boolean> {
+/** What a file holds, from its first window (`fileContent`). */
+async function contentAt(at: string): Promise<FileContent> {
   const handle = await open(at, "r")
   try {
-    const buf = Buffer.alloc(TEXT_WINDOW)
-    const { bytesRead } = await handle.read(buf, 0, TEXT_WINDOW, 0)
-    return !buf.subarray(0, bytesRead).includes(0)
+    const buf = Buffer.alloc(FILE_CONTENT_WINDOW)
+    const { bytesRead } = await handle.read(buf, 0, FILE_CONTENT_WINDOW, 0)
+    return fileContent(buf.subarray(0, bytesRead))
   } finally {
     await handle.close()
   }
@@ -92,7 +93,7 @@ async function factAt(root: string, p: string): Promise<PathFact> {
       return {
         kind: "file",
         exec: (s.mode & 0o100) !== 0,
-        text: await isText(at),
+        content: await contentAt(at),
         size: s.size,
       }
     case "other":
@@ -161,30 +162,34 @@ async function isSameBytes(a: string, b: string): Promise<boolean> {
 }
 
 /**
- * The paths where snapshots `a` and `b` both hold a file of the same bytes:
- * sizes first, then a read of both. Shared extents would prove a clone
- * alike without a read; only the paths both sides changed are asked, so a
+ * The pairs where snapshot `a` holds a file at the pair's `a` and snapshot
+ * `b` one of the same bytes at its `b`: sizes first, then a read of both.
+ * Shared extents would prove a clone alike without a read; only paths a
+ * change touched are asked, and only files of one size are read, so a
  * read is cheap enough.
  */
 export async function sameContent(
   disks: ProjectDisks,
   a: string,
   b: string,
-  paths: readonly string[],
-): Promise<readonly string[]> {
+  pairs: readonly PathPair[],
+): Promise<readonly PathPair[]> {
   const rootA = disks.snapshot(named(a))
   const rootB = disks.snapshot(named(b))
-  const out: string[] = []
-  for (const p of paths.map(inside)) {
-    if (!(await isUnderDirs(rootA, p)) || !(await isUnderDirs(rootB, p)))
+  const out: PathPair[] = []
+  for (const pair of pairs) {
+    const pa = inside(pair.a)
+    const pb = inside(pair.b)
+    if (!(await isUnderDirs(rootA, pa)) || !(await isUnderDirs(rootB, pb)))
       continue
     const [sa, sb] = await Promise.all([
-      lstatOrNull(path.join(rootA, p)),
-      lstatOrNull(path.join(rootB, p)),
+      lstatOrNull(path.join(rootA, pa)),
+      lstatOrNull(path.join(rootB, pb)),
     ])
     if (sa === null || sb === null || !sa.isFile() || !sb.isFile()) continue
     if (sa.size !== sb.size) continue
-    if (await isSameBytes(path.join(rootA, p), path.join(rootB, p))) out.push(p)
+    if (await isSameBytes(path.join(rootA, pa), path.join(rootB, pb)))
+      out.push({ a: pa, b: pb })
   }
   return out
 }

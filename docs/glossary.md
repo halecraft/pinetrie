@@ -39,7 +39,7 @@ words they were written with.
 | **folder project** | A project whose folder is no jj repo: pine·trie keeps its history itself, as states (ADR-0142). | `ProjectKind` `"folder"`, `startFolderProject` | |
 | **state** | A snapshot of a folder project's disk, recorded with its parents: a read of the project's folder, a lane's start, turn or catch-up. | `StateRecord`, `PointId` | |
 | **conflict** | A path a catch-up left conflicted in a folder lane: a record of its three versions' states, shown under `/pinetrie-states/conflicts/`. | `ConflictRecord` | |
-| **resolve** | Close a conflict with the version chosen: the lane's own (`ours`), `theirs` or `base`. | `resolve_conflict`, `LaneHistory.resolve` | |
+| **resolve** | Close a conflict with the version chosen: the lane's own (`ours`), `theirs` or `base`, by the agent's tool or a person's choice on the page. In a folder project it is a state of the lane's own (`resolve`). | `resolve_conflict`, `LaneHistory.resolve`, `planResolve`, `ResolvedFact` | |
 
 ## A lane's disk
 
@@ -48,6 +48,8 @@ words they were written with.
 | **lane's history** | The kind of history a lane's own copy keeps, jj's or a folder's, for its whole life: on its record, a new lane's the kind of the disk it clones. A lane of another kind than the project's is refused, whole and intact (ADR-0150). | `LaneRecord.history`, `ForeignLane`, `laneFits` | a lane's own copy (as a yes or no, `ownCopy`) |
 | **point** | A state in the project's history, a lane's or accepted work's, named by an opaque id: a jj commit's, or a folder's snapshot's, read by the kind of the lane it is read in (ADR-0150). | `PointId`, `pointFromCommit`, `commitFromPoint` | a turn's commit (as what lane work names) |
 | **state** (of a folder project) | A point of a folder project's history: a snapshot, recorded with its parents when it is made, never changed after (ADR-0142). | `StateRecord`, `STATE`, `planState`, `StateGraph` | |
+| **history** (of a folder project) | Accepted work's line of states, newest first, as the history page shows it: each kept one with who made it, when and how (ADR-0165). | `historyView`, `lineStates`, `FolderAcceptedRecord.kept` | |
+| **restore** (a state) | Write an earlier kept state of a folder project's accepted work into its folder, as a new state of the line, checked as an accept is (ADR-0165). Not a trashed card's restore, nor an archived canvas's. | `restoreNow`, `RestorePreview`, `writeStateNow` | |
 | **merge base** | Where two states' histories last met: their lowest common ancestor; several are merged first into one virtual base, never one chosen (ADR-0142). | `mergeBases`, `planBase`, `BasePlan` | |
 | **conflict** (a folder lane's) | A path a merge into a lane could not merge, kept as the lane's, recorded with the states of its base and both sides, whose three versions the lane reads (ADR-0142). | `ConflictRecord`, `CONFLICT`, `planPathMerge` | |
 | **source** | A path `.gitignore` does not ignore: what the project is made of, committed and proposed (ADR-0135). | `PathClass` `"source"` | tracked (as a class) |

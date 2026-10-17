@@ -540,7 +540,7 @@ describe("what a new lane starts from: its line", () => {
   test("baseChoices: none in a folder project, which has no WIP", () => {
     expect(
       baseChoices(
-        { kind: "folder", newest: pointId("line-0192aaaa"), at: 1 },
+        { kind: "folder", newest: pointId("line-0192aaaa"), kept: [], at: 1 },
         null,
       ),
     ).toEqual([])

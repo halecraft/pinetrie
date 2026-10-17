@@ -12,7 +12,7 @@ import {
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { afterEach, beforeEach, expect, test } from "vitest"
-import { checkTarPaths, tarStream } from "./tar-out.ts"
+import { checkOutPaths, tarStream } from "./tar-out.ts"
 
 let dir = ""
 let root = ""
@@ -31,16 +31,16 @@ afterEach(async () => {
   await rm(dir, { recursive: true, force: true })
 })
 
-test("checkTarPaths refuses a path that climbs out, one under a symlink, a symlink, and one missing", async () => {
-  await expect(checkTarPaths(root, ["../secret"])).rejects.toThrow(
+test("checkOutPaths refuses a path that climbs out, one under a symlink, a symlink, and one missing", async () => {
+  await expect(checkOutPaths(root, ["../secret"])).rejects.toThrow(
     "not a path inside",
   )
-  await expect(checkTarPaths(root, ["out/secret"])).rejects.toThrow(
+  await expect(checkOutPaths(root, ["out/secret"])).rejects.toThrow(
     "out is not one",
   )
-  await expect(checkTarPaths(root, ["link"])).rejects.toThrow("link is not one")
-  await expect(checkTarPaths(root, ["nope"])).rejects.toThrow("missing")
-  await expect(checkTarPaths(root, ["a.txt", "d/run.sh"])).resolves.toBe(
+  await expect(checkOutPaths(root, ["link"])).rejects.toThrow("link is not one")
+  await expect(checkOutPaths(root, ["nope"])).rejects.toThrow("missing")
+  await expect(checkOutPaths(root, ["a.txt", "d/run.sh"])).resolves.toBe(
     undefined,
   )
 })

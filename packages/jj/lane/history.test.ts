@@ -353,7 +353,9 @@ withJjRig(
   "resolve refuses: a jj lane's conflicts are markers in the file",
   async rig => {
     const lane = await rig.lane()
-    expect(await lane.withHistory(h => h.resolve("a.txt", "theirs"))).toEqual({
+    expect(
+      await lane.withHistory(h => h.resolve("a.txt", "theirs", null)),
+    ).toEqual({
       kind: "refused",
       why: "markers",
     })

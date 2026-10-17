@@ -4,7 +4,8 @@
 // newest, the reverse of jj's commit then snapshot, since the diff compares
 // snapshots; a catch-up is the path merge on the graph's base, its
 // conflicts records (`CONFLICT`) whose versions the lane reads under
-// `/pinetrie-states`. Every snapshot is taken by `planSnapshot`, after the
+// `/pinetrie-states`, each closed by a resolution, a state of its own
+// (`planResolve`). Every snapshot is taken by `planSnapshot`, after the
 // lane's `sync`. Nothing is fetched anywhere: `follow` is always null.
 
 import {
@@ -14,6 +15,7 @@ import {
   folderCopyReady,
   type LaneStatesOp,
   type PointId,
+  resolveStateId,
   type StateRecord,
   snapshotId,
   startStateId,
@@ -26,6 +28,7 @@ import {
   isAncestor,
   laneNewest,
   planBase,
+  planResolve,
   planState,
   type StateGraph,
   stateGraph,
@@ -322,25 +325,42 @@ export function folderHistory(
 
     conflicts: async () => openConflicts(),
 
-    async resolve(path, choose) {
+    async resolve(path, choose, by) {
+      // gather
       const open = store.conflicts(lane).find(c => c.path === path)
-      if (open === undefined) return { kind: "refused", why: "no-conflict" }
-      if (choose !== "ours") {
-        const from = open[choose]
-        const [fact] = await disks.pathFacts(from, [path])
+      const [chosen] =
+        open === undefined || choose === "ours"
+          ? [null]
+          : await disks.pathFacts(open[choose], [path])
+      // plan
+      const planned = planResolve({
+        graph: graph(),
+        lane,
+        path,
+        open,
+        choose,
+        chosen: chosen ?? null,
+        id: resolveStateId(input.newId()),
+        at: input.now(),
+        by,
+      })
+      if (planned.kind === "no-conflict")
+        return { kind: "refused", why: "no-conflict" }
+      // execute
+      const { step, record } = planned
+      if (open !== undefined && step !== null)
         await disks.applyMerge({
           disk: lane,
           base: null,
-          theirs: from,
-          steps: [
-            fact === undefined || fact.kind === "absent"
-              ? { kind: "delete", path }
-              : { kind: "take", path },
-          ],
+          theirs: open[choose],
+          steps: [step],
           markers: false,
         })
-      }
-      await store.write([deleteRecord(CONFLICT, conflictKey(lane, path))])
+      await snapshot(record.id)
+      await store.write([
+        setRecord(STATE, record),
+        deleteRecord(CONFLICT, conflictKey(lane, path)),
+      ])
       await disks.states(lane, { kind: "resolved", path })
       return { kind: "resolved" }
     },

@@ -8,6 +8,7 @@ import type {
   LaneStatesOp,
   MergeStep,
   PathFact,
+  PathPair,
   ReadInAnswer,
   ReadPath,
   TextMerged,
@@ -41,6 +42,8 @@ export type LanehostCall =
       readonly project: string
       readonly snapshot: string
     }
+  /** The names of the project's snapshots, sorted: one listing for what a sweep keeps. */
+  | { readonly kind: "snapshots"; readonly project: string }
   /** A folder lane's states directory, made if missing, for its container to mount. */
   | {
       readonly kind: "statesDir"
@@ -112,13 +115,13 @@ export type LanehostCall =
       readonly b: string
       readonly paths: readonly string[]
     }
-  /** The paths where two snapshots hold files of alike content. */
+  /** The pairs of paths, `a`'s in one snapshot and `b`'s in another, whose files hold alike bytes. */
   | {
       readonly kind: "sameContent"
       readonly project: string
       readonly a: string
       readonly b: string
-      readonly paths: readonly string[]
+      readonly pairs: readonly PathPair[]
     }
   /**
    * A merge's steps applied to a disk (a lane's, or a virtual base's
@@ -167,6 +170,7 @@ export interface LanehostResults {
   readonly disk: null
   readonly diskExists: boolean
   readonly snapshotExists: boolean
+  readonly snapshots: readonly string[]
   readonly nestedDisk: null
   readonly statesDir: null
   readonly read: string | null
@@ -176,7 +180,7 @@ export interface LanehostResults {
   readonly grant: null
   readonly diff: DiskDiff
   readonly pathFacts: readonly PathFact[]
-  readonly sameContent: readonly string[]
+  readonly sameContent: readonly PathPair[]
   readonly filesUnder: readonly string[]
   readonly fileDiff: string
   readonly diffStats: readonly DiffStat[]

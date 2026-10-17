@@ -67,6 +67,7 @@ import {
   foldMemory,
   type HeldView,
   heldByOthers,
+  historyView,
   type Identity,
   type Intent,
   type IntentState,
@@ -105,6 +106,7 @@ import {
   readSessionFacts,
   reconcileName,
   resolveLayout,
+  restoreStatus,
   rootEntriesOf,
   rootSeed,
   type SearchState,
@@ -156,6 +158,7 @@ import {
   canvasLines,
   canvasList,
   canvasPinnedOf,
+  displayName,
   reachableAgents,
   TRASH_KEEP_MS,
   unstartedThreads,
@@ -190,6 +193,7 @@ import { useFileDropGuard } from "./file-drop.ts"
 import { type FocusContext, focusFacts } from "./focus.ts"
 import { FocusClaim } from "./focus-claim.ts"
 import { Footer } from "./footer.tsx"
+import { HistoryPage } from "./history-page.tsx"
 import { threadRow } from "./inbox-menu.tsx"
 import { InventoryPanel } from "./inventory-panel.tsx"
 import { Page } from "./page.tsx"
@@ -387,6 +391,11 @@ export function App({
   const status = useDocStatus(doc)
   // The page over the stage, from the URL's hash.
   const page = usePage()
+  // Your commands out now: the history's restore reads its own.
+  const actingNow = useSyncExternalStore(
+    session.acting.subscribe,
+    session.acting.current,
+  )
   // The roots this tab holds: the roots of the sidebar and the one
   // you are on, set by the effect below. Every read of the tree reads them
   // as one.
@@ -1840,6 +1849,22 @@ export function App({
               {page === "setup" && (
                 <SetupPage
                   view={setupView(workFacts.setup, workFacts.commands)}
+                />
+              )}
+              {page === "history" && (
+                <HistoryPage
+                  acting={restoreStatus(actingNow.restore)}
+                  narrow={narrow}
+                  restore={preview => void session.restore(preview)}
+                  view={historyView({
+                    states: workFacts.states,
+                    accepted:
+                      workFacts.accepted?.kind === "folder"
+                        ? workFacts.accepted
+                        : null,
+                    personName: w => displayName(w, nameOf.get(w)),
+                    laneName: lane => workFacts.names.get(lane) ?? lane,
+                  })}
                 />
               )}
             </Page>

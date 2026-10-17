@@ -275,8 +275,14 @@ export {
   type CompletionOption,
   completion,
 } from "./completion.ts"
+export {
+  type ConflictShown,
+  conflictChoiceWords,
+  conflictsView,
+  conflictsWords,
+} from "./conflicts-view.ts"
 export { copyText } from "./copy-text.ts"
-export { plural } from "./counts.ts"
+export { byteWords, plural, whenWords } from "./counts.ts"
 export {
   type Armed,
   type CanvasOver,
@@ -339,6 +345,7 @@ export {
   UNFOLD,
   UNNAMED_THREAD,
 } from "./folded-column-view.ts"
+export { jjWordsIn, wordsIn } from "./folder-words.ts"
 export {
   behind,
   type FollowEvent,
@@ -368,6 +375,14 @@ export {
   toggleOpenMenu,
   withOpenMenus,
 } from "./here.ts"
+export {
+  type HistoryEntry,
+  type HistoryView,
+  historyView,
+  madeWords,
+  restoreStatus,
+  restoreWords,
+} from "./history-view.ts"
 export {
   type Identity,
   identityCodec,
@@ -463,6 +478,7 @@ export {
   noteColumnsOf,
   noteCountWords,
 } from "./note-column-view.ts"
+export { outcomeWords } from "./outcome-words.ts"
 export {
   BACK,
   hashOfPage,
@@ -532,6 +548,7 @@ export {
   proposalView,
 } from "./proposal-view.ts"
 export {
+  historyLink,
   publishToast,
   publishView,
   publishWords,
@@ -574,6 +591,9 @@ export {
   diffLines,
   type FileRow,
   type Loaded,
+  type MediaRow,
+  type MediaShown,
+  MOVED_UNCHANGED,
   type ReviewPref,
   reviewPrefWords,
   reviewView,

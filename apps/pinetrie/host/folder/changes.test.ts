@@ -17,15 +17,15 @@ function reader(input: {
   const fact = (state: string, p: string): PathFact => ({
     kind: "file",
     exec: state === B && (input.exec?.[p] ?? false),
-    text: true,
+    content: "text",
     size: 1,
   })
   return {
     runtime: { diff: async () => ({ changes: input.changes }) },
     disks: {
       filesUnder: async (_, paths) => paths.flatMap(p => input.under[p] ?? []),
-      sameContent: async (_a, _b, paths) =>
-        paths.filter(p => input.alike.includes(p)),
+      sameContent: async (_a, _b, pairs) =>
+        pairs.filter(p => input.alike.includes(p.a)),
       pathFacts: async (state, paths) => paths.map(p => fact(state, p)),
       read: async (_, p) =>
         p === ".gitignore" ? (input.ignore ?? null) : null,

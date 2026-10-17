@@ -6,6 +6,32 @@ const archive = "packages/rules/archive.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "readableSpan grants a span whose first state is swept",
+    file: "packages/rules/review.ts",
+    from: "    const a = kept.find(p => p === from)\n",
+    to: "    const a = from as PointId\n",
+    command: unit,
+    expect:
+      "readableSpan: the oldest kept state's span from its swept parent is none",
+  },
+  {
+    name: "planReviewRead reads a swept state",
+    file: "packages/rules/review.ts",
+    from: "    if (a !== undefined && b !== undefined)\n",
+    to: "    if (b !== undefined)\n",
+    command: unit,
+    expect: "planReviewRead: a state accepted work no longer keeps is refused",
+  },
+  {
+    name: "planResolveCommand lets a running thread through",
+    file: "packages/rules/resolve.ts",
+    from: '  if (input.running) return { kind: "refused", code: ERR.THREAD_RUNNING }\n',
+    to: "",
+    command: unit,
+    expect:
+      "planResolveCommand: a lane of the host's own and idle goes; one not its own or running is refused",
+  },
+  {
     name: "the first open state's canvases are tasks",
     file: "packages/rules/board.ts",
     from: '  return at > 0 ? "task" : "topic"',
@@ -1902,16 +1928,16 @@ export const mutations: readonly Mutation[] = [
   {
     name: "accepted proposed changes' commit is read",
     file: "packages/rules/review.ts",
-    from: '        o.kind === "jj" && proposedChangesStatus(o).kind === "open"\n',
-    to: '        o.kind === "jj"\n',
+    from: '      o.kind === "jj" && proposedChangesStatus(o).kind === "open"\n',
+    to: '      o.kind === "jj"\n',
     command: unit,
     expect: "planReviewRead: only a commit open proposed changes hold now",
   },
   {
     name: "held proposed changes' commit is read",
     file: "packages/rules/review.ts",
-    from: '        o.kind === "jj" && proposedChangesStatus(o).kind === "open"\n',
-    to: '        o.kind === "jj" && o.acceptedAs === null\n',
+    from: '      o.kind === "jj" && proposedChangesStatus(o).kind === "open"\n',
+    to: '      o.kind === "jj" && o.acceptedAs === null\n',
     command: unit,
     expect: "planReviewRead: only a commit open proposed changes hold now",
   },

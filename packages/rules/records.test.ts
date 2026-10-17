@@ -25,7 +25,6 @@ import {
 import { describe, expect, test } from "vitest"
 import { BUDGET } from "./budget.ts"
 import {
-  ACCEPT_JOURNAL,
   ACCEPTED,
   ACCESS,
   BANNER,
@@ -38,6 +37,7 @@ import {
   decodeFolderStamps,
   deleteRecord,
   encodeFolderStamps,
+  FOLDER_WRITE_JOURNAL,
   ICONS,
   LANE,
   MARK,
@@ -248,7 +248,7 @@ const SAMPLES: readonly Sample[] = [
   sample(
     "a folder's accepted work",
     ACCEPTED,
-    { kind: "folder", newest: pointId("line-0192aaaa"), at: 1 },
+    { kind: "folder", newest: pointId("line-0192aaaa"), kept: [], at: 1 },
     null,
   ),
   sample(
@@ -372,10 +372,9 @@ const SAMPLES: readonly Sample[] = [
   ),
   sample(
     "accept's journal",
-    ACCEPT_JOURNAL,
+    FOLDER_WRITE_JOURNAL,
     {
       id: "0190-a",
-      lane: L,
       record: {
         id: pointId("shown-1"),
         parents: [pointId("line-1"), pointId("e-1")],
@@ -394,7 +393,7 @@ const SAMPLES: readonly Sample[] = [
           keptOn: pointId("shown-1"),
         },
       ],
-      status: "accepted",
+      status: "written",
     },
     "id",
   ),
@@ -584,7 +583,12 @@ test("planKindSweep deletes the proposed changes, accepted work and bases of the
       [L, proposed],
       [F, folderProposed],
     ]),
-    accepted: { kind: "folder", newest: pointId("line-0192aaaa"), at: 1 },
+    accepted: {
+      kind: "folder",
+      newest: pointId("line-0192aaaa"),
+      kept: [],
+      at: 1,
+    },
     bases: new Map<ThreadId, BaseRecord>([[F, folderBase]]),
   } as const
   const swept = (kind: "jj" | "folder") =>

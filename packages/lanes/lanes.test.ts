@@ -33,6 +33,7 @@ function recordingRuntime(seen: string[]): LaneRuntime {
     execArgv: (container, argv) => ["exec", container, ...argv],
     diskExists: no,
     snapshotExists: no,
+    snapshots: no,
     diff: no,
     readLaneFile: no,
     runSpec: no,

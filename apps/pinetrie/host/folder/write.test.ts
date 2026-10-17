@@ -13,12 +13,12 @@ import {
 import { tmpdir } from "node:os"
 import path from "node:path"
 import {
-  type AcceptJournal,
   type AcceptWrite,
-  acceptAsideDir,
-  acceptStageDir,
   pointId,
   threadIdFor,
+  type WriteJournal,
+  writeAsideDir,
+  writeStageDir,
 } from "@pinetrie/core"
 import {
   checkStage,
@@ -27,14 +27,14 @@ import {
   shownMergeId,
 } from "@pinetrie/folder"
 import { afterEach, beforeEach, describe, expect, test } from "vitest"
-import { extractTar } from "./accept.ts"
 import { scanFolder } from "./scan.ts"
 import {
   type AllLinked,
   executeWriteSteps,
-  recoverAccept,
+  recoverWrite,
   walkStage,
 } from "./write.ts"
+import { extractTar } from "./writes.ts"
 
 const ID = "0190-accept"
 const LANE = threadIdFor("1")
@@ -76,7 +76,7 @@ async function planned(shown: Record<string, string | null>) {
           ? { kind: "symlink", target: v.slice(2) }
           : { kind: "file" },
   }))
-  const stage = acceptStageDir(ID)
+  const stage = writeStageDir(ID)
   await mkdir(path.join(root, stage))
   await put(
     Object.fromEntries(
@@ -89,9 +89,8 @@ async function planned(shown: Record<string, string | null>) {
   const checked = checkStage(await walkStage(path.join(root, stage)), writes)
   if (checked.kind !== "staged") throw new Error(JSON.stringify(checked))
   const steps = planWriteSteps(writes, stage)
-  const journal: AcceptJournal = {
+  const journal: WriteJournal = {
     id: ID,
-    lane: LANE,
     record: {
       id: shownMergeId(L1, TIP),
       parents: [L1, TIP],
@@ -115,7 +114,7 @@ describe("executeWriteSteps", () => {
       "d/e.txt": null,
       l: "->a.txt",
     })
-    const saved: AcceptJournal[] = []
+    const saved: WriteJournal[] = []
     const { done } = await executeWriteSteps({
       root,
       journal,
@@ -129,7 +128,7 @@ describe("executeWriteSteps", () => {
     expect(await read("b.txt")).toBe("b")
     expect(await read("gone.txt")).toBeNull()
     expect(await readlink(path.join(root, "l"))).toBe("a.txt")
-    expect(await read(`${acceptAsideDir(ID)}/a.txt`)).toBe("old")
+    expect(await read(`${writeAsideDir(ID)}/a.txt`)).toBe("old")
     // A directory a delete leaves empty goes.
     await expect(stat(path.join(root, "d"))).rejects.toThrow()
     expect(saved.at(-1)?.paths.every(p => p.linked)).toBe(true)
@@ -151,7 +150,7 @@ describe("executeWriteSteps", () => {
       },
     })
     expect(done).toMatchObject({ kind: "failed", path: "b.txt" })
-    expect((await recoverAccept(root, after)).kind).toBe("put-back")
+    expect((await recoverWrite(root, after)).kind).toBe("put-back")
     expect(await read("a.txt")).toBe("old")
     expect(await read("b.txt")).toBe("yours")
   })
@@ -171,7 +170,7 @@ describe("executeWriteSteps", () => {
     })
     expect(done).toMatchObject({ kind: "failed", path: "z.txt" })
     expect(await read("a.txt")).toBe("new")
-    const recovered = await recoverAccept(root, after)
+    const recovered = await recoverWrite(root, after)
     expect(recovered.kind).toBe("put-back")
     expect(await read("a.txt")).toBe("old")
     expect(await read("z.txt")).toBe("yours, since")
@@ -179,7 +178,7 @@ describe("executeWriteSteps", () => {
   })
 })
 
-describe("recoverAccept", () => {
+describe("recoverWrite", () => {
   test("a put back never unlinks a file written in place since its link", async () => {
     await put({ "a.txt": "old", "z.txt": "z-old" })
     const { steps, journal } = await planned({ "a.txt": "new", "z.txt": "z" })
@@ -192,7 +191,7 @@ describe("recoverAccept", () => {
     })
     // An app writes through a.txt by its path after the link.
     await writeFile(path.join(root, "a.txt"), "yours, in place")
-    await recoverAccept(root, after)
+    await recoverWrite(root, after)
     expect(await read("a.txt")).toBe("yours, in place")
     expect((await lstat(path.join(root, "z.txt"))).isFile()).toBe(true)
   })
@@ -215,9 +214,9 @@ test("extractTar takes a stream whose tail tar never reads", async () => {
 
 test("only the executor makes an AllLinked, and it takes no recovery step", () => {
   // @ts-expect-error: the brand is write.ts's own, so no literal is one.
-  const forged: AllLinked = { accept: ID }
+  const forged: AllLinked = { write: ID }
   const steps = (s: Parameters<typeof executeWriteSteps>[0]["steps"]) => s
   // @ts-expect-error: a recovery step is never a write step.
   steps([{ kind: "drop-stage", id: ID }])
-  expect(forged.accept).toBe(ID)
+  expect(forged.write).toBe(ID)
 })

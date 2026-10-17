@@ -7,6 +7,7 @@ import {
   threadIdFor,
   withTrailers,
 } from "@pinetrie/core"
+import { fileUrl } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
 import type { ReviewTarget } from "./column-view.ts"
 import {
@@ -27,11 +28,11 @@ const file = (path: string, added: number, removed: number): ReviewFile => ({
   change: "modified",
   added,
   removed,
+  content: { kind: "lines" },
 })
 const ready = <T>(value: T): Loaded<T> => ({ kind: "ready", value })
 const span = (commit: typeof C1) => ({ kind: "revision", commit }) as const
 const target: ReviewTarget = {
-  lane: LANE,
   spans: [span(C1), span(C2)],
   conflicts: ["b.txt"],
   yourEdits: ["a.txt"],
@@ -81,6 +82,54 @@ describe("reviewView", () => {
     expect(new Set(keys).size).toBe(3)
     expect(second?.files[0]?.letter).toBe("A")
   })
+  test("a media row has its sides' URLs and sizes and no lines; a renamed row with no lines is moved, unchanged", () => {
+    const view = reviewView({ ...target, spans: [span(C1)] }, [
+      ready({
+        description: "feat: media\n",
+        files: [
+          {
+            ...file("a.png", 0, 0),
+            content: {
+              kind: "media",
+              before: { content: "image/png", size: 1200 },
+              after: { content: "image/png", size: 1_500_000 },
+            },
+          },
+          {
+            ...file("b.bin", 0, 0),
+            change: "added",
+            content: {
+              kind: "media",
+              before: null,
+              after: { content: "binary", size: 12 },
+            },
+          },
+          {
+            ...file("new.txt", 0, 0),
+            shown: "{old.txt => new.txt}",
+            change: "renamed",
+          },
+        ],
+        widenings: [],
+      }),
+    ])
+    const rows =
+      view.revisions[0]?.state.kind === "ready"
+        ? view.revisions[0].state.value.files
+        : []
+    expect(rows.map(r => [r.path, r.media?.kind ?? null, r.moved])).toEqual([
+      ["a.png", "image", false],
+      ["b.bin", "file", false],
+      ["new.txt", null, true],
+    ])
+    expect(rows[0]?.media).toEqual({
+      kind: "image",
+      before: { url: fileUrl(span(C1), "a.png", "before"), size: "1.2 KB" },
+      after: { url: fileUrl(span(C1), "a.png", "after"), size: "1.5 MB" },
+    })
+    expect(rows[1]?.media?.before).toBeNull()
+  })
+
   test("a revision still loading keeps its place", () => {
     const view = reviewView(target, [{ kind: "loading" }, ready(two)])
     expect(view.revisions.map(r => [r.key, r.state.kind])).toEqual([

@@ -3,8 +3,10 @@
 // edited, is read once it is quiet; a clean catch-up, then one that conflicts,
 // its versions in the lane and resolved by `resolve_conflict`; nothing written
 // in the project's folder until an accept writes the shown merge there, and
-// none after a save of yours since the review. Then the folder becomes a jj
-// repo, and the folder lane is refused.
+// none after a save of yours since the review. A person chooses a conflict's
+// version; accepted work is restored to its state before the accept, and a
+// restore not as shown is refused. Then the folder becomes a jj repo, and the
+// folder lane is refused.
 
 import {
   chmodSync,
@@ -28,8 +30,14 @@ import {
   type ThreadId,
 } from "@pinetrie/core"
 import { scriptedModel } from "@pinetrie/pi"
-import { readAccepted, readPlaces, readProposedByLane } from "@pinetrie/reads"
-import { foreignLaneWords } from "@pinetrie/rules"
+import {
+  readAccepted,
+  readConflicts,
+  readPlaces,
+  readProposedByLane,
+  readStates,
+} from "@pinetrie/reads"
+import { foreignLaneWords, reviewUrl } from "@pinetrie/rules"
 import { rowMessage } from "@pinetrie/schema"
 import type { Checks } from "../checks.ts"
 import { command } from "../command.ts"
@@ -133,16 +141,24 @@ async function folderSection(
         readAccepted(wh.session)?.kind === "folder",
       JSON.stringify(proposed),
     )
-    const review = await fetch(
-      new URL(
-        `/review/3/review/${proposed?.kind === "folder" ? `${proposed.start}..${proposed.tip}` : ""}`,
-        wh.httpUrl,
-      ),
-    ).then(r => (r.ok ? r.json() : r.status))
+    const review =
+      proposed?.kind === "folder"
+        ? await fetch(
+            new URL(
+              reviewUrl({
+                kind: "range",
+                from: proposed.start,
+                to: proposed.tip,
+              }),
+              wh.httpUrl,
+            ),
+          ).then(r => (r.ok ? r.json() : r.status))
+        : null
     check(
       "the proposed changes are reviewed as files, with their line counts",
       typeof review === "object" &&
-        JSON.stringify(review).includes('"path":"b.txt"'),
+        JSON.stringify(review).includes('"path":"b.txt"') &&
+        JSON.stringify(review).includes('"added":1,'),
       JSON.stringify(review),
     )
 
@@ -218,6 +234,56 @@ async function folderSection(
       JSON.stringify(listing(dir)),
     )
 
+    // 5. Both add f.txt: a person chooses accepted work's version, which
+    //    closes the conflict as a state of the lane's and tells the thread.
+    script.use([
+      { tool: "write", args: { path: "f.txt", content: "lane's f\n" } },
+      { text: "wrote f" },
+    ])
+    await wu.send("@agent write f", at(laneTip(lane)), { thread: lane })
+    await idle()
+    const beforeF = newestOf()
+    writeFileSync(path.join(dir, "f.txt"), "yours f\n")
+    await waitFor(() => newestOf() !== beforeF, 60_000)
+    script.use([{ tool: CATCH_UP_TOOL, args: {} }, { text: "conflicted on f" }])
+    await wu.send("@agent catch up with f", at(laneTip(lane)), {
+      thread: lane,
+    })
+    await idle()
+    const open = () =>
+      readConflicts(wh.session)
+        .filter(c => c.lane === lane)
+        .map(c => c.path)
+    await waitFor(() => open().includes("f.txt"), 60_000)
+    const chose = await wu.resolve(lane, "f.txt", "theirs")
+    const told =
+      (await waitFor(() => {
+        const now = tree()
+        return ancestry(now, laneTip(lane)).path.some(id => {
+          const m = now.entries[id]?.message as
+            | { readonly role?: string; readonly content?: unknown }
+            | undefined
+          return (
+            m?.role === "fact" &&
+            String(m.content).includes("f.txt") &&
+            String(m.content).includes("its conflict is closed")
+          )
+        })
+      }, 30_000)) >= 0
+    const resolveState = [...readStates(wh.session).values()].find(
+      r => r.made.kind === "resolve" && r.made.path === "f.txt",
+    )
+    const fInLane = await inLane(lane, "cat f.txt")
+    check(
+      "a person's choice of a conflict's version closes it as a state of the lane's, and tells the thread",
+      chose.kind === "proposed" &&
+        !open().includes("f.txt") &&
+        resolveState !== undefined &&
+        fInLane.includes("yours f") &&
+        told,
+      JSON.stringify({ chose, open: open(), resolveState, fInLane, told }),
+    )
+
     // 6. Accepted: the shown merge's files are written into the project's
     //    folder, and nothing of the accept's own stays there.
     const openWith = (file: string) => {
@@ -238,11 +304,55 @@ async function folderSection(
         readFileSync(path.join(dir, "a.txt"), "utf8") ===
           "one\nyours\nthree\n" &&
         JSON.stringify(listing(dir)) ===
-          JSON.stringify([...before, "b.txt", "c.txt"].sort()),
+          JSON.stringify([...before, "b.txt", "c.txt", "f.txt"].sort()),
       `${JSON.stringify(accepted)} ${JSON.stringify(listing(dir))}`,
     )
 
-    // 7. Your save after the review refuses the accept, and nothing is written.
+    // 7. Accepted work restored to its state before the accept: the
+    //    folder holds its files again; a restore whose preview the folder
+    //    moved past is refused.
+    const acceptState = newestOf()
+    const beforeAccept =
+      acceptState === null
+        ? undefined
+        : readStates(wh.session).get(acceptState)?.parents[0]
+    await waitFor(() => {
+      const r = readAccepted(wh.session)
+      return (
+        r?.kind === "folder" &&
+        beforeAccept !== undefined &&
+        r.kept.includes(beforeAccept)
+      )
+    }, 30_000)
+    const restored =
+      acceptState === null || beforeAccept === undefined
+        ? null
+        : await wu.restore({ of: beforeAccept, from: acceptState })
+    check(
+      "a restore of the state before the accept writes its files back into the project's folder",
+      restored?.kind === "accepted-moved" &&
+        !existsSync(path.join(dir, "b.txt")) &&
+        readFileSync(path.join(dir, "a.txt"), "utf8") ===
+          "one\nyours\nthree\n" &&
+        readStates(wh.session).get(newestOf() ?? acceptState ?? ("" as never))
+          ?.made.kind === "restore",
+      JSON.stringify({ restored, listing: listing(dir) }),
+    )
+    const shownFrom = newestOf()
+    writeFileSync(path.join(dir, "g.txt"), "yours, since the preview\n")
+    const stale =
+      shownFrom === null || acceptState === null
+        ? null
+        : await wu.restore({ of: acceptState, from: shownFrom })
+    check(
+      "a restore after your save since its preview is refused as not shown, and writes nothing",
+      stale?.kind === "refused" &&
+        stale.code === ERR.NOT_AS_SHOWN &&
+        !existsSync(path.join(dir, "b.txt")),
+      JSON.stringify(stale),
+    )
+
+    // 8. Your save after the review refuses the accept, and nothing is written.
     script.use([
       { tool: "write", args: { path: "d.txt", content: "lane's d\n" } },
       { text: "wrote d" },
@@ -260,7 +370,7 @@ async function folderSection(
       JSON.stringify(refused),
     )
 
-    // 5. The folder becomes a jj repo: the folder lane is refused, a new one works.
+    // 9. The folder becomes a jj repo: the folder lane is refused, a new one works.
     const tipBefore = laneTip(lane)
     await wu.close()
     await wh.shutdown()

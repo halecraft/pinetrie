@@ -12,17 +12,27 @@
 
 import type { ConfigPlaces } from "@pinetrie/config"
 import {
+  type ConflictChoice,
+  ERR,
+  type ErrCode,
   type ForeignLane,
   PROJECT_CONFIG_FILE,
   type ProjectRecord,
   proveRunnable,
+  type ResolvedFact,
   type RunnableLane,
   type ThreadId,
   WORKSPACE_ROOT,
+  type WriterId,
 } from "@pinetrie/core"
 import { createKeeper } from "@pinetrie/keeper"
 import type { LaneHooks, PiSetup } from "@pinetrie/pi"
-import { refusedAnswer, resolveAnswer } from "@pinetrie/rules"
+import { readRunning } from "@pinetrie/reads"
+import {
+  planResolveCommand,
+  refusedAnswer,
+  resolveAnswer,
+} from "@pinetrie/rules"
 import { failed, type LeaseBasics } from "../basics.ts"
 import type { Records } from "../records.ts"
 import type { HostReport } from "../settings.ts"
@@ -67,6 +77,20 @@ export type LaneWork = Pick<
     quiet(): Promise<void>
     /** `listener` hears each lane whose base record changed. */
     onBaseChanged(listener: (lane: ThreadId) => void): void
+    /**
+     * A person's choice of `lane`'s conflict's version at `path`, refused
+     * while the thread runs: the conflict closed as a state of the lane's,
+     * its proposed changes rebuilt. Answers the fact its thread is told.
+     */
+    resolve(
+      lane: ThreadId,
+      path: string,
+      choose: ConflictChoice,
+      by: WriterId,
+    ): Promise<
+      | { readonly kind: "refused"; readonly code: ErrCode }
+      | { readonly kind: "done"; readonly fact: ResolvedFact }
+    >
     /**
      * `lane` proven to be one a run may start on (`proveRunnable`), or why
      * not: what every run's start must hold (`Runs.start`).
@@ -230,7 +254,7 @@ export async function startLaneWork(input: {
           return resolveAnswer(path, { kind: "refused", why: "no-copy" })
         return resolveAnswer(
           path,
-          await registry.withHistory(lane, h => h.resolve(path, choose)),
+          await registry.withHistory(lane, h => h.resolve(path, choose, null)),
         )
       },
       async configWritten(lane) {
@@ -243,6 +267,36 @@ export async function startLaneWork(input: {
           read.code === 0 ? String(read.stdout) : null,
         )
       },
+    },
+    async resolve(lane, path, choose, by) {
+      // gather, plan
+      const planned = planResolveCommand({
+        own: registry.isOwn(lane),
+        running: readRunning(basics.live, lane),
+      })
+      if (planned.kind === "refused") return planned
+      // execute
+      // The lane is idle, its container stopped: started for the
+      // resolution's snapshot, which syncs inside it, then stopped again.
+      const done = await registry.withHistory(lane, async h => {
+        await containers.startContainer(lane, h)
+        try {
+          return await h.resolve(path, choose, by)
+        } finally {
+          await registry.handleOf(lane).stop()
+        }
+      })
+      if (done.kind === "refused")
+        return {
+          kind: "refused",
+          code: done.why === "markers" ? ERR.REFUSED : ERR.NO_CONFLICT,
+        }
+      // Its `refreshed` fact is the command's own business, never told.
+      await destination.proposed.act(lane, "refresh", by)
+      return {
+        kind: "done",
+        fact: { kind: "resolved", lane, by, path, choose },
+      }
     },
     checkBegin: newLanes.checkBegin,
     prepareLane: newLanes.prepareLane,
@@ -287,6 +341,7 @@ const NO_LANES: LaneWork = {
   },
   checkBegin: async () => null,
   prepareLane: async () => {},
+  resolve: async () => ({ kind: "refused", code: ERR.NOT_OWN_COPY }),
   beforeRun: () => {},
   runEnded: () => {},
   prepareUpdate: async () => ({

@@ -2,10 +2,10 @@
 // how leaving it treats the browser's history, and its words. The page's shell
 // (`use-page.ts`) reads `location` and `history` and carries these out.
 
-/** A page that covers the stage: your profile, and what the host read of its config. */
-export type PageName = "profile" | "setup"
+/** A page that covers the stage: your profile, what the host read of its config, and a folder project's history. */
+export type PageName = "profile" | "setup" | "history"
 
-const PAGES: readonly PageName[] = ["profile", "setup"]
+const PAGES: readonly PageName[] = ["profile", "setup", "history"]
 
 const isPage = (name: string): name is PageName =>
   (PAGES as readonly string[]).includes(name)
@@ -45,6 +45,7 @@ interface PageWords {
 const TITLES: Readonly<Record<PageName, string>> = {
   profile: "Profile",
   setup: "Setup",
+  history: "History",
 }
 
 /** What a way back says: a page's, and the account menu's from the inbox. */

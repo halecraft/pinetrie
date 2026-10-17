@@ -5,9 +5,10 @@
 import { createHash } from "node:crypto"
 import { readFile } from "node:fs/promises"
 import { commandStream, openChannel } from "@pinetrie/channel"
-import { OBSERVER_SOCKET, snapshotId } from "@pinetrie/core"
+import { OBSERVER_SOCKET, type PointId, snapshotId } from "@pinetrie/core"
 import {
   connectObserver,
+  FILE_OUT,
   LANE_FILES,
   LANEHOST_CONTAINERFILE,
   type LanehostChannel,
@@ -283,6 +284,34 @@ export function dockerRuntime(input: {
     return network
   }
 
+  /**
+   * A command of the disks role's own over `state`'s snapshot, its stdout as
+   * it comes: a tar of files, or one file. The call before it starts the
+   * disks role's container when it is not yet, and refuses a snapshot that
+   * is gone before the command is asked.
+   */
+  async function* snapshotOut(
+    command: string,
+    state: PointId,
+    stdin: string,
+  ): AsyncIterable<Uint8Array> {
+    if (
+      !(await lanehost.call({
+        kind: "snapshotExists",
+        project: key,
+        snapshot: snapshotId(state),
+      }))
+    )
+      throw new Error(`the state ${state} has no snapshot`)
+    yield* commandStream(
+      execArgv(lanehostContainer("disks", key, target), [
+        ...runtimeNode(`${PINETRIE_MOUNT}/${command}`),
+        disks.snapshot(snapshotId(state)),
+      ]),
+      { stdin },
+    )
+  }
+
   /** A project's grant rules, by lanehost's privileged role on the VM's own network. */
   async function firewall(
     k: string,
@@ -317,6 +346,10 @@ export function dockerRuntime(input: {
       lanehost.call({ kind: "diskExists", project: key, lane }),
     snapshotExists: id =>
       lanehost.call({ kind: "snapshotExists", project: key, snapshot: id }),
+    snapshots: async () =>
+      (await lanehost.call({ kind: "snapshots", project: key })).map(
+        snapshotId,
+      ),
     diff: (from, to) => lanehost.call({ kind: "diff", project: key, from, to }),
     readLaneFile: (snapshot, file) =>
       lanehost.call({
@@ -335,32 +368,16 @@ export function dockerRuntime(input: {
         lanehost.call({ kind: "diffStats", project: key, a, b, paths }),
       filesUnder: (snapshot, paths) =>
         lanehost.call({ kind: "filesUnder", project: key, snapshot, paths }),
-      sameContent: (a, b, paths) =>
-        lanehost.call({ kind: "sameContent", project: key, a, b, paths }),
+      sameContent: (a, b, pairs) =>
+        lanehost.call({ kind: "sameContent", project: key, a, b, pairs }),
       applyMerge: merge =>
         lanehost.call({ kind: "applyMerge", project: key, ...merge }),
       read: (snapshot, path, limit) =>
         lanehost.call({ kind: "read", project: key, snapshot, path, limit }),
       readIn: read => lanehost.call({ kind: "readIn", project: key, ...read }),
-      async *tarOut(state, paths) {
-        // The call starts the disks role's container when it is not yet,
-        // and refuses a snapshot that is gone before tar is asked.
-        if (
-          !(await lanehost.call({
-            kind: "snapshotExists",
-            project: key,
-            snapshot: snapshotId(state),
-          }))
-        )
-          throw new Error(`the state ${state} has no snapshot`)
-        yield* commandStream(
-          execArgv(lanehostContainer("disks", key, target), [
-            ...runtimeNode(`${PINETRIE_MOUNT}/${TAR_OUT}`),
-            disks.snapshot(snapshotId(state)),
-          ]),
-          { stdin: paths.map(p => `${p}\0`).join("") },
-        )
-      },
+      tarOut: (state, paths) =>
+        snapshotOut(TAR_OUT, state, paths.map(p => `${p}\0`).join("")),
+      fileOut: (state, path) => snapshotOut(FILE_OUT, state, path),
       states: async (lane, op) => {
         await lanehost.call({ kind: "states", project: key, lane, op })
       },

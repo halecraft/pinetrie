@@ -1,6 +1,4 @@
 import {
-  type AcceptJournal,
-  type AcceptPath,
   type AcceptWrite,
   ERR,
   type FolderProposedChangesRecord,
@@ -10,6 +8,8 @@ import {
   pointId,
   type StateRecord,
   threadIdFor,
+  type WriteJournal,
+  type WritePath,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
@@ -21,6 +21,7 @@ import {
   planAsides,
   planNames,
   planRecovery,
+  planRestore,
   planWriteSteps,
   type StageEntry,
 } from "./accept.ts"
@@ -151,8 +152,8 @@ test("acceptWrites: each changed path with the read's stamp and the shown merge'
     acceptWrites(
       ["a.txt", "new.txt", "gone.txt", "l", "d"],
       [
-        { kind: "file", exec: false, text: true, size: 4 },
-        { kind: "file", exec: true, text: true, size: 4 },
+        { kind: "file", exec: false, content: "text", size: 4 },
+        { kind: "file", exec: true, content: "text", size: 4 },
         { kind: "absent" },
         { kind: "symlink", target: "a.txt" },
         { kind: "dir" },
@@ -294,14 +295,13 @@ describe("planRecovery", () => {
   const SHOWN = shownMergeId(L1, TURN)
   const staged: InodeStat = { ino: 50, size: 4, mtimeNs: "10" }
   const moved: InodeStat = { ino: 20, size: 1, mtimeNs: "5" }
-  const journal = (paths: AcceptPath[]): AcceptJournal => ({
+  const journal = (paths: WritePath[]): WriteJournal => ({
     id: "j1",
-    lane: LANE,
     record: record(SHOWN, { kind: "accept", lane: LANE }, L1, TURN),
     paths,
     status: "open",
   })
-  const path = (over: Partial<AcceptPath> = {}): AcceptPath => ({
+  const path = (over: Partial<WritePath> = {}): WritePath => ({
     path: "a",
     aside: ".pinetrie-aside-j1/a",
     moved,
@@ -388,9 +388,8 @@ describe("planAsides", () => {
     })
   })
   test("an open journal's asides are not kept yet", () => {
-    const j: AcceptJournal = {
+    const j: WriteJournal = {
       id: "j1",
-      lane: LANE,
       record: record(L2, { kind: "accept", lane: LANE }, L1, TURN),
       paths: journalPaths(
         [{ kind: "delete", path: "a", expected: stamp() }],
@@ -400,7 +399,7 @@ describe("planAsides", () => {
       status: "open",
     }
     expect(keptAsides([j])).toEqual([])
-    expect(keptAsides([{ ...j, status: "accepted" }])).toHaveLength(1)
+    expect(keptAsides([{ ...j, status: "written" }])).toHaveLength(1)
   })
 })
 
@@ -432,5 +431,61 @@ describe("a concurrent save", () => {
       record(pointId("concurrent-1"), { kind: "concurrent", path: "a" }, L1),
     ])
     expect(folderNewest(g)).toBe(L1)
+  })
+})
+
+describe("planRestore", () => {
+  const graph = stateGraph([...STATES, record(L2, { kind: "read" }, L1)])
+  const restore = (over: Partial<Parameters<typeof planRestore>[0]> = {}) =>
+    planRestore({
+      graph,
+      kept: [L2, L1],
+      of: L1,
+      ofMade: true,
+      changes: ["a.txt"],
+      seen: L2,
+      uuid: "0192-r",
+      at: 3,
+      by: null,
+      ...over,
+    })
+
+  test("a kept state as shown: a restore state on accepted work's newest, its content the state restored", () => {
+    const planned = restore()
+    expect(planned).toEqual({
+      kind: "restore",
+      record: {
+        id: "restore-0192-r",
+        parents: [L2],
+        made: { kind: "restore", of: L1 },
+        at: 3,
+        by: null,
+      },
+    })
+    if (planned.kind !== "restore") return
+    expect(
+      planState(graph, planned.record).kind,
+      "the graph takes it as a line state",
+    ).toBe("record")
+  })
+
+  test("refused not as shown once accepted work moved past what was shown", () => {
+    expect(restore({ seen: L1 })).toEqual({
+      kind: "refused",
+      code: ERR.NOT_AS_SHOWN,
+    })
+  })
+
+  test("refused for a state not kept, or whose snapshot is gone", () => {
+    const notKept = { kind: "refused", code: ERR.STATE_NOT_KEPT }
+    expect(restore({ kept: [L2] })).toEqual(notKept)
+    expect(restore({ ofMade: false, changes: [] })).toEqual(notKept)
+  })
+
+  test("refused when the folder holds the state's content already", () => {
+    expect(restore({ changes: [] })).toEqual({
+      kind: "refused",
+      code: ERR.NOTHING_TO_RESTORE,
+    })
   })
 })

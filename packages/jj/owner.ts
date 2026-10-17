@@ -18,6 +18,8 @@ import {
 } from "./observe.ts"
 import { planImport } from "./plan.ts"
 import {
+  type BytesStream,
+  bytesFor,
   type CommandWatch,
   executeRepo,
   operationGone,
@@ -44,8 +46,10 @@ export interface RepoOps {
   shared(): Promise<SharedFacts>
 }
 
-/** What a read may run: jj pinned to the last observed operation, and git. */
-export type RepoReads = Pick<RepoOps, "jj" | "git">
+/** What a read may run: jj pinned to the last observed operation, its stdout as text or as bytes, and git. */
+export type RepoReads = Pick<RepoOps, "jj" | "git"> & {
+  readonly jjBytes: BytesStream
+}
 
 export type RepoKey = `refresh:${ThreadId}` | "accepted" | "observe" | "shared"
 
@@ -191,6 +195,12 @@ export function startRepoOwner(input: {
       }
     }
 
+  /** `pinned`'s bytes: a file read whole at the last observed head. */
+  const pinnedBytes: BytesStream = async function* (args) {
+    await first.promise
+    yield* bytesFor(root, { at: seen?.op ?? "" })(args)
+  }
+
   /** jj pinned to the last observed head; once its operation is gone, observed again and retried once. */
   const pinned: Runner = async args => {
     await first.promise
@@ -227,7 +237,7 @@ export function startRepoOwner(input: {
   return {
     command: step => keeper.run(owned(step)),
     later: (key, step) => keeper.later(key, owned(step)),
-    read: go => go({ jj: pinned, git }),
+    read: go => go({ jj: pinned, git, jjBytes: pinnedBytes }),
     importLane: (lane, bundle, stack) =>
       keeper.run(
         owned(ops => ops.execute(planImport({ lane, bundle, stack }))),

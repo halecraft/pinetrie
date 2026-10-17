@@ -7,10 +7,12 @@ import { createHash } from "node:crypto"
 import {
   type BasePlan,
   isFolderStateId,
+  isLineState,
   type NonEmpty,
   type PointId,
   type StateMade,
   type StateRecord,
+  stateLane,
   type ThreadId,
 } from "@pinetrie/core"
 
@@ -41,20 +43,6 @@ export const isAncestor = (g: StateGraph, a: PointId, b: PointId): boolean =>
 
 const byId = (x: PointId, y: PointId) => (x < y ? -1 : x > y ? 1 : 0)
 
-/** Whether a state is one of accepted work's line's: a read, an accept or a restore. */
-const isLineState = (r: StateRecord): boolean =>
-  r.made.kind === "read" ||
-  r.made.kind === "accept" ||
-  r.made.kind === "restore"
-
-/** The lane a state of a lane's own (a start, a turn, a catch-up) was made in; null for any other. */
-const laneOf = (r: StateRecord): ThreadId | null =>
-  r.made.kind === "start" ||
-  r.made.kind === "turn" ||
-  r.made.kind === "catch-up"
-    ? r.made.lane
-    : null
-
 /**
  * The lane `lane` branched from: the lane whose state its start state's one
  * parent is. Null for a lane started on accepted work's line, or before its
@@ -66,7 +54,7 @@ export function parentLane(g: StateGraph, lane: ThreadId): ThreadId | null {
   )
   const [from] = start?.parents ?? []
   const parent = from === undefined ? undefined : g.states.get(from)
-  return parent === undefined ? null : laneOf(parent)
+  return parent === undefined ? null : stateLane(parent)
 }
 
 /**
@@ -75,7 +63,7 @@ export function parentLane(g: StateGraph, lane: ThreadId): ThreadId | null {
  * time, on its queue.
  */
 export function laneNewest(g: StateGraph, lane: ThreadId): PointId | null {
-  const own = [...g.states.values()].filter(r => laneOf(r) === lane)
+  const own = [...g.states.values()].filter(r => stateLane(r) === lane)
   const followed = new Set(own.flatMap(r => r.parents.slice(0, 1)))
   const heads = own.filter(r => !followed.has(r.id))
   if (heads.length > 1)
@@ -222,6 +210,8 @@ export type StateRefusal =
   | { readonly kind: "refused"; readonly why: "parents" }
   /** A concurrent save whose parent is no state of accepted work's line. */
   | { readonly kind: "refused"; readonly why: "concurrent-off-line" }
+  /** A resolve whose parent is not its own lane's newest state. */
+  | { readonly kind: "refused"; readonly why: "resolve-off-lane" }
 
 /**
  * How many parents a state made so may have. A read has none only when the
@@ -234,6 +224,7 @@ function isParentCount(made: StateMade, count: number, empty: boolean) {
     case "start":
     case "turn":
     case "restore":
+    case "resolve":
     case "concurrent":
       return count === 1
     case "catch-up":
@@ -273,5 +264,10 @@ export function planState(
     (on === undefined || !isLineState(on))
   )
     return { kind: "refused", why: "concurrent-off-line" }
+  if (
+    proposed.made.kind === "resolve" &&
+    first !== laneNewest(g, proposed.made.lane)
+  )
+    return { kind: "refused", why: "resolve-off-lane" }
   return { kind: "record", record: proposed }
 }

@@ -27,6 +27,7 @@ import {
   type CommitSpan,
   commitFromPoint,
   fileDiff,
+  jjFileBytes,
   laneRefSteps,
   type RepoOwner,
   revisionRead,
@@ -218,7 +219,12 @@ export function startProposedChanges(input: {
       /** The span in commits: a range's points read in its lane, proven jj; null when it is not. */
       const spanInCommits = (span: RecordedSpan): CommitSpan | null => {
         if (span.kind === "revision") return span
-        const lane = recordedJjLane(readLaneRecords(basics.session), span.lane)
+        // Accepted work's kept states are a folder project's alone.
+        if (span.reader.kind !== "lane") return null
+        const lane = recordedJjLane(
+          readLaneRecords(basics.session),
+          span.reader.lane,
+        )
         return lane === null
           ? null
           : {
@@ -243,7 +249,7 @@ export function startProposedChanges(input: {
             await owner.read(ops =>
               // A widening names a mount by its target: the root does not matter.
               revisionRead(
-                ops.jj,
+                ops,
                 span,
                 text =>
                   decodeAuthority("/", PROJECT_CONFIG_FILE, text).authority,
@@ -254,6 +260,27 @@ export function startProposedChanges(input: {
           return answerDiff(
             await owner.read(ops => fileDiff(ops.jj, span, read.path)),
           )
+        case "file": {
+          const rev =
+            span.kind === "revision"
+              ? read.side === "before"
+                ? `${span.commit}-`
+                : span.commit
+              : read.side === "before"
+                ? span.from
+                : span.to
+          const file = await owner.read(ops =>
+            jjFileBytes(ops.jjBytes, rev, read.path),
+          )
+          return file === null
+            ? { kind: "refused", status: 404, reason: "no file there" }
+            : {
+                kind: "file",
+                content: file.content,
+                size: null,
+                bytes: file.bytes,
+              }
+        }
       }
     },
   }

@@ -12,6 +12,32 @@ const trailers = "packages/core/trailers.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "writeContent answers a restore's own id",
+    file: "packages/core/folder.ts",
+    from: '  r.made.kind === "restore" ? r.made.of : r.id\n',
+    to: "  r.id\n",
+    command: unit,
+    expect:
+      "writeContent: an accept writes its own snapshot, a restore the state it restores",
+  },
+  {
+    name: "lineStates follows a second parent",
+    file: "packages/core/folder.ts",
+    from: "    const [first] = at.parents\n",
+    to: "    const first = at.parents.at(-1)\n",
+    command: unit,
+    expect:
+      "lineStates walks first parents from the newest, ending at the first read",
+  },
+  {
+    name: "fileContent calls an SVG an image",
+    file: "packages/core/images.ts",
+    from: '  if (!window.includes(0)) return "text"\n',
+    to: '  if (!window.includes(0)) return window[0] === 0x3c ? "image/png" : "text"\n',
+    command: unit,
+    expect: "an SVG is text, never an image",
+  },
+  {
     name: "the WIP line keeps the @agent its first message asks with",
     file: "packages/core/trailers.ts",
     from: "  const said = first.startsWith(ASKED) ? first.slice(ASKED.length) : first\n",

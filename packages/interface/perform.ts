@@ -29,6 +29,7 @@ export interface AppPorts {
     | "request"
     | "send"
     | "proposed"
+    | "resolve"
     | "createCard"
     | "cardText"
     | "paste"
@@ -185,6 +186,9 @@ function performOne(effect: Effect, ports: AppPorts): void {
       return
     case "proposed":
       void ports.session.proposed(effect.lane, effect.action, effect.to)
+      return
+    case "resolve":
+      void ports.session.resolve(effect.lane, effect.path, effect.choose)
       return
     case "list": {
       const { openThreads } = ports.session

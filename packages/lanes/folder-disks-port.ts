@@ -7,6 +7,7 @@ import type {
   LaneStatesOp,
   MergeStep,
   PathFact,
+  PathPair,
   PointId,
   ReadInAnswer,
   ReadPath,
@@ -34,12 +35,12 @@ export interface FolderDisks {
     b: PointId,
     paths: readonly string[],
   ): Promise<readonly DiffStat[]>
-  /** The paths where `a` and `b` both hold a file of the same bytes. */
+  /** The pairs where `a` holds a file at the pair's `a` and `b` one of the same bytes at its `b`. */
   sameContent(
     a: PointId,
     b: PointId,
-    paths: readonly string[],
-  ): Promise<readonly string[]>
+    pairs: readonly PathPair[],
+  ): Promise<readonly PathPair[]>
   /**
    * A merge's steps applied to `disk` (a lane's, or a virtual base's scratch
    * disk) over `base` (null: empty) from `theirs`; each text step answered
@@ -74,6 +75,12 @@ export interface FolderDisks {
    * snapshot, a symlink on its way included.
    */
   tarOut(state: PointId, paths: readonly string[]): AsyncIterable<Uint8Array>
+  /**
+   * One regular file of `state`'s, its bytes as they come: a command of the
+   * disks role's own, as `tarOut` is. Throws as `tarOut` does for a path
+   * that is no regular file inside the snapshot.
+   */
+  fileOut(state: PointId, path: string): AsyncIterable<Uint8Array>
   /** A change to `lane`'s states directory, which its container sees read-only. */
   states(lane: ThreadId, op: LaneStatesOp): Promise<void>
 }

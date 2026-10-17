@@ -1,20 +1,21 @@
-// host/folder/sweep — the snapshots of a folder project's states that nothing
-// needs any more, deleted: what `liveStates` keeps is decided from the records
-// (each folder lane's tip, start and merge bases with accepted work and with
-// its parent lane, open conflicts' three states, open proposed changes' two
-// and their shown merges, what an accept's journal needs, accepted work's
-// newest states, and the concurrent saves on those kept). A state's record stays: merge bases walk
-// parents through every state, so a record removed would break every older
-// state's ancestry; a state whose snapshot is gone is known by that alone.
+// host/folder/sweep — what a folder project keeps of its states, said once:
+// the snapshots nothing needs any more, to delete, and accepted work's
+// states the history may show, from one `liveStates` call over the records
+// and one listing of the snapshots there are. A state's record stays: merge
+// bases walk parents through every state, so a record removed would break
+// every older state's ancestry; a state whose snapshot is gone is known by
+// that alone.
 
-import type {
-  AcceptJournal,
-  ConflictRecord,
-  PointId,
-  ProjectKind,
-  ProposedChangesRecord,
-  StateRecord,
-  ThreadId,
+import {
+  type ConflictRecord,
+  lineStates,
+  type PointId,
+  type ProjectKind,
+  type ProposedChangesRecord,
+  type StateRecord,
+  type ThreadId,
+  type WriteJournal,
+  writeContent,
 } from "@pinetrie/core"
 import {
   folderNewest,
@@ -25,8 +26,21 @@ import {
   stateGraph,
 } from "@pinetrie/folder"
 
-/** The states whose snapshots go: every state of the graph the live set keeps not. */
-export function planSweep(input: {
+/** What a folder project keeps, decided: the snapshots that go, and accepted work's states kept. */
+export interface KeepPlanned {
+  /** States whose snapshots exist and that the live set keeps not. */
+  readonly gone: readonly PointId[]
+  /**
+   * Accepted work's line states and concurrent saves the live set keeps
+   * and whose snapshots exist, newest first: accepted work's record's
+   * `kept`.
+   */
+  readonly kept: readonly PointId[]
+  /** Accepted work's newest state; null before the project's folder's first read. */
+  readonly newest: PointId | null
+}
+
+export function planKeep(input: {
   readonly states: readonly StateRecord[]
   readonly lanes: readonly {
     readonly lane: ThreadId
@@ -34,13 +48,15 @@ export function planSweep(input: {
   }[]
   readonly conflicts: readonly ConflictRecord[]
   readonly proposed: readonly ProposedChangesRecord[]
-  /** The accepts' journals: what an open one or a kept aside needs is kept. */
-  readonly journals: readonly AcceptJournal[]
+  /** The writes' journals: what an open one or a kept aside needs is kept. */
+  readonly journals: readonly WriteJournal[]
   readonly keep: number
-}): readonly PointId[] {
+  /** Every snapshot there is (`LaneRuntime.snapshots`). */
+  readonly exists: ReadonlySet<PointId>
+}): KeepPlanned {
   const graph = stateGraph(input.states)
   const newest = folderNewest(graph)
-  if (newest === null) return []
+  if (newest === null) return { gone: [], kept: [], newest }
   const lanes = input.lanes.flatMap(l => {
     const tip = laneNewest(graph, l.lane)
     const start = tip === null ? null : folderStateHeld(graph, tip)
@@ -57,12 +73,34 @@ export function planSweep(input: {
     lanes,
     conflicts: input.conflicts,
     proposed: input.proposed.flatMap(o => (o.kind === "folder" ? [o] : [])),
+    // An open write streams from its content, a restore's another state's.
     pinned: input.journals.flatMap(j => [
-      ...(j.status === "open" ? [j.record.id] : []),
+      ...(j.status === "open" ? [j.record.id, writeContent(j.record)] : []),
       ...j.paths.flatMap(p => (p.keptOn === null ? [] : [p.keptOn])),
     ]),
     folderNewest: newest,
     keep: input.keep,
   })
-  return [...graph.states.keys()].filter(id => !live.has(id))
+  const has = (id: PointId) => live.has(id) && input.exists.has(id)
+  const saves = [...graph.states.values()].filter(
+    r => r.made.kind === "concurrent" && has(r.id),
+  )
+  const kept = lineStates(graph.states, newest).flatMap(r =>
+    has(r.id)
+      ? [
+          ...saves
+            .filter(s => s.parents[0] === r.id)
+            .sort((a, b) => b.at - a.at)
+            .map(s => s.id),
+          r.id,
+        ]
+      : [],
+  )
+  return {
+    gone: [...graph.states.keys()].filter(
+      id => input.exists.has(id) && !live.has(id),
+    ),
+    kept,
+    newest,
+  }
 }

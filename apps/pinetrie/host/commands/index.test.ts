@@ -163,6 +163,8 @@ test.each([
   ["a squash", { kind: "proposed", action: "squash" }, "repo"],
   ["a description again", { kind: "proposed", action: "describe" }, "repo"],
   ["a publish", { kind: "publish" }, "repo"],
+  ["a restore", { kind: "restore" }, "repo"],
+  ["a conflict's version chosen", { kind: "resolve" }, "repo"],
   ["a move on the board", { kind: "move-canvas" }, "board"],
   ["a workflow edit", { kind: "workflow" }, "documents"],
   ["a chat", { kind: "send" }, "documents"],
@@ -170,6 +172,35 @@ test.each([
   ["a stop", { kind: "stop" }, "documents"],
 ] as const)("placeOfCommand: %s runs on %s", (_, intent, place) => {
   expect(placeOfCommand(intent as Intent)).toBe(place)
+})
+
+test("a publish to a folder project and a restore to a jj project are each refused by the handler", async () => {
+  const folder = setUp({
+    destination: record<Destination>({
+      accepted: { kind: "folder", restore: async () => ({ kind: "done" }) },
+    }).port,
+  })
+  await folder.commands.handle(folder.sender, ALICE, {
+    id: "p-1",
+    kind: "publish",
+  })
+  const jj = setUp({
+    destination: record<Destination>({
+      accepted: { kind: "jj", act: async () => null },
+    }).port,
+  })
+  await jj.commands.handle(jj.sender, ALICE, {
+    id: "r-1",
+    kind: "restore",
+    targetId: "line-0192aaaa",
+    seen: "line-0192bbbb",
+  })
+  expect(
+    [...folder.replies, ...jj.replies].map(r => [r.id, r.outcome, r.errorCode]),
+  ).toEqual([
+    ["p-1", "refused", ERR.REFUSED],
+    ["r-1", "refused", ERR.REFUSED],
+  ])
 })
 
 test("a chat completes while an acceptance is held open on your repo's owner", async () => {

@@ -1558,6 +1558,38 @@ composer*).
   that asks no agent ignores it. A run refused at the host could not reach
   its author, since the host answers `started` before pi admits the run.
 
+## A folder project's history (`history-view.ts`, `conflicts-view.ts`, ADR-0165)
+
+- **`historyView` decides the history page** from the session's `STATE`
+  records and accepted work's record: core's `lineStates` from its
+  `newest`, the states its `kept` names listed newest first, each with who
+  made it, when (`whenWords`) and how (`madeWords`), the review of what it
+  changed, its concurrent saves beneath it, and a restore of it; then how
+  many of the line's states are no longer kept. The review is from its
+  first parent, by `@pinetrie/rules`' `readableSpan`, so it is null
+  exactly where the host would refuse one: the first read, and the oldest
+  kept entry, whose parent is swept.
+- **A restore sends what its preview drew** (`RestorePreview`, `{ of,
+  from }`): `from` is the newest the tab shows, the preview the review
+  `from..of`; a record that moves redraws it with a new `from`. The host
+  refuses one whose `from` is no longer the newest (`not_as_shown`).
+- **The footer offers the history in the publish button's place**
+  (`historyLink`): a folder project's accepted work has nothing to set up
+  or publish to, so `publishView` is `absent` there.
+- **`conflictsView` decides a folder lane's conflicts pane:** per path,
+  each side's span from the version both began from, and the three
+  choices, worded once (`conflictChoiceWords`): "take amber-fox's" when
+  `theirs` is a lane's state (`stateLane`), else accepted work's.
+- **A review row shown as a file** (`reviewView`'s `media`): an image row
+  draws both sides, any other each side's size (`byteWords`) and a link to
+  open it, every URL the review's own `fileUrl`; a move with no lines says
+  "moved, unchanged" (`MOVED_UNCHANGED`). Neither has a diff section.
+- **No label a folder project's views produce names jj's words** (the
+  words check, `folder-words.test.ts`, over `jjWordsIn`): commit,
+  bookmark, revision, repo, stack, WIP or publish, in the work strip's
+  folder states, the history, the conflicts, publish and base choices; the
+  host's folder refusals are held to it in `commands/lane.test.ts`.
+
 ## A person's picture (`picture-crop.ts`, ADR-0098)
 
 - **The crop is a value** (`Crop`: a zoom and the square's centre, in the

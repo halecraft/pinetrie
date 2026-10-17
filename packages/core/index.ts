@@ -3,6 +3,7 @@
 // Node builtin (`TECHNICAL.md`).
 
 import type { CardCommand } from "./cards.ts"
+import type { ConflictChoice, FileContent } from "./folder.ts"
 import {
   type AgentId,
   type CanvasId,
@@ -203,6 +204,14 @@ export const ERR = {
    * a device): refused before anything is written.
    */
   FOLDER_CANNOT_HOLD: "folder_cannot_hold",
+  /** A restore of a state of accepted work whose snapshot the host no longer keeps. */
+  STATE_NOT_KEPT: "state_not_kept",
+  /** A restore of a state the project's folder holds already. */
+  NOTHING_TO_RESTORE: "nothing_to_restore",
+  /** A conflict's version chosen while the thread's agent runs. */
+  THREAD_RUNNING: "thread_running",
+  /** A conflict's version chosen at a path with no open conflict: closed already. */
+  NO_CONFLICT: "no_conflict",
   /** Squashing a folder project's proposed changes, which is its files, never a stack. */
   NOT_A_STACK: "not_a_stack",
   /** A `/package:name` command that names no command there is. */
@@ -528,6 +537,23 @@ export type Intent =
     }
   /** Set up accepted work, or publish it. */
   | { readonly kind: AcceptedAction }
+  /**
+   * Restore a folder project's kept state `of` into its folder, as its
+   * preview showed it: `seen` is accepted work's newest the preview was
+   * drawn from.
+   */
+  | {
+      readonly kind: "restore"
+      readonly of: PointId
+      readonly seen: PointId
+    }
+  /** Close a folder lane's conflict at `path` with `choose`'s version. */
+  | {
+      readonly kind: "resolve"
+      readonly lane: ThreadId
+      readonly path: string
+      readonly choose: ConflictChoice
+    }
   /**
    * Move cards, create one, or remove one: one move, or a keep's several,
    * accepted whole or refused. The host records it in a canvas's history of the
@@ -1100,10 +1126,19 @@ export interface RepoConfig {
   readonly publishCatchesUp: boolean
 }
 
-/** A folder project's accepted work, as the host last read the project's folder: its newest state. */
+/**
+ * A folder project's accepted work, as the host last read the project's
+ * folder: its newest state, and what of its history the host keeps.
+ */
 export interface FolderAcceptedRecord {
   readonly kind: "folder"
   readonly newest: PointId
+  /**
+   * Accepted work's states whose snapshots the host keeps, newest first:
+   * line states and concurrent saves. What the history may review and
+   * restore.
+   */
+  readonly kept: readonly PointId[]
   readonly at: number
 }
 
@@ -1567,15 +1602,32 @@ export type ConflictCause = "work" | "start"
 /** How jj says a file changed in a revision. */
 export type FileChange = "added" | "modified" | "removed" | "copied" | "renamed"
 
-/** One file of one revision, as jj's diff stats read it. */
+/** One side of a file a review shows as a file, not as lines: what it holds, and its size in bytes. */
+export interface MediaSide {
+  readonly content: FileContent
+  readonly size: number
+}
+
+/** One file of a review, in either kind of project: its change, and how its content is shown. */
 export interface ReviewFile {
   readonly path: string
-  /** jj's display path: `{old => new}` for a rename or copy, else `path`. */
+  /** The display path: `{old => new}` for a rename or copy, else `path`. */
   readonly shown: string
   readonly change: FileChange
   /** Lines added and removed; 0 and 0 for a binary file or a pure rename. */
   readonly added: number
   readonly removed: number
+  /**
+   * Lines, shown as a diff; or media, each side a file to show whole (an
+   * image) or to open, null where the file is absent.
+   */
+  readonly content:
+    | { readonly kind: "lines" }
+    | {
+        readonly kind: "media"
+        readonly before: MediaSide | null
+        readonly after: MediaSide | null
+      }
 }
 
 /**

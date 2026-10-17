@@ -1,15 +1,13 @@
-// folder/accept — an accept into the project's folder decided as values:
-// whether it may be, what it writes, whether the folder can hold those
-// names, whether its staging directory holds what was planned; from its
-// journal and what the folder holds, how a stopped or failed accept ends;
-// and at a quiet read, what becomes of the asides it kept.
+// folder/accept — a write into the project's folder, an accept's or a
+// restore's, decided as values: whether it may be, what it writes, whether
+// the folder can hold those names, whether its staging directory holds what
+// was planned; from its journal and what the folder holds, how a stopped or
+// failed write ends; and at a quiet read, what becomes of the asides it
+// kept.
 
 import path from "node:path/posix"
 import {
-  type AcceptJournal,
-  type AcceptPath,
   type AcceptWrite,
-  acceptAsideDir,
   ERR,
   type ErrCode,
   type FolderProposedChangesRecord,
@@ -19,8 +17,12 @@ import {
   type PathFact,
   type PointId,
   type ProposedChangesSeen,
+  restoreStateId,
   type StateRecord,
+  type WriteJournal,
+  type WritePath,
   type WriterId,
+  writeAsideDir,
 } from "@pinetrie/core"
 import {
   folderNewest,
@@ -81,6 +83,57 @@ export function planAccept(input: {
   })
   return planned.kind === "record"
     ? { kind: "accept", record: planned.record }
+    : refused(ERR.NOT_AS_SHOWN)
+}
+
+/** What a restore does, decided from the graph after its own read. */
+export type RestorePlanned =
+  /** The restore's state, its content `of`'s (`writeContent`). */
+  | { readonly kind: "restore"; readonly record: StateRecord }
+  | { readonly kind: "refused"; readonly code: ErrCode }
+
+/**
+ * A restore of `of` into the project's folder, as accepted work's newest
+ * was `seen`: refused unless the newest is still `seen`; refused when `of`
+ * is not kept, or its snapshot is gone; refused when the newest holds its
+ * content already. Else its state is a line state with one parent, the
+ * newest, written from `of`'s snapshot. Every refusal is decided before
+ * anything is made.
+ */
+export function planRestore(input: {
+  readonly graph: StateGraph
+  /** Accepted work's record's `kept`. */
+  readonly kept: readonly PointId[]
+  readonly of: PointId
+  /** Whether `of`'s snapshot is there. */
+  readonly ofMade: boolean
+  /** The source paths between accepted work's newest and `of`; none when `of`'s snapshot is gone. */
+  readonly changes: readonly string[]
+  /** Accepted work's newest when the person was shown the restore. */
+  readonly seen: PointId
+  /** A uuidv7 for the restore's state. */
+  readonly uuid: string
+  readonly at: number
+  readonly by: WriterId | null
+}): RestorePlanned {
+  const refused = (code: ErrCode): RestorePlanned => ({
+    kind: "refused",
+    code,
+  })
+  const newest = folderNewest(input.graph)
+  if (newest === null || newest !== input.seen) return refused(ERR.NOT_AS_SHOWN)
+  if (!input.kept.includes(input.of) || !input.ofMade)
+    return refused(ERR.STATE_NOT_KEPT)
+  if (input.changes.length === 0) return refused(ERR.NOTHING_TO_RESTORE)
+  const planned = planState(input.graph, {
+    id: restoreStateId(input.uuid),
+    parents: [newest],
+    made: { kind: "restore", of: input.of },
+    at: input.at,
+    by: input.by,
+  })
+  return planned.kind === "record"
+    ? { kind: "restore", record: planned.record }
     : refused(ERR.NOT_AS_SHOWN)
 }
 
@@ -316,7 +369,7 @@ export function journalPaths(
   steps: readonly WriteStep[],
   staged: ReadonlyMap<string, InodeStat>,
   id: string,
-): readonly AcceptPath[] {
+): readonly WritePath[] {
   return steps.map(step => {
     const to = step.kind === "delete" ? null : step.to
     const file = to?.kind === "file" ? staged.get(step.path) : undefined
@@ -325,7 +378,7 @@ export function journalPaths(
     return {
       path: step.path,
       aside:
-        step.kind === "create" ? null : `${acceptAsideDir(id)}/${step.path}`,
+        step.kind === "create" ? null : `${writeAsideDir(id)}/${step.path}`,
       moved: null,
       staged: file ?? null,
       symlink: to?.kind === "symlink" ? to.target : null,
@@ -360,7 +413,7 @@ export const isSameInode = (a: InodeStat, b: InodeStat): boolean =>
  * staged file's inode, size and mtime, or a symlink to the journal's
  * target. A file written in place since its link is yours, not pine·trie's.
  */
-const isOwn = (p: AcceptPath, t: TargetFact | null): boolean => {
+const isOwn = (p: WritePath, t: TargetFact | null): boolean => {
   const own = ownOf(p)
   return own !== null && isStillOwn(own, t)
 }
@@ -371,7 +424,7 @@ export type Own =
   | { readonly kind: "symlink"; readonly target: string }
 
 /** `p`'s proof of its own write; null before it is planned. */
-const ownOf = (p: AcceptPath): Own | null =>
+const ownOf = (p: WritePath): Own | null =>
   p.staged !== null
     ? { kind: "file", stat: p.staged }
     : p.symlink !== null
@@ -404,7 +457,7 @@ export type RecoveryPlan =
       readonly kind: "put-back"
       readonly steps: readonly RecoveryStep[]
       /** The journal after: put back, its kept asides' `keptOn` set. */
-      readonly journal: AcceptJournal
+      readonly journal: WriteJournal
     }
 
 /**
@@ -416,7 +469,7 @@ export type RecoveryPlan =
  * kept, on accepted work's newest, when written through since.
  */
 export function planRecovery(
-  journal: AcceptJournal,
+  journal: WriteJournal,
   now: readonly PathNow[],
 ): RecoveryPlan {
   const facts = journal.paths.map((p, i) => ({
@@ -436,7 +489,7 @@ export function planRecovery(
   if (newest === undefined)
     throw new Error(`an accept's state has no parents: ${journal.record.id}`)
   const steps: RecoveryStep[] = []
-  const paths = facts.map(({ p, now }): AcceptPath => {
+  const paths = facts.map(({ p, now }): WritePath => {
     const proof = ownOf(p)
     const own = proof !== null && isStillOwn(proof, now.target)
     if (own) steps.push({ kind: "unlink-own", path: p.path, own: proof })
@@ -476,7 +529,7 @@ export interface KeptAside {
 
 /** Each ended journal's asides still to be checked. */
 export const keptAsides = (
-  journals: readonly AcceptJournal[],
+  journals: readonly WriteJournal[],
 ): readonly KeptAside[] =>
   journals.flatMap(j =>
     j.status === "open"
@@ -488,7 +541,7 @@ export const keptAsides = (
                 {
                   path: p.path,
                   aside: p.aside,
-                  moved: j.status === "accepted" ? p.moved : null,
+                  moved: j.status === "written" ? p.moved : null,
                   keptOn: p.keptOn,
                 },
               ],

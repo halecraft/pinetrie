@@ -1,11 +1,13 @@
-// session/acting — your proposed changes, setup and publish commands, and your
-// answers to lanes' use of your ssh identity, while they are out, and what the
+// session/acting — your proposed changes, setup, publish and restore
+// commands, your choices of conflicts' versions, and your answers to lanes'
+// use of your ssh identity, while they are out, and what the
 // host answered; `nextActing` decides.
 
 import type {
   AcceptedAction,
   AccessAnswer,
   ErrCode,
+  PointId,
   ProposedChangesAction,
   ThreadId,
 } from "@pinetrie/core"
@@ -79,17 +81,26 @@ export function nextActing<A>(
     : null
 }
 
+/** A restore of yours of a folder project's kept state, named by that state. */
+export type RestoreActing = Acting<PointId>
+/** A choice of yours of a conflict's version in a folder lane, named by its path. */
+export type ResolveActing = Acting<string>
+
 /** Every command of yours this tab has out or was refused: per lane, and accepted work. */
 export interface ActingState {
   readonly proposedByLane: ReadonlyMap<ThreadId, ProposedChangesActing>
   readonly access: ReadonlyMap<ThreadId, AccessActing>
   readonly accepted: AcceptedActing | null
+  readonly restore: RestoreActing | null
+  readonly resolveByLane: ReadonlyMap<ThreadId, ResolveActing>
 }
 
 export const NO_ACTING: ActingState = {
   proposedByLane: new Map(),
   access: new Map(),
   accepted: null,
+  restore: null,
+  resolveByLane: new Map(),
 }
 
 /** What a command is on: a lane's proposed changes, or accepted work. */
@@ -105,6 +116,12 @@ type ActingOn =
       readonly event: ActingEvent<AccessAnswer>
     }
   | { readonly kind: "accepted"; readonly event: ActingEvent<AcceptedAction> }
+  | { readonly kind: "restore"; readonly event: ActingEvent<PointId> }
+  | {
+      readonly kind: "resolve"
+      readonly lane: ThreadId
+      readonly event: ActingEvent<string>
+    }
 
 /** A lane's entry after one event: gone once the answer carried it out. */
 function laneStep<A>(
@@ -131,6 +148,13 @@ function actingStep(state: ActingState, on: ActingOn): ActingState {
       }
     case "access":
       return { ...state, access: laneStep(state.access, on.lane, on.event) }
+    case "restore":
+      return { ...state, restore: nextActing(state.restore, on.event) }
+    case "resolve":
+      return {
+        ...state,
+        resolveByLane: laneStep(state.resolveByLane, on.lane, on.event),
+      }
   }
 }
 
@@ -148,6 +172,12 @@ type ActingCommand =
       readonly answer: AccessAnswer
     }
   | { readonly kind: "accepted"; readonly action: AcceptedAction }
+  | { readonly kind: "restore"; readonly of: PointId }
+  | {
+      readonly kind: "resolve"
+      readonly lane: ThreadId
+      readonly path: string
+    }
 
 /** What `command` is on, with `event`. */
 function actingOn(
@@ -185,6 +215,23 @@ function actingOn(
         event:
           event.kind === "sent"
             ? { ...event, action: command.action, to: null }
+            : event,
+      }
+    case "restore":
+      return {
+        kind: "restore",
+        event:
+          event.kind === "sent"
+            ? { ...event, action: command.of, to: null }
+            : event,
+      }
+    case "resolve":
+      return {
+        kind: "resolve",
+        lane: command.lane,
+        event:
+          event.kind === "sent"
+            ? { ...event, action: command.path, to: null }
             : event,
       }
   }

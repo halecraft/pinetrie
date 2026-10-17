@@ -6,12 +6,17 @@ import {
   type ConfigWidening,
   type DiffSpan,
   type FileChange,
+  isImageMime,
+  type MediaSide,
+  type ReviewFile,
   type RevisionReview,
   spanKey,
   wideningWords,
   withoutTrailers,
 } from "@pinetrie/core"
+import { fileUrl } from "@pinetrie/rules"
 import type { ReviewTarget } from "./column-view.ts"
+import { byteWords } from "./counts.ts"
 
 /** A fetch's state. */
 export type Loaded<T> =
@@ -27,6 +32,23 @@ export type Loaded<T> =
 const COLLAPSE_OVER = 400
 /** A section draws at most this many lines of its diff. */
 export const DIFF_LINES_SHOWN = 5000
+
+/** One side of a media row: the file's URL at that side, and its size in words. */
+export interface MediaShown {
+  readonly url: string
+  readonly size: string
+}
+
+/**
+ * A file shown as a file, not as lines: an image drawn on each side, or
+ * another file's sizes and links to open each side. A side the file is
+ * absent at is null.
+ */
+export interface MediaRow {
+  readonly kind: "image" | "file"
+  readonly before: MediaShown | null
+  readonly after: MediaShown | null
+}
 
 export interface FileRow {
   /** `<span>:<path>` (`spanKey`): a stack can change one path in two revisions. */
@@ -45,6 +67,36 @@ export interface FileRow {
   readonly startsCollapsed: boolean
   /** The placeholder's height, in diff lines, before the diff loads. */
   readonly estimate: number
+  /** Shown as media, with no diff section; null for lines. */
+  readonly media: MediaRow | null
+  /** A move with no change to its content: "moved, unchanged", no diff section. */
+  readonly moved: boolean
+}
+
+/** What a renamed row with no lines says in place of a diff. */
+export const MOVED_UNCHANGED = "moved, unchanged"
+
+/** A file's sides as a media row, each side's URL its span's (`fileUrl`). */
+function mediaRow(span: DiffSpan, f: ReviewFile): MediaRow | null {
+  if (f.content.kind === "lines") return null
+  const { before, after } = f.content
+  const side = (s: MediaSide | null, which: "before" | "after") =>
+    s === null
+      ? null
+      : { url: fileUrl(span, f.path, which), size: byteWords(s.size) }
+  const isImage = (s: MediaSide | null) => s === null || isImageMime(s.content)
+  return {
+    kind:
+      isImage(before) && isImage(after) && (before ?? after) !== null
+        ? "image"
+        : "file",
+    before:
+      // A move's before is at its old path.
+      f.change === "renamed" || f.change === "copied"
+        ? null
+        : side(before, "before"),
+    after: side(after, "after"),
+  }
 }
 
 interface RevisionShown {
@@ -128,6 +180,8 @@ export function reviewView(
           DIFF_LINES_SHOWN,
           changed + 4 + 6 * Math.ceil(changed / 20),
         ),
+        media: mediaRow(span, f),
+        moved: f.change === "renamed" && changed === 0,
       }
     })
     return {
