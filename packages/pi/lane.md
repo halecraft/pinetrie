@@ -128,8 +128,10 @@ changes pine·trie can keep this note true. You can skip them.
 - A lane has 4 GiB of memory. <!-- apps/pinetrie/host/work/setup.ts LANE_MEMORY -->
 - There is no `gh`, and no container runtime unless the project grants its
   lanes lanes of their own (`lanes.nested` in `pinetrie.json`): then a
-  rootless Docker answers at `$DOCKER_HOST`.
+  rootless Docker answers at `$DOCKER_HOST`. There is no
+  `/var/run/docker.sock`: point a tool that assumes it at `$DOCKER_HOST`.
   <!-- packages/lanes/plan.ts LaneGrants -->
+  <!-- packages/docker/plan.ts INNER_DOCKER_HOST -->
 - The person's machine's own services (bound to its loopback) are out of
   reach, but for ports the project grants (`lanes.hostPorts`): those are at
   `$PINETRIE_HOST`, and `$PINETRIE_HOST_PORTS` lists them.
@@ -206,6 +208,7 @@ changes pine·trie can keep this note true. You can skip them.
 
 ## When the lane can't do something
 
-Some work needs what a lane lacks: a container runtime, a model key, the
-person's credentials, or their localhost. Say what you could not run and
+Some work needs what a lane lacks: a container runtime (unless the
+project grants `lanes.nested`), a model key, the person's credentials, or
+their localhost. Say what you could not run and
 why, and leave it to the person. Don't work around the lane's limits.

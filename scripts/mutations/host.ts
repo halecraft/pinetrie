@@ -4,6 +4,15 @@ import type { Mutation } from "../mutate.ts"
 const unit = ["pnpm", "exec", "vitest", "run", "apps/pinetrie/host"]
 
 export const mutations: readonly Mutation[] = [
+  // ── what a lane is told ──
+  {
+    name: "a nested lane is never told of its Docker",
+    file: "apps/pinetrie/host/work/containers.ts",
+    from: "      nested: grants.nested,",
+    to: "      nested: false,",
+    command: unit,
+    expect: "laneFacts: a lane is told each grant its config holds",
+  },
   // 0019 to 0021: deleted with their migrations once Duane's store has run them.
   {
     name: "0019 leaves a trashed pinned-to-the-task row",

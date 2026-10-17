@@ -268,6 +268,14 @@ export const mutations: readonly Mutation[] = [
     expect: "says what is granted",
   },
   {
+    name: "a lane granted lanes inside is told it has no container runtime",
+    file: "packages/pi/lanes.ts",
+    from: '    ...(grants.nested ? [] : ["container runtime"]),',
+    to: '    "container runtime",',
+    command: unit,
+    expect: "names Docker at $DOCKER_HOST only when lanes inside are granted",
+  },
+  {
     name: "the note names a symbol that is gone",
     file: "packages/pi/lane.md",
     from: "<!-- apps/pinetrie/host/work/containers.ts runEnded -->",
@@ -675,7 +683,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a lane is not told the runtime's programs for bash",
     file: "packages/pi/lanes.ts",
-    from: "    `Search with the ${GREP_TOOL} and ${FIND_TOOL} tools. In bash, ${listed(Object.keys(PREFERRED_OVER))} are on PATH: prefer them to ${listed(Object.values(PREFERRED_OVER))}.`,\n",
+    from: '    `Search with the ${GREP_TOOL} and ${FIND_TOOL} tools. In bash, ${listed(Object.keys(PREFERRED_OVER), "and")} are on PATH: prefer them to ${listed(Object.values(PREFERRED_OVER), "and")}.`,\n',
     to: "",
     command: unit,
     expect: "names the runtime's programs for bash, on any image",

@@ -613,6 +613,12 @@ item 18, and in `lanes.test.ts` against the harness.
   values, in about 300 tokens, among them that nothing installs for it, and
   that a catch up removes what was made from files that changed (ADR-0135).
   The model is sent the conversation as stored: nothing is rewritten.
+  - **A lane granted `lanes.nested` is told its Docker** answers at
+    `$DOCKER_HOST`, and that there is no `/var/run/docker.sock`; its
+    "No …" line drops "container runtime". The line names the variable,
+    never its value (`INNER_DOCKER_HOST`, in `@pinetrie/docker`), so pi
+    holds no copy of the address. Only those lanes' prefixes carry the
+    line. The host's `laneFacts` decides which grants a lane is told.
   - **Guidelines, not a section of its own.** pi joins its sections into one
     string, and a provider may rebuild that string by its tags:
     `pi-anthropic-auth` keeps `<rules>` and drops `<docs>` (S23, addendum).

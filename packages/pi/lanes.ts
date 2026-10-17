@@ -50,9 +50,10 @@ export interface LaneAccess {
 /**
  * What a lane of its own is told about itself. The host builds every name in
  * it: `PINETRIE_MOUNT` and `laneNote` are in `@pinetrie/lanes`, which this
- * package does not declare. Nothing here changes while the lane lives: a
- * change would alter every request's prefix, and Anthropic then drops the
- * lane's earlier thinking.
+ * package does not declare. Any change alters every later request's prefix,
+ * and Anthropic then drops the lane's earlier thinking: the grants and the
+ * shared directories follow the lane's config, and nothing else here changes
+ * while the lane lives.
  */
 export interface LaneFacts {
   /** `WORKSPACE_ROOT` in a container; the helper's own directory in tests. */
@@ -70,6 +71,8 @@ export interface LaneFacts {
       readonly personal: boolean
       readonly services: readonly string[]
     }
+    /** Lanes of its own: a rootless Docker, which `$DOCKER_HOST` names. */
+    readonly nested: boolean
     /** Names of environment variables passed in. */
     readonly env: readonly string[]
     /** Where each granted read-only mount is, in the lane. */
@@ -94,11 +97,11 @@ export interface LaneFacts {
 const PREFERRED_OVER: Readonly<Record<Exclude<RuntimeProgram, "jj">, string>> =
   { rg: "grep", fd: "find", sd: "sed" }
 
-/** `a`, `a and b`, `a, b and c`. */
-const listed = (words: readonly string[]): string =>
+/** `a`, `a and b`, `a, b and c`, with `conjunction` in place of `and`. */
+const listed = (words: readonly string[], conjunction: "and" | "or"): string =>
   words.length < 2
     ? (words[0] ?? "")
-    : `${words.slice(0, -1).join(", ")} and ${words.at(-1)}`
+    : `${words.slice(0, -1).join(", ")} ${conjunction} ${words.at(-1)}`
 
 /**
  * The block a lane of its own is told, one guideline per line. Guidelines,
@@ -115,12 +118,17 @@ export function laneGuidelines(facts: LaneFacts): string[] {
     ...(grants.ssh.services.length === 0
       ? []
       : [
-          `the ssh ${grants.ssh.services.length === 1 ? "identity" : "identities"} ${listed(grants.ssh.services)}`,
+          `the ssh ${grants.ssh.services.length === 1 ? "identity" : "identities"} ${listed(grants.ssh.services, "and")}`,
         ]),
     ...grants.env.map(name => `$${name}`),
     ...(grants.mounts.length === 0
       ? []
       : [`read-only files at ${grants.mounts.join(", ")}`]),
+  ]
+  const lacks = [
+    ...(grants.nested ? [] : ["container runtime"]),
+    "model keys",
+    "credentials",
   ]
   return [
     `You work in a ${PRODUCT_NAME} lane: a Linux container where you are root, in your own jj repo at ${dir}.`,
@@ -132,8 +140,13 @@ export function laneGuidelines(facts: LaneFacts): string[] {
       p =>
         `${dir}/${p} is shared live with the person and other threads, never committed.`,
     ),
-    `No container runtime, model keys or credentials${allowed.length === 0 ? "" : ` except ${allowed.join(", ")}`}. The internet works; the person's localhost does not.`,
-    `Search with the ${GREP_TOOL} and ${FIND_TOOL} tools. In bash, ${listed(Object.keys(PREFERRED_OVER))} are on PATH: prefer them to ${listed(Object.values(PREFERRED_OVER))}.`,
+    `No ${listed(lacks, "or")}${allowed.length === 0 ? "" : ` except ${allowed.join(", ")}`}. The internet works; the person's localhost does not.`,
+    ...(grants.nested
+      ? [
+          "Docker runs here, rootless, at $DOCKER_HOST. There is no /var/run/docker.sock: point a tool that assumes it at $DOCKER_HOST.",
+        ]
+      : []),
+    `Search with the ${GREP_TOOL} and ${FIND_TOOL} tools. In bash, ${listed(Object.keys(PREFERRED_OVER), "and")} are on PATH: prefer them to ${listed(Object.values(PREFERRED_OVER), "and")}.`,
     ...(facts.defaultImage
       ? [
           "Chromium's headless shell is installed ($PLAYWRIGHT_BROWSERS_PATH), and so is python3.",

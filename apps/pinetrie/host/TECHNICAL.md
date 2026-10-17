@@ -1262,7 +1262,7 @@ adapter's.
 | `shared.ts` | the shared files' lineages (`pinetrie.shared`, ADR-0135), one recorder for every lane and the watcher, so none reads and writes a lineage at once: a turn's accesses of shared files (`classifyWritesOnQueue` hands them over), based on what the lane last read, numbered and flagged (`planSharedLineages`) after the turn's queued step, since the lineages are every lane's; the watcher's stamps (`seen`). An earlier turn found concurrent after its rival is learnt has its revision record rewritten; one whose record is not written yet keeps what it says |
 | `shared-watch.ts` | your writes to the shared directories as they are made (S169): each directory of accepted work's watched (`watch-dir.ts`, with no quiet window), each file an event names stat'ed into the stamp a lane would read, and handed to `shared.ts`. A scan at each start, and after a dropped-events error, finds what changed unseen. It follows accepted work's list (`LaneConfigs.onShared`). Lanes' writes come by here too, and are claimed when their turns are recorded |
 | `registry.ts` | `LaneRegistry`: each lane's handle, its record, whether it is a lane of its own; the only module that touches the handles; `withHistory`, the one way to a lane's `LaneHistory`, which queues its function on the lane's queue with the history, the handle and the lane's record; refused, with nothing queued, for a lane with no record, no copy of its own, or a history the adapter does not keep |
-| `containers.ts` | `access`, a container's start (`planContainer`, `planStartFrom`; after a restore from a snapshot, the history's `afterRestore`, for jj `pre-rename:`, since a snapshot made before the rename holds the old names (S114); run from a queued step, which hands it the history; every start loses stale outputs, `removeStaleOutputs`), `beforeRun`, `runEnded` |
+| `containers.ts` | `access` (its prompt's facts from the lane's grants, `laneFacts`, pure), a container's start (`planContainer`, `planStartFrom`; after a restore from a snapshot, the history's `afterRestore`, for jj `pre-rename:`, since a snapshot made before the rename holds the old names (S114); run from a queued step, which hands it the history; every start loses stale outputs, `removeStaleOutputs`), `beforeRun`, `runEnded` |
 | `turns.ts` | pi's `turnDone`: the turn's revision (`recordTurn`), its classes and snapshot (`disk.ts`), its whole-disk diff, and what follows its commit (`follow`, for jj its fetch), fired once the snapshot step is queued (`queueTurnEnd`); the turn records still being written (`pendingRecords`). A revision is titled by its message's first line, else its first call in a person's words (`titleOf`, `callLabel` from `@pinetrie/interface`, ADR-0114: `shell pnpm test`, not `bash …`). A lane is fetched into your repo only after a turn that commits, so a lane that never changed a file has no `tip@pinetrie-<lane>`, no refresh and no `pinetrie.base` until it catches up (a clean merge is fetched) |
 | `create.ts` | a new lane: `checkBegin`, its record and name (`recordLane`, its `history` the kind of the disk it will clone, `sourceHistory`), its fork (`forkFacts` waits for `pendingRecords`; `forkSource` refuses a disk of another kind than the record's, thrown with `foreignLaneWords`) |
 | `update.ts` | an update (`withLaneStarted`, then one queued step, `planSettle` and `applySettle`, which fires the merge's `follow` after `recordUpdate`); `catchUpInRun`, the agent's `catch_up`; `askedAboutConflict`, which asks the lane's history for conflicts in its copy |
@@ -1329,6 +1329,13 @@ adapter's.
   says what goes, the paths are deleted and the registry rewritten. A
   failure is reported and the step goes on: a stale output is a rebuild
   the agent misses, not a broken lane.
+- **Every grant is told to the lane, or left out by name** (`laneFacts`,
+  `containers.ts`): its `grants` literal `satisfies` a record of
+  `LaneGrants`' keys, so a new grant fails `tsc` until the lane's facts say
+  what its agent is told of it. Host ports are left out, since whether
+  `$PINETRIE_HOST` is set depends on the runtime's target. `tsc` also
+  refuses a key pi's facts lack only while the literal stays inline in the
+  returned facts.
 - **An update is one step on the lane's `LaneQueue`** (`updateOnQueue`):
   the copy found ready (`readyToMerge`, whose `ReadyCopy` alone `merge`
   takes), the lane's base from its own history, accepted work and the WIP

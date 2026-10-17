@@ -3,6 +3,7 @@
 
 import {
   errorText,
+  type ProjectKind,
   type SnapshotId,
   type ThreadId,
   WORKSPACE_ROOT,
@@ -11,6 +12,7 @@ import type { Keeper } from "@pinetrie/keeper"
 import {
   executeOrThrow,
   KILL_SSH,
+  type LaneGrants,
   type LaneHistory,
   laneNote,
   PINETRIE_MOUNT,
@@ -22,13 +24,41 @@ import {
   RUNTIME_BIN,
   specHashOf,
 } from "@pinetrie/lanes"
-import type { LaneAccess } from "@pinetrie/pi"
+import type { LaneAccess, LaneFacts } from "@pinetrie/pi"
 import { readLaneSnapshots, readRunning, readThreadName } from "@pinetrie/reads"
 import { type Basics, failed } from "../basics.ts"
 import type { ProposedChangesActs } from "./destination.ts"
 import { removeStaleOutputs } from "./disk.ts"
 import type { LaneRegistry } from "./registry.ts"
 import type { Setup } from "./setup.ts"
+
+/** What a lane of its own is told about itself, from what the host holds for it. */
+export function laneFacts(input: {
+  readonly grants: LaneGrants
+  readonly ssh: LaneFacts["grants"]["ssh"]
+  readonly shared: readonly string[]
+  readonly defaultImage: boolean
+  readonly kind: ProjectKind
+}): LaneFacts {
+  const { grants } = input
+  return {
+    dir: WORKSPACE_ROOT,
+    shared: input.shared,
+    // Every grant is told, or excluded by name in the `satisfies` type. The
+    // literal stays inline: only there does tsc also refuse a key that
+    // `LaneFacts` lacks. Host ports are excluded: whether `$PINETRIE_HOST` is
+    // set depends on the runtime's target, which this does not see.
+    grants: {
+      ssh: input.ssh,
+      nested: grants.nested,
+      env: grants.env,
+      mounts: grants.mounts.map(m => m.target),
+    } satisfies Record<Exclude<keyof LaneGrants, "hostPorts">, unknown>,
+    defaultImage: input.defaultImage,
+    install: PINETRIE_MOUNT,
+    note: laneNote(input.kind),
+  }
+}
 
 const RETIRED =
   "this thread's lane has no disk and no snapshot to start from; branch from it to continue with its files"
@@ -142,20 +172,14 @@ export function createContainers(deps: {
       const history = registry.recordOf(lane)?.history ?? null
       if (history === null) return null
       const handle = registry.handleOf(lane)
-      const { grants } = setup.configs.laneConfig(lane)
       return {
-        facts: {
-          dir: WORKSPACE_ROOT,
+        facts: laneFacts({
+          grants: setup.configs.laneConfig(lane).grants,
+          ssh: setup.ssh.holdsFor(lane),
           shared: setup.configs.laneShared(lane).map(d => d.path),
-          grants: {
-            ssh: setup.ssh.holdsFor(lane),
-            env: grants.env,
-            mounts: grants.mounts.map(m => m.target),
-          },
           defaultImage: setup.defaultImage,
-          install: PINETRIE_MOUNT,
-          note: laneNote(history),
-        },
+          kind: history,
+        }),
         hostPaths: setup.hostPaths,
         programs: RUNTIME_BIN,
         gate: async () => {

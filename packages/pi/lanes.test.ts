@@ -49,7 +49,12 @@ import { assembleTools } from "./tools.ts"
 const facts = (over: Partial<LaneFacts> = {}): LaneFacts => ({
   dir: "/workspace",
   shared: [],
-  grants: { ssh: { personal: false, services: [] }, env: [], mounts: [] },
+  grants: {
+    ssh: { personal: false, services: [] },
+    nested: false,
+    env: [],
+    mounts: [],
+  },
   defaultImage: false,
   install: "/pinetrie",
   note: "/pinetrie/packages/pi/lane.md",
@@ -202,6 +207,7 @@ describe("laneGuidelines", () => {
         facts({
           grants: {
             ssh: { personal: true, services: ["deploy", "ci"] },
+            nested: false,
             env: ["NPM_TOKEN", "CI"],
             mounts: ["/data", "/ref"],
           },
@@ -215,12 +221,25 @@ describe("laneGuidelines", () => {
         facts({
           grants: {
             ssh: { personal: false, services: [] },
+            nested: false,
             env: ["CI"],
             mounts: [],
           },
         }),
       ),
     ).toContain("or credentials except $CI. ")
+  })
+
+  test("names Docker at $DOCKER_HOST only when lanes inside are granted", () => {
+    const without = text(facts())
+    expect(without).toContain("No container runtime, model keys or credentials")
+    expect(without).not.toContain("DOCKER_HOST")
+    const granted = facts().grants
+    const told = text(facts({ grants: { ...granted, nested: true } }))
+    expect(told).toContain("No model keys or credentials")
+    expect(told).toContain("at $DOCKER_HOST")
+    expect(told).toContain("There is no /var/run/docker.sock")
+    expect(told).not.toContain("container runtime")
   })
 
   test("names the browser and python3 only on the default image", () => {
@@ -270,6 +289,7 @@ describe("laneGuidelines", () => {
         defaultImage: true,
         grants: {
           ssh: { personal: true, services: ["deploy"] },
+          nested: true,
           env: ["A"],
           mounts: ["/m"],
         },
