@@ -3,7 +3,7 @@
 // pine·trie reads back.
 
 import { type Static, type TSchema, Type } from "typebox"
-import { Value } from "typebox/value"
+import { isWellFormed } from "./decode.ts"
 
 /** A history message as pi stores it. */
 export interface HistoryMessage<T extends string, D> {
@@ -54,7 +54,7 @@ export function historyMessage<T extends string, S extends TSchema>(
       timestamp,
     }),
     decode: message =>
-      Value.Check(schema, message)
+      isWellFormed(schema, message)
         ? (message as unknown as { readonly details: Static<S> }).details
         : undefined,
   }

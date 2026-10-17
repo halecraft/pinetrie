@@ -14,11 +14,11 @@ import type {
   WriterId,
 } from "@pinetrie/core"
 import { Type } from "typebox"
-import { Value } from "typebox/value"
 import { CatchUpFromSchema, catchUpName } from "./catch-up-from.ts"
 import {
   CanvasIdSchema,
   EntryIdSchema,
+  isWellFormed,
   List,
   ThreadIdSchema,
   WriterIdSchema,
@@ -140,7 +140,7 @@ export const encodeQueuedFact = (fact: QueuedFact): string =>
 export function decodeQueuedFact(stored: string): QueuedFact | undefined {
   try {
     const fact: unknown = JSON.parse(stored)
-    return Value.Check(QueuedFactSchema, fact) ? fact : undefined
+    return isWellFormed(QueuedFactSchema, fact) ? fact : undefined
   } catch {
     return undefined
   }

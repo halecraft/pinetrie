@@ -468,7 +468,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a forget leaves the host's version of proposed changes you deleted",
     file: "packages/jj/proposed-steps.ts",
-    from: "        steps: decision.hostLeft ? forgetSteps(proposedBookmark(at.name)) : [],\n",
+    from: "        steps: decision.hostLeft ? forgetSteps(proposedBookmark(name)) : [],\n",
     to: "        steps: [],\n",
     command: proposedRefresh,
     expect: "the host's version is forgotten",
@@ -988,8 +988,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "forget keeps the record",
     file: "packages/jj/proposed-steps.ts",
-    from: '        steps: decision.hostLeft ? forgetSteps(proposedBookmark(at.name)) : [],\n        after: { kind: "remove" },',
-    to: '        steps: decision.hostLeft ? forgetSteps(proposedBookmark(at.name)) : [],\n        after: { kind: "nothing" },',
+    from: '        steps: decision.hostLeft ? forgetSteps(proposedBookmark(name)) : [],\n        after: { kind: "remove" },',
+    to: '        steps: decision.hostLeft ? forgetSteps(proposedBookmark(name)) : [],\n        after: { kind: "nothing" },',
     command: unit,
     expect: "forget removes the record",
   },
@@ -1022,8 +1022,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "withdrawn proposed changes keep its record",
     file: "packages/jj/proposed-steps.ts",
-    from: '              ...forgetSteps(proposedBookmark(at.name)),\n            ],\n            after: { kind: "remove" },',
-    to: '              ...forgetSteps(proposedBookmark(at.name)),\n            ],\n            after: { kind: "nothing" },',
+    from: '              ...forgetSteps(proposedBookmark(name)),\n            ],\n            after: { kind: "remove" },',
+    to: '              ...forgetSteps(proposedBookmark(name)),\n            ],\n            after: { kind: "nothing" },',
     command: unit,
     expect: "withdraw plans the abandon",
   },
@@ -1402,6 +1402,15 @@ export const mutations: readonly Mutation[] = [
     from: '  readonly history: "jj"\n  readonly [jjLaneBrand]: true\n',
     to: '  readonly history: "jj"\n',
     command: ["pnpm", "exec", "tsc", "--noEmit"],
+  },
+  // ── which refresh decisions read the lane's root ──
+  {
+    name: "a refresh's rebase reads the lane's root",
+    file: "packages/jj/proposed-steps.ts",
+    from: '  decision.kind === "build" || decision.kind === "rebuild"\n',
+    to: '  decision.kind === "build" ||\n  decision.kind === "rebuild" ||\n  decision.kind === "refresh"\n',
+    command: unit,
+    expect: "only a build and a rebuild write messages from the lane's root",
   },
   {
     name: "a fork at a recorded turn works on that turn's parent",

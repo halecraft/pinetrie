@@ -58,9 +58,10 @@ translates to.
   `gatherStack`, `gatherDescribe`), each returning core's facts. Where proposed changes sit is decided here, once, as an `ProposedChangesPlace`, and so is the read
   path: a refresh of a lane on accepted work takes the one read, every other
   gather the separate reads.
-- `proposed-steps.ts`: a decision into steps, pure (`proposedChangesEffects`,
-  `rebuildEffects`, `acceptanceEffects`, `describeEffects`), with what the host
-  does after (`ProposedChangesEffects.after`).
+- `proposed-steps.ts`: a decision into steps, pure (`buildEffects`,
+  `proposedChangesEffects`, `rebuildEffects`, `acceptanceEffects`,
+  `describeEffects`), with what the host does after
+  (`ProposedChangesEffects.after`).
 - `proposed-repair.ts`: `repairProposedChanges`, the one step on proposed changes that read between
   its steps.
 - `accepted.ts`: accepted work's facts, a new lane's begin, a WIP's state
@@ -291,6 +292,12 @@ update's merge will change.**
   the rest), then the steps on the owner. A decision carries the facts its
   steps need (a `Placed`, the proposed changes, its changes), so each kind has one
   translation and none that runs nothing because a case cannot occur.
+- **Only a build and a rebuild take the lane's tip and WIP line**
+  (`isBuild`, `buildEffects`, `BuildAt`): they are the refresh decisions
+  that write commit messages. Every other one is translated by
+  `proposedChangesEffects` from the thread's name alone, so its types give
+  it nothing read from the lane's root, and the host reads the root only
+  after a decision to build.
 
 - **Proposed changes' bookmark is `pinetrie-proposed/<name>`**, the thread's two-word
   name (`proposedBookmark`). Every step finds the proposed changes by it: one built under

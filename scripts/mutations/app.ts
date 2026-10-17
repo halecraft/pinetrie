@@ -3202,8 +3202,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a squash rebuilds nothing",
     file: "apps/pinetrie/host/jj/proposed/act.ts",
-    from: "    await refresh.rebuild(ops, lane, planned)\n",
-    to: '    if (action !== "squash") await refresh.rebuild(ops, lane, planned)\n',
+    from: "    await refresh.rebuild(ops, lane, planned, message.entry)\n",
+    to: '    if (action !== "squash") await refresh.rebuild(ops, lane, planned, message.entry)\n',
     suite: "lanes",
     scenario: "main",
     expect:

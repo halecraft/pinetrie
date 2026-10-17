@@ -21,7 +21,9 @@ import {
 } from "./plan.ts"
 import {
   acceptanceEffects,
+  buildEffects,
   describeEffects,
+  isBuild,
   proposedChangesEffects,
   rebuildEffects,
 } from "./proposed-steps.ts"
@@ -62,9 +64,9 @@ const TRAILERS = { lane: LANE, name: NAME, entry: "e1" }
 const AT = { ...TRAILERS, wip: "WIP (amber-fox): fix it", nonce: "n1" }
 const LEDGER = { source: NEW_TIP, start: [START] }
 
-describe("proposedChangesEffects: each refresh decision's steps, and what follows", () => {
+describe("buildEffects and proposedChangesEffects: each refresh decision's steps, and what follows", () => {
   test("rebuild: planRebuildProposed's steps, its WIP line with the host's trailers and the new ledger, then a record", () => {
-    const e = proposedChangesEffects(
+    const e = buildEffects(
       { kind: "rebuild", place: PLACE, proposed: PROPOSED_CHANGES },
       AT,
     )
@@ -85,14 +87,16 @@ describe("proposedChangesEffects: each refresh decision's steps, and what follow
   })
   test("none, stale and leave run nothing and record: the read made before planning is still the proposed changes", () => {
     for (const kind of ["none", "stale", "leave"] as const)
-      expect(proposedChangesEffects({ kind, place: PLACE }, AT)).toEqual({
+      expect(proposedChangesEffects({ kind, place: PLACE }, NAME)).toEqual({
         steps: [],
         after: { kind: "record", place: PLACE },
         built: false,
       })
   })
   test("mark marks the proposed changes, then records it", () => {
-    expect(proposedChangesEffects({ kind: "mark", place: PLACE }, AT)).toEqual({
+    expect(
+      proposedChangesEffects({ kind: "mark", place: PLACE }, NAME),
+    ).toEqual({
       steps: markSteps(BOOKMARK),
       after: { kind: "record", place: PLACE },
       built: false,
@@ -102,7 +106,7 @@ describe("proposedChangesEffects: each refresh decision's steps, and what follow
     expect(
       proposedChangesEffects(
         { kind: "withdraw", proposed: PROPOSED_CHANGES },
-        AT,
+        NAME,
       ),
     ).toEqual({
       steps: [...planAbandonProposed(["kxyz"]), ...forgetSteps(BOOKMARK)],
@@ -112,37 +116,37 @@ describe("proposedChangesEffects: each refresh decision's steps, and what follow
   })
   test("forget removes the record, and forgets the host's version only when one is left", () => {
     expect(
-      proposedChangesEffects({ kind: "forget", hostLeft: false }, AT),
+      proposedChangesEffects({ kind: "forget", hostLeft: false }, NAME),
     ).toEqual({
       steps: [],
       after: { kind: "remove" },
       built: false,
     })
     expect(
-      proposedChangesEffects({ kind: "forget", hostLeft: true }, AT).steps,
+      proposedChangesEffects({ kind: "forget", hostLeft: true }, NAME).steps,
     ).toEqual(forgetSteps(BOOKMARK))
   })
   test("refresh rebases the bottom onto the target, then marks; repair names the changes; untouched does nothing", () => {
     expect(
       proposedChangesEffects(
         { kind: "refresh", place: PLACE, proposed: PROPOSED_CHANGES },
-        AT,
+        NAME,
       ).steps,
     ).toEqual([...planRefreshProposed("kxyz", TARGET), ...markSteps(BOOKMARK)])
     expect(
       proposedChangesEffects(
         { kind: "repair", place: PLACE, changeIds: ["ka", "kb"] },
-        AT,
+        NAME,
       ).after,
     ).toEqual({ kind: "repair", place: PLACE, changeIds: ["ka", "kb"] })
-    expect(proposedChangesEffects({ kind: "untouched" }, AT)).toEqual({
+    expect(proposedChangesEffects({ kind: "untouched" }, NAME)).toEqual({
       steps: [],
       after: { kind: "nothing" },
       built: false,
     })
   })
   test("build names the lane's tip as its one source on its WIP line, and is a rebuild with nothing to abandon", () => {
-    const build = proposedChangesEffects({ kind: "build", place: PLACE }, AT)
+    const build = buildEffects({ kind: "build", place: PLACE }, AT)
     expect(build).toEqual({
       steps: [
         ...planProposedChanges({
@@ -187,9 +191,30 @@ describe("proposedChangesEffects: each refresh decision's steps, and what follow
       { kind: "repair", place: PLACE, changeIds: ["k"] },
     ]
     for (const d of decisions) {
-      const { after } = proposedChangesEffects(d, AT)
+      const { after } = isBuild(d)
+        ? buildEffects(d, AT)
+        : proposedChangesEffects(d, NAME)
       expect("place" in after && after.place).toBe(PLACE)
     }
+  })
+  test("only a build and a rebuild write messages from the lane's root", () => {
+    const decisions: RefreshDecision[] = [
+      { kind: "untouched" },
+      { kind: "forget", hostLeft: true },
+      { kind: "withdraw", proposed: PROPOSED_CHANGES },
+      { kind: "build", place: PLACE },
+      { kind: "rebuild", place: PLACE, proposed: PROPOSED_CHANGES },
+      { kind: "refresh", place: PLACE, proposed: PROPOSED_CHANGES },
+      { kind: "mark", place: PLACE },
+      { kind: "none", place: PLACE },
+      { kind: "stale", place: PLACE },
+      { kind: "leave", place: PLACE },
+      { kind: "repair", place: PLACE, changeIds: ["k"] },
+    ]
+    expect(decisions.filter(isBuild).map(d => d.kind)).toEqual([
+      "build",
+      "rebuild",
+    ])
   })
 })
 

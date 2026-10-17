@@ -45,7 +45,11 @@ export {
 export { repairProposedChanges } from "./proposed-repair.ts"
 export {
   acceptanceEffects,
+  type BuildAt,
+  type BuildDecision,
+  buildEffects,
   describeEffects,
+  isBuild,
   type ProposedChangesEffects,
   proposedChangesEffects,
   rebuildEffects,

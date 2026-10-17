@@ -65,6 +65,12 @@ const FolderProposedChangesSchema = Type.Object({
   at: Type.Number(),
 })
 
+/** Proposed changes' record as stored: jj's or a folder's. */
+const ProposedChangesSchema = Type.Union([
+  JjProposedChangesSchema,
+  FolderProposedChangesSchema,
+])
+
 /** Each lane's proposed changes, of the project's kind, at the lane. */
 export const PROPOSED_CHANGES: RecordSpec<
   ProposedChangesRecord,
@@ -98,7 +104,7 @@ export const PROPOSED_CHANGES: RecordSpec<
         },
   decode: (contents, key) =>
     decodeRecord(
-      Type.Union([JjProposedChangesSchema, FolderProposedChangesSchema]),
+      ProposedChangesSchema,
       contents,
       threadKey(key),
       (r, lane): ProposedChangesRecord =>

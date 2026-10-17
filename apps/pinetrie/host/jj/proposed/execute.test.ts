@@ -6,7 +6,11 @@ import {
   type ThreadName,
   threadIdFor,
 } from "@pinetrie/core"
-import { acceptanceEffects, proposedChangesEffects } from "@pinetrie/jj"
+import {
+  acceptanceEffects,
+  buildEffects,
+  proposedChangesEffects,
+} from "@pinetrie/jj"
 import { proposedChangesRecord } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
 import { methods, record } from "../../fakes.ts"
@@ -79,7 +83,7 @@ describe("executeProposedChanges", () => {
     const p = ports()
     const effects = proposedChangesEffects(
       { kind: "withdraw", proposed: BEFORE },
-      AT,
+      NAME,
     )
     expect(
       await executeProposedChanges(p.port, { base: null, effects }, BEFORE),
@@ -90,7 +94,7 @@ describe("executeProposedChanges", () => {
 
   test("follow: its steps run, then the proposed changes are read again and recorded as it is after them", async () => {
     const p = ports()
-    const effects = proposedChangesEffects(
+    const effects = buildEffects(
       { kind: "rebuild", place: PLACE, proposed: BEFORE },
       AT,
     )
@@ -104,7 +108,7 @@ describe("executeProposedChanges", () => {
 
   test("none: no steps, so the read made before planning is recorded, and nothing more is read", async () => {
     const p = ports()
-    const effects = proposedChangesEffects({ kind: "none", place: PLACE }, AT)
+    const effects = proposedChangesEffects({ kind: "none", place: PLACE }, NAME)
     await executeProposedChanges(p.port, { base: null, effects }, BEFORE)
     expect(methods(p.calls)).toEqual(["writeBase", "run", "record"])
     expect(p.calls[2]?.args[0]).toBe(BEFORE)
@@ -114,7 +118,7 @@ describe("executeProposedChanges", () => {
     const p = ports()
     const effects = proposedChangesEffects(
       { kind: "repair", place: PLACE, changeIds: ["ka", "kb"] },
-      AT,
+      NAME,
     )
     await executeProposedChanges(p.port, { base: null, effects }, null)
     expect(methods(p.calls)).toEqual([
@@ -129,7 +133,7 @@ describe("executeProposedChanges", () => {
 
   test("the lane's base record is written before any step", async () => {
     const p = ports()
-    const effects = proposedChangesEffects({ kind: "build", place: PLACE }, AT)
+    const effects = buildEffects({ kind: "build", place: PLACE }, AT)
     await executeProposedChanges(p.port, { base: BASE, effects }, null)
     expect(methods(p.calls)[0]).toBe("writeBase")
     expect(p.calls[0]?.args[0]).toBe(BASE)

@@ -50,13 +50,23 @@ export interface ProposedChangesDocs {
   archived(lane: ThreadId): boolean
   /** A gather's input: the lane, its name, accepted work's names, and the last catch-up read, a memo `readCatchUp` keeps at the same tip and base commit. */
   input(lane: ThreadId): ProposedChangesInput
-  /** The lane's tip entry, for `Pinetrie-Entry`, its root leased; "" for none. */
-  tipOf(lane: ThreadId): Promise<string>
   /**
-   * Proposed changes' line until an agent describes it: the thread's name and
-   * its own first message, the first prompt its lane ran, its root leased.
+   * The lane's tip entry, for `Pinetrie-Entry`, its root leased; "" for none.
+   * Loads the root: only a build reads it.
    */
-  wipLine(lane: ThreadId, name: ThreadName): Promise<string>
+  laneTip(lane: ThreadId): Promise<string>
+  /**
+   * The tip, and proposed changes' line until an agent describes it (the
+   * thread's name and its own first message, the first prompt its lane ran),
+   * under one lease. Loads the root: only a build reads it.
+   */
+  messageFacts(lane: ThreadId, name: ThreadName): Promise<MessageFacts>
+}
+
+/** What a build's messages take from the lane's root. */
+export interface MessageFacts {
+  readonly entry: string
+  readonly wip: string
 }
 
 /** The records the host writes from your repo, the page's cache. */
@@ -122,20 +132,20 @@ export function createProposedChangesDeps(input: {
       repoConfig,
       known: jjCatchUp(readBases(doc).get(lane)),
     }),
-    async tipOf(lane) {
+    async laneTip(lane) {
       await using held = basics.leases.lane(lane)
       const root = held === null ? null : await held.ready
       return (root === null ? null : readLaneTip(root, lane)) ?? ""
     },
-    async wipLine(lane, name) {
+    async messageFacts(lane, name) {
       await using held = basics.leases.lane(lane)
       const root = held === null ? null : await held.ready
-      if (root === null) return wipDescription(name, "")
+      if (root === null) return { entry: "", wip: wipDescription(name, "") }
       const index = readTreeIndex(root)
       const tip = readLaneTip(root, lane)
       const first = laneFirstPrompt(index, readRevisions(root), lane, tip)
       const text = projectTranscript(index, tip).find(m => m.id === first)?.text
-      return wipDescription(name, text ?? "")
+      return { entry: tip ?? "", wip: wipDescription(name, text ?? "") }
     },
   }
   const records: ProposedChangesRecords = {

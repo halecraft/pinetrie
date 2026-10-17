@@ -1,13 +1,17 @@
 // host/jj/proposed/refresh — what a trigger does to a lane's proposed changes,
 // and proposed changes rebuilt: gather (`gatherRefresh`, `@pinetrie/jj`),
-// decide (`planRefresh`, `@pinetrie/rules`), translate
-// (`proposedChangesEffects`, `rebuildEffects`) and execute
+// decide (`planRefresh`, `@pinetrie/rules`), translate (`buildEffects`,
+// `proposedChangesEffects`, `rebuildEffects`) and execute
 // (`executeProposedChanges`). The record is written from the repo after each
-// step, never read back to decide.
+// step, never read back to decide. The lane's root is read only after a
+// decision to build: every lane is refreshed when accepted work moves, and
+// most decide nothing that writes a message.
 
 import type { Placed, Rebuild, ThreadId, ThreadName } from "@pinetrie/core"
 import {
+  buildEffects,
   gatherRefresh,
+  isBuild,
   proposedBookmark,
   proposedChangesEffects,
   type RepoOps,
@@ -23,8 +27,13 @@ import type { ProposedChangesDeps } from "./state.ts"
 export interface Refresh {
   /** What a trigger does to one lane's proposed changes: "built" when its content changed. */
   refresh(ops: RepoOps, lane: ThreadId): Promise<"built" | "other">
-  /** Proposed changes rebuilt (`planStackEnded`, `planRebuild`), then its record. */
-  rebuild(ops: RepoOps, lane: ThreadId, rebuild: Rebuild): Promise<void>
+  /** Proposed changes rebuilt (`planStackEnded`, `planRebuild`), then its record; `entry` is the lane's tip (`laneTip`). */
+  rebuild(
+    ops: RepoOps,
+    lane: ThreadId,
+    rebuild: Rebuild,
+    entry: string,
+  ): Promise<void>
   /** The ports the effects of a step on proposed changes run over, for `lane`'s proposed changes under `name`. */
   ports(ops: RepoOps, lane: ThreadId, name: ThreadName): ProposedChangesPorts
 }
@@ -94,14 +103,16 @@ export function createRefresh(
         return "other"
       }
       const { name, facts } = now
-      // plan
-      const effects = proposedChangesEffects(planRefresh(facts), {
-        lane,
-        name,
-        entry: await docs.tipOf(lane),
-        wip: await docs.wipLine(lane, name),
-        nonce: newNonce(),
-      })
+      // plan, then what a build's messages need
+      const decision = planRefresh(facts)
+      const effects = isBuild(decision)
+        ? buildEffects(decision, {
+            lane,
+            name,
+            nonce: newNonce(),
+            ...(await docs.messageFacts(lane, name)),
+          })
+        : proposedChangesEffects(decision, name)
       // execute
       return executeProposedChanges(
         ports(ops, lane, name),
@@ -109,10 +120,10 @@ export function createRefresh(
         facts.proposed,
       )
     },
-    async rebuild(ops, lane, rebuild) {
+    async rebuild(ops, lane, rebuild, entry) {
       const effects = rebuildEffects(rebuild, {
         lane,
-        entry: await docs.tipOf(lane),
+        entry,
         nonce: newNonce(),
       })
       await executeProposedChanges(

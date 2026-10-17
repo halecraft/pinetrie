@@ -22,7 +22,30 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import { type Static, type TSchema, Type } from "typebox"
-import { Value } from "typebox/value"
+import { Compile } from "typebox/compile"
+
+/** Each schema's checker, compiled the first time it checks a value. */
+const checkers = new WeakMap<TSchema, (value: unknown) => boolean>()
+
+/**
+ * Whether `value` matches `schema`. Compiled once per schema object, so a
+ * schema must be built once, at module level: one built in a decode would
+ * compile at every call, slower than not compiling. Where code cannot be
+ * evaluated (a page whose content security policy forbids eval), TypeBox
+ * checks without compiling, with the same answers.
+ */
+export function isWellFormed<S extends TSchema>(
+  schema: S,
+  value: unknown,
+): value is Static<S> {
+  let check = checkers.get(schema)
+  if (check === undefined) {
+    const compiled = Compile(schema)
+    check = v => compiled.Check(v)
+    checkers.set(schema, check)
+  }
+  return check(value)
+}
 
 /**
  * Check `value` against `schema`, then brand it with `build`; undefined if it
@@ -35,7 +58,7 @@ export function decodeWith<S extends TSchema, T>(
   value: unknown,
   build: (wire: Static<S>) => T,
 ): T | undefined {
-  return Value.Check(schema, value) ? build(value as Static<S>) : undefined
+  return isWellFormed(schema, value) ? build(value) : undefined
 }
 
 /**
@@ -85,7 +108,7 @@ export const fixedKey = <K extends string>(
 ): K | undefined => (key === expected ? expected : undefined)
 
 // Branded ids as stored: each schema's `Static` is the brand, so a value that
-// passes `Value.Check` is already the code's own type. A lane is checked with
+// passes `isWellFormed` is already the code's own type. A lane is checked with
 // core's `THREAD_PATTERN`, the pattern `isThreadId` tests.
 
 /** A commit id as stored: never empty. */

@@ -44,7 +44,7 @@ export function stackEnded(
     const planned = planStackEnded({ stack, facts, gathered })
     if (planned.kind === "refused") return planned.why
     // execute: the stack was made from this tip and start, and its ledger names them.
-    await refresh.rebuild(ops, lane, planned)
+    await refresh.rebuild(ops, lane, planned, await deps.docs.laneTip(lane))
     return null
   })
 }

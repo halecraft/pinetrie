@@ -80,6 +80,9 @@ const FolderBaseSchema = Type.Object({
   work: WorkSchema,
 })
 
+/** A lane's base record as stored: jj's or a folder's. */
+const BaseRecordSchema = Type.Union([JjBaseSchema, FolderBaseSchema])
+
 /**
  * Each lane's base, as its history says it, of the project's kind, at the
  * lane. A record written before records had a kind decodes as none, until
@@ -105,7 +108,7 @@ export const BASE: RecordSpec<BaseRecord, ThreadId, "session"> = {
   },
   decode: (contents, key) =>
     decodeRecord(
-      Type.Union([JjBaseSchema, FolderBaseSchema]),
+      BaseRecordSchema,
       contents,
       threadKey(key),
       (r, lane): BaseRecord =>

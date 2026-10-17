@@ -1682,8 +1682,8 @@ adapter's.
   gather (`@pinetrie/jj`: `gatherRefresh`, `gatherProposedChanges`, `gatherAcceptance`,
   `gatherStack`, `gatherDescribe`), a decision (`@pinetrie/rules`: `planRefresh`,
   `planAcceptance`, `planRebuild`, `planStackEnded`, `planDescribeSettle`),
-  a translation into steps (`@pinetrie/jj`: `proposedChangesEffects`, `acceptanceEffects`,
-  `rebuildEffects`, `describeEffects`), and `executeProposedChanges` (`execute.ts`),
+  a translation into steps (`@pinetrie/jj`: `buildEffects`, `proposedChangesEffects`,
+  `acceptanceEffects`, `rebuildEffects`, `describeEffects`), and `executeProposedChanges` (`execute.ts`),
   which carries out every action over ports: the lane's base record first,
   when it differs from the page's, then the steps, then what comes after
   (`ProposedChangesEffects.after`). So the rules are tested as values in the two
@@ -1695,6 +1695,12 @@ adapter's.
   for one import, S78, must not withdraw live proposed changes), the last catch-up
   read (`pinetrie.base`, a memo `readCatchUp` keeps at the same tip and base
   commit, never read to decide), the lane's tip entry and the WIP line.
+  **The tip and the WIP line are read only after a decision to build or
+  rebuild** (`isBuild`), both under one lease (`messageFacts`): reading them
+  loads the lane's root, which the upkeep then compacts and lets go, and
+  every lane is refreshed at a start and whenever accepted work moves,
+  most deciding nothing that writes a message. `refresh.test.ts` counts
+  the leases.
   Everything else is read from your repo (ADR-0104), and where proposed changes
   sit is decided once there (`ProposedChangesPlace`): a WIP gone moves nothing and
   writes only its base record; an untraced start builds nothing, so squash,

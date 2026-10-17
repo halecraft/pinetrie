@@ -21,13 +21,16 @@ import { deleteRecord, type RecordSpec, setRecord } from "./records.ts"
  * Each writer's name, at the writer's id. The contents are the name alone.
  * Total: contents that are not a string are malformed.
  */
+/** A name or a picture's hash, as stored. */
+const StoredText = Type.String()
+
 export const PARTICIPANT: RecordSpec<ParticipantRecord, WriterId, "session"> = {
   namespace: "pinetrie.participant",
   home: "session",
   keyOf: r => r.writer,
   encode: r => r.name,
   decode: (contents, key) =>
-    decodeRecord(Type.String(), contents, writerKey(key), (name, writer) => ({
+    decodeRecord(StoredText, contents, writerKey(key), (name, writer) => ({
       writer,
       name,
     })),
@@ -66,7 +69,7 @@ export const PICTURE: RecordSpec<PictureRecord, WriterId, "session"> = {
   keyOf: r => r.writer,
   encode: r => r.sha256,
   decode: (contents, key) =>
-    decodeRecord(Type.String(), contents, writerKey(key), (sha, writer) =>
+    decodeRecord(StoredText, contents, writerKey(key), (sha, writer) =>
       isSha256(sha) ? { writer, sha256: sha } : undefined,
     ),
 }

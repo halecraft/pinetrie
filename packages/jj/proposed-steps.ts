@@ -40,7 +40,7 @@ interface ProposedChangesAt {
 }
 
 /** What a build needs besides: the WIP line, and a fresh nonce its commits are named by (`nonceRevset`). */
-interface BuildAt extends ProposedChangesAt {
+export interface BuildAt extends ProposedChangesAt {
   /** The WIP line proposed changes carry until an agent describes it (`wipDescription`). */
   readonly wip: string
   /** `pinetrie-proposed-<uuid>`, fresh for each build: the host makes it. */
@@ -115,33 +115,21 @@ export function rebuildEffects(
   }
 }
 
-/** What each refresh decision runs, and what the host writes after. */
-export function proposedChangesEffects(
-  decision: RefreshDecision,
+/** The refresh decisions that write commit messages, from the lane's root: the only ones that read it. */
+export type BuildDecision = Extract<
+  RefreshDecision,
+  { readonly kind: "build" | "rebuild" }
+>
+
+export const isBuild = (decision: RefreshDecision): decision is BuildDecision =>
+  decision.kind === "build" || decision.kind === "rebuild"
+
+/** What a build or a rebuild runs, its messages from `at`, and what the host writes after. */
+export function buildEffects(
+  decision: BuildDecision,
   at: BuildAt,
 ): ProposedChangesEffects {
   switch (decision.kind) {
-    case "untouched":
-      return NOTHING
-    case "forget":
-      return {
-        steps: decision.hostLeft ? forgetSteps(proposedBookmark(at.name)) : [],
-        after: { kind: "remove" },
-        built: false,
-      }
-    case "withdraw": {
-      const changeIds = revisionChangeIds(decision.proposed)
-      return changeIds.length === 0
-        ? NOTHING
-        : {
-            steps: [
-              ...planAbandonProposed(changeIds),
-              ...forgetSteps(proposedBookmark(at.name)),
-            ],
-            after: { kind: "remove" },
-            built: false,
-          }
-    }
     case "build":
       return rebuildEffects(
         {
@@ -176,6 +164,39 @@ export function proposedChangesEffects(
         built: true,
       }
     }
+  }
+}
+
+/**
+ * What every other refresh decision runs, and what the host writes after:
+ * none writes a message, so none takes the lane's tip or WIP line.
+ */
+export function proposedChangesEffects(
+  decision: Exclude<RefreshDecision, BuildDecision>,
+  name: ThreadName,
+): ProposedChangesEffects {
+  switch (decision.kind) {
+    case "untouched":
+      return NOTHING
+    case "forget":
+      return {
+        steps: decision.hostLeft ? forgetSteps(proposedBookmark(name)) : [],
+        after: { kind: "remove" },
+        built: false,
+      }
+    case "withdraw": {
+      const changeIds = revisionChangeIds(decision.proposed)
+      return changeIds.length === 0
+        ? NOTHING
+        : {
+            steps: [
+              ...planAbandonProposed(changeIds),
+              ...forgetSteps(proposedBookmark(name)),
+            ],
+            after: { kind: "remove" },
+            built: false,
+          }
+    }
     case "refresh": {
       const [bottom] = revisionChangeIds(decision.proposed)
       if (bottom === undefined) return NOTHING
@@ -190,7 +211,7 @@ export function proposedChangesEffects(
     }
     case "mark":
       return {
-        steps: markSteps(proposedBookmark(at.name)),
+        steps: markSteps(proposedBookmark(name)),
         after: { kind: "record", place: decision.place },
         built: false,
       }

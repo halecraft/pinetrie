@@ -12,6 +12,7 @@ import {
   commitId,
   HOST_OPERATOR,
   NO_EDITOR,
+  type RootId,
   type ThreadId,
   type ThreadName,
   threadIdFor,
@@ -95,7 +96,22 @@ async function yourRepo(tag: string) {
  * files, or null for none.
  */
 async function settles(dir: string, lane: ThreadId, name: ThreadName) {
-  const b = basics()
+  const fake = basics()
+  /** Each lease the refresh takes, by root or by lane: each one loads a root. */
+  let leased = 0
+  const b = {
+    ...fake,
+    leases: {
+      root: (root: RootId) => {
+        leased += 1
+        return fake.leases.root(root)
+      },
+      lane: (l: ThreadId) => {
+        leased += 1
+        return fake.leases.lane(l)
+      },
+    },
+  }
   putValue(b, setRecord(NAME, { lane, name, at: 1 }))
   const scribe = record<Records>({
     writeValues: async writes => applyWrites(b, writes),
@@ -147,6 +163,7 @@ async function settles(dir: string, lane: ThreadId, name: ThreadName) {
       files,
       record: readProposedByLane(b.session).get(lane) ?? null,
       base: readBases(b.session).get(lane) ?? null,
+      leased,
     }
   } finally {
     owner.close()
@@ -213,6 +230,7 @@ test("a catch-up that merged your acceptance of the lane's work leaves nothing t
     files: null,
     record: null,
     base: expect.objectContaining({ catchUp: null, untraced: [] }),
+    leased: 0,
   })
 }, 60_000)
 
@@ -246,6 +264,7 @@ test("an accepted thread commit with no Pinetrie-Source builds nothing until the
       untraced: [accepted],
       catchUp: { tip: more, to: yours, files: ["a.txt"] },
     }),
+    leased: 0,
   })
   const merged = await you.commit(
     [more, yours],
@@ -389,4 +408,27 @@ test("you deleted the proposed changes' bookmark and the lane has nothing to off
       `remote_bookmarks(exact:"${proposedBookmark(THREAD)}", remote=exact:"pinetrie-host")`,
     ),
   ).toEqual([])
+}, 60_000)
+
+test("a refresh that builds nothing leases the lane's root not once", async () => {
+  const you = await yourRepo("unbuilt")
+  const work = await you.commit(
+    [you.base],
+    { "a.txt": "a\n" },
+    `turn\n\nPinetrie-Lane: ${LANE}\nPinetrie-Entry: e1\n`,
+  )
+  await you.setTip(LANE, work)
+  expect(await settles(you.dir, LANE, THREAD)).toMatchObject({
+    files: ["a.txt"],
+    leased: 1,
+  })
+  // Accepted work moves past the lane: the proposed changes are rebased, and
+  // nothing is built.
+  await you.moveAccepted(
+    await you.commit([you.base], { "b.txt": "yours\n" }, "yours"),
+  )
+  expect(await settles(you.dir, LANE, THREAD)).toMatchObject({
+    files: ["a.txt"],
+    leased: 0,
+  })
 }, 60_000)

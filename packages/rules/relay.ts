@@ -16,9 +16,9 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import { Type } from "typebox"
-import { Value } from "typebox/value"
 import {
   EntryIdSchema,
+  isWellFormed,
   List,
   ThreadIdSchema,
   WriterIdSchema,
@@ -82,7 +82,7 @@ export const encodeRelay = (relay: RelayDetails): string =>
 export function decodeStoredRelay(stored: string): RelayDetails | undefined {
   try {
     const relay: unknown = JSON.parse(stored)
-    return Value.Check(RelaySchema, relay) ? relay : undefined
+    return isWellFormed(RelaySchema, relay) ? relay : undefined
   } catch {
     return undefined
   }

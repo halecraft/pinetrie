@@ -1307,7 +1307,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a history message decodes without its schema's check",
     file: "packages/rules/history.ts",
-    from: "      Value.Check(schema, message)\n",
+    from: "      isWellFormed(schema, message)\n",
     to: '      typeof message === "object"\n',
     command: unit,
     expect:
@@ -1351,7 +1351,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a card's fact decodes whatever its kind",
     file: "packages/rules/fact.ts",
-    from: "    return Value.Check(QueuedFactSchema, fact) ? fact : undefined\n",
+    from: "    return isWellFormed(QueuedFactSchema, fact) ? fact : undefined\n",
     to: "    return fact as QueuedFact\n",
     command: unit,
     expect:
@@ -1493,7 +1493,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "decoding skips the schema check",
     file: "packages/rules/decode.ts",
-    from: "  return Value.Check(schema, value) ? build(value as Static<S>) : undefined",
+    from: "  return isWellFormed(schema, value) ? build(value) : undefined",
     to: "  return build(value as Static<S>)",
     command: unit,
   },
@@ -4274,6 +4274,24 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "archiving settles its threads' pending verdicts as unclassified; another canvas's stay pending",
+  },
+  // ── decoding ──
+  {
+    name: "a schema is compiled at every check",
+    file: "packages/rules/decode.ts",
+    from: "    checkers.set(schema, check)\n",
+    to: "",
+    command: unit,
+    expect: "a schema is compiled once, however often it checks",
+  },
+  {
+    name: "a participant's name is decoded with a schema built at each call",
+    file: "packages/rules/participant.ts",
+    from: "    decodeRecord(StoredText, contents, writerKey(key), (name, writer) => ({\n",
+    to: "    decodeRecord(Type.String(), contents, writerKey(key), (name, writer) => ({\n",
+    command: unit,
+    expect:
+      "no decode builds its schema inline, which would compile it at every call",
   },
   {
     name: "a moved start never rebuilds proposed changes",

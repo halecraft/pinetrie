@@ -2940,6 +2940,15 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "a check that finds no stall leaves the histogram as it is",
   },
+  // ── a refresh reads the lane's root only to build ──
+  {
+    name: "every refresh reads the lane's tip",
+    file: "apps/pinetrie/host/jj/proposed/refresh.ts",
+    from: "      const decision = planRefresh(facts)\n",
+    to: "      const decision = planRefresh(facts)\n      await docs.laneTip(lane)\n",
+    command: unit,
+    expect: "a refresh that builds nothing leases the lane's root not once",
+  },
   // ── shared files' lineages ──
   {
     name: "a listing that fails reads as every file gone",

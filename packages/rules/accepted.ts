@@ -79,6 +79,12 @@ const FolderAcceptedSchema = Type.Object({
   at: Type.Number(),
 })
 
+/** Accepted work's record as stored: jj's or a folder's. */
+const AcceptedRecordSchema = Type.Union([
+  JjAcceptedSchema,
+  FolderAcceptedSchema,
+])
+
 /**
  * Accepted work, of the project's kind, at its one key. A record written
  * before records had a kind decodes as none, until the host writes it again.
@@ -117,7 +123,7 @@ export const ACCEPTED: RecordSpec<
         },
   decode: (contents, key) =>
     decodeRecord(
-      Type.Union([JjAcceptedSchema, FolderAcceptedSchema]),
+      AcceptedRecordSchema,
       contents,
       fixedKey(ACCEPTED_KEY, key),
       (r): AcceptedRecord =>

@@ -99,6 +99,16 @@ Every module decodes through `decodeWith` (`decode.ts`), which is
 total: a malformed value is dropped, never thrown. `decodeRecords` and
 `recordsIn` do it for a namespace's stored records (`records.ts`, below).
 
+**A schema is compiled once, the first time it checks a value**
+(`isWellFormed`, `decode.ts`), and its checker is kept by the schema
+object. Checking a namespace of records was the host's longest stall
+(S220). So a schema is built once, at module level: one built inside a
+decode would compile at every call, slower than not compiling at all, and
+`decode.test.ts` fails on a decode that builds its schema inline. Where
+code cannot be evaluated (a page whose content security policy forbids
+eval), TypeBox checks without compiling, with the same answers: measured
+in Chromium with `script-src 'self'`, no error logged.
+
 A decoder brands the ids it reads, and its `build` may refuse a value too.
 **Every lane is checked with `isThreadId`**: on a record's address for a
 record keyed by lane (`threadKey`), and in `build` for a lane in its
@@ -200,7 +210,7 @@ retired or rehomed record type leaves nothing behind.
   `DigestRecord` and `SeatRecord` carry their key in memory
   though their contents never held it.
 - **A value written before ADR-0062 still decodes.** Ten records kept their
-  key in their contents too. typebox's `Value.Check` accepts the extra
+  key in their contents too. typebox's check accepts the extra
   property, and `decode` sets the key after the contents, so the address
   wins over the old copy. A record `setIfChanged` finds unchanged is never
   rewritten, so such a copy can stay; nothing reads it.

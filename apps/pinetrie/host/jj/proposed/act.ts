@@ -123,12 +123,13 @@ export async function act(
     // squash and refresh: the proposed changes rebuilt from the lane's tip, as
     // one.
     const name = gathered?.name
-    const planned = planRebuild(
-      gathered,
-      name === undefined ? "" : await docs.wipLine(lane, name),
-    )
+    const message =
+      name === undefined
+        ? { entry: "", wip: "" }
+        : await docs.messageFacts(lane, name)
+    const planned = planRebuild(gathered, message.wip)
     if (planned.kind === "refused") return code(planned.why)
-    await refresh.rebuild(ops, lane, planned)
+    await refresh.rebuild(ops, lane, planned, message.entry)
     return { code: null, describe: false, fact: actionFact(action, lane, by) }
   }
 }
