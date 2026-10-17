@@ -15,6 +15,7 @@
       "!!docs/findings",
       "!!.pinetrie-lane",
       "!!.plans",
+      "!!media",
       "!!packages/docker/seccomp-*.json"
     ]
   },
