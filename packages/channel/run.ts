@@ -112,3 +112,42 @@ export function streamCommand(
     )
   })
 }
+
+/**
+ * `argv`'s stdout as it comes, read only as fast as its reader takes it,
+ * with `stdin` on its input: for a stream to pipe on, such as a tar. Throws
+ * at its end, with its stderr's tail, when it did not exit 0; a reader that
+ * stops early kills it.
+ */
+export async function* commandStream(
+  argv: readonly string[],
+  options: { readonly stdin: string },
+): AsyncIterable<Uint8Array> {
+  const child = spawn(argv[0] ?? "", argv.slice(1), {
+    stdio: ["pipe", "pipe", "pipe"],
+  })
+  let stderr = ""
+  child.stderr.setEncoding("utf8")
+  child.stderr.on("data", (chunk: string) => {
+    stderr = (stderr + chunk).slice(-STDERR_KEPT)
+  })
+  const exited = new Promise<number>(resolve => {
+    child.on("error", error => {
+      stderr = error.message
+      resolve(-1)
+    })
+    child.on("close", code => resolve(code ?? -1))
+  })
+  // A command that exits before reading all its input: its exit says enough.
+  child.stdin.on("error", () => {})
+  child.stdin.end(options.stdin)
+  let ended = false
+  try {
+    for await (const chunk of child.stdout) yield chunk as Uint8Array
+    ended = true
+  } finally {
+    if (!ended) child.kill()
+  }
+  const code = await exited
+  if (code !== 0) throw new Error(`${argv[0]} exited ${code}: ${stderr.trim()}`)
+}

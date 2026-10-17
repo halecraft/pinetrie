@@ -17,6 +17,11 @@ export const LAW_SETS = [
     section: "The graph's laws",
     suite: "packages/folder/graph.test.ts",
   },
+  {
+    doc: "packages/folder/TECHNICAL.md",
+    section: "The accept's laws",
+    suite: "apps/pinetrie/host/folder/accept.test.ts",
+  },
 ] as const
 
 export type LawGap =

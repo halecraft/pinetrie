@@ -67,6 +67,13 @@ export interface FolderDisks {
     readonly paths: readonly ReadPath[]
     readonly deleted: readonly string[]
   }): Promise<ReadInAnswer>
+  /**
+   * `state`'s `paths`, each a regular file, as one tar stream as it comes:
+   * a command of the disks role's own, never a call, since its answer is a
+   * stream. Throws naming a path that is not a regular file inside the
+   * snapshot, a symlink on its way included.
+   */
+  tarOut(state: PointId, paths: readonly string[]): AsyncIterable<Uint8Array>
   /** A change to `lane`'s states directory, which its container sees read-only. */
   states(lane: ThreadId, op: LaneStatesOp): Promise<void>
 }

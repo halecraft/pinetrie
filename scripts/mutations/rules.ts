@@ -75,19 +75,19 @@ export const mutations: readonly Mutation[] = [
     expect: "is the row's brief asked of the agent, for its opener alone",
   },
   {
-    name: "workStripView leaves folder proposed changes' accept live",
+    name: "workStripView gives folder proposed changes no destination",
     file: "packages/rules/work-strip.ts",
-    from: '      ...(later && buttons.includes("accept") ? (["accept"] as const) : []),\n',
-    to: "",
+    from: "    open === undefined || into === null\n",
+    to: '    open === undefined || into?.kind !== "bookmark"\n',
     command: unit,
     expect:
-      "folder proposed changes' accept is drawn disabled, with no destination",
+      "folder proposed changes' accept is live, into accepted work, its one destination",
   },
   {
     name: "workStripView offers accept before accepted work is read",
     file: "packages/rules/work-strip.ts",
-    from: '  const later = into?.kind === "folder"\n',
-    to: '  const later = into?.kind !== "bookmark"\n',
+    from: '    destinations.length === 0 ? buttons.filter(b => b !== "accept") : buttons',
+    to: "    buttons",
     command: unit,
     expect: "jj proposed changes before accepted work are read has no accept",
   },
@@ -2477,8 +2477,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an acceptance is never shown a conflict",
     file: "packages/rules/proposed.ts",
-    from: "  conflicted: (record?.conflicts.length ?? 0) > 0,",
-    to: "  conflicted: false,",
+    from: "  const conflicted = (record?.conflicts.length ?? 0) > 0",
+    to: "  const conflicted = false",
     command: ["pnpm", "exec", "vitest", "run", "packages/rules"],
     expect: "proposedChangesSeen: what an acceptance was shown",
   },
@@ -2839,7 +2839,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an acceptance ignores what it was shown",
     file: "packages/rules/proposed.ts",
-    from: "  if (!isAsShown(proposed, seen)) return refused(ERR.NOT_AS_SHOWN)",
+    from: "  if (!isAsShown(now, seen)) return refused(ERR.NOT_AS_SHOWN)",
     to: "  if (false) return refused(ERR.NOT_AS_SHOWN)",
     command: unit,
     expect:
@@ -2857,8 +2857,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a newly conflicting proposed changes are accepted",
     file: "packages/rules/proposed.ts",
-    from: "  (proposed.conflicts.length === 0 || seen.conflicted)",
-    to: "  true",
+    from: "  return same && (!now.conflicted || seen.conflicted)",
+    to: "  return same",
     command: unit,
     expect:
       "an acceptance of the proposed changes it was shown: newly conflicting",
@@ -2874,8 +2874,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "conflicted proposed changes are accepted into accepted work",
     file: "packages/rules/proposed.ts",
-    from: "    conflicted: proposed.conflicts.length > 0,",
-    to: "    conflicted: false,",
+    from: "  const conflicted = proposed.conflicts.length > 0\n",
+    to: "  const conflicted = false\n",
     command: unit,
     expect: "conflicted proposed changes never go to accepted work",
   },

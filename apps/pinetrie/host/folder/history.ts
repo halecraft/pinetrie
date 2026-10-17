@@ -55,9 +55,9 @@ import {
   setRecord,
 } from "@pinetrie/rules"
 import { sourceChanges } from "./changes.ts"
-import { conflictedPaths, mergeInto } from "./merge.ts"
+import { dropUnrecordedBase, mergeToState } from "./merge.ts"
 import type { FolderLane } from "./proven.ts"
-import { baseMissing, baseState } from "./virtual-base.ts"
+import { baseMissing } from "./virtual-base.ts"
 
 /** A folder project's records of its history, as lane work reads and writes them. */
 export interface FolderStore {
@@ -244,16 +244,14 @@ export function folderHistory(
        * and never run.
        */
       const mergeOver = async () => {
-        const base = await baseState(reader, plan)
-        const merged = await mergeInto(reader, {
+        const { base, paths } = await mergeToState(reader, {
           disk: lane,
           ours,
           theirs,
-          base,
+          plan,
           markers: false,
+          snapshot: () => snapshot(state),
         })
-        await snapshot(state)
-        const paths = conflictedPaths(merged)
         const conflicts = paths.map(path => ({
           lane,
           path,
@@ -278,13 +276,7 @@ export function folderHistory(
           ...stateWrite(g, record),
           ...conflicts.map(c => setRecord(CONFLICT, c)),
         ])
-        // Once a state, a virtual base is the sweep's; else it goes now,
-        // left behind by an earlier merge or not.
-        if (plan.kind === "virtual" && !graph().states.has(plan.name))
-          await runtime.disk({
-            kind: "deleteSnapshots",
-            ids: [snapshotId(plan.name)],
-          })
+        await dropUnrecordedBase(runtime, plan, s => graph().states.has(s))
         return { paths, conflicts }
       }
       const { paths, conflicts } =

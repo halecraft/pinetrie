@@ -38,7 +38,6 @@ import { describe, expect, test } from "vitest"
 import { canvasMarkerWords, canvasPinnedMarkerWords } from "./card-words.ts"
 import { projectColumns } from "./column-paths.ts"
 import {
-  ACCEPT_LATER,
   behindMark,
   type ColumnFacts,
   type ColumnShows,
@@ -972,8 +971,8 @@ describe("workStripWords", () => {
       "moves wip/search forward to pinetrie-proposed/amber-fox",
     )
   })
-  test("folder proposed changes name accepted work, and its disabled accept says why, no bookmark moved", () => {
-    const w = workStripWords(
+  const folderWords = (conflicts: readonly string[]) =>
+    workStripWords(
       workStripView({
         proposed: proposedChangesStatus({
           kind: "folder",
@@ -981,7 +980,7 @@ describe("workStripWords", () => {
           start: pointId("line-0192aaaa"),
           tip: pointId("turn-0192bbbb"),
           files: ["a.txt"],
-          conflicts: ["a.txt"],
+          conflicts,
           description: null,
           at: 10,
         }),
@@ -998,9 +997,17 @@ describe("workStripWords", () => {
       }),
       null,
     )
+  test("folder proposed changes' accept writes into the project's folder, no bookmark moved", () => {
+    const accept = folderWords([]).buttons.find(b => b.button === "accept")
+    expect(accept).toMatchObject({
+      title: "writes these files into the project's folder",
+    })
+    expect(accept?.disabled).toBeUndefined()
+  })
+  test("conflicted folder proposed changes offer catching up, and no accept", () => {
+    const w = folderWords(["a.txt"])
     expect(w.line).toBe("conflicts with accepted work in 1 file")
-    const accept = w.buttons.find(b => b.button === "accept")
-    expect(accept).toMatchObject({ title: ACCEPT_LATER, disabled: true })
+    expect(w.buttons.find(b => b.button === "accept")).toBeUndefined()
     expect(w.buttons.find(b => b.button === "update")?.title).toBe(
       "merges accepted work into this thread's copy",
     )

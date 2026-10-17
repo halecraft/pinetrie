@@ -2,6 +2,7 @@
 // each state with its parents, and each conflict a merge into a lane left.
 
 import {
+  type AcceptJournal,
   type ConflictRecord,
   type FolderStamp,
   isThreadId,
@@ -33,6 +34,10 @@ const StateMadeSchema = Type.Union([
   Type.Object({ kind: Type.Literal("accept"), lane: ThreadIdSchema }),
   Type.Object({ kind: Type.Literal("restore"), of: PointSchema }),
   Type.Object({ kind: Type.Literal("bases-merged") }),
+  Type.Object({
+    kind: Type.Literal("concurrent"),
+    path: Type.String({ minLength: 1 }),
+  }),
 ])
 
 const StateSchema = Type.Object({
@@ -59,6 +64,53 @@ export const STATE: RecordSpec<StateRecord, StateRecord["id"], "session"> = {
       made: r.made,
       at: r.at,
       by: r.by,
+    })),
+}
+
+const InodeSchema = Type.Object({
+  ino: Type.Integer({ minimum: 0 }),
+  size: Type.Integer({ minimum: 0 }),
+  mtimeNs: Type.String({ pattern: "^[0-9]+$" }),
+})
+
+const AcceptJournalSchema = Type.Object({
+  lane: ThreadIdSchema,
+  record: Type.Object({ id: PointSchema, ...StateSchema.properties }),
+  paths: List(
+    Type.Object({
+      path: Type.String({ minLength: 1 }),
+      aside: Type.Union([Type.String({ minLength: 1 }), Type.Null()]),
+      moved: Type.Union([InodeSchema, Type.Null()]),
+      staged: Type.Union([InodeSchema, Type.Null()]),
+      symlink: Type.Union([Type.String(), Type.Null()]),
+      linked: Type.Boolean(),
+      keptOn: Type.Union([PointSchema, Type.Null()]),
+    }),
+  ),
+  status: Type.Union([
+    Type.Literal("open"),
+    Type.Literal("accepted"),
+    Type.Literal("put-back"),
+  ]),
+})
+
+/**
+ * Each accept into the project's folder from before its first move until
+ * its asides are dealt with: what a host stopped part way finishes or puts
+ * back at its next start.
+ */
+export const ACCEPT_JOURNAL: RecordSpec<AcceptJournal, string, "session"> = {
+  namespace: "pinetrie.accept",
+  home: "session",
+  keyOf: j => j.id,
+  encode: ({ id, ...contents }) => JSON.parse(JSON.stringify(contents)),
+  decode: (contents, key) =>
+    decodeAt(AcceptJournalSchema, contents, textKey(key), (r, id) => ({
+      id,
+      lane: r.lane,
+      record: r.record,
+      paths: r.paths,
+      status: r.status,
     })),
 }
 

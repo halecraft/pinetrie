@@ -507,7 +507,11 @@ export function planReadIn(
       disks,
     ),
     drop,
-    paths: call.paths.map(p => ({ ...p, path: inside(p.path) })),
+    paths: call.paths.map(p => ({
+      ...p,
+      path: inside(p.path),
+      ...(p.source === undefined ? {} : { source: inside(p.source) }),
+    })),
     deleted: call.deleted.map(inside),
   }
 }
@@ -552,7 +556,8 @@ async function pruneEmpty(root: string, p: string): Promise<void> {
 
 /**
  * Carry out a read: the line's disk made from its newest state, the deleted
- * paths removed, each path copied from the project's folder with its stamp checked
+ * paths removed, each path copied from the project's folder (from its
+ * `source`, when it names one) with its stamp checked
  * before and after (a read that saw no stamp move held one version whole),
  * then the disk snapshotted as the new state. A path whose stamp moved, or
  * that is under a symlink in the project's folder now, makes no state: the host
@@ -570,9 +575,12 @@ export async function executeReadIn(
       await pruneEmpty(disk, p)
     }
     const moved: string[] = []
-    for (const { path: p, stamp } of planned.paths) {
-      const from = path.join(folder, p)
-      if (!(await isUnderDirs(folder, p)) || !(await holdsStamp(from, stamp))) {
+    for (const { path: p, source = p, stamp } of planned.paths) {
+      const from = path.join(folder, source)
+      if (
+        !(await isUnderDirs(folder, source)) ||
+        !(await holdsStamp(from, stamp))
+      ) {
         moved.push(p)
         continue
       }

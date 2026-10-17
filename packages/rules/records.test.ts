@@ -25,6 +25,7 @@ import {
 import { describe, expect, test } from "vitest"
 import { BUDGET } from "./budget.ts"
 import {
+  ACCEPT_JOURNAL,
   ACCEPTED,
   ACCESS,
   BANNER,
@@ -358,6 +359,46 @@ const SAMPLES: readonly Sample[] = [
     "id",
   ),
   sample(
+    "state of a concurrent save",
+    STATE,
+    {
+      id: pointId("concurrent-1"),
+      parents: [pointId("line-1")],
+      made: { kind: "concurrent", path: "a.txt" },
+      at: 1,
+      by: null,
+    },
+    "id",
+  ),
+  sample(
+    "accept's journal",
+    ACCEPT_JOURNAL,
+    {
+      id: "0190-a",
+      lane: L,
+      record: {
+        id: pointId("shown-1"),
+        parents: [pointId("line-1"), pointId("e-1")],
+        made: { kind: "accept", lane: L },
+        at: 1,
+        by: ADA,
+      },
+      paths: [
+        {
+          path: "a.txt",
+          aside: ".pinetrie-aside-0190-a/a.txt",
+          moved: { ino: 4, size: 2, mtimeNs: "123" },
+          staged: { ino: 5, size: 3, mtimeNs: "124" },
+          symlink: null,
+          linked: true,
+          keptOn: pointId("shown-1"),
+        },
+      ],
+      status: "accepted",
+    },
+    "id",
+  ),
+  sample(
     "conflict",
     CONFLICT,
     {
@@ -482,6 +523,8 @@ test("each record lives where it is read: across roots in the session, by entry 
     "card history": "session",
     trace: "session",
     state: "session",
+    "state of a concurrent save": "session",
+    "accept's journal": "session",
     conflict: "session",
     verdict: "session",
   })

@@ -802,7 +802,7 @@ export const mutations: readonly Mutation[] = [
     name: "an acceptance need not say what it was shown",
     file: "packages/protocol/codec.ts",
     from: "    const seen = proposedChangesSeenFromWire(text(wire?.seen))\n",
-    to: "    const seen = proposedChangesSeenFromWire(text(wire?.seen)) ?? { ledger: null, conflicted: false }\n",
+    to: '    const seen = proposedChangesSeenFromWire(text(wire?.seen)) ?? { kind: "jj", ledger: null, conflicted: false }\n',
     command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
     expect:
       "an acceptance that does not say which proposed changes it was shown, well formed, is refused",

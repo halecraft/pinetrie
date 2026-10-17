@@ -53,7 +53,8 @@ export const isCatchUp = (command: CardCommand): command is CatchUpCommand =>
 /**
  * What a command on a thread's proposed changes did, as a fact in the thread:
  * an acceptance, with the change it was added as, the bookmark it moved and
- * what that bookmark is to the thread; or a description asked for again, a
+ * what that bookmark is to the thread, or into a folder project's folder
+ * with how many files it wrote; or a description asked for again, a
  * squash, a refresh. `by` is who asked.
  */
 export type ProposedChangesFact =
@@ -65,6 +66,13 @@ export type ProposedChangesFact =
       readonly as: string
       readonly bookmark: string
       readonly to: CatchUpFrom
+    }
+  /** A folder project's accept: the files it wrote into the project's folder. */
+  | {
+      readonly kind: "accepted-into-folder"
+      readonly lane: ThreadId
+      readonly by: WriterId
+      readonly files: number
     }
   | {
       readonly kind: "described" | "squashed" | "refreshed"

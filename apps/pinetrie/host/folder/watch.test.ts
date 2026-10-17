@@ -13,3 +13,9 @@ test("isSourceChange: a source path changed; only ignored ones, or pine·trie's 
   expect(change(".jj/repo/op_heads", ".plans/p.md")).toBe(false)
   expect(change(".gitignore")).toBe(true)
 })
+
+test("isSourceChange: an accept's staging directory is none; a write into its asides is one", () => {
+  const change = (...paths: string[]) => isSourceChange({ paths, files, own })
+  expect(change(".pinetrie-accept-1/a.txt")).toBe(false)
+  expect(change(".pinetrie-aside-1/a.txt")).toBe(true)
+})

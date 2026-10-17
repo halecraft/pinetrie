@@ -59,3 +59,13 @@ test("scanFolder stamps a symlink by its target, never following it", async () =
   })
   expect([...scanned.keys()].sort()).toEqual(["link", "real/x.txt"])
 })
+
+test("scanFolder never enters an accept's reserved names at the root, and stamps them deeper down", async () => {
+  const at = await folder({
+    ".pinetrie-accept-1/a.txt": "x",
+    ".pinetrie-aside-1/a.txt": "x",
+    "d/.pinetrie-aside-1": "x",
+  })
+  const scanned = await scanFolder({ root: at, own: "" })
+  expect([...scanned.keys()]).toEqual(["d/.pinetrie-aside-1"])
+})

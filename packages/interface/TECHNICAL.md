@@ -1283,11 +1283,11 @@ composer*).
   whose record is not read yet: then nothing is accepted into, and accept
   is left out, as for a gone WIP. Jj proposed changes' accept is titled with the
   bookmark it moves ("moves pinetrie-accepted forward to …"); folder
-  proposed changes' names no bookmark anywhere. Its accept stays, drawn disabled
-  (`WorkStripView.quiet`), and titled `ACCEPT_LATER`, the one sentence the
-  host also refuses an accept with (`folder_accept_later`), so the two
-  never drift. A quiet button's title always says why: it would change
-  nothing now, or cannot yet be done.
+  proposed changes' names no bookmark anywhere: its accept is live, into
+  its one destination, accepted work, and titled "writes these files into
+  the project's folder"; conflicted, it has no accept, a folder having no
+  WIP. A quiet button's title always says why: it would change nothing
+  now, or cannot yet be done.
 - **What catching up would do** (`catchUpOf`, from `pinetrie.base`'s `start`
   and `catchUp` against `pinetrie.accepted`'s commits, S97): when it `brings`
   files, the strip's line adds "· accepted work has moved on", or is that

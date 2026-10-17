@@ -2,9 +2,15 @@
 // `ours`, over their base: gathered in two rounds (the facts at the paths
 // either side changed near theirs, then whether ours and theirs hold alike
 // content), planned by `@pinetrie/folder` (`planPathMerge`), then applied by
-// lanehost. A lane's catch-up and a virtual base's making both merge so.
+// lanehost. A lane's catch-up, a virtual base's making and a shown merge
+// all merge so.
 
-import type { PointId, TextMerged } from "@pinetrie/core"
+import {
+  type BasePlan,
+  type PointId,
+  snapshotId,
+  type TextMerged,
+} from "@pinetrie/core"
 import {
   type MergePlanned,
   type PathFacts,
@@ -12,8 +18,9 @@ import {
   pathsToGather,
   planPathMerge,
 } from "@pinetrie/folder"
-import type { FolderDisks } from "@pinetrie/lanes"
+import type { FolderDisks, LaneRuntime } from "@pinetrie/lanes"
 import { type StateReader, sourceDiff } from "./changes.ts"
+import { baseState } from "./virtual-base.ts"
 
 /** What a merge did: its plan, and each text step answered clean or not. */
 export interface MergeApplied {
@@ -92,4 +99,57 @@ export async function mergeInto(
     markers: input.markers,
   })
   return { plan, texts }
+}
+
+/**
+ * `theirs` merged into `disk`, which holds `ours`, over the base `plan`
+ * names (made first when virtual), then snapshotted as `state` by
+ * `snapshot`: a catch-up's state, or a shown merge. Writes no record: a
+ * catch-up records its state at once, a shown merge only when accepted.
+ * Answers the base merged over and the paths left conflicted, their
+ * markers in place of ours' text only where `markers`.
+ */
+export async function mergeToState(
+  r: StateReader & {
+    readonly runtime: Pick<LaneRuntime, "diff" | "disk" | "snapshotExists">
+    readonly disks: Pick<
+      FolderDisks,
+      "pathFacts" | "sameContent" | "applyMerge" | "filesUnder" | "read"
+    >
+  },
+  input: {
+    readonly disk: string
+    readonly ours: PointId
+    readonly theirs: PointId
+    readonly plan: BasePlan
+    readonly markers: boolean
+    readonly snapshot: () => Promise<void>
+  },
+): Promise<{ readonly base: PointId; readonly paths: readonly string[] }> {
+  const base = await baseState(r, input.plan)
+  const merged = await mergeInto(r, {
+    disk: input.disk,
+    ours: input.ours,
+    theirs: input.theirs,
+    base,
+    markers: input.markers,
+  })
+  await input.snapshot()
+  return { base, paths: conflictedPaths(merged) }
+}
+
+/**
+ * A virtual base no record names, deleted: once a state, it is the
+ * sweep's; else it goes now, left behind by an earlier merge or not.
+ */
+export async function dropUnrecordedBase(
+  runtime: Pick<LaneRuntime, "disk">,
+  plan: BasePlan,
+  recorded: (state: PointId) => boolean,
+): Promise<void> {
+  if (plan.kind === "virtual" && !recorded(plan.name))
+    await runtime.disk({
+      kind: "deleteSnapshots",
+      ids: [snapshotId(plan.name)],
+    })
 }

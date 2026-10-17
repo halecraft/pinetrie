@@ -1,6 +1,7 @@
 // @pinetrie/lanehost/fixtures — for tests of lanehost's hosts: the machine
 // role's server on a stand-in loader (`fixtures/stand-in-observe.mjs`, which
-// says what its table holds), and the disks role answering in-process.
+// says what its table holds), and the disks role answering in-process, its
+// tar stream too.
 
 import { spawn } from "node:child_process"
 import { existsSync, mkdtempSync } from "node:fs"
@@ -9,6 +10,8 @@ import path from "node:path"
 import { answer } from "./answer.ts"
 import type { LanehostCall, LanehostResult } from "./protocol.ts"
 import { servingFrom } from "./serving.ts"
+
+export { tarStream } from "./tar-out.ts"
 
 /** The role started on a socket of its own; `close` stops it. */
 export async function standInRole(): Promise<{

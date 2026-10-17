@@ -429,10 +429,12 @@ describe("workStripView: the work strip's states", () => {
     expect(at(v)).toEqual(["ready", ["accept"], ["describe", "update"]])
     expect([v.facts.size, v.facts.bookmark]).toEqual([1, null])
   })
-  test("folder proposed changes' accept is drawn disabled, with no destination", () => {
+  test("folder proposed changes' accept is live, into accepted work, its one destination", () => {
     const v = folderView()
-    expect(v.destinations).toEqual([])
-    expect(v.quiet).toContain("accept")
+    expect(v.destinations).toEqual([
+      { bookmark: "", kind: "accepted", bringsAlong: 0, final: true },
+    ])
+    expect(v.quiet).not.toContain("accept")
   })
   test("jj proposed changes before accepted work are read has no accept", () => {
     const v = workStripView({

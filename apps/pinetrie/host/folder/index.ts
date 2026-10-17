@@ -3,9 +3,9 @@
 // (`line.ts`) at a thread's first message, at each catch-up, and once it has
 // been quiet after a change (`watch.ts`); each lane's history is states of the
 // graph (`history.ts`); its proposed changes are the lane's newest state
-// against accepted work's newest (`proposed.ts`). Nothing is written into the
-// project's folder but the shared directories its config asks for. Accepting
-// into it is the next step's: refused, with words.
+// merged onto accepted work's newest (`proposed.ts`). Nothing is written
+// into the project's folder but the shared directories its config asks for
+// and what an accept writes (`accept.ts`).
 
 import { mkdir, stat } from "node:fs/promises"
 import path from "node:path"
@@ -29,11 +29,18 @@ import {
   readRecords,
   readRunning,
 } from "@pinetrie/reads"
-import { ACCEPTED, CONFLICT, STATE, setRecord } from "@pinetrie/rules"
+import {
+  ACCEPT_JOURNAL,
+  ACCEPTED,
+  CONFLICT,
+  STATE,
+  setRecord,
+} from "@pinetrie/rules"
 import { failed } from "../basics.ts"
 import { createDescriber } from "../describe.ts"
 import type { ProjectAdapter } from "../work/adapter.ts"
 import type { Destination } from "../work/destination.ts"
+import { createFolderAccept } from "./accept.ts"
 import { folderFileAt } from "./file-at.ts"
 import { folderHistory } from "./history.ts"
 import { createFolderLine } from "./line.ts"
@@ -71,6 +78,9 @@ export function startFolderProject(dir: {
       }
       /** Accepted work moved: its record, then whoever listens. */
       const movedListeners: ((newest: PointId) => void)[] = []
+      const moved = (newest: PointId) => {
+        for (const l of movedListeners) l(newest)
+      }
       // The folder's reads and every virtual base's merge, one at a time.
       const queue = createQueue()
       const line = createFolderLine({
@@ -83,9 +93,26 @@ export function startFolderProject(dir: {
         writeState: r => records.writeValues([setRecord(STATE, r)]),
         newId: basics.newId,
         now: basics.now,
-        moved: newest => {
-          for (const l of movedListeners) l(newest)
+        moved,
+        recover: () => accepter.recover(),
+        asides: () => accepter.asides(),
+      })
+      const accepter = createFolderAccept({
+        root,
+        line,
+        queue,
+        reader: { runtime, disks, own },
+        states: store.states,
+        proposed: lane => {
+          const r = readProposedByLane(session).get(lane)
+          return r?.kind === "folder" ? r : undefined
         },
+        journals: () => [...readRecords(session, ACCEPT_JOURNAL).values()],
+        write: writes => records.writeValues(writes),
+        newId: basics.newId,
+        now: basics.now,
+        moved,
+        log: basics.log,
       })
       const writeAccepted = (newest: PointId) => {
         const record: FolderAcceptedRecord = {
@@ -153,11 +180,13 @@ export function startFolderProject(dir: {
             records: parts.records,
             keeper: parts.keeper,
             reader,
+            queue,
             states: store.states,
             conflicts: lane => store.conflicts(lane).map(c => c.path),
             describer: createDescriber({ basics, piSetup: parts.piSetup }),
             running: lane => readRunning(basics.live, lane),
             baseChanged: parts.baseChanged,
+            accept: accepter.accept,
           })
           // Accepted work moving is base news: every lane's proposed changes
           // and base follow it.
@@ -186,6 +215,7 @@ export function startFolderProject(dir: {
               ),
               conflicts: [...readRecords(session, CONFLICT).values()],
               proposed: [...readProposedByLane(session).values()],
+              journals: [...readRecords(session, ACCEPT_JOURNAL).values()],
               keep: parts.keepStates(),
             }).filter(id => !swept.has(id))
             if (gone.length === 0) return
@@ -205,7 +235,10 @@ export function startFolderProject(dir: {
           const watching = watchFolder({
             root,
             own,
-            read: () => parts.acceptedMoved(),
+            read: () => {
+              line.markQuiet()
+              parts.acceptedMoved()
+            },
             failed: failed(basics, "watching the project's folder"),
           }).catch(error => {
             failed(basics, "watching the project's folder")(error)

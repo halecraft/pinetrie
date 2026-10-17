@@ -1,12 +1,14 @@
 // host/folder/sweep — the snapshots of a folder project's states that nothing
 // needs any more, deleted: what `liveStates` keeps is decided from the records
 // (each folder lane's tip, start and merge bases with accepted work and with
-// its parent lane, open conflicts' three states, open proposed changes' two,
-// accepted work's newest states). A state's record stays: merge bases walk
+// its parent lane, open conflicts' three states, open proposed changes' two
+// and their shown merges, what an accept's journal needs, accepted work's
+// newest states, and the concurrent saves on those kept). A state's record stays: merge bases walk
 // parents through every state, so a record removed would break every older
 // state's ancestry; a state whose snapshot is gone is known by that alone.
 
 import type {
+  AcceptJournal,
   ConflictRecord,
   PointId,
   ProjectKind,
@@ -32,6 +34,8 @@ export function planSweep(input: {
   }[]
   readonly conflicts: readonly ConflictRecord[]
   readonly proposed: readonly ProposedChangesRecord[]
+  /** The accepts' journals: what an open one or a kept aside needs is kept. */
+  readonly journals: readonly AcceptJournal[]
   readonly keep: number
 }): readonly PointId[] {
   const graph = stateGraph(input.states)
@@ -53,6 +57,10 @@ export function planSweep(input: {
     lanes,
     conflicts: input.conflicts,
     proposed: input.proposed.flatMap(o => (o.kind === "folder" ? [o] : [])),
+    pinned: input.journals.flatMap(j => [
+      ...(j.status === "open" ? [j.record.id] : []),
+      ...j.paths.flatMap(p => (p.keptOn === null ? [] : [p.keptOn])),
+    ]),
     folderNewest: newest,
     keep: input.keep,
   })

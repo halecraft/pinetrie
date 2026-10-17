@@ -188,7 +188,7 @@ test("a chat completes while an acceptance is held open on your repo's owner", a
     kind: "proposed",
     lane: HELD,
     mode: "accept",
-    seen: JSON.stringify({ ledger: null, conflicted: false }),
+    seen: JSON.stringify({ kind: "jj", ledger: null, conflicted: false }),
   })
   await commands.handle(sender, ALICE, said(cardIdFor("c1")))
   expect(replies.map(r => r.id)).toEqual([cardIdFor("c1")])

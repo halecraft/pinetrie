@@ -443,8 +443,6 @@ Decided, and waiting for their turn:
 - **Fold** (ADR-0005, ADR-0010): the context merge, an LLM's three-way
   fold into a merge entry with a `fromId` (`docs/01-architecture.md`,
   Fold). The tree can already represent the entry.
-- **Accepting a folder project's proposed changes** (ADR-0142): reviewed as
-  files today; the accept is refused with words.
 - **What else a canvas holds** (ADR-0116, ADR-0118, ADR-0119, ADR-0126):
   file cards, media cards, sources a lane mounts, runners, stacks of
   threads (`docs/glossary.md`, "Accepted, not yet built").

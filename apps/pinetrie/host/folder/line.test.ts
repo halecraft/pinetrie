@@ -136,6 +136,8 @@ describe("createFolderLine", () => {
     const line = createFolderLine({
       root,
       own: () => "",
+      recover: async () => {},
+      asides: async () => {},
       disks: {
         readIn: async () => {
           order.push("readIn")
@@ -164,5 +166,46 @@ describe("createFolderLine", () => {
     // Read again with nothing changed: no call, no state.
     expect(await line.read()).toBe(newest)
     expect(order).toEqual(["readIn", "readIn", "state"])
+  })
+
+  test("the first read recovers once; asides are checked at a quiet read, never at an accept's own", async () => {
+    dir = await mkdtemp(path.join(tmpdir(), "pinetrie-line-"))
+    const root = path.join(dir, "folder")
+    await mkdir(root)
+    const calls: string[] = []
+    const states: StateRecord[] = []
+    let n = 0
+    const queue = createQueue()
+    const line = createFolderLine({
+      root,
+      own: () => "",
+      recover: async () => {
+        calls.push("recover")
+      },
+      asides: async () => {
+        calls.push("asides")
+      },
+      disks: { readIn: async () => ({ kind: "made" }) },
+      queue,
+      stampsFile: path.join(dir, "folder-stamps.json"),
+      states: () => states,
+      writeState: async r => {
+        states.push(r)
+      },
+      newId: () => `0000000${n++}`,
+      now: () => 1,
+      moved: () => {},
+    })
+    await line.read()
+    expect(calls).toEqual(["recover", "asides"])
+    // Not quiet since: a read checks nothing.
+    await line.read()
+    expect(calls).toEqual(["recover", "asides"])
+    // The watcher saw quiet, then an accept read first: the asides stay due.
+    line.markQuiet()
+    await queue.enqueue(() => line.readNow())
+    expect(calls).toEqual(["recover", "asides"])
+    await line.read()
+    expect(calls).toEqual(["recover", "asides", "asides"])
   })
 })

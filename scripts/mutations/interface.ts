@@ -62,11 +62,11 @@ export const mutations: readonly Mutation[] = [
   {
     name: "workStripWords leaves folder proposed changes' accept untitled",
     file: "packages/interface/column-view.ts",
-    from: '            into?.kind === "folder"\n              ? ACCEPT_LATER\n',
-    to: '            into?.kind === "folder" && false\n              ? ACCEPT_LATER\n',
+    from: '            into?.kind === "folder"\n              ? "writes these files into the project\'s folder"\n',
+    to: '            into?.kind === "folder" && false\n              ? "writes these files into the project\'s folder"\n',
     command: unit,
     expect:
-      "folder proposed changes name accepted work, and its disabled accept says why, no bookmark moved",
+      "folder proposed changes' accept writes into the project's folder, no bookmark moved",
   },
   {
     name: "a host's line is labelled by its role, not by pine·trie",

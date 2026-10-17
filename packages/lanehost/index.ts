@@ -55,6 +55,7 @@ export {
   type RoleSpec,
 } from "./roles.ts"
 export { ONCE, SERVER, serverArgs } from "./serving.ts"
+export { TAR_OUT } from "./tar-out.ts"
 
 /** The observer's loader and its suite's guest, built for the machine's architecture. */
 export const OBSERVER_CONTAINERFILE = path.join(

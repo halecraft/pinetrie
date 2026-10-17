@@ -2,7 +2,8 @@
 
 A folder project's history, decided as values (ADR-0142): its graph of
 states and their merge bases (`graph.ts`), the path merge's plan
-(`merge.ts`), and the snapshots kept (`live.ts`). It declares only
+(`merge.ts`), the snapshots kept (`live.ts`), and an accept into the
+project's folder (`accept.ts`, ADR-0159). It declares only
 `@pinetrie/core` (`workspace.test.ts`) and does no I/O: lanehost's disks
 role carries out what it decides, through the folder adapter, and the
 host's `apps/pinetrie/host/folder/` is the only code that touches your
@@ -28,8 +29,11 @@ lanehost declares only core and channel.
     its caller mints; a virtual base `bases-<hash>`.
   - **Its parents' number follows how it was made** (`StateMade`): a read
     has one, or none when the graph is empty (the first read of the project's folder); a
-    start, a turn and a restore one; a catch-up and an accept two; a merge
-    of bases two or more; none repeats. A start's parent is the state its
+    start, a turn, a restore and a concurrent save one; a catch-up and an
+    accept two; a merge of bases two or more; none repeats. A concurrent
+    save's one parent is a line state (an accept's, or the read a put-back
+    accept was built on), and it is never on accepted work's line itself,
+    so `folderNewest` never answers one. A start's parent is the state its
     disk was restored from, and it is a state of its own. A restore's is
     accepted work's newest state, never the state restored, so accepted
     work's line stays a line and its newest states are reached by first parents.
@@ -48,6 +52,12 @@ lanehost declares only core and channel.
 - **A virtual base is named by what it merges:** `bases-` and a hash of
   its bases' sorted ids (`virtualBaseName`), so the same bases always name
   the same snapshot, which is found made rather than made again.
+- **A shown merge is named by its two states:** `shown-` and a hash of
+  accepted work's newest and the lane's tip (`shownMergeId`). No record
+  holds the id: every reader derives it from the proposed changes' `start`
+  and `tip`, so a record cannot name another merge than its own. It has no
+  `STATE` record until it is accepted, and then it is the accept's state,
+  a pair being accepted at most once.
 - **A virtual base becomes a state only when a conflict names it**
   (`virtualBaseRecord`, made `bases-merged`), so a conflict's base is
   always a state of the graph. Its parents are its bases.
@@ -71,6 +81,52 @@ flows, merged by `git merge-file` as lanehost merges.
 - **Accepted work's newest state** (`folderNewest`) is the one line state (a
   read, an accept or a restore) no other has as its first parent: your
   folder's line is made one state at a time, so it has one head.
+
+## An accept (`accept.ts`)
+
+- **An accept is of what was shown:** refused `NOT_AS_SHOWN` unless
+  accepted work's newest and the lane's tip, after the accept's own read
+  of the project's folder, are the two the page showed, with no conflict
+  it was not shown (`planAccept`). Any save since the review refuses,
+  whatever path it touched: the page has not shown the review rebuilt. A
+  conflicted shown merge has no destination, a folder having no WIP.
+- **What it writes is a value:** each source path between accepted work's
+  newest and the shown merge, with the stamp the accept's own read took
+  there and what the shown merge holds (`acceptWrites`), never a scan of
+  its own. `planWriteSteps` makes each one step, every delete first, so a
+  file that becomes a directory frees its name before anything is made.
+- **What the folder cannot hold is refused before anything is written**
+  (`planNames`): a name another folds to (NFC, and case-folded on a disk
+  that folds case, every directory on the way compared too), one read with
+  U+FFFD, a symlink absolute or climbing out, a path under a reserved name.
+- **The staging directory holds exactly what was planned** (`checkStage`):
+  a lane controls the names in its state, and a symlink there would let a
+  link write around the checks.
+- **A journal path's fields are each written before the step they name,**
+  so recovery (`planRecovery`) finds everything it may undo. All linked
+  finishes. Else every path is put back, all or nothing: a target is
+  unlinked only while it is still pine·trie's (the staged file's inode,
+  size and mtime, or a symlink's target), and an aside is linked back only
+  where nothing stands. An aside whose path holds a save since is dropped
+  when it holds what was moved, and kept on accepted work's newest when it
+  was written through.
+- **A kept aside is checked at a quiet read** (`planAsides`): dropped when
+  its inode, size and mtime are as moved, else a concurrent save of its
+  path on the line state its journal kept it on (`keptOn`).
+
+## The accept's laws
+
+Each is one test in `apps/pinetrie/host/folder/accept.test.ts` titled by
+its sentence, over a plain temp directory, with the host's executor
+(`write.ts`). A save races the accept at every journal write, which is
+every boundary between its sub-steps (S192's protocol, its interleavings
+run as values rather than by a clock).
+
+- **An accept never replaces a file it has not checked.**
+- **A save made by name during an accept survives it.**
+- **A write through a file held across an accept is kept as a concurrent save.**
+- **An accept writes exactly the paths whose content changed.**
+- **A host that stops during an accept finishes or puts it back at its next start.**
 
 ## A read of the project's folder (`read.ts`)
 
@@ -116,8 +172,10 @@ flows, merged by `git merge-file` as lanehost merges.
 - **The snapshots kept:** each folder lane's tip, start, and merge bases
   with accepted work's newest state and with its parent lane's newest,
   foreign lanes included (ADR-0150); every conflict's three states; each
-  proposed changes' start and tip; accepted work's newest `keep` line states, along
-  first parents, its newest always.
+  proposed changes' start, tip and shown merge; every state an accept's
+  journal pins (an open one's own, each kept aside's `keptOn`); accepted
+  work's newest `keep` line states, along first parents, its newest always;
+  and each concurrent save whose line state is kept.
 - **A lane's parent is read from the graph** (`parentLane`): the lane whose
   state its start state's parent is. So the sweep keeps a parent base only
   where the graph records the branch. A branch whose fork's files were lost

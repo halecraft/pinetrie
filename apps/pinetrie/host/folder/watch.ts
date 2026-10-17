@@ -6,6 +6,7 @@
 
 import { readFile } from "node:fs/promises"
 import path from "node:path"
+import { isFolderReserved } from "@pinetrie/core"
 import {
   type IgnoreFile,
   ignoreDirs,
@@ -20,14 +21,19 @@ export const FOLDER_QUIET_MS = 10_000
  * Whether any of `paths` (from the folder's root) is a source path: one
  * neither `own` nor the `.gitignore` files on its way ignore. A path's
  * own kind is not known once it is gone, so each is read as a file; its
- * directories are read as directories.
+ * directories are read as directories. An accept's staging directory is
+ * none; its asides count, since a write through a held file lands only
+ * there, and the read it sets off is what records it.
  */
 export const isSourceChange = (input: {
   readonly paths: readonly string[]
   readonly files: readonly IgnoreFile[]
   readonly own: string
-}): boolean =>
-  ignoredPaths({ ...input, dirs: new Set() }).size < input.paths.length
+}): boolean => {
+  if (input.paths.some(p => isFolderReserved(p, "aside"))) return true
+  const paths = input.paths.filter(p => !isFolderReserved(p))
+  return ignoredPaths({ ...input, paths, dirs: new Set() }).size < paths.length
+}
 
 /** The project's folder watched until closed: `read` after each quiet window that saw a source path change. */
 export async function watchFolder(deps: {

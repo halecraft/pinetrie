@@ -271,10 +271,12 @@ it): the project's folder is read into states of accepted work's line, by the ho
 disks role's checked copy; a lane's turns and catch-ups are states of the
 graph, a catch-up the path merge on its base, a conflict a record whose
 three versions the lane reads under `/pinetrie-states`, closed by
-`resolve_conflict`; proposed changes are a lane's newest state against accepted work's
-newest, reviewed as files. Accepting into a folder project is not built:
-it is refused with words, and the page draws its accept disabled with the
-same words. At start the host deletes the proposed changes, accepted-work and
+`resolve_conflict`; proposed changes are the shown merge, a lane's newest
+state merged onto accepted work's newest, reviewed as files. An accept
+writes the shown merge into the project's folder (ADR-0159): only if the
+folder's own read at the press finds it as shown, each file checked, moved
+aside and linked in, journalled so a stopped host finishes or puts it back,
+and a write through a file held across it kept as a concurrent save. At start the host deletes the proposed changes, accepted-work and
 base records of the other kind, and keeps every state.
 
 pine·trie reads only its own config (ADR-0146): five layers (system, user,

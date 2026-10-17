@@ -2,13 +2,16 @@
 // lane, its proposed changes are the files it changed; the project's folder,
 // edited, is read once it is quiet; a clean catch-up, then one that conflicts,
 // its versions in the lane and resolved by `resolve_conflict`; nothing written
-// in the project's folder. Then the folder becomes a jj repo, and the folder
-// lane is refused.
+// in the project's folder until an accept writes the shown merge there, and
+// none after a save of yours since the review. Then the folder becomes a jj
+// repo, and the folder lane is refused.
 
 import {
   chmodSync,
+  existsSync,
   mkdtempSync,
   readdirSync,
+  readFileSync,
   realpathSync,
   writeFileSync,
 } from "node:fs"
@@ -17,6 +20,7 @@ import path from "node:path"
 import {
   ancestry,
   CATCH_UP_TOOL,
+  ERR,
   entryId,
   messageText,
   projectTranscript,
@@ -220,6 +224,48 @@ async function folderSection(
       JSON.stringify(listing(dir)) ===
         JSON.stringify([...before, "c.txt"].sort()),
       JSON.stringify(listing(dir)),
+    )
+
+    // 6. Accepted: the shown merge's files are written into the project's
+    //    folder, and nothing of the accept's own stays there.
+    const openWith = (file: string) => {
+      const o = readProposedByLane(wh.session).get(lane)
+      return o?.kind === "folder" &&
+        o.start === newestOf() &&
+        o.files.includes(file) &&
+        o.conflicts.length === 0
+        ? o
+        : undefined
+    }
+    await waitFor(() => openWith("b.txt") !== undefined, 60_000)
+    const accepted = await wu.proposed(lane, "accept", "")
+    check(
+      "an accept writes the shown merge into the project's folder, and leaves nothing of its own there",
+      accepted.kind === "accepted" &&
+        readFileSync(path.join(dir, "b.txt"), "utf8") === "lane's\n" &&
+        readFileSync(path.join(dir, "a.txt"), "utf8") ===
+          "one\nyours\nthree\n" &&
+        JSON.stringify(listing(dir)) ===
+          JSON.stringify([...before, "b.txt", "c.txt"].sort()),
+      `${JSON.stringify(accepted)} ${JSON.stringify(listing(dir))}`,
+    )
+
+    // 7. Your save after the review refuses the accept, and nothing is written.
+    script.use([
+      { tool: "write", args: { path: "d.txt", content: "lane's d\n" } },
+      { text: "wrote d" },
+    ])
+    await wu.send("@agent write d", at(laneTip(lane)), { thread: lane })
+    await idle()
+    await waitFor(() => openWith("d.txt") !== undefined, 60_000)
+    writeFileSync(path.join(dir, "e.txt"), "yours, since the review\n")
+    const refused = await wu.proposed(lane, "accept", "")
+    check(
+      "an accept after your save since the review is refused as not shown, and writes nothing",
+      refused.kind === "refused" &&
+        refused.code === ERR.NOT_AS_SHOWN &&
+        !existsSync(path.join(dir, "d.txt")),
+      JSON.stringify(refused),
     )
 
     // 5. The folder becomes a jj repo: the folder lane is refused, a new one works.

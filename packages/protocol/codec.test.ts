@@ -12,6 +12,7 @@ import {
   type MoveOf,
   type MoveTarget,
   type PlaceKey,
+  pointId,
   printAddress,
   rootIdFor,
   runId,
@@ -49,9 +50,10 @@ const NEW_ROOT = rootIdFor("01a0f9eb-86e1-77ad-a822-2a3067862240")
 const NEW_THREAD = threadIdFor("01a0f9eb-86e1-77ad-a822-2a306786223f")
 /** What an acceptance was shown: a ledger, conflicting. */
 const SEEN = {
+  kind: "jj",
   ledger: { source: commitId("a1"), start: [commitId("b2"), commitId("c3")] },
   conflicted: true,
-}
+} as const
 
 const refusalCode = (x: ReturnType<typeof decodeCommand>) =>
   x.kind === "refused" ? x.code : `not refused: ${x.kind}`
@@ -294,7 +296,19 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       lane: threadIdFor("abc"),
       action: "accept",
       to: null,
-      seen: { ledger: null, conflicted: false },
+      seen: { kind: "jj", ledger: null, conflicted: false },
+    },
+    {
+      kind: "proposed",
+      lane: threadIdFor("abc"),
+      action: "accept",
+      to: null,
+      seen: {
+        kind: "folder",
+        start: pointId("line-1"),
+        tip: pointId("turn-2"),
+        conflicted: false,
+      },
     },
     {
       kind: "proposed",

@@ -3,12 +3,13 @@
 // a directory that is ignored, so `node_modules` costs nothing. What is
 // ignored is the lanes' own rule (`ignoredPaths`, with `laneIgnores`), so a
 // read holds what a lane's diff counts as source. Symlinks are stamped,
-// never followed. With the watcher (`watch.ts`) and the line (`line.ts`),
+// never followed, and an accept's reserved names at the root
+// (`FOLDER_RESERVED`) never entered. With the watcher (`watch.ts`) and the line (`line.ts`),
 // the only code that touches the project's folder.
 
 import { lstat, readdir, readFile, readlink } from "node:fs/promises"
 import path from "node:path"
-import type { FolderStamp } from "@pinetrie/core"
+import { type FolderStamp, isFolderReserved } from "@pinetrie/core"
 import {
   type IgnoreFile,
   ignoreDirs,
@@ -16,7 +17,7 @@ import {
 } from "@pinetrie/rules/ignores"
 
 /** A stamp of what `lstat` and `readlink` say; null for a directory or anything else. */
-async function stampOf(at: string): Promise<FolderStamp | null> {
+export async function folderStamp(at: string): Promise<FolderStamp | null> {
   const s = await lstat(at, { bigint: true }).catch(() => null)
   if (s === null) return null
   const base = { size: Number(s.size), ctimeNs: String(s.ctimeNs) }
@@ -62,12 +63,12 @@ export async function scanFolder(input: {
       dirs,
     })
     for (const p of paths) {
-      if (ignored.has(p)) continue
+      if (ignored.has(p) || isFolderReserved(p)) continue
       if (dirs.has(p)) {
         pending.push(p)
         continue
       }
-      const stamp = await stampOf(path.join(input.root, p))
+      const stamp = await folderStamp(path.join(input.root, p))
       if (stamp !== null) stamps.set(p, stamp)
     }
   }

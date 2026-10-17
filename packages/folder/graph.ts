@@ -147,6 +147,17 @@ export const virtualBaseName = (bases: readonly PointId[]): PointId =>
     .slice(0, 32)}` as PointId
 
 /**
+ * The state a folder lane's proposed changes show: its tip merged onto
+ * accepted work's newest `start`, the accept's state once accepted. The
+ * same two always name the same merge, and a pair is accepted at most once.
+ */
+export const shownMergeId = (start: PointId, tip: PointId): PointId =>
+  `shown-${createHash("sha256")
+    .update(`${start}\n${tip}`)
+    .digest("hex")
+    .slice(0, 32)}` as PointId
+
+/**
  * How the base of `a` and `b` is had: their one merge base, or their bases
  * merged first, the lowest id first and each other merged in over its own
  * base with the first, as git's recursive strategy does. Null when they
@@ -209,6 +220,8 @@ export type StateRefusal =
     }
   /** Its parents' number contradicts how it was made, or one repeats. */
   | { readonly kind: "refused"; readonly why: "parents" }
+  /** A concurrent save whose parent is no state of accepted work's line. */
+  | { readonly kind: "refused"; readonly why: "concurrent-off-line" }
 
 /**
  * How many parents a state made so may have. A read has none only when the
@@ -221,6 +234,7 @@ function isParentCount(made: StateMade, count: number, empty: boolean) {
     case "start":
     case "turn":
     case "restore":
+    case "concurrent":
       return count === 1
     case "catch-up":
     case "accept":
@@ -252,5 +266,12 @@ export function planState(
     !isParentCount(proposed.made, count, g.states.size === 0)
   )
     return { kind: "refused", why: "parents" }
+  const [first] = proposed.parents
+  const on = first === undefined ? undefined : g.states.get(first)
+  if (
+    proposed.made.kind === "concurrent" &&
+    (on === undefined || !isLineState(on))
+  )
+    return { kind: "refused", why: "concurrent-off-line" }
   return { kind: "record", record: proposed }
 }

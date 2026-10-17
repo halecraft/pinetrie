@@ -770,13 +770,6 @@ function actingWords(
     : `accepting into ${to.bookmark}…`
 }
 
-/**
- * Why folder proposed changes' accept is disabled: the accept button's title,
- * and the host's words when it refuses one.
- */
-export const ACCEPT_LATER =
-  "accepting comes in a later step for a project without a jj repo"
-
 /** Every word proposed changes show: its line, and its buttons' labels by state. */
 export function workStripWords(
   view: WorkStripView,
@@ -867,7 +860,7 @@ export function workStripWords(
           label: acceptLabel(),
           ...titled(
             into?.kind === "folder"
-              ? ACCEPT_LATER
+              ? "writes these files into the project's folder"
               : first === undefined
                 ? undefined
                 : moves(first.bookmark),

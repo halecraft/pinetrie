@@ -306,7 +306,19 @@ out, every call checked and planned into paths first (`planApply`,
   removal drops each states directory, whose read-only copies a plain
   removal cannot delete.
 - **git is in the image** for `git merge-file` (S181), so the image's tag,
-  a hash of its Containerfile, moved with it.
+  a hash of its Containerfile, moved with it. So is GNU tar, for an
+  accept's stream.
+- **An accept's files are a stream, never a call** (`tar-out.ts`): a
+  command of the disks role's own, run by `docker exec` beside the server,
+  its paths NUL-separated on stdin (a list can be longer than a command
+  line holds), its stdout a pax tar of each path alone. Every path is
+  checked first to be a regular file inside the snapshot with no symlink
+  on its way, and a refused one exits before tar writes a byte: a lane
+  controls the names in its state. Only regular files travel; an accept
+  makes a symlink from its target.
+- **A read can copy from another path** (`ReadPath`'s `source`): a kept
+  aside read into a concurrent save at its own path, `source` checked
+  inside the project's folder as `path` is.
 
 ## Diffs (`diff.ts`)
 

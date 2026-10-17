@@ -192,8 +192,17 @@ export const ERR = {
   NOT_OWN_COPY: "not_own_copy",
   /** An action on proposed changes, on a lane with none in your repo. */
   NO_PROPOSED_CHANGES: "no_proposed_changes",
-  /** Accepting a folder project's proposed changes, which the host cannot do yet. */
-  FOLDER_ACCEPT_LATER: "folder_accept_later",
+  /**
+   * An accept into the project's folder that found a path it writes changed
+   * while it wrote: everything it wrote is put back.
+   */
+  FOLDER_MOVED: "folder_moved",
+  /**
+   * An accept whose proposed changes hold a path the project's folder cannot
+   * hold (a name another there folds to, one not UTF-8, a symlink out of it,
+   * a device): refused before anything is written.
+   */
+  FOLDER_CANNOT_HOLD: "folder_cannot_hold",
   /** Squashing a folder project's proposed changes, which is its files, never a stack. */
   NOT_A_STACK: "not_a_stack",
   /** A `/package:name` command that names no command there is. */

@@ -573,9 +573,9 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   thread's newest state changes against accepted work's newest, reviewed as
   files, each with its line counts and its unified diff; it has no bookmark,
   no stack and no split. Its words name accepted work as jj proposed changes' do,
-  and its titles name no bookmark. **accept** is drawn disabled, titled
-  with the words the host refuses one with (`ACCEPT_LATER`,
-  `@pinetrie/interface`). The footer shows no publish or set up
+  and its titles name no bookmark. **accept** writes the files into the
+  project's folder, as its title says; conflicted proposed changes have
+  none, since a folder has no WIP, and catching up resolves them. The footer shows no publish or set up
   button, and the composer no WIP to start from: a folder project's
   accepted work is its folder.
 - **A row of the column's header, the work strip, says what became of the

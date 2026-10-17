@@ -7,7 +7,7 @@ import {
   threadIdFor,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
-import { stateGraph } from "./graph.ts"
+import { shownMergeId, stateGraph } from "./graph.ts"
 import { type LiveInput, liveStates } from "./live.ts"
 
 const LANE = threadIdFor("1")
@@ -43,6 +43,7 @@ const input = (over: Partial<LiveInput>): LiveInput => ({
   lanes: [],
   conflicts: [],
   proposed: [],
+  pinned: [],
   folderNewest: p("line-4"),
   keep: 1,
   ...over,
@@ -77,10 +78,31 @@ describe("liveStates", () => {
     expect(
       ids(
         liveStates(
-          input({ keep: 2, proposed: [{ start: p("line-1"), tip: p("t-1") }] }),
+          input({
+            keep: 2,
+            proposed: [{ start: p("line-1"), tip: p("t-1"), files: [] }],
+          }),
         ),
       ),
     ).toEqual(["line-1", "line-3", "line-4", "t-1"])
+  })
+
+  test("a proposed changes' shown merge is kept with its two", () => {
+    const proposed = [{ start: p("line-4"), tip: p("t-2"), files: ["a"] }]
+    expect(
+      liveStates(input({ proposed })).has(shownMergeId(p("line-4"), p("t-2"))),
+    ).toBe(true)
+  })
+
+  test("a pinned accept state is kept past keep, and a concurrent save with it", () => {
+    const g = stateGraph([
+      ...graph.states.values(),
+      record("concurrent-1", { kind: "concurrent", path: "a" }, "line-3"),
+    ])
+    const live = liveStates(input({ graph: g, pinned: [p("line-3")] }))
+    expect(live.has(p("line-3"))).toBe(true)
+    expect(live.has(p("concurrent-1"))).toBe(true)
+    expect(liveStates(input({ graph: g })).has(p("concurrent-1"))).toBe(false)
   })
 
   test("a virtual base is kept while a conflict names it, and not otherwise", () => {

@@ -1473,12 +1473,50 @@ adapter's.
   folder first, so a catch-up merges its newest state; a WIP is refused. Each run's
   end builds the lane's proposed changes and base records (`folder/proposed.ts`) and describes
   the proposed changes with the host's describer (`describe.ts`, jj's too); accepted
-  work moving rebuilds every folder lane's. An accept is refused
-  (`folder_accept_later`, worded by `ACCEPT_LATER`, the page's title for
-  the disabled button too), a squash too (`not_a_stack`), a setup and a
-  publish with why. A review reads an open folder proposed changes' `start..tip`:
-  its files with their line counts (`diffStats`), and one file's diff
-  (`fileDiff`), both lanehost's.
+  work moving rebuilds every folder lane's. A squash is refused
+  (`not_a_stack`), a setup and a publish with why.
+- **Proposed changes are the shown merge** (`folder/proposed.ts`,
+  ADR-0159): the lane's tip merged onto accepted work's newest
+  (`mergeToState`, `merge.ts`, shared with a catch-up), made on the
+  project's queue whenever either moves, in a scratch disk
+  `<id>-scratch`, snapshotted as `shownMergeId` and not made again while
+  kept; the one it replaces goes unless an accept made it a state. A
+  conflicted one keeps git's markers. The record's files are accepted
+  work's newest → the shown merge, and the base's forecast the lane's tip
+  → the shown merge: what a catch-up would change in the lane. A review
+  of open proposed changes, asked as `start..tip`, reads `start` → the
+  shown merge: its files with their line counts (`diffStats`), and one
+  file's diff (`fileDiff`), both lanehost's.
+- **An accept is one step on the project's queue** (`folder/accept.ts`):
+  the project's folder read inline (`FolderLine`'s `readNow`, since a
+  queued read would wait behind the step forever), so every save before
+  the press is a state and refuses an accept of what was shown before it;
+  the writes planned (`@pinetrie/folder`'s `accept.ts`); a staging
+  directory `.pinetrie-accept-<uuid>` at the folder's root, whose
+  case-folding a probe file answers; the shown merge's regular files
+  streamed into it by `tarOut` and extracted by the system's `tar`
+  (bsdtar on the Mac, GNU tar on Linux), then checked; the journal
+  (`ACCEPT_JOURNAL`) written; each path's check, move aside into
+  `.pinetrie-aside-<uuid>/`, check by inode, size and mtime (a rename
+  changes ctime) and `link(2)` or `symlink(2)`, which fail where anything
+  stands (`write.ts`). Only with every path linked (`AllLinked`, which
+  only `write.ts` makes) is the accept's state recorded, the staging
+  directory dropped (unlinking a staged file moves its target's ctime),
+  and the folder's stamps written as the read's with each written path
+  stamped anew, so the next read answers current. A check or link that
+  fails puts every path back and refuses `folder_moved`, naming the path;
+  what the folder cannot hold refuses `folder_cannot_hold` before
+  anything is written.
+- **The line's first read recovers, and a quiet read checks asides**
+  (`line.ts`): before it, each open journal is finished or put back and
+  a startup line says which; a staging directory no open journal names
+  goes. A read the watcher sets off checks the asides ended journals kept
+  first: an unchanged one is dropped, a written-through one read into a
+  concurrent save (`ReadPath`'s `source`) on its `keptOn`. A write into an
+  aside is a source change to the watcher (`isSourceChange`), since it
+  lands nowhere else; the accept's own read leaves asides alone, being
+  never quiet. The scan never enters either reserved name at the root
+  (`FOLDER_RESERVED`).
 - **The sweep** (`sweep.ts`), at start and after each run's end, deletes the
   snapshots of the states `liveStates` keeps not, `folder.history.states`
   of accepted work's line among them; every `STATE` record stays.

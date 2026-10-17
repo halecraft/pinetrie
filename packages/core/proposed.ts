@@ -10,6 +10,7 @@ import type {
   JjAcceptedRecord,
   JjBaseRecord,
   JjProposedChangesRecord,
+  PointId,
   ThreadName,
 } from "./index.ts"
 
@@ -48,14 +49,23 @@ export interface ProposedLedger {
 }
 
 /**
- * What an acceptance was shown: the proposed changes' ledger, and whether it
- * conflicted. An acceptance whose proposed changes now bring other work, or
- * newly conflicts, is refused (`NOT_AS_SHOWN`).
+ * What an acceptance was shown, and whether it conflicted: a jj project's
+ * proposed changes' ledger, or a folder project's two states. An
+ * acceptance whose proposed changes now bring other work, or newly
+ * conflict, is refused (`NOT_AS_SHOWN`).
  */
-export interface ProposedChangesSeen {
-  readonly ledger: ProposedLedger | null
-  readonly conflicted: boolean
-}
+export type ProposedChangesSeen =
+  | {
+      readonly kind: "jj"
+      readonly ledger: ProposedLedger | null
+      readonly conflicted: boolean
+    }
+  | {
+      readonly kind: "folder"
+      readonly start: PointId
+      readonly tip: PointId
+      readonly conflicted: boolean
+    }
 
 /**
  * Proposed changes as your repo holds it now (`readProposedChanges` in

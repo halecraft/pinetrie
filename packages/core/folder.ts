@@ -28,6 +28,12 @@ export type StateMade =
   | { readonly kind: "restore"; readonly of: PointId }
   /** A virtual base a conflict names; its parents are the bases it merges. */
   | { readonly kind: "bases-merged" }
+  /**
+   * A write through a file an app held across an accept, which landed in
+   * the file the accept moved aside: its one parent is the accept's state,
+   * with `path` holding what the aside held. Never on accepted work's line.
+   */
+  | { readonly kind: "concurrent"; readonly path: string }
 
 /** A state of a folder project: its snapshot, its parents, how it was made. */
 export interface StateRecord {
@@ -81,6 +87,40 @@ export const startStateId = (uuid: string): PointId =>
 /** A folder lane's catch-up state, from a uuidv7 its caller mints. */
 export const catchUpStateId = (uuid: string): PointId =>
   `catch-up-${uuid}` as PointId
+
+/** A concurrent save's state, from a uuidv7 its caller mints. */
+export const concurrentStateId = (uuid: string): PointId =>
+  `concurrent-${uuid}` as PointId
+
+/**
+ * The prefixes of the names an accept makes at the project's folder's root,
+ * and nowhere else: its staging directory and its directory of asides. A
+ * scan never enters them; deeper down, such a name is an ordinary source
+ * path.
+ */
+export const FOLDER_RESERVED = {
+  stage: ".pinetrie-accept-",
+  aside: ".pinetrie-aside-",
+} as const
+
+/** Whether a path from the folder's root lies under a name an accept reserves, or one of `which`. */
+export const isFolderReserved = (
+  path: string,
+  which: keyof typeof FOLDER_RESERVED | "any" = "any",
+): boolean => {
+  const top = path.split("/", 1)[0] ?? ""
+  return (
+    which === "any" ? Object.values(FOLDER_RESERVED) : [FOLDER_RESERVED[which]]
+  ).some(p => top.startsWith(p))
+}
+
+/** The accept `id`'s staging directory, from the folder's root. */
+export const acceptStageDir = (id: string): string =>
+  `${FOLDER_RESERVED.stage}${id}`
+
+/** The accept `id`'s directory of asides, from the folder's root. */
+export const acceptAsideDir = (id: string): string =>
+  `${FOLDER_RESERVED.aside}${id}`
 
 /** What a side holds at a path. */
 export type PathFact =
@@ -177,9 +217,81 @@ export interface DiffStat {
   readonly removed: number
 }
 
+/**
+ * One path an accept writes: what the folder held there when the accept
+ * read it, and what the merged state holds.
+ */
+export interface AcceptWrite {
+  readonly path: string
+  /** Null for none. */
+  readonly expected: FolderStamp | null
+  /** Null to delete it. */
+  readonly to:
+    | { readonly kind: "file" }
+    | { readonly kind: "symlink"; readonly target: string }
+    | null
+}
+
+/**
+ * A file's inode, size and mtime, by `lstat`: what proves it the same
+ * file, unwritten, across a rename, which changes its ctime but none of
+ * these. A target's just before its move aside; a staged file's.
+ */
+export interface InodeStat {
+  readonly ino: number
+  readonly size: number
+  /** In ns, as a decimal string. */
+  readonly mtimeNs: string
+}
+
+/**
+ * One path of an accept as its journal records it. Each field is written
+ * before the step it names, so a host stopped at any point finds, for
+ * each path, everything it may have to undo.
+ */
+export interface AcceptPath {
+  readonly path: string
+  /** Its aside, from the folder's root, once it is to be moved; null before, or for a new path. */
+  readonly aside: string | null
+  /** The target's `lstat` just before its move. */
+  readonly moved: InodeStat | null
+  /**
+   * The staged file's stat, once it is to be linked: what proves a target
+   * pine·trie's, and nobody's written in place since.
+   */
+  readonly staged: InodeStat | null
+  /** A symlink's target, once it is to be made: its proof in place of an inode. */
+  readonly symlink: string | null
+  /** Written after its link, or after its aside for a delete. */
+  readonly linked: boolean
+  /**
+   * Once the accept ends with its aside kept: the line state a concurrent
+   * save of it is made on (the accept's state, or on a put back accepted
+   * work's newest), and the aside is the folder's next reads' to check.
+   */
+  readonly keptOn: PointId | null
+}
+
+/** An accept as its journal records it, from before its first move to its end. */
+export interface AcceptJournal {
+  /** A uuid, which names its staging directory and its asides' directory. */
+  readonly id: string
+  readonly lane: ThreadId
+  /** The accept's state, its snapshot made: recorded only once every path is linked. */
+  readonly record: StateRecord
+  readonly paths: readonly AcceptPath[]
+  /** `open` until it ends, accepted or put back. */
+  readonly status: "open" | "accepted" | "put-back"
+}
+
 /** A path a read copies into accepted work's line, with the stamp the host read. */
 export interface ReadPath {
   readonly path: string
+  /**
+   * The path in the project's folder copied to `path`, when another: a
+   * kept aside, read into a concurrent save.
+   */
+  readonly source?: string
   readonly stamp: Pick<FolderStamp, "size" | "ctimeNs">
 }
 

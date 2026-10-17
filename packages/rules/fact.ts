@@ -34,6 +34,12 @@ const QueuedFactSchema = Type.Union([
     to: CatchUpFromSchema,
   }),
   Type.Object({
+    kind: Type.Literal("accepted-into-folder"),
+    lane: ThreadIdSchema,
+    by: WriterIdSchema,
+    files: Type.Integer({ minimum: 0 }),
+  }),
+  Type.Object({
     kind: Type.Union([
       Type.Literal("described"),
       Type.Literal("squashed"),
@@ -152,6 +158,8 @@ export function factLine(fact: QueuedFact): string {
   switch (fact.kind) {
     case "accepted":
       return `✓ accepted${into(fact.to)} as ${fact.as.slice(0, 8)}`
+    case "accepted-into-folder":
+      return `✓ accepted into the project's folder: ${fact.files === 1 ? "1 file" : `${fact.files} files`} written`
     case "described":
       return "✎ a new description of the changes was asked for"
     case "squashed":
@@ -197,6 +205,8 @@ export function factContent(fact: QueuedFact, name: string): string {
   switch (fact.kind) {
     case "accepted":
       return `${name} accepted this thread's work${into(fact.to)}, as the commit with change id ${fact.as}: ${fact.bookmark} moved forward to it. That work is no longer proposed; what you do next is proposed on top of it.`
+    case "accepted-into-folder":
+      return `${name} accepted this thread's work: its files are written into the project's folder. That work is no longer proposed; what you do next is proposed on top of it.`
     case "described":
       return `${name} asked for a new description of this thread's proposed changes.`
     case "squashed":

@@ -403,29 +403,40 @@ const sameLedger = (
     : a.source === b.source && sameStart(a.start, b.start)
 
 /**
- * What an acceptance was shown, from the record the page drew: the proposed
- * changes' ledger, and whether they conflicted. With no record, it was shown
- * none.
+ * What an acceptance was shown, from the record the page drew: a jj
+ * project's ledger, or a folder project's two states, and whether they
+ * conflicted. With no record, it was shown none.
  */
 export const proposedChangesSeen = (
   record: ProposedChangesRecord | undefined,
-): ProposedChangesSeen => ({
-  ledger: record?.kind === "jj" ? record.ledger : null,
-  conflicted: (record?.conflicts.length ?? 0) > 0,
-})
+): ProposedChangesSeen => {
+  const conflicted = (record?.conflicts.length ?? 0) > 0
+  return record?.kind === "folder"
+    ? { kind: "folder", start: record.start, tip: record.tip, conflicted }
+    : { kind: "jj", ledger: record?.ledger ?? null, conflicted }
+}
 
 /**
- * Whether the proposed changes are the ones an acceptance was shown: the
- * same work (the same ledger), and no conflict now that was not there then.
- * A rebase onto a moved target keeps the ledger, and so does your edit: both
- * are accepted.
+ * Whether proposed changes as they are now (`now`) are the ones an
+ * acceptance was shown: the same work (the same ledger, or the same two
+ * states), and no conflict now that was not there then. A rebase onto a
+ * moved target keeps the ledger, and so does your edit: both are accepted.
+ * A folder project's proposed changes move with accepted work's newest
+ * state, so any save since the review is other work. Of another kind, they
+ * are not.
  */
-const isAsShown = (
-  proposed: ProposedChangesNow,
+export const isAsShown = (
+  now: ProposedChangesSeen,
   seen: ProposedChangesSeen,
-): boolean =>
-  sameLedger(proposed.ledger, seen.ledger) &&
-  (proposed.conflicts.length === 0 || seen.conflicted)
+): boolean => {
+  const same =
+    now.kind === "jj"
+      ? seen.kind === "jj" && sameLedger(now.ledger, seen.ledger)
+      : seen.kind === "folder" &&
+        now.start === seen.start &&
+        now.tip === seen.tip
+  return same && (!now.conflicted || seen.conflicted)
+}
 
 /**
  * An acceptance, decided from the proposed changes read in its own command: the
@@ -464,7 +475,13 @@ export function planAcceptance(input: {
   const top = proposed.revisions.at(-1)?.changeId
   if (top === undefined || acceptance === null)
     return refused(ERR.NO_PROPOSED_CHANGES)
-  if (!isAsShown(proposed, seen)) return refused(ERR.NOT_AS_SHOWN)
+  const conflicted = proposed.conflicts.length > 0
+  const now: ProposedChangesSeen = {
+    kind: "jj",
+    ledger: proposed.ledger,
+    conflicted,
+  }
+  if (!isAsShown(now, seen)) return refused(ERR.NOT_AS_SHOWN)
   const destinations = acceptanceDestinations({
     base: place.base.base,
     state: place.state,

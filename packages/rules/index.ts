@@ -289,6 +289,7 @@ export {
   tokensWords,
 } from "./fact.ts"
 export {
+  ACCEPT_JOURNAL,
   CONFLICT,
   conflictKey,
   decodeFolderStamps,
@@ -455,6 +456,7 @@ export {
 } from "./proposal.ts"
 export {
   type AcceptanceDestination,
+  isAsShown,
   isNotYetAccepted,
   PROPOSED_CHANGES,
   planAcceptance,

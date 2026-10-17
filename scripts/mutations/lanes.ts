@@ -145,8 +145,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the project's folder's watcher reads nothing",
     file: "apps/pinetrie/host/folder/index.ts",
-    from: "            read: () => parts.acceptedMoved(),",
-    to: "            read: () => {},",
+    from: "              parts.acceptedMoved()\n            },",
+    to: "            },",
     suite: "lanes",
     scenario: "folder",
     expect:
@@ -702,5 +702,33 @@ export const mutations: readonly Mutation[] = [
     from: "    ready: ReadyCopy,\n",
     to: "    ready: { readonly parents: readonly CommitId[] },\n",
     command: ["pnpm", "exec", "tsc", "--noEmit"],
+  },
+  {
+    name: "tarOut skips its path check",
+    file: "packages/lanehost/tar-out.ts",
+    from: "  await checkTarPaths(root, paths)\n",
+    to: "",
+    command: ["pnpm", "exec", "vitest", "run", "packages/lanehost"],
+    expect: "tarStream writes nothing for a refused path",
+  },
+  {
+    name: "a folder accept writes nothing",
+    file: "apps/pinetrie/host/folder/proposed.ts",
+    from: "          return deps.accept(lane, seen ?? null, by)\n",
+    to: '          return { kind: "refused", code: ERR.NO_PROPOSED_CHANGES }\n',
+    suite: "lanes",
+    scenario: "folder",
+    expect:
+      "an accept writes the shown merge into the project's folder, and leaves nothing of its own there",
+  },
+  {
+    name: "a folder accept skips its own read of the project's folder",
+    file: "apps/pinetrie/host/folder/accept.ts",
+    from: "    const newest = await deps.line.readNow()\n",
+    to: "    const newest = deps.proposed(lane)?.start ?? (await deps.line.readNow())\n",
+    suite: "lanes",
+    scenario: "folder",
+    expect:
+      "an accept after your save since the review is refused as not shown, and writes nothing",
   },
 ]

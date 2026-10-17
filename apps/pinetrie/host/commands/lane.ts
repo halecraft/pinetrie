@@ -15,7 +15,6 @@ import {
   type TreeIndex,
   type WriterId,
 } from "@pinetrie/core"
-import { ACCEPT_LATER } from "@pinetrie/interface"
 import type { Agent } from "@pinetrie/pi"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import {
@@ -256,7 +255,7 @@ export async function actOnProposedChanges(
     return {
       kind: "refused",
       code: done.code,
-      message: proposedChangesRefusal(done.code),
+      message: proposedChangesRefusal(done.code, done.path ?? null),
     }
   // Off the command's reply, in a late step: what the command did, queued as
   // a card on its thread, which an idle lane pops at once and a running one
@@ -269,15 +268,20 @@ export async function actOnProposedChanges(
   return action === "accept" ? { kind: "accepted" } : { kind: "proposed" }
 }
 
-/** Why an action on proposed changes were refused, worded once. */
-export function proposedChangesRefusal(code: ErrCode): string {
+/** Why an action on proposed changes were refused, worded once; `path` is what a folder accept's refusal names. */
+export function proposedChangesRefusal(
+  code: ErrCode,
+  path: string | null,
+): string {
   switch (code) {
     case ERR.BAD_DESTINATION:
       return "the changes cannot be accepted there now: conflicted changes go only into a WIP, and the destination must sit below them"
     case ERR.NOT_AS_SHOWN:
       return "the changes are not what you were shown: review them again"
-    case ERR.FOLDER_ACCEPT_LATER:
-      return ACCEPT_LATER
+    case ERR.FOLDER_MOVED:
+      return `${path ?? "a file"} changed in the project's folder while it was accepted: catch up, then accept again`
+    case ERR.FOLDER_CANNOT_HOLD:
+      return `${path ?? "a file"} cannot be written into the project's folder: another name there is the same once folded, or the folder cannot hold it`
     case ERR.NOT_A_STACK:
       return "a folder project's changes are its files, never a stack"
     default:

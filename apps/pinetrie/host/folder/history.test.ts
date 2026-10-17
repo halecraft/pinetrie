@@ -2,16 +2,17 @@
 // process over a btrfs directory, as `packages/lanehost/disks.test.ts` runs it,
 // the project's folder a directory beside it, and a lane's commands run on the
 // host in its disk. The rig's test-only hooks read the graph and a diff of
-// their own (`git diff --no-index` of two snapshots), and accept an proposed
-// changes by writing the lane's tip into the project's folder and recording the
-// read as an accept. Where there is no btrfs, it skips, saying why.
+// their own (`git diff --no-index` of two snapshots); an accept is the host's
+// own (`accept.ts`), of the proposed changes the host would show. Where there
+// is no btrfs, it skips, saying why.
 
-import { cp, mkdir, readFile, rm, statfs, writeFile } from "node:fs/promises"
+import { mkdir, readFile, rm, statfs, writeFile } from "node:fs/promises"
 import path from "node:path"
 import {
   type BaseMerge,
   type ConflictRecord,
   entryId,
+  type FolderProposedChangesRecord,
   type ForkStart,
   folderCopyReady,
   lineStateId,
@@ -22,6 +23,7 @@ import {
   type ThreadName,
   threadIdFor,
   type ValueWrite,
+  writerId,
 } from "@pinetrie/core"
 import {
   folderNewest,
@@ -29,10 +31,11 @@ import {
   laneNewest,
   planBase,
   type StateGraph,
+  shownMergeId,
   stateGraph,
 } from "@pinetrie/folder"
 import { projectDisks } from "@pinetrie/lanehost"
-import { disksInProcess } from "@pinetrie/lanehost/fixtures"
+import { disksInProcess, tarStream } from "@pinetrie/lanehost/fixtures"
 import {
   createQueue,
   type FolderDisks,
@@ -47,13 +50,21 @@ import {
   historySuite,
   type RigLane,
 } from "@pinetrie/lanes/testing"
-import { CONFLICT, recordsOf, STATE, setRecord } from "@pinetrie/rules"
+import {
+  ACCEPT_JOURNAL,
+  CONFLICT,
+  recordsOf,
+  STATE,
+  setRecord,
+} from "@pinetrie/rules"
 import { afterAll, describe, expect, test } from "vitest"
+import { createFolderAccept } from "./accept.ts"
+import { sourceChanges } from "./changes.ts"
 import { folderFileAt } from "./file-at.ts"
 import { folderHistory } from "./history.ts"
 import { createFolderLine } from "./line.ts"
+import { makeShownMerge } from "./proposed.ts"
 import type { FolderLane } from "./proven.ts"
-import { scanFolder } from "./scan.ts"
 import { planSweep } from "./sweep.ts"
 
 const BTRFS_MAGIC = 0x9123683e
@@ -131,6 +142,8 @@ async function makeRig(): Promise<FolderRig> {
     read: (snapshot, p, limit) =>
       call({ kind: "read", project: key, snapshot, path: p, limit }),
     readIn: r => call({ kind: "readIn", project: key, ...r }),
+    tarOut: (state, paths) =>
+      tarStream(disks.snapshot(snapshotId(state)), paths),
     states: async (lane, op) => {
       await call({ kind: "states", project: key, lane, op })
     },
@@ -175,6 +188,27 @@ async function makeRig(): Promise<FolderRig> {
     newId,
     now: () => ids,
     moved: () => {},
+    recover: () => accepter.recover(),
+    asides: () => accepter.asides(),
+  })
+  const reader = { runtime, disks: folderDisks, own }
+  // The lane whose proposed changes the rig shows, built as the host builds them.
+  let shown: FolderProposedChangesRecord | undefined
+  const accepter = createFolderAccept({
+    root: folder,
+    line,
+    queue: project,
+    reader,
+    states: store.states,
+    proposed: lane => (shown?.lane === lane ? shown : undefined),
+    journals: () => [
+      ...recordsOf(ACCEPT_JOURNAL, values(ACCEPT_JOURNAL.namespace)).values(),
+    ],
+    write: store.write,
+    newId,
+    now: () => ids,
+    moved: () => {},
+    log: () => {},
   })
   const graph = () => stateGraph(store.states())
   let lanes = 0
@@ -257,6 +291,7 @@ async function makeRig(): Promise<FolderRig> {
           ...recordsOf(CONFLICT, values(CONFLICT.namespace)).values(),
         ],
         proposed: [],
+        journals: [],
         keep: 1,
       })
       if (gone.length > 0)
@@ -291,37 +326,36 @@ async function makeRig(): Promise<FolderRig> {
     },
 
     async accept({ lane }) {
-      const g = graph()
-      const tip = laneNewest(g, lane)
-      const newest = folderNewest(g)
-      if (tip === null || newest === null) throw new Error("nothing to accept")
-      // The project's folder made the lane's tip, as the next plan's accept writes it.
-      await rm(folder, { recursive: true, force: true })
-      await cp(disks.snapshot(tip), folder, {
-        recursive: true,
-        verbatimSymlinks: true,
-      })
-      const scan = await scanFolder({ root: folder, own: own() })
-      const state = lineStateId(newId())
-      const answered = await folderDisks.readIn({
-        from: null,
-        state,
-        paths: [...scan].map(([p, s]) => ({
-          path: p,
-          stamp: { size: s.size, ctimeNs: s.ctimeNs },
-        })),
-        deleted: [],
-      })
-      if (answered.kind !== "made") throw new Error("the accept's read moved")
-      const record: StateRecord = {
-        id: state,
-        parents: [newest, tip],
-        made: { kind: "accept", lane },
+      // The proposed changes as the host shows them: the lane's tip merged
+      // onto accepted work's newest, read after the folder's last save.
+      const newest = await line.read()
+      const tip = laneNewest(graph(), lane)
+      if (tip === null) throw new Error("nothing to accept")
+      const merged = await project.enqueue(() =>
+        makeShownMerge(reader, store.states, newest, tip, null),
+      )
+      if (merged === null) throw new Error("the shown merge's base is gone")
+      shown = {
+        kind: "folder",
+        lane,
+        start: newest,
+        tip,
+        files: await sourceChanges(reader, newest, shownMergeId(newest, tip)),
+        conflicts: [...merged.paths],
+        description: null,
         at: ids,
-        by: null,
       }
-      await store.write([setRecord(STATE, record)])
-      return state
+      const answer = await accepter.accept(
+        lane,
+        { kind: "folder", start: newest, tip, conflicted: false },
+        writerId("rig@pinetrie.invalid"),
+      )
+      if (answer.kind !== "done")
+        throw new Error(`the accept was refused: ${JSON.stringify(answer)}`)
+      const accepted = folderNewest(graph())
+      if (accepted === null)
+        throw new Error("no accepted work after the accept")
+      return accepted
     },
 
     statesDir: async lane => disks.states(lane),
@@ -509,7 +543,7 @@ describe.skipIf(!onBtrfs)(
       await recorded(lane, 1)
       const yours = await rig.yoursOnAccepted({ "a.txt": files.yours })
       await rig.accept(lane)
-      // The accept wrote the lane's tip: accepted work then takes its own file.
+      // Accepted work then takes its own file.
       const theirs = await rig.yoursOnAccepted({ "a.txt": files.accepted })
       const first = await merge(lane, withAccepted(yours))
       if (first.kind === "conflicted")
@@ -527,11 +561,14 @@ describe.skipIf(!onBtrfs)(
       yours: lines("X", "1", "2", "y", "3", "4", "z"),
       accepted: lines("X", "1", "2", "Y1", "3", "4", "z"),
     }
+    // Your change and the lane's are on lines of their own, so the accept
+    // is clean; the conflict comes after, at the last line, which the lane
+    // and accepted work then change apart.
     const F = {
-      start: lines("x", "y", "z"),
-      lane: lines("x", "Y1", "z"),
-      yours: lines("x", "Yy", "z"),
-      accepted: lines("x", "Yy", "z"),
+      start: lines("x", "1", "2", "y", "3", "4", "z"),
+      lane: lines("x", "1", "2", "Y1", "3", "4", "z"),
+      yours: lines("X", "1", "2", "y", "3", "4", "z"),
+      accepted: lines("X", "1", "2", "Y1", "3", "4", "Zyours"),
     }
 
     test("a clean catch-up over a virtual base leaves no snapshot of it; two in turn each make it", async () => {
@@ -555,8 +592,10 @@ describe.skipIf(!onBtrfs)(
         const { lane, theirs, caughtUp, base } = await crissCross(rig, F)
         // Branched before the conflict, it takes your line: clean over the same bases.
         const branch = await rig.branch(caughtUp)
-        await branch.write("a.txt", F.yours)
+        await branch.write("a.txt", F.accepted)
         await recorded(branch, 2)
+        await lane.write("a.txt", lines("X", "1", "2", "Y1", "3", "4", "Zlane"))
+        await recorded(lane, 3)
         expect((await merge(lane, withAccepted(theirs))).kind).toBe(
           "conflicted",
         )

@@ -99,6 +99,25 @@ test("a read's plan refuses a path that leaves the disk", () => {
   expect(plan("a/b.txt").paths[0]?.path).toBe("a/b.txt")
 })
 
+test("a read's plan refuses a source that leaves the folder", () => {
+  const plan = (source: string) =>
+    planReadIn(
+      {
+        from: "line-1",
+        state: "concurrent-1",
+        paths: [{ path: "a.txt", source, stamp: { size: 0, ctimeNs: "0" } }],
+        deleted: [],
+      },
+      FOLDER,
+      disks,
+    )
+  expect(() => plan("../x")).toThrow()
+  expect(plan(".pinetrie-aside-1/a.txt").paths[0]).toMatchObject({
+    path: "a.txt",
+    source: ".pinetrie-aside-1/a.txt",
+  })
+})
+
 describe.skipIf(!onBtrfs)(
   "reading the project's folder into its line on btrfs (skipped: not on btrfs here)",
   () => {

@@ -1,4 +1,5 @@
 import {
+  ERR,
   entryId,
   runId,
   type ThreadId,
@@ -46,6 +47,7 @@ import {
   handleSshAccess,
   handleStop,
   type LaneDeps,
+  proposedChangesRefusal,
 } from "./lane.ts"
 
 const ada = writerId("ada@example.com")
@@ -382,4 +384,13 @@ test("a carry-on the rule refuses is answered with its refusal, and starts nothi
     ),
   ).toMatchObject({ kind: "refused", code: "unknown_target" })
   expect(started).toEqual([])
+})
+
+test("proposedChangesRefusal names the path a folder accept found changed", () => {
+  expect(proposedChangesRefusal(ERR.FOLDER_MOVED, "src/a.ts")).toBe(
+    "src/a.ts changed in the project's folder while it was accepted: catch up, then accept again",
+  )
+  expect(proposedChangesRefusal(ERR.FOLDER_CANNOT_HOLD, "README.md")).toMatch(
+    /^README\.md cannot be written into the project's folder/,
+  )
 })

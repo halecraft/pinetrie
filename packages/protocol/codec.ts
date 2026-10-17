@@ -25,6 +25,7 @@ import {
   entryId,
   type Intent,
   isCanvasId,
+  isFolderStateId,
   isNoteColumnId,
   isReferenceCardId,
   isReorderAt,
@@ -65,6 +66,7 @@ import {
   parseTextCardId,
   parseTitle,
   placeFields,
+  pointId,
   printAddress,
   QUEUE_HOLD_CHANGES,
   type QueueHoldChange,
@@ -699,9 +701,23 @@ function proposedChangesSeenFromWire(wire: string): ProposedChangesSeen | null {
     return null
   }
   if (typeof parsed !== "object" || parsed === null) return null
-  const { ledger, conflicted } = parsed as Record<string, unknown>
+  const fields = parsed as Record<string, unknown>
+  const { conflicted } = fields
   if (typeof conflicted !== "boolean") return null
-  if (ledger === null) return { ledger: null, conflicted }
+  if (fields.kind === "folder") {
+    const { start, tip } = fields
+    return isFolderStateId(text(start)) && isFolderStateId(text(tip))
+      ? {
+          kind: "folder",
+          start: pointId(text(start)),
+          tip: pointId(text(tip)),
+          conflicted,
+        }
+      : null
+  }
+  if (fields.kind !== "jj") return null
+  const { ledger } = fields
+  if (ledger === null) return { kind: "jj", ledger: null, conflicted }
   if (typeof ledger !== "object" || ledger === undefined) return null
   const { source, start } = ledger as Record<string, unknown>
   if (
@@ -712,7 +728,11 @@ function proposedChangesSeenFromWire(wire: string): ProposedChangesSeen | null {
   )
     return null
   const commits: CommitId[] = start.map(commitId)
-  return { ledger: { source: commitId(source), start: commits }, conflicted }
+  return {
+    kind: "jj",
+    ledger: { source: commitId(source), start: commits },
+    conflicted,
+  }
 }
 
 /** The card a chat is sent from: null for none; undefined for an id that is no text card's. */

@@ -13,6 +13,7 @@ import {
   type ProposedChangesNow,
   type ProposedChangesSeen,
   pointFromCommit,
+  pointId,
   type RefreshFacts,
   type StackFacts,
   type StartRead,
@@ -42,7 +43,11 @@ import {
   renderableMessage,
   setRecord,
 } from "./index.ts"
-import { acceptanceDestinations, isProposedMoved } from "./proposed.ts"
+import {
+  acceptanceDestinations,
+  isAsShown,
+  isProposedMoved,
+} from "./proposed.ts"
 import { decodeUpdate } from "./update.ts"
 
 const LANE = threadIdFor("1")
@@ -75,16 +80,70 @@ test("proposedChangesSeen: what an acceptance was shown is the record's ledger a
   expect(
     proposedChangesSeen({ ...proposed, ledger, conflicts: ["a.txt"] }),
   ).toEqual({
+    kind: "jj",
     ledger,
     conflicted: true,
   })
   expect(proposedChangesSeen(proposed)).toEqual({
+    kind: "jj",
     ledger: null,
     conflicted: false,
   })
   expect(proposedChangesSeen(undefined)).toEqual({
+    kind: "jj",
     ledger: null,
     conflicted: false,
+  })
+})
+
+test("proposedChangesSeen: a folder record shows its two states", () => {
+  expect(
+    proposedChangesSeen({
+      kind: "folder",
+      lane: LANE,
+      start: pointId("line-1"),
+      tip: pointId("turn-1"),
+      files: ["a.txt"],
+      conflicts: [],
+      description: null,
+      at: 0,
+    }),
+  ).toEqual({
+    kind: "folder",
+    start: pointId("line-1"),
+    tip: pointId("turn-1"),
+    conflicted: false,
+  })
+})
+
+describe("isAsShown", () => {
+  const folder = {
+    kind: "folder",
+    start: pointId("line-1"),
+    tip: pointId("turn-1"),
+    conflicted: false,
+  } as const
+  const jj = {
+    kind: "jj",
+    ledger: { source: TIP, start: [BASE] },
+    conflicted: false,
+  } as const
+  test("the same two states are as shown", () => {
+    expect(isAsShown(folder, folder)).toBe(true)
+  })
+  test("accepted work moved, or the lane's tip, is not as shown", () => {
+    expect(isAsShown({ ...folder, start: pointId("line-2") }, folder)).toBe(
+      false,
+    )
+    expect(isAsShown({ ...folder, tip: pointId("turn-2") }, folder)).toBe(false)
+  })
+  test("a conflict now that was not shown is not as shown", () => {
+    expect(isAsShown({ ...folder, conflicted: true }, folder)).toBe(false)
+    expect(isAsShown(jj, { ...jj, conflicted: true })).toBe(true)
+  })
+  test("a seen value of the other kind is not as shown", () => {
+    expect(isAsShown(folder, jj)).toBe(false)
+    expect(isAsShown(jj, folder)).toBe(false)
   })
 })
 
@@ -723,7 +782,7 @@ describe("the proposed changes' policy over a gather", () => {
       source: START,
     } as const
     /** What the page drew: this proposed changes' ledger, not conflicting. */
-    const SHOWN = { ledger: o.ledger, conflicted: false }
+    const SHOWN = { kind: "jj" as const, ledger: o.ledger, conflicted: false }
     const BOTH = new Set(["wip/x", "pinetrie-accepted"])
     const accept = (
       over: {
@@ -806,7 +865,7 @@ describe("the proposed changes' policy over a gather", () => {
     })
     test("conflicted proposed changes never go to accepted work; an untraced place is accepted where it sits", () => {
       const conflicted = { ...o, conflicts: ["a.txt"] }
-      const shown = { ledger: o.ledger, conflicted: true }
+      const shown = { kind: "jj" as const, ledger: o.ledger, conflicted: true }
       expect(outcome(accept({ proposed: conflicted, seen: shown }))).toBe(
         "wip/x",
       )
@@ -885,6 +944,7 @@ describe("the proposed changes' policy over a gather", () => {
             ledger: { source: TIP, start: [NEW_TIP, START] },
           }),
           seen: {
+            kind: "jj",
             ledger: { source: TIP, start: [START, NEW_TIP] },
             conflicted: false,
           },
@@ -900,13 +960,13 @@ describe("the proposed changes' policy over a gather", () => {
         "conflicting, as it was shown",
         {
           proposed: read({ ...o, conflicts: ["a.txt"] }),
-          seen: { ledger: o.ledger, conflicted: true },
+          seen: { kind: "jj", ledger: o.ledger, conflicted: true },
         },
         "wip/x",
       ],
       [
         "shown no ledger, now one",
-        { seen: { ledger: null, conflicted: false } },
+        { seen: { kind: "jj", ledger: null, conflicted: false } },
         ERR.NOT_AS_SHOWN,
       ],
     ] as const)("an acceptance of the proposed changes it was shown: %s", (_, over, expected) => {

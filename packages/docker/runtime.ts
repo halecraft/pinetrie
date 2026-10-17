@@ -4,8 +4,8 @@
 
 import { createHash } from "node:crypto"
 import { readFile } from "node:fs/promises"
-import { openChannel } from "@pinetrie/channel"
-import { OBSERVER_SOCKET } from "@pinetrie/core"
+import { commandStream, openChannel } from "@pinetrie/channel"
+import { OBSERVER_SOCKET, snapshotId } from "@pinetrie/core"
 import {
   connectObserver,
   LANE_FILES,
@@ -23,6 +23,7 @@ import {
   type Role,
   SERVER,
   serverArgs,
+  TAR_OUT,
 } from "@pinetrie/lanehost"
 import {
   type FolderDisks,
@@ -341,6 +342,25 @@ export function dockerRuntime(input: {
       read: (snapshot, path, limit) =>
         lanehost.call({ kind: "read", project: key, snapshot, path, limit }),
       readIn: read => lanehost.call({ kind: "readIn", project: key, ...read }),
+      async *tarOut(state, paths) {
+        // The call starts the disks role's container when it is not yet,
+        // and refuses a snapshot that is gone before tar is asked.
+        if (
+          !(await lanehost.call({
+            kind: "snapshotExists",
+            project: key,
+            snapshot: snapshotId(state),
+          }))
+        )
+          throw new Error(`the state ${state} has no snapshot`)
+        yield* commandStream(
+          execArgv(lanehostContainer("disks", key, target), [
+            ...runtimeNode(`${PINETRIE_MOUNT}/${TAR_OUT}`),
+            disks.snapshot(snapshotId(state)),
+          ]),
+          { stdin: paths.map(p => `${p}\0`).join("") },
+        )
+      },
       states: async (lane, op) => {
         await lanehost.call({ kind: "states", project: key, lane, op })
       },

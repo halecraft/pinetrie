@@ -56,7 +56,12 @@ export interface ProposedChangesActs {
     to?: string | null,
     seen?: ProposedChangesSeen | null,
   ): Promise<
-    | { readonly kind: "refused"; readonly code: ErrCode }
+    | {
+        readonly kind: "refused"
+        readonly code: ErrCode
+        /** The path it names, for a folder accept's refusal. */
+        readonly path?: string
+      }
     | { readonly kind: "done"; readonly fact: ProposedChangesFact }
   >
   /** A review or a diff a page asked for, of a commit open proposed changes hold. */

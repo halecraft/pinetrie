@@ -137,7 +137,8 @@ export function conflictCause(record: ProposedChangesRecord): ConflictCause {
  * (`pinetrie.base`), null before the host read it, as accepted work; `into` and
  * `wipAhead` come from accepted work's record. Jj proposed changes' acceptance
  * is offered only with a destination (`acceptanceDestinations`); a folder
- * proposed changes' is drawn disabled until accepting into a folder is built.
+ * project's one is accepted work, the project's folder, for clean proposed
+ * changes.
  */
 export function workStripView(input: {
   readonly proposed: ProposedChangesStatus
@@ -199,25 +200,21 @@ export function workStripView(input: {
   }
   const { into } = input
   const destinations =
-    open === undefined || into?.kind !== "bookmark"
+    open === undefined || into === null
       ? []
       : acceptanceDestinations({
           base: jjBase?.base ?? { kind: "accepted" },
           state: jjBase?.state ?? "ok",
-          acceptedBookmark: into.bookmark,
+          // A folder has no bookmark: the wire's empty destination is the default.
+          acceptedBookmark: into.kind === "bookmark" ? into.bookmark : "",
           conflicted: open.conflicts.length > 0,
           wipAhead: input.wipAhead,
         })
   const gone = jjBase?.state === "gone"
-  // Folder proposed changes' accept stays, disabled: accepting into a folder
-  // project is not built yet, and its title says so.
-  const later = into?.kind === "folder"
   const integrable = (
     buttons: readonly WorkStripButton[],
   ): readonly WorkStripButton[] =>
-    destinations.length === 0 && !later
-      ? buttons.filter(b => b !== "accept")
-      : buttons
+    destinations.length === 0 ? buttons.filter(b => b !== "accept") : buttons
   const view = (
     state: WorkStripView["state"],
     buttons: readonly WorkStripButton[],
@@ -256,7 +253,6 @@ export function workStripView(input: {
         : []),
       // A split already waits in the queue.
       ...(input.queued.includes("split") ? (["split"] as const) : []),
-      ...(later && buttons.includes("accept") ? (["accept"] as const) : []),
     ]
     // An untraced start rebuilds nothing: only your edited proposed changes are
     // left.

@@ -3,7 +3,9 @@
 // role copies only what changed into a new state (`readIn`), checking each
 // path's stamp. One read at a time, on the project's queue. The stamps are
 // written only once the state they made is recorded, so a read that failed
-// is planned again from the last one that held.
+// is planned again from the last one that held. The first read finishes or
+// puts back an accept a stopped host left; a read after the watcher saw the
+// folder quiet checks the asides accepts kept first.
 
 import { readFile, rename, writeFile } from "node:fs/promises"
 import {
@@ -89,6 +91,16 @@ export function planLineRead(input: {
 export interface FolderLine {
   /** The project's folder read, after any read before it: its newest state then. */
   read(): Promise<PointId>
+  /**
+   * `read`, for a step on the project's queue already, which a queued read
+   * would wait behind forever. Leaves kept asides alone: it is not quiet.
+   */
+  readNow(): Promise<PointId>
+  /** The stamps of the last read that held, which match accepted work's newest; null for none. */
+  stamps(): Promise<ReadonlyMap<string, FolderStamp> | null>
+  writeStamps(stamps: ReadonlyMap<string, FolderStamp>): Promise<void>
+  /** The watcher saw the folder quiet: the next read checks the asides accepts kept. */
+  markQuiet(): void
 }
 
 export function createFolderLine(deps: {
@@ -107,8 +119,16 @@ export function createFolderLine(deps: {
   readonly now: () => number
   /** A read made a state: accepted work moved. */
   readonly moved: (newest: PointId) => void
+  /** What the line's first read does before it: a stopped accept finished or put back. */
+  readonly recover: () => Promise<void>
+  /** What a quiet read does before its scan: the asides accepts kept, checked. */
+  readonly asides: () => Promise<void>
 }): FolderLine {
   const { queue } = deps
+  let recovered = false
+  // The first read, at startup, is quiet as far as any aside is concerned:
+  // the host was not running to write through one.
+  let asidesDue = true
 
   const lastStamps = () =>
     readFile(deps.stampsFile, "utf8").then(decodeFolderStamps, () => null)
@@ -119,7 +139,17 @@ export function createFolderLine(deps: {
     await rename(tmp, deps.stampsFile)
   }
 
-  async function readNow(): Promise<PointId> {
+  async function readNow(quiet: boolean): Promise<PointId> {
+    if (!recovered) {
+      await deps.recover()
+      recovered = true
+    }
+    // An accept's own read is never quiet: the asides wait for the watcher,
+    // and its read leaves them due.
+    if (quiet && asidesDue) {
+      asidesDue = false
+      await deps.asides()
+    }
     let moved: readonly string[] = []
     for (let tries = 0; tries < READ_TRIES; tries++) {
       // gather
@@ -150,5 +180,13 @@ export function createFolderLine(deps: {
     )
   }
 
-  return { read: () => queue.enqueue(readNow) }
+  return {
+    read: () => queue.enqueue(() => readNow(true)),
+    readNow: () => readNow(false),
+    stamps: lastStamps,
+    writeStamps,
+    markQuiet() {
+      asidesDue = true
+    },
+  }
 }

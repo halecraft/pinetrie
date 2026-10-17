@@ -1,10 +1,13 @@
-// host/folder/proposed — each folder lane's proposed changes: its newest state
-// against accepted work's newest, its files those whose content differs
+// host/folder/proposed — each folder lane's proposed changes: the shown
+// merge, its newest state merged onto accepted work's newest
+// (`shownMergeId`), made on the project's queue whenever either moves; its
+// files those whose content differs from accepted work's newest
 // (`sourceChanges`), reviewed as the range between the two, described by the
 // host's describer. With it, the lane's base record: the state of the
-// project's folder its line holds, and what catching up with accepted work's
-// newest would change. Both are the page's caches, written from the graph; nothing decides
-// from them. Accepting into the project's folder is the next step's: refused.
+// project's folder its line holds, and what a catch-up would change in the
+// lane. Both are the page's caches, written from the graph and the shown
+// merge; nothing decides from them. An accept writes the shown merge into
+// the project's folder (`accept.ts`).
 
 import {
   ERR,
@@ -12,16 +15,25 @@ import {
   type FolderProposedChangesRecord,
   type PointId,
   type StateRecord,
+  snapshotId,
   type ThreadId,
 } from "@pinetrie/core"
 import {
   folderNewest,
   folderStateHeld,
+  isAncestor,
   laneNewest,
+  planBase,
+  shownMergeId,
   stateGraph,
 } from "@pinetrie/folder"
 import type { Keeper } from "@pinetrie/keeper"
-import type { FolderDisks } from "@pinetrie/lanes"
+import type {
+  FolderDisks,
+  LaneOwner,
+  LaneQueue,
+  LaneRuntime,
+} from "@pinetrie/lanes"
 import { readLaneRecords, readProposedByLane } from "@pinetrie/reads"
 import {
   answerDiff,
@@ -40,7 +52,10 @@ import {
   type ProposedChangesActs,
   reviewReadFacts,
 } from "../work/destination.ts"
+import type { FolderAccept } from "./accept.ts"
 import { type StateReader, sourceChanges } from "./changes.ts"
+import { dropUnrecordedBase, mergeToState } from "./merge.ts"
+import { baseMissing } from "./virtual-base.ts"
 
 /** The most of proposed changes' diff a description reads. */
 const DESCRIBE_DIFF_BYTES = 200_000
@@ -52,9 +67,9 @@ const DESCRIBE_DIFF_BYTES = 200_000
 export function planFolderRecords(input: {
   readonly lane: ThreadId
   readonly states: readonly StateRecord[]
-  /** The proposed changes' files: the source paths differing between accepted work's newest and the lane's newest. */
+  /** The proposed changes' files: the source paths differing between accepted work's newest and the shown merge. */
   readonly files: readonly string[]
-  /** What catching up would bring: the source paths differing between the lane's start and accepted work's newest. */
+  /** What catching up would change in the lane: the source paths differing between its newest and the shown merge. */
   readonly brings: readonly string[]
   /** Whether the lane changed anything since its start. */
   readonly worked: boolean
@@ -100,23 +115,102 @@ export function planFolderRecords(input: {
 export interface FolderProposedChanges extends ProposedChangesActs {
   /** Every folder lane's proposed changes and base built again: accepted work moved. */
   rebuildAll(): Promise<void>
-  /** `lane`'s proposed changes built again, or withdrawn. */
+  /** `lane`'s proposed changes built again, or withdrawn, on the project's queue. */
   rebuild(lane: ThreadId): Promise<void>
+  /** `rebuild`, for a step on the project's queue already, which a queued one would wait behind forever. */
+  rebuildNow(lane: ThreadId): Promise<void>
   withdraw(lane: ThreadId): Promise<void>
+}
+
+/** What the folder's proposed changes read and merge on. */
+export type ShownReader = StateReader & {
+  readonly runtime: Pick<LaneRuntime, "diff" | "disk" | "snapshotExists">
+  readonly disks: Pick<
+    FolderDisks,
+    | "fileDiff"
+    | "diffStats"
+    | "pathFacts"
+    | "sameContent"
+    | "applyMerge"
+    | "filesUnder"
+    | "read"
+  >
+}
+
+/**
+ * The state a folder proposed changes record shows: its shown merge, or
+ * its tip when it holds no work, which has none.
+ */
+export const shownOf = (r: FolderProposedChangesRecord): PointId =>
+  r.files.length === 0 ? r.tip : shownMergeId(r.start, r.tip)
+
+/**
+ * `tip` merged onto `newest` as their shown merge, unless it is made
+ * already and `known` holds its conflicts: in a scratch disk of its own,
+ * snapshotted and deleted after, on the project's queue. Null when their
+ * base's snapshot is gone.
+ */
+export async function makeShownMerge(
+  reader: ShownReader,
+  states: () => readonly StateRecord[],
+  newest: PointId,
+  tip: PointId,
+  known: readonly string[] | null,
+): Promise<{ readonly paths: readonly string[] } | null> {
+  const shown = shownMergeId(newest, tip)
+  const made = await reader.runtime.snapshotExists(snapshotId(shown))
+  if (made && known !== null) return { paths: known }
+  const plan = planBase(stateGraph(states()), newest, tip)
+  if (plan === null || (await baseMissing(reader, plan)) !== null) return null
+  const scratch = `${shown}-scratch` as LaneOwner
+  if (made)
+    await reader.runtime.disk({
+      kind: "deleteSnapshots",
+      ids: [snapshotId(shown)],
+    })
+  await reader.runtime.disk({ kind: "delete", lane: scratch })
+  await reader.runtime.disk({
+    kind: "restore",
+    lane: scratch,
+    from: snapshotId(newest),
+  })
+  try {
+    const { paths } = await mergeToState(reader, {
+      disk: scratch,
+      ours: newest,
+      theirs: tip,
+      plan,
+      markers: true,
+      snapshot: () =>
+        reader.runtime.disk({
+          kind: "snapshot",
+          lane: scratch,
+          snapshot: snapshotId(shown),
+        }),
+    })
+    return { paths }
+  } finally {
+    await reader.runtime.disk({ kind: "delete", lane: scratch })
+    await dropUnrecordedBase(reader.runtime, plan, s =>
+      stateGraph(states()).states.has(s),
+    )
+  }
 }
 
 export function startFolderProposedChanges(deps: {
   readonly basics: Basics
   readonly records: Pick<Records, "writeValues">
   readonly keeper: Keeper
-  readonly reader: StateReader & {
-    readonly disks: Pick<FolderDisks, "fileDiff" | "diffStats">
-  }
+  readonly reader: ShownReader
+  /** The project's one queue: a shown merge is made on it, as a read and a virtual base are. */
+  readonly queue: LaneQueue
   readonly states: () => readonly StateRecord[]
   readonly conflicts: (lane: ThreadId) => readonly string[]
   readonly describer: Describe
   readonly running: (lane: ThreadId) => boolean
   readonly baseChanged: (lane: ThreadId) => void
+  /** An accept into the project's folder (`accept.ts`). */
+  readonly accept: FolderAccept["accept"]
 }): FolderProposedChanges {
   const { basics, reader } = deps
 
@@ -127,21 +221,42 @@ export function startFolderProposedChanges(deps: {
     return record?.kind === "folder" ? record : undefined
   }
 
-  async function rebuild(lane: ThreadId): Promise<void> {
+  /** `lane`'s proposed changes and base built again, on the project's queue already. */
+  async function rebuildNow(lane: ThreadId): Promise<void> {
     // gather
     const states = deps.states()
     const g = stateGraph(states)
     const newest = folderNewest(g)
     const tip = laneNewest(g, lane)
     const start = tip === null ? null : folderStateHeld(g, tip)
-    const changes = (a: PointId | null, b: PointId | null) =>
-      a === null || b === null || a === b
-        ? Promise.resolve([])
-        : sourceChanges(reader, a, b)
-    const [files, brings, worked] = await Promise.all([
-      changes(newest, tip),
-      changes(start, newest),
-      changes(start, tip),
+    if (newest === null || tip === null || start === null) return withdraw(lane)
+    const before = folderRecord(lane)
+    const changes = (a: PointId, b: PointId) =>
+      a === b ? Promise.resolve([]) : sourceChanges(reader, a, b)
+    const worked = await changes(start, tip)
+    // A tip accepted work holds already has nothing to show.
+    const holds = isAncestor(g, tip, newest)
+    const merged = holds
+      ? { paths: [] }
+      : await makeShownMerge(
+          reader,
+          deps.states,
+          newest,
+          tip,
+          before?.start === newest && before.tip === tip
+            ? before.conflicts.filter(p => !deps.conflicts(lane).includes(p))
+            : null,
+        )
+    if (merged === null) {
+      basics.log(
+        `[host] ${lane}: its proposed changes are not built: the state it shares with the project's folder is no longer kept`,
+      )
+      return
+    }
+    const shown = holds ? newest : shownMergeId(newest, tip)
+    const [files, brings] = await Promise.all([
+      changes(newest, shown),
+      changes(tip, shown),
     ])
     // plan
     const planned = planFolderRecords({
@@ -150,8 +265,8 @@ export function startFolderProposedChanges(deps: {
       files,
       brings,
       worked: worked.length > 0,
-      conflicts: deps.conflicts(lane),
-      before: folderRecord(lane),
+      conflicts: [...new Set([...merged.paths, ...deps.conflicts(lane)])],
+      before,
       now: basics.now(),
     })
     // execute
@@ -160,8 +275,24 @@ export function startFolderProposedChanges(deps: {
       setRecord(PROPOSED_CHANGES, planned.proposed),
       setRecord(BASE, planned.base),
     ])
+    // The shown merge it replaces goes, unless an accept made it a state.
+    const was =
+      before === undefined || before.files.length === 0
+        ? null
+        : shownMergeId(before.start, before.tip)
+    if (
+      was !== null &&
+      was !== shownOf(planned.proposed) &&
+      !stateGraph(deps.states()).states.has(was)
+    )
+      await reader.runtime.disk({
+        kind: "deleteSnapshots",
+        ids: [snapshotId(was)],
+      })
     deps.baseChanged(lane)
   }
+
+  const rebuild = (lane: ThreadId) => deps.queue.enqueue(() => rebuildNow(lane))
 
   async function withdraw(lane: ThreadId): Promise<void> {
     await deps.records.writeValues([
@@ -189,7 +320,7 @@ export function startFolderProposedChanges(deps: {
           if (diff.length > DESCRIBE_DIFF_BYTES) break
           diff += await reader.disks.fileDiff(
             proposed.start,
-            proposed.tip,
+            shownOf(proposed),
             path,
             DESCRIBE_DIFF_BYTES,
           )
@@ -212,9 +343,13 @@ export function startFolderProposedChanges(deps: {
 
   return {
     rebuild,
+    rebuildNow,
     withdraw,
     async rebuildAll() {
-      for (const lane of lanes()) await rebuild(lane)
+      for (const lane of lanes())
+        await rebuild(lane).catch(
+          failed(basics, "building its proposed changes", lane),
+        )
     },
     runEnded(lane) {
       void deps.keeper.track(
@@ -223,10 +358,10 @@ export function startFolderProposedChanges(deps: {
           .catch(failed(basics, "building its proposed changes", lane)),
       )
     },
-    async act(lane, action, by) {
+    async act(lane, action, by, _to, seen) {
       switch (action) {
         case "accept":
-          return { kind: "refused", code: ERR.FOLDER_ACCEPT_LATER }
+          return deps.accept(lane, seen ?? null, by)
         case "squash":
           return { kind: "refused", code: ERR.NOT_A_STACK }
         case "describe":
@@ -249,7 +384,12 @@ export function startFolderProposedChanges(deps: {
           status: 404,
           reason: "a folder project's proposed changes have no revisions",
         }
-      const { from, to } = read.span
+      const { from, to: asked } = read.span
+      const proposed = [...readProposedByLane(basics.session).values()].find(
+        o => o.kind === "folder" && o.start === from && o.tip === asked,
+      )
+      // Proposed changes are reviewed as their shown merge; a lane's turns as they are.
+      const to = proposed?.kind === "folder" ? shownOf(proposed) : asked
       if (read.kind === "diff")
         return answerDiff(
           await reader.disks.fileDiff(from, to, read.path, MAX_DIFF_BYTES),
@@ -260,9 +400,6 @@ export function startFolderProposedChanges(deps: {
         reader.disks.pathFacts(from, files),
         reader.disks.pathFacts(to, files),
       ])
-      const proposed = [...readProposedByLane(basics.session).values()].find(
-        o => o.kind === "folder" && o.start === from && o.tip === to,
-      )
       return {
         kind: "review",
         review: {

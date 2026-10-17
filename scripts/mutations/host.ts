@@ -110,18 +110,18 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a folder catch-up keeps a virtual base no conflict names",
-    file: "apps/pinetrie/host/folder/history.ts",
-    from: '        if (plan.kind === "virtual" && !graph().states.has(plan.name))\n',
-    to: "        if (false)\n",
+    file: "apps/pinetrie/host/folder/merge.ts",
+    from: '  if (plan.kind === "virtual" && !recorded(plan.name))\n',
+    to: "  if (false)\n",
     command: unit,
     expect:
       "a clean catch-up over a virtual base leaves no snapshot of it; two in turn each make it",
   },
   {
     name: "a folder catch-up deletes a virtual base a conflict names",
-    file: "apps/pinetrie/host/folder/history.ts",
-    from: '        if (plan.kind === "virtual" && !graph().states.has(plan.name))\n',
-    to: '        if (plan.kind === "virtual")\n',
+    file: "apps/pinetrie/host/folder/merge.ts",
+    from: '  if (plan.kind === "virtual" && !recorded(plan.name))\n',
+    to: '  if (plan.kind === "virtual")\n',
     command: unit,
     expect:
       "a virtual base a conflict names is recorded and kept, a clean catch-up over it after included",
@@ -183,11 +183,20 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the scan stamps what a .gitignore ignores",
     file: "apps/pinetrie/host/folder/scan.ts",
-    from: "      if (ignored.has(p)) continue\n",
-    to: "",
+    from: "      if (ignored.has(p) || isFolderReserved(p)) continue\n",
+    to: "      if (isFolderReserved(p)) continue\n",
     command: unit,
     expect:
       "scanFolder stamps every source path, a .gitignore's ignored ones and pine·trie's own left out",
+  },
+  {
+    name: "the scan stamps an accept's staging directory and its asides",
+    file: "apps/pinetrie/host/folder/scan.ts",
+    from: "      if (ignored.has(p) || isFolderReserved(p)) continue\n",
+    to: "      if (ignored.has(p)) continue\n",
+    command: unit,
+    expect:
+      "scanFolder never enters an accept's reserved names at the root, and stamps them deeper down",
   },
   {
     name: "a read with its stamps lost keeps what was deleted since",
@@ -219,11 +228,20 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a change only ignored paths saw reads the project's folder",
     file: "apps/pinetrie/host/folder/watch.ts",
-    from: "  ignoredPaths({ ...input, dirs: new Set() }).size < input.paths.length",
-    to: "  input.paths.length > 0",
+    from: "  return ignoredPaths({ ...input, paths, dirs: new Set() }).size < paths.length",
+    to: "  return paths.length > 0",
     command: unit,
     expect:
       "isSourceChange: a source path changed; only ignored ones, or pine·trie's own, did not",
+  },
+  {
+    name: "a write into a kept aside reads nothing",
+    file: "apps/pinetrie/host/folder/watch.ts",
+    from: '  if (input.paths.some(p => isFolderReserved(p, "aside"))) return true\n',
+    to: "",
+    command: unit,
+    expect:
+      "isSourceChange: an accept's staging directory is none; a write into its asides is one",
   },
   {
     name: "the quiet window hands on each event at once",
@@ -2665,5 +2683,80 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "an answer held for an asker archived meanwhile is the answering thread's undelivered fact",
+  },
+  {
+    name: "the executor renames over a target instead of linking",
+    file: "apps/pinetrie/host/folder/write.ts",
+    from: "      ? link(path.join(root, step.to.staged), target)\n",
+    to: "      ? rename(path.join(root, step.to.staged), target)\n",
+    command: unit,
+    expect: "A save made by name during an accept survives it.",
+  },
+  {
+    name: "the executor never checks the aside after its move",
+    file: "apps/pinetrie/host/folder/write.ts",
+    from: "      if (after === null || !isSameInode(inodeStat(after), before))\n",
+    to: "      if (after === null)\n",
+    command: unit,
+    expect: "An accept never replaces a file it has not checked.",
+  },
+  {
+    name: "the executor deletes a replaced file at once",
+    file: "apps/pinetrie/host/folder/write.ts",
+    from: '    if (!linked) return failed(step.path, "taken")\n',
+    to: '    if (!linked) return failed(step.path, "taken")\n    if (entry.aside !== null) await unlink(path.join(root, entry.aside))\n',
+    command: unit,
+    expect:
+      "A write through a file held across an accept is kept as a concurrent save.",
+  },
+  {
+    name: "recovery skips its put-back",
+    file: "apps/pinetrie/host/folder/write.ts",
+    from: "        if (back) await unlink(aside)\n        else held = false\n",
+    to: "        if (back) await unlink(aside)\n        else held = false\n        if (back) await unlink(at)\n",
+    command: unit,
+    expect:
+      "A host that stops during an accept finishes or puts it back at its next start.",
+  },
+  {
+    name: "the executor deletes without checking the stamp",
+    file: "apps/pinetrie/host/folder/write.ts",
+    from: '      if (before === null) return failed(step.path, "changed")\n',
+    to: "",
+    command: unit,
+    expect: "An accept never replaces a file it has not checked.",
+  },
+  {
+    name: "a folder accept's moved refusal is worded as the generic one",
+    file: "apps/pinetrie/host/commands/lane.ts",
+    from: "    case ERR.FOLDER_MOVED:\n",
+    to: '    case ERR.FOLDER_MOVED + "x":\n',
+    command: unit,
+    expect:
+      "proposedChangesRefusal names the path a folder accept found changed",
+  },
+  {
+    name: "an accept takes tar's early close of its input as a failure",
+    file: "apps/pinetrie/host/folder/accept.ts",
+    from: '  return code === "ERR_STREAM_PREMATURE_CLOSE" || code === "EPIPE"\n',
+    to: "  return false\n",
+    command: unit,
+    expect: "extractTar takes a stream whose tail tar never reads",
+  },
+  {
+    name: "AllLinked loses its brand, so any value proves every path linked",
+    file: "apps/pinetrie/host/folder/write.ts",
+    from: "  readonly [allLinkedBrand]: true\n",
+    to: "",
+    command: ["pnpm", "exec", "tsc", "--noEmit"],
+  },
+  {
+    name: "an accept's own read clears the asides' check",
+    file: "apps/pinetrie/host/folder/line.ts",
+    from: "    if (quiet && asidesDue) {\n      asidesDue = false\n      await deps.asides()\n",
+    to: "    if (asidesDue || !quiet) {\n      asidesDue = false\n      if (quiet) await deps.asides()\n",
+    command: unit,
+    expect:
+      "the first read recovers once; asides are checked at a quiet read, never at an accept's own",
   },
 ]
