@@ -55,7 +55,6 @@ import {
   type SetupRecord,
   type Sha256,
   type SharedLineage,
-  type SnapshotId,
   type StateRecord,
   summarizeRoots,
   type ThreadId,
@@ -85,12 +84,12 @@ import {
   DIGEST,
   decodeCard,
   decodeMessage,
-  FILES_LOST,
-  type FilesLostRecord,
   type Home,
   ICONS,
   ICONS_KEY,
   LANE,
+  LANE_FORK,
+  type LaneForkRecord,
   MARK,
   NAME,
   NOTE_COLUMN,
@@ -588,10 +587,10 @@ export const readSharedLineages = (
   doc: SessionDocHandle,
 ): ReadonlyMap<string, SharedLineage> => readRecords(doc, SHARED_LINEAGE)
 
-/** Each lane whose fork's files were not kept (`pinetrie.files-lost`). */
-export const readFilesLost = (
+/** Each lane of its own's fork (`pinetrie.lane-fork`), by lane. */
+export const readLaneForks = (
   doc: SessionDocHandle,
-): ReadonlyMap<ThreadId, FilesLostRecord> => readRecords(doc, FILES_LOST)
+): ReadonlyMap<ThreadId, LaneForkRecord> => readRecords(doc, LANE_FORK)
 
 /**
  * Each held queue (`pinetrie.queue-hold`), by lane. The same map while the
@@ -711,15 +710,14 @@ export const readRevisions = (
   doc: RootDocHandle,
 ): ReadonlyMap<EntryId, RevisionRecord> => readRecords(doc, REVISION)
 
-/** The snapshots of `lane`'s own revision records in `doc`, newest first. */
-export const readLaneSnapshots = (
+/** `lane`'s own revision records in `doc`, newest first. */
+export const readLaneRevisions = (
   doc: RootDocHandle,
   lane: ThreadId,
-): SnapshotId[] =>
+): RevisionRecord[] =>
   [...readRevisions(doc).values()]
     .filter(r => r.lane === lane)
     .sort((a, b) => (a.entry < b.entry ? 1 : -1))
-    .flatMap(r => (r.snapshot === null ? [] : [r.snapshot]))
 
 /** Each lane's proposed changes in your repo, by lane. */
 export const readProposedByLane = (

@@ -7,6 +7,51 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/lanes"]
 const plan = "packages/lanes/plan.ts"
 
 export const mutations: readonly Mutation[] = [
+  // ── a lane's start, and its fork ──
+  {
+    name: "a fork owed starts on whatever disk is there",
+    file: plan,
+    from: '  if (input.fork === "owed") return { kind: "fork" }\n',
+    to: "",
+    command: unit,
+    expect: "planLaneStart: a fork owed runs whatever is there",
+  },
+  {
+    name: "a lane that recorded no turn is retired, never forked again",
+    file: plan,
+    from: '  return made.recorded ? { kind: "retired" } : { kind: "fork" }',
+    to: '  return { kind: "retired" }',
+    command: unit,
+    expect:
+      "planLaneStart: with nothing kept, a lane that recorded no turn forks again, and one that did is retired",
+  },
+  {
+    name: "a start restores a snapshot that is gone",
+    file: plan,
+    from: "    s => made.listed.has(s),",
+    to: "    () => true,",
+    command: unit,
+    expect:
+      "planLaneStart: with no disk, the newest of its snapshots that exists, then its kept state's",
+  },
+  {
+    name: "a lane's kept state's snapshot is never restored",
+    file: plan,
+    from: "  const from = [...made.own, ...(made.kept === null ? [] : [made.kept])].find(",
+    to: "  const from = [...made.own].find(",
+    command: unit,
+    expect:
+      "planLaneStart: with no disk, the newest of its snapshots that exists, then its kept state's",
+  },
+  {
+    name: "a fork clones over whatever a stopped fork left",
+    file: plan,
+    from: '    onRuntime({ kind: "remove", container: laneContainer(lane) }),\n    onRuntime({ kind: "delete", lane }),\n',
+    to: "",
+    command: unit,
+    expect:
+      "planFork: the container and disk deleted, the restore, the container, the old config folder gone, then the adapter's setup",
+  },
   // ── a proposal's branches, in the lanes suite ──
   {
     name: "a Start's sends lose their mention of the agent",
@@ -341,11 +386,11 @@ export const mutations: readonly Mutation[] = [
   {
     name: "pre-rename: a fork keeps the old config folder",
     file: plan,
-    from: "  laneShell(`rm -rf ${OLD_LANE_CONFIG_DIR}`),\n  ...input.setup.steps,\n",
-    to: "  ...input.setup.steps,\n",
+    from: "    laneShell(`rm -rf ${OLD_LANE_CONFIG_DIR}`),\n    ...input.setup.steps,\n",
+    to: "    ...input.setup.steps,\n",
     command: unit,
     expect:
-      "planFork: the restore, the container, the old config folder gone, then the adapter's setup",
+      "planFork: the container and disk deleted, the restore, the container, the old config folder gone, then the adapter's setup",
   },
   {
     name: "a turn's snapshot is taken before sync",
@@ -497,10 +542,11 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a lane with no disk and no snapshot is not told it is retired",
     file: "packages/lanes/plan.ts",
-    from: '    ? { kind: "retired" }',
-    to: '    ? { kind: "snapshot", from: input.newest }',
+    from: '  return made.recorded ? { kind: "retired" } : { kind: "fork" }',
+    to: '  return { kind: "fork" }',
     command: unit,
-    expect: "planStartFrom: a disk starts from it",
+    expect:
+      "planLaneStart: with nothing kept, a lane that recorded no turn forks again, and one that did is retired",
   },
   {
     name: "the resolution is not told what the card asked",
@@ -693,8 +739,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a fork's lane steps run jj",
     file: plan,
-    from: "  ...input.setup.steps,\n]",
-    to: '  ...input.setup.steps,\n  inLane("jj", "new"),\n]',
+    from: "    ...input.setup.steps,\n  ]",
+    to: '    ...input.setup.steps,\n    inLane("jj", "new"),\n  ]',
     command: unit,
     expect: "@pinetrie/lanes names jj as a command nowhere but its image check",
   },

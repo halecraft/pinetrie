@@ -18,6 +18,7 @@ import {
   pointId,
   type RevisionRecord,
   type Sha256,
+  snapshotId,
   type ThreadId,
   type ThreadLane,
   type ThreadName,
@@ -191,7 +192,7 @@ const work = (over: Partial<WorkFacts> = {}): WorkFacts => ({
   accepted: null,
   bases: new Map(),
   forks: new Map(),
-  filesLost: new Map(),
+  laneForks: new Map(),
   setup: null,
   budgets: new Map(),
   states: new Map(),
@@ -494,6 +495,31 @@ describe("columnView: the fork row of a thread forked elsewhere", () => {
     ])
     return columnView(facts(1, { thread, work: work({ forks }) })).origin
   }
+  test("a copy whose fork began from its base says its files were not kept", () => {
+    if (thread === null) throw new Error("no thread")
+    const forks = new Map([
+      [thread, { kind: "fork", at: entryId("4"), how: "copy" } as const],
+    ])
+    const words = (lost: string | null) => {
+      const laneForks = new Map([
+        [
+          thread,
+          {
+            lane: thread,
+            base: null,
+            state: "begun",
+            lost: lost === null ? null : snapshotId(lost),
+          } as const,
+        ],
+      ])
+      const o = columnView(
+        facts(1, { thread, work: work({ forks, laneForks }) }),
+      ).origin
+      return o.kind === "source" ? o.words : ""
+    }
+    expect(words("e1")).toContain("its files were not kept")
+    expect(words(null)).not.toContain("its files were not kept")
+  })
   test("a copy says it was copied; a branch, only where it is from", () => {
     expect(row("copy")).toMatchObject({ kind: "source", copied: true })
     expect(row("branch")).toMatchObject({ kind: "source", copied: false })

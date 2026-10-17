@@ -6,7 +6,7 @@ import {
   writerId,
 } from "@pinetrie/core"
 import type { LaneHistory, LaneRuntime } from "@pinetrie/lanes"
-import { foreignLaneWords, LANE, setRecord } from "@pinetrie/rules"
+import { foreignLaneWords, LANE, planLaneRecords } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
 import { basics, putValue, record } from "../fakes.ts"
 import type { HistoryAnswer } from "./adapter.ts"
@@ -14,23 +14,28 @@ import { createRegistry } from "./registry.ts"
 
 const LANE_ID = threadIdFor("1")
 
-/** A registry whose lane `LANE_ID` keeps `history`, over `adapter`. */
+/**
+ * A registry whose lane `LANE_ID` keeps `history`, over `adapter`; with
+ * `fork` false, its `LANE` alone, as no lane is written.
+ */
 function registryWith(
   history: ProjectKind | null | "none",
   adapter: () => HistoryAnswer,
+  fork = true,
 ) {
   const b = basics()
   if (history !== "none")
-    putValue(
-      b,
-      setRecord(LANE, {
+    for (const w of planLaneRecords({
+      record: {
         lane: LANE_ID,
         root: rootIdFor("r"),
         history,
         by: writerId("ada@x.io"),
         createdAt: 0,
-      }),
-    )
+      },
+      base: null,
+    }))
+      if (fork || w.namespace === LANE.namespace) putValue(b, w)
   const asked: unknown[] = []
   const registry = createRegistry({
     session: b.session,
@@ -98,5 +103,17 @@ describe("withHistory refuses a lane it cannot prove, and runs nothing on it", (
       )
       expect(asked).toEqual([])
     }
+  })
+
+  test("a lane of its own with no fork record is refused before the adapter is asked", async () => {
+    const { registry, asked } = registryWith(
+      "jj",
+      () => ({ kind: "history", history: record<LaneHistory>().port }),
+      false,
+    )
+    await expect(registry.withHistory(LANE_ID, async () => {})).rejects.toThrow(
+      "has no fork record",
+    )
+    expect(asked).toEqual([])
   })
 })

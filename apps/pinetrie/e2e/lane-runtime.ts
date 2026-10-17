@@ -147,6 +147,22 @@ export async function deleteSnapshot(
   })
 }
 
+/**
+ * Put back a lane's disk as `from`'s clone, as a fork's restore leaves it
+ * before the fork's setup runs.
+ */
+export async function restoreDisk(
+  root: string,
+  lane: ThreadId,
+  from: SnapshotId,
+): Promise<void> {
+  for (const op of [
+    { kind: "delete", lane },
+    { kind: "restore", lane, from },
+  ] as const)
+    await lanehostOnce(root, { kind: "disk", project: projectKey(root), op })
+}
+
 /** Remove a lane's container and its disk. */
 export async function removeLane(root: string, lane: ThreadId): Promise<void> {
   await quietly(["rm", "-f", container(lane)])

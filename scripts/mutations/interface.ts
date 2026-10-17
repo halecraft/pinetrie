@@ -6,6 +6,15 @@ const workspace = ["pnpm", "exec", "vitest", "run", "workspace.test.ts"]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a copy's fork row ignores whether its files were kept",
+    file: "packages/interface/column-view.ts",
+    from: '    copied && laneFork?.state === "begun" && laneFork.lost !== null',
+    to: '    copied && laneFork?.state === "begun"',
+    command: unit,
+    expect:
+      "a copy whose fork began from its base says its files were not kept",
+  },
+  {
     name: "the words check's pattern drops commit",
     file: "packages/interface/folder-words.ts",
     from: "  /\\b(commit|commits|bookmark|",

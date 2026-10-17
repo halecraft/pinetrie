@@ -38,7 +38,7 @@ import type { HostReport } from "../settings.ts"
 import type { Splits, StartedProject } from "./adapter.ts"
 import { type Archive, createArchive } from "./archive.ts"
 import { type Containers, createContainers } from "./containers.ts"
-import { createNewLanes, type NewLanes, recordLane } from "./create.ts"
+import { createNewLanes, type NewLanes, prepareLane } from "./create.ts"
 import type { ActRefusal, Destination } from "./destination.ts"
 import { createRegistry } from "./registry.ts"
 import { type OpenedProject, startSetup } from "./setup.ts"
@@ -139,17 +139,19 @@ export async function startLaneWork(input: {
   if (setup === null)
     return {
       ...NO_LANES,
-      prepareLane: (view, lane, _at, by) =>
-        recordLane(
+      prepareLane: (view, lane, at, by, base) =>
+        prepareLane(
           {
             basics,
             records: input.records,
             ensureNames: input.ensureNames,
+            kind: null,
           },
           view,
           lane,
-          null,
+          at,
           by,
+          base,
         ),
     }
   const baseListeners: ((lane: ThreadId) => void)[] = []
@@ -169,7 +171,7 @@ export async function startLaneWork(input: {
     piSetup: input.piSetup,
     keeper,
     registry,
-    startContainer: (lane, h) => containers.startContainer(lane, h),
+    startContainer: (record, h) => containers.startContainer(record, h),
     beforeRun: lane => containers.beforeRun(lane),
     acceptedMoved: () => setup.refreshBaseSoon(),
     ready: () => setup.ready.then(() => {}),
@@ -180,13 +182,6 @@ export async function startLaneWork(input: {
     },
   })
   const { destination, splits } = started
-  const containers = createContainers({
-    basics,
-    setup,
-    registry,
-    keeper,
-    proposed: destination.proposed,
-  })
   const sharedLineages = createSharedLineages({
     basics,
     records: input.records,
@@ -215,12 +210,19 @@ export async function startLaneWork(input: {
   const newLanes = createNewLanes({
     basics,
     setup,
-    registry,
-    keeper,
     records: input.records,
     ensureNames: input.ensureNames,
     pendingRecords: turns.pendingRecords,
     destination,
+  })
+  // After `turns` and `newLanes`: a fork waits on the records `turnDone` adds.
+  const containers = createContainers({
+    basics,
+    setup,
+    registry,
+    keeper,
+    proposed: destination.proposed,
+    fork: newLanes.fork,
   })
   const updates = createUpdates({
     basics,

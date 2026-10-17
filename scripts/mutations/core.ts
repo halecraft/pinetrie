@@ -12,6 +12,15 @@ const trailers = "packages/core/trailers.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a thread's chat is read as a revision",
+    file: "packages/core/work.ts",
+    from: "    if (record === undefined) continue\n",
+    to: "    if (record === undefined) {\n      lane ??= null\n      snapshot ??= null\n      break\n    }\n",
+    command: unit,
+    expect:
+      "nearestRevision: a thread's chat below where it forks finds what that entry finds",
+  },
+  {
     name: "writeContent answers a restore's own id",
     file: "packages/core/folder.ts",
     from: '  r.made.kind === "restore" ? r.made.of : r.id\n',

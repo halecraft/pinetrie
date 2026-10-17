@@ -1,4 +1,6 @@
-# ADR-0164 — Fold, and sources with relocation, are shelved: decided long ago, never built, and no longer described as coming
+# ADR-0168 — Fold, and sources with relocation, are shelved: decided long ago, never built, and no longer described as coming
+
+Numbered 0164 until 2026-10-17, when two files held that number.
 
 - **Status:** Proposed
 - **Area:** `docs/01-architecture.md`, `docs/00-vision.md`,

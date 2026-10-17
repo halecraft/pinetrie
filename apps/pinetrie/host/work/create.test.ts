@@ -3,10 +3,18 @@ import {
   pointId,
   type SnapshotId,
   snapshotId,
+  threadIdFor,
 } from "@pinetrie/core"
+import {
+  executeFork,
+  type ForkSteps,
+  type LaneRuntime,
+  recordedStart,
+} from "@pinetrie/lanes"
+import { LANE_FORK, setRecord } from "@pinetrie/rules"
 import { expect, test } from "vitest"
 import { deferred } from "../fakes.ts"
-import { forkFacts } from "./create.ts"
+import { forkEnd, forkFacts } from "./create.ts"
 
 test("forkFacts reads nothing before every pending turn record is written", async () => {
   const pending = deferred<void>()
@@ -66,4 +74,29 @@ test("forkFacts asks whether the snapshot above is still there, and not of the b
   expect(await facts(BASE_SNAPSHOT)).toMatchObject({ kept: true })
   expect(await facts(null)).toMatchObject({ kept: true })
   expect(asked).toEqual(["s-1"])
+})
+
+test("forkEnd: the history's start records, then the fork begun, its lost carried, in one write", async () => {
+  const lane = threadIdFor("1")
+  const forked = await executeFork(
+    { lane, steps: [] } as unknown as ForkSteps,
+    {
+      runtime: {} as LaneRuntime,
+      lane: async () => ({ ok: true, code: 0, stdout: "", stderr: "" }),
+      laneBytes: async () => {
+        throw new Error("no bytes")
+      },
+    },
+  )
+  const start = setRecord(LANE_FORK, { lane, base: null, state: "owed" })
+  const writes = forkEnd({
+    fork: { lane, base: "wip", state: "owed" },
+    lost: snapshotId("e1"),
+    forked,
+    start: recordedStart([start]),
+  })
+  expect(writes.map(w => ("value" in w ? w.value : null))).toEqual([
+    start.value,
+    { base: "wip", state: "begun", lost: "e1" },
+  ])
 })

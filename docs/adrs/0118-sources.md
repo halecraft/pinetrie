@@ -27,7 +27,7 @@
     folder to a session by name.
   - ADR-0150: its move of the session out of the project is built for every
     project, before folder projects are served.
-  - ADR-0164: sources are shelved: their registration, their three modes,
+  - ADR-0168: sources are shelved: their registration, their three modes,
     `/sources/<name>`, and accepted work and proposed changes per source. What
     is built of it stays: the session kept outside the project, the extra
     slots, and the folder project.

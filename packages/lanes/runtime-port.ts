@@ -32,10 +32,14 @@ export type DiskOp =
   | { readonly kind: "delete"; readonly lane: LaneOwner }
   | { readonly kind: "deleteSnapshots"; readonly ids: readonly SnapshotId[] }
 
-/** What a step asks of the runtime: a disk operation, or a lane's container made and started. */
+/**
+ * What a step asks of the runtime: a disk operation, a lane's container made
+ * and started, or a container deleted (`LaneRuntime.remove`).
+ */
 export type RuntimeOp =
   | DiskOp
   | { readonly kind: "run"; readonly shape: ContainerShape }
+  | { readonly kind: "remove"; readonly container: string }
 
 /** A container's state and spec label (`SPEC_LABEL`), as its runtime reports them. */
 export interface ContainerFacts {

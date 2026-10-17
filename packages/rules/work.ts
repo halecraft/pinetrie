@@ -19,6 +19,7 @@ import {
   type SnapshotId,
   snapshotId,
   type ThreadId,
+  type ValueWrite,
   type WriterId,
 } from "@pinetrie/core"
 import { Type } from "typebox"
@@ -31,7 +32,7 @@ import {
   threadKey,
   WriterIdSchema,
 } from "./decode.ts"
-import type { RecordSpec } from "./records.ts"
+import { type RecordSpec, setRecord } from "./records.ts"
 
 /** The one `pinetrie.project` value's key: a host has one project. */
 export const PROJECT_KEY = "project"
@@ -297,30 +298,76 @@ export function forkSource(input: {
 }
 
 /**
- * A lane that began from its base because the files it was forked from
- * were not kept: a copy from the archive whose snapshot was
- * deleted. Its fork row says so.
+ * A lane's fork: owed from the send until the fork's last step, then
+ * begun. A start forks a lane owed, so a fork a host stopped part way runs
+ * again from the top; outside its disk, nothing else says a jj lane's setup
+ * ran.
  */
-export interface FilesLostRecord {
+export type LaneForkRecord = {
   readonly lane: ThreadId
-  /** The snapshot it would have cloned. */
-  readonly snapshot: SnapshotId
-}
+  /** The WIP bookmark it starts from; null for accepted work. */
+  readonly base: string | null
+} & (
+  | { readonly state: "owed" }
+  | {
+      readonly state: "begun"
+      /** The snapshot its source would have cloned, when that was not kept: its fork row says so. */
+      readonly lost: SnapshotId | null
+    }
+)
 
-const FilesLostSchema = Type.Object({ snapshot: Type.String({ minLength: 1 }) })
+const LaneForkSchema = Type.Union([
+  Type.Object({
+    state: Type.Literal("owed"),
+    base: Type.Union([Type.String({ minLength: 1 }), Type.Null()]),
+  }),
+  Type.Object({
+    state: Type.Literal("begun"),
+    base: Type.Union([Type.String({ minLength: 1 }), Type.Null()]),
+    lost: Type.Union([Type.String({ minLength: 1 }), Type.Null()]),
+  }),
+])
 
-/** Each lane whose fork's files were not kept, at the lane. */
-export const FILES_LOST: RecordSpec<FilesLostRecord, ThreadId, "session"> = {
-  namespace: "pinetrie.files-lost",
+/** Each lane of its own's fork, at the lane. */
+export const LANE_FORK: RecordSpec<LaneForkRecord, ThreadId, "session"> = {
+  namespace: "pinetrie.lane-fork",
   home: "session",
   keyOf: r => r.lane,
   encode: ({ lane, ...contents }) => contents,
   decode: (contents, key) =>
-    decodeRecord(FilesLostSchema, contents, threadKey(key), (r, lane) => ({
-      lane,
-      snapshot: snapshotId(r.snapshot),
-    })),
+    decodeRecord(LaneForkSchema, contents, threadKey(key), (r, lane) =>
+      r.state === "owed"
+        ? { lane, base: r.base, state: "owed" }
+        : {
+            lane,
+            base: r.base,
+            state: "begun",
+            lost: r.lost === null ? null : snapshotId(r.lost),
+          },
+    ),
 }
+
+/**
+ * The writes that record a new lane: its `LANE`, and for a lane of its own
+ * its fork, owed, in the same write, so no lane of its own is recorded
+ * without one.
+ */
+export const planLaneRecords = (input: {
+  readonly record: LaneRecord
+  /** The WIP it starts from; null for accepted work. */
+  readonly base: string | null
+}): Extract<ValueWrite<"session">, { kind: "set" }>[] => [
+  setRecord(LANE, input.record),
+  ...(input.record.history === null
+    ? []
+    : [
+        setRecord(LANE_FORK, {
+          lane: input.record.lane,
+          base: input.base,
+          state: "owed",
+        }),
+      ]),
+]
 
 /**
  * The snapshots to delete. An open root keeps every one: any visible turn can

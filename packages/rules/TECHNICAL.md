@@ -81,8 +81,8 @@ follow this list. A name only this package uses is imported from its module.
 - `names.ts`, `banner.ts`: a thread's name and its banner, each with its
   record; `banner.ts` also holds the icon source (`icons.source`) and its
   published record.
-- `work.ts`: where lanes work (`pinetrie.lane`, `pinetrie.revision`,
-  `pinetrie.project`).
+- `work.ts`: where lanes work (`pinetrie.lane`, `pinetrie.lane-fork`,
+  `pinetrie.revision`, `pinetrie.project`).
 - `accepted.ts`: accepted work (`pinetrie.accepted`): its record, setup and
   publishing.
 - `base.ts`: a thread's base (`pinetrie.base`): where a lane begins, what
@@ -149,7 +149,9 @@ root's record is written only through a step's documents (ADR-0162).
   happened (pending, said, failed, stopped, unclassified), never a level,
   which each client decides for its person.
 - **`LANE`** is written for every lane as it is created, naming its root;
-  `work` is null for a lane with no work of its own.
+  `history` is null for a lane with no copy of its own. `planLaneRecords`
+  is its one maker, and writes a lane of its own's fork owed beside it
+  (`LANE_FORK`).
 - **`WORKFLOW`** (`board.ts`, ADR-0122): the session's workflow states, a
   singleton. A canvas is a card on the board (ADR-0126): no record says
   where it is, who opened it or when; its card and its card's history do.
@@ -1324,6 +1326,7 @@ Host-written records, each a `RecordSpec` (above) with a total decoder:
 | record | namespace | key | written |
 |---|---|---|---|
 | a lane's setting: the root it works in, and the kind of history its own copy keeps (`history`: `"jj"`, `"folder"`, or null for no copy of its own) (ADR-0102, ADR-0150) | `pinetrie.lane` | the lane | once, when the lane is created |
+| a lane of its own's fork: the WIP it starts from (`base`, null for accepted work), and `state`: `owed`, or `begun` with `lost`, the snapshot its source would have cloned when that was not kept (ADR-0167) | `pinetrie.lane-fork` | the lane | owed with `LANE` (`planLaneRecords`), and again by a fork run over a begun lane; begun at the fork's end, with its history's start records (`forkEnd`, the host's) |
 | the state (`point`) and disk at an entry, and the paths its turn changed, written whole: every field present (`0016-revision-point` moved the older shapes) | `pinetrie.revision` | the entry | for every run's prompt, and every assistant message of a lane of its own that made tool calls |
 | what the host found where it runs: its root, its kind (`jj` or `folder`, what a lane's history must be to run), and its owner; a record from before the kind decodes as none until the host's start rewrites it | `pinetrie.project` | `project` | at every start |
 
@@ -1523,8 +1526,8 @@ Host-written records, each a `RecordSpec` (above) with a total decoder:
   parent's working-copy change, and the fork must leave it (S42). A snapshot
   that is gone (`kept` false, which the host asks the runtime) is read as
   missing: the fork starts from its base, and names the snapshot `lost`;
-  the host records it (`FILES_LOST`, `pinetrie.files-lost`, keyed by lane),
-  which a copy's fork row reads (ADR-0124).
+  the lane's begun fork record carries it (`LANE_FORK`), which a copy's
+  fork row reads (ADR-0124).
 - **A project record of kind `workspaces` no longer decodes**; the host
   rewrites it at start.
 - **`planRetention`** keeps every snapshot of an open root, and each lane's

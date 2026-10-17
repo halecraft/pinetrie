@@ -1,0 +1,110 @@
+PROBE names: {
+ "A": "t-01a14b56-bbbe-76a0-9e9f-085b8156a162",
+ "P": "t-01a14b56-da04-7a07-99e3-0dbcb32a0985",
+ "B": "t-01a14b56-ddcf-74d1-b592-35b301dfa2db",
+ "C": "t-01a14b56-e153-7aff-bb75-0d4791cc292b",
+ "aSnap": "01a14b56-d1fc-7096-8f12-033d9fbc602f"
+}
+PROBE B whole, before: .
+..
+.git
+.jj
+.pinetrie-lane
+a.txt
+
+PROBE B half, after: .
+..
+.git
+.jj
+.pinetrie-lane
+a.txt
+
+PROBE t-01a14b56-ddcf-74d1-b592-35b301dfa2db inspected: --bookmarks
+pinetrie/fetched/0: vppsxpyz a11f83b3 the project
+pinetrie/t-01a14b56-bbbe-76a0-9e9f-085b8156a162: qozxrzqz c77a0578 shell echo a > a.txt
+--log
+qkmkrmknrsnx 009732fe137a  
+qozxrzqzotts c77a0578b104 pinetrie/t-01a14b56-bbbe-76a0-9e9f-085b8156a162 shell echo a > a.txt
+svouxxktxvzp 7b9f039d0626  base: accepted work
+vppsxpyzwktv a11f83b3513e pinetrie/fetched/0 the project
+--config
+[[--scope]]
+--when.repositories = ["/workspace"]
+[--scope.revset-aliases]
+"immutable_heads()" = "builtin_immutable_heads() | 7b9f039d0626452d28b02ff76d353dd1a7be6264"
+--immutable
+7b9f039d0626
+000000000000
+
+PROBE t-01a14b56-ddcf-74d1-b592-35b301dfa2db wrote: (no output)
+PROBE t-01a14b56-ddcf-74d1-b592-35b301dfa2db records: [
+ {
+  "point": "c77a0578b104c433f73240e76e27f5ac8e1b45d7",
+  "snapshot": true
+ },
+ {
+  "point": null,
+  "snapshot": true
+ },
+ {
+  "point": null,
+  "snapshot": true
+ },
+ {
+  "point": "7474ab6ef9894b1987ec74fbf9b213c3d2781ed9",
+  "snapshot": true
+ }
+]
+PROBE t-01a14b56-e153-7aff-bb75-0d4791cc292b inspected: --bookmarks
+pinetrie/fetched/0: vppsxpyz a11f83b3 the project
+--log
+wuvvppsstnmv 088819625b80  
+vppsxpyzwktv a11f83b3513e pinetrie/fetched/0 the project
+--config
+cat: .pinetrie-lane/jj.toml: No such file or directory
+--immutable
+000000000000
+
+PROBE t-01a14b56-e153-7aff-bb75-0d4791cc292b wrote: (no output)
+PROBE t-01a14b56-e153-7aff-bb75-0d4791cc292b records: [
+ {
+  "point": "f60bc41b346903b77a6995ccb8b4f11685bcc299",
+  "snapshot": true
+ },
+ {
+  "point": null,
+  "snapshot": true
+ },
+ {
+  "point": null,
+  "snapshot": true
+ },
+ {
+  "point": "751c21f63037d431a33666f8be4073c4f0c62d63",
+  "snapshot": true
+ }
+]
+PROBE your repo: srxwlnqrttsv 6e3ce53ae8e4 false pinetrie-proposed/famous-crow proposed changes: scripted
+qkmkrmknrsnx c964118650b4 true tip@pinetrie-t-01a14b56-bbbe-76a0-9e9f-085b8156a162 shell echo a2 > a.txt
+rumxxvznmpvk 6ef213e9b66f false pinetrie-proposed/warm-ocean proposed changes: scripted
+wuvvppsstnmv 751c21f63037 false tip@pinetrie-t-01a14b56-e153-7aff-bb75-0d4791cc292b shell echo t-01a14b56-e153-7aff-bb75-0d4791cc292b > mine.txt
+ymvwkktspkkr ff42df84589a false pinetrie-proposed/sweet-hawk proposed changes: scripted
+qkmkrmknrsnx 7474ab6ef989 true tip@pinetrie-t-01a14b56-ddcf-74d1-b592-35b301dfa2db shell echo t-01a14b56-ddcf-74d1-b592-35b301dfa2db > mine.txt
+vppsxpyzwktv a11f83b3513e false pinetrie-accepted the project
+
+PROBE your repo, all: srxwlnqrttsv 6e3ce53ae8e4 div=false [pinetrie-proposed/famous-crow] proposed changes: scripted
+qkmkrmknrsnx c964118650b4 div=true [tip@pinetrie-t-01a14b56-bbbe-76a0-9e9f-085b8156a162] shell echo a2 > a.txt
+rumxxvznmpvk 6ef213e9b66f div=false [pinetrie-proposed/warm-ocean] proposed changes: scripted
+wuvvppsstnmv 751c21f63037 div=false [tip@pinetrie-t-01a14b56-e153-7aff-bb75-0d4791cc292b] shell echo t-01a14b56-e153-7aff-bb75-0d4791cc292b > mine.txt
+ymvwkktspkkr ff42df84589a div=false [pinetrie-proposed/sweet-hawk] proposed changes: scripted
+qkmkrmknrsnx 7474ab6ef989 div=true [tip@pinetrie-t-01a14b56-ddcf-74d1-b592-35b301dfa2db] shell echo t-01a14b56-ddcf-74d1-b592-35b301dfa2db > mine.txt
+qozxrzqzotts c77a0578b104 div=false [] shell echo a > a.txt
+svouxxktxvzp 7b9f039d0626 div=false [] base: accepted work
+zxmtoqntznsm 0d07ab84ca85 div=false [] 
+vppsxpyzwktv a11f83b3513e div=false [pinetrie-accepted] the project
+
+PROBE host lines: []
+PROBE tree size: 29
+  PASS  the probe ran
+
+=== e2e:lanes: pass=1 fail=0 skip=0 ===

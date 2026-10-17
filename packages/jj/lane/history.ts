@@ -19,6 +19,7 @@ import {
   forkSetup,
   type LaneHistory,
   type LaneRunners,
+  recordedStart,
   type TurnCommittedOf,
 } from "@pinetrie/lanes"
 import { laneBase } from "./base.ts"
@@ -74,8 +75,10 @@ export function jjLaneHistory(input: {
   return {
     forkSteps: start => forkSetup(null, planForkSetup(input.lane, start)),
 
-    // A fork setup's commit records its base: nothing more.
-    begun: async () => {},
+    // The fork setup's commit, on the lane's disk, records where it began.
+    startRecords: async () => recordedStart([]),
+
+    keptSnapshot: async () => null,
 
     commit: async edits => turnFromCommits((await committed(edits)).made),
 

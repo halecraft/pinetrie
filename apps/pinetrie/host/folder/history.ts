@@ -44,6 +44,7 @@ import {
   type LaneRunners,
   type LaneRuntime,
   planSnapshot,
+  recordedStart,
   STATES_MOUNT,
   type TurnCommitted,
 } from "@pinetrie/lanes"
@@ -171,7 +172,7 @@ export function folderHistory(
     forkSteps: start =>
       forkSetup(start.kind === "accepted" ? snapshotId(start.point) : null, []),
 
-    async begun(start: ForkStart) {
+    async startRecords(start: ForkStart) {
       const from =
         start.kind === "accepted"
           ? start.point
@@ -190,8 +191,18 @@ export function folderHistory(
         at: input.now(),
         by: null,
       }
-      await store.write(stateWrite(g, record))
-      for (const op of startOp(graph(), state)) await disks.states(lane, op)
+      const writes = stateWrite(g, record)
+      // Before the record is written, against the graph it will make: the
+      // op renames a symlink over the last, so a fork run again repeats it
+      // harmlessly.
+      for (const op of startOp(stateGraph([...store.states(), record]), state))
+        await disks.states(lane, op)
+      return recordedStart(writes)
+    },
+
+    async keptSnapshot() {
+      const newest = laneNewest(graph(), lane)
+      return newest === null ? null : snapshotId(newest)
     },
 
     async commit(edits) {

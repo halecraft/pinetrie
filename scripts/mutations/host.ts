@@ -4,6 +4,43 @@ import type { Mutation } from "../mutate.ts"
 const unit = ["pnpm", "exec", "vitest", "run", "apps/pinetrie/host"]
 
 export const mutations: readonly Mutation[] = [
+  // ── a lane's fork ──
+  {
+    name: "a fork's end leaves out its history's start",
+    file: "apps/pinetrie/host/work/create.ts",
+    from: "  ...input.start.writes,\n",
+    to: "",
+    command: unit,
+    expect:
+      "forkEnd: the history's start records, then the fork begun, its lost carried, in one write",
+  },
+  {
+    name: "withHistory queues a lane with no fork record",
+    file: "apps/pinetrie/host/work/registry.ts",
+    from: "      if (!readLaneForks(input.session).has(lane))",
+    to: "      if (false)",
+    command: unit,
+    expect:
+      "a lane of its own with no fork record is refused before the adapter is asked",
+  },
+  {
+    name: "the migration makes a recorded lane owed",
+    file: "apps/pinetrie/host/migrations/0023-lane-forks.ts",
+    from: "    const begun = input.recorded.has(r.lane) || input.started.has(r.lane)",
+    to: "    const begun = input.started.has(r.lane)",
+    command: unit,
+    expect:
+      "a recorded lane and a folder lane with a start state are begun, a files-lost snapshot their lost; any other is owed",
+  },
+  {
+    name: "a folder lane's start writes its state itself",
+    file: "apps/pinetrie/host/folder/history.ts",
+    from: "      return recordedStart(writes)",
+    to: "      await store.write(writes)\n      return recordedStart([])",
+    command: unit,
+    expect:
+      "a folder lane's start records nothing itself; once its caller writes them, its newest state is the start, and kept off its disk",
+  },
   {
     name: "bytesResponse drops nosniff",
     file: "apps/pinetrie/host/responses.ts",

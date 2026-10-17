@@ -79,11 +79,13 @@ the helper, S122 to S131 for Docker and the lane VM.
   a lane's copy records and merges: a turn (`commit`, `recordTurn`), its
   base (`base`), a catch-up (`readyToMerge`, `merge`), its conflicts and
   their resolution (`resolve`: a folder lane's; jj's refuses, its conflicts
-  being markers in the file), what
-  it records once its fork made its disk (`begun`: a folder lane's start
-  state; nothing for jj, whose fork setup's commit records its base), and
-  what a disk restored from a snapshot needs at each container's start
-  (`afterRestore`). The host hands it out only
+  being markers in the file), the records of where it began once its
+  fork made its disk (`startRecords`: a folder lane's start state; none for
+  jj, whose fork setup's commit records its base), which it returns and
+  never writes, the snapshot of its newest state kept off its disk
+  (`keptSnapshot`: a folder lane's; null for jj, whose history is on its
+  disk), and what a disk restored from a snapshot needs at each container's
+  start (`afterRestore`). The host hands it out only
   through its registry's `withHistory`, which queues the caller's function
   on the lane's queue (The queue): no module holds one outside a queued
   step, so every change to a lane's history runs there by construction. A
@@ -246,11 +248,19 @@ paths are its diff." would compare a function with itself.
 
 ## Forks
 
-- **A fork is its disk cloned from its source's snapshot, or the one its
-  setup names, then the adapter's setup** (`planFork`, from `forkSource`):
-  the steps a `ForkSetup` holds, which only the adapter's
-  `LaneHistory.forkSteps` makes. Once they ran, the fork calls the
-  history's `begun`, on the lane's queue. Between them, one step
+- **A fork deletes the lane's container and disk first, then clones its
+  disk from its source's snapshot, or the one its setup names, then runs
+  the adapter's setup** (`planFork`, from `forkSource`): the steps a
+  `ForkSetup` holds, which only the adapter's `LaneHistory.forkSteps`
+  makes. The deletes are steps (a `remove` `RuntimeOp`, a `delete`
+  `DiskOp`), so no fork skips them, and one a host stopped part way runs
+  again from the top over whatever it left. `planFork` returns `ForkSteps`,
+  the only steps `executeFork` runs, and only `executeFork` makes a
+  `Forked`; a lane's fork record says begun only through the host's
+  `forkEnd`, which takes a `Forked` and the history's `StartRecords`
+  (`startRecords`, which only an adapter makes, with `recordedStart`), so
+  no record says begun for a fork whose steps did not run. Between the
+  clone and the setup, one step
   removes `/workspace/.pineta-lane` (`OLD_LANE_CONFIG_DIR`, tagged
   `pre-rename:`): a snapshot of a lane made before the rename holds that
   folder, `laneIgnores` does not list it, and the adapter's first command
@@ -332,10 +342,24 @@ paths are its diff." would compare a function with itself.
   - stopped: start it;
   - running with the same label: nothing to do.
 
-  A container made anew starts from what `planStartFrom` decides: its
-  disk; else its newest snapshot (a restored root); else nothing, and the
-  lane is retired: a branch from it continues. Both decisions are in
-  `plan.ts`.
+- **A lane's start is one decision** (`planLaneStart`, ADR-0167), from its
+  fork's record and `planContainer`'s answer:
+  - a fork owed runs, whatever is there (S226: a jj lane's half-made disk
+    looks like a whole one, so only the record can say);
+  - a begun lane's container that is there starts;
+  - one to make asks for its facts (`gather`), then starts on its disk;
+    else restores its newest snapshot that exists, its revision records'
+    before its kept state's (a turn that changed only ignored files leaves
+    the state older); else, with no turn recorded, forks again, since its
+    files are its fork's (S227); else it is retired: the files it recorded
+    are gone, and a branch from it continues.
+
+  The facts are one read of its revision records, its history's
+  `keptSnapshot` and one listing of every snapshot (`LaneMade`), asked only
+  when the container must be made.
+- **A jj lane's fork record is the only proof its setup ran** (S226). A
+  lost record would fork the lane again, deleting its disk, so only a fork
+  about to run writes a begun lane owed again.
 - **A disk restored from a snapshot gets the current names**
   (`pre-rename:`). A snapshot of a lane made before b05e2252 holds
   `pineta/<lane>` and `.pineta-lane/` (S114): `readLaneBookmark` would find no
@@ -511,7 +535,7 @@ paths are its diff." would compare a function with itself.
   image check, and exports none of jj's names.
 - **`history-port.test.ts`**: the brands, by type: a merge takes only a
   `ReadyCopy`, `planFork` only a `ForkSetup`, `refreshBase` only a
-  `BaseCheckout`.
+  `BaseCheckout`; `executeFork` only `ForkSteps`.
 - **`lane.test.ts`**: the queue, and that each file a lane is pointed at
   inside pine·trie's mount (`HELPER`, each kind's `laneNote`) exists in the install.
 - **`runtime.test.ts`**: `runtimeComplete`, and that `EXTRACT` copies every
@@ -547,7 +571,7 @@ paths are its diff." would compare a function with itself.
   read-only mount, a shared mount seen both ways, the git ignore variables,
   jj's config scope, an agent's own commit, the image's browser and python3,
   the runtime's rg.
-  `planContainer`'s and `planStartFrom`'s rules are unit mutations. These
+  `planContainer`'s and `planLaneStart`'s rules are unit mutations. These
   are all that `e2e:lanes` proves by mutation: the host's lane work and proposed changes
   are proven by unit tests (`apps/pinetrie/host/TECHNICAL.md`).
 - **The `contract` scenario is Docker's:** the checks in

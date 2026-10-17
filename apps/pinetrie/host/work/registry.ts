@@ -24,7 +24,7 @@ import {
   openChannel,
   relayObserver,
 } from "@pinetrie/pi"
-import { readLaneRecords, readThreadName } from "@pinetrie/reads"
+import { readLaneForks, readLaneRecords, readThreadName } from "@pinetrie/reads"
 import { foreignLaneWords, laneFold } from "@pinetrie/rules"
 import type { SessionDocHandle } from "@pinetrie/schema"
 import type { HistoryAnswer } from "./adapter.ts"
@@ -77,8 +77,8 @@ export interface LaneRegistry {
    * changes it off the queue. With `fatal`, a failure breaks the queue
    * (`LaneQueue.enqueue`). Never called from a step already on the queue,
    * which would wait on itself: such a step is handed the history. Refused,
-   * with nothing queued, for a lane with no record, no copy of its own, or
-   * a history the adapter does not keep.
+   * with nothing queued, for a lane with no record, no copy of its own, no
+   * fork record, or a history the adapter does not keep.
    */
   withHistory<T>(
     lane: ThreadId,
@@ -134,6 +134,14 @@ export function createRegistry(input: {
           ),
         )
       }
+      // Whether it has one never changes once written; whether it is owed
+      // or begun is read in the step, which a fork queued before may change.
+      if (!readLaneForks(input.session).has(lane))
+        return Promise.reject(
+          new Error(
+            `${readThreadName(input.session, lane)} has no fork record`,
+          ),
+        )
       const handle = handleOf(lane)
       const answer = input.history(own, handle.runners)
       if (answer.kind === "foreign")

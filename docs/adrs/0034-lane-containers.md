@@ -44,6 +44,9 @@
     identities a host relays: service ones from a folder of the person's, and
     the person's own, which each lane uses only once its owner approves. A
     broker on the host connects names only the host's ssh config knows.
+  - ADR-0167: a lane with no disk and no snapshot is retired only when it
+    recorded a turn; one that never did is forked again, and a fork a host
+    stopped part way is run again at the lane's next start.
 
 **Context.** ADR-0032 gave each lane a jj workspace on the host and made a
 branch's inherited history read as if it had always worked there, by

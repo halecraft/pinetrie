@@ -6,6 +6,7 @@ import {
 } from "@pinetrie/core"
 import { expect, test } from "vitest"
 import { refreshBase } from "./base.ts"
+import { executeFork, type Runners } from "./execute.ts"
 import {
   type BaseCheckout,
   baseCheckout,
@@ -13,7 +14,7 @@ import {
   forkSetup,
   type LaneHistory,
 } from "./history-port.ts"
-import { type LaneOwner, type LaneSpec, planFork } from "./plan.ts"
+import { type LaneOwner, type LaneSpec, planFork, type Step } from "./plan.ts"
 import type { LaneRuntime } from "./runtime-port.ts"
 
 test("a merge takes only a copy found ready, never its facts", () => {
@@ -56,4 +57,11 @@ test("a fork takes only a fork's setup, and the base only a checkout", () => {
     refreshBase({ ...input, accepted: { points: [], checkout: () => setup } })
   expect([fork, refresh]).toHaveLength(2)
   expect(forkSetup(null, []).steps).toEqual(baseCheckout([]).steps)
+})
+
+test("a fork runs only the steps planFork made", () => {
+  const run = (steps: readonly Step[], runners: Runners) =>
+    // @ts-expect-error: only `planFork` makes a fork's steps
+    executeFork(steps, runners)
+  expect(run).toBeTypeOf("function")
 })

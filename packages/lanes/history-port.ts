@@ -21,6 +21,7 @@ import type {
   ReadyCopy,
   SnapshotId,
   ThreadId,
+  ValueWrite,
   WriterId,
 } from "@pinetrie/core"
 import type { LaneStep } from "./plan.ts"
@@ -76,6 +77,17 @@ export const forkSetup = (
   from: SnapshotId | null,
   steps: readonly LaneStep[],
 ): ForkSetup => ({ from, steps }) as ForkSetup
+
+declare const startRecordsBrand: unique symbol
+/** A lane's start as its history records it: written only with its fork's end. */
+export interface StartRecords {
+  readonly writes: readonly ValueWrite<"session">[]
+  readonly [startRecordsBrand]: true
+}
+/** Only an adapter makes one, from its own records of the start. */
+export const recordedStart = (
+  writes: readonly ValueWrite<"session">[],
+): StartRecords => ({ writes }) as StartRecords
 
 declare const baseCheckoutBrand: unique symbol
 /** The lane steps that check accepted work out on the base's scratch lane. */
@@ -205,10 +217,16 @@ export interface LaneHistory {
    */
   forkSteps(start: ForkStart): ForkSetup
   /**
-   * What the lane records once, after its fork made its disk (`forkSteps`'
-   * setup run), its container running. Unlike `afterRestore`, never again.
+   * The records of where the lane began, once its fork made its disk
+   * (`forkSteps`' setup run) and its container runs. It writes none of them:
+   * its caller writes them with the fork's end, in one write (`StartRecords`).
    */
-  begun(start: ForkStart): Promise<void>
+  startRecords(start: ForkStart): Promise<StartRecords>
+  /**
+   * The snapshot of the lane's newest state, which the project keeps off the
+   * lane's disk; null when its history keeps none, as jj's, on its disk.
+   */
+  keptSnapshot(): Promise<SnapshotId | null>
   /** What changed in the lane, committed as a turn; nothing when nothing did. */
   commit(edits: Edits): Promise<TurnCommitted>
   /** `commit`, with the revision's paths and conflicts. */

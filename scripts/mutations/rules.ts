@@ -5,6 +5,16 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/rules"]
 const archive = "packages/rules/archive.ts"
 
 export const mutations: readonly Mutation[] = [
+  // ── a lane's fork record ──
+  {
+    name: "a lane of its own is recorded with no fork",
+    file: "packages/rules/work.ts",
+    from: "  ...(input.record.history === null\n    ? []",
+    to: "  ...(true\n    ? []",
+    command: unit,
+    expect:
+      "planLaneRecords: a lane of its own is recorded with its fork owed, in one write",
+  },
   {
     name: "readableSpan grants a span whose first state is swept",
     file: "packages/rules/review.ts",

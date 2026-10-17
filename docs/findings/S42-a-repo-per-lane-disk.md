@@ -1,7 +1,7 @@
 # S42 — a jj repo per lane disk, exchanging work by push and fetch
 
 - **Status:** Answered
-- **Led to:** ADR-0034
+- **Led to:** ADR-0034, ADR-0167
 
 S41 forked a lane by cloning its disk, with one jj repo shared by every lane
 over virtiofs and a workspace per lane. A clone then carried its parent's

@@ -6,7 +6,7 @@
 - **Amended by:**
   - ADR-0033: resolving a merge's conflicts gets labelled sides, and never
     loses the destination's.
-  - ADR-0164: the fold it shapes is shelved. Its finding that a fold without
+  - ADR-0168: the fold it shapes is shelved. Its finding that a fold without
     its `ours` leg is confidently wrong (S5) is still evidence.
 
 **Context.** S5's ablation A ran the fold with only the `theirs` leg. The output

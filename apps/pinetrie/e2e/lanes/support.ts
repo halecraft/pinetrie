@@ -69,6 +69,7 @@ export {
   inDisks,
   isRunning,
   removeLane,
+  restoreDisk,
   runtimeCli,
   snapshotExists,
 } from "../lane-runtime.ts"

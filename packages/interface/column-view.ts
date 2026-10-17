@@ -50,7 +50,7 @@ import {
   catchUpName,
   catchUpNow,
   displayName,
-  type FilesLostRecord,
+  type LaneForkRecord,
   type ParentNow,
   type PinnedStatus,
   parentNow,
@@ -113,8 +113,8 @@ export interface WorkFacts {
   readonly bases: ReadonlyMap<ThreadId, BaseRecord>
   /** Each forked thread's fork, a branch's or a copy's (`CanvasIndex.forkOf`). */
   readonly forks: ReadonlyMap<ThreadId, ThreadFork>
-  /** The lanes that began from their base, their fork's files not kept. */
-  readonly filesLost: ReadonlyMap<ThreadId, FilesLostRecord>
+  /** Each lane of its own's fork: a copy's fork row says when its files were not kept. */
+  readonly laneForks: ReadonlyMap<ThreadId, LaneForkRecord>
   /** Each budget for agents talking, by the message that set it. */
   readonly budgets: ReadonlyMap<EntryId, BudgetRecord>
   /** What the host read of its config; null before a host wrote it. */
@@ -623,8 +623,11 @@ function sourceOf(f: ColumnFacts): HeadOrigin | null {
     link.kind === "open" && link.canvas === origins.canvas
       ? []
       : [linkWords(link, origins.reader, origins.labelOf)]
+  const laneFork = f.work.laneForks.get(thread)
   const lost =
-    copied && f.work.filesLost.has(thread) ? ["its files were not kept"] : []
+    copied && laneFork?.state === "begun" && laneFork.lost !== null
+      ? ["its files were not kept"]
+      : []
   return {
     kind: "source",
     copied,

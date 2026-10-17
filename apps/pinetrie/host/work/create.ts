@@ -1,38 +1,53 @@
 // host/work/create — a new lane: where it works, its record and name, and, for
 // a lane of its own, its fork from where it branched, or from accepted work or
-// a WIP's copy where nothing is above.
+// a WIP's copy where nothing is above. The send records the lane, its fork
+// owed; the lane's start runs the fork (`containers.ts`).
 
 import {
+  atEntry,
   BASE_SNAPSHOT,
   type ErrCode,
+  forkEntry,
   nearestRevision,
+  type OwnLane,
   type Position,
   type ProjectKind,
+  ROOT,
   type SnapshotId,
   type ThreadId,
+  type ThreadOrigin,
+  type ValueWrite,
   type WriterId,
 } from "@pinetrie/core"
-import type { Keeper } from "@pinetrie/keeper"
-import { executeOrThrow, planFork, removeLane } from "@pinetrie/lanes"
+import {
+  executeFork,
+  type Forked,
+  type LaneHandle,
+  type LaneHistory,
+  planFork,
+  type StartRecords,
+} from "@pinetrie/lanes"
+import type { LaneChannel } from "@pinetrie/pi"
 import {
   type RootView,
   readLaneRecords,
   readRevisions,
+  readThreads,
   readTreeIndex,
 } from "@pinetrie/reads"
 import {
-  FILES_LOST,
   type ForkBegin,
   foreignLaneWords,
   forkSource,
-  LANE,
+  LANE_FORK,
+  type LaneForkRecord,
+  planLaneRecords,
   setRecord,
   sourceHistory,
 } from "@pinetrie/rules"
-import { type Basics, failed, type LeaseBasics } from "../basics.ts"
+import type { Basics, LeaseBasics } from "../basics.ts"
 import type { Records } from "../records.ts"
 import type { Destination } from "./destination.ts"
-import type { LaneRegistry } from "./registry.ts"
 import type { Setup } from "./setup.ts"
 import type { Turns } from "./turns.ts"
 
@@ -73,7 +88,10 @@ export interface NewLanes {
     at: Position,
     base: string | null,
   ): Promise<ErrCode | null>
-  /** Record a new lane in its root, name it, and queue its fork. */
+  /**
+   * Record a new lane in its root, its fork owed, and name it. Its fork runs
+   * at its start (`fork`).
+   */
   prepareLane(
     view: RootView,
     lane: ThreadId,
@@ -81,48 +99,109 @@ export interface NewLanes {
     by: WriterId,
     base: string | null,
   ): Promise<void>
+  /**
+   * Fork `lane` from where its thread begins: its disk and container
+   * replaced, its history's start recorded, its fork begun. Run from a step
+   * on the lane's queue, which holds `h`; `fork` is read in that step.
+   */
+  fork(
+    lane: ThreadId,
+    h: LaneHistory,
+    handle: LaneHandle<LaneChannel>,
+    record: OwnLane,
+    fork: LaneForkRecord,
+  ): Promise<void>
 }
 
 /**
- * A new lane's record, written as it is made, and its name: every lane has
- * both, a host without tools' too.
+ * Record a new lane (`planLaneRecords`) and name it: every lane has both, a
+ * host without tools' too, whose lanes have no copy of their own (`kind`
+ * null).
  */
-export async function recordLane(
+export async function prepareLane(
   deps: {
-    readonly basics: Pick<Basics, "now">
+    readonly basics: Pick<Basics, "now" | "session">
     readonly records: Pick<Records, "writeValues">
     readonly ensureNames: () => Promise<void>
+    /** The project's kind; null for a host without tools. */
+    readonly kind: ProjectKind | null
   },
-  view: Pick<RootView, "root">,
+  view: Pick<RootView, "root" | "doc">,
   lane: ThreadId,
-  /** Its own copy's kind of history; null for a host without tools. */
-  history: ProjectKind | null,
+  at: Position,
   by: WriterId,
+  base: string | null,
 ): Promise<void> {
-  await deps.records.writeValues([
-    setRecord(LANE, {
-      lane,
-      root: view.root,
-      history,
-      by,
-      createdAt: deps.basics.now(),
+  const { kind } = deps
+  const { doc } = view
+  // The kind of the disk it will clone, read as if its snapshot is kept: a
+  // lost one falls back to the base, the project's kind, which differs only
+  // for a source of another kind, refused before a send.
+  const history =
+    kind === null
+      ? null
+      : sourceHistory({
+          above: nearestRevision(readTreeIndex(doc), readRevisions(doc), at),
+          kept: true,
+          lanes: readLaneRecords(deps.basics.session),
+          kind,
+        })
+  await deps.records.writeValues(
+    planLaneRecords({
+      record: {
+        lane,
+        root: view.root,
+        history,
+        by,
+        createdAt: deps.basics.now(),
+      },
+      base,
     }),
-  ])
+  )
   await deps.ensureNames()
+}
+
+/**
+ * The one write that ends a fork: its history's start, then its record
+ * begun. It takes what only a fork's steps (`Forked`) and its history
+ * (`StartRecords`) make, so no record says begun for a fork that did not run.
+ */
+export const forkEnd = (input: {
+  readonly fork: LaneForkRecord
+  readonly lost: SnapshotId | null
+  readonly forked: Forked
+  readonly start: StartRecords
+}): ValueWrite<"session">[] => [
+  ...input.start.writes,
+  setRecord(LANE_FORK, {
+    lane: input.fork.lane,
+    base: input.fork.base,
+    state: "begun",
+    lost: input.lost,
+  }),
+]
+
+/**
+ * Where a lane's fork begins in its root: its thread's fork entry, else the
+ * root. Its first agent message may come after chat of its own thread, which
+ * carries no revision record, so the nearest revision above either is the
+ * same.
+ */
+const forkPosition = (origin: ThreadOrigin | undefined): Position => {
+  const entry = origin === undefined ? null : forkEntry(origin)
+  return entry === null ? ROOT : atEntry(entry)
 }
 
 export function createNewLanes(deps: {
   readonly basics: LeaseBasics
   readonly setup: Setup
-  readonly registry: LaneRegistry
-  /** Work nobody awaits: `quiet` waits for it. */
-  readonly keeper: Keeper
   readonly records: Pick<Records, "writeValues">
   readonly ensureNames: () => Promise<void>
   readonly pendingRecords: Turns["pendingRecords"]
   readonly destination: Pick<Destination, "begin">
 }): NewLanes {
-  const { basics, setup, registry, keeper, destination } = deps
+  const { basics, setup, destination } = deps
+  const { session } = basics
 
   return {
     async checkBegin(view, at, base) {
@@ -133,69 +212,63 @@ export function createNewLanes(deps: {
       return typeof begin === "string" ? begin : null
     },
 
-    async prepareLane(view, lane, at, by, base) {
-      const { doc } = view
+    prepareLane: (view, lane, at, by, base) =>
+      prepareLane(
+        { ...deps, kind: setup.opened.kind },
+        view,
+        lane,
+        at,
+        by,
+        base,
+      ),
+
+    async fork(lane, h, handle, record, fork) {
+      const { runtime, ready } = setup
       const { kind } = setup.opened
-      // The kind of the disk it will clone, read as if its snapshot is
-      // kept: a lost one falls back to the base, the project's kind, which
-      // differs only for a source of another kind, refused before a send.
-      const history = sourceHistory({
-        above: nearestRevision(readTreeIndex(doc), readRevisions(doc), at),
-        kept: true,
-        lanes: readLaneRecords(basics.session),
+      // gather
+      const r = await ready
+      await using held = basics.leases.lane(lane)
+      if (held === null) throw new Error(`${lane} is in no root`)
+      const doc = await held.ready
+      const at = forkPosition(readThreads(session).get(lane)?.origin)
+      const facts = await forkFacts({
+        pendingRecords: deps.pendingRecords,
+        nearest: () =>
+          nearestRevision(readTreeIndex(doc), readRevisions(doc), at),
+        begin: () => destination.begin(fork.base),
+        exists: id => runtime.snapshotExists(id),
+      })
+      if (typeof facts === "string")
+        throw new Error(`the lane cannot begin: ${facts}`)
+      // plan
+      const source = forkSource({
+        ...facts,
+        lane: record,
+        lanes: readLaneRecords(session),
         kind,
       })
-      await recordLane(deps, view, lane, history, by)
-      const { runtime, ready } = setup
-      void keeper.track(
-        registry
-          .withHistory(
-            lane,
-            async (h, handle, record) => {
-              const r = await ready
-              const facts = await forkFacts({
-                pendingRecords: deps.pendingRecords,
-                nearest: () =>
-                  nearestRevision(readTreeIndex(doc), readRevisions(doc), at),
-                begin: () => destination.begin(base),
-                exists: id => runtime.snapshotExists(id),
-              })
-              if (typeof facts === "string")
-                throw new Error(`the lane cannot begin: ${facts}`)
-              const source = forkSource({
-                ...facts,
-                lane: record,
-                lanes: readLaneRecords(basics.session),
-                kind,
-              })
-              if (source.kind === "foreign")
-                throw new Error(foreignLaneWords(source))
-              // Its fork row says it began from its base.
-              if (source.lost !== null)
-                await deps.records.writeValues([
-                  setRecord(FILES_LOST, { lane, snapshot: source.lost }),
-                ])
-              const forkSetup = h.forkSteps(source.start)
-              if (forkSetup.from === null && source.snapshot === BASE_SNAPSHOT)
-                await setup.baseAtAccepted()
-              await removeLane(runtime, lane)
-              await executeOrThrow(
-                planFork({
-                  source,
-                  spec: setup.specOf(lane, r),
-                  env: process.env,
-                  setup: forkSetup,
-                }),
-                handle.runners,
-              )
-              await h.begun(source.start)
-              // The fork's `run` made it, and started it.
-              await handle.start("running")
-            },
-            { fatal: true },
-          )
-          .catch(failed(basics, "forking", lane)),
+      if (source.kind === "foreign") throw new Error(foreignLaneWords(source))
+      const forkSetup = h.forkSteps(source.start)
+      const steps = planFork({
+        source,
+        spec: setup.specOf(lane, r),
+        env: process.env,
+        setup: forkSetup,
+      })
+      // execute: a fork run again is owed until its end, like the first
+      if (fork.state === "begun")
+        await deps.records.writeValues([
+          setRecord(LANE_FORK, { lane, base: fork.base, state: "owed" }),
+        ])
+      if (forkSetup.from === null && source.snapshot === BASE_SNAPSHOT)
+        await setup.baseAtAccepted()
+      const forked = await executeFork(steps, handle.runners)
+      const start = await h.startRecords(source.start)
+      await deps.records.writeValues(
+        forkEnd({ fork, lost: source.lost, forked, start }),
       )
+      // The fork's `run` made it, and started it.
+      await handle.start("running")
     },
   }
 }

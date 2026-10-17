@@ -90,7 +90,7 @@ export interface ProjectParts {
   readonly keeper: Keeper
   readonly registry: LaneRegistry
   /** Start a lane's container, from a step on its queue. */
-  readonly startContainer: (lane: ThreadId, h: LaneHistory) => Promise<void>
+  readonly startContainer: (record: OwnLane, h: LaneHistory) => Promise<void>
   /** Queue a lane's container to start before a run. */
   readonly beforeRun: (lane: ThreadId) => void
   /** Accepted work moved: the base snapshot follows. */

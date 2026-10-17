@@ -3,8 +3,8 @@
 
 import {
   errorText,
+  type OwnLane,
   type ProjectKind,
-  type SnapshotId,
   type ThreadId,
   WORKSPACE_ROOT,
 } from "@pinetrie/core"
@@ -14,19 +14,26 @@ import {
   KILL_SSH,
   type LaneGrants,
   type LaneHistory,
+  type LaneMade,
   laneNote,
   PINETRIE_MOUNT,
   planContainer,
   planDisk,
+  planLaneStart,
   planShape,
   planStart,
-  planStartFrom,
   RUNTIME_BIN,
   shapeSpecHash,
 } from "@pinetrie/lanes"
 import type { LaneAccess, LaneFacts } from "@pinetrie/pi"
-import { readLaneSnapshots, readRunning, readThreadName } from "@pinetrie/reads"
+import {
+  readLaneForks,
+  readLaneRevisions,
+  readRunning,
+  readThreadName,
+} from "@pinetrie/reads"
 import { failed, type LeaseBasics } from "../basics.ts"
+import type { NewLanes } from "./create.ts"
 import type { ProposedChangesActs } from "./destination.ts"
 import { removeStaleOutputs } from "./disk.ts"
 import type { LaneRegistry } from "./registry.ts"
@@ -71,14 +78,14 @@ export interface Containers {
   /** After a run: stop its container, and follow its proposed changes. */
   runEnded(lane: ThreadId): void
   /**
-   * Start a lane's container, as `planContainer` decides. A container made
-   * from another spec (image, mounts, grants) is recreated on the same
-   * volume. A missing one starts from what `planStartFrom` decides; a disk
-   * restored from a snapshot then gets what its history needs
-   * (`LaneHistory.afterRestore`). Run from a step on the lane's queue, which
-   * holds `h`.
+   * Start a lane's container, as `planLaneStart` decides from its fork's
+   * record and its container (`planContainer`): a fork owed runs; a container
+   * made from another spec (image, mounts, grants) is recreated on the same
+   * volume; a missing one starts from its disk, else a snapshot, whose disk
+   * then gets what its history needs (`LaneHistory.afterRestore`). Run from a
+   * step on the lane's queue, which holds `h`.
    */
-  startContainer(lane: ThreadId, h: LaneHistory): Promise<void>
+  startContainer(record: OwnLane, h: LaneHistory): Promise<void>
   /** Stop every running lane's container. */
   close(): Promise<void>
 }
@@ -90,6 +97,8 @@ export function createContainers(deps: {
   /** Work nobody awaits: `quiet` waits for it. */
   readonly keeper: Keeper
   readonly proposed: Pick<ProposedChangesActs, "runEnded">
+  /** A lane's fork (`work/create.ts`), run by its start. */
+  readonly fork: NewLanes["fork"]
 }): Containers {
   const { basics, setup, registry, keeper, proposed } = deps
   const { session, log } = basics
@@ -107,58 +116,88 @@ export function createContainers(deps: {
     )
   })
 
-  /** The snapshots of `lane`'s own records, newest first. */
-  async function ownSnapshots(lane: ThreadId): Promise<SnapshotId[]> {
-    await using held = basics.leases.lane(lane)
-    return held === null ? [] : readLaneSnapshots(await held.ready, lane)
-  }
-
-  /** The newest snapshot of `lane`'s own records that is still there. */
-  async function newestSnapshot(lane: ThreadId): Promise<SnapshotId | null> {
+  /**
+   * What a begun lane's start reads once its container must be made: its
+   * disk, the snapshots its revision records name and whether it has any,
+   * its history's kept snapshot, and one listing of every snapshot.
+   */
+  async function made(lane: ThreadId, h: LaneHistory): Promise<LaneMade> {
     const { runtime } = setup
-    for (const id of await ownSnapshots(lane))
-      if (await runtime.snapshotExists(id)) return id
-    return null
+    await using held = basics.leases.lane(lane)
+    const [disk, revisions, kept, listed] = await Promise.all([
+      runtime.diskExists(lane),
+      held === null ? [] : held.ready.then(doc => readLaneRevisions(doc, lane)),
+      h.keptSnapshot(),
+      runtime.snapshots(),
+    ])
+    return {
+      disk,
+      own: revisions.flatMap(r => (r.snapshot === null ? [] : [r.snapshot])),
+      recorded: revisions.length > 0,
+      kept,
+      listed: new Set(listed),
+    }
   }
 
-  async function startContainer(lane: ThreadId, h: LaneHistory): Promise<void> {
+  async function startContainer(
+    record: OwnLane,
+    h: LaneHistory,
+  ): Promise<void> {
+    const { lane } = record
     const { ready, runtime } = setup
     const r = await ready
     const handle = registry.handleOf(lane)
-    const container = handle.container
+    const { container } = handle
     // Its own pinetrie.json may narrow what it gets: a narrowing changes the
     // spec, so the container is made anew below.
     await setup.configs.readLane(lane)
     const spec = setup.specOf(lane, r)
-    const decided = planContainer({
+    // Read in this step, never when it was queued: a fork queued before it
+    // may have ended since. `withHistory` refused a lane with none.
+    const fork = readLaneForks(session).get(lane)
+    if (fork === undefined)
+      throw new Error(`${readThreadName(session, lane)} has no fork record`)
+    const containerPlan = planContainer({
       facts: await runtime.containerFacts(container),
       want: shapeSpecHash(runtime, planShape(spec, process.env)),
     })
-    if (decided === "recreate") {
-      await handle.stop()
-      await runtime.remove(container)
-    }
-    if (decided === "create" || decided === "recreate") {
-      const disk = await runtime.diskExists(lane)
-      const newest = disk ? null : await newestSnapshot(lane)
-      const from = planStartFrom({ disk, newest })
-      switch (from.kind) {
-        case "disk":
+    const facts = { fork: fork.state, container: containerPlan }
+    const first = planLaneStart({ ...facts, made: null })
+    const decided =
+      first.kind === "gather"
+        ? planLaneStart({ ...facts, made: await made(lane, h) })
+        : first
+    switch (decided.kind) {
+      case "fork":
+        // A fork stopped part way may have left its container running, its
+        // link open: the fork deletes it.
+        if (containerPlan !== "create") await handle.stop()
+        await deps.fork(lane, h, handle, record, fork)
+        break
+      case "container":
+        await handle.start(decided.plan === "start" ? "stopped" : "running")
+        break
+      case "disk":
+      case "snapshot":
+        if (decided.recreate) {
+          await handle.stop()
+          await runtime.remove(container)
+        }
+        if (decided.kind === "disk")
           await executeOrThrow([planStart(spec, process.env)], handle.runners)
-          break
-        case "snapshot":
+        else {
           await executeOrThrow(
-            planDisk({ spec, env: process.env, from: from.from }),
+            planDisk({ spec, env: process.env, from: decided.from }),
             handle.runners,
           )
           await h.afterRestore()
-          break
-        case "retired":
-          throw new Error(RETIRED)
-      }
+        }
+        // Made just now: running.
+        await handle.start("running")
+        break
+      case "retired":
+        throw new Error(RETIRED)
     }
-    // Made just now, or read above: running unless it was stopped.
-    await handle.start(decided === "start" ? "stopped" : "running")
     // Every run starts on a disk whose recipes are checked, whatever made it
     // (a fork, a restore, a merge, another image): what went stale goes.
     await removeStaleOutputs(handle, r.image).catch(
@@ -194,7 +233,9 @@ export function createContainers(deps: {
       registry.handleOf(lane).queue.reset()
       void keeper.track(
         registry
-          .withHistory(lane, h => startContainer(lane, h), { fatal: true })
+          .withHistory(lane, (h, _, record) => startContainer(record, h), {
+            fatal: true,
+          })
           .catch(error =>
             log(
               `[host] ${readThreadName(session, lane)} cannot start: ${errorText(error)}`,

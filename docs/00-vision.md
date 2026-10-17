@@ -108,7 +108,7 @@ and accepted into accepted work; a team's board of canvases, live across devices
 **Out:** replacing pi's TUI. Hosted, authenticated teams are designed for
 and not shipped: today the invite key decides who gets in.
 
-**Designed for but not built:** fold, which ADR-0164, proposed, would
+**Designed for but not built:** fold, which ADR-0168, proposed, would
 shelve. The tree can *represent* a merge
 node (`fromId` alongside `parentId`): retrofitting a second parent edge
 would be painful, allowing it was free. References were built and

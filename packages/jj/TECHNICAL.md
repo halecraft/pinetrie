@@ -647,6 +647,12 @@ with the steps this package gives it (`ForkSetup`, `BaseCheckout`).
   that change's id, and your repo sees a divergent change (S42 item 2).
   `repo.test.ts` (`@pinetrie/jj`) forks a lane's repo and checks that your repo has no
   `divergent()`. Its mutation drops `jj new`.
+- **A jj lane's start records nothing beyond its disk** (`startRecords`
+  is empty, `keptSnapshot` null): the setup's commit, bookmark and config
+  are on the lane's disk alone, so the host's fork record is what says
+  they were made (S226, ADR-0167). A disk cloned and never set up carries
+  its source's bookmark and config; its first commit would take its
+  parent's working-copy change, a divergent change in your repo.
 - **Inherited history is immutable in the fork.** Its config is a file on its
   own disk (`JJ_CONFIG=/workspace/.pinetrie-lane/jj.toml`), so forks of forks
   inherit it. It sets `immutable_heads()` to

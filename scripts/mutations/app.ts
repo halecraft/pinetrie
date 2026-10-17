@@ -69,8 +69,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a new lane forks from the root, not where it branched",
     file: "apps/pinetrie/host/work/create.ts",
-    from: "                  nearestRevision(readTreeIndex(doc), readRevisions(doc), at),",
-    to: '                  nearestRevision(readTreeIndex(doc), readRevisions(doc), { kind: "root" }),',
+    from: "          nearestRevision(readTreeIndex(doc), readRevisions(doc), at),\n        begin:",
+    to: '          nearestRevision(readTreeIndex(doc), readRevisions(doc), { kind: "root" }),\n        begin:',
     suite: "lanes",
     scenario: "main",
     expect:
@@ -155,8 +155,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a lane with no disk and no snapshot starts anyway",
     file: "apps/pinetrie/host/work/containers.ts",
-    from: '        case "retired":\n          throw new Error(RETIRED)',
-    to: '        case "retired":\n          break',
+    from: '      case "retired":\n        throw new Error(RETIRED)',
+    to: '      case "retired":\n        break',
     suite: "lanes",
     scenario: "main",
     expect:
@@ -165,11 +165,21 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a restored lane finds no snapshot",
     file: "apps/pinetrie/host/work/containers.ts",
-    from: "      if (await runtime.snapshotExists(id)) return id",
-    to: "      if (false) return id",
+    from: "      listed: new Set(listed),",
+    to: "      listed: new Set(),",
     suite: "lanes",
     scenario: "main",
     expect: "after restoring, a lane runs again on its newest snapshot",
+  },
+  {
+    name: "a start reads every fork as begun",
+    file: "apps/pinetrie/host/work/containers.ts",
+    from: "    const facts = { fork: fork.state, container: containerPlan }",
+    to: '    const facts = { fork: "begun" as const, container: containerPlan }',
+    suite: "lanes",
+    scenario: "main",
+    expect:
+      "a fork a host stopped after its clone is run again at the lane's next start",
   },
   {
     name: "the inventory previews nothing",

@@ -668,13 +668,14 @@ export {
   VERDICT,
 } from "./verdict.ts"
 export {
-  FILES_LOST,
-  type FilesLostRecord,
   type ForkSource,
   forkSource,
   LANE,
+  LANE_FORK,
+  type LaneForkRecord,
   PROJECT,
   PROJECT_KEY,
+  planLaneRecords,
   planTurnRecord,
   REVISION,
   sourceHistory,

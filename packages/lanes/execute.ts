@@ -1,7 +1,8 @@
 // lanes/execute — carrying out a list of steps, in order.
 
 import { writeFile } from "node:fs/promises"
-import type { LaneStep, Step } from "./plan.ts"
+import type { ThreadId } from "@pinetrie/core"
+import type { ForkSteps, LaneStep, Step } from "./plan.ts"
 import {
   type BytesRunner,
   describeFailure,
@@ -58,6 +59,8 @@ async function runSteps(
       if (runtime === undefined)
         throw new Error("a runtime step with no runtime to run it")
       if (step.op.kind === "run") await runtime.run(step.op.shape)
+      else if (step.op.kind === "remove")
+        await runtime.remove(step.op.container)
       else await runtime.disk(step.op)
       continue
     }
@@ -91,4 +94,20 @@ export async function executeOrThrow(
     throw new Error(
       describeFailure(`lane: ${done.step.argv.join(" ")}`, done.ran),
     )
+}
+
+declare const forkedBrand: unique symbol
+/** Proof that a fork's steps ran, its clearing first; only `executeFork` makes one. */
+export interface Forked {
+  readonly lane: ThreadId
+  readonly [forkedBrand]: true
+}
+
+/** A fork's steps (`planFork`) run in order, throwing the first failure. */
+export async function executeFork(
+  fork: ForkSteps,
+  runners: Runners,
+): Promise<Forked> {
+  await executeOrThrow(fork.steps, runners)
+  return { lane: fork.lane } as Forked
 }

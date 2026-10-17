@@ -30,7 +30,7 @@
   - ADR-0158: the board's card is a canvas, not a task; topic and task are
     words for where a canvas is on the board; the task column is the canvas
     column, and its pinned cards are pinned to the canvas.
-  - ADR-0164: a file card names a file of the project, the one source a host
+  - ADR-0168: a file card names a file of the project, the one source a host
     has, as accepted work holds it.
 
 **Context.**

@@ -10,7 +10,7 @@
   - ADR-0034: a lane at rest is its revisions; what else is on its disk is
     rebuildable.
 - **Amended by:**
-  - ADR-0164: a lane's record naming its host, the runner, and the check that
+  - ADR-0168: a lane's record naming its host, the runner, and the check that
     a lane rebuilt from its revisions runs are shelved. One host holds a lane
     at a time and alone writes its thread's end, as built.
 

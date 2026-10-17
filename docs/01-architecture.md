@@ -228,7 +228,7 @@ import each other, and the host only connects them.
 ADR-0119, accepted and not yet built, keeps a thread, its lane and the host the lane runs
 on apart, so a lane at rest could later be rebuilt on another machine:
 one host holds a lane at a time, and the model is each run's choice.
-ADR-0164, proposed, would shelve what of it is unbuilt.
+ADR-0168, proposed, would shelve what of it is unbuilt.
 
 ADR-0135 has pine·trie learn a lane's disk by watching it rather than from
 what a project declares. Every tool call's command is a run, and one
@@ -491,7 +491,7 @@ thirds of it.** Kept here because the refutation is the useful part.
 
 ## Fold (context merge)
 
-Decided, and not built yet; ADR-0164, proposed, would shelve it. Destination-aware and lazy (ADR-0005). pi summarizes on *leaving* a branch, with no
+Decided, and not built yet; ADR-0168, proposed, would shelve it. Destination-aware and lazy (ADR-0005). pi summarizes on *leaving* a branch, with no
 knowledge of where the summary will land. We summarize on *landing*, knowing the
 destination — strictly more information, and it preserves optionality (an eager
 summary can never be re-folded differently).

@@ -26,13 +26,13 @@ import {
   planFork,
   planHostMounts,
   planImages,
+  planLaneStart,
   planLinks,
   planMounts,
   planProjectDir,
   planShape,
   planShared,
   planSnapshot,
-  planStartFrom,
   type Step,
   sessionFiles,
   shapeSpecHash,
@@ -371,14 +371,16 @@ const argvs = (steps: readonly (LaneStep | Step)[]) =>
         : `runtime: ${JSON.stringify(s.op)}`,
   )
 
-test("planFork: the restore, the container, the old config folder gone, then the adapter's setup", () => {
-  const steps = planFork({
+test("planFork: the container and disk deleted, the restore, the container, the old config folder gone, then the adapter's setup", () => {
+  const { steps } = planFork({
     source: { snapshot: snapshotId("e1") },
     spec,
     env: {},
     setup: forkSetup(null, [{ in: "lane", argv: ["setup"] }]),
   })
   expect(argvs(steps)).toEqual([
+    `runtime: ${JSON.stringify({ kind: "remove", container: `pinetrie-${LANE}` })}`,
+    `runtime: ${JSON.stringify({ kind: "delete", lane: LANE })}`,
     `runtime: ${JSON.stringify({ kind: "restore", lane: LANE, from: "e1" })}`,
     `runtime: run pinetrie-${LANE}`,
     "lane: sh -c rm -rf /workspace/.pineta-lane",
@@ -387,13 +389,13 @@ test("planFork: the restore, the container, the old config folder gone, then the
 })
 
 test("planFork restores from the adapter's snapshot when it names one", () => {
-  const steps = planFork({
+  const { steps } = planFork({
     source: { snapshot: snapshotId("e1") },
     spec,
     env: {},
     setup: forkSetup(snapshotId("line-1"), []),
   })
-  expect(steps[0]).toEqual({
+  expect(steps[2]).toEqual({
     in: "runtime",
     op: { kind: "restore", lane: LANE, from: "line-1" },
   })
@@ -501,17 +503,61 @@ describe("the host: its root", () => {
     expect(decide("stopped", "h1")).toBe("start")
     expect(decide("running", "h1")).toBe("running")
   })
-  test("planStartFrom: a disk starts from it; none, from the newest snapshot; neither, retired", () => {
-    const newest = snapshotId("e1")
-    expect(planStartFrom({ disk: true, newest: null })).toEqual({
-      kind: "disk",
+  test("planLaneStart: a fork owed runs whatever is there", () => {
+    for (const container of ["create", "recreate", "start", "running"] as const)
+      expect(planLaneStart({ fork: "owed", container, made: null })).toEqual({
+        kind: "fork",
+      })
+  })
+
+  test("planLaneStart: a begun lane's container there is started; one to make asks for its facts", () => {
+    expect(
+      planLaneStart({ fork: "begun", container: "running", made: null }),
+    ).toEqual({ kind: "container", plan: "running" })
+    expect(
+      planLaneStart({ fork: "begun", container: "create", made: null }),
+    ).toEqual({ kind: "gather" })
+  })
+
+  describe("planLaneStart: a begun lane whose container must be made", () => {
+    const made = {
+      disk: false,
+      own: [snapshotId("e2"), snapshotId("e1")],
+      recorded: true,
+      kept: snapshotId("turn-1"),
+      listed: new Set([snapshotId("e1"), snapshotId("turn-1")]),
+    }
+    const start = (m: Partial<typeof made>, container = "create" as const) =>
+      planLaneStart({ fork: "begun", container, made: { ...made, ...m } })
+
+    test("planLaneStart: a disk starts from it", () => {
+      expect(start({ disk: true })).toEqual({ kind: "disk", recreate: false })
+      expect(
+        planLaneStart({
+          fork: "begun",
+          container: "recreate",
+          made: { ...made, disk: true },
+        }),
+      ).toEqual({ kind: "disk", recreate: true })
     })
-    expect(planStartFrom({ disk: false, newest })).toEqual({
-      kind: "snapshot",
-      from: newest,
+
+    test("planLaneStart: with no disk, the newest of its snapshots that exists, then its kept state's", () => {
+      expect(start({})).toEqual({
+        kind: "snapshot",
+        from: "e1",
+        recreate: false,
+      })
+      expect(start({ own: [] })).toEqual({
+        kind: "snapshot",
+        from: "turn-1",
+        recreate: false,
+      })
     })
-    expect(planStartFrom({ disk: false, newest: null })).toEqual({
-      kind: "retired",
+
+    test("planLaneStart: with nothing kept, a lane that recorded no turn forks again, and one that did is retired", () => {
+      const gone = { listed: new Set<ReturnType<typeof snapshotId>>() }
+      expect(start({ ...gone, recorded: false })).toEqual({ kind: "fork" })
+      expect(start(gone)).toEqual({ kind: "retired" })
     })
   })
 })
@@ -575,9 +621,9 @@ test("the base's scratch lane is no thread's: nothing that takes a thread takes 
     env: {},
     setup: forkSetup(null, []),
   })
-  expect([laneContainer(BASE_LANE), setup.length]).toEqual([
+  expect([laneContainer(BASE_LANE), setup.steps.length]).toEqual([
     "pinetrie-base-scratch",
-    3,
+    5,
   ])
 })
 

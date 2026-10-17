@@ -28,7 +28,12 @@ import {
   readProject,
   readRevisions,
 } from "@pinetrie/reads"
-import { deleteRecord, PROPOSED_CHANGES } from "@pinetrie/rules"
+import {
+  deleteRecord,
+  LANE_FORK,
+  PROPOSED_CHANGES,
+  setRecord,
+} from "@pinetrie/rules"
 import { rowMessage } from "@pinetrie/schema"
 import type { Checks } from "../checks.ts"
 import {
@@ -56,6 +61,7 @@ import { cleanUp, inLane, inLaneQuiet, type LaneHosts } from "../lane-hosts.ts"
 import type { Scenario } from "../scenario.ts"
 import {
   bringUpToDate,
+  cli,
   container,
   containerExists,
   deleteSnapshot,
@@ -63,6 +69,7 @@ import {
   jjRefusal,
   queueCommand,
   removeLane,
+  restoreDisk,
   snapshotExists,
 } from "./support.ts"
 
@@ -316,6 +323,39 @@ async function mainSection(
         (await sums(looker.name)).replace(/shared.txt.*/, "") ===
           parentSums.replace(/shared.txt.*/, "") &&
         (await sums(looker.name)) === parentSums,
+    )
+    // A fork a host stopped after its clone: the looker's container gone,
+    // its disk put back as its source's snapshot, its setup not run, its
+    // fork owed. Its next start forks it again, so it has its own bookmark.
+    const source =
+      setUp === null
+        ? null
+        : nearestRevision(tree(), heldRootRecords(wh, readRevisions), at(setUp))
+            .snapshot
+    if (looker !== undefined && source !== null) {
+      await wh.quiet()
+      await cli(["rm", "-f", container(looker.name)])
+      await restoreDisk(project, looker.name, source)
+      await wh.records.writeValues([
+        setRecord(LANE_FORK, { lane: looker.name, base: null, state: "owed" }),
+      ])
+    }
+    script.use([
+      { tool: "bash", args: { command: "jj bookmark list" } },
+      { text: "listed" },
+    ])
+    await wu.send("which bookmarks?", at(looker?.tip ?? null), {
+      thread: looker?.name,
+    })
+    await idle()
+    check(
+      "a fork a host stopped after its clone is run again at the lane's next start",
+      looker !== undefined &&
+        source !== null &&
+        toolResults(looker.name)
+          .at(-1)
+          ?.includes(`pinetrie/${looker.name}:`) === true,
+      `${toolResults(looker?.name).at(-1)?.slice(0, 200) ?? "none"}`,
     )
     // That a branch's writes never reach its parent, nor its parent's it, is
     // the disks' rule, proved on btrfs by lanehost's `disks.test.ts`.
@@ -1203,8 +1243,8 @@ async function mainSection(
       toolResults(one?.name).at(-1)?.trim() === "parent-later",
     )
 
-    // A lane with a record and neither a disk nor a snapshot is retired
-    // (`planStartFrom`): its tools say so, and name what to do.
+    // A lane that recorded turns, with neither a disk nor a snapshot left,
+    // is retired (`planLaneStart`): its tools say so, and name what to do.
     if (two !== undefined) {
       await wh.quiet()
       await removeLane(project, two.name)

@@ -13,8 +13,10 @@ import { describe, expect, test } from "vitest"
 import {
   decodeRecords,
   forkSource,
+  LANE_FORK,
   LANE as LANE_RECORD,
   PROJECT,
+  planLaneRecords,
   planTurnRecord,
   REVISION,
   setRecord,
@@ -26,6 +28,47 @@ const LANE = threadIdFor("1")
 const ADA = writerId("ada")
 const C1 = pointId("c1")
 const C2 = pointId("c2")
+
+describe("a lane's fork: owed with its record, begun at its end", () => {
+  const lane = {
+    lane: LANE,
+    root: rootIdFor("test-root"),
+    history: "jj" as const,
+    by: ADA,
+    createdAt: 1,
+  }
+  test("a fork record round-trips owed, and begun with or without lost", () => {
+    for (const fork of [
+      { lane: LANE, base: "wip", state: "owed" },
+      { lane: LANE, base: null, state: "begun", lost: snapshotId("e1") },
+      { lane: LANE, base: null, state: "begun", lost: null },
+    ] as const) {
+      const w = setRecord(LANE_FORK, fork)
+      expect(LANE_FORK.decode(w.value, w.key)).toEqual(fork)
+    }
+  })
+  test("a begun fork with no lost does not decode", () => {
+    expect(
+      LANE_FORK.decode({ base: null, state: "begun" }, LANE),
+    ).toBeUndefined()
+  })
+  test("planLaneRecords: a lane of its own is recorded with its fork owed, in one write", () => {
+    expect(
+      planLaneRecords({ record: lane, base: "wip" }).map(w => [
+        w.namespace,
+        w.value,
+      ]),
+    ).toEqual([
+      ["pinetrie.lane", LANE_RECORD.encode(lane)],
+      ["pinetrie.lane-fork", { base: "wip", state: "owed" }],
+    ])
+    expect(
+      planLaneRecords({ record: { ...lane, history: null }, base: null }).map(
+        w => w.namespace,
+      ),
+    ).toEqual(["pinetrie.lane"])
+  })
+})
 
 describe("records: one spec each, total decoders", () => {
   const lane = {

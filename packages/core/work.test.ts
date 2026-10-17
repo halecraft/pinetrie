@@ -126,6 +126,11 @@ const revisions: ReadonlyMap<EntryId, RevisionRecord> = new Map(
 const near = (id: string) =>
   nearestRevision(index, revisions, atEntry(entryId(id)))
 
+test("nearestRevision: a thread's chat below where it forks finds what that entry finds", () => {
+  expect(near("5-x1")).toEqual(near("3-r1"))
+  expect(near("5-x1")).toMatchObject({ point: C2, snapshot: SNAP2 })
+})
+
 describe("laneFirstPrompt: a lane's own first prompt", () => {
   test("a branch's first prompt is its own, below its parent's", () => {
     expect(laneFirstPrompt(index, revisions, B, entryId("7-mb"))).toBe("6-pb")

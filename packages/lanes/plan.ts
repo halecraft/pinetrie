@@ -717,22 +717,38 @@ export const planDisk = (input: {
  * such snapshot remains.
  */
 export const OLD_LANE_CONFIG_DIR = `${WORKSPACE_ROOT}/.pineta-lane`
+declare const forkStepsBrand: unique symbol
+/** A fork's steps, as `planFork` plans them: the only steps `executeFork` runs. */
+export interface ForkSteps {
+  readonly lane: ThreadId
+  readonly steps: readonly Step[]
+  readonly [forkStepsBrand]: true
+}
+
 /**
- * A fork: its disk cloned from the adapter's snapshot (`ForkSetup.from`),
- * else its source's, then the adapter's setup steps.
+ * A fork: the lane's container and disk deleted first, whatever a fork
+ * stopped part way left, so a fork runs again from the top; then its disk
+ * cloned from the adapter's snapshot (`ForkSetup.from`), else its source's,
+ * then the adapter's setup steps.
  */
 export const planFork = (input: {
   readonly source: { readonly snapshot: SnapshotId }
   readonly spec: LaneSpec
   readonly env: Readonly<Record<string, string | undefined>>
   readonly setup: ForkSetup
-}): Step[] => [
-  ...planDisk({ ...input, from: input.setup.from ?? input.source.snapshot }),
-  // pre-rename: before any command of the adapter's, which could snapshot
-  // it into the working copy the clone carries (`OLD_LANE_CONFIG_DIR`).
-  laneShell(`rm -rf ${OLD_LANE_CONFIG_DIR}`),
-  ...input.setup.steps,
-]
+}): ForkSteps => {
+  const { lane } = input.spec
+  const steps: Step[] = [
+    onRuntime({ kind: "remove", container: laneContainer(lane) }),
+    onRuntime({ kind: "delete", lane }),
+    ...planDisk({ ...input, from: input.setup.from ?? input.source.snapshot }),
+    // pre-rename: before any command of the adapter's, which could snapshot
+    // it into the working copy the clone carries (`OLD_LANE_CONFIG_DIR`).
+    laneShell(`rm -rf ${OLD_LANE_CONFIG_DIR}`),
+    ...input.setup.steps,
+  ]
+  return { lane, steps } as unknown as ForkSteps
+}
 
 /**
  * A turn's snapshot: `sync`, so what the tools wrote is on the disk (without
@@ -910,22 +926,69 @@ export function planContainer(input: {
   return state === "running" ? "running" : "start"
 }
 
-/**
- * Where a lane's container, made anew, starts from: its disk if it has one;
- * else its newest snapshot (a restored root); else nothing, and the lane
- * is retired: a branch from it continues.
- */
-export function planStartFrom(input: {
+/** What a lane's start does (`planLaneStart`). */
+export type LaneStart =
+  | { readonly kind: "fork" }
+  | { readonly kind: "gather" }
+  | { readonly kind: "container"; readonly plan: "start" | "running" }
+  | { readonly kind: "disk"; readonly recreate: boolean }
+  | {
+      readonly kind: "snapshot"
+      readonly from: SnapshotId
+      readonly recreate: boolean
+    }
+  | { readonly kind: "retired" }
+
+/** What a lane's start reads of its disk and snapshots, once it must make its container. */
+export interface LaneMade {
   readonly disk: boolean
-  readonly newest: SnapshotId | null
-}):
-  | { readonly kind: "disk" }
-  | { readonly kind: "snapshot"; readonly from: SnapshotId }
-  | { readonly kind: "retired" } {
-  if (input.disk) return { kind: "disk" }
-  return input.newest === null
-    ? { kind: "retired" }
-    : { kind: "snapshot", from: input.newest }
+  /** The snapshots its revision records name, newest first. */
+  readonly own: readonly SnapshotId[]
+  /** Whether any revision record names the lane, with a snapshot or not. */
+  readonly recorded: boolean
+  /** The snapshot of its newest state, kept off its disk (`LaneHistory.keptSnapshot`). */
+  readonly kept: SnapshotId | null
+  /** Every snapshot of the project's. */
+  readonly listed: ReadonlySet<SnapshotId>
+}
+
+/**
+ * A lane's start, from its fork's state and its container (`planContainer`).
+ * A fork owed runs whatever is there. A begun lane whose container must be
+ * made asks for its facts (`gather`), then starts from its disk; else its
+ * newest snapshot that exists, a revision's before its kept state's, since a
+ * turn that changed only ignored files leaves the state older; else, with no
+ * turn recorded, its files are its fork's, so it forks again; else what it
+ * recorded is gone, and it is retired: a branch from it continues.
+ */
+export function planLaneStart(input: {
+  readonly fork: "owed" | "begun"
+  readonly container: ContainerPlan
+  readonly made: LaneMade
+}): Exclude<LaneStart, { readonly kind: "gather" }>
+export function planLaneStart(input: {
+  readonly fork: "owed" | "begun"
+  readonly container: ContainerPlan
+  /** Null until gathered. */
+  readonly made: LaneMade | null
+}): LaneStart
+export function planLaneStart(input: {
+  readonly fork: "owed" | "begun"
+  readonly container: ContainerPlan
+  readonly made: LaneMade | null
+}): LaneStart {
+  const { container, made } = input
+  if (input.fork === "owed") return { kind: "fork" }
+  if (container === "start" || container === "running")
+    return { kind: "container", plan: container }
+  if (made === null) return { kind: "gather" }
+  const recreate = container === "recreate"
+  if (made.disk) return { kind: "disk", recreate }
+  const from = [...made.own, ...(made.kept === null ? [] : [made.kept])].find(
+    s => made.listed.has(s),
+  )
+  if (from !== undefined) return { kind: "snapshot", from, recreate }
+  return made.recorded ? { kind: "retired" } : { kind: "fork" }
 }
 
 /** The oldest git a lane's image may have: jj's fetch needs 2.41. */

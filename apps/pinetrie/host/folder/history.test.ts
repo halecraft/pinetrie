@@ -290,7 +290,7 @@ async function makeRig(): Promise<FolderRig> {
       now: () => ids,
     })
     await runtime.disk({ kind: "restore", lane, from: snapshotId(from) })
-    await history.begun(start)
+    await store.write((await history.startRecords(start)).writes)
     let queue: Promise<unknown> = Promise.resolve()
     return {
       lane,
@@ -878,7 +878,13 @@ test("a folder lane's fork restores from accepted work's state, or from its sour
   ).toMatchObject({ from: null, steps: [] })
 })
 
-test("every folder state is snapshotted straight after its lane's sync", async () => {
+/**
+ * A folder lane's history over recording fakes: `calls` lists its lane's
+ * commands and the runtime's disk ops in order; `records` the states its
+ * store holds, accepted work's `first` among them. `begin` writes what its
+ * start records, as the fork's end does.
+ */
+function recordingHistory() {
   // One list of the lane's commands and the runtime's disk ops, in order.
   const calls: string[] = []
   const lane = threadIdFor("sync")
@@ -941,7 +947,39 @@ test("every folder state is snapshotted straight after its lane's sync", async (
     newId: () => `0192${String(ids++).padStart(4, "0")}`,
     now: () => 0,
   })
-  await h.begun({ kind: "accepted", point: first.id })
+  const keep = (writes: readonly ValueWrite[]) => {
+    for (const w of writes)
+      if (w.kind === "set" && w.namespace === STATE.namespace)
+        records.push(
+          ...decodeRecords(STATE, [{ key: w.key, value: w.value }]).values(),
+        )
+  }
+  const begin = async () =>
+    keep((await h.startRecords({ kind: "accepted", point: first.id })).writes)
+  return { h, calls, records, read, first, begin }
+}
+
+test("a folder lane's start records nothing itself; once its caller writes them, its newest state is the start, and kept off its disk", async () => {
+  const { h, records, first } = recordingHistory()
+  const start = await h.startRecords({ kind: "accepted", point: first.id })
+  expect([records.length, await h.keptSnapshot()]).toEqual([1, null])
+  const [write] = start.writes
+  expect(write?.kind === "set" && write.namespace).toBe(STATE.namespace)
+  const id = write?.key ?? ""
+  records.push(
+    ...decodeRecords(
+      STATE,
+      start.writes.flatMap(w =>
+        w.kind === "set" ? [{ key: w.key, value: w.value }] : [],
+      ),
+    ).values(),
+  )
+  expect(await h.keptSnapshot()).toBe(id)
+})
+
+test("every folder state is snapshotted straight after its lane's sync", async () => {
+  const { h, calls, records, read, first, begin } = recordingHistory()
+  await begin()
   const turn = await h.recordTurn({ title: "a turn", entry: entryId("e-1") })
   expect(turn.committed).not.toBeNull()
   const next = read("0192bbbb", first.id)

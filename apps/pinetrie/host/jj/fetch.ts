@@ -68,11 +68,11 @@ export function createFetches(deps: {
   return {
     fetchLane(lane, have, stack = false) {
       const yours = owner
-      const bundled = registry.withHistory(lane, async (h, handle) => {
+      const bundled = registry.withHistory(lane, async (h, handle, record) => {
         const stopped =
           (await handle.runners.runtime.containerFacts(handle.container))
             .state !== "running"
-        if (stopped) await deps.startContainer(lane, h)
+        if (stopped) await deps.startContainer(record, h)
         try {
           const jj = laneJj(handle.runners.lane)
           const name = stack ? stackBookmark(lane) : bookmarkName(lane)

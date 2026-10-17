@@ -34,7 +34,7 @@ import { SETUP } from "./setup.ts"
 import { SHARED_LINEAGE } from "./shared.ts"
 import { THREAD } from "./thread.ts"
 import { VERDICT } from "./verdict.ts"
-import { FILES_LOST, LANE, PROJECT, REVISION } from "./work.ts"
+import { LANE, LANE_FORK, PROJECT, REVISION } from "./work.ts"
 
 /** What a check over every record reads of a spec: its address and its decoder. */
 export type AnyRecordSpec = Pick<
@@ -54,8 +54,8 @@ export const RECORD_SPECS: readonly AnyRecordSpec[] = [
   CONFLICT,
   ICONS,
   DIGEST,
-  FILES_LOST,
   LANE,
+  LANE_FORK,
   ACCEPTED,
   MARK,
   NAME,
