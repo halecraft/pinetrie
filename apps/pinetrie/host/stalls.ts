@@ -6,7 +6,7 @@
 import { monitorEventLoopDelay } from "node:perf_hooks"
 
 /** A stall worth a line, in ms: the slow-command log's own threshold. */
-export const STALL_MS = 500
+const STALL_MS = 500
 
 /**
  * How often Node's delay timer samples the loop. Each sample is the time
@@ -48,12 +48,11 @@ export const stallWords = (ms: number): string =>
 export function checkStalls(
   histogram: DelayHistogram,
   log: (line: string) => void,
-  thresholdMs: number = STALL_MS,
 ): void {
   const stalled = stallToReport({
     maxNs: histogram.max,
     resolutionMs: RESOLUTION_MS,
-    thresholdMs,
+    thresholdMs: STALL_MS,
   })
   if (stalled === null) return
   log(stallWords(stalled))
