@@ -192,27 +192,26 @@ test.each([
     tip: entryId("e-6"),
     next: true,
   },
-])("a run's end digests the ask it answered, after the drain left $left", async ({
-  rows,
-  tip,
-  next,
-}) => {
-  const { b, pi, keeper, digests } = running(
-    "Fixed the rail.\n- `rail.tsx` draws it",
-  )
-  endRun(b.live, lane, runId("r-1"))
-  for (const r of rows) writeEntry(b.root, r)
-  writeLaneTip(b.root, lane, tip)
-  if (next) beginRun(b.live, lane, runId("r-2"))
-  await digests.ended(ROOT_ID, lane, entryId("e-1"), failed)
-  await keeper.idle()
-  expect(writesOf(pi.calls)).toEqual([FINAL])
-  const asked = pi.calls.find(c => c.method === "complete")?.args[0] as {
-    user: string
-  }
-  expect(asked.user).toContain("looking")
-  expect(asked.user).not.toContain("starting")
-})
+])(
+  "a run's end digests the ask it answered, after the drain left $left",
+  async ({ rows, tip, next }) => {
+    const { b, pi, keeper, digests } = running(
+      "Fixed the rail.\n- `rail.tsx` draws it",
+    )
+    endRun(b.live, lane, runId("r-1"))
+    for (const r of rows) writeEntry(b.root, r)
+    writeLaneTip(b.root, lane, tip)
+    if (next) beginRun(b.live, lane, runId("r-2"))
+    await digests.ended(ROOT_ID, lane, entryId("e-1"), failed)
+    await keeper.idle()
+    expect(writesOf(pi.calls)).toEqual([FINAL])
+    const asked = pi.calls.find(c => c.method === "complete")?.args[0] as {
+      user: string
+    }
+    expect(asked.user).toContain("looking")
+    expect(asked.user).not.toContain("starting")
+  },
+)
 
 test("a reply in another shape is logged, and a live one writes nothing", async () => {
   const { b, pi, keeper, digests, read } = running(
@@ -230,40 +229,43 @@ test("a reply in another shape is logged, and a live one writes nothing", async 
 test.each([
   ["a refused one", "It went well.\nVery well."],
   ["nothing to add", "Nothing to add."],
-])("at the run's end, %s clears the live headline for good", async (_, answer) => {
-  const { b, pi, keeper, digests } = running(answer)
-  const live = setRecord(
-    DIGEST,
-    {
-      prompt: entryId("e-1"),
-      headline: "Fixing the rail",
-      points: [],
-      at: 1,
-      final: false,
-    },
-    ROOT_ID,
-  )
-  putValue(b, live)
-  await digests.ended(ROOT_ID, lane, entryId("e-1"), failed)
-  await keeper.idle()
-  const cleared = setRecord(
-    DIGEST,
-    {
-      prompt: entryId("e-1"),
-      headline: null,
-      points: [],
-      at: 1_000,
-      final: true,
-    },
-    ROOT_ID,
-  )
-  expect(writesOf(pi.calls)).toEqual([cleared])
-  putValue(b, cleared)
-  const before = pi.calls.length
-  await digests.ended(ROOT_ID, lane, entryId("e-1"), failed)
-  await keeper.idle()
-  expect(pi.calls.length).toBe(before)
-})
+])(
+  "at the run's end, %s clears the live headline for good",
+  async (_, answer) => {
+    const { b, pi, keeper, digests } = running(answer)
+    const live = setRecord(
+      DIGEST,
+      {
+        prompt: entryId("e-1"),
+        headline: "Fixing the rail",
+        points: [],
+        at: 1,
+        final: false,
+      },
+      ROOT_ID,
+    )
+    putValue(b, live)
+    await digests.ended(ROOT_ID, lane, entryId("e-1"), failed)
+    await keeper.idle()
+    const cleared = setRecord(
+      DIGEST,
+      {
+        prompt: entryId("e-1"),
+        headline: null,
+        points: [],
+        at: 1_000,
+        final: true,
+      },
+      ROOT_ID,
+    )
+    expect(writesOf(pi.calls)).toEqual([cleared])
+    putValue(b, cleared)
+    const before = pi.calls.length
+    await digests.ended(ROOT_ID, lane, entryId("e-1"), failed)
+    await keeper.idle()
+    expect(pi.calls.length).toBe(before)
+  },
+)
 
 test("a short ask is not asked about", async () => {
   const { b, pi, keeper, digests } = running()
@@ -364,19 +366,22 @@ test("with digests off, a run's end asks for its verdict alone, and no live dige
 test.each([
   ["fails", null],
   ["answers in another shape", "All done here."],
-])("a request that %s leaves the verdict unclassified, never pending", async (_, answer) => {
-  const { pi, keeper, digests } = await stopping(answer, false)
-  await digests.ended(ROOT_ID, lane, entryId("e-1"), failed)
-  await keeper.idle()
-  expect(writesOf(pi.calls).at(-1)).toEqual(
-    setRecord(VERDICT, {
-      lane,
-      ask: entryId("e-1"),
-      end: entryId("e-4"),
-      verdict: { kind: "unclassified" },
-    }),
-  )
-})
+])(
+  "a request that %s leaves the verdict unclassified, never pending",
+  async (_, answer) => {
+    const { pi, keeper, digests } = await stopping(answer, false)
+    await digests.ended(ROOT_ID, lane, entryId("e-1"), failed)
+    await keeper.idle()
+    expect(writesOf(pi.calls).at(-1)).toEqual(
+      setRecord(VERDICT, {
+        lane,
+        ask: entryId("e-1"),
+        end: entryId("e-4"),
+        verdict: { kind: "unclassified" },
+      }),
+    )
+  },
+)
 
 test("a failed run's verdict is its error, and no verdict is asked for", async () => {
   const set = running("done", false)

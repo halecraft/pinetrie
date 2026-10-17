@@ -264,23 +264,23 @@ describe("laneGuidelines", () => {
       )
   })
 
-  test.each([
-    "lane.md",
-    "lane-folder.md",
-  ])("every source %s names is a file that still has its symbol", name => {
-    const repo = path.join(import.meta.dirname, "../..")
-    const note = readFileSync(path.join(import.meta.dirname, name), "utf8")
-    const sources = [...note.matchAll(/<!-- (\S+) (\S+) -->/g)]
-    expect(sources.length).toBeGreaterThan(20)
-    const missing = sources.flatMap(([, file = "", symbol = ""]) => {
-      const at = path.join(repo, file)
-      if (!existsSync(at)) return [`${file} (no such file)`]
-      const escaped = symbol.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-      const word = new RegExp(`(^|[^\\w$])${escaped}($|[^\\w$])`, "m")
-      return word.test(readFileSync(at, "utf8")) ? [] : [`${file} ${symbol}`]
-    })
-    expect(missing).toEqual([])
-  })
+  test.each(["lane.md", "lane-folder.md"])(
+    "every source %s names is a file that still has its symbol",
+    name => {
+      const repo = path.join(import.meta.dirname, "../..")
+      const note = readFileSync(path.join(import.meta.dirname, name), "utf8")
+      const sources = [...note.matchAll(/<!-- (\S+) (\S+) -->/g)]
+      expect(sources.length).toBeGreaterThan(20)
+      const missing = sources.flatMap(([, file = "", symbol = ""]) => {
+        const at = path.join(repo, file)
+        if (!existsSync(at)) return [`${file} (no such file)`]
+        const escaped = symbol.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+        const word = new RegExp(`(^|[^\\w$])${escaped}($|[^\\w$])`, "m")
+        return word.test(readFileSync(at, "utf8")) ? [] : [`${file} ${symbol}`]
+      })
+      expect(missing).toEqual([])
+    },
+  )
 
   test("no two lines are equal, since pi drops a repeated guideline", () => {
     const lines = laneGuidelines(

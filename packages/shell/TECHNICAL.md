@@ -21,8 +21,8 @@ layout's runs, from the parse the layout's check already made.
   is copied from the source: a node that fits its line is its source text,
   and one that does not breaks where the shell takes a line break (one
   statement a line; one part of an `&&`, `||` or `|` chain a line, the
-  operator ending the line; a subshell's, group's, loop's or `if`'s body
-  indented). `sameProgram` keeps a layout only when unbash's printer, which
+  operator ending the line, a pipeline's `time` or `!` before its first
+  part; a subshell's, group's, loop's or `if`'s body indented). `sameProgram` keeps a layout only when unbash's printer, which
   ignores line breaks, prints both the same, and the two are the same
   characters once whitespace and `;` are dropped. The second test is there
   because the printer drops comments too.
@@ -44,10 +44,11 @@ substitution) are operators.
 ## Gotchas
 
 - **unbash computes some children on first read**, as getters on its node
-  classes (`parts`, `elements`, `index`, `value`, `expression`,
+  classes (`parts`, `script`, `elements`, `index`, `value`, `expression`,
   `initialize`, `test`, `update`), which `Object.values` does not list. The
-  walk reads them by name (`LAZY`). A new unbash version may add one:
-  a role then goes missing, and `spans.test.ts`'s role table fails.
+  walk reads them by name (`LAZY`). A new unbash version may add one, as 6
+  did `script`: a role then goes missing, and `spans.test.ts`'s role table
+  fails.
 - **Nested scripts' offsets are into the outer source**, so a `$(…)` is
   walked in place, except a script that owns a `source` of its own (an
   escaped backtick's), whose offsets index that decoded text: it is left

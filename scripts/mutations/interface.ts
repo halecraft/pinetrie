@@ -2075,7 +2075,7 @@ export const mutations: readonly Mutation[] = [
     from: "      ports.identity.save(effect.identity)\n",
     to: "",
     command: unit,
-    expect: "storeIdentity' effect is one port call",
+    expect: "the storeIdentity effect is one port call",
   },
   {
     name: "switching tabs keeps reporting the old tab",

@@ -24,32 +24,34 @@ import {
 
 const ADA = writerId("ada@x.io")
 
-test.each(
-  PERSON_DOC_KINDS,
-)("a person's %s document names its writer, and nothing else names one", kind => {
-  expect(ownerOfPersonDoc(personDocId(kind, ADA))).toEqual({
-    kind,
-    writer: ADA,
-  })
-  for (const other of [
-    `${kind}:`,
-    `${kind}:ada@x.io`,
-    `${kind}:w-Ada@X.io`,
-    "card:c-1",
-    "places",
-    "person:w-ada@x.io",
-  ])
-    expect(ownerOfPersonDoc(other)).toBeUndefined()
-})
+test.each(PERSON_DOC_KINDS)(
+  "a person's %s document names its writer, and nothing else names one",
+  kind => {
+    expect(ownerOfPersonDoc(personDocId(kind, ADA))).toEqual({
+      kind,
+      writer: ADA,
+    })
+    for (const other of [
+      `${kind}:`,
+      `${kind}:ada@x.io`,
+      `${kind}:w-Ada@X.io`,
+      "card:c-1",
+      "places",
+      "person:w-ada@x.io",
+    ])
+      expect(ownerOfPersonDoc(other)).toBeUndefined()
+  },
+)
 
-test.each(
-  PERSON_DOC_KINDS,
-)("a person's %s document is held by that person only", kind => {
-  const doc = personDocId(kind, ADA)
-  expect(holdsPersonDoc(doc, "Ada@X.io")).toBe(true)
-  expect(holdsPersonDoc(doc, "bea@x.io")).toBe(false)
-  expect(holdsPersonDoc("card:c-1", "ada@x.io")).toBeUndefined()
-})
+test.each(PERSON_DOC_KINDS)(
+  "a person's %s document is held by that person only",
+  kind => {
+    const doc = personDocId(kind, ADA)
+    expect(holdsPersonDoc(doc, "Ada@X.io")).toBe(true)
+    expect(holdsPersonDoc(doc, "bea@x.io")).toBe(false)
+    expect(holdsPersonDoc("card:c-1", "ada@x.io")).toBeUndefined()
+  },
+)
 
 test("mayWrite: the host's documents are the host's; a person's is theirs, relayed by the host", () => {
   for (const doc of [

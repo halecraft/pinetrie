@@ -68,12 +68,13 @@ describe("PALETTE", () => {
         expect(distance(color, other)).toBeGreaterThanOrEqual(0.059)
   })
 
-  test.each(
-    PALETTE,
-  )("%s is apart from the colours that already mean something", color => {
-    for (const r of reserved)
-      expect(distance(color, r)).toBeGreaterThanOrEqual(0.08)
-  })
+  test.each(PALETTE)(
+    "%s is apart from the colours that already mean something",
+    color => {
+      for (const r of reserved)
+        expect(distance(color, r)).toBeGreaterThanOrEqual(0.08)
+    },
+  )
 
   test("index.html links a header and its fork dots on hover, for every slot", () => {
     for (const slot of [...seeds.map(String), "pending"]) {

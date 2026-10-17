@@ -442,13 +442,12 @@ describe("writesIn: the canvases a command writes in", () => {
       { kind: "undo-move", canvas: OTHER_CANVAS, direction: "undo" },
       [OTHER_CANVAS],
     ],
-  ] satisfies [
-    string,
-    Gated,
-    readonly CanvasId[],
-  ][])("%s", (_, intent, want) => {
-    expect(at(intent)).toEqual(want)
-  })
+  ] satisfies [string, Gated, readonly CanvasId[]][])(
+    "%s",
+    (_, intent, want) => {
+      expect(at(intent)).toEqual(want)
+    },
+  )
 })
 
 describe("archivedIn", () => {

@@ -576,7 +576,8 @@ describe("sendMessage", () => {
       ),
     )
     const appended = pi.calls.find(c => c.method === "appendToTree")
-    const content = (appended?.args[0] as { content: string }).content
+    const content = (appended?.args[0] as { content: string } | undefined)
+      ?.content
     expect(content).toContain("Shared: n.md\n> ```\n> a `note`\n> ```")
     expect(content).toContain(
       "Shared: l.log\n> text of 28 B, 3 lines, not quoted",
@@ -809,8 +810,10 @@ describe("sendMessage", () => {
     await sendCleared(deps, ALICE, "s-1", said("plain"))
     expect(cards.calls.filter(c => c.method === "writers")).toEqual([])
     const appended = pi.calls.find(c => c.method === "appendToTree")
+    expect(appended).toBeDefined()
     expect(
-      (appended?.args[0] as { details: MessageDetails }).details.contributors,
+      (appended?.args[0] as { details: MessageDetails } | undefined)?.details
+        .contributors,
     ).toBeUndefined()
   })
 })

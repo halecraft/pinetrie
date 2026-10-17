@@ -27,14 +27,12 @@ describe("listWidthCodec", () => {
   test.each<ListWidth>(["full", "icons"])("decodes what it encodes: %s", w => {
     expect(listWidthCodec.decode(listWidthCodec.encode(w))).toBe(w)
   })
-  test.each<unknown>([
-    undefined,
-    "wide",
-    3,
-    { width: "full" },
-  ])("refuses %o", raw => {
-    expect(listWidthCodec.decode(raw)).toBeUndefined()
-  })
+  test.each<unknown>([undefined, "wide", 3, { width: "full" }])(
+    "refuses %o",
+    raw => {
+      expect(listWidthCodec.decode(raw)).toBeUndefined()
+    },
+  )
 })
 
 describe("listFoldWords", () => {

@@ -124,33 +124,29 @@ describe("planAskWork", () => {
       ),
     ),
   )
-  test.each(
-    cases,
-  )("the summary is said once: $density, $choice, running $running, $shape", ({
-    density,
-    choice,
-    running,
-    shape,
-  }) => {
-    const parts = shapes[shape] ?? []
-    const lines = read(
-      planAskWork(
-        view({ running, outcome: running ? null : "OUTCOME" }),
-        parts,
-        reader({ density, choice }),
-      ),
-    )
-    const folds = parts.some(s => s.kind === "fold")
-    expect({
-      work: times(lines, "WORK"),
-      headline: times(lines, "HEAD"),
-      outcome: times(lines, "OUTCOME"),
-    }).toEqual({
-      work: density === "outline" || folds ? 1 : 0,
-      headline: 1,
-      outcome: running ? 0 : 1,
-    })
-  })
+  test.each(cases)(
+    "the summary is said once: $density, $choice, running $running, $shape",
+    ({ density, choice, running, shape }) => {
+      const parts = shapes[shape] ?? []
+      const lines = read(
+        planAskWork(
+          view({ running, outcome: running ? null : "OUTCOME" }),
+          parts,
+          reader({ density, choice }),
+        ),
+      )
+      const folds = parts.some(s => s.kind === "fold")
+      expect({
+        work: times(lines, "WORK"),
+        headline: times(lines, "HEAD"),
+        outcome: times(lines, "OUTCOME"),
+      }).toEqual({
+        work: density === "outline" || folds ? 1 : 0,
+        headline: 1,
+        outcome: running ? 0 : 1,
+      })
+    },
+  )
 
   test("outline, opened: the line says the summary, and its fold only its steps", () => {
     const draw = planAskWork(
@@ -169,21 +165,21 @@ describe("planAskWork", () => {
     ])
   })
 
-  test.each([
-    null,
-    "open",
-  ] as const)("outline: the digest is whole under the line, open or closed (%s)", choice => {
-    const draw = planAskWork(
-      view(),
-      shapes["two folds"] ?? [],
-      reader({ density: "outline", choice }),
-    )
-    expect(draw.rows[0]).toEqual({
-      kind: "digest",
-      headline: "HEAD",
-      points: ["p1"],
-    })
-  })
+  test.each([null, "open"] as const)(
+    "outline: the digest is whole under the line, open or closed (%s)",
+    choice => {
+      const draw = planAskWork(
+        view(),
+        shapes["two folds"] ?? [],
+        reader({ density: "outline", choice }),
+      )
+      expect(draw.rows[0]).toEqual({
+        kind: "digest",
+        headline: "HEAD",
+        points: ["p1"],
+      })
+    },
+  )
 
   test("outline, closed: no fold, and the last word it hides left out", () => {
     const parts = shapes["two folds"] ?? []

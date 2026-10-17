@@ -36,19 +36,19 @@ describe("planAsk", () => {
     ...a,
   })
   const stored = (sha: Sha256) => sha === A
-  test.each([
-    true,
-    false,
-  ])("a pasted image is used when stored, drawing or not (%s)", draws => {
-    expect(planAsk(ask({ image: A }), stored, draws)).toEqual({
-      kind: "write",
-      sha: A,
-    })
-    expect(planAsk(ask({ image: B }), stored, draws)).toEqual({
-      kind: "refused",
-      reason: "not_stored",
-    })
-  })
+  test.each([true, false])(
+    "a pasted image is used when stored, drawing or not (%s)",
+    draws => {
+      expect(planAsk(ask({ image: A }), stored, draws)).toEqual({
+        kind: "write",
+        sha: A,
+      })
+      expect(planAsk(ask({ image: B }), stored, draws)).toEqual({
+        kind: "refused",
+        reason: "not_stored",
+      })
+    },
+  )
   test("words, or nothing, make a new one while drawing", () => {
     expect(planAsk(ask({ direction: "at dusk" }), stored, true)).toEqual({
       kind: "generate",

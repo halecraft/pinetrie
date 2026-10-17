@@ -8,13 +8,10 @@ test("a name splits into its adjective and noun", () => {
   })
 })
 
-test.each([
-  "fox",
-  "amber-notanoun",
-  "fox-amber",
-  "amber-fox-x",
-  "",
-])("%j is no thread's name", name => {
-  expect(threadNameParts(name)).toBeNull()
-  expect(isThreadNameHandle(name)).toBe(false)
-})
+test.each(["fox", "amber-notanoun", "fox-amber", "amber-fox-x", ""])(
+  "%j is no thread's name",
+  name => {
+    expect(threadNameParts(name)).toBeNull()
+    expect(isThreadNameHandle(name)).toBe(false)
+  },
+)

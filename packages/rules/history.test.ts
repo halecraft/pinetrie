@@ -182,23 +182,24 @@ describe("history messages (history.ts)", () => {
     expect(new Set(types).size).toBe(types.length)
   })
 
-  test.each(
-    MESSAGE_SPECS.map(spec => [spec.customType, spec] as const),
-  )("%s: stored as the code's value, decoded by its schema, rendered in its role", (type, spec) => {
-    const sample = SAMPLES[type]
-    const message = (spec as HistorySpec<string, unknown>).encode(
-      sample,
-      "what the model reads",
-      5,
-    )
-    expect(message.details).toEqual(sample)
-    expect(spec.decode(structuredClone(message))).toEqual(sample)
-    expect(renderableMessage(message).role).toBe(ROLES[type])
-    // Another kind's message, or one whose lane is no lane, is not this one.
-    expect(spec.decode({ ...message, customType: "pinetrie.other" })).toBe(
-      undefined,
-    )
-  })
+  test.each(MESSAGE_SPECS.map(spec => [spec.customType, spec] as const))(
+    "%s: stored as the code's value, decoded by its schema, rendered in its role",
+    (type, spec) => {
+      const sample = SAMPLES[type]
+      const message = (spec as HistorySpec<string, unknown>).encode(
+        sample,
+        "what the model reads",
+        5,
+      )
+      expect(message.details).toEqual(sample)
+      expect(spec.decode(structuredClone(message))).toEqual(sample)
+      expect(renderableMessage(message).role).toBe(ROLES[type])
+      // Another kind's message, or one whose lane is no lane, is not this one.
+      expect(spec.decode({ ...message, customType: "pinetrie.other" })).toBe(
+        undefined,
+      )
+    },
+  )
 
   test("a lane that is no lane does not decode: the schema checks it as isThreadId does", () => {
     const message = CARRY_ON.encode(

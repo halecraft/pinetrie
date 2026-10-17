@@ -39,6 +39,22 @@ export const mutations: readonly Mutation[] = [
     expect: "while read -r line",
   },
   {
+    name: "a pipeline's time or ! is dropped",
+    file: layout,
+    from: "${i === 0 ? lead : pad(indent + INDENT)}",
+    to: '${i === 0 ? "" : pad(indent + INDENT)}',
+    command: unit,
+    expect: "! grep -q TODO",
+  },
+  {
+    name: "a command expansion is never walked",
+    file: spans,
+    from: '  "parts",\n  "script",\n',
+    to: '  "parts",\n',
+    command: unit,
+    expect: "command marks",
+  },
+  {
     name: "a command's name is a plain word",
     file: spans,
     from: '  walk(name, mark, "command")',

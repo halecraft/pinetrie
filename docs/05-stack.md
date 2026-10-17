@@ -35,6 +35,12 @@ properties or decorators. A type error does not stop a run:
 `pnpm run typecheck` (`tsc --noEmit`, and the interface's and shell's own
 `tsconfig.json`) is the check.
 
+`tsc` is TypeScript 7, the native compiler. It has no JavaScript API to
+parse with, so `scripts/prose-names.ts` reads a file's comments with
+`oxc-parser`, a root dev dependency beside it. Since TypeScript 6 a
+`tsconfig.json` includes no `@types` package unless it names it, so the
+root's names `node`.
+
 Types carry the decisions a type system can check. An entry is immutable
 and has a required unique id, so its fields are `readonly` (ADR-0004).
 `seq` never crosses the wire (ADR-0013): it is never part of a stored or
@@ -83,6 +89,10 @@ derived read; `useValue` takes a `CallableRef`. `useDocStatus` returns the
 union `"pending" | "empty" | "populated"`, not an object. A card's text is
 bound to its textarea with Kyneta's `attach` (`packages/web/card-box.ts`).
 
+React is held at 19.2, and why is in `packages/web/TECHNICAL.md`. TypeBox
+is held at the version pi pins (1.3.27): pi's tools take our schemas, so
+the two must be one copy, and it moves with pi.
+
 ## Node, not Bun
 
 pi and `pi-agent-core` target Node, and Vite's dev server internals are
@@ -93,6 +103,16 @@ coupled to Node's `http`, `net` and `stream` modules.
 Unit tests sit beside the code they test, run by `pnpm test`
 (`vitest.config.mjs`). Biome formats and lints with Kyneta's settings
 (`biome.json`); `pnpm run lint:fix` applies its fixes.
+
+- **`linter.rules.preset` is `"recommended"` on purpose.** From Biome 2.5,
+  a `rules` that configures a group without a preset drops the rules a
+  domain recommends, so React's (`useExhaustiveDependencies`, on in
+  `@pinetrie/web` because it depends on React) silently stop running, and
+  every suppression of them reads as unused.
+- **`noDescendingSpecificity` is off for `packages/web/index.html`.** From
+  Biome 2.5 it finds selectors there it did not before. The page's
+  stylesheet is ordered by component, each rule after the ones it
+  overrides, so a lower specificity later is deliberate there.
 
 ## Playwright
 

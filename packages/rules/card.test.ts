@@ -1463,17 +1463,16 @@ describe("handoffs", () => {
       to: queuedKey,
       lands: { order: orderAfter([]), by: BEA },
     },
-  ] as const)("a card moves straight from $name (Move to ▸)", ({
-    place,
-    to,
-    lands,
-  }) => {
-    const c = card({ place })
-    expect(planMove([c], { card: C1, from: keyOf(place), to }, BEA)).toEqual({
-      kind: "write",
-      record: { ...c, place: { ...to, ...lands }, placer: BEA },
-    })
-  })
+  ] as const)(
+    "a card moves straight from $name (Move to ▸)",
+    ({ place, to, lands }) => {
+      const c = card({ place })
+      expect(planMove([c], { card: C1, from: keyOf(place), to }, BEA)).toEqual({
+        kind: "write",
+        record: { ...c, place: { ...to, ...lands }, placer: BEA },
+      })
+    },
+  )
 
   describe("a discard", () => {
     const gone = (_: CardRecord["place"]) => DISCARDED
@@ -1497,19 +1496,22 @@ describe("handoffs", () => {
           seen: "",
         },
       ],
-    ] as const)("of %s: in the trash, recording the place it left, its discarder its placer", (_, place) => {
-      const c = card({ place })
-      expect(
-        planMove([c], { card: C1, from: keyOf(place), to: gone(place) }, ADA),
-      ).toEqual({
-        kind: "write",
-        record: {
-          ...c,
-          place: { kind: "trash", left: place },
-          placer: ADA,
-        },
-      })
-    })
+    ] as const)(
+      "of %s: in the trash, recording the place it left, its discarder its placer",
+      (_, place) => {
+        const c = card({ place })
+        expect(
+          planMove([c], { card: C1, from: keyOf(place), to: gone(place) }, ADA),
+        ).toEqual({
+          kind: "write",
+          record: {
+            ...c,
+            place: { kind: "trash", left: place },
+            placer: ADA,
+          },
+        })
+      },
+    )
 
     test("a gone card is moved by no handoff, and a popped one is gone", () => {
       const discarded = card({

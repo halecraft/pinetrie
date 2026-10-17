@@ -4610,6 +4610,19 @@ async function run(check: Checks["check"]): Promise<void> {
         })
         .catch(() => {})
       const farColumn = `#strip .column[data-card="${farThread}"]`
+      // Unfolding moves the columns beside it: a click while they move lands
+      // on a neighbour, and the click's retry scrolls the strip until the ⋯
+      // is in the window's left half, where its box opens away from the
+      // column's messages.
+      await page
+        .waitForFunction(
+          column =>
+            document.querySelector(column) !== null &&
+            document.getAnimations().every(a => a.id !== "fold"),
+          farColumn,
+          { timeout: 15_000 },
+        )
+        .catch(() => {})
       let layered: {
         under: boolean
         onTop: boolean

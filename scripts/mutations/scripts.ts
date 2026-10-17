@@ -35,6 +35,13 @@ const proseNames = [
   "scripts/prose-names.test.ts",
 ]
 const gate = ["pnpm", "exec", "vitest", "run", "apps/pinetrie/e2e/gate.test.ts"]
+const suiteCommand = [
+  "pnpm",
+  "exec",
+  "vitest",
+  "run",
+  "apps/pinetrie/e2e/command.test.ts",
+]
 const words = ["pnpm", "exec", "vitest", "run", "scripts/words.test.ts"]
 const scenarios = [
   "pnpm",
@@ -45,6 +52,15 @@ const scenarios = [
 ]
 
 export const mutations: readonly Mutation[] = [
+  {
+    name: "a suite's command crashes on a child that does not read its input",
+    file: "apps/pinetrie/e2e/command.ts",
+    from: '    child.stdin.on("error", () => {})\n',
+    to: "",
+    command: suiteCommand,
+    expect:
+      "a command that exits before reading its input is answered by its exit",
+  },
   {
     name: "a folder catch-up's words name your folder",
     file: "packages/rules/update.ts",
@@ -184,6 +200,14 @@ export const mutations: readonly Mutation[] = [
     to: '      line => /^\\s*FAIL/.test(line) || line.includes("AssertionError"),',
     command: unit,
     expect: "a suite's FAIL, Vitest's ×, and an assertion error",
+  },
+  {
+    name: "failingChecks reads Vitest's colours as text",
+    file: "scripts/mutate.ts",
+    from: '    .replace(COLOUR, "")\n',
+    to: "",
+    command: unit,
+    expect: "a mark Vitest coloured still names its check",
   },
   {
     name: "a filter that names nothing runs nothing, and passes",

@@ -59,6 +59,10 @@ export function commandBytes(
     child.stdout.on("data", (b: Buffer) => out.push(b))
     child.stderr.on("data", (b: Buffer) => err.push(b))
     child.on("error", reject)
+    // A child that exits before reading its input breaks the pipe: its exit
+    // status, on `close`, is the answer, and an unhandled EPIPE would end the
+    // whole suite.
+    child.stdin.on("error", () => {})
     child.on("close", status => {
       const stdout = Buffer.concat(out)
       const stderr = Buffer.concat(err).toString()

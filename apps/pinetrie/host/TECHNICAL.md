@@ -1307,8 +1307,8 @@ queued cards, which `planArchive` refuses.
 - **Under `pnpm dev`, Vite's HMR socket shares the host's port, behind admission.** Vite's
   listener sits on `viteUpgrades`, a server that never binds, and `http.ts`
   passes it each admitted upgrade that is not `/ws`. `hmr: false` does not
-  stop `/@vite/client` from connecting, and without `hmr.server` Vite
-  listens on port 24678. Behind a tunnel that socket hangs, and Firefox,
+  stop `/@vite/client` from connecting, and without `server.ws.server`
+  (`hmr.server` before Vite 8) Vite listens on port 24678. Behind a tunnel that socket hangs, and Firefox,
   which opens one WebSocket to a host at a time, held `/ws` behind it (S112).
   Vite's own host check is off (`allowedHosts: true`): admission decides.
 - **Every answer the host writes itself is a `responses.ts` value**, written

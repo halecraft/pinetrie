@@ -38,7 +38,13 @@ const allDeps = (m: Manifest) => [
  * package (Node resolves by walking up), so this list IS the residue every
  * package can reach. Adding to it widens what every package can import.
  */
-const ROOT_TOOLING = ["@biomejs/biome", "@types/node", "typescript", "vitest"]
+const ROOT_TOOLING = [
+  "@biomejs/biome",
+  "@types/node",
+  "oxc-parser",
+  "typescript",
+  "vitest",
+]
 
 test("the root declares tooling only, so nothing runtime leaks to packages", () => {
   const root = read(".")

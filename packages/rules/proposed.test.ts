@@ -969,9 +969,12 @@ describe("the proposed changes' policy over a gather", () => {
         { seen: { kind: "jj", ledger: null, conflicted: false } },
         ERR.NOT_AS_SHOWN,
       ],
-    ] as const)("an acceptance of the proposed changes it was shown: %s", (_, over, expected) => {
-      expect(outcome(accept(over))).toBe(expected)
-    })
+    ] as const)(
+      "an acceptance of the proposed changes it was shown: %s",
+      (_, over, expected) => {
+        expect(outcome(accept(over))).toBe(expected)
+      },
+    )
   })
 
   describe("planStackEnded and planRebuild: proposed changes built anew", () => {

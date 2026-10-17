@@ -65,6 +65,13 @@ else
 fi`,
   ],
   [
+    "! grep -q TODO packages/shell/layout.ts packages/shell/spans.ts | cat && time pnpm --filter @pinetrie/app run e2e | tee /tmp/e2e.log",
+    `! grep -q TODO packages/shell/layout.ts packages/shell/spans.ts |
+  cat &&
+  time pnpm --filter @pinetrie/app run e2e |
+    tee /tmp/e2e.log`,
+  ],
+  [
     'while read -r line; do echo "$line" | cut -d: -f1; done < /etc/passwd | sort | uniq -c | sort -rn | head',
     `while read -r line; do echo "$line" | cut -d: -f1; done < /etc/passwd |
   sort |

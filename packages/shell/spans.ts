@@ -135,12 +135,13 @@ function walk(node: unknown, mark: Mark, word: ShellRole = "plain"): void {
 
 /**
  * unbash computes some children on first read, as getters on its classes'
- * prototypes, which `Object.values` does not list (`unbash/dist/word.js`, `assignment.js`, `heredoc.js`,
- * `parser.js`). `args` and `redirects` are left out: they repeat `prefix`
- * and `suffix`.
+ * prototypes, which `Object.values` does not list (`unbash/dist/word.js`,
+ * `expansion.js`, `assignment.js`, `heredoc.js`, `parser.js`). `args` and
+ * `redirects` are left out: they repeat `prefix` and `suffix`.
  */
 const LAZY = [
   "parts",
+  "script",
   "elements",
   "index",
   "value",

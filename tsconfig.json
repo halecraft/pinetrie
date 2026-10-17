@@ -17,6 +17,10 @@
     // name the real file. `allowImportingTsExtensions` makes tsc agree.
     "allowImportingTsExtensions": true,
 
+    // TypeScript 6 stopped including every `@types` package by default; this
+    // keeps Node's globals in every config that extends this one, as before.
+    "types": ["node"],
+
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
     "noFallthroughCasesInSwitch": true

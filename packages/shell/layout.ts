@@ -93,26 +93,28 @@ function layOut(source: string, parsed: ParsedScript, width: number): string {
   ): string =>
     `${open}\n${list(body.commands, indent + INDENT)}\n${pad(indent)}${close}`
 
-  /** A chain, one part a line, each operator at the end of the part before it. */
-  const chain = (n: AndOr | Pipeline, indent: number): string =>
-    n.commands
+  /**
+   * A chain, one part a line, each operator at the end of the part before it.
+   * A pipeline's `time` or `!` stays before its first part.
+   */
+  const chain = (n: AndOr | Pipeline, indent: number): string => {
+    const lead = source.slice(n.pos, n.commands[0]?.pos ?? n.pos)
+    return n.commands
       .map((part, i) => {
         const operator = n.operators[i]
         // The first part starts the line; the rest continue it.
         const line = node(part, i === 0 ? indent : indent + INDENT)
-        return `${i === 0 ? "" : pad(indent + INDENT)}${line}${operator === undefined ? "" : ` ${operator}`}`
+        return `${i === 0 ? lead : pad(indent + INDENT)}${line}${operator === undefined ? "" : ` ${operator}`}`
       })
       .join("\n")
+  }
 
   const conditional = (n: If, indent: number): string => {
     let out = `${source.slice(n.pos, n.then.pos).trim()}\n${list(n.then.commands, indent + INDENT)}`
-    let rest = n.else
-    while (rest?.type === "If") {
-      out += `\n${pad(indent)}elif ${source.slice(rest.clause.pos, rest.then.pos).trim()}\n${list(rest.then.commands, indent + INDENT)}`
-      rest = rest.else
-    }
-    if (rest !== undefined)
-      out += `\n${pad(indent)}else\n${list(rest.commands, indent + INDENT)}`
+    for (const elif of n.elif)
+      out += `\n${pad(indent)}elif ${source.slice(elif.clause.pos, elif.then.pos).trim()}\n${list(elif.then.commands, indent + INDENT)}`
+    if (n.else !== undefined)
+      out += `\n${pad(indent)}else\n${list(n.else.commands, indent + INDENT)}`
     return `${out}\n${pad(indent)}fi`
   }
 

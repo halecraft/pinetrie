@@ -25,25 +25,27 @@ describe("rootSeed", () => {
 })
 
 describe("trackSlot", () => {
-  test.each(
-    seeds,
-  )("from seed %i, the first tracks take every slot once", seed => {
-    const slots = Array.from({ length: size }, (_, t) => trackSlot(seed, t))
-    expect(slots[0]).toBe(seed)
-    expect(new Set(slots).size).toBe(size)
-  })
+  test.each(seeds)(
+    "from seed %i, the first tracks take every slot once",
+    seed => {
+      const slots = Array.from({ length: size }, (_, t) => trackSlot(seed, t))
+      expect(slots[0]).toBe(seed)
+      expect(new Set(slots).size).toBe(size)
+    },
+  )
 
-  test.each(
-    seeds,
-  )("from seed %i, neighbouring tracks are a quarter of the palette apart or more", seed => {
-    for (let t = 0; t < 2 * size; t += 1) {
-      const a = trackSlot(seed, t)
-      const b = trackSlot(seed, t + 1)
-      if (typeof a !== "number" || typeof b !== "number")
-        throw new Error("a track has no slot")
-      expect(apart(a, b)).toBeGreaterThanOrEqual(size / 4)
-    }
-  })
+  test.each(seeds)(
+    "from seed %i, neighbouring tracks are a quarter of the palette apart or more",
+    seed => {
+      for (let t = 0; t < 2 * size; t += 1) {
+        const a = trackSlot(seed, t)
+        const b = trackSlot(seed, t + 1)
+        if (typeof a !== "number" || typeof b !== "number")
+          throw new Error("a track has no slot")
+        expect(apart(a, b)).toBeGreaterThanOrEqual(size / 4)
+      }
+    },
+  )
 
   test("a fresh branch is pending, whatever the seed", () => {
     expect(trackSlot(5, PENDING_TRACK)).toBe("pending")

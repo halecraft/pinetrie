@@ -1096,14 +1096,17 @@ describe("a new card", () => {
       { kind: "card", card: TEST_THREAD },
       { kind: "margin", entry: A, thread: TEST_THREAD, order: LAST_ORDER },
     ],
-  ] as const)("%s is made at its list's end with its text, said in its column", (_, to, column, place) => {
-    expect(
-      plan(
-        inColumn({ kind: "newCard", card: C1, to, text: "j" }, column),
-        state(),
-      ),
-    ).toEqual([made(place, "j", keyText(column))])
-  })
+  ] as const)(
+    "%s is made at its list's end with its text, said in its column",
+    (_, to, column, place) => {
+      expect(
+        plan(
+          inColumn({ kind: "newCard", card: C1, to, text: "j" }, column),
+          state(),
+        ),
+      ).toEqual([made(place, "j", keyText(column))])
+    },
+  )
 
   test("a comment is an empty note at its margin's end, its box armed to take focus", () => {
     expect(

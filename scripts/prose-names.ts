@@ -14,7 +14,7 @@
 
 import { globSync, readFileSync } from "node:fs"
 import path from "node:path"
-import ts from "typescript"
+import { parseSync } from "oxc-parser"
 
 /** What a living doc cites: a backticked code name, at its file's line. */
 interface Citation {
@@ -128,6 +128,7 @@ export const OUTSIDE_NAMES: ReadonlySet<string> = new Set([
   // React, the DOM, and the page's markdown
   "defaultUrlTransform",
   "isSecureContext",
+  "PerformanceObserver",
   "sanitizeUri",
   "useEffectEvent",
   // Node, Linux and macOS
@@ -174,24 +175,11 @@ export function splitComments(
   text: string,
 ): { readonly code: string; readonly comments: string } {
   if (!/\.tsx?$/.test(file)) return { code: text, comments: "" }
-  const source = ts.createSourceFile(
-    file,
-    text,
-    ts.ScriptTarget.Latest,
-    false,
-    file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+  // In source order. A file that does not parse still gives the comments
+  // read before its error, as the type-check reports the error itself.
+  const sorted = parseSync(file, text).comments.map(
+    c => [c.start, c.end] as const,
   )
-  const ranges = new Map<number, number>()
-  const visit = (node: ts.Node): void => {
-    for (const r of [
-      ...(ts.getLeadingCommentRanges(text, node.pos) ?? []),
-      ...(ts.getTrailingCommentRanges(text, node.end) ?? []),
-    ])
-      ranges.set(r.pos, r.end)
-    for (const child of node.getChildren(source)) visit(child)
-  }
-  visit(source)
-  const sorted = [...ranges].sort(([a], [b]) => a - b)
   const blanked = (part: string) => part.replace(/[^\n]/g, " ")
   let code = ""
   let comments = ""

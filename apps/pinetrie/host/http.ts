@@ -85,7 +85,7 @@ export async function startHttp(input: {
           configFile: path.join(pageDir(), "vite.config.ts"),
           server: {
             middlewareMode: true,
-            hmr: { server: viteUpgrades },
+            ws: { server: viteUpgrades },
             // Admission decides which `Host` gets in (admission.ts): off
             // loopback, any name with the key, such as a tunnel's.
             allowedHosts: true,

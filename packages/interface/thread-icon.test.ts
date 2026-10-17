@@ -43,13 +43,14 @@ describe("threadIcon", () => {
     ).toEqual({ kind: "built-in", url: builtInIconUrl("fox") })
   })
 
-  test.each(
-    NOT_BUILT_IN,
-  )("under %s, a named thread with no banner shows ✦", (_, icons) => {
-    expect(
-      threadIcon({ thread: T, names: NAMES, banners: new Map(), icons }),
-    ).toBeNull()
-  })
+  test.each(NOT_BUILT_IN)(
+    "under %s, a named thread with no banner shows ✦",
+    (_, icons) => {
+      expect(
+        threadIcon({ thread: T, names: NAMES, banners: new Map(), icons }),
+      ).toBeNull()
+    },
+  )
 
   test("an unnamed thread, or none, shows ✦ under built-in", () => {
     const icons = BUILT_IN

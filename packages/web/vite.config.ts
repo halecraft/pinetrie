@@ -19,7 +19,7 @@ const stamp = (mode: string): Plugin => ({
   apply: "build",
   generateBundle() {
     const files = [
-      ...this.getWatchFiles().filter(f => path.isAbsolute(f)),
+      ...[...this.getModuleIds()].filter(f => path.isAbsolute(f)),
       path.join(root, "vite.config.ts"),
       ...filesUnder(path.join(root, "public")),
     ]
@@ -31,8 +31,8 @@ const stamp = (mode: string): Plugin => ({
   },
 })
 
-// `target: esnext` because the client connects with a top-level `await`
-// (`main.tsx`), which a modern browser supports natively.
+// `build.target: esnext` because the client connects with a top-level
+// `await` (`main.tsx`), which a modern browser supports natively.
 export default defineConfig(({ mode }) => ({
   // This file lives in the page's package, so that directory is Vite's root.
   root,
@@ -50,8 +50,6 @@ export default defineConfig(({ mode }) => ({
       ? "node_modules/.vite-react-prod"
       : "node_modules/.vite",
   build: { target: "esnext" },
-  esbuild: { target: "esnext" },
-  optimizeDeps: { esbuildOptions: { target: "esnext" } },
   // The linked Kyneta sources sit outside the package, in the sibling kyneta
   // checkout.
   server: {

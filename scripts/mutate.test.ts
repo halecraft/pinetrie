@@ -98,6 +98,11 @@ describe("failingChecks: the lines that name a failing check", () => {
       "AssertionError: expected 1 to be 2",
     ])
   })
+  test("a mark Vitest coloured still names its check", () => {
+    const out =
+      "\x1b[31m   \x1b[31m×\x1b[31m planChat > a busy lane holds\x1b[39m"
+    expect(failingChecks(out)).toEqual(["   × planChat > a busy lane holds"])
+  })
 })
 
 describe("mutantEnv: a mutant names the check its suite stops at", () => {

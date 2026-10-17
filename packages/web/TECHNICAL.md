@@ -151,6 +151,12 @@ about 55 ms (S59).
   the function that rendered: a message's is `MessageView`, the function
   `memo` wraps, and a list's `MessageListView`, so a check counting
   `Message` counts nothing.
+- **React stays on 19.2 while the suite reads renders from the performance
+  buffer.** React 19.3's development build clears each measure as soon as
+  it writes it (`performance.clearMeasures`), so `componentRenders` finds
+  none, and the suite stops at its start. Moving to 19.3 means reading the
+  measures as they are written, with a `PerformanceObserver` set up before
+  the page loads.
 - **React measures no render whose props are new objects with the same
   data**, nor one from state (a `useSelector` write). That is the redraw
   `MessageList`'s memo prevents: a tab's `columns` rebuilt on every card's

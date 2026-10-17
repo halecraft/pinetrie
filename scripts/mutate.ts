@@ -123,12 +123,16 @@ export function judge(
     : "ELSEWHERE"
 }
 
+/** A terminal colour code. Vitest colours its marks even into a pipe. */
+const COLOUR = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g")
+
 /**
  * The lines of a run's output that name a failing check: a suite's `FAIL`,
  * Vitest's `×`, or an assertion's error.
  */
 export const failingChecks = (output: string): string[] =>
   output
+    .replace(COLOUR, "")
     .split("\n")
     .filter(
       line => /^\s*(FAIL|×)/.test(line) || line.includes("AssertionError"),

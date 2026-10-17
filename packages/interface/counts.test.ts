@@ -60,6 +60,9 @@ test.each([
   [3_600_000, "an hour"],
   [30 * 60_000, "30 minutes"],
   [90_500, "2 minutes"],
-])("spanWords(%d) is %s, in the largest unit it is a whole number of", (ms, words) => {
-  expect(spanWords(ms)).toBe(words)
-})
+])(
+  "spanWords(%d) is %s, in the largest unit it is a whole number of",
+  (ms, words) => {
+    expect(spanWords(ms)).toBe(words)
+  },
+)

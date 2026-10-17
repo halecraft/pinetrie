@@ -7,6 +7,6 @@
     ".": "./index.ts"
   },
   "dependencies": {
-    "unbash": "5.0.0"
+    "unbash": "6.0.0"
   }
 }

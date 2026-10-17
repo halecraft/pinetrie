@@ -87,12 +87,13 @@ describe("numberingGaps", () => {
 
 describe("the repository's numbered docs", () => {
   const files = readRecord(path.join(import.meta.dirname, ".."))
-  test.each(
-    NUMBERINGS.map(n => [n.dir, n] as const),
-  )("%s: no number names two files, and every title carries its number", (_, n) => {
-    expect(numberingGaps(n, files)).toEqual({
-      clashes: [],
-      mismatches: [],
-    })
-  })
+  test.each(NUMBERINGS.map(n => [n.dir, n] as const))(
+    "%s: no number names two files, and every title carries its number",
+    (_, n) => {
+      expect(numberingGaps(n, files)).toEqual({
+        clashes: [],
+        mismatches: [],
+      })
+    },
+  )
 })
