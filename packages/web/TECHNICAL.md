@@ -1536,6 +1536,11 @@ plain `#setup` anchor: `usePage` hears the hash change.
   (`planLeave`), since Back from a page loaded by its URL would leave
   pine·trie. `pushState` and `replaceState` fire no event, so `goTo` tells
   the subscribers itself.
+- **A sideways scroll never goes Back.** `index.html` sets
+  `overscroll-behavior-x: none` on `html` and `body`: a strip or diff
+  scrolled past its edge chains to the root, where Chrome's trackpad
+  swipe would navigate. No prompt guards Back instead: a page cannot
+  draw its own, and `beforeunload`'s would also stop every reload.
 - **The page is a sibling of `#stage` in its grid cell**, after it in
   the document and at the board's `z-index` (3), so it covers the board
   too; the footer's menus open over it, in the top layer.

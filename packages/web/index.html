@@ -16,6 +16,11 @@
       @media (width < 56rem) { :root { --side: 11.5rem; } }
       /* The sidebar folded to icons (ADR-0088), at any window width. */
       :root[data-list="icons"] { --side: 3rem; }
+      /* A sideways scroll that runs past a scroller's edge chains to the
+         page, where a trackpad swipe would go Back and leave pine·trie.
+         `none` on the root ends the chain there, in a browser that ties
+         its swipe to overscroll (Chrome does). */
+      html, body { overscroll-behavior-x: none; }
       * { box-sizing: border-box; }
       button { padding: .5rem .9rem; border-radius: 6px; border: 0; background: #2f6feb; color: #fff; font: inherit; cursor: pointer; }
       .actions button, .tools button { background: none; border: 1px solid #3a3f48; color: #aaa;
