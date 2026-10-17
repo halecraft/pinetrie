@@ -1,6 +1,6 @@
 # ADR-0101 — A search covers the task you are on: opened from the rail, each column shows its own matches over its thread, and the rail lights them
 
-- **Status:** Proposed
+- **Status:** Accepted (Duane, 2026-10-16)
 - **Area:** `docs/06-interface.md`, `packages/interface/TECHNICAL.md`,
   `packages/web/TECHNICAL.md`
 - **Evidence:** S126

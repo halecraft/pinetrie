@@ -134,8 +134,8 @@ const awayWords = (n: number): string =>
 const matchAskWords = (line: string): string => `in ${line}`
 
 export const NO_MATCHES_HERE = "no matches in this thread"
-export const SEARCH_FIELD_LABEL = "search this tree"
-export const SEARCH_OPEN_TITLE = "search this tree · /"
+export const SEARCH_FIELD_LABEL = "search this task"
+export const SEARCH_OPEN_TITLE = "search this task · /"
 export const SEARCH_CLOSE_TITLE = "close search · Esc"
 export const SEARCH_CLEAR = "clear the search"
 export const SEARCH_DONE = "done"

@@ -849,7 +849,7 @@ The rail is E; the column is T. Seeing both at once is the product.
   puts in the handle and a space, Escape hides the list. A handle typed in
   full, a `@` in code or inside a word (`ada@example.com`), offers nothing,
   so Enter sends.
-- **Another thread's agent can be brought in** (ADR-0128, proposed). A
+- **Another thread's agent can be brought in** (ADR-0128). A
   mention can name the agent of a thread on any open task's canvas by its
   thread's name (`@amber-fox`); a person's name may not be a thread's. A
   mention in an inline code span or a fenced block is no mention, of an
@@ -882,6 +882,11 @@ The rail is E; the column is T. Seeing both at once is the product.
     says otherwise) is set by the person's message the talk began from;
     the runs agents start spend it, and a spent one stops the run, wakes
     nobody, and says so in the thread.
+  - **An agent cannot read another thread yet.** A `read_thread` tool,
+    reaching as far as a mention does, is decided and not built. A budget
+    chosen in the composer, a top-up of a spent one, dismissing a member, a
+    relayed run's verdict in the thread that asked, and "talking in
+    sable-meadow" in the asked thread's header are shelved (ADR-0160).
 - **The send button says what the message will do**: "send", "send to Ada"
   ("send to Ada +2" for three), "send to agent", or, while the agent is busy,
   "queue up next", "queue after Bea" or "queue after yours", naming who

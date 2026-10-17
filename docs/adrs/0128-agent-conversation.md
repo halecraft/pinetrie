@@ -2,7 +2,7 @@
 
 Numbered 0127 until 2026-10-10, when two files held that number.
 
-- **Status:** Proposed (2026-10-10)
+- **Status:** Accepted (Duane, 2026-10-16)
 - **Area:** `docs/06-interface.md`
 - **Evidence:** S144
 - **Amends:**
@@ -16,6 +16,9 @@ Numbered 0127 until 2026-10-10, when two files held that number.
 - **Amended by:**
   - ADR-0144: a run's request spends its output and the context new since the
     run's previous request, not pi's `totalTokens`.
+  - ADR-0160: a budget chosen in the composer, a top-up, dismissing a member,
+    a relayed run's verdict in the asking thread and the asked thread's
+    "talking in" header are shelved; `read_thread` is still to build.
 
 **Context.** Each thread has at most one agent, its lane's (ADR-0019,
 ADR-0021), and `@agent` names it. A common wish is to bring another

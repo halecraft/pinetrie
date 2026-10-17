@@ -1,6 +1,6 @@
 # ADR-0144 — A budget for agents talking spends what each request adds, never the context it re-reads
 
-- **Status:** Proposed (2026-10-14)
+- **Status:** Accepted (Duane, 2026-10-16)
 - **Area:** `packages/rules/TECHNICAL.md`, `apps/pinetrie/host/TECHNICAL.md`,
   `packages/pi/TECHNICAL.md`
 - **Evidence:** S144
