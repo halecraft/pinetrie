@@ -9,13 +9,13 @@ import {
   inboxWords,
 } from "./inbox-view.ts"
 
-const verdict = (lane: string, level: Level): Item => ({
+const report = (lane: string, level: Level): Item => ({
   lane: threadIdFor(lane),
   end: entryId(`e-${lane}`),
   level,
   raised: {
-    kind: "verdict",
-    verdict: { kind: "said", said: level, reason: "why" },
+    kind: "runEnd",
+    report: { kind: "modelSaid", urgency: level, reason: "why" },
     ask: entryId(`p-${lane}`),
   },
 })
@@ -49,20 +49,20 @@ describe("inboxCount", () => {
   test("counts what needs you, proposed changes of threads you follow and unseen mentions; never what is worth a read", () => {
     expect(
       inboxCount(
-        [verdict("a", "needsYou"), proposed("b"), verdict("c", "worthARead")],
+        [report("a", "needsYou"), proposed("b"), report("c", "worthARead")],
         1,
       ),
     ).toBe(3)
-    expect(inboxCount([verdict("c", "worthARead")], 0)).toBe(0)
+    expect(inboxCount([report("c", "worthARead")], 0)).toBe(0)
   })
 })
 
 describe("inboxView", () => {
-  test("each verdict under its level, each proposed changes under ready, in the order given", () => {
-    const a = verdict("a", "needsYou")
+  test("each run-end report under its level, each proposed changes under ready, in the order given", () => {
+    const a = report("a", "needsYou")
     const b = proposed("b")
-    const c = verdict("c", "worthARead")
-    const d = verdict("d", "needsYou")
+    const c = report("c", "worthARead")
+    const d = report("d", "needsYou")
     expect(view({ items: [a, b, c, d] }).items).toEqual({
       needsYou: [a, d],
       ready: [b],
@@ -73,9 +73,9 @@ describe("inboxView", () => {
     expect(
       view({
         items: [
-          verdict("c", "worthARead"),
+          report("c", "worthARead"),
           proposed("b"),
-          verdict("a", "needsYou"),
+          report("a", "needsYou"),
         ],
         mentions: 1,
       }).sections,
@@ -100,7 +100,7 @@ describe("inboxWords", () => {
   test("the label says what needs you, and never where the agent works", () => {
     const words = inboxWords(
       view({
-        items: [verdict("a", "needsYou"), proposed("b"), proposed("c")],
+        items: [report("a", "needsYou"), proposed("b"), proposed("c")],
         mentions: 1,
         unseen: 1,
       }),
@@ -130,9 +130,9 @@ describe("inboxWords", () => {
       inboxWords(
         view({
           items: [
-            verdict("a", "needsYou"),
+            report("a", "needsYou"),
             proposed("b"),
-            verdict("c", "worthARead"),
+            report("c", "worthARead"),
           ],
           mentions: 1,
         }),

@@ -42,7 +42,7 @@ export interface AttentionStore {
   read(lane: ThreadId, entry: EntryId): void
   /** A column has left its thread's end, or the page is hidden: write every waiting mark. */
   leave(): void
-  /** Mark `lane`'s verdict, of the run `ask` started, "not needed". */
+  /** Mark `lane`'s run-end report, of the run `ask` started, "not needed". */
   dismiss(lane: ThreadId, ask: EntryId): void
   /** Mark `lane`'s proposed changes "not needed" while it holds `source`. */
   dismissReady(lane: ThreadId, source: string): void
@@ -56,8 +56,8 @@ export function attentionStore(
   me: WriterId,
   host: string,
   /**
-   * Where a person with no document starts (`startingSince`): every verdict
-   * and mention up to it was before them. Null until the session's
+   * Where a person with no document starts (`startingSince`): every run-end
+   * report and mention up to it was before them. Null until the session's
    * directory has arrived, when no start can be told.
    */
   start: () => string | null,

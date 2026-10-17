@@ -414,7 +414,7 @@ is given to pi's code, kept out of `~/.pi` and a project's `.pi/`:
   command). `ModelSetup.model` is that `ModelState`, never a null: every
   consumer asks. With none, `createAgent` builds the harness on
   `NO_MODEL_STAND_IN`, never asked, and refuses every run with
-  `ERR.NO_MODEL`; titles, digests, verdicts and commit messages skip their
+  `ERR.NO_MODEL`; titles, digests, run-end reports and commit messages skip their
   request (`complete` with no model answers as a failed one).
 - **`named`:** `models.json` and `auth.json` only, for `e2e:live`'s one real
   run (ADR-0041).
@@ -435,8 +435,8 @@ is given to pi's code, kept out of `~/.pi` and a project's `.pi/`:
     default `SCRIPTED_DESCRIPTION`), so a describe request never takes a
     reply from the run's script (S48 item 22). `ModelSetup.describeModel` is
     that model when scripted, and the run's model otherwise. A run's end
-    asks for a verdict (ADR-0077), and the scripted model answers
-    `SCRIPTED_VERDICT` first, so a suite's threads are done.
+    asks for an urgency line (ADR-0077, ADR-0166), and the scripted model answers
+    `SCRIPTED_URGENCY` first, so a suite's threads are done.
   - **Each request queues its own response** (`perRequest`): both providers
     are wrapped so that `stream` and `streamSimple` append one dispatcher,
     then delegate. Faux takes a response off its queue when a request
@@ -963,7 +963,7 @@ conformance stayed green, which is why they ran first.
   resolves at once, and does not await the abort: the hook runs inside the
   lane's drive, which an awaited abort would wait on (S144).
 - **`complete` returns its tokens** (`Completed`): a budget counts a
-  relayed run's verdict and digest requests too.
+  relayed run's urgency and digest requests too.
 - **Gotcha: compaction keeps only what is stored.** pi summarises stored
   messages with `convertToLlm` and skips custom entries, so what an asked
   agent hears of another thread is copied into its thread as a heard

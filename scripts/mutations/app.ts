@@ -827,7 +827,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a root's drag lands nowhere",
     file: "packages/interface/drag.ts",
-    from: '    case "root":\n      return [verdict.intent]',
+    from: '    case "root":\n      return [drop.intent]',
     to: '    case "root":\n      return []',
     suite: "browser",
     scenario: "page",

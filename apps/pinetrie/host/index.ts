@@ -108,7 +108,7 @@ import { createCanvasNews } from "./canvas-news.ts"
 import { startCards } from "./cards.ts"
 import { createCommands } from "./commands/index.ts"
 import { startControl } from "./control.ts"
-import { createDigests, writePendingVerdict } from "./digests.ts"
+import { createDigests, writePendingRunEndReport } from "./digests.ts"
 import { startDirectory } from "./directory.ts"
 import {
   type HostDocuments,
@@ -640,7 +640,7 @@ export async function startHost({
     piSetup,
     draws,
   })
-  // Each run's verdict, and each ask's digest unless the config turns
+  // Each run's end report, and each ask's digest unless the config turns
   // digests off. What agents talking spend. Its drain and the relays are made
   // after the agent, whose hooks call them: bound late.
   const budgets = createBudgets({
@@ -773,7 +773,7 @@ export async function startHost({
     readPinned,
     readCanvasContext,
     baseNews,
-    pending: writePendingVerdict({ runs: runDocs, records }),
+    pending: writePendingRunEndReport({ runs: runDocs, records }),
   })
   const relays = createRelays({
     basics,

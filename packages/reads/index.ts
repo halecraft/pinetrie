@@ -49,6 +49,7 @@ import {
   type RevisionRecord,
   type RootId,
   type RootRecord,
+  type RunEndReportRecord,
   rootFirstLine,
   runPrompt,
   type SeatRecord,
@@ -63,7 +64,6 @@ import {
   type ThreadRecord,
   type TraceRecord,
   type TreeIndex,
-  type VerdictRecord,
   type Workflow,
   type WriterId,
 } from "@pinetrie/core"
@@ -105,6 +105,7 @@ import {
   REVISION,
   type RecordSpec,
   ROOT,
+  RUN_END_REPORT,
   readableThreadName,
   recordsIn,
   renderableMessage,
@@ -117,7 +118,6 @@ import {
   TRACE,
   tasksInArchive,
   textBlobs,
-  VERDICT,
   WORKFLOW,
   WORKFLOW_KEY,
 } from "@pinetrie/rules"
@@ -693,10 +693,10 @@ export const readTraces = (
   doc: SessionDocHandle,
 ): ReadonlyMap<string, TraceRecord> => readRecords(doc, TRACE)
 
-/** Each thread's last run's verdict (`pinetrie.verdict`), by lane. */
-export const readVerdicts = (
+/** Each thread's last run's end report (`pinetrie.runEndReport`), by lane. */
+export const readRunEndReports = (
   doc: SessionDocHandle,
-): ReadonlyMap<ThreadId, VerdictRecord> => readRecords(doc, VERDICT)
+): ReadonlyMap<ThreadId, RunEndReportRecord> => readRecords(doc, RUN_END_REPORT)
 
 // ── where lanes work ──────────────────────────────────────────────────────
 

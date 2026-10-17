@@ -1,7 +1,7 @@
-// host/digests — each long ask's digest, and each run's verdict. A digest is
+// host/digests — each long ask's digest, and each run's end report. A digest is
 // asked as its run goes, while someone reads it, at most once a `DIGEST_EVERY`,
 // unless the config turns digests off. At a run's end one request asks for
-// the verdict and the final digest together, digests on or off. `planDigest`,
+// the urgency line and the final digest together, digests on or off. `planDigest`,
 // `planRunEnded`, `digestToWrite` and `runEndedToWrite` decide, and `parseDigest`
 // and `parseEndReply` read the reply; this carries them out, each step and each
 // answer a late write (`later.ts`), so none lands in a thread archived or
@@ -11,7 +11,7 @@
 // is written once, so its ask never changes; a lane's tip moves with every
 // append, and by a run's end the drain queued before it may have moved it
 // to the next ask. So a run's end reads its last entry from its asks, and
-// takes its lane only as the verdict's key, never to read its tip.
+// takes its lane only as the run-end report's key, never to read its tip.
 
 import {
   type EntryId,
@@ -25,8 +25,8 @@ import {
   readDigests,
   readPlaces,
   readReading,
+  readRunEndReports,
   readTreeIndex,
-  readVerdicts,
 } from "@pinetrie/reads"
 import {
   type Answer,
@@ -37,14 +37,14 @@ import {
   type EndReply,
   endedOutcome,
   parseEndReply,
-  pendingVerdict,
+  pendingRunEndReport,
   planDigest,
   planRunEnded,
   queuedOn,
+  RUN_END_REPORT,
   readsAsk,
   runEndedToWrite,
   setRecord,
-  VERDICT,
 } from "@pinetrie/rules"
 import type { PresenceDocHandle } from "@pinetrie/schema"
 import type { Basics } from "./basics.ts"
@@ -65,7 +65,7 @@ type Failed = (error: unknown) => void
 export interface Digests {
   /** A turn of `lane`'s is done at `at`: a live digest of its ask, when due. */
   step(lane: ThreadId, at: EntryId, failed: Failed): Promise<void>
-  /** That run, in `root`, has ended: its verdict and its ask's final digest. */
+  /** That run, in `root`, has ended: its end report and its ask's final digest. */
   ended(
     root: RootId,
     lane: ThreadId,
@@ -75,12 +75,12 @@ export interface Digests {
 }
 
 /**
- * `lane`'s run that `prompt` started is stopping: its verdict is pending.
+ * `lane`'s run that `prompt` started is stopping: its end report is pending.
  * Written before the run's end closes it (`planRunEnd`), so no reader sees
- * the lane stopped beside the last run's verdict. Not a late write: the lane
+ * the lane stopped beside the last run's end report. Not a late write: the lane
  * still runs, so its canvas cannot be archived.
  */
-export const writePendingVerdict =
+export const writePendingRunEndReport =
   (deps: {
     readonly runs: RunDocs
     readonly records: Pick<Records, "writeValues">
@@ -90,7 +90,7 @@ export const writePendingVerdict =
     if (doc === null) return
     const end = indexAsks(readTreeIndex(doc)).last.get(prompt) ?? prompt
     await deps.records.writeValues([
-      setRecord(VERDICT, pendingVerdict(lane, prompt, end)),
+      setRecord(RUN_END_REPORT, pendingRunEndReport(lane, prompt, end)),
     ])
   }
 
@@ -101,7 +101,7 @@ export function createDigests(deps: {
   readonly presence: PresenceDocHandle
   /** The model a digest is asked of, and its skill. */
   readonly piSetup: Pick<PiSetup, "complete" | "skill">
-  /** The settled `digests.enabled`: off, a run's end asks for its verdict alone. */
+  /** The settled `digests.enabled`: off, a run's end asks for its urgency line alone. */
   readonly enabled: boolean
   /**
    * Tokens a request for `ask`'s run spent: its budget counts them, when
@@ -141,8 +141,9 @@ export function createDigests(deps: {
       basics.log(
         `[host] the model's ${half} is not one: ${JSON.stringify(reply)}`,
       )
-    if (request.answer !== "verdict" && read.digest === null) refused("digest")
-    if (request.answer !== "digest" && read.verdict === null) refused("verdict")
+    if (request.answer !== "urgency" && read.digest === null) refused("digest")
+    if (request.answer !== "digest" && read.urgency === null)
+      refused("urgency line")
     return read
   }
 
@@ -209,7 +210,7 @@ export function createDigests(deps: {
   /**
    * One step: gather, decide with `planRunEnded`, write what the facts
    * decide, and ask outside the queue for the rest. The request's settle
-   * runs even when it failed, so a verdict asked for never stays pending.
+   * runs even when it failed, so a run-end report asked for never stays pending.
    */
   const ended = (
     root: RootId,
@@ -220,14 +221,15 @@ export function createDigests(deps: {
     later
       .step(
         { kind: "thread", thread: lane },
-        "a run's verdict",
+        "a run's end report",
         async roots => {
           const doc = await roots.root(root)
           const index = readTreeIndex(doc)
           const asks = indexAsks(index)
           const end = asks.last.get(prompt) ?? prompt
           const plan = planRunEnded({
-            current: readVerdicts(basics.session).get(lane)?.ask === prompt,
+            current:
+              readRunEndReports(basics.session).get(lane)?.ask === prompt,
             // Until its fact is appended, a stop's queued fact names who
             // stopped the run.
             outcome: endedOutcome(
@@ -255,7 +257,7 @@ export function createDigests(deps: {
             const answer: Answer = request.answer
             void later.outside({
               scope: { kind: "thread", thread: lane },
-              what: "a run's verdict",
+              what: "a run's end report",
               held: { set: asking, key: prompt },
               failed,
               request: async () => {
@@ -282,7 +284,7 @@ export function createDigests(deps: {
                     end,
                     answer,
                     stored: {
-                      verdict: readVerdicts(basics.session).get(lane),
+                      report: readRunEndReports(basics.session).get(lane),
                       digest: readDigests(now).get(prompt),
                     },
                     reply,
@@ -292,15 +294,15 @@ export function createDigests(deps: {
               },
             })
           }
-          return plan.verdict === null
+          return plan.report === null
             ? null
             : {
                 records: [
-                  setRecord(VERDICT, {
+                  setRecord(RUN_END_REPORT, {
                     lane,
                     ask: prompt,
                     end,
-                    verdict: plan.verdict,
+                    report: plan.report,
                   }),
                 ],
               }

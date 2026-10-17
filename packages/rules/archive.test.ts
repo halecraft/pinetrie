@@ -78,7 +78,7 @@ const plan = (
     own: [],
     revisions: new Map(),
     trees: [],
-    verdicts: new Map(),
+    runEndReports: new Map(),
     ...over,
   })
 
@@ -87,27 +87,27 @@ describe("planArchive", () => {
     expect(plan()).toEqual({
       kind: "cross",
       teardown: { forget: [], refs: [], snapshots: [] },
-      verdicts: [],
+      runEndReports: [],
     })
   })
-  test("archiving settles its threads' pending verdicts as unclassified; another canvas's stay pending", () => {
-    const verdict = (name: string, kind: "pending" | "unclassified") => ({
+  test("archiving settles its threads' pending run-end reports as unclassified; another canvas's stay pending", () => {
+    const report = (name: string, kind: "pending" | "unclassified") => ({
       lane: threadIdFor(name),
       ask: entryId("a"),
       end: entryId("b"),
-      verdict: { kind },
+      report: { kind },
     })
-    const verdicts = new Map(
-      [verdict("mine", "pending"), verdict("theirs", "pending")].map(v => [
+    const runEndReports = new Map(
+      [report("mine", "pending"), report("theirs", "pending")].map(v => [
         v.lane,
         v,
       ]),
     )
-    expect(plan({ verdicts })).toMatchObject({
-      verdicts: [verdict("mine", "unclassified")],
+    expect(plan({ runEndReports })).toMatchObject({
+      runEndReports: [report("mine", "unclassified")],
     })
-    expect(plan({ verdicts, crossing: "restore" })).toMatchObject({
-      verdicts: [],
+    expect(plan({ runEndReports, crossing: "restore" })).toMatchObject({
+      runEndReports: [],
     })
   })
   test("refuses while an agent of its threads works, or cards wait there, held or not", () => {

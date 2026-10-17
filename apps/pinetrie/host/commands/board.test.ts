@@ -8,7 +8,12 @@ import {
   writerId,
 } from "@pinetrie/core"
 import { readPlaces } from "@pinetrie/reads"
-import { pendingVerdict, setRecord, VERDICT, WORKFLOW } from "@pinetrie/rules"
+import {
+  pendingRunEndReport,
+  RUN_END_REPORT,
+  setRecord,
+  WORKFLOW,
+} from "@pinetrie/rules"
 import { beginRun, writeEntry, writeLaneTip } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import {
@@ -136,13 +141,13 @@ test("archiving lets go of the canvas's stacks of moves, after its teardown; a m
   expect(open.histories.calls).toEqual([])
 })
 
-test("an idle canvas moved to Done with its last run's verdict pending leaves it unclassified", async () => {
+test("an idle canvas moved to Done with its last run's end report pending leaves it unclassified", async () => {
   const { b, records, deps } = setUp()
-  const pending = pendingVerdict(THREAD_1, entryId("e-1"), entryId("e-1"))
-  putValue(b, setRecord(VERDICT, pending))
+  const pending = pendingRunEndReport(THREAD_1, entryId("e-1"), entryId("e-1"))
+  putValue(b, setRecord(RUN_END_REPORT, pending))
   await handleCanvasMove(deps, ADA, toDone)
   expect(writtenValues(records.calls)).toEqual([
-    setRecord(VERDICT, { ...pending, verdict: { kind: "unclassified" } }),
+    setRecord(RUN_END_REPORT, { ...pending, report: { kind: "unclassified" } }),
   ])
 })
 

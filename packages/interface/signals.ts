@@ -8,7 +8,7 @@
 // holds text, not while its record exists: a record outlives its text. Only
 // your messages and your notes count: a queued card is on its way to being
 // sent, not left somewhere. A trace marks nothing yet: raising it is for
-// `attentionItems`, beside verdicts and ready proposed changes.
+// `attentionItems`, beside run-end reports and ready proposed changes.
 
 import type {
   CanvasId,

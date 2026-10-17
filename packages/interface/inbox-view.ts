@@ -23,7 +23,7 @@ const ORDER: readonly InboxSection[] = [
   "mentions",
 ]
 
-/** A verdict goes under its level; proposed changes, under ready. */
+/** A run-end report goes under its level; proposed changes, under ready. */
 const sectionOf = (item: Item): ThreadSection =>
   item.raised.kind === "ready" ? "ready" : item.level
 

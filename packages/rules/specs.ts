@@ -29,11 +29,11 @@ import { PROPOSED_CHANGES } from "./proposed.ts"
 import { QUEUE_HOLD } from "./queue-hold.ts"
 import { deleteRecord, type RecordSpec } from "./records.ts"
 import { ROOT } from "./roots.ts"
+import { RUN_END_REPORT } from "./run-end-report.ts"
 import { SEAT } from "./seat.ts"
 import { SETUP } from "./setup.ts"
 import { SHARED_LINEAGE } from "./shared.ts"
 import { THREAD } from "./thread.ts"
-import { VERDICT } from "./verdict.ts"
 import { LANE, LANE_FORK, PROJECT, REVISION } from "./work.ts"
 
 /** What a check over every record reads of a spec: its address and its decoder. */
@@ -73,7 +73,7 @@ export const RECORD_SPECS: readonly AnyRecordSpec[] = [
   SHARED_LINEAGE,
   STATE,
   TRACE,
-  VERDICT,
+  RUN_END_REPORT,
   WORKFLOW,
 ]
 

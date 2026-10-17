@@ -15,7 +15,7 @@
 //   - A run that times out is KILLED (hung): a guard against spinning, removed,
 //     makes the suite hang, and a hang is a failure.
 //   - With `expect`, a suite stops at that check (`PINETRIE_STOP_AT`,
-//     `apps/pinetrie/e2e/checks.ts`): nothing after it changes the verdict.
+//     `apps/pinetrie/e2e/checks.ts`): nothing after it changes the result.
 //   - A suite mutation runs only its scenario (`PINETRIE_SCENARIO`,
 //     `apps/pinetrie/e2e/scenario.ts`), with its suite's command (`SUITES`).
 //
@@ -24,7 +24,7 @@
 //
 // With `--against <command…>` last, each mutant runs that command instead of
 // its own and reports which checks fail: CAUGHT with their lines, or MISSED.
-// No verdict, and the exit status is 0. It finds where a suite mutation's bug
+// No result, and the exit status is 0. It finds where a suite mutation's bug
 // is already caught by a faster command, as a unit test.
 
 import { spawn } from "node:child_process"
@@ -91,7 +91,12 @@ export const SUITES: Readonly<
 export const mutationCommand = (m: Mutation): readonly string[] =>
   "suite" in m ? SUITES[m.suite].command : m.command
 
-export type Verdict = "KILLED" | "SURVIVED" | "BROKEN" | "ELSEWHERE" | "ANCHOR"
+export type MutantResult =
+  | "KILLED"
+  | "SURVIVED"
+  | "BROKEN"
+  | "ELSEWHERE"
+  | "ANCHOR"
 
 /** Signs that the mutant never ran: the change itself does not load. */
 const LOAD_FAILURES = [
@@ -113,7 +118,7 @@ export function judge(
     readonly output: string
   },
   expect: string | undefined,
-): Verdict {
+): MutantResult {
   if (run.timedOut) return "KILLED"
   if (LOAD_FAILURES.some(sign => run.output.includes(sign))) return "BROKEN"
   if (run.status === 0) return "SURVIVED"
@@ -236,7 +241,6 @@ export function choose(
     : `no mutation's name contains "${only}"`
 }
 
-/** A mutant's verdict, and the checks that failed with it in place. */
 /** Every mutation list in `dir` (`scripts/mutations`), by file name, in name order. */
 export async function loadMutationLists(
   dir: string,
@@ -258,16 +262,17 @@ export async function loadMutationLists(
   )
 }
 
+/** A mutant's result, and the checks that failed with it in place. */
 const apply = (
   root: string,
   m: Mutation,
 ): Promise<{
-  readonly verdict: Verdict
+  readonly result: MutantResult
   readonly failing: readonly string[]
 }> =>
   withMutant(root, m, async () => {
     const [cmd, ...args] = mutationCommand(m)
-    if (cmd === undefined) return { verdict: "BROKEN" as const, failing: [] }
+    if (cmd === undefined) return { result: "BROKEN" as const, failing: [] }
     const ran = await run(
       cmd,
       args,
@@ -276,10 +281,10 @@ const apply = (
       mutantEnv(process.env, m),
     )
     return {
-      verdict: judge(ran, m.expect),
+      result: judge(ran, m.expect),
       failing: [...new Set(failingChecks(ran.output).map(l => l.trim()))],
     }
-  }).then(r => (r === "ANCHOR" ? { verdict: r, failing: [] } : r))
+  }).then(r => (r === "ANCHOR" ? { result: r, failing: [] } : r))
 
 /** The checks `against` fails with the mutant in place, each once, trimmed. */
 const probe = (
@@ -328,13 +333,13 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   }
   let bad = 0
   for (const m of chosen) {
-    const { verdict, failing } = await apply(root, m)
-    console.log(`  ${verdict.padEnd(9)} ${m.name}`)
+    const { result, failing } = await apply(root, m)
+    console.log(`  ${result.padEnd(9)} ${m.name}`)
     // Caught by another check: the expect has drifted from the test that
     // catches it, which is one of these.
-    if (verdict === "ELSEWHERE")
+    if (result === "ELSEWHERE")
       for (const line of failing.slice(0, 5)) console.log(`      ${line}`)
-    if (verdict !== "KILLED") bad += 1
+    if (result !== "KILLED") bad += 1
   }
   console.log(`\n=== mutations: ${chosen.length - bad} killed, ${bad} not ===`)
   process.exit(bad)

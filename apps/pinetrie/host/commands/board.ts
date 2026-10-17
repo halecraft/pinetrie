@@ -28,8 +28,8 @@ import {
   readPlaces,
   readQueueHolds,
   readRevisions,
+  readRunEndReports,
   readTreeIndex,
-  readVerdicts,
   readWorkflow,
 } from "@pinetrie/reads"
 import {
@@ -38,9 +38,9 @@ import {
   planArchive,
   planBoardMove,
   planWorkflowEdit,
+  RUN_END_REPORT,
   setRecord,
   taskBoard,
-  VERDICT,
   WORKFLOW,
 } from "@pinetrie/rules"
 import { readLaneTip } from "@pinetrie/schema"
@@ -145,9 +145,9 @@ async function record(
   if (crossed.kind === "refused") return done(crossed)
   // execute
   const outcome = await deps.moves(roots).placeCanvas(writer, moved)
-  if (crossed.verdicts.length > 0)
+  if (crossed.runEndReports.length > 0)
     await deps.records.writeValues(
-      crossed.verdicts.map(v => setRecord(VERDICT, v)),
+      crossed.runEndReports.map(r => setRecord(RUN_END_REPORT, r)),
     )
   return {
     kind: "follow",
@@ -201,7 +201,7 @@ async function planCrossing(
     own,
     revisions,
     trees,
-    verdicts: readVerdicts(session),
+    runEndReports: readRunEndReports(session),
   })
 }
 

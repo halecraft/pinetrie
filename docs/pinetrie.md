@@ -426,9 +426,9 @@ under it in story, or nothing when the agent's last message says it all.
 
 **A thread's followers are told how its runs end** (ADR-0077). You follow a
 thread once you have written on it (`RootRecord.threads`). At each run's end
-the same request asks a model for a verdict, digests on or off: needs you,
-worth a read, or done, with a one-line reason (`pinetrie.verdict`, one per
-lane); a failed or stopped run's verdict is its facts. A canvas's item in
+the same request asks a model for an urgency line, digests on or off: needs you,
+worth a read, or done, with a one-line reason (`pinetrie.runEndReport`, one per
+lane); a failed or stopped run's end report is its facts. A canvas's item in
 the sidebar says what its threads need of you: a still ring while the agent works, an amber
 dot that pulses as it arrives when something needs you (a question, an
 error, work ready to add), a dim one when something is worth a read, a ✓
@@ -629,7 +629,7 @@ Decided, and waiting for their turn:
   skill to change what it asks; yours must still ask for a headline line
   and `- ` points, or `nothing to add`, since a reply in another shape is
   logged and dropped. With digests on or off, each run's end also asks
-  for its verdict (ADR-0077), a request of its own for a short ask; a
+  for its urgency line (ADR-0077), a request of its own for a short ask; a
   replaced skill must answer `needs you: <reason>`, `worth a read:
   <reason>` or `done` first, or the run is unclassified.
 - `PINETRIE_TOOLS=0` removes the tools. A thread's agent that starts the

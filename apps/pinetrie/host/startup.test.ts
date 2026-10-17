@@ -19,11 +19,11 @@ import {
   encodeCard,
   ICONS,
   PROJECT,
-  pendingVerdict,
+  pendingRunEndReport,
+  RUN_END_REPORT,
   SEAT,
   SETUP,
   setRecord,
-  VERDICT,
 } from "@pinetrie/rules"
 import { readNamespace } from "@pinetrie/schema"
 import { beginRun, newPlacesDoc, writeLaneTip } from "@pinetrie/schema/fixtures"
@@ -277,17 +277,19 @@ test("recover writes the project, icon and setup records only when they changed,
   ])
 })
 
-test("recover writes unclassified over a verdict a stopped host left pending", async () => {
+test("recover writes unclassified over a run-end report a stopped host left pending", async () => {
   const LANE = threadIdFor("0123456789abcdef")
   const b = basics()
-  const pending = pendingVerdict(LANE, entryId("p-1"), entryId("w-1"))
-  putValue(b, setRecord(VERDICT, pending))
+  const pending = pendingRunEndReport(LANE, entryId("p-1"), entryId("w-1"))
+  putValue(b, setRecord(RUN_END_REPORT, pending))
   const agent = fakePi()
   await recover(deps({ basics: b, ...ports(agent) }))
   expect(
-    writtenValues(agent.calls).filter(w => w.namespace === VERDICT.namespace),
+    writtenValues(agent.calls).filter(
+      w => w.namespace === RUN_END_REPORT.namespace,
+    ),
   ).toEqual([
-    setRecord(VERDICT, { ...pending, verdict: { kind: "unclassified" } }),
+    setRecord(RUN_END_REPORT, { ...pending, report: { kind: "unclassified" } }),
   ])
 })
 

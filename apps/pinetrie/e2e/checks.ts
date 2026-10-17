@@ -27,7 +27,7 @@ export interface Checks {
  * Whether a check's result ends the suite: it failed, and its label is
  * `stopAt`. `judge` in `scripts/mutate.ts` counts a mutant KILLED when a
  * FAIL line holds its `expect`, and `mutate` passes `expect` as
- * `PINETRIE_STOP_AT`: nothing after that check can change the verdict.
+ * `PINETRIE_STOP_AT`: nothing after that check can change the result.
  */
 export const stopsHere = (
   passed: boolean,

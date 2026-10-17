@@ -27,12 +27,12 @@ import {
   type NoteColumnId,
   type NoteColumnRecord,
   type RootId,
+  type RunEndReportRecord,
   type SeatRecord,
   type ThreadId,
   type ThreadRecord,
   type TraceRecord,
   type TreeIndex,
-  type VerdictRecord,
   type Workflow,
 } from "@pinetrie/core"
 import {
@@ -59,13 +59,13 @@ import {
   readProposedByLane,
   readQueueHolds,
   readRevisions,
+  readRunEndReports,
   readRunningLanes,
   readSeats,
   readSetup,
   readStates,
   readThreads,
   readTraces,
-  readVerdicts,
   readWorkflow,
 } from "@pinetrie/reads"
 import {
@@ -109,8 +109,8 @@ export interface SessionFacts {
   readonly noteColumns: ReadonlyMap<NoteColumnId, NoteColumnRecord>
   /** Every thread, by id: each one's root. */
   readonly threads: ReadonlyMap<ThreadId, ThreadRecord>
-  /** Each thread's last run's verdict, in any root, by lane. */
-  readonly verdicts: ReadonlyMap<ThreadId, VerdictRecord>
+  /** Each thread's last run's end report, in any root, by lane. */
+  readonly runEndReports: ReadonlyMap<ThreadId, RunEndReportRecord>
   readonly histories: ReadonlyMap<CardId, CardHistoryRecord>
   /** Every trace, by id: each column draws its reader's own. */
   readonly traces: ReadonlyMap<string, TraceRecord>
@@ -182,7 +182,7 @@ function readFacts(view: HeldView): SessionFacts {
     marks: readMarks(doc),
     noteColumns: readNoteColumns(doc),
     threads: readThreads(doc),
-    verdicts: readVerdicts(doc),
+    runEndReports: readRunEndReports(doc),
     histories: readCardHistories(doc),
     traces: readTraces(doc),
     workFacts: {

@@ -34,7 +34,7 @@ Reply with this alone: no heading, no quotes, no commentary. A reply in any othe
 
 ## At the end of a run
 
-When the request ends with "Answer with the verdict line", first say what the end of the run asks of the people in the thread, on one line of its own:
+When the request ends with "Answer with the urgency line", first say what the end of the run asks of the people in the thread, on one line of its own:
 
 ```
 needs you: <reason>
@@ -48,4 +48,4 @@ done
 - The reason is one line of 20 words or fewer, saying what they will find, not that they should look: "asks whether to drop the v1 table", "explains why the cache misses on reload".
 - When the last message asks anything at all, answer **needs you**.
 
-If the request says "the verdict line alone", reply with that line and nothing else. If it says "then the summary", put the summary, in the shape above, on the lines after it.
+If the request says "the urgency line alone", reply with that line and nothing else. If it says "then the summary", put the summary, in the shape above, on the lines after it.

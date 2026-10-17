@@ -1,13 +1,13 @@
 // The scripted model: its queue, its standing answer, and held replies.
 
 import path from "node:path"
-import { VERDICT_ALONE, VERDICT_THEN_DIGEST } from "@pinetrie/rules"
+import { URGENCY_ALONE, URGENCY_THEN_DIGEST } from "@pinetrie/rules"
 import { expect, test, vi } from "vitest"
 import { bindAgentDir } from "./agent-dir.ts"
 import { loadModelSetup, NO_RESOURCES } from "./config.ts"
 import {
   SCRIPTED_DESCRIPTION,
-  SCRIPTED_VERDICT,
+  SCRIPTED_URGENCY,
   type ScriptedModel,
   scriptedModel,
 } from "./scripted.ts"
@@ -188,7 +188,7 @@ test("a scripted tool step's call carries its arguments", async () => {
   ).toMatchObject([{ name: "read", arguments: { path: "notes.txt" } }])
 })
 
-test("a run's end is answered with a verdict line, first, so the suites' threads are done", async () => {
+test("a run's end is answered with an urgency line, first, so the suites' threads are done", async () => {
   const setup = await loadModelSetup(
     { kind: "scripted", script: scriptedModel() },
     where(),
@@ -202,11 +202,11 @@ test("a run's end is answered with a verdict line, first, so the suites' threads
         messages: [{ role: "user", content: user, timestamp: 0 }],
       }),
     )
-  expect(await describe(`What was asked\n\n${VERDICT_ALONE}\n`)).toBe(
-    SCRIPTED_VERDICT,
+  expect(await describe(`What was asked\n\n${URGENCY_ALONE}\n`)).toBe(
+    SCRIPTED_URGENCY,
   )
-  expect(await describe(`What was asked\n\n${VERDICT_THEN_DIGEST}\n`)).toBe(
-    `${SCRIPTED_VERDICT}\n${SCRIPTED_DESCRIPTION}`,
+  expect(await describe(`What was asked\n\n${URGENCY_THEN_DIGEST}\n`)).toBe(
+    `${SCRIPTED_URGENCY}\n${SCRIPTED_DESCRIPTION}`,
   )
   expect(await describe("a commit message, please")).toBe(SCRIPTED_DESCRIPTION)
 })

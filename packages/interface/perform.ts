@@ -216,7 +216,7 @@ function performOne(effect: Effect, ports: AppPorts): void {
         .then(outcome => perform(afterCanvasMove(outcome, effect.moved), ports))
       return
     case "notNeeded":
-      if (effect.raised.kind === "verdict")
+      if (effect.raised.kind === "runEnd")
         ports.attention.dismiss(effect.lane, effect.raised.ask)
       else if (effect.raised.kind === "ready" && effect.raised.source !== null)
         ports.attention.dismissReady(effect.lane, effect.raised.source)

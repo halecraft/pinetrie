@@ -1,5 +1,5 @@
 // schema/attention — what a person has dealt with: how far they have read each
-// thread, the verdicts and ready proposed changes they marked "not needed", and
+// thread, the run-end reports and ready proposed changes they marked "not needed", and
 // the mentions they have seen. A Yjs document per person, written only by that
 // person's tabs.
 //
@@ -19,19 +19,19 @@ import {
 export const AttentionDoc = yjs.bind(
   Schema.struct({
     /**
-     * Where this person started: a verdict that ended, or a mention
+     * Where this person started: a run-end report that ended, or a mention
      * written, at or before this entry id was before them. Set once, by the
      * first write; "" until then, which nothing is raised against.
      */
     since: Schema.string(),
     /**
      * The inbox's watermark (`inbox.ts`): every mention at or before it is
-     * seen. It moves as mentions are seen, so verdicts never read it.
+     * seen. It moves as mentions are seen, so run-end reports never read it.
      */
     mentionsSince: Schema.string(),
     /** Lane to the furthest entry read on it. */
     read: Schema.record(Schema.string()),
-    /** Lane to the ask whose verdict was marked "not needed". */
+    /** Lane to the ask whose run-end report was marked "not needed". */
     dismissed: Schema.record(Schema.string()),
     /** Lane to its proposed changes' `ledger.source` when it was marked "not needed". */
     dismissedReady: Schema.record(Schema.string()),

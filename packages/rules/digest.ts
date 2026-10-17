@@ -221,22 +221,22 @@ export function digestToWrite(input: {
 
 /**
  * What a request asks the model to answer with. At a run's end it is asked
- * for the verdict too, first, then the digest when there is one
+ * for the urgency line too, first, then the digest when there is one
  * to ask for.
  */
-export type Answer = "digest" | "verdict" | "verdict and digest"
+export type Answer = "digest" | "urgency" | "urgency and digest"
 
-/** The closing line of a request for the verdict alone. */
-export const VERDICT_ALONE = "Answer with the verdict line alone."
-/** The closing line of a request for the verdict and the digest. */
-export const VERDICT_THEN_DIGEST =
-  "Answer with the verdict line, then the summary."
+/** The closing line of a request for the urgency line alone. */
+export const URGENCY_ALONE = "Answer with the urgency line alone."
+/** The closing line of a request for the urgency line and the digest. */
+export const URGENCY_THEN_DIGEST =
+  "Answer with the urgency line, then the summary."
 
 /** The request's closing line for `answer`; none for a digest alone, whose skill says it. */
 const answerLine = (answer: Answer): string =>
   answer === "digest"
     ? ""
-    : `\n${answer === "verdict" ? VERDICT_ALONE : VERDICT_THEN_DIGEST}\n`
+    : `\n${answer === "urgency" ? URGENCY_ALONE : URGENCY_THEN_DIGEST}\n`
 
 /**
  * The request: the skill as the system text, then the ask, the run's

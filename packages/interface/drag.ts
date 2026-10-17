@@ -98,7 +98,7 @@ export type DragAt =
   | (CanvasSource & { readonly over: CanvasOver })
 
 /** What a drop there would do. */
-export type DragVerdict =
+export type PlannedDrop =
   /** A column moved along the strip, to `to`; null where it already is. */
   | { readonly kind: "reorder"; readonly to: number | null }
   /** A card landing on `target`, as `landing` says. */
@@ -120,15 +120,15 @@ export interface DragFrom {
   readonly archive: WorkflowStateId | null
 }
 
-const NOTHING: DragVerdict = { kind: "nothing" }
+const NOTHING: PlannedDrop = { kind: "nothing" }
 
 /** What dropping `at` where it is would do, `how` its Alt. */
-export function dragVerdict(
+export function planDrop(
   at: DragAt,
   from: DragFrom,
   how: PutHow,
   state: IntentState,
-): DragVerdict {
+): PlannedDrop {
   if (at.kind === "canvas") {
     const { over } = at
     if (over.kind === "none" || from.archive === null) return NOTHING
@@ -162,37 +162,37 @@ export function dragVerdict(
  * The intents a drop sends: the ones a key or a menu would. A reorder is
  * `moveColumn`, a landing a `put`, a canvas's drop its own; each runs its
  * own planner, so a drop does what the put key or Move up does. The
- * verdict holds all a drop needs besides its source.
+ * planned drop holds all it needs besides its source.
  */
 export function dropIntents(
   source: DragSource,
-  verdict: DragVerdict,
+  drop: PlannedDrop,
   how: PutHow,
 ): readonly Intent[] {
-  switch (verdict.kind) {
+  switch (drop.kind) {
     case "reorder":
-      return verdict.to === null || source.kind !== "card"
+      return drop.to === null || source.kind !== "card"
         ? []
         : [
             {
               kind: "moveColumn",
               column: { kind: "card", card: source.card },
-              to: verdict.to,
+              to: drop.to,
             },
           ]
     case "land":
-      return source.kind === "card" && verdict.landing.kind !== "refused"
+      return source.kind === "card" && drop.landing.kind !== "refused"
         ? [
             {
               kind: "put",
               source: { kind: "card", card: source.card },
-              target: verdict.target,
+              target: drop.target,
               how,
             },
           ]
         : []
     case "root":
-      return [verdict.intent]
+      return [drop.intent]
     case "nothing":
       return []
   }
@@ -284,8 +284,8 @@ export interface Armed {
 }
 
 /**
- * How a verdict is marked on its target: a canvas's landing as `root`
- * (`data-root-drop`), any other as what it would do (`data-drag-verdict`).
+ * How a planned drop is marked on its target: a canvas's landing as `root`
+ * (`data-root-drop`), any other as what it would do (`data-drop-mark`).
  */
 export type DropMark = "root" | "move" | "copy" | "replace" | "refused"
 
@@ -304,9 +304,9 @@ export interface DrawPlan {
   readonly opens: HoverOver
 }
 
-/** How a verdict is marked: what it would do there. */
-export function dropMark(verdict: DragVerdict, how: PutHow): DropMark | null {
-  switch (verdict.kind) {
+/** How a planned drop is marked: what it would do there. */
+export function dropMark(drop: PlannedDrop, how: PutHow): DropMark | null {
+  switch (drop.kind) {
     case "reorder":
       return null
     case "root":
@@ -314,9 +314,9 @@ export function dropMark(verdict: DragVerdict, how: PutHow): DropMark | null {
     case "nothing":
       return null
     case "land":
-      return verdict.landing.kind === "refused"
+      return drop.landing.kind === "refused"
         ? "refused"
-        : verdict.landing.kind === "replace"
+        : drop.landing.kind === "replace"
           ? "replace"
           : how === "copy"
             ? "copy"
@@ -340,11 +340,11 @@ export function drawPlan(
   pointer: Point,
   speed: number,
   at: DragAt,
-  verdict: DragVerdict,
+  drop: PlannedDrop,
   how: PutHow,
 ): DrawPlan {
   const lean = Math.max(-MAX_LEAN, Math.min(MAX_LEAN, speed * LEAN_PER_PX))
-  const mark = dropMark(verdict, how)
+  const mark = dropMark(drop, how)
   const opens = heldOpens(at)
   const still = armed.widths.map(() => 0)
   const { strip } = armed

@@ -3,10 +3,10 @@ import {
   canvasIdFor,
   type EntryId,
   entryId,
+  type RunEndReport,
+  type RunEndReportRecord,
   type ThreadId,
   threadIdFor,
-  type Verdict,
-  type VerdictRecord,
   writerId,
 } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
@@ -17,6 +17,7 @@ import {
   type AttentionInput,
   arrivals,
   attentionItems,
+  attentionLevel,
   attentionWords,
   canvasStatus,
   doneThreads,
@@ -25,7 +26,6 @@ import {
   markLevel,
   type Status,
   threadStatus,
-  verdictLevel,
 } from "./attention.ts"
 
 const ADA = writerId("ada@x.io")
@@ -37,17 +37,22 @@ const R2 = entryId("r2")
 const K1 = canvasIdFor("1")
 const _K2 = canvasIdFor("2")
 
-const said = (s: "needsYou" | "worthARead" | "done"): Verdict => ({
-  kind: "said",
-  said: s,
+const said = (s: "needsYou" | "worthARead" | "done"): RunEndReport => ({
+  kind: "modelSaid",
+  urgency: s,
   reason: s === "done" ? null : `why ${s}`,
 })
-const verdict = (
+const report = (
   lane: ThreadId,
-  v: Verdict,
+  r: RunEndReport,
   end = "e-5",
   ask = "p-1",
-): VerdictRecord => ({ lane, ask: entryId(ask), end: entryId(end), verdict: v })
+): RunEndReportRecord => ({
+  lane,
+  ask: entryId(ask),
+  end: entryId(end),
+  report: r,
+})
 
 const person = (over: Partial<Attention> = {}): Attention => ({
   since: "e-0",
@@ -65,7 +70,7 @@ const input = (over: Partial<AttentionInput> = {}): AttentionInput => ({
     [A, [BEA, ADA]],
     [B, [BEA]],
   ]),
-  verdicts: new Map([[A, verdict(A, said("needsYou"))]]),
+  runEndReports: new Map([[A, report(A, said("needsYou"))]]),
   openProposed: [],
   sshAsks: [],
   owner: null,
@@ -96,7 +101,7 @@ test("you follow a thread you wrote on", () => {
   expect(follows(ADA, [BEA])).toBe(false)
 })
 
-test.each<[string, Verdict, "needsYou" | "worthARead" | null]>([
+test.each<[string, RunEndReport, "needsYou" | "worthARead" | null]>([
   ["said needs you", said("needsYou"), "needsYou"],
   ["said worth a read", said("worthARead"), "worthARead"],
   ["said done", said("done"), null],
@@ -105,8 +110,8 @@ test.each<[string, Verdict, "needsYou" | "worthARead" | null]>([
   ["stopped by you", { kind: "stopped", by: ADA }, null],
   ["stopped by someone else", { kind: "stopped", by: BEA }, "worthARead"],
   ["pending", { kind: "pending" }, null],
-])("verdictLevel: %s", (_, v, level) => {
-  expect(verdictLevel(v, ADA)).toBe(level)
+])("attentionLevel: %s", (_, v, level) => {
+  expect(attentionLevel(v, ADA)).toBe(level)
 })
 
 describe("attentionItems", () => {
@@ -116,7 +121,7 @@ describe("attentionItems", () => {
     expect(
       attentionItems(
         input({
-          verdicts: new Map(),
+          runEndReports: new Map(),
           sshAsks: asks,
           owner: ADA,
           busy: new Set([C]),
@@ -131,16 +136,18 @@ describe("attentionItems", () => {
       },
     ])
     expect(
-      attentionItems(input({ verdicts: new Map(), sshAsks: asks, owner: BEA })),
+      attentionItems(
+        input({ runEndReports: new Map(), sshAsks: asks, owner: BEA }),
+      ),
     ).toEqual([])
   })
-  test("a verdict on a thread you follow, ended after where you read, is raised", () => {
+  test("a run-end report on a thread you follow, ended after where you read, is raised", () => {
     expect(attentionItems(input())).toEqual([
       {
         lane: A,
         end: "e-5",
         level: "needsYou",
-        raised: { kind: "verdict", verdict: said("needsYou"), ask: "p-1" },
+        raised: { kind: "runEnd", report: said("needsYou"), ask: "p-1" },
       },
     ])
   })
@@ -149,14 +156,14 @@ describe("attentionItems", () => {
     expect(
       attentionItems(
         input({
-          verdicts: new Map([[B, verdict(B, said("needsYou"))]]),
+          runEndReports: new Map([[B, report(B, said("needsYou"))]]),
           openProposed: [proposed(B, cardIdFor("c1"))],
         }),
       ),
     ).toEqual([])
   })
 
-  test("reading to the run's end, on any device, clears its verdict", () => {
+  test("reading to the run's end, on any device, clears its report", () => {
     expect(
       attentionItems(
         input({ person: person({ read: new Map([[A, entryId("e-5")]]) }) }),
@@ -169,21 +176,23 @@ describe("attentionItems", () => {
     ).toHaveLength(1)
   })
 
-  test("a verdict from before you started is not raised; nothing is before your document's first write", () => {
+  test("a run-end report from before you started is not raised; nothing is before your document's first write", () => {
     expect(attentionItems(input({ person: person({ since: "e-9" }) }))).toEqual(
       [],
     )
     expect(attentionItems(input({ person: person({ since: "" }) }))).toEqual([])
   })
 
-  test("not needed clears a verdict until the next run's", () => {
+  test("not needed clears a run-end report until the next run's", () => {
     const dismissed = person({ dismissed: new Map([[A, entryId("p-1")]]) })
     expect(attentionItems(input({ person: dismissed }))).toEqual([])
     expect(
       attentionItems(
         input({
           person: dismissed,
-          verdicts: new Map([[A, verdict(A, said("needsYou"), "e-9", "p-2")]]),
+          runEndReports: new Map([
+            [A, report(A, said("needsYou"), "e-9", "p-2")],
+          ]),
         }),
       ),
     ).toHaveLength(1)
@@ -198,7 +207,7 @@ describe("attentionItems", () => {
     const read = person({ read: new Map([[A, entryId("e-9")]]) })
     const items = attentionItems(
       input({
-        verdicts: new Map(),
+        runEndReports: new Map(),
         openProposed: [proposed(A, cardIdFor("c1"))],
         person: read,
       }),
@@ -212,7 +221,7 @@ describe("attentionItems", () => {
     expect(
       attentionItems(
         input({
-          verdicts: new Map(),
+          runEndReports: new Map(),
           openProposed: [proposed(A, cardIdFor("c1"))],
           person: dismissed,
         }),
@@ -221,7 +230,7 @@ describe("attentionItems", () => {
     expect(
       attentionItems(
         input({
-          verdicts: new Map(),
+          runEndReports: new Map(),
           openProposed: [proposed(A, cardIdFor("c2"))],
           person: dismissed,
         }),
@@ -231,8 +240,8 @@ describe("attentionItems", () => {
 })
 
 describe("threadStatus and canvasStatus", () => {
-  const facts = { work: new Map(), verdicts: new Map() }
-  test("working wins, and a pending verdict is working; else the highest item", () => {
+  const facts = { work: new Map(), runEndReports: new Map() }
+  test("working wins, and a pending run-end report is working; else the highest item", () => {
     const items = attentionItems(
       input({ openProposed: [proposed(A, cardIdFor("c1"))] }),
     )
@@ -247,7 +256,7 @@ describe("threadStatus and canvasStatus", () => {
       threadStatus({
         ...facts,
         items,
-        verdicts: new Map([[A, verdict(A, { kind: "pending" })]]),
+        runEndReports: new Map([[A, report(A, { kind: "pending" })]]),
       }).get(A),
     ).toEqual({ kind: "working" })
   })
@@ -333,9 +342,9 @@ test("doneThreads: a run you follow that was done, or that you stopped", () => {
   expect(
     doneThreads(
       input({
-        verdicts: new Map([
-          [A, verdict(A, said("done"))],
-          [B, verdict(B, said("done"))],
+        runEndReports: new Map([
+          [A, report(A, said("done"))],
+          [B, report(B, said("done"))],
         ]),
       }),
     ),
@@ -343,7 +352,7 @@ test("doneThreads: a run you follow that was done, or that you stopped", () => {
   expect(
     doneThreads(
       input({
-        verdicts: new Map([[A, verdict(A, { kind: "stopped", by: ADA })]]),
+        runEndReports: new Map([[A, report(A, { kind: "stopped", by: ADA })]]),
       }),
     ),
   ).toEqual(new Set([A]))
@@ -351,9 +360,9 @@ test("doneThreads: a run you follow that was done, or that you stopped", () => {
 
 test("attentionWords: each reason, as a value worded once", () => {
   const nameOf = (w: string) => (w === BEA ? "Bea" : w)
-  const of = (v: Verdict) =>
+  const of = (v: RunEndReport) =>
     attentionWords(
-      { kind: "verdict", verdict: v, ask: entryId("p") as EntryId },
+      { kind: "runEnd", report: v, ask: entryId("p") as EntryId },
       nameOf,
     )
   expect(of(said("needsYou"))).toBe("why needsYou")

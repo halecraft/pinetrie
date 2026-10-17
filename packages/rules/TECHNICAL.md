@@ -75,7 +75,7 @@ follow this list. A name only this package uses is imported from its module.
 - `board.ts`, `archive.ts`, `order.ts`: the board's workflow states and
   each root's place, what crossing the archive's edge does, and order
   keys (a queue's, the pinned cards' and the board's).
-- `roots.ts`, `mark.ts`, `title.ts`, `stop.ts`, `digest.ts`, `verdict.ts`:
+- `roots.ts`, `mark.ts`, `title.ts`, `stop.ts`, `digest.ts`, `run-end-report.ts`:
   the directory of roots, titles, who stopped a run and carrying on after
   it, an ask's digest, and how a thread's last run ended.
 - `names.ts`, `banner.ts`: a thread's name and its banner, each with its
@@ -144,9 +144,10 @@ root's record is written only through a step's documents (ADR-0162).
   (`host/directory.ts`, `planRebuild`), never migrated. The host refreshes
   it whenever the root's document changes, so it lags a running turn by one
   step of the host's queue.
-- **`VERDICT`** (`verdict.ts`, ADR-0077): a thread's last run's verdict,
-  keyed by lane, in the session: the run's prompt and last entry, and what
-  happened (pending, said, failed, stopped, unclassified), never a level,
+- **`RUN_END_REPORT`** (`run-end-report.ts`, ADR-0077, ADR-0166): a thread's
+  last run's end report, keyed by lane, in the session: the run's prompt and
+  last entry, and what happened (pending, the model's urgency, failed,
+  stopped, unclassified), never a level,
   which each client decides for its person.
 - **`LANE`** is written for every lane as it is created, naming its root;
   `history` is null for a lane with no copy of its own. `planLaneRecords`
@@ -386,8 +387,8 @@ are the only code that builds or reads the shape.
 - **`planStartup`** (`startup.ts`): a starting host resumes every lane a
   crash interrupted, before anything queued for it, since it holds its
   operation open (S36); its run's end then drains it. It drains every other
-  lane with cards queued for it, since no run's end will. A verdict left
-  pending lost its request with the last host and is `unclassified`, unless
+  lane with cards queued for it, since no run's end will. A run-end report
+  left pending lost its request with the last host and is `unclassified`, unless
   its lane is resumed. What does not survive a process (runs and streams)
   is cleared first (`planClear`, `live.ts`).
 
@@ -1114,8 +1115,8 @@ and made read-only, never removed.
   inventory, still holds a thread of (`stillHeld`). The host passes its
   lanes of their own (`own`, each with its root's index) and the revision
   records, so no part decides anything when it runs.
-- **An archive settles its threads' pending verdicts** (`verdicts`,
-  `unclassifiedPending`, `verdict.ts`): the run's end that would write one
+- **An archive settles its threads' pending run-end reports**
+  (`runEndReports`, `unclassifiedPending`, `run-end-report.ts`): the run's end that would write one
   is a late write, which an archived canvas refuses, so the archive writes
   `unclassified` with its place, as a starting host does for a request it
   lost (`planStartup`).
@@ -1181,7 +1182,7 @@ queue (`holdOnStop`, ADR-0048 step 7), written before the abort.
   `askOutcome`, the thread's face and the dock's `laneNext` read it; no
   reader takes a map of stops. A stop whose run answered anyway is ignored.
 - **Until its fact is appended, the queued fact names the stopper**
-  (`runStopper`): the run's verdict, written as the run ends, reads the
+  (`runStopper`): the run's end report, written as the run ends, reads the
   outcome so (`endedOutcome`), and so does the dock.
 - **A run stopped before stops were facts names nobody**: its
   `pinetrie.stop` record is in no spec now, so a starting host's sweep of
@@ -1246,32 +1247,32 @@ headline is a digest with nothing to draw. No agent reads it.
   reply writes an empty final digest: a live headline says what the run
   was doing, which is no longer true.
 - **`askLines`** is an ask's run as transcript lines, `planDigest`'s and a
-  short ask's verdict request's alike.
+  short ask's urgency request's alike.
 - **`digestRequest`** is the skill, the ask, the run's newest work that fits
   (`fitNewest`: the oldest is cut first), the last word, the last digest,
   and what to answer with (`Answer`): a digest alone ends with nothing
-  more, a verdict with `VERDICT_ALONE` or `VERDICT_THEN_DIGEST`, which the
+  more, an urgency line with `URGENCY_ALONE` or `URGENCY_THEN_DIGEST`, which the
   scripted model reads. The ask and the last word are never cut.
 
-# Verdicts (`verdict.ts`, ADR-0077)
+# Run-end reports (`run-end-report.ts`, ADR-0077, ADR-0166)
 
 How a thread's last run ended, for the people who follow it.
 
-- **`planRunEnded`** decides a run's end: a failed or stopped run's verdict
+- **`planRunEnded`** decides a run's end: a failed or stopped run's report
   is its facts, and only a due digest is asked for; an answered run asks
-  for its verdict, with its final digest when `planDigest` gives one; a run
-  with no entry to read is unclassified; a run whose stored verdict is no
-  longer its own (`current`) gets no verdict.
-- **`parseVerdictLine` refuses rather than cuts**, as `parseDigest` does: `needs you:
+  for its urgency, with its final digest when `planDigest` gives one; a run
+  with no entry to read is unclassified; a run whose stored report is no
+  longer its own (`current`) gets no report.
+- **`parseUrgencyLine` refuses rather than cuts**, as `parseDigest` does: `needs you:
   <reason>`, `worth a read: <reason>` or `done`, in any case, a reason of at
   most `REASON_WORDS` words.
 - **`parseEndReply`** reads a run's final reply as `Answer` asked for it: the
-  first line a verdict, the rest a digest, each refused on its own.
+  first line an urgency line, the rest a digest, each refused on its own.
 - **`runEndedToWrite` is the whole write decision**, both records in one
-  write: the model's verdict, or `unclassified` for a failed request or a
+  write: the model's urgency, or `unclassified` for a failed request or a
   refused line, never written over the next run's; the digest as
   `digestToWrite` decides a final one, none for a failed request.
-- **`pendingVerdict`** is what a run's end writes before it closes the run.
+- **`pendingRunEndReport`** is what a run's end writes before it closes the run.
 
 # A model setting (`config.ts`)
 

@@ -14,7 +14,7 @@
 // A scenario's fixed waits are its other cost: each is paid in full on every
 // run, and guesses when a state comes. `FIXED_WAITS` lists the few left.
 //
-// And no test or scenario reads a duration: its verdict would hang on the
+// And no test or scenario reads a duration: its result would hang on the
 // machine's load. A clock reading subtracted is refused everywhere.
 
 import { globSync, readFileSync } from "node:fs"

@@ -548,11 +548,11 @@ export function planStackEnded(input: {
   const refused = (why: string) => ({ kind: "refused", why }) as const
   const { facts, gathered } = input
   if (facts === "no-top") return refused("the stack's bookmark was not set")
-  const verdict = acceptStack({
+  const acceptance = acceptStack({
     revisions: facts.revisions.length,
     differing: facts.differing,
   })
-  if (!verdict.ok) return refused(verdict.reason)
+  if (!acceptance.ok) return refused(acceptance.reason)
   if (gathered === null) return refused("the thread's lane is not in your repo")
   const { place, name, proposed } = gathered
   if (name === undefined) return refused("the thread has no name yet")

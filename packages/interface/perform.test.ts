@@ -478,7 +478,7 @@ test("a fold that moves goes through the fold's port, whose commit lands it; one
   expect(q.dispatch).toHaveBeenCalledWith(action)
 })
 
-test("not needed marks a verdict by its ask, proposed changes by its source, and proposed changes with none not at all", () => {
+test("not needed marks a run-end report by its ask, proposed changes by its source, and proposed changes with none not at all", () => {
   const p: Ports = ports()
   const lane = threadIdFor("a")
   perform(
@@ -487,8 +487,8 @@ test("not needed marks a verdict by its ask, proposed changes by its source, and
         kind: "notNeeded",
         lane,
         raised: {
-          kind: "verdict",
-          verdict: { kind: "unclassified" },
+          kind: "runEnd",
+          report: { kind: "unclassified" },
           ask: entryId("p-1"),
         },
       },

@@ -17,20 +17,20 @@ import {
   type PointId,
   type Refusal,
   type RevisionRecord,
+  type RunEndReportRecord,
   refused,
   type SnapshotId,
   type ThreadId,
   type TreeIndex,
   threadEnd,
   threadsWork,
-  type VerdictRecord,
 } from "@pinetrie/core"
 import {
   type CanvasIndex,
   canvasOfCard,
   canvasOfTarget,
 } from "./canvas-index.ts"
-import { unclassifiedPending } from "./verdict.ts"
+import { unclassifiedPending } from "./run-end-report.ts"
 import { planRetention } from "./work.ts"
 
 /** Into the archive, or out of it: `stateTransition`'s crossings. */
@@ -58,11 +58,11 @@ type ArchivePlan =
       /** Off the keeper, after the place is written. */
       readonly teardown: ArchiveTeardown
       /**
-       * With the place, on archiving: each of the canvas's threads' verdicts
+       * With the place, on archiving: each of the canvas's threads' run-end reports
        * still pending, `unclassified`. Its run's end, a late write, is
        * refused from now on, and would have been the one to write it.
        */
-      readonly verdicts: readonly VerdictRecord[]
+      readonly runEndReports: readonly RunEndReportRecord[]
     }
 
 /** Why a canvas cannot be archived now, as the board and the host both say it. */
@@ -96,8 +96,8 @@ export function planArchive(input: {
   readonly revisions: ReadonlyMap<EntryId, RevisionRecord>
   /** Its roots' trees, whose every thread's end keeps its snapshot. */
   readonly trees: readonly TreeIndex[]
-  /** Every thread's verdict, by its lane. */
-  readonly verdicts: ReadonlyMap<ThreadId, VerdictRecord>
+  /** Every thread's run-end report, by its lane. */
+  readonly runEndReports: ReadonlyMap<ThreadId, RunEndReportRecord>
 }): ArchivePlan {
   const { crossing } = input
   const busy = threadsWork(input.lanes, new Set(input.threads))
@@ -106,9 +106,9 @@ export function planArchive(input: {
   return {
     kind: "cross",
     teardown: planTeardown(crossing, input),
-    verdicts:
+    runEndReports:
       crossing === "archive"
-        ? unclassifiedPending(input.verdicts.values(), lane =>
+        ? unclassifiedPending(input.runEndReports.values(), lane =>
             input.threads.includes(lane),
           )
         : [],

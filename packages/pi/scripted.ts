@@ -22,7 +22,7 @@ import {
   type TranscriptContext,
 } from "@earendil-works/pi-ai"
 import type { ToolId } from "@pinetrie/core"
-import { VERDICT_ALONE, VERDICT_THEN_DIGEST } from "@pinetrie/rules"
+import { URGENCY_ALONE, URGENCY_THEN_DIGEST } from "@pinetrie/rules"
 
 /**
  * One scripted reply: text; text made from the context the model was given,
@@ -76,16 +76,16 @@ const handles = new WeakMap<
 export const SCRIPTED_DESCRIPTION = "proposed changes: scripted"
 
 /** What a scripted model says of a run's end: nothing is needed. */
-export const SCRIPTED_VERDICT = "done"
+export const SCRIPTED_URGENCY = "done"
 
 /**
- * A describe request's answer: `describe`, with the verdict line first when
+ * A describe request's answer: `describe`, with the urgency line first when
  * the request is a run's end, which asks for it (`digestRequest`).
  */
 function describeStep(describe: ScriptStep, asked: string): ScriptStep {
-  if (asked.includes(VERDICT_ALONE)) return { text: SCRIPTED_VERDICT }
-  if (asked.includes(VERDICT_THEN_DIGEST) && "text" in describe)
-    return { text: `${SCRIPTED_VERDICT}\n${describe.text}` }
+  if (asked.includes(URGENCY_ALONE)) return { text: SCRIPTED_URGENCY }
+  if (asked.includes(URGENCY_THEN_DIGEST) && "text" in describe)
+    return { text: `${SCRIPTED_URGENCY}\n${describe.text}` }
   return describe
 }
 

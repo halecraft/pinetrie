@@ -137,7 +137,7 @@ a value is stored.
 | **fork** | The point, at an entry, where threads diverge; not an entry. Forking before an entry edits it (ADR-0043); after it, branches. | `ThreadOrigin.fork` | |
 | **margin** | An entry's surface, for comments on it; shut, a count beside the entry; open, the comments under it (ADR-0126). | place `margin`, `marginCards`, `marginCounts`, `Margin`, `MarginFace` | |
 | **comment** | A note on an entry, in its margin: people read it; the agent does once a reference to it is queued (ADR-0126). | `comment`, `planComment`, `queueReference`, `commentMarkdown` | annotation |
-| **derivation** | What the host computes from a thread's entries and replaces as they grow: a digest, a verdict. Never an entry, never a card, never read by the agent; one a model made says so. | `DigestRecord`, `VerdictRecord` | host record (for these), annotation |
+| **derivation** | What the host computes from a thread's entries and replaces as they grow: a digest, a run-end report. Never an entry, never a card, never read by the agent; one a model made says so. | `DigestRecord`, `RunEndReportRecord` | host record (for these), annotation |
 
 ## The board
 
@@ -200,7 +200,7 @@ code word alone.)
 - **close**: what × does in the sidebar, for you alone, writing nothing
   shared, and on a card opened from your inventory, folding it back into
   its slot. Nothing archives by closing.
-- **done**: a run's verdict, a ✓ that fades when it ends with nothing to
+- **done**: a run's end report, a ✓ that fades when it ends with nothing to
   do (ADR-0077). A thread can be done while its canvas is a task in
   Active.
 - **task**, **topic** and **ask**: a task and a topic are a canvas, by its

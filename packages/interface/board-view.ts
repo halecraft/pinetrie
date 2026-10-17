@@ -45,7 +45,7 @@ export type Count =
 
 /** What a workflow state shows of its roots' work, beyond their count. */
 export interface StateSignals {
-  /** Its canvases the agent works in (`Status` working, a pending verdict among them): ◌. */
+  /** Its canvases the agent works in (`Status` working, a pending run-end report among them): ◌. */
   readonly working: number
   /** Its canvases with changes ready to accept: ⇡. */
   readonly ready: number

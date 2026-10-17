@@ -547,7 +547,7 @@ folded strip's, a note column's too), a card frame's header, a slot's card,
 a board card, a sidebar row. Each handle carries `dragProps` (`data-drag-card`
 or `data-drag-canvas`), and the engine finds its source with
 `sourceOfElement`. It decides nothing: `drag.ts` in `@pinetrie/interface`
-does (`dragVerdict` over `putLanding` and `planRootDrop`, `drawPlan`,
+does (`planDrop` over `putLanding` and `planRootDrop`, `drawPlan`,
 `dropIntents`, `hoverOpens`). It gathers by source (`DragAt`): a canvas's
 drag reads only the root zones, a card's the strip, ▦ and the drop
 zones. It marks a target with the attribute the plan's mark names, and
@@ -577,12 +577,12 @@ set `data-card-drag`.
   frame to 33 ms at 4× throttling; written on change, it is the
   baseline's. The engine keeps the element it marked and the mark it
   wrote, and writes again only when either changes. When it read the mark
-  back from `data-drag-verdict` instead, a canvas's mark (`data-root-drop`)
+  back from `data-drop-mark` instead, a canvas's mark (`data-root-drop`)
   never matched, and was written every frame.
 - **A drag writes to the DOM, never to React state**: a transform,
   `data-dragging` on what moves, `data-reordering` on the strip,
   `data-card-drag` on the body (an empty pinned strip shows, and drop zones
-  are outlined), `data-drag-verdict` on the target (`move`, `copy`,
+  are outlined), `data-drop-mark` on the target (`move`, `copy`,
   `replace`, `refused`) or `data-root-drop` for a canvas's landing,
   `data-hover-open` on the target's own element (a sidebar row a card is
   onto, ▦) while its ring fills. It reads the intent state from a function each frame, never

@@ -414,7 +414,7 @@ The shape of a `RootDoc`: pi's storage and the host's `records`. A
 - **values** — LWW map over `(namespace, key)`: pi's own. Carries
   `pi.branch.tip`, `pi.lane.*`, `pi.op.*`.
 - **records** — the host's records (`pinetrie.*`, ADR-0062, ADR-0095: the
-  directory, lanes, proposed changes, marks, digests, verdicts, seats…), a record per
+  directory, lanes, proposed changes, marks, digests, run-end reports, seats…), a record per
   namespace then key, written by the host directly. The session's document
   holds only these.
 

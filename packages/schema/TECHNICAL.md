@@ -370,14 +370,14 @@ panel draws a slot whose card is not held as empty.
 `readAttention`:
 
 - `since`: where they started, set once by the first write and never moved:
-  a verdict that ended, or a mention written, at or before it is not new to
+  a run-end report that ended, or a mention written, at or before it is not new to
   them. "" until then, which nothing is raised against.
 - `mentionsSince` and `seen`: the inbox (`packages/interface/inbox.ts`). The
   inbox's watermark moves as mentions are seen, so it is a field of its own:
-  verdicts read only `since`.
+  run-end reports read only `since`.
 - `read`: per lane, the furthest entry read, which only moves forward
   (`readStep`).
-- `dismissed` and `dismissedReady`: per lane, the ask whose verdict, and
+- `dismissed` and `dismissedReady`: per lane, the ask whose run-end report, and
   the `ledger.source` whose ready proposed changes, was marked "not needed".
   `dismissedReady` was named for offers before ADR-0153.
 - A key that is no lane name is left out when read.

@@ -27,6 +27,9 @@
   - ADR-0091: an open offer is marked on the board for everyone, and listed
     and counted in your inbox for its followers.
   - ADR-0128: a run another thread asked for has its verdict in that thread.
+  - ADR-0166: the record is `RunEndReportRecord`, stored under
+    `pinetrie.runEndReport`; a model's answer is the kind `modelSaid`, with
+    its `urgency`.
 
 Builds on ADR-0076.
 

@@ -1,4 +1,4 @@
-// interface/attention — what needs you, and where, decided. A verdict clears by
+// interface/attention — what needs you, and where, decided. A run-end report clears by
 // reading past it, proposed changes by accepting or withdrawing it, and either
 // by "not needed".
 
@@ -7,9 +7,9 @@ import type {
   CanvasId,
   EntryId,
   RootRecord,
+  RunEndReport,
+  RunEndReportRecord,
   ThreadId,
-  Verdict,
-  VerdictRecord,
   WriterId,
 } from "@pinetrie/core"
 import { PRODUCT_NAME } from "@pinetrie/core"
@@ -40,22 +40,25 @@ export const follows = (me: WriterId, writers: readonly WriterId[]): boolean =>
   writers.includes(me)
 
 /**
- * What a verdict asks of `me`, one of its thread's followers: what the
+ * What a run-end report asks of `me`, one of its thread's followers: what the
  * model said, unless it was `done`; a failed or unclassified run needs
  * you; a stop is done for whoever stopped it, and worth a read for the
- * rest; a pending verdict asks nothing yet.
+ * rest; a pending report asks nothing yet.
  */
-export function verdictLevel(verdict: Verdict, me: WriterId): Level | null {
-  switch (verdict.kind) {
+export function attentionLevel(
+  report: RunEndReport,
+  me: WriterId,
+): Level | null {
+  switch (report.kind) {
     case "pending":
       return null
-    case "said":
-      return verdict.said === "done" ? null : verdict.said
+    case "modelSaid":
+      return report.urgency === "done" ? null : report.urgency
     case "failed":
     case "unclassified":
       return "needsYou"
     case "stopped":
-      return verdict.by === me ? null : "worthARead"
+      return report.by === me ? null : "worthARead"
   }
 }
 
@@ -72,8 +75,8 @@ export const threadWriters = (
 /** What raised a thread's attention, and what "not needed" marks. */
 export type Raised =
   | {
-      readonly kind: "verdict"
-      readonly verdict: Verdict
+      readonly kind: "runEnd"
+      readonly report: RunEndReport
       /** The run's prompt: what "not needed" dismisses. */
       readonly ask: EntryId
     }
@@ -99,7 +102,7 @@ export interface AttentionInput {
   readonly me: WriterId
   /** Each thread's writers (`threadWriters`). */
   readonly writers: ReadonlyMap<ThreadId, readonly WriterId[]>
-  readonly verdicts: ReadonlyMap<ThreadId, VerdictRecord>
+  readonly runEndReports: ReadonlyMap<ThreadId, RunEndReportRecord>
   readonly openProposed: readonly OpenProposedChanges[]
   /** Lanes waiting for their owner's answer about ssh (`appView`'s `sshAsks`). */
   readonly sshAsks: readonly SshAsk[]
@@ -122,7 +125,7 @@ const followed = (input: AttentionInput, lane: ThreadId): boolean =>
   !input.archived.has(lane) && follows(input.me, input.writers.get(lane) ?? [])
 
 /**
- * Everything raised for you, verdicts and ready proposed changes apart: a
+ * Everything raised for you, run-end reports and ready proposed changes apart: a
  * thread can raise both. Only a thread you follow raises anything, and only
  * while its agent is idle and its canvas is not archived. Before your document's
  * first write (`since` ""), where you started is not known, and nothing is
@@ -134,8 +137,8 @@ export function attentionItems(input: AttentionInput): readonly Item[] {
   const yours = (lane: ThreadId): boolean =>
     !input.busy.has(lane) && followed(input, lane)
   const items: Item[] = []
-  for (const v of input.verdicts.values()) {
-    const level = verdictLevel(v.verdict, me)
+  for (const v of input.runEndReports.values()) {
+    const level = attentionLevel(v.report, me)
     if (!yours(v.lane) || level === null) continue
     if (v.end <= latest(person.since, person.read.get(v.lane))) continue
     if (person.dismissed.get(v.lane) === v.ask) continue
@@ -143,7 +146,7 @@ export function attentionItems(input: AttentionInput): readonly Item[] {
       lane: v.lane,
       end: v.end,
       level,
-      raised: { kind: "verdict", verdict: v.verdict, ask: v.ask },
+      raised: { kind: "runEnd", report: v.report, ask: v.ask },
     })
   }
   for (const o of input.openProposed) {
@@ -203,7 +206,7 @@ const withItem = (now: Status | undefined, next: Status): Status => {
 
 /**
  * Each thread's status: working while its agent works, cards wait for it
- * to be free, or its verdict is pending (the agent's side is not finished);
+ * to be free, or its run-end report is pending (the agent's side is not finished);
  * else its highest item. Cards behind a held queue are not work: they wait
  * for a person. A thread with none of these has none.
  */
@@ -211,13 +214,13 @@ export function threadStatus(input: {
   readonly items: readonly Item[]
   /** Threads whose agent works, held by this tab or not (`threadWork`). */
   readonly work: ReadonlyMap<ThreadId, AgentWork>
-  readonly verdicts: ReadonlyMap<ThreadId, VerdictRecord>
+  readonly runEndReports: ReadonlyMap<ThreadId, RunEndReportRecord>
 }): ReadonlyMap<ThreadId, Status> {
   const out = new Map<ThreadId, Status>()
   for (const [thread, work] of input.work)
     if (work !== "held") out.set(thread, { kind: "working" })
-  for (const v of input.verdicts.values())
-    if (v.verdict.kind === "pending") out.set(v.lane, { kind: "working" })
+  for (const v of input.runEndReports.values())
+    if (v.report.kind === "pending") out.set(v.lane, { kind: "working" })
   for (const item of input.items)
     out.set(item.lane, withItem(out.get(item.lane), { kind: item.level, item }))
   return out
@@ -241,14 +244,14 @@ export function canvasStatus(
 }
 
 /**
- * The threads where a run you follow ended asking nothing of you (`verdictLevel`
+ * The threads where a run you follow ended asking nothing of you (`attentionLevel`
  * null, and not pending): what a ✓ marks as it fades (`arrivals`).
  */
 export function doneThreads(input: AttentionInput): ReadonlySet<ThreadId> {
   const out = new Set<ThreadId>()
-  for (const v of input.verdicts.values()) {
-    if (!followed(input, v.lane) || v.verdict.kind === "pending") continue
-    if (verdictLevel(v.verdict, input.me) === null) out.add(v.lane)
+  for (const v of input.runEndReports.values()) {
+    if (!followed(input, v.lane) || v.report.kind === "pending") continue
+    if (attentionLevel(v.report, input.me) === null) out.add(v.lane)
   }
   return out
 }
@@ -311,9 +314,9 @@ export function attentionWords(
   if (raised.kind === "ready") return "changes ready to accept"
   if (raised.kind === "ssh")
     return `wants your ssh for ${raised.host ?? "a host"}`
-  const v = raised.verdict
+  const v = raised.report
   switch (v.kind) {
-    case "said":
+    case "modelSaid":
       return v.reason ?? "done"
     case "failed":
       return v.error === "" ? "the run failed" : `the run failed: ${v.error}`

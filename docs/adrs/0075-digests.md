@@ -10,6 +10,9 @@
 - **Amended by:**
   - ADR-0077: the final request also asks for the run's verdict, first, and
     its reply is read by `endReplyOf`.
+  - ADR-0166: a run's end request closes with "Answer with the urgency line
+    alone." or "Answer with the urgency line, then the summary.", and the
+    `ask-digest` skill looks for those words.
 
 **Context.** ADR-0056 asked a model for "two or three plain sentences: what
 was asked, what has been done, and what is happening now" for every ask

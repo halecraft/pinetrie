@@ -2851,7 +2851,8 @@ export const mutations: readonly Mutation[] = [
     from: '  item.raised.kind === "ready" ? "ready" : item.level',
     to: "  item.level",
     command: unit,
-    expect: "each verdict under its level, each proposed changes under ready",
+    expect:
+      "each run-end report under its level, each proposed changes under ready",
   },
   {
     name: "the mentions section shows alone",
@@ -2988,12 +2989,12 @@ export const mutations: readonly Mutation[] = [
     expect: "a thread you do not follow raises nothing",
   },
   {
-    name: "reading a thread does not clear its verdict",
+    name: "reading a thread does not clear its run-end report",
     file: "packages/interface/attention.ts",
     from: "    if (v.end <= latest(person.since, person.read.get(v.lane))) continue",
     to: "    if (v.end <= person.since) continue",
     command: unit,
-    expect: "reading to the run's end, on any device, clears its verdict",
+    expect: "reading to the run's end, on any device, clears its report",
   },
   {
     name: "reading a thread clears its proposed changes",
@@ -3030,10 +3031,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a stop raises worth a read for whoever stopped it",
     file: "packages/interface/attention.ts",
-    from: '      return verdict.by === me ? null : "worthARead"',
+    from: '      return report.by === me ? null : "worthARead"',
     to: '      return "worthARead"',
     command: unit,
-    expect: "verdictLevel: stopped by you",
+    expect: "attentionLevel: stopped by you",
   },
   {
     name: "proposed changes are counted twice",
@@ -3045,12 +3046,12 @@ export const mutations: readonly Mutation[] = [
       "counts what needs you, proposed changes of threads you follow and unseen mentions",
   },
   {
-    name: "a pending verdict is no work",
+    name: "a pending run-end report is no work",
     file: "packages/interface/attention.ts",
-    from: '    if (v.verdict.kind === "pending") out.set(v.lane, { kind: "working" })',
+    from: '    if (v.report.kind === "pending") out.set(v.lane, { kind: "working" })',
     to: '    if (false) out.set(v.lane, { kind: "working" })',
     command: unit,
-    expect: "working wins, and a pending verdict is working",
+    expect: "working wins, and a pending run-end report is working",
   },
   {
     name: "a first render arrives at every mark",
@@ -3061,12 +3062,12 @@ export const mutations: readonly Mutation[] = [
     expect: "a first render arrives at nothing",
   },
   {
-    name: "not needed marks no verdict",
+    name: "not needed marks no run-end report",
     file: "packages/interface/perform.ts",
     from: "        ports.attention.dismiss(effect.lane, effect.raised.ask)",
     to: "        undefined",
     command: unit,
-    expect: "not needed marks a verdict by its ask",
+    expect: "not needed marks a run-end report by its ask",
   },
   {
     name: "a root's ⋯ offers no not needed",
@@ -4271,7 +4272,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a refused landing is dropped anyway",
     file: "packages/interface/drag.ts",
-    from: '      return source.kind === "card" && verdict.landing.kind !== "refused"',
+    from: '      return source.kind === "card" && drop.landing.kind !== "refused"',
     to: '      return source.kind === "card"',
     command: unit,
     expect:

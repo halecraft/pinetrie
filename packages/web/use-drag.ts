@@ -2,7 +2,7 @@
 // a column's, a card's, a slot's, a canvas's, by the pointer. It decides
 // nothing (`drag.ts` in `@pinetrie/interface` does): each frame it gathers
 // what the source is over and the element it read that from, asks
-// `dragVerdict` and `drawPlan`, and applies the plan to `style` and
+// `planDrop` and `drawPlan`, and applies the plan to `style` and
 // `dataset`, the target's mark and what a hold opens included; a drop
 // sends `dropIntents`. A drag writes to the DOM, never to React state: a
 // render of `App` per pointer move would redraw every column.
@@ -23,7 +23,6 @@ import {
   type DragFrom,
   type DragSource,
   type DropMark,
-  dragVerdict,
   drawPlan,
   dropIntents,
   edgeScroll,
@@ -36,6 +35,7 @@ import {
   NOT_A_HANDLE,
   type PutHow,
   placeAfter,
+  planDrop,
   pointerGap,
   ROOT_DROP_ZONE,
   ROOT_GROUP_ZONE,
@@ -170,7 +170,7 @@ export function useDrag(input: {
     const how = (): PutHow => (alt ? "copy" : "move")
 
     const unmark = (el: HTMLElement) => {
-      delete el.dataset.dragVerdict
+      delete el.dataset.planDrop
       delete el.dataset.rootDrop
     }
     const mark = (el: HTMLElement | null, value: DropMark | null) => {
@@ -181,7 +181,7 @@ export function useDrag(input: {
       if (el === null) return
       unmark(el)
       if (value === "root") el.dataset.rootDrop = ""
-      else if (value !== null) el.dataset.dragVerdict = value
+      else if (value !== null) el.dataset.planDrop = value
     }
 
     const setHover = (at: HoverOver, el: HTMLElement | null) => {
@@ -270,8 +270,8 @@ export function useDrag(input: {
       const p = press
       if (p === null || !begun) return
       const seen = gather(p)
-      const verdict = dragVerdict(seen.at, p.from, how(), read())
-      const plan = drawPlan(p.armed, { x, y }, speed, seen.at, verdict, how())
+      const drop = planDrop(seen.at, p.from, how(), read())
+      const plan = drawPlan(p.armed, { x, y }, speed, seen.at, drop, how())
       speed *= 0.6
       // Only what changed is written: a style written again, the same,
       // still costs the page a style pass over what it touches.
@@ -388,7 +388,7 @@ export function useDrag(input: {
       if (p === null || e.pointerId !== p.pointer) return
       if (!begun) return finish(false)
       const seen = gather(p)
-      const final = dragVerdict(seen.at, p.from, how(), read())
+      const final = planDrop(seen.at, p.from, how(), read())
       const intents = dropIntents(seen.at, final, how())
       finish(intents.length > 0)
       for (const intent of intents) send(intent)

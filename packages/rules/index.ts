@@ -258,8 +258,8 @@ export {
   planDigest,
   pointsText,
   readsAsk,
-  VERDICT_ALONE,
-  VERDICT_THEN_DIGEST,
+  URGENCY_ALONE,
+  URGENCY_THEN_DIGEST,
 } from "./digest.ts"
 export {
   type ClassedWrites,
@@ -576,6 +576,15 @@ export {
   roundRequest,
 } from "./round.ts"
 export {
+  type EndReply,
+  parseEndReply,
+  parseUrgencyLine,
+  pendingRunEndReport,
+  planRunEnded,
+  RUN_END_REPORT,
+  runEndedToWrite,
+} from "./run-end-report.ts"
+export {
   checkRecipe,
   dirtyPaths,
   drainLane,
@@ -642,7 +651,6 @@ export {
   planStop,
   runStopper,
 } from "./stop.ts"
-
 export { THREAD } from "./thread.ts"
 export {
   planTitling,
@@ -658,15 +666,6 @@ export {
   folderIncoming,
   type UpdateMessage,
 } from "./update.ts"
-export {
-  type EndReply,
-  parseEndReply,
-  parseVerdictLine,
-  pendingVerdict,
-  planRunEnded,
-  runEndedToWrite,
-  VERDICT,
-} from "./verdict.ts"
 export {
   type ForkSource,
   forkSource,

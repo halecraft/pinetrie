@@ -19,11 +19,11 @@ import {
   readProject,
   readProposedByLane,
   readRecords,
+  readRunEndReports,
   readRunning,
   readSeats,
   readSetup,
   readThreadName,
-  readVerdicts,
   readWorkflow,
 } from "@pinetrie/reads"
 import {
@@ -42,11 +42,11 @@ import {
   planStartup,
   planUndeclaredSweep,
   planWorkflowSeed,
+  RUN_END_REPORT,
   SEAT,
   SETUP,
   setIfChanged,
   setRecord,
-  VERDICT,
 } from "@pinetrie/rules"
 import {
   applyLiveOps,
@@ -133,7 +133,7 @@ export async function recoverRoot(
   const planned = planStartup({
     cards: readPlaces(places),
     interrupted,
-    verdicts: [],
+    runEndReports: [],
   })
   // execute
   if (undeclared.length > 0) {
@@ -166,7 +166,7 @@ export async function recoverRoot(
  * accepted work and bases of another kind than the project's
  * (`planKindSweep`); name every lane that has none; recover the roots opened
  * (`recoverRoot`), in one step; write what the host found, the commands its
- * pi loaded, the icon source and the verdicts whose request died with the
+ * pi loaded, the icon source and the run-end reports whose request died with the
  * last host, those that changed in one write; sweep what no one will type in
  * again (`sweepTexts`); and last, settle the lanes with cards queued, whose
  * compaction then holds every write above. Nothing else runs yet, so clearing
@@ -217,10 +217,10 @@ export async function recover(deps: StartupDeps): Promise<void> {
   const planned = planStartup({
     cards: readPlaces(places),
     interrupted,
-    verdicts: [...readVerdicts(doc).values()],
+    runEndReports: [...readRunEndReports(doc).values()],
   })
   const changed = [
-    ...planned.unclassified.map(v => setRecord(VERDICT, v)),
+    ...planned.unclassified.map(v => setRecord(RUN_END_REPORT, v)),
     // A lane that waited for its owner's answer waits no longer: the request
     // went with the host that held it.
     ...planAccessRecovery(

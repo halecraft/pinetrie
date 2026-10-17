@@ -910,7 +910,7 @@ The rail is E; the column is T. Seeing both at once is the product.
   - **An agent cannot read another thread yet.** A `read_thread` tool,
     reaching as far as a mention does, is decided and not built. A budget
     chosen in the composer, a top-up of a spent one, dismissing a member, a
-    relayed run's verdict in the thread that asked, and "talking in
+    relayed run's end report in the thread that asked, and "talking in
     sable-meadow" in the asked thread's header are shelved (ADR-0160).
 - **The send button says what the message will do**: "send", "send to Ada"
   ("send to Ada +2" for three), "send to agent", or, while the agent is busy,

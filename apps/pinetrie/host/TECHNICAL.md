@@ -54,7 +54,7 @@ wires them.
 | `jj/` | jj's adapter (`startJjProject`, § jj's adapter): each lane's proposed changes in your repo (ADR-0105), on the owner of your repo (§ Proposed changes), and the reviews and diffs a page reads of it (ADR-0047); accepted work's record and commands (`jj/accepted.ts`); each lane's fetch into your repo (`jj/fetch.ts`); splits (`jj/split.ts`) |
 | `names.ts` | every thread's name (ADR-0039, ADR-0117): `ensure` for the lanes pi holds and the threads recorded, `reserve` for a thread a column opened before its first message (ADR-0057), on one queue |
 | `banners.ts` | each thread's column banner (ADR-0050, ADR-0053): made as the thread is named, at reservation or creation, set by `set_banner`; every step a late one |
-| `digests.ts` | each ask's digest (ADR-0106, ADR-0075), unless the config turns them off (ADR-0071); a live digest waits for someone reading the thread (presence, ADR-0024); every step a late one, and `writePendingVerdict`, the verdict a stopping run writes before its end |
+| `digests.ts` | each ask's digest (ADR-0106, ADR-0075), unless the config turns them off (ADR-0071); a live digest waits for someone reading the thread (presence, ADR-0024); every step a late one, and `writePendingRunEndReport`, the run-end report a stopping run writes before its end |
 | `relays.ts` | another thread's agent asked (ADR-0128): `ask` and `leave` (the tools' hooks), `relayMessage` (a person's chat that asks or invites), `relayCard` (an ask card popped), `deliver` (a relay into a thread, for these and the round) |
 | `answers.ts` | what a relayed run sends back once it has ended (ADR-0128): its answer, the answers held for a busy asker, and the round, each a late step (`Answers.ended`, from `runs.onEnded`) |
 | `threads-now.ts` | a thread as it is now, for the relays, the answers and the late steps: its reach, its tree, end and lane (`thread`, which opens only a live thread's root), and the names a message uses |
@@ -159,7 +159,7 @@ wires them.
 ## A run's end
 
 `planRunEnd(role)` returns the order, and `runs.ts` carries it out: a
-split's `splitEnded`, then `verdictPending`, `endRun`, `laneStopped`,
+split's `splitEnded`, then `runEndReportPending`, `endRun`, `laneStopped`,
 `ended`. A resolution ends as any run does (ADR-0080, S104): what it left
 conflicted is the proposed changes', and whether the agent asked is the tree's. A run touches no tools: every lane's list is the
 same for every run (`packages/pi/TECHNICAL.md`, S85).
@@ -171,13 +171,14 @@ same for every run (`packages/pi/TECHNICAL.md`, S85).
   steered into the lane, so the next run plans from the tree alone. `ended`
   drains the lane; a drain that ran before
   `endRun` could start the next run with the last one's reply still open.
-- **The verdict is pending before `endRun`** (ADR-0077, `writePendingVerdict`):
-  written after, a page would see the lane stopped beside the last run's
-  verdict, and draw its arrival. Its `end` is the run's last entry from its
+- **The run-end report is pending before `endRun`** (ADR-0077,
+  `writePendingRunEndReport`, the step `runEndReportPending`): written
+  after, a page would see the lane stopped beside the last run's report,
+  and draw its arrival. Its `end` is the run's last entry from its
   asks, as at `ended`.
 - **A failure before `endRun` is logged as `run end failed`,** and `endRun`
   and every step after it still run.
-- **`ended` is one function, set once** in `startHost`: `settle`, banners, and the verdict with the final digest. It breaks a cycle: a run's end
+- **`ended` is one function, set once** in `startHost`: `settle`, banners, and the run-end report with the final digest. It breaks a cycle: a run's end
   drains, the drain may run an update, and an update may start a run.
   `runs.ts` imports neither the queue's pop nor the commands.
 - **`ended` is given the run's prompt**, read at the start of `end()`,
@@ -229,7 +230,7 @@ same for every run (`packages/pi/TECHNICAL.md`, S85).
 - **A run holds its root by a lease**, taken in `Runs.start`, which takes
   its step's `StepDocs` and so runs only in a step, and released after the
   run's `ended` has run. What reads a running lane's root (its stream, its
-  pinned cards, its canvas's context, its budget, its pending verdict, base
+  pinned cards, its canvas's context, its budget, its pending run-end report, base
   news, `save_blob`) reads `RunDocs.docOf`, whose null is "no run". The
   leases say what must stay in memory; which lanes run is
   `pinetrie:live`'s.
@@ -367,7 +368,14 @@ until the next compaction (S120), and the host compacts at startup. So
   registered: each lane of its own without a fork record gets one, begun
   when a revision record names it or (a folder lane) it has a start state,
   its `lost` from `pinetrie.files-lost`, which the startup's sweep then
-  deletes; owed otherwise, from accepted work. It reads every root too. `0021-entry-words` (ADR-0158) renamed
+  deletes; owed otherwise, from accepted work. It reads every root too.
+  `0024-run-end-report` (ADR-0166) is registered after it: each session
+  record under `pinetrie.verdict` moves to `pinetrie.runEndReport`, its
+  `verdict` named `report` and a model's `said` named `modelSaid` with its
+  `urgency`. `rewriteRecords` keeps a record in its namespace, so this one
+  writes the set and the delete itself. A record in no known shape is not
+  moved, and the same start's sweep of undeclared records deletes it.
+  `0021-entry-words` (ADR-0158) renamed
   each root's stored entries raw, by `customType` (a person's message
   `pinetrie.chat` to `pinetrie.message`, the cards pinned to a task to
   `pinetrie.canvas-pinned`, and `details` naming a canvas), and never an
@@ -1028,7 +1036,7 @@ rejects `shutdown()`.
   first press is the one named. With a message card queued it holds the
   queue first (`holdOnStop`, ADR-0048 step 7); the run's end, a drain on
   the same keeper, appends the stop's fact, which goes before the cards,
-  and pops nothing else. The run's verdict names the stopper from the
+  and pops nothing else. The run's end report names the stopper from the
   queued fact (`endedOutcome`).
 - **`queue-hold` holds or releases a thread's queue** (`handleQueueHold`,
   `planQueueHold`): it answers how the queue is now, `held` or `released`,
@@ -1118,14 +1126,14 @@ queued cards, which `planArchive` refuses.
 - **Exempt, each with its reason** (the list is closed):
   - commands, and the sends made for one: `planGate`, through `clear`;
   - the archive's own steps (`commands/board.ts`): they write about the
-    archived canvas on purpose, its pending verdicts among them (below);
+    archived canvas on purpose, its pending run-end reports among them (below);
   - upkeep: the directory's refresh and rebuild, the sweeps
     (`housekeeping.ts`, the trash, holds, histories, provenance), names,
     seats, the compaction, startup;
   - what happens inside a running lane, whose canvas cannot be archived
     (`planArchive` refuses `running`): `budgets`' `stopNow` in pi's gate,
     `split-call.ts`, `canvas-news.ts`, `base-news.ts`,
-    `writePendingVerdict`, `runs.ts`;
+    `writePendingRunEndReport`, `runs.ts`;
   - a budget's own record (`BUDGET`), written when it goes over whatever
     became of its thread, so a restored canvas's agents cannot spend it
     again;
@@ -1146,32 +1154,33 @@ queued cards, which `planArchive` refuses.
 
   Every places write, exempt or not, goes through `Places.change`.
 - **An archive settles what it cuts off.** A run's end the gate refuses
-  would leave its verdict `pending` in the archive for good, so the
-  archive's record step writes `unclassified` over each pending verdict of
-  the canvas's threads (`planArchive`'s `verdicts`, `unclassifiedPending`),
+  would leave its end report `pending` in the archive for good, so the
+  archive's record step writes `unclassified` over each pending report of
+  the canvas's threads (`planArchive`'s `runEndReports`,
+  `unclassifiedPending`),
   as a starting host does.
 
-## Digests and verdicts (`digests.ts`, ADR-0106, ADR-0077)
+## Digests and run-end reports (`digests.ts`, ADR-0106, ADR-0077, ADR-0166)
 
 - **Always made.** The config's `digests` (`enabled`) turns off live
-  digests and the final digest; a run's end still asks for its verdict.
+  digests and the final digest; a run's end still asks for its urgency.
 - **A run's end is one request** (`planRunEnded`): a failed or stopped run's
-  verdict is written from its facts and only a due digest is asked for; an
-  answered run asks for its verdict, with the final digest when
-  `planDigest` gives one, and for a short ask the verdict alone. The
-  request's last line says which (`VERDICT_ALONE`, `VERDICT_THEN_DIGEST`),
+  end report is written from its facts and only a due digest is asked for;
+  an answered run asks for its urgency line, with the final digest when
+  `planDigest` gives one, and for a short ask the urgency line alone. The
+  request's last line says which (`URGENCY_ALONE`, `URGENCY_THEN_DIGEST`),
   and the scripted model answers it (`packages/pi/scripted.ts`).
-- **One settle, one write** (`runEndedToWrite`): the verdict and the digest
-  together. A failed request still settles, so a verdict asked for is
+- **One settle, one write** (`runEndedToWrite`): the run-end report and the
+  digest together. A failed request still settles, so a report asked for is
   `unclassified`, never left pending; a reply for a run whose stored
-  verdict the next run's end has replaced writes no verdict. A failed
+  report the next run's end has replaced writes no report. A failed
   request writes no digest, as before.
-- **The lane keys the verdict and nothing else.** `ended` takes it from
+- **The lane keys the run-end report and nothing else.** `ended` takes it from
   `runs.onEnded`, and reads the run's last entry from its asks: the lane's
   tip may already be past the run (below). It is also the scope of every
   late step `digests.ts` takes, a live digest's (`step(lane, at)`) and a
   run's end's, so none lands in a thread archived meanwhile.
-- **A starting host** writes `unclassified` over each verdict still pending
+- **A starting host** writes `unclassified` over each run-end report still pending
   (`planStartup`), unless its lane is resumed.
 - **Asked on events, each naming an entry**: the tip the lane's `turnDone`
   hook is given (wrapped in `startHost` after lane work records the turn),
@@ -1190,7 +1199,7 @@ queued cards, which `planArchive` refuses.
   digest. No agent reads the answer.
 - **The reply is read in `request`, as a title's is** (`titles.ts`):
   `parseEndReply` there, and each refused half logged ("the model's digest is
-  not one", "the model's verdict is not one"). The answer's `plan` gets
+  not one", "the model's urgency line is not one"). The answer's `plan` gets
   the parsed reply, never raw model text. A live digest writes what `digestToWrite`
   returns; a run's end, what `runEndedToWrite` returns.
 - A missing `ask-digest` skill is logged, and settles as a failed request.

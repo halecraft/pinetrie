@@ -73,7 +73,7 @@ export type ReadCanvasContext = (lane: ThreadId) => Promise<CanvasContext>
 /**
  * A running lane's root, through the lease its run holds from its start
  * until its end's last step has run. What reads a run's root (its stream, its
- * pinned cards, its canvas's context, its budget, its pending verdict) reads it
+ * pinned cards, its canvas's context, its budget, its pending run-end report) reads it
  * here; null is "no run". The leases say what must stay in memory: which
  * lanes run is `pinetrie:live`'s.
  */
@@ -125,7 +125,7 @@ export interface Runs {
 /** One step of a run's end, in the order `planRunEnd` returns them. */
 export type RunEndStep =
   | "splitEnded"
-  | "verdictPending"
+  | "runEndReportPending"
   | "endRun"
   | "laneStopped"
   | "ended"
@@ -134,14 +134,14 @@ export type RunEndStep =
  * A run's end, in order, from its prompt's role. A split checks its stack,
  * however it started. A resolution ends as any run does: its outcome is the
  * proposed changes' conflicts and the agent's asks in the tree. The run's
- * verdict is pending before `endRun`: written after, a reader would see the
- * lane stopped beside the last run's verdict. `endRun` comes before
+ * end report is pending before `endRun`: written after, a reader would see
+ * the lane stopped beside the last run's end report. `endRun` comes before
  * `laneStopped` and `ended`: it closes the lane's streams, and what follows
  * reads the lane as idle.
  */
 export function planRunEnd(role: string | undefined): readonly RunEndStep[] {
   const outcome: readonly RunEndStep[] = role === "stack" ? ["splitEnded"] : []
-  return [...outcome, "verdictPending", "endRun", "laneStopped", "ended"]
+  return [...outcome, "runEndReportPending", "endRun", "laneStopped", "ended"]
 }
 
 /**
@@ -188,7 +188,7 @@ export function createRuns(deps: {
   readonly readCanvasContext: ReadCanvasContext
   /** What a chat's run is told first of its base's new work, and forgetting what was steered once the lane stops. */
   readonly baseNews: Pick<BaseNews, "atStart" | "runEnded">
-  /** Write `lane`'s run's verdict as pending (`Digests.pending`). */
+  /** Write `lane`'s run's end report as pending (`Digests.pending`). */
   readonly pending: (lane: ThreadId, prompt: EntryId) => Promise<void>
 }): Runs {
   const { basics, agent, work, readPinned, readCanvasContext, baseNews } = deps
@@ -216,7 +216,7 @@ export function createRuns(deps: {
         case "splitEnded":
           if (prompt !== null) await work.splitEnded(lane, prompt.id)
           return
-        case "verdictPending":
+        case "runEndReportPending":
           if (prompt !== null) await deps.pending(lane, prompt.id)
           return
         case "endRun":

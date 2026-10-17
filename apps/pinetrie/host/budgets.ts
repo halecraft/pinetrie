@@ -85,7 +85,7 @@ export interface Budgets {
   spent(key: EntryId): boolean
   /** A model request of `lane`'s run was answered, with `tokens`. */
   onUsage(lane: ThreadId, tokens: RequestTokens): void
-  /** A request outside the thread for `prompt`'s run spent `tokens`: its verdict or digest. */
+  /** A request outside the thread for `prompt`'s run spent `tokens`: its urgency line or digest. */
   spendFor(prompt: EntryId, tokens: number): void
   /** A request agents talking made outside every run spent `tokens` from `key`: the round's. */
   spendFrom(key: EntryId, tokens: number): void

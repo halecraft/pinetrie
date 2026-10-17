@@ -461,7 +461,7 @@ export async function connectSession(
     intents: () => slotIntents(local.current().moves),
   })
   // Before the directory arrives, a start would leave out every root not yet
-  // read, and their verdicts and mentions would count as new.
+  // read, and their run-end reports and mentions would count as new.
   const attention = attentionStore(exchange, me, host.peerId, () =>
     sync(session).readyFor(p => p.peerId === host.peerId)
       ? startingSince(readRoots(session).values())

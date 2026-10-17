@@ -34,7 +34,7 @@ export const ignoreDirs = (paths: readonly string[]): readonly string[] =>
   [...new Set(paths.flatMap(ancestorsOf))].sort()
 
 /** `m`'s answer for `rel`, or `before` when no pattern of it matches. */
-const verdict = (m: Ignore, rel: string, before: boolean): boolean => {
+const ignoredBy = (m: Ignore, rel: string, before: boolean): boolean => {
   const said = m.test(rel)
   return said.ignored ? true : said.unignored ? false : before
 }
@@ -58,11 +58,11 @@ export function ignoredPaths(input: {
   const matched = (p: string, isDir: boolean): boolean => {
     const slash = isDir ? "/" : ""
     const parts = p.split("/")
-    let ignored = verdict(own, `${p}${slash}`, false)
+    let ignored = ignoredBy(own, `${p}${slash}`, false)
     for (let i = 0; i < parts.length; i++) {
       const m = byDir.get(parts.slice(0, i).join("/"))
       if (m !== undefined)
-        ignored = verdict(m, `${parts.slice(i).join("/")}${slash}`, ignored)
+        ignored = ignoredBy(m, `${parts.slice(i).join("/")}${slash}`, ignored)
     }
     return ignored
   }

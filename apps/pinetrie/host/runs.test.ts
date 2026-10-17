@@ -68,7 +68,7 @@ describe("planRunEnd", () => {
     expect(planRunEnd("land")).toEqual(planRunEnd("person"))
     expect(planRunEnd("stack")).toEqual([
       "splitEnded",
-      "verdictPending",
+      "runEndReportPending",
       "endRun",
       "laneStopped",
       "ended",
@@ -76,11 +76,11 @@ describe("planRunEnd", () => {
     expect(planRunEnd(undefined)).not.toContain("splitEnded")
   })
 
-  test("the verdict is pending before endRun, for every role", () => {
+  test("the run-end report is pending before endRun, for every role", () => {
     for (const role of [undefined, "person", "land", "stack"]) {
       const steps = planRunEnd(role)
-      expect(steps.indexOf("verdictPending")).toBeGreaterThanOrEqual(0)
-      expect(steps.indexOf("verdictPending")).toBeLessThan(
+      expect(steps.indexOf("runEndReportPending")).toBeGreaterThanOrEqual(0)
+      expect(steps.indexOf("runEndReportPending")).toBeLessThan(
         steps.indexOf("endRun"),
       )
     }
@@ -101,7 +101,7 @@ function setUp(
     splitEnded,
   })
   const agent = record<Pick<Agent, "lane">>({ lane: () => lane.lane })
-  // Whether the lane was still running when its verdict was made pending.
+  // Whether the lane was still running when its end report was made pending.
   const pending: { prompt: string; running: boolean }[] = []
   const runDocs = createRunDocs()
   const runs = createRuns({
@@ -166,7 +166,7 @@ describe("a run's end", () => {
     })
   })
 
-  test("its verdict is made pending while the run is still active, for the prompt it answered", async () => {
+  test("its run-end report is made pending while the run is still active, for the prompt it answered", async () => {
     const { b, lane, runs, pending, ended } = setUp()
     runs.start(runnableFor(LANE), {
       kind: "prompt",
@@ -493,7 +493,7 @@ test("a run holds its lane's root from its start until its end's last step, thro
     readCanvasContext: async () => [],
     baseNews: { atStart: async () => null, runEnded: () => {} },
     pending: async () => {
-      throw new Error("verdict lost")
+      throw new Error("run-end report lost")
     },
   })
   runs.onEnded(() => loadedAtEnded.resolve(roots.loaded().includes(ROOT_ID)))

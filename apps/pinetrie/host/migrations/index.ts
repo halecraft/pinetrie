@@ -13,6 +13,7 @@ import { PRODUCT_NAME } from "@pinetrie/core"
 import { SCHEMA_OF, type StoredKind, storedKind } from "../policy.ts"
 import { TURN_SHARED_READS } from "./0022-turn-shared-reads.ts"
 import { LANE_FORKS } from "./0023-lane-forks.ts"
+import { runEndReport } from "./0024-run-end-report.ts"
 
 /** What a migration reads with, and writes with once every read loaded. */
 export interface MigrationRun {
@@ -72,6 +73,7 @@ export interface RecordMigration {
 export const RECORD_MIGRATIONS: readonly RecordMigration[] = [
   TURN_SHARED_READS,
   LANE_FORKS,
+  runEndReport,
 ]
 
 /**

@@ -2,16 +2,16 @@ import { entryId, runId, threadIdFor, writerId } from "@pinetrie/core"
 import {
   type PiSetup,
   SCRIPTED_DESCRIPTION,
-  SCRIPTED_VERDICT,
+  SCRIPTED_URGENCY,
 } from "@pinetrie/pi"
-import { readVerdicts } from "@pinetrie/reads"
+import { readRunEndReports } from "@pinetrie/reads"
 import {
   DIGEST,
   parseDigest,
   parseEndReply,
-  pendingVerdict,
+  pendingRunEndReport,
+  RUN_END_REPORT,
   setRecord,
-  VERDICT,
 } from "@pinetrie/rules"
 import { readingKey, seatKey } from "@pinetrie/schema"
 import {
@@ -21,7 +21,7 @@ import {
   writeLaneTip,
 } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
-import { createDigests, writePendingVerdict } from "./digests.ts"
+import { createDigests, writePendingRunEndReport } from "./digests.ts"
 import {
   archiveCanvas,
   basics,
@@ -101,7 +101,7 @@ function running(
     piSetup: pi.port,
     enabled,
   })
-  const pending = writePendingVerdict({
+  const pending = writePendingRunEndReport({
     runs: { docOf: () => b.root },
     records: pi.port,
   })
@@ -284,9 +284,9 @@ test("the scripted model's answer is a digest, so the suites have one", () => {
   expect(parseDigest(SCRIPTED_DESCRIPTION)?.headline).toBe(SCRIPTED_DESCRIPTION)
 })
 
-// ── a run's verdict ──────────────────────────────────────────────────────────
+// ── a run's end report ───────────────────────────────────────────────────────
 
-/** Ada's ask `e-1` is stopping: its verdict is pending, as `runs.ts` writes it. */
+/** Ada's ask `e-1` is stopping: its end report is pending, as `runs.ts` writes it. */
 async function stopping(
   answer: string | null | Promise<string | null>,
   enabled = true,
@@ -301,14 +301,14 @@ async function stopping(
   return set
 }
 
-test("a run's verdict is pending as it stops, at the run's last entry", async () => {
+test("a run's end report is pending as it stops, at the run's last entry", async () => {
   const { b } = await stopping(null)
-  expect(readVerdicts(b.session).get(lane)).toEqual(
-    pendingVerdict(lane, entryId("e-1"), entryId("e-4")),
+  expect(readRunEndReports(b.session).get(lane)).toEqual(
+    pendingRunEndReport(lane, entryId("e-1"), entryId("e-4")),
   )
 })
 
-test("at a run's end, one request for the verdict and the final digest, written in one write", async () => {
+test("at a run's end, one request for the urgency line and the final digest, written in one write", async () => {
   const { pi, keeper, digests } = await stopping(
     "needs you: which rail to keep\nFixed the rail.\n- `rail.tsx` draws it",
   )
@@ -322,13 +322,13 @@ test("at a run's end, one request for the verdict and the final digest, written 
   ])
   expect(pi.calls.at(-1)?.args).toEqual([
     [
-      setRecord(VERDICT, {
+      setRecord(RUN_END_REPORT, {
         lane,
         ask: entryId("e-1"),
         end: entryId("e-4"),
-        verdict: {
-          kind: "said",
-          said: "needsYou",
+        report: {
+          kind: "modelSaid",
+          urgency: "needsYou",
           reason: "which rail to keep",
         },
       }),
@@ -339,11 +339,11 @@ test("at a run's end, one request for the verdict and the final digest, written 
     user: string
   }
   expect(asked.user).toContain(
-    "Answer with the verdict line, then the summary.",
+    "Answer with the urgency line, then the summary.",
   )
 })
 
-test("with digests off, a run's end asks for its verdict alone, and no live digest is asked", async () => {
+test("with digests off, a run's end asks for its urgency line alone, and no live digest is asked", async () => {
   const { pi, keeper, digests, read } = await stopping("done", false)
   read()
   const before = pi.calls.length
@@ -353,40 +353,40 @@ test("with digests off, a run's end asks for its verdict alone, and no live dige
   await digests.ended(ROOT_ID, lane, entryId("e-1"), failed)
   await keeper.idle()
   expect(writtenValues(pi.calls).at(-1)).toEqual(
-    setRecord(VERDICT, {
+    setRecord(RUN_END_REPORT, {
       lane,
       ask: entryId("e-1"),
       end: entryId("e-4"),
-      verdict: { kind: "said", said: "done", reason: null },
+      report: { kind: "modelSaid", urgency: "done", reason: null },
     }),
   )
   const asked = pi.calls.findLast(c => c.method === "complete")?.args[0] as {
     user: string
   }
-  expect(asked.user).toContain("Answer with the verdict line alone.")
+  expect(asked.user).toContain("Answer with the urgency line alone.")
 })
 
 test.each([
   ["fails", null],
   ["answers in another shape", "All done here."],
 ])(
-  "a request that %s leaves the verdict unclassified, never pending",
+  "a request that %s leaves the run-end report unclassified, never pending",
   async (_, answer) => {
     const { pi, keeper, digests } = await stopping(answer, false)
     await digests.ended(ROOT_ID, lane, entryId("e-1"), failed)
     await keeper.idle()
     expect(writtenValues(pi.calls).at(-1)).toEqual(
-      setRecord(VERDICT, {
+      setRecord(RUN_END_REPORT, {
         lane,
         ask: entryId("e-1"),
         end: entryId("e-4"),
-        verdict: { kind: "unclassified" },
+        report: { kind: "unclassified" },
       }),
     )
   },
 )
 
-test("a failed run's verdict is its error, and no verdict is asked for", async () => {
+test("a failed run's end report is its error, and no urgency is asked for", async () => {
   const set = running("done", false)
   writeEntry(
     set.b.root,
@@ -407,23 +407,23 @@ test("a failed run's verdict is its error, and no verdict is asked for", async (
   await set.keeper.idle()
   expect(methods(set.pi.calls)).not.toContain("complete")
   expect(writtenValues(set.pi.calls).at(-1)).toEqual(
-    setRecord(VERDICT, {
+    setRecord(RUN_END_REPORT, {
       lane,
       ask: entryId("e-1"),
       end: entryId("e-5"),
-      verdict: { kind: "failed", error: "rate limited" },
+      report: { kind: "failed", error: "rate limited" },
     }),
   )
 })
 
-test("the scripted model answers a run's end with a verdict and a digest, so the suites have both", () => {
+test("the scripted model answers a run's end with an urgency line and a digest, so the suites have both", () => {
   expect(
     parseEndReply(
-      `${SCRIPTED_VERDICT}\n${SCRIPTED_DESCRIPTION}`,
-      "verdict and digest",
+      `${SCRIPTED_URGENCY}\n${SCRIPTED_DESCRIPTION}`,
+      "urgency and digest",
     ),
   ).toEqual({
-    verdict: { said: "done", reason: null },
+    urgency: { urgency: "done", reason: null },
     digest: { headline: SCRIPTED_DESCRIPTION, points: [] },
   })
 })

@@ -34,7 +34,7 @@ import {
   type Floor,
   messageImageShas,
   participants,
-  pendingVerdict,
+  pendingRunEndReport,
   planMessage,
   planResolution,
   planStack,
@@ -601,7 +601,7 @@ describe("settling and starting up", () => {
         queuedOn(LANE1, cardIdFor("c2")),
       ],
       interrupted: [],
-      verdicts: [],
+      runEndReports: [],
     })
     expect(plan).toEqual({
       resume: [],
@@ -617,7 +617,7 @@ describe("settling and starting up", () => {
         queuedOn(LANE2, cardIdFor("c2")),
       ],
       interrupted: [runnable(LANE1)],
-      verdicts: [],
+      runEndReports: [],
     })
     expect(plan).toMatchObject({ resume: [LANE1], drain: [LANE2] })
   })
@@ -630,7 +630,7 @@ describe("settling and starting up", () => {
     const plan = planStartup({
       cards: [queuedOn(LANE2, cardIdFor("c2"))],
       interrupted: [runnable(LANE1), foreign],
-      verdicts: [],
+      runEndReports: [],
     })
     expect(plan).toMatchObject({
       resume: [LANE1],
@@ -638,20 +638,20 @@ describe("settling and starting up", () => {
       drain: [LANE2],
     })
   })
-  test("planStartup: a pending verdict is unclassified, unless its lane is resumed", () => {
+  test("planStartup: a pending run-end report is unclassified, unless its lane is resumed", () => {
     const pending = (lane: typeof LANE1) =>
-      pendingVerdict(lane, entryId(`p-${lane}`), entryId(`w-${lane}`))
-    const said = {
+      pendingRunEndReport(lane, entryId(`p-${lane}`), entryId(`w-${lane}`))
+    const modelSaid = {
       ...pending(LANE2),
-      verdict: { kind: "said", said: "done", reason: null } as const,
+      report: { kind: "modelSaid", urgency: "done", reason: null } as const,
     }
     const plan = planStartup({
       cards: [],
       interrupted: [runnable(LANE1)],
-      verdicts: [pending(LANE1), pending(LANE2), said],
+      runEndReports: [pending(LANE1), pending(LANE2), modelSaid],
     })
     expect(plan.unclassified).toEqual([
-      { ...pending(LANE2), verdict: { kind: "unclassified" } },
+      { ...pending(LANE2), report: { kind: "unclassified" } },
     ])
   })
 })

@@ -944,30 +944,30 @@ export interface DigestRecord extends DigestBody {
   readonly final: boolean
 }
 
-/** What a model says a run's end asks of the people in its thread. */
-export type Said = "needsYou" | "worthARead" | "done"
+/** How urgently a model says a run's end asks the people in its thread to look. */
+export type ReaderUrgency = "needsYou" | "worthARead" | "done"
 
 /**
  * How a thread's last run ended: what happened, never what it asks of whom.
- * Each client decides that for its person (`verdictLevel`).
+ * Each client decides that for its person (`attentionLevel`).
  */
-export type Verdict =
+export type RunEndReport =
   /** The run has stopped running, and the model has not answered yet. */
   | { readonly kind: "pending" }
   /** The model's answer; `reason` is null for `done`. */
   | {
-      readonly kind: "said"
-      readonly said: Said
+      readonly kind: "modelSaid"
+      readonly urgency: ReaderUrgency
       readonly reason: string | null
     }
   | { readonly kind: "failed"; readonly error: string }
   /** `by` is null for a stop made before stops were recorded. */
   | { readonly kind: "stopped"; readonly by: WriterId | null }
-  /** The request failed, its answer was no verdict, or its host stopped. */
+  /** The request failed, its answer was no urgency line, or its host stopped. */
   | { readonly kind: "unclassified" }
 
-/** A thread's last run's verdict: a session record keyed by its lane. */
-export interface VerdictRecord {
+/** A thread's last run's end report: a session record keyed by its lane. */
+export interface RunEndReportRecord {
   readonly lane: ThreadId
   /** The run's prompt. */
   readonly ask: EntryId
@@ -977,7 +977,7 @@ export interface VerdictRecord {
    * is read.
    */
   readonly end: EntryId
-  readonly verdict: Verdict
+  readonly report: RunEndReport
 }
 
 /** A title's longest form, in UTF-16 code units. */

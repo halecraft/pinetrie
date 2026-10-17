@@ -54,12 +54,12 @@ import {
   REVISION,
   type RecordSpec,
   ROOT,
+  RUN_END_REPORT,
   SEAT,
   STATE,
   setIfChanged,
   setRecord,
   TRACE,
-  VERDICT,
   WORKFLOW,
 } from "./index.ts"
 
@@ -410,13 +410,13 @@ const SAMPLES: readonly Sample[] = [
     null,
   ),
   sample(
-    "verdict",
-    VERDICT,
+    "run-end report",
+    RUN_END_REPORT,
     {
       lane: L,
       ask: E,
       end: entryId("e-2"),
-      verdict: { kind: "stopped", by: ADA },
+      report: { kind: "stopped", by: ADA },
     },
     "lane",
   ),
@@ -527,7 +527,7 @@ test("each record lives where it is read: across roots in the session, by entry 
     "state of a concurrent save": "session",
     "accept's journal": "session",
     conflict: "session",
-    verdict: "session",
+    "run-end report": "session",
   })
 })
 

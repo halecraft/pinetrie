@@ -11,8 +11,8 @@ import {
   laneWork,
   type RootId,
   type RootRecord,
+  type RunEndReportRecord,
   type ThreadId,
-  type VerdictRecord,
   type WriterId,
 } from "@pinetrie/core"
 import {
@@ -57,7 +57,7 @@ export function useAttention(input: {
   readonly me: WriterId
   readonly attention: AttentionStore
   readonly directory: ReadonlyMap<RootId, RootRecord>
-  readonly verdicts: ReadonlyMap<ThreadId, VerdictRecord>
+  readonly runEndReports: ReadonlyMap<ThreadId, RunEndReportRecord>
   readonly openProposed: readonly OpenProposedChanges[]
   /** Lanes waiting for their owner's answer about ssh. */
   readonly sshAsks: readonly SshAsk[]
@@ -111,7 +111,7 @@ export function useAttention(input: {
     const facts = {
       me: input.me,
       writers,
-      verdicts: input.verdicts,
+      runEndReports: input.runEndReports,
       openProposed: input.openProposed,
       sshAsks: input.sshAsks,
       owner: input.owner,
@@ -126,7 +126,7 @@ export function useAttention(input: {
   }, [
     input.me,
     writers,
-    input.verdicts,
+    input.runEndReports,
     input.openProposed,
     input.sshAsks,
     input.owner,
@@ -138,10 +138,14 @@ export function useAttention(input: {
   const status = useMemo(
     () =>
       canvasStatus(
-        threadStatus({ items, work: input.work, verdicts: input.verdicts }),
+        threadStatus({
+          items,
+          work: input.work,
+          runEndReports: input.runEndReports,
+        }),
         input.canvasOfThread,
       ),
-    [items, input.work, input.verdicts, input.canvasOfThread],
+    [items, input.work, input.runEndReports, input.canvasOfThread],
   )
   const elsewhere = useMemo(
     () =>

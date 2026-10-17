@@ -11,11 +11,11 @@ import {
   type DragFrom,
   type DragSource,
   dragProps,
-  dragVerdict,
   drawPlan,
   dropIntents,
   dropMark,
   hoverOpens,
+  planDrop,
   sidebarSpot,
   sourceOfElement,
 } from "./drag.ts"
@@ -35,7 +35,7 @@ const canvas: CanvasSource = {
 const cardAt = (over: CardOver): DragAt => ({ ...card, over })
 const overCanvas = (over: CanvasOver): DragAt => ({ ...canvas, over })
 const from: DragFrom = { column: 1, home: null, archive: ARCHIVE }
-/** A drag's verdict never reads the state for these: a canvas's, or one over the strip. */
+/** A planned drop never reads the state for these: a canvas's, or one over the strip. */
 const NO_STATE = {} as IntentState
 
 const element = (attrs: Readonly<Record<string, string>>) => ({
@@ -59,13 +59,13 @@ test("a handle's source round-trips through its attributes; an element with none
 
 test("a column over the strip reorders, over its own gap moves nothing; a canvas lands by its own drop", () => {
   expect(
-    dragVerdict(cardAt({ kind: "strip", gap: 3 }), from, "move", NO_STATE),
+    planDrop(cardAt({ kind: "strip", gap: 3 }), from, "move", NO_STATE),
   ).toEqual({ kind: "reorder", to: 2 })
   expect(
-    dragVerdict(cardAt({ kind: "strip", gap: 1 }), from, "move", NO_STATE),
+    planDrop(cardAt({ kind: "strip", gap: 1 }), from, "move", NO_STATE),
   ).toEqual({ kind: "reorder", to: null })
   expect(
-    dragVerdict(
+    planDrop(
       overCanvas({ kind: "root", target: { kind: "list", before: NEXT } }),
       from,
       "move",

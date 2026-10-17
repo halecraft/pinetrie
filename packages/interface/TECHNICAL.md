@@ -686,8 +686,8 @@ pending.
   and the inventory; `accountWords` and `inventoryWords` word them.
 - **Your inbox** (`inbox-view.ts`, pure, ADR-0091): what the threads you
   follow raise (`attentionItems`'s items) and your mentions, in one menu
-  (`inbox-menu.tsx`). `inboxView` groups the items into sections (a verdict
-  under its level, open proposed changes under ready, its raised kind `ready`), so the inbox lists exactly what
+  (`inbox-menu.tsx`). `inboxView` groups the items into sections (a run-end
+  report under its level, open proposed changes under ready, its raised kind `ready`), so the inbox lists exactly what
   it counts; `inboxWords` words them. Its badge is `inboxCount`, given:
   `App` computes it once and the window's title shows the same number.
   `useInboxMenu` only turns each section's items into rows (`threadRow`,
@@ -704,8 +704,8 @@ pending.
   session (`running`); `canvasWork` is each canvas's, the most of its threads'.
   `App` builds them once, and the sidebar, the board and `threadStatus` all
   read them, so a canvas rung on the board also refuses Move to Done there.
-  `threadStatus` rings a thread while the agent works there or its verdict
-  is pending, and `canvasStatus` a canvas while any of its threads rings;
+  `threadStatus` rings a thread while the agent works there or its run-end
+  report is pending, and `canvasStatus` a canvas while any of its threads rings;
   `boardView` folds each column's items into `working` and `ready` counts
   beside `mark`, and an item's `ready` is its canvas's threads with open
   proposed changes (`openProposedByCanvas`, each named by `readableThreadName`, so one the host has
@@ -792,19 +792,19 @@ pending.
   items and the board's hold readers' avatars too, so `.avatar` anywhere matches them,
   who never include you either.
 
-## What needs you (`attention.ts`, `use-attention.ts`, ADR-0077)
+## What needs you (`attention.ts`, `use-attention.ts`, ADR-0077, ADR-0166)
 
-- **`attentionItems` decides what is raised**, pure: a thread's verdict and its
+- **`attentionItems` decides what is raised**, pure: a thread's run-end report and its
   open proposed changes, for its followers only (`follows`, over the directory's
   `RootRecord.threads`), while its lane is idle and its canvas not archived.
-  A verdict clears when your read mark passes its `end`, proposed changes when it
+  A run-end report clears when your read mark passes its `end`, proposed changes when it
   goes; either with "not needed" (`dismissed`, `dismissedReady`). Nothing
   is raised before your attention document's `since` is set.
-- **`verdictLevel` turns a verdict, a fact, into a level for you**: a stop is
+- **`attentionLevel` turns a run-end report, a fact, into a level for you**: a stop is
   done for whoever stopped it. `LEVELS` orders the levels once; `highest`
   reads it.
 - **`threadStatus`** is each thread's mark: working while the agent works
-  there (`threadWork`, held by this tab or not) or its verdict is pending,
+  there (`threadWork`, held by this tab or not) or its run-end report is pending,
   else its highest item; **`canvasStatus`** is each canvas's, its threads'
   together, working winning, through `canvasOfThread` (ADR-0116). `markLevel`
   folds it over several canvases: `unlisted` (`layout.ts`) gives ▦'s, as it
@@ -1860,20 +1860,20 @@ values; the engine gathers and applies.
   not `{ source, over }`: TypeScript narrows a union only by a top-level
   discriminant.
 - **What a drop would do is the same function each frame and on the
-  drop** (`dragVerdict`), so what is drawn is what happens. Alt is read
+  drop** (`planDrop`), so what is drawn is what happens. Alt is read
   each frame as `how: "copy"`.
 - **A drop sends the intents a key or a menu would** (`dropIntents`):
   `moveColumn`, `put` with its source, target and how, or the root drop's
   own; each runs its own planner. A refused landing sends nothing. A
-  landing's verdict carries its target, so a drop reads only the source
-  and the verdict.
+  landing's planned drop carries its target, so a drop reads only the
+  source and the planned drop.
 - **What a frame draws is a value** (`drawPlan`): the dragged element's
   translate (never a scale, a rotation or a shadow, S153), the card face's
   position off the strip, each column's shift (`neighbourShifts`), the
   target's mark (`dropMark`), the handle's lean, and what a hold there
   opens (`opens`). S153's drawing conditions are its unit tests. A mark
   names its attribute too: `root` for a canvas's landing
-  (`data-root-drop`), any other for `data-drag-verdict`.
+  (`data-root-drop`), any other for `data-drop-mark`.
 - **A sidebar row splits in quarters** (`sidebarSpot`): its top and
   bottom are between rows, its middle onto its canvas. Only a card's drag
   reads it: a canvas's has no put target (`CanvasOver`), and reorders among

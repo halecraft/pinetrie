@@ -1,4 +1,4 @@
-// verdict — how a thread's last run ended, for the people who follow it.
+// run-end-report — how a thread's last run ended, for the people who follow it.
 
 import {
   type AskOutcome,
@@ -6,12 +6,12 @@ import {
   type DigestRecord,
   type EntryId,
   entryId,
+  type ReaderUrgency,
   type RootId,
-  type Said,
+  type RunEndReport,
+  type RunEndReportRecord,
   type ThreadId,
   type ValueWrite,
-  type Verdict,
-  type VerdictRecord,
   type WriterId,
 } from "@pinetrie/core"
 import { Type } from "typebox"
@@ -28,14 +28,14 @@ import { type RecordSpec, setRecord } from "./records.ts"
 import { bareLine } from "./request.ts"
 
 const Id = Type.String({ minLength: 1 })
-const VerdictSchema = Type.Object({
+const RunEndReportSchema = Type.Object({
   ask: Id,
   end: Id,
-  verdict: Type.Union([
+  report: Type.Union([
     Type.Object({ kind: Type.Literal("pending") }),
     Type.Object({
-      kind: Type.Literal("said"),
-      said: Type.Union([
+      kind: Type.Literal("modelSaid"),
+      urgency: Type.Union([
         Type.Literal("needsYou"),
         Type.Literal("worthARead"),
         Type.Literal("done"),
@@ -51,98 +51,102 @@ const VerdictSchema = Type.Object({
   ]),
 })
 
-/** Each thread's last run's verdict, at its lane. */
-export const VERDICT: RecordSpec<VerdictRecord, ThreadId, "session"> = {
-  namespace: "pinetrie.verdict",
+/** Each thread's last run's end report, at its lane. */
+export const RUN_END_REPORT: RecordSpec<
+  RunEndReportRecord,
+  ThreadId,
+  "session"
+> = {
+  namespace: "pinetrie.runEndReport",
   home: "session",
   keyOf: r => r.lane,
   encode: ({ lane, ...contents }) => contents,
   decode: (contents, key) =>
-    decodeRecord(VerdictSchema, contents, threadKey(key), (r, lane) => ({
+    decodeRecord(RunEndReportSchema, contents, threadKey(key), (r, lane) => ({
       lane,
       ask: entryId(r.ask),
       end: entryId(r.end),
-      verdict:
-        r.verdict.kind === "stopped"
-          ? { kind: "stopped", by: r.verdict.by as WriterId | null }
-          : r.verdict,
+      report:
+        r.report.kind === "stopped"
+          ? { kind: "stopped", by: r.report.by as WriterId | null }
+          : r.report,
     })),
 }
 
 /**
- * Each of `verdicts` still pending for a lane `settles` names, as
+ * Each of `reports` still pending for a lane `settles` names, as
  * `unclassified`: its request is gone, with a host that stopped or a canvas
- * archived since, so nothing will write the run's verdict.
+ * archived since, so nothing will write the run's end report.
  */
 export const unclassifiedPending = (
-  verdicts: Iterable<VerdictRecord>,
+  reports: Iterable<RunEndReportRecord>,
   settles: (lane: ThreadId) => boolean,
-): readonly VerdictRecord[] =>
-  [...verdicts]
-    .filter(v => v.verdict.kind === "pending" && settles(v.lane))
-    .map(v => ({ ...v, verdict: { kind: "unclassified" } }))
+): readonly RunEndReportRecord[] =>
+  [...reports]
+    .filter(r => r.report.kind === "pending" && settles(r.lane))
+    .map(r => ({ ...r, report: { kind: "unclassified" } }))
 
 // ── the reply ─────────────────────────────────────────────────────────────
 
 /** The most words a reason may have. */
 export const REASON_WORDS = 20
 
-/** How the skill asks each verdict to be written. */
-const SAID_WORDS: Readonly<Record<string, Said>> = {
+/** How the skill asks each urgency to be written. */
+const URGENCY_WORDS: Readonly<Record<string, ReaderUrgency>> = {
   "needs you": "needsYou",
   "worth a read": "worthARead",
   done: "done",
 }
 
-/** What the model said of a run: a verdict line read. */
-export interface SaidLine {
-  readonly said: Said
+/** What the model said of a run: an urgency line read. */
+export interface UrgencyLine {
+  readonly urgency: ReaderUrgency
   /** Null for `done`, whose reason no one is shown. */
   readonly reason: string | null
 }
 
 /**
- * One verdict line: `needs you: <reason>`, `worth a read: <reason>`
+ * One urgency line: `needs you: <reason>`, `worth a read: <reason>`
  * or `done`, in any case. Null for any other line, a missing reason, or a
  * reason over `REASON_WORDS` words: never cut, as `parseDigest` never cuts.
  */
-export function parseVerdictLine(line: string): SaidLine | null {
+export function parseUrgencyLine(line: string): UrgencyLine | null {
   const bare = bareLine(line)
   const colon = bare.indexOf(":")
   const head = (colon < 0 ? bare : bare.slice(0, colon)).trim().toLowerCase()
-  const said = SAID_WORDS[head]
-  if (said === undefined) return null
-  if (said === "done") return { said, reason: null }
+  const urgency = URGENCY_WORDS[head]
+  if (urgency === undefined) return null
+  if (urgency === "done") return { urgency, reason: null }
   const reason = colon < 0 ? "" : bareLine(bare.slice(colon + 1))
   if (reason === "" || reason.split(/\s+/).length > REASON_WORDS) return null
-  return { said, reason }
+  return { urgency, reason }
 }
 
 /** A run's final reply, read: each half null when it was refused or not asked for. */
 export interface EndReply {
-  readonly verdict: SaidLine | null
+  readonly urgency: UrgencyLine | null
   readonly digest: DigestBody | null
 }
 
 /**
- * A run's final reply as `answer` asked for it: the verdict line
+ * A run's final reply as `answer` asked for it: the urgency line
  * first, then the digest. Each half is refused on its own, so a good digest
- * survives a bad verdict line and the other way round. A verdict alone must
+ * survives a bad urgency line and the other way round. An urgency line alone must
  * be the reply's only line.
  */
 export function parseEndReply(reply: string, answer: Answer): EndReply {
-  if (answer === "digest") return { verdict: null, digest: parseDigest(reply) }
+  if (answer === "digest") return { urgency: null, digest: parseDigest(reply) }
   const [first = "", ...rest] = reply
     .split("\n")
     .map(l => l.trim())
     .filter(l => l !== "")
-  if (answer === "verdict")
+  if (answer === "urgency")
     return {
-      verdict: rest.length === 0 ? parseVerdictLine(first) : null,
+      urgency: rest.length === 0 ? parseUrgencyLine(first) : null,
       digest: null,
     }
   return {
-    verdict: parseVerdictLine(first),
+    urgency: parseUrgencyLine(first),
     digest: parseDigest(rest.join("\n")),
   }
 }
@@ -160,21 +164,21 @@ interface EndRequest {
 /** What a run's end does (`planRunEnded`). */
 interface RunEndedPlan {
   /** Written now, from the facts; null when the model is asked for it. */
-  readonly verdict: Verdict | null
+  readonly report: RunEndReport | null
   /** What to ask, or null for nothing. */
   readonly request: EndRequest | null
 }
 
 /**
- * A failed or stopped run's verdict is its facts, and the model is
- * asked only for its digest, if one is due. An answered run's verdict is
+ * A failed or stopped run's end report is its facts, and the model is
+ * asked only for its digest, if one is due. An answered run's urgency is
  * the model's, asked with the digest when one is due (`digest`, from
  * `planDigest`). A run with no entry to read is unclassified. A run whose
- * stored verdict is no longer its own gets no verdict: the next run's end
+ * stored report is no longer its own gets no report: the next run's end
  * has replaced it.
  */
 export function planRunEnded(input: {
-  /** The stored verdict is this run's (`pendingVerdict`). */
+  /** The stored report is this run's (`pendingRunEndReport`). */
   readonly current: boolean
   readonly outcome: AskOutcome
   /** The run's lines (`askLines`); null for a run with no entry. */
@@ -187,51 +191,52 @@ export function planRunEnded(input: {
     digest === null
       ? null
       : { answer: "digest", lines: digest, previous: digest.previous }
-  if (!input.current) return { verdict: null, request: digestOnly }
+  if (!input.current) return { report: null, request: digestOnly }
   switch (outcome.kind) {
     case "failed":
       return {
-        verdict: { kind: "failed", error: outcome.error },
+        report: { kind: "failed", error: outcome.error },
         request: digestOnly,
       }
     case "stopped":
       return {
-        verdict: { kind: "stopped", by: outcome.by },
+        report: { kind: "stopped", by: outcome.by },
         request: digestOnly,
       }
     case "answered":
     case "running":
       if (digest !== null)
         return {
-          verdict: null,
+          report: null,
           request: {
-            answer: "verdict and digest",
+            answer: "urgency and digest",
             lines: digest,
             previous: digest.previous,
           },
         }
       return input.lines === null
-        ? { verdict: { kind: "unclassified" }, request: null }
+        ? { report: { kind: "unclassified" }, request: null }
         : {
-            verdict: null,
-            request: { answer: "verdict", lines: input.lines, previous: null },
+            report: null,
+            request: { answer: "urgency", lines: input.lines, previous: null },
           }
   }
 }
 
 /** What a run's end writes as it stops running, before the model is asked. */
-export const pendingVerdict = (
+export const pendingRunEndReport = (
   lane: ThreadId,
   ask: EntryId,
   end: EntryId,
-): VerdictRecord => ({ lane, ask, end, verdict: { kind: "pending" } })
+): RunEndReportRecord => ({ lane, ask, end, report: { kind: "pending" } })
 
 /**
- * What a run's final reply writes, in one write. The verdict, when
- * asked for: the model's, or `unclassified` when the request failed or its
- * line was refused; nothing when the stored verdict is another run's, since
- * the next run's end has replaced it. The digest, when asked for, as
- * `digestToWrite` decides for a final one; nothing when the request failed.
+ * What a run's final reply writes, in one write. The end report, when an
+ * urgency was asked for: the model's, or `unclassified` when the request
+ * failed or its line was refused; nothing when the stored report is another
+ * run's, since the next run's end has replaced it. The digest, when asked
+ * for, as `digestToWrite` decides for a final one; nothing when the request
+ * failed.
  */
 export function runEndedToWrite(input: {
   readonly root: RootId
@@ -240,7 +245,7 @@ export function runEndedToWrite(input: {
   readonly end: EntryId
   readonly answer: Answer
   readonly stored: {
-    readonly verdict: VerdictRecord | undefined
+    readonly report: RunEndReportRecord | undefined
     readonly digest: DigestRecord | undefined
   }
   /** The reply, read; null when the request failed. */
@@ -249,21 +254,21 @@ export function runEndedToWrite(input: {
 }): readonly ValueWrite[] {
   const { answer, reply, ask } = input
   const writes: ValueWrite[] = []
-  if (answer !== "digest" && input.stored.verdict?.ask === ask) {
-    const said = reply?.verdict ?? null
+  if (answer !== "digest" && input.stored.report?.ask === ask) {
+    const line = reply?.urgency ?? null
     writes.push(
-      setRecord(VERDICT, {
+      setRecord(RUN_END_REPORT, {
         lane: input.lane,
         ask,
         end: input.end,
-        verdict:
-          said === null
+        report:
+          line === null
             ? { kind: "unclassified" }
-            : { kind: "said", said: said.said, reason: said.reason },
+            : { kind: "modelSaid", urgency: line.urgency, reason: line.reason },
       }),
     )
   }
-  if (answer !== "verdict" && reply !== null) {
+  if (answer !== "urgency" && reply !== null) {
     const record = digestToWrite({
       stored: input.stored.digest,
       asked: { final: true },
