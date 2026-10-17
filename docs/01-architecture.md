@@ -3,7 +3,7 @@
 ## Evidence base
 
 Everything below rests on reverse-engineering `@earendil-works/pi-coding-agent`
-**0.85.0**, since bumped to **0.87.1** (conformance re-verified), and reading the Kyneta source at `~/halecraft/kyneta`. Findings that
+**0.85.0**, since bumped to **0.87.1** and **0.99.2** (conformance re-verified), and reading the Kyneta source at `~/halecraft/kyneta`. Findings that
 carry load are cited. **pi's experimental surface is unreleased, undocumented,
 and version-locked across seven packages — treat all of it as churning.**
 
@@ -529,7 +529,7 @@ a "landed" signal for the tree UI.
 
 | Risk | Mitigation |
 |---|---|
-| pi's experimental APIs churn (pinned at 0.87.1) | Pin exact versions; keep `Storage` the *only* deep coupling; diff upstream periodically, with `pnpm run conformance` as the gate |
+| pi's experimental APIs churn (pinned at 0.99.2) | Pin exact versions; keep `Storage` the *only* deep coupling; diff upstream periodically, with `pnpm run conformance` as the gate. pi 1.x removed the harness and `Storage` from pi-agent-core (S219): moving past 0.99.2 is a decision |
 | Kyneta is consumed from a local checkout | Published `@kyneta/*` predates what pine·trie imports, and a stale build is refused at load (S47): a missing named import stops the module before it runs |
 | `seq` escapes its replica | `seq` is a derived replica-local **arrival** index (S1, ADR-0013): it must never cross a replica boundary or survive a restart |
 

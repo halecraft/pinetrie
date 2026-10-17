@@ -6,19 +6,19 @@
 // map. Every such import is collected here, so a change in pi's files
 // breaks this one file.
 //
-// Verified export maps at 0.87.1:
+// Verified export maps at 0.99.2:
 //   @earendil-works/pi-agent-core  -> ".", "./node", "./harness/context",
 //        "./experimental/pico3", "./harness/env/nodejs",
 //        "./harness/runtime/reducer", "./harness/session",
 //        "./harness/session/testing"
 //   @earendil-works/pi-coding-agent -> ".", "./rpc-entry", "./client",
 //        "./experimental/plugin"
-// `@earendil-works/pi-coding-agent`'s root ALSO cannot be imported here: it
-// pulls in dist/experimental/server.js, which requires `@earendil-works/pi-server`,
-// a package the install does not ship. So `ModelRuntime`, and the pieces that
+// Neither root exports `createAgentHarness`, `addUsage`, `emptyUsage`,
+// `buildSystemPrompt`, `loadPromptTemplates` or `detectSupportedImageMimeType`,
+// so every name here comes from its file, `ModelRuntime` and the pieces that
 // load skills, prompts, extensions and context files (`SettingsManager`,
-// `DefaultResourceLoader`, `buildSystemPrompt`), come from their files.
-// `openLoader` and `openRuntime` are the only ways out for the first three,
+// `DefaultResourceLoader`) with them.
+// `openLoader` and `openRuntime` are the only ways out for those three,
 // so the options that keep pi out of its own directories cannot be varied
 // elsewhere.
 //

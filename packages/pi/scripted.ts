@@ -9,16 +9,15 @@ import {
   type AssistantMessageEvent,
   type AssistantMessageEventStream,
   createAssistantMessageEventStream,
-  createImagesProvider,
+  createProvider,
   type FauxProviderHandle,
   type FauxResponseFactory,
   fauxAssistantMessage,
   fauxProvider,
   fauxText,
   fauxToolCall,
-  type ImagesApi,
-  type ImagesModel,
-  type ImagesProvider,
+  type ImageApi,
+  type ImageModel,
   type Provider,
   type TranscriptContext,
 } from "@earendil-works/pi-ai"
@@ -424,10 +423,11 @@ export const SCRIPTED_IMAGE_PNG =
  * answers every request with `SCRIPTED_IMAGE_PNG` and needs no key.
  */
 export function scriptedImages(): {
-  readonly provider: ImagesProvider
-  readonly model: ImagesModel<ImagesApi>
+  readonly provider: Provider
+  readonly model: ImageModel<ImageApi>
 } {
-  const model: ImagesModel<ImagesApi> = {
+  const model: ImageModel<ImageApi> = {
+    type: "image",
     id: "banner",
     name: "scripted banner",
     api: "scripted-images",
@@ -437,21 +437,23 @@ export function scriptedImages(): {
     output: ["image"],
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
   }
-  const provider = createImagesProvider({
+  const provider = createProvider({
     id: "scripted-images",
     auth: { apiKey: { name: "Scripted", resolve: async () => ({ auth: {} }) } },
     models: [model],
-    api: {
-      generateImages: async () => ({
-        api: model.api,
-        provider: model.provider,
-        model: model.id,
-        output: [
-          { type: "image", mimeType: "image/png", data: SCRIPTED_IMAGE_PNG },
-        ],
-        stopReason: "stop",
-        timestamp: Date.now(),
-      }),
+    images: {
+      [model.api]: {
+        generateImages: async () => ({
+          api: model.api,
+          provider: model.provider,
+          model: model.id,
+          output: [
+            { type: "image", mimeType: "image/png", data: SCRIPTED_IMAGE_PNG },
+          ],
+          stopReason: "stop",
+          timestamp: Date.now(),
+        }),
+      },
     },
   })
   return { provider, model }

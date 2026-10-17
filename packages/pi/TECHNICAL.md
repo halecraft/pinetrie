@@ -198,7 +198,7 @@ Four facts from pi's source and the probes shape it:
   when it creates it, with a null value until the first entry.
 - **`harness.lane(name, { createAt })` returns a lane it holds**, and ignores
   `createAt` (`dist/harness/runtime/harness.js`, `lane()`, in
-  `@earendil-works/pi-agent-core` 0.87.1). So `createThreadLane` refuses an
+  `@earendil-works/pi-agent-core` 0.99.2). So `createThreadLane` refuses an
   id pi holds, in memory or in the document, with `lane_id_in_use`, before it
   asks: otherwise a chosen id could write into another thread.
 - **A foreign-written entry is not navigable** (`unknown_target`): pi's session
@@ -932,7 +932,10 @@ adapter, twice (Kyneta-backed and in-memory control). 21/21 + 21/21.
 It is the authority on round-trip fidelity — far more thorough than a
 hand-written test — and it is the canary for pi upgrades: if pi's `Entry`
 envelope moves, this fails at upgrade time rather than corrupting data silently.
-It survived 0.85 → 0.87.1 and the ADR-0015 typed-row change unchanged.
+It survived 0.85 → 0.87.1 → 0.99.2 and the ADR-0015 typed-row change
+unchanged. pi-agent-core 1.0 removed the suite with the harness and its
+`Storage` (S219), so past 0.99.2 there is no suite of pi's to run this
+adapter against.
 
 Note what it does **not** do: it detects change, it does not design for it.
 Probes P1 and P2 in `sandbox/s17-typed-entries/` could each have failed while
@@ -981,16 +984,18 @@ the root its label. A scripted model answers it from its own provider
 
 ### Banners' images (`PiSetup.drawBanner`, ADR-0050, ADR-0053)
 
-- **`setup.images`** is pi-ai's image registry (`createImagesModels`):
-  `openrouterImagesProvider()` for a named or configured model, and
-  `scriptedImages()` for a scripted one, which draws `SCRIPTED_IMAGE_PNG`
-  and needs no key. An OpenRouter id pi-ai does not list is described by
-  `imageModelFor` (text in, image out), since `generateImages` takes the
-  model as given: so a model newer than pi-ai, such as
-  `recraft/recraft-v4.1-flash`, can be named.
-- **The registry does not read `auth.json`.** `images.apiKey(provider)`
-  asks the `ModelRuntime` (`getAuth`), which reads `auth.json` and then
-  `OPENROUTER_API_KEY`, and the key is passed as `apiKey`.
+- **`setup.images`** is pi-ai's models, whose image models
+  (`getModelOfType("image", …)`) draw banners: the `ModelRuntime` itself
+  for a named or configured model, its `openrouter` provider listing
+  OpenRouter's, and a `createModels()` holding `scriptedImages()` for a
+  scripted one, which draws `SCRIPTED_IMAGE_PNG` and needs no key. An
+  OpenRouter id pi-ai does not list is described by `imageModelFor` (text
+  in, image out), since `generateImages` takes the model as given: so a
+  model newer than pi-ai can be named.
+- **The key is asked for apart.** `images.apiKey(provider)` asks the
+  `ModelRuntime` (`getAuth`), which reads `auth.json` and then
+  `OPENROUTER_API_KEY`: whether there is one decides `canDrawBanners`, and
+  the key is passed as `apiKey`.
 - **pi-ai sends no `image_config`.** `drawBanner` adds
   `bannerImageConfig` in `onPayload`: `aspect_ratio` always 1:1, since
   OpenRouter clamps a ratio to what the model has and every model has 1:1.

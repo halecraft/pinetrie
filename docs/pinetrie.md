@@ -205,13 +205,19 @@ primitive).
 
 ### pi
 
-Pinned exactly at **0.87.1**: pi's three packages, declared by `packages/pi`,
-and `pi-agent-core` by `apps/conformance` too. pi is mid-rewrite into a
-distributed architecture (coordinator → server → worker-per-session → N
-clients) behind `PI_EXPERIMENTAL=1`; we deliberately embed `pi-agent-core`
-directly and use none of it (ADR-0001). `Storage` is a real supported port with
-a conformance suite — that is the single deep coupling, and it survived the
-0.85 → 0.87.1 bump unchanged.
+Pinned exactly at **0.99.2**: pi's three packages (`pi-agent-core`,
+`pi-ai`, `pi-coding-agent`), declared by `packages/pi`, and `pi-agent-core`
+by `apps/conformance` too. We embed `pi-agent-core`'s harness directly
+(ADR-0001), and its `Storage` port, with pi's conformance suite, is the
+single deep coupling; it survived the 0.85 → 0.87.1 → 0.99.2 bumps
+unchanged.
+
+**0.99.2 is the last pi with that harness** (S219). pi-agent-core 1.0
+removed it, with `Storage`, lanes and the conformance suite; it is the bare
+`Agent` now. The harness's successor is `@earendil-works/pi-durable`, an
+experimental, different design (conversations, tasks, a `Storage` of its
+own). So moving past 0.99.2 is a decision, not a bump, and none is made
+yet.
 
 ---
 

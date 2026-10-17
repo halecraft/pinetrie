@@ -13,13 +13,11 @@
 import { stat } from "node:fs/promises"
 import path from "node:path"
 import {
-  createImagesModels,
   createModels,
-  type ImagesApi,
-  type ImagesModel,
-  type ImagesModels,
+  type ImageApi,
+  type ImageModel,
+  type Models as ImageModels,
 } from "@earendil-works/pi-ai"
-import { openrouterImagesProvider } from "@earendil-works/pi-ai/providers/openrouter-images"
 import { type ConfigLayer, isWithin, type NoModel } from "@pinetrie/core"
 import type { GatheredCommand, ModelRef } from "@pinetrie/rules"
 import type { AgentDirBinding } from "./agent-dir.ts"
@@ -206,15 +204,14 @@ export const NO_MODEL_STAND_IN = {
   maxTokens: 1,
 } as Model
 
-/** Where banners are drawn: pi-ai's image registry, and a key for it. */
+/** Where banners are drawn: pi-ai's models, whose image models draw them, and a key for it. */
 export interface ImagesSetup {
-  readonly models: ImagesModels
+  readonly models: ImageModels
   /** The model a banner is drawn with: the one named, or a scripted model's own. */
-  model(provider: string, id: string): ImagesModel<ImagesApi> | undefined
+  model(provider: string, id: string): ImageModel<ImageApi> | undefined
   /**
    * The request's key for `provider`: from pi's `auth.json`, or its
-   * environment variable. Undefined with none; the image registry does not
-   * read `auth.json` itself.
+   * environment variable. Undefined with none.
    */
   apiKey(provider: string): Promise<string | undefined>
 }
@@ -222,18 +219,19 @@ export interface ImagesSetup {
 /**
  * The image model `provider/id` names: pi-ai's entry when it lists one, or,
  * for an OpenRouter id it does not, one described here. OpenRouter adds
- * models faster than pi-ai's list follows (`recraft/recraft-v4.1-flash` is
- * not in 0.87.1's), and pi-ai's `generateImages` takes the model as given,
- * without looking it up. An unlisted model is taken to draw from text alone;
- * an id OpenRouter does not have fails at the draw.
+ * models faster than pi-ai's list follows, and pi-ai's `generateImages`
+ * takes the model as given, without looking it up. An unlisted model is
+ * taken to draw from text alone; an id OpenRouter does not have fails at the
+ * draw.
  */
 export function imageModelFor(
-  listed: ImagesModel<ImagesApi> | undefined,
+  listed: ImageModel<ImageApi> | undefined,
   provider: string,
   id: string,
-): ImagesModel<ImagesApi> | undefined {
+): ImageModel<ImageApi> | undefined {
   if (listed !== undefined || provider !== "openrouter") return listed
   return {
+    type: "image",
     id,
     name: id,
     api: "openrouter-images",
@@ -245,14 +243,12 @@ export function imageModelFor(
   }
 }
 
-/** OpenRouter's image models, keyed by pine·trie's credential for OpenRouter. */
-function openRouterImages(models: Runtime): ImagesSetup {
-  const images = createImagesModels()
-  images.setProvider(openrouterImagesProvider())
+/** The runtime's image models, OpenRouter's among them, keyed by pine·trie's credentials. */
+function runtimeImages(models: Runtime): ImagesSetup {
   return {
-    models: images,
+    models,
     model: (provider, id) =>
-      imageModelFor(images.getModel(provider, id), provider, id),
+      imageModelFor(models.getModelOfType("image", provider, id), provider, id),
     apiKey: provider =>
       models
         .getAuth(provider)
@@ -372,7 +368,7 @@ export async function loadModelSetup(
       models.setProvider(faux.provider)
       models.setProvider(describe.provider)
       const drawn = scriptedImages()
-      const images = createImagesModels()
+      const images = createModels()
       images.setProvider(drawn.provider)
       return {
         models,
@@ -397,7 +393,7 @@ export async function loadModelSetup(
         models,
         model: { kind: "model", model },
         describeModel: model,
-        images: openRouterImages(models),
+        images: runtimeImages(models),
         refusedPackages,
         credentials: credentialsIn(models),
         ...resources,
@@ -421,7 +417,7 @@ export async function loadModelSetup(
         models,
         model: state,
         describeModel: state.kind === "model" ? state.model : null,
-        images: openRouterImages(models),
+        images: runtimeImages(models),
         refusedPackages,
         credentials: credentialsIn(models),
         ...resources,
