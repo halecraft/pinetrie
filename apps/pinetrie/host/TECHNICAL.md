@@ -264,19 +264,20 @@ until the next compaction (S120), and the host compacts at startup. So
   a change to one fails that test until a migration from the old hash is
   registered, so no schema changes by accident.
 - **Registered now, from ADR-0158's rename:** `0019-canvas-places` (the
-  places, from their hash while rows named a canvas): each row's `canvas`
-  becomes `canvas` and a card pinned to a canvas, trashed or not, is pinned to
+  places, from their hash while rows named a task): each row's `task`
+  becomes `canvas` and a card pinned to a task, trashed or not, is pinned to
   its canvas; each undelivered fact names its canvas; each card-history
   event and trace in the session names its places the same way; a state
   still named Backlog, Doing or Done becomes Topics, Active or Archive; and
   every stack of moves is retired (`MigrationRun.storedIds`), since a whole
   undo would restore a row of the old shape. And `0020-canvas-open` (each
-  person's open list, its `canvases` now `canvases`). A Yjs document keys each
+  person's open list, its `tasks` now `canvases`). A Yjs document keys each
   field by an identity hash, not its name, so each reads the old field from
   a snapshot opened under the old schema (`PlacesDocBeforeCanvas`,
   `OpenDocBeforeCanvas`, `@pinetrie/schema`): a probe showed the current
-  schema reads a stored row's `canvas` as nothing. `0018-dismissed-ready`,
-  the one earlier write to a person's document, ran, and was deleted.
+  schema reads a stored row's `task` as nothing. `0012-unstarted-threads`
+  and `0013-task-cards` (the places) and `0018-dismissed-ready`, the one
+  earlier write to a person's document, ran, and were deleted.
 - **None with no `run` is registered now:** `0001-live-row`, `0002-records` (ADR-0095),
   `0005-tasks`' places and sidebars (ADR-0116) and `0008-entry-thread`
   (every root's rows given the thread column, a context entry in the
