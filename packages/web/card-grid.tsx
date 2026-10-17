@@ -2,15 +2,18 @@
 // cards, empty cells dashed. Every cell is a drop target; a card's cell starts
 // its drag. Its keys are `gridKeyAct`'s: arrows and `hjkl` move the selection,
 // Alt+arrows move the selected card, Enter opens it, as a click on the selected
-// card does. Each cell draws its card's face (`DrawFace`). The open card is
-// drawn whole and editable in place, over its neighbours, by the caller
-// (`renderOpen`); Escape folds it. Whether it is open is the caller's too, so
+// card does. Each cell draws its card's face (`DrawFace`), and a card you may
+// discard its ×. The open card is drawn whole and editable in place, over its
+// neighbours, by the caller (`renderOpen`); Escape folds it, and so does the
+// fold the caller is handed. Whether it is open is the caller's too, so
 // the caller can hide what it draws beside the grid while it is. What a
 // selection, a move or a drop does is the caller's: an intent, planned like any
 // other.
 
 import type { CardRecord } from "@pinetrie/core"
 import {
+  DISCARD_CARD,
+  DISCARD_SLOT_TITLE,
   type DrawnCard,
   dragProps,
   dropProps,
@@ -32,8 +35,10 @@ export function CardGrid(p: {
   onSelect: (n: number) => void
   /** The selected card to cell `to`, a card there swapping with it. */
   onMove: (card: CardRecord, to: number) => void
-  /** The open card, whole: a `CardFrame` around its box. */
-  renderOpen: (card: DrawnCard) => ReactNode
+  /** A cell's ×: its card to your trash. */
+  onDiscard: (card: CardRecord) => void
+  /** The open card, whole: a `CardFrame` around its box; `fold` closes it. */
+  renderOpen: (card: DrawnCard, fold: () => void) => ReactNode
   /** The selected card is open, drawn whole. */
   open: boolean
   onOpen: (open: boolean) => void
@@ -118,12 +123,27 @@ export function CardGrid(p: {
           >
             {cell.face !== null && <DrawFace face={cell.face} />}
           </button>
+          {/* Beside the cell's button, not in it: a button holds no button. */}
+          {cell.discards && cell.card !== null && (
+            <button
+              aria-label={DISCARD_SLOT_TITLE}
+              className="slot-discard"
+              data-card={cell.card.id}
+              onClick={() => {
+                if (cell.card !== null) p.onDiscard(cell.card)
+              }}
+              title={DISCARD_SLOT_TITLE}
+              type="button"
+            >
+              {DISCARD_CARD}
+            </button>
+          )}
           {shownOpen && cell.selected && cell.card !== null && (
             <div
               className="card-grid-open"
               data-side={cell.index % view.grid.width < half ? "left" : "right"}
             >
-              {p.renderOpen(cell.card)}
+              {p.renderOpen(cell.card, () => select(view.selected))}
             </div>
           )}
         </div>

@@ -188,6 +188,11 @@ export const PUT_TITLE =
 export const DISCARD_CARD = "×"
 export const DISCARD_CARD_TITLE =
   "discard (Ctrl+Shift+Backspace) · the undo key brings it back"
+/** A slot's ×, which discards its card from your inventory. */
+export const DISCARD_SLOT_TITLE = "discard · the undo key brings it back"
+/** An open card's ×, which folds it back into its slot. */
+export const CLOSE_CARD = "×"
+export const CLOSE_CARD_TITLE = "close (Esc)"
 
 /** A notice's React key: what it is about, and why. */
 export const noticeKey = (notice: CardNotice): string =>

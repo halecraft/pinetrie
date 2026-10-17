@@ -1803,8 +1803,8 @@ docked left, centre or right by this device's choice (`inventory-dock.ts`,
 - **Selectors for the browser suite:** `.inventory` (the panel),
   `.inventory .slot[data-slot][data-card]` and its `.card-face-lines`, the
   preview's `.inventory .preview .card-normal[data-card]`, the open card's
-  `.card-grid-open`, `.inventory .put`, `.inventory
-  .discard-card`, `#bottom .inventory-toggle` (`.account-inventory` in the
+  `.card-grid-open` and its × `.close-card`, `.inventory .put`, a slot's ×
+  `.inventory .slot-discard[data-card]`, `#bottom .inventory-toggle` (`.account-inventory` in the
   account menu while the sidebar is folded), the clipboard cell's
   `.inventory .clipboard-cell` and its `.keep`, a card's focusable
   `.card-head[data-card]`.

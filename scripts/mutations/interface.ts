@@ -2427,6 +2427,15 @@ export const mutations: readonly Mutation[] = [
       "previews the selected card, normal and one column wide; an empty slot or an open card, none",
   },
   {
+    name: "a slot's × is offered on someone else's card",
+    file: "packages/interface/grid-view.ts",
+    from: "      discards: card !== null && isDiscardable(card, input.me),",
+    to: "      discards: card !== null,",
+    command: unit,
+    expect:
+      "a slot's × is drawn on a card you may discard, never on an empty slot",
+  },
+  {
     name: "a queued card cannot be pinned from its ⋯",
     file: "packages/interface/card-frame.ts",
     from: '        pin,\n        pinCanvas,\n        take,\n      ]\n    case "pinned":',

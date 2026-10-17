@@ -576,8 +576,10 @@ export function BoundCardEditor(p: {
   among: readonly CardRecord[] | null
   /** A move from its ⋯, a ↑ or ↓, or a key in its box; absent where it has none. */
   onAct?: (act: ColumnAct) => void
-  /** Discards the card: its × and Ctrl+Shift+Backspace. */
+  /** Discards the card: its × (unless `onClose`) and Ctrl+Shift+Backspace. */
   onDiscard: () => void
+  /** Folds a card opened from its slot: its ×, given. */
+  onClose?: () => void
   /** Every seat the host has seen, to name who wrote in a note; empty for none. */
   seats?: readonly SeatRecord[]
 }) {
@@ -618,6 +620,7 @@ export function BoundCardEditor(p: {
       onAct={onAct}
       onClearCommand={null}
       onDiscard={p.onDiscard}
+      onClose={p.onClose}
       reader={p.reader}
       view={view}
       writers={

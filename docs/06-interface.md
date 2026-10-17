@@ -1179,8 +1179,10 @@ The rail is E; the column is T. Seeing both at once is the product.
   queued card below the line at once, and the undo key outside a box puts
   them back.
 - **× on a card discards it** (ADR-0111), wherever it is: your message, a
-  note, a queued or pinned card, or the selected card in
-  your inventory; so does Ctrl+Shift+Backspace in its box. Where you did it,
+  note, a queued or pinned card, or a card in a slot of your inventory,
+  whose × is on its corner, shown on the selected card and on hover; so
+  does Ctrl+Shift+Backspace in its box. A card opened from your inventory
+  is the one exception: its × closes it, as Escape does. Where you did it,
   the column says "discarded · the undo key (⌘Z outside a box) brings it
   back", and the undo key does, for a week; then the host deletes it.
   Discarding someone else's card leaves them a trace, as a move does.
@@ -1346,8 +1348,9 @@ The rail is E; the column is T. Seeing both at once is the product.
   of the panel onto a column: a note in the note column nearest its thread,
   or, onto a note column, at its end. Dropped on a
   composer, it becomes your message there. Held over a canvas in the sidebar,
-  or over ▦, a drag opens it while a ring around it fills. The open card's **×** discards it; the undo key brings
-  it back.
+  or over ▦, a drag opens it while a ring around it fills. A slot's **×**
+  discards its card; the undo key brings it back. The open card's **×**
+  closes it.
 - **Undo a move** with Cmd+Z (Ctrl+Z elsewhere) while no box has focus;
   Cmd+Shift+Z, Ctrl+Shift+Z or Ctrl+Y redo it (ADR-0066). It undoes your
   newest move in the canvas you are on, from any of your tabs, after a reload

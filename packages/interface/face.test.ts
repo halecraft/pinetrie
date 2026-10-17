@@ -128,6 +128,7 @@ describe("faceOf", () => {
         tone: "inventory",
         placed: new Map([[0, card]]),
         selected: 0,
+        me: ADA,
         texts: new Map(),
         threads: facts.threads,
         notes: facts.notes,

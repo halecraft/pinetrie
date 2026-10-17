@@ -30,11 +30,12 @@ import {
   type ThreadFace,
   type ThreadPreview,
 } from "@pinetrie/interface"
-import type {
-  CardNotice,
-  Intents,
-  SessionClient,
-  Slots,
+import {
+  AT_INVENTORY,
+  type CardNotice,
+  type Intents,
+  type SessionClient,
+  type Slots,
 } from "@pinetrie/session"
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react"
 import { CardGrid } from "./card-grid.tsx"
@@ -89,6 +90,7 @@ export function InventoryPanel(p: {
     slots: p.slots,
     intents: p.intents,
     selected: p.selected,
+    me: p.reader.me,
     texts,
     threads: p.threads,
     open,
@@ -105,6 +107,7 @@ export function InventoryPanel(p: {
       threadNames,
       column,
       onIntent,
+      onClose: null,
     }),
     [session, reader, colorOf, previewOf, notes, threadNames, column, onIntent],
   )
@@ -163,11 +166,16 @@ export function InventoryPanel(p: {
                   how: "move",
                 })
               }
+              onDiscard={card =>
+                p.onIntent({ kind: "discard", card: card.id, at: AT_INVENTORY })
+              }
               onOpen={setOpen}
               onSelect={slot => p.onIntent({ kind: "selectSlot", slot })}
               open={open}
-              renderOpen={(card: DrawnCard) => (
-                <DrawCard card={card} detail="whole" width={1} />
+              renderOpen={(card: DrawnCard, fold) => (
+                <RenderingProvider context={{ ...context, onClose: fold }}>
+                  <DrawCard card={card} detail="whole" width={1} />
+                </RenderingProvider>
               )}
               targetOf={slot => ({ kind: "inventory", slot })}
               view={view.grid}

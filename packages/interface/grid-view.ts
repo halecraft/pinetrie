@@ -1,8 +1,15 @@
 // interface/grid-view — your inventory's slots as they are drawn: cells in
 // reading order, each a face or empty, the selection, and its rows.
 
-import type { CardId, Grid, NoteColumnId, ThreadId } from "@pinetrie/core"
+import type {
+  CardId,
+  Grid,
+  NoteColumnId,
+  ThreadId,
+  WriterId,
+} from "@pinetrie/core"
 import type { CardTone } from "./card-frame.ts"
+import { isDiscardable } from "./discardable.ts"
 import { type DrawnCard, type Face, faceOf } from "./face.ts"
 import type { NoteColumnView } from "./note-column-view.ts"
 import type { ThreadFace } from "./thread-face.ts"
@@ -13,6 +20,8 @@ export interface GridCell {
   readonly card: DrawnCard | null
   readonly face: Face | null
   readonly selected: boolean
+  /** Whether its × is drawn: a card you may discard (`isDiscardable`). */
+  readonly discards: boolean
 }
 
 export interface GridView {
@@ -35,6 +44,8 @@ export function gridView(input: {
   readonly tone: CardTone
   readonly placed: ReadonlyMap<number, DrawnCard>
   readonly selected: number
+  /** Who draws it: whose discards a cell's × offers. */
+  readonly me: WriterId
   /** Each card's text, by id; one not yet read is "". */
   readonly texts: ReadonlyMap<CardId, string>
   /** Each thread's face, by its id. */
@@ -60,6 +71,7 @@ export function gridView(input: {
               notes: input.notes ?? NONE,
             }),
       selected: index === input.selected,
+      discards: card !== null && isDiscardable(card, input.me),
     }
   })
   return {

@@ -1153,9 +1153,14 @@ the session sends moves and draws them until its copy holds them
   in view once they scroll.
 - **`CardGrid`** (`card-grid.tsx`) draws your inventory's `GridView` as
   index cards, each cell a button (the drop target, `dropProps`, and the
-  card's drag) holding its face (`DrawFace`). Its keys are `gridKeyAct`'s, on the
+  card's drag) holding its face (`DrawFace`), and beside that button, never
+  in it, the card's × (`.slot-discard`) when the cell `discards`: hidden by
+  opacity, not `visibility`, so it is shown on the selected cell and on
+  hover and stays clickable. Its keys are `gridKeyAct`'s, on the
   grid; the open card is the caller's (`renderOpen`), drawn over its
-  neighbours from its cell, towards the grid's middle (`data-side`), at
+  neighbours from its cell, handed the grid's fold for its ×
+  (`RenderingContext`'s close, `.close-card` in place of `.discard-card`),
+  towards the grid's middle (`data-side`), at
   least as tall as the cell, which it hides (`data-open`, by opacity so
   Escape can focus it again), carrying the selection's ring itself. A
   face's owner is an `Initial`, not an `Avatar`: the suites count people by
@@ -1167,7 +1172,9 @@ the session sends moves and draws them until its copy holds them
   its header with who else wrote in it. The frame's header is the card's drag handle (`draggable`,
   `data-card`, so Ctrl+Shift+I finds the card from it and `NOT_A_HANDLE`
   keeps a column's drag off it); a press on its ⋯ or × starts no drag. Its
-  ⋯ is a `Menu` of the card's Move to ▸ items, then History. Its × discards.
+  ⋯ is a `Menu` of the card's Move to ▸ items, then History. Its × discards,
+  except on a card given a close (the inventory's open card), where it
+  closes.
   Its footer holds ↑ and ↓ and the editor's own primary button. What it
   shows is `cardFrame` (`packages/interface/TECHNICAL.md`, *Card frames*).
 - **The frame's wrappers are the same with a card and without one.** The

@@ -59,6 +59,8 @@ interface RenderingContext {
   /** The column a put lands in: the one last focused; null for none. */
   readonly column: string | null
   readonly onIntent: (intent: Intent) => void
+  /** Folds the card drawn whole back into its slot; null where none is open. */
+  readonly onClose: (() => void) | null
 }
 
 const Rendering = createContext<RenderingContext | null>(null)
@@ -188,7 +190,7 @@ function TextNormal(p: { card: CardOf<"text">; width: CardWidth }) {
 
 /** A text card opened: its editor in its frame, with its put. */
 function TextWhole(p: { card: CardOf<"text">; width: CardWidth }) {
-  const { session, reader, onIntent } = useRendering()
+  const { session, reader, onIntent, onClose } = useRendering()
   return (
     <BoundCardEditor
       among={null}
@@ -196,6 +198,7 @@ function TextWhole(p: { card: CardOf<"text">; width: CardWidth }) {
       catchUps={null}
       foot={<PutButton card={p.card} title={PUT_TITLE} />}
       key={p.card.id}
+      onClose={onClose ?? undefined}
       onDiscard={() =>
         onIntent({ kind: "discard", card: p.card.id, at: AT_INVENTORY })
       }

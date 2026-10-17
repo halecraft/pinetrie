@@ -16,6 +16,9 @@
   - 2026-10-08 (S139): a queued card's primary action is none, since ADR-0113
     put the one control in the queue's header; the undo key's lift reads the
     cards its step moves before it reverts them.
+  - 2026-10-17: in your inventory, × is on the slot's card, and the open
+    card's × closes it. People read × on a card opened for editing as close,
+    and found a discard there instead.
 - **Amended by:**
   - ADR-0113: the drafts leave the column for the notes board; the column's
     foot is a dock of the queue, the line and your message, whose queue header
@@ -95,7 +98,8 @@ plain line: nobody moves or edits it. No card takes its thread's colour.
 *A text card's moves are one menu.* Pin, unqueue, take and queue are each a
 move to another place, so the ⋯ holds **Move to ▸** (queue, pinned, drafts,
 inventory) and **History**, and drag makes the same moves. **×** discards
-the card wherever it is, the inventory's remove included, and the undo key
+the card wherever it is, the inventory's remove included (from its slot;
+the open card's × closes it), and the undo key
 outside a box brings it back: Physics 7's "every move can be undone, except
 send" counts a discard as a move.
 

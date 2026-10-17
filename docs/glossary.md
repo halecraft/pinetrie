@@ -196,7 +196,8 @@ code word alone.)
   which is not. Plain English uses it too: a commit's `Pinetrie-Source`,
   an icon's `icons.source`.
 - **close**: what × does in the sidebar, for you alone, writing nothing
-  shared. Nothing archives by closing.
+  shared, and on a card opened from your inventory, folding it back into
+  its slot. Nothing archives by closing.
 - **done**: a run's verdict, a ✓ that fades when it ends with nothing to
   do (ADR-0077). A thread can be done while its canvas is a task in
   Active.

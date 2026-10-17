@@ -3730,6 +3730,8 @@ async function run(check: Checks["check"]): Promise<void> {
       const placeOf = (id: string) =>
         readPlaces(host.places).find(c => c.id === id)?.place
       const slotOf = (id: string) => `.inventory .slot[data-card="${id}"]`
+      const slotDiscardOf = (id: string) =>
+        `.inventory .slot-discard[data-card="${id}"]`
       const valueIs = (sel: string, want: string) =>
         page
           .waitForFunction(
@@ -3888,11 +3890,9 @@ async function run(check: Checks["check"]): Promise<void> {
         wrapped && unwrapped >= 0,
         `${wrapped}, ${wrapPlace?.kind}; undone ${unwrapped} ms, ${placeOf(parked)?.kind}`,
       )
-      // Discarded with its ×, and back in its slot with the undo key: a
-      // discard is a move the host's history holds.
-      await page.click(slotOf(parked))
-      await page.keyboard.press("Enter")
-      await page.click(".inventory .discard-card")
+      // Discarded with its slot's ×, and back in its slot with the undo
+      // key: a discard is a move the host's history holds.
+      await page.click(slotDiscardOf(parked))
       await waitFor(() => placeOf(parked)?.kind === "trash", 5_000)
       await page.evaluate(() =>
         (document.activeElement as HTMLElement | null)?.blur(),
@@ -3903,7 +3903,7 @@ async function run(check: Checks["check"]): Promise<void> {
         5_000,
       )
       check(
-        "a card's × discards it, and the undo key outside a box brings it back",
+        "a slot's × discards its card, and the undo key outside a box brings it back",
         discardUndone >= 0,
         `${discardUndone} ms; ${placeOf(parked)?.kind}`,
       )
@@ -4017,14 +4017,27 @@ async function run(check: Checks["check"]): Promise<void> {
           () => true,
           () => false,
         )
-      check(
-        "a card selected in the inventory opens in place, and Escape folds it",
-        openInPlace && foldedBack,
-        `opened ${openInPlace}, folded ${foldedBack}`,
-      )
-      await page.click(slotOf(parked))
+      // The open card's × folds it too, the card still in its slot.
       await page.keyboard.press("Enter")
-      await page.click(".inventory .discard-card")
+      await page.click(".inventory .card-grid-open .close-card")
+      const closed = await page
+        .waitForFunction(
+          sel =>
+            document.querySelector(".inventory .card-grid-open") === null &&
+            document.querySelector(sel) !== null,
+          slotOf(parked),
+          { timeout: 5_000 },
+        )
+        .then(
+          () => placeOf(parked)?.kind === "inventory",
+          () => false,
+        )
+      check(
+        "a card selected in the inventory opens in place, and Escape or its × folds it",
+        openInPlace && foldedBack && closed,
+        `opened ${openInPlace}, folded ${foldedBack}, closed ${closed}`,
+      )
+      await page.click(slotDiscardOf(parked))
       await waitFor(() => placeOf(parked)?.kind === "trash", 5_000)
       const columnsBefore = await page.locator(".column").count()
       // Move to trash, from its ⋯, on an unstarted branch with text trashes
@@ -4514,9 +4527,7 @@ async function run(check: Checks["check"]): Promise<void> {
         `.inventory .slot[data-slot="5"][data-card="${thought}"]`,
       )
       check("a reload keeps your inventory's cards in their slots", stillInSlot)
-      await page.click(`.inventory .slot[data-card="${thought}"]`)
-      await page.keyboard.press("Enter")
-      await page.click(".inventory .discard-card")
+      await page.click(`.inventory .slot-discard[data-card="${thought}"]`)
       await page.click("#bottom .inventory-toggle")
       await page.fill(`${col(0)} .composer .input`, "")
       // A new tab shares the device's storage (same context; every

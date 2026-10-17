@@ -202,14 +202,14 @@ export const mutations: readonly Mutation[] = [
     expect: "a fold turns the column's name onto its strip's, in its colour",
   },
   {
-    name: "a card's × does nothing",
-    file: "packages/web/card-frame.tsx",
-    from: "      onClick={p.onDiscard}",
-    to: "      onClick={() => {}}",
+    name: "a slot's × does nothing",
+    file: "packages/web/card-grid.tsx",
+    from: "                if (cell.card !== null) p.onDiscard(cell.card)",
+    to: "",
     suite: "browser",
     scenario: "page",
     expect:
-      "a card's × discards it, and the undo key outside a box brings it back",
+      "a slot's × discards its card, and the undo key outside a box brings it back",
   },
   {
     name: "a catch-up's turn names no commit",
@@ -2279,7 +2279,17 @@ export const mutations: readonly Mutation[] = [
     suite: "browser",
     scenario: "page",
     expect:
-      "a card selected in the inventory opens in place, and Escape folds it",
+      "a card selected in the inventory opens in place, and Escape or its × folds it",
+  },
+  {
+    name: "an open card's × leaves it open",
+    file: "packages/web/renderings.tsx",
+    from: "      onClose={onClose ?? undefined}",
+    to: "      onClose={() => {}}",
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "a card selected in the inventory opens in place, and Escape or its × folds it",
   },
   {
     name: "the pin box stays open once you leave it",

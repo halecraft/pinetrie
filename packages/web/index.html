@@ -1040,6 +1040,15 @@
         overflow: hidden; background: #1b1e24; border: 1px solid #2c313a; border-radius: 4px; }
       .card-grid-cell > button.empty { border-style: dashed; background: none; }
       .card-grid-cell > button[aria-pressed="true"] { outline: 2px solid #9ecbff; }
+      /* A slot's ×, on its card's corner: shown on the selected card and on
+         hover; hidden by opacity, so it stays clickable for the keyboard. */
+      .card-grid-cell > button.slot-discard { position: absolute; top: .1rem; right: .1rem;
+        width: auto; height: auto; padding: 0 .3rem; line-height: 1.2; font-size: .8rem;
+        color: #8b93a1; background: #1b1e24; border: 0; border-radius: 3px; opacity: 0; }
+      .card-grid-cell:hover > button.slot-discard,
+      .card-grid-cell > button[aria-pressed="true"] ~ button.slot-discard,
+      .card-grid-cell > button.slot-discard:focus-visible { opacity: 1; }
+      .card-grid-cell > button.slot-discard:hover { color: #ddd; }
       /* The open card covers its cell whole, however short its text, and
          carries the selection's ring itself: the cell under it is hidden. */
       .card-grid-open { position: absolute; top: 0; z-index: 3; width: 22rem;

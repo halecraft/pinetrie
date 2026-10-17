@@ -44,6 +44,7 @@ describe("inventoryView", () => {
       slots,
       intents: NO_INTENTS,
       selected: 10,
+      me: ADA,
       texts: new Map([[B, "\n  plan: ship it\nsecond line"]]),
       threads: new Map(),
       open: false,
@@ -78,6 +79,7 @@ describe("inventoryView", () => {
       slots: slotsOf({ "0": cardIdFor("ca") }),
       intents: NO_INTENTS,
       selected: 0,
+      me: ADA,
       texts: new Map(),
       threads: new Map(),
       open: false,
@@ -97,6 +99,7 @@ describe("inventoryView", () => {
         slots: slotsOf({ "3": cardIdFor("ca") }),
         intents: NO_INTENTS,
         selected,
+        me: ADA,
         texts: new Map(),
         threads: new Map(),
         open,
@@ -108,6 +111,25 @@ describe("inventoryView", () => {
     })
     expect(view(4, false)).toBeNull()
     expect(view(3, true)).toBeNull()
+  })
+
+  test("a slot's × is drawn on a card you may discard, never on an empty slot", () => {
+    const cells = (me: typeof ADA) =>
+      inventoryView({
+        held: [record(A)],
+        slots: slotsOf({ "0": cardIdFor("ca") }),
+        intents: NO_INTENTS,
+        selected: 0,
+        me,
+        texts: new Map(),
+        threads: new Map(),
+        open: false,
+      }).grid.cells
+    expect(cells(ADA).map(c => c.discards)).toEqual([
+      true,
+      ...Array(17).fill(false),
+    ])
+    expect(cells(writerId("bea@x.io"))[0]?.discards).toBe(false)
   })
 })
 
@@ -155,6 +177,7 @@ test("a thread's card is drawn by its face: its name, its first line, where it e
     slots: {},
     intents: NO_INTENTS,
     selected: 0,
+    me: ADA,
     texts: new Map(),
     threads: new Map([[T, { ...face, thread: T }]]),
     open: false,

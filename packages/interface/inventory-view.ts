@@ -8,6 +8,7 @@ import {
   type CardWidth,
   INVENTORY_GRID,
   type ThreadId,
+  type WriterId,
 } from "@pinetrie/core"
 import { type Intents, type Slots, settleSlots } from "@pinetrie/session"
 import type { DrawnCard } from "./face.ts"
@@ -42,6 +43,8 @@ export function inventoryView(input: {
   readonly slots: Slots
   readonly intents: Intents
   readonly selected: number
+  /** You: whose cards the grid's × discards. */
+  readonly me: WriterId
   /** Each card's text, by id; one not yet read is "". */
   readonly texts: ReadonlyMap<CardId, string>
   /** Each thread's face, for a thread's card. */
@@ -67,6 +70,7 @@ export function inventoryView(input: {
     tone: "inventory",
     placed,
     selected: input.selected,
+    me: input.me,
     texts: input.texts,
     threads: input.threads,
     keyOf: slotKey,
