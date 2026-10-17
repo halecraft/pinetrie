@@ -250,6 +250,13 @@ same for every run (`packages/pi/TECHNICAL.md`, S85).
   only once the store holds every write. Only the upkeep unloads a root;
   a test reads the sources and fails on any other `exchange.unload`, the
   migrations' and the stacks of moves' aside.
+- **`PINETRIE_ROOT_TRACE=<file>` logs how roots are used** (`root-trace.ts`),
+  one JSON object a line: each use (through a step, a lease or a tab's
+  ask), whether it loaded the root, and the host code that asked; each
+  lease's end; and each upkeep that compacts or lets go, with the roots a
+  tab holds. It is for replaying offline what a policy for keeping roots
+  would cost. Off, nothing is computed for it: the trace is an optional
+  call, whose arguments, the caller's stack among them, are not evaluated.
 - **What follows, by construction:** L1, a root a step loaded stays loaded
   until the step ends (only the upkeep unloads, and it is a step of the
   same keeper); L2, a leased root stays loaded while its lease lives (it is

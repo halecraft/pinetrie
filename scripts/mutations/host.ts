@@ -2880,4 +2880,22 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "a check that finds no stall leaves the histogram as it is",
   },
+  // ── the roots' trace ──
+  {
+    name: "the roots' trace says a use of a loaded root loaded it",
+    file: "apps/pinetrie/host/roots.ts",
+    from: "    const fresh = !loaded.has(root)\n",
+    to: "    const fresh = true\n",
+    command: unit,
+    expect:
+      "the trace hears each use and whether it loaded, each release, and the upkeep that lets the root go",
+  },
+  {
+    name: "the roots' trace names the code that keeps roots as the caller",
+    file: "apps/pinetrie/host/root-trace.ts",
+    from: "    if (KEEPING.test(line)) continue\n",
+    to: "",
+    command: unit,
+    expect: "a use names the first caller outside the code that keeps roots",
+  },
 ]

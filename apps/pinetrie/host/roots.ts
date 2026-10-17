@@ -44,6 +44,7 @@ import {
 } from "@pinetrie/schema"
 import type { HostKeeper } from "./basics.ts"
 import { createStepRecords, type StepRecords } from "./records.ts"
+import { callerNow, type RootTrace } from "./root-trace.ts"
 
 /** A call through a step's documents after the step ended. */
 export class StepEnded extends Error {
@@ -240,6 +241,8 @@ export function createRoots(input: {
   readonly peers?: PeerStates
   /** Keep each root's newest handle for `lastRead`: a suite's, never a host's in use. */
   readonly keepLastRead?: boolean
+  /** Hears each use of a root, each lease's end and each upkeep's plan. */
+  readonly trace?: RootTrace
 }): Roots {
   const { exchange, session } = input
   const peers = input.peers ?? kynetaPeers
@@ -286,6 +289,20 @@ export function createRoots(input: {
     return entry
   }
 
+  /** `load`, told to the trace as a use of `root` through `via`. */
+  function use(root: RootId, via: "step" | "lease" | "tab"): Loaded {
+    const fresh = !loaded.has(root)
+    const entry = load(root, via === "tab")
+    input.trace?.({
+      kind: "use",
+      root,
+      via,
+      loaded: fresh,
+      caller: callerNow(),
+    })
+    return entry
+  }
+
   /** Run the release listeners. */
   async function release(
     root: RootId,
@@ -309,14 +326,14 @@ export function createRoots(input: {
         // directory record it, so its send would find its id in use.
         if (loaded.has(root) || !readRoots(session).has(root)) return
         if (exchange.documents.get(change.docId)?.mode !== "interpret") return
-        load(root, true)
+        use(root, "tab")
       })
     }
   })
 
   /** Count a lease on `root` at once, then load it if it is not. */
   function lease(r: RootId): Lease {
-    const entry = load(r, false)
+    const entry = use(r, "lease")
     leases.set(r, (leases.get(r) ?? 0) + 1)
     let held = true
     return {
@@ -334,6 +351,7 @@ export function createRoots(input: {
       async [Symbol.asyncDispose]() {
         if (!held) return
         held = false
+        input.trace?.({ kind: "release", root: r })
         const n = (leases.get(r) ?? 1) - 1
         if (n > 0) leases.set(r, n)
         else leases.delete(r)
@@ -350,7 +368,7 @@ export function createRoots(input: {
     const root = async (r: RootId): Promise<RootDocHandle> => {
       ensure()
       stepping.add(r)
-      return load(r, false).ready
+      return use(r, "step").ready
     }
     const docs: StepDocs = {
       root,
@@ -461,6 +479,15 @@ export function createRoots(input: {
         shown,
         watching: new Set(watching.keys()),
       })
+      if (plan.compact.length > 0 || plan.unload.length > 0)
+        input.trace?.({
+          kind: "upkeep",
+          loaded: loaded.size,
+          leased: leases.size,
+          shown: [...shown].sort(),
+          compact: plan.compact,
+          unload: plan.unload,
+        })
       // execute: each root released before it is compacted, so what its
       // holders write as they let go is in its compaction, then let go
       const going = new Set(plan.unload)

@@ -150,6 +150,7 @@ import {
 } from "./queued-card-pop.ts"
 import { createRecords, type Records } from "./records.ts"
 import { createRelays, type Relays } from "./relays.ts"
+import { fileTrace } from "./root-trace.ts"
 import { createRoots, queueUpkeepOn, type StepDocs } from "./roots.ts"
 import { createRunDocs, createRuns, streamInto } from "./runs.ts"
 import { createReadBlob } from "./save-blob.ts"
@@ -470,12 +471,20 @@ export async function startHost({
   // keeper or a lease (`roots.ts`). The upkeep is queued on the keeper, made
   // below: bound late.
   let queueUpkeepLate: () => Promise<void> = async () => {}
+  // `PINETRIE_ROOT_TRACE=<file>` logs every use of a root, to replay offline.
+  const rootTrace =
+    env.PINETRIE_ROOT_TRACE === undefined || env.PINETRIE_ROOT_TRACE === ""
+      ? null
+      : fileTrace(env.PINETRIE_ROOT_TRACE, now)
+  if (rootTrace !== null)
+    log(`[host] tracing roots to ${env.PINETRIE_ROOT_TRACE}`)
   const roots = createRoots({
     exchange,
     session,
     queueUpkeep: () => void queueUpkeepLate(),
     failed: error => failed(basics, "compaction")(error),
     keepLastRead: keepRootsRead,
+    ...(rootTrace === null ? {} : { trace: rootTrace.trace }),
   })
   // Each root's first load is recovered (`recoverRoot`) in a step of its own,
   // once the agent and the runs exist: the roots that load before are held
@@ -1041,7 +1050,8 @@ export async function startHost({
           roots.close()
           histories.dispose()
           await exchange.flush()
-          return exchange.shutdown()
+          await exchange.shutdown()
+          return rootTrace?.close()
         case "server":
           return server.close()
       }

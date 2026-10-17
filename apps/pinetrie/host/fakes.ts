@@ -90,6 +90,7 @@ import {
   type ProvenanceHooks,
 } from "./provenance.ts"
 import { createStepRecords, type Records } from "./records.ts"
+import type { RootTrace } from "./root-trace.ts"
 import {
   createRoots,
   type Lease,
@@ -692,6 +693,7 @@ export function hostRoots(
     readonly peers?: PeerStates
     readonly failed?: (error: unknown) => void
     readonly keepLastRead?: boolean
+    readonly trace?: RootTrace
   } = {},
 ) {
   const exchange = new Exchange({
@@ -718,6 +720,7 @@ export function hostRoots(
     ...(input.keepLastRead === undefined
       ? {}
       : { keepLastRead: input.keepLastRead }),
+    ...(input.trace === undefined ? {} : { trace: input.trace }),
   })
   const keeper = createKeeper<HostKey, StepDocs>({ context: roots.context })
   return {
