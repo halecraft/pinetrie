@@ -9,6 +9,8 @@
 - **Amended by:**
   - ADR-0116: a lane is told its task's canvas.
   - ADR-0118: a lane is told its sources.
+  - ADR-0169: a nested lane's guidelines name a second note, on the Docker it
+    runs, which only a nested lane is pointed to.
 
 Restates ADR-0046 as amended by ADR-0048, ADR-0064 and ADR-0103; decides
 nothing new. ADR-0046's change to ADR-0034 stands as ADR-0046 made it. Since

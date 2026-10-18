@@ -175,9 +175,10 @@ never reaches the VM's Docker or the launcher's ports.
 - **The inner Docker's data root is made empty and never pruned:** each
   new nested lane builds the lane image from cold, and every version it
   builds stays (S232). ADR-0169, accepted and not yet built, makes the
-  data root a subvolume a fork clones from the lane it came from, and has
-  a host that builds an image remove the older ones of its kind that no
-  container uses.
+  data root a subvolume cloned from the project's nested lane that ran
+  last, at each fork and each run's start; has a host that builds an
+  image remove pine·trie's images it does not need that no container
+  uses; and caps the daemon's cache beside its images (S234, S236).
 - **A host in a nested lane** gets `docker-host` from `planRuntime`, its
   lanes directory `/var/lib/pinetrie-lanes`. Its lanes' root is uid 1000
   outside, so a directory they write must be that user's: the suites hand

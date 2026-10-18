@@ -85,6 +85,11 @@ the host does: ADR-0129). A suite's own helpers are beside its scenarios:
   e2e:lanes` 134 s (64 passed; the Mac's network checks and ssh skipped)
   and `pnpm run e2e:browser` 223 s (177 passed). `pnpm run verify` runs
   the first two.
+- **A lane builds the lane image from its own checkout,** tagged by its
+  inputs, and every version it builds stays in its inner Docker (S232).
+  ADR-0169, accepted and not yet built, shares the inner Docker between a
+  project's nested lanes, and this doc will say what a change to the lane
+  image's Containerfile or the app's Playwright version then costs them.
 - **In a nested lane, inner lanes write as uid 1000,** the rootless user:
   each throwaway project is opened to others' search (`committedProject`),
   and only the paths lanes write are handed to that user

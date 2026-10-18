@@ -623,6 +623,9 @@ item 18, and in `lanes.test.ts` against the harness.
     never its value (`INNER_DOCKER_HOST`, in `@pinetrie/docker`), so pi
     holds no copy of the address. Only those lanes' prefixes carry the
     line. The host's `laneFacts` decides which grants a lane is told.
+    ADR-0169, accepted and not yet built, adds to that line where to read
+    about the Docker it runs, a note of its own that only those lanes are
+    pointed to; the lane note says no more of it.
   - **Guidelines, not a section of its own.** pi joins its sections into one
     string, and a provider may rebuild that string by its tags:
     `pi-anthropic-auth` keeps `<rules>` and drops `<docs>` (S23, addendum).
