@@ -5,10 +5,11 @@
 import { type FSWatcher, watch } from "node:fs"
 import { readdir, readFile, stat } from "node:fs/promises"
 import path from "node:path"
-import type { RepoConfig, ThreadId } from "@pinetrie/core"
+import type { AcceptedFacts, RepoConfig, ThreadId } from "@pinetrie/core"
 import { createKeeper, type SlowStep } from "@pinetrie/keeper"
 import type { Runner } from "@pinetrie/lanes"
 
+import { acceptedFacts } from "./accepted.ts"
 import {
   type Fingerprint,
   fingerprintRead,
@@ -39,11 +40,13 @@ export interface RepoOps {
   /** Carry out a repo plan's steps: the only way a `RepoStep` runs. */
   execute(steps: readonly RepoStep[]): Promise<void>
   /**
-   * What accepted work's record and every lane's refresh read, as the head is now
-   * (`SharedFacts`): read once per operation, and again once the head moves,
-   * a write of this step's included.
+   * What every lane's refresh reads, as the head is now (`SharedFacts`): read
+   * once per operation, and again once the head moves, a write of this
+   * step's included.
    */
   shared(): Promise<SharedFacts>
+  /** What accepted work's record reads (`acceptedFacts`), as the head is now: kept as `shared` is. */
+  acceptedFacts(): Promise<AcceptedFacts>
 }
 
 /** What a read may run: jj pinned to the last observed operation, its stdout as text or as bytes, and git. */
@@ -103,6 +106,8 @@ export function startRepoOwner(input: {
   readonly onSlowCommand?: (command: TimedCommand) => void
   /** Default 500 ms. */
   readonly slowCommandMs?: number
+  /** Each jj or git command, a step's or a read's, as it ends: what a check counts. */
+  readonly onCommand?: (command: TimedCommand) => void
   /** How often the heads are listed without an event; default 5 s. */
   readonly backstopMs?: number
 }): RepoOwner {
@@ -115,6 +120,7 @@ export function startRepoOwner(input: {
   const listeners = new Set<(moved: Moved) => void>()
   const slowCommandMs = input.slowCommandMs ?? 500
   const timed: CommandWatch = command => {
+    input.onCommand?.(command)
     if (command.ms > slowCommandMs) input.onSlowCommand?.(command)
   }
   /** Every runner the owner makes, each command of it watched. */
@@ -150,7 +156,17 @@ export function startRepoOwner(input: {
     first.resolve()
     for (const listener of listeners) listener(moved)
   }
-  const queueObserve = () => keeper.later("observe", observeNow)
+  /** Whether the one head is the one observed: listing the heads costs no jj process. */
+  const isHeadSeen = async (): Promise<boolean> => {
+    const heads = (await readdir(await headsDir(root))).filter(isOpId)
+    return heads.length === 1 && heads[0] === seen?.op
+  }
+  // Looked again when it runs: a step's own write is observed by the step,
+  // after the watch heard it and queued this.
+  const queueObserve = () =>
+    keeper.later("observe", async () => {
+      if (!(await isHeadSeen())) await observeNow()
+    })
 
   /**
    * The shared facts at the head as it is at the moment of reading: the one
@@ -160,13 +176,26 @@ export function startRepoOwner(input: {
    */
   let kept: SharedFacts | null = null
   async function shared(): Promise<SharedFacts> {
-    const heads = (await readdir(await headsDir(root))).filter(isOpId)
-    if (heads.length !== 1 || heads[0] !== seen?.op) await observeNow()
+    if (!(await isHeadSeen())) await observeNow()
     const op = seen?.op
     if (op === undefined) throw new Error("your repo has no operation to read")
     if (kept?.op !== op)
-      kept = await readShared(op, runner({ at: op }), git, repoConfig)
+      kept = await readShared(op, runner({ at: op }), repoConfig)
     return kept
+  }
+  let keptAccepted: {
+    readonly op: string
+    readonly facts: AcceptedFacts
+  } | null = null
+  /** Accepted work's record's facts at the head `shared` reads, once per operation. */
+  async function accepted(): Promise<AcceptedFacts> {
+    const { op } = await shared()
+    if (keptAccepted?.op !== op)
+      keptAccepted = {
+        op,
+        facts: await acceptedFacts(runner({ at: op }), git, repoConfig),
+      }
+    return keptAccepted.facts
   }
 
   /** A step's ops, flagging the step as one that wrote. */
@@ -180,6 +209,7 @@ export function startRepoOwner(input: {
       },
       git,
       shared,
+      acceptedFacts: accepted,
       async execute(steps) {
         if (steps.length === 0) return
         try {
@@ -224,8 +254,7 @@ export function startRepoOwner(input: {
   const check = () =>
     void (async () => {
       if (closed) return
-      const heads = (await readdir(await headsDir(root))).filter(isOpId)
-      if (heads.length === 1 && heads[0] === seen?.op) return
+      if (await isHeadSeen()) return
       void queueObserve()
     })().catch(() => {})
   void headsDir(root)

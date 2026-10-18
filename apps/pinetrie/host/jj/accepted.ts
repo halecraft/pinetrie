@@ -1,6 +1,6 @@
 // host/jj/accepted — accepted work in your repo: its record, read whenever
 // the owner observes a move that changes it, and setup and publish. Gather (the
-// shared facts' `acceptedFacts`), decide (`planAcceptedRecord`,
+// owner's `acceptedFacts`, once per operation), decide (`planAcceptedRecord`,
 // `planAcceptedAction`, `planPublishFinish`), translate (`setupProposal`,
 // `planSetup` and the publish's steps) and execute, on the owner: the record as
 // upkeep (`later("accepted")`), a command as a command.
@@ -37,7 +37,7 @@ import type { AcceptedAnswer } from "../work/destination.ts"
 export interface AcceptedWork {
   /** Read accepted work and write its record when it changed, as upkeep. */
   refresh(): Promise<void>
-  /** Accepted work's record, from the step's shared facts, written when it changed. */
+  /** Accepted work's record, from its facts at the step's head, written when it changed. */
   record(ops: RepoOps): Promise<JjAcceptedRecord>
   /**
    * A setup or publish; null when carried out, else why not, worded
@@ -59,7 +59,7 @@ export function createAcceptedWork(deps: {
   const { session: doc } = deps.basics
 
   async function record(ops: RepoOps) {
-    const facts = (await ops.shared()).accepted
+    const facts = await ops.acceptedFacts()
     const next = planAcceptedRecord({
       facts,
       repoConfig,

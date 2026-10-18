@@ -1,22 +1,18 @@
-// What accepted work's record and every lane's refresh read, read once per
-// operation: an operation id names the repo exactly, so the owner keeps one
-// set until the head moves.
+// What every lane's refresh reads, read once per operation: an operation id
+// names the repo exactly, so the owner keeps one set until the head moves.
+// Accepted work's record reads more (`acceptedFacts`), and the owner keeps it
+// apart, read only when that record is written: a refresh never pays for it.
 
 import {
-  type AcceptedFacts,
   type CommitId,
+  commitId,
   messageSources,
   type RepoConfig,
   type ThreadId,
   untracedLanes,
 } from "@pinetrie/core"
 import { describeFailure, lines, type Runner } from "@pinetrie/lanes"
-import { acceptedFacts } from "./accepted.ts"
 import { revsetName } from "./lane/names.ts"
-import {
-  ACCEPTED_THREAD_COMMIT_ROW,
-  parseAcceptedThreadCommits,
-} from "./lane/revisions.ts"
 import { ACCEPTED_THREAD_COMMITS } from "./plan.ts"
 
 /** A commit on accepted work carrying accepted proposed changes' `Pinetrie-Source` trailers. */
@@ -32,11 +28,11 @@ export interface Untraced {
   readonly lanes: readonly ThreadId[]
 }
 
-/** What accepted work's record and every lane's refresh read, as one operation left your repo. */
+/** What every lane's refresh reads, as one operation left your repo. */
 export interface SharedFacts {
   readonly op: string
-  /** What `acceptedFacts` reads: accepted work, its config, the WIPs, your work's state. */
-  readonly accepted: AcceptedFacts
+  /** Accepted work's commit; null before it is set up. */
+  readonly acceptedCommit: CommitId | null
   /** Every accepted thread commit on accepted work that names sources. */
   readonly acceptedThreadCommits: readonly AcceptedThreadCommit[]
   /** Every accepted thread commit on accepted work that names none (`untracedLanes`). */
@@ -45,40 +41,79 @@ export interface SharedFacts {
   readonly editing: ReadonlySet<string>
 }
 
-/** Read the shared facts with jj pinned to `op`, and git. */
-export async function readShared(
-  op: string,
-  jj: Runner,
-  git: Runner,
-  repoConfig: RepoConfig,
-): Promise<SharedFacts> {
-  const ran = await jj([
+/**
+ * The one read of the shared facts: accepted work's commit, the accepted
+ * thread commits under it, and `@`, each row flagged by which it is (one
+ * commit may be more than one), `@`'s files read from its diff, as `jj diff
+ * --name-only` lists them.
+ */
+function sharedRead(repoConfig: RepoConfig): readonly string[] {
+  const accepted = `present(${revsetName(repoConfig.acceptedBookmark)})`
+  const threadCommits = `::${accepted} & ${ACCEPTED_THREAD_COMMITS}`
+  const flag = (letter: string, revset: string) =>
+    `if(self.contained_in(${JSON.stringify(revset)}), "${letter}")`
+  return [
     "log",
     "--no-graph",
     "-r",
-    `::present(${revsetName(repoConfig.acceptedBookmark)}) & ${ACCEPTED_THREAD_COMMITS}`,
+    `${accepted} | (${threadCommits}) | @`,
     "-T",
-    ACCEPTED_THREAD_COMMIT_ROW,
-  ])
-  if (!ran.ok) throw new Error(describeFailure("jj log", ran))
-  const accepted = parseAcceptedThreadCommits(ran.stdout).map(
-    ({ commit, description }) => ({
-      commit,
-      sources: messageSources(description),
-      lanes: untracedLanes(description),
-    }),
-  )
-  const edited = await jj(["diff", "-r", "@", "--name-only"])
-  if (!edited.ok) throw new Error(describeFailure("jj diff", edited))
+    [
+      'commit_id ++ "\\t"',
+      flag("A", accepted),
+      flag("K", threadCommits),
+      flag("W", "@"),
+      '"\\t"',
+      'if(self.contained_in("@"), "[" ++ self.diff().files().map(|f| json(f.path())).join(",") ++ "]", "[]") ++ "\\t"',
+      'json(description) ++ "\\n"',
+    ].join(" ++ "),
+  ]
+}
+
+/** `sharedRead`'s output → the facts at `op`. */
+export function parseShared(op: string, stdout: string): SharedFacts {
+  let acceptedCommit: CommitId | null = null
+  let editing: ReadonlySet<string> = new Set()
+  const threadCommits: {
+    commit: CommitId
+    sources: readonly CommitId[]
+    lanes: readonly ThreadId[]
+  }[] = []
+  for (const row of lines(stdout)) {
+    const [commit = "", flags = "", files = "[]", description = '""'] =
+      row.split("\t")
+    const id = commitId(commit)
+    if (flags.includes("A")) acceptedCommit = id
+    if (flags.includes("W")) editing = new Set(JSON.parse(files) as string[])
+    if (flags.includes("K")) {
+      const message = JSON.parse(description) as string
+      threadCommits.push({
+        commit: id,
+        sources: messageSources(message),
+        lanes: untracedLanes(message),
+      })
+    }
+  }
   return {
     op,
-    accepted: await acceptedFacts(jj, git, repoConfig),
-    acceptedThreadCommits: accepted
+    acceptedCommit,
+    acceptedThreadCommits: threadCommits
       .filter(t => t.sources.length > 0)
       .map(({ commit, sources }) => ({ commit, sources })),
-    untraced: accepted
+    untraced: threadCommits
       .filter(t => t.lanes.length > 0)
       .map(({ commit, lanes }) => ({ commit, lanes })),
-    editing: new Set(lines(edited.stdout)),
+    editing,
   }
+}
+
+/** Read the shared facts with jj pinned to `op`: one `jj log`. */
+export async function readShared(
+  op: string,
+  jj: Runner,
+  repoConfig: RepoConfig,
+): Promise<SharedFacts> {
+  const ran = await jj(sharedRead(repoConfig))
+  if (!ran.ok) throw new Error(describeFailure("jj log", ran))
+  return parseShared(op, ran.stdout)
 }

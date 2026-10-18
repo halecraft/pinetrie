@@ -649,8 +649,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "accepted work's preview runs no git",
     file: "packages/jj/owner.ts",
-    from: "      kept = await readShared(op, runner({ at: op }), git, repoConfig)",
-    to: '      kept = await readShared(op, runner({ at: op }), async () => ({ ok: false, code: 1, stdout: "", stderr: "" }), repoConfig)',
+    from: "        facts: await acceptedFacts(runner({ at: op }), git, repoConfig),",
+    to: '        facts: await acceptedFacts(runner({ at: op }), async () => ({ ok: false, code: 1, stdout: "", stderr: "" }), repoConfig),',
     suite: "lanes",
     scenario: "main",
     expect:
@@ -3088,6 +3088,14 @@ export const mutations: readonly Mutation[] = [
     to: "  histogram.reset()\n  if (stalled === null) return\n  log(stallWords({ ms: stalled, cpuMs: Math.min(cpuMs, stalled) }))\n",
     command: unit,
     expect: "a check that finds no stall leaves the histogram as it is",
+  },
+  {
+    name: "a stall off the CPU is told as work",
+    file: "apps/pinetrie/host/stalls.ts",
+    from: "  return stall.cpuMs < stall.ms * BUSY_SHARE\n",
+    to: "  return false\n",
+    command: unit,
+    expect: "a stall spent off the CPU is told as a pause, not as work",
   },
   // ── a refresh reads the lane's root only to build ──
   {

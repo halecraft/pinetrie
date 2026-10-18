@@ -432,3 +432,74 @@ test("a refresh that builds nothing leases the lane's root not once", async () =
     leased: 0,
   })
 }, 60_000)
+
+test("a refresh runs as many jj and git processes as its case needs: two unchanged, three after any new operation, about a dozen when it writes", async () => {
+  const you = await yourRepo("counted")
+  const b = basics()
+  putValue(b, setRecord(NAME, { lane: LANE, name: THREAD, at: 1 }))
+  const scribe = record<Records>({
+    writeValues: async writes => applyWrites(b, writes),
+  })
+  /** Each command the owner ran, by program and first argument. */
+  const ran: string[] = []
+  const owner = startRepoOwner({
+    root: you.dir,
+    repoConfig: DEFAULT_REPO,
+    onCommand: c => ran.push(`${c.program} ${c.args[0] ?? ""}`),
+  })
+  try {
+    const refresh = createRefresh(
+      createProposedChangesDeps({
+        owner,
+        repoConfig: DEFAULT_REPO,
+        basics: b,
+        records: scribe.port,
+        piSetup: record<PiSetup>({}).port,
+        running: () => false,
+        baseChanged: () => {},
+      }),
+    )
+    /** One refresh, with every observation it leaves queued: its processes. */
+    const count = async () => {
+      await owner.idle()
+      ran.length = 0
+      await owner.command(ops => refresh.refresh(ops, LANE))
+      await owner.idle()
+      return ran.length
+    }
+    const work = await you.commit(
+      [you.base],
+      { "a.txt": "a\n" },
+      `turn\n\nPinetrie-Lane: ${LANE}\nPinetrie-Entry: e1\n`,
+    )
+    await you.setTip(LANE, work)
+    const counts = { build: await count(), unchanged: await count() }
+    // A command of yours moves the head: the shared facts are read again.
+    await you.jj("new", you.base)
+    const afterYours = await count()
+    await you.moveAccepted(
+      await you.commit([you.base], { "b.txt": "yours\n" }, "yours"),
+    )
+    const rebase = await count()
+    const turn = await you.commit(
+      [work],
+      { "c.txt": "c\n" },
+      `turn\n\nPinetrie-Lane: ${LANE}\nPinetrie-Entry: e2\n`,
+    )
+    await you.setTip(LANE, turn)
+    expect({
+      ...counts,
+      afterYours,
+      rebase,
+      rebuild: await count(),
+    }).toEqual({
+      build: 15,
+      unchanged: 2,
+      afterYours: 3,
+      rebase: 13,
+      rebuild: 16,
+    })
+  } finally {
+    owner.close()
+  }
+}, 60_000)

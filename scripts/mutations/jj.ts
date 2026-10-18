@@ -23,6 +23,13 @@ const catchUpTest = [
 ]
 const repoTest = ["pnpm", "exec", "vitest", "run", "packages/jj/repo.test.ts"]
 const tidyTest = ["pnpm", "exec", "vitest", "run", "packages/jj/tidy.test.ts"]
+const refreshTest = [
+  "pnpm",
+  "exec",
+  "vitest",
+  "run",
+  "apps/pinetrie/host/jj/proposed/refresh.test.ts",
+]
 const proposedRefresh = [
   "pnpm",
   "exec",
@@ -120,16 +127,16 @@ export const mutations: readonly Mutation[] = [
   {
     name: "proposed changes are its bookmark's commit alone",
     file: "packages/jj/proposed.ts",
-    from: "    `(::${bookmark} ~ ::(${input.target})) & (${thread} | ${bookmark})`,",
-    to: "    `(::${bookmark} ~ ::(${input.target})) & ${bookmark}`,",
+    from: "  return `(::${bookmark} ~ ::(${input.target})) & (${thread} | ${bookmark})`\n",
+    to: "  return `(::${bookmark} ~ ::(${input.target})) & ${bookmark}`\n",
     command: unit,
     expect: "proposed changes on accepted work: built, immutable",
   },
   {
     name: "proposed changes' revisions include what is already under its base",
     file: "packages/jj/proposed.ts",
-    from: "    `(::${bookmark} ~ ::(${input.target})) & (${thread} | ${bookmark})`,",
-    to: "    `(::${bookmark}) & (${thread} | ${bookmark})`,",
+    from: "  return `(::${bookmark} ~ ::(${input.target})) & (${thread} | ${bookmark})`\n",
+    to: "  return `(::${bookmark}) & (${thread} | ${bookmark})`\n",
     command: unit,
     expect: "proposed changes on accepted work: built, immutable",
   },
@@ -355,7 +362,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "proposed changes read as the host's version whatever its top",
     file: "packages/jj/proposed.ts",
-    from: "  const marked = host === top\n",
+    from: "  const marked = host === top.commit\n",
     to: "  const marked = true\n",
     command: repoTest,
     expect:
@@ -894,8 +901,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the shared facts outlive a write",
     file: "packages/jj/owner.ts",
-    from: "    if (heads.length !== 1 || heads[0] !== seen?.op) await observeNow()\n    const op = seen?.op\n",
-    to: "    if (heads.length !== 1 || heads[0] !== seen?.op) await observeNow()\n    const op = kept?.op ?? seen?.op\n",
+    from: "    if (!(await isHeadSeen())) await observeNow()\n    const op = seen?.op\n",
+    to: "    if (!(await isHeadSeen())) await observeNow()\n    const op = kept?.op ?? seen?.op\n",
     command: ["pnpm", "exec", "vitest", "run", "packages/jj/owner.test.ts"],
     expect: "a write reads them anew",
   },
@@ -1398,5 +1405,51 @@ export const mutations: readonly Mutation[] = [
     scenario: "main",
     expect:
       "a run that moves the lane keeps the proposed changes' change id; it is a WIP line until each run ends",
+  },
+  // ── what a refresh runs ──
+  {
+    name: "the shared facts are read again at every step",
+    file: "packages/jj/owner.ts",
+    from: "    if (kept?.op !== op)\n",
+    to: "    if (true)\n",
+    command: refreshTest,
+    expect:
+      "a refresh runs as many jj and git processes as its case needs: two unchanged, three after any new operation, about a dozen when it writes",
+  },
+  {
+    name: "a queued observation runs though the step observed its own write",
+    file: "packages/jj/owner.ts",
+    from: "      if (!(await isHeadSeen())) await observeNow()\n",
+    to: "      await observeNow()\n",
+    command: refreshTest,
+    expect:
+      "a refresh runs as many jj and git processes as its case needs: two unchanged, three after any new operation, about a dozen when it writes",
+  },
+  {
+    name: "one revision's proposed changes read their files with a diff of their own",
+    file: "packages/jj/proposed.ts",
+    from: "    found.length === 1\n",
+    to: "    false\n",
+    command: refreshTest,
+    expect:
+      "a refresh runs as many jj and git processes as its case needs: two unchanged, three after any new operation, about a dozen when it writes",
+  },
+  {
+    name: "the shared facts take accepted work's commit for your edits",
+    file: "packages/jj/shared.ts",
+    from: '    if (flags.includes("W")) editing',
+    to: '    if (flags.includes("A")) editing',
+    command: unit,
+    expect:
+      "the shared facts' one read gives accepted work's commit, its accepted thread commits, and the files @ changes as jj diff lists them",
+  },
+  {
+    name: "the shared facts take an accepted thread commit for accepted work",
+    file: "packages/jj/shared.ts",
+    from: '    if (flags.includes("A")) acceptedCommit = id',
+    to: '    if (flags.includes("K")) acceptedCommit = id',
+    command: unit,
+    expect:
+      "the shared facts' one read gives accepted work's commit, its accepted thread commits, and the files @ changes as jj diff lists them",
   },
 ]

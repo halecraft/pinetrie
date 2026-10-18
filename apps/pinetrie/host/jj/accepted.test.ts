@@ -38,11 +38,12 @@ function rig(
   const ops = record<RepoOps>({
     shared: async () => ({
       op,
-      accepted: now,
+      acceptedCommit: now.commit,
       acceptedThreadCommits: [],
       untraced: [],
       editing: new Set(),
     }),
+    acceptedFacts: async () => now,
     execute: async steps => {
       ran.push([...steps])
       const [first] = steps

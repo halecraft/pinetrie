@@ -155,7 +155,9 @@ everything else reads at the head it last saw.**
 - **The watch** (`fs.watch` on `op_heads/heads`, S87 items 5 and 6) and a
   `readdir` every 5 s as its backstop: neither starts jj. Heads that are
   exactly the last observed one do nothing; anything else queues an
-  observation. `.jj/repo` is a file naming the repo in a secondary
+  observation, which lists the heads again when it runs: the watch hears a
+  step's own write before the step observes it, and an observation queued
+  then would run `jj op log` for a head already seen (`isHeadSeen`). `.jj/repo` is a file naming the repo in a secondary
   workspace (`headsDir`). `close()` stops both and refuses every step.
 - **A closed owner drops its upkeep not yet started** (`owner.ts`): the
   running step and the commands queued finish, and each refresh, shared
@@ -178,15 +180,24 @@ operation is read once and kept until the head moves.**
   `gatherRefresh`: one that never committed was never fetched. No
   `pinetrie.base` is written for it, and the page reads catching up as
   `unknown` (`catchUpNow`, `@pinetrie/rules`), never as caught up.
-- **`SharedFacts`**, per operation (`RepoOps.shared()`): accepted work's facts
-  (`acceptedFacts`, for accepted work's record), the accepted thread commits on the
-  line (`ACCEPTED_THREAD_COMMITS`: a `Pinetrie-Source` or `Pinetrie-Thread`
-  trailer), split into those naming sources (`acceptedThreadCommits`) and
-  those that name none for some lane (`untraced`,
-  `untracedLanes`, S97), and the files `@` changes (`editing`). The owner keeps one set, keyed by the head as it
-  is at the moment of reading: the one file in the heads directory; any
-  other (an outside write, two heads) is observed first. A write in the same
-  step observes, so a read after it reads a fresh set.
+- **`SharedFacts`**, per operation (`RepoOps.shared()`), in one `jj log`
+  (`readShared`): accepted work's commit, the accepted thread commits on
+  the line (`ACCEPTED_THREAD_COMMITS`: a `Pinetrie-Source` or
+  `Pinetrie-Thread` trailer), split into those naming sources
+  (`acceptedThreadCommits`) and those that name none for some lane
+  (`untraced`, `untracedLanes`, S97), and the files `@` changes
+  (`editing`), from `@`'s diff as `jj diff --name-only` lists them (a
+  rename lists its new path; `shared.test.ts`). Each row is flagged by
+  which it is, since one commit may be several. The owner keeps one set,
+  keyed by the head as it is at the moment of reading: the one file in the
+  heads directory; any other (an outside write, two heads) is observed
+  first. A write in the same step observes, so a read after it reads a
+  fresh set.
+- **Accepted work's record's facts are kept apart** (`RepoOps.acceptedFacts()`,
+  `acceptedFacts`): nine reads and six more when your `@-` is behind (its
+  configs, the WIPs, the publish bookmark, your `@-` and `@`), once per
+  operation, read only when that record is written. In the shared facts,
+  every refresh at a new operation paid them, twice when it wrote (S232).
 - **`yourEdits` is `files ∩ editing`**, decided in `proposedChangesRecord`
   (`@pinetrie/rules`): no lane reads `@`. `@` alone moving rewrites every open
   record's from one shared read (`planYourEdits`).
@@ -218,6 +229,15 @@ operation is read once and kept until the head moves.**
   and no evolog (`repo.test.ts` counts 2: the read and `filesTouched`);
   S89 measured 18 before, and 3 with the evolog (ADR-0154). A lane whose base moved runs two more, once per move,
   and one more for each further head of its proposed changes' start.
+- **A whole refresh, as the host runs it, is counted** (the host's
+  `refresh.test.ts`, every command the owner heard, `onCommand`): 2
+  unchanged, 3 after any new operation (the shared facts' read), 13 for a
+  rebase when accepted work moved, 15 for a first build, 16 for a rebuild
+  after a turn. A writing refresh's steps and mark, the observation after
+  them (2), the record's read (1) and the shared facts read again (1) are
+  most of it. S232 measured 43 and 60 before the shared facts were split
+  and proposed changes read in one `jj log`; on the Mac a jj process is
+  about 20 ms.
 - **One rule decides both.** `repo.test.ts` holds `gatherLane` beside the
   separate reads (`laneTipIn`, `laneBase`, `startOfProposed`, `readProposedChanges`,
   `filesTouched`, `readCatchUp`) at every proposed changes it builds, accepts, follows, repairs and
@@ -451,7 +471,12 @@ update's merge will change.**
   writes the tip ref, then deletes the park.
 - **`readProposedChanges` reads proposed changes from your repo alone** (`ProposedChangesInRepo`,
   ADR-0104): nothing the host remembers is needed, so a lost record costs
-  nothing. Its revisions (`proposedRevisions`) are what is under the bookmark,
+  nothing, in one `jj log` (`proposedRead`): the bookmark's commits, the
+  revisions, the host's version and the target, each row flagged by which
+  it is, with its parents, whether each parent is under the target, its
+  files (the bookmark's commit only) and its description; then, only when
+  needed, each revision's facts since the host, a stack's files, and the
+  top's conflicted files. Its revisions (`proposedRevisions`) are what is under the bookmark,
   not already under the target, and carries the thread's trailer:
   `(::<bookmark> ~ ::<target>) & (description(regex:"(?m)^Pinetrie-Thread:
   <name>$") | <bookmark>)`. Conflicted proposed changes' `startConflicts` are the
@@ -460,8 +485,8 @@ update's merge will change.**
   names none. Accepted proposed changes below carry the same trailer, but
   is under the target; your commits carry none. The bookmark's own commit
   is always the top. A conflicted bookmark, or a change id naming two
-  commits, reads as divergent, with only the change ids. Every read after
-  the first names commits (S48 item 2). It returns facts, and the bookmark it
+  commits (jj's `divergent`), reads as divergent, with only the change ids.
+  Every read after the first names commits (S48 item 2). It returns facts, and the bookmark it
   found them under; `planRefresh`, `isProposedEdited` and `isProposedMoved`
   (`@pinetrie/rules`) decide what they mean.
 - **The host's version of each proposed changes are a tracked remote bookmark,

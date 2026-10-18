@@ -134,7 +134,7 @@ import {
 } from "./proposed-gather.ts"
 import { repairProposedChanges } from "./proposed-repair.ts"
 import { jjFileBytes } from "./review-content.ts"
-import { bytesFor, executeRepo, hostJj, hostOps, runnerFor } from "./run.ts"
+import { bytesFor, executeRepo, hostJj, hostOps } from "./run.ts"
 import { readShared } from "./shared.ts"
 import { git, host } from "./step.ts"
 
@@ -1141,7 +1141,7 @@ describe("a lane's repo, with jj", () => {
     const agrees = async () => {
       const op = (await ops(["op", "log", "--no-graph", "-n", "1", "-T", "id"]))
         .stdout
-      const shared = await readShared(op, ops, runnerFor(yoursDir, "git"), line)
+      const shared = await readShared(op, ops, line)
       const gathered = await gatherLane(ops, {
         lane: LANE,
         name: NAME,
@@ -1746,7 +1746,7 @@ describe("a lane's repo, with jj", () => {
       lane: FORK,
       name: BRANCH,
       repoConfig: line,
-      shared: await readShared(op, ops, runnerFor(yoursDir, "git"), line),
+      shared: await readShared(op, ops, line),
       known: null,
     })
     expect(gathered).toMatchObject({
@@ -2309,12 +2309,7 @@ describe("a lane's repo, with jj", () => {
     ])
     const op = (await ops(["op", "log", "--no-graph", "-n", "1", "-T", "id"]))
       .stdout
-    const shared = await readShared(
-      op,
-      ops,
-      runnerFor(rig.yoursDir, "git"),
-      line,
-    )
+    const shared = await readShared(op, ops, line)
     let ran = 0
     const evologs: string[] = []
     const counted: Runner = args => {
@@ -2347,12 +2342,7 @@ describe("a lane's repo, with jj", () => {
       const now = (
         await ops(["op", "log", "--no-graph", "-n", "1", "-T", "id"])
       ).stdout
-      const facts = await readShared(
-        now,
-        ops,
-        runnerFor(rig.yoursDir, "git"),
-        line,
-      )
+      const facts = await readShared(now, ops, line)
       ran = 0
       const read = await gatherLane(counted, {
         lane: LANE,
@@ -2423,7 +2413,7 @@ describe("a lane's repo, with jj", () => {
     )
     const op = (await ops(["op", "log", "--no-graph", "-n", "1", "-T", "id"]))
       .stdout
-    const shared = await readShared(op, ops, runnerFor(yoursDir, "git"), line)
+    const shared = await readShared(op, ops, line)
     const gathered = await gatherLane(ops, {
       lane: LANE,
       name: NAME,

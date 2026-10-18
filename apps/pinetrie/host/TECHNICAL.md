@@ -1767,7 +1767,7 @@ adapter's.
   (`yours`, jjui and your editor) marks no lane: one `later("shared")` step
   rewrites each open record's `yourEdits` (its files that `@` changes,
   `planYourEdits`) and
-  accepted work's record from the shared facts; a lane's
+  accepted work's record from its own facts (`acceptedFacts`); a lane's
   ref (a fetch's import) marks that lane; proposed bookmark the lane its
   thread names. A run's end marks its lane, then describes it. A refresh
   that wrote is observed, and refreshes the lanes it moved once more: that

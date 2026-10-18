@@ -343,7 +343,7 @@ export async function gatherLane(
     readonly known: CatchUpRead | null
   },
 ): Promise<LaneGather | "none" | "wip"> {
-  const acceptedBookmark = input.shared.accepted.commit
+  const acceptedBookmark = input.shared.acceptedCommit
   if (acceptedBookmark === null) return "none"
   const ran = await jj(
     laneRead({

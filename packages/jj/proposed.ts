@@ -328,6 +328,16 @@ export async function readHostVersion(
   return host ?? null
 }
 
+/** Proposed changes' revisions as a revset: under its bookmark, not under its target, and its thread's or the bookmark's own. */
+const proposedRegion = (input: {
+  readonly name: ThreadName
+  readonly target: string
+}): string => {
+  const bookmark = bookmarkRevset(proposedBookmark(input.name))
+  const thread = trailerRevset(["thread"], input.name)
+  return `(::${bookmark} ~ ::(${input.target})) & (${thread} | ${bookmark})`
+}
+
 /**
  * Proposed changes' revisions in your repo, bottom first, each with its change
  * id: what is under its bookmark and not already under its target, and carries
@@ -340,13 +350,11 @@ export async function proposedRevisions(
   jj: Runner,
   input: { readonly name: ThreadName; readonly target: string },
 ): Promise<{ readonly commit: CommitId; readonly changeId: string }[]> {
-  const bookmark = bookmarkRevset(proposedBookmark(input.name))
-  const thread = trailerRevset(["thread"], input.name)
   const ran = await jj([
     "log",
     "--no-graph",
     "-r",
-    `(::${bookmark} ~ ::(${input.target})) & (${thread} | ${bookmark})`,
+    proposedRegion(input),
     "-T",
     'commit_id ++ "\\t" ++ change_id ++ "\\n"',
   ])
@@ -378,40 +386,123 @@ export async function readStartConflicts(
   return [...files].sort()
 }
 
+/** One commit of proposed changes' read, with what its revsets say of it. */
+interface ProposedRow {
+  readonly commit: CommitId
+  readonly changeId: string
+  readonly parents: readonly CommitId[]
+  /** Whether each parent is under the target, in `parents`' order. */
+  readonly parentsPlaced: readonly boolean[]
+  /** The proposed changes' bookmark points here. */
+  readonly bookmark: boolean
+  /** One of its revisions (`proposedRegion`). */
+  readonly revision: boolean
+  /** The host's version points here (`hostProposedRevset`). */
+  readonly host: boolean
+  /** The target is here. */
+  readonly target: boolean
+  readonly divergent: boolean
+  readonly conflict: boolean
+  /** The files it changes. */
+  readonly files: readonly string[]
+  readonly description: string
+}
+
+/** The one read of proposed changes under `name` at `target`: its bookmark, revisions, the host's version and the target. */
+function proposedRead(input: {
+  readonly name: ThreadName
+  readonly target: string
+}): readonly string[] {
+  const bookmark = `present(${bookmarkRevset(proposedBookmark(input.name))})`
+  const region = proposedRegion(input)
+  const host = hostProposedRevset(proposedBookmark(input.name))
+  const target = `(${input.target})`
+  const flag = (letter: string, revset: string) =>
+    `if(self.contained_in(${JSON.stringify(revset)}), "${letter}")`
+  return [
+    "log",
+    "--no-graph",
+    "-r",
+    `${bookmark} | ${region} | ${host} | ${target}`,
+    "-T",
+    [
+      'commit_id ++ "\\t" ++ change_id ++ "\\t"',
+      'parents.map(|p| p.commit_id()).join(",") ++ "\\t"',
+      `parents.map(|p| if(p.contained_in(${JSON.stringify(`::${target}`)}), "1", "0")).join("") ++ "\\t"`,
+      flag("O", bookmark),
+      flag("R", region),
+      flag("H", host),
+      flag("G", target),
+      'if(divergent, "D") ++ if(conflict, "C") ++ "\\t"',
+      `if(self.contained_in(${JSON.stringify(bookmark)}), "[" ++ self.diff().files().map(|f| json(f.path())).join(",") ++ "]", "[]") ++ "\\t"`,
+      'json(description) ++ "\\n"',
+    ].join(" ++ "),
+  ]
+}
+
+/** `proposedRead`'s output → its rows, newest first, as jj lists them. */
+function parseProposedRows(stdout: string): ProposedRow[] {
+  return lines(stdout).map(row => {
+    const [
+      commit = "",
+      changeId = "",
+      parents = "",
+      placed = "",
+      flags = "",
+      files = "[]",
+      description = '""',
+    ] = row.split("\t")
+    return {
+      commit: commitId(commit),
+      changeId,
+      parents: parents === "" ? [] : parents.split(",").map(commitId),
+      parentsPlaced: [...placed].map(c => c === "1"),
+      bookmark: flags.includes("O"),
+      revision: flags.includes("R"),
+      host: flags.includes("H"),
+      target: flags.includes("G"),
+      divergent: flags.includes("D"),
+      conflict: flags.includes("C"),
+      files: JSON.parse(files) as string[],
+      description: JSON.parse(description) as string,
+    }
+  })
+}
+
 /**
  * Proposed changes as your repo holds it now (`ProposedChangesInRepo`): its
  * revisions and each one's facts since the host's version
  * (`revisionSinceHost`), whether its top is that version, its ledger and first
  * line, where it sits, its files and conflicts. Null when its bookmark is gone
  * (you abandoned it, or accepted it by hand). Divergent when the bookmark is
- * conflicted or a change id names two commits: then only its change ids. Every
- * read after the first names commits, so no read acts on a hidden one.
+ * conflicted or a change id names two commits: then only its change ids. One
+ * `jj log` says all of it; every read after it names commits, so no read acts
+ * on a hidden one: each revision's facts since the host when its top is not
+ * that version, a stack's files, and the conflicted files when the top is
+ * conflicted.
  */
 export async function readProposedChanges(
   jj: Runner,
   input: { readonly name: ThreadName; readonly target: string },
 ): Promise<ProposedChangesInRepo | null> {
-  const heads = await readCommits(
-    jj,
-    `present(${bookmarkRevset(proposedBookmark(input.name))})`,
-  )
-  const found = await proposedRevisions(jj, input)
+  const ran = await jj(proposedRead(input))
+  if (!ran.ok) throw new Error(describeFailure("jj log", ran))
+  const rows = parseProposedRows(ran.stdout)
+  const heads = rows.filter(r => r.bookmark)
+  const found = rows.filter(r => r.revision).toReversed()
   const [top] = heads
   const [bottom] = found
   if (top === undefined || bottom === undefined) return null
   const changeIds = [...new Set(found.map(r => r.changeId))]
-  const visible = await readCommits(
-    jj,
-    changeIds.map(c => `change_id(${c})`).join(" | "),
-  )
-  if (heads.length > 1 || visible.length > changeIds.length)
+  if (heads.length > 1 || found.some(r => r.divergent))
     return { kind: "divergent", changeIds }
-  const host = await readHostVersion(jj, proposedBookmark(input.name))
-  const marked = host === top
+  const host = rows.find(r => r.host)?.commit ?? null
+  const marked = host === top.commit
   const revisions: ProposedRevision[] = []
   for (const r of found)
     revisions.push({
-      ...r,
+      commit: r.commit,
+      changeId: r.changeId,
       since: await revisionSinceHost(jj, r, {
         marked,
         host,
@@ -419,33 +510,22 @@ export async function readProposedChanges(
       }),
     })
   const chained =
-    found.at(-1)?.commit === top &&
-    (
-      await Promise.all(
-        found.slice(1).map(async (r, i) => {
-          const parents = await readCommits(jj, `parents(${r.commit})`)
-          return parents.length === 1 && parents[0] === found[i]?.commit
-        }),
+    found.at(-1)?.commit === top.commit &&
+    found
+      .slice(1)
+      .every(
+        (r, i) => r.parents.length === 1 && r.parents[0] === found[i]?.commit,
       )
-    ).every(Boolean)
-  const parents = await readCommits(jj, `parents(${bottom.commit})`)
-  const placed =
-    (await readCommits(jj, `parents(${bottom.commit}) & ::(${input.target})`))
-      .length === parents.length
-  const target = await readCommits(jj, input.target)
-  const onTarget =
-    parents.length === target.length && parents.every(p => target.includes(p))
-  const files = await proposedFiles(jj, bottom.commit, top)
-  const conflicts = await readConflictedFiles(jj, top)
-  const message = await query(jj, [
-    "log",
-    "--no-graph",
-    "-r",
-    top,
-    "-T",
-    "description",
-  ])
-  const ledger = proposedLedger(message)
+  const target = rows.filter(r => r.target).map(r => r.commit)
+  const { parents } = bottom
+  const files =
+    found.length === 1
+      ? top.files
+      : await proposedFiles(jj, bottom.commit, top.commit)
+  const conflicts = top.conflict
+    ? await readConflictedFiles(jj, top.commit)
+    : []
+  const ledger = proposedLedger(top.description)
   return {
     kind: "present",
     bookmark: proposedBookmark(input.name),
@@ -453,9 +533,11 @@ export async function readProposedChanges(
     revisions,
     chained,
     ledger,
-    firstLine: message.split("\n")[0] ?? "",
-    placed,
-    onTarget,
+    firstLine: top.description.split("\n")[0] ?? "",
+    placed: bottom.parentsPlaced.every(Boolean),
+    onTarget:
+      parents.length === target.length &&
+      parents.every(p => target.includes(p)),
     files,
     conflicts,
     startConflicts: await readStartConflicts(jj, ledger, conflicts),
