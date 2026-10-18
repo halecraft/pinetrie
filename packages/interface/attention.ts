@@ -124,6 +124,42 @@ const latest = (a: string, b: string | undefined): string =>
 const followed = (input: AttentionInput, lane: ThreadId): boolean =>
   !input.archived.has(lane) && follows(input.me, input.writers.get(lane) ?? [])
 
+/** A thread's last run-end report, while it asks something of you. */
+export interface StandingRunEnd {
+  readonly record: RunEndReportRecord
+  readonly level: Level
+  /**
+   * Not yet read past or dismissed: it raises an item. Read or dismissed, it
+   * still stands, quietly, until the next run starts.
+   */
+  readonly raised: boolean
+}
+
+/**
+ * Each thread's run-end report that asks something of you (`attentionLevel`),
+ * by lane: only a thread you follow, while its agent is idle and its canvas
+ * is not archived. The sidebar's items and a column's status line both read
+ * this, so they cannot disagree. Before your document's first write (`since`
+ * ""), where you started is not known, and none is raised.
+ */
+export function standingRunEnds(
+  input: AttentionInput,
+): ReadonlyMap<ThreadId, StandingRunEnd> {
+  const { me, person } = input
+  const out = new Map<ThreadId, StandingRunEnd>()
+  for (const record of input.runEndReports.values()) {
+    const level = attentionLevel(record.report, me)
+    if (level === null || input.busy.has(record.lane)) continue
+    if (!followed(input, record.lane)) continue
+    const raised =
+      person.since !== "" &&
+      record.end > latest(person.since, person.read.get(record.lane)) &&
+      person.dismissed.get(record.lane) !== record.ask
+    out.set(record.lane, { record, level, raised })
+  }
+  return out
+}
+
 /**
  * Everything raised for you, run-end reports and ready proposed changes apart: a
  * thread can raise both. Only a thread you follow raises anything, and only
@@ -137,11 +173,8 @@ export function attentionItems(input: AttentionInput): readonly Item[] {
   const yours = (lane: ThreadId): boolean =>
     !input.busy.has(lane) && followed(input, lane)
   const items: Item[] = []
-  for (const v of input.runEndReports.values()) {
-    const level = attentionLevel(v.report, me)
-    if (!yours(v.lane) || level === null) continue
-    if (v.end <= latest(person.since, person.read.get(v.lane))) continue
-    if (person.dismissed.get(v.lane) === v.ask) continue
+  for (const { record: v, level, raised } of standingRunEnds(input).values()) {
+    if (!raised) continue
     items.push({
       lane: v.lane,
       end: v.end,

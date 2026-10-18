@@ -75,7 +75,9 @@ export {
   type Moments,
   markLevel,
   moving,
+  type StandingRunEnd,
   type Status,
+  standingRunEnds,
   threadStatus,
   threadWriters,
 } from "./attention.ts"
@@ -229,6 +231,7 @@ export {
   threadTrack,
   trackIndex,
 } from "./column-paths.ts"
+export { type ColumnStatus, columnStatus } from "./column-status.ts"
 export {
   AGENT_MARK,
   columnView,

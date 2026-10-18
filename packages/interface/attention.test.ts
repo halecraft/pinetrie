@@ -25,6 +25,7 @@ import {
   highest,
   markLevel,
   type Status,
+  standingRunEnds,
   threadStatus,
 } from "./attention.ts"
 
@@ -237,6 +238,41 @@ describe("attentionItems", () => {
       ),
     ).toHaveLength(1)
   })
+})
+
+test("the sidebar and the column read one standing report", () => {
+  const reports = [
+    said("needsYou"),
+    said("worthARead"),
+    said("done"),
+    { kind: "pending" } as const,
+    { kind: "failed", error: "x" } as const,
+    { kind: "stopped", by: ADA } as const,
+    { kind: "stopped", by: BEA } as const,
+    { kind: "unclassified" } as const,
+  ]
+  const people = [
+    person(),
+    person({ since: "" }),
+    person({ since: "e-9" }),
+    person({ read: new Map([[A, entryId("e-5")]]) }),
+    person({ read: new Map([[A, entryId("e-4")]]) }),
+    person({ dismissed: new Map([[A, entryId("p-1")]]) }),
+    person({ dismissed: new Map([[A, entryId("p-0")]]) }),
+  ]
+  for (const r of reports)
+    for (const p of people)
+      for (const busy of [new Set<ThreadId>(), new Set([A])]) {
+        const facts = input({
+          runEndReports: new Map([[A, report(A, r)]]),
+          person: p,
+          busy,
+        })
+        const raised = attentionItems(facts).some(
+          i => i.lane === A && i.raised.kind === "runEnd",
+        )
+        expect(standingRunEnds(facts).get(A)?.raised ?? false).toBe(raised)
+      }
 })
 
 describe("threadStatus and canvasStatus", () => {

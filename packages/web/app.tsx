@@ -1611,6 +1611,7 @@ export function App({
     folds,
     live,
     attention: session.attention,
+    runEnds: attention.runEnds,
     spots,
     viewports,
     digests,

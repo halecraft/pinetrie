@@ -287,6 +287,7 @@ const facts = (
       labelOf: () => "",
       reader: { me: ADA, nameOf: new Map() },
     },
+    runEnds: new Map(),
     ...over,
   }
 }
@@ -343,6 +344,37 @@ describe("columnView: the header", () => {
       focus: { kind: "model", text: "Planning the billing page" },
     })
   })
+  test("a thread whose last run needs you says so in its header", () => {
+    const standing = {
+      record: {
+        lane: B,
+        ask: entryId("b1"),
+        end: entryId("b2"),
+        report: { kind: "stopped", by: ADA } as const,
+      },
+      level: "worthARead" as const,
+      raised: true,
+    }
+    const shows = columnView(
+      facts(1, {
+        lane: onLane(laneView(B, "b2")),
+        work: work({ revisions: OWNERS, names: NAMES }),
+        runEnds: new Map([
+          [A, { ...standing, record: { ...standing.record, lane: A } }],
+          [B, standing],
+        ]),
+      }),
+    )
+    expect(shows.identity).toMatchObject({
+      kind: "agent",
+      status: {
+        level: "worthARead",
+        quiet: false,
+        words: "worth a read: Ada stopped it",
+        end: entryId("b2"),
+      },
+    })
+  })
   test("a lane about to start is named by its thread's id, and only while the next send creates it", () => {
     const sha = "a".repeat(64) as Sha256
     const banners = new Map([[B, { lane: B, sha, at: 1 }]])
@@ -358,6 +390,7 @@ describe("columnView: the header", () => {
       kind: "agent",
       name: COPPER,
       focus: null,
+      status: null,
       details: {
         open: false,
         started: null,
@@ -1297,6 +1330,7 @@ describe("identityWords", () => {
         kind: "agent",
         name: "amber-fox" as ThreadName,
         focus: null,
+        status: null,
         icon: null,
         details: {
           open: false,

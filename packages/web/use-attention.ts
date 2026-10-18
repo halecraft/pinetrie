@@ -27,7 +27,9 @@ import {
   markLevel,
   type OpenProposedChanges,
   type SshAsk,
+  type StandingRunEnd,
   type Status,
+  standingRunEnds,
   threadStatus,
   threadWriters,
   unlisted,
@@ -44,6 +46,8 @@ import {
 interface AttentionView {
   /** Everything raised for you (`attentionItems`). */
   readonly items: readonly Item[]
+  /** Each thread's run-end report that asks something of you, read or not: its column's status line. */
+  readonly runEnds: ReadonlyMap<ThreadId, StandingRunEnd>
   /** Each canvas's (`canvasStatus`). */
   readonly status: ReadonlyMap<CanvasId, Status>
   /** ▦'s: the highest status of canvases not in the sidebar (`markLevel`). */
@@ -107,7 +111,7 @@ export function useAttention(input: {
       ),
     [input.canvasOfThread, input.archived],
   )
-  const { items, done } = useMemo(() => {
+  const { items, done, runEnds } = useMemo(() => {
     const facts = {
       me: input.me,
       writers,
@@ -122,7 +126,11 @@ export function useAttention(input: {
     const ended = new Set(
       [...doneThreads(facts)].flatMap(t => input.canvasOfThread.get(t) ?? []),
     )
-    return { items: attentionItems(facts), done: ended }
+    return {
+      items: attentionItems(facts),
+      done: ended,
+      runEnds: standingRunEnds(facts),
+    }
   }, [
     input.me,
     writers,
@@ -154,6 +162,7 @@ export function useAttention(input: {
   )
   return {
     items,
+    runEnds,
     status,
     elsewhere,
     arrivals: useArrivals(status, done, input.settled && person.since !== ""),

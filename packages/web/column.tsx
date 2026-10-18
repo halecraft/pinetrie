@@ -50,6 +50,7 @@ import {
   type ColumnKey,
   type ColumnMatches,
   type Column as ColumnSpec,
+  type ColumnStatus,
   type ColumnView,
   type ComposerPlacesStore,
   columnProposals,
@@ -95,6 +96,7 @@ import {
   type SeenEnd,
   type SpotStore,
   START_WORDS,
+  type StandingRunEnd,
   seenBatches,
   startedWords,
   type ThreadDetails,
@@ -248,6 +250,8 @@ export interface ColumnProps {
    * How far you have read each thread, on every device of yours.
    */
   attention: AttentionStore
+  /** Each thread's run-end report that asks something of you (`standingRunEnds`). */
+  runEnds: ReadonlyMap<ThreadId, StandingRunEnd>
   /** Every mounted column's view, which the rail outlines. */
   viewports: ViewportStore
   /** Where columns were left, by message. */
@@ -665,6 +669,7 @@ export function Column(p: ColumnProps) {
     lanes: p.lanes,
     work: p.work,
     origins,
+    runEnds: p.runEnds,
   })
   // What a card's command catches up with: the thread's base,
   // or the thread it branched from. One object while what it
@@ -1031,6 +1036,10 @@ export function Column(p: ColumnProps) {
                 >
                   {shows.identity.focus.text}
                 </div>
+              )}
+            {shows.identity.kind === "agent" &&
+              shows.identity.status !== null && (
+                <StatusRow onOpen={openAt} status={shows.identity.status} />
               )}
             <Origin onLink={openLink} onOpen={openAt} origin={shows.origin} />
             {agentsLine !== null && (
@@ -1498,6 +1507,31 @@ function ThreadDetailsPanel({
  * or a copy's source, or a parent thread in another canvas, by its link,
  * which opens nothing where someone else holds it.
  */
+/**
+ * The status line: what the thread's last run needs from you. A press brings
+ * the run's last entry into view.
+ */
+function StatusRow({
+  status,
+  onOpen,
+}: {
+  status: ColumnStatus
+  onOpen: (id: EntryId) => void
+}) {
+  return (
+    <button
+      className="head-status"
+      data-level={status.level === "needsYou" ? "needs-you" : "worth-a-read"}
+      data-quiet={status.quiet || undefined}
+      onClick={() => onOpen(status.end)}
+      title={status.words}
+      type="button"
+    >
+      {status.words}
+    </button>
+  )
+}
+
 function Origin({
   origin,
   onOpen,

@@ -319,6 +319,15 @@
       .column-head .head-focus { display: block; min-width: 0; overflow: hidden;
         text-overflow: ellipsis; white-space: nowrap; color: #c9d3dc; }
       .column-head .head-focus[data-kind="opening"] { color: #7f8896; }
+      /* What the thread's last run needs from you (ADR-0175): the signals'
+         amber until read past or dismissed, then the header's grey. */
+      .column-head .head-status { display: block; width: 100%; min-width: 0; overflow: hidden;
+        text-overflow: ellipsis; white-space: nowrap; text-align: left; font-size: .75rem;
+        cursor: pointer; }
+      .column-head .head-status[data-level="needs-you"] { color: #e0c080; }
+      .column-head .head-status[data-level="worth-a-read"] { color: #c9b48a; }
+      .column-head .head-status[data-quiet] { color: #7f8896; }
+      .column-head .head-status:hover, .column-head .head-status:focus-visible { color: #d0d4da; }
       .column-head .origin { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis;
         white-space: nowrap; text-align: left; font-size: .75rem; color: #7f8896; }
       .column-head .origin:hover, .column-head .origin:focus-visible { color: #d0d4da; }

@@ -435,6 +435,13 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   no such row. A focus follows the digests' setting. A thread's preview
   shows a model's focus above its first and last lines, and its folded
   strip's tooltip leads with it.
+- **A column's header says what its thread's last run needs from you**
+  (ADR-0175), on a row under its focus: "needs you: asks whether to drop
+  the v1 table", "worth a read: Bea stopped it", in the sidebar's words and
+  for its followers alone, as its dot is. It stays until the next run
+  starts: read past or dismissed, its amber turns grey. A press brings the
+  run's last entry into view. A run that was done, or a stop you made,
+  shows nothing, and neither does a folded strip.
 - **A thread's name opens its details** (ADR-0073), under the header, and a
   second click on it closes them; a chevron after the name turns as they
   open. They show the thread's icon magnified, which spins in as they open
@@ -749,7 +756,8 @@ the tree.
   how far you have read it, on any device of yours (ADR-0077): a column at
   its end in a page you can see marks it, and so does leaving it there.
   Coming back, a dashed line, "since you were here", marks the first
-  message after it. It takes no room.
+  message after it. It takes no room. Reading quiets the header's status line; it
+  does not hide it.
 - **A summary for every long ask, unless digests are off**
   (`{ "digests": { "enabled": false } }` in your `pinetrie.json`, ADR-0071,
   ADR-0146, ADR-0173): a model's headline on an ask's work, and up to four

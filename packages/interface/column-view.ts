@@ -66,8 +66,10 @@ import {
 } from "@pinetrie/rules"
 import type { ProposedChangesActing } from "@pinetrie/session"
 import { type AccessView, accessView } from "./access-view.ts"
+import type { StandingRunEnd } from "./attention.ts"
 import { commandWords } from "./card-words.ts"
 import type { ColumnView } from "./column-paths.ts"
+import { type ColumnStatus, columnStatus } from "./column-status.ts"
 import type { Column } from "./columns.ts"
 import { ago, count } from "./counts.ts"
 import { speakerWords } from "./names.ts"
@@ -195,6 +197,8 @@ export type HeadIdentity =
       readonly name: ThreadName
       /** What the thread is doing now (`threadFocus`); null for none yet. */
       readonly focus: ThreadFocus | null
+      /** What its last run needs from you (`columnStatus`); null for nothing. */
+      readonly status: ColumnStatus | null
       readonly details: ThreadDetails
       /** Its icon (`threadIcon`); only a named agent's header draws one. */
       readonly icon: HeadIcon | null
@@ -338,6 +342,8 @@ export interface ColumnFacts {
   /** Your last command on proposed changes on the column's lane (`acting.ts`); null for none. */
   readonly acting: ProposedChangesActing | null
   readonly origins: OriginFacts
+  /** Each thread's run-end report that asks something of you (`standingRunEnds`). */
+  readonly runEnds: ReadonlyMap<ThreadId, StandingRunEnd>
 }
 
 export interface ColumnShows {
@@ -405,6 +411,10 @@ export function columnView(f: ColumnFacts): ColumnShows {
       detailsOf(f, head, stretches, behind),
       thread => shownHeadIcon(threadIcon({ thread, ...work }), f.mountedIcon),
       thread => threadFocus({ focuses: work.focuses, index, thread }),
+      thread =>
+        columnStatus(f.runEnds.get(thread), w =>
+          displayName(w, f.nameOf.get(w)),
+        ),
     ),
     origin: originOf(f, stretches),
     joins: joinsOf(view, stretches, work.names),
@@ -516,6 +526,7 @@ function identityOf(
   details: ThreadDetails,
   iconOf: (thread: ThreadId) => HeadIcon | null,
   focusOf: (thread: ThreadId) => ThreadFocus | null,
+  statusOf: (thread: ThreadId) => ColumnStatus | null,
 ): HeadIdentity {
   if (head === null) return createsLane ? { kind: "pending" } : { kind: "none" }
   const name = names.get(head)
@@ -524,6 +535,7 @@ function identityOf(
     kind: "agent",
     name,
     focus: focusOf(head),
+    status: statusOf(head),
     details,
     icon: iconOf(head),
   }

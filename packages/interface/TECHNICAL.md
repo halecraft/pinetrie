@@ -793,8 +793,17 @@ pending.
   items and the board's hold readers' avatars too, so `.avatar` anywhere matches them,
   who never include you either.
 
-## What needs you (`attention.ts`, `use-attention.ts`, ADR-0077, ADR-0166)
+## What needs you (`attention.ts`, `column-status.ts`, `use-attention.ts`, ADR-0077, ADR-0166, ADR-0175)
 
+- **`standingRunEnds` is the one rule for a run-end report**: each thread's
+  report that asks something of you (`attentionLevel`), for its followers,
+  while its lane is idle and its canvas not archived, and whether it is
+  still `raised`. `attentionItems` keeps the raised ones; a column's status
+  line (`columnStatus`, on `HeadIdentity`'s agent case) shows any, `quiet`
+  once read or dismissed. So the sidebar and the column cannot disagree.
+  The line's words are `columnStatusWords`: the level's signal words, then
+  `attentionWords`' reason. Selector: `.head-status[data-level]`, with
+  `data-quiet`.
 - **`attentionItems` decides what is raised**, pure: a thread's run-end report and its
   open proposed changes, for its followers only (`follows`, over the directory's
   `RootRecord.threads`), while its lane is idle and its canvas not archived.
