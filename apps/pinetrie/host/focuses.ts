@@ -77,7 +77,7 @@ export function createFocuses(deps: {
               },
             )
             deps.spent?.(ask, tokens)
-            return value ?? null
+            return value
           },
           plan: reply => {
             const record = focusToWrite({
