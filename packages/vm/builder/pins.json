@@ -1,8 +1,8 @@
 {
   "kernel": {
-    "version": "6.18.56-r0",
-    "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/aarch64/linux-virt-6.18.56-r0.apk",
-    "sha256": "1cb07a2d56c685194cadde1c2f436a71eb4fd1aeab9458c4bf249e2b467f5bdb"
+    "version": "6.18.57-r0",
+    "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/aarch64/linux-virt-6.18.57-r0.apk",
+    "sha256": "0fb7408c1270157b6cfd77613638eb1f418de3f0df44b14d8b2e67ae18ac0e5d"
   },
   "root": {
     "version": "3.23.6",
