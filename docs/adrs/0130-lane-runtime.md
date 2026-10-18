@@ -21,6 +21,8 @@
   - ADR-0147: the VM's image is built on the Mac in a VM of pine·trie's own,
     from `linux-virt` and Alpine's minirootfs pinned by SHA-256, not in a
     Docker; a host that finds it missing builds it.
+  - ADR-0169: a nested lane's inner Docker keeps its data root on a subvolume
+    of its own, cloned from the one its fork came from, not made empty.
 
 Restates ADR-0103 as amended by ADR-0118 and its revisions of 2026-10-07;
 decides nothing new. ADR-0103's changes to ADR-0034, ADR-0035 and ADR-0046
