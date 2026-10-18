@@ -156,7 +156,7 @@ interface ProposalView {
 
 /**
  * What a proposal's card shows and offers `me`. Start and Open count the rows
- * kept, and are offered only while the host would take them: the run ended,
+ * kept, and are offered only once the host would take them: the run ended,
  * the proposal not spent, the column writable (`readOnly` its words, null
  * when writable). Send is the presser's alone.
  */
@@ -209,25 +209,28 @@ export function proposalView(input: {
         unsent: state.threads.filter(t => !t.started).length,
       }),
     }
-  const pressable =
-    state.kind === "ready" && input.readOnly === null && kept.length > 0
+  // Start and Open are drawn only once a press would take: shown disabled
+  // through a run, they read as broken. Nothing kept stays a disabled
+  // button, since ↺ is the reader's own way back.
+  const offered = state.kind === "ready" && input.readOnly === null
   const pressed = kept.map(r => ({
     row: r.row,
     brief: r.brief.trim(),
     edited: r.edited,
   }))
+  const branchOut = (kind: "start" | "open"): ProposalButton | null =>
+    offered
+      ? {
+          label: proposalWords({ kind, count: kept.length }),
+          press: kept.length > 0 ? { kind, rows: pressed } : null,
+        }
+      : null
   return {
     proposal: facts.proposal,
     rows,
     editable: input.readOnly === null,
-    start: {
-      label: proposalWords({ kind: "start", count: kept.length }),
-      press: pressable ? { kind: "start", rows: pressed } : null,
-    },
-    open: {
-      label: proposalWords({ kind: "open", count: kept.length }),
-      press: pressable ? { kind: "open", rows: pressed } : null,
-    },
+    start: branchOut("start"),
+    open: branchOut("open"),
     send: null,
     state:
       state.kind === "running"

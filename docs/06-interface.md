@@ -997,9 +997,10 @@ The rail is E; the column is T. Seeing both at once is the product.
     Each composer starts with `@agent <brief>`, on any of your devices,
     and is a card of yours only once you type in it. Everyone else sees
     them folded, with nothing in them.
-  - Both wait, disabled, while the run that proposed them runs ("waiting
-    for the run to end"), and in a column nothing may be written in,
-    saying why. Once either is pressed the proposal is spent, for
+  - Neither is drawn while the run that proposed them runs (the card
+    says "waiting for the run to end"), nor in a column nothing may be
+    written in (it says why): a button is shown only once a press can
+    take. With every row dropped they stay, disabled, since ↺ undoes it. Once either is pressed the proposal is spent, for
     everyone: the card says "started by Ada" or "opened by Ada · 2
     unsent", and only Ada sees **Send K**, which sends each of her opened
     branches still unsent from its composer.

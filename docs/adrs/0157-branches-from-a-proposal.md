@@ -21,6 +21,9 @@
     alone; a brief edited before the press is kept by the pressing page. The
     host builds Start's messages from the briefs, so every branch asks the
     agent. A run that ended on a tool result forks at its last word.
+  - 2026-10-18 (Duane): Start and Open are not drawn until a press can take:
+    while the proposing run runs, the card lists its rows and says it waits
+    for the run to end; a disabled button read as broken.
 
 **Context.** A person and the agent discuss tech debt, and the agent lists
 the three things most worth fixing. The person wants three threads, each
@@ -56,8 +59,8 @@ the agent's prose, and the agent knows best how to split the work.
   reads the run's last word, usually the list itself. They fork at its last
   entry, even a tool result a Stop left last, as a reply after a Stop
   follows it: forking at the message before would leave its tool call with
-  no result. The buttons wait until that run ends; a later run of the
-  thread does not hold them.
+  no result. The buttons are not drawn until that run ends, the card
+  saying it waits; a later run of the thread does not hold them.
 - **Two buttons, counting the rows kept:**
   - **Start N**, the main one: one host command opens N branches at the
     fork and sends each one's first message, `@agent <brief>`, as the

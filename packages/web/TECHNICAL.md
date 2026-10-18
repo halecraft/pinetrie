@@ -1473,8 +1473,9 @@ board draws it (`boardView`), and an inventory never holds one
   column, after its ask's work and outside `.ask-work`; its rows
   `.proposal-row` (`data-dropped`), each a `.proposal-title` button and
   `.proposal-line` or, opened, `.proposal-brief`; `.proposal-drop`;
-  `.proposal-start`, `.proposal-open`, `.proposal-send` (disabled while a
-  press would be refused) and `.proposal-state`.
+  `.proposal-start`, `.proposal-open` (absent while the run runs or the
+  column is read only), `.proposal-send` (disabled while a press would be
+  refused) and `.proposal-state`.
 
 ## Who you are (ADR-0037)
 

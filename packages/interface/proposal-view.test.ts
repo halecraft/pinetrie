@@ -147,14 +147,24 @@ describe("proposalView", () => {
     expect(v.rows[0]?.firstLine).toBe("do one")
   })
 
-  test("offers no press while the run runs, or in a column nothing may be written in, saying why", () => {
+  test("draws no Start or Open while the run runs, or in a column nothing may be written in, saying why", () => {
     const running = view(facts({ lanes: [lane(true)] }))
-    expect(running.start?.press).toBeNull()
+    expect(running.start).toBeNull()
+    expect(running.open).toBeNull()
     expect(running.state).toBe("waiting for the run to end")
     const held = view(facts(), { readOnly: "Bea has it" })
-    expect(held.open?.press).toBeNull()
+    expect(held.start).toBeNull()
+    expect(held.open).toBeNull()
     expect(held.state).toBe("Bea has it")
     expect(held.editable).toBe(false)
+  })
+
+  test("with every row dropped, Start and Open stay drawn, disabled", () => {
+    const v = view(facts(), {
+      memory: { ...NO_PROPOSAL_MEMORY, dropped: new Set([0, 1, 2]) },
+    })
+    expect(v.start).toEqual({ label: "Start 0", press: null })
+    expect(v.open).toEqual({ label: "Open 0", press: null })
   })
 
   test("spent, it offers Send to its presser alone, counting their unsent branches", () => {

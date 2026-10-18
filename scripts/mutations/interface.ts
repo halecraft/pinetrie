@@ -51,13 +51,30 @@ export const mutations: readonly Mutation[] = [
       "names your unsent branches once you opened them, and nobody else's",
   },
   {
-    name: "a read-only column's proposal can be pressed",
+    name: "a read-only column's proposal draws Start and Open",
     file: "packages/interface/proposal-view.ts",
-    from: '    state.kind === "ready" && input.readOnly === null && kept.length > 0',
-    to: '    state.kind === "ready" && kept.length > 0',
+    from: '  const offered = state.kind === "ready" && input.readOnly === null\n',
+    to: '  const offered = state.kind === "ready"\n',
     command: unit,
     expect:
-      "offers no press while the run runs, or in a column nothing may be written in, saying why",
+      "draws no Start or Open while the run runs, or in a column nothing may be written in, saying why",
+  },
+  {
+    name: "a running proposal draws Start and Open",
+    file: "packages/interface/proposal-view.ts",
+    from: '  const offered = state.kind === "ready" && input.readOnly === null\n',
+    to: "  const offered = input.readOnly === null\n",
+    command: unit,
+    expect:
+      "draws no Start or Open while the run runs, or in a column nothing may be written in, saying why",
+  },
+  {
+    name: "a proposal with every row dropped draws no Start or Open",
+    file: "packages/interface/proposal-view.ts",
+    from: '  const offered = state.kind === "ready" && input.readOnly === null\n',
+    to: '  const offered =\n    state.kind === "ready" && input.readOnly === null && kept.length > 0\n',
+    command: unit,
+    expect: "with every row dropped, Start and Open stay drawn, disabled",
   },
   {
     name: "Send sends a blank composer",

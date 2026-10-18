@@ -1016,8 +1016,9 @@ the columns read one. `segmentPath` (`ask-segments.ts`) decides what a column fo
   memoises it; `MessageList` draws each proposal after its ask's row, at
   every density, so no fold hides it.
 - **`proposalView` decides the card**: its rows, Start and Open counting
-  the rows kept, each with the press it makes or null while the host would
-  refuse it (the run still running, the column read only, nothing kept),
+  the rows kept, drawn only once the run has ended in a column you may
+  write in (null before: shown disabled through a run, they read as
+  broken), each with the press it makes or null with nothing kept,
   and, once spent, Send for its presser alone. Words come from
   `proposalWords`. The reader's edits, drops and opened rows are a
   `ProposalMemory`, kept by proposal in `App`'s screen memory as a tool
