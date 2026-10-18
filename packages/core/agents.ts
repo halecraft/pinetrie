@@ -3,7 +3,9 @@
 // a round of asks has been answered. Each is read from the path, as a thread's
 // mode is: nothing about them is stored beside the entries.
 
-import type { AgentCandidate, EntryId, ThreadId, ThreadName } from "./index.ts"
+import type { EntryId, ThreadId } from "./ids.ts"
+import type { AgentCandidate } from "./mentions.ts"
+import type { ThreadName } from "./thread-names.ts"
 import { ancestry, newestOnPath, type TreeIndex } from "./tree.ts"
 
 /**

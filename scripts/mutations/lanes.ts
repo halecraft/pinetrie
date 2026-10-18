@@ -316,7 +316,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a folder lane runs in a jj project",
-    file: "packages/core/index.ts",
+    file: "packages/core/lanes.ts",
     from: "  lane.history === kind\n    ? null\n",
     to: "  true\n    ? null\n",
     suite: "lanes",
@@ -753,7 +753,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the lane runtime leaves rg behind",
-    file: "packages/core/index.ts",
+    file: "packages/core/lane-env.ts",
     from: 'export const RUNTIME_PROGRAMS = ["jj", "rg", "fd", "sd"] as const',
     to: 'export const RUNTIME_PROGRAMS = ["jj", "fd", "sd"] as const',
     suite: "lanes",

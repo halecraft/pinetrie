@@ -36,7 +36,7 @@ tool's own result carries a merge, and a steer carries a host's fact; see
 Decision.
 
 **Context.** pine·trie has grown commands the host carries out, each started
-by a button and nothing else (`packages/core/index.ts`):
+by a button and nothing else (`packages/core/intents.ts`):
 
 | command | what it changes |
 |---|---|

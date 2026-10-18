@@ -5,17 +5,16 @@
 // back every message it writes. A revset that finds commits by a trailer is
 // `trailerRevset`, and matches what `hasTrailer` matches.
 
+import { type CommitId, commitId } from "./bases.ts"
 import {
-  type CommitId,
-  commitId,
   type EntryId,
   entryId,
   isThreadId,
   THE_AGENT,
   type ThreadId,
-  type ThreadName,
-} from "./index.ts"
+} from "./ids.ts"
 import type { ProposedLedger } from "./proposed.ts"
+import type { ThreadName } from "./thread-names.ts"
 import { firstLine } from "./tree.ts"
 
 /**

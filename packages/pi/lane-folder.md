@@ -14,10 +14,10 @@ changes pine·trie can keep this note true. You can skip them.
 - `/workspace` is your own copy of the project's folder, on the lane's
   disk. It is no repo of pine·trie's: don't run `jj` or `git` to record
   your work, which pine·trie records as it goes.
-  <!-- packages/core/index.ts WORKSPACE_ROOT -->
+  <!-- packages/core/lane-env.ts WORKSPACE_ROOT -->
 - `/mnt/host-working-copy` is the project's folder, which is accepted
   work, read-only. A path under it that someone writes in a message
-  reaches you as the same path under `/mnt/host-working-copy`. <!-- packages/core/index.ts HOST_WORKING_COPY -->
+  reaches you as the same path under `/mnt/host-working-copy`. <!-- packages/core/lane-env.ts HOST_WORKING_COPY -->
   <!-- packages/rules/work.ts showHostWorkingCopy -->
 - `/pinetrie-states` is read-only, and pine·trie's: `start` is accepted
   work as this thread's proposed changes are computed against, so `diff -r
@@ -34,7 +34,7 @@ changes pine·trie can keep this note true. You can skip them.
 - A dependency the project links from outside itself (`link:`) is mounted
   read-only at its own path. <!-- packages/lanes/plan.ts planLinks -->
 - A skill's files are at `/mnt/host` followed by their path on the
-  person's machine, read-only. <!-- packages/core/index.ts hostPathInLane -->
+  person's machine, read-only. <!-- packages/core/lane-env.ts hostPathInLane -->
 - `/pinetrie-runtime`, `/pinetrie-git` and `/workspace/.pinetrie-lane/` are
   pine·trie's own. Leave them alone. <!-- packages/lanes/plan.ts RUNTIME_MOUNT -->
   <!-- packages/lanes/plan.ts IGNORE_MOUNT -->
@@ -96,7 +96,7 @@ changes pine·trie can keep this note true. You can skip them.
   <!-- packages/lanes/image.ts projectContainerfile -->
 - Whatever the image, `rg`, `fd` and `sd` are in `/pinetrie-runtime/bin`,
   last on your `PATH`: static builds pine·trie brings, so an image's own
-  version of one comes first. <!-- packages/core/index.ts RUNTIME_PROGRAMS -->
+  version of one comes first. <!-- packages/core/lane-env.ts RUNTIME_PROGRAMS -->
   <!-- packages/lanes/plan.ts RUNTIME_BIN -->
 - Besides `read`, `write`, `edit` and `bash`, you have `grep` and `find`
   tools, which run that `rg` and `fd` in the lane. They skip what

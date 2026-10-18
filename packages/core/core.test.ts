@@ -15,7 +15,6 @@ import {
   DISCARDED,
   emailLocalPart,
   entryId,
-  findSeqKeys,
   fitsPlace,
   historyScope,
   indexTree,
@@ -66,7 +65,7 @@ import {
   writerOfPrincipal,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
-import { cardIdFor } from "./fixtures.ts"
+import { cardIdFor, findSeqKeys } from "./fixtures.ts"
 
 const _TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 const TEST_THREAD = threadIdFor("e")

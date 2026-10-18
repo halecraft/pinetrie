@@ -10,11 +10,11 @@ changes pine·trie can keep this note true. You can skip them.
 ## Where things are
 
 - `/workspace` is your own copy of the project: a jj repo, colocated with
-  git, on the lane's disk. <!-- packages/core/index.ts WORKSPACE_ROOT -->
+  git, on the lane's disk. <!-- packages/core/lane-env.ts WORKSPACE_ROOT -->
 - `/mnt/host-working-copy` is the person's working copy, read-only,
   including its `.git` and `.jj`. A path under their working copy that
   someone writes in a message reaches you as the same path under
-  `/mnt/host-working-copy`. <!-- packages/core/index.ts HOST_WORKING_COPY -->
+  `/mnt/host-working-copy`. <!-- packages/core/lane-env.ts HOST_WORKING_COPY -->
   <!-- packages/rules/work.ts showHostWorkingCopy -->
 - A shared directory, such as `/workspace/.plans` when the person shares
   it, is their own directory mounted read-write. Your edits there are
@@ -27,7 +27,7 @@ changes pine·trie can keep this note true. You can skip them.
 - A dependency the project links from outside itself (`link:`) is mounted
   read-only at its own path. <!-- packages/lanes/plan.ts planLinks -->
 - A skill's files are at `/mnt/host` followed by their path on the
-  person's machine, read-only. <!-- packages/core/index.ts hostPathInLane -->
+  person's machine, read-only. <!-- packages/core/lane-env.ts hostPathInLane -->
 - `/pinetrie-runtime`, `/pinetrie-git` and `/workspace/.pinetrie-lane/` are
   pine·trie's own. Leave them alone. <!-- packages/lanes/plan.ts RUNTIME_MOUNT -->
   <!-- packages/lanes/plan.ts IGNORE_MOUNT -->
@@ -57,7 +57,7 @@ changes pine·trie can keep this note true. You can skip them.
   <!-- packages/rules/work.ts planTurnRecord -->
 - `JJ_EDITOR` is `false`, so a jj command that would open an editor fails.
   Always pass `-m`, and don't use interactive commands such as `jj split` or
-  `jj diffedit`. <!-- packages/core/index.ts NO_EDITOR -->
+  `jj diffedit`. <!-- packages/core/lane-env.ts NO_EDITOR -->
 - Ignored files, such as `node_modules` and build output, stay on the disk,
   and a branch gets them. The person's copy of your work never includes them.
 - Nothing installs the project's dependencies or builds it for you: run
@@ -118,7 +118,7 @@ changes pine·trie can keep this note true. You can skip them.
   <!-- packages/lanes/image.ts projectContainerfile -->
 - Whatever the image, `jj`, `rg`, `fd` and `sd` are in `/pinetrie-runtime/bin`,
   last on your `PATH`: static builds pine·trie brings, so an image's own
-  version of one comes first. <!-- packages/core/index.ts RUNTIME_PROGRAMS -->
+  version of one comes first. <!-- packages/core/lane-env.ts RUNTIME_PROGRAMS -->
   <!-- packages/lanes/plan.ts RUNTIME_BIN -->
 - Besides `read`, `write`, `edit` and `bash`, you have `grep` and `find`
   tools, which run that `rg` and `fd` in the lane. They skip what

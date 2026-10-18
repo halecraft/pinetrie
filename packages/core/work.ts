@@ -7,14 +7,10 @@
 // with no copy of its own records its prompts with neither: it still counts
 // as the lane above, but the walk passes it for state and disk.
 
-import type {
-  EntryId,
-  PointId,
-  Position,
-  RevisionRecord,
-  SnapshotId,
-  ThreadId,
-} from "./index.ts"
+import type { PointId } from "./bases.ts"
+import type { SnapshotId } from "./disks.ts"
+import type { EntryId, Position, ThreadId } from "./ids.ts"
+import type { RevisionRecord } from "./revisions.ts"
 import { ancestry, type TreeIndex } from "./tree.ts"
 
 /** What is above an entry: the lane it belongs to, its state, and its disk. */

@@ -16,7 +16,7 @@ import {
   type WriterId,
   workflowStateIdFor,
   writerId,
-} from "./index.ts"
+} from "./ids.ts"
 import type { AgentMessageLike, EntryLike } from "./tree.ts"
 
 /**
@@ -198,4 +198,25 @@ export function collectionSteps<T>(f: () => T): {
   } finally {
     for (const [proto, key, own] of saved) proto[key] = own
   }
+}
+
+/**
+ * The paths at which a `seq` key appears, so a test can assert none do: seq
+ * is local to one replica, so none may be stored or sent. A brand cannot keep
+ * one out, since a branded number drops into any `number` field.
+ */
+export function findSeqKeys(value: unknown, path = "$"): string[] {
+  const hits: string[] = []
+  if (value === null || typeof value !== "object") return hits
+  if (Array.isArray(value)) {
+    value.forEach((v, i) => {
+      hits.push(...findSeqKeys(v, `${path}[${i}]`))
+    })
+    return hits
+  }
+  for (const [k, v] of Object.entries(value)) {
+    if (k === "seq") hits.push(`${path}.${k}`)
+    hits.push(...findSeqKeys(v, `${path}.${k}`))
+  }
+  return hits
 }

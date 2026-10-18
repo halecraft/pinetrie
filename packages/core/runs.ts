@@ -4,7 +4,8 @@
 // observes the lane; folded, they are its record (`RunRecord`), with paths
 // relative to the lane's directory.
 
-import type { DiskPath, EntryId, ThreadId } from "./index.ts"
+import type { DiskPath } from "./disks.ts"
+import type { EntryId, ThreadId } from "./ids.ts"
 
 declare const stampBrand: unique symbol
 /**

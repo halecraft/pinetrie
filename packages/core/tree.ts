@@ -11,23 +11,20 @@
 // A tool's result is its own entry, but it belongs to its call: `projectSpine`
 // pairs it with the call on the same path, and it is never a message itself.
 
-import { type ImageRef, isImageMime, isSha256, type Share } from "./images.ts"
+import type { CatchUpFrom, PointId } from "./bases.ts"
 import {
-  type AnswerDetails,
   atEntry,
   type CanvasId,
   type CardId,
-  type CatchUpFrom,
   type EntryId,
-  type HeardDetails,
-  type PointId,
   type Position,
-  type Proposal,
-  type RelayDetails,
-  type SendAt,
   type ThreadId,
   type WriterId,
-} from "./index.ts"
+} from "./ids.ts"
+import { type ImageRef, isImageMime, isSha256, type Share } from "./images.ts"
+import type { SendAt } from "./intents.ts"
+import type { AnswerDetails, HeardDetails, RelayDetails } from "./mentions.ts"
+import type { Proposal } from "./threads.ts"
 import { callSubject } from "./tools.ts"
 
 // ── entries and messages ──────────────────────────────────────────────────

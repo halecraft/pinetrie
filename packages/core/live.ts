@@ -3,7 +3,7 @@
 // (`packages/rules/live.ts`), and `@pinetrie/schema` writes them.
 
 import type { TextEdit } from "./edits.ts"
-import type { EntryId, RunId, ThreadId } from "./index.ts"
+import type { EntryId, RunId, ThreadId } from "./ids.ts"
 
 /**
  * What a running turn streams, in pine·trie's own words: no pi type crosses.

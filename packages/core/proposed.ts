@@ -2,17 +2,11 @@
 // the facts `@pinetrie/jj` reads, and the decisions it carries out, which
 // `@pinetrie/rules` returns from those facts.
 
-import type {
-  CommitBase,
-  CommitId,
-  ERR,
-  ErrCode,
-  JjAcceptedRecord,
-  JjBaseRecord,
-  JjProposedChangesRecord,
-  PointId,
-  ThreadName,
-} from "./index.ts"
+import type { JjAcceptedRecord, JjBaseRecord } from "./accepted.ts"
+import type { CommitBase, CommitId, PointId } from "./bases.ts"
+import type { ERR, ErrCode } from "./intents.ts"
+import type { JjProposedChangesRecord } from "./revisions.ts"
+import type { ThreadName } from "./thread-names.ts"
 
 /** Where proposed changes are accepted into: accepted work's bookmark, or a folder project's accepted work. */
 export type AcceptsInto =

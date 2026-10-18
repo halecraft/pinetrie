@@ -33,7 +33,7 @@ import {
   type ThreadId,
   type WorkflowStateId,
   type WriterId,
-} from "./index.ts"
+} from "./ids.ts"
 import { KINDS } from "./kinds.ts"
 
 /**

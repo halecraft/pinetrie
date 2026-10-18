@@ -1,8 +1,11 @@
-// thread-names — the words a thread's name is made of: two lists, and the
-// hash that picks a pair of them. Here because a person's name may not take a
-// thread's shape (`normalizeName`), and both `@pinetrie/rules`, which names
-// threads, and `@pinetrie/config`, which suffixes a session's name, take
-// pairs from them, and neither may import the other.
+// thread-names — a thread's name (`ThreadName`, `NameRecord`) and the words it
+// is made of: two lists, and the hash that picks a pair of them. Here because
+// a person's name may not take a thread's shape (`normalizeName`), and both
+// `@pinetrie/rules`, which names threads, and `@pinetrie/config`, which
+// suffixes a session's name, take pairs from them, and neither may import the
+// other.
+
+import type { ThreadId } from "./ids.ts"
 
 /**
  * 256 adjectives and 256 nouns: lowercase, 3 to 7 letters, common, concrete,
@@ -577,3 +580,17 @@ export function threadNameParts(
  */
 export const isThreadNameHandle = (handle: string): boolean =>
   threadNameParts(handle) !== null
+
+declare const threadNameBrand: unique symbol
+/**
+ * A thread's name as people say it: two words, `amber-fox`. Minted by
+ * `@pinetrie/rules`' naming and its decoder; stored, never recomputed.
+ */
+export type ThreadName = string & { readonly [threadNameBrand]: true }
+
+/** A lane's name: a host-written `pinetrie.name` value keyed by the lane. */
+export interface NameRecord {
+  readonly lane: ThreadId
+  readonly name: ThreadName
+  readonly at: number
+}

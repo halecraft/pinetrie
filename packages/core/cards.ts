@@ -4,20 +4,20 @@
 // traces. Where cards are, and how they move, is `places.ts`'.
 
 import type { Address } from "./address.ts"
-import type { ConflictChoice } from "./folder.ts"
-import type { CardId, EntryId, TextCardId, ThreadId, WriterId } from "./ids.ts"
-import type { Sha256 } from "./images.ts"
+import type { CatchUpFrom } from "./bases.ts"
 import type {
   BranchedFact,
   BudgetSpentFact,
-  CatchUpFrom,
   MemberFact,
-  RelayDetails,
   RoundFact,
   StopFact,
   UnansweredFact,
   UndeliveredFact,
-} from "./index.ts"
+} from "./facts.ts"
+import type { ConflictChoice } from "./folder.ts"
+import type { CardId, EntryId, TextCardId, ThreadId, WriterId } from "./ids.ts"
+import type { Sha256 } from "./images.ts"
+import type { RelayDetails } from "./mentions.ts"
 import type { IdOf, PlaceKey, PlaceOf } from "./places.ts"
 
 /**

@@ -99,11 +99,11 @@
                 "paths": {
                   "@pinetrie/core": {
                     "importNames": ["entryId", "runId", "threadIdFor"],
-                    "message": "Mint an id only where it enters: here it arrives branded from a read (packages/core/index.ts). A thread's id is minted by `newThreadId` (@pinetrie/session) alone."
+                    "message": "Mint an id only where it enters: here it arrives branded from a read (packages/core/ids.ts). A thread's id is minted by `newThreadId` (@pinetrie/session) alone."
                   },
-                  "./index.ts": {
+                  "./ids.ts": {
                     "importNames": ["entryId", "runId", "threadIdFor"],
-                    "message": "Mint an id only where it enters: here it arrives branded from a read (packages/core/index.ts). A thread's id is minted by `newThreadId` (@pinetrie/session) alone."
+                    "message": "Mint an id only where it enters: here it arrives branded from a read (packages/core/ids.ts). A thread's id is minted by `newThreadId` (@pinetrie/session) alone."
                   }
                 }
               }
@@ -130,11 +130,7 @@
                 "paths": {
                   "@pinetrie/core": {
                     "importNames": ["entryId", "threadIdFor"],
-                    "message": "Mint an id only where it enters: here it arrives branded from a read (packages/core/index.ts). A thread's id is minted by `newThreadId` (@pinetrie/session) alone."
-                  },
-                  "./index.ts": {
-                    "importNames": ["entryId", "threadIdFor"],
-                    "message": "Mint an id only where it enters: here it arrives branded from a read (packages/core/index.ts). A thread's id is minted by `newThreadId` (@pinetrie/session) alone."
+                    "message": "Mint an id only where it enters: here it arrives branded from a read (packages/core/ids.ts). A thread's id is minted by `newThreadId` (@pinetrie/session) alone."
                   }
                 }
               }

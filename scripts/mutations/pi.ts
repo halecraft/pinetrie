@@ -941,7 +941,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a project's skill is read under /mnt/host",
-    file: "packages/core/index.ts",
+    file: "packages/core/lane-env.ts",
     from: "  project !== null && isWithin(file, project)\n",
     to: "  false\n",
     command: unit,

@@ -4,7 +4,8 @@
 // agree.
 
 import { type AskIndex, entryAsk } from "./asks.ts"
-import type { EntryId, ThreadId, ThreadRecord, WriterId } from "./index.ts"
+import type { EntryId, ThreadId, WriterId } from "./ids.ts"
+import type { ThreadRecord } from "./threads.ts"
 import type { TreeIndex } from "./tree.ts"
 
 /** A branch opened from a proposal, as its record names it. */

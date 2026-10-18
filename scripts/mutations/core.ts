@@ -5,7 +5,6 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/core"]
 const tree = "packages/core/tree.ts"
 const roots = "packages/core/roots.ts"
 const asks = "packages/core/asks.ts"
-const core = "packages/core/index.ts"
 const ids = "packages/core/ids.ts"
 const places = "packages/core/places.ts"
 const trailers = "packages/core/trailers.ts"
@@ -142,7 +141,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a mention in code counts",
-    file: core,
+    file: "packages/core/mentions.ts",
     from: "  return [...withoutCode(text).matchAll(pattern)].map(m => ({\n",
     to: "  return [...text.matchAll(pattern)].map(m => ({\n",
     command: unit,
@@ -151,7 +150,7 @@ export const mutations: readonly Mutation[] = [
   // ── agents talking ──
   {
     name: "a first mention asks rather than invites",
-    file: core,
+    file: "packages/core/mentions.ts",
     from: "      const into = member ? asks : invites\n",
     to: "      const into = asks\n",
     command: unit,
@@ -450,7 +449,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "compel the agent on any mention",
-    file: core,
+    file: "packages/core/mentions.ts",
     from: 'const agent = input.mentions.find(m => m.kind === "agent")',
     to: 'const agent = input.mentions.map(() => ({ kind: "agent" as const, agent: THE_AGENT }))[0]',
     command: unit,
@@ -458,7 +457,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "naming people still asks the agent in an agent thread",
-    file: core,
+    file: "packages/core/mentions.ts",
     from: "      : people.length > 0 || asks.length > 0 || !input.agentByDefault",
     to: "      : asks.length > 0 || !input.agentByDefault",
     command: unit,
@@ -482,7 +481,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "every handle is a person",
-    file: core,
+    file: "packages/core/mentions.ts",
     from: '    } else if (target?.kind === "person") people.push(target.name)',
     to: '    } else people.push(target?.kind === "person" ? target.name : m.name)',
     command: unit,
@@ -582,7 +581,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "handles are ASCII only",
-    file: core,
+    file: "packages/core/mentions.ts",
     from: 'const HANDLE_CHARS = "\\\\p{L}\\\\p{N}_\\\\-"',
     to: 'const HANDLE_CHARS = "A-Za-z0-9_\\\\-"',
     command: unit,
@@ -590,7 +589,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a name no mention can reach is accepted",
-    file: core,
+    file: "packages/core/mentions.ts",
     from: '    handle === "" ||\n',
     to: "",
     command: unit,
@@ -704,7 +703,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a title keeps its line break",
-    file: core,
+    file: "packages/core/marks.ts",
     from: "  return /[\\r\\n]/.test(title) || title.length > MAX_TITLE",
     to: "  return title.length > MAX_TITLE",
     command: unit,
@@ -720,7 +719,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "every message compels the agent",
-    file: core,
+    file: "packages/core/mentions.ts",
     from: '        ? NOBODY\n        : { kind: "agent", agent: THE_AGENT }',
     to: '        ? { kind: "agent", agent: THE_AGENT }\n        : { kind: "agent", agent: THE_AGENT }',
     command: unit,
@@ -728,7 +727,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a lane is told host paths as the host's",
-    file: core,
+    file: "packages/core/lane-env.ts",
     from: "  `${HOST_MOUNT}${hostPath}`",
     to: "  hostPath",
     command: unit,
@@ -827,7 +826,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a shell word keeps its quotes unescaped",
-    file: core,
+    file: "packages/core/lane-env.ts",
     from: "  /^[A-Za-z0-9_./:=@+-]+$/.test(s) ? s : `'${s.replaceAll(\"'\", `'\\\\''`)}'`",
     to: "  /^[A-Za-z0-9_./:=@+-]+$/.test(s) ? s : `'${s}'`",
     command: unit,
@@ -1237,7 +1236,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a bare @ is a mention",
-    file: core,
+    file: "packages/core/mentions.ts",
     from: '    if (handle === "" || seen.has(handle)) continue\n',
     to: "    if (seen.has(handle)) continue\n",
     command: unit,
@@ -1245,7 +1244,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the caret before an @ is in its mention",
-    file: core,
+    file: "packages/core/mentions.ts",
     from: "m.start < caret && caret <= m.end",
     to: "m.start <= caret && caret <= m.end",
     command: ["pnpm", "exec", "vitest", "run", "packages/interface"],
@@ -1253,7 +1252,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a person takes a thread's handle",
-    file: core,
+    file: "packages/core/mentions.ts",
     from: '    if (targets.get(handle)?.kind !== "thread")\n',
     to: "    if (true)\n",
     command: unit,
@@ -1262,16 +1261,24 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "of two people with one handle, the first is named",
-    file: core,
+    file: "packages/core/mentions.ts",
     from: '    if (targets.get(handle)?.kind !== "thread")\n',
     to: "    if (!targets.has(handle))\n",
     command: unit,
     expect: "of two people with one handle, the later in the list is named",
   },
+  {
+    name: "a core module mints an entry id",
+    file: asks,
+    from: 'import { atEntry, type EntryId, type WriterId } from "./ids.ts"',
+    to: 'import { atEntry, type EntryId, entryId, type WriterId } from "./ids.ts"\nexport const minted = entryId("x")',
+    command: ["pnpm", "exec", "biome", "lint", asks],
+    expect: "Mint an id only where it enters",
+  },
   // ── a copy ready to merge ──
   {
     name: "a copy with no bookmark reads as off its line",
-    file: "packages/core/index.ts",
+    file: "packages/core/bases.ts",
     from: '  if (copy.bookmark === null) return "no-bookmark"\n',
     to: '  if (copy.bookmark === null) return "off-line"\n',
     command: unit,
@@ -1279,7 +1286,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the agent's own commit is off its line",
-    file: "packages/core/index.ts",
+    file: "packages/core/bases.ts",
     from: "    (parent === copy.bookmark || copy.descends)",
     to: "    parent === copy.bookmark",
     command: unit,
@@ -1287,7 +1294,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a copy whose one parent is neither the bookmark nor below it is ready",
-    file: core,
+    file: "packages/core/bases.ts",
     from: '    ? (copy as ReadyCopy)\n    : "off-line"\n',
     to: "    ? (copy as ReadyCopy)\n    : (copy as ReadyCopy)\n",
     command: unit,
@@ -1295,21 +1302,21 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a ready copy is any copy's facts",
-    file: core,
+    file: "packages/core/bases.ts",
     from: "export type ReadyCopy = CopyFacts & { readonly [readyCopyBrand]: true }",
     to: "export type ReadyCopy = CopyFacts",
     command: ["pnpm", "exec", "tsc", "--noEmit"],
   },
   {
     name: "a project has a kind no adapter takes",
-    file: core,
+    file: "packages/core/config.ts",
     from: 'export type ProjectKind = "jj" | "folder"',
     to: 'export type ProjectKind = "jj" | "folder" | "git"',
     command: ["pnpm", "exec", "tsc", "--noEmit"],
   },
   {
     name: "a copy off its line is ready",
-    file: core,
+    file: "packages/core/bases.ts",
     from: '    ? (copy as ReadyCopy)\n    : "off-line"\n',
     to: "    ? (copy as ReadyCopy)\n    : (copy as ReadyCopy)\n",
     command: [
@@ -1323,7 +1330,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "laneFits lets every lane fit",
-    file: core,
+    file: "packages/core/lanes.ts",
     from: "  lane.history === kind\n    ? null\n",
     to: "  true\n    ? null\n",
     command: unit,
@@ -1332,7 +1339,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "proveRunnable makes any lane runnable",
-    file: core,
+    file: "packages/core/lanes.ts",
     from: "  return foreign ?? (lane as RunnableLane)\n",
     to: "  return lane as RunnableLane\n",
     command: unit,
@@ -1341,14 +1348,14 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a point is any string",
-    file: core,
+    file: "packages/core/bases.ts",
     from: "export type PointId = string & { readonly [pointIdBrand]: true }",
     to: "export type PointId = string",
     command: ["pnpm", "exec", "tsc", "--noEmit"],
   },
   {
     name: "a runnable lane is any lane",
-    file: core,
+    file: "packages/core/lanes.ts",
     from: "export type RunnableLane = ThreadId & { readonly [runnableBrand]: true }",
     to: "export type RunnableLane = ThreadId",
     command: ["pnpm", "exec", "tsc", "--noEmit"],

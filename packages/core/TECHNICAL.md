@@ -13,14 +13,41 @@ that `lanes` or `jj` must read, write or name lives in core, since neither
 can declare `@pinetrie/rules`. What a stored shape says, and how the host
 changes it, is `@pinetrie/rules`', whoever reads it. Core also holds the few
 pure helpers several packages share (`paths.ts`, `errorText`), since every
-package that uses one already depends on core. `index.ts` re-exports every
-module but `fixtures.ts`, which tests import as `@pinetrie/core/fixtures`.
+package that uses one already depends on core. `index.ts` declares nothing:
+it re-exports every module but `fixtures.ts`, which tests import as
+`@pinetrie/core/fixtures`.
+
+- **A module imports the sibling that declares a name, never `./index.ts`**
+  (a test may). Loading one module then loads only what it uses, and the
+  package has no import cycle at runtime. Types still cross both ways
+  (`ids.ts` and `kinds.ts`, `proposed.ts` and `accepted.ts`): they are
+  erased, so such a cycle costs nothing at run time.
 
 - **`collectionSteps` (`fixtures.ts`) wraps globals:** the iterators of
   `Map.prototype` and `Set.prototype`, while the function it counts runs.
   That function must be synchronous, and its test must not be
   `test.concurrent`. It counts iteration (spread, `for … of`, `forEach`,
   `new Set(iterable)`), not `get`, `has`, `set` or `delete` (S214).
+
+## Where things are
+
+| module | holds |
+|---|---|
+| `ids.ts`, `kinds.ts` | every branded id and position; every kind of card |
+| `cards.ts`, `places.ts`, `paste.ts`, `grid.ts` | what a card is, where cards are and the moves between places, a paste, your inventory's grid |
+| `tree.ts`, `asks.ts`, `agents.ts`, `roots.ts`, `address.ts`, `ordering.ts` | the reads of the tree, asks, other threads' agents, each root summarized and its directory record (`RootRecord`), an address's codec, entries' arrival order |
+| `threads.ts` | a thread's record and how it began, and the proposal a branch was opened from |
+| `intents.ts` | every command (`Intent`), its refusals (`ERR`), where its writes go (`Target`, `ValueWrite`), a send's place in the tree |
+| `board.ts`, `marks.ts` | the board's workflow states and the archive; a canvas's and a note column's title |
+| `facts.ts`, `reports.ts` | the host's facts in a thread and a queue held; an ask's digest and how a thread's last run ended |
+| `mentions.ts` | who a message names and compels (`address`), what a relay between agents carries, a person's display name |
+| `thread-names.ts`, `banners.ts`, `participants.ts` | a thread's name and its words; its banner and the icon source; seats, display names and pictures |
+| `config.ts`, `setup.ts`, `access.ts` | config as other packages name it; what the setup page reads; a lane's use of its owner's ssh identity |
+| `product.ts`, `lane-env.ts` | the product's name and the host's operator; what every lane of its own sees: paths, home, programs, variables |
+| `lanes.ts`, `bases.ts`, `disks.ts`, `commands.ts` | a lane's record and its proof it may run; a thread's base, history states and a copy ready to merge; a lane's disk and snapshots; the `/` commands |
+| `revisions.ts`, `accepted.ts`, `proposed.ts`, `trailers.ts`, `work.ts` | a turn's revision record, proposed changes recorded and reviewed; accepted work and a thread's base recorded; proposed changes' facts and decisions, the commit trailers, where a lane works |
+| `folder.ts`, `runs.ts`, `live.ts`, `edits.ts`, `images.ts`, `tools.ts` | a folder project's history; what a command did to a disk; what a turn streams; a text's edits; blobs; the tools |
+| `paths.ts`, `errors.ts` | paths as strings, and a thrown value as text |
 
 ## Paths as strings (`paths.ts`)
 
@@ -75,7 +102,7 @@ module but `fixtures.ts`, which tests import as `@pinetrie/core/fixtures`.
 - Your inventory is one grid, its cells addressed in reading order
   (ADR-0048).
 
-## The tree (`tree.ts`, `asks.ts`, `agents.ts`, `roots.ts`, `address.ts`)
+## The tree (`tree.ts`, `asks.ts`, `agents.ts`, `roots.ts`, `address.ts`, `ordering.ts`)
 
 - Order is structural: the `parentId` walk, and ids, which are uuidv7 and so
   sort by creation (S9). Nothing reads seq, which is local to a replica
@@ -124,7 +151,7 @@ module but `fixtures.ts`, which tests import as `@pinetrie/core/fixtures`.
   (S85). The search tools run programs
   carried into every lane (`RUNTIME_PROGRAMS`, ADR-0064).
 
-## Records (`index.ts`)
+## Records, commands and lanes (`intents.ts`, `board.ts`, `marks.ts`, `config.ts`, `setup.ts`, `lanes.ts`, `bases.ts`, `disks.ts`, `revisions.ts`)
 
 - A `Send` is a person's message the host sends: a `send` intent's, or a popped
   queued card's (`SendAt`'s `queue`). `Gated`, an intent or a send, is

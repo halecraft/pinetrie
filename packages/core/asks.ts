@@ -9,13 +9,8 @@
 // What a column folds of each ask's work, and the rail's capsules, are the
 // interface's (`segmentPath`, `compactRail`, `@pinetrie/interface`).
 
-import {
-  atEntry,
-  type DiffSpan,
-  type EntryId,
-  type RevisionRecord,
-  type WriterId,
-} from "./index.ts"
+import { atEntry, type EntryId, type WriterId } from "./ids.ts"
+import type { DiffSpan, RevisionRecord } from "./revisions.ts"
 import {
   type EntryLike,
   messageText,

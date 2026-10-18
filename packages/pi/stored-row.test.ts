@@ -8,7 +8,8 @@
 // either copy yields the same entry. Only the disjointness case sees that, so
 // it comes first.
 
-import { findSeqKeys, threadIdFor } from "@pinetrie/core"
+import { threadIdFor } from "@pinetrie/core"
+import { findSeqKeys } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   type EntryWithoutSeq,

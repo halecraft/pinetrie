@@ -3,8 +3,10 @@
 // merge. `@pinetrie/folder` decides over them; lanehost's disks role does
 // what they say, and declares only core and channel.
 
+import type { PointId } from "./bases.ts"
+import type { EntryId, ThreadId, WriterId } from "./ids.ts"
 import type { ImageMime } from "./images.ts"
-import type { EntryId, NonEmpty, PointId, ThreadId, WriterId } from "./index.ts"
+import type { NonEmpty } from "./proposed.ts"
 
 /** How a folder project's state came to be: what its parents mean. */
 export type StateMade =

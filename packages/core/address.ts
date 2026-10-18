@@ -9,7 +9,7 @@ import {
   isThreadId,
   parseCardId,
   type ThreadId,
-} from "./index.ts"
+} from "./ids.ts"
 
 /** The kinds of block a message's text is numbered by (`textBlocks`). */
 export const BLOCK_KINDS = ["table", "code", "image", "paragraph"] as const
