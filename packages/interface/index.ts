@@ -343,6 +343,7 @@ export {
   foldedView,
   foldedWords,
   NO_MARK,
+  stripTitle,
   UNFOLD,
   UNNAMED_THREAD,
 } from "./folded-column-view.ts"
@@ -720,10 +721,14 @@ export {
 export {
   bareThreadFace,
   faceStatus,
+  focusTitle,
   type PreviewRow,
   type ThreadFace,
+  type ThreadFocus,
   type ThreadPreview,
   threadFace,
+  threadFocus,
+  threadOpening,
   threadPreview,
 } from "./thread-face.ts"
 export {

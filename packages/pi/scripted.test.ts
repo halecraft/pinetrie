@@ -1,12 +1,17 @@
 // The scripted model: its queue, its standing answer, and held replies.
 
 import path from "node:path"
-import { URGENCY_ALONE, URGENCY_THEN_DIGEST } from "@pinetrie/rules"
+import {
+  FOCUS_REQUEST_HEAD,
+  URGENCY_ALONE,
+  URGENCY_THEN_DIGEST,
+} from "@pinetrie/rules"
 import { expect, test, vi } from "vitest"
 import { bindAgentDir } from "./agent-dir.ts"
 import { loadModelSetup, NO_RESOURCES } from "./config.ts"
 import {
   SCRIPTED_DESCRIPTION,
+  SCRIPTED_FOCUS,
   SCRIPTED_URGENCY,
   type ScriptedModel,
   scriptedModel,
@@ -209,4 +214,28 @@ test("a run's end is answered with an urgency line, first, so the suites' thread
     `${SCRIPTED_URGENCY}\n${SCRIPTED_DESCRIPTION}`,
   )
   expect(await describe("a commit message, please")).toBe(SCRIPTED_DESCRIPTION)
+})
+
+test("a focus request is answered same, unless the scenario describes", async () => {
+  const describeWith = async (script: ReturnType<typeof scriptedModel>) => {
+    const setup = await loadModelSetup({ kind: "scripted", script }, where())
+    const describeModel = setup.describeModel
+    if (describeModel === null) throw new Error("no describe model")
+    return textOf(
+      await setup.models.completeSimple(describeModel, {
+        systemPrompt: "name it",
+        messages: [
+          {
+            role: "user",
+            content: `${FOCUS_REQUEST_HEAD} (none yet)\n\nWhat was asked…`,
+            timestamp: 0,
+          },
+        ],
+      }),
+    )
+  }
+  expect(await describeWith(scriptedModel())).toBe(SCRIPTED_FOCUS)
+  expect(
+    await describeWith(scriptedModel({ describe: { text: "Billing" } })),
+  ).toBe("Billing")
 })

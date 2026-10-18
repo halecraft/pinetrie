@@ -4,7 +4,11 @@
 // lands (`data-fold-name`, `data-fold-mark`): a column's header turned on
 // its side, at the header's size, so the turn ends on them exactly.
 
-import type { ControlWords, FoldedMark } from "@pinetrie/interface"
+import {
+  type ControlWords,
+  type FoldedMark,
+  stripTitle,
+} from "@pinetrie/interface"
 import { ThreadMark } from "./thread-mark.tsx"
 
 export function FoldedStrip(p: {
@@ -12,6 +16,8 @@ export function FoldedStrip(p: {
   mark: FoldedMark
   name: string
   detail: string | null
+  /** What the tooltip says before how to unfold: a thread's focus. */
+  hint: string | null
   onUnfold: () => void
 }) {
   return (
@@ -19,7 +25,7 @@ export function FoldedStrip(p: {
       aria-label={`${p.unfold.title}: ${p.name}`}
       className="folded-title"
       onClick={p.onUnfold}
-      title={p.unfold.title}
+      title={stripTitle(p.unfold, p.hint)}
       type="button"
     >
       <span aria-hidden="true" className={p.unfold.className}>

@@ -62,6 +62,24 @@ export function fitNewest(
   return { text: kept.join(""), dropped: lines.length - kept.length }
 }
 
+/**
+ * A request's list of lines: the first always, since it usually says what
+ * the thread is for, then the newest of `rest` that fit in what is left of
+ * `room`, after a note of how many were left out.
+ */
+export function firstAndNewest(
+  first: string,
+  rest: readonly string[],
+  room: number,
+): { readonly first: string; readonly newest: string } {
+  const head = `- ${first.trim()}\n`
+  const { text, dropped } = fitNewest(
+    rest,
+    Math.max(0, room - head.length - LEFT_OUT_NOTE),
+  )
+  return { first: head, newest: leftOut(dropped) + text }
+}
+
 /** Room for `leftOut`'s line. */
 export const LEFT_OUT_NOTE = 32
 
@@ -117,3 +135,20 @@ export const bareLine = (text: string): string =>
     .replace(WRAPPED, "")
     .replace(/[.:;,!]+$/, "")
     .trim()
+
+/** How many words `text` has. */
+export const wordCount = (text: string): number =>
+  text.split(/\s+/).filter(w => w !== "").length
+
+/**
+ * A reply as one bare line (`bareLine`) of at most `maxWords` words, or null:
+ * for more than one line, an empty one, or one too long. It never cuts a
+ * reply, which could leave "Fixing the".
+ */
+export function oneLine(reply: string, maxWords: number): string | null {
+  const lines = reply.split("\n").filter(l => l.trim() !== "")
+  const [only] = lines
+  if (lines.length !== 1 || only === undefined) return null
+  const bare = bareLine(only)
+  return bare === "" || wordCount(bare) > maxWords ? null : bare
+}

@@ -1,4 +1,4 @@
-# ADR-0173 — A reader sees what a thread's work is about: a headline for every long ask, a topic for every thread, an intent for every tool call
+# ADR-0173 — A reader sees what a thread's work is about: a headline for every long ask, a focus for every thread, an intent for every tool call
 
 - **Status:** Accepted (Duane, 2026-10-18)
 - **Area:** `docs/06-interface.md`, `docs/glossary.md`,
@@ -12,7 +12,7 @@
   - ADR-0106: an ask's digest is drawn as one summary row, at one place, at
     every density, never in a fold's head.
   - ADR-0077: a run's end, once its reply is written, is followed by a request
-    of its own for the thread's topic.
+    of its own for the thread's focus.
   - ADR-0114: `bash`, `edit` and `write` take a required `intent`, which never
     reaches pi.
   - ADR-0123: in story, a tool row with an intent leads with it, and its
@@ -47,17 +47,22 @@ person who is not a programmer cannot read.
   after the ask's first fold, else before its work. Outline shows the
   headline alone; story and raw show its points too. A fold's head holds
   the counts and the outcome, never the headline.
-- **A thread has a topic**, what it is doing now in a few words, in its
+- **A thread has a focus**, what it is doing now in a few words, in its
   column's header. After each run's end, once its reply is written, a
-  request of its own (the `thread-topic` skill) gives the model the topic
+  request of its own (the `thread-focus` skill) gives the model the focus
   shown now and the thread's asks, each with its digest's headline, and
   the model names the phase the thread is in or answers `same`. S239: with
-  each ask's headline, the topic followed a thread's phases (23 changes in
-  82 requests, about 3 of them noise). A topic is refused over 10 words,
-  never cut, and an older run's topic never replaces a newer one's. Until
+  each ask's headline, the focus followed a thread's phases (23 changes in
+  82 requests, about 3 of them noise). A focus is refused over 10 words,
+  never cut, and an older run's focus never replaces a newer one's. Until
   a thread's first run ends, its header shows its first message's first
-  line, dimmed. Topics follow `digests.enabled`. The canvas's title stays
-  as ADR-0074 has it.
+  line, dimmed. A focus follows `digests.enabled`. The canvas's title
+  stays as ADR-0074 has it.
+- **It is a focus, not a topic.** *Topic* names a canvas in Topics
+  (ADR-0158), so a thread's is its focus, in the glossary, the page and
+  the code (`FocusRecord`, `pinetrie.focus`). Only what no person reads
+  says *topic*: the `thread-focus` skill and its request keep the words
+  S239 measured them with.
 - **`bash`, `edit` and `write` require an `intent`**: what the call is
   for, in a few plain words. Each tool says in its entry whether it takes
   one, and the wrapper drops it before pi's `execute`. S231: no call of 66
@@ -71,7 +76,7 @@ person who is not a programmer cannot read.
 
 - Most asks show a summary where they showed none, and a column's header
   says what its thread is doing.
-- Each run's end costs one more small request, for the topic.
+- Each run's end costs one more small request, for the focus.
 - Stored digests of the old shape (`headline: null`) and live ones with
   points no longer decode, and are skipped. No migration.
 - Adding the `intent` to three tools' schemas redefines them for every
@@ -83,17 +88,17 @@ person who is not a programmer cannot read.
 
 - **A flag on the digest for "adds to the last word".** Empty points carry
   it (S229).
-- **A topic that holds unless the subject changes** (S230's skill). It kept
-  the topic 76 times in 80, and missed the phases.
-- **The topic in the run-end request**, as a third answer. The model would
+- **A focus that holds unless the subject changes** (S230's skill). It kept
+  the focus 76 times in 80, and missed the phases.
+- **The focus in the run-end request**, as a third answer. The model would
   name it from one run's work, not the thread's asks and headlines, which
   is not what S239 measured, and before this run's final headline exists.
-- **The topic as the canvas's title.** The title stays stable.
-- **A setting of its own for topics.** A topic reads the headlines, so it
+- **The focus as the canvas's title.** The title stays stable.
+- **A setting of its own for focuses.** A focus reads the headlines, so it
   follows `digests.enabled`.
 - **An optional `intent`, with words made from the command.** No model
   left it out (S231).
-- **A person's own topic.** It would need a rule for when the model may
+- **A person's own focus.** It would need a rule for when the model may
   replace it: a later decision.
 - **A migration for old digests.** A record that does not decode is
   skipped, and no reader or decision sees it.

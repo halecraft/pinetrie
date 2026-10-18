@@ -20,6 +20,7 @@ import { BUDGET } from "./budget.ts"
 import { CARD_HISTORY, TRACE } from "./card-history.ts"
 import { COMMANDS } from "./commands.ts"
 import { DIGEST } from "./digest.ts"
+import { FOCUS } from "./focus.ts"
 import { CONFLICT, FOLDER_WRITE_JOURNAL, STATE } from "./folder-records.ts"
 import { MARK } from "./mark.ts"
 import { NAME } from "./names.ts"
@@ -74,6 +75,7 @@ export const RECORD_SPECS: readonly AnyRecordSpec[] = [
   STATE,
   TRACE,
   RUN_END_REPORT,
+  FOCUS,
   WORKFLOW,
 ]
 

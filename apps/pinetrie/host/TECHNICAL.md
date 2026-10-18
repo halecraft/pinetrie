@@ -55,6 +55,8 @@ wires them.
 | `names.ts` | every thread's name (ADR-0039, ADR-0117): `ensure` for the lanes pi holds and the threads recorded, `reserve` for a thread a column opened before its first message (ADR-0057), on one queue |
 | `banners.ts` | each thread's column banner (ADR-0050, ADR-0053): made as the thread is named, at reservation or creation, set by `set_banner`; every step a late one |
 | `digests.ts` | each ask's digest (ADR-0106, ADR-0075), unless the config turns them off (ADR-0071); a live digest waits for someone reading the thread (presence, ADR-0024); every step a late one, and `writePendingRunEndReport`, the run-end report a stopping run writes before its end |
+| `focuses.ts` | each thread's focus (ADR-0173): asked once its run's end has settled (`RunEndSettled`, from `Digests.ended`), from its asks and their headlines; every step a late one |
+| `ask-model.ts` | one request to a model outside every thread with one of pine·trie's skills (`askModel`): the skill, the request, its tokens, the reply read and each refused part of it logged; digests, titles and focuses go through it |
 | `relays.ts` | another thread's agent asked (ADR-0128): `ask` and `leave` (the tools' hooks), `relayMessage` (a person's chat that asks or invites), `relayCard` (an ask card popped), `deliver` (a relay into a thread, for these and the round) |
 | `answers.ts` | what a relayed run sends back once it has ended (ADR-0128): its answer, the answers held for a busy asker, and the round, each a late step (`Answers.ended`, from `runs.onEnded`) |
 | `threads-now.ts` | a thread as it is now, for the relays, the answers and the late steps: its reach, its tree, end and lane (`thread`, which opens only a live thread's root), and the names a message uses |
@@ -178,7 +180,7 @@ same for every run (`packages/pi/TECHNICAL.md`, S85).
   asks, as at `ended`.
 - **A failure before `endRun` is logged as `run end failed`,** and `endRun`
   and every step after it still run.
-- **`ended` is one function, set once** in `startHost`: `settle`, banners, and the run-end report with the final digest. It breaks a cycle: a run's end
+- **`ended` is one function, set once** in `startHost`: `settle`, banners, and the run-end report with the final digest, then the thread's focus once that has settled (`RunEndSettled`, ADR-0173). It breaks a cycle: a run's end
   drains, the drain may run an update, and an update may start a run.
   `runs.ts` imports neither the queue's pop nor the commands.
 - **`ended` is given the run's prompt**, read at the start of `end()`,
@@ -1124,7 +1126,7 @@ queued cards, which `planArchive` refuses.
   caller's plan to read (`bannerDue`, `planDigest`'s `inFlight`). A failure
   goes to `failed`, never to the caller.
 - **The modules whose work is late hold no write port and no keeper**:
-  `digests.ts`, `titles.ts`, `banners.ts` and `answers.ts` take `Later`,
+  `digests.ts`, `focuses.ts`, `titles.ts`, `banners.ts` and `answers.ts` take `Later`,
   and no `Records`, places writer or keeper, so every step they take is a
   late one. `answers.ts` keeps pi's ports for an answer's delivery, which
   it makes only in an `after`; that much is held by its tests. `budgets.ts`
@@ -1210,6 +1212,24 @@ queued cards, which `planArchive` refuses.
   the parsed reply, never raw model text. A live digest writes what `digestToWrite`
   returns; a run's end, what `runEndedToWrite` returns.
 - A missing `ask-digest` skill is logged, and settles as a failed request.
+- **A run's end settles with what it wrote** (`RunEndSettled`): `ended`
+  resolves once its reply is written or its request failed, with the ask's
+  final digest. It keeps `later.outside`'s promise and waits for it after
+  its step, never inside it: the settle is a step of its own on the same
+  keeper. Only `digests.ts` makes the value, so the focus step, which takes
+  it, cannot run before the final headline is written.
+
+## Focuses (`focuses.ts`, ADR-0173)
+
+- **Asked after every run's end, digests on.** `Focuses.ended` takes the
+  `RunEndSettled` the run's end resolved to, plans with `planFocus` from the
+  thread's asks, the root's digests and the settled run's own, and asks
+  outside the keeper with `askModel` and the `thread-focus` skill. The
+  answer writes what `focusToWrite` decides, as a late write.
+- **No request is held per thread.** A run that ends while another run's
+  focus is asked asks too: `focusToWrite` keeps the newer ask's, and
+  skipping it would leave the focus a phase behind.
+- **Its tokens count to the ask** (`budgets.spendFor`), as a digest's do.
 
 ## Agents talking (`relays.ts`, `answers.ts`, `budgets.ts`, ADR-0128)
 

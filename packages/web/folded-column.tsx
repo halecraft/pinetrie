@@ -51,6 +51,7 @@ export function FoldedColumn(p: {
       </header>
       <FoldedStrip
         detail={words.detail}
+        hint={words.hint}
         mark={foldedMark(face)}
         name={words.title}
         onUnfold={() => p.onIntent({ kind: "fold", card, unfolded: true })}

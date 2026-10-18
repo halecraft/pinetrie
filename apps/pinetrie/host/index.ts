@@ -109,6 +109,7 @@ import {
   planLoads,
   rootsOpenedWords,
 } from "./docs.ts"
+import { createFocuses } from "./focuses.ts"
 import {
   sweepBlobs,
   sweepHistories,
@@ -643,6 +644,14 @@ export async function startHost({
   })
   const digestFailed = (lane: ThreadId) =>
     failed(basics, "summarizing its ask", lane)
+  // Each thread's focus, asked once its run's end has settled.
+  const focuses = createFocuses({
+    basics,
+    later,
+    piSetup,
+    enabled: settled["digests.enabled"].value,
+    spent: (ask, tokens) => budgets.spendFor(ask, tokens),
+  })
   // Each root's title, unasked as its first lane starts unless the config
   // turns that off, or when a person asks.
   const titles = createTitles({
@@ -902,14 +911,17 @@ export async function startHost({
   })
   // A run's end: the lane drains and the session compacts. A thread whose banner failed tries again. The
   // final digest is for the run's prompt: the drain queued before it may
-  // append to the lane or start its next run.
+  // append to the lane or start its next run. The thread's focus is asked
+  // once that has settled, from what it wrote.
   runs.onEnded((lane, prompt) => {
     void answers.ended(lane, prompt).catch(failed(basics, "an answer"))
     void settle([lane])
     banners.due(lane).catch(failed(basics, "banner"))
     const root = docs.rootOfLane(lane)
     if (prompt !== null && root !== null)
-      void digests.ended(root, lane, prompt, digestFailed(lane))
+      void digests
+        .ended(root, lane, prompt, digestFailed(lane))
+        .then(s => focuses.ended(s, failed(basics, "naming its focus", lane)))
   })
   // A card queued on a lane that is not running is popped at once: the move
   // that queued it asks for a drain. A lane's drain is the keeper's `once`:

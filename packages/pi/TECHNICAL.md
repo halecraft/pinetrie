@@ -436,7 +436,10 @@ is given to pi's code, kept out of `~/.pi` and a project's `.pi/`:
     reply from the run's script (S48 item 22). `ModelSetup.describeModel` is
     that model when scripted, and the run's model otherwise. A run's end
     asks for an urgency line (ADR-0077, ADR-0166), and the scripted model answers
-    `SCRIPTED_URGENCY` first, so a suite's threads are done.
+    `SCRIPTED_URGENCY` first, so a suite's threads are done. A focus
+    request (`FOCUS_REQUEST_HEAD`, ADR-0173) is answered `SCRIPTED_FOCUS`
+    (`same`), so no suite's header shows a focus it did not ask for,
+    unless the scenario gave its own `describe`, which answers it.
   - **Each request queues its own response** (`perRequest`): both providers
     are wrapped so that `stream` and `streamSimple` append one dispatcher,
     then delegate. Faux takes a response off its queue when a request
@@ -753,11 +756,13 @@ item 18, and in `lanes.test.ts` against the harness.
   (`additionalSkillPaths`; pi's loader keeps the first of a name):
   `resolve-conflicts` (ADR-0033), `commit-message` and `proposed-changes-stack`
   (ADR-0105), `column-banner` (ADR-0053), whose whole body is the image
-  model's prompt, and `ask-digest` (ADR-0106), whose reply has a shape the
-  host reads (`parseDigest`, ADR-0075): a replacement must ask for it too. So
+  model's prompt, `ask-digest` (ADR-0106), whose reply has a shape the
+  host reads (`parseDigest`, ADR-0075, ADR-0173), and `thread-focus`
+  (ADR-0173), whose reply is a focus or `same` (`parseFocus`): a
+  replacement must ask for them too. So
   one of yours or the repo's of the same name replaces pine·trie's; a
   replacement goes by the skill's name, so one still named `offer-stack`,
-  the stack skill's name before ADR-0156, replaces nothing. All five are
+  the stack skill's name before ADR-0156, replaces nothing. Each is
   `disable-model-invocation: true`: only the host asks for them.
   `PiSetup.skill(name)` reads the file at call time, without its frontmatter,
   and hashes it. The scripted and named model choices load no resources, so

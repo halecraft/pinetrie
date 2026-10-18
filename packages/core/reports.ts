@@ -1,5 +1,5 @@
-// core/reports — what a reader is told of a run: an ask's digest, and how the
-// thread's last run ended.
+// core/reports — what a reader is told of a run: an ask's digest, how the
+// thread's last run ended, and the thread's focus.
 
 import type { EntryId, ThreadId, WriterId } from "./ids.ts"
 
@@ -34,6 +34,20 @@ export type DigestRecord =
       /** Written after its run ended: kept, and never replaced by a live one. */
       readonly final: true
     } & DigestBody)
+
+/**
+ * A thread's focus: what it is doing now, in a few words, named by a model
+ * after each of its runs. A session record keyed by its thread.
+ */
+export interface FocusRecord {
+  readonly thread: ThreadId
+  /** At most `FOCUS_WORDS` words (`@pinetrie/rules`' `focus.ts`). */
+  readonly focus: string
+  /** The ask whose run's end named it: an older ask's focus never replaces it. */
+  readonly ask: EntryId
+  /** When it was written, in ms since the epoch. */
+  readonly at: number
+}
 
 /** How urgently a model says a run's end asks the people in its thread to look. */
 export type ReaderUrgency = "needsYou" | "worthARead" | "done"

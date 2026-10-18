@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest"
-import { entriesById, entry } from "./fixtures.ts"
+import { entriesById, entry, FIXTURE_THREAD } from "./fixtures.ts"
 import {
   askOutcome,
   askSpan,
@@ -16,6 +16,7 @@ import {
   type RevisionRecord,
   startsRun,
   type TreeIndex,
+  threadAsks,
   threadIdFor,
   writerId,
 } from "./index.ts"
@@ -275,4 +276,26 @@ describe("askSpan", () => {
       askSpan(index, asks, entryId("1-p"), new Map([rev("1-p", null)])),
     ).toBeNull()
   })
+})
+
+test("a thread's asks are its own runs' prompts, oldest first", () => {
+  const other = threadIdFor("other")
+  const index = build([
+    entry("1-p", null, personMessage("in the parent")),
+    entry("2-a", "1-p", said("parent's answer")),
+    entry("3-p", "2-a", personMessage("first"), { thread: other }),
+    entry("4-a", "3-p", said("one"), { thread: other }),
+    entry("5-q", "4-a", personMessage("for people only"), { thread: other }),
+    entry(
+      "6-l",
+      "5-q",
+      { role: "land", content: "land it" },
+      { thread: other },
+    ),
+    entry("7-a", "6-l", said("landed"), { thread: other }),
+  ])
+  const asks = indexAsks(index)
+  expect(threadAsks(index, asks, other)).toEqual(["3-p", "6-l"])
+  expect(threadAsks(index, asks, FIXTURE_THREAD)).toEqual(["1-p"])
+  expect(threadAsks(index, asks, threadIdFor("none"))).toEqual([])
 })

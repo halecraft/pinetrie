@@ -3,9 +3,12 @@ import { FIXTURE_THREAD } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   describeRequest,
+  firstAndNewest,
   fitNewest,
   leftOut,
+  oneLine,
   transcriptLines,
+  wordCount,
 } from "./request.ts"
 
 const message = (
@@ -104,4 +107,28 @@ describe("the commit message", () => {
     })
     expect(tighter.user).toContain("the rest of the diff left out")
   })
+})
+
+describe("oneLine", () => {
+  test("oneLine refuses a second line, and never cuts", () => {
+    expect(oneLine('  "Fixing the rail."  ', 3)).toBe("Fixing the rail")
+    expect(oneLine("\nFixing the rail\n\n", 3)).toBe("Fixing the rail")
+    expect(oneLine("Fixing the rail\nand more", 9)).toBeNull()
+    expect(oneLine("one two three four", 3)).toBeNull()
+    expect(oneLine("  ", 3)).toBeNull()
+  })
+  test("wordCount counts words, not the spaces around them", () => {
+    expect(wordCount("  a  b c ")).toBe(3)
+    expect(wordCount("")).toBe(0)
+  })
+})
+
+test("firstAndNewest keeps the first line, and cuts the oldest of the rest first", () => {
+  const rest = Array.from({ length: 20 }, (_, i) => `line ${i}`)
+  const { first, newest } = firstAndNewest("the first", rest, 120)
+  expect(first).toBe("- the first\n")
+  expect(newest).toContain("earlier left out")
+  expect(newest).toContain("- line 19\n")
+  expect(newest).not.toContain("- line 0\n")
+  expect(firstAndNewest("x", ["a"], 1_000).newest).toBe("- a\n")
 })

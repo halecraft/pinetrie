@@ -25,7 +25,8 @@ import { sealed } from "./inside.ts"
 /**
  * pinetrie's own skills, loaded after yours and the repo's:
  * `resolve-conflicts`, `commit-message`, `proposed-changes-stack`,
- * `column-banner`, `ask-digest`, `tab-title` and `agents-round`.
+ * `column-banner`, `ask-digest`, `tab-title`, `thread-focus` and
+ * `agents-round`.
  */
 const SKILLS_DIR = path.join(import.meta.dirname, "skills")
 

@@ -31,6 +31,7 @@ import {
   titleRequest,
   titleStillWanted,
 } from "@pinetrie/rules"
+import { askModel, oneAnswer } from "./ask-model.ts"
 import { type Basics, failed } from "./basics.ts"
 import { canvasesNow } from "./canvases.ts"
 import type { Later } from "./later.ts"
@@ -102,28 +103,23 @@ export function createTitles(deps: {
         ? { held: { set: asking, key: canvas } }
         : {}),
       failed: failed(basics, "titling a thread"),
-      request: async () => {
-        const skill = await deps.piSetup.skill("pinetrie:skill:tab-title")
-        if (skill === null) {
-          log("[host] no tab-title skill")
-          return null
-        }
-        const { text: reply } = await deps.piSetup.complete({
-          ...titleRequest({
-            skill: skill.content,
-            lines: plan.lines,
-            budget: TITLE_BUDGET,
-          }),
-          purpose: "title",
-        })
-        if (reply === null) return null
-        const title = replyTitle(reply)
-        if (title === null) {
-          log(`[host] the model's title is not one: ${JSON.stringify(reply)}`)
-          return null
-        }
-        return title
-      },
+      request: async () =>
+        (
+          await askModel(
+            { piSetup: deps.piSetup, log },
+            {
+              skill: "pinetrie:skill:tab-title",
+              request: skill =>
+                titleRequest({
+                  skill,
+                  lines: plan.lines,
+                  budget: TITLE_BUDGET,
+                }),
+              parse: oneAnswer(replyTitle, "title"),
+              purpose: "title",
+            },
+          )
+        ).value,
       plan: title => {
         const marks = readMarks(session)
         if (!titleStillWanted(marks.get(canvas), by)) return null

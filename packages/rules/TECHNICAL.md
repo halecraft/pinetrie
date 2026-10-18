@@ -38,7 +38,10 @@ follow this list. A name only this package uses is imported from its module.
   total decoders and key readers every module uses.
 - `config.ts`: `modelRef`, the parser a model setting's kind wraps; the
   config's files are `@pinetrie/config`'s, and the host declares every
-  setting. `request.ts`: what fits a model request's budget.
+  setting. `request.ts`: what fits a model request's budget
+  (`fitNewest`, `firstAndNewest`), and a one-line reply read back
+  (`bareLine`, `oneLine`, `wordCount`), which titles, urgency lines and
+  focuses share.
 - `message.ts`, `participant.ts`, `shares.ts`, `commands.ts`: a person's
   message, who is in the session, the files a message shares, and `/`
   commands (`pinetrie.commands`).
@@ -85,9 +88,10 @@ follow this list. A name only this package uses is imported from its module.
 - `board.ts`, `archive.ts`, `order.ts`: the board's workflow states and
   each root's place, what crossing the archive's edge does, and order
   keys (a queue's, the pinned cards' and the board's).
-- `roots.ts`, `mark.ts`, `title.ts`, `stop.ts`, `digest.ts`, `run-end-report.ts`:
-  the directory of roots, titles, who stopped a run and carrying on after
-  it, an ask's digest, and how a thread's last run ended.
+- `roots.ts`, `mark.ts`, `title.ts`, `stop.ts`, `digest.ts`, `run-end-report.ts`,
+  `focus.ts`: the directory of roots, titles, who stopped a run and
+  carrying on after it, an ask's digest, how a thread's last run ended,
+  and what the thread is doing now.
 - `names.ts`, `banner.ts`: a thread's name and its banner, each with its
   record; `banner.ts` also holds the icon source (`icons.source`) and its
   published record.
@@ -1336,13 +1340,36 @@ reads a root's tree: Phase 2 holds one root a canvas.
   asked.
 - **`titleRequest`** keeps the first line whatever the budget, since how a
   thread began usually says what it is for, then the newest that fit
-  (`fitNewest`).
-- **`replyTitle` refuses rather than cuts**: more than `TITLE_WORDS` words, or
-  what `parseTitle` refuses, is null, and the canvas keeps its label. It
-  unwraps quotes and trailing punctuation with `bareLine` (`request.ts`),
-  as a digest's headline is.
+  (`firstAndNewest`).
+- **`replyTitle` refuses rather than cuts**: a reply that is not one line of
+  at most `TITLE_WORDS` words (`oneLine`), or what `parseTitle` refuses, is
+  null, and the canvas keeps its label. It unwraps quotes and trailing
+  punctuation with `bareLine` (`request.ts`), as a digest's headline is.
 - **`titleStillWanted`**: an asked title is always written; an unasked one
   only over no mark.
+
+# Focuses (`focus.ts`, ADR-0173)
+
+A thread's focus: what it is doing now, in a few words, a session record
+keyed by its thread (`FOCUS`, `pinetrie.focus`), written by the host after
+each run's end. Not a *topic*, which is a canvas in Topics (ADR-0158).
+
+- **`planFocus`** is the decision and the request's parts: none with digests
+  off, since a focus reads its asks' headlines, or for a thread with no ask
+  (`threadAsks`, core). Each ask is its prompt's `transcriptLine`, cut, with
+  its digest's headline; the run that just ended gives its own (`settled`),
+  since the root may not hold it yet.
+- **`focusRequest`** is the shape the `thread-focus` skill was measured with
+  (S239): the focus shown now, then the first ask always and the newest
+  that fit (`firstAndNewest`), at most 29. The request and the skill call it
+  a topic: no person reads them. `FOCUS_REQUEST_HEAD` begins it, which the
+  scripted model reads.
+- **`parseFocus` refuses rather than cuts**: one line of at most
+  `FOCUS_WORDS` words (`oneLine`), or `same`. The skill asks for eight.
+- **`focusToWrite` is the whole write decision**: nothing for `same`, a
+  refused reply or a failed request, the stored focus's own words, or a
+  stored focus a newer ask named (entry ids sort by time). It compares the
+  words alone, since `ask` and `at` differ on every run.
 
 # Where lanes work (`work.ts`, ADR-0032 to ADR-0034)
 

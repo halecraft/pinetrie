@@ -290,6 +290,18 @@ export {
   tokensWords,
 } from "./fact.ts"
 export {
+  FOCUS,
+  FOCUS_REQUEST_HEAD,
+  FOCUS_WORDS,
+  type FocusAsk,
+  type FocusPlan,
+  type FocusReply,
+  focusRequest,
+  focusToWrite,
+  parseFocus,
+  planFocus,
+} from "./focus.ts"
+export {
   CONFLICT,
   conflictKey,
   decodeFolderStamps,

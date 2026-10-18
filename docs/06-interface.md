@@ -424,6 +424,17 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   their inventory, the row says "Bea has it" and opens nothing. A thread that started from a WIP says so, "on
   wip/search", or "wip/search is gone" once it is (ADR-0104); one on the
   line says nothing.
+- **A named agent's header says what its thread is doing now** (ADR-0173):
+  its focus, on a row of its own between the agent's row and the fork's,
+  one line cut to the column with the whole of it in its title, "written by
+  a model". A model names it after each of the thread's runs, once the
+  run's summary is written, from the thread's asks and their headlines; it
+  stays while the work goes on, and changes when the thread moves to a new
+  phase. Until a thread's first run ends, the row shows its first message's
+  first line, dimmed. A chat or a column whose agent is not named yet has
+  no such row. A focus follows the digests' setting. A thread's preview
+  shows a model's focus above its first and last lines, and its folded
+  strip's tooltip leads with it.
 - **A thread's name opens its details** (ADR-0073), under the header, and a
   second click on it closes them; a chevron after the name turns as they
   open. They show the thread's icon magnified, which spins in as they open

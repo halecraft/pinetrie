@@ -425,6 +425,11 @@ ADR-0173), which no agent reads: always a headline, and a few points only
 when the work adds to the agent's last message. It is one summary row, at
 one place in the ask at every density, its points in story and raw.
 
+**A thread's header says what it is doing now** (ADR-0173). Once a run's
+end has settled, a request of its own (the `thread-focus` skill) asks a
+model for the thread's focus from its asks and their headlines, or `same`
+(`pinetrie.focus`, one per thread); digests off, none is asked.
+
 **A thread's followers are told how its runs end** (ADR-0077). You follow a
 thread once you have written on it (`RootRecord.threads`). At each run's end
 the same request asks a model for an urgency line, digests on or off: needs you,

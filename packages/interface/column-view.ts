@@ -19,6 +19,7 @@ import {
   type DiffSpan,
   type EntryId,
   entryThread,
+  type FocusRecord,
   firstLine,
   type IconsRecord,
   type LaneRecord,
@@ -72,6 +73,7 @@ import { ago, count } from "./counts.ts"
 import { speakerWords } from "./names.ts"
 import { outcomeWords } from "./outcome-words.ts"
 import type { Reader } from "./send.ts"
+import { type ThreadFocus, threadFocus } from "./thread-face.ts"
 import { type ThreadIcon, threadIcon } from "./thread-icon.ts"
 import { linkWords, type ThreadLink } from "./thread-link.ts"
 
@@ -102,6 +104,8 @@ export interface WorkFacts {
   /** Each lane's proposed changes in your repo. */
   readonly proposedByLane: ReadonlyMap<ThreadId, ProposedChangesRecord>
   readonly names: ReadonlyMap<ThreadId, ThreadName>
+  /** Each thread's focus, a model's (`pinetrie.focus`). */
+  readonly focuses: ReadonlyMap<ThreadId, FocusRecord>
   readonly banners: ReadonlyMap<ThreadId, BannerRecord>
   /** Where icons come from; null before a host published it. */
   readonly icons: IconsRecord | null
@@ -189,6 +193,8 @@ export type HeadIdentity =
   | {
       readonly kind: "agent"
       readonly name: ThreadName
+      /** What the thread is doing now (`threadFocus`); null for none yet. */
+      readonly focus: ThreadFocus | null
       readonly details: ThreadDetails
       /** Its icon (`threadIcon`); only a named agent's header draws one. */
       readonly icon: HeadIcon | null
@@ -398,6 +404,7 @@ export function columnView(f: ColumnFacts): ColumnShows {
       work.names,
       detailsOf(f, head, stretches, behind),
       thread => shownHeadIcon(threadIcon({ thread, ...work }), f.mountedIcon),
+      thread => threadFocus({ focuses: work.focuses, index, thread }),
     ),
     origin: originOf(f, stretches),
     joins: joinsOf(view, stretches, work.names),
@@ -499,8 +506,8 @@ export const detailsTitle = (open: boolean): string =>
   open ? "hide this thread's details" : "show this thread's details"
 
 /**
- * `head` is `headLane`'s. Only a named agent carries `details` and an icon:
- * pending, the header shows ✦ alone, and a chat's names no thread.
+ * `head` is `headLane`'s. Only a named agent carries `details`, an icon and
+ * a focus: pending, the header shows ✦ alone, and a chat's names no thread.
  */
 function identityOf(
   head: ThreadId | null,
@@ -508,11 +515,18 @@ function identityOf(
   names: ReadonlyMap<ThreadId, ThreadName>,
   details: ThreadDetails,
   iconOf: (thread: ThreadId) => HeadIcon | null,
+  focusOf: (thread: ThreadId) => ThreadFocus | null,
 ): HeadIdentity {
   if (head === null) return createsLane ? { kind: "pending" } : { kind: "none" }
   const name = names.get(head)
   if (name === undefined) return { kind: "pending" }
-  return { kind: "agent", name, details, icon: iconOf(head) }
+  return {
+    kind: "agent",
+    name,
+    focus: focusOf(head),
+    details,
+    icon: iconOf(head),
+  }
 }
 
 /**

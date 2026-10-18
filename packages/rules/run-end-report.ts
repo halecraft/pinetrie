@@ -24,7 +24,7 @@ import {
   parseDigest,
 } from "./digest.ts"
 import { type RecordSpec, setRecord } from "./records.ts"
-import { bareLine } from "./request.ts"
+import { bareLine, oneLine } from "./request.ts"
 
 const Id = Type.String({ minLength: 1 })
 const RunEndReportSchema = Type.Object({
@@ -116,9 +116,8 @@ export function parseUrgencyLine(line: string): UrgencyLine | null {
   const urgency = URGENCY_WORDS[head]
   if (urgency === undefined) return null
   if (urgency === "done") return { urgency, reason: null }
-  const reason = colon < 0 ? "" : bareLine(bare.slice(colon + 1))
-  if (reason === "" || reason.split(/\s+/).length > REASON_WORDS) return null
-  return { urgency, reason }
+  const reason = colon < 0 ? null : oneLine(bare.slice(colon + 1), REASON_WORDS)
+  return reason === null ? null : { urgency, reason }
 }
 
 /** A run's final reply, read: each half null when it was refused or not asked for. */

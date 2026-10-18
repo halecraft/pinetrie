@@ -5,6 +5,7 @@
 
 import {
   faceStatus,
+  focusTitle,
   type ThreadFace,
   type ThreadPreview,
 } from "@pinetrie/interface"
@@ -47,6 +48,11 @@ export function ThreadFaceView({ face }: { face: ThreadFace }) {
         )}
         <span className="thread-face-name">{face.name ?? "a thread"}</span>
       </span>
+      {face.focus?.kind === "model" && (
+        <span className="thread-face-focus" title={focusTitle(face.focus)}>
+          {face.focus.text}
+        </span>
+      )}
       <span className="thread-face-first">{face.first}</span>
       {face.last !== null && (
         <span className="thread-face-last">… {face.last}</span>

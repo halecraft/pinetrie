@@ -9,13 +9,15 @@
 // What a column folds of each ask's work, and the rail's capsules, are the
 // interface's (`segmentPath`, `compactRail`, `@pinetrie/interface`).
 
-import { atEntry, type EntryId, type WriterId } from "./ids.ts"
+import { atEntry, type EntryId, type ThreadId, type WriterId } from "./ids.ts"
 import type { DiffSpan, RevisionRecord } from "./revisions.ts"
 import {
+  ancestry,
   type EntryLike,
   messageText,
   startsRun,
   type TreeIndex,
+  threadEnd,
 } from "./tree.ts"
 import { nearestRevision } from "./work.ts"
 
@@ -148,6 +150,23 @@ export const LONG_ASK = 3
 /** A long ask: its run holds `LONG_ASK` agent messages or more. */
 export const isLongAsk = (asks: AskIndex, prompt: EntryId): boolean =>
   (asks.work.get(prompt)?.length ?? 0) >= LONG_ASK
+
+/**
+ * `thread`'s own asks, oldest first: the prompts on its path to its end
+ * (`threadEnd`) that are in the thread and started a run. A land or stack
+ * message that started one is among them. None for a thread with no end.
+ */
+export function threadAsks(
+  index: TreeIndex,
+  asks: AskIndex,
+  thread: ThreadId,
+): readonly EntryId[] {
+  return ancestry(index, threadEnd(index, thread))
+    .path.filter(
+      id => index.entries[id]?.thread === thread && asks.work.has(id),
+    )
+    .toReversed()
+}
 
 /**
  * How `prompt`'s run ended, from its last entries: an assistant message that

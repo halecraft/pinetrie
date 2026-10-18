@@ -1332,9 +1332,10 @@ export function App({
         index,
         lanes,
         names: workFacts.names,
+        focuses: workFacts.focuses,
         iconFor,
       }),
-    [index, lanes, workFacts.names, iconFor],
+    [index, lanes, workFacts.names, workFacts.focuses, iconFor],
   )
   // Each thread you hold, as its slot draws it.
   const threadFaces = useMemo(

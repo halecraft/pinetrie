@@ -86,6 +86,7 @@ test("a scripted model with nothing listed loads nothing of pi's, and still has 
     "pinetrie:skill:proposed-changes-stack",
     "pinetrie:skill:resolve-conflicts",
     "pinetrie:skill:tab-title",
+    "pinetrie:skill:thread-focus",
   ])
 })
 

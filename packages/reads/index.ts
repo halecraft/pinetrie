@@ -27,6 +27,7 @@ import {
   type EntryId,
   type EntryLike,
   entryId,
+  type FocusRecord,
   type IconsRecord,
   indexTree,
   isCanvasId,
@@ -84,6 +85,7 @@ import {
   DIGEST,
   decodeCard,
   decodeMessage,
+  FOCUS,
   type Home,
   ICONS,
   ICONS_KEY,
@@ -697,6 +699,11 @@ export const readTraces = (
 export const readRunEndReports = (
   doc: SessionDocHandle,
 ): ReadonlyMap<ThreadId, RunEndReportRecord> => readRecords(doc, RUN_END_REPORT)
+
+/** Each thread's focus (`pinetrie.focus`), by thread. */
+export const readFocuses = (
+  doc: SessionDocHandle,
+): ReadonlyMap<ThreadId, FocusRecord> => readRecords(doc, FOCUS)
 
 // ── where lanes work ──────────────────────────────────────────────────────
 

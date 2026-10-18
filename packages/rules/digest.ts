@@ -22,6 +22,7 @@ import {
   leftOut,
   transcriptLine,
   transcriptLines,
+  wordCount,
 } from "./request.ts"
 
 // A live digest stores no points, so one that holds them does not decode.
@@ -71,7 +72,6 @@ export const POINT_WORDS = 40
 // it alone is no headline: it would be drawn as one.
 const NOTHING_TO_ADD = "nothing to add"
 
-const words = (text: string): number => text.split(/\s+/).length
 const BULLET = /^[-*] +/
 
 /**
@@ -90,10 +90,10 @@ export function parseDigest(reply: string): DigestBody | null {
     .filter(l => l !== "")
   if (first === undefined || BULLET.test(first)) return null
   const headline = bareLine(first.replace(/^#+\s*/, ""))
-  if (headline === "" || words(headline) > HEADLINE_WORDS) return null
+  if (headline === "" || wordCount(headline) > HEADLINE_WORDS) return null
   if (rest.length > MAX_POINTS || !rest.every(l => BULLET.test(l))) return null
   const points = rest.map(l => l.replace(BULLET, "").trim())
-  if (points.some(p => p === "" || words(p) > POINT_WORDS)) return null
+  if (points.some(p => p === "" || wordCount(p) > POINT_WORDS)) return null
   return { headline, points }
 }
 

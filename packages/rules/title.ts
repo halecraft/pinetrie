@@ -19,10 +19,8 @@ import {
 } from "@pinetrie/core"
 import type { ModelRef } from "./config.ts"
 import {
-  bareLine,
-  fitNewest,
-  LEFT_OUT_NOTE,
-  leftOut,
+  firstAndNewest,
+  oneLine,
   transcriptLine,
   transcriptLines,
 } from "./request.ts"
@@ -121,23 +119,28 @@ export const TITLE_REQUEST_HEAD = "How it began:"
 
 /**
  * The request: the skill, the root's first message always, since it
- * usually says what the thread is for, then the newest that fit.
+ * usually says what the thread is for, then the newest that fit
+ * (`firstAndNewest`).
  */
 export function titleRequest(input: {
   readonly skill: string
   readonly lines: readonly string[]
   readonly budget: number
 }): { readonly system: string; readonly user: string } {
-  const [first, ...rest] = input.lines
-  const head = `${TITLE_REQUEST_HEAD}\n- ${(first ?? "").trim()}\n\n`
-  const room = Math.max(0, input.budget - head.length)
-  const { text, dropped } = fitNewest(rest, room - LEFT_OUT_NOTE)
+  const [first = "", ...rest] = input.lines
+  const head = `${TITLE_REQUEST_HEAD}\n`
+  const label = "\nWhat was said since:\n"
+  const listed = firstAndNewest(
+    first,
+    rest,
+    input.budget - head.length - label.length,
+  )
   return {
     system: input.skill.trim(),
     user:
       rest.length === 0
-        ? head
-        : `${head}What was said since:\n${leftOut(dropped)}${text}`,
+        ? `${head}${listed.first}\n`
+        : `${head}${listed.first}${label}${listed.newest}`,
   }
 }
 
@@ -145,15 +148,14 @@ export function titleRequest(input: {
 const TITLE_WORDS = 5
 
 /**
- * The model's reply as a title (`bareLine`). Null for a reply of more
- * than `TITLE_WORDS` words, or one `parseTitle` refuses (more than one line,
- * or too long): the root keeps its label. It never cuts a reply, which could
- * leave "Fixing the".
+ * The model's reply as a title, one line of at most `TITLE_WORDS` words
+ * (`oneLine`) that `parseTitle` takes; null otherwise, and the root keeps
+ * its label. It never cuts a reply.
  */
 export function replyTitle(reply: string): string | null {
-  const bare = bareLine(reply)
-  if (bare.split(/\s+/).length > TITLE_WORDS) return null
-  const parsed = parseTitle(bare)
+  const line = oneLine(reply, TITLE_WORDS)
+  if (line === null) return null
+  const parsed = parseTitle(line)
   return parsed.kind === "set" ? parsed.title : null
 }
 

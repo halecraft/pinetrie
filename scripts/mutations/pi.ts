@@ -212,7 +212,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a scripted commit message takes from the run's script",
     file: "packages/pi/scripted.ts",
-    from: "    describe: perRequest(describer, context =>\n      describeStep(describe, lastUserText(context)),\n    ),",
+    from: "    describe: perRequest(describer, context =>\n      describeStep(\n        describe,\n        lastUserText(context),\n        options.describe !== undefined,\n      ),\n    ),",
     to: "    describe: run,",
     command: unit,
     expect: "commit messages from a provider of its own",

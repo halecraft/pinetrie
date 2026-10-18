@@ -12,13 +12,18 @@
 // append, and by a run's end the drain queued before it may have moved it
 // to the next ask. So a run's end reads its last entry from its asks, and
 // takes its lane only as the run-end report's key, never to read its tip.
+//
+// A run's end settles once its reply is written, with the ask's final digest
+// (`RunEndSettled`): the thread's focus is asked from that (`focuses.ts`).
 
 import {
+  type DigestRecord,
   type EntryId,
   indexAsks,
   type RootId,
   runPrompt,
   type ThreadId,
+  type ValueWrite,
 } from "@pinetrie/core"
 import type { PiSetup } from "@pinetrie/pi"
 import {
@@ -31,6 +36,7 @@ import {
 import {
   type Answer,
   askLines,
+  DIGEST,
   digestRequest,
   digestToWrite,
   type EndReply,
@@ -46,6 +52,7 @@ import {
   setRecord,
 } from "@pinetrie/rules"
 import type { PresenceDocHandle } from "@pinetrie/schema"
+import { askModel } from "./ask-model.ts"
 import type { Basics } from "./basics.ts"
 import type { Later } from "./later.ts"
 import type { Records } from "./records.ts"
@@ -60,17 +67,49 @@ const DIGEST_BUDGET = 12_000
 /** Where a failure is logged: the caller words it with its thread's name. */
 type Failed = (error: unknown) => void
 
+declare const settledBrand: unique symbol
+
+/**
+ * A run's end, its reply written or failed: what the thread's focus is asked
+ * from (`focuses.ts`). Only `Digests.ended` makes one, so a focus step cannot
+ * run before the run's final digest is written.
+ */
+export interface RunEndSettled {
+  readonly root: RootId
+  readonly lane: ThreadId
+  readonly ask: EntryId
+  /** The ask's final digest as it stands; null for none. */
+  readonly digest: DigestRecord | null
+  readonly [settledBrand]: true
+}
+
 /** A failure goes to `failed`, never to the caller. */
 export interface Digests {
   /** A turn of `lane`'s is done at `at`: a live digest of its ask, when due. */
   step(lane: ThreadId, at: EntryId, failed: Failed): Promise<void>
-  /** That run, in `root`, has ended: its end report and its ask's final digest. */
+  /**
+   * That run, in `root`, has ended: its end report and its ask's final
+   * digest. Settles once its reply is written, or its request failed,
+   * with what it settled.
+   */
   ended(
     root: RootId,
     lane: ThreadId,
     prompt: EntryId,
     failed: Failed,
-  ): Promise<void>
+  ): Promise<RunEndSettled>
+}
+
+/** The digest a run's end wrote among `writes`, else the one stored; null for none. */
+function settledDigest(
+  writes: readonly ValueWrite[],
+  stored: DigestRecord | undefined,
+): DigestRecord | null {
+  const write = writes.find(w => w.namespace === DIGEST.namespace)
+  if (write === undefined) return stored ?? null
+  return write.kind === "set"
+    ? (DIGEST.decode(write.value, write.key) ?? null)
+    : null
 }
 
 /**
@@ -117,33 +156,34 @@ export function createDigests(deps: {
    * The model's reply to a request for `answer`, read; null when the skill
    * is missing or the request failed. A half it refused is logged.
    */
-  async function askModel(
+  async function askDigest(
     ask: EntryId,
     request: Omit<Parameters<typeof digestRequest>[0], "skill" | "budget">,
   ): Promise<EndReply | null> {
-    const skill = await deps.piSetup.skill("pinetrie:skill:ask-digest")
-    if (skill === null) {
-      basics.log("[host] no ask-digest skill")
-      return null
-    }
-    const { text: reply, tokens } = await deps.piSetup.complete(
-      digestRequest({
-        ...request,
-        skill: skill.content,
-        budget: DIGEST_BUDGET,
-      }),
+    const { value, tokens } = await askModel(
+      { piSetup: deps.piSetup, log: basics.log },
+      {
+        skill: "pinetrie:skill:ask-digest",
+        request: skill =>
+          digestRequest({ ...request, skill, budget: DIGEST_BUDGET }),
+        parse: reply => {
+          const read = parseEndReply(reply, request.answer)
+          return {
+            value: read,
+            refused: [
+              ...(request.answer !== "urgency" && read.digest === null
+                ? ["digest"]
+                : []),
+              ...(request.answer !== "digest" && read.urgency === null
+                ? ["urgency line"]
+                : []),
+            ],
+          }
+        },
+      },
     )
     deps.spent?.(ask, tokens)
-    if (reply === null) return null
-    const read = parseEndReply(reply, request.answer)
-    const refused = (half: string) =>
-      basics.log(
-        `[host] the model's ${half} is not one: ${JSON.stringify(reply)}`,
-      )
-    if (request.answer !== "urgency" && read.digest === null) refused("digest")
-    if (request.answer !== "digest" && read.urgency === null)
-      refused("urgency line")
-    return read
+    return value
   }
 
   /** One step: gather, decide with `planDigest`, and ask outside the queue. */
@@ -179,7 +219,7 @@ export function createDigests(deps: {
           held: { set: asking, key: ask },
           failed,
           request: async () => {
-            const read = await askModel(ask, {
+            const read = await askDigest(ask, {
               answer: "digest",
               ask: plan.said,
               work: plan.work,
@@ -210,13 +250,17 @@ export function createDigests(deps: {
    * decide, and ask outside the queue for the rest. The request's settle
    * runs even when it failed, so a run-end report asked for never stays pending.
    */
-  const ended = (
+  const ended = async (
     root: RootId,
     lane: ThreadId,
     prompt: EntryId,
     failed: Failed,
-  ) =>
-    later
+  ): Promise<RunEndSettled> => {
+    let digest: DigestRecord | null = null
+    // The settle is a step of its own on the same keeper: kept here, and
+    // waited for after this step, never inside it.
+    let settling: Promise<void> = Promise.resolve()
+    await later
       .step(
         { kind: "thread", thread: lane },
         "a run's end report",
@@ -225,6 +269,7 @@ export function createDigests(deps: {
           const index = readTreeIndex(doc)
           const asks = indexAsks(index)
           const end = asks.last.get(prompt) ?? prompt
+          digest = readDigests(doc).get(prompt) ?? null
           const plan = planRunEnded({
             current:
               readRunEndReports(basics.session).get(lane)?.ask === prompt,
@@ -253,13 +298,13 @@ export function createDigests(deps: {
           const { request } = plan
           if (request !== null) {
             const answer: Answer = request.answer
-            void later.outside({
+            settling = later.outside({
               scope: { kind: "thread", thread: lane },
               what: "a run's end report",
               held: { set: asking, key: prompt },
               failed,
               request: async () => {
-                const reply = await askModel(prompt, {
+                const reply = await askDigest(prompt, {
                   answer,
                   ask: request.lines.said,
                   work: request.lines.work,
@@ -273,22 +318,22 @@ export function createDigests(deps: {
                 return { reply }
               },
               plan: async ({ reply }, roots) => {
-                const now = await roots.root(root)
-                return {
-                  records: runEndedToWrite({
-                    root,
-                    lane,
-                    ask: prompt,
-                    end,
-                    answer,
-                    stored: {
-                      report: readRunEndReports(basics.session).get(lane),
-                      digest: readDigests(now).get(prompt),
-                    },
-                    reply,
-                    at: basics.now(),
-                  }),
-                }
+                const stored = readDigests(await roots.root(root)).get(prompt)
+                const records = runEndedToWrite({
+                  root,
+                  lane,
+                  ask: prompt,
+                  end,
+                  answer,
+                  stored: {
+                    report: readRunEndReports(basics.session).get(lane),
+                    digest: stored,
+                  },
+                  reply,
+                  at: basics.now(),
+                })
+                digest = settledDigest(records, stored)
+                return { records }
               },
             })
           }
@@ -307,6 +352,9 @@ export function createDigests(deps: {
         },
       )
       .catch(failed)
+    await settling
+    return { root, lane, ask: prompt, digest } as RunEndSettled
+  }
 
   return { step: live, ended }
 }

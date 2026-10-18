@@ -47,6 +47,7 @@ export { createScribe, type Scribe } from "./scribe.ts"
 export {
   type Held,
   SCRIPTED_DESCRIPTION,
+  SCRIPTED_FOCUS,
   SCRIPTED_URGENCY,
   type ScriptedModel,
   type ScriptStep,

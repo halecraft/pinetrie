@@ -181,6 +181,7 @@ describe("lanesAlong", () => {
 const PROJECT: ProjectRecord = { root: "/p", kind: "jj", owner: null }
 const work = (over: Partial<WorkFacts> = {}): WorkFacts => ({
   project: PROJECT,
+  focuses: new Map(),
   commands: [],
   lanes: new Map(),
   revisions: new Map(),
@@ -319,6 +320,29 @@ describe("columnView: the header", () => {
     })
     expect(columnView(facts(1)).identity).toEqual({ kind: "none" })
   })
+  test("a thread with a focus shows it in its header", () => {
+    const focuses = new Map([
+      [
+        B,
+        {
+          thread: B,
+          focus: "Planning the billing page",
+          ask: entryId("b1"),
+          at: 1,
+        },
+      ],
+    ])
+    const shows = columnView(
+      facts(1, {
+        lane: onLane(laneView(B, "b2")),
+        work: work({ revisions: OWNERS, names: NAMES, focuses }),
+      }),
+    )
+    expect(shows.identity).toMatchObject({
+      kind: "agent",
+      focus: { kind: "model", text: "Planning the billing page" },
+    })
+  })
   test("a lane about to start is named by its thread's id, and only while the next send creates it", () => {
     const sha = "a".repeat(64) as Sha256
     const banners = new Map([[B, { lane: B, sha, at: 1 }]])
@@ -333,6 +357,7 @@ describe("columnView: the header", () => {
     expect(about({ createsLane: true }).identity).toEqual({
       kind: "agent",
       name: COPPER,
+      focus: null,
       details: {
         open: false,
         started: null,
@@ -1271,6 +1296,7 @@ describe("identityWords", () => {
       {
         kind: "agent",
         name: "amber-fox" as ThreadName,
+        focus: null,
         icon: null,
         details: {
           open: false,

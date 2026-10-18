@@ -21,7 +21,7 @@ import {
   writeEntry,
   writeLaneTip,
 } from "@pinetrie/schema/fixtures"
-import { expect, test } from "vitest"
+import { expect, test, vi } from "vitest"
 import { createDigests, writePendingRunEndReport } from "./digests.ts"
 import {
   archiveCanvas,
@@ -327,6 +327,25 @@ test("at a run's end, one request for the urgency line and the final digest, wri
   )
 })
 
+test("ended settles once its run-end reply is written, with its digest", async () => {
+  const { pi, digests } = await stopping(
+    "done\nFixed the rail.\n- `rail.tsx` draws it",
+  )
+  const settled = await digests.ended(ROOT_ID, lane, entryId("e-1"), failed)
+  expect(methods(pi.calls).at(-1)).toBe("writeValues")
+  expect(settled).toMatchObject({
+    root: ROOT_ID,
+    lane,
+    ask: entryId("e-1"),
+    digest: {
+      prompt: entryId("e-1"),
+      headline: "Fixed the rail",
+      points: ["`rail.tsx` draws it"],
+      final: true,
+    },
+  })
+})
+
 test("with digests off, a run's end asks for its urgency line alone, and no live digest is asked", async () => {
   const { pi, keeper, digests, read } = await stopping("done", false)
   read()
@@ -415,7 +434,9 @@ test("the scripted model answers a run's end with an urgency line and a digest, 
 test("a run's end answered after its canvas was archived writes nothing and opens no root", async () => {
   const answer = Promise.withResolvers<string | null>()
   const { b, pi, keeper, digests } = await stopping(answer.promise)
-  await digests.ended(ROOT_ID, lane, entryId("e-1"), failed)
+  // It settles only once the answer is written, so it is not awaited here.
+  const ending = digests.ended(ROOT_ID, lane, entryId("e-1"), failed)
+  await vi.waitFor(() => expect(methods(pi.calls)).toContain("complete"))
   // What the late step opens, from here on.
   const opened: unknown[] = []
   const root = b.roots.root
@@ -427,6 +448,7 @@ test("a run's end answered after its canvas was archived writes nothing and open
   // Its canvas is archived while the model writes.
   archiveCanvas(b)
   answer.resolve("done\nFixed the rail.\n- `rail.tsx` draws it")
+  await ending
   await keeper.idle()
   expect([writtenValues(pi.calls).length, opened]).toEqual([written, []])
 })

@@ -66,6 +66,7 @@ import {
   earlierWords,
   endTraces,
   type FoldMemory,
+  focusTitle,
   gridKeyAct,
   type HeadIcon,
   type HeadIdentity,
@@ -1021,6 +1022,16 @@ export function Column(p: ColumnProps) {
                 />
               )}
             </div>
+            {shows.identity.kind === "agent" &&
+              shows.identity.focus !== null && (
+                <div
+                  className="head-focus"
+                  data-kind={shows.identity.focus.kind}
+                  title={focusTitle(shows.identity.focus)}
+                >
+                  {shows.identity.focus.text}
+                </div>
+              )}
             <Origin onLink={openLink} onOpen={openAt} origin={shows.origin} />
             {agentsLine !== null && (
               // Other threads' agents in this thread, and what agents

@@ -84,6 +84,7 @@ export function CanvasColumn(p: {
       >
         <FoldedStrip
           detail={pinnedCountWords(p.pins.length)}
+          hint={null}
           mark={NO_MARK}
           name={view.label}
           onUnfold={() => fold(true)}

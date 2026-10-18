@@ -496,6 +496,14 @@ export const mutations: readonly Mutation[] = [
     expect: "historyWords",
   },
   {
+    name: "the header ignores a thread's focus",
+    file: "packages/interface/thread-face.ts",
+    from: '  if (record !== undefined) return { kind: "model", text: record.focus }\n',
+    to: "",
+    command: unit,
+    expect: "a thread with a focus shows it in its header",
+  },
+  {
     name: "a story ask's summary goes before its work, not after its first fold",
     file: "packages/interface/ask-fold.ts",
     from: '        ? { kind: "fold", fold: firstFold }\n',

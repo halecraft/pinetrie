@@ -36,19 +36,34 @@ export function foldedView(
   }
 }
 
-/** A folded column's words: its title, and what it holds under it, or null. */
+/**
+ * A folded column's words: its title, what it holds under it, or null, and
+ * what its strip's tooltip says before how to unfold it: a thread's focus.
+ */
 interface FoldedWords {
   readonly title: string
   readonly detail: string | null
+  readonly hint: string | null
 }
 
 export const foldedWords = (face: FoldedFace): FoldedWords =>
   face.kind === "thread"
-    ? { title: face.name ?? UNNAMED_THREAD, detail: null }
+    ? {
+        title: face.name ?? UNNAMED_THREAD,
+        detail: null,
+        hint: face.focus?.text ?? null,
+      }
     : {
         title: face.title,
         detail: face.notes === null ? null : noteCountWords(face.notes),
+        hint: null,
       }
+
+/** A folded strip's tooltip: its hint, then how to unfold it. */
+export const stripTitle = (
+  unfold: ControlWords,
+  hint: string | null,
+): string => (hint === null ? unfold.title : `${hint}\n${unfold.title}`)
 
 /**
  * What heads a folded strip above its name: a thread's mark (its icon, or ✦

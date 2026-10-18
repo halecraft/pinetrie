@@ -1368,6 +1368,15 @@ composer*).
   the faces and the list share. `ThreadIcon.kind` says how it is drawn: a
   `banner` on black, blended off; a `built-in` sprite on a transparent
   ground, unblended.
+- **The header's focus is its named agent's thread's, by type** (ADR-0173):
+  `HeadIdentity`'s `agent` case carries `focus`, as it carries its icon,
+  so a chat or a pending column has none. `threadFocus` (`thread-face.ts`)
+  is the one place its words are decided: the thread's `FocusRecord`, a
+  model's (`kind: "model"`), else the first line of how the thread began
+  (`threadOpening`, `kind: "opening"`), else null. The header, a thread's
+  preview and the folded strip's tooltip (`stripTitle`) take it, and
+  `focusTitle` words its tooltip. `ThreadFace.first` is `threadOpening`
+  too, never computed again.
 - **The header's icon is its named agent's, by type**: `HeadIdentity`'s
   `agent` case carries it, as it carries `details`, so a pending or absent
   identity cannot have one. `identityOf` makes it from `headLane`'s lane
@@ -1739,8 +1748,8 @@ docked left, centre or right by this device's choice (`inventory-dock.ts`,
   A click selects; Enter, or a click on the card already selected, opens it
   whole in place, which is the panel's state, so the preview can hide.
 - **A thread's card is drawn by its face** (`thread-face.ts`, ADR-0124):
-  `threadFace` (name, icon, first line, the first line of where it ended,
-  stopped, cards queued), a case of `Face`; opened, `threadPreview`, its
+  `threadFace` (name, icon, first line, focus, the first line of where it
+  ended, stopped, cards queued), a case of `Face`; opened, `threadPreview`, its
   path read only, a `ThreadPreview` that no composer, dock or queue takes.
 - **Two layers**: the host's records say which cards are in your
   inventory, and your inventory document which slot holds each. The session

@@ -314,6 +314,11 @@
       .thread-details-start { align-self: flex-start; padding: 0; border: none; border-radius: 0;
         background: none; color: #7f8896; text-decoration: underline; cursor: pointer; }
       .thread-details-start:hover, .thread-details-start:focus-visible { color: #d0d4da; }
+      /* What the thread is doing now (ADR-0173): one line, cut, the whole of
+         it in its title; dimmed while it is only how the thread began. */
+      .column-head .head-focus { display: block; min-width: 0; overflow: hidden;
+        text-overflow: ellipsis; white-space: nowrap; color: #c9d3dc; }
+      .column-head .head-focus[data-kind="opening"] { color: #7f8896; }
       .column-head .origin { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis;
         white-space: nowrap; text-align: left; font-size: .75rem; color: #7f8896; }
       .column-head .origin:hover, .column-head .origin:focus-visible { color: #d0d4da; }
@@ -1075,8 +1080,9 @@
       .thread-face-sprite { width: 1.1rem; height: 1.1rem; }
       .thread-face-sprite[data-kind="banner"] { image-rendering: pixelated; }
       .thread-face-name { font-weight: 600; color: #d2a8ff; }
-      .thread-face-first, .thread-face-last { color: #c9d1d9; white-space: nowrap;
-        overflow: hidden; text-overflow: ellipsis; }
+      .thread-face-first, .thread-face-last, .thread-face-focus { color: #c9d1d9;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .thread-face-focus { color: #e6edf3; }
       .thread-face-last { color: #8b93a1; }
       .thread-face-status { margin-top: auto; color: #e3b341; }
       .thread-preview { flex: 1; display: flex; flex-direction: column; max-height: 24rem;

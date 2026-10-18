@@ -22,7 +22,11 @@ import {
   type TranscriptContext,
 } from "@earendil-works/pi-ai"
 import type { ToolId } from "@pinetrie/core"
-import { URGENCY_ALONE, URGENCY_THEN_DIGEST } from "@pinetrie/rules"
+import {
+  FOCUS_REQUEST_HEAD,
+  URGENCY_ALONE,
+  URGENCY_THEN_DIGEST,
+} from "@pinetrie/rules"
 
 /**
  * One scripted reply: text; text made from the context the model was given,
@@ -78,11 +82,22 @@ export const SCRIPTED_DESCRIPTION = "proposed changes: scripted"
 /** What a scripted model says of a run's end: nothing is needed. */
 export const SCRIPTED_URGENCY = "done"
 
+/** What a scripted model says of a thread's focus: keep it, so a suite names none it did not ask for. */
+export const SCRIPTED_FOCUS = "same"
+
 /**
  * A describe request's answer: `describe`, with the urgency line first when
- * the request is a run's end, which asks for it (`digestRequest`).
+ * the request is a run's end, which asks for it (`digestRequest`). A focus
+ * request (`focusRequest`) is answered `same`, unless the scenario gave a
+ * `describe` of its own, which answers it.
  */
-function describeStep(describe: ScriptStep, asked: string): ScriptStep {
+function describeStep(
+  describe: ScriptStep,
+  asked: string,
+  own: boolean,
+): ScriptStep {
+  if (!own && asked.startsWith(FOCUS_REQUEST_HEAD))
+    return { text: SCRIPTED_FOCUS }
   if (asked.includes(URGENCY_ALONE)) return { text: SCRIPTED_URGENCY }
   if (asked.includes(URGENCY_THEN_DIGEST) && "text" in describe)
     return { text: `${SCRIPTED_URGENCY}\n${describe.text}` }
@@ -151,7 +166,11 @@ export function scriptedModel(
   handles.set(model, {
     run,
     describe: perRequest(describer, context =>
-      describeStep(describe, lastUserText(context)),
+      describeStep(
+        describe,
+        lastUserText(context),
+        options.describe !== undefined,
+      ),
     ),
   })
   return model

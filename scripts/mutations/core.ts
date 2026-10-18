@@ -1270,8 +1270,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a core module mints an entry id",
     file: asks,
-    from: 'import { atEntry, type EntryId, type WriterId } from "./ids.ts"',
-    to: 'import { atEntry, type EntryId, entryId, type WriterId } from "./ids.ts"\nexport const minted = entryId("x")',
+    from: 'import { atEntry, type EntryId, type ThreadId, type WriterId } from "./ids.ts"',
+    to: 'import { atEntry, type EntryId, entryId, type ThreadId, type WriterId } from "./ids.ts"\nexport const minted = entryId("x")',
     command: ["pnpm", "exec", "biome", "lint", asks],
     expect: "Mint an id only where it enters",
   },

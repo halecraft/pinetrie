@@ -2,13 +2,14 @@ import {
   type CardPlace,
   canvasIdFor,
   cardIdOfKind,
+  entryId,
   NO_CONTENT,
   type NoteColumnCard,
   type TextCard,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
+import { cardIdFor, threadOfEntry } from "@pinetrie/core/fixtures"
 import type { NoteCard } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
 import type { Column } from "./columns.ts"
@@ -23,7 +24,12 @@ import {
 import { tree } from "./fixtures.ts"
 import { foldedMark, foldedView, foldedWords } from "./folded-column-view.ts"
 import { gridView } from "./grid-view.ts"
-import { type ThreadFace, threadFace } from "./thread-face.ts"
+import {
+  focusTitle,
+  type ThreadFace,
+  threadFace,
+  threadFocus,
+} from "./thread-face.ts"
 import { builtInIconUrl, threadIcon } from "./thread-icon.ts"
 
 const ADA = writerId("ada@x.test")
@@ -62,6 +68,7 @@ const threadFaceOfT: ThreadFace = threadFace({
   index: tree({ "1-r": null }),
   lanes: [],
   names: new Map([[T, "amber-fox" as never]]),
+  focuses: new Map(),
   iconFor: () => null,
 })
 const facts: FaceFacts = {
@@ -146,10 +153,12 @@ describe("cardFace", () => {
     expect(thread === null ? null : foldedWords(thread)).toEqual({
       title: "amber-fox",
       detail: null,
+      hint: null,
     })
     expect(folded === null ? null : foldedWords(folded)).toEqual({
       title: "Ideas",
       detail: "2 notes",
+      hint: null,
     })
   })
 })
@@ -161,6 +170,7 @@ test("a thread's face carries its icon, a chat's with no lane included", () => {
     index: tree({ "1-r": null }),
     lanes: [],
     names,
+    focuses: new Map(),
     iconFor: thread =>
       threadIcon({
         thread,
@@ -213,6 +223,37 @@ describe("cardDetail", () => {
     }
     expect(Object.keys(DETAIL_ON).length).toBeGreaterThan(
       Object.keys(missing).length,
+    )
+  })
+})
+
+describe("threadFocus", () => {
+  const index = tree({ "1-r": null })
+  const F = threadOfEntry("1-r")
+  test("a thread with a focus says it, a model's", () => {
+    expect(
+      threadFocus({
+        focuses: new Map([
+          [
+            F,
+            { thread: F, focus: "Fixing the rail", ask: entryId("1-r"), at: 1 },
+          ],
+        ]),
+        index,
+        thread: F,
+      }),
+    ).toEqual({ kind: "model", text: "Fixing the rail" })
+  })
+  test("a thread with none shows its first message's first line, not as a model's", () => {
+    expect(threadFocus({ focuses: new Map(), index, thread: F })).toEqual({
+      kind: "opening",
+      text: "1-r",
+    })
+    expect(
+      threadFocus({ focuses: new Map(), index: tree({}), thread: F }),
+    ).toBeNull()
+    expect(focusTitle({ kind: "model", text: "Fixing" })).toBe(
+      "Fixing\nwritten by a model",
     )
   })
 })
