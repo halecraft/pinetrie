@@ -43,21 +43,32 @@ import {
   emptyAccess,
   planAccessAsk,
   planAccessChange,
+  planAccessOutside,
   planAccessTimeout,
   planAccessUse,
   setRecord,
 } from "@pinetrie/rules"
 import {
+  type AllowedHost,
+  type AllowedHosts,
+  type CombinedConfig,
+  checkedHostName,
+  combinedConfigText,
   HOP_AGENT_SOCKET,
+  type HostPatterns,
+  hostPatternList,
   identityPaths,
   inlineIncludes,
   LANE_SSH_DIR,
   laneToken,
   missingIncludes,
+  parseResolved,
   planLaneSsh,
+  resolveArgv,
   runProgram,
   SOCKET_ENV,
   type SshHost,
+  type SshName,
   type SshSettings,
   serviceKeyCheck,
   settingsOnHost,
@@ -66,10 +77,11 @@ import {
   startSshHost,
   TOKEN_ENV,
   type UsableServiceKey,
+  writeCombinedConfig,
 } from "@pinetrie/ssh"
 import type { Basics } from "../basics.ts"
 import type { Records } from "../records.ts"
-import { sshLines } from "../startup-lines.ts"
+import { sshLines, sshOutsideLine } from "../startup-lines.ts"
 
 /** Where a lane finds the host's socket. */
 const HOST_SOCKET_IN_LANE = "/run/pinetrie/ssh-host.sock"
@@ -89,9 +101,12 @@ export interface LaneSsh {
   attachedFor(lane: LaneOwner): LaneAttached
   /** The host paths every lane holding an identity mounts. */
   readonly mounts: readonly Mount[]
-  /** What a lane's agent is told it holds: its own grant decides your identity. */
+  /**
+   * What a lane's agent is told it holds: its own grant decides your
+   * identity, named by the hosts it may sign for.
+   */
   holdsFor(lane: LaneOwner): {
-    readonly personal: boolean
+    readonly personal: HostPatterns | null
     readonly services: readonly string[]
   }
   /** `listener` hears a lane whose sessions must end now. */
@@ -102,7 +117,7 @@ export interface LaneSsh {
 const NO_SSH: LaneSsh = {
   attachedFor: () => NOTHING_ATTACHED,
   mounts: [],
-  holdsFor: () => ({ personal: false, services: [] }),
+  holdsFor: () => ({ personal: null, services: [] }),
   onCut: () => {},
   close: async () => {},
 }
@@ -188,6 +203,20 @@ export async function sshSecret(file: string): Promise<Uint8Array> {
 }
 
 /**
+ * The name ssh checks `name`'s host key under, as the combined config
+ * resolves it; null with no ssh, or when `ssh -G` fails.
+ */
+async function resolvedCheckedName(
+  combined: CombinedConfig | null,
+  name: SshName,
+): Promise<string | null> {
+  if (combined === null) return null
+  const ran = await runProgram(resolveArgv(combined, name, null))
+  const resolved = ran.code === 0 ? parseResolved(ran.stdout) : null
+  return resolved === null ? null : checkedHostName(resolved)
+}
+
+/**
  * Lanes' ssh, started before any lane is: the service agent and the host's
  * socket, the lanes' files written. Nothing at all when lanes hold no
  * identity: no personal one, and no usable key in the service folder.
@@ -211,7 +240,7 @@ export async function startLaneSsh(input: {
   const { basics, records, personal: places } = input
   const { log } = basics
 
-  // --- gather -------------------------------------------------------------
+  // --- round 1: the files, and the combined config `ssh -G` reads --------
   const settings: SshSettings = settingsOnHost(sshSettings(input.choice), {
     owner: input.owner !== null,
     agent: places.agent !== null,
@@ -240,20 +269,44 @@ export async function startLaneSsh(input: {
       : null,
   }
   const hasSsh = (await runProgram(["ssh", "-V"])).code === 0
+  const combined = hasSsh
+    ? await writeCombinedConfig(
+        input.dir,
+        combinedConfigText({
+          service: service === null ? null : serviceConfigFile,
+          personal: personal === null ? null : personalConfigFile,
+        }),
+      )
+    : null
 
-  // --- plan ---------------------------------------------------------------
+  // --- round 2: the allowed hosts, as ssh checks their keys ---------------
+  const allowed: AllowedHosts | null =
+    personalSsh.kind === "off"
+      ? null
+      : personalSsh.hosts === "all"
+        ? "all"
+        : await Promise.all(
+            hostPatternList(personalSsh.hosts).map(
+              async (p): Promise<AllowedHost> =>
+                p.kind === "name"
+                  ? {
+                      ...p,
+                      checkedAs: await resolvedCheckedName(combined, p.name),
+                    }
+                  : p,
+            ),
+          )
   const checks = keyFiles.map(serviceKeyCheck)
   const usable = checks.flatMap(c => (c.kind === "usable" ? [c.key] : []))
   const hop = runtimeNode(HOP_IN_LANE).map(shellWord).join(" ")
   const connect = hasSsh ? `${hop} connect` : null
   const files = planLaneSsh(
     { service, personal, pubs, knownHosts },
-    settings.personal,
+    allowed,
     dirs,
     connect,
   )
 
-  // --- execute ------------------------------------------------------------
   const serviceAgent = await startServiceAgent({ dir: input.dir, keys: usable })
   const added: readonly UsableServiceKey[] = serviceAgent?.added ?? []
   for (const line of sshLines({
@@ -262,6 +315,7 @@ export async function startLaneSsh(input: {
     failed: serviceAgent?.failed ?? [],
     added: added.map(k => k.name),
     dropped: files.dropped,
+    unmatched: files.unmatched,
     hasSsh,
     hasAgent: serviceAgent !== null,
   }))
@@ -278,15 +332,6 @@ export async function startLaneSsh(input: {
   for (const [name, pub] of files.keys)
     await writeFile(path.join(laneSsh, "keys", name), `${pub}\n`)
   const secret = await sshSecret(secretFile)
-  const combined = path.join(input.dir, "combined")
-  await writeFile(
-    combined,
-    [
-      ...(service === null ? [] : [`Include ${serviceConfigFile}`]),
-      ...(personal === null ? [] : [`Include ${personalConfigFile}`]),
-      "",
-    ].join("\n"),
-  )
 
   /** Requests held for each lane's owner, each settled as its record changes. */
   const waiting = new Map<ThreadId, ((may: boolean) => void)[]>()
@@ -345,6 +390,13 @@ export async function startLaneSsh(input: {
       const next = planAccessUse(readAccess(lane), use)
       if (next !== null) void write(next)
     },
+    outside: (lane, refusal) => {
+      if (!isThreadId(lane)) return
+      const next = planAccessOutside(readAccess(lane), refusal, basics.now())
+      if (next === null) return
+      void write(next)
+      log(sshOutsideLine(lane, refusal))
+    },
   })
 
   // Every change to a lane's record is carried out here, whoever made it:
@@ -391,7 +443,10 @@ export async function startLaneSsh(input: {
           },
     mounts,
     holdsFor: lane => ({
-      personal: laneMayAsk(lane),
+      personal:
+        personalSsh.kind === "on" && laneMayAsk(lane)
+          ? personalSsh.hosts
+          : null,
       services: added.map(k => k.name),
     }),
     onCut: listener => void cutListeners.push(listener),

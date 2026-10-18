@@ -1481,7 +1481,7 @@ adapter's.
   once written; a step queued while another forks would otherwise carry
   "owed" and fork the lane twice.
 
-## Lanes' ssh (`work/ssh.ts`, ADR-0140)
+## Lanes' ssh (`work/ssh.ts`, ADR-0140, ADR-0170)
 
 - **Its socket's path comes first:** `prepareSshDir` makes its directory
   before the runtime is found, since the Mac's lease names the socket
@@ -1491,7 +1491,12 @@ adapter's.
 - **A lane is given ssh only if it holds an identity:** a usable service
   key, or the person's own, which your config grants, or the project
   does and the lane's own config keeps (`laneMayAsk`). Its agent is told
-  the same (`holdsFor`).
+  the same, and the hosts your identity may sign for (`holdsFor`).
+- **Two rounds at start** (ADR-0170): the files are read and the combined
+  config written, which `ssh -G` needs; then each name your
+  `lanes.ssh.hosts` allows is resolved to the name ssh checks its key
+  under, before the lane's files are planned. A name with no key in your
+  `known_hosts` is said in the log.
 - **The record is the one truth.** The relay asks `mayUsePersonal`: an
   approved lane signs, a refused one does not, and anything else writes
   `waiting` and holds the signature until the record changes or
@@ -1499,8 +1504,14 @@ adapter's.
   writes the record; a subscription to the session's records carries out
   each change (`planAccessChange`): release, refuse, or cut, which closes
   the lane's connections through the host and runs `KILL_SSH` in it.
+- **A signature refused for a host outside your allowed ones** is written
+  to the lane's record (`planAccessOutside`) and logged, once each time
+  its host or key changes, so a lane that retries writes nothing
+  (ADR-0170).
 - **A starting host leaves nothing waiting** (`recover`,
   `planAccessRecovery`): a held signature goes with the host that held it.
+  It also clears a refusal for a host outside, since your allowed hosts
+  are read again then.
 - **Shutdown** is part of lane work's close (`"work"`): every waiting
   signature is refused, each ask's deadline cleared, the socket and the
   service agent closed, and the socket's directory removed.

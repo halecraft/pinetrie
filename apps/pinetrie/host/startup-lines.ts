@@ -10,6 +10,7 @@ import type {
   ConfigOrigin,
   ConfigRefusal,
   ModelLine,
+  ThreadId,
 } from "@pinetrie/core"
 import {
   fileStateWords,
@@ -19,7 +20,9 @@ import {
 } from "@pinetrie/interface"
 
 import type {
+  AllowedHost,
   DroppedIdentity,
+  OutsideRefusal,
   PersonalOff,
   ServiceKeyCheck,
   ServiceKeyRefusal,
@@ -144,6 +147,8 @@ export function sshLines(facts: {
   /** The service identities the agent holds. */
   readonly added: readonly string[]
   readonly dropped: readonly DroppedIdentity[]
+  /** The allowed names and wildcards that kept no line of the person's `known_hosts`. */
+  readonly unmatched: readonly AllowedHost[]
   readonly hasSsh: boolean
   readonly hasAgent: boolean
 }): readonly string[] {
@@ -177,6 +182,7 @@ export function sshLines(facts: {
       d =>
         `[host] ${d.side === "service" ? "the service" : "your"} ssh config's IdentityFile ${d.file} is not given to lanes: ${DROPPED[d.why]}`,
     ),
+    ...(personal.kind === "on" ? facts.unmatched.map(unmatchedLine) : []),
     ...(holds.length > 0 && !facts.hasSsh
       ? [
           "[host] this host has no ssh: lanes connect directly, without your ssh config's names",
@@ -189,6 +195,18 @@ export function sshLines(facts: {
       : []),
   ]
 }
+
+const unmatchedLine = (host: AllowedHost): string =>
+  host.kind === "name" && host.checkedAs !== null
+    ? `[host] lanes.ssh.hosts: ${host.name} has no key in your known_hosts (ssh checks it as ${host.checkedAs}), so your identity signs for it nowhere; ssh there once from this machine`
+    : `[host] lanes.ssh.hosts: ${host.kind === "name" ? host.name : host.pattern} matches no line of your known_hosts, so your identity signs for it nowhere`
+
+/** What the host says when a lane's personal signature is refused for a host not allowed. */
+export const sshOutsideLine = (
+  lane: ThreadId,
+  refusal: OutsideRefusal,
+): string =>
+  `[host] lane ${lane}: your ssh identity can't sign for ${refusal.host ?? "a host"}${refusal.key === null ? "" : ` (${refusal.key})`}: its host key is outside lanes.ssh.hosts`
 
 /** A start-up phase that took a second or more, worded; a quicker one says nothing. */
 const startupPhaseLine = (what: string, ms: number): string | null =>

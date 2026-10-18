@@ -10,13 +10,13 @@ test("laneFacts: a lane is told each grant its config holds", () => {
   const facts = (grants: LaneGrants) =>
     laneFacts({
       grants,
-      ssh: { personal: false, services: [] },
+      ssh: { personal: null, services: [] },
       shared: [],
       defaultImage: false,
       kind: "jj",
     }).grants
   expect(facts(NO_GRANTS)).toEqual({
-    ssh: { personal: false, services: [] },
+    ssh: { personal: null, services: [] },
     nestedDockerNote: null,
     env: [],
     mounts: [],
@@ -34,7 +34,7 @@ test("laneFacts: a lane is told each grant its config holds", () => {
       mounts: [mount("/data"), mount("/ref")],
     }),
   ).toEqual({
-    ssh: { personal: false, services: [] },
+    ssh: { personal: null, services: [] },
     nestedDockerNote: nestedLaneDockerNote,
     env: ["CI", "NPM_TOKEN"],
     mounts: ["/data", "/ref"],

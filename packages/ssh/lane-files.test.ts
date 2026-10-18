@@ -1,17 +1,20 @@
 import { describe, expect, test } from "vitest"
 import {
+  type AllowedHosts,
   hashedHostMatches,
   identityRef,
   keyFileName,
+  knownHostsName,
   laneKnownHosts,
   planLaneSsh,
   type SshSources,
 } from "./lane-files.ts"
+import { hostPatternList } from "./patterns.ts"
 
 const DIRS = { home: "/home/d", service: "/home/d/.config/pinetrie/ssh" }
 const DEPLOY_PUB = "ssh-ed25519 AAAAdeploy deploy"
 const ME_PUB = "ssh-ed25519 AAAAme d@mac"
-const ON = { kind: "on", hosts: "all", own: false } as const
+const ON: AllowedHosts = "all"
 const CONNECT =
   "/pinetrie-runtime/node/node /pinetrie/packages/ssh/hop.ts connect"
 
@@ -22,6 +25,15 @@ const sources = (over: Partial<SshSources>): SshSources => ({
   knownHosts: { service: null, personal: null },
   ...over,
 })
+
+/** `patterns` as the host resolves them, each name's checked name from `checked`. */
+const allowed = (
+  patterns: readonly string[],
+  checked: Readonly<Record<string, string>> = {},
+): AllowedHosts =>
+  hostPatternList(patterns).map(p =>
+    p.kind === "name" ? { ...p, checkedAs: checked[p.name] ?? null } : p,
+  )
 
 // A real line, hashed by `ssh-keygen -H` from `pop.lan ssh-ed25519 …`.
 const KEY =
@@ -133,7 +145,7 @@ describe("planLaneSsh", () => {
   test("personal blocks are left out when personal identity is off", () => {
     const { config } = planLaneSsh(
       sources({ personal: "Host pop\n  HostName 192.168.1.2" }),
-      { kind: "off", why: "not-granted" },
+      null,
       DIRS,
       CONNECT,
     )
@@ -173,8 +185,8 @@ describe("known hosts", () => {
 
   test("narrowed, a hashed line is kept for a concrete name and not for a wildcard", () => {
     const files = { service: null, personal: HASHED }
-    expect(laneKnownHosts(files, ["pop.lan"]).text).toContain(KEY)
-    expect(laneKnownHosts(files, ["*.lan"]).text).toBe("")
+    expect(laneKnownHosts(files, allowed(["pop.lan"])).text).toContain(KEY)
+    expect(laneKnownHosts(files, allowed(["*.lan"])).text).toBe("")
   })
 
   test("narrowed, personal identity may sign only for the person's kept keys", () => {
@@ -183,7 +195,7 @@ describe("known hosts", () => {
         service: "git.internal ssh-ed25519 AAAAgit",
         personal: "pop ssh-ed25519 AAAApop\nother ssh-ed25519 AAAAother",
       },
-      ["pop"],
+      allowed(["pop"]),
     )
     expect(facts.personal).toEqual(new Set(["AAAApop"]))
     expect(facts.names.get("AAAAgit")).toBe("git.internal")
@@ -192,7 +204,7 @@ describe("known hosts", () => {
   test("a port's bracketed entry is named by its host", () => {
     const { facts } = laneKnownHosts(
       { service: null, personal: "[pop]:2222 ssh-ed25519 AAAApop" },
-      ["pop"],
+      allowed(["pop"]),
     )
     expect(facts.names.get("AAAApop")).toBe("pop")
   })
@@ -206,12 +218,84 @@ describe("known hosts", () => {
     expect(facts.personal).toBe("all")
   })
 
+  test("an allowed alias keeps the lines under its checked name", () => {
+    const { text, facts, unmatched } = laneKnownHosts(
+      {
+        service: null,
+        personal:
+          "192.168.1.2 ssh-ed25519 AAAAhq\n[10.0.0.9]:2222 ssh-ed25519 AAAAbox\nother ssh-ed25519 AAAAother",
+      },
+      allowed(["hql", "box"], { hql: "192.168.1.2", box: "[10.0.0.9]:2222" }),
+    )
+    expect(text).toBe(
+      "192.168.1.2 ssh-ed25519 AAAAhq\n[10.0.0.9]:2222 ssh-ed25519 AAAAbox\n",
+    )
+    expect(facts.personal).toEqual(new Set(["AAAAhq", "AAAAbox"]))
+    expect(unmatched).toEqual([])
+  })
+
+  test("a hashed line under an alias's checked name is kept", () => {
+    const { text } = laneKnownHosts(
+      { service: null, personal: HASHED },
+      allowed(["lan-pop"], { "lan-pop": "pop.lan" }),
+    )
+    expect(text).toContain(KEY)
+  })
+
+  test("a hashed line for one name of a comma list is kept", () => {
+    const { text } = laneKnownHosts(
+      { service: null, personal: HASHED },
+      allowed(["git.lan,pop.lan"]),
+    )
+    expect(text).toContain(KEY)
+  })
+
+  test("a pattern that keeps no line is unmatched", () => {
+    const { unmatched } = laneKnownHosts(
+      { service: null, personal: "pop ssh-ed25519 AAAApop" },
+      allowed(["pop", "hql", "*.lan"], { hql: "192.168.1.2" }),
+    )
+    expect(unmatched).toEqual([
+      { kind: "name", name: "hql", checkedAs: "192.168.1.2" },
+      { kind: "wild", pattern: "*.lan" },
+    ])
+  })
+
+  test("a key no kept line names is named by the person's known_hosts", () => {
+    const { facts } = laneKnownHosts(
+      { service: null, personal: "192.168.1.2 ssh-ed25519 AAAAhq" },
+      allowed(["pop"]),
+    )
+    expect(facts.personal).toEqual(new Set())
+    expect(facts.names.get("AAAAhq")).toBe("192.168.1.2")
+  })
+
+  test("a host on another port is checked as [name]:port", () => {
+    expect(knownHostsName("192.168.1.2", 22)).toBe("192.168.1.2")
+    expect(knownHostsName("192.168.1.2", 2222)).toBe("[192.168.1.2]:2222")
+  })
+
   test("with personal identity off, the person's file is not read", () => {
     expect(
       laneKnownHosts({ service: null, personal: "b ssh-ed25519 AAAAb" }, null)
         .text,
     ).toBe("")
   })
+})
+
+test("a pinned block says IdentitiesOnly once", () => {
+  const { config } = planLaneSsh(
+    sources({
+      personal:
+        "Host pop\n  IdentitiesOnly yes\n  IdentityFile ~/.ssh/id_ed25519\nHost web\n  IdentitiesOnly no",
+      pubs: new Map([["/home/d/.ssh/id_ed25519", ME_PUB]]),
+    }),
+    ON,
+    DIRS,
+    CONNECT,
+  )
+  expect(config.match(/IdentitiesOnly/g)).toHaveLength(2)
+  expect(config).toContain("Host web\n  IdentitiesOnly no")
 })
 
 test("a lane's personal IdentityFile keeps its own public key", () => {

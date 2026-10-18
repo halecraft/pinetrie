@@ -30,8 +30,18 @@ import {
 import type { UsableServiceKey } from "./keys.ts"
 import type { HostKeyFacts } from "./lane-files.ts"
 import { type Run, runProgram } from "./programs.ts"
-import { NEW_CONNECTION, relayStep, withBinding } from "./relay-step.ts"
-import { brokerTarget, parseResolved, resolveArgv } from "./resolve.ts"
+import {
+  NEW_CONNECTION,
+  type OutsideRefusal,
+  relayStep,
+  withBinding,
+} from "./relay-step.ts"
+import {
+  brokerTarget,
+  type CombinedConfig,
+  parseResolved,
+  resolveArgv,
+} from "./resolve.ts"
 import { readLine, socketSide, splice } from "./splice.ts"
 
 /** The host's socket in its directory: named before it listens, for the Mac's lease. */
@@ -50,7 +60,7 @@ export interface SshHostOptions {
   readonly serviceKeys: readonly UsableServiceKey[]
   readonly hostKeys: HostKeyFacts
   /** The file of `Include`s the broker resolves with; null with no broker. */
-  readonly combinedConfig: string | null
+  readonly combinedConfig: CombinedConfig | null
   readonly run?: Run
   /** May `lane` sign with the person's identity, for `host`? Resolves when decided. */
   readonly mayUsePersonal: (
@@ -59,6 +69,8 @@ export interface SshHostOptions {
   ) => Promise<boolean>
   /** A service identity signed, or the broker connected a name, for `lane`. */
   readonly used: (lane: string, use: SshUse) => void
+  /** A personal signature for `lane` refused, unasked: its host is not allowed. */
+  readonly outside: (lane: string, refusal: OutsideRefusal) => void
 }
 
 export type SshUse =
@@ -172,6 +184,9 @@ export async function startSshHost(options: SshHostOptions): Promise<SshHost> {
       switch (step.kind) {
         case "refuse":
           return FAILURE
+        case "outside":
+          options.outside(lane, step.refusal)
+          return FAILURE
         case "list": {
           const seen = new Set<string>()
           return listReply(
@@ -255,10 +270,9 @@ export async function startSshHost(options: SshHostOptions): Promise<SshHost> {
     const ran = await run(
       resolveArgv(options.combinedConfig, line.name, line.port),
     )
-    const target =
-      ran.code === 0
-        ? brokerTarget(parseResolved(ran.stdout))
-        : ({ kind: "refused", why: "unresolved" } as const)
+    const target = brokerTarget(
+      ran.code === 0 ? parseResolved(ran.stdout) : null,
+    )
     if (target.kind === "refused") return refuse(target.why)
     const remote = net.createConnection({
       host: target.host,

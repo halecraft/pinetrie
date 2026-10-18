@@ -16,17 +16,17 @@ OpenSSH behaves was measured there, against OpenSSH 10.0p2.
 
 | module | holds |
 |---|---|
-| `settings.ts` | `lanes.ssh` as the host's config settled it, decided (`sshSettings`); host patterns as written (`parseHostPatterns`); and what the host adds (`settingsOnHost`) |
-| `patterns.ts` | ssh's host patterns (`isHostAllowed`), as OpenSSH's `match_pattern_list` |
+| `settings.ts` | `lanes.ssh` as the host's config settled it, decided (`sshSettings`); host patterns as written, case kept (`parseHostPatterns`); and what the host adds (`settingsOnHost`) |
+| `patterns.ts` | ssh's host patterns, a list's comma lists split once (`hostPatternList`), matched as OpenSSH's `match_pattern_list` (`isHostAllowed`) |
 | `names.ts` | what a lane hands the host, branded once checked: `SshName`, `SshPort`, `LaneToken` |
 | `hop-line.ts` | the first line of a hop's connection, decoded only through a token that checks |
 | `config.ts` | ssh config text: lines, `Host` blocks, `Include`s put in place |
-| `lane-files.ts` | what a lane gets at `/pinetrie-ssh`: its config, `known_hosts` and public keys (`planLaneSsh`), and the host keys personal identity may sign for |
+| `lane-files.ts` | what a lane gets at `/pinetrie-ssh`: its config, `known_hosts` and public keys (`planLaneSsh`), the host keys personal identity may sign for, and the allowed hosts that kept no line; a host as `known_hosts` names it (`knownHostsName`) |
 | `keys.ts` | whether a key pair in the service folder can be a service identity |
 | `wire.ts` | SSH's wire format, which the agent protocol, key blobs and `openssh-key-v1` keys share: one reader, one string encoder |
 | `agent.ts` | the agent protocol: framing, the requests the relay knows, their encoders |
 | `relay-step.ts` | one request's step on one lane's agent connection (`relayStep`), and the sessions bound on it |
-| `resolve.ts` | what the broker does with a name, from `ssh -G`'s answer (`brokerTarget`) |
+| `resolve.ts` | the file of `Include`s `ssh -G` reads (`CombinedConfig`), its answer (`parseResolved`), what the broker does with a name (`brokerTarget`), and the name ssh checks a host's key under (`checkedHostName`) |
 | `splice.ts` | two streams joined both ways with half-close, and a connection's first line |
 | `programs.ts` | the OpenSSH programs the host runs: a runner that never throws, and `startServiceAgent` |
 | `host.ts` | the host's socket (`startSshHost`): the relay and the broker, and `cut` |
@@ -67,6 +67,24 @@ OpenSSH behaves was measured there, against OpenSSH 10.0p2.
   lines. A binding is remembered (`withBinding`) only after an OpenSSH
   agent accepted its signature (S174 item 11), so a lane cannot bind an
   allowed host's key to a session it opened elsewhere.
+- **An allowed name keeps the lines under the name ssh checks its key
+  under** (ADR-0170, S238). The host resolves each name of
+  `lanes.ssh.hosts` with `ssh -G` against the combined config, with no
+  `-p` (it would override the config's `Port`), in the case the person
+  wrote it: ssh matches `Host` as typed. The checked name is the
+  `HostKeyAlias`, else the host name as `[name]:port` off port 22, and a
+  line is kept when an entry equals it, clear or hashed, as well as when a
+  pattern matches it as written. A wildcard is never resolved. Allowing a
+  name allows its server: another alias with the same host key signs too.
+- **A signature refused for a host outside the allowed ones is said,
+  never asked** (ADR-0170). The relay tells it apart (`outside`) from its
+  other refusals and the app records it: `lanes.ssh.hosts` is the owner's
+  answer already. It is named by the host's own `known_hosts`, which names
+  keys the lane is not given, else by the broker's newest name for the
+  lane.
+- **Nothing resolves a name before the combined config is written:** only
+  `writeCombinedConfig` makes a `CombinedConfig`, which `resolveArgv`
+  takes.
 - **A lane's config is written from typed lines.** Only `CARRIED` keywords
   reach it, so a person's `ProxyCommand`, `LocalCommand` or `Match` never
   runs or decides in a lane. Service blocks come first: ssh keeps a
@@ -138,9 +156,15 @@ OpenSSH behaves was measured there, against OpenSSH 10.0p2.
 - **An `Include` inside a block** is read in that block, and ssh returns to
   the block after it: `inlineIncludes` writes the block's header again
   after an included text that opens blocks of its own.
-- **A wildcard never matches a hashed `known_hosts` line:** only a concrete
-  name can be hashed and compared. A host on another port is hashed as
-  `[name]:port`, which a bare name does not match either.
+- **ssh checks a host's key under its `HostKeyAlias` or `HostName`, never
+  the alias typed** (S174 item 8, S238): a person's `known_hosts` names
+  `hql`'s server as `192.168.1.2`. A hashed entry matches only the whole
+  name, `[name]:port` included, so a wildcard never matches one.
+- **ssh lowercases what it prints and records, but matches `Host` as
+  typed** (S238): `ssh -G HQL` does not read a `Host hql` block.
+- **An entry of `lanes.ssh.hosts` may be a comma-separated list,** as a
+  `Host` line's patterns are: split it before matching or hashing
+  (`hostPatternList`).
 - **`@cert-authority` lines** name a CA, not a host's key: narrowed, a host
   that presents a certificate is not among the keys personal identity may
   sign for.

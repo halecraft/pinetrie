@@ -23,6 +23,8 @@ import { type SshHost, type SshHostOptions, startSshHost } from "./host.ts"
 import type { HostKeyFacts } from "./lane-files.ts"
 import { laneToken, type SshName, type SshPort } from "./names.ts"
 import type { Ran } from "./programs.ts"
+import { fingerprint } from "./relay-step.ts"
+import type { CombinedConfig } from "./resolve.ts"
 import { wireString } from "./wire.ts"
 
 const SECRET = Buffer.alloc(32, 3)
@@ -143,6 +145,7 @@ async function host(
     combinedConfig: null,
     mayUsePersonal: async () => false,
     used: () => {},
+    outside: () => {},
     ...over,
   })
   cleanups.push(() => h.close())
@@ -263,6 +266,33 @@ describe("the relay", () => {
     expect(await real.request(encodeSign(sign(MINE)))).toEqual(SIGNATURE)
     expect(asked).toBe(1)
   })
+
+  test("a signature for a host outside is reported, never asked", async () => {
+    const dir = tempDir()
+    const service = await fakeAgent(dir, "service", [])
+    const personal = await fakeAgent(dir, "personal", [MINE])
+    const popKey = Buffer.from("popkey").toString("base64")
+    let asked = 0
+    const outside: unknown[] = []
+    const h = await host({
+      dir,
+      serviceAgent: service.socket,
+      personalAgent: personal.socket,
+      hostKeys: { personal: new Set(), names: new Map([[popKey, "pop"]]) },
+      mayUsePersonal: async () => {
+        asked++
+        return true
+      },
+      outside: (lane, refusal) => outside.push([lane, refusal]),
+    })
+    const lane = await laneAgent(h.socket, "t-a")
+    expect(await lane.request(encodeBind(bind("good")))).toEqual(SUCCESS)
+    expect(await lane.request(encodeSign(sign(MINE)))).toEqual(FAILURE)
+    expect(asked).toBe(0)
+    expect(outside).toEqual([
+      ["t-a", { host: "pop", key: fingerprint(popKey) }],
+    ])
+  })
 })
 
 describe("the host's socket", () => {
@@ -305,6 +335,8 @@ async function bannerServer(banner: string): Promise<number> {
   return typeof address === "object" && address !== null ? address.port : 0
 }
 
+const COMBINED = "/combined" as CombinedConfig
+
 const resolvedRun = (stdout: string) => async (): Promise<Ran> => ({
   code: 0,
   stdout,
@@ -338,7 +370,7 @@ describe("the broker", () => {
     const used: unknown[] = []
     const h = await host({
       dir,
-      combinedConfig: "/combined",
+      combinedConfig: COMBINED,
       run: resolvedRun(`hostname 127.0.0.1\nport ${port}\n`),
       used: (lane, use) => used.push([lane, use]),
     })
@@ -350,7 +382,7 @@ describe("the broker", () => {
     const dir = tempDir()
     const h = await host({
       dir,
-      combinedConfig: "/combined",
+      combinedConfig: COMBINED,
       run: resolvedRun("hostname pop\nport 22\nproxycommand nc %h %p\n"),
     })
     expect(await connectThrough(h, "t-a")).toBe("refused proxycommand\n")
@@ -371,7 +403,7 @@ describe("the hop", () => {
     const port = await bannerServer("SSH-2.0-test\r\n")
     const h = await host({
       dir,
-      combinedConfig: "/combined",
+      combinedConfig: COMBINED,
       run: resolvedRun(`hostname 127.0.0.1\nport ${port}\n`),
     })
     const hop = spawn(process.execPath, [HOP, "connect", "pop", "22"], {
@@ -415,10 +447,14 @@ describe("the hop", () => {
     const port = await bannerServer("SSH-2.0-test\r\n")
     const h = await host({
       dir,
-      combinedConfig: "/combined",
+      combinedConfig: COMBINED,
       run: async (argv): Promise<Ran> =>
         argv.includes("refused")
-          ? { code: 0, stdout: "proxycommand x\n", stderr: "" }
+          ? {
+              code: 0,
+              stdout: "hostname refused\nport 22\nproxycommand x\n",
+              stderr: "",
+            }
           : {
               code: 0,
               stdout: `hostname 127.0.0.1\nport ${port}\n`,

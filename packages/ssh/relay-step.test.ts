@@ -105,7 +105,11 @@ describe("a personal key asks", () => {
 
 describe("with personal hosts narrowed", () => {
   const narrowed = facts({
-    hostKeys: { personal: new Set([b64("popkey")]), names: new Map() },
+    hostKeys: {
+      personal: new Set([b64("popkey")]),
+      names: new Map([[b64("evilkey"), "192.168.1.9"]]),
+    },
+    newestName: "hql",
   })
 
   test("a sign for an allowed host's bound session asks", () => {
@@ -113,23 +117,25 @@ describe("with personal hosts narrowed", () => {
     expect(relayStep(state, signWith("mine"), narrowed).kind).toBe("ask")
   })
 
-  test("a sign for an unbound session is refused", () => {
+  test("a sign for an unbound session is refused as outside, named by the broker", () => {
     expect(relayStep(NEW_CONNECTION, signWith("mine"), narrowed)).toEqual({
-      kind: "refuse",
+      kind: "outside",
+      refusal: { host: "hql", key: null },
     })
   })
 
-  test("a sign for a host key the lane may not use is refused", () => {
+  test("a host key outside the allowed hosts is refused as outside", () => {
     const state = withBinding(NEW_CONNECTION, bindTo("evilkey"))
     expect(relayStep(state, signWith("mine"), narrowed)).toEqual({
-      kind: "refuse",
+      kind: "outside",
+      refusal: { host: "192.168.1.9", key: fingerprint(b64("evilkey")) },
     })
   })
 
-  test("a sign for another session than the one bound is refused", () => {
+  test("a sign for another session than the one bound is refused as outside", () => {
     const state = withBinding(NEW_CONNECTION, bindTo("popkey", "s1"))
-    expect(relayStep(state, signWith("mine", "s2"), narrowed)).toEqual({
-      kind: "refuse",
-    })
+    expect(relayStep(state, signWith("mine", "s2"), narrowed).kind).toBe(
+      "outside",
+    )
   })
 })

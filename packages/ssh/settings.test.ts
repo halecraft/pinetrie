@@ -65,8 +65,8 @@ describe("sshSettings", () => {
   })
 })
 
-test("parseHostPatterns: a list of patterns, lowercased; anything else is null", () => {
-  expect(parseHostPatterns(["POP", " *.lan "])).toEqual(["pop", "*.lan"])
+test("host patterns keep the case they were written in; anything but a list is null", () => {
+  expect(parseHostPatterns(["POP", " *.lan "])).toEqual(["POP", "*.lan"])
   for (const bad of ["pop", ["a b"], [""], [3], null])
     expect(parseHostPatterns(bad)).toBeNull()
 })

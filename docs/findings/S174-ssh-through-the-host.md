@@ -1,7 +1,7 @@
 # S174 — A lane can ssh through a relay and a broker on the host: ssh's own config chooses the key and checks the host key, a relay refuses what it should and tells lanes apart, and a revoke ends sessions within 50 ms
 
 - **Status:** Answered
-- **Led to:** ADR-0140
+- **Led to:** ADR-0140, ADR-0170
 
 **Question.** Can a lane ssh anywhere its host can, with keys that never
 enter the lane? The design under test:

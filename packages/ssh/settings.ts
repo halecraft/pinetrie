@@ -54,8 +54,9 @@ export interface PersonalChoice {
 }
 
 /**
- * Host patterns as written, lowercased; null for anything but a list of
- * non-empty strings without spaces.
+ * Host patterns as written, trimmed; null for anything but a list of
+ * non-empty strings without spaces. Case is kept: ssh matches a `Host` line
+ * against a name as typed, so `ssh -G` must get it in the config's case.
  */
 export function parseHostPatterns(v: unknown): readonly string[] | null {
   if (!Array.isArray(v)) return null
@@ -63,7 +64,7 @@ export function parseHostPatterns(v: unknown): readonly string[] | null {
   for (const p of v) {
     if (typeof p !== "string" || p.trim() === "" || /\s/.test(p.trim()))
       return null
-    patterns.push(p.trim().toLowerCase())
+    patterns.push(p.trim())
   }
   return patterns
 }

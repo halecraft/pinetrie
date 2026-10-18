@@ -293,6 +293,7 @@ const SAMPLES: readonly Sample[] = [
     {
       lane: L,
       personal: { kind: "approved", by: ADA, at: 1 },
+      outside: { host: "hql", key: "SHA256:k", at: 2 },
       services: ["deploy"],
       hosts: ["pop"],
     },

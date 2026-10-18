@@ -161,8 +161,19 @@ changes pine·trie can keep this note true. You can skip them.
   `~/.ssh/config` wins. <!-- packages/ssh/lane-files.ts planLaneSsh -->
 - `SSH_AUTH_SOCK` lists the identities you hold, service ones first. A
   service identity signs at once. Your owner's own signs only once they
-  approve this lane: until they answer, ssh waits; unanswered or refused,
-  it says "agent refused operation". <!-- packages/ssh/relay-step.ts relayStep -->
+  approve this lane, and only for the hosts their config allows, which your
+  guidelines name. <!-- packages/ssh/relay-step.ts relayStep -->
+- "agent refused operation" means one of these, and the access row of your
+  column's header tells your owner which:
+  - your owner has not answered yet: ssh waits, up to their approval time;
+  - they refused, or nobody answered in time;
+  - the host is not one they allow: refused at once, without asking them.
+    The host matches a host by its key, under the name ssh checks it as.
+    <!-- packages/ssh/resolve.ts checkedHostName -->
+  - the key is not one you hold.
+- Do not turn off host key checking (`StrictHostKeyChecking`, a
+  `known_hosts` of your own): the host key is how your owner's limit
+  holds, and a key you accepted yourself is not one they allowed.
 - `Match` blocks and hosts reached through a `ProxyCommand` are not
   carried into a lane. <!-- packages/ssh/lane-files.ts CARRIED -->
 - A project's own image needs `openssh-client` and the line

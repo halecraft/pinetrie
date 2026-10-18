@@ -68,7 +68,12 @@ export interface LaneFacts {
      * by name.
      */
     readonly ssh: {
-      readonly personal: boolean
+      /**
+       * The hosts its owner's identity may sign for, as their config writes
+       * them, or `"all"`; null when the lane does not hold it. Spelled out
+       * here, not imported: only the app may import `@pinetrie/ssh`.
+       */
+      readonly personal: "all" | readonly string[] | null
       readonly services: readonly string[]
     }
     /**
@@ -115,9 +120,13 @@ const listed = (words: readonly string[], conjunction: "and" | "or"): string =>
 export function laneGuidelines(facts: LaneFacts): string[] {
   const { dir, grants } = facts
   const allowed = [
-    ...(grants.ssh.personal
-      ? ["your owner's ssh identity (once they approve this lane)"]
-      : []),
+    ...(grants.ssh.personal === null
+      ? []
+      : grants.ssh.personal === "all"
+        ? ["your owner's ssh identity (once they approve this lane)"]
+        : [
+            `your owner's ssh identity for ${listed(grants.ssh.personal, "and")} (once they approve this lane; no other host)`,
+          ]),
     ...(grants.ssh.services.length === 0
       ? []
       : [

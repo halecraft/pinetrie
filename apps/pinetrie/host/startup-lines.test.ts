@@ -1,9 +1,11 @@
 import { sessionNameFor } from "@pinetrie/config/testing"
+import type { SshName } from "@pinetrie/ssh"
 import { describe, expect, test } from "vitest"
 import {
   agentReadyLine,
   reportLines,
   sessionLines,
+  sshLines,
   startupLaps,
   storeLine,
 } from "./startup-lines.ts"
@@ -143,4 +145,29 @@ test("startupLaps: a phase of a second or more is said with its time since the l
   lap("slow")
   lap("just under")
   expect(lines).toEqual(["[host] starting: slow took 1500 ms"])
+})
+
+test("an allowed host with no known key is said at start", () => {
+  const lines = sshLines({
+    settings: {
+      personal: { kind: "on", hosts: ["hql", "*.lan"], own: true },
+      approvalSeconds: 120,
+    },
+    checks: [],
+    failed: [],
+    added: [],
+    dropped: [],
+    unmatched: [
+      { kind: "name", name: "hql" as SshName, checkedAs: "192.168.1.2" },
+      { kind: "wild", pattern: "*.lan" },
+    ],
+    hasSsh: true,
+    hasAgent: true,
+  })
+  expect(lines).toContain(
+    "[host] lanes.ssh.hosts: hql has no key in your known_hosts (ssh checks it as 192.168.1.2), so your identity signs for it nowhere; ssh there once from this machine",
+  )
+  expect(lines).toContain(
+    "[host] lanes.ssh.hosts: *.lan matches no line of your known_hosts, so your identity signs for it nowhere",
+  )
 })

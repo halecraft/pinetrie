@@ -566,8 +566,12 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   with **approve** and **refuse**; an approved one proposed changes **revoke**, and
   a refused, revoked or unanswered one **approve**. Only the owner sees
   the buttons; everyone else reads "🔑 waiting for Duane". While your
-  answer is out its buttons wait, and a refusal is said there. A lane
-  that never asked and used no service identity has no row. A lane
+  answer is out its buttons wait, and a refusal is said there. A
+  signature refused because its host is outside your `lanes.ssh.hosts` is
+  said there too, with no buttons ("🔑 your ssh can't sign for
+  192.168.1.2: outside lanes.ssh.hosts", ADR-0170): your config is the
+  answer, and a host clears it as it starts. A lane that never asked,
+  used no service identity and was refused no host has no row. A lane
   waiting for you is also in your inbox ("wants your ssh for pop"),
   whether or not you follow it; answering clears it.
 - **In a folder project** (ADR-0142), the strip's proposed changes are the files the

@@ -13,6 +13,7 @@ import {
   planAccessAnswer,
   planAccessAsk,
   planAccessChange,
+  planAccessOutside,
   planAccessRecovery,
   planAccessTimeout,
   planAccessUse,
@@ -109,6 +110,26 @@ describe("asking", () => {
     expect(
       planAccessRecovery([at(STATES.waiting), at(STATES.approved)], 9),
     ).toEqual([at({ kind: "unanswered", host: "pop", at: 9 })])
+  })
+
+  test("a starting host clears a refusal for a host outside", () => {
+    const refused = {
+      ...at(STATES.approved),
+      outside: { host: "hql", key: "SHA256:k", at: 1 },
+    }
+    expect(planAccessRecovery([refused], 9)).toEqual([at(STATES.approved)])
+  })
+})
+
+describe("planAccessOutside", () => {
+  test("the same refusal for a host outside writes nothing again", () => {
+    const refusal = { host: "hql", key: "SHA256:k" }
+    const once = planAccessOutside(emptyAccess(LANE), refusal, 3)
+    expect(once?.outside).toEqual({ ...refusal, at: 3 })
+    expect(once && planAccessOutside(once, refusal, 4)).toBeNull()
+    expect(
+      once && planAccessOutside(once, { ...refusal, key: "SHA256:j" }, 5),
+    ).not.toBeNull()
   })
 })
 

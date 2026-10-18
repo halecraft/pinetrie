@@ -3055,4 +3055,12 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "a use names the first caller outside the code that keeps roots",
   },
+  {
+    name: "an allowed host with no known key is not said",
+    file: "apps/pinetrie/host/startup-lines.ts",
+    from: '    ...(personal.kind === "on" ? facts.unmatched.map(unmatchedLine) : []),\n',
+    to: "",
+    command: unit,
+    expect: "an allowed host with no known key is said at start",
+  },
 ]

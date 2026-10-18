@@ -11,11 +11,26 @@ import {
   type SshBlock,
   type SshLine,
 } from "./config.ts"
-import { type HostPatterns, isConcrete, isHostAllowed } from "./patterns.ts"
-import type { PersonalSsh } from "./settings.ts"
+import type { SshName } from "./names.ts"
+import { type HostPattern, matchesPattern } from "./patterns.ts"
 
 /** Where the lane's files are mounted. */
 export const LANE_SSH_DIR = "/pinetrie-ssh"
+
+/**
+ * A pattern of `lanes.ssh.hosts`, a name carrying the name ssh checks its
+ * host's key under, as the host's `ssh -G` resolved it: null where the host
+ * has no ssh, or `ssh -G` failed.
+ */
+export type AllowedHost =
+  | Exclude<HostPattern, { readonly kind: "name" }>
+  | {
+      readonly kind: "name"
+      readonly name: SshName
+      readonly checkedAs: string | null
+    }
+
+export type AllowedHosts = "all" | readonly AllowedHost[]
 
 /**
  * The keywords a lane's config carries, each with ssh's own spelling for the
@@ -132,7 +147,10 @@ export interface SshSources {
 export interface HostKeyFacts {
   /** Key blobs, base64; `"all"` when personal hosts are not narrowed. */
   readonly personal: "all" | ReadonlySet<string>
-  /** A name for each key a `known_hosts` line names in clear. */
+  /**
+   * A name for each key a line of either file names in clear, kept for the
+   * lane or not: the host's own, for wording a request or a refusal.
+   */
   readonly names: ReadonlyMap<string, string>
 }
 
@@ -143,6 +161,8 @@ interface LaneSshFiles {
   readonly keys: ReadonlyMap<string, string>
   readonly hostKeys: HostKeyFacts
   readonly dropped: readonly DroppedIdentity[]
+  /** The allowed names and wildcards that kept no line of the person's `known_hosts`. */
+  readonly unmatched: readonly AllowedHost[]
 }
 
 /** The public key file a lane is given for a key: named by what it holds. */
@@ -155,12 +175,14 @@ const quoted = (arg: string): string =>
 /**
  * A lane's files.
  * - Every `Host` block of the service config, then of the person's when
- *   personal identity is on, keeping only `CARRIED` lines: ssh keeps a
+ *   personal identity is on (`allowed` not null), keeping only `CARRIED`
+ *   lines: ssh keeps a
  *   setting's first value, so the service's wins, and `IdentityFile`s add
  *   up, the service's first.
  * - An `IdentityFile` becomes its public key's copy under `keys/`, and a
- *   block keeping one says `IdentitiesOnly yes`, so an agent holding many
- *   keys does not use up the server's tries.
+ *   block keeping one says `IdentitiesOnly yes`, in place of any it
+ *   carried, so an agent holding many keys does not use up the server's
+ *   tries.
  * - Every personal block is carried, narrowed or not: a block of patterns
  *   cannot be told apart from the hosts it would serve, and its defaults
  *   (`Host *`) serve the allowed ones too. The relay decides by key.
@@ -172,20 +194,23 @@ const quoted = (arg: string): string =>
  */
 export function planLaneSsh(
   sources: SshSources,
-  personal: PersonalSsh,
+  allowed: AllowedHosts | null,
   dirs: SshDirs,
   connect: string | null,
 ): LaneSshFiles {
   const keys = new Map<string, string>()
   const dropped: DroppedIdentity[] = []
-  const hosts: HostPatterns | null =
-    personal.kind === "on" ? personal.hosts : null
 
   const render = (block: SshBlock, side: ConfigSide): string[] => {
     const lines: string[] = []
     let pinned = false
+    let only: string | null = null
     for (const line of block.lines) {
       if (!isCarried(line.keyword)) continue
+      if (line.keyword === "identitiesonly") {
+        only = `  IdentitiesOnly ${line.args.map(quoted).join(" ")}`
+        continue
+      }
       if (line.keyword === "identityfile") {
         for (const file of identityFiles(
           line,
@@ -205,6 +230,7 @@ export function planLaneSsh(
       )
     }
     if (pinned) lines.push("  IdentitiesOnly yes")
+    if (!pinned && only !== null) lines.push(only)
     return lines.length === 0
       ? []
       : [`Host ${block.patterns.map(quoted).join(" ")}`, ...lines]
@@ -215,7 +241,7 @@ export function planLaneSsh(
       ? []
       : parseSshConfig(sources.service)
     ).flatMap(b => render(b, "service")),
-    ...(hosts === null || sources.personal === null
+    ...(allowed === null || sources.personal === null
       ? []
       : parseSshConfig(sources.personal).flatMap(b => render(b, "personal"))),
   ]
@@ -229,13 +255,14 @@ export function planLaneSsh(
     "  StrictHostKeyChecking yes",
     "",
   ].join("\n")
-  const known = laneKnownHosts(sources.knownHosts, hosts)
+  const known = laneKnownHosts(sources.knownHosts, allowed)
   return {
     config,
     knownHosts: known.text,
     keys,
     hostKeys: known.facts,
     dropped,
+    unmatched: known.unmatched,
   }
 }
 
@@ -283,6 +310,10 @@ function parseKnownHost(raw: string): KnownHostLine | null {
 const bareHost = (entry: string): string =>
   /^\[([^\]]+)\]:\d+$/.exec(entry)?.[1] ?? entry
 
+/** A host as ssh records it in `known_hosts`: bare on port 22, else `[host]:port`. */
+export const knownHostsName = (host: string, port: number): string =>
+  port === 22 ? host : `[${host}]:${port}`
+
 /**
  * Whether a hashed entry (`|1|salt|hash`) is one of `names`, hashed as
  * OpenSSH's `hostfile.c` does: HMAC-SHA1 of the name under the salt. Only a
@@ -301,38 +332,72 @@ export function hashedHostMatches(
 }
 
 /**
+ * Whether a `known_hosts` entry names an allowed name or wildcard. A clear
+ * entry matches by pattern, its port aside, or equals a name's checked name;
+ * a hashed entry matches only a whole name, which ssh hashes lowercased, so
+ * a wildcard never matches one.
+ */
+function isEntryMatched(
+  entry: string,
+  host: Exclude<AllowedHost, { readonly kind: "not" }>,
+): boolean {
+  if (entry.startsWith("!")) return false
+  const checked =
+    host.kind === "name" && host.checkedAs !== null ? [host.checkedAs] : []
+  if (entry.startsWith("|"))
+    return (
+      host.kind === "name" &&
+      hashedHostMatches(entry, [host.name.toLowerCase(), ...checked])
+    )
+  return (
+    matchesPattern(
+      bareHost(entry),
+      host.kind === "name" ? host.name : host.pattern,
+    ) || checked.includes(entry.toLowerCase())
+  )
+}
+
+/**
  * The lane's `known_hosts`. Not narrowed: both files whole. Narrowed: the
- * service file whole, and the person's lines for allowed hosts, `@revoked`
- * lines always. Personal identity may sign only for the keys of the
- * person's lines kept, never the service file's.
+ * service file whole, and the person's lines whose entries an allowed name
+ * or wildcard matches and no negation does, `@revoked` lines always.
+ * Personal identity may sign only for the keys of the person's lines kept,
+ * never the service file's. `unmatched` is each allowed name or wildcard
+ * that kept no line.
  */
 export function laneKnownHosts(
   files: { readonly service: string | null; readonly personal: string | null },
-  hosts: HostPatterns | null,
-): { readonly text: string; readonly facts: HostKeyFacts } {
+  allowed: AllowedHosts | null,
+): {
+  readonly text: string
+  readonly facts: HostKeyFacts
+  readonly unmatched: readonly AllowedHost[]
+} {
   const parse = (t: string | null) =>
     (t ?? "").split("\n").flatMap(l => {
       const line = parseKnownHost(l)
       return line === null ? [] : [line]
     })
   const service = parse(files.service)
-  const personal = hosts === null ? [] : parse(files.personal)
-  const concrete =
-    hosts === null || hosts === "all" ? [] : hosts.filter(isConcrete)
+  const personal = allowed === null ? [] : parse(files.personal)
+  const narrowed = allowed === null || allowed === "all" ? [] : allowed
+  const positive = narrowed.flatMap(h => (h.kind === "not" ? [] : [h]))
+  const isVetoed = (entry: string) =>
+    !entry.startsWith("|") &&
+    narrowed.some(
+      h => h.kind === "not" && matchesPattern(bareHost(entry), h.pattern),
+    )
   const kept = personal.filter(
     line =>
-      hosts === "all" ||
+      allowed === "all" ||
       line.marker === "@revoked" ||
-      line.hosts.some(entry =>
-        entry.startsWith("|")
-          ? hashedHostMatches(entry, concrete)
-          : !entry.startsWith("!") &&
-            hosts !== null &&
-            isHostAllowed(bareHost(entry), hosts),
+      line.hosts.some(
+        entry =>
+          !isVetoed(entry) && positive.some(h => isEntryMatched(entry, h)),
       ),
   )
   const names = new Map<string, string>()
-  for (const line of [...service, ...kept])
+  for (const line of [...service, ...personal])
     if (line.marker === null) {
       const name = line.hosts.find(
         e => !e.startsWith("|") && !e.startsWith("!"),
@@ -344,10 +409,18 @@ export function laneKnownHosts(
     text: [...service, ...kept].map(l => `${l.raw}\n`).join(""),
     facts: {
       personal:
-        hosts === "all"
+        allowed === "all"
           ? "all"
           : new Set(kept.filter(l => l.marker === null).map(l => l.blob)),
       names,
     },
+    unmatched: positive.filter(
+      h =>
+        !kept.some(
+          l =>
+            l.marker !== "@revoked" &&
+            l.hosts.some(entry => isEntryMatched(entry, h)),
+        ),
+    ),
   }
 }

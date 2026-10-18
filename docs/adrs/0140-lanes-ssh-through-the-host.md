@@ -17,6 +17,11 @@
     the user's choice beats the project's is the setting's declared order, and
     a system file may forbid personal ssh. `lanes.ssh` has one shape in every
     layer: a project grants with `lanes.ssh.personal: true`.
+  - ADR-0170: narrowed hosts keep the `known_hosts` lines under the names ssh
+    checks each allowed host's key under, as the host's `ssh -G` resolves
+    them. A personal signature refused because its host key is outside them is
+    recorded in the lane's access record and logged, not dropped without a
+    word.
 
 **Context.**
 

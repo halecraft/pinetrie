@@ -1170,10 +1170,14 @@ which names the entry and its thread (`packages/rules/TECHNICAL.md`,
 
 ## The access row (`access-view.ts`, ADR-0140)
 
-- **`accessView` decides, `accessWords` words it.** A lane with no
-  `pinetrie.access` record, or one that never asked and used no service
-  identity, has no row. Service identities come first, then the owner's
-  identity's state, then the hosts the lane reached.
+- **`accessView` decides, `accessWords` words it.** A row exists when its
+  record holds something it says of identities: a service identity used,
+  the owner's asked for, or a signature refused for a host outside the
+  owner's `lanes.ssh.hosts` (ADR-0170). The hosts the lane reached say
+  more of a row and make none. Service identities come first, then the
+  owner's identity's state, then the refusal, then the hosts.
+- **A refusal for a host outside has no answers:** the owner's config is
+  the answer, so the row says it and offers nothing.
 - **Only the owner is offered answers,** exactly `ACCESS_ANSWERS`' for the
   state, the table the host refuses by; everyone else reads the state. The
   owner reads "your ssh"; others read the owner's name.

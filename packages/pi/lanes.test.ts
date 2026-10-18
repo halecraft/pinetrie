@@ -50,7 +50,7 @@ const facts = (over: Partial<LaneFacts> = {}): LaneFacts => ({
   dir: "/workspace",
   shared: [],
   grants: {
-    ssh: { personal: false, services: [] },
+    ssh: { personal: null, services: [] },
     nestedDockerNote: null,
     env: [],
     mounts: [],
@@ -206,7 +206,7 @@ describe("laneGuidelines", () => {
       text(
         facts({
           grants: {
-            ssh: { personal: true, services: ["deploy", "ci"] },
+            ssh: { personal: "all", services: ["deploy", "ci"] },
             nestedDockerNote: null,
             env: ["NPM_TOKEN", "CI"],
             mounts: ["/data", "/ref"],
@@ -220,7 +220,7 @@ describe("laneGuidelines", () => {
       text(
         facts({
           grants: {
-            ssh: { personal: false, services: [] },
+            ssh: { personal: null, services: [] },
             nestedDockerNote: null,
             env: ["CI"],
             mounts: [],
@@ -228,6 +228,23 @@ describe("laneGuidelines", () => {
         }),
       ),
     ).toContain("or credentials except $CI. ")
+  })
+
+  test("a narrowed identity names its hosts", () => {
+    expect(
+      text(
+        facts({
+          grants: {
+            ssh: { personal: ["hql", "*.lan"], services: [] },
+            nestedDockerNote: null,
+            env: [],
+            mounts: [],
+          },
+        }),
+      ),
+    ).toContain(
+      "or credentials except your owner's ssh identity for hql and *.lan (once they approve this lane; no other host). ",
+    )
   })
 
   test("names Docker at $DOCKER_HOST only when lanes inside are granted", () => {
@@ -310,7 +327,7 @@ describe("laneGuidelines", () => {
         shared: [".plans", "notes"],
         defaultImage: true,
         grants: {
-          ssh: { personal: true, services: ["deploy"] },
+          ssh: { personal: "all", services: ["deploy"] },
           nestedDockerNote: "/pinetrie/packages/pi/lane-docker.md",
           env: ["A"],
           mounts: ["/m"],

@@ -1,7 +1,8 @@
 // access — a lane's ssh identities, as the column's header shows them, and
 // how its use of its owner's identity changes: asked, answered, timed out,
-// and recovered after a host stops. The host's relay follows the record, so
-// each change here is also what happens to a request held for the owner.
+// refused for a host not allowed, and recovered after a host stops. The
+// host's relay follows the record, so each change to its owner's answer is
+// also what happens to a request held for the owner.
 
 import type {
   AccessAnswer,
@@ -40,8 +41,15 @@ const PersonalSchema = Type.Union([
   }),
 ])
 
+const OutsideSchema = Type.Object({
+  host: HostSchema,
+  key: Type.Union([Type.String(), Type.Null()]),
+  at: Type.Number(),
+})
+
 const AccessRecordSchema = Type.Object({
   personal: Type.Union([PersonalSchema, Type.Null()]),
+  outside: Type.Union([OutsideSchema, Type.Null()]),
   services: Type.Array(Type.String()),
   hosts: Type.Array(Type.String()),
 })
@@ -56,6 +64,7 @@ export const ACCESS: RecordSpec<AccessRecord, ThreadId, "session"> = {
     decodeRecord(AccessRecordSchema, contents, threadKey(key), (r, lane) => ({
       lane,
       personal: r.personal,
+      outside: r.outside,
       services: r.services,
       hosts: r.hosts,
     })),
@@ -65,6 +74,7 @@ export const ACCESS: RecordSpec<AccessRecord, ThreadId, "session"> = {
 export const emptyAccess = (lane: ThreadId): AccessRecord => ({
   lane,
   personal: null,
+  outside: null,
   services: [],
   hosts: [],
 })
@@ -148,15 +158,32 @@ export const planAccessTimeout = (
 
 /**
  * A starting host's records: nothing waits for an answer any longer, since
- * the requests that waited went with the host that held them.
+ * the requests that waited went with the host that held them, and no
+ * refusal for a host not allowed is kept, since the allowed hosts are read
+ * again at start.
  */
 export const planAccessRecovery = (
   records: readonly AccessRecord[],
   now: number,
 ): readonly AccessRecord[] =>
   records
-    .filter(r => r.personal?.kind === "waiting")
-    .map(r => planAccessTimeout(r, now))
+    .filter(r => r.personal?.kind === "waiting" || r.outside !== null)
+    .map(r => ({ ...planAccessTimeout(r, now), outside: null }))
+
+/**
+ * A signature refused for a host not allowed, recorded; null when it is the
+ * host and key recorded already, so a lane that retries writes nothing.
+ */
+export function planAccessOutside(
+  record: AccessRecord,
+  refusal: { readonly host: string | null; readonly key: string | null },
+  now: number,
+): AccessRecord | null {
+  const was = record.outside
+  if (was !== null && was.host === refusal.host && was.key === refusal.key)
+    return null
+  return { ...record, outside: { ...refusal, at: now } }
+}
 
 /** The most names a record keeps of the hosts a lane connected. */
 const ACCESS_HOSTS = 8

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest"
-import { isConcrete, isHostAllowed, matchesPattern } from "./patterns.ts"
+import { hostPatternList, isHostAllowed, matchesPattern } from "./patterns.ts"
 
 describe("matchesPattern", () => {
   test("a star matches any run of characters, even none", () => {
@@ -41,8 +41,18 @@ describe("isHostAllowed", () => {
   })
 })
 
-test("a concrete pattern has no wildcard and no negation", () => {
-  expect(isConcrete("pop")).toBe(true)
-  expect(isConcrete("*.lan")).toBe(false)
-  expect(isConcrete("!pop")).toBe(false)
+describe("hostPatternList", () => {
+  test("a comma-separated entry is several patterns", () => {
+    expect(hostPatternList(["hql,*.lan", "!db.lan"])).toEqual([
+      { kind: "name", name: "hql" },
+      { kind: "wild", pattern: "*.lan" },
+      { kind: "not", pattern: "db.lan" },
+    ])
+  })
+
+  test("a concrete pattern ssh would read as an option is matched, never resolved", () => {
+    expect(hostPatternList(["-oProxyCommand=x"])).toEqual([
+      { kind: "wild", pattern: "-oProxyCommand=x" },
+    ])
+  })
 })

@@ -27,6 +27,7 @@ export {
   planAccessAnswer,
   planAccessAsk,
   planAccessChange,
+  planAccessOutside,
   planAccessRecovery,
   planAccessTimeout,
   planAccessUse,

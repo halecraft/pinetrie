@@ -1,8 +1,38 @@
 // ssh/patterns — ssh's host patterns, matched as OpenSSH's
 // `match_pattern_list` matches them.
 
-/** A list of ssh host patterns, lowercased: what a setting narrows to. */
+import { parseSshName, type SshName } from "./names.ts"
+
+/** A list of ssh host patterns, as the person wrote them: what a setting narrows to. */
 export type HostPatterns = "all" | readonly string[]
+
+/** One pattern of a list, its comma-separated entries split. */
+export type HostPattern =
+  /** No wildcard and no negation, and safe to hand `ssh -G`. */
+  | { readonly kind: "name"; readonly name: SshName }
+  | { readonly kind: "wild"; readonly pattern: string }
+  /** `!pattern`, without its `!`. */
+  | { readonly kind: "not"; readonly pattern: string }
+
+/**
+ * A list's patterns. Each entry may itself be a comma-separated list, as a
+ * `Host` line's is. A pattern with no wildcard that `parseSshName` refuses
+ * is `wild`: matched as written, never handed to ssh.
+ */
+export function hostPatternList(
+  hosts: readonly string[],
+): readonly HostPattern[] {
+  return hosts
+    .flatMap(h => h.split(","))
+    .filter(p => p !== "")
+    .map((p): HostPattern => {
+      if (p.startsWith("!")) return { kind: "not", pattern: p.slice(1) }
+      const name = /[*?]/.test(p) ? null : parseSshName(p)
+      return name === null
+        ? { kind: "wild", pattern: p }
+        : { kind: "name", name }
+    })
+}
 
 /** Whether `name` matches one pattern: `*` any run of characters, `?` one. */
 export function matchesPattern(name: string, pattern: string): boolean {
@@ -24,21 +54,23 @@ export function matchesPattern(name: string, pattern: string): boolean {
 }
 
 /**
- * Whether `name` passes a pattern list, as ssh decides a `Host` line: any
- * negated pattern (`!pattern`) that matches fails it, and otherwise one
- * positive match passes it. Each entry may itself be a comma-separated list.
+ * Whether `name` passes a list's patterns, as ssh decides a `Host` line:
+ * any negated pattern that matches fails it, and otherwise one positive
+ * match passes it.
  */
-export function isHostAllowed(name: string, hosts: HostPatterns): boolean {
-  if (hosts === "all") return true
-  const patterns = hosts.flatMap(h => h.split(",")).filter(p => p !== "")
+export function isNamePassed(
+  name: string,
+  patterns: readonly HostPattern[],
+): boolean {
   let positive = false
-  for (const pattern of patterns) {
-    if (pattern.startsWith("!")) {
-      if (matchesPattern(name, pattern.slice(1))) return false
-    } else if (matchesPattern(name, pattern)) positive = true
+  for (const p of patterns) {
+    if (p.kind === "not") {
+      if (matchesPattern(name, p.pattern)) return false
+    } else if (matchesPattern(name, p.kind === "name" ? p.name : p.pattern))
+      positive = true
   }
   return positive
 }
 
-/** Whether a pattern names one host: no wildcard, no negation. */
-export const isConcrete = (pattern: string): boolean => !/[*?!]/.test(pattern)
+export const isHostAllowed = (name: string, hosts: HostPatterns): boolean =>
+  hosts === "all" || isNamePassed(name, hostPatternList(hosts))

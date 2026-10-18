@@ -4591,4 +4591,12 @@ export const mutations: readonly Mutation[] = [
     expect:
       "its lane's, or the lane a first send there clones; none of the project's kind, or with no project",
   },
+  {
+    name: "a refusal for a host outside makes no row",
+    file: "packages/interface/access-view.ts",
+    from: "    record.outside !== null,\n",
+    to: "",
+    command: unit,
+    expect: "a lane refused only for a host outside has a row",
+  },
 ]

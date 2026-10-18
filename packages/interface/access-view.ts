@@ -1,11 +1,12 @@
 // interface/access-view — a lane's ssh identities, as the access row of its
-// column's header shows them: what it holds and has used, and for the owner
-// the answers the lane's state takes. `accessView` decides; `accessWords`
-// words it.
+// column's header shows them: what it holds and has used, a signature
+// refused for a host not allowed, and for the owner the answers the lane's
+// state takes. `accessView` decides; `accessWords` words it.
 
 import type {
   AccessAnswer,
   AccessRecord,
+  OutsideHost,
   PersonalAccess,
   WriterId,
 } from "@pinetrie/core"
@@ -20,15 +21,18 @@ export interface AccessView {
   readonly owner: { readonly name: string; readonly isYou: boolean } | null
   /** Service identities it has signed with. */
   readonly services: readonly string[]
-  /** Names the host connected for it. */
+  /** The last signature refused, unasked, for a host not allowed. */
+  readonly outside: OutsideHost | null
+  /** Names the host connected for it: they say more of a row, and make none. */
   readonly hosts: readonly string[]
   /** What the reader may answer: the owner alone, as `ACCESS_ANSWERS` says. */
   readonly answers: readonly AccessAnswer[]
 }
 
 /**
- * The row for a lane's record; null for a lane that has neither asked for
- * its owner's identity nor used a service one.
+ * The row for a lane's record; null when the record holds none of what a
+ * row says of identities: a service one used, the owner's asked for, or a
+ * signature refused for a host not allowed.
  */
 export function accessView(input: {
   readonly record: AccessRecord | undefined
@@ -38,7 +42,12 @@ export function accessView(input: {
 }): AccessView | null {
   const { record, owner, me } = input
   if (record === undefined) return null
-  if (record.personal === null && record.services.length === 0) return null
+  const parts = [
+    record.services.length > 0,
+    record.personal !== null,
+    record.outside !== null,
+  ]
+  if (!parts.includes(true)) return null
   const isYou = owner !== null && owner === me
   return {
     personal: record.personal,
@@ -47,15 +56,17 @@ export function accessView(input: {
         ? null
         : { name: displayName(owner, input.nameOf.get(owner)), isYou },
     services: record.services,
+    outside: record.outside,
     hosts: record.hosts,
     answers: isYou ? answersFor(record) : [],
   }
 }
 
 /**
- * The row's line, service identities first, then the owner's, then the
- * hosts; its buttons; and what came of your last answer, when it was
- * refused or failed. While an answer is out, its buttons wait.
+ * The row's line, service identities first, then the owner's, then a
+ * signature refused for a host not allowed, then the hosts; its buttons;
+ * and what came of your last answer, when it was refused or failed. While
+ * an answer is out, its buttons wait.
  */
 export function accessWords(
   view: AccessView,
@@ -89,7 +100,15 @@ export function accessWords(
           : personal.kind === "refused"
             ? `${whose} ${personal.revoked ? "revoked" : "refused"}`
             : `${whose}: no answer for ${forHost(personal.host)}`
-  const holds = [...view.services, ...(own === null ? [] : [own])]
+  const outside =
+    view.outside === null
+      ? null
+      : `${whose} can't sign for ${forHost(view.outside.host)}: outside lanes.ssh.hosts`
+  const holds = [
+    ...view.services,
+    ...(own === null ? [] : [own]),
+    ...(outside === null ? [] : [outside]),
+  ]
   const hosts = view.hosts.length === 0 ? "" : ` · ${view.hosts.join(", ")}`
   return {
     line: `🔑 ${holds.join(", ")}${hosts}`,

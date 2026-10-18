@@ -628,6 +628,12 @@ item 18, and in `lanes.test.ts` against the harness.
     ends with it: read that note before building or running images
     (ADR-0169). So no lane without the grant is told of the note, and a
     lane with it cannot be told the grant without the note's path.
+  - **A lane holding its owner's ssh identity is told the hosts it may
+    sign for,** as their config writes them (`LaneFacts.grants.ssh`), or
+    none when it may sign for any (ADR-0170). Both lane notes list each
+    cause of "agent refused operation", since ssh prints no more, and
+    tell the agent not to turn off host key checking, which the relay's
+    limit rests on.
   - **Guidelines, not a section of its own.** pi joins its sections into one
     string, and a provider may rebuild that string by its tags:
     `pi-anthropic-auth` keeps `<rules>` and drops `<docs>` (S23, addendum).

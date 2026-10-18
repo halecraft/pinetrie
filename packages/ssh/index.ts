@@ -13,14 +13,25 @@ export {
   type UsableServiceKey,
 } from "./keys.ts"
 export {
+  type AllowedHost,
+  type AllowedHosts,
   type DroppedIdentity,
   identityPaths,
   LANE_SSH_DIR,
   planLaneSsh,
 } from "./lane-files.ts"
-export { laneToken } from "./names.ts"
-export type { HostPatterns } from "./patterns.ts"
+export { laneToken, type SshName } from "./names.ts"
+export { type HostPatterns, hostPatternList } from "./patterns.ts"
 export { runProgram, startServiceAgent } from "./programs.ts"
+export type { OutsideRefusal } from "./relay-step.ts"
+export {
+  type CombinedConfig,
+  checkedHostName,
+  combinedConfigText,
+  parseResolved,
+  resolveArgv,
+  writeCombinedConfig,
+} from "./resolve.ts"
 export {
   DEFAULT_APPROVAL_SECONDS,
   MAX_APPROVAL_SECONDS,

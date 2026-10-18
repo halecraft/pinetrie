@@ -4314,4 +4314,20 @@ export const mutations: readonly Mutation[] = [
     expect:
       "accepting a parent's proposed changes shrink its branch's proposed changes to its own work, in place",
   },
+  {
+    name: "the same refusal for a host outside is written again",
+    file: "packages/rules/access.ts",
+    from: "  if (was !== null && was.host === refusal.host && was.key === refusal.key)\n    return null\n",
+    to: "",
+    command: unit,
+    expect: "the same refusal for a host outside writes nothing again",
+  },
+  {
+    name: "a starting host keeps a refusal for a host outside",
+    file: "packages/rules/access.ts",
+    from: "    .map(r => ({ ...planAccessTimeout(r, now), outside: null }))\n",
+    to: "    .map(r => planAccessTimeout(r, now))\n",
+    command: unit,
+    expect: "a starting host clears a refusal for a host outside",
+  },
 ]

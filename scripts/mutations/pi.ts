@@ -1005,4 +1005,12 @@ export const mutations: readonly Mutation[] = [
     command: ["pnpm", "exec", "vitest", "run", "packages/pi/lanes.test.ts"],
     expect: "after a crash, the lane is resumed in its own directory",
   },
+  {
+    name: "a narrowed identity is told as unnarrowed",
+    file: "packages/pi/lanes.ts",
+    from: '      : grants.ssh.personal === "all"\n',
+    to: "      : true\n",
+    command: unit,
+    expect: "a narrowed identity names its hosts",
+  },
 ]

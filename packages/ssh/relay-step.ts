@@ -46,7 +46,17 @@ type RelayStep =
     }
   /** A session binding: an OpenSSH agent checks its signature first. */
   | { readonly kind: "verify"; readonly request: BindRequest }
+  /** A personal key, for a session bound to no host key the lane may use. */
+  | { readonly kind: "outside"; readonly refusal: OutsideRefusal }
   | { readonly kind: "refuse" }
+
+/** A personal signature refused, its host's key outside the allowed hosts. */
+export interface OutsideRefusal {
+  /** The host's own name for the key, else the broker's newest for the lane. */
+  readonly host: string | null
+  /** The key's fingerprint; null when the session was never bound. */
+  readonly key: string | null
+}
 
 /** A host key's fingerprint, as `ssh-keygen -l` prints it. */
 export const fingerprint = (blob: string): string =>
@@ -58,9 +68,10 @@ export const fingerprint = (blob: string): string =>
  *   removing and locking keys, and every other extension.
  * - A service key signs with no question; it wins over the same key in the
  *   person's agent.
- * - A personal key asks. With personal hosts narrowed, it is refused unless
- *   its session was bound to a host key the lane may use, so a lane that
- *   skips its config's host check still cannot sign elsewhere.
+ * - A personal key asks. With personal hosts narrowed, it is refused as
+ *   `outside`, unasked, unless its session was bound to a host key the
+ *   lane may use, so a lane that skips its config's host check still
+ *   cannot sign elsewhere.
  */
 export function relayStep(
   state: ConnectionState,
@@ -84,7 +95,16 @@ export function relayStep(
       const hostKey = session === null ? undefined : state.bound.get(session)
       const allowed = facts.hostKeys.personal
       if (allowed !== "all" && (hostKey === undefined || !allowed.has(hostKey)))
-        return { kind: "refuse" }
+        return {
+          kind: "outside",
+          refusal: {
+            host:
+              (hostKey === undefined
+                ? undefined
+                : facts.hostKeys.names.get(hostKey)) ?? facts.newestName,
+            key: hostKey === undefined ? null : fingerprint(hostKey),
+          },
+        }
       const host =
         hostKey === undefined
           ? facts.newestName

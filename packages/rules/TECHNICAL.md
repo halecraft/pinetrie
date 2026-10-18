@@ -163,7 +163,11 @@ root's record is written only through a step's documents (ADR-0162).
   `planAccessAnswer` refuses any other, and the page offers exactly these.
   `planAccessChange` says what a change does to a held signature (release,
   refuse, or cut), and `planAccessRecovery` what a starting host leaves
-  (nothing waiting). The owner is the project record's (`PROJECT`'s
+  (nothing waiting, and no refusal for a host outside). The record also
+  keeps the last signature refused for a host outside the owner's
+  `lanes.ssh.hosts` (`planAccessOutside`, ADR-0170), which no answer
+  changes; a record stored before it was added does not decode, and its
+  lane asks again. The owner is the project record's (`PROJECT`'s
   `owner`), never a lane's.
 - **`QUEUE_HOLD`** (`queue-hold.ts`, ADR-0048 step 7): a thread's queue
   held, keyed by lane, in the session: who held it and when.

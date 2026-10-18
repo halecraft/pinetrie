@@ -1847,6 +1847,18 @@ export type PersonalAccess =
     }
 
 /**
+ * The last of a lane's personal signatures refused unasked, its host's key
+ * outside the owner's `lanes.ssh.hosts`.
+ */
+export interface OutsideHost {
+  /** The host's own name for the key, else the name the lane last connected; null for neither. */
+  readonly host: string | null
+  /** The key's fingerprint; null when the lane's session was never bound to one. */
+  readonly key: string | null
+  readonly at: number
+}
+
+/**
  * What ssh identities a lane holds and has used: a host-written
  * `pinetrie.access` value keyed by lane, which the column's header shows.
  */
@@ -1854,6 +1866,8 @@ export interface AccessRecord {
   readonly lane: ThreadId
   /** Null until the lane first asks for its owner's identity. */
   readonly personal: PersonalAccess | null
+  /** Null until a signature is refused for a host not allowed, and again once a host starts. */
+  readonly outside: OutsideHost | null
   /** Service identities it has signed with, by name, in first-use order. */
   readonly services: readonly string[]
   /** Names the host connected for it, in first-use order. */

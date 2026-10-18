@@ -28,6 +28,18 @@ const WAITING: PersonalAccess = { kind: "waiting", host: "pop", since: 1 }
 test("a lane that never asked and used nothing has no row", () => {
   expect(row(undefined)).toBeNull()
   expect(row(at(null))).toBeNull()
+  expect(row(at(null, { hosts: ["pop"] }))).toBeNull()
+})
+
+test("a lane refused only for a host outside has a row", () => {
+  expect(
+    row(at(null, { outside: { host: "hql", key: "SHA256:k", at: 1 } })),
+  ).toEqual({
+    line: "🔑 your ssh can't sign for hql: outside lanes.ssh.hosts",
+    answers: [],
+    waiting: false,
+    note: null,
+  })
 })
 
 describe("the owner", () => {
