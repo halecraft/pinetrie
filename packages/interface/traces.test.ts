@@ -37,7 +37,7 @@ test("endTraces: yours, whose place resolves to this end, oldest first", () => {
   const traces = [
     trace({ id: "late", at: 3 }),
     trace({ id: "early", at: 1 }),
-    trace({ id: "not-yours", for: BEA }),
+    trace({ id: "someone-elses", for: BEA }),
     trace({ id: "elsewhere", from: at("e-other") }),
   ]
   expect(endTraces(traces, ADA, HERE, endOf).map(t => t.id)).toEqual([
@@ -55,7 +55,7 @@ test("traceGroups: one line per person and verb, in the order each first happene
   ])
   expect(groups.map(g => [g.by, g.verb, g.traces.map(t => t.id)])).toEqual([
     [BEA, "queued", ["1", "3"]],
-    [CAL, "took-into-inventory", ["2"]],
+    [CAL, "put-away", ["2"]],
     [BEA, "sent", ["4"]],
   ])
 })

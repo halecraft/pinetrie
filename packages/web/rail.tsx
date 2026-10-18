@@ -22,6 +22,7 @@ import {
   compactRail,
   matchCountWords,
   opens,
+  RAIL_LABEL,
   type RailItem,
   type RailStretch,
   type RailStub,
@@ -80,7 +81,7 @@ export function Rail({
   activity,
   onPick,
   here,
-  yours,
+  mine,
   nameOf,
   digests,
   viewports,
@@ -102,7 +103,7 @@ export function Rail({
    * Thread ends holding an unsent card of yours (`UnsentSignals.ends`), with
    * your colour: each dot there carries a pip.
    */
-  yours: { readonly ends: ReadonlySet<EntryId>; readonly color: string }
+  mine: { readonly ends: ReadonlySet<EntryId>; readonly color: string }
   /** A writer's name, for a capsule's label. */
   nameOf: (writer: WriterId) => string
   /** Each mounted column's view, outlined; none, no outlines. */
@@ -124,7 +125,7 @@ export function Rail({
   const slots = items.reduce((n, it) => Math.max(n, it.slot + it.span), 0)
   return (
     <nav
-      aria-label="this thread's tree"
+      aria-label={RAIL_LABEL}
       className="rail"
       data-searching={matches === null ? undefined : "yes"}
     >
@@ -158,7 +159,7 @@ export function Rail({
         </svg>
         {/* Dots and capsules are buttons over the drawing, so they are
           reachable by keyboard and read as controls. */}
-        {railItems(items, { open, yours, matches }).map(([it, marks]) =>
+        {railItems(items, { open, mine, matches }).map(([it, marks]) =>
           it.kind === "stretch" ? (
             <Capsule
               key={it.ids[0]}
@@ -177,7 +178,7 @@ export function Rail({
               activity={activity}
               id={it.ids[0]}
               key={it.ids[0]}
-              yours={marks.yours}
+              mine={marks.mine}
               matches={marks.matches}
               onPick={onPick}
               open={marks.open}
@@ -401,16 +402,16 @@ export function LiveRail({
       ),
     [reading, names, colorOf],
   )
-  const { index, activity, yours } = rail
+  const { index, activity, mine } = rail
   const items = useMemo(
     () =>
       compactRail(
         index,
         rows,
-        railKeep({ rings: here, activity, ends, cards: yours.ends }),
+        railKeep({ rings: here, activity, ends, cards: mine.ends }),
         { asks, revisions },
       ),
-    [index, rows, here, activity, ends, yours.ends, asks, revisions],
+    [index, rows, here, activity, ends, mine.ends, asks, revisions],
   )
   return (
     <Rail {...rail} here={here} items={items} nameOf={w => nameFor(names, w)} />
@@ -424,7 +425,7 @@ export function LiveRail({
  */
 export function EmptyRail() {
   return (
-    <nav aria-label="this thread's tree" className="rail">
+    <nav aria-label={RAIL_LABEL} className="rail">
       <div
         className="rail-tree"
         style={{ width: x(0) + PAD, height: y(0) + PAD }}
@@ -446,7 +447,7 @@ function Dot(p: {
   track: number
   open: boolean
   /** Your colour when a card of yours waits at this end; null otherwise. */
-  yours: string | null
+  mine: string | null
   activity: readonly AgentRun[]
   people: readonly { name: string; color: string }[]
   /** Its matches while searching (`RailMarks.matches`), else null. */
@@ -492,7 +493,7 @@ function Dot(p: {
             ? undefined
             : matchCountWords(p.matches),
           here,
-          p.yours === null ? undefined : signalWords("unsent"),
+          p.mine === null ? undefined : signalWords("unsent"),
         ]
           .filter(t => t !== undefined)
           .join(" · ") || undefined
@@ -502,7 +503,7 @@ function Dot(p: {
       {p.people.length > 1 && (
         <span className="here-count">{p.people.length}</span>
       )}
-      {p.yours !== null && <SignalMark color={p.yours} signal="unsent" />}
+      {p.mine !== null && <SignalMark color={p.mine} signal="unsent" />}
     </button>
   )
 }

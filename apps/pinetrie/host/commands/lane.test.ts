@@ -233,7 +233,7 @@ test("the owner's answer to a lane's ssh is written; anyone else's is refused", 
         applyWrites(b, w),
     },
   }
-  const approve = { kind: "ssh-access", lane, answer: "approve" } as const
+  const approve = { kind: "ssh-access", lane, answer: "allow" } as const
   expect(await handleSshAccess(deps, bea, approve)).toMatchObject({
     kind: "refused",
     code: "not_owner",
@@ -242,7 +242,7 @@ test("the owner's answer to a lane's ssh is written; anyone else's is refused", 
     kind: "answered",
   })
   expect(readRecords(b.session, ACCESS).get(lane)?.personal).toEqual({
-    kind: "approved",
+    kind: "allowed",
     host: "pop",
     by: ada,
     at: 1_000,

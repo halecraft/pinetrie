@@ -81,7 +81,35 @@ export const mutations: readonly Mutation[] = [
     from: '    ? "accepted work, as it was last read"\n',
     to: '    ? "your folder, as it was last read"\n',
     command: words,
-    expect: 'no source says "your folder"',
+    expect:
+      "nothing people or the agent read says a phrase the glossary retires",
+  },
+  {
+    name: "a field named after the old word comes back",
+    file: "packages/interface/publish-view.ts",
+    from: "  const { behind, ahead } = record.workingCopy\n",
+    to: "  const { behind, ahead } = record.workingCopy\n  const yours = ahead\n  void yours\n",
+    command: words,
+    expect:
+      "no identifier holds a retired name, but in a migration's old shapes",
+  },
+  {
+    name: "a retired name in capitals hides",
+    file: "scripts/words.ts",
+    from: "    .filter(name => lower.some(w => name.toLowerCase().includes(w)))\n",
+    to: "    .filter(name => lower.some(w => name.includes(w)))\n",
+    command: words,
+    expect:
+      "an identifier holds a retired name in any case; a string or a comment does not count",
+  },
+  {
+    name: "the glossary's list of phrases nothing says reads past its heading",
+    file: "scripts/words.ts",
+    from: "  const section = end === -1 ? rest : rest.slice(0, end)\n",
+    to: "  const section = rest\n",
+    command: words,
+    expect:
+      "the phrases nothing says are the glossary list's quoted bullets, up to the next heading",
   },
   {
     name: "a unit mutation's expect may name a test its command does not run",

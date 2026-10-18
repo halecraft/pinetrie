@@ -211,7 +211,7 @@ const ACCEPTED = {
   heads: { current: null, proposed: "" },
   log: { current: null, proposed: "" },
   wips: [],
-  yours: {
+  workingCopy: {
     behind: 0,
     ahead: 0,
     catchUp: null,
@@ -553,7 +553,7 @@ describe("columnView: the fork row of a thread forked elsewhere", () => {
     ])
     return columnView(facts(1, { thread, work: work({ forks }) })).origin
   }
-  test("a copy whose fork began from its base says its files were not kept", () => {
+  test("a copy whose fork began from its base says its files could not be copied", () => {
     if (thread === null) throw new Error("no thread")
     const forks = new Map([
       [thread, { kind: "fork", at: entryId("4"), how: "copy" } as const],
@@ -575,8 +575,8 @@ describe("columnView: the fork row of a thread forked elsewhere", () => {
       ).origin
       return o.kind === "source" ? o.words : ""
     }
-    expect(words("e1")).toContain("its files were not kept")
-    expect(words(null)).not.toContain("its files were not kept")
+    expect(words("e1")).toContain("its files could not be copied")
+    expect(words(null)).not.toContain("its files could not be copied")
   })
   test("a copy says it was copied; a branch, only where it is from", () => {
     expect(row("copy")).toMatchObject({ kind: "source", copied: true })
@@ -780,7 +780,7 @@ describe("columnView: the work strip", () => {
     expect(shows.strip.words.menu.find(b => b.button === "update")).toEqual({
       button: "update",
       label: "catch up with accepted work",
-      title: "merges pinetrie-accepted into this thread's copy",
+      title: "merges accepted work into this thread's copy",
     })
     expect(shows.behind).toBeNull()
   })
@@ -824,7 +824,7 @@ describe("columnView: the work strip", () => {
       files: ["a.txt"],
       conflicts: [],
       startConflicts: [],
-      yourEdits: ["a.txt"],
+      workingCopyEdits: ["a.txt"],
       described: true,
       edited: false,
       bookmark: "pinetrie-proposed/copper-owl",
@@ -846,7 +846,7 @@ describe("columnView: the work strip", () => {
     const target = {
       spans: [{ kind: "revision", commit: commitId("c1") }],
       conflicts: [],
-      yourEdits: ["a.txt"],
+      workingCopyEdits: ["a.txt"],
     }
     expect(strip(open)).toMatchObject({ state: "ready", review: target })
     expect(strip(open, true)).toMatchObject({
@@ -896,7 +896,7 @@ describe("workStripWords", () => {
     files: ["a.txt", "b.txt"],
     conflicts: [],
     startConflicts: [],
-    yourEdits: [],
+    workingCopyEdits: [],
     described: true,
     edited: false,
     bookmark: "pinetrie-proposed/amber-fox",
@@ -963,7 +963,7 @@ describe("workStripWords", () => {
     ["ready", proposed, "idle", "2 files changed"],
     [
       "ready, touching your edits",
-      { ...proposed, yourEdits: ["a.txt"] },
+      { ...proposed, workingCopyEdits: ["a.txt"] },
       "idle",
       "2 files changed · touches files you're editing",
     ],
@@ -1001,7 +1001,7 @@ describe("workStripWords", () => {
       "accepted",
       { ...proposed, acceptedAs: "zz12345678ab" },
       "idle",
-      "accepted as zz123456",
+      "accepted ✓",
     ],
   ] as const)("%s", (_, o, activity, line) => {
     const w = words(o, activity)
@@ -1044,7 +1044,14 @@ describe("workStripWords", () => {
     from: pointId("a"),
     to: pointId("b"),
   } as const
-  test("the jj facts are titles: which bookmark an acceptance moves, and what catching up merges", () => {
+  test("an accepted strip says so, its change id in the line's title alone", () => {
+    const w = words({ ...proposed, acceptedAs: "zz12345678ab" })
+    expect(w.line).toBe("accepted ✓")
+    expect(w.lineTitle).toBe("change id zz12345678ab")
+    expect(words(proposed).lineTitle).toBeNull()
+  })
+
+  test("the jj facts are titles: which bookmark an acceptance moves, and what catching up merges, by the base's name", () => {
     const w = words(proposed, "idle", ACCEPTED_BASE, {
       catchUp: { kind: "unknown" },
     })
@@ -1052,7 +1059,7 @@ describe("workStripWords", () => {
       "moves pinetrie-accepted forward to pinetrie-proposed/amber-fox",
     )
     expect(w.menu.find(b => b.button === "update")?.title).toBe(
-      "merges pinetrie-accepted into this thread's copy",
+      "merges accepted work into this thread's copy",
     )
     expect(words(proposed, "idle", WIP_BASE).buttons[0]?.title).toBe(
       "moves wip/search forward to pinetrie-proposed/amber-fox",
@@ -1106,8 +1113,7 @@ describe("workStripWords", () => {
     expect(behind.buttons.find(b => b.button === "update")).toEqual({
       button: "update",
       label: "catch up with accepted work",
-      title:
-        "merges pinetrie-accepted into this thread's copy · changes 3 files",
+      title: "merges accepted work into this thread's copy · changes 3 files",
     })
     expect(words(undefined, "idle", ACCEPTED_BASE, brings).line).toBe(
       "accepted work has moved on since this thread started",
@@ -1137,7 +1143,7 @@ describe("workStripWords", () => {
     expect(update({ kind: "unknown" })).toEqual({
       button: "update",
       label: "catch up with accepted work",
-      title: "merges pinetrie-accepted into this thread's copy",
+      title: "merges accepted work into this thread's copy",
     })
     // Nothing new is no "new work" either.
     expect(
@@ -1222,7 +1228,7 @@ describe("workStripWords", () => {
     expect(w.menu.map(b => b.label)).toEqual([
       "rewrite description",
       "catch up with wip/search",
-      "accept, with your 2 commits beneath it",
+      "accept, with 2 of your own changes",
     ])
   })
   const sent = (
@@ -1288,11 +1294,10 @@ describe("workStripWords", () => {
 })
 
 describe("behindMark: the header's mark for a base that moved on", () => {
-  test("worded as the project, its title naming the files, the bookmark and both commits", () => {
+  test("worded as the project, its title naming the files, never jj's bookmark or commits", () => {
     expect(behindMark(BASE, ACCEPTED)).toEqual({
       mark: "↓",
-      title:
-        "accepted work has moved on since this thread started, in 2 files · pinetrie-accepted: aaaaaaaa → bbbbbbbb",
+      title: "accepted work has moved on since this thread started, in 2 files",
     })
   })
   test("a thread's details say it in full", () => {

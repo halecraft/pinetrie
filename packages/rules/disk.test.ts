@@ -108,11 +108,11 @@ describe("classifyWrites: each written path's class", () => {
     ])
   })
 
-  test("a run that lost events derives nothing: its ignored writes are local, and no recipe", () => {
+  test("a run that lost events derives nothing: its ignored writes are private, and no recipe", () => {
     const writes = classify([
       { ...install, observed: { kind: "lost", events: 2 } },
     ])
-    expect(writes.classes.get("node_modules/a/index.js")).toBe("local")
+    expect(writes.classes.get("node_modules/a/index.js")).toBe("private")
     expect(writes.made).toEqual([])
   })
 
@@ -123,26 +123,26 @@ describe("classifyWrites: each written path's class", () => {
     expect(writes.classes.get("b.ts")).toBe("source")
   })
 
-  test("an ignored file a run made without reading source is local", () => {
+  test("an ignored file a run made without reading source is private", () => {
     const writes = classify([
       run({ command: "echo k > .env", writes: [made(".env")] }),
     ])
-    expect(writes.classes.get(".env")).toBe("local")
+    expect(writes.classes.get(".env")).toBe("private")
     expect(writes.made).toEqual([])
   })
 
-  test("an ignored file a run edited in place, read before written, is local", () => {
+  test("an ignored file a run edited in place, read before written, is private", () => {
     const writes = classify([
       run({ reads: ["a.ts", ".env"], writes: [rewritten(".env")] }),
     ])
-    expect(writes.classes.get(".env")).toBe("local")
+    expect(writes.classes.get(".env")).toBe("private")
   })
 
-  test("a write tool's ignored write is local, inside a derived root too", () => {
+  test("a write tool's ignored write is private, inside a derived root too", () => {
     const writes = classify([install], {
       toolWrites: ["node_modules/a/index.js"],
     })
-    expect(writes.classes.get("node_modules/a/index.js")).toBe("local")
+    expect(writes.classes.get("node_modules/a/index.js")).toBe("private")
   })
 
   test("a known root rewritten by a run that read no source stays derived", () => {
@@ -436,7 +436,7 @@ describe("ignoreQuery", () => {
 
 describe("unattributed", () => {
   const written = (...paths: string[]) => ({
-    classes: new Map(paths.map(p => [p, "local" as const])),
+    classes: new Map(paths.map(p => [p, "private" as const])),
     made: [],
     roots: new Map(),
     gone: [],
@@ -487,7 +487,7 @@ describe("unattributed", () => {
 })
 
 describe("the turn's record", () => {
-  test("derived roots and local paths, topmost; a diff's ignored path no call wrote is local", () => {
+  test("derived roots and private paths, topmost; a diff's ignored path no call wrote is private", () => {
     const writes = classify([
       install,
       run({ id: "r2", command: "echo k > .env", writes: [made(".env")] }),
@@ -507,7 +507,7 @@ describe("the turn's record", () => {
     expect(unattributed(writes, diff, [".plans"])).toEqual(["out.log"])
     expect(turnDisk(writes, ["out.log"])).toEqual({
       derived: { paths: ["node_modules"], more: 0 },
-      local: { paths: [".env", "out.log"], more: 0 },
+      private: { paths: [".env", "out.log"], more: 0 },
       unignored: [],
       leftovers: [],
       shared: NO_SHARED,
@@ -522,7 +522,7 @@ describe("the turn's record", () => {
       ignored: new Set(made103.map(w => w.path)),
     })
     const disk = turnDisk(writes, [])
-    expect([disk.local.paths.length, disk.local.more]).toEqual([100, 3])
+    expect([disk.private.paths.length, disk.private.more]).toEqual([100, 3])
   })
 
   test("topmost: a directory stands for what is under it", () => {

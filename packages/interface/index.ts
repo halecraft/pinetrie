@@ -57,6 +57,8 @@ export {
   lastEndedAsk,
 } from "./ask-view.ts"
 export {
+  ASK_FILES_TITLE,
+  askFoldWords,
   askLine,
   DENSITIES,
   type Density,
@@ -83,6 +85,7 @@ export {
 } from "./attention.ts"
 export {
   addStateIntent,
+  BOARD_MOVE_LABEL,
   type BoardKey,
   type BoardSearch,
   type BoardShown,
@@ -182,8 +185,6 @@ export {
   historyItemWords,
   historyWords,
   INVENTORY,
-  KEEP,
-  KEEP_TITLE,
   movedBackWords,
   NEW_PIN,
   NEW_PIN_TITLE,
@@ -196,8 +197,10 @@ export {
   PUT_TITLE,
   pinnedMarkerWords,
   retiredWords,
-  sizeWords,
+  SAVE,
+  SAVE_TITLE,
   TRASH_SELECTED,
+  tokenSizeWords,
   traceWords,
   writtenWords,
 } from "./card-words.ts"
@@ -250,6 +253,7 @@ export {
   promptParent,
   type ReserveStep,
   type ReviewTarget,
+  reviewToggleTitle,
   START_WORDS,
   startedWords,
   type ThreadDetails,
@@ -298,7 +302,7 @@ export {
   conflictsView,
   conflictsWords,
 } from "./conflicts-view.ts"
-export { copyText } from "./copy-text.ts"
+export { COPY_MESSAGE, copyText } from "./copy-text.ts"
 export { countWords, type ListKind } from "./count-words.ts"
 export { byteWords, plural, whenWords } from "./counts.ts"
 export {
@@ -415,6 +419,7 @@ export {
   inboxCount,
   inboxView,
   inboxWords,
+  NOT_NEEDED,
 } from "./inbox-view.ts"
 export {
   type ColumnAct,
@@ -603,6 +608,7 @@ export {
 export {
   capsulePick,
   columnLandmarks,
+  RAIL_LABEL,
   railItems,
   railKeep,
   railView,
@@ -630,6 +636,7 @@ export {
   type ReviewPref,
   reviewPrefWords,
   reviewView,
+  revisionReadWords,
   sectionState,
 } from "./review.ts"
 export {
@@ -722,6 +729,7 @@ export {
   openProposedByCanvas,
   pageTitle,
   renameIntent,
+  SIDEBAR_WORDS,
   type SidebarView,
   sidebarView,
 } from "./sidebar-view.ts"
@@ -745,6 +753,7 @@ export {
   type StartItem,
 } from "./start-button.ts"
 export {
+  moveTitle,
   type ThreadCardHead,
   type ThreadMove,
   threadCardHeads,

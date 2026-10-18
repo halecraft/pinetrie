@@ -876,10 +876,10 @@ async function mainSection(
     writeFileSync(path.join(project, "yours.txt"), "yours\n")
     await jj(project, "commit", "-m", "you add yours.txt")
     const previewed = await waitFor(
-      () => (readJjAccepted(wh.session)?.yours.catchUp ?? null) !== null,
+      () => (readJjAccepted(wh.session)?.workingCopy.catchUp ?? null) !== null,
       30_000,
     )
-    const preview = readJjAccepted(wh.session)?.yours.catchUp
+    const preview = readJjAccepted(wh.session)?.workingCopy.catchUp
     const unpublished = readJjAccepted(wh.session)?.published.behind ?? 0
     const published = await wu.actOnAccepted("publish")
     /** Who ran the newest rebase in your op log: the catch-up. */
@@ -964,13 +964,13 @@ async function mainSection(
     // Where the host starts the proposed changes, as it computes it.
     const tipCommit = commitId(laneTipCommit)
     // Your own reads, as you would run them: never snapshotting the working copy.
-    const yours: Runner = args =>
+    const repo: Runner = args =>
       run("jj", ["-R", project, "--ignore-working-copy", ...args])
-    const base = await laneBase(yours, tipCommit, DEFAULT_REPO)
+    const base = await laneBase(repo, tipCommit, DEFAULT_REPO)
     const read =
       base === null || lane2 === undefined
         ? null
-        : await startOfProposed(yours, {
+        : await startOfProposed(repo, {
             tip: tipCommit,
             base,
             repoConfig: DEFAULT_REPO,
@@ -1010,12 +1010,12 @@ async function mainSection(
     // A new root thread starts at accepted work: what you landed, not what you
     // committed and have not landed, nor your working copy.
     writeFileSync(path.join(project, "unlanded.txt"), "not landed\n")
-    const aheadBefore = readJjAccepted(wh.session)?.yours.ahead ?? 0
+    const aheadBefore = readJjAccepted(wh.session)?.workingCopy.ahead ?? 0
     await jj(project, "commit", "-m", "you add unlanded.txt")
     // The host has seen your commit (its line record counts it), so its
     // reads, pinned to the head it observed, have it too.
     await waitFor(
-      () => (readJjAccepted(wh.session)?.yours.ahead ?? 0) > aheadBefore,
+      () => (readJjAccepted(wh.session)?.workingCopy.ahead ?? 0) > aheadBefore,
       10_000,
     )
     writeFileSync(path.join(project, "unsaved.txt"), "not committed\n")

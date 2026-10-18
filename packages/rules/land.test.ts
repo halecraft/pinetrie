@@ -104,7 +104,7 @@ describe("planResolution: the land message", () => {
       reasons,
       `${"a".repeat(size / 2)}\n<<<<<<< conflict 1 of 1\nCONFLICT\n>>>>>>> conflict 1 of 1 ends\n${"b".repeat(size / 2)}`,
     )
-  const details = { lane: LANE, yours: [C1], by: ADA }
+  const details = { lane: LANE, merged: [C1], by: ADA }
   const plan = (files: ConflictFile[], tokens: number, intent = "") =>
     planResolution({
       floor: floorOf(tokens, intent),

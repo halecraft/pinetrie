@@ -26,6 +26,7 @@ import {
   planAcceptance,
   planDescribeAgain,
   planRebuild,
+  shortId,
 } from "@pinetrie/rules"
 import type { Describe } from "../../describe.ts"
 import { describe } from "./describe.ts"
@@ -107,7 +108,7 @@ export async function act(
         null,
       )
       basics.log(
-        `[host] ${readThreadName(basics.session, lane)}: proposed changes accepted by ${by} as ${planned.top.slice(0, 8)}`,
+        `[host] ${readThreadName(basics.session, lane)}: proposed changes accepted by ${by} as ${shortId(planned.top)}`,
       )
       return {
         code: null,

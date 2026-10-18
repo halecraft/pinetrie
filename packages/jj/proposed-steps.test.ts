@@ -34,14 +34,14 @@ const TIP = commitId("11111111")
 const NEW_TIP = commitId("22222222")
 const START = commitId("33333333")
 const TARGET = commitId("44444444")
-const NOT_YOURS = { reached: true, yoursChanged: false }
+const HOST_ONLY = { reached: true, othersChanged: false }
 const BOOKMARK = `pinetrie-proposed/${NAME}`
 const PROPOSED_CHANGES: ProposedChangesNow = {
   kind: "present",
   bookmark: BOOKMARK,
   marked: true,
   revisions: [
-    { commit: commitId("55555555"), changeId: "kxyz", since: NOT_YOURS },
+    { commit: commitId("55555555"), changeId: "kxyz", since: HOST_ONLY },
   ],
   chained: true,
   ledger: { source: TIP, start: [START] },
@@ -258,7 +258,7 @@ test("acceptanceEffects and describeEffects: the acceptance's bookmark move, and
     files: [],
     conflicts: [],
     startConflicts: [],
-    yourEdits: [],
+    workingCopyEdits: [],
     described: false,
     edited: false,
     bookmark: `pinetrie-proposed/${NAME}`,

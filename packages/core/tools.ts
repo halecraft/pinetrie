@@ -8,7 +8,7 @@ export const READ_TOOL = "read"
 export const WRITE_TOOL = "write"
 /** Replace text in a file. */
 export const EDIT_TOOL = "edit"
-/** Run a command in the lane's shell. People read it as "shell"; the model's id stays pi's. */
+/** Run a command in the lane's shell. People read it as "ran"; the model's id stays pi's. */
 export const BASH_TOOL = "bash"
 /** Search file contents. */
 export const GREP_TOOL = "grep"

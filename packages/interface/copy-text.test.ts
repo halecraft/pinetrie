@@ -48,7 +48,7 @@ test("then each call: its tool's word and subject in code, and its whole output 
       "Let me look.",
       "`read notes.txt`",
       "```\nthe secret word is MANGO\n```",
-      "`shell false`",
+      "`ran false`",
       "```\nCommand exited with code 1\n```",
     ].join("\n\n"),
   )
@@ -62,7 +62,7 @@ test("a call alone, a running one, and one with no output copy their label", () 
         { id: "b", name: "bash", subject: "true", result: done("") },
       ]),
     ),
-  ).toBe("`shell sleep 5`\n\n`shell true`")
+  ).toBe("`ran sleep 5`\n\n`ran true`")
 })
 
 test("a copied call is its command", () => {
@@ -72,7 +72,7 @@ test("a copied call is its command", () => {
         { id: "a", name: "bash", subject: "ls", intent: "List the files" },
       ]),
     ),
-  ).toBe("`shell ls`")
+  ).toBe("`ran ls`")
 })
 
 test("a subject is copied whole, fenced when it runs over lines", () => {
@@ -86,7 +86,7 @@ test("a subject is copied whole, fenced when it runs over lines", () => {
         },
       ]),
     ),
-  ).toBe("```\nshell cd x\npnpm test\n```")
+  ).toBe("```\nran cd x\npnpm test\n```")
 })
 
 test("no backticks inside close the code they are copied in", () => {
@@ -101,7 +101,7 @@ test("no backticks inside close the code they are copied in", () => {
         },
       ]),
     ),
-  ).toBe("`` shell echo `date` ``\n\n````\na\n```\nb\n````")
+  ).toBe("`` ran echo `date` ``\n\n````\na\n```\nb\n````")
 })
 
 test("a message with neither text nor calls copies nothing", () => {
@@ -116,5 +116,5 @@ test("an output with more backtick runs than a call takes arguments still copies
         { id: "a", name: "bash", subject: "x", result: done(output) },
       ]),
     ),
-  ).toBe(`\`shell x\`\n\n\`\`\`\n${output}\n\`\`\``)
+  ).toBe(`\`ran x\`\n\n\`\`\`\n${output}\n\`\`\``)
 })

@@ -40,7 +40,7 @@ import {
   answerReview,
   isNotYetAccepted,
   planReviewRead,
-  planYourEdits,
+  planWorkingCopyEdits,
   proposedChangesStatus,
   type RecordedSpan,
   type ReviewAnswer,
@@ -171,14 +171,14 @@ export function startProposedChanges(input: {
     void acceptedWork.refresh().catch(failed(basics, "reading accepted work"))
   /**
    * Only `@` moved (jjui, an editor): one shared read rewrites each open
-   * record's `yourEdits` and accepted work's record, with no lane's jj.
+   * record's `workingCopyEdits` and accepted work's record, with no lane's jj.
    */
   const markShared = () =>
     void owner
       .later("shared", async ops => {
         const { editing } = await ops.shared()
         await acceptedWork.record(ops)
-        for (const record of planYourEdits(
+        for (const record of planWorkingCopyEdits(
           readProposedByLane(basics.session).values(),
           editing,
         ))

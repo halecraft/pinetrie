@@ -178,6 +178,8 @@ export interface AgentMessageLike {
   }
   /** Role `fact` only, for a member's: who left the thread's members. */
   readonly member?: { readonly gone: ThreadId }
+  /** Role `fact` only: what its line leaves out, such as jj's ids, shown as its title. */
+  readonly detail?: string
   /** Role `chat` only: the other threads' agents it asks and invites. */
   readonly asks?: readonly ThreadId[]
   readonly invites?: readonly ThreadId[]
@@ -235,6 +237,8 @@ export interface TranscriptMessage {
   readonly merged?: readonly PointId[]
   /** Roles `relay`, `answer` and `heard` only: the thread it came from. */
   readonly from?: ThreadId
+  /** Role `fact` only: what its line leaves out, as its title. */
+  readonly detail?: string
 }
 
 /**
@@ -404,6 +408,8 @@ function renderableMessage(entry: EntryLike): TranscriptMessage | null {
   const heard = entry.message?.heard
   if (role === "heard" && heard !== undefined)
     return { ...message, from: heard.from }
+  const detail = entry.message?.detail
+  if (role === "fact" && detail !== undefined) return { ...message, detail }
   const calls = role === "assistant" ? messageToolCalls(entry.message) : []
   return calls.length === 0 ? message : { ...message, toolCalls: calls }
 }

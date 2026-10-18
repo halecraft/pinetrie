@@ -39,7 +39,7 @@ const proposed: JjProposedChangesRecord = {
   files: ["a.txt", "b.txt"],
   conflicts: [],
   startConflicts: [],
-  yourEdits: [],
+  workingCopyEdits: [],
   described: true,
   edited: false,
   bookmark: "pinetrie-proposed/t-1",

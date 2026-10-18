@@ -228,7 +228,8 @@ async function sharedSection(
     await jj(dir, "commit", "-m", "you share notes")
     // Published once accepted work's record has seen your commit.
     await waitFor(
-      () => (readJjAccepted(h.host.session)?.yours.catchUp ?? null) !== null,
+      () =>
+        (readJjAccepted(h.host.session)?.workingCopy.catchUp ?? null) !== null,
       30_000,
     )
     await h.user.actOnAccepted("publish")

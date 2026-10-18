@@ -702,7 +702,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   `message.tsx`, a `div.tool`), and `rowView` (`@pinetrie/interface`,
   `tool-row.ts`, ADR-0123) decides all it draws but its head, in this
   order:
-  - `.tool-head`: `.tool-tag`, the tool's word ("shell", "read", "search",
+  - `.tool-head`: `.tool-tag`, the tool's word ("ran", "read", "searched",
     ADR-0114), absent for a call that touched nothing it names, whose word
     is then its command; then `.tool-status`, ✓ or ✗ (`callMark`). A
     running call has no mark: once ringed, it has `.tool-elapsed`, how long
@@ -800,7 +800,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   - **The header's one button** (`.next-button`) is `.stop` (sending
     `stop`), `.resume` (`carry-on`) or `.release-queue` ("send queue (n)",
     the `holdQueue` act). Its ⋯ (`.queue-menu-trigger`) holds `.resume`,
-    `.hold-queue`, `.release-queue` ("release hold") and `.unqueue-all`.
+    `.hold-queue`, `.release-queue` ("unpause") and `.unqueue-all`.
     The browser suite reads `.stop` as "the lane runs" (`page.ts`), and a
     carry-on message's row is `.msg.carry-on`. No header is drawn
     read-only, nor for a thread with no lane.

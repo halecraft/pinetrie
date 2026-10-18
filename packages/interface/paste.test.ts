@@ -88,7 +88,7 @@ describe("shareChip", () => {
   test("its name, format and size; an opaque file downloads, text opens beside the thread", () => {
     expect(shareChip(share("report.pdf", "application/octet-stream"))).toEqual({
       name: "report.pdf",
-      meta: "PDF · 2.0 MB",
+      meta: "PDF · 2.1 MB",
       location: null,
       opens: "download",
     })
@@ -99,7 +99,7 @@ describe("shareChip", () => {
     const chip = shareChip(
       share("Makefile", "text/markdown", { hasLocation: true, size: 12 }),
     )
-    expect(chip.meta).toBe("file · 12 B")
+    expect(chip.meta).toBe("file · 12 bytes")
     expect(chip.location).toBe("holds a location")
   })
 })

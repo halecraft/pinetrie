@@ -55,7 +55,7 @@ describe("accepted work", () => {
     log: null,
     wips: [],
     published: { commit: null, behind: 0, ahead: 0 },
-    yours: {
+    workingCopy: {
       behind: 0,
       ahead: 0,
       catchUp: null,
@@ -110,9 +110,9 @@ describe("accepted work", () => {
   })
   describe("publish", () => {
     const main = commitId("m1")
-    const yours = (
-      over: Partial<JjAcceptedRecord["yours"]> = {},
-    ): JjAcceptedRecord["yours"] => ({
+    const workingCopyFacts = (
+      over: Partial<JjAcceptedRecord["workingCopy"]> = {},
+    ): JjAcceptedRecord["workingCopy"] => ({
       behind: 0,
       ahead: 0,
       catchUp: null,
@@ -133,7 +133,7 @@ describe("accepted work", () => {
     test("with publish.catchUp off it moves the publish bookmark alone, whatever the working copy holds", () => {
       const r = at(unpublished, {
         publishCatchesUp: false,
-        yours: yours({
+        workingCopy: workingCopyFacts({
           behind: 2,
           ahead: 3,
           conflicts: { commits: 1, files: ["a"] },
@@ -148,13 +148,17 @@ describe("accepted work", () => {
       })
       expect(publishWork(r)).toEqual({
         acceptedCommits: 2,
-        yours: 0,
+        workingCopyCommits: 0,
         catchUp: false,
       })
     })
     test("with publish.catchUp on it catches the working copy up and accepts your commits", () => {
       const r = at(unpublished, {
-        yours: yours({ behind: 2, ahead: 1, catchUp: preview }),
+        workingCopy: workingCopyFacts({
+          behind: 2,
+          ahead: 1,
+          catchUp: preview,
+        }),
       })
       expect(planAcceptedAction("publish", r)).toEqual({
         kind: "publish",
@@ -165,14 +169,20 @@ describe("accepted work", () => {
       })
       expect(publishWork(r)).toEqual({
         acceptedCommits: 2,
-        yours: 1,
+        workingCopyCommits: 1,
         catchUp: true,
       })
     })
     test("with nothing unpublished, your commits or files behind are still work", () => {
-      expect(code(at(published, { yours: yours({ ahead: 1 }) }))).toBeNull()
       expect(
-        code(at(published, { yours: yours({ behind: 1, catchUp: preview }) })),
+        code(at(published, { workingCopy: workingCopyFacts({ ahead: 1 }) })),
+      ).toBeNull()
+      expect(
+        code(
+          at(published, {
+            workingCopy: workingCopyFacts({ behind: 1, catchUp: preview }),
+          }),
+        ),
       ).toBeNull()
     })
     test("refused, in order: no line, no bookmark, main ahead, your conflicts, no shared commit, nothing to do", () => {
@@ -184,7 +194,11 @@ describe("accepted work", () => {
         code(
           at(
             { commit: main, behind: 3, ahead: 2 },
-            { yours: yours({ conflicts: { commits: 1, files: [] } }) },
+            {
+              workingCopy: workingCopyFacts({
+                conflicts: { commits: 1, files: [] },
+              }),
+            },
           ),
         ),
       ).toBe(ERR.NOT_FAST_FORWARD)
@@ -193,20 +207,23 @@ describe("accepted work", () => {
         { conflicts: { commits: 0, files: ["a.txt"] } },
         { behind: 1, catchUp: { ...preview, conflicts: ["a.txt"] } },
       ])
-        expect(code(at(unpublished, { yours: yours(over) }))).toBe(
-          ERR.YOURS_CONFLICT,
-        )
-      expect(code(at(unpublished, { yours: yours({ behind: 1 }) }))).toBe(
-        ERR.REFUSED,
-      )
+        expect(
+          code(at(unpublished, { workingCopy: workingCopyFacts(over) })),
+        ).toBe(ERR.WORKING_COPY_CONFLICT)
+      expect(
+        code(at(unpublished, { workingCopy: workingCopyFacts({ behind: 1 }) })),
+      ).toBe(ERR.REFUSED)
       expect(code(at(published))).toBe(ERR.REFUSED)
     })
     test("nothingToPublish is the rule's own nothing to do", () => {
       for (const r of [
         at(published),
         at(unpublished),
-        at(published, { yours: yours({ ahead: 1 }) }),
-        at(published, { publishCatchesUp: false, yours: yours({ ahead: 1 }) }),
+        at(published, { workingCopy: workingCopyFacts({ ahead: 1 }) }),
+        at(published, {
+          publishCatchesUp: false,
+          workingCopy: workingCopyFacts({ ahead: 1 }),
+        }),
       ])
         expect(nothingToPublish(publishWork(r))).toBe(code(r) === ERR.REFUSED)
     })
@@ -224,9 +241,9 @@ describe("accepted work", () => {
       expect(
         acceptedRefusal(
           "publish",
-          ERR.YOURS_CONFLICT,
+          ERR.WORKING_COPY_CONFLICT,
           at(unpublished, {
-            yours: yours({
+            workingCopy: workingCopyFacts({
               conflicts: { commits: 1, files: ["a", "b", "c", "d", "e"] },
             }),
           }),
@@ -235,9 +252,9 @@ describe("accepted work", () => {
       expect(
         acceptedRefusal(
           "publish",
-          ERR.YOURS_CONFLICT,
+          ERR.WORKING_COPY_CONFLICT,
           at(unpublished, {
-            yours: yours({
+            workingCopy: workingCopyFacts({
               behind: 1,
               catchUp: { ...preview, conflicts: ["x.ts"] },
             }),
@@ -255,9 +272,13 @@ describe("accepted work", () => {
         accept: false,
       } as const
       const after = (
-        over: Partial<JjAcceptedRecord["yours"]> = {},
+        over: Partial<JjAcceptedRecord["workingCopy"]> = {},
         ahead = 0,
-      ) => at({ commit: main, behind: 2, ahead }, { yours: yours(over) })
+      ) =>
+        at(
+          { commit: main, behind: 2, ahead },
+          { workingCopy: workingCopyFacts(over) },
+        )
       test.each([
         [
           "without a catch-up: the move as decided",
@@ -280,7 +301,7 @@ describe("accepted work", () => {
             after: after({ conflicts: { commits: 1, files: [] } }),
             op: "op1",
           },
-          { kind: "undo", op: "op1", code: ERR.YOURS_CONFLICT },
+          { kind: "undo", op: "op1", code: ERR.WORKING_COPY_CONFLICT },
         ],
         [
           "main moved meanwhile: reverted",
@@ -321,14 +342,14 @@ describe("accepted work", () => {
     const after = record({
       commit: commitId("c1"),
       published: { commit: commitId("m1"), behind: 1, ahead: 1 },
-      yours: {
+      workingCopy: {
         behind: 0,
         ahead: 2,
         catchUp: null,
         conflicts: { commits: 2, files: [] },
       },
     })
-    expect(publishUndone(ERR.YOURS_CONFLICT, after)).toBe(
+    expect(publishUndone(ERR.WORKING_COPY_CONFLICT, after)).toBe(
       "catching the working copy up would leave 2 commits of yours with conflicts",
     )
     expect(publishUndone(ERR.NOT_FAST_FORWARD, after)).toBe(

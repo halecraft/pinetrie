@@ -5,6 +5,7 @@
 // name is a seed for the session's display name (`reconcileName`); its field
 // is your profile's too (`name-input.tsx`).
 
+import { PRODUCT_NAME } from "@pinetrie/core"
 import { type Identity, parseIdentity } from "@pinetrie/interface"
 import { useState } from "react"
 import { createRoot } from "react-dom/client"
@@ -28,7 +29,7 @@ function IdentityForm({ onDone }: { onDone: (identity: Identity) => void }) {
         else setProblem(parsed.problem)
       }}
     >
-      <h1>pinetrie</h1>
+      <h1>{PRODUCT_NAME}</h1>
       <label>
         email:{" "}
         <input

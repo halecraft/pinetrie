@@ -70,7 +70,7 @@ export function placeRefusal(
 ): MoveRefusal | null {
   const kind = kindOfCard(card)
   if (!KINDS[kind].moves || !fitsPlace(kind, to.kind)) return "no-place"
-  if (!ownsPlace(to, sender)) return "not-yours"
+  if (!ownsPlace(to, sender)) return "someone-elses"
   return to.kind === "inventory" && inventoryFull(cards, sender, card)
     ? "full"
     : null

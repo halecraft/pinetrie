@@ -5,13 +5,13 @@ import {
   firstEmpty,
   NO_INTENTS,
   planSlots,
+  putAwayWrites,
   repairStep,
   type Slots,
   STEADY_MS,
   settleSlots,
   steadiness,
   swapWrites,
-  takeIntoInventoryWrites,
 } from "./inventory.ts"
 
 const _ADA = writerId("ada@x.io")
@@ -201,7 +201,7 @@ describe("settleSlots and planSlots: the repair", () => {
 
   test("a take into the inventory writes its slot, and clears any other slot holding the card", () => {
     expect(
-      takeIntoInventoryWrites(
+      putAwayWrites(
         slotsOf({
           "2": cardIdFor("ca"),
           "3": cardIdFor("cb"),

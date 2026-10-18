@@ -167,8 +167,8 @@ describe("what is written reads back", () => {
     const at = { lane: LANE, name: NAME, entry: "e9" }
     const m = "feat: x\n\nwhy it changed\n"
     expect(withoutTrailers(withTrailers(m, at))).toBe(m.trim())
-    const yours = "feat: x\n\nSigned-off-by: Ada <ada@x.io>"
-    expect(withoutTrailers(withTrailers(yours, at))).toBe(yours)
+    const message = "feat: x\n\nSigned-off-by: Ada <ada@x.io>"
+    expect(withoutTrailers(withTrailers(message, at))).toBe(message)
     expect(
       withoutTrailers(`feat: x\n\nSigned-off-by: Ada\nPinetrie-Entry: e1`),
     ).toBe("feat: x\n\nSigned-off-by: Ada\nPinetrie-Entry: e1")

@@ -287,6 +287,13 @@ export {
 } from "./context.ts"
 export { type CopyPlan, type CopyThread, planCopy } from "./copy.ts"
 export {
+  byteWords,
+  count,
+  noteCountWords,
+  plural,
+  shortId,
+} from "./counts.ts"
+export {
   type Answer,
   type AskLines,
   askLines,
@@ -528,7 +535,7 @@ export {
   planRebuild,
   planRefresh,
   planStackEnded,
-  planYourEdits,
+  planWorkingCopyEdits,
   proposedChangesRecord,
   proposedChangesSeen,
   proposedChangesStatus,
@@ -712,7 +719,6 @@ export {
   shareMarkdown,
   shareQuote,
   shareQuoteMarkdown,
-  sizeWords,
   type TextBlob,
   textBlobs,
 } from "./shares.ts"
@@ -744,6 +750,7 @@ export {
 export { decodeStack, planStack, type StackMessage } from "./stack.ts"
 export { planStartup } from "./startup.ts"
 export {
+  CARRY_ON_TYPE,
   type CarryOnMessage,
   carryOnState,
   decodeCarryOn,

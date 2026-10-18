@@ -275,6 +275,8 @@ export interface LaneJoin {
 /** Proposed changes' words: its line, and a label for each button and menu row. */
 export interface WorkStripWords {
   readonly line: string
+  /** What the line leaves out, as its title: jj's ids. Null for none. */
+  readonly lineTitle: string | null
   /** Your last command on proposed changes here: in flight, refused or failed; null for none. */
   readonly note: string | null
   readonly buttons: readonly LabelledButton[]
@@ -298,7 +300,7 @@ interface LabelledButton {
 export interface ReviewTarget {
   readonly conflicts: readonly string[]
   /** Files you are editing in your working copy: jj proposed changes' alone. */
-  readonly yourEdits: readonly string[]
+  readonly workingCopyEdits: readonly string[]
   readonly spans: readonly DiffSpan[]
   readonly title?: string
 }
@@ -437,8 +439,8 @@ export function columnView(f: ColumnFacts): ColumnShows {
 
 /**
  * The header's mark for a thread whose base has new work for it: catching
- * up would change files (`catchUpNow`'s `brings`). Its title says how many,
- * and adds the jj facts, the bookmark and both commits.
+ * up would change files (`catchUpNow`'s `brings`). Its title says how many;
+ * jj's bookmark and commits are the thread's details', not its mark's.
  */
 export function behindMark(
   base: BaseRecord | undefined,
@@ -449,7 +451,7 @@ export function behindMark(
   const { move } = now
   return {
     mark: "↓",
-    title: `${baseMovedOn(move.base)} since this thread started, in ${count(now.files, "file", "files")} · ${move.bookmark}: ${move.from.slice(0, 8)} → ${move.to.slice(0, 8)}`,
+    title: `${baseMovedOn(move.base)} since this thread started, in ${count(now.files, "file", "files")}`,
   }
 }
 
@@ -652,7 +654,7 @@ function sourceOf(f: ColumnFacts): HeadOrigin | null {
   const laneFork = f.work.laneForks.get(thread)
   const lost =
     copied && laneFork?.state === "begun" && laneFork.lost !== null
-      ? ["its files were not kept"]
+      ? ["its files could not be copied"]
       : []
   return {
     kind: "source",
@@ -736,12 +738,12 @@ const proposedReview = (record: ProposedChangesRecord): ReviewTarget =>
     ? {
         spans: [{ kind: "range", from: record.start, to: record.tip }],
         conflicts: record.conflicts,
-        yourEdits: [],
+        workingCopyEdits: [],
       }
     : {
         spans: record.commits.map(commit => ({ kind: "revision", commit })),
         conflicts: record.conflicts,
-        yourEdits: record.yourEdits,
+        workingCopyEdits: record.workingCopyEdits,
       }
 
 /** What a lane runs now, as its proposed changes cares: a turn, a resolution, a split. */
@@ -811,7 +813,9 @@ export function workStripWords(
 ): WorkStripWords {
   const { state, facts } = view
   const files = count(facts.files, "file", "files")
-  const yours = facts.touchesYourEdits ? " · touches files you're editing" : ""
+  const editing = facts.touchesWorkingCopyEdits
+    ? " · touches files you're editing"
+    : ""
   const base = catchUpName(facts.base)
   const parent = facts.parent === null ? null : catchUpName(facts.parent)
   const conflicted = count(facts.conflicts, "file", "files")
@@ -846,7 +850,7 @@ export function workStripWords(
               ? `resolving what's new in ${base} into this thread`
               : "splitting the changes into a stack"
           : state === "accepted"
-            ? `accepted as ${(facts.acceptedAs ?? "").slice(0, 8)}`
+            ? "accepted ✓"
             : state === "needs_you"
               ? "the agent has a question about your edits · see the thread"
               : state === "edited"
@@ -856,8 +860,8 @@ export function workStripWords(
                   : state === "stale"
                     ? `a stack of ${facts.size}, and changes since`
                     : state === "stack"
-                      ? `a stack of ${facts.size} · ${files} changed${yours}`
-                      : `${files} changed${yours}`
+                      ? `a stack of ${facts.size} · ${files} changed${editing}`
+                      : `${files} changed${editing}`
   const line =
     brings && state !== "nothing" && state !== "busy" && state !== "running"
       ? `${said} · ${baseMovedOn(facts.base)}`
@@ -884,8 +888,6 @@ export function workStripWords(
           ? `accept anyway${where}`
           : `accept changes${where}`
   }
-  const baseBookmark =
-    facts.base.kind === "accepted" ? intoBookmark : facts.base.bookmark
   const labelled = (button: WorkStripButton): LabelledButton => {
     switch (button) {
       case "accept":
@@ -906,7 +908,7 @@ export function workStripWords(
           label:
             toAccepted === undefined || toAccepted.bringsAlong === 0
               ? "accept"
-              : `accept, with your ${count(toAccepted.bringsAlong, "commit", "commits")} beneath it`,
+              : `accept, with ${count(toAccepted.bringsAlong, "of your own changes", "of your own changes")}`,
           ...titled(intoBookmark === null ? undefined : moves(intoBookmark)),
         }
       case "update": {
@@ -916,14 +918,14 @@ export function workStripWords(
           // Catching up is how a conflict is resolved: the agent resolves
           // what the merge leaves.
           label: state === "conflicts" ? `${label} and resolve` : label,
-          title: catchUpTitle(facts.catchUp, base, baseBookmark),
+          title: catchUpTitle(facts.catchUp, base),
         }
       }
       case "continue":
         return {
           button,
           label: commandWords("continue-on-accepted", catchUps),
-          title: `merges ${intoBookmark ?? catchUpName({ kind: "accepted" })} into this thread's copy, its base from then on`,
+          title: `merges ${catchUpName({ kind: "accepted" })} into this thread's copy, its base from then on`,
         }
       case "catch-up-parent":
         return {
@@ -954,6 +956,10 @@ export function workStripWords(
       : labelled(button)
   return {
     line,
+    lineTitle:
+      state === "accepted" && facts.acceptedAs !== null
+        ? `change id ${facts.acceptedAs}`
+        : null,
     note: actingWords(acting, view.destinations),
     buttons: view.buttons.map(shown),
     menu: view.menu.map(shown),
@@ -964,13 +970,8 @@ export function workStripWords(
  * Catching up's title: what it merges, and what that changes, or why it
  * changes nothing.
  */
-function catchUpTitle(
-  catchUp: CatchUpNow,
-  base: string,
-  /** The base's bookmark; null for a folder project's accepted work, which has none. */
-  bookmark: string | null,
-): string {
-  const merges = `merges ${bookmark ?? base} into this thread's copy`
+function catchUpTitle(catchUp: CatchUpNow, base: string): string {
+  const merges = `merges ${base} into this thread's copy`
   switch (catchUp.kind) {
     case "current":
       return `already caught up with ${base}`
@@ -985,6 +986,10 @@ function catchUpTitle(
 
 const titled = (title: string | undefined) =>
   title === undefined ? {} : { title }
+
+/** The strip's line, when it opens the review: what a press does. */
+export const reviewToggleTitle = (open: boolean): string =>
+  open ? "close the review" : "see the changes"
 
 /** A lane-start divider's words. */
 export function joinWords(join: LaneJoin): string {

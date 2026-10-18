@@ -125,13 +125,13 @@ export function startJjProject(dir: JjProjectDir): ProjectAdapter {
           }
         },
         async acceptedNow() {
-          const yours = await owner.read(({ jj }) =>
+          const accepted = await owner.read(({ jj }) =>
             readCommits(jj, acceptedRev),
           )
           return {
-            points: yours.map(pointFromCommit),
+            points: accepted.map(pointFromCommit),
             checkout: (fresh: boolean) =>
-              baseCheckout(planBaseCheckout({ yours, fresh })),
+              baseCheckout(planBaseCheckout({ accepted, fresh })),
           }
         },
 

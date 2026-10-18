@@ -273,7 +273,7 @@ describe("walkToHost", () => {
   const id = commitId
   test("a revision the host made last: reached at once, none of yours", () => {
     const entries = evolog(["c2", HOST, "c1"], ["c1", "you@mac", ""])
-    expect(walkToHost(entries, id("c2"))).toEqual({ reached: true, yours: [] })
+    expect(walkToHost(entries, id("c2"))).toEqual({ reached: true, other: [] })
   })
   test("your versions since the host's newest are listed, each with the one before it", () => {
     const entries = evolog(
@@ -284,7 +284,7 @@ describe("walkToHost", () => {
     )
     expect(walkToHost(entries, id("c4"))).toEqual({
       reached: true,
-      yours: [
+      other: [
         { from: id("c3"), to: id("c4") },
         { from: id("c2"), to: id("c3") },
       ],
@@ -304,15 +304,15 @@ describe("walkToHost", () => {
     )
     expect(walkToHost(entries, id("c2"))).toEqual({
       reached: true,
-      yours: [{ from: id("c1"), to: id("c2") }],
+      other: [{ from: id("c1"), to: id("c2") }],
     })
   })
 })
 
 describe("planSinceHost: what a revision's read since the host needs next", () => {
   const HOST = commitId("h1")
-  const host = { reached: true, yoursChanged: false }
-  const unreached = { reached: false, yoursChanged: false }
+  const host = { reached: true, othersChanged: false }
+  const unreached = { reached: false, othersChanged: false }
   test("marked proposed changes are the host's, with nothing read", () => {
     expect(planSinceHost({ marked: true, host: HOST, walked: null })).toEqual({
       kind: "known",
@@ -323,10 +323,10 @@ describe("planSinceHost: what a revision's read since the host needs next", () =
     expect(planSinceHost({ marked: false, host: HOST, walked: null })).toEqual({
       kind: "walk",
     })
-    const yours = { reached: true, yoursChanged: true }
-    expect(planSinceHost({ marked: false, host: HOST, walked: yours })).toEqual(
-      { kind: "known", facts: yours },
-    )
+    const edited = { reached: true, othersChanged: true }
+    expect(
+      planSinceHost({ marked: false, host: HOST, walked: edited }),
+    ).toEqual({ kind: "known", facts: edited })
   })
   test("a walk that cannot reach the host compares with the host's version, or with none is what it found", () => {
     expect(
@@ -409,7 +409,7 @@ describe("planObserve: what moved between two fingerprints", () => {
     all: false,
     acceptedMoved: false,
     published: false,
-    yours: false,
+    workingCopy: false,
     lanes: new Set(),
     proposed: new Set(),
   }
@@ -425,7 +425,7 @@ describe("planObserve: what moved between two fingerprints", () => {
     [
       "@ alone moved",
       fp(base, "c0000000-0000-7000-8000-000000000105"),
-      { ...none, yours: true },
+      { ...none, workingCopy: true },
     ],
     [
       "the publish bookmark moved: accepted work's record alone",

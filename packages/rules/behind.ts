@@ -11,6 +11,7 @@ import { Type } from "typebox"
 import type { AcceptedRecord } from "./accepted.ts"
 import { type BaseRecord, catchUpNow } from "./base.ts"
 import { baseMovedOn, CatchUpFromSchema } from "./catch-up-from.ts"
+import { count } from "./counts.ts"
 import { List, PointSchema } from "./decode.ts"
 import { type HistoryMessage, historyMessage } from "./history.ts"
 
@@ -36,12 +37,9 @@ export type BehindMessage = HistoryMessage<typeof BEHIND_TYPE, BehindView>
 export const decodeBehind = (message: unknown): BehindView | undefined =>
   BEHIND.decode(message)
 
-const plural = (n: number, one: string, many: string) =>
-  `${n} ${n === 1 ? one : many}`
-
 /** The one line a column shows for a base's news. */
 export const behindLine = (v: BehindView): string =>
-  `↓ ${baseMovedOn(v.from)}: ${plural(v.files.length, "file", "files")}${v.overlap.length === 0 ? "" : `, ${v.overlap.length} this thread changed too`}`
+  `↓ ${baseMovedOn(v.from)}: ${count(v.files.length, "file", "files")}${v.overlap.length === 0 ? "" : `, ${v.overlap.length} this thread changed too`}`
 
 /** Some names, then how many more. */
 const named = (files: readonly string[]): string => {
@@ -61,7 +59,7 @@ export function behindContent(v: BehindView): string {
       ? ""
       : `\nThis thread's proposed changes conflict with it in:\n${named(v.conflicts)}`
   return (
-    `${baseMovedOn(v.from)} since this thread's copy was made or last caught up. Catching up would change ${plural(v.files.length, "file", "files")}:\n${named(v.files)}\n` +
+    `${baseMovedOn(v.from)} since this thread's copy was made or last caught up. Catching up would change ${count(v.files.length, "file", "files")}:\n${named(v.files)}\n` +
     `${overlap}${conflicts}\n` +
     `To merge it into this copy, call \`${CATCH_UP_TOOL}\`, alone in its turn. Nothing is merged until you do.`
   )

@@ -10,7 +10,7 @@ export const LAND_TYPE = "pinetrie.land"
 const LandDetailsSchema = Type.Object({
   lane: ThreadIdSchema,
   /** The state that was merged: accepted work's, a WIP's copy, or the parent's. */
-  yours: List(PointSchema),
+  merged: List(PointSchema),
   /** The files that conflicted when it merged. */
   files: List(Type.String()),
   /** The skill the run followed, and a hash of its content; null with none found. */

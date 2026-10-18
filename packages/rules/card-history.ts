@@ -219,7 +219,7 @@ export type Verb =
   | "unqueued"
   | "pinned"
   | "unpinned"
-  | "took-into-inventory"
+  | "put-away"
   | "put"
   | "discarded"
   | "moved"
@@ -294,7 +294,7 @@ export function changeVerb(from: PlaceKey | null, to: PlaceKey | null): Verb {
   if (to.kind === "trash") return "discarded"
   if (to.kind === "queued") return "queued"
   if (to.kind === "pinned" || to.kind === "canvas-pinned") return "pinned"
-  if (to.kind === "inventory") return "took-into-inventory"
+  if (to.kind === "inventory") return "put-away"
   if (from.kind === "inventory") return "put"
   return "moved"
 }

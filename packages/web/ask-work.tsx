@@ -5,8 +5,10 @@
 
 import type { EntryId } from "@pinetrie/core"
 import {
+  ASK_FILES_TITLE,
   type AskSummary,
   type AskView,
+  askFoldWords,
   type Density,
   type FoldMemory,
   planAskWork,
@@ -70,7 +72,7 @@ export function AskWork({
   const draw = planAskWork(view, parts, { choice, density })
   const { open } = draw
   const toggle = () => folds.set(ask, toggled(open))
-  const title = open ? "fold this ask's work" : "show this ask's work"
+  const title = askFoldWords(open)
   // One flat list of children in `draw`'s order, each message keyed by its
   // entry: a message that moves into a fold as its run goes on keeps its
   // element, and a running tool row the element its result replaces its live
@@ -117,7 +119,7 @@ export function AskWork({
               <button
                 className="ask-files"
                 onClick={() => pane.open({ kind: "ask", ask })}
-                title="review what this ask changed"
+                title={ASK_FILES_TITLE}
                 type="button"
               >
                 {row.files}

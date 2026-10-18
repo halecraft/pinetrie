@@ -3,7 +3,7 @@
 // (`@pinetrie/rules`), written once the host keeps the file (`upload.ts`).
 
 import { blobKind, type Share } from "@pinetrie/core"
-import { sizeWords } from "@pinetrie/rules"
+import { byteWords } from "@pinetrie/rules"
 
 /** A selection in a text box, in UTF-16 offsets. */
 export interface Selection {
@@ -93,7 +93,7 @@ const formatOf = (name: string): string => {
 export function shareChip(share: Share): ShareChip {
   return {
     name: share.name,
-    meta: `${formatOf(share.name)} · ${sizeWords(share.size)}`,
+    meta: `${formatOf(share.name)} · ${byteWords(share.size)}`,
     location: share.hasLocation ? "holds a location" : null,
     opens: blobKind(share.original) === "opaque" ? "download" : "pane",
   }

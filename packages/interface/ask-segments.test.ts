@@ -71,14 +71,14 @@ describe("workStats", () => {
   const revisions = new Map([
     rev("2-a", ["a.txt", "b.txt"], {
       derived: { paths: ["node_modules"], more: 0 },
-      local: { paths: [".env", "out.log"], more: 1 },
+      private: { paths: [".env", "out.log"], more: 1 },
       unignored: ["dist"],
       leftovers: [],
       shared: NO_SHARED,
     }),
     rev("4-a", ["b.txt", "c.txt"], {
       derived: { paths: [], more: 0 },
-      local: { paths: [".env"], more: 0 },
+      private: { paths: [".env"], more: 0 },
       unignored: ["dist"],
       leftovers: ["big.bin"],
       shared: {
@@ -86,7 +86,7 @@ describe("workStats", () => {
       },
     }),
   ])
-  test("counts the work, the union of its turns' paths and local files, and its time", () => {
+  test("counts the work, the union of its turns' paths and private files, and its time", () => {
     expect(
       workStats(
         index,
@@ -101,7 +101,7 @@ describe("workStats", () => {
       calls: 2,
       failed: 1,
       files: ["a.txt", "b.txt", "c.txt"],
-      local: 3,
+      private: 3,
       unignored: 1,
       leftovers: 1,
       concurrent: 1,

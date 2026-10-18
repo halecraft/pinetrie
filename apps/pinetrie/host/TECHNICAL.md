@@ -409,30 +409,49 @@ reading the store once, planning once, then acting:
   backup is taken after the reads, before the first write. One that reads
   every root (as one built on `recordDocs` over the roots does) loads them
   all, once per store.
-- **`0001-reply-diagnostics` is registered** (ADR-0176): each stored
-  reply's list of the thinking Anthropic dropped becomes its count, by the
-  rule a new reply is stored by (`countedDiagnostics`, `@pinetrie/pi`).
-  It reads every root's entries raw and writes only the rows that change,
-  never an entry's `content`, id or parent; over its own output it plans
-  nothing (`planCountedDiagnostics`). None is retired.
-- **`0002-image-versions`** registers the places document's new hash: its
-  card record gains `versions`, which a stored record without it reads as
-  "" (ADR-0182). It moves no data.
-- **`0003-one-margin`** (ADR-0182) rewrites each comment's place from its
-  entry's id and thread to the entry's printed address, in every places row,
-  live or trashed, and every place a card's history or a trace stores
-  (`marginFieldsNow`, `planMarginRows`, `planMarginEvents`). An address
-  holds `/`, an entry's id never does, so over its own output it plans
-  nothing. A Kyneta undo of a comment's move made before it still writes the
-  old row back.
-- **`0004-card-titles`** (ADR-0182) moves each `pinetrie.note-column`
-  record to `pinetrie.card-title` under the same id, deleting the old
-  (`planCardTitles`).
+- **Registered now**, none retired:
+  - `0001-reply-diagnostics` (ADR-0176): each stored reply's list of the
+    thinking Anthropic dropped becomes its count, by the rule a new reply
+    is stored by (`countedDiagnostics`, `@pinetrie/pi`). It reads every
+    root's entries raw and writes only the rows that change, never an
+    entry's `content`, id or parent; over its own output it plans nothing
+    (`planCountedDiagnostics`).
+  - `0002-image-versions` registers the places document's new hash: its
+    card record gains `versions`, which a stored record without it reads as
+    "" (ADR-0182). It moves no data.
+  - `0003-one-margin` (ADR-0182) rewrites each comment's place from its
+    entry's id and thread to the entry's printed address, in every places
+    row, live or trashed, and every place a card's history or a trace
+    stores (`marginFieldsNow`, `planMarginRows`, `planMarginEvents`). An
+    address holds `/`, an entry's id never does, so over its own output it
+    plans nothing. A Kyneta undo of a comment's move made before it still
+    writes the old row back.
+  - `0004-card-titles` (ADR-0182) moves each `pinetrie.note-column` record
+    to `pinetrie.card-title` under the same id, deleting the old
+    (`planCardTitles`).
+  - ADR-0172's renames: `0005-accepted-working-copy` and
+    `0006-proposed-working-copy-edits` rename accepted work's `yours` and
+    each proposed changes record's `yourEdits`, which an old record would
+    otherwise keep, undecoded, until the host's next observation, or for
+    good where the lane's proposed changes have ended; `0007-land-merged`
+    renames each land message's `details.yours` to `merged`, which
+    `baseKnown` reads; `0008-turn-disk-private` renames each turn record's
+    `disk.local` to `disk.private`; `0009-access-answers` renames each
+    access record's `approved` to `allowed`, and `refused` with `revoked`
+    to `denied` with `takenBack`; `0010-ssh-fact-words` renames each ssh
+    fact's news `refused` to `denied` and `revoked` to `taken-back`, and
+    `0011-carry-on-ssh-allowed` each carry-on's reason `ssh-approved` to
+    `ssh-allowed`, `content` untouched in both.
 - **A migration that only reshapes one namespace's records,** record by
   record, is a pure rewrite over `rewriteRecords` (`migrations/rewrite.ts`,
   over `recordDocs`, which any record migration reads a home's documents
   with), which reads every document the namespace lives in before it
-  writes any.
+  writes any. `renamedFields` is the rewrite that renames top-level
+  fields.
+- **A migration that only reshapes one kind of history message** is a pure
+  rewrite of its stored `details` over `rewriteHistory`
+  (`planHistoryRewrites`), which reads every root before it writes any and
+  never touches `content`, what the model read.
 
 ## Blobs hold any file (`blobs.ts`, ADR-0126, ADR-0151)
 
@@ -1569,20 +1588,20 @@ adapter's.
   `known_hosts` is said in the log.
 - **The record is the one truth, and no signature waits on it**
   (ADR-0178). The relay's `mayUsePersonal` is answered at once
-  (`planPersonalSign`): an approved lane signs, any other is refused, and
+  (`planPersonalSign`): an allowed lane signs, any other is refused, and
   a lane that never asked writes `waiting` as it is refused. The
   `ssh-access` command only writes the record.
 - **Each change to the record is news, once** (`planAccessChange`,
-  `LaneSsh.onNews`, lane work's `onSshNews`): asked, approved, refused or
-  revoked. It is read from the record, not from whoever wrote it, so two
+  `LaneSsh.onNews`, lane work's `onSshNews`): asked, allowed, denied or
+  taken back. It is read from the record, not from whoever wrote it, so two
   signatures that both wrote `waiting` make one change and one piece of
-  news. A revoke closes the lane's connections through the host
+  news. A take-back closes the lane's connections through the host
   (`host.cut`), and containers run `KILL_SSH` in it.
 - **Ssh news reaches the lane** (`ssh-news.ts`, made after the agent,
   beside base news): a late step on the lane's thread, so a thread out of
   reach is skipped, placed by the delivery an answer uses (`delivery.ts`).
-  A request, a refusal and a revoke are ssh facts, steered into a running
-  lane or appended; an approval is its owner's carry-on, which wakes an
+  A request, a denial and a take-back are ssh facts, steered into a running
+  lane or appended; an allowance is its owner's carry-on, which wakes an
   idle lane (`planSshNews`).
 - **A signature refused for a host outside your allowed ones** is written
   to the lane's record (`planAccessOutside`) and logged, once each time
@@ -1781,9 +1800,9 @@ adapter's.
   move of accepted work or a WIP, or the first observation (`all`), marks the
   line's record, every named lane whose root is not archived, and every
   open record; your `@` alone
-  (`yours`, jjui and your editor) marks no lane: one `later("shared")` step
-  rewrites each open record's `yourEdits` (its files that `@` changes,
-  `planYourEdits`) and
+  (`workingCopy`, jjui and your editor) marks no lane: one `later("shared")` step
+  rewrites each open record's `workingCopyEdits` (its files that `@` changes,
+  `planWorkingCopyEdits`) and
   accepted work's record from its own facts (`acceptedFacts`); a lane's
   ref (a fetch's import) marks that lane; proposed bookmark the lane its
   thread names. A run's end marks its lane, then describes it. A refresh

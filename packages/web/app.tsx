@@ -113,6 +113,7 @@ import {
   rootSeed,
   type SearchState,
   type SeenEnd,
+  SIDEBAR_WORDS,
   type Spot,
   type Strip as StripView,
   screenMemory,
@@ -902,7 +903,7 @@ export function App({
       }),
     [mine, filled, layout, archivedCanvases, canvases, index],
   )
-  const yours = useMemo(
+  const mineOnRail = useMemo(
     () => ({ ends: unsent.ends, color: colorOf(session.writer) }),
     [unsent.ends, colorOf, session.writer],
   )
@@ -914,9 +915,9 @@ export function App({
       columnLandmarks(rail, {
         activity,
         ends,
-        cards: yours.ends,
+        cards: mineOnRail.ends,
       }),
-    [rail, activity, ends, yours.ends],
+    [rail, activity, ends, mineOnRail.ends],
   )
 
   // `App` writes presence and reads none: a read here would render every
@@ -1720,7 +1721,7 @@ export function App({
               width={listWidth}
             />
           ) : (
-            <nav aria-label="your threads" id="sidebar" />
+            <nav aria-label={SIDEBAR_WORDS.list} id="sidebar" />
           )}
           {/* Drawn always, hidden while closed, so it opens and closes in
           motion. */}
@@ -1817,7 +1818,7 @@ export function App({
                                   })
                                 }
                                 viewports={viewports}
-                                yours={yours}
+                                mine={mineOnRail}
                               />
                             ) : (
                               <EmptyRail />

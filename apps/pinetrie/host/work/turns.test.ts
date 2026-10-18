@@ -31,7 +31,7 @@ test("a turn's title is its message's first line, else its first call's intent o
   )
   const index = readTreeIndex(doc)
   expect(revisionTitle(index, entryId("e1"))).toBe("fix it")
-  expect(revisionTitle(index, entryId("e2"))).toBe("shell ls -la")
+  expect(revisionTitle(index, entryId("e2"))).toBe("ran ls -la")
   expect(revisionTitle(index, entryId("e3"))).toBe("turn")
   expect(revisionTitle(index, entryId("e4"))).toBe("List the files")
 })

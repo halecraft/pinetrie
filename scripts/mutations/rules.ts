@@ -304,7 +304,7 @@ export const mutations: readonly Mutation[] = [
     to: "    const complete = run as CompleteRun\n",
     command: unit,
     expect:
-      "a run that lost events derives nothing: its ignored writes are local, and no recipe",
+      "a run that lost events derives nothing: its ignored writes are private, and no recipe",
   },
   {
     name: "a raced write's version is clean",
@@ -595,7 +595,7 @@ export const mutations: readonly Mutation[] = [
     to: "        (readSource ||\n",
     command: unit,
     expect:
-      "an ignored file a run edited in place, read before written, is local",
+      "an ignored file a run edited in place, read before written, is private",
   },
   {
     name: "an ignored file made without reading source is derived",
@@ -603,7 +603,7 @@ export const mutations: readonly Mutation[] = [
     from: "    const readSource = run.reads.some(\n",
     to: "    const readSource = true || run.reads.some(\n",
     command: unit,
-    expect: "an ignored file a run made without reading source is local",
+    expect: "an ignored file a run made without reading source is private",
   },
   {
     name: "a known root rewritten by a run that read no source is local",
@@ -616,10 +616,11 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a write tool's ignored write is derived",
     file: "packages/rules/disk.ts",
-    from: '    if (isIgnored(p)) classes.set(p, "local")\n',
+    from: '    if (isIgnored(p)) classes.set(p, "private")\n',
     to: '    if (isIgnored(p)) classes.set(p, "derived")\n',
     command: unit,
-    expect: "a write tool's ignored write is local, inside a derived root too",
+    expect:
+      "a write tool's ignored write is private, inside a derived root too",
   },
   {
     name: "each new file in an ignored directory is a root of its own",
@@ -1196,10 +1197,11 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an acceptance's line names no change",
     file: "packages/rules/fact.ts",
-    from: "      return `✓ accepted${into(fact.to)} as ${fact.as.slice(0, 8)}`",
-    to: "      return `✓ accepted${into(fact.to)}`",
+    from: '  return fact.kind === "accepted" ? `change id ${fact.as}` : null',
+    to: "  return null",
     command: unit,
-    expect: "factLine",
+    expect:
+      "the column draws it as its one line, role fact, an acceptance's change id as its detail",
   },
   {
     name: "an acceptance into a WIP is told as accepted work",
@@ -1220,10 +1222,11 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a fact is read as a message",
     file: "packages/rules/message.ts",
-    from: '  if (fact !== undefined)\n    return fact.kind === "stopped"\n',
-    to: '  if (fact !== undefined && false)\n    return fact.kind === "stopped"\n',
+    from: "  if (fact !== undefined) {\n    const detail = factDetail(fact)\n",
+    to: "  if (fact !== undefined && false) {\n    const detail = factDetail(fact)\n",
     command: unit,
-    expect: "the column draws it as its one line, role fact",
+    expect:
+      "the column draws it as its one line, role fact, an acceptance's change id as its detail",
   },
   {
     name: "a conflict ask is read from its text",
@@ -1494,7 +1497,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the host's own rewrite reads as your edit",
     file: "packages/rules/proposed.ts",
-    from: "  !r.reached || r.yoursChanged",
+    from: "  !r.reached || r.othersChanged",
     to: "  true",
     command: unit,
     expect:
@@ -2441,7 +2444,7 @@ export const mutations: readonly Mutation[] = [
     from: '  key.kind !== "inventory" || key.holder === sender',
     to: "  true",
     command: unit,
-    expect: "into or out of someone else's inventory is refused not-yours",
+    expect: "into or out of someone else's inventory is refused someone-elses",
   },
   {
     name: "a move out of an inventory skips whose it is",
@@ -2860,7 +2863,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a publish runs while the working copy would conflict",
     file: "packages/rules/accepted.ts",
-    from: "      return refused(ERR.YOURS_CONFLICT)\n",
+    from: "      return refused(ERR.WORKING_COPY_CONFLICT)\n",
     to: "      return OK\n",
     command: unit,
     expect: "refused, in order",
@@ -2868,7 +2871,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a publish's second round ignores your commits conflicted by the catch-up",
     file: "packages/rules/accepted.ts",
-    from: "  if (after.yours.conflicts.commits > 0)\n",
+    from: "  if (after.workingCopy.conflicts.commits > 0)\n",
     to: "  if (false)\n",
     command: unit,
     expect: "your commits conflicted by the catch-up: reverted",
@@ -2876,7 +2879,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a reverted catch-up is worded as conflicts you have",
     file: "packages/rules/accepted.ts",
-    from: '  if (code !== ERR.YOURS_CONFLICT)\n    return acceptedRefusal("publish", code, after)\n',
+    from: '  if (code !== ERR.WORKING_COPY_CONFLICT)\n    return acceptedRefusal("publish", code, after)\n',
     to: '  return acceptedRefusal("publish", code, after)\n',
     command: unit,
     expect: "publishUndone",
@@ -2884,7 +2887,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a publish's second round accepts as decided",
     file: "packages/rules/accepted.ts",
-    from: "  return { ...move, accept: after.yours.ahead > 0 }",
+    from: "  return { ...move, accept: after.workingCopy.ahead > 0 }",
     to: "  return { ...move, accept: decision.accept }",
     command: unit,
     expect: "your commits, read after the catch-up, move with accepted work",
@@ -2892,8 +2895,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "publishing needs publish.catchUp on",
     file: "packages/rules/accepted.ts",
-    from: "  if (record.commit === null) return refused(ERR.NOT_SET_UP)\n  const { published, yours } = record\n",
-    to: "  if (record.commit === null) return refused(ERR.NOT_SET_UP)\n  if (!record.catchUp) return refused(ERR.REFUSED)\n  const { published, yours } = record\n",
+    from: "  if (record.commit === null) return refused(ERR.NOT_SET_UP)\n  const { published, workingCopy } = record\n",
+    to: "  if (record.commit === null) return refused(ERR.NOT_SET_UP)\n  if (!record.catchUp) return refused(ERR.REFUSED)\n  const { published, workingCopy } = record\n",
     command: unit,
     expect: "with publish.catchUp off it moves the publish bookmark alone",
   },
@@ -2924,8 +2927,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "with publish.catchUp off a publish catches files up",
     file: "packages/rules/accepted.ts",
-    from: "    catchUp: publishCatchesUp && yours.behind > 0,",
-    to: "    catchUp: yours.behind > 0,",
+    from: "    catchUp: publishCatchesUp && workingCopy.behind > 0,",
+    to: "    catchUp: workingCopy.behind > 0,",
     command: unit,
     expect: "with publish.catchUp off it moves the publish bookmark alone",
   },
@@ -2967,8 +2970,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "every file of proposed changes are your edit",
     file: "packages/rules/proposed.ts",
-    from: "    yourEdits: proposed.files.filter(f => input.editing.has(f)),",
-    to: "    yourEdits: proposed.files,",
+    from: "    workingCopyEdits: proposed.files.filter(f => input.editing.has(f)),",
+    to: "    workingCopyEdits: proposed.files,",
     command: unit,
     expect: "your edits are its files that @ changes, and only those",
   },
@@ -2991,10 +2994,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "every file of proposed changes not yet accepted are your edit when @ moves",
     file: "packages/rules/proposed.ts",
-    from: "      ? [{ ...r, yourEdits: r.files.filter(f => editing.has(f)) }]",
-    to: "      ? [{ ...r, yourEdits: r.files }]",
+    from: "      ? [{ ...r, workingCopyEdits: r.files.filter(f => editing.has(f)) }]",
+    to: "      ? [{ ...r, workingCopyEdits: r.files }]",
     command: unit,
-    expect: "planYourEdits",
+    expect: "planWorkingCopyEdits",
   },
   {
     name: "accepted proposed changes' record is rewritten when @ moves",
@@ -3002,7 +3005,7 @@ export const mutations: readonly Mutation[] = [
     from: '    r.kind === "jj" && isNotYetAccepted(proposedChangesStatus(r))',
     to: '    r.kind === "jj"',
     command: unit,
-    expect: "planYourEdits",
+    expect: "planWorkingCopyEdits",
   },
   {
     name: "a squash rebuilds from an untraced start",
@@ -4389,10 +4392,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a waiting lane signs",
     file: "packages/rules/access.ts",
-    from: '  if (record.personal?.kind === "approved") return { signs: true, write: null }\n',
+    from: '  if (record.personal?.kind === "allowed") return { signs: true, write: null }\n',
     to: "  if (record.personal !== null) return { signs: true, write: null }\n",
     command: unit,
-    expect: "an approved lane signs; any other is refused at once",
+    expect: "an allowed lane signs; any other is refused at once",
   },
   {
     name: "a lane that never asked does not ask",
@@ -4421,10 +4424,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a revoke is told as a refusal",
     file: "packages/rules/access.ts",
-    from: '        kind: prev?.kind === "approved" ? "revoked" : "refused",\n',
-    to: '        kind: "refused",\n',
+    from: '        kind: prev?.kind === "allowed" ? "taken-back" : "denied",\n',
+    to: '        kind: "denied",\n',
     command: unit,
-    expect: "taking back an approval is revoked news",
+    expect: "taking back what was allowed is taken-back news",
   },
   {
     name: "an answer forgets the host it was asked for",
@@ -4437,10 +4440,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an approval is told as a fact",
     file: "packages/rules/ssh-news.ts",
-    from: '  if (news.kind === "approved")\n',
+    from: '  if (news.kind === "allowed")\n',
     to: '  if (news.kind === ("never" as string))\n',
     command: unit,
-    expect: "an approval wakes its lane with its owner's carry-on",
+    expect: "an allowance wakes its lane with its owner's carry-on",
   },
   {
     name: "the agent is not told to stop retrying",

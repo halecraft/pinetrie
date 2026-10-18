@@ -49,7 +49,7 @@ const stats = (over: Partial<WorkStats> = {}): WorkStats => ({
   calls: 0,
   failed: 0,
   files: [],
-  local: 0,
+  private: 0,
   unignored: 0,
   leftovers: 0,
   concurrent: 0,
@@ -61,7 +61,7 @@ const stats = (over: Partial<WorkStats> = {}): WorkStats => ({
 describe("workWords", () => {
   test.each<[string, WorkStats, string]>([
     [
-      "every part that is not zero, failures last",
+      "every part that is not zero, problems last",
       stats({
         agent: 38,
         calls: 61,
@@ -70,7 +70,7 @@ describe("workWords", () => {
         last: 253_000,
         failed: 2,
       }),
-      "38 steps · 61 tool calls · 2 files · 4m 12s · 2 failed",
+      "38 steps · 2 files changed · 4m 12s · 2 problems",
     ],
     [
       "people, named",
@@ -78,14 +78,14 @@ describe("workWords", () => {
       "12 messages from Ada and Bea · 3 steps",
     ],
     [
-      "concurrent writes to shared files, after the failed calls",
+      "concurrent writes to shared files, after the problems",
       stats({ agent: 1, failed: 1, concurrent: 2 }),
-      "1 step · 1 failed · 2 writes to shared files over others'",
+      "1 step · 1 problem · 2 overwrote others' shared files",
     ],
     [
-      "local files a turn wrote, outputs nothing ignores, and files jj left out",
-      stats({ agent: 2, files: ["a"], local: 3, unignored: 1, leftovers: 2 }),
-      "2 steps · 1 file · 3 local files · 1 output .gitignore misses · 2 files jj left out",
+      "private files a turn wrote, generated files not ignored, and files not saved to history",
+      stats({ agent: 2, files: ["a"], private: 3, unignored: 1, leftovers: 2 }),
+      "2 steps · 1 file changed · 3 private files · 1 generated file not ignored · 2 files not saved to history",
     ],
     [
       "under a second takes no time",

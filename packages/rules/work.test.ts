@@ -87,7 +87,7 @@ describe("records: one spec each, total decoders", () => {
     conflicts: ["b.txt"],
     disk: {
       derived: { paths: ["node_modules"], more: 0 },
-      local: { paths: [".env"], more: 2 },
+      private: { paths: [".env"], more: 2 },
       unignored: ["dist"],
       leftovers: ["big.bin"],
       shared: NO_SHARED,

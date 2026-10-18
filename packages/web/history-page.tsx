@@ -56,7 +56,7 @@ function Preview({
             close={cancel}
             line=""
             narrow={narrow}
-            target={{ spans: [span], conflicts: [], yourEdits: [] }}
+            target={{ spans: [span], conflicts: [], workingCopyEdits: [] }}
           />
         </>
       )}
@@ -132,7 +132,11 @@ function Entry({
           close={() => setOpened(null)}
           line=""
           narrow={p.narrow}
-          target={{ spans: [entry.review], conflicts: [], yourEdits: [] }}
+          target={{
+            spans: [entry.review],
+            conflicts: [],
+            workingCopyEdits: [],
+          }}
         />
       )}
       {previewing === entry.id && entry.restore !== null && (

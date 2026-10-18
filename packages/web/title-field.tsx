@@ -2,7 +2,7 @@
 // and a note column's. `planTitle` decides what a save sends.
 
 import { MAX_TITLE } from "@pinetrie/core"
-import { planTitle, renameKey } from "@pinetrie/interface"
+import { planTitle, renameKey, SIDEBAR_WORDS } from "@pinetrie/interface"
 import { useLayoutEffect, useRef, useState } from "react"
 
 /**
@@ -15,7 +15,7 @@ export function TitleField({
   placeholder,
   onSend,
   onEnd,
-  label = "title for this thread",
+  label = SIDEBAR_WORDS.titleField,
 }: {
   stored: string | null
   placeholder: string

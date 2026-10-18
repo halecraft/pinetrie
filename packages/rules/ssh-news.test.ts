@@ -14,16 +14,16 @@ const news = (kind: AccessNews["kind"]): AccessNews => ({
 })
 
 describe("planSshNews", () => {
-  test("an approval wakes its lane with its owner's carry-on", () => {
-    const delivery = planSshNews(news("approved"), LANE, "Duane", 1)
+  test("an allowance wakes its lane with its owner's carry-on", () => {
+    const delivery = planSshNews(news("allowed"), LANE, "Duane", 1)
     expect(delivery.wakes).toBe(true)
     expect(decodeCarryOn(delivery.message)).toEqual({
       lane: LANE,
       by: DUANE,
       name: "Duane",
-      reason: { kind: "ssh-approved", host: "hql" },
+      reason: { kind: "ssh-allowed", host: "hql" },
     })
-    for (const kind of ["asked", "refused", "revoked"] as const)
+    for (const kind of ["asked", "denied", "taken-back"] as const)
       expect(planSshNews(news(kind), LANE, "Duane", 1).wakes).toBe(false)
   })
 

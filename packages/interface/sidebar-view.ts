@@ -267,9 +267,30 @@ export function openProposedByCanvas(
   return byCanvas
 }
 
+/** The sidebar's own words: its list, and each canvas item's buttons and ⋯. */
+export const SIDEBAR_WORDS = {
+  list: "your canvases",
+  menu: "more for this canvas",
+  close: "close this canvas for you; nothing is written",
+  closeTitle: "close for you; open it again from the board",
+  closeNew: "close this new canvas; nothing has been written",
+  closeLabel: "Close",
+  rename: {
+    label: "Rename",
+    title: "change this canvas's title for everyone",
+  },
+  retitle: {
+    label: "Retitle from the conversation",
+    title: "title this canvas from what was said in it, for everyone",
+  },
+  titleField: "title for this canvas",
+} as const
+
 /** What archiving a canvas does to its threads' proposed changes, beside its item. */
 export const dropsWords = (drops: readonly string[]): string | null =>
-  drops.length === 0 ? null : `work not accepted goes: ${drops.join(", ")}`
+  drops.length === 0
+    ? null
+    : `unfinished changes will be dropped: ${drops.join(", ")}`
 
 /** What a canvas's rename field sends, once planned (`planTitle`). */
 export const renameIntent = (

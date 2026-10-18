@@ -31,7 +31,7 @@ import { Type } from "typebox"
 import { decodeWith } from "./decode.ts"
 
 /** What a path a turn wrote is. */
-export type PathClass = "source" | "derived" | "local"
+export type PathClass = "source" | "derived" | "private"
 
 /** Paths never classed: pine·trie's own and the repos', but the lane's home (`LANE_HOME_PATH`). */
 const isSkipped = (p: string, shared: readonly string[]): boolean =>
@@ -270,7 +270,7 @@ function classifyWrites(input: {
         complete !== null &&
         ((readSource && !(readFirst.has(w.path) && !w.created)) ||
           underKnown !== undefined)
-      classes.set(w.path, isDerived ? "derived" : "local")
+      classes.set(w.path, isDerived ? "derived" : "private")
       if (isDerived) derived.push(w.path)
     }
     for (const p of run.deletions) {
@@ -307,7 +307,7 @@ function classifyWrites(input: {
   }
   for (const p of input.toolWrites) {
     if (isSkipped(p, shared)) continue
-    if (isIgnored(p)) classes.set(p, "local")
+    if (isIgnored(p)) classes.set(p, "private")
     else {
       classes.set(p, "source")
       sourceWritten.add(p)
@@ -519,12 +519,12 @@ export function turnDisk(
   writes: ClassedWrites,
   unattributedIgnored: readonly string[],
 ): TurnDisk {
-  const local = [...writes.classes]
-    .filter(([, c]) => c === "local")
+  const privatePaths = [...writes.classes]
+    .filter(([, c]) => c === "private")
     .map(([p]) => p)
   return {
     derived: listed(topmost(writes.roots.keys())),
-    local: listed(topmost([...local, ...unattributedIgnored])),
+    private: listed(topmost([...privatePaths, ...unattributedIgnored])),
     unignored: writes.unignored,
     leftovers: writes.leftovers,
     // The host fills it in from the shared files' lineages (`planSharedLineages`).

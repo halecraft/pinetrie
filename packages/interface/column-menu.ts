@@ -144,7 +144,7 @@ function columnMenu(input: {
           label: moveWords("inventory").label,
           title:
             "put this thread away: its run stops, and only you can open it",
-          intent: { kind: "takeIntoInventory", card: source },
+          intent: { kind: "putAway", card: source },
         },
       ],
     },

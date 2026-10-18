@@ -763,7 +763,7 @@ item 18, and in `lanes.test.ts` against the harness.
     prefix once. A tool with no factory fails to compile, and
     `tools.test.ts` checks each is named its id, so a pi upgrade that
     renames one of its own fails there. The id is what the model calls; it
-    never changes for people's words ("shell" for `bash` is interface's).
+    never changes for people's words ("ran" for `bash` is interface's).
     The constants (`BASH_TOOL`, `GREP_TOOL`, `BANNER_TOOL`…) are core's.
   - **The host's tools are active in every lane** (`TOOL_IDS`, core):
     `ask_about_conflict`, `catch_up` and `split_proposed_changes` (ADR-0080),

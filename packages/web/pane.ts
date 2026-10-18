@@ -241,7 +241,7 @@ export function askReviewTarget(
   return {
     spans: [span],
     conflicts: [],
-    yourEdits: [],
+    workingCopyEdits: [],
     ...(title === null ? {} : { title }),
   }
 }

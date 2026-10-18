@@ -40,7 +40,7 @@ function behind(to = "l2") {
       heads: { current: null, proposed: "x" },
       log: { current: null, proposed: "x" },
       wips: [],
-      yours: {
+      workingCopy: {
         behind: 0,
         ahead: 0,
         catchUp: null,

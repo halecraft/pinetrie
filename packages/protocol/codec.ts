@@ -230,7 +230,7 @@ export function decodeCommand(
     if (!isThreadId(lane))
       return refused(ERR.UNKNOWN_TARGET, `not a thread's lane: ${lane}`)
     const answer = text(wire?.mode)
-    return answer === "approve" || answer === "refuse" || answer === "revoke"
+    return answer === "allow" || answer === "deny" || answer === "take-back"
       ? { kind, lane, answer }
       : refused(ERR.UNKNOWN_KIND, `unknown ssh answer: ${answer}`)
   }
@@ -1103,7 +1103,7 @@ const PLACE_REFUSALS = {
   gone: true,
   exists: true,
   full: true,
-  "not-yours": true,
+  "someone-elses": true,
   replied: true,
   archived: true,
   "no-place": true,

@@ -206,9 +206,9 @@ operation is read once and kept until the head moves.**
   configs, the WIPs, the publish bookmark, your `@-` and `@`), once per
   operation, read only when that record is written. In the shared facts,
   every refresh at a new operation paid them, twice when it wrote (S254).
-- **`yourEdits` is `files ∩ editing`**, decided in `proposedChangesRecord`
+- **`workingCopyEdits` is `files ∩ editing`**, decided in `proposedChangesRecord`
   (`@pinetrie/rules`): no lane reads `@`. `@` alone moving rewrites every open
-  record's from one shared read (`planYourEdits`).
+  record's from one shared read (`planWorkingCopyEdits`).
 - **A lane on accepted work is read in one `jj log`** (`laneRead`): its tip, the
   newest commit carrying `Pinetrie-Base`, the newest accepted commit in its
   history, the proposed changes' region (`::<bookmark> ~ ::<line>`), and the
@@ -415,7 +415,7 @@ update's merge will change.**
   paragraph, on its WIP line and kept through a description. The source is
   the lane tip the whole proposed changes hold, a stack's revisions included:
   accepted, it says you have that tip.
-- **`acceptedFacts` previews catching the working copy up** (`yours.catchUp`, S80):
+- **`acceptedFacts` previews catching the working copy up** (`workingCopy.catchUp`, S80):
   `git merge-tree --write-tree --name-only --merge-base=<fork point> <accepted>
   <@>` exits 1 on conflicts and prints the merged tree, the conflicting
   paths, a blank line, then its messages; the tree against `@`'s names the
@@ -423,11 +423,11 @@ update's merge will change.**
   snapshotted: the host never snapshots the working copy. Null when nothing is
   behind, or `@` shares no commit with accepted work but the root. `-b @`
   moves every head on your work, which the preview counts: `-r` would
-  strip them of the commits under them. `yours.conflicts` counts your
+  strip them of the commits under them. `workingCopy.conflicts` counts your
   conflicted commits above accepted work, and lists `@`'s conflicted files; a
   publish's second round reads it again after the catch-up, since a commit
   of yours that `@`'s tree resolves can conflict where the preview of `@`
-  says nothing. `yours.ahead` is `::@- ~ ::<accepted>`, whether or not `@-`
+  says nothing. `workingCopy.ahead` is `::@- ~ ::<accepted>`, whether or not `@-`
   descends from accepted work: what a publish accepts once caught up.
 - **`filesTouched`** says whether a lane's work since its start changes any
   file: `none`, `some` or `unknown` (ADR-0067). From one start, `jj diff

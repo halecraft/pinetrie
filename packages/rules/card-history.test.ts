@@ -372,8 +372,8 @@ test.each([
   [PINNED, DRAFTING, "unpinned"],
   [DRAFTING, CANVAS_PINNED, "pinned"],
   [CANVAS_PINNED, DRAFTING, "unpinned"],
-  [QUEUED, ADAS, "took-into-inventory"],
-  [DRAFTING, BEAS, "took-into-inventory"],
+  [QUEUED, ADAS, "put-away"],
+  [DRAFTING, BEAS, "put-away"],
   [BEAS, ELSEWHERE, "put"],
   [DRAFTING, ELSEWHERE, "moved"],
 ] as const)("changeVerb(%o, %o): %s", (from, to, verb) => {

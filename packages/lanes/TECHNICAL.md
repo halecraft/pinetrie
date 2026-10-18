@@ -222,7 +222,7 @@ paths are its diff." would compare a function with itself.
 
 ## The disk model (ADR-0135)
 
-- **A path is source, derived or local, from `.gitignore` and what the
+- **A path is source, derived or private, from `.gitignore` and what the
   turn's commands did.** Every tool call's command is a run, which the
   machine's observer sees (The channel into a lane); a turn's end classes what its runs
   and the write tools wrote, and keeps each run that made derived files as

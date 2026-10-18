@@ -59,7 +59,7 @@ export interface JjAcceptedRecord {
    * with accepted work. `conflicts` are your conflicted commits above accepted
    * work, `@` included, and the conflicted files in `@`.
    */
-  readonly yours: {
+  readonly workingCopy: {
     readonly behind: number
     readonly ahead: number
     readonly catchUp: {

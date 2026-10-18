@@ -172,7 +172,7 @@ export function steadiness(
 }
 
 /** The slots a take into the inventory writes: the card in `slot`, and out of any other. */
-export function takeIntoInventoryWrites(
+export function putAwayWrites(
   slots: Slots,
   card: CardId,
   slot: number,

@@ -2082,7 +2082,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           .catch(() => null)
         const accounted = await railCount(tp)
         check(
-          "a long loop is one hollow capsule on the rail, as long as its size has digits, its label counting the failed call",
+          "a long loop is one hollow capsule on the rail, as long as its size has digits, its label counting the problem",
           tall &&
             capsule !== null &&
             capsule.count >= 30 &&
@@ -2090,7 +2090,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
             capsule.height > 8 &&
             // Its first line counts; a digest, on by default,
             // follows on the next.
-            (capsule.label.split("\n")[0] ?? "").endsWith("· 1 failed") &&
+            (capsule.label.split("\n")[0] ?? "").endsWith("· 1 problem") &&
             capsule.fill === "agent" &&
             accounted === loopRows.length,
           `${capsule?.count ?? 0} messages, ${capsule?.span ?? 0} rows, ${capsule?.fill ?? "no"} fill, "${capsule?.label ?? ""}"; ${accounted} of ${loopRows.length} accounted for`,

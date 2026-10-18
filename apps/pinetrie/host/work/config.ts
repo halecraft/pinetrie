@@ -167,12 +167,12 @@ export async function startLaneConfigs(input: {
       ...grants.env.map(e => `$${e}`),
       ...grants.mounts.map(m => m.source),
     ].filter(g => g !== null)
-    const yours = personal()
+    const personalShares = personal()
     return [
       ...a.copy.refusals.map(r => `[host] ${refusalWords(r)}`),
       ...(on.length > 0 ? [`[host] lanes are granted: ${on.join(", ")}`] : []),
       ...a.shared.map(d => {
-        const from = yours.get(d.path) ?? PROJECT_CONFIG_FILE
+        const from = personalShares.get(d.path) ?? PROJECT_CONFIG_FILE
         return `[host] ${d.path}/ is shared read-write with every lane (${from})`
       }),
     ]

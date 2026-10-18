@@ -81,8 +81,8 @@ export const DISK_LISTED = 100
 export interface TurnDisk {
   /** Derived roots its runs wrote. */
   readonly derived: ListedPaths
-  /** Local paths it wrote: ignored, and not made from source. */
-  readonly local: ListedPaths
+  /** Private paths it wrote: ignored, and not made from source. */
+  readonly private: ListedPaths
   /** Directories its runs made from source that `.gitignore` does not ignore. */
   readonly unignored: readonly string[]
   /** Source files it wrote that its commit left out: jj's size limit, for one. */

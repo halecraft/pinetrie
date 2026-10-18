@@ -39,7 +39,7 @@ const JjProposedChangesSchema = Type.Object({
   files: Type.Array(Type.String()),
   conflicts: Type.Array(Type.String()),
   startConflicts: Type.Array(Type.String()),
-  yourEdits: Type.Array(Type.String()),
+  workingCopyEdits: Type.Array(Type.String()),
   described: Type.Boolean(),
   edited: Type.Boolean(),
   bookmark: Type.String({ minLength: 1 }),
@@ -92,7 +92,7 @@ export const PROPOSED_CHANGES: RecordSpec<
           files: [...contents.files],
           conflicts: [...contents.conflicts],
           startConflicts: [...contents.startConflicts],
-          yourEdits: [...contents.yourEdits],
+          workingCopyEdits: [...contents.workingCopyEdits],
           commits: [...contents.commits],
           ledger:
             contents.ledger === null
@@ -125,7 +125,7 @@ const decodeJjProposedChanges = (
   files: r.files,
   conflicts: r.conflicts,
   startConflicts: r.startConflicts,
-  yourEdits: r.yourEdits,
+  workingCopyEdits: r.workingCopyEdits,
   described: r.described,
   edited: r.edited,
   bookmark: r.bookmark,
@@ -148,7 +148,7 @@ const decodeJjProposedChanges = (
  * is your operation but changes nothing so it is no edit.
  */
 const revisionEdited = (r: RevisionFacts): boolean =>
-  !r.reached || r.yoursChanged
+  !r.reached || r.othersChanged
 
 /**
  * Whether you edited the proposed changes: a revision edited, a commit of yours
@@ -360,7 +360,7 @@ export function proposedChangesRecord(input: {
     files: proposed.files,
     conflicts: proposed.conflicts,
     startConflicts: proposed.startConflicts,
-    yourEdits: proposed.files.filter(f => input.editing.has(f)),
+    workingCopyEdits: proposed.files.filter(f => input.editing.has(f)),
     described: !isWipLine(input.name, proposed.firstLine),
     edited: isProposedEdited(proposed),
     bookmark: proposed.bookmark,
@@ -372,17 +372,17 @@ export function proposedChangesRecord(input: {
 }
 
 /**
- * Only `@` moved: each jj record not yet accepted, with `yourEdits` its files
+ * Only `@` moved: each jj record not yet accepted, with `workingCopyEdits` its files
  * that `@` changes now. Unchanged ones come back too: the host writes only
  * what changed.
  */
-export const planYourEdits = (
+export const planWorkingCopyEdits = (
   records: Iterable<ProposedChangesRecord>,
   editing: ReadonlySet<string>,
 ): JjProposedChangesRecord[] =>
   [...records].flatMap(r =>
     r.kind === "jj" && isNotYetAccepted(proposedChangesStatus(r))
-      ? [{ ...r, yourEdits: r.files.filter(f => editing.has(f)) }]
+      ? [{ ...r, workingCopyEdits: r.files.filter(f => editing.has(f)) }]
       : [],
   )
 
@@ -461,7 +461,7 @@ export function planAcceptance(input: {
   readonly seen: ProposedChangesSeen | null
   /** What only an acceptance reads (`gatherAcceptance`); null without proposed changes to accept. */
   readonly acceptance: AcceptanceFacts | null
-  /** Files `@` changes, for the accepted record's `yourEdits`. */
+  /** Files `@` changes, for the accepted record's `workingCopyEdits`. */
   readonly editing: ReadonlySet<string>
   readonly acceptedBookmark: string
   readonly to: string | null

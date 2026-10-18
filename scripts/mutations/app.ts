@@ -619,8 +619,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a new canvas's rail is not styled as a rail, so the columns move",
     file: "packages/web/rail.tsx",
-    from: '    <nav aria-label="this thread\'s tree" className="rail">\n      <div\n        className="rail-tree"',
-    to: '    <nav aria-label="this thread\'s tree" className="rail-new">\n      <div\n        className="rail-tree"',
+    from: '    <nav aria-label={RAIL_LABEL} className="rail">\n      <div\n        className="rail-tree"',
+    to: '    <nav aria-label={RAIL_LABEL} className="rail-new">\n      <div\n        className="rail-tree"',
     suite: "browser",
     scenario: "page",
     expect:
@@ -941,7 +941,7 @@ export const mutations: readonly Mutation[] = [
     suite: "browser",
     scenario: "tools",
     expect:
-      "a long loop is one hollow capsule on the rail, as long as its size has digits, its label counting the failed call",
+      "a long loop is one hollow capsule on the rail, as long as its size has digits, its label counting the problem",
   },
   {
     name: "the inbox badge never hears of unseen mentions",
@@ -2485,8 +2485,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a rail dot never carries your pip",
     file: "packages/web/rail.tsx",
-    from: '      {p.yours !== null && <SignalMark color={p.yours} signal="unsent" />}',
-    to: '      {false && <SignalMark color={p.yours} signal="unsent" />}',
+    from: '      {p.mine !== null && <SignalMark color={p.mine} signal="unsent" />}',
+    to: '      {false && <SignalMark color={p.mine} signal="unsent" />}',
     suite: "browser",
     scenario: "page",
     expect:
@@ -2725,8 +2725,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "Auto-update title in a root's ⋯ sends nothing",
     file: "packages/web/sidebar.tsx",
-    from: '        label: "Auto-update title",\n        onChoose: () => onIntent(item.intent),',
-    to: '        label: "Auto-update title",\n        onChoose: () => {},',
+    from: "        label: SIDEBAR_WORDS.retitle.label,\n        onChoose: () => onIntent(item.intent),",
+    to: "        label: SIDEBAR_WORDS.retitle.label,\n        onChoose: () => {},",
     suite: "browser",
     scenario: "page",
     expect: "Auto-update title in a root's ⋯ titles it from the model",

@@ -450,7 +450,7 @@ describe("queuePlace: behind the newest message waiting", () => {
   })
   test("behind your own message, as yours", () => {
     expect(queuePlace(lane({ waiting: 2, lastWaiting: ME }), READER)).toEqual({
-      kind: "afterYours",
+      kind: "afterMine",
       ahead: 2,
     })
   })
@@ -466,12 +466,12 @@ describe("queueWords", () => {
       label: "queue after Bea",
       title: null,
     })
-    expect(queueWords({ kind: "afterYours", ahead: 1 }).label).toBe(
+    expect(queueWords({ kind: "afterMine", ahead: 1 }).label).toBe(
       "queue after yours",
     )
   })
   test("counts the queue when one name stands for several", () => {
-    expect(queueWords({ kind: "afterYours", ahead: 3 }).title).toBe(
+    expect(queueWords({ kind: "afterMine", ahead: 3 }).title).toBe(
       "3 waiting ahead",
     )
   })
@@ -510,7 +510,7 @@ describe("what a new lane starts from: its line", () => {
     heads: { current: null, proposed: "" },
     log: { current: null, proposed: "" },
     wips,
-    yours: {
+    workingCopy: {
       behind: 0,
       ahead: 0,
       catchUp: null,

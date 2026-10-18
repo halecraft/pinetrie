@@ -19,10 +19,13 @@ import {
   type ListWidth,
   listFoldWords,
   listKey,
+  moveTitle,
+  NOT_NEEDED,
   type RootDrag,
   renameIntent,
   rootDropProps,
   rootGroupProps,
+  SIDEBAR_WORDS,
   type SidebarView,
 } from "@pinetrie/interface"
 import { CANVAS_BUSY_REASON } from "@pinetrie/rules"
@@ -109,7 +112,7 @@ export function Sidebar({
   }, [here])
   const readers = { session, index, canvasOfThread, order, nameOf, colorOf }
   return (
-    <nav aria-label="your threads" id="sidebar" ref={nav}>
+    <nav aria-label={SIDEBAR_WORDS.list} id="sidebar" ref={nav}>
       {/* biome-ignore lint/a11y/noStaticElementInteractions: Up and Down move focus between the buttons inside */}
       <div className="sidebar-items" onKeyDown={moveFocus} {...rootGroupProps}>
         {view.items.map(item => {
@@ -198,16 +201,16 @@ export function Sidebar({
                       ),
                     },
                   ]}
-                  label="more for this thread"
+                  label={SIDEBAR_WORDS.menu}
                   trigger="⋯"
                   triggerClassName="open-menu"
                 />
               )}
               <button
-                aria-label="close this thread for you; nothing is written"
+                aria-label={SIDEBAR_WORDS.close}
                 className="open-close"
                 onClick={() => onIntent(item.close)}
-                title="close for you; open it again from the board"
+                title={SIDEBAR_WORDS.closeTitle}
                 type="button"
               >
                 ×
@@ -319,9 +322,9 @@ function FoldedItem({
     className: "open-close-item",
     title:
       item.kind === "canvas"
-        ? "close for you; open it again from the board"
-        : "close this new thread; nothing has been written",
-    label: "Close",
+        ? SIDEBAR_WORDS.closeTitle
+        : SIDEBAR_WORDS.closeNew,
+    label: SIDEBAR_WORDS.closeLabel,
     onChoose: () => onIntent(item.close),
   }
   const items =
@@ -415,24 +418,24 @@ function menuItem(
       return {
         key: "not-needed",
         className: "not-needed",
-        title: "clear this thread's mark, on every device of yours",
-        label: "Not needed",
+        title: NOT_NEEDED.canvasTitle,
+        label: NOT_NEEDED.label,
         onChoose: () => onIntent(item.intent),
       }
     case "rename":
       return {
         key: "rename",
         className: "rename-root",
-        title: "change this thread's title for everyone",
-        label: "Rename",
+        title: SIDEBAR_WORDS.rename.title,
+        label: SIDEBAR_WORDS.rename.label,
         onChoose: rename,
       }
     case "retitle":
       return {
         key: "retitle",
         className: "retitle-root",
-        title: "title this thread from what was said in it, for everyone",
-        label: "Auto-update title",
+        title: SIDEBAR_WORDS.retitle.title,
+        label: SIDEBAR_WORDS.retitle.label,
         onChoose: () => onIntent(item.intent),
       }
     case "moveTo": {
@@ -441,9 +444,7 @@ function menuItem(
         key: `move-to:${item.name}`,
         className: item.closes ? "move-to closes" : "move-to",
         disabled: item.busy !== null,
-        title: item.closes
-          ? "archive: read-only for everyone until moved out"
-          : "move it on the board, for everyone",
+        title: moveTitle(item),
         label: (
           <>
             Move to {item.name}

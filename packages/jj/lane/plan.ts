@@ -381,7 +381,7 @@ export function planTurnCommit(facts: {
 }
 
 /**
- * A base's checkout of accepted work's commits (`yours`), by id. On a fresh
+ * A base's checkout of accepted work's commits (`accepted`), by id. On a fresh
  * disk, `git init` and `jj git init --colocate` first, not `jj git clone`: a
  * fresh volume holds `lost+found`, which `jj git clone` refuses.
  *
@@ -393,15 +393,15 @@ export function planTurnCommit(facts: {
  * does nothing when it is not.
  */
 export function planBaseCheckout(input: {
-  readonly yours: readonly CommitId[]
+  readonly accepted: readonly CommitId[]
   readonly fresh: boolean
 }): readonly LaneStep[] {
   return [
     ...(input.fresh
       ? [inLane("git", "init", "-q"), inLane("jj", "git", "init", "--colocate")]
       : []),
-    fetchById(input.yours),
+    fetchById(input.accepted),
     ...(input.fresh ? [] : [inLane("jj", "workspace", "update-stale")]),
-    inLane("jj", "new", ...input.yours),
+    inLane("jj", "new", ...input.accepted),
   ]
 }

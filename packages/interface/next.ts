@@ -214,7 +214,7 @@ export function nextWords(next: Next, reader: Reader): string {
     case "stopped":
       return `stopped by ${who(next.by, reader)}`
     case "idle":
-      return "idle"
+      return "waiting for you"
   }
 }
 
@@ -257,19 +257,19 @@ export function nextItemWords(item: NextItem): ControlWords {
       }
     case "hold":
       return {
-        label: "hold queue",
+        label: "pause the queue",
         title: "nothing queued here is sent until someone sends the queue",
         className: "hold-queue",
       }
     case "release":
       return {
-        label: "release hold",
+        label: "unpause",
         title: "a card queued here is sent when the thread is free",
         className: "release-queue",
       }
     case "unqueue-all":
       return {
-        label: "unqueue all",
+        label: "move all back to notes",
         title: "every queued card back to the notes",
         className: "unqueue-all",
       }

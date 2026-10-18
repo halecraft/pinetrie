@@ -3,6 +3,9 @@
 import type { ToolCall, TranscriptMessage } from "@pinetrie/core"
 import { callLabel } from "./tool-words.ts"
 
+/** A message's copy button: what it copies. Markdown is how, not what. */
+export const COPY_MESSAGE = "copy this message"
+
 /**
  * A message as markdown: its text as stored, then each tool call it made, in
  * order. A call is its tool's word and all it touched, in code (`callLabel`),

@@ -47,9 +47,7 @@ export function keyAct(event: KeyLike, focus: Focus): Intent | null {
   if (plain && event.key === "Escape" && focus.inPanel)
     return { kind: "inventory", act: { kind: "escape" } }
   if (chord && key === "i")
-    return focus.card === null
-      ? null
-      : { kind: "takeIntoInventory", card: focus.card }
+    return focus.card === null ? null : { kind: "putAway", card: focus.card }
   if (chord && key === "o")
     return focus.selectedCard === null || focus.column === null
       ? null

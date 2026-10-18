@@ -25,15 +25,15 @@ import {
   WRITE_TOOL,
 } from "@pinetrie/core"
 
-/** What people call each tool. */
+/** What each tool's call did, as people read it on its row. */
 const TOOL_WORDS: Readonly<Record<ToolId, string>> = {
   [READ_TOOL]: "read",
-  [WRITE_TOOL]: "write",
-  [EDIT_TOOL]: "edit",
-  [BASH_TOOL]: "shell",
-  [GREP_TOOL]: "search",
-  [FIND_TOOL]: "find",
-  [CONFLICT_TOOL]: "ask",
+  [WRITE_TOOL]: "wrote",
+  [EDIT_TOOL]: "edited",
+  [BASH_TOOL]: "ran",
+  [GREP_TOOL]: "searched",
+  [FIND_TOOL]: "looked for",
+  [CONFLICT_TOOL]: "asked you",
   [CATCH_UP_TOOL]: "catch up",
   [SPLIT_TOOL]: "split",
   [BANNER_TOOL]: "banner",

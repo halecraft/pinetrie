@@ -70,7 +70,7 @@ test("stretchFill: the agent alone, people alone, or both", () => {
     calls: 0,
     failed: 0,
     files: [],
-    local: 0,
+    private: 0,
     unignored: 0,
     leftovers: 0,
     concurrent: 0,
@@ -89,12 +89,12 @@ test("railItems: a dot at a thread end holding your card carries your colour", (
   })
   const marks = railItems([item("c"), item("o")], {
     open: new Set([entryId("o")]),
-    yours: { ends: new Set([entryId("c")]), color: "#f0f" },
+    mine: { ends: new Set([entryId("c")]), color: "#f0f" },
     matches: null,
   }).map(([, m]) => m)
   expect(marks).toEqual([
-    { open: false, yours: "#f0f", matches: null },
-    { open: true, yours: null, matches: null },
+    { open: false, mine: "#f0f", matches: null },
+    { open: true, mine: null, matches: null },
   ])
 })
 
@@ -105,7 +105,7 @@ test("railItems: while searching, an item counts every match among its messages,
   const hit = { from: 0, to: 1 }
   const marks = railItems([item("a"), item("b")], {
     open: new Set(),
-    yours: { ends: new Set(), color: "#f0f" },
+    mine: { ends: new Set(), color: "#f0f" },
     matches: { hits: new Map([[entryId("a-later"), [hit] as const]]) },
   }).map(([, m]) => m.matches)
   expect(marks).toEqual([1, 0])

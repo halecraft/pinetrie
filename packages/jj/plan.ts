@@ -345,7 +345,7 @@ export function parseEvolog(stdout: string): EvologEntry[] {
  * `from` through each entry's predecessor of the same change, until a
  * version the host made (`reached`). It stops, not `reached`, at an entry
  * with no such predecessor, one the read did not return, or a cycle.
- * `yours` are the versions an operation not the host's made, each with the
+ * `other` are the versions an operation not the host's made, each with the
  * version before it: only those can be your edit. The evolog says who made
  * each version, as long as the op log still holds the operations.
  */
@@ -354,20 +354,20 @@ export function walkToHost(
   from: CommitId,
 ): {
   readonly reached: boolean
-  readonly yours: readonly { readonly from: CommitId; readonly to: CommitId }[]
+  readonly other: readonly { readonly from: CommitId; readonly to: CommitId }[]
 } {
   const byCommit = new Map(entries.map(e => [e.commit, e]))
-  const yours: { from: CommitId; to: CommitId }[] = []
+  const other: { from: CommitId; to: CommitId }[] = []
   const seen = new Set<CommitId>()
   let at = from
   for (;;) {
     const entry = byCommit.get(at)
-    if (entry === undefined || seen.has(at)) return { reached: false, yours }
-    if (entry.byHost) return { reached: true, yours }
+    if (entry === undefined || seen.has(at)) return { reached: false, other }
+    if (entry.byHost) return { reached: true, other }
     seen.add(at)
     const before = entry.predecessors.find(p => p.changeId === entry.changeId)
-    if (before === undefined) return { reached: false, yours }
-    yours.push({ from: before.commit, to: at })
+    if (before === undefined) return { reached: false, other }
+    other.push({ from: before.commit, to: at })
     at = before.commit
   }
 }
@@ -395,7 +395,7 @@ export function planSinceHost(input: {
   readonly walked: RevisionFacts | null
 }): SinceHostRead {
   if (input.marked)
-    return { kind: "known", facts: { reached: true, yoursChanged: false } }
+    return { kind: "known", facts: { reached: true, othersChanged: false } }
   if (input.walked === null) return { kind: "walk" }
   if (input.walked.reached || input.host === null)
     return { kind: "known", facts: input.walked }
@@ -514,11 +514,11 @@ export const planDescribe = (changeId: string, message: string): RepoStep[] => [
 export const planRepair = (input: {
   /** The proposed changes' bookmark, as its record holds it. */
   readonly bookmark: string
-  readonly hosts: CommitId
-  readonly yours: CommitId
+  readonly host: CommitId
+  readonly other: CommitId
   readonly top: boolean
 }): RepoStep[] => [
-  rewrite("abandon", input.hosts),
+  rewrite("abandon", input.host),
   ...(input.top
     ? [
         host(
@@ -527,7 +527,7 @@ export const planRepair = (input: {
           "--allow-backwards",
           input.bookmark,
           "-r",
-          input.yours,
+          input.other,
         ),
       ]
     : []),

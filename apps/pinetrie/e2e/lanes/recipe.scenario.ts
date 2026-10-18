@@ -140,7 +140,7 @@ async function recipeSection(
     // Each tool call is a turn of its own, with its own record.
     const wrote = recordsOf(first).slice(earlier)
     const derived = wrote.flatMap(r => r.disk?.derived.paths ?? [])
-    const local = wrote.flatMap(r => r.disk?.local.paths ?? [])
+    const local = wrote.flatMap(r => r.disk?.private.paths ?? [])
     check(
       "a turn's record names its runs' outputs derived, and a file a command wrote from nothing local",
       derived.includes("out-a") &&
@@ -148,7 +148,7 @@ async function recipeSection(
         !local.some(p => p.startsWith("out-")) &&
         // No record names a path only the diff's own machinery made.
         !recordsOf(first).some(r =>
-          (r.disk?.local.paths ?? []).some(
+          (r.disk?.private.paths ?? []).some(
             p => /^o\d+-\d+-\d+(\/|$)/.test(p) || p.startsWith(".git/"),
           ),
         ),

@@ -260,8 +260,12 @@ test("an accepted thread commit with no Pinetrie-Source builds nothing until the
     { "a.txt": "the lane's\n" },
     `feat: the lane's\n\nPinetrie-Thread: ${THREAD}\nPinetrie-Lane: ${LANE}\nPinetrie-Entry: e1\n`,
   )
-  const yours = await you.commit([accepted], { "a.txt": "yours\n" }, "yours")
-  await you.moveAccepted(yours)
+  const repoCommit = await you.commit(
+    [accepted],
+    { "a.txt": "yours\n" },
+    "yours",
+  )
+  await you.moveAccepted(repoCommit)
   const more = await you.commit(
     [work],
     { "b.txt": "more\n" },
@@ -275,16 +279,16 @@ test("an accepted thread commit with no Pinetrie-Source builds nothing until the
     record: null,
     base: expect.objectContaining({
       untraced: [accepted],
-      catchUp: { tip: more, to: yours, files: ["a.txt"] },
+      catchUp: { tip: more, to: repoCommit, files: ["a.txt"] },
     }),
     leased: 0,
   })
   const merged = await you.commit(
-    [more, yours],
+    [more, repoCommit],
     { "a.txt": "yours\n" },
     baseMessage("catch up: accepted work", {
       kind: "accepted",
-      commit: yours,
+      commit: repoCommit,
     }),
   )
   await you.setTip(LANE, merged)
@@ -306,17 +310,17 @@ test("work you landed yourself leaves the proposed changes held: kept, with no f
   expect(await settles(you.dir, LANE, THREAD)).toMatchObject({
     files: ["a.txt"],
   })
-  const yours = await you.commit(
+  const repoCommit = await you.commit(
     [you.base],
     { "a.txt": "a\n" },
     "you: the same a.txt",
   )
-  await you.moveAccepted(yours)
+  await you.moveAccepted(repoCommit)
   // Accepted work moved by work the lane has: catching up would change nothing.
   expect(await settles(you.dir, LANE, THREAD)).toMatchObject({
     files: [],
     record: { files: [], acceptedAs: null },
-    base: { catchUp: { tip: work, to: yours, files: [] } },
+    base: { catchUp: { tip: work, to: repoCommit, files: [] } },
   })
 }, 60_000)
 
@@ -504,7 +508,7 @@ test("a refresh runs as many jj and git processes as its case needs: two unchang
     const counts = { build: await count(), unchanged: await count() }
     // A command of yours moves the head: the shared facts are read again.
     await you.jj("new", you.base)
-    const afterYours = await count()
+    const afterRepoCommand = await count()
     await you.moveAccepted(
       await you.commit([you.base], { "b.txt": "yours\n" }, "yours"),
     )
@@ -517,13 +521,13 @@ test("a refresh runs as many jj and git processes as its case needs: two unchang
     await you.setTip(LANE, turn)
     expect({
       ...counts,
-      afterYours,
+      afterRepoCommand,
       rebase,
       rebuild: await count(),
     }).toEqual({
       build: 15,
       unchanged: 2,
-      afterYours: 3,
+      afterRepoCommand: 3,
       rebase: 13,
       rebuild: 16,
     })

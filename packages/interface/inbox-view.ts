@@ -88,13 +88,25 @@ export interface InboxWords {
 /** The inbox's name: its trigger's label leads with it, and the account menu's item is it. */
 export const INBOX = "Inbox"
 
+/**
+ * What clears a raised item on every device of yours, wherever it is offered:
+ * an inbox row, and a canvas's ⋯ in the sidebar, whose title names the canvas.
+ */
+export const NOT_NEEDED = {
+  label: "Dismiss",
+  title: "clear it, on every device of yours",
+  canvasTitle: "clear this canvas's mark, on every device of yours",
+} as const
+
 export function inboxWords(view: InboxView): InboxWords {
   const { badge, mentions, unseen } = view
   const needsYou = view.items.needsYou.length
   const ready = view.items.ready.length
   const worthARead = view.items.worthARead.length
   const what = [
-    ...(needsYou > 0 ? [count(needsYou, "run ended", "runs ended")] : []),
+    ...(needsYou > 0
+      ? [count(needsYou, "answer waiting", "answers waiting")]
+      : []),
     ...(ready > 0 ? [`${ready} ready to accept`] : []),
     ...(unseen > 0 ? [count(unseen, "unseen mention", "unseen mentions")] : []),
   ]

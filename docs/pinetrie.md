@@ -362,8 +362,8 @@ Coming from pi, one line of `~/.pi/agent/settings.json` at a time:
 - `pnpm sign-in <provider>` for each provider you use.
 
 **A lane can ssh where its host can** (ADR-0140). Your own identity is
-your agent's keys; lanes use it once you approve each lane, in its
-column's header. Turn it on for every project, and say who approves, in
+your agent's keys; lanes use it once you allow each lane, in its
+column's header. Turn it on for every project, and say who answers, in
 your `pinetrie.json`:
 
 ```json
@@ -409,7 +409,7 @@ your words only under `drawn`.
 
 **A column folds each ask's work** (ADR-0106). An ask is a message that
 started a run, with that run, read from the tree (`indexAsks`,
-`packages/core/asks.ts`). A column is read in outline, story or raw: story
+`packages/core/asks.ts`). A column is read in brief, story or everything (stored `outline`, `story`, `raw`): story
 shows each ask's message, one digest line folding its work, and its last
 word. The rail and the column compact the same stretches: one landmark rule
 (`railLandmarks`) is drawn apart in both, and a long ask is a dot and a

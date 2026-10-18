@@ -75,7 +75,7 @@ const queue = {
   hold: "keep",
 } as const
 const pin = { kind: "pin", card: C1 } as const
-const take = { kind: "takeIntoInventory", card: C1 } as const
+const take = { kind: "putAway", card: C1 } as const
 const pinCanvas = { kind: "pinToCanvas", card: C1 } as const
 
 describe("cardFrame", () => {
@@ -223,7 +223,7 @@ describe("cardFrame", () => {
     })
     expect(view.moves).toEqual([
       { to: "note", act: { kind: "unqueue", card: id, lane: LANE, by: BEA } },
-      { to: "inventory", act: { kind: "takeIntoInventory", card: id } },
+      { to: "inventory", act: { kind: "putAway", card: id } },
     ])
     expect(view.discards).toBe(true)
     expect(view.tools.map(t => t.act?.kind ?? null)).toEqual([null, "reorder"])

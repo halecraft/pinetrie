@@ -191,14 +191,14 @@ test("A write never replaces a file it has not checked.", () =>
       for (let n = 0; n <= BOUNDARIES; n++) {
         await fresh()
         await put(BEFORE)
-        const yours = `yours, in place, at ${n}`
+        const mine = `yours, in place, at ${n}`
         const { written } = await writeRacing(record, SHOWN, n, () =>
-          writeFile(path.join(root, target), yours),
+          writeFile(path.join(root, target), mine),
         )
         const where = `${target} at boundary ${n}`
         // Either the write saw yours and put everything back, or your
         // write came after its link, into what it wrote: never under it.
-        expect(await read(target), where).toBe(yours)
+        expect(await read(target), where).toBe(mine)
         if (!written)
           for (const [p, v] of Object.entries(BEFORE))
             if (p !== target) expect(await read(p), where).toBe(v)
@@ -212,7 +212,7 @@ test("A save made by name during a write survives it.", () =>
         for (let n = 1; n <= BOUNDARIES; n++) {
           await fresh()
           await put(BEFORE)
-          const yours = `yours, ${kind}, at boundary ${n}`
+          const mine = `yours, ${kind}, at boundary ${n}`
           const { written, journal } = await writeRacing(
             record,
             SHOWN,
@@ -220,15 +220,15 @@ test("A save made by name during a write survives it.", () =>
             async () => {
               const at = path.join(root, target)
               if (kind === "rename") {
-                await writeFile(`${at}.tmp`, yours)
+                await writeFile(`${at}.tmp`, mine)
                 await rename(`${at}.tmp`, at)
-              } else await writeFile(at, yours)
+              } else await writeFile(at, mine)
             },
           )
           const where = `${kind} into ${target} at boundary ${n}`
           // At its path, or kept aside, never lost.
           const held = [await read(target), ...(await keptContent(journal))]
-          expect(held, where).toContain(yours)
+          expect(held, where).toContain(mine)
           if (!written)
             for (const [p, v] of Object.entries(BEFORE))
               if (p !== target) expect(await read(p), where).toBe(v)

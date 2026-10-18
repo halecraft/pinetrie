@@ -35,7 +35,7 @@ import {
   slotMounts,
 } from "@pinetrie/lanes"
 import type { PiSetup } from "@pinetrie/pi"
-import type { ProjectRecord } from "@pinetrie/rules"
+import { type ProjectRecord, shortId } from "@pinetrie/rules"
 import { failed, type LeaseBasics } from "../basics.ts"
 import type { Records } from "../records.ts"
 import {
@@ -359,9 +359,7 @@ export async function startSetup(input: {
     configsAt = at
     if (made) {
       if (accepted.checkout !== null)
-        log(
-          `[host] the base snapshot is at accepted work (${point.slice(0, 8)})`,
-        )
+        log(`[host] the base snapshot is at accepted work (${shortId(point)})`)
       // Accepted work moved: what it grants may have. Shared before it is in
       // force, so no lane names a directory no slot holds; a failed share is
       // said, and lanes naming what it lacks say why they cannot start.

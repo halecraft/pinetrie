@@ -207,7 +207,7 @@ async function sshSection(check: Checks["check"], lanes: LaneHosts) {
       service.slice(0, 200),
     )
 
-    // Not approved: refused at once, the owner asked, and the lane told.
+    // Not allowed: refused at once, the owner asked, and the lane told.
     const refused = await inLaneLater(lane, sign(2))
     await waitFor(() => sshFacts().some(f => f.news === "asked"), 30_000).catch(
       () => 0,
@@ -223,14 +223,14 @@ async function sshSection(check: Checks["check"], lanes: LaneHosts) {
     // The approval wakes the lane with its owner's carry-on, whose run the
     // scripted model answers; the next signature signs.
     h.script.use([{ text: "retried" }])
-    await owner.access(lane, "approve")
+    await owner.access(lane, "allow")
     await waitFor(() => wokeBy().length > 0, 60_000).catch(() => 0)
     await h.idle()
     await startLane()
     const signed = await inLaneLater(lane, sign(2))
     check(
       "an approval wakes the lane, and its next signature signs",
-      wokeBy().some(c => c.reason.kind === "ssh-approved") &&
+      wokeBy().some(c => c.reason.kind === "ssh-allowed") &&
         h.laneWith("retried")?.name === lane &&
         signed.includes("SIGNED"),
       `${JSON.stringify(wokeBy())} · ${signed.slice(0, 120)}`,
@@ -264,7 +264,7 @@ async function sshSection(check: Checks["check"], lanes: LaneHosts) {
       `rm -f /tmp/in; mkfifo /tmp/in; (tail -f /dev/null > /tmp/in 2>/dev/null &); start=$(date +%s); ${HOP} connect banner ${port} < /tmp/in > /dev/null; echo ENDED $(( $(date +%s) - start ))`,
     )
     await waitFor(() => connections.length > before, 30_000).catch(() => 0)
-    const revoked = await owner.access(lane, "revoke")
+    const revoked = await owner.access(lane, "take-back")
     const ended = await held
     const seconds = Number(/ENDED (\d+)/.exec(ended)?.[1] ?? "99")
     check(

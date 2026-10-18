@@ -59,11 +59,11 @@ import {
   sendButton,
   settleSend,
   shownBy,
-  sizeWords,
   spent,
   startText,
   startWords,
   textTokens,
+  tokenSizeWords,
 } from "@pinetrie/interface"
 import {
   type AcceptedRecord,
@@ -938,7 +938,9 @@ export function PinnedCardEditor(p: {
       among={p.among}
       card={card}
       catchUps={p.catchUps}
-      foot={<span className="pinned-size">{sizeWords(textTokens(text))}</span>}
+      foot={
+        <span className="pinned-size">{tokenSizeWords(textTokens(text))}</span>
+      }
       onAct={p.onAct}
       onDiscard={() => p.onAct({ kind: "discard", card: card.id })}
       onText={setText}

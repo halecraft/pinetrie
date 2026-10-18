@@ -21,6 +21,12 @@ export interface ThreadMove {
   readonly intent: Intent
 }
 
+/** What a Move to ▸ item does, as its title says it, wherever it is offered. */
+export const moveTitle = (move: Pick<ThreadMove, "closes">): string =>
+  move.closes
+    ? "archive: read-only for everyone until moved out"
+    : "move it on the board, for everyone"
+
 /** A thread card's header: its signals, and its ⋯'s Move to ▸. */
 export interface ThreadCardHead {
   readonly canvas: CanvasId

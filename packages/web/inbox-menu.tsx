@@ -23,6 +23,7 @@ import {
   inboxView,
   inboxWords,
   linkWords,
+  NOT_NEEDED,
   opens,
   type Reader,
   signalOfLevel,
@@ -148,8 +149,8 @@ export function useInboxMenu({
             key: `${item.lane}:${item.raised.kind}:not-needed`,
             className: "not-needed",
             keepOpen: true,
-            label: "not needed",
-            title: "clear it, on every device of yours",
+            label: NOT_NEEDED.label,
+            title: NOT_NEEDED.title,
             onChoose: () =>
               onIntent({
                 kind: "notNeeded",

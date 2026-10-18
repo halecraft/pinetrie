@@ -23,9 +23,9 @@ import {
   type CatchUps,
   commandNote,
   commandWords,
+  PUT_AWAY,
   pinnedStatusWords,
   reorderWords,
-  TAKE,
   unsentWords,
 } from "./card-words.ts"
 import type { ColumnAct } from "./intent.ts"
@@ -165,7 +165,7 @@ const moveItems = (
   }
   const take: CardMoveItem = {
     to: "inventory",
-    act: { kind: "takeIntoInventory", card: id },
+    act: { kind: "putAway", card: id },
   }
   const threads = (facts.threadIn ?? []).map(
     (state): CardMoveItem => ({
@@ -377,10 +377,10 @@ const MOVE: Readonly<Record<Exclude<CardMoveTo, object>, MoveWords>> = {
   },
   inventory: {
     label: "Move to your inventory",
-    title: TAKE,
+    title: PUT_AWAY,
   },
   reference: {
-    label: "Queue a reference",
+    label: "Send to the agent, quoting this comment",
     title:
       "queue a reference to this comment on its thread: the agent reads it, under the message it is on, once; the comment stays",
   },

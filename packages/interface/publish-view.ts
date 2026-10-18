@@ -84,7 +84,10 @@ type PublishWords =
   | {
       readonly kind: "publish"
       readonly label: string
+      /** What it does, in plain words. */
       readonly title: string
+      /** The jj commands it runs, in order: for whoever works in jj too, apart from the words. */
+      readonly jj: readonly string[]
       /** The host would refuse it: the button is marked. */
       readonly refused: boolean
     }
@@ -100,11 +103,14 @@ type PublishWords =
 const commits = (n: number) => count(n, "commit", "commits")
 
 /** What a publish does, in order, and the jj that does it. */
-function publishSays(record: JjAcceptedRecord, work: PublishWork): string {
+function publishSays(
+  record: JjAcceptedRecord,
+  work: PublishWork,
+): { readonly said: string; readonly jj: readonly string[] } {
   const { acceptedBookmark, publish } = record
   const steps: string[] = []
   const jj: string[] = []
-  const preview = record.yours.catchUp
+  const preview = record.workingCopy.catchUp
   if (work.catchUp) {
     const moves =
       preview === null || preview.heads === 0
@@ -115,8 +121,8 @@ function publishSays(record: JjAcceptedRecord, work: PublishWork): string {
     )
     jj.push(`jj rebase -b @ -d ${acceptedBookmark}`)
   }
-  if (work.yours > 0) {
-    steps.push(`accepts your ${commits(work.yours)}`)
+  if (work.workingCopyCommits > 0) {
+    steps.push(`accepts your ${commits(work.workingCopyCommits)}`)
     jj.push(`jj bookmark move ${acceptedBookmark} ${publish} --to @-`)
   } else jj.push(`jj bookmark move ${publish} --to ${acceptedBookmark}`)
   steps.push(
@@ -130,12 +136,12 @@ function publishSays(record: JjAcceptedRecord, work: PublishWork): string {
       : `${steps.slice(0, -1).join(", ")}, then ${steps.at(-1) ?? ""}`
   // With the setting off, the working copy behind or your commits below `@` would
   // otherwise read as left out by mistake.
-  const { behind, ahead } = record.yours
+  const { behind, ahead } = record.workingCopy
   const unmoved =
     !record.publishCatchesUp && (behind > 0 || ahead > 0)
       ? "; the working copy does not move (publish.catchUp is off)"
       : ""
-  return `${said}${unmoved} · ${jj.join("; ")}`
+  return { said: `${said}${unmoved}`, jj }
 }
 
 /** What a setup or publish in flight says on the button, until the host answers. */
@@ -159,14 +165,15 @@ export function publishWords(
         JJUI_NOTE,
       ],
     }
-  const says = publishSays(view.record, view.work)
+  const { said, jj } = publishSays(view.record, view.work)
   return {
     kind: "publish",
     label: sending ?? "publish",
     title:
       view.state.kind === "refused"
-        ? `${acceptedRefusal("publish", view.state.code, view.record)} · ${says}`
-        : says,
+        ? `${acceptedRefusal("publish", view.state.code, view.record)} · ${said}`
+        : said,
+    jj,
     refused: view.state.kind === "refused",
   }
 }

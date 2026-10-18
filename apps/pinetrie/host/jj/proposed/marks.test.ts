@@ -19,7 +19,7 @@ describe("planMarks: what a move the owner observed refreshes", () => {
     all: false,
     acceptedMoved: false,
     published: false,
-    yours: false,
+    workingCopy: false,
     lanes: new Set(),
     proposed: new Set(),
     ...over,
@@ -27,7 +27,7 @@ describe("planMarks: what a move the owner observed refreshes", () => {
   const marks = (m: Moved, open: readonly ThreadId[] = [C]) =>
     planMarks({ moved: m, names, archived, open })
   test("everything moved marks accepted work, every named lane not archived and every open record", () => {
-    expect(marks(moved({ all: true, yours: true }))).toEqual({
+    expect(marks(moved({ all: true, workingCopy: true }))).toEqual({
       accepted: true,
       shared: false,
       lanes: [A, B, C],
@@ -48,7 +48,7 @@ describe("planMarks: what a move the owner observed refreshes", () => {
     })
   })
   test("your @ alone marks no lane: one shared read rewrites your edits and accepted work's record", () => {
-    expect(marks(moved({ yours: true }))).toEqual({
+    expect(marks(moved({ workingCopy: true }))).toEqual({
       accepted: false,
       shared: true,
       lanes: [],

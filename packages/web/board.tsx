@@ -26,6 +26,7 @@ import type {
 } from "@pinetrie/core"
 import {
   addStateIntent,
+  BOARD_MOVE_LABEL,
   type BoardSide,
   type BoardView,
   boardKeyAct,
@@ -43,6 +44,7 @@ import {
   type Level,
   type MessageCount,
   messageCountTitle,
+  moveTitle,
   nameStateIntent,
   noticeKey,
   noticeWords,
@@ -617,7 +619,7 @@ function ItemCard({
       </span>
       <Menu
         className="item-more"
-        label="move this thread on the board"
+        label={BOARD_MOVE_LABEL}
         sections={[
           ...(item.up === null && item.down === null
             ? []
@@ -658,9 +660,7 @@ function ItemCard({
               key: m.name,
               className: m.closes ? "move-to closes" : "move-to",
               disabled: m.busy !== null,
-              title: m.closes
-                ? "archive: read-only for everyone until moved out"
-                : "move it on the board, for everyone",
+              title: moveTitle(m),
               label: (
                 <>
                   Move to {m.name}

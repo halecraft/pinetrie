@@ -55,7 +55,7 @@ const ListedSchema = Type.Object({
 
 const TurnDiskSchema = Type.Object({
   derived: ListedSchema,
-  local: ListedSchema,
+  private: ListedSchema,
   unignored: Type.Array(Type.String()),
   leftovers: Type.Array(Type.String()),
   shared: Type.Object({

@@ -31,7 +31,7 @@ test("a thread's ⋯ copies it here or into your inventory, and takes it; it lis
       "Copy to your inventory",
       { kind: "copyThread", source: card, to: "inventory" },
     ],
-    ["Move to your inventory", { kind: "takeIntoInventory", card }],
+    ["Move to your inventory", { kind: "putAway", card }],
   ])
   expect(menuOf(NOTES).map(s => s.key)).toEqual(["canvas", "trash"])
 })

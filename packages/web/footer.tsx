@@ -142,7 +142,7 @@ function PublishButton({
           data-refused={words.refused || undefined}
           disabled={waiting}
           onClick={() => void session.actOnAccepted("publish")}
-          title={words.title}
+          title={`${words.title}\n\nin jj: ${words.jj.join("; ")}`}
           type="button"
         >
           {words.label}

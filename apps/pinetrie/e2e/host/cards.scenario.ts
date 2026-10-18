@@ -596,7 +596,7 @@ async function run(check: Checks["check"]): Promise<void> {
     check(
       "a move out of someone else's inventory is refused, as not theirs",
       stolen.kind === "refused" &&
-        stolen.refusal?.code === "not-yours" &&
+        stolen.refusal?.code === "someone-elses" &&
         onHost(forLater)?.place.kind === "inventory",
       JSON.stringify(stolen),
     )
@@ -609,19 +609,16 @@ async function run(check: Checks["check"]): Promise<void> {
     const here = canvasHolding(ch, tipOf())
     const other = await ada.send("a root of its own", ROOT, { mode: "branch" })
     const otherEnd = other.kind === "appended" ? other.id : null
-    const takeIntoInventory = (
-      card: TextCardId,
-      end: EntryId | null,
-      slot: number,
-    ) => ada.moveCard({ card, from: drafting(end), to: mine }, into(slot))
+    const putAway = (card: TextCardId, end: EntryId | null, slot: number) =>
+      ada.moveCard({ card, from: drafting(end), to: mine }, into(slot))
     const a1 = newCard(ada, tipOf(), "taken here")
     const b1 = newCard(ada, otherEnd, "taken there")
     await waitFor(
       () => onHost(a1) !== undefined && onHost(b1) !== undefined,
       5_000,
     )
-    await takeIntoInventory(a1, tipOf(), 4)
-    await takeIntoInventory(b1, otherEnd, 5)
+    await putAway(a1, tipOf(), 4)
+    await putAway(b1, otherEnd, 5)
     const undoneHere = await ada2.undoMoves(here, "undo")
     const a1Back = onHost(a1)?.place.kind === "composing"
     const b1Stays = onHost(b1)?.place.kind === "inventory"

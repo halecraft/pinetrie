@@ -549,8 +549,8 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
     },
     { kind: "queue-hold", lane: threadIdFor("abc"), held: true },
     { kind: "queue-hold", lane: threadIdFor("abc"), held: false },
-    { kind: "ssh-access", lane: threadIdFor("abc"), answer: "approve" },
-    { kind: "ssh-access", lane: threadIdFor("abc"), answer: "revoke" },
+    { kind: "ssh-access", lane: threadIdFor("abc"), answer: "allow" },
+    { kind: "ssh-access", lane: threadIdFor("abc"), answer: "take-back" },
     { kind: "unqueue-all", lane: threadIdFor("abc") },
     {
       kind: "reorder",
@@ -692,7 +692,7 @@ test("encodeOutcome -> decodeReply round-trips every outcome", () => {
     { kind: "unmoved", code: "order-changed", place: null, by: null },
     {
       kind: "unmoved",
-      code: "not-yours",
+      code: "someone-elses",
       place: { kind: "inventory", holder: writerId("bea@example.com") },
       by: writerId("bea@example.com"),
     },
@@ -1339,13 +1339,13 @@ test("decode: a malformed reorder or queue hold is refused", () => {
   )
 })
 
-test("decode: an ssh answer is approve, refuse or revoke", () => {
+test("decode: an ssh answer is allow, deny or take back; the old approve is none", () => {
   assert.equal(
     refusalCode(
       decodeCommand({
         kind: "ssh-access",
         lane: threadIdFor("abc"),
-        mode: "allow",
+        mode: "approve",
       }),
     ),
     ERR.UNKNOWN_KIND,

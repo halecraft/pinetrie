@@ -19,8 +19,8 @@ export interface ClipboardCellView {
   /** The cell's heading. */
   readonly words: string
   readonly title: string
-  /** Whether **keep** is offered: a slot is free for its copy. */
-  readonly keep: boolean
+  /** Whether **save** is offered: a slot is free for its copy. */
+  readonly save: boolean
 }
 
 /**
@@ -38,7 +38,7 @@ export function clipboardCellView(
     summary: clipSummary(clip),
     words: CLIPBOARD_CELL,
     title: CLIPBOARD_CELL_TITLE,
-    keep: held < INVENTORY_SLOTS && firstEmpty(slots) !== null,
+    save: held < INVENTORY_SLOTS && firstEmpty(slots) !== null,
   }
 }
 

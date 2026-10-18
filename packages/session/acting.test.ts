@@ -150,7 +150,7 @@ describe("sendActing: the session's store, around one command", () => {
     const store = snapshotStore<ActingState>(NO_ACTING)
     await sendActing(
       store,
-      { kind: "access", lane: A, answer: "approve" },
+      { kind: "access", lane: A, answer: "allow" },
       () =>
         Promise.resolve({
           kind: "refused",
@@ -162,7 +162,7 @@ describe("sendActing: the session's store, around one command", () => {
     expect(store.current().access.get(A)).toEqual({
       kind: "refused",
       code: "not_owner",
-      action: "approve",
+      action: "allow",
       message: "not yours",
     })
     expect(store.current().proposedByLane.has(A)).toBe(false)

@@ -145,18 +145,18 @@ export function endedOutcome(
 
 // ── carrying on ───────────────────────────────────────────────
 
-const CARRY_ON_TYPE = "pinetrie.carry-on"
+export const CARRY_ON_TYPE = "pinetrie.carry-on"
 
 const CarryOnDetailsSchema = Type.Object({
   lane: ThreadIdSchema,
   by: WriterIdSchema,
   /** Who resumed, as named when they did: the column's line shows it. */
   name: Type.String(),
-  /** Why: a stopped run carried on, or the owner's ssh approved, which wakes the lane. */
+  /** Why: a stopped run carried on, or the owner's ssh allowed, which wakes the lane. */
   reason: Type.Union([
     Type.Object({ kind: Type.Literal("stopped") }),
     Type.Object({
-      kind: Type.Literal("ssh-approved"),
+      kind: Type.Literal("ssh-allowed"),
       host: Type.Union([Type.String(), Type.Null()]),
     }),
   ]),
@@ -179,7 +179,7 @@ export const decodeCarryOn = CARRY_ON.decode
 export const carryOnLine = (d: CarryOnDetails): string =>
   d.reason.kind === "stopped"
     ? `↻ resumed by ${d.name}`
-    : `↻ resumed by ${d.name}: approved ssh for ${d.reason.host ?? "a host"}`
+    : `↻ resumed by ${d.name}: allowed ssh for ${d.reason.host ?? "a host"}`
 
 type CarryOnState =
   | { readonly kind: "ok" }

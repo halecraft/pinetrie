@@ -128,7 +128,7 @@ describe("planCopy", () => {
           to: { kind: "inventory", holder: BEA },
         },
       }),
-    ).toEqual({ kind: "refused", why: "not-yours" })
+    ).toEqual({ kind: "refused", why: "someone-elses" })
     const full = Array.from({ length: INVENTORY_SLOTS }, (_, n) => ({
       kind: "text" as const,
       id: cardIdFor(`f${n}`),

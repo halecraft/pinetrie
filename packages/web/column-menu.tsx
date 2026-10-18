@@ -62,7 +62,7 @@ function ColumnMenu(p: {
           title: item.title,
           // Take has one icon wherever it is offered.
           label:
-            item.intent.kind === "takeIntoInventory" ? (
+            item.intent.kind === "putAway" ? (
               <>
                 <InventoryIcon way="take" /> {item.label}
               </>

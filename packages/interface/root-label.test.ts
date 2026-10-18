@@ -124,7 +124,7 @@ describe("labels and summaries, from the directory", () => {
   test.each([
     [
       { held: 2, total: 4 },
-      "2 in the threads this tab has loaded, of 4 in the session",
+      "2 in the canvases this tab has loaded, of 4 in the session",
     ],
   ])("messageCountTitle(%o)", (count, words) => {
     expect(messageCountTitle(count)).toBe(words)

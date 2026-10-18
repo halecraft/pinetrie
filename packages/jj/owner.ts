@@ -335,7 +335,7 @@ export function startRepoOwner(input: {
               all: true,
               acceptedMoved: false,
               published: true,
-              yours: true,
+              workingCopy: true,
               lanes: new Set(),
               proposed: new Set(),
             })

@@ -18,17 +18,17 @@ const PersonalSchema = Type.Union([
     since: Type.Number(),
   }),
   Type.Object({
-    kind: Type.Literal("approved"),
+    kind: Type.Literal("allowed"),
     host: HostSchema,
     by: WriterIdSchema,
     at: Type.Number(),
   }),
   Type.Object({
-    kind: Type.Literal("refused"),
+    kind: Type.Literal("denied"),
     host: HostSchema,
     by: WriterIdSchema,
     at: Type.Number(),
-    revoked: Type.Boolean(),
+    takenBack: Type.Boolean(),
   }),
 ])
 
@@ -48,7 +48,7 @@ const AccessRecordSchema = Type.Object({
 /**
  * A lane's use of its owner's ssh identity: asked, and what the owner
  * answered, each state naming the host the lane last asked for. No
- * signature is held on it: a lane not approved is refused at once, and each
+ * signature is held on it: a lane not allowed is refused at once, and each
  * change of state is news to the lane.
  */
 export type PersonalAccess =
@@ -59,18 +59,18 @@ export type PersonalAccess =
       readonly since: number
     }
   | {
-      readonly kind: "approved"
+      readonly kind: "allowed"
       readonly host: string | null
       readonly by: WriterId
       readonly at: number
     }
   | {
-      readonly kind: "refused"
+      readonly kind: "denied"
       readonly host: string | null
       readonly by: WriterId
       readonly at: number
-      /** Approved, then taken back. */
-      readonly revoked: boolean
+      /** Allowed, then taken back. */
+      readonly takenBack: boolean
     }
 
 /**
@@ -134,9 +134,9 @@ export const emptyAccess = (lane: ThreadId): AccessRecord => ({
 export const ACCESS_ANSWERS: Readonly<
   Record<PersonalAccess["kind"], readonly AccessAnswer[]>
 > = {
-  waiting: ["approve", "refuse"],
-  approved: ["revoke"],
-  refused: ["approve"],
+  waiting: ["allow", "deny"],
+  allowed: ["take-back"],
+  denied: ["allow"],
 }
 
 /** The answers the owner may give a lane now; none before it has asked. */
@@ -160,14 +160,14 @@ export function planAccessAnswer(input: {
     return { refused: "nothing_to_answer" }
   const { host } = record.personal
   const personal: PersonalAccess =
-    answer === "approve"
-      ? { kind: "approved", host, by: sender, at: now }
+    answer === "allow"
+      ? { kind: "allowed", host, by: sender, at: now }
       : {
-          kind: "refused",
+          kind: "denied",
           host,
           by: sender,
           at: now,
-          revoked: answer === "revoke",
+          takenBack: answer === "take-back",
         }
   return { record: { ...record, personal } }
 }
@@ -187,7 +187,7 @@ export const planAccessAsk = (input: {
 
 /**
  * A personal signature's answer, at once, from the lane's record: an
- * approved lane signs; any other is refused, and a lane that never asked
+ * allowed lane signs; any other is refused, and a lane that never asked
  * asks as it is refused. A lane that may not ask writes nothing.
  */
 export function planPersonalSign(input: {
@@ -198,7 +198,7 @@ export function planPersonalSign(input: {
 }): { readonly signs: boolean; readonly write: AccessRecord | null } {
   const { record } = input
   if (!input.mayAsk) return { signs: false, write: null }
-  if (record.personal?.kind === "approved") return { signs: true, write: null }
+  if (record.personal?.kind === "allowed") return { signs: true, write: null }
   return {
     signs: false,
     write: record.personal === null ? planAccessAsk(input) : null,
@@ -252,11 +252,11 @@ export function planAccessUse(
 /** What a change to a lane's record tells it; each names its host and owner. */
 export interface AccessNews {
   /**
-   * `asked`: it waits for its owner. `approved`: it may sign. `refused`:
-   * its request was refused. `revoked`: an approval was taken back, and its
-   * sessions end.
+   * `asked`: it waits for its owner. `allowed`: it may sign. `denied`:
+   * its request was denied. `taken-back`: what was allowed was taken back,
+   * and its sessions end.
    */
-  readonly kind: "asked" | "approved" | "refused" | "revoked"
+  readonly kind: "asked" | "allowed" | "denied" | "taken-back"
   readonly host: string | null
   readonly owner: WriterId
 }
@@ -276,11 +276,11 @@ export function planAccessChange(
   switch (next.kind) {
     case "waiting":
       return { kind: "asked", host: next.host, owner }
-    case "approved":
-      return { kind: "approved", host: next.host, owner: next.by }
-    case "refused":
+    case "allowed":
+      return { kind: "allowed", host: next.host, owner: next.by }
+    case "denied":
       return {
-        kind: prev?.kind === "approved" ? "revoked" : "refused",
+        kind: prev?.kind === "allowed" ? "taken-back" : "denied",
         host: next.host,
         owner: next.by,
       }

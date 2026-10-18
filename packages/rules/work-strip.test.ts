@@ -34,7 +34,7 @@ const proposed: JjProposedChangesRecord = {
   files: ["a.txt", "b.txt"],
   conflicts: [],
   startConflicts: [],
-  yourEdits: [],
+  workingCopyEdits: [],
   described: true,
   edited: false,
   bookmark: "pinetrie-proposed/t-1",
@@ -121,13 +121,13 @@ describe("workStripView: the work strip's states", () => {
     ])
   })
   test("files you are editing are a fact; the state and buttons stay", () => {
-    const v = view({ ...proposed, yourEdits: ["b.txt"] })
-    expect([v.state, v.buttons, v.facts.touchesYourEdits]).toEqual([
+    const v = view({ ...proposed, workingCopyEdits: ["b.txt"] })
+    expect([v.state, v.buttons, v.facts.touchesWorkingCopyEdits]).toEqual([
       "ready",
       ["accept", "split"],
       true,
     ])
-    expect(view(proposed).facts.touchesYourEdits).toBe(false)
+    expect(view(proposed).facts.touchesWorkingCopyEdits).toBe(false)
   })
   test("the facts: proposed changes' bookmark, files and size, until it is accepted", () => {
     expect(view({ ...proposed, size: 2 }).facts).toEqual({
@@ -135,7 +135,7 @@ describe("workStripView: the work strip's states", () => {
       files: 2,
       size: 2,
       conflicts: 0,
-      touchesYourEdits: false,
+      touchesWorkingCopyEdits: false,
       bookmark: "pinetrie-proposed/t-1",
       held: false,
       acceptedAs: null,
@@ -286,7 +286,7 @@ describe("workStripView: the work strip's states", () => {
       heads: { current: null, proposed: "" },
       log: { current: null, proposed: "" },
       wips: wips.map(w => ({ ...w, behind: 0, ahead: 1 })),
-      yours: {
+      workingCopy: {
         behind: 0,
         ahead: 0,
         catchUp: null,

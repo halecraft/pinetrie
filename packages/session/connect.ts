@@ -547,8 +547,7 @@ export async function connectSession(
       })
       for (const p of pending) {
         const slotted = slotOnAccept(p, answer)
-        if (slotted !== null)
-          inventory.takeIntoInventory(slotted.card, slotted.slot)
+        if (slotted !== null) inventory.putAway(slotted.card, slotted.slot)
       }
       step({ kind: "answered", id: first.id, answer })
       return { outcome, answer }

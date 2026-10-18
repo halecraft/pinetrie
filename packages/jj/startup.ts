@@ -66,7 +66,7 @@ export async function prepareProjectDir(dir: string): Promise<ProjectDir> {
  * tracked file. Nothing without a git directory, which `prepareProjectDir`
  * refuses a jj project for.
  */
-async function excludeInYours(
+async function excludeInRepo(
   root: string,
   lines: readonly string[],
 ): Promise<void> {
@@ -128,7 +128,7 @@ export async function prepareShared(
   for (const p of planned.create)
     await mkdir(path.join(root, p), { recursive: true })
   if (planned.exclude.length > 0)
-    await excludeInYours(
+    await excludeInRepo(
       root,
       planned.exclude.map(p => `/${p}/`),
     )

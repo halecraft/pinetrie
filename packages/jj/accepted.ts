@@ -16,7 +16,7 @@ import { readCommits, readConflictedFiles } from "./lane/revisions.ts"
 import { readChangeId } from "./proposed.ts"
 
 /** What `planPublishCatchUp`'s rebase would do to the working copy: `AcceptedRecord`'s shape. */
-type CatchUpPreview = NonNullable<AcceptedFacts["yours"]["catchUp"]>
+type CatchUpPreview = NonNullable<AcceptedFacts["workingCopy"]["catchUp"]>
 
 const count = async (jj: Runner, revset: string): Promise<number> =>
   (await readCommits(jj, revset)).length
@@ -46,7 +46,7 @@ export async function acceptedFacts(
       log,
       wips: [],
       published: { commit: null, behind: 0, ahead: 0 },
-      yours: {
+      workingCopy: {
         behind: 0,
         ahead: 0,
         catchUp: null,
@@ -90,7 +90,7 @@ export async function acceptedFacts(
       acceptedBookmark,
       revsetName(repoConfig.publish),
     ),
-    yours: {
+    workingCopy: {
       behind,
       ahead: await count(jj, `::@- ~ ::${acceptedBookmark}`),
       catchUp:

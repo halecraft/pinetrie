@@ -174,7 +174,7 @@ describe("take into the inventory", () => {
   test("into the selected slot when it is empty, else the first empty", () => {
     const s = state({ cards: [card(C1, atEnd)], selected: 4 })
     const move = { card: C1, from: atEnd, to: inventory }
-    expect(plan({ kind: "takeIntoInventory", card: C1 }, s)).toEqual([
+    expect(plan({ kind: "putAway", card: C1 }, s)).toEqual([
       { kind: "inventory", act: { kind: "show", how: "peek" } },
       {
         kind: "moveCard",
@@ -186,7 +186,7 @@ describe("take into the inventory", () => {
       },
     ])
     const intoInventory = plan(
-      { kind: "takeIntoInventory", card: C1 },
+      { kind: "putAway", card: C1 },
       state({ cards: [card(C1, atEnd)], selected: 4, slots: { "4": C2 } }),
     )
     expect(intoInventory[1]).toMatchObject({ how: { slot: 0 } })
@@ -198,7 +198,7 @@ describe("take into the inventory", () => {
     )
     expect(
       plan(
-        { kind: "takeIntoInventory", card: C1 },
+        { kind: "putAway", card: C1 },
         state({ cards: [card(C1, atEnd)], slots }),
       )[1],
     ).toEqual({
@@ -248,7 +248,7 @@ describe("which kinds are taken and put (KINDS)", () => {
     for (const c of ofEveryKind()) {
       const s = state({ cards: [c] })
       const holds = fitsPlace(c.kind, "inventory")
-      const take = plan({ kind: "takeIntoInventory", card: c.id }, s)
+      const take = plan({ kind: "putAway", card: c.id }, s)
       const put = plan(
         {
           kind: "put",

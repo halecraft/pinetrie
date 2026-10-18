@@ -312,13 +312,13 @@ test("planForkSetup: jj new before any other jj command, then the bookmark, then
 
 describe("the base's checkout", () => {
   test("planBaseCheckout: a fresh disk's git and jj, not cloned; a copied base's stale copy recovered", () => {
-    expect(argvs(planBaseCheckout({ yours: [C1], fresh: true }))).toEqual([
+    expect(argvs(planBaseCheckout({ accepted: [C1], fresh: true }))).toEqual([
       "lane: git init -q",
       "lane: jj git init --colocate",
       `lane: ${fetchById([C1]).argv.join(" ")}`,
       "lane: jj new c1",
     ])
-    expect(argvs(planBaseCheckout({ yours: [C2], fresh: false }))).toEqual([
+    expect(argvs(planBaseCheckout({ accepted: [C2], fresh: false }))).toEqual([
       `lane: ${fetchById([C2]).argv.join(" ")}`,
       "lane: jj workspace update-stale",
       "lane: jj new c2",

@@ -42,34 +42,35 @@ test("a lane refused only for a host outside has a row", () => {
 })
 
 describe("the owner", () => {
-  test("is asked for their ssh by host, and answers approve or refuse", () => {
+  test("is asked for their ssh by host, and answers allow or deny", () => {
     expect(row(at(WAITING))).toEqual({
-      line: "🔑 wants your ssh for pop",
+      line: "🔑 asks to use your ssh for pop",
       answers: [
-        { answer: "approve", label: "approve" },
-        { answer: "refuse", label: "refuse" },
+        { answer: "allow", label: "allow" },
+        { answer: "deny", label: "deny" },
       ],
       waiting: false,
       note: null,
     })
   })
 
-  test("can take an approval back, and approve after a refusal", () => {
+  test("can take an allowance back, and allow after a denial", () => {
     expect(
       row(
         at(
-          { kind: "approved", host: "pop", by: DUANE, at: 1 },
+          { kind: "allowed", host: "pop", by: DUANE, at: 1 },
           { hosts: ["pop"] },
         ),
       ),
     ).toMatchObject({
       line: "🔑 your ssh · pop",
-      answers: [{ answer: "revoke", label: "revoke" }],
+      answers: [{ answer: "take-back", label: "take back" }],
     })
     expect(
-      row(at({ kind: "refused", host: "pop", by: DUANE, at: 1, revoked: true }))
-        ?.answers,
-    ).toEqual([{ answer: "approve", label: "approve" }])
+      row(
+        at({ kind: "denied", host: "pop", by: DUANE, at: 1, takenBack: true }),
+      )?.answers,
+    ).toEqual([{ answer: "allow", label: "allow" }])
   })
 })
 
@@ -81,22 +82,22 @@ describe("everyone else", () => {
     })
   })
 
-  test("sees whose ssh it holds, refused or revoked", () => {
+  test("sees whose ssh it holds, denied or taken back", () => {
     expect(
-      row(at({ kind: "approved", host: "pop", by: DUANE, at: 1 }), BEA)?.line,
+      row(at({ kind: "allowed", host: "pop", by: DUANE, at: 1 }), BEA)?.line,
     ).toBe("🔑 Duane's ssh")
     expect(
       row(
-        at({ kind: "refused", host: "pop", by: DUANE, at: 1, revoked: false }),
+        at({ kind: "denied", host: "pop", by: DUANE, at: 1, takenBack: false }),
         BEA,
       )?.line,
-    ).toBe("🔑 Duane's ssh refused")
+    ).toBe("🔑 Duane's ssh denied")
     expect(
       row(
-        at({ kind: "refused", host: "pop", by: DUANE, at: 1, revoked: true }),
+        at({ kind: "denied", host: "pop", by: DUANE, at: 1, takenBack: true }),
         BEA,
       )?.line,
-    ).toBe("🔑 Duane's ssh revoked")
+    ).toBe("🔑 Duane's ssh taken back")
   })
 })
 
@@ -104,7 +105,7 @@ test("service identities come first, with the hosts the lane reached", () => {
   expect(
     row(
       at(
-        { kind: "approved", host: "pop", by: DUANE, at: 1 },
+        { kind: "allowed", host: "pop", by: DUANE, at: 1 },
         { services: ["deploy"], hosts: ["git.internal", "pop"] },
       ),
       BEA,
@@ -121,14 +122,14 @@ test("an answer out makes the buttons wait; a refused one is said", () => {
   })
   if (view === null) throw new Error("a waiting lane has a row")
   expect(
-    accessWords(view, { kind: "sent", id: "1", action: "approve", to: null })
+    accessWords(view, { kind: "sent", id: "1", action: "allow", to: null })
       .waiting,
   ).toBe(true)
   expect(
     accessWords(view, {
       kind: "refused",
       code: "not_owner",
-      action: "approve",
+      action: "allow",
       message: "only this host's owner answers",
     }).note,
   ).toBe("not done: only this host's owner answers")

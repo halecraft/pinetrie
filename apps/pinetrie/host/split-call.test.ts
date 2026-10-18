@@ -41,7 +41,7 @@ function runningWithProposed() {
       files: ["a.ts"],
       conflicts: [],
       startConflicts: [],
-      yourEdits: [],
+      workingCopyEdits: [],
       described: true,
       edited: false,
       bookmark: "pinetrie-proposed/x",

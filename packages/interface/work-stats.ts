@@ -33,7 +33,7 @@ export interface WorkStats {
    * Local files its turns wrote, from their records: each record's topmost
    * paths and how many more it counted.
    */
-  readonly local: number
+  readonly private: number
   /** Directories its runs made from source that `.gitignore` does not ignore. */
   readonly unignored: number
   /** Source files its turns wrote that their commits left out. */
@@ -83,8 +83,8 @@ export function entriesWorkStats(
   let people = 0
   const calls: ToolCall[] = []
   const files = new Set<string>()
-  const local = new Set<string>()
-  let localMore = 0
+  const priv = new Set<string>()
+  let privateMore = 0
   const unignored = new Set<string>()
   const leftovers = new Set<string>()
   let concurrent = 0
@@ -100,8 +100,8 @@ export function entriesWorkStats(
     const record = revisions.get(id)
     for (const p of record?.paths ?? []) files.add(p)
     const disk = record?.disk ?? null
-    for (const p of disk?.local.paths ?? []) local.add(p)
-    localMore += disk?.local.more ?? 0
+    for (const p of disk?.private.paths ?? []) priv.add(p)
+    privateMore += disk?.private.more ?? 0
     for (const p of disk?.unignored ?? []) unignored.add(p)
     for (const p of disk?.leftovers ?? []) leftovers.add(p)
     concurrent += (disk?.shared.wrote ?? []).filter(w => w.concurrent).length
@@ -114,7 +114,7 @@ export function entriesWorkStats(
     calls: calls.length,
     failed: calls.filter(c => results.get(c.id)?.isError === true).length,
     files: [...files].sort(),
-    local: local.size + localMore,
+    private: priv.size + privateMore,
     unignored: unignored.size,
     leftovers: leftovers.size,
     concurrent,

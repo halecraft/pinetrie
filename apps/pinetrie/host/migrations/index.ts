@@ -22,6 +22,13 @@ import { REPLY_DIAGNOSTICS } from "./0001-reply-diagnostics.ts"
 import { IMAGE_VERSIONS } from "./0002-image-versions.ts"
 import { ONE_MARGIN } from "./0003-one-margin.ts"
 import { CARD_TITLES } from "./0004-card-titles.ts"
+import { acceptedWorkingCopy } from "./0005-accepted-working-copy.ts"
+import { proposedWorkingCopyEdits } from "./0006-proposed-working-copy-edits.ts"
+import { landMerged } from "./0007-land-merged.ts"
+import { turnDiskPrivateMigration } from "./0008-turn-disk-private.ts"
+import { accessAnswersMigration } from "./0009-access-answers.ts"
+import { sshFactWordsMigration } from "./0010-ssh-fact-words.ts"
+import { carryOnSshAllowedMigration } from "./0011-carry-on-ssh-allowed.ts"
 import type { MigrationLedger } from "./ledger.ts"
 
 /** What a migration reads with, and writes with once every read loaded. */
@@ -80,6 +87,13 @@ export const RECORD_MIGRATIONS: readonly RecordMigration[] = [
   REPLY_DIAGNOSTICS,
   ONE_MARGIN,
   CARD_TITLES,
+  acceptedWorkingCopy,
+  proposedWorkingCopyEdits,
+  landMerged,
+  turnDiskPrivateMigration,
+  accessAnswersMigration,
+  sshFactWordsMigration,
+  carryOnSshAllowedMigration,
 ]
 
 /**

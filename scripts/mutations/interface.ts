@@ -44,7 +44,7 @@ export const mutations: readonly Mutation[] = [
     to: '    copied && laneFork?.state === "begun"',
     command: unit,
     expect:
-      "a copy whose fork began from its base says its files were not kept",
+      "a copy whose fork began from its base says its files could not be copied",
   },
   {
     name: "the words check's pattern drops commit",
@@ -192,22 +192,22 @@ export const mutations: readonly Mutation[] = [
     expect: "baseChoices: none in a folder project, which has no WIP",
   },
   {
-    name: "a turn's local files go unsaid",
+    name: "a turn's private files go unsaid",
     file: "packages/interface/ask-words.ts",
-    from: '    stats.local > 0 ? plural(stats.local, "local file") : "",\n',
+    from: '    stats.private > 0 ? plural(stats.private, "private file") : "",\n',
     to: "",
     command: unit,
     expect:
-      "local files a turn wrote, outputs nothing ignores, and files jj left out",
+      "private files a turn wrote, generated files not ignored, and files not saved to history",
   },
   {
-    name: "a turn's local files are not counted",
+    name: "a turn's private files are not counted",
     file: "packages/interface/work-stats.ts",
-    from: "    for (const p of disk?.local.paths ?? []) local.add(p)\n",
+    from: "    for (const p of disk?.private.paths ?? []) priv.add(p)\n",
     to: "",
     command: unit,
     expect:
-      "counts the work, the union of its turns' paths and local files, and its time",
+      "counts the work, the union of its turns' paths and private files, and its time",
   },
   {
     name: "a named thread opened before its lane asks for no banner",
@@ -686,7 +686,7 @@ export const mutations: readonly Mutation[] = [
     to: '    case "unknown":\n      return ""\n',
     command: unit,
     expect:
-      "the jj facts are titles: which bookmark an acceptance moves, and what catching up merges",
+      "the jj facts are titles: which bookmark an acceptance moves, and what catching up merges, by the base's name",
   },
   {
     name: "proposed changes' line says nothing of its base moving on",
@@ -698,13 +698,22 @@ export const mutations: readonly Mutation[] = [
       "behind its base, the strip says so and offers catching up beside the proposed changes",
   },
   {
+    name: "an accepted strip's line keeps its change id from no one",
+    file: "packages/interface/column-view.ts",
+    from: '      state === "accepted" && facts.acceptedAs !== null\n',
+    to: "      false\n",
+    command: unit,
+    expect:
+      "an accepted strip says so, its change id in the line's title alone",
+  },
+  {
     name: "the header never marks a thread behind",
     file: "packages/interface/column-view.ts",
     from: '  if (now.kind !== "brings") return null\n',
     to: "  return null\n",
     command: unit,
     expect:
-      "worded as the project, its title naming the files, the bookmark and both commits",
+      "worded as the project, its title naming the files, never jj's bookmark or commits",
   },
   {
     name: "the header marks a thread behind by its own work",
@@ -1142,8 +1151,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a stack reads as one proposed changes",
     file: "packages/interface/column-view.ts",
-    from: "                      ? `a stack of ${facts.size} · ${files} changed${yours}`",
-    to: "                      ? `${files} changed${yours}`",
+    from: "                      ? `a stack of ${facts.size} · ${files} changed${editing}`",
+    to: "                      ? `${files} changed${editing}`",
     command: unit,
     expect: "a stack",
   },
@@ -1222,8 +1231,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "your own message is someone else's",
     file: "packages/interface/send.ts",
-    from: '  if (last === reader.me) return { kind: "afterYours", ahead: lane.waiting }',
-    to: '  if (false) return { kind: "afterYours", ahead: lane.waiting }',
+    from: '  if (last === reader.me) return { kind: "afterMine", ahead: lane.waiting }',
+    to: '  if (false) return { kind: "afterMine", ahead: lane.waiting }',
     command: unit,
     expect: "behind your own message, as yours",
   },
@@ -1327,7 +1336,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "bash reads as bash",
     file: "packages/interface/tool-words.ts",
-    from: '  [BASH_TOOL]: "shell",',
+    from: '  [BASH_TOOL]: "ran",',
     to: '  [BASH_TOOL]: "bash",',
     command: unit,
     expect: "bash reads as its word",
@@ -1403,7 +1412,7 @@ export const mutations: readonly Mutation[] = [
     to: "    return [...spans]",
     command: unit,
     expect:
-      "a long chain is tagged shell, highlighted, and laid out a step a line",
+      "a long chain is tagged ran, highlighted, and laid out a step a line",
   },
   {
     name: "the longest backtick run, found by spreading every run",
@@ -2279,8 +2288,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the rail draws no mark",
     file: "packages/interface/rail-view.ts",
-    from: "        yours: facts.yours.ends.has(id) ? facts.yours.color : null,",
-    to: "        yours: null,",
+    from: "        mine: facts.mine.ends.has(id) ? facts.mine.color : null,",
+    to: "        mine: null,",
     command: unit,
     expect:
       "railItems: a dot at a thread end holding your card carries your colour",
@@ -3199,8 +3208,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "reading a thread clears its proposed changes",
     file: "packages/interface/attention.ts",
-    from: "    if (!yours(o.lane)) continue\n",
-    to: "    if (!yours(o.lane) || person.read.has(o.lane)) continue\n",
+    from: "    if (!isMine(o.lane)) continue\n",
+    to: "    if (!isMine(o.lane) || person.read.has(o.lane)) continue\n",
     command: unit,
     expect: "proposed changes you follow needs you until not needed",
   },
@@ -4203,7 +4212,7 @@ export const mutations: readonly Mutation[] = [
     name: "Cmd+X takes into the inventory again",
     file: "packages/interface/page-keys.ts",
     from: '  if (command && key === "z")',
-    to: '  if (command && key === "x" && focus.card !== null)\n    return { kind: "takeIntoInventory", card: focus.card }\n  if (command && key === "z")',
+    to: '  if (command && key === "x" && focus.card !== null)\n    return { kind: "putAway", card: focus.card }\n  if (command && key === "z")',
     command: unit,
     expect:
       "Cmd+C, Cmd+X and Cmd+V are no keys here: they are the page's copy, cut and paste events",
@@ -4732,7 +4741,7 @@ export const mutations: readonly Mutation[] = [
     to: "",
     command: unit,
     expect:
-      "counts the work, the union of its turns' paths and local files, and its time",
+      "counts the work, the union of its turns' paths and private files, and its time",
   },
   {
     name: "you are offered as a mention",

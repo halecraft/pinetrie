@@ -83,7 +83,7 @@ const proposed: JjProposedChangesRecord = {
   files: ["a.txt"],
   conflicts: [],
   startConflicts: [],
-  yourEdits: [],
+  workingCopyEdits: [],
   described: true,
   edited: false,
   bookmark: "pinetrie-proposed/x",
@@ -205,7 +205,7 @@ const SAMPLES: readonly Sample[] = [
       heads: { current: null, proposed: "h" },
       log: { current: null, proposed: "l" },
       wips: [],
-      yours: {
+      workingCopy: {
         behind: 0,
         ahead: 0,
         catchUp: null,
@@ -292,7 +292,7 @@ const SAMPLES: readonly Sample[] = [
     ACCESS,
     {
       lane: L,
-      personal: { kind: "approved", host: "pop", by: ADA, at: 1 },
+      personal: { kind: "allowed", host: "pop", by: ADA, at: 1 },
       outside: { host: "hql", key: "SHA256:k", at: 2 },
       services: ["deploy"],
       hosts: ["pop"],

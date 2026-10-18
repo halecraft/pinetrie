@@ -42,7 +42,7 @@ import { canvasFactLine, decodeCanvas, decodeCanvasFact } from "./canvas.ts"
 import { decodeCanvasPinned } from "./canvas-pinned.ts"
 import type { CommandRef } from "./commands.ts"
 import { choiceSchema, decodeWith, ThreadIdSchema } from "./decode.ts"
-import { decodeFact, factLine } from "./fact.ts"
+import { decodeFact, factDetail, factLine } from "./fact.ts"
 import { decodeLand, type LandMessage, landLine } from "./land.ts"
 import { type LinkedQuote, withQuotes } from "./links.ts"
 import { decodePinned } from "./pinned.ts"
@@ -377,7 +377,7 @@ function toolResultFacts(
 export function renderableMessage(message: unknown): AgentMessageLike {
   const land = decodeLand(message)
   if (land !== undefined)
-    return { role: "land", content: landLine(land), merged: land.yours }
+    return { role: "land", content: landLine(land), merged: land.merged }
   const update = decodeUpdate(message)
   if (update !== undefined)
     return {
@@ -388,11 +388,16 @@ export function renderableMessage(message: unknown): AgentMessageLike {
   const stack = decodeStack(message)
   if (stack !== undefined) return { role: "stack", content: stackLine(stack) }
   const fact = decodeFact(message)
-  if (fact !== undefined)
+  if (fact !== undefined) {
+    const detail = factDetail(fact)
+    const line = {
+      role: "fact",
+      content: factLine(fact),
+      ...(detail === null ? {} : { detail }),
+    } as const
     return fact.kind === "stopped"
       ? {
-          role: "fact",
-          content: factLine(fact),
+          ...line,
           stopped: {
             prompt: fact.prompt,
             by: fact.by,
@@ -400,12 +405,9 @@ export function renderableMessage(message: unknown): AgentMessageLike {
           },
         }
       : fact.kind === "dismissed" || fact.kind === "left"
-        ? {
-            role: "fact",
-            content: factLine(fact),
-            member: { gone: fact.member },
-          }
-        : { role: "fact", content: factLine(fact) }
+        ? { ...line, member: { gone: fact.member } }
+        : line
+  }
   const relay = decodeRelay(message)
   if (relay !== undefined) return { role: "relay", content: relay.text, relay }
   const answer = decodeAnswer(message)

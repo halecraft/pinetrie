@@ -245,12 +245,12 @@ async function walkedSinceHost(
   commit: CommitId,
 ): Promise<RevisionFacts> {
   const walk = walkToHost(await evologOf(jj, commit), commit)
-  let yoursChanged = false
-  for (const v of walk.yours) {
+  let othersChanged = false
+  for (const v of walk.other) {
     const step = await sameAs(jj, v.from, v.to)
-    if (!step.sameDescription || !step.sameChange) yoursChanged = true
+    if (!step.sameDescription || !step.sameChange) othersChanged = true
   }
-  return { reached: walk.reached, yoursChanged }
+  return { reached: walk.reached, othersChanged }
 }
 
 /**
@@ -277,11 +277,11 @@ async function comparedWithHost(
   )
     .map(row => row.split("\t"))
     .find(([, changeId]) => changeId === input.changeId)?.[0]
-  if (was === undefined) return { reached: false, yoursChanged: false }
+  if (was === undefined) return { reached: false, othersChanged: false }
   const step = await sameAs(jj, commitId(was), input.commit)
   return {
     reached: true,
-    yoursChanged: !step.sameDescription || !step.sameChange,
+    othersChanged: !step.sameDescription || !step.sameChange,
   }
 }
 
@@ -779,7 +779,7 @@ export async function hostCommitIn(
   jj: Runner,
   changeId: string,
   host: CommitId | null,
-): Promise<{ readonly hosts: CommitId; readonly yours: CommitId } | null> {
+): Promise<{ readonly host: CommitId; readonly other: CommitId } | null> {
   const commits = await readCommits(jj, `present(change_id(${changeId}))`)
   const inHost =
     host === null
@@ -795,10 +795,10 @@ export async function hostCommitIn(
     if (hosts) byHost.push(c)
     else byYou.push(c)
   }
-  const [hosts] = byHost
-  const [yours] = byYou
-  return byHost.length === 1 && byYou.length === 1 && hosts && yours
-    ? { hosts, yours }
+  const [hostMade] = byHost
+  const [other] = byYou
+  return byHost.length === 1 && byYou.length === 1 && hostMade && other
+    ? { host: hostMade, other }
     : null
 }
 

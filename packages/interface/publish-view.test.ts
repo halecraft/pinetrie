@@ -9,9 +9,9 @@ import { describe, expect, test } from "vitest"
 import { baseWords } from "./column-view.ts"
 import { publishToast, publishView, publishWords } from "./publish-view.ts"
 
-const yours = (
-  over: Partial<JjAcceptedRecord["yours"]> = {},
-): JjAcceptedRecord["yours"] => ({
+const workingCopyFacts = (
+  over: Partial<JjAcceptedRecord["workingCopy"]> = {},
+): JjAcceptedRecord["workingCopy"] => ({
   behind: 0,
   ahead: 0,
   catchUp: null,
@@ -29,7 +29,7 @@ const record = (over: Partial<JjAcceptedRecord> = {}): JjAcceptedRecord => ({
   heads: { current: null, proposed: "builtin_immutable_heads() | …" },
   log: { current: null, proposed: "builtin_log() | …" },
   wips: [],
-  yours: yours(),
+  workingCopy: workingCopyFacts(),
   publishCatchesUp: true,
   ...over,
 })
@@ -76,42 +76,48 @@ describe("publishView: one button, only with something to do", () => {
   })
   test("nothing to publish: hidden; the working copy or your commits alone are something", () => {
     expect(publishView(record()).kind).toBe("hidden")
-    expect(publishView(record({ yours: yours({ ahead: 1 }) })).kind).toBe(
-      "publish",
-    )
+    expect(
+      publishView(record({ workingCopy: workingCopyFacts({ ahead: 1 }) })).kind,
+    ).toBe("publish")
     expect(
       publishView(
-        record({ publishCatchesUp: false, yours: yours({ ahead: 1 }) }),
+        record({
+          publishCatchesUp: false,
+          workingCopy: workingCopyFacts({ ahead: 1 }),
+        }),
       ).kind,
     ).toBe("hidden")
   })
 })
 
 describe("publishWords: what the button says it will do", () => {
-  test("main forward over accepted work, the host's move in jj", () => {
+  test("main forward over accepted work, the host's move in jj apart from its words", () => {
     const w = words(record(unpublished(2)))
     expect(w.label).toBe("publish")
-    expect(w.title).toBe(
-      "moves main forward over 2 accepted commits · jj bookmark move main --to pinetrie-accepted",
-    )
+    expect(w.title).toBe("moves main forward over 2 accepted commits")
+    expect(w.kind === "publish" && w.jj).toEqual([
+      "jj bookmark move main --to pinetrie-accepted",
+    ])
   })
   test("with publish.catchUp off, the title says the working copy does not move, naming the setting", () => {
-    const off = (y: Partial<JjAcceptedRecord["yours"]>) =>
+    const off = (y: Partial<JjAcceptedRecord["workingCopy"]>) =>
       words(
-        record({ ...unpublished(2), publishCatchesUp: false, yours: yours(y) }),
+        record({
+          ...unpublished(2),
+          publishCatchesUp: false,
+          workingCopy: workingCopyFacts(y),
+        }),
       ).title
     expect(off({ behind: 1, ahead: 1 })).toBe(
-      "moves main forward over 2 accepted commits; the working copy does not move (publish.catchUp is off) · jj bookmark move main --to pinetrie-accepted",
+      "moves main forward over 2 accepted commits; the working copy does not move (publish.catchUp is off)",
     )
-    expect(off({})).toBe(
-      "moves main forward over 2 accepted commits · jj bookmark move main --to pinetrie-accepted",
-    )
+    expect(off({})).toBe("moves main forward over 2 accepted commits")
   })
   test("with publish.catchUp on: the working copy catches up, your commits are accepted, then main moves", () => {
     const w = words(
       record({
         ...unpublished(1),
-        yours: yours({
+        workingCopy: workingCopyFacts({
           behind: 1,
           ahead: 2,
           catchUp: { changes: 4, conflicts: [], heads: 1 },
@@ -119,8 +125,12 @@ describe("publishWords: what the button says it will do", () => {
       }),
     )
     expect(w.title).toBe(
-      "catches the working copy up with accepted work (changes 4 files; 1 other line of your work moves with it), accepts your 2 commits, then moves main forward over 1 accepted commit · jj rebase -b @ -d pinetrie-accepted; jj bookmark move pinetrie-accepted main --to @-",
+      "catches the working copy up with accepted work (changes 4 files; 1 other line of your work moves with it), accepts your 2 commits, then moves main forward over 1 accepted commit",
     )
+    expect(w.kind === "publish" && w.jj).toEqual([
+      "jj rebase -b @ -d pinetrie-accepted",
+      "jj bookmark move pinetrie-accepted main --to @-",
+    ])
   })
   test("a publish the host would refuse leads its title with why", () => {
     const w = words(record(unpublished(3, 1)))
@@ -165,7 +175,7 @@ describe("publishToast", () => {
       "a conflict in the working copy is said, and offers no agent",
       {
         kind: "refused",
-        code: ERR.YOURS_CONFLICT,
+        code: ERR.WORKING_COPY_CONFLICT,
         action: "publish",
         message: "the working copy has conflicts in g.txt",
       },

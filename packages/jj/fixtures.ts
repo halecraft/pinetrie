@@ -46,7 +46,7 @@ export function jjLaneFor(lane: ThreadId): JjLane {
  */
 export async function fetchLane(
   runners: LaneRunners,
-  yours: string,
+  repo: string,
   input: {
     readonly lane: ThreadId
     readonly have: readonly CommitId[]
@@ -64,7 +64,7 @@ export async function fetchLane(
     runners,
   )
   await executeRepo(
-    yours,
+    repo,
     planImport({ lane: input.lane, bundle: input.bundle, stack: false }),
   )
 }
@@ -103,7 +103,7 @@ export async function knownStart(
  * nothing kept. The lane's tip must be fetched already.
  */
 export async function buildProposedChanges(
-  yours: string,
+  repo: string,
   input: {
     readonly lane: ThreadId
     readonly name: ThreadName
@@ -112,13 +112,13 @@ export async function buildProposedChanges(
   },
 ) {
   const { lane, name, repoConfig } = input
-  const ops = hostOps(yours)
+  const ops = hostOps(repo)
   const tip = await laneTipIn(ops, lane)
   if (tip === null) throw new Error("no tip")
   const base = await laneBase(ops, tip, repoConfig)
   if (base === null) throw new Error("no base")
   const target = await acceptedIn(ops, repoConfig)
-  await executeRepo(yours, [
+  await executeRepo(repo, [
     ...planProposedChanges({
       name,
       start: await knownStart(ops, { tip, base, repoConfig, lane }),
@@ -143,16 +143,16 @@ export async function buildProposedChanges(
  * already.
  */
 export async function proposedTip(
-  yours: string,
+  repo: string,
   input: {
     readonly lane: ThreadId
     readonly name: ThreadName
     readonly repoConfig: RepoConfig
   },
 ) {
-  const tip = await laneTipIn(hostOps(yours), input.lane)
+  const tip = await laneTipIn(hostOps(repo), input.lane)
   if (tip === null) throw new Error("no tip")
-  return buildProposedChanges(yours, {
+  return buildProposedChanges(repo, {
     ...input,
     sources: [{ commit: tip, description: `WIP\n\nPinetrie-Source: ${tip}\n` }],
   })
@@ -164,7 +164,7 @@ export async function proposedTip(
  * as the host accepts one.
  */
 export async function acceptProposedChanges(
-  yours: string,
+  repo: string,
   input: {
     readonly name: ThreadName
     readonly top: string
@@ -172,7 +172,7 @@ export async function acceptProposedChanges(
   },
 ): Promise<void> {
   await executeRepo(
-    yours,
+    repo,
     planAcceptanceSteps({
       bookmark: proposedBookmark(input.name),
       top: input.top,

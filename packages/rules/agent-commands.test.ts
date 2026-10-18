@@ -144,7 +144,7 @@ describe("catchUpAnswer", () => {
     const land = planResolution({
       floor: floor(),
       files: [],
-      details: { lane: LANE, yours: [PC], by: ADA },
+      details: { lane: LANE, merged: [PC], by: ADA },
       timestamp: 1,
     })
     expect(catchUpAnswer({ kind: "conflicted", message: land })).toEqual({

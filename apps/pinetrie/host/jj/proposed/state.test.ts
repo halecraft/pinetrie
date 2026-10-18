@@ -32,7 +32,7 @@ const PROPOSED_CHANGES: JjProposedChangesRecord = {
   files: ["a.txt"],
   conflicts: [],
   startConflicts: [],
-  yourEdits: [],
+  workingCopyEdits: [],
   described: false,
   edited: false,
   bookmark: "pinetrie-proposed/amber-fox",

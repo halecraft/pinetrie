@@ -130,7 +130,7 @@ export function catchUpAnswer(
       return {
         text: settled.message.content,
         isError: false,
-        details: { merged: [...settled.message.details.yours] },
+        details: { merged: [...settled.message.details.merged] },
       }
     case "nothing":
       return refusedAnswer("nothing-new")

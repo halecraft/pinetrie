@@ -23,7 +23,7 @@ function Side({
   side: ConflictShown["sides"][number]
   path: string
 }) {
-  const target = { spans: [side.span], conflicts: [], yourEdits: [] }
+  const target = { spans: [side.span], conflicts: [], workingCopyEdits: [] }
   const view = reviewView(
     target,
     useFetched([reviewUrl(side.span)], readReview),

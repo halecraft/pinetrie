@@ -165,15 +165,20 @@ const awayLine = (name: string, why: Away): string =>
       ? `${name} is in someone's inventory`
       : `${name} is no longer on any canvas`
 
+/** What a fact's line leaves out, as its title; null for none. */
+export function factDetail(fact: QueuedFact): string | null {
+  return fact.kind === "accepted" ? `change id ${fact.as}` : null
+}
+
 /** The one line a column shows for a fact. */
 export function factLine(fact: QueuedFact): string {
   switch (fact.kind) {
     case "accepted":
-      return `✓ accepted${into(fact.to)} as ${fact.as.slice(0, 8)}`
+      return `✓ accepted${into(fact.to)}`
     case "accepted-into-folder":
       return `✓ accepted into the project's folder: ${fact.files === 1 ? "1 file" : `${fact.files} files`} written`
     case "described":
-      return "✎ a new description of the changes was asked for"
+      return "✎ asked for a new description"
     case "squashed":
       return "⇣ the changes were squashed into one revision"
     case "refreshed":

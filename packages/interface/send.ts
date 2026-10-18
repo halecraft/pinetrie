@@ -24,8 +24,10 @@ import {
   displayName,
   parseCommand,
   type SetupRecord,
+  shortId,
 } from "@pinetrie/rules"
 import type { SendHow } from "@pinetrie/session"
+import { COMMAND_VERB } from "./card-words.ts"
 import type { Prefill } from "./columns.ts"
 import { UPLOADING } from "./paste.ts"
 import { noModelWords } from "./setup-words.ts"
@@ -339,12 +341,7 @@ function commandSendWords(
   command: NonNullable<SendPlan["command"]>,
   queue: QueuePlace,
 ): ButtonWords {
-  const verb =
-    command.command === "split"
-      ? "split"
-      : command.command === "continue-on-accepted"
-        ? "continue"
-        : "catch up"
+  const verb = COMMAND_VERB[command.command]
   return {
     label:
       command.command === "split" || !command.text ? verb : `${verb} and send`,
@@ -373,7 +370,7 @@ export type QueuePlace =
   /** Nothing waits: it is popped when the run ends. */
   | { readonly kind: "next" }
   /** Behind `ahead` queued cards, the last of them yours. */
-  | { readonly kind: "afterYours"; readonly ahead: number }
+  | { readonly kind: "afterMine"; readonly ahead: number }
   /** Behind `ahead` queued cards, the last of them `name`'s. */
   | { readonly kind: "after"; readonly name: string; readonly ahead: number }
 
@@ -385,7 +382,7 @@ export function queuePlace(lane: ThreadLane, reader: Reader): QueuePlace {
   if (lane.kind === "none") return { kind: "next" }
   const last = lane.lastWaiting
   if (last === null) return { kind: "next" }
-  if (last === reader.me) return { kind: "afterYours", ahead: lane.waiting }
+  if (last === reader.me) return { kind: "afterMine", ahead: lane.waiting }
   return {
     kind: "after",
     name: displayName(last, reader.nameOf.get(last)),
@@ -406,11 +403,11 @@ export function queueWords(place: QueuePlace): ButtonWords {
       }
     case "next":
       return { label: "queue up next", title: null }
-    case "afterYours":
+    case "afterMine":
     case "after":
       return {
         label:
-          place.kind === "afterYours"
+          place.kind === "afterMine"
             ? "queue after yours"
             : `queue after ${place.name}`,
         title: place.ahead > 1 ? `${place.ahead} waiting ahead` : null,
@@ -486,7 +483,7 @@ export function baseChoices(
       row: "accepted work",
       detail: null,
       chosen: chosen === null,
-      title: `${accepted.acceptedBookmark} at ${accepted.commit.slice(0, 8)}`,
+      title: `${accepted.acceptedBookmark} at ${shortId(accepted.commit)}`,
     },
     ...accepted.wips.map(w => ({
       key: `base:${w.bookmark}`,
@@ -494,7 +491,7 @@ export function baseChoices(
       row: w.bookmark,
       detail: behind(w.behind),
       chosen: chosen === w.bookmark,
-      title: `${w.bookmark} at ${w.commit.slice(0, 8)}, copied for the thread`,
+      title: `${w.bookmark} at ${shortId(w.commit)}, copied for the thread`,
     })),
   ]
 }

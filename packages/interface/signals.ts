@@ -43,7 +43,7 @@ export type Signal =
   | "done"
 
 const SIGNAL_WORDS: Readonly<Record<Signal, string>> = {
-  unsent: "your unsent card is here",
+  unsent: "you have an unsent message here",
   "needs-you": "needs you",
   "worth-a-read": "worth a read",
   running: "the agent is working",
@@ -59,7 +59,7 @@ export const signalOfLevel = (level: Level): Signal =>
 
 /** ▦'s mark's title: what the canvases not in the sidebar raise. */
 export const elsewhereWords = (level: Level): string =>
-  `a thread not in the sidebar: ${signalWords(signalOfLevel(level))}`
+  `a canvas not in the sidebar: ${signalWords(signalOfLevel(level))}`
 
 /**
  * The signal a thread's or a canvas's status draws: running while its agent

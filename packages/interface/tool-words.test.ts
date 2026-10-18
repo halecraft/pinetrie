@@ -5,12 +5,12 @@ import { callLabel, PREVIEW_LENGTH, toolWord } from "./tool-words.ts"
 describe("toolWord", () => {
   const WORDS: Readonly<Record<ToolId, string>> = {
     read: "read",
-    write: "write",
-    edit: "edit",
-    bash: "shell",
-    grep: "search",
-    find: "find",
-    ask_about_conflict: "ask",
+    write: "wrote",
+    edit: "edited",
+    bash: "ran",
+    grep: "searched",
+    find: "looked for",
+    ask_about_conflict: "asked you",
     catch_up: "catch up",
     split_proposed_changes: "split",
     set_banner: "banner",
@@ -36,9 +36,9 @@ describe("callLabel", () => {
 
   test.each([
     [call("read", "a.ts"), "read a.ts"],
-    [call("bash", "pnpm test\necho done"), "shell pnpm test…"],
-    [call("grep", "TODO src"), "search TODO src"],
-    [call("find", "*.ts"), "find *.ts"],
+    [call("bash", "pnpm test\necho done"), "ran pnpm test…"],
+    [call("grep", "TODO src"), "searched TODO src"],
+    [call("find", "*.ts"), "looked for *.ts"],
     [call("split_proposed_changes"), "split"],
     [call("mystery"), "mystery"],
   ])("cut, %o reads %s", (c, label) => {
@@ -48,10 +48,10 @@ describe("callLabel", () => {
   test("a long subject is cut at PREVIEW_LENGTH, and whole keeps every line", () => {
     const long = `echo ${"x".repeat(200)}`
     expect(callLabel(call("bash", long), "cut")).toBe(
-      `shell ${long.slice(0, PREVIEW_LENGTH)}…`,
+      `ran ${long.slice(0, PREVIEW_LENGTH)}…`,
     )
     expect(callLabel(call("bash", `${long}\nls`), "whole")).toBe(
-      `shell ${long}\nls`,
+      `ran ${long}\nls`,
     )
     expect(callLabel(call("read", "a.ts"), "whole")).toBe("read a.ts")
   })

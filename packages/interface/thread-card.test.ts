@@ -12,6 +12,7 @@ import { tree } from "./fixtures.ts"
 import { initialLayout, layoutReducer, resolveLayout } from "./layout.ts"
 import { sidebarView } from "./sidebar-view.ts"
 import {
+  moveTitle,
   type ThreadCardFacts,
   threadCardHead,
   threadCardHeads,
@@ -118,4 +119,13 @@ describe("threadCardHead", () => {
     expect(item?.kind === "canvas" ? item.head : null).toBe(heads.get(K1))
     expect(card?.head).toBe(heads.get(K1))
   })
+})
+
+test("a move into the archive says it makes the canvas read-only; any other, that it moves it", () => {
+  expect(moveTitle({ closes: true })).toBe(
+    "archive: read-only for everyone until moved out",
+  )
+  expect(moveTitle({ closes: false })).toBe(
+    "move it on the board, for everyone",
+  )
 })

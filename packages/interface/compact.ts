@@ -27,6 +27,7 @@ import {
 } from "@pinetrie/rules"
 import { addressWords } from "./address-words.ts"
 import type { CardTone } from "./card-frame.ts"
+import { COMMAND_VERB } from "./card-words.ts"
 import { countWords } from "./count-words.ts"
 import {
   mediaColumnGlance,
@@ -266,7 +267,7 @@ export const compactWords = (
             compact.mark.writer,
             reader.nameOf.get(compact.mark.writer),
           ),
-  command: compact.command === null ? null : COMMAND_CHIP[compact.command],
+  command: compact.command === null ? null : COMMAND_VERB[compact.command],
   badge:
     compact.badge === null
       ? null
@@ -274,14 +275,6 @@ export const compactWords = (
         ? compact.badge.key
         : glanceStatus(compact.badge.glance),
 })
-
-/** A command on a compact: short, since it has no thread to name (`commandWords` has). */
-const COMMAND_CHIP: Readonly<Record<CardCommand, string>> = {
-  "bring-up-to-date": "catch up",
-  "continue-on-accepted": "continue",
-  "catch-up-with-parent": "catch up with parent",
-  split: "split",
-}
 
 // ── levels of detail ──────────────────────────────────────────────────────
 

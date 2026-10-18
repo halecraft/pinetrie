@@ -62,6 +62,20 @@ export function accessView(input: {
   }
 }
 
+/** Each answer to a lane's ask, as its button says it. */
+const ANSWER_WORDS: Readonly<Record<AccessAnswer, string>> = {
+  allow: "allow",
+  deny: "deny",
+  "take-back": "take back",
+}
+
+/**
+ * A lane's ask to use someone's ssh, as its owner reads it: in the access row,
+ * and in a mark's title and the inbox (`attentionWords`).
+ */
+export const sshAskWords = (whose: string, host: string | null): string =>
+  `asks to use ${whose} for ${host ?? "a host"}`
+
 /**
  * The row's line, service identities first, then the owner's, then a
  * signature refused for a host not allowed, then the hosts; its buttons;
@@ -93,11 +107,11 @@ export function accessWords(
       ? null
       : personal.kind === "waiting"
         ? view.owner?.isYou === true
-          ? `wants ${whose} for ${forHost(personal.host)}`
+          ? sshAskWords(whose, personal.host)
           : `waiting for ${view.owner?.name ?? "its owner"}`
-        : personal.kind === "approved"
+        : personal.kind === "allowed"
           ? whose
-          : `${whose} ${personal.revoked ? "revoked" : "refused"}`
+          : `${whose} ${personal.takenBack ? "taken back" : "denied"}`
   const outside =
     view.outside === null
       ? null
@@ -110,7 +124,10 @@ export function accessWords(
   const hosts = view.hosts.length === 0 ? "" : ` · ${view.hosts.join(", ")}`
   return {
     line: `🔑 ${holds.join(", ")}${hosts}`,
-    answers: view.answers.map(answer => ({ answer, label: answer })),
+    answers: view.answers.map(answer => ({
+      answer,
+      label: ANSWER_WORDS[answer],
+    })),
     waiting: acting?.kind === "sent",
     note: actingSaid(acting),
   }

@@ -580,9 +580,9 @@ describe("sendMessage", () => {
       ?.content
     expect(content).toContain("Shared: n.md\n> ```\n> a `note`\n> ```")
     expect(content).toContain(
-      "Shared: l.log\n> text of 28 B, 3 lines, not quoted",
+      "Shared: l.log\n> text of 28 bytes, 3 lines, not quoted",
     )
-    expect(content).toContain(`Shared: z.zip\n> a file of 4 B`)
+    expect(content).toContain(`Shared: z.zip\n> a file of 4 bytes`)
     expect(content).toContain(`/blob/${ZIP}`)
   })
 
@@ -627,7 +627,7 @@ describe("sendMessage", () => {
           heads: { current: null, proposed: "x" },
           log: { current: null, proposed: "x" },
           wips: [],
-          yours: {
+          workingCopy: {
             behind: 0,
             ahead: 0,
             catchUp: null,

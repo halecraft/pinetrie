@@ -111,7 +111,7 @@ export interface LaneSsh {
   }
   /**
    * `listener` hears each change to a lane's use of your identity, once:
-   * asked, approved, refused, or revoked, whose sessions have ended.
+   * asked, allowed, denied, or taken back, whose sessions have ended.
    */
   onNews(listener: (lane: ThreadId, news: AccessNews) => void): void
   close(): Promise<void>
@@ -405,7 +405,7 @@ export async function startLaneSsh(input: {
       )
       seen.set(lane, record.personal)
       if (news === null) continue
-      if (news.kind === "revoked") host.cut(lane)
+      if (news.kind === "taken-back") host.cut(lane)
       for (const listener of newsListeners) listener(lane, news)
     }
   }

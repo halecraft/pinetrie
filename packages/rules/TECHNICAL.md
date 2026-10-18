@@ -178,14 +178,14 @@ root's record is written only through a step's documents (ADR-0162).
   singleton. A canvas is a card on the board (ADR-0126): no record says
   where it is, who opened it or when; its card and its card's history do.
 - **`ACCESS`** (`access.ts`, ADR-0140): a lane's ssh identities, keyed by
-  lane, in the session: its use of its owner's (waiting, approved,
+  lane, in the session: its use of its owner's (waiting, allowed,
   refused), each state naming the host it last asked for, and the service
   identities and hosts it used, each name once. `ACCESS_ANSWERS` is what
   the owner may answer from each state: `planAccessAnswer` refuses any
   other, keeps the host, and the page offers exactly these.
   `planPersonalSign` answers a signature at once from the record: no
   signature waits (ADR-0178). `planAccessChange` turns a change of state
-  into news (asked, approved, refused, revoked), read from the record, so
+  into news (asked, allowed, denied, taken-back), read from the record, so
   one change is one piece of news whoever wrote it. `planAccessRecovery`
   keeps every request and clears a refusal for a host outside. The record
   also keeps the last signature refused for a host outside the owner's
@@ -194,9 +194,9 @@ root's record is written only through a step's documents (ADR-0162).
   and its lane asks again. The owner is the project record's (`PROJECT`'s
   `owner`), never a lane's.
 - **What a lane is told of its ssh** (`ssh-news.ts`, ADR-0178): a request,
-  a refusal and a revoke as an ssh fact (`SSH_FACT`, drawn as a fact row,
-  `sshFactLine`), which never starts a run; an approval as its owner's
-  carry-on with the reason `ssh-approved`, which wakes it. `planSshNews`
+  a denial and a take-back as an ssh fact (`SSH_FACT`, drawn as a fact row,
+  `sshFactLine`), which never starts a run; an allowance as its owner's
+  carry-on with the reason `ssh-allowed`, which wakes it. `planSshNews`
   returns both kinds as one value, so a waking message is always a prompt.
 - **`QUEUE_HOLD`** (`queue-hold.ts`, ADR-0048 step 7): a thread's queue
   held, keyed by lane, in the session: who held it and when.
@@ -583,7 +583,7 @@ which are swept.
   `left`, a canvas at its old rank, for anyone a move into `left` allows;
   refused `left-gone` when what `left` is on is trashed or has no record,
   `left-taken` for your message's place where you have a newer one, and
-  `not-yours` for someone else's message). A move to `BACK`, or out of a
+  `someone-elses` for someone else's message). A move to `BACK`, or out of a
   trash to the very place the card left, is a restore. All of them share
   `handoff`, the compare-and-set and every check after it. A thread's
   card in a trash is held by nobody (`threadCardHolding`: `trashed`), but its run
@@ -603,7 +603,7 @@ which are swept.
   card already is is refused `moved`: it would queue the card last under its
   sender's name, and a card changes its place in line by a reorder.
   Refusals (`MoveRefusal`): `gone` (no record, or discarded), `moved`,
-  `exists`, `full`, `not-yours`, `no-place` (a place the card's kind is
+  `exists`, `full`, `someone-elses`, `no-place` (a place the card's kind is
   never in, or a kind no person moves: every move of a fact is refused so,
   with no check of its own), a restore's `left-gone` and `left-taken`, and
   an undo's `replied`. A move to `new-canvas` makes a canvas (`planCanvasOpening`,
@@ -638,10 +638,10 @@ which are swept.
   from the queue as it is when the command arrives, and carries it out as
   one move, so one undo queues them again.
 - **An inventory is its holder's alone** (`ownsPlace`): a move into or out
-  of someone else's is refused `not-yours`, checked on both ends, and a
+  of someone else's is refused `someone-elses`, checked on both ends, and a
   move into yours `full` once it holds `INVENTORY_SLOTS` cards, the card
   itself not counted. A creation obeys both. A card taken into the
-  inventory keeps its owner: the take moves its place, not who wrote it.
+  inventory keeps its owner: putting it away moves its place, not who wrote it.
 - **The placer is who put the card where it is**: the sender of every
   accepted move. A write the host makes itself keeps it (`planUnsent`,
   `planSetCommand`), so a refusal never names the host.
@@ -903,7 +903,7 @@ whole undo of a move (S82).
   - **A trace whose card is back at its `from`** is deleted.
   - Histories keep `HISTORY_EVENTS` (50): the first event and the newest.
 - **`changeVerb(from, to)`** is the one rule for what a change is called: sent,
-  queued, unqueued, pinned, unpinned, took-into-inventory, put, moved or
+  queued, unqueued, pinned, unpinned, put-away, put, moved or
   created. The
   page's words read it; nothing stores a verb.
 - **`movedBackBy`**: who unqueued or unpinned a card, when that is the last
@@ -1033,11 +1033,11 @@ trash, have no agent and no runner. Where its card leaves it is
   `foreignLaneWords`), and the drain asks before it pops
   (`planNextQueuedCardPop`'s `away`: its own thread's `threadCardHolding`, and the
   lane's kind), so its messages wait. A
-  fact on top is popped there all the same: it starts no run, and a take's
+  fact on top is popped there all the same: it starts no run, and putting one away's
   stop must be in the thread for its face to say so (ADR-0126). Refused
   with `HELD_WORDS`, "put it on a canvas first", or for a trashed thread
   `TRASHED_WORDS`, "restore it first" (`holdingWords`).
-- **A take stops the run** (`takenIn(before, after)`): every thread card
+- **Putting a thread away stops the run** (`takenIn(before, after)`): every thread card
   in an inventory or a trash after a change that was not there before. The host's
   provenance step reads it from every person's change to the places (a
   move, an undo or a redo, a copy), so no path that writes places can
@@ -1252,8 +1252,8 @@ Ada"), and why (`reason`). It is a prompt, so its run is an ask of its own
 (`PROMPT_ROLES`), and its run is the resumer's (`promptAuthor`): their
 budget, and their inbox when it ends.
 - **A carry-on also wakes a lane its owner let use their ssh** (ADR-0178):
-  its reason `ssh-approved`, with the host, and its line "↻ resumed by
-  Duane: approved ssh for hql". Only `planSshNews` makes one; the Resume
+  its reason `ssh-allowed`, with the host, and its line "↻ resumed by
+  Duane: allowed ssh for hql". Only `planSshNews` makes one; the Resume
   button's `planCarryOn` gives the reason `stopped`.
 
 - **`carryOnState` is the one rule**, read by the host's `planCarryOn` and
@@ -1543,11 +1543,11 @@ Host-written records, each a `RecordSpec` (above) with a total decoder:
       only adds, and `node_modules` must not be kept as a cache when its
       recipe's key breaks. The evidence is kept per root
       (`RootEvidence`).
-    - **The record lists** derived roots and local paths, topmost, at most
+    - **The record lists** derived roots and private paths, topmost, at most
       `DISK_LISTED` each with how many more (`turnDisk`); directories a run
       made from source that `.gitignore` misses; and source files written
       that the commit left out (jj's size limit). A path in the turn's
-      whole-disk diff that no run or tool wrote is local when ignored
+      whole-disk diff that no run or tool wrote is private when ignored
       (`unattributed`); else it is source, and in the commit.
     - **`unattributed` is linear:** a `pnpm install` turn writes tens of
       thousands of paths, its diff names as many, and it runs on the host's
@@ -1558,7 +1558,7 @@ Host-written records, each a `RecordSpec` (above) with a total decoder:
       (`collectionSteps`).
     - **A known limit:** a run's write named through a symlink is classed
       by that name, while the diff names the real path, which
-      `unattributed` cannot match to it: the real path may be listed local
+      `unattributed` cannot match to it: the real path may be listed private
       as well. Matching them would mean resolving links.
     - A prompt's record and an update's have none.
     - **What a turn did to shared files** (`disk.shared`, `shared.ts`):
@@ -1702,8 +1702,8 @@ commit-message request `request.ts` (`describeRequest`).
   your repo holds it: its files and conflicts, your edits (its files that
   `@` changes), described (its first line no longer the WIP line), edited,
   stale (a stack whose lane moved past its ledger), its bookmark (as the
-  gather found it) and its commits. **`planYourEdits`**: only `@` moved, so
-  each record not yet accepted has its `yourEdits` rewritten from one
+  gather found it) and its commits. **`planWorkingCopyEdits`**: only `@` moved, so
+  each record not yet accepted has its `workingCopyEdits` rewritten from one
   shared read.
 - **`planAcceptance`** decides an acceptance from the proposed changes
   read in its own command and what only an acceptance reads (`AcceptanceFacts`: the WIP's commits above accepted work,
@@ -1839,7 +1839,7 @@ commit-message request `request.ts` (`describeRequest`).
 
 | record | namespace | key | written |
 |---|---|---|---|
-| accepted work: its commit, the WIP bookmarks above it, the publish bookmark and your work against it (`yours.ahead`, `yours.catchUp`), and `publish.catchUp` (`catchUp`) | `pinetrie.accepted` | `line` | when your repo's operation head moves |
+| accepted work: its commit, the WIP bookmarks above it, the publish bookmark and your work against it (`workingCopy.ahead`, `workingCopy.catchUp`), and `publish.catchUp` (`catchUp`) | `pinetrie.accepted` | `line` | when your repo's operation head moves |
 | a lane's base, as its newest `Pinetrie-Base` says it, whether a WIP base landed or is gone, what catching up would change and where that was read, and its untraced accepted thread commits (S97) | `pinetrie.base` | the lane | when a refresh reads the lane |
 
 - **`planAcceptedRecord`** is accepted work's record from what the host read
@@ -1856,7 +1856,7 @@ commit-message request `request.ts` (`describeRequest`).
 - **`planPublishFinish` is a publish's second round** (ADR-0090): from the
   record read again after the catch-up, the move, or the catch-up's
   operation reverted (`undo`, S111) when your commits came out conflicted
-  (`yours.conflicts.commits`, which the preview of `@` alone cannot show)
+  (`workingCopy.conflicts.commits`, which the preview of `@` alone cannot show)
   or the publish bookmark moved meanwhile. `accept` is read from the
   record after, not the decision. `publishUndone` words an undo from that
   record: the conflicts the catch-up would have left, since the revert took
@@ -1874,7 +1874,7 @@ commit-message request `request.ts` (`describeRequest`).
   (ADR-0099); setup is refused only once accepted work exists. A publish is
   refused, in order: `no_line`, `no_publish`, `not_fast_forward`; with
   `publish.catchUp` on,
-  `yours_conflict` (conflicted commits or files, or a preview that would
+  `working_copy_conflict` (conflicted commits or files, or a preview that would
   conflict) and `refused` for files behind with no commit in common; then
   `refused` when `nothingToPublish(publishWork(record))`, the one "nothing
   to do", which the page's hidden button reads too. `acceptedRefusal` words
@@ -1901,7 +1901,7 @@ commit-message request `request.ts` (`describeRequest`).
 - **`pinetrie.accepted` and `pinetrie.base` are caches** (ADR-0104): the repo is
   the ledger, and the host rewrites each from it. A lost one costs a read.
   A `pinetrie.accepted` from before `publish` and `published` (ADR-0076), or
-  before `yours.catchUp` and a numeric `yours.ahead` (ADR-0090), does not
+  before `workingCopy.catchUp` and a numeric `workingCopy.ahead` (ADR-0090), does not
   decode, and is read as unknown until the host writes it again.
   A `pinetrie.base` from before `catchUp` and `untraced` does not decode, and
   is dropped (ADR-0067): the page reads catching up as unknown until the
@@ -2056,7 +2056,7 @@ reads, `details` what pine·trie reads back.
 - **A state any kind of project has is a point; what only jj has is a
   commit** (ADR-0150). `PointSchema` and `CommitSchema` store the same
   bare string, so a message stored before points decodes unchanged.
-  `update`'s `merged`, `land`'s `yours`, `behind`'s `to` and a
+  `update`'s `merged`, `land`'s `merged`, `behind`'s `to` and a
   `catch_up`'s `merged` are points; proposed changes, WIPs, accepted work's and a
   base's jj records (`JjProposedChangesRecord`, `JjAcceptedRecord`, `JjBaseRecord`,
   `CatchUpRead`) and the stack's message are jj's, and commits; a base's

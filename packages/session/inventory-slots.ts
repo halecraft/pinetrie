@@ -11,10 +11,10 @@ import { InventoryDoc, readSlots } from "@pinetrie/schema"
 import {
   type HeldSince,
   type Intents,
+  putAwayWrites,
   repairStep,
   type Slots,
   type SlotWrites,
-  takeIntoInventoryWrites,
 } from "./inventory.ts"
 import { personDoc } from "./person-doc.ts"
 import type { Readable } from "./store.ts"
@@ -29,7 +29,7 @@ interface InventorySlots {
   /** Write `writes` in one batch; nothing for none. */
   write(writes: SlotWrites): void
   /** An accepted take into the inventory: `card` into `slot`, and out of any other. */
-  takeIntoInventory(card: CardId, slot: number): void
+  putAway(card: CardId, slot: number): void
   dispose(): void
 }
 
@@ -88,8 +88,8 @@ export function inventorySlots(
     stored: () => readSlots(inventory),
     repair,
     write,
-    takeIntoInventory: (card, slot) =>
-      write(takeIntoInventoryWrites(readSlots(inventory), card, slot)),
+    putAway: (card, slot) =>
+      write(putAwayWrites(readSlots(inventory), card, slot)),
     dispose() {
       own.dispose()
       if (wake !== null) clearTimeout(wake)

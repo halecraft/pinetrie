@@ -53,7 +53,7 @@ const JjAcceptedSchema = Type.Object({
     behind: Type.Integer({ minimum: 0 }),
     ahead: Type.Integer({ minimum: 0 }),
   }),
-  yours: Type.Object({
+  workingCopy: Type.Object({
     behind: Type.Integer({ minimum: 0 }),
     ahead: Type.Integer({ minimum: 0 }),
     catchUp: Type.Union([
@@ -129,18 +129,18 @@ export const ACCEPTED: RecordSpec<
           log: { ...r.log },
           wips: r.wips.map(w => ({ ...w })),
           published: { ...r.published },
-          yours: {
-            ...r.yours,
+          workingCopy: {
+            ...r.workingCopy,
             catchUp:
-              r.yours.catchUp === null
+              r.workingCopy.catchUp === null
                 ? null
                 : {
-                    ...r.yours.catchUp,
-                    conflicts: [...r.yours.catchUp.conflicts],
+                    ...r.workingCopy.catchUp,
+                    conflicts: [...r.workingCopy.catchUp.conflicts],
                   },
             conflicts: {
-              ...r.yours.conflicts,
-              files: [...r.yours.conflicts.files],
+              ...r.workingCopy.conflicts,
+              files: [...r.workingCopy.conflicts.files],
             },
           },
         },
@@ -195,7 +195,7 @@ export function planAcceptedRecord(input: {
     log: { current: facts.log, proposed: proposed.log },
     wips: facts.wips,
     published: facts.published,
-    yours: facts.yours,
+    workingCopy: facts.workingCopy,
     publishCatchesUp: repoConfig.publishCatchesUp,
   }
 }
@@ -216,7 +216,7 @@ export interface PublishWork {
   /** Line commits the publish bookmark lacks. */
   readonly acceptedCommits: number
   /** Your commits below `@` it accepts: 0 with `publish.catchUp` off. */
-  readonly yours: number
+  readonly workingCopyCommits: number
   /** Whether the working copy catches up first: never with `publish.catchUp` off. */
   readonly catchUp: boolean
 }
@@ -226,19 +226,22 @@ export interface PublishWork {
  * bookmark alone, so the working copy and your commits count for nothing.
  */
 export function publishWork(
-  record: Pick<JjAcceptedRecord, "publishCatchesUp" | "published" | "yours">,
+  record: Pick<
+    JjAcceptedRecord,
+    "publishCatchesUp" | "published" | "workingCopy"
+  >,
 ): PublishWork {
-  const { publishCatchesUp, published, yours } = record
+  const { publishCatchesUp, published, workingCopy } = record
   return {
     acceptedCommits: published.commit === null ? 0 : published.behind,
-    yours: publishCatchesUp ? yours.ahead : 0,
-    catchUp: publishCatchesUp && yours.behind > 0,
+    workingCopyCommits: publishCatchesUp ? workingCopy.ahead : 0,
+    catchUp: publishCatchesUp && workingCopy.behind > 0,
   }
 }
 
 /** Nothing for a publish to do: the page hides its button, and the host refuses it. */
 export const nothingToPublish = (work: PublishWork): boolean =>
-  work.acceptedCommits === 0 && work.yours === 0 && !work.catchUp
+  work.acceptedCommits === 0 && work.workingCopyCommits === 0 && !work.catchUp
 
 /**
  * Whether `action` may run on accepted work as `record` has it: the one rule the
@@ -256,18 +259,19 @@ export function acceptedActionState(
   if (action === "setup")
     return record.commit === null ? OK : refused(ERR.REFUSED)
   if (record.commit === null) return refused(ERR.NOT_SET_UP)
-  const { published, yours } = record
+  const { published, workingCopy } = record
   if (published.commit === null) return refused(ERR.NO_PUBLISH)
   if (published.ahead > 0) return refused(ERR.NOT_FAST_FORWARD)
   if (record.publishCatchesUp) {
     if (
-      yours.conflicts.commits > 0 ||
-      yours.conflicts.files.length > 0 ||
-      (yours.catchUp?.conflicts.length ?? 0) > 0
+      workingCopy.conflicts.commits > 0 ||
+      workingCopy.conflicts.files.length > 0 ||
+      (workingCopy.catchUp?.conflicts.length ?? 0) > 0
     )
-      return refused(ERR.YOURS_CONFLICT)
+      return refused(ERR.WORKING_COPY_CONFLICT)
     // Behind, with no commit in common: there is no rebase to preview.
-    if (yours.behind > 0 && yours.catchUp === null) return refused(ERR.REFUSED)
+    if (workingCopy.behind > 0 && workingCopy.catchUp === null)
+      return refused(ERR.REFUSED)
   }
   return nothingToPublish(publishWork(record)) ? refused(ERR.REFUSED) : OK
 }
@@ -297,7 +301,7 @@ export function planAcceptedAction(
     acceptedBookmark,
     publish: record.publish,
     catchUp: work.catchUp,
-    accept: work.yours > 0,
+    accept: work.workingCopyCommits > 0,
   }
 }
 
@@ -323,11 +327,11 @@ export function planPublishFinish(input: {
     publish: decision.publish,
   } as const
   if (op === null) return { ...move, accept: decision.accept }
-  if (after.yours.conflicts.commits > 0)
-    return { kind: "undo", op, code: ERR.YOURS_CONFLICT }
+  if (after.workingCopy.conflicts.commits > 0)
+    return { kind: "undo", op, code: ERR.WORKING_COPY_CONFLICT }
   if (after.published.ahead > 0)
     return { kind: "undo", op, code: ERR.NOT_FAST_FORWARD }
-  return { ...move, accept: after.yours.ahead > 0 }
+  return { ...move, accept: after.workingCopy.ahead > 0 }
 }
 
 /** Files named, the first three, then how many more. */
@@ -348,7 +352,7 @@ export function acceptedRefusal(
   code: ErrCode,
   record: JjAcceptedRecord,
 ): string {
-  const { publish, published, yours } = record
+  const { publish, published, workingCopy } = record
   switch (code) {
     case ERR.NOT_SET_UP:
       return "set up first"
@@ -356,18 +360,18 @@ export function acceptedRefusal(
       return `this repo has no ${publish} bookmark to publish to`
     case ERR.NOT_FAST_FORWARD:
       return `${publish} has ${commits(published.ahead)} accepted work doesn't: bring ${published.ahead === 1 ? "it" : "them"} into accepted work in jj first`
-    case ERR.YOURS_CONFLICT: {
-      const would = yours.catchUp?.conflicts ?? []
-      if (yours.conflicts.files.length > 0)
-        return `the working copy has conflicts in ${named(yours.conflicts.files)}`
+    case ERR.WORKING_COPY_CONFLICT: {
+      const would = workingCopy.catchUp?.conflicts ?? []
+      if (workingCopy.conflicts.files.length > 0)
+        return `the working copy has conflicts in ${named(workingCopy.conflicts.files)}`
       if (would.length > 0)
         return `catching the working copy up would conflict in ${named(would)}`
-      return `${commits(yours.conflicts.commits)} of yours ${yours.conflicts.commits === 1 ? "has" : "have"} conflicts`
+      return `${commits(workingCopy.conflicts.commits)} of yours ${workingCopy.conflicts.commits === 1 ? "has" : "have"} conflicts`
     }
     default:
       if (action === "setup") return "already set up"
-      return yours.behind > 0 &&
-        yours.catchUp === null &&
+      return workingCopy.behind > 0 &&
+        workingCopy.catchUp === null &&
         record.publishCatchesUp
         ? "the working copy shares no commit with accepted work: rebase onto it in jj"
         : "nothing to publish"
@@ -383,8 +387,8 @@ export function publishUndone(
   code: Extract<PublishFinish, { readonly kind: "undo" }>["code"],
   after: JjAcceptedRecord,
 ): string {
-  if (code !== ERR.YOURS_CONFLICT)
+  if (code !== ERR.WORKING_COPY_CONFLICT)
     return acceptedRefusal("publish", code, after)
-  const n = after.yours.conflicts.commits
+  const n = after.workingCopy.conflicts.commits
   return `catching the working copy up would leave ${commits(n)} of yours with conflicts`
 }

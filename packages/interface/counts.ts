@@ -1,25 +1,6 @@
 // interface/counts — how a count, a list of names and an age read.
 
-/** "1 message", "6 messages": a noun whose plural adds an s. */
-export const plural = (n: number, noun: string): string =>
-  `${n} ${noun}${n === 1 ? "" : "s"}`
-
-/** "1 commit", "3 commits": a count with its noun in either form. */
-export const count = (n: number, one: string, many: string): string =>
-  `${n} ${n === 1 ? one : many}`
-
-/** A size in bytes as people read it: "12 bytes", "340 KB", "1.2 MB", "3.4 GB". */
-export function byteWords(bytes: number): string {
-  if (bytes < 1000) return plural(bytes, "byte")
-  const units = ["KB", "MB", "GB", "TB"] as const
-  let n = bytes / 1000
-  let unit = 0
-  while (n >= 1000 && unit < units.length - 1) {
-    n /= 1000
-    unit++
-  }
-  return `${n >= 100 ? Math.round(n) : Number(n.toFixed(1))} ${units[unit]}`
-}
+export { byteWords, count, plural } from "@pinetrie/rules"
 
 const names = new Intl.ListFormat("en", { style: "long", type: "conjunction" })
 

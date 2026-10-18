@@ -32,12 +32,12 @@ import {
   inventoryCountWords,
   inventoryView,
   isInventoryShown,
-  KEEP,
-  KEEP_TITLE,
   type MediaColumnView,
   type NoteColumnView,
   noticeWords,
   type Reader,
+  SAVE,
+  SAVE_TITLE,
   snappedDock,
   type ThreadGlance,
   type ThreadPreview,
@@ -278,7 +278,7 @@ export function InventoryPanel(p: {
         {p.cell !== null && (
           <ClipboardChip
             cell={p.cell}
-            onKeep={() => onIntent({ kind: "keep" })}
+            onSave={() => onIntent({ kind: "save" })}
           />
         )}
         <button
@@ -369,10 +369,10 @@ export function InventoryPanel(p: {
 
 /**
  * The clipboard chip, in the header: never a slot and no drop target. It is
- * focusable, so Cmd+C on it copies its copy again; **keep** pastes it into a
+ * focusable, so Cmd+C on it copies its copy again; **save** pastes it into a
  * free slot.
  */
-function ClipboardChip(p: { cell: ClipboardCellView; onKeep: () => void }) {
+function ClipboardChip(p: { cell: ClipboardCellView; onSave: () => void }) {
   const { cell } = p
   return (
     <section
@@ -386,13 +386,13 @@ function ClipboardChip(p: { cell: ClipboardCellView; onKeep: () => void }) {
       <span className="clipboard-cell-what">{cell.summary.words}</span>
       <span className="clipboard-cell-line">{cell.summary.line}</span>
       <button
-        className="keep"
-        disabled={!cell.keep}
-        onClick={p.onKeep}
-        title={KEEP_TITLE}
+        className="save"
+        disabled={!cell.save}
+        onClick={p.onSave}
+        title={SAVE_TITLE}
         type="button"
       >
-        <InventoryIcon way="take" /> {KEEP}
+        <InventoryIcon way="take" /> {SAVE}
       </button>
     </section>
   )

@@ -37,7 +37,7 @@ export interface SharedFacts {
   readonly acceptedThreadCommits: readonly AcceptedThreadCommit[]
   /** Every accepted thread commit on accepted work that names none (`untracedLanes`). */
   readonly untraced: readonly Untraced[]
-  /** Files `@` changes: proposed changes' `yourEdits` is its files that are here. */
+  /** Files `@` changes: proposed changes' `workingCopyEdits` is its files that are here. */
   readonly editing: ReadonlySet<string>
 }
 

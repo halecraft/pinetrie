@@ -245,7 +245,7 @@ function refuseBack(
   sender: WriterId,
 ): MoveRefusal | null {
   if (left.kind === "composing") {
-    if (now.owner !== sender) return "not-yours"
+    if (now.owner !== sender) return "someone-elses"
     const newer = cards.some(
       c =>
         c.id !== now.id &&
@@ -293,7 +293,7 @@ function handoff(
   if (sameKey(move.from, move.to))
     return { kind: "refused", code: "moved", now }
   if (!ownsPlace(move.from, sender))
-    return { kind: "refused", code: "not-yours", now }
+    return { kind: "refused", code: "someone-elses", now }
   const refusal = placeRefusal(move.to, cards, move.card, sender)
   if (refusal !== null) return { kind: "refused", code: refusal, now }
   const place = placeAt(move.to, cards, sender, now)

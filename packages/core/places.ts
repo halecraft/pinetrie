@@ -642,7 +642,7 @@ export type MoveRefusal =
   /** The sender's inventory holds `INVENTORY_SLOTS` cards already. */
   | "full"
   /** A move into or out of someone else's inventory. */
-  | "not-yours"
+  | "someone-elses"
   /**
    * An undo that would lift back a thread a card was spun into, after someone
    * wrote there, or the agent started on it.

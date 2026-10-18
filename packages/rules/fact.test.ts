@@ -105,9 +105,9 @@ describe("a fact", () => {
   })
 
   test.each([
-    [ACCEPTED, "✓ accepted as kabcdefg"],
-    [FACTS[1], "✓ accepted into wip/search as kabcdefg"],
-    [FACTS[2], "✎ a new description of the changes was asked for"],
+    [ACCEPTED, "✓ accepted"],
+    [FACTS[1], "✓ accepted into wip/search"],
+    [FACTS[2], "✎ asked for a new description"],
     [FACTS[3], "⇣ the changes were squashed into one revision"],
     [FACTS[4], "↻ the changes were rebuilt from this thread's work"],
   ] as const)("factLine: %o", (fact, line) => {
@@ -123,10 +123,17 @@ describe("a fact", () => {
     )
   })
 
-  test("the column draws it as its one line, role fact", () => {
+  test("the column draws it as its one line, role fact, an acceptance's change id as its detail", () => {
     expect(renderableMessage(encodeFact(ACCEPTED, "Ada", 1))).toEqual({
       role: "fact",
-      content: "✓ accepted as kabcdefg",
+      content: "✓ accepted",
+      detail: "change id kabcdefghij",
+    })
+    expect(
+      renderableMessage(encodeFact(FACTS[4] as ProposedChangesFact, "Ada", 1)),
+    ).toEqual({
+      role: "fact",
+      content: "↻ the changes were rebuilt from this thread's work",
     })
   })
 

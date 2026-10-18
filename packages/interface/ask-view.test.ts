@@ -151,7 +151,7 @@ describe("askView", () => {
     expect(view()).toMatchObject({
       running: false,
       endedWhileAway: false,
-      work: "3 steps · 1 tool call",
+      work: "3 steps",
       outcome: null,
       live: null,
       outlineHides: "5-a",

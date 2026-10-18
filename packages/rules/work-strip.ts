@@ -92,7 +92,7 @@ interface WorkStripFacts {
   /** Files that conflict with your work. */
   readonly conflicts: number
   /** It touches files you have uncommitted edits in. */
-  readonly touchesYourEdits: boolean
+  readonly touchesWorkingCopyEdits: boolean
   /** Its bookmark, to find it in jj; null with no proposed changes not yet accepted. */
   readonly bookmark: string | null
   /** Proposed changes not yet accepted whose work accepted work already holds (`held`). */
@@ -188,7 +188,7 @@ export function workStripView(input: {
     // Folder proposed changes are one change: never a stack.
     size: open === undefined ? 0 : (jjOpen?.size ?? 1),
     conflicts: open?.conflicts.length ?? 0,
-    touchesYourEdits: (jjOpen?.yourEdits.length ?? 0) > 0,
+    touchesWorkingCopyEdits: (jjOpen?.workingCopyEdits.length ?? 0) > 0,
     bookmark: notYetAccepted?.kind === "jj" ? notYetAccepted.bookmark : null,
     held: proposed.kind === "held",
     acceptedAs: proposed.kind === "accepted" ? proposed.as : null,

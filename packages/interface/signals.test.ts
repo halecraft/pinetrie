@@ -157,7 +157,7 @@ describe("signals as one family", () => {
     for (const signal of SIGNALS) expect(signalWords(signal)).not.toBe("")
     expect(new Set(SIGNALS.map(signalWords)).size).toBe(SIGNALS.length)
     expect(elsewhereWords("needsYou")).toBe(
-      "a thread not in the sidebar: needs you",
+      "a canvas not in the sidebar: needs you",
     )
   })
   test("a status's signal: running while its agent works, its level's when raised, done while a finished run fades, else none", () => {

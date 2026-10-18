@@ -11,6 +11,7 @@ import {
 } from "@pinetrie/core"
 import {
   COMMENT,
+  COPY_MESSAGE,
   callLabel,
   callMark,
   callStatus,
@@ -118,7 +119,11 @@ function MessageView(p: MessageProps) {
             ))}
           </details>
         )}
-      <div className={classes.join(" ")} data-entry={node.id}>
+      <div
+        className={classes.join(" ")}
+        data-entry={node.id}
+        title={node.detail}
+      >
         <span className="role">{speaker}</span>
         {p.crossCanvasLink !== undefined && (
           // Another canvas's thread it came from, opened as a fork row's link is;
@@ -288,7 +293,7 @@ function CopyButton({ node }: { node: TranscriptMessage }) {
   const { copied, copy } = useCopy()
   return (
     <button
-      aria-label="copy this message"
+      aria-label={COPY_MESSAGE}
       className="copy"
       onClick={e =>
         copy(copyText(node), [
@@ -297,7 +302,7 @@ function CopyButton({ node }: { node: TranscriptMessage }) {
             ?.querySelectorAll(":scope > .text, :scope > .tool") ?? []),
         ])
       }
-      title={copied ? COPIED : "copy this message as markdown"}
+      title={copied ? COPIED : COPY_MESSAGE}
       type="button"
     >
       {copied ? "✓" : <CopyIcon />}

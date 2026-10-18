@@ -29,8 +29,8 @@ export const marginCountWords = (
 /** The control that shuts an open margin. */
 export const shutMarginWords = (beside: MarginBeside) =>
   ({
-    label: "shut",
-    title: `shut this ${beside}'s comments${beside === "message" ? " (Escape)" : ""}`,
+    label: "close",
+    title: `close this ${beside}'s comments${beside === "message" ? " (Escape)" : ""}`,
   }) as const
 
 /** The control that adds a comment in an open margin (`c` on a message). */

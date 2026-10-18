@@ -1,7 +1,7 @@
 // ssh-news — what a lane is told as its owner's ssh request changes: that
-// its owner was asked, refused or took an approval back, as a fact steered
-// into its run or appended; and an approval, as the owner's carry-on that
-// wakes it. A fact never starts a run: only a prompt's role does
+// its owner was asked, denied it or took back what they allowed, as a fact
+// steered into its run or appended; and an allowance, as the owner's
+// carry-on that wakes it. A fact never starts a run: only a prompt's role does
 // (`startsRun`), so the one news that wakes is a carry-on.
 
 import { PRODUCT_NAME, type ThreadId } from "@pinetrie/core"
@@ -15,8 +15,8 @@ export const SSH_FACT_TYPE = "pinetrie.ssh-fact"
 const SshFactSchema = Type.Object({
   news: Type.Union([
     Type.Literal("asked"),
-    Type.Literal("refused"),
-    Type.Literal("revoked"),
+    Type.Literal("denied"),
+    Type.Literal("taken-back"),
   ]),
   host: Type.Union([Type.String(), Type.Null()]),
   /** The owner, by their display name then, as a chat keeps its author's. */
@@ -41,9 +41,9 @@ export function sshFactLine(fact: SshFact): string {
   switch (fact.news) {
     case "asked":
       return `asked ${fact.ownerName} for their ssh for ${forHost(fact.host)}`
-    case "refused":
-      return `${fact.ownerName} refused their ssh for ${forHost(fact.host)}`
-    case "revoked":
+    case "denied":
+      return `${fact.ownerName} denied their ssh for ${forHost(fact.host)}`
+    case "taken-back":
       return `${fact.ownerName} took back their ssh for ${forHost(fact.host)}`
   }
 }
@@ -56,17 +56,17 @@ function sshFactContent(fact: SshFact): string {
       return (
         `${PRODUCT_NAME} asked ${fact.ownerName} to let this thread use their ssh for ${host}. ` +
         "Until they answer, ssh refuses their key here. Do not retry: finish what you can " +
-        `without it, then end your turn saying you are waiting for ${fact.ownerName} to approve. ` +
-        "Their approval wakes you to try again."
+        `without it, then end your turn saying you are waiting for ${fact.ownerName} to allow it. ` +
+        "Their answer wakes you to try again."
       )
-    case "refused":
-      return `${fact.ownerName} refused this thread their ssh for ${host}. Their key stays refused here: do not ask again.`
-    case "revoked":
+    case "denied":
+      return `${fact.ownerName} denied this thread their ssh for ${host}. Their key stays refused here: do not ask again.`
+    case "taken-back":
       return `${fact.ownerName} took back this thread's use of their ssh for ${host}, and its ssh sessions ended. Their key stays refused here: do not ask again.`
   }
 }
 
-/** What news is delivered as: an approval is the carry-on that wakes its lane; the rest are facts. */
+/** What news is delivered as: an allowance is the carry-on that wakes its lane; the rest are facts. */
 export type SshDelivery =
   | { readonly wakes: true; readonly message: CarryOnMessage }
   | { readonly wakes: false; readonly message: SshFactMessage }
@@ -77,7 +77,7 @@ export function planSshNews(
   ownerName: string,
   now: number,
 ): SshDelivery {
-  if (news.kind === "approved")
+  if (news.kind === "allowed")
     return {
       wakes: true,
       message: CARRY_ON.encode(
@@ -85,9 +85,9 @@ export function planSshNews(
           lane,
           by: news.owner,
           name: ownerName,
-          reason: { kind: "ssh-approved", host: news.host },
+          reason: { kind: "ssh-allowed", host: news.host },
         },
-        `${ownerName} approved this thread's use of their ssh for ${forHost(news.host)}. ` +
+        `${ownerName} allowed this thread's use of their ssh for ${forHost(news.host)}. ` +
           "Try again what needed it.",
         now,
       ),

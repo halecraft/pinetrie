@@ -35,7 +35,7 @@ const span = (commit: typeof C1) => ({ kind: "revision", commit }) as const
 const target: ReviewTarget = {
   spans: [span(C1), span(C2)],
   conflicts: ["b.txt"],
-  yourEdits: ["a.txt"],
+  workingCopyEdits: ["a.txt"],
 }
 
 describe("reviewView", () => {
@@ -48,7 +48,7 @@ describe("reviewView", () => {
       }),
     ]).revisions[0]?.state
     expect(widened?.kind === "ready" ? widened.value.widens : null).toBe(
-      "Accepting this lets lanes use your ssh identity, $TOKEN.",
+      "Accepting this lets threads use your ssh identity, $TOKEN.",
     )
   })
   const at = { lane: LANE, name: "amber-fox" as ThreadName, entry: "e1" }
@@ -69,7 +69,7 @@ describe("reviewView", () => {
     )
     expect(first).toMatchObject({ title: "feat: one", body: "why it changed" })
     expect(
-      first?.files.map(f => [f.letter, f.lines, f.conflicts, f.yours]),
+      first?.files.map(f => [f.letter, f.lines, f.conflicts, f.editing]),
     ).toEqual([
       ["M", "+3 −1", false, true],
       ["M", "", true, false],

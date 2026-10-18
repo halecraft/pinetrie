@@ -54,9 +54,9 @@ export function durationWords(ms: number): string {
 
 /**
  * What some work holds, as one line: "12 messages from Ada and Bea · 38 steps
- * · 61 tool calls · 7 files · 3 local files · 4m 12s · 2 failed". A part
- * that is zero is left out; failures come last, a failed recipe after the
- * failed calls. A capsule's tooltip and a fold's line hold this
+ * · 7 files changed · 3 private files · 4m 12s · 2 problems". A part that is
+ * zero is left out; problems come last. Tool calls are not counted: each is
+ * a step's. A capsule's tooltip and a fold's line hold this
  * line.
  */
 export function workWords(
@@ -71,27 +71,32 @@ export function workWords(
   return [
     stats.people > 0 ? `${plural(stats.people, "message")}${from}` : "",
     stats.agent > 0 ? plural(stats.agent, "step") : "",
-    stats.calls > 0 ? plural(stats.calls, "tool call") : "",
-    stats.files.length > 0 ? plural(stats.files.length, "file") : "",
-    stats.local > 0 ? plural(stats.local, "local file") : "",
+    stats.files.length > 0
+      ? count(stats.files.length, "file changed", "files changed")
+      : "",
+    stats.private > 0 ? plural(stats.private, "private file") : "",
     stats.first > 0 && took >= 1000 ? durationWords(took) : "",
-    stats.failed > 0 ? `${stats.failed} failed` : "",
+    stats.failed > 0 ? plural(stats.failed, "problem") : "",
     stats.concurrent > 0
       ? count(
           stats.concurrent,
-          "write to a shared file over another's",
-          "writes to shared files over others'",
+          "overwrote someone else's shared file",
+          "overwrote others' shared files",
         )
       : "",
     stats.unignored > 0
       ? count(
           stats.unignored,
-          "output .gitignore misses",
-          "outputs .gitignore misses",
+          "generated file not ignored",
+          "generated files not ignored",
         )
       : "",
     stats.leftovers > 0
-      ? count(stats.leftovers, "file jj left out", "files jj left out")
+      ? count(
+          stats.leftovers,
+          "file not saved to history",
+          "files not saved to history",
+        )
       : "",
   ]
     .filter(part => part !== "")
@@ -151,15 +156,22 @@ export const densityWords = (
 ): { readonly label: string; readonly title: string } =>
   ({
     outline: {
-      label: "outline",
+      label: "brief",
       title: "people's messages, and one line for each ask",
     },
     story: {
       label: "story",
-      title: "each ask's message, its digest, and its last word",
+      title: "each ask's message, a summary, and the answer",
     },
-    raw: { label: "raw", title: "every message and tool row" },
+    raw: { label: "everything", title: "every step the agent took" },
   })[d]
+
+/** An ask's fold: what a press does, and its files' button. */
+export const askFoldWords = (open: boolean): string =>
+  open ? "hide the steps" : "show the steps"
+
+/** An ask's files button's title. */
+export const ASK_FILES_TITLE = "see what this changed"
 
 /** The line where this device last left a thread. */
 export const LEFT_WORDS = "since you were here"

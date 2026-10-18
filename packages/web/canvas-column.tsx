@@ -23,6 +23,7 @@ import {
   dropsWords,
   FOLD_CANVAS,
   type Intent,
+  moveTitle,
   NO_MARK,
   pinnedCountWords,
   RENAME_CANVAS_TITLE,
@@ -140,9 +141,7 @@ export function CanvasColumn(p: {
                       key: m.name,
                       className: m.closes ? "move-to closes" : "move-to",
                       disabled: m.busy !== null,
-                      title: m.closes
-                        ? "archive: read-only for everyone until moved out"
-                        : "move it on the board, for everyone",
+                      title: moveTitle(m),
                       label: (
                         <>
                           Move to {m.name}

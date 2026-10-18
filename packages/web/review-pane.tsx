@@ -14,6 +14,7 @@ import {
   type ReviewTarget,
   reviewPrefWords,
   reviewView,
+  revisionReadWords,
   sectionState,
 } from "@pinetrie/interface"
 import { decodeRevisionReview, diffUrl, reviewUrl } from "@pinetrie/rules"
@@ -166,7 +167,7 @@ function ReviewPaneView(p: ReviewPaneProps) {
                         }
                         className="review-list-file"
                         data-conflicts={f.conflicts || undefined}
-                        data-yours={f.yours || undefined}
+                        data-editing={f.editing || undefined}
                         key={f.key}
                         onClick={() => jump(f.key)}
                         title={f.shown}
@@ -187,9 +188,9 @@ function ReviewPaneView(p: ReviewPaneProps) {
             <div className="review-revision" key={r.key}>
               {r.state.kind !== "ready" ? (
                 <div className="review-note">
-                  {r.state.kind === "loading"
-                    ? "reading this revision…"
-                    : `could not read this revision: ${r.state.reason}`}
+                  {revisionReadWords(
+                    r.state.kind === "loading" ? null : r.state.reason,
+                  )}
                 </div>
               ) : (
                 <>
@@ -262,7 +263,7 @@ function ReviewFileView({ row, watch }: ReviewFileProps) {
       data-letter={row.letter}
       data-media={row.media?.kind}
       data-state={row.media !== null || row.moved ? "shown" : state}
-      data-yours={row.yours || undefined}
+      data-editing={row.editing || undefined}
       ref={self}
     >
       <div className="review-file-head">
@@ -278,7 +279,7 @@ function ReviewFileView({ row, watch }: ReviewFileProps) {
         <span className="review-path">{row.shown}</span>
         {row.lines !== "" && <span className="review-lines">{row.lines}</span>}
         {row.conflicts && <span className="review-flag">conflicts</span>}
-        {row.yours && <span className="review-flag">you're editing</span>}
+        {row.editing && <span className="review-flag">you're editing</span>}
       </div>
       {row.media !== null ? (
         open && <ReviewMedia media={row.media} />

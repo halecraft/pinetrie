@@ -493,3 +493,6 @@ export const filterTitle = (search: BoardSearch): string =>
 
 /** The banner's button, which lifts the whole filter. */
 export const CLEAR_FILTER = "Clear"
+
+/** A canvas card's ⋯ on the board: where it moves. */
+export const BOARD_MOVE_LABEL = "move this canvas on the board"

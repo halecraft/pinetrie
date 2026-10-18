@@ -420,14 +420,14 @@ describe("where a card sits", () => {
   })
 
   test("yourCard: your message only, never a note of yours at the same end", () => {
-    const yours = note({
+    const mine = note({
       id: cardIdFor("c9"),
     })
     expect(
-      yourCard(ADA, { kind: "end", end: E2 }, [card(), yours], tree())?.id,
+      yourCard(ADA, { kind: "end", end: E2 }, [card(), mine], tree())?.id,
     ).toBe(cardIdFor("c1"))
     expect(
-      yourCard(ADA, { kind: "end", end: E2 }, [yours], tree()),
+      yourCard(ADA, { kind: "end", end: E2 }, [mine], tree()),
     ).toBeUndefined()
   })
 
@@ -1588,20 +1588,20 @@ describe("handoffs", () => {
       })
     })
 
-    test("into or out of someone else's inventory is refused not-yours", () => {
+    test("into or out of someone else's inventory is refused someone-elses", () => {
       const c = card({ place: atEnd })
       expect(planMove([c], { card: C1, from: atEnd, to: beas }, ADA)).toEqual({
         kind: "refused",
-        code: "not-yours",
+        code: "someone-elses",
         now: c,
       })
       const held = card({ place: beas })
       expect(
         planMove([held], { card: C1, from: beas, to: atEnd }, ADA),
-      ).toEqual({ kind: "refused", code: "not-yours", now: held })
+      ).toEqual({ kind: "refused", code: "someone-elses", now: held })
       expect(planMove([], { card: C1, from: null, to: beas }, ADA)).toEqual({
         kind: "refused",
-        code: "not-yours",
+        code: "someone-elses",
         now: null,
       })
     })
@@ -1635,7 +1635,7 @@ describe("handoffs", () => {
       )
       expect(planMove([held], { card: C1, from: mine, to }, BEA)).toEqual({
         kind: "refused",
-        code: "not-yours",
+        code: "someone-elses",
         now: held,
       })
     })
@@ -2745,23 +2745,23 @@ describe("out of a trash: a restore back where the card was, and a new canvas", 
       kind: "refused",
       code: "left-gone",
     })
-    const yours = { kind: "composing", thread: T_E } as const
+    const mine = { kind: "composing", thread: T_E } as const
     const thread = landedThreadCard({
       thread: T_E,
       canvas: TEST_CANVAS,
       by: ADA,
       cards: [],
     })
-    expect(restore([thread, trashed(yours)])).toMatchObject({
+    expect(restore([thread, trashed(mine)])).toMatchObject({
       kind: "refused",
-      code: "not-yours",
+      code: "someone-elses",
     })
     const newer = card({ id: cardIdFor("c2") })
-    expect(restore([thread, trashed(yours), newer], ADA)).toMatchObject({
+    expect(restore([thread, trashed(mine), newer], ADA)).toMatchObject({
       kind: "refused",
       code: "left-taken",
     })
-    expect(restore([thread, trashed(yours)], ADA)).toMatchObject({
+    expect(restore([thread, trashed(mine)], ADA)).toMatchObject({
       kind: "steps",
     })
   })

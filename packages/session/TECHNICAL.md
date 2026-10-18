@@ -52,7 +52,7 @@ it.
 | `rootDocs` (`root-docs.ts`) | the roots held, the `pinetrie.roots` policy | `planHold` (`root-hold.ts`) |
 | `cardTexts` (`card-texts.ts`) | each card's text, and the copies to destroy | `hostLetGo`, `spentCards` (`card-copies.ts`) |
 | one `snapshotStore<LocalState>` | the host's records, this tab's moves, the cards drawn | `localStep` (`card-moves.ts`) |
-| `inventorySlots` (`inventory-slots.ts`) | your inventory's slots, the repair's alarm | `repairStep`, `takeIntoInventoryWrites`, `swapWrites` (`inventory.ts`) |
+| `inventorySlots` (`inventory-slots.ts`) | your inventory's slots, the repair's alarm | `repairStep`, `putAwayWrites`, `swapWrites` (`inventory.ts`) |
 | `attentionStore` (`attention-doc.ts`) | what you have dealt with, the read marks' alarm | `readStep` (`read-marks.ts`) |
 | `openThreads` (`open-threads.ts`) | the sidebar: the canvases you have open, in your order (ADR-0122, ADR-0116) | `placeInList`, `planOpenRepair` (`open-repair.ts`) |
 | `presenceSeat` (`presence-seat.ts`) | this seat's reading and typing | none |
@@ -238,8 +238,8 @@ session or someone else's inventory throws before it is made.
   not, for `STEADY_MS`, and looks again then. It reads the host's records,
   not the drawn ones, so a put in flight keeps its slot until accepted.
   It writes nothing when nothing differs.
-- **The slot a take into the inventory chose is written at the answer** (`slotOnAccept`, then
-  `takeIntoInventoryWrites`), before the answer is recorded: if the places reached the
+- **The slot putting a card away chose is written at the answer** (`slotOnAccept`, then
+  `putAwayWrites`), before the answer is recorded: if the places reached the
   tab first, the answer drops the pending move at once, and a repair in
   between would place the card in the first empty slot. Until then the
   pending move's `slot` is an intent: drawn there, and left alone by the

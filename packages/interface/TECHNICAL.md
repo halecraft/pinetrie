@@ -252,7 +252,7 @@ canvas's threads (`canvasRail`). A canvas's signals are its threads', whatever r
   `renameKey` what Enter and Escape do.
 - **What the sidebar shows and offers is `sidebarView`'s**
   (`sidebar-view.ts`), over `sidebarList`'s order: each item's label, pip,
-  `⋯` items (Not needed, Rename, Auto-update title, Move to ▸ each other
+  `⋯` items (Dismiss, Rename, Retitle from the conversation, Move to ▸ each other
   state) and the intents they send. `Sidebar`
   (`sidebar.tsx`) draws it; each item's `Readers` read presence
   themselves (S59, `root-signals.tsx`). `selected` is the item you are on,
@@ -421,7 +421,7 @@ canvas's threads (`canvasRail`). A canvas's signals are its threads', whatever r
   A board card spreads its head and keeps it whole as `head`, adding Move
   up and Move down, its writers, and its body (`bodyOf`: its first line
   under a title that says something else); a sidebar item keeps it as
-  `head`, adding Rename, Auto-update title and Not needed. A root whose
+  `head`, adding Rename, Retitle from the conversation and Dismiss. A root whose
   directory record has not arrived has a head with no id and no moves.
 - **A card dropped on a state, or in the sidebar, becomes a thread**
   (`spin-off.ts`): `PutTarget`'s `state` and `sidebar`, marked by
@@ -507,7 +507,7 @@ canvas's threads (`canvasRail`). A canvas's signals are its threads', whatever r
   section, ADR-0127): `copyThread` (a `copy-thread` request at the
   source's end, `threadAnchor`, its id `Minted.thread`), `here` just after
   the source on its canvas (`canvasOfCard`) or into your inventory, and
-  `takeIntoInventory`. It lists no canvas: a thread reaches another canvas
+  `putAway`. It lists no canvas: a thread reaches another canvas
   through your inventory. A thread's card put
   from your inventory lands on the canvas you are on after the column it
   was put on (`putOnCanvas`).
@@ -696,7 +696,7 @@ pending.
   it counts; `inboxWords` words them. Its badge is `inboxCount`, given:
   `App` computes it once and the window's title shows the same number.
   `useInboxMenu` only turns each section's items into rows (`threadRow`,
-  made once by `App` and shared with the board) and "not needed", for the
+  made once by `App` and shared with the board) and "Dismiss", for the
   corner's `InboxMenu` and, folded, the account menu alike. `kept` is the
   sections shown when the menu opened, set through `onToggle`, so an open
   menu keeps a section whose rows have gone and says so. The trigger is
@@ -812,7 +812,7 @@ pending.
   open proposed changes, for its followers only (`follows`, over the directory's
   `RootRecord.threads`), while its lane is idle and its canvas not archived.
   A run-end report clears when your read mark passes its `end`, proposed changes when it
-  goes; either with "not needed" (`dismissed`, `dismissedReady`). Nothing
+  goes; either with "Dismiss" (`dismissed`, `dismissedReady`). Nothing
   is raised before your attention document's `since` is set.
 - **`attentionLevel` turns a run-end report, a fact, into a level for you**: a stop is
   done for whoever stopped it. `LEVELS` orders the levels once; `highest`
@@ -955,7 +955,7 @@ the columns read one. `segmentPath` (`ask-segments.ts`) decides what a column fo
   `planColumn` sends them through `onCanvasYouAreOn`, as `sent` is, as your
   view of the column's card.
 - **`workWords` counts what the work's records say** (`entriesWorkStats`): the
-  files its turns changed, the local files they wrote ("3 local files",
+  files its turns changed, the private files they wrote ("3 private files",
   each record's topmost and how many more), the directories made from
   source that `.gitignore` misses, the source files jj left out of a
   commit, and the writes to shared files over another's, from each
@@ -1187,7 +1187,7 @@ which names the entry and its thread (`packages/rules/TECHNICAL.md`,
   *+ comment* and *shut*. The list carries the open margin as a slot
   (`marginSlot`), so opening it rebuilds the list once and typing in it
   rebuilds nothing.
-- **A comment's ⋯ has *Queue a reference*** (`queueReference`): a
+- **A comment's ⋯ has *Send to the agent, quoting this comment*** (`queueReference`): a
   reference to it (`{ kind: "card" }`) queued on its thread. Its quote is
   the comment's text as it is then, under a link to its entry
   (`commentMarkdown`), kept as a blob (`planQueueReference`'s `paste`,
@@ -1229,7 +1229,7 @@ which names the entry and its thread (`packages/rules/TECHNICAL.md`,
 - **An ask needs its owner wherever they are:** `appView`'s `sshAsks` raise
   an inbox item (`Raised` `ssh`) for the owner alone, whether or not they
   follow the thread and while its lane runs, since the lane asks mid-run.
-  It has no "not needed": answering clears it. A request waits until it is
+  It has no "Dismiss": answering clears it. A request waits until it is
   answered, however long, so its item lasts that long too, and its row is
   marked as needing the owner (ADR-0178).
 
@@ -1833,7 +1833,7 @@ one status line (the newest notice).
   inventory's slots").
 - **`settleSlots` is the one slot rule** (`@pinetrie/session`): the panel
   draws it (`inventoryView`, `inventory-view.ts`), the session's repair
-  writes towards it, and a take into the inventory lands by the same
+  writes towards it, and putting a card away lands by the same
   `firstEmpty`. `App` computes it once, with the takes into the inventory in
   flight as intents (`slotIntents`), and
   both the panel and the intents read that.
@@ -1926,7 +1926,7 @@ one status line (the newest notice).
   before the move (`ports.fly`), and once it is drawn elsewhere that
   element animates from the old box, as `cardFlight` says: into your
   inventory as a ghost on the page, since the panel may still be growing
-  (S243); anywhere else in place. A take into the inventory while the panel
+  (S243); anywhere else in place. Putting a card away while the panel
   is closed peeks.
 - **Selectors for the browser suite:** `.inventory` (the panel, always in
   the page: `.inventory[data-shown]` is it open, its value `peek`, `held`
@@ -1937,7 +1937,7 @@ one status line (the newest notice).
   `.trash-selected`, its open card's × `.close-card`, the panel's ×
   `.inventory .inventory-close`, `#bottom .inventory-toggle`
   (`.account-inventory` in the account menu while the sidebar is folded),
-  the clipboard chip's `.inventory .clipboard-cell` and its `.keep`, the
+  the clipboard chip's `.inventory .clipboard-cell` and its `.save`, the
   status line `.inventory-status`, a card's focusable
   `.card-head[data-card]`.
 
@@ -2035,12 +2035,12 @@ decides is here.
   `uncut`: the card itself moves out.
 - **A paste is one request** (`paste`, `@pinetrie/rules`' `planPaste`):
   the card it replaces discarded first, then the card made or moved, one
-  step of history. **Queue a reference** is a paste of a reference onto
+  step of history. **Send to the agent, quoting this comment** is a paste of a reference onto
   its thread's queue, its quote the comment's under a link to its entry,
   read as it is kept.
 - **The clipboard cell** is `clipboardCellView`: the last `Clip` this tab
   copied (or pasted: a paste shows what the clipboard holds), its words,
-  "last copied here", and whether **keep** (a paste into an unaimed slot)
+  "last copied here", and whether **save** (a paste into an unaimed slot)
   has a free slot. No page reads the clipboard before a paste, so it claims
   no more.
 

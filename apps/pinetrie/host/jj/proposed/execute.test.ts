@@ -27,7 +27,7 @@ const proposed = (commit: string): ProposedChangesNow => ({
     {
       commit: commitId(commit),
       changeId: "kxyz",
-      since: { reached: true, yoursChanged: false },
+      since: { reached: true, othersChanged: false },
     },
   ],
   chained: true,

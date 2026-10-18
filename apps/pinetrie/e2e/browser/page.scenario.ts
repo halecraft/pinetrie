@@ -973,15 +973,15 @@ async function run(check: Checks["check"]): Promise<void> {
           ),
         15_000,
       )
-      const yours = readPlaces(host.places)
+      const mine = readPlaces(host.places)
         .filter(isTextCard)
         .find(
           c =>
             c.place.kind === "queued" &&
             host.cardText(c.id) === "@agent after Bea",
         )
-      if (yours !== undefined) {
-        const theirs = other.cardText(yours.id)
+      if (mine !== undefined) {
+        const theirs = other.cardText(mine.id)
         await waitFor(() => theirs.text() === "@agent after Bea", 15_000)
         theirs.text.insert(16, ", and Bea's too")
       }
@@ -1000,7 +1000,7 @@ async function run(check: Checks["check"]): Promise<void> {
                 "@agent after Bea, and Bea's too"
             )
           },
-          [col(0), yours?.id ?? ""] as const,
+          [col(0), mine?.id ?? ""] as const,
           { timeout: 15_000 },
         )
         .then(
@@ -1045,13 +1045,13 @@ async function run(check: Checks["check"]): Promise<void> {
       )
       check(
         "with your own message last in line, it says it will queue after yours",
-        await queueButton(queueWords({ kind: "afterYours", ahead: 2 })),
+        await queueButton(queueWords({ kind: "afterMine", ahead: 2 })),
         `"${await label(0)}"`,
       )
       // ── the queue's own controls ────────────────────────
       // Alt+↑ in your queued card moves it above Bea's; its box keeps the
       // focus and the caret, though the list was drawn again.
-      const yourBox = `${col(0)} .card-editor.queued textarea[data-card="${yours?.id ?? ""}"]`
+      const yourBox = `${col(0)} .card-editor.queued textarea[data-card="${mine?.id ?? ""}"]`
       await page.focus(yourBox)
       await page.$eval(yourBox, el => {
         ;(el as HTMLTextAreaElement).setSelectionRange(5, 5)
@@ -1066,7 +1066,7 @@ async function run(check: Checks["check"]): Promise<void> {
               ? -1
               : 1,
           )[0]?.id
-      const reordered = await waitFor(() => firstNow() === yours?.id, 15_000)
+      const reordered = await waitFor(() => firstNow() === mine?.id, 15_000)
       const focusKept = await page
         .waitForFunction(
           ([c, id]) => {
@@ -1078,7 +1078,7 @@ async function run(check: Checks["check"]): Promise<void> {
               a.selectionStart === 5
             )
           },
-          [col(0), yours?.id ?? ""] as const,
+          [col(0), mine?.id ?? ""] as const,
           { timeout: 15_000 },
         )
         .then(
@@ -1106,7 +1106,7 @@ async function run(check: Checks["check"]): Promise<void> {
       )
       const unqueued = await waitFor(
         () =>
-          [again, yours?.id].every(
+          [again, mine?.id].every(
             id =>
               readPlaces(host.places).find(c => c.id === id)?.place.kind ===
               "note",
@@ -1132,7 +1132,7 @@ async function run(check: Checks["check"]): Promise<void> {
       await page.keyboard.press("ControlOrMeta+z")
       await waitFor(
         () =>
-          [again, yours?.id].every(
+          [again, mine?.id].every(
             id =>
               readPlaces(host.places).find(c => c.id === id)?.place.kind ===
               "queued",

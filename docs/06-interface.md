@@ -78,7 +78,7 @@ beside it (ADR-0081, turned sideways).
   (ADR-0074).
   **Rename** in the item's `⋯` turns the label into a field: Enter or
   leaving it saves the title for everyone, Escape cancels, and an empty title
-  brings back the first line. **Auto-update title**, beside it, asks the
+  brings back the first line. **Retitle from the conversation**, beside it, asks the
   model again from what was said in the thread, and replaces the title for
   everyone. A title is a mark on the canvas (ADR-0045), and names the canvas
   wherever it is shown: the sidebar, the board, your inbox.
@@ -92,7 +92,7 @@ beside it (ADR-0081, turned sideways).
   read; and, when a run you follow ends with nothing to do, a ✓ that fades.
   Its title says why ("needs you: asks whether to drop the v1 table").
   Reading the thread to its end, on any device of yours, clears it; work
-  ready to accept clears when it is accepted, or with **Not needed** in the item's
+  ready to accept clears when it is accepted, or with **Dismiss** in the item's
   `⋯`. A page that loads draws every mark still: only a change you see
   moves. After the label, small avatars of the others reading there, and a
   small dot in your colour when the canvas holds something you typed and have
@@ -166,7 +166,7 @@ While the page syncs, "syncing…" leads its right end.
   reason, in amber), **Ready to accept** (threads you follow with open
   proposed changes), **Worth a read** (listed, not counted) and **Mentions of you**.
   It lists exactly what it counts. Each thread's row opens it; under each,
-  **not needed** clears it on every device of yours, until the next run's
+  **Dismiss** clears it on every device of yours, until the next run's
   end or new work. You follow a thread once you have written on it; threads
   you do not follow raise nothing for you.
 - **Mentions of you**: the messages that mention you, newest first, each
@@ -191,7 +191,7 @@ While the page syncs, "syncing…" leads its right end.
   the highest mark of the canvases not in the sidebar, a dot in your colour
   when one of them holds something you typed, and a blue ⌕ while a filter
   is on and the board is closed; its title is the session's
-  message count, "2 in the threads this tab has loaded, of 4 in the
+  message count, "2 in the canvases this tab has loaded, of 4 in the
   session": the messages in the roots this browser tab holds, of every
   root's. Nothing in the footer animates: the sidebar, the column, the rail
   and the board show where the agent works.
@@ -523,7 +523,7 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
 - **Move to trash, or the bin on a thread not yet started, trashes a column,
   for everyone, asking nothing** (ADR-0134, ADR-0161): a
   thread, running or not, sent or not, and a note column with its notes.
-  A running thread's run stops, as a take's does ("Ada stopped it"). The
+  A running thread's run stops, as putting it away does ("Ada stopped it"). The
   cards at a thread's end, your message among them, stay with the thread,
   in the trash with it. A new canvas's only thread, not yet sent, takes its
   canvas out of your sidebar too. The undo key brings any of it back.
@@ -564,8 +564,8 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   | idle, nothing queued | idle | none |
 
   Its ⋯ holds the rest: **resume** while the queue is held and the turn
-  may carry on, **hold queue** (or **release hold** while it is held with
-  nothing to send), and **unqueue all** while a card waits.
+  may carry on, **pause the queue** (or **unpause** while it is held with
+  nothing to send), and **move all back to notes** while a card waits.
 - **Queued cards are folded** to their header and first line, and open
   while one holds the focus. **+ add to queue** makes an empty card at the
   queue's end, never a note first, and focuses it; on an idle thread it
@@ -581,9 +581,9 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
 - **A row of the column's header, the access row, says which ssh
   identities its lane holds** (ADR-0140): its service identities, then
   your identity's state, then the hosts it reached ("🔑 deploy, Duane's
-  ssh · pop"). A lane waiting for you reads "🔑 wants your ssh for pop"
-  with **approve** and **refuse**, marked as needing you; an approved one
-  **revoke**, and a refused or revoked one **approve**. Only the owner sees
+  ssh · pop"). A lane waiting for you reads "🔑 asks to use your ssh for
+  pop" with **allow** and **deny**, marked as needing you; an allowed one
+  **take back**, and a denied or taken back one **allow** (ADR-0172). Only the owner sees
   the buttons; everyone else reads "🔑 waiting for Duane". While your
   answer is out its buttons wait, and a refusal is said there. A
   signature refused because its host is outside your `lanes.ssh.hosts` is
@@ -591,11 +591,11 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   192.168.1.2: outside lanes.ssh.hosts", ADR-0170): your config is the
   answer, and a host clears it as it starts. A lane that never asked,
   used no service identity and was refused no host has no row. A lane
-  waiting for you is also in your inbox ("wants your ssh for pop"),
+  waiting for you is also in your inbox ("asks to use your ssh for pop"),
   whether or not you follow it; answering clears it. A request waits until
   you answer, however long (ADR-0178): the lane's ssh is refused meanwhile,
-  and its agent is told to end its turn. Your approval wakes the lane, its
-  thread reading "↻ resumed by Duane: approved ssh for pop", and it tries
+  and its agent is told to end its turn. Allowing it wakes the lane, its
+  thread reading "↻ resumed by Duane: allowed ssh for pop", and it tries
   again.
 - **In a folder project** (ADR-0142), the strip's proposed changes are the files the
   thread's newest state changes against accepted work's newest, reviewed as
@@ -676,8 +676,8 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   (ADR-0108).
 - **The thread hears what was done to its work** (ADR-0080). An
   acceptance, a rewrite of the description, a squash and a refresh each add a line to
-  the thread: "✓ accepted as k1a2b3c4", "✎ a new description
-  was asked for", "⇣ the stack was squashed into one revision", "↻ the
+  the thread: "✓ accepted", its change id in the line's title, "✎ asked
+  for a new description", "⇣ the stack was squashed into one revision", "↻ the
   proposed changes were rebuilt from this thread's work". While the agent works, the
   line waits in the dock's queue as a quiet row, and joins the thread when
   the run ends. When accepted work has moved on with work the thread
@@ -725,17 +725,21 @@ for people only is not one. Nothing about an ask is stored; it is read from
 the tree.
 
 - **A column is read at one of three densities**, chosen in its header, kept
-  with the column and never written. A new column opens in story.
+  with the column and never written: **brief**, **story** and
+  **everything** (stored `outline`, `story`, `raw`, ADR-0172). A new column
+  opens in story.
 
   | density | an ask shows |
   |---|---|
-  | **outline** | its message, and one line: how it ended, or what it is doing, and its counts; its summary's headline under it; the column's last ended ask also its last word (ADR-0106) |
+  | **brief** | its message, and one line: how it ended, or what it is doing, and its counts; its summary's headline under it; the column's last ended ask also its last word (ADR-0106) |
   | **story** | its message, a digest line folding its work, its summary, and its last word |
-  | **raw** | every message and tool row, under its digest line and its summary |
+  | **everything** | every message and tool row, under its digest line and its summary |
 
-  People's messages show at every density. Outline lists everyone's asks.
-- **An ask's digest line** counts its work: steps, tool calls, files its
-  turns changed, how long it took, and failures. A press opens or closes the
+  People's messages show at every density. Brief lists everyone's asks.
+- **An ask's digest line** counts its work: steps, files its turns
+  changed, how long it took, and problems, in plain words: "3 steps · 2
+  files changed · 1m 05s · 1 problem" (ADR-0172). A tool call is a step's,
+  never counted on its own. A press opens or closes the
   work under it. Its files open a review of what the ask alone changed, beside
   the column, as proposed changes' review does.
 - **What the rail draws apart, no fold hides**: a fork, a branch's first
@@ -1040,8 +1044,9 @@ The rail is E; the column is T. Seeing both at once is the product.
 - **Tool calls are rows under the agent's message** (ADR-0107): what the call
   touched (`packages/core/tree.ts`, `pnpm test`), and what it returned. The
   tool's word is a tag at the row's top right, apart from what it touched:
-  "shell", "read", "search", "ask" (ADR-0114), with ✓ or ✗ beside it once
-  the call ends. The model still calls its tools by their ids (`bash`,
+  what the call did, "ran", "read", "wrote", "edited", "searched",
+  "looked for", "asked you" (ADR-0114, ADR-0172), with ✓ or ✗ beside it
+  once the call ends. The model still calls its tools by their ids (`bash`,
   `grep`). A shell command is highlighted, its commands, options, strings
   and variables told apart, and a long one-line chain is laid out a step a
   line. A result is its own entry in the tree, but it belongs to its call,
@@ -1232,7 +1237,7 @@ The rail is E; the column is T. Seeing both at once is the product.
   send is back below the line saying "not sent: …" until it is queued again.
 - **The queue's controls are its header's** (ADR-0048 step 7, ADR-0113),
   on any thread with an agent: **send queue (n)** releases a held queue;
-  **hold queue**, **release hold** and **unqueue all** are in its ⋯. While
+  **pause the queue**, **unpause** and **move all back to notes** are in its ⋯. While
   the queue is held nothing in it is sent, so you can line up several steps on a
   quiet thread and let them go together. Notes the thread will read (a
   fact, ADR-0080) still go. **Sending removes the hold** (ADR-0113): on an
@@ -1338,7 +1343,7 @@ The rail is E; the column is T. Seeing both at once is the product.
   nothing. Narrower than two columns, it is one column, the bench taking
   the bag's place while a card is open on it.
 - **The header** says "inventory · 8/12", holds the clipboard chip and its
-  **keep** (below), and **×**, which closes the panel.
+  **save to your inventory** (below), and **×**, which closes the panel.
 - **The status line** under the bag and the bench says the newest notice
   ("trashed · ⌘Z brings it back", "inventory full"), and keeps its height when it says nothing.
 - **A fixed grid of 12 slots, two wide and six high**, the first nine
@@ -1350,7 +1355,7 @@ The rail is E; the column is T. Seeing both at once is the product.
   or has cards queued (ADR-0124). Cards keep their slots, gaps included, on
   every device. Dropping a card on a slot that holds one swaps the two, and
   so do Alt+arrows. Holding more than 12 (an undo brought one back), you
-  see each, in rows past the sixth, and every take is refused "inventory
+  see each, in rows past the sixth, and putting one more away is refused "inventory
   full" until you hold 12 or fewer.
 - **The bench**: click a slot, or move with the arrow keys or `hjkl` while
   the panel has focus, to select it, and the bench beside the grid, on the
@@ -1371,7 +1376,7 @@ The rail is E; the column is T. Seeing both at once is the product.
 - **Who opened it closes it.** Opened by you (its toggle, a link to a
   thread you hold, an undo that shows it), it stays until you close it:
   **×**, Escape, or the toggle; a click elsewhere leaves it open, since you
-  work in the columns while it is. A take while it is closed **peeks**: it
+  work in the columns while it is. Putting a card away while it is closed **peeks**: it
   opens for the card's landing and closes again, unless you move your
   pointer over it, focus is in it, you are dragging a card, or you press
   its toggle, which keep it open.
@@ -1379,13 +1384,13 @@ The rail is E; the column is T. Seeing both at once is the product.
 - **It opens and closes in motion**, growing from its toggle and shrinking
   back into it; with less motion asked for, it fades.
 - **A card held over the closed toggle in a drag opens it**, and dropped on
-  the toggle, it is taken into a free slot.
-- **Take** moves a card into your inventory (a *take into the inventory*,
-  ADR-0083): Ctrl+Shift+I in its box or on its header, **Move to your
+  the toggle, it is put away into a free slot.
+- **Put away** moves a card into your inventory (ADR-0083, ADR-0172):
+  Ctrl+Shift+I in its box or on its header, **Move to your
   inventory** in its ⋯ (marked with the inventory's box and an arrow into
-  it, the take's one icon wherever it is offered), or a drag of its header
-  onto the panel. A take lands in the selected slot if that is empty, else
-  the first empty one, and flies there; a take into the inventory while the
+  it, put away's one icon wherever it is offered), or a drag of its header
+  onto the panel. A card put away lands in the selected slot if that is empty, else
+  the first empty one, and flies there; one put away while the
   panel is closed peeks at it. With no empty slot it is refused with
   "inventory full". **A drop or a paste aimed at a filled slot replaces its
   card**, which goes to your trash in the same undo step (ADR-0133); a card
@@ -1417,8 +1422,9 @@ The rail is E; the column is T. Seeing both at once is the product.
   - **The clipboard cell**, a chip in the panel's header, shows what you
     last copied in this tab ("last copied here"): a
     copy made in another app shows there once you paste it. It is no slot
-    and takes no drop; **keep** pastes it into a free slot. Keeping a
-    message or a block takes those two steps: copy, then keep.
+    and takes no drop; **save to your inventory** pastes it into a free
+    slot. Saving a message or a block takes those two steps: copy, then
+    save.
 - **A reference** names a message, a table or a range of a message's
   text, with its quote (ADR-0126). It shows as a chip; selected, its quote;
   opened, its quote and thread, and **Edit as text**, which makes it a text
@@ -1429,8 +1435,8 @@ The rail is E; the column is T. Seeing both at once is the product.
 - **Comments** (ADR-0126): a message's **comment** opens its margin under
   it with a new note focused. Everyone on the canvas reads it; the agent does
   not. Shut, the message shows how many comments it has (💬 2); a press
-  opens them, **+ comment** adds one, **shut** closes them. A comment's ⋯
-  has **Queue a reference**, which queues the comment on its thread, under
+  opens them, **+ comment** adds one, **close** closes them. A comment's ⋯
+  has **Send to the agent, quoting this comment**, which queues the comment on its thread, under
   a link to the message, so the agent reads it once with what it is about;
   the comment stays. Queued, the reference shows in the dock as a queued
   message does, with ↑ ↓, a bin and a ⋯ that moves it back to the notes or into
@@ -1454,13 +1460,13 @@ The rail is E; the column is T. Seeing both at once is the product.
   who, and nothing moves. Closing a branch is undone whole, its card and
   your message back; a new canvas, closed empty, is gone for good.
   Sends are final; a paste, **Copy to this canvas**, **Copy to your
-  inventory**, **Edit as text** and **Queue a reference** are each undone
+  inventory**, **Edit as text** and **Send to the agent, quoting this comment** are each undone
   whole, and a copy to the clipboard changes nothing to undo. On no canvas, the undo key undoes your moves
   outside any canvas: a discard from your inventory. An archived canvas's moves cannot be
   undone, and are forgotten 7 days after it was archived.
 - **Undo a swap** with the same keys while the panel has focus: this tab's
   newest swap goes back, unless those slots have changed since.
-- **A refusal is said where you acted**: in the panel for a take into the
+- **A refusal is said where you acted**: in the panel for a card put away into the
   inventory, in the
   column you aimed at for a put, and where an undo showed.
 

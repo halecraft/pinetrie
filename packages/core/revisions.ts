@@ -74,7 +74,7 @@ export interface JjProposedChangesRecord {
    */
   readonly startConflicts: readonly string[]
   /** Files it touches that you are editing in `@`. */
-  readonly yourEdits: readonly string[]
+  readonly workingCopyEdits: readonly string[]
   /** An agent wrote its description; false while it carries the placeholder. */
   readonly described: boolean
   /** You edited it since the host last wrote it: the host leaves it alone. */

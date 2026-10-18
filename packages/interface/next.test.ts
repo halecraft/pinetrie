@@ -225,7 +225,7 @@ test("words: who holds or stopped it, and send queue (n)", () => {
     ),
   ).toBe("held by Bea")
   expect(nextWords({ kind: "stopped", by: ADA }, reader)).toBe("stopped by you")
-  expect(nextWords({ kind: "idle" }, reader)).toBe("idle")
+  expect(nextWords({ kind: "idle" }, reader)).toBe("waiting for you")
   const held: QueueHead = {
     lane: A,
     next: { kind: "held", by: BEA, top: C1, count: 3, resumable: false },

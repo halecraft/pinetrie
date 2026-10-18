@@ -16,6 +16,7 @@ words they were written with.
 | **proposed changes**, read as **changes** | A thread's work waiting to be accepted: one revision or a stack under `pinetrie-proposed/<thread name>`, or a folder project's files. People read **changes** ("2 files changed", **accept changes**); code, docs and the agent say **proposed changes**, and *changes* is never bare in code (ADR-0156). | `ProposedChangesInRepo`, `ProposedChangesRecord`, `ProposedChangesStatus`, `proposedBookmark`, `PROPOSED_CHANGES` (`pinetrie.proposed`) | offer |
 | **WIP** | A bookmark (prefix `wip/`, config `wip.prefix`) a thread may start from and be accepted into. | `wip`, `wipPrefix` | |
 | **publish** | Move `main` (config `publish.bookmark`) forward to accepted work; with `publish.catchUp` on, catch the working copy up and accept your commits below `@` first (ADR-0099). | `publish`, `publishCatchesUp` | |
+| **working copy** | `@` in your repo, with your commits below it that accepted work lacks (ADR-0172). A lane's is always "the lane's working copy"; to people, a thread's copy. | `workingCopy`, `ERR.WORKING_COPY_CONFLICT`, `workingCopyEdits` | yours, your files, the host's working copy |
 | **set up** | Create accepted work's bookmark at your `@-` and write its `immutable_heads()` and `revsets.log` to your repo's config. | `setup`, `planSetup`, `setupProposal` | |
 | **tidy** | Cut your repo's op log to a window (seven days by default) with `pnpm tidy`, while no host serves the repo; a starting host logs when one is due (ADR-0155). | `pnpm tidy`, `planTidy` | trim, prune |
 
@@ -28,7 +29,7 @@ words they were written with.
 | **lane** | A thread's own copy of your repo, in a container of its own (ADR-0034), named by its thread's id (ADR-0117). | `lane`, `ThreadId`, `threadLane` | |
 | **work strip** | The row of a column's header that says what became of its thread's files, with its buttons and its ⋯ (ADR-0153). | `WorkStripView`, `workStripView`, `WorkStripButton`, `WorkStripWords`, `.work-strip` | offer view, offer strip |
 | **review** | The pane that shows proposed changes' or an ask's revisions, files and diffs, read by commit id (`/review/…`, ADR-0047, ADR-0153). | `ReviewAsk`, `ReviewAnswer`, `parseReviewPath`, `REVIEW_WIRE` | offer read, `/offer/` |
-| **ready** | An inbox item for proposed changes you follow, waiting to be accepted; "not needed" dismisses it (ADR-0091, ADR-0153). | raised kind `ready`, `dismissReady`, `dismissedReady` | |
+| **ready** | An inbox item for proposed changes you follow, waiting to be accepted; "Dismiss" dismisses it (ADR-0091, ADR-0153). | raised kind `ready`, `dismissReady`, `dismissedReady` | |
 | **change id** | jj's id of a revision, kept across its rewrites; never called "change" alone (ADR-0153). | `changeId`, `revisionChangeIds` | change (for the id) |
 | **files touched** | Whether a lane's work since its start changes any file: `none`, `some` or `unknown` (ADR-0067, ADR-0153). | `FilesTouched`, `filesTouched` | `WorkChanges` |
 
@@ -54,14 +55,14 @@ words they were written with.
 | **conflict** (a folder lane's) | A path a merge into a lane could not merge, kept as the lane's, recorded with the states of its base and both sides, whose three versions the lane reads (ADR-0142). | `ConflictRecord`, `CONFLICT`, `planPathMerge` | |
 | **source** | A path `.gitignore` does not ignore: what the project is made of, committed and proposed (ADR-0135). | `PathClass` `"source"` | tracked (as a class) |
 | **derived** | An ignored path a command made from source: a lane drops it when what it was made from changes, and makes it again. | `PathClass` `"derived"`, `TurnDisk.derived` | recipe output |
-| **local** | An ignored path no command made from source, such as `.env`: it stays on its disk, and is never sent. The page counts **local files**. | `PathClass` `"local"`, `TurnDisk.local` | ignored file |
+| **private** | An ignored path no command made from source, such as `.env`: it stays on its disk, and is never sent. The page counts **private files**. | `PathClass` `"private"`, `TurnDisk.private` | ignored file, local (ADR-0172) |
 | **recipe** | A recorded command that made derived files, kept with what it read; never declared. | `Recipe`, `Registry` | `lanes.install` |
 | **cache** | A derived directory commands only add to, or one holding a `CACHEDIR.TAG`, such as pnpm's store: kept when its recipe goes stale. | `isCache` | `installCaches` |
 | **shared file version** | One write to a file in a shared directory, a thread's or yours; one based on a version another write replaced is concurrent. | `SharedVersion` | |
 | **lineage** | A shared file's versions in order, each based on the one its writer last read, and what each thread last read of the file. | `SharedLineage`, `planSharedLineages` | line (of a shared file) |
-| **your identity** | Your own ssh keys, in your agent, which a lane uses only once you approve that lane (ADR-0140). | `PersonalSsh`, `PersonalAccess`, `mayUsePersonal` | your ssh agent |
+| **your identity** | Your own ssh keys, in your agent, which a lane uses only once you allow that lane (ADR-0140). | `PersonalSsh`, `PersonalAccess`, `mayUsePersonal` | your ssh agent |
 | **service identity** | A key pair in the `ssh/` folder beside your config: a project's or a team's, which every lane uses unasked (ADR-0140). | `serviceKeyCheck`, `startServiceAgent` | |
-| **access row** | The row of a column's header that says which ssh identities its lane holds and used, and offers you, its owner, approve, refuse or revoke (ADR-0140). | `AccessRecord`, `ACCESS`, `ACCESS_ANSWERS`, `accessView` | |
+| **access row** | The row of a column's header that says which ssh identities its lane holds and used, and offers you, its owner, allow, deny or take back (ADR-0140, ADR-0172). | `AccessRecord`, `ACCESS`, `ACCESS_ANSWERS`, `accessView` | approve, refuse, revoke (ADR-0172) |
 
 ## Cards and where they are
 
@@ -78,7 +79,7 @@ words they were written with.
 | **cut** | Cmd+X on a card you can discard: a copy, then a discard, one undo step (ADR-0132). | `clipOfFocus`'s `cut`, `isDiscardable` | Cmd+X as a take into the inventory |
 | **paste** | Cmd+V: what the clipboard holds landed where focus is, a new thing keeping its origin; the first paste after a cut moves the cut card. A selection lands as text; an entry, a block or a card as a link in a text box, as a card on a surface (ADR-0132). | `readPaste`, `putLanding`, `planPut`, `planPaste`, `paste` (the command) |  |
 | **clipboard cell** | The chip in the inventory panel's header: the last thing copied in pine·trie, not a slot (ADR-0132, ADR-0171). | `clipboardCellView`, `ClipboardChip` |  |
-| **keep** | Paste the clipboard cell into a free slot: how a message or a block reaches your inventory, as a reference (ADR-0132). | the `keep` intent | taking from the past (a message's take, a block's ❝) |
+| **save** | Paste the clipboard cell into a free slot: how a message or a block reaches your inventory, as a reference (ADR-0132); the page says "save to your inventory". | the `save` intent | taking from the past (a message's take, a block's ❝); keep (ADR-0172) |
 | **carrier** | pine·trie's data on the clipboard beside the text: `application/x-pinetrie`, and `data-pinetrie` in `text/html`. It counts only when the pasted text is the text it was written with (ADR-0132). | `Carrier`, `CLIP_ATTRIBUTE` |  |
 | **replace** (a slot) | A drop or a paste aimed at a filled slot of your inventory: the new card takes the slot, and the one there goes to your trash, one undo step (ADR-0133). | `Landing`'s `replace`, `Replacing` | landing in another empty slot |
 | **in your hand** | Your inventory's selected slot: what the put key puts. Every card leaves it when put (ADR-0126, ADR-0132). | `selectedCard` | a reference staying in your hand |
@@ -113,7 +114,7 @@ words they were written with.
 | **agent thread** | A thread whose agent works in it: it has a lane, and a message naming no one asks the agent. Not stored (ADR-0021, ADR-0158). | `agentByDefault`, `AGENT_PREFILL`, `branchPrefill` | agent work (as a kind of thread) |
 | **copy** (a thread) | A new thread branched at a thread's end as its copier saw it, put as its own card; its fork row leads back to the original (ADR-0117). | `copy-thread`, `planCopy`, `ThreadOrigin` | |
 | **proposal** | The branches an agent's `propose_branches` call offers, each a title and a brief, drawn as one card below its ask's last word. A person's press opens or starts them at the end of the run that proposed them; it is then **spent**, and never pressed again (ADR-0157). | `Proposal`, `proposalState`, `planBranchOut`, `branch-out`, `ThreadFork.proposal` | |
-| **take** (a thread) | Move a thread's card into your inventory: its run stops, and only you open it until you put it on a canvas (ADR-0124). A link to it anywhere else says who has it. | `takenIn`, `runsIn`, `heldIn`, `threadLink`, `ThreadLink` | |
+| **put away** (a card, a thread among them) | Move a card into your inventory: a thread's run stops, and only you open it until you put it on a canvas (ADR-0124, ADR-0172). A link to it anywhere else says who has it. | `putAway`, `takenIn`, `runsIn`, `heldIn`, `threadLink`, `ThreadLink` | take (ADR-0172) |
 | **member** | Another thread's agent invited into a thread: a mention of it there asks it (ADR-0128). Read from the thread's path, never stored. A member whose thread is no longer on an open canvas is away, and asking it is refused. | `threadMembers`, `AgentCandidate` | |
 | **invite** | The first mention of another thread's agent in a thread, which makes it a member without asking it (ADR-0128). | `Address.invites`, `MessageDetails.invites` | |
 | **heard** | What an asked agent was told of the thread that asked, copied into its own thread before the ask (ADR-0128). | `pinetrie.heard`, `HeardDetails`, `lastHeardEntry` | |
@@ -194,9 +195,10 @@ code word alone.)
   ADR-0048, ADR-0113),
   and Kyneta's command **Line** (`host/control.ts`), one per seat. None of
   them is accepted work, and none is a shared file's **lineage**.
-- **take**: take a card into your inventory (ADR-0083); a thread's run
-  stops as it is taken (ADR-0124). Nothing is done to proposed changes by taking
-  it.
+- **put away**: put a card away into your inventory (ADR-0083, ADR-0172);
+  a thread's run stops as it is put away (ADR-0124). Nothing is done to
+  proposed changes by putting it away. A card that leaves a canvas any
+  other way is still "taken from the canvas" in the agent's canvas facts.
 - **source**: a path `.gitignore` does not ignore (ADR-0135), which is
   built; and a folder the host's owner registers for lanes (ADR-0118),
   which is not. Plain English uses it too: a commit's `Pinetrie-Source`,
@@ -242,6 +244,15 @@ code word alone.)
 - **accept** in plain English: the host accepts a command or a write
   (`acceptsWrite`, a move `accepted`). Only proposed changes are *accepted* into
   accepted work.
+
+## Phrases nothing says
+
+What people and the agent read never says these, in any case
+(`scripts/words.test.ts`). A word in a row's **retired** cell is retired as
+that concept's name; a phrase here is retired as English too.
+
+- "your folder": accepted work, for every kind of project, since pine·trie
+  may run hosted, where the folder is no one's own.
 
 ## Where these are configured
 

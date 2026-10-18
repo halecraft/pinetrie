@@ -53,11 +53,11 @@ export function createFetches(deps: {
   const { basics, owner, registry, keeper } = deps
 
   /** What your repo has of `candidates`: a bundle may exclude only those. */
-  const yoursHas = (
-    yours: RepoOwner,
+  const repoHas = (
+    repo: RepoOwner,
     candidates: readonly (CommitId | null)[],
   ): Promise<CommitId[]> =>
-    yours.read(async ({ git }) => {
+    repo.read(async ({ git }) => {
       const out: CommitId[] = []
       for (const c of candidates)
         if (c !== null && (await git(["cat-file", "-e", `${c}^{commit}`])).ok)
@@ -67,7 +67,7 @@ export function createFetches(deps: {
 
   return {
     fetchLane(lane, have, stack = false) {
-      const yours = owner
+      const repo = owner
       const bundled = registry.withHistory(lane, async (h, handle, record) => {
         const stopped =
           (await handle.runners.runtime.containerFacts(handle.container))
@@ -88,7 +88,7 @@ export function createFetches(deps: {
             [
               planBundle({
                 bookmark: name,
-                have: await yoursHas(yours, have),
+                have: await repoHas(repo, have),
                 to: bundle,
               }),
             ],
@@ -104,7 +104,7 @@ export function createFetches(deps: {
           bundled.then(async made => {
             if (made === null) return
             try {
-              await yours.importLane(lane, made.bundle, stack)
+              await repo.importLane(lane, made.bundle, stack)
             } finally {
               await rm(made.dir, { recursive: true, force: true })
             }

@@ -125,7 +125,7 @@ export type ColumnAct =
   /** Discard a card here; the undo key brings it back. */
   | { readonly kind: "discard"; readonly card: CardId }
   /** Take a card in this column into your inventory. */
-  | { readonly kind: "takeIntoInventory"; readonly card: CardId }
+  | { readonly kind: "putAway"; readonly card: CardId }
   /** Read the column at `density`. */
   | { readonly kind: "density"; readonly density: Density }
   /** Open or close the thread's details under the header. */
@@ -389,7 +389,7 @@ export type Intent =
     }
   | { readonly kind: "signOut" }
   /** Take `card` into your inventory, into a free slot: by key, wherever it is. */
-  | { readonly kind: "takeIntoInventory"; readonly card: CardId }
+  | { readonly kind: "putAway"; readonly card: CardId }
   /**
    * Land `source` at `target` (`planPut`): a put by key or button, a drop,
    * a slot's swap; `how` copies instead, as an Alt-drag does.
@@ -412,7 +412,7 @@ export type Intent =
   /** A paste of `clip` at `target`: a copy landed there. */
   | { readonly kind: "paste"; readonly clip: Clip; readonly target: PutTarget }
   /** The clipboard cell's copy into a free slot of your inventory. */
-  | { readonly kind: "keep" }
+  | { readonly kind: "save" }
   /**
    * Edit a reference as text: a paste of the quote `text` as the
    * text card `card`, replacing the reference in its place.
@@ -663,8 +663,8 @@ function planOf(
       return planOpenLink(intent.link, intent.entry, state)
     case "signOut":
       return [{ kind: "forgetIdentity" }, { kind: "reload" }]
-    case "takeIntoInventory":
-      return planTake(intent.card, state, minted)
+    case "putAway":
+      return planPutAway(intent.card, state, minted)
     case "put":
       return planPut(intent.source, intent.target, intent.how, state, minted)
     case "editAsText":
@@ -683,7 +683,7 @@ function planOf(
         state,
         minted,
       )
-    case "keep":
+    case "save":
       return state.clips.cell === null
         ? []
         : planPut(
@@ -761,8 +761,8 @@ function planColumn(
       )
     case "discard":
       return planDiscard(act.card, IN_COLUMN(key), state)
-    case "takeIntoInventory":
-      return planTake(act.card, state, minted)
+    case "putAway":
+      return planPutAway(act.card, state, minted)
     case "density":
       return reading({ kind: "density", density: act.density })
     case "details":
@@ -1012,7 +1012,7 @@ function planAddColumn(
 }
 
 /** Take `card` into a free slot of your inventory: a landing with no slot aimed at. */
-const planTake = (
+const planPutAway = (
   card: CardId,
   state: IntentState,
   minted: Minted,

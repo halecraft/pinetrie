@@ -127,7 +127,7 @@ export const ERR = {
   /** Publishing while the publish bookmark has commits accepted work lacks. */
   NOT_FAST_FORWARD: "not_fast_forward",
   /** Publishing while the working copy has conflicts, or catching it up would make some. */
-  YOURS_CONFLICT: "yours_conflict",
+  WORKING_COPY_CONFLICT: "working_copy_conflict",
   /** An acceptance into a bookmark that is not one of the proposed changes' destinations now. */
   BAD_DESTINATION: "bad_destination",
   /** A new thread's base that is not a WIP bookmark above accepted work. */

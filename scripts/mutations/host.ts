@@ -1667,7 +1667,7 @@ export const mutations: readonly Mutation[] = [
     name: "your @ moving marks every lane",
     file: "apps/pinetrie/host/jj/proposed/marks.ts",
     from: "  const every = moved.all\n",
-    to: "  const every = moved.all || moved.yours\n",
+    to: "  const every = moved.all || moved.workingCopy\n",
     command: unit,
     expect: "your @ alone marks no lane",
   },
@@ -1691,7 +1691,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "your @ moving rewrites nothing",
     file: "apps/pinetrie/host/jj/proposed/marks.ts",
-    from: "    shared: !every && moved.yours,",
+    from: "    shared: !every && moved.workingCopy,",
     to: "    shared: false,",
     command: unit,
     expect: "your @ alone marks no lane",
@@ -1760,7 +1760,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a fetch is never imported",
     file: "apps/pinetrie/host/jj/fetch.ts",
-    from: "              await yours.importLane(lane, made.bundle, stack)\n",
+    from: "              await repo.importLane(lane, made.bundle, stack)\n",
     to: "",
     command: unit,
     expect: "a lane's fetch is imported by the owner of your repo",
@@ -3166,6 +3166,40 @@ export const mutations: readonly Mutation[] = [
     to: "",
     command: unit,
     expect: "an allowed host with no known key is said at start",
+  },
+  {
+    name: "a turn's private paths keep their old name",
+    file: "apps/pinetrie/host/migrations/0008-turn-disk-private.ts",
+    from: 'const renameDisk = renamedFields({ local: "private" })',
+    to: 'const renameDisk = renamedFields({ local: "local" })',
+    command: unit,
+    expect:
+      "a turn's disk in the old shape lists its private paths under their new name",
+  },
+  {
+    name: "a revoke loses that it was taken back",
+    file: "apps/pinetrie/host/migrations/0009-access-answers.ts",
+    from: '      personal: { ...rest, kind: "denied", takenBack: revoked === true },\n',
+    to: '      personal: { ...rest, kind: "denied", takenBack: false },\n',
+    command: unit,
+    expect:
+      "an approval reads as allowed, a refusal as denied, a revoke as taken back",
+  },
+  {
+    name: "a revoked ssh fact keeps its old word",
+    file: "apps/pinetrie/host/migrations/0010-ssh-fact-words.ts",
+    from: '  revoked: "taken-back",\n',
+    to: "",
+    command: unit,
+    expect: "a refusal reads as denied, and a revoke as taken back",
+  },
+  {
+    name: "a carry-on an approval woke keeps its old word",
+    file: "apps/pinetrie/host/migrations/0011-carry-on-ssh-allowed.ts",
+    from: '  return r.kind === "ssh-approved"\n',
+    to: '  return r.kind === "never"\n',
+    command: unit,
+    expect: "a carry-on an approval woke reads as one an allowance woke",
   },
   // ── a lane's prompt ──
   {

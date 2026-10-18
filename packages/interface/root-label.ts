@@ -38,7 +38,7 @@ export const messageCount = (
 
 /** The count's tooltip: ▦'s, in the footer. */
 export const messageCountTitle = ({ held, total }: MessageCount): string =>
-  `${held} in the threads this tab has loaded, of ${total} in the session`
+  `${held} in the canvases this tab has loaded, of ${total} in the session`
 
 /** What a canvas's card shows of its threads' roots, from the directory. */
 export interface CanvasSummary {

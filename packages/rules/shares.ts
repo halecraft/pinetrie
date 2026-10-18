@@ -17,6 +17,7 @@ import {
   type Sha256,
   type Share,
 } from "@pinetrie/core"
+import { byteWords } from "./counts.ts"
 import { parseMarkdown } from "./markdown.ts"
 
 /**
@@ -259,13 +260,6 @@ export function shareQuote(
   }
 }
 
-/** A size as a person reads it: bytes, KB or MB. */
-export function sizeWords(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
-
 /** A fence for `text`: one backtick longer than its longest run, and at least three. */
 export function fenceFor(text: string): string {
   const longest = Math.max(
@@ -283,7 +277,7 @@ export function shareQuoteMarkdown(share: Share, quote: ShareQuote): string {
   }
   const lines = quote.lines === null ? "" : `, ${quote.lines} lines`
   const what = quote.lines === null ? "a file" : "text"
-  return `${what} of ${sizeWords(share.size)}${lines}, not quoted here. Save it into your lane with save_blob and ${blobUrl(share.original.sha256)} to read it.`
+  return `${what} of ${byteWords(share.size)}${lines}, not quoted here. Save it into your lane with save_blob and ${blobUrl(share.original.sha256)} to read it.`
 }
 
 /**

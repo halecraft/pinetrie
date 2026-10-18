@@ -37,7 +37,7 @@ const lane = threadIdFor("x")
 const target: ReviewTarget = {
   spans: [{ kind: "range", from: pointId("a0"), to: pointId("a1") }],
   conflicts: [],
-  yourEdits: [],
+  workingCopyEdits: [],
 }
 const node = (id: string, text: string): SpineNode => ({
   id: entryId(id),

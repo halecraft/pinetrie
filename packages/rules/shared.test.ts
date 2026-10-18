@@ -261,7 +261,7 @@ describe("planSharedLineages", () => {
   })
 
   test("your write between a lane's read and its write makes the lane's concurrent", () => {
-    const yours = plan(empty, {
+    const mine = plan(empty, {
       seen: [
         { path: P, stamp: st(100) },
         { path: P, stamp: st(200) },
@@ -269,7 +269,7 @@ describe("planSharedLineages", () => {
       writer: null,
     })
     expect(
-      plan(lineagesAfter(yours), { writes: [write(st(100), st(300))] }).turn
+      plan(lineagesAfter(mine), { writes: [write(st(100), st(300))] }).turn
         .wrote[0]?.concurrent,
     ).toBe(true)
   })

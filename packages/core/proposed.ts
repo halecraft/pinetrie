@@ -23,7 +23,7 @@ export type AcceptsInto =
  */
 export interface RevisionFacts {
   readonly reached: boolean
-  readonly yoursChanged: boolean
+  readonly othersChanged: boolean
 }
 
 /** One revision of proposed changes, as your repo holds it now. */
@@ -342,7 +342,10 @@ export interface DescribeDecision {
  * `revsets.log` as jj resolves them (null for jj's own).
  */
 export interface AcceptedFacts
-  extends Pick<JjAcceptedRecord, "commit" | "wips" | "published" | "yours"> {
+  extends Pick<
+    JjAcceptedRecord,
+    "commit" | "wips" | "published" | "workingCopy"
+  > {
   readonly heads: string | null
   readonly log: string | null
 }
@@ -393,5 +396,7 @@ export type PublishFinish =
   | {
       readonly kind: "undo"
       readonly op: string
-      readonly code: typeof ERR.YOURS_CONFLICT | typeof ERR.NOT_FAST_FORWARD
+      readonly code:
+        | typeof ERR.WORKING_COPY_CONFLICT
+        | typeof ERR.NOT_FAST_FORWARD
     }

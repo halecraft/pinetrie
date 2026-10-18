@@ -210,7 +210,7 @@ describe("sidebarView", () => {
     expect(done(r1)).toMatchObject({ drops: [amber] })
     expect(done(r2)).toMatchObject({ drops: [] })
     expect(dropsWords([amber, "cozy-mallard" as ThreadName])).toBe(
-      "work not accepted goes: amber-fox, cozy-mallard",
+      "unfinished changes will be dropped: amber-fox, cozy-mallard",
     )
     expect(dropsWords([])).toBe(null)
   })

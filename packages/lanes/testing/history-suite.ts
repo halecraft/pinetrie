@@ -46,7 +46,7 @@ export interface RigLane {
  */
 export interface HistoryRig {
   /** Your own work on accepted work, `files` written; accepted work's new state. */
-  yoursOnAccepted(files: Readonly<Record<string, string>>): Promise<PointId>
+  repoOnAccepted(files: Readonly<Record<string, string>>): Promise<PointId>
   /** A new lane, started on accepted work now. */
   lane(): Promise<RigLane>
   /** `path` at `site` of the destination (`Destination.fileAt`). */
@@ -118,7 +118,7 @@ export function historySuite(
     test(name, async () => {
       const rig = await make()
       try {
-        await rig.yoursOnAccepted({ "a.txt": "one\ntwo\nthree\n" })
+        await rig.repoOnAccepted({ "a.txt": "one\ntwo\nthree\n" })
         await body(rig)
       } finally {
         await rig.close()
@@ -128,7 +128,7 @@ export function historySuite(
   withRig(
     "a lane started from accepted work has a base naming it",
     async rig => {
-      const accepted = await rig.yoursOnAccepted({ "b.txt": "b\n" })
+      const accepted = await rig.repoOnAccepted({ "b.txt": "b\n" })
       const lane = await rig.lane()
       const base = await lane.withHistory(h => h.base())
       expect(base?.base).toEqual({ kind: "accepted" })
@@ -146,7 +146,7 @@ export function historySuite(
     expect(own.kind).toBe("nothing")
     expect(own.kind === "nothing" ? own.mark : null).toBeNull()
     expect(await texts(lane, paths)).toEqual(before)
-    const accepted = await rig.yoursOnAccepted({ "b.txt": "b\n" })
+    const accepted = await rig.repoOnAccepted({ "b.txt": "b\n" })
     expect((await catchUp(lane, accepted)).kind).toBe("clean")
     const held = await texts(lane, paths)
     expect((await catchUp(lane, accepted)).kind).toBe("nothing")
@@ -194,7 +194,7 @@ export function historySuite(
     const lane = await rig.lane()
     await lane.write("a.txt", "one\ntwo (lane)\nthree\n")
     await lane.withHistory(h => h.recordTurn(TURN))
-    const accepted = await rig.yoursOnAccepted({ "b.txt": "b\n" })
+    const accepted = await rig.repoOnAccepted({ "b.txt": "b\n" })
     await lane.write("c.txt", "edited between runs\n")
     const merged = await catchUp(lane, accepted, {
       title: "edits between runs",
@@ -218,7 +218,7 @@ export function historySuite(
       const lane = await rig.lane()
       await lane.write("a.txt", "one\ntwo (lane)\nthree\n")
       await lane.withHistory(h => h.recordTurn(TURN))
-      const accepted = await rig.yoursOnAccepted({
+      const accepted = await rig.repoOnAccepted({
         "a.txt": "one\ntwo (yours)\nthree\n",
       })
       const merged = await catchUp(lane, accepted)

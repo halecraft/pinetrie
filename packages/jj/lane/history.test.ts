@@ -109,10 +109,10 @@ async function makeRig(): Promise<
   Omit<HistoryRig, "lane"> & { lane(): Promise<JjRigLane> }
 > {
   const dir = path.join(top, `rig-${rigs++}`)
-  const yoursDir = path.join(dir, "yours")
-  await mkdir(yoursDir, { recursive: true })
-  await run("jj", ["git", "init", "--colocate", yoursDir])
-  const yours = hostJj(yoursDir)
+  const repoDir = path.join(dir, "yours")
+  await mkdir(repoDir, { recursive: true })
+  await run("jj", ["git", "init", "--colocate", repoDir])
+  const inRepo = hostJj(repoDir)
   let lanes = 0
   /** Each lane's runners, by its id: the hooks run in the lane's own repo. */
   const runnersOf = new Map<ThreadId, LaneRunners>()
@@ -132,7 +132,7 @@ async function makeRig(): Promise<
 
   /** A lane's runners at `laneDir`, as its container's would run there. */
   const runnersAt = (laneDir: string): LaneRunners => {
-    const dirs = { [HOST_WORKING_COPY]: yoursDir, [WORKSPACE_ROOT]: laneDir }
+    const dirs = { [HOST_WORKING_COPY]: repoDir, [WORKSPACE_ROOT]: laneDir }
     const config = path.join(
       laneDir,
       path.relative(WORKSPACE_ROOT, LANE_JJ_CONFIG),
@@ -150,15 +150,15 @@ async function makeRig(): Promise<
   }
 
   return {
-    async yoursOnAccepted(files) {
+    async repoOnAccepted(files) {
       for (const [file, text] of Object.entries(files)) {
-        await mkdir(path.dirname(path.join(yoursDir, file)), {
+        await mkdir(path.dirname(path.join(repoDir, file)), {
           recursive: true,
         })
-        await writeFile(path.join(yoursDir, file), text)
+        await writeFile(path.join(repoDir, file), text)
       }
-      await yours(["commit", "-m", "accepted"])
-      await yours([
+      await inRepo(["commit", "-m", "accepted"])
+      await inRepo([
         "bookmark",
         "set",
         "--allow-backwards",
@@ -166,7 +166,7 @@ async function makeRig(): Promise<
         "-r",
         "@-",
       ])
-      const [commit] = await readCommits(yours, "@-")
+      const [commit] = await readCommits(inRepo, "@-")
       if (commit === undefined) throw new Error("nothing accepted")
       return pointFromCommit(commit)
     },
@@ -177,9 +177,9 @@ async function makeRig(): Promise<
       await mkdir(laneDir, { recursive: true })
       const runners = runnersAt(laneDir)
       runnersOf.set(lane, runners)
-      const accepted = await acceptedIn(yours, DEFAULT_REPO)
+      const accepted = await acceptedIn(inRepo, DEFAULT_REPO)
       const steps: LaneStep[] = [
-        ...planBaseCheckout({ yours: [accepted], fresh: true }),
+        ...planBaseCheckout({ accepted: [accepted], fresh: true }),
         ...planForkSetup(jjLaneFor(lane), {
           kind: "accepted",
           point: pointFromCommit(accepted),
@@ -200,12 +200,12 @@ async function makeRig(): Promise<
                 c !== null &&
                 (
                   await run("git", ["cat-file", "-e", `${c}^{commit}`], {
-                    cwd: yoursDir,
+                    cwd: repoDir,
                   })
                 ).ok
               )
                 held.push(c)
-            await fetchLane(runners, yoursDir, { lane, have: held, bundle })
+            await fetchLane(runners, repoDir, { lane, have: held, bundle })
           })(),
         )
       }
@@ -245,7 +245,7 @@ async function makeRig(): Promise<
       }
     },
 
-    fileAt: (point, file) => readRepoFile(yours, DEFAULT_REPO, point, file),
+    fileAt: (point, file) => readRepoFile(inRepo, DEFAULT_REPO, point, file),
 
     isAncestor(lane, a, b) {
       const { jj, commit } = inLane(lane)
@@ -273,24 +273,24 @@ async function makeRig(): Promise<
 
     async accept({ lane }) {
       const name = `rig-lane-${lane}` as ThreadName
-      await fetchLane(runnersFor(lane), yoursDir, {
+      await fetchLane(runnersFor(lane), repoDir, {
         lane,
         have: [],
         bundle: path.join(dir, `${lane}-proposed.bundle`),
       })
-      const built = await proposedTip(yoursDir, {
+      const built = await proposedTip(repoDir, {
         lane,
         name,
         repoConfig: DEFAULT_REPO,
       })
       const [top] = built.changeIds
       if (top === undefined) throw new Error("no proposed changes")
-      await acceptProposedChanges(yoursDir, {
+      await acceptProposedChanges(repoDir, {
         name,
         top,
         repoConfig: DEFAULT_REPO,
       })
-      return pointFromCommit(await acceptedIn(yours, DEFAULT_REPO))
+      return pointFromCommit(await acceptedIn(inRepo, DEFAULT_REPO))
     },
 
     close: () => rm(dir, { recursive: true, force: true }),
@@ -307,7 +307,7 @@ const withJjRig = (
   test(name, async () => {
     const rig = await makeRig()
     try {
-      await rig.yoursOnAccepted({ "a.txt": "one\ntwo\nthree\n" })
+      await rig.repoOnAccepted({ "a.txt": "one\ntwo\nthree\n" })
       await body(rig)
     } finally {
       await rig.close()
@@ -326,7 +326,7 @@ withJjRig(
     made.follow?.()
     await lane.settled()
     expect(lane.fetched.length).toBe(1)
-    const accepted = await rig.yoursOnAccepted({ "b.txt": "b\n" })
+    const accepted = await rig.repoOnAccepted({ "b.txt": "b\n" })
     const merged = await lane.withHistory(async h => {
       const ready = await h.readyToMerge()
       if (typeof ready === "string") throw new Error(ready)

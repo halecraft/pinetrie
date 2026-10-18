@@ -225,11 +225,11 @@ describe("rowSummary", () => {
   const call = (name: string, subject?: string): ToolCall =>
     subject === undefined ? { id: "c", name } : { id: "c", name, subject }
 
-  test("a long chain is tagged shell, highlighted, and laid out a step a line", () => {
+  test("a long chain is tagged ran, highlighted, and laid out a step a line", () => {
     const chain =
       "mkdir -p /tmp/wc && cd /tmp/wc && git init -q && git commit -m init && ls -la && pnpm test"
     const s = rowSummary(call("bash", chain))
-    expect(s.tag).toBe("shell")
+    expect(s.tag).toBe("ran")
     expect(s.whole.filter(r => r.role === "command").length).toBe(6)
     expect(text(s.whole)?.split("\n")).toEqual([
       "mkdir -p /tmp/wc &&",

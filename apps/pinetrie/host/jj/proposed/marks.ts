@@ -13,7 +13,7 @@ import type { Moved } from "@pinetrie/jj"
  * withdraws an proposed changes it still has, and what still holds one, its
  * ref, its proposed bookmark or an open record, marks it anyway. The publish
  * bookmark (`line`) marks accepted work's record alone. `@` alone (`yours`)
- * marks no lane: it changes only each record's `yourEdits` and accepted work's
+ * marks no lane: it changes only each record's `workingCopyEdits` and accepted work's
  * preview, which one shared read rewrites (`shared`). A lane's ref marks that
  * lane, and proposed bookmark the lane its thread names.
  */
@@ -26,7 +26,7 @@ export function planMarks(input: {
   readonly open: readonly ThreadId[]
 }): {
   readonly accepted: boolean
-  /** Rewrite what `@` changes: each open record's `yourEdits`, and accepted work's record. */
+  /** Rewrite what `@` changes: each open record's `workingCopyEdits`, and accepted work's record. */
   readonly shared: boolean
   readonly lanes: readonly ThreadId[]
 } {
@@ -48,7 +48,7 @@ export function planMarks(input: {
   ])
   return {
     accepted: every || moved.published,
-    shared: !every && moved.yours,
+    shared: !every && moved.workingCopy,
     lanes: [...lanes],
   }
 }

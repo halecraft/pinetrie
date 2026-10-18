@@ -258,7 +258,7 @@ describe("planSettle: what a merge comes to", () => {
     if (settled.kind !== "conflicted") throw new Error("not conflicted")
     expect(settled.message.details).toMatchObject({
       lane: LANE,
-      yours: [ACCEPTED],
+      merged: [ACCEPTED],
       by: ADA,
       files: ["a.txt", "b.txt"],
     })
@@ -528,7 +528,7 @@ describe("catchUpInRun", () => {
         heads: { current: null, proposed: "x" },
         log: { current: null, proposed: "x" },
         wips: [],
-        yours: {
+        workingCopy: {
           behind: 0,
           ahead: 0,
           catchUp: null,

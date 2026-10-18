@@ -5,6 +5,8 @@
   `packages/interface/TECHNICAL.md`, `ARCHITECTURE.md`
 - **Evidence:** S138
 - **Amended by:**
+  - ADR-0172: the tool tags read as what a call did: read, wrote, edited, ran,
+    searched, looked for; the conflict tool's is "asked you".
   - ADR-0173: `bash`, `edit` and `write` take a required `intent`, which never
     reaches pi.
 

@@ -341,9 +341,9 @@ describe("carrying on", () => {
         lane: s,
         by: ada,
         name: "Ada",
-        reason: { kind: "ssh-approved", host: "hql" },
+        reason: { kind: "ssh-allowed", host: "hql" },
       }),
-    ).toBe("↻ resumed by Ada: approved ssh for hql")
+    ).toBe("↻ resumed by Ada: allowed ssh for hql")
   })
   test("planCarryOn: a refusal is worded", () => {
     const o = over([ask, aborted], { running: true })

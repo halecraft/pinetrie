@@ -282,7 +282,7 @@ export const mutations: readonly Mutation[] = [
     name: "the pane keeps the strip's review when the strip has none",
     file: "packages/web/pane.ts",
     from: '      return facts.strip === null ? null : { kind: "review", ...facts.strip }',
-    to: '      return { kind: "review", target: facts.strip?.target ?? { lane: "x", spans: [], conflicts: [], yourEdits: [] }, line: "" } as PaneView',
+    to: '      return { kind: "review", target: facts.strip?.target ?? { lane: "x", spans: [], conflicts: [], workingCopyEdits: [] }, line: "" } as PaneView',
     command: unit,
     expect: "the strip draws its review, and closes without one",
   },

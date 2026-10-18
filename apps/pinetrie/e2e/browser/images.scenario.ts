@@ -364,7 +364,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
             () => true,
             () => false,
           )
-        if (shown) await pp.click(".inventory .clipboard-cell .keep")
+        if (shown) await pp.click(".inventory .clipboard-cell .save")
         const kept = await pp
           .waitForSelector(refSlot, { timeout: 10_000 })
           .then(

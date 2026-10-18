@@ -315,7 +315,7 @@ async function makeRig(): Promise<FolderRig> {
   }
 
   return {
-    async yoursOnAccepted(files) {
+    async repoOnAccepted(files) {
       for (const [file, text] of Object.entries(files)) {
         await mkdir(path.dirname(path.join(folder, file)), { recursive: true })
         await writeFile(path.join(folder, file), text)
@@ -455,11 +455,11 @@ describe.skipIf(!onBtrfs)(
     test("a conflicted catch-up shows three versions; resolve_conflict writes the one chosen, records a resolve state and closes it", async () => {
       const rig = await makeRig()
       try {
-        await rig.yoursOnAccepted({ "a.txt": "one\ntwo\nthree\n" })
+        await rig.repoOnAccepted({ "a.txt": "one\ntwo\nthree\n" })
         const lane = await rig.lane()
         await lane.write("a.txt", "one\ntwo (lane)\nthree\n")
         await lane.withHistory(h => h.recordTurn(TURN))
-        const point = await rig.yoursOnAccepted({
+        const point = await rig.repoOnAccepted({
           "a.txt": "one\ntwo (yours)\nthree\n",
         })
         const merged = await lane.withHistory(async h =>
@@ -541,7 +541,7 @@ describe.skipIf(!onBtrfs)(
     test("a branch catches up with its parent after a sweep, the parent's turn it began on kept", async () => {
       const rig = await makeRig()
       try {
-        await rig.yoursOnAccepted({ "a.txt": lines("1", "2", "3", "4") })
+        await rig.repoOnAccepted({ "a.txt": lines("1", "2", "3", "4") })
         const parent = await rig.lane()
         await parent.write("a.txt", lines("P", "2", "3", "4"))
         const p1 = await recorded(parent, 1)
@@ -563,7 +563,7 @@ describe.skipIf(!onBtrfs)(
     test("a branch whose fork began on accepted work catches up cleanly with its parent after a sweep", async () => {
       const rig = await makeRig()
       try {
-        await rig.yoursOnAccepted({ "a.txt": lines("1", "2", "3", "4") })
+        await rig.repoOnAccepted({ "a.txt": lines("1", "2", "3", "4") })
         const parent = await rig.lane()
         await parent.write("a.txt", lines("P", "2", "3", "4"))
         const p1 = await recorded(parent, 1)
@@ -585,7 +585,7 @@ describe.skipIf(!onBtrfs)(
     test("a catch-up whose base's snapshot is gone is refused with words, and makes nothing", async () => {
       const rig = await makeRig()
       try {
-        await rig.yoursOnAccepted({ "a.txt": lines("1", "2") })
+        await rig.repoOnAccepted({ "a.txt": lines("1", "2") })
         const parent = await rig.lane()
         await parent.write("a.txt", lines("P", "2"))
         const p1 = await recorded(parent, 1)
@@ -622,20 +622,20 @@ describe.skipIf(!onBtrfs)(
       files: {
         readonly start: string
         readonly lane: string
-        readonly yours: string
+        readonly repo: string
         /** The lane's file once its first catch-up conflicted, resolved as its own. */
         readonly accepted: string
       },
     ) {
-      await rig.yoursOnAccepted({ "a.txt": files.start })
+      await rig.repoOnAccepted({ "a.txt": files.start })
       const lane = await rig.lane()
       await lane.write("a.txt", files.lane)
       await recorded(lane, 1)
-      const yours = await rig.yoursOnAccepted({ "a.txt": files.yours })
+      const repo = await rig.repoOnAccepted({ "a.txt": files.repo })
       await rig.accept(lane)
       // Accepted work then takes its own file.
-      const theirs = await rig.yoursOnAccepted({ "a.txt": files.accepted })
-      const first = await merge(lane, withAccepted(yours))
+      const theirs = await rig.repoOnAccepted({ "a.txt": files.accepted })
+      const first = await merge(lane, withAccepted(repo))
       if (first.kind === "conflicted")
         await lane.withHistory(h =>
           h.resolve("a.txt", "ours", { kind: "agent" }),
@@ -650,7 +650,7 @@ describe.skipIf(!onBtrfs)(
     const E2 = {
       start: lines("x", "1", "2", "y", "3", "4", "z"),
       lane: lines("x", "1", "2", "Y1", "3", "4", "z"),
-      yours: lines("X", "1", "2", "y", "3", "4", "z"),
+      repo: lines("X", "1", "2", "y", "3", "4", "z"),
       accepted: lines("X", "1", "2", "Y1", "3", "4", "z"),
     }
     // Your change and the lane's are on lines of their own, so the accept
@@ -659,7 +659,7 @@ describe.skipIf(!onBtrfs)(
     const F = {
       start: lines("x", "1", "2", "y", "3", "4", "z"),
       lane: lines("x", "1", "2", "Y1", "3", "4", "z"),
-      yours: lines("X", "1", "2", "y", "3", "4", "z"),
+      repo: lines("X", "1", "2", "y", "3", "4", "z"),
       accepted: lines("X", "1", "2", "Y1", "3", "4", "Zyours"),
     }
 
@@ -711,13 +711,13 @@ describe.skipIf(!onBtrfs)(
     test("a review shows an image as media, a moved unchanged file as one row, and serves a side's bytes typed by them", async () => {
       const rig = await makeRig()
       try {
-        const first = await rig.yoursOnAccepted({
+        const first = await rig.repoOnAccepted({
           "old.txt": "moved, unchanged\n",
           "a.gif": GIF(1),
           "b.txt": "one\n",
         })
         await rig.removeOnAccepted("old.txt")
-        const second = await rig.yoursOnAccepted({
+        const second = await rig.repoOnAccepted({
           "docs/new.txt": "moved, unchanged\n",
           "a.gif": GIF(3),
           "b.txt": "two\n",
@@ -755,8 +755,8 @@ describe.skipIf(!onBtrfs)(
     test("a restore makes accepted work's newest hold its state's content, and the next read answers current", async () => {
       const rig = await makeRig()
       try {
-        const first = await rig.yoursOnAccepted({ "a.txt": "one\n" })
-        const second = await rig.yoursOnAccepted({
+        const first = await rig.repoOnAccepted({ "a.txt": "one\n" })
+        const second = await rig.repoOnAccepted({
           "a.txt": "two\n",
           "b.txt": "new\n",
         })
@@ -771,7 +771,7 @@ describe.skipIf(!onBtrfs)(
         expect(await rig.snapshotExists(newest)).toBe(true)
         expect(await rig.folderFile("a.txt")).toBe("one\n")
         expect(await rig.folderFile("b.txt")).toBeNull()
-        expect(await rig.yoursOnAccepted({})).toBe(newest)
+        expect(await rig.repoOnAccepted({})).toBe(newest)
       } finally {
         await rig.close()
       }
@@ -780,8 +780,8 @@ describe.skipIf(!onBtrfs)(
     test("a restore not as shown, of a state not kept, or of what the folder holds is refused, making nothing", async () => {
       const rig = await makeRig()
       try {
-        const first = await rig.yoursOnAccepted({ "a.txt": "one\n" })
-        const second = await rig.yoursOnAccepted({ "a.txt": "two\n" })
+        const first = await rig.repoOnAccepted({ "a.txt": "one\n" })
+        const second = await rig.repoOnAccepted({ "a.txt": "two\n" })
         const states = rig.graph().states.size
         expect(await rig.restore(first, first)).toEqual({
           kind: "refused",
@@ -806,8 +806,8 @@ describe.skipIf(!onBtrfs)(
     test("a restore stopped after its last link is finished at the next start, its snapshot made then", async () => {
       const rig = await makeRig()
       try {
-        const first = await rig.yoursOnAccepted({ "a.txt": "one\n" })
-        const second = await rig.yoursOnAccepted({ "a.txt": "two\n" })
+        const first = await rig.repoOnAccepted({ "a.txt": "one\n" })
+        const second = await rig.repoOnAccepted({ "a.txt": "two\n" })
         await rig.sweep(5)
         // The journal's writes: open, then before the move and after the link.
         rig.stopJournalAfter(2)
@@ -828,8 +828,8 @@ describe.skipIf(!onBtrfs)(
     test("a restore stopped before its last link is put back, leaving no snapshot its record names", async () => {
       const rig = await makeRig()
       try {
-        const first = await rig.yoursOnAccepted({ "a.txt": "one\n" })
-        const second = await rig.yoursOnAccepted({ "a.txt": "two\n" })
+        const first = await rig.repoOnAccepted({ "a.txt": "one\n" })
+        const second = await rig.repoOnAccepted({ "a.txt": "two\n" })
         await rig.sweep(5)
         rig.stopJournalAfter(1)
         await expect(rig.restore(first, second)).rejects.toThrow("stopped")

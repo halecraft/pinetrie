@@ -152,7 +152,7 @@ describe("the owner of your repo", () => {
       all: false,
       acceptedMoved: false,
       published: true,
-      yours: false,
+      workingCopy: false,
       lanes: new Set(),
       proposed: new Set(),
     })
@@ -237,7 +237,7 @@ describe("the owner of your repo", () => {
       all: false,
       acceptedMoved: false,
       published: false,
-      yours: false,
+      workingCopy: false,
       lanes: new Set(),
       proposed: new Set(["amber-fox"]),
     })
@@ -302,7 +302,7 @@ describe("the owner of your repo", () => {
     const count = moves.length
     await jj("describe", "-m", "yours")
     expect(await waitFor(() => moves.length > count)).toBe(true)
-    expect(moves.at(-1)).toMatchObject({ all: false, yours: true })
+    expect(moves.at(-1)).toMatchObject({ all: false, workingCopy: true })
     close(owner)
   })
 

@@ -37,7 +37,7 @@ import {
   planRefresh,
   planStack,
   planStackEnded,
-  planYourEdits,
+  planWorkingCopyEdits,
   proposedChangesRecord,
   proposedChangesSeen,
   renderableMessage,
@@ -65,7 +65,7 @@ const proposed: JjProposedChangesRecord = {
   files: ["a.txt", "b.txt"],
   conflicts: [],
   startConflicts: [],
-  yourEdits: [],
+  workingCopyEdits: [],
   described: true,
   edited: false,
   bookmark: "pinetrie-proposed/t-1",
@@ -148,7 +148,7 @@ describe("isAsShown", () => {
 })
 
 describe("planRefresh", () => {
-  const host = { reached: true, yoursChanged: false }
+  const host = { reached: true, othersChanged: false }
   const rev = (since = host) => ({ commit: TIP, changeId: "k", since })
   const read = (
     o: Partial<Extract<ProposedChangesInRepo, { kind: "present" }>> = {},
@@ -281,7 +281,7 @@ describe("planRefresh", () => {
         facts(
           read({
             marked: false,
-            revisions: [rev({ reached: true, yoursChanged: true })],
+            revisions: [rev({ reached: true, othersChanged: true })],
           }),
         ),
       ),
@@ -323,7 +323,7 @@ describe("planRefresh", () => {
     expect(plan(facts(read({ ledger: null })))).toBe("rebuild")
   })
   test("you edited it: a version of yours that changed a revision, a commit of yours between, or its bottom moved", () => {
-    const changed = { reached: true, yoursChanged: true }
+    const changed = { reached: true, othersChanged: true }
     expect(plan(facts(read({ revisions: [rev(changed)] })))).toBe("leave")
     expect(plan(facts(read({ revisions: [rev(changed), rev()] }), T2))).toBe(
       "leave",
@@ -335,7 +335,7 @@ describe("planRefresh", () => {
     expect(
       plan(
         facts(
-          read({ revisions: [rev({ reached: false, yoursChanged: false })] }),
+          read({ revisions: [rev({ reached: false, othersChanged: false })] }),
         ),
       ),
     ).toBe("leave")
@@ -358,7 +358,7 @@ describe("isWipLine, isProposedMoved, describeWanted", () => {
       {
         commit: TIP,
         changeId: "k",
-        since: { reached: true, yoursChanged: false },
+        since: { reached: true, othersChanged: false },
       },
     ],
     chained: true,
@@ -435,7 +435,7 @@ describe("records", () => {
       heads: { current: null, proposed: "builtin_immutable_heads() | …" },
       log: { current: null, proposed: "builtin_log() | …" },
       wips: [{ bookmark: "wip/x", commit: TIP, behind: 1, ahead: 2 }],
-      yours: {
+      workingCopy: {
         behind: 0,
         ahead: 0,
         catchUp: null,
@@ -625,7 +625,7 @@ describe("acceptanceDestinations", () => {
 
 describe("the proposed changes' policy over a gather", () => {
   const NAME = "amber-fox" as ThreadName
-  const NOT_YOURS = { reached: true, yoursChanged: false }
+  const HOST_ONLY = { reached: true, othersChanged: false }
   const START = commitId("s0")
   const NEW_TIP = commitId("t9")
   const NOW_COMMIT = commitId("c5")
@@ -650,7 +650,7 @@ describe("the proposed changes' policy over a gather", () => {
     kind: "present",
     bookmark: `pinetrie-proposed/${NAME}`,
     marked: true,
-    revisions: [{ commit: NOW_COMMIT, changeId: "kxyz", since: NOT_YOURS }],
+    revisions: [{ commit: NOW_COMMIT, changeId: "kxyz", since: HOST_ONLY }],
     chained: true,
     ledger: { source: TIP, start: [START] },
     firstLine: `WIP (${NAME}): fix it`,
@@ -700,7 +700,7 @@ describe("the proposed changes' policy over a gather", () => {
         files: ["a.txt"],
         conflicts: [],
         startConflicts: [],
-        yourEdits: ["a.txt"],
+        workingCopyEdits: ["a.txt"],
         described: false,
         edited: false,
         bookmark: "pinetrie-proposed/amber-fox",
@@ -719,27 +719,27 @@ describe("the proposed changes' policy over a gather", () => {
           place: { tip: TIP, start: [START] },
           editing: new Set(["b.txt", "c.txt"]),
           now: 1,
-        }).yourEdits,
+        }).workingCopyEdits,
       ).toEqual(["b.txt"])
     })
     test("described once its first line is not the WIP line; edited once a version of yours changed it", () => {
       expect(record(read({ firstLine: "fix: it" })).described).toBe(true)
-      const yours = read({
+      const edited = read({
         revisions: [
           {
             commit: NOW_COMMIT,
             changeId: "kxyz",
-            since: { reached: true, yoursChanged: true },
+            since: { reached: true, othersChanged: true },
           },
         ],
       })
-      expect(record(yours).edited).toBe(true)
+      expect(record(edited).edited).toBe(true)
     })
     test("a stack is stale when the lane moved past its ledger; single proposed changes never are", () => {
       const stack = read({
         revisions: [
-          { commit: commitId("b1"), changeId: "kb", since: NOT_YOURS },
-          { commit: commitId("b2"), changeId: "kt", since: NOT_YOURS },
+          { commit: commitId("b1"), changeId: "kb", since: HOST_ONLY },
+          { commit: commitId("b2"), changeId: "kt", since: HOST_ONLY },
         ],
       })
       expect(record(stack, NEW_TIP).stale).toBe(true)
@@ -748,13 +748,17 @@ describe("the proposed changes' policy over a gather", () => {
     })
   })
 
-  test("planYourEdits: each record's files that @ changes, open and held alike, until it is accepted", () => {
-    const open = { ...proposed, files: ["a.txt", "b.txt"], yourEdits: [] }
+  test("planWorkingCopyEdits: each record's files that @ changes, open and held alike, until it is accepted", () => {
+    const open = {
+      ...proposed,
+      files: ["a.txt", "b.txt"],
+      workingCopyEdits: [],
+    }
     const held = {
       ...proposed,
       lane: threadIdFor("2"),
       files: [],
-      yourEdits: ["x"],
+      workingCopyEdits: ["x"],
     }
     const accepted = {
       ...proposed,
@@ -762,18 +766,18 @@ describe("the proposed changes' policy over a gather", () => {
       acceptedAs: "kt",
     }
     expect(
-      planYourEdits([open, held, accepted], new Set(["b.txt", "c.txt"])),
+      planWorkingCopyEdits([open, held, accepted], new Set(["b.txt", "c.txt"])),
     ).toEqual([
-      { ...open, yourEdits: ["b.txt"] },
-      { ...held, yourEdits: [] },
+      { ...open, workingCopyEdits: ["b.txt"] },
+      { ...held, workingCopyEdits: [] },
     ])
   })
 
   describe("planAcceptance", () => {
     const o = read({
       revisions: [
-        { commit: commitId("b1"), changeId: "kbot", since: NOT_YOURS },
-        { commit: commitId("b2"), changeId: "ktop", since: NOT_YOURS },
+        { commit: commitId("b1"), changeId: "kbot", since: HOST_ONLY },
+        { commit: commitId("b2"), changeId: "ktop", since: HOST_ONLY },
       ],
     })
     const WIP_BASE = {
@@ -897,7 +901,7 @@ describe("the proposed changes' policy over a gather", () => {
           proposed: read({
             ...o,
             revisions: [
-              { commit: commitId("c9"), changeId: "ktop", since: NOT_YOURS },
+              { commit: commitId("c9"), changeId: "ktop", since: HOST_ONLY },
             ],
           }),
         },
@@ -912,7 +916,7 @@ describe("the proposed changes' policy over a gather", () => {
               {
                 commit: commitId("c9"),
                 changeId: "ktop",
-                since: { reached: true, yoursChanged: true },
+                since: { reached: true, othersChanged: true },
               },
             ],
           }),

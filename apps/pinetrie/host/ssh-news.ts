@@ -1,6 +1,6 @@
 // host/ssh-news — a lane is told each change to its use of its owner's ssh
-// (`AccessNews`, from lane work's `onSshNews`): a request, a refusal and a
-// revoke as facts, steered into its run or appended; an approval as its
+// (`AccessNews`, from lane work's `onSshNews`): a request, a denial and a
+// take-back as facts, steered into its run or appended; an allowance as its
 // owner's carry-on, which wakes it (`planSshNews`). Each is a late step on
 // the lane's thread, so a thread out of reach is skipped by its gate, and
 // is placed by the delivery an answer uses.

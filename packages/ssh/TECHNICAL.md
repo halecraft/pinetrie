@@ -60,9 +60,9 @@ OpenSSH behaves was measured there, against OpenSSH 10.0p2.
 - **A personal key asks** the app's policy, naming the host the session was
   bound to: as the lane's `known_hosts` names its key, else the broker's
   newest name for the lane, else the key's fingerprint. The app answers at
-  once, and the relay holds nothing: a key not yet approved is refused,
+  once, and the relay holds nothing: a key not yet allowed is refused,
   the request waits in the lane's record for its owner, however long, and
-  an approval wakes the lane to try again (ADR-0178).
+  an allowance wakes the lane to try again (ADR-0178).
 - **Narrowed personal hosts are enforced by host key, not by config.** A
   personal sign is refused unless its session (the first string of a
   login's data) was bound to a key from the person's kept `known_hosts`
@@ -121,7 +121,7 @@ OpenSSH behaves was measured there, against OpenSSH 10.0p2.
 - **The app is asked one question,** `mayUsePersonal(lane, host)`, which it
   answers at once (ADR-0178), and told two things: `used` (a service
   identity signed, the broker connected a name) and `outside` (a personal
-  signature refused for a host not allowed). Approvals and records are the
+  signature refused for a host not allowed). Answers and records are the
   app's: the package never sees a thread.
 - **An agent connection is relayed one request at a time,** as the protocol
   is, each lane connection with its own connections to the service agent
@@ -145,7 +145,7 @@ OpenSSH behaves was measured there, against OpenSSH 10.0p2.
   container's `/run` outlives its stop. So a socket file proves no hop
   listens: wait until `ssh-add -l` stops exiting 2 ("cannot connect").
 - **The hop's `connect` ends with the host's end of its connection,**
-  whatever is left of its input: a revoke's cut, or the remote's close.
+  whatever is left of its input: a take-back's cut, or the remote's close.
   Its socket allows half-open, and ssh never half-closes a session, so
   waiting for its input to end would leave it running after a cut.
 

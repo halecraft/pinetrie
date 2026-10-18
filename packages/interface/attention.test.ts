@@ -405,9 +405,7 @@ test("attentionWords: each reason, as a value worded once", () => {
   expect(of({ kind: "failed", error: "rate limited" })).toBe(
     "the run failed: rate limited",
   )
-  expect(of({ kind: "unclassified" })).toBe(
-    "the run ended; pine·trie could not tell what it needs",
-  )
+  expect(of({ kind: "unclassified" })).toBe("finished: have a look")
   expect(attentionWords({ kind: "ready", source: null }, nameOf)).toBe(
     "changes ready to accept",
   )

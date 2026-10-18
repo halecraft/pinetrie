@@ -8,6 +8,7 @@ import {
   catchUpName,
   incomingWords,
 } from "./catch-up-from.ts"
+import { count } from "./counts.ts"
 import { List, PointSchema, ThreadIdSchema, WriterIdSchema } from "./decode.ts"
 import { type HistoryMessage, historyMessage } from "./history.ts"
 
@@ -32,12 +33,9 @@ export type UpdateMessage = HistoryMessage<"pinetrie.update", UpdateDetails>
 /** A stored message -> its update details, or undefined if it is not one. */
 export const decodeUpdate = UPDATE.decode
 
-const plural = (n: number, one: string, many: string) =>
-  `${n} ${n === 1 ? one : many}`
-
 /** The one line a column shows for an update. */
 export const updateLine = (d: UpdateDetails): string =>
-  `↓ caught up with ${catchUpName(d.from)}: ${d.files.length === 0 ? "no file" : plural(d.files.length, "file", "files")} changed`
+  `↓ caught up with ${catchUpName(d.from)}: ${d.files.length === 0 ? "no file" : count(d.files.length, "file", "files")} changed`
 
 /**
  * What came in to a folder lane, as a catch-up's titles: a folder project's

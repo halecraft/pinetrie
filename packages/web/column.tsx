@@ -91,6 +91,7 @@ import {
   type ReadOnly,
   type ReserveStep,
   type RowMemory,
+  reviewToggleTitle,
   type ScreenMemory,
   type SeenEnd,
   type SpotStore,
@@ -1672,16 +1673,16 @@ function WorkStripView({
   return (
     <div className="work work-strip" data-state={strip.state}>
       {strip.review === null ? (
-        <span className="work-line">{words.line}</span>
+        <span className="work-line" title={words.lineTitle ?? undefined}>
+          {words.line}
+        </span>
       ) : (
         <button
           aria-controls={review.id}
           aria-expanded={review.open}
           className="work-line"
           onClick={review.toggle}
-          title={
-            review.open ? "close the review" : "review what adding it brings"
-          }
+          title={reviewToggleTitle(review.open)}
           type="button"
         >
           {words.line}

@@ -66,7 +66,7 @@ export function madeWords(
         : `restored the version of ${whenWords(of.at)}`
     }
     case "concurrent":
-      return "written through a file held open across an accept"
+      return "saved by an app while changes were accepted"
     // A lane's own states are never on accepted work's line.
     case "start":
     case "turn":
@@ -141,7 +141,7 @@ export const restoreWords = {
   preview: (when: string) =>
     `restoring writes the version of ${when} into the project's folder: these are its changes from what the folder holds now`,
   review: "what it changed",
-  empty: "no states yet: the project's folder has not been read",
+  empty: "no history yet: the project's folder has not been read",
 } as const
 
 /** Your restore as the history says it: out now, or what it was refused or failed with. */

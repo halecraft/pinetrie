@@ -829,7 +829,7 @@ describe("planIntent", () => {
     const where = atEntry(entryId("3-b"))
     const ada = writerId("ada@x.test")
     const c = cardIdFor("c1")
-    const yours: TextCard = {
+    const mine: TextCard = {
       kind: "text",
       id: cardIdFor("c105"),
       owner: ada,
@@ -853,7 +853,7 @@ describe("planIntent", () => {
     const withCard = (place: TextPlace) =>
       ({
         ...NO_CARDS,
-        cards: [{ ...yours, id: c, place }],
+        cards: [{ ...mine, id: c, place }],
       }) satisfies CardFacts
     test("a queue is one queueCard, onto its lane, with the hold change asked, said in the column; with no card, nothing", () => {
       const queue = column({
@@ -907,7 +907,7 @@ describe("planIntent", () => {
     test("a reorder moves the card one place among the list as drawn; at an edge, or past a fact, nothing", () => {
       const q = (id: string, order: string) =>
         ({
-          ...yours,
+          ...mine,
           id: textCardId(id),
           place: { ...queuedPlace, order },
         }) satisfies CardRecord
@@ -969,7 +969,7 @@ describe("planIntent", () => {
         plan(
           column({
             kind: "queueNew",
-            card: yours.id,
+            card: mine.id,
             command: "bring-up-to-date",
             hold: "keep",
             lane,
@@ -980,7 +980,7 @@ describe("planIntent", () => {
         {
           kind: "queueCard",
           move: {
-            card: yours.id,
+            card: mine.id,
             from: null,
             to: { kind: "queued", thread: lane, seen: "" },
           },
@@ -991,8 +991,8 @@ describe("planIntent", () => {
       ])
     })
     test("a card handed to its list is armed to take focus there", () => {
-      expect(plan(column({ kind: "focusCard", card: yours.id }))).toEqual([
-        { kind: "armFocus", key: { kind: "card", card: yours.id } },
+      expect(plan(column({ kind: "focusCard", card: mine.id }))).toEqual([
+        { kind: "armFocus", key: { kind: "card", card: mine.id } },
       ])
     })
     test("+ add to queue makes its card held in the queue, its box armed to take focus", () => {
@@ -1000,7 +1000,7 @@ describe("planIntent", () => {
         plan(
           column({
             kind: "queueNew",
-            card: yours.id,
+            card: mine.id,
             command: null,
             hold: "hold-if-idle",
             lane,
@@ -1011,7 +1011,7 @@ describe("planIntent", () => {
         {
           kind: "queueCard",
           move: {
-            card: yours.id,
+            card: mine.id,
             from: null,
             to: { kind: "queued", thread: lane, seen: "" },
           },
@@ -1019,7 +1019,7 @@ describe("planIntent", () => {
           command: null,
           how: inColumn,
         },
-        { kind: "armFocus", key: { kind: "card", card: yours.id } },
+        { kind: "armFocus", key: { kind: "card", card: mine.id } },
       ])
     })
     test("proposed changes' other buttons are one command each", () => {
@@ -1032,7 +1032,7 @@ describe("planIntent", () => {
         plan(
           column({
             kind: "queueNew",
-            card: yours.id,
+            card: mine.id,
             command: "continue-on-accepted",
             hold: "keep",
             lane,
@@ -1336,7 +1336,7 @@ describe("a press on a proposal", () => {
     const [mine, untouched, cleared] = BRANCHES
     if (mine === undefined || untouched === undefined || cleared === undefined)
       throw new Error("three threads")
-    const yours = (id: string, thread: typeof mine): TextCard => ({
+    const myCard = (id: string, thread: typeof mine): TextCard => ({
       kind: "text",
       id: cardIdFor(id),
       owner: ME,
@@ -1350,7 +1350,7 @@ describe("a press on a proposal", () => {
     ])
     const cards = {
       ...NO_CARDS,
-      cards: [yours("c-mine", mine), yours("c-gone", cleared)],
+      cards: [myCard("c-mine", mine), myCard("c-gone", cleared)],
     }
     const effects = plan(
       press({

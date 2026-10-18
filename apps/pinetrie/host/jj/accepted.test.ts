@@ -5,13 +5,15 @@ import { describe, expect, test } from "vitest"
 import { applyWrites, basics, record } from "../fakes.ts"
 import { createAcceptedWork } from "./accepted.ts"
 
-const facts = (over: Partial<AcceptedFacts["yours"]> = {}): AcceptedFacts => ({
+const facts = (
+  over: Partial<AcceptedFacts["workingCopy"]> = {},
+): AcceptedFacts => ({
   commit: commitId("c1"),
   heads: null,
   log: null,
   wips: [],
   published: { commit: commitId("m0"), behind: 1, ahead: 0 },
-  yours: {
+  workingCopy: {
     behind: 1,
     ahead: 0,
     catchUp: { changes: 1, conflicts: [], heads: 0 },
@@ -90,7 +92,7 @@ describe("a publish with publish.catchUp on, in two rounds", () => {
       facts({ behind: 0, ahead: 1, conflicts: { commits: 1, files: [] } }),
     )
     const answer = await line.act("publish")
-    expect(answer?.code).toBe(ERR.YOURS_CONFLICT)
+    expect(answer?.code).toBe(ERR.WORKING_COPY_CONFLICT)
     expect(argv()).toEqual([
       ['rebase -b @ -d "pinetrie-accepted"'],
       ["op revert op-catch-up"],

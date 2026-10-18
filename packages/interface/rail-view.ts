@@ -7,6 +7,9 @@ import type { SearchResult } from "./search.ts"
 import { itemMatches } from "./search-view.ts"
 import type { WorkStats } from "./work-stats.ts"
 
+/** The rail, as a screen reader names it. */
+export const RAIL_LABEL = "this canvas's conversation map"
+
 /**
  * The messages this view draws on their own, never inside a stretch: thread
  * ends someone else is reading, running lanes' tips, each open
@@ -98,7 +101,7 @@ export interface RailMarks {
   /** On an open column's path: `data-open`. A stretch's first message speaks for it. */
   readonly open: boolean
   /** Your colour when an unsent card of yours waits here, else null. */
-  readonly yours: string | null
+  readonly mine: string | null
   /**
    * How many of its messages a search finds (`itemMatches`): 0 to dim it, null
    * while not searching.
@@ -113,7 +116,7 @@ export function railItems<
   items: readonly I[],
   facts: {
     readonly open: ReadonlySet<EntryId>
-    readonly yours: {
+    readonly mine: {
       readonly ends: ReadonlySet<EntryId>
       readonly color: string
     }
@@ -126,7 +129,7 @@ export function railItems<
       item,
       {
         open: facts.open.has(id),
-        yours: facts.yours.ends.has(id) ? facts.yours.color : null,
+        mine: facts.mine.ends.has(id) ? facts.mine.color : null,
         matches: itemMatches(item.ids, facts.matches),
       },
     ] as const

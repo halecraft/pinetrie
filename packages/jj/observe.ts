@@ -35,8 +35,8 @@ export interface Fingerprint {
  * `acceptedMoved`: accepted work's bookmark moved since an earlier observation,
  * which the base snapshot follows; never on the first, since startup reads the
  * base itself. `published`: the publish bookmark moved, which changes only
- * accepted work's record, since no proposed changes depend on it. `yours`: `@`
- * moved, which changes only each record's `yourEdits` and accepted work's
+ * accepted work's record, since no proposed changes depend on it. `workingCopy`: `@`
+ * moved, which changes only each record's `workingCopyEdits` and accepted work's
  * preview. `lanes`: lanes' refs moved. `proposed`: the threads whose proposed
  * bookmarks moved, by name.
  */
@@ -44,7 +44,7 @@ export interface Moved {
   readonly all: boolean
   readonly acceptedMoved: boolean
   readonly published: boolean
-  readonly yours: boolean
+  readonly workingCopy: boolean
   readonly lanes: ReadonlySet<ThreadId>
   readonly proposed: ReadonlySet<ThreadName>
 }
@@ -151,7 +151,7 @@ export function planObserve(
     all,
     acceptedMoved,
     published: published,
-    yours: prev === null || prev.at !== next.at,
+    workingCopy: prev === null || prev.at !== next.at,
     lanes,
     proposed,
   }

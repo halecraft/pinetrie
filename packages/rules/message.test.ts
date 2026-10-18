@@ -722,7 +722,7 @@ describe("promptAuthor", () => {
         planResolution({
           floor: floor(),
           files: [],
-          details: { lane: threadIdFor("1"), yours: [], by: ADA },
+          details: { lane: threadIdFor("1"), merged: [], by: ADA },
           timestamp: 1,
         }),
       ),
@@ -749,7 +749,7 @@ describe("promptAuthor", () => {
     expect(
       promptAuthor(
         planSshNews(
-          { kind: "approved", host: "hql", owner: ADA },
+          { kind: "allowed", host: "hql", owner: ADA },
           threadIdFor("1"),
           "Ada",
           1,

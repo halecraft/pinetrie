@@ -24,7 +24,7 @@ import {
   pinnedMarkerWords,
   pinnedStatusWords,
   retiredWords,
-  sizeWords,
+  tokenSizeWords,
   traceWords,
   unsentWords,
   writtenWords,
@@ -157,8 +157,8 @@ describe("pinned card words", () => {
       "changed since the agent last read it",
     ],
     ["unread", pinnedStatusWords("unread"), "not read by the agent yet"],
-    ["one token", sizeWords(1), "~1 token"],
-    ["tokens", sizeWords(120), "~120 tokens"],
+    ["one token", tokenSizeWords(1), "~1 token"],
+    ["tokens", tokenSizeWords(120), "~120 tokens"],
     [
       "a marker, one card",
       pinnedMarkerWords({ cards: [card], retired: [] }),
@@ -207,14 +207,14 @@ describe("history and traces", () => {
     [event({ kind: "created", by: ME, from: null }), "created by you"],
     [event({}), "queued by Bea"],
     [event({ from: queued, to: atEnd }), "unqueued by Bea"],
-    [event({ to: { kind: "inventory", holder: BEA } }), "taken by Bea"],
+    [event({ to: { kind: "inventory", holder: BEA } }), "put away by Bea"],
     [
       event({ kind: "undone", from: queued, to: atEnd }),
       "unqueued by Bea (an undo)",
     ],
     [
       event({ kind: "unsent", by: null, from: queued, to: atEnd }),
-      "not sent: back below the line",
+      "not sent: back in your message box",
     ],
   ] as const)("historyWords: %o", (e, words) => {
     expect(historyWords(e, READER)).toBe(words)
@@ -233,10 +233,7 @@ describe("history and traces", () => {
   test.each([
     [{ by: BEA, verb: "queued", traces: [trace(queued)] }, "Bea queued this"],
     [{ by: BEA, verb: "sent", traces: [trace(null)] }, "Bea sent this →"],
-    [
-      { by: BEA, verb: "took-into-inventory", traces: [trace(null)] },
-      "Bea took this",
-    ],
+    [{ by: BEA, verb: "put-away", traces: [trace(null)] }, "Bea put this away"],
     [
       {
         by: BEA,

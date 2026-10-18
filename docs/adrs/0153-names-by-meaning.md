@@ -8,6 +8,9 @@
   - ADR-0104: the ledger's commits are accepted thread commits.
   - ADR-0047: the review's routes and asks are the review's, not the offer's.
   - ADR-0091: an inbox item ready to accept is `ready` in code too.
+- **Amended by:**
+  - ADR-0172: the identifier `yours` it left in place takes a name per meaning
+    (`workingCopy`, `repo`, `other`, `merged`, `mine`).
 
 **Context.** *Offer* appears about 3,500 times in the code, the docs and
 the agent's orientation, and it means eight things:

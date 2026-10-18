@@ -65,7 +65,7 @@ describe("historyView", () => {
   test("a concurrent save shows under its accept", () => {
     const { entries } = view(["restore-a", "concurrent-a", "shown-a"])
     expect(entries[1]?.saves.map(s => [s.id, s.words])).toEqual([
-      ["concurrent-a", "written through a file held open across an accept"],
+      ["concurrent-a", "saved by an app while changes were accepted"],
     ])
   })
 
@@ -85,7 +85,7 @@ test("madeWords: each way accepted work's state is made", () => {
     "saved in the project's folder",
     "saved in the project's folder",
     "accepted amber-fox's changes",
-    "written through a file held open across an accept",
+    "saved by an app while changes were accepted",
     `restored the version of ${whenWords(3)}`,
   ])
 })

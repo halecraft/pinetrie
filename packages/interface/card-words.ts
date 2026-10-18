@@ -55,6 +55,17 @@ const commandFrom = (
 /** A split's words: the button's, and above a card that carries it. */
 const SPLIT = "split into a stack"
 
+/**
+ * A command in a word or two, where no thread can be named: a card's face, and
+ * the send button of a card that carries it (`commandWords` names the thread).
+ */
+export const COMMAND_VERB: Readonly<Record<CardCommand, string>> = {
+  "bring-up-to-date": "catch up",
+  "continue-on-accepted": "continue",
+  "catch-up-with-parent": "catch up with parent",
+  split: "split",
+}
+
 const fromName = (from: CatchUpFrom | null) =>
   from === null ? "the thread this one branched from" : catchUpName(from)
 
@@ -144,11 +155,11 @@ export function noticeWords(notice: CardNotice, reader: Reader): string {
         : `not moved: ${who(by, reader)} moved it first`
     case "full":
       return "inventory full"
-    case "not-yours":
+    case "someone-elses":
       return "not moved: that inventory is someone else's"
     // A reorder of a fact's card, or one that would pass it: it stays put.
     case "fact":
-      return "not moved: a note the thread will read keeps its place"
+      return "not moved: a card the agent is about to read keeps its place"
     case "order-changed":
       return "not moved: the cards around it changed first"
     case "replied":
@@ -175,11 +186,11 @@ export const CLOSE_INVENTORY = {
   title: "close your inventory (Esc)",
 } as const
 /** Take into your inventory: one name and one key wherever it is offered. */
-export const TAKE = "take into your inventory (Ctrl+Shift+I)"
+export const PUT_AWAY = "put away into your inventory (Ctrl+Shift+I)"
 /** The clipboard cell's button: its copy into a free slot. */
-export const KEEP = "keep"
-export const KEEP_TITLE =
-  "keep this in your inventory, in a free slot: a copy, as a paste makes"
+export const SAVE = "save to your inventory"
+export const SAVE_TITLE =
+  "save this in your inventory, in a free slot: a copy, as a paste makes"
 /** The clipboard cell's heading: what it shows, and that it knows no more. */
 export const CLIPBOARD_CELL = "last copied here"
 export const CLIPBOARD_CELL_TITLE =
@@ -187,7 +198,7 @@ export const CLIPBOARD_CELL_TITLE =
 /** The panel's button that puts the selected card in the column last focused. */
 export const PUT = "put"
 export const PUT_TITLE =
-  "put below the line in the column you were in (Ctrl+Shift+O)"
+  "put into your message box in the column you were in (Ctrl+Shift+O)"
 /** A card's trash button, drawn as a bin; the undo key brings it back. */
 export const DISCARD_CARD_TITLE =
   "trash (Ctrl+Shift+Backspace) · ⌘Z brings it back"
@@ -264,7 +275,7 @@ export const pinnedStatusWords = (status: PinnedStatus): string => {
 }
 
 /** A pinned card's size: what it costs on every run, quietly. */
-export const sizeWords = (tokens: number): string =>
+export const tokenSizeWords = (tokens: number): string =>
   `~${tokens} ${tokens === 1 ? "token" : "tokens"}`
 
 /** The marker above a run's prompt: how many pinned cards the agent read. */
@@ -306,7 +317,7 @@ const PARTICIPLE: Readonly<Record<Verb, string>> = {
   unqueued: "unqueued",
   pinned: "pinned",
   unpinned: "unpinned",
-  "took-into-inventory": "taken",
+  "put-away": "put away",
   put: "put",
   discarded: "discarded",
   moved: "moved",
@@ -319,7 +330,7 @@ export function historyWords(event: CardEvent, reader: Reader): string {
     case "created":
       return `created${by}`
     case "unsent":
-      return "not sent: back below the line"
+      return "not sent: back in your message box"
     case "moved":
     case "undone":
     case "redone": {
@@ -335,18 +346,18 @@ export function historyWords(event: CardEvent, reader: Reader): string {
   }
 }
 
-/** A verb as its doer does it: "Bea queued this", "Carl took this". */
+/** A verb as its doer does it, with what it did it to: "Bea queued this", "Carl put this away". */
 const ACTIVE: Readonly<Record<Verb, string>> = {
-  created: "created",
-  sent: "sent",
-  queued: "queued",
-  unqueued: "unqueued",
-  pinned: "pinned",
-  unpinned: "unpinned",
-  "took-into-inventory": "took",
-  put: "put",
-  discarded: "discarded",
-  moved: "moved",
+  created: "created this",
+  sent: "sent this",
+  queued: "queued this",
+  unqueued: "unqueued this",
+  pinned: "pinned this",
+  unpinned: "unpinned this",
+  "put-away": "put this away",
+  put: "put this",
+  discarded: "discarded this",
+  moved: "moved this",
 }
 
 /**
@@ -358,7 +369,7 @@ export function traceWords(group: TraceGroup, reader: Reader): string {
   const n = group.traces.length
   if (n > 1) return `${n} cards ${PARTICIPLE[group.verb]} by ${name}`
   const arrow = group.verb === "sent" ? " →" : ""
-  return `${name} ${ACTIVE[group.verb]} this${arrow}`
+  return `${name} ${ACTIVE[group.verb]}${arrow}`
 }
 
 /** A card someone else moved back below the line: "unqueued by Bea". */

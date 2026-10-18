@@ -71,7 +71,7 @@ const SAMPLES: Record<CustomType, unknown> = {
   },
   "pinetrie.land": {
     lane: LANE,
-    yours: [C],
+    merged: [C],
     files: ["a.ts"],
     skill: { path: "/s", hash: "h" },
     by: ADA,
@@ -95,7 +95,7 @@ const SAMPLES: Record<CustomType, unknown> = {
     lane: LANE,
     by: ADA,
     name: "Ada",
-    reason: { kind: "ssh-approved", host: "hql" },
+    reason: { kind: "ssh-allowed", host: "hql" },
   },
   "pinetrie.pinned": {
     lane: LANE,

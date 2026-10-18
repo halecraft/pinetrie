@@ -264,7 +264,7 @@ export function planSettle(
               reasons: touching(facts.theirs, path).map(d => firstLine(d, 200)),
             },
           })),
-          details: { lane, yours: [facts.from], by },
+          details: { lane, merged: [facts.from], by },
           timestamp: ctx.now,
         }),
       }

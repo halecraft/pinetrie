@@ -15,6 +15,7 @@ import type {
 import { Type } from "typebox"
 import { type CardOnCanvas, isCardOnCanvas } from "./canvas-index.ts"
 import type { CardTitleRecord } from "./card-title.ts"
+import { count, noteCountWords } from "./counts.ts"
 import { CanvasIdSchema, List, WriterIdSchema } from "./decode.ts"
 import { type HistoryMessage, historyMessage } from "./history.ts"
 import { type ImageInColumn, imagesIn } from "./media.ts"
@@ -72,13 +73,6 @@ const STATE_WORDS: Readonly<Record<AgentWork, string>> = {
   waiting: "waiting",
   held: "held",
 }
-
-const notesWords = (n: number): string => (n === 1 ? "1 note" : `${n} notes`)
-
-const imagesWords = (n: number): string => (n === 1 ? "1 image" : `${n} images`)
-
-const versionsWords = (n: number): string =>
-  n === 1 ? "1 version" : `${n} versions`
 
 /** How many images a media column's line names; the rest are counted. */
 export const MEDIA_LINE_CAP = 12
@@ -140,7 +134,10 @@ export function columnGlances(input: {
 const imagesLine = (images: readonly ImageGlance[]): string => {
   const named = images
     .slice(0, MEDIA_LINE_CAP)
-    .map(i => `"${i.title}" (${i.id}, ${versionsWords(i.versions)})`)
+    .map(
+      i =>
+        `"${i.title}" (${i.id}, ${count(i.versions, "version", "versions")})`,
+    )
   const more = images.length - named.length
   return [...named, ...(more > 0 ? [`and ${more} more`] : [])].join(", ")
 }
@@ -162,7 +159,7 @@ function cardLine(c: CardOnCanvas, f: CanvasFacts): string {
       const g = f.glances.get(c.id)
       const title = g?.title ?? NEW_NOTES_TITLE
       const notes = g?.kind === "note-column" ? g.notes : 0
-      return `note column "${title}", ${notesWords(notes)}, ${by}`
+      return `note column "${title}", ${noteCountWords(notes)}, ${by}`
     }
     case "media": {
       const g = f.glances.get(c.id)
@@ -170,7 +167,7 @@ function cardLine(c: CardOnCanvas, f: CanvasFacts): string {
       const images = g?.kind === "media" ? g.images : []
       return images.length === 0
         ? `media column "${title}", no images, ${by}`
-        : `media column "${title}", ${imagesWords(images.length)}: ${imagesLine(images)}, ${by}`
+        : `media column "${title}", ${count(images.length, "image", "images")}: ${imagesLine(images)}, ${by}`
     }
     // A new kind of canvas card does not compile until it has its line.
     default:

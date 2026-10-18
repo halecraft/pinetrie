@@ -62,7 +62,8 @@ export interface FileRow {
   /** Lines added and removed, together. */
   readonly changed: number
   readonly conflicts: boolean
-  readonly yours: boolean
+  /** `@` changes it too: you are editing it in your working copy. */
+  readonly editing: boolean
   /** More than `COLLAPSE_OVER` changed lines: it waits to be opened. */
   readonly startsCollapsed: boolean
   /** The placeholder's height, in diff lines, before the diff loads. */
@@ -130,11 +131,17 @@ interface ReviewView {
   }[]
 }
 
+/** A revision the review reads: while it reads, or why it could not. */
+export const revisionReadWords = (failed: string | null): string =>
+  failed === null
+    ? "reading this revision…"
+    : `could not read this revision: ${failed}`
+
 /** What a revision's `pinetrie.json` would let every lane do once accepted, in one line; "" for nothing. */
 export const wideningLine = (widenings: readonly ConfigWidening[]): string =>
   widenings.length === 0
     ? ""
-    : `Accepting this lets lanes use ${widenings.map(wideningWords).join(", ")}.`
+    : `Accepting this lets threads use ${widenings.map(wideningWords).join(", ")}.`
 
 const LETTER: Record<FileChange, FileRow["letter"]> = {
   added: "A",
@@ -153,7 +160,7 @@ export function reviewView(
   revisions: readonly Loaded<RevisionReview>[],
 ): ReviewView {
   const conflicts = new Set(target.conflicts)
-  const yours = new Set(target.yourEdits)
+  const editing = new Set(target.workingCopyEdits)
   const shown: ReviewView["revisions"] = target.spans.map((span, i) => {
     const key = spanKey(span)
     const got = revisions[i] ?? { kind: "loading" }
@@ -176,7 +183,7 @@ export function reviewView(
           .join(" "),
         changed,
         conflicts: conflicts.has(f.path),
-        yours: yours.has(f.path),
+        editing: editing.has(f.path),
         startsCollapsed: changed > COLLAPSE_OVER,
         estimate: Math.min(
           DIFF_LINES_SHOWN,
@@ -195,7 +202,7 @@ export function reviewView(
           title:
             (cut < 0 ? text : text.slice(0, cut)) ||
             target.title ||
-            "(no description)",
+            "(no summary)",
           body: cut < 0 ? "" : text.slice(cut + 1).trim(),
           widens: wideningLine(got.value.widenings),
           files,

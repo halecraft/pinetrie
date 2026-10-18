@@ -119,7 +119,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the host's newest version does not stop the walk",
     file: "packages/jj/plan.ts",
-    from: "    if (entry.byHost) return { reached: true, yours }\n",
+    from: "    if (entry.byHost) return { reached: true, other }\n",
     to: "",
     command: unit,
     expect: "walkToHost",
@@ -380,7 +380,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "marked proposed changes' evolog is read all the same",
     file: "packages/jj/plan.ts",
-    from: '  if (input.marked)\n    return { kind: "known", facts: { reached: true, yoursChanged: false } }\n',
+    from: '  if (input.marked)\n    return { kind: "known", facts: { reached: true, othersChanged: false } }\n',
     to: "",
     command: repoTest,
     expect: "unchanged proposed changes' refresh reads at most 2 jj processes",
@@ -487,8 +487,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a version of yours since the host's write goes unlisted",
     file: "packages/jj/plan.ts",
-    from: "    yours.push({ from: before.commit, to: at })",
-    to: "    if (false) yours.push({ from: before.commit, to: at })",
+    from: "    other.push({ from: before.commit, to: at })",
+    to: "    if (false) other.push({ from: before.commit, to: at })",
     command: unit,
     expect: "your versions since the host's newest are listed",
   },
@@ -611,8 +611,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the repair keeps the host's commit",
     file: "packages/jj/plan.ts",
-    from: '  rewrite("abandon", input.hosts),',
-    to: '  rewrite("abandon", input.yours),',
+    from: '  rewrite("abandon", input.host),',
+    to: '  rewrite("abandon", input.other),',
     command: unit,
     expect: "proposed changes on accepted work: built, immutable",
   },
@@ -699,8 +699,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "your @ moving is not noticed",
     file: "packages/jj/observe.ts",
-    from: "    yours: prev === null || prev.at !== next.at,",
-    to: "    yours: prev === null,",
+    from: "    workingCopy: prev === null || prev.at !== next.at,",
+    to: "    workingCopy: prev === null,",
     command: unit,
     expect: "@ alone moved",
   },
@@ -1379,8 +1379,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "jj's own rebase of proposed changes reads as your edit",
     file: "packages/jj/proposed.ts",
-    from: "    if (!step.sameDescription || !step.sameChange) yoursChanged = true",
-    to: "    if (step) yoursChanged = true",
+    from: "    if (!step.sameDescription || !step.sameChange) othersChanged = true",
+    to: "    if (step) othersChanged = true",
     suite: "lanes",
     scenario: "main",
     expect:

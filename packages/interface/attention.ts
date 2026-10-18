@@ -9,13 +9,13 @@ import type {
   ThreadId,
   WriterId,
 } from "@pinetrie/core"
-import { PRODUCT_NAME } from "@pinetrie/core"
 import type {
   RootRecord,
   RunEndReport,
   RunEndReportRecord,
 } from "@pinetrie/rules"
 import type { Attention } from "@pinetrie/schema"
+import { sshAskWords } from "./access-view.ts"
 import type { OpenProposedChanges, SshAsk } from "./app-view.ts"
 
 /** Lowest first: `highest` and every comparison read this order. */
@@ -172,7 +172,7 @@ export function standingRunEnds(
 export function attentionItems(input: AttentionInput): readonly Item[] {
   const { me, person } = input
   if (person.since === "") return []
-  const yours = (lane: ThreadId): boolean =>
+  const isMine = (lane: ThreadId): boolean =>
     !input.busy.has(lane) && followed(input, lane)
   const items: Item[] = []
   for (const { record: v, level, raised } of standingRunEnds(input).values()) {
@@ -185,7 +185,7 @@ export function attentionItems(input: AttentionInput): readonly Item[] {
     })
   }
   for (const o of input.openProposed) {
-    if (!yours(o.lane)) continue
+    if (!isMine(o.lane)) continue
     if (o.source !== null && person.dismissedReady.get(o.lane) === o.source)
       continue
     items.push({
@@ -339,7 +339,7 @@ export const moving = (at: number | null, now: number): boolean =>
   at !== null && now - at < ARRIVAL_MS
 
 /** Why the agent's end could not be told, in words. */
-const UNCLASSIFIED_WORDS = `the run ended; ${PRODUCT_NAME} could not tell what it needs`
+const UNCLASSIFIED_WORDS = "finished: have a look"
 
 /** A raised item's reason: a mark's title, an inbox row's line. */
 export function attentionWords(
@@ -347,8 +347,7 @@ export function attentionWords(
   nameOf: (writer: WriterId) => string,
 ): string {
   if (raised.kind === "ready") return "changes ready to accept"
-  if (raised.kind === "ssh")
-    return `wants your ssh for ${raised.host ?? "a host"}`
+  if (raised.kind === "ssh") return sshAskWords("your ssh", raised.host)
   const v = raised.report
   switch (v.kind) {
     case "modelSaid":

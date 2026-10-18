@@ -106,7 +106,7 @@ describe("inboxWords", () => {
       }),
     )
     expect(words.label).toBe(
-      "Inbox · 4 things need you: 1 run ended, 2 ready to accept, 1 unseen mention",
+      "Inbox · 4 things need you: 1 answer waiting, 2 ready to accept, 1 unseen mention",
     )
     expect(inboxWords(view()).label).toBe("Inbox · nothing needs you")
     expect(inboxWords(view({ items: [proposed("b")] })).heading).toBe(
