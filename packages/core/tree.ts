@@ -247,6 +247,8 @@ export interface ToolCall {
   readonly name: string
   /** What it touched, whole: a path, a command, or a search's pattern and path (`callSubject`). */
   readonly subject?: string
+  /** What it is for, in the model's plain words: the call's `intent`, which a tool that takes one requires. */
+  readonly intent?: string
   /** Its result, when the result is on the same path. */
   readonly result?: ToolResult
 }
@@ -436,7 +438,18 @@ export function entryMessage(
 /** One call, before its result is paired with it. */
 function callOf(id: string, name: string, args: unknown): ToolCall {
   const subject = callSubject(name, args)
-  return subject === undefined ? { id, name } : { id, name, subject }
+  const intent =
+    typeof args === "object" && args !== null && "intent" in args
+      ? args.intent
+      : undefined
+  return {
+    id,
+    name,
+    ...(subject === undefined ? {} : { subject }),
+    ...(typeof intent === "string" && intent.trim() !== ""
+      ? { intent: intent.trim() }
+      : {}),
+  }
 }
 
 /** The tool calls an assistant message makes, from its `toolCall` content parts; none for any other message. */

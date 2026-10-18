@@ -11,6 +11,14 @@ const trailers = "packages/core/trailers.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a call's intent goes unread",
+    file: "packages/core/tree.ts",
+    from: '    ...(typeof intent === "string" && intent.trim() !== ""\n',
+    to: '    ...(false && typeof intent === "string" && intent.trim() !== ""\n',
+    command: unit,
+    expect: "a call's intent is read from its arguments, for any tool",
+  },
+  {
     name: "a thread's chat is read as a revision",
     file: "packages/core/work.ts",
     from: "    if (record === undefined) continue\n",
@@ -688,8 +696,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a call keeps no subject",
     file: tree,
-    from: "  return subject === undefined ? { id, name } : { id, name, subject }",
-    to: "  return { id, name }",
+    from: "    ...(subject === undefined ? {} : { subject }),",
+    to: "",
     command: ["pnpm", "exec", "vitest", "run", "packages/core"],
     expect: "carries its whole subject",
   },

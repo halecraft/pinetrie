@@ -757,16 +757,18 @@ export {
   NO_MEMORY,
   REVEAL_MS,
   type RowBody,
+  type RowLead,
   type RowMemory,
   type RowSummary,
   type RowView,
   type Run,
+  rowLead,
   rowSummary,
   rowView,
   runningFor,
   toolBody,
 } from "./tool-row.ts"
-export { callLabel, toolWord } from "./tool-words.ts"
+export { callLabel, callPurpose, toolWord } from "./tool-words.ts"
 export {
   endTraces,
   keptTraces,

@@ -18,7 +18,7 @@ import {
 } from "@pinetrie/core"
 import { askStats, type Segment } from "./ask-segments.ts"
 import { outcomeWords, workWords } from "./ask-words.ts"
-import { callLabel } from "./tool-words.ts"
+import { callPurpose } from "./tool-words.ts"
 
 /** A column's messages as drawn: one on its own, or an ask's work together. */
 export type ColumnRow =
@@ -99,7 +99,7 @@ export interface AskView {
 const LIVE_LINE = 80
 
 /**
- * What it does now: the call its newest message made, while no result has
+ * What it does now: what the call its newest message made is for (`callPurpose`), while no result has
  * come after it; else the first line of its newest text.
  */
 function liveLine(
@@ -112,7 +112,7 @@ function liveLine(
   const message = newest === undefined ? null : entryMessage(index, newest)
   const call = message?.toolCalls?.at(-1)
   if (call !== undefined && asks.last.get(ask) === newest)
-    return callLabel(call, "cut")
+    return callPurpose(call)
   for (const id of work.toReversed()) {
     const line = firstLine(entryMessage(index, id)?.text ?? "", LIVE_LINE)
     if (line !== "") return line

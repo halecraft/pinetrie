@@ -5,7 +5,8 @@
 // A row is its summary or its detail. The summary shows the command's first
 // SUMMARY_LINES lines and the output's last, so the live output and the result
 // that replaces it draw the same height; only the reader opens the detail,
-// which shows both whole.
+// which shows both whole. In story, a call with an intent leads with it
+// (`rowLead`), its command in the detail alone.
 
 import {
   BASH_TOOL,
@@ -18,6 +19,7 @@ import {
   type ToolResult,
 } from "@pinetrie/core"
 import { readShell, type ShellRole } from "@pinetrie/shell"
+import type { Density } from "./ask-words.ts"
 import { elapsed, plural } from "./counts.ts"
 import { toolWord } from "./tool-words.ts"
 
@@ -96,7 +98,23 @@ export interface RowSummary {
   readonly tag: string | undefined
   /** All of what the call touched: a shell command highlighted, and laid out when it is one long line. */
   readonly whole: readonly Run[]
+  /** What the call is for, in the model's words; absent for a call that says none. */
+  readonly intent: string | undefined
 }
+
+/** What a tool row leads with: an intent it has, or its command. */
+export type RowLead =
+  | { readonly kind: "intent"; readonly intent: string }
+  | { readonly kind: "command" }
+
+/**
+ * What a row leads with at `density`: in story, a call's intent, when it has
+ * one; else its command, as raw always does.
+ */
+export const rowLead = (summary: RowSummary, density: Density): RowLead =>
+  density === "story" && summary.intent !== undefined
+    ? { kind: "intent", intent: summary.intent }
+    : { kind: "command" }
 
 /**
  * How many columns a shell command is laid out to. A command has its row's
@@ -117,13 +135,15 @@ const VIEWS: Readonly<Partial<Record<ToolId, (subject: string) => Run[]>>> = {
 /** What a call's row shows of what it touched; a row keeps it for its call. */
 export function rowSummary(call: ToolCall): RowSummary {
   const word = toolWord(call.name)
+  const { intent } = call
   if (call.subject === undefined)
-    return { tag: undefined, whole: [{ text: word, role: "plain" }] }
+    return { tag: undefined, whole: [{ text: word, role: "plain" }], intent }
   const id = knownToolId(call.name)
   const view = id === undefined ? undefined : VIEWS[id]
   return {
     tag: word,
     whole: view?.(call.subject) ?? [{ text: call.subject, role: "plain" }],
+    intent,
   }
 }
 
@@ -235,7 +255,11 @@ export type RowBody =
 
 /** Everything a row draws but its tag and status. */
 export interface RowView {
-  /** What the call touched, its head or whole. */
+  /** The intent it leads with, beside its tag (`rowLead`); null when it leads with its command. */
+  readonly head: string | null
+  /** Its intent, as a caption under its command, when it leads with the command; null for none. */
+  readonly caption: string | null
+  /** What the call touched: its first lines, all of it in the detail, none in a summary led by its intent. */
   readonly command: readonly Run[]
   readonly body: RowBody
   /** The toggle's words; undefined when the summary hides nothing. */
@@ -244,8 +268,8 @@ export interface RowView {
 
 /** What a summary hides, which its toggle names. */
 export interface Hidden {
-  /** The command's lines left out. */
-  readonly command: number
+  /** The command's lines left out; "all" when its intent stands for it. */
+  readonly command: number | "all"
   /** The output's lines left out. */
   readonly output: number
   /** A line shown, of either, was cut at LINE_LENGTH. */
@@ -257,7 +281,11 @@ export interface Hidden {
 /** The toggle's words: what the summary hides, or "less" in the detail; undefined when it hides nothing. */
 export function moreWords(hidden: Hidden, open: boolean): string | undefined {
   const lines = [
-    ...(hidden.command > 0 ? [`+${plural(hidden.command, "line")}`] : []),
+    ...(hidden.command === "all"
+      ? ["command"]
+      : hidden.command > 0
+        ? [`+${plural(hidden.command, "line")}`]
+        : []),
     ...(hidden.output > 0
       ? [`+${plural(hidden.output, "line")} of output`]
       : []),
@@ -274,16 +302,20 @@ export function moreWords(hidden: Hidden, open: boolean): string | undefined {
 const textOf = (runs: readonly Run[]) => runs.map(r => r.text).join("")
 
 /**
- * What a row draws, from what its call touched (`rowSummary`), its output's
- * text (the live stream's, or the result's), its body, and whether the
- * reader opened its detail.
+ * What a row draws, from what its call touched (`rowSummary`), what it leads
+ * with (`rowLead`), its output's text (the live stream's, or the result's),
+ * its body, and whether the reader opened its detail. Led by its intent, its
+ * summary shows no command, and the output's last lines still, so a row
+ * draws the same height before and after its result.
  */
 export function rowView(
   summary: RowSummary,
+  lead: RowLead,
   output: string,
   body: ToolBody,
   open: boolean,
 ): RowView {
+  const byIntent = lead.kind === "intent"
   const head = headLines(summary.whole)
   const tail =
     body.kind === "text"
@@ -292,13 +324,15 @@ export function rowView(
   const tall =
     body.kind === "images" && body.images.some(i => i.height > THUMB_HEIGHT)
   const hidden: Hidden = {
-    command: head.hidden,
+    command: byIntent ? "all" : head.hidden,
     output: tail.hidden,
-    cut: head.cut || tail.cut,
+    cut: (!byIntent && head.cut) || tail.cut,
     image: tall,
   }
   return {
-    command: open ? summary.whole : head.runs,
+    head: byIntent ? lead.intent : null,
+    caption: byIntent ? null : (summary.intent ?? null),
+    command: open ? summary.whole : byIntent ? [] : head.runs,
     body:
       body.kind === "images"
         ? { ...body, thumb: !open && tall }

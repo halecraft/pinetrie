@@ -14,6 +14,7 @@ import {
   moreWords,
   NO_MEMORY,
   type Run,
+  rowLead,
   rowSummary,
   rowView,
   runningFor,
@@ -170,25 +171,32 @@ describe("rowView", () => {
     subject,
   })
   const TEXT = { kind: "text" } as const
+  const COMMAND = { kind: "command" } as const
 
   test("the summary shows the command's head and the output's tail; the detail both whole", () => {
     const summary = rowSummary(call(numbered(9)))
     const output = numbered(300)
-    const closed = rowView(summary, output, TEXT, false)
+    const closed = rowView(summary, COMMAND, output, TEXT, false)
     expect(text(closed.command)).toBe(numbered(5))
     expect(closed.body).toEqual({
       kind: "text",
       text: "line 296\nline 297\nline 298\nline 299\nline 300",
     })
     expect(closed.more).toBe("+4 lines · +295 lines of output")
-    const open = rowView(summary, output, TEXT, true)
+    const open = rowView(summary, COMMAND, output, TEXT, true)
     expect(text(open.command)).toBe(numbered(9))
     expect(open.body).toEqual({ kind: "text", text: output })
     expect(open.more).toBe("less")
   })
 
   test("a short command with short output hides nothing, and has no toggle", () => {
-    const view = rowView(rowSummary(call("echo hi")), "hi\n", TEXT, false)
+    const view = rowView(
+      rowSummary(call("echo hi")),
+      COMMAND,
+      "hi\n",
+      TEXT,
+      false,
+    )
     expect(text(view.command)).toBe("echo hi")
     expect(view.body).toEqual({ kind: "text", text: "hi" })
     expect(view.more).toBeUndefined()
@@ -197,16 +205,16 @@ describe("rowView", () => {
   test("a tall image is a thumbnail in the summary, with full size; a short one is drawn whole, with no toggle", () => {
     const summary = rowSummary({ id: "c", name: "read", subject: "a.png" })
     const tall = toolBody(result([image(400)]))
-    expect(rowView(summary, "", tall, false)).toMatchObject({
+    expect(rowView(summary, COMMAND, "", tall, false)).toMatchObject({
       body: { kind: "images", thumb: true },
       more: "full size",
     })
-    expect(rowView(summary, "", tall, true)).toMatchObject({
+    expect(rowView(summary, COMMAND, "", tall, true)).toMatchObject({
       body: { kind: "images", thumb: false },
       more: "less",
     })
     const short = toolBody(result([image(100)]))
-    expect(rowView(summary, "", short, false)).toMatchObject({
+    expect(rowView(summary, COMMAND, "", short, false)).toMatchObject({
       body: { kind: "images", thumb: false },
       more: undefined,
     })
@@ -266,4 +274,70 @@ test("a running call's time counts from its stream's start, and next changes at 
   // A browser whose clock is behind the host's: no time before the start.
   expect(runningFor(stream, start - 2_500)).toEqual({ words: "0s", next: 1000 })
   expect(runningFor(streamId("id-0001"), start)).toBeUndefined()
+})
+
+describe("rowLead", () => {
+  const call = (subject: string): ToolCall => ({
+    id: "c",
+    name: "bash",
+    subject,
+  })
+  const TEXT = { kind: "text" } as const
+  const COMMAND = { kind: "command" } as const
+  test("story leads a row with its intent", () => {
+    const summary = rowSummary({
+      ...call("npx vitest run"),
+      intent: "Run the tests",
+    })
+    expect(rowLead(summary, "story")).toEqual({
+      kind: "intent",
+      intent: "Run the tests",
+    })
+    expect(rowLead(summary, "raw")).toEqual({ kind: "command" })
+    expect(rowLead(summary, "outline")).toEqual({ kind: "command" })
+    const view = rowView(
+      summary,
+      rowLead(summary, "story"),
+      "ok\n",
+      TEXT,
+      false,
+    )
+    expect(view).toMatchObject({
+      head: "Run the tests",
+      caption: null,
+      command: [],
+    })
+  })
+  test("raw shows the command, its intent a caption under it", () => {
+    const summary = rowSummary({
+      ...call("npx vitest run"),
+      intent: "Run the tests",
+    })
+    const view = rowView(summary, COMMAND, "ok\n", TEXT, false)
+    expect(view.head).toBeNull()
+    expect(view.caption).toBe("Run the tests")
+    expect(text(view.command)).toBe("npx vitest run")
+  })
+  test("a call with no intent reads as before", () => {
+    const summary = rowSummary(call("echo hi"))
+    expect(rowLead(summary, "story")).toEqual({ kind: "command" })
+    expect(rowView(summary, COMMAND, "hi\n", TEXT, false)).toMatchObject({
+      head: null,
+      caption: null,
+    })
+  })
+  test("the toggle names the hidden command", () => {
+    const summary = rowSummary({
+      ...call("npx vitest run"),
+      intent: "Run the tests",
+    })
+    const lead = rowLead(summary, "story")
+    expect(rowView(summary, lead, "ok\n", TEXT, false).more).toBe("command")
+    expect(rowView(summary, lead, numbered(300), TEXT, false).more).toBe(
+      "command · +295 lines of output",
+    )
+    const open = rowView(summary, lead, "ok\n", TEXT, true)
+    expect(text(open.command)).toBe("npx vitest run")
+    expect(open.more).toBe("less")
+  })
 })

@@ -10,6 +10,7 @@ import type {
 } from "@pinetrie/core"
 import type {
   CrossCanvasLink,
+  Density,
   LaneJoin,
   MessageAct,
   MessageTools,
@@ -33,6 +34,8 @@ export interface MessageProps {
   live: LiveDocHandle
   /** Each tool row's state, by call id, across unmounts. */
   rows: ScreenMemory<RowMemory>
+  /** The column's density, which a tool row leads by (`rowLead`). */
+  density: Density
   nameOf: ReadonlyMap<WriterId, string>
   /** Which tools it offers (`messageTools`). */
   tools: MessageTools
@@ -60,6 +63,7 @@ export interface MessageProps {
  */
 const MESSAGE_PROPS = {
   node: "value",
+  density: "value",
   streams: "value",
   live: "identity",
   rows: "identity",

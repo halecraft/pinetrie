@@ -122,7 +122,15 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
               tool: "read" as const,
               args: { path: "notes.txt" },
             })),
-            { tool: "bash", args: { command: gateCommand(held) } },
+            // Its intent names the gate, as its command does: in story the
+            // row leads with the intent, and is known by it.
+            {
+              tool: "bash",
+              args: {
+                intent: `Wait at ${held.fifo}`,
+                command: gateCommand(held),
+              },
+            },
             { text: reply },
           ])
           return held

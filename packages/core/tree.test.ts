@@ -23,6 +23,7 @@ import {
   knownToolId,
   type MessageAt,
   messageImages,
+  messageToolCalls,
   messageWriters,
   newestOnPath,
   type PinnedView,
@@ -932,4 +933,42 @@ test("entryMessage: the host's own messages show as their line; other roles are 
     text: "↻ resumed by Ada",
   })
   expect(entryMessage(index, entryId("3-x"))).toBeNull()
+})
+
+test("a call's intent is read from its arguments, for any tool", () => {
+  const calls = messageToolCalls({
+    role: "assistant",
+    content: [
+      {
+        type: "toolCall",
+        id: "a",
+        name: "bash",
+        arguments: { intent: " Run the tests ", command: "pnpm test" },
+      },
+      {
+        type: "toolCall",
+        id: "b",
+        name: "mystery",
+        arguments: { intent: "Do it" },
+      },
+      {
+        type: "toolCall",
+        id: "c",
+        name: "read",
+        arguments: { path: "a", intent: 3 },
+      },
+      {
+        type: "toolCall",
+        id: "d",
+        name: "bash",
+        arguments: { intent: " ", command: "ls" },
+      },
+    ],
+  })
+  expect(calls.map(c => c.intent)).toEqual([
+    "Run the tests",
+    "Do it",
+    undefined,
+    undefined,
+  ])
 })

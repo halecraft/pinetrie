@@ -225,6 +225,35 @@ describe("askView", () => {
       }).endedWhileAway,
     ).toBe(false)
   })
+  test("a running ask's line says what its call is for", () => {
+    const calling = indexEntries([
+      entry("1-p", null, personMessage),
+      entry("2-a", "1-p", {
+        role: "assistant",
+        content: [
+          {
+            type: "toolCall",
+            id: "c1",
+            name: "bash",
+            arguments: { intent: "Run the tests", command: "pnpm test" },
+          },
+        ],
+      }),
+    ])
+    expect(
+      askView({
+        index: calling,
+        asks: indexAsks(calling),
+        ask: entryId("1-p"),
+        runningAsk: entryId("1-p"),
+        lastEnded: null,
+        revisions: noRevisions,
+        digests: new Map(),
+        releasedPath: null,
+        nameOf: () => "Bea",
+      }).live,
+    ).toBe("Run the tests")
+  })
   test("running, it says what it is doing", () => {
     expect(view({ runningAsk: entryId("1-p") })).toMatchObject({
       running: true,

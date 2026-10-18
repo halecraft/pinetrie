@@ -79,3 +79,12 @@ export function callLabel(call: ToolCall, length: "cut" | "whole"): string {
   const { at, cut } = previewEnd(subject)
   return `${word} ${subject.slice(0, at)}${cut ? "…" : ""}`
 }
+
+/**
+ * What a call is for, as one line: its intent, when it says one, else its
+ * tool's word and what it touched (`callLabel`, cut). Outline's line of what
+ * a running ask is doing and a turn's revision title say a call so; a copy
+ * keeps the command (`callLabel`).
+ */
+export const callPurpose = (call: ToolCall): string =>
+  call.intent ?? callLabel(call, "cut")

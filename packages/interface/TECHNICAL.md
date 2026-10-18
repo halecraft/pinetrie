@@ -1094,6 +1094,26 @@ stored), and `searchOn` applies it only on the canvas it was opened on.
   checked before the text box's guard, so Escape in the field is this rule
   too.
 
+## What a tool row leads with (`tool-row.ts`, ADR-0123, ADR-0173)
+
+- **`rowLead` decides, in interface:** in story, a call's intent (`RowLead`
+  `intent`, carrying its words, so no row leads with an intent its call
+  lacks); else its command, as raw always shows. `rowSummary` stays one per
+  call and takes no density; it carries the call's `intent`.
+- **`rowView` takes the lead.** Led by its intent, its summary shows no
+  command (`Hidden.command` `"all"`, worded "command" by `moreWords`) and
+  still the output's last lines, so the row keeps its height when its
+  result arrives (ADR-0123). Led by its command, a call with an intent shows
+  it as a caption under the command (`RowView.caption`), so the command's
+  first line keeps its place beside the tag.
+- **`callPurpose` says what a call is for in one line:** its intent, else
+  `callLabel`'s cut words. Outline's live line and a turn's revision title
+  use it; a message's copy keeps `callLabel`, since pasting wants the
+  command.
+- A call's intent is read for any tool, from its arguments (`callOf`,
+  `packages/core/tree.ts`); which tools require one is pi's
+  (`TAKES_INTENT`, `packages/pi/intent.ts`).
+
 ## A message's tools (`message-tools.ts`, ADR-0043)
 
 `messageTools` decides which tools a message offers, and `Message` draws

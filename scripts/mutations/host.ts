@@ -1220,7 +1220,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a turn's title ignores its tools",
     file: "apps/pinetrie/host/work/turns.ts",
-    from: '  return call === undefined ? "turn" : callLabel(call, "cut")',
+    from: '  return call === undefined ? "turn" : callPurpose(call)',
     to: '  return "turn"',
     command: unit,
     expect: "a turn's title is its message's first line",
@@ -2562,8 +2562,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "lane work imports jj's adapter",
     file: "apps/pinetrie/host/work/turns.ts",
-    from: 'import { callLabel } from "@pinetrie/interface"\n',
-    to: 'import { callLabel } from "@pinetrie/interface"\nimport { readLaneBookmark } from "@pinetrie/jj"\nvoid readLaneBookmark\n',
+    from: 'import { callPurpose } from "@pinetrie/interface"\n',
+    to: 'import { callPurpose } from "@pinetrie/interface"\nimport { readLaneBookmark } from "@pinetrie/jj"\nvoid readLaneBookmark\n',
     command: unit,
     expect: "no file of lane work, tests included, imports jj's adapter",
   },

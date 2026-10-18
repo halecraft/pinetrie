@@ -65,6 +65,16 @@ test("a call alone, a running one, and one with no output copy their label", () 
   ).toBe("`shell sleep 5`\n\n`shell true`")
 })
 
+test("a copied call is its command", () => {
+  expect(
+    copyText(
+      reply("", [
+        { id: "a", name: "bash", subject: "ls", intent: "List the files" },
+      ]),
+    ),
+  ).toBe("`shell ls`")
+})
+
 test("a subject is copied whole, fenced when it runs over lines", () => {
   expect(
     copyText(

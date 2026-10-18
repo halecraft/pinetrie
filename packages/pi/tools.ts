@@ -34,6 +34,7 @@ import {
 import type { BannerAnswer, BannerAsk } from "@pinetrie/rules"
 import { bannerTool } from "./banner.ts"
 import { readImageProcessor } from "./images.ts"
+import { requireIntent, TAKES_INTENT } from "./intent.ts"
 import { conflictTool, type LaneHooks } from "./lanes.ts"
 import { saveBlobTool } from "./save-blob.ts"
 import { findTool, grepTool } from "./search.ts"
@@ -109,7 +110,8 @@ type Executes = {
  * `tool` whose result, after it wrote the lane's `pinetrie.json`, carries
  * the host's note on it: what applies at once and what waits for
  * acceptance. Wrapped, not replaced: its name, description and parameters
- * stay pi's, so the tool list and the prompt do not change.
+ * stay pi's, so the tool list and the prompt do not change; `requireIntent`
+ * adds the intent outside it (`assembleTools`).
  */
 function noteConfigWrites<T extends Executes>(
   tool: T,
@@ -160,15 +162,20 @@ const FILE_TOOLS: readonly ToolId[] = [
 ]
 
 /**
- * Every tool the harness registers, in `TOOL_IDS`' order, and the names of
- * the file tools among them.
+ * Every tool the harness registers, in `TOOL_IDS`' order, each that takes
+ * an intent (`TAKES_INTENT`) requiring one, and the names of the file tools
+ * among them.
  */
 export function assembleTools(input: ToolsInput): {
   readonly registered: readonly unknown[]
   readonly files: string[]
 } {
+  const made = (id: ToolId) => {
+    const tool = TOOLS[id](input)
+    return TAKES_INTENT[id] ? requireIntent(tool as never) : tool
+  }
   return {
-    registered: TOOL_IDS.map(id => TOOLS[id](input)),
+    registered: TOOL_IDS.map(made),
     files: [...FILE_TOOLS],
   }
 }

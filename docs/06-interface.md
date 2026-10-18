@@ -1047,6 +1047,16 @@ The rail is E; the column is T. Seeing both at once is the product.
   +335 lines of output", and shows it all; in the detail it says "less". A
   row that leaves nothing out has no button. The row spans the column, as
   far from its right edge as from its left.
+- **In story, a row says what its call is for** (ADR-0173): `shell`, `edit`
+  and `write` calls carry an intent, the model's few plain words ("Run the
+  unit tests"), and a story row leads with it where the command would be,
+  the tag and ✓/✗ beside it. Its command is in its detail, and its button
+  names it, "command · +335 lines of output"; the output's last five lines
+  stay, so a row is as tall before its result as after. In raw a row shows
+  its command, with the intent under it. A call with no intent (one from
+  before, or another tool's) reads as it always has. Outline's line of what
+  a running ask is doing says its call's intent, and so does a turn's
+  revision title in your repo; a message's copy keeps the command.
 - **An image a tool read is drawn in its row** (ADR-0051), in place of the
   caption ("Read image file [image/png]"), which is its tooltip. A tall
   one shows 10rem tall, and its row's button, "full size", shows it whole;

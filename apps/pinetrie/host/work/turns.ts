@@ -20,7 +20,7 @@ import {
   turnEntry,
   turnMerged,
 } from "@pinetrie/core"
-import { callLabel } from "@pinetrie/interface"
+import { callPurpose } from "@pinetrie/interface"
 import type { Keeper } from "@pinetrie/keeper"
 import { executeOrThrow, type Follow, planSnapshot } from "@pinetrie/lanes"
 import type { LaneHooks } from "@pinetrie/pi"
@@ -36,7 +36,7 @@ import type { SharedLineages } from "./shared.ts"
 /** A revision's title: a message's first line, cut. */
 const TITLE_LENGTH = 72
 
-/** The title a revision is described with: the message's first line, or its first call in words (`callLabel`). */
+/** The title a revision is described with: the message's first line, or what its first call is for (`callPurpose`). */
 export function revisionTitle(index: TreeIndex, entry: EntryId): string {
   const text = firstLine(
     messageText(index.entries[entry]?.message),
@@ -44,7 +44,7 @@ export function revisionTitle(index: TreeIndex, entry: EntryId): string {
   )
   if (text !== "") return text
   const call = messageToolCalls(index.entries[entry]?.message)[0]
-  return call === undefined ? "turn" : callLabel(call, "cut")
+  return call === undefined ? "turn" : callPurpose(call)
 }
 
 /**

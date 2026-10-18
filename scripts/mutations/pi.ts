@@ -5,6 +5,22 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/pi"]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "pi's execute sees the intent",
+    file: "packages/pi/intent.ts",
+    from: "      return execute(id, own, ...rest)\n",
+    to: "      return execute(id, params, ...rest)\n",
+    command: unit,
+    expect: "pi's execute never sees the intent",
+  },
+  {
+    name: "a tool's intent is optional",
+    file: "packages/pi/intent.ts",
+    from: "      required: [INTENT_FIELD, ...required],\n",
+    to: "      required: [...required],\n",
+    command: unit,
+    expect: "a call without an intent is refused by validation",
+  },
+  {
     name: "a nested lane is never pointed at the note on its Docker",
     file: "packages/pi/lanes.ts",
     from: " Before building or running images here, read ${grants.nestedDockerNote}.`,\n",
@@ -295,7 +311,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a scripted tool call drops its arguments",
     file: "packages/pi/scripted.ts",
-    from: "          step.args as Parameters<typeof fauxToolCall>[1],",
+    from: "          scriptedArgs(step) as Parameters<typeof fauxToolCall>[1],",
     to: "          {},",
     command: unit,
     expect: "a scripted tool step's call carries its arguments",
@@ -360,8 +376,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "set_banner is not registered",
     file: "packages/pi/tools.ts",
-    from: "    registered: TOOL_IDS.map(id => TOOLS[id](input)),",
-    to: "    registered: TOOL_IDS.filter(id => id !== BANNER_TOOL).map(id => TOOLS[id](input)),",
+    from: "    registered: TOOL_IDS.map(made),",
+    to: "    registered: TOOL_IDS.filter(id => id !== BANNER_TOOL).map(made),",
     command: unit,
     expect: "every tool is registered, in the order the model is given them",
   },
@@ -544,8 +560,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the tools are registered in another order than the model's",
     file: "packages/pi/tools.ts",
-    from: "    registered: TOOL_IDS.map(id => TOOLS[id](input)),",
-    to: "    registered: [...TOOL_IDS].reverse().map(id => TOOLS[id](input)),",
+    from: "    registered: TOOL_IDS.map(made),",
+    to: "    registered: [...TOOL_IDS].reverse().map(made),",
     command: unit,
     expect: "every tool is registered, in the order the model is given them",
   },

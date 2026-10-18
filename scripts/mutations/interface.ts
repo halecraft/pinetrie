@@ -6,6 +6,38 @@ const workspace = ["pnpm", "exec", "vitest", "run", "workspace.test.ts"]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "story leads with the command though its call has an intent",
+    file: "packages/interface/tool-row.ts",
+    from: '  density === "story" && summary.intent !== undefined\n',
+    to: '  density === "raw" && summary.intent !== undefined\n',
+    command: unit,
+    expect: "story leads a row with its intent",
+  },
+  {
+    name: "raw drops the command under its intent",
+    file: "packages/interface/tool-row.ts",
+    from: "    command: open ? summary.whole : byIntent ? [] : head.runs,\n",
+    to: "    command: open ? summary.whole : summary.intent !== undefined ? [] : head.runs,\n",
+    command: unit,
+    expect: "raw shows the command, its intent a caption under it",
+  },
+  {
+    name: "a copy says what its call is for, not its command",
+    file: "packages/interface/copy-text.ts",
+    from: '  const label = callLabel(call, "whole")\n',
+    to: '  const label = call.intent ?? callLabel(call, "whole")\n',
+    command: unit,
+    expect: "a copied call is its command",
+  },
+  {
+    name: "outline's live line ignores its call's intent",
+    file: "packages/interface/ask-view.ts",
+    from: "    return callPurpose(call)\n",
+    to: "    return callPurpose({ ...call, intent: undefined })\n",
+    command: unit,
+    expect: "a running ask's line says what its call is for",
+  },
+  {
     name: "a copy's fork row ignores whether its files were kept",
     file: "packages/interface/column-view.ts",
     from: '    copied && laneFork?.state === "begun" && laneFork.lost !== null',
@@ -1351,8 +1383,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a row's detail is its summary",
     file: "packages/interface/tool-row.ts",
-    from: "    command: open ? summary.whole : head.runs,",
-    to: "    command: head.runs,",
+    from: "    command: open ? summary.whole : byIntent ? [] : head.runs,",
+    to: "    command: byIntent ? [] : head.runs,",
     command: unit,
     expect: "the detail both whole",
   },

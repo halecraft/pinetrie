@@ -183,6 +183,30 @@ test("finish releases the rest of a reply stepped part way", async () => {
   expect(textOf(await held.result)).toBe(LONG)
 })
 
+test("a scripted call to a tool that takes an intent carries one, its own or a default", async () => {
+  const script = scriptedModel()
+  const ask = await asker(script)
+  const args = async (step: Parameters<typeof script.use>[0][number]) => {
+    script.use([step])
+    const reply = await ask("go")
+    return reply.content.flatMap(p =>
+      p.type === "toolCall" ? [p.arguments] : [],
+    )
+  }
+  expect(await args({ tool: "bash", args: { command: "ls" } })).toEqual([
+    { intent: "Scripted bash call", command: "ls" },
+  ])
+  expect(
+    await args({
+      tool: "bash",
+      args: { intent: "List the files", command: "ls" },
+    }),
+  ).toEqual([{ intent: "List the files", command: "ls" }])
+  expect(await args({ tool: "read", args: { path: "a" } })).toEqual([
+    { path: "a" },
+  ])
+})
+
 test("a scripted tool step's call carries its arguments", async () => {
   const script = scriptedModel()
   const ask = await asker(script)

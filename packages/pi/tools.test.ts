@@ -5,14 +5,17 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import { BACKGROUND_CONTEXT } from "@earendil-works/pi-agent-core/harness/context"
 import { NodeExecutionEnv } from "@earendil-works/pi-agent-core/harness/env/nodejs"
+import { validateToolArguments } from "@earendil-works/pi-ai"
 import {
   BANNER_TOOL,
   type EDIT_TOOL,
   TOOL_IDS,
+  type ToolId,
   threadIdFor,
   WRITE_TOOL,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
+import { INTENT_FIELD, requireIntent, TAKES_INTENT } from "./intent.ts"
 import { threadContext } from "./thread-context.ts"
 import { parseCatchUpArgs, proposeTool } from "./thread-tools.ts"
 import { assembleTools, TOOLS, toolsChanged } from "./tools.ts"
@@ -144,5 +147,63 @@ describe("parseCatchUpArgs", () => {
     expect(parseCatchUpArgs({ from: "base" })).toBe("base")
     expect(parseCatchUpArgs({})).toBe("base")
     expect(parseCatchUpArgs({ from: "elsewhere" })).toBe("base")
+  })
+})
+
+describe("a tool's intent", () => {
+  type Tool = {
+    readonly name: string
+    readonly parameters: object
+    readonly execute: (...a: unknown[]) => Promise<unknown>
+  }
+  const registered = () => assembleTools(input).registered as Tool[]
+  const call = (name: string, args: Record<string, unknown>) => ({
+    type: "toolCall" as const,
+    id: "c",
+    name,
+    arguments: args as never,
+  })
+
+  test("a tool requires an intent exactly when its entry says so", () => {
+    for (const tool of registered())
+      expect([
+        tool.name,
+        (tool.parameters as { required?: string[] }).required?.includes(
+          INTENT_FIELD,
+        ) ?? false,
+      ]).toEqual([tool.name, TAKES_INTENT[tool.name as ToolId]])
+    expect(
+      Object.entries(TAKES_INTENT).flatMap(([id, takes]) =>
+        takes ? [id] : [],
+      ),
+    ).toEqual(["bash", "edit", "write"])
+  })
+
+  test("a call without an intent is refused by validation", () => {
+    const bash = registered().find(t => t.name === "bash")
+    if (bash === undefined) throw new Error("no bash")
+    expect(() =>
+      validateToolArguments(bash as never, call("bash", { command: "ls" })),
+    ).toThrow(/intent/)
+    expect(
+      validateToolArguments(
+        bash as never,
+        call("bash", { intent: "List the files", command: "ls" }),
+      ),
+    ).toMatchObject({ intent: "List the files", command: "ls" })
+  })
+
+  test("pi's execute never sees the intent", async () => {
+    const seen: unknown[] = []
+    const tool = requireIntent({
+      parameters: { properties: { command: {} }, required: ["command"] },
+      execute: async (...args: unknown[]) => {
+        seen.push(args[1])
+        return { content: [] }
+      },
+    })
+    await tool.execute("c", { intent: "List the files", command: "ls" }, null)
+    expect(seen).toEqual([{ command: "ls" }])
+    expect(tool.parameters.required).toEqual([INTENT_FIELD, "command"])
   })
 })

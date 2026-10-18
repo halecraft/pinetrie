@@ -17,6 +17,7 @@ import {
   canvasMarkerWords,
   canvasPinnedMarkerWords,
   copyText,
+  type Density,
   joinWords,
   type MessageAct,
   type MessageTools,
@@ -28,6 +29,7 @@ import {
   type RowMemory,
   type Run,
   retiredWords,
+  rowLead,
   rowSummary,
   rowView,
   runningFor,
@@ -170,6 +172,7 @@ function MessageView(p: MessageProps) {
         {node.toolCalls?.map(call => (
           <ToolRow
             call={call}
+            density={p.density}
             doc={p.live}
             key={call.id}
             rows={p.rows}
@@ -318,11 +321,14 @@ function ToolRow({
   stream,
   doc,
   rows,
+  density,
 }: {
   call: ToolCall
   stream: StreamId | undefined
   doc: LiveDocHandle
   rows: ScreenMemory<RowMemory>
+  /** The column's density: in story a call leads with its intent (`rowLead`). */
+  density: Density
 }) {
   const status = callStatus(call.result)
   const mark = callMark(status)
@@ -340,6 +346,7 @@ function ToolRow({
   const summary = useMemo(() => rowSummary(call), [call])
   const view = rowView(
     summary,
+    rowLead(summary, density),
     call.result?.text ?? streamed,
     toolBody(call.result),
     open,
@@ -370,9 +377,15 @@ function ToolRow({
         {mark !== undefined && <span className="tool-status">{mark}</span>}
         {live !== undefined && revealed && <Elapsed stream={live} />}
       </span>
-      <div className="tool-command">
-        <Runs runs={view.command} />
-      </div>
+      {view.head !== null && <div className="tool-intent">{view.head}</div>}
+      {view.command.length > 0 && (
+        <div className="tool-command">
+          <Runs runs={view.command} />
+        </div>
+      )}
+      {view.caption !== null && (
+        <div className="tool-caption">{view.caption}</div>
+      )}
       {body.kind === "images" ? (
         <div className="tool-images" data-thumb={body.thumb || undefined}>
           {body.images.map(image => (

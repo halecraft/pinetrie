@@ -68,7 +68,7 @@ person who is not a programmer cannot read.
   one, and the wrapper drops it before pi's `execute`. S231: no call of 66
   left it out, with pi's strict tools or without, and the intents said
   what each call was for. In story a row with an intent leads with it, its
-  command in its detail; raw shows the intent above the command; a copy
+  command in its detail; raw shows the intent under the command; a copy
   of a message keeps the command. A revision's title and outline's line
   of what an ask is doing use the intent.
 

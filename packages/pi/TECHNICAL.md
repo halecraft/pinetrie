@@ -76,7 +76,8 @@ kept, so the next call asks again. That stays sound because the host runs
 | module | its one job |
 |---|---|
 | `thread-lanes.ts` | each thread's pi lane, held, and its handle (`ThreadLanes`) |
-| `tools.ts` | the tools registered, and whether a stored lane's list differs from `TOOL_IDS` (`toolsChanged`) |
+| `tools.ts` | the tools registered, each that takes an intent wrapped (`assembleTools`), and whether a stored lane's list differs from `TOOL_IDS` (`toolsChanged`) |
+| `intent.ts` | which tools take a required `intent` (`TAKES_INTENT`, a record of every tool), and `requireIntent`, which adds it to a tool's schema and drops it before pi's `execute` (ADR-0173) |
 | `search.ts` | the `grep` and `find` tools: rg and fd through the lane's `env` (ADR-0064) |
 | `lanes.ts` | where a lane's tools work (`laneToolContext`), and what it is told (`systemPromptFor`, `laneGuidelines`) |
 | `stream.ts` | pi's events as `StreamEvent`s (`harnessStreamEvent`) |
@@ -454,7 +455,14 @@ skills and prompts; with none listed, a scripted or named model loads
 nothing of pi's, and only pine·trie's own skills are commands. With tools
 (`CreateAgentOptions.tools`), pi-agent-core's `read`, `write`, `edit` and
 `bash`, and pine·trie's `grep` and `find`, run in each lane's own directory
-(below). Context files load from `PiSetupOptions.project`, with tools on or
+(below). `bash`, `edit` and `write` take a required `intent` (ADR-0173,
+`intent.ts`): `requireIntent` puts it first in the tool's schema, written as
+plain JSON Schema so pi's optional parameters stay optional, and drops it
+before pi's `execute` runs, so pi's tool never sees it. A call without one
+is refused by pi's own validation (`validateToolArguments`), an error
+result the model reads; the run goes on. The scripted model gives a step
+for one of them an intent of its own when the step names none
+(`scriptedArgs`). Context files load from `PiSetupOptions.project`, with tools on or
 off (ADR-0086); with none, from the process's working directory. The system
 prompt is pi's `buildSystemPrompt`, with the loader's context files and
 skills: the section layout `pi-anthropic-auth` shapes. Its `cwd` is the

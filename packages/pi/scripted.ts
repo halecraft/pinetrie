@@ -27,6 +27,7 @@ import {
   URGENCY_ALONE,
   URGENCY_THEN_DIGEST,
 } from "@pinetrie/rules"
+import { INTENT_FIELD, TAKES_INTENT } from "./intent.ts"
 
 /**
  * One scripted reply: text; text made from the context the model was given,
@@ -371,7 +372,7 @@ function render(
         // Script arguments are plain JSON, as a model's would be.
         fauxToolCall(
           step.tool,
-          step.args as Parameters<typeof fauxToolCall>[1],
+          scriptedArgs(step) as Parameters<typeof fauxToolCall>[1],
         ),
       ],
       { stopReason: "toolUse" },
@@ -381,6 +382,19 @@ function render(
       step.reply(context.messages.map(m => textOf(m.content))),
     )
   return fauxAssistantMessage(step.text)
+}
+
+/**
+ * A tool step's arguments as a model gives them: with an intent, when its
+ * tool takes one and the step names none, so a suite's call is never
+ * refused for the want of one.
+ */
+function scriptedArgs(
+  step: Extract<ScriptStep, { readonly tool: ToolId }>,
+): Record<string, unknown> {
+  return TAKES_INTENT[step.tool] && !(INTENT_FIELD in step.args)
+    ? { [INTENT_FIELD]: `Scripted ${step.tool} call`, ...step.args }
+    : step.args
 }
 
 function lastUserText(context: TranscriptContext): string {

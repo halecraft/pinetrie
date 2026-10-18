@@ -28,6 +28,7 @@ const props = (
   if (node === undefined) throw new Error("no node")
   return {
     node,
+    density: "story",
     streams: {},
     live: LIVE,
     rows: ROWS,

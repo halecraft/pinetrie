@@ -49,6 +49,7 @@ function MessageListView(p: MessageListProps) {
     return (
       <Fragment key={node.id}>
         <Message
+          density={p.density}
           live={p.live}
           rows={p.rows}
           streams={callStreams(node.toolCalls, p.tools)}

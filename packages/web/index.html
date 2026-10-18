@@ -693,6 +693,11 @@
       .sh-variable { color: #e8c07a; }
       .sh-keyword, .sh-operator { color: #c8d0dc; }
       .sh-comment { color: #6f7784; font-style: italic; }
+      /* What a call is for (ADR-0173): in story, it leads the row in plain
+         words where the command would, beside the tag; in raw, a caption
+         under the command, whose first line keeps its place beside the tag. */
+      .tool-intent { color: #c9d1d9; overflow-wrap: anywhere; }
+      .tool-caption { font-size: .75rem; color: #8b93a1; overflow-wrap: anywhere; }
       /* How long a running call has run, in the ring's colour. Tabular figures,
          so a tick that keeps its count of digits keeps its width. */
       .tool-elapsed { font-size: 11px; line-height: 1.6; color: #e8c07a;
