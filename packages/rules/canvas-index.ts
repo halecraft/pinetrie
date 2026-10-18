@@ -19,6 +19,7 @@ import {
   NO_CONTENT,
   type PlaceKey,
   type PlaceOf,
+  type RankedCanvas,
   type RootId,
   type SurfaceOwner,
   surfaceOwner,
@@ -34,13 +35,8 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import { boardEnd } from "./board.ts"
-import {
-  type MakeStep,
-  type PlaceStep,
-  planMake,
-  rankOnCanvas,
-} from "./moves.ts"
-import { branchAfter, rankAfter } from "./rank.ts"
+import { type MakeStep, type PlaceStep, planMake } from "./place-steps.ts"
+import { branchAfter, rankAfter, rankOfDrop } from "./rank.ts"
 import { setRecord } from "./records.ts"
 import { THREAD } from "./thread.ts"
 
@@ -265,6 +261,29 @@ export const cardsOnCanvas = (
     .filter(onCanvas)
     .filter(c => c.place.canvas === canvas)
     .sort(byRank)
+
+/**
+ * Where `card` lands on a canvas: just after a drop's `after`,
+ * at the end when that card is no longer there or for a canvas's key alone,
+ * with the cards given new ranks to make room, written first.
+ */
+export function rankOnCanvas(
+  cards: readonly CardRecord[],
+  card: CardId,
+  to: CanvasKey | CanvasTarget,
+): { readonly to: RankedCanvas; readonly first: readonly PlaceStep[] } {
+  const here = cardsOnCanvas(cards, to.canvas).filter(c => c.id !== card)
+  const ranked =
+    to.kind === "canvas-at"
+      ? rankOfDrop(here, to.after)
+      : rankAfter(here, here.length - 1)
+  return {
+    to: { kind: "canvas", canvas: to.canvas, order: ranked.order },
+    first: ranked.respaced.map(
+      (record): PlaceStep => ({ kind: "write", record }),
+    ),
+  }
+}
 
 /**
  * Where a thread's card lands as the thread opens: on `canvas`'s

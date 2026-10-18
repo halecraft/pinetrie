@@ -2,8 +2,6 @@
 // where a target resolves to, and the steps a command's moves make.
 
 import {
-  type CanvasKey,
-  type CanvasTarget,
   type CardId,
   type CardPlace,
   type CardRecord,
@@ -13,7 +11,6 @@ import {
   isNoteColumnId,
   isTextCardId,
   isWhereSenderSaw,
-  KINDS,
   kindOfCard,
   type LivePlace,
   type Move,
@@ -27,7 +24,6 @@ import {
   placed,
   placeKey,
   placeOfKind,
-  type RankedCanvas,
   type Replacing,
   type ResolvedMove,
   type ResolvedTarget,
@@ -38,37 +34,21 @@ import {
   type WriterId,
   wrapperKind,
 } from "@pinetrie/core"
-import { cardsOnCanvas, planCanvasOpening } from "./canvas-index.ts"
+import { planCanvasOpening, rankOnCanvas } from "./canvas-index.ts"
 import { marginEnd } from "./margin.ts"
 import { makeNoteColumn, noteColumnEnd, toNotes } from "./notes.ts"
 import { orderAfter } from "./order.ts"
 import {
-  canvasPinnedCards,
-  inventoryFull,
-  isPinned,
-  queuedOn,
-} from "./queue.ts"
-import { rankAfter, rankOfDrop } from "./rank.ts"
+  afterSteps,
+  type MoveStep,
+  ownsPlace,
+  type PlaceStep,
+  placeRefusal,
+  planMake,
+} from "./place-steps.ts"
+import { canvasPinnedCards, isPinned, queuedOn } from "./queue.ts"
 
 // ── handoffs ───────────────────────────────────────────────────
-
-/** A write to the places document, as the host's one writer carries it out. */
-export type PlaceStep =
-  | { readonly kind: "write"; readonly record: CardRecord }
-  | { readonly kind: "remove"; readonly id: CardId }
-
-/** What the host makes of a move: a step to carry out, or a refusal. */
-export type MoveStep =
-  | PlaceStep
-  | {
-      readonly kind: "refused"
-      readonly code: MoveRefusal
-      /** The card as it is, or null when it is gone. */
-      readonly now: CardRecord | null
-    }
-
-/** What the host makes of a card made: its write, or a refusal. */
-export type MakeStep = Extract<MoveStep, { readonly kind: "write" | "refused" }>
 
 /**
  * A key as the place it becomes, with what the host assigns to a queued or
@@ -125,62 +105,6 @@ function placeAt(
     default:
       return key
   }
-}
-
-/**
- * Whether `sender` may move a card into or out of `key`: every place but
- * someone else's inventory.
- */
-export const ownsPlace = (key: PlaceKey, sender: WriterId): boolean =>
-  key.kind !== "inventory" || key.holder === sender
-
-/**
- * Why a move into `to` is refused before the card is looked at; null for
- * none. A kind no person moves (`KINDS`' `moves`: a fact) and a place the
- * card's kind is never in are refused alike, `no-place`.
- */
-function refuseInto(
-  to: PlaceKey,
-  cards: readonly CardRecord[],
-  card: CardId,
-  sender: WriterId,
-): MoveRefusal | null {
-  const kind = kindOfCard(card)
-  if (!KINDS[kind].moves || !fitsPlace(kind, to.kind)) return "no-place"
-  if (!ownsPlace(to, sender)) return "not-yours"
-  return to.kind === "inventory" && inventoryFull(cards, sender, card)
-    ? "full"
-    : null
-}
-
-/**
- * Whether the host writes `card`, made (`makeCard`): the one rule every card
- * is made by, a person's or the host's. Refused `exists` for an
- * id in use, else as any move into its place is (`refuseInto`: a kind no
- * person moves, someone else's inventory, a full one); the host makes the
- * kinds no person moves, so its own make is refused only for a full
- * inventory. Its place fits its kind by its type, so a misplaced card never
- * reaches this. `planMove`'s creations, a copy's card (`planCopy`), a
- * thread's card, a note column made for a note, a fact's card and a
- * split's card all go through it, so their refusals cannot drift.
- */
-export function planMake(
-  cards: readonly CardRecord[],
-  card: CardRecord,
-  sender: WriterId | "host",
-): MakeStep {
-  const now = cards.find(c => c.id === card.id)
-  if (now !== undefined) return { kind: "refused", code: "exists", now }
-  const to = placeKey(card.place)
-  const refusal =
-    sender === "host"
-      ? to.kind === "inventory" && inventoryFull(cards, to.holder, card.id)
-        ? "full"
-        : null
-      : refuseInto(to, cards, card.id, sender)
-  return refusal === null
-    ? { kind: "write", record: card }
-    : { kind: "refused", code: refusal, now: null }
 }
 
 /**
@@ -359,7 +283,7 @@ function handoff(
     return { kind: "refused", code: "moved", now }
   if (!ownsPlace(move.from, sender))
     return { kind: "refused", code: "not-yours", now }
-  const refusal = refuseInto(move.to, cards, move.card, sender)
+  const refusal = placeRefusal(move.to, cards, move.card, sender)
   if (refusal !== null) return { kind: "refused", code: refusal, now }
   const place = placeAt(move.to, cards, sender, now)
   const record = place === undefined ? undefined : placed(now, place)
@@ -405,7 +329,7 @@ export function planPaste(
           sender,
         )
   if (discard?.kind === "refused") return discard
-  const before = discard === null ? cards : afterStep(cards, discard)
+  const before = discard === null ? cards : afterSteps(cards, [discard])
   if (paste.kind === "uncut") {
     const step = planFromTrash(before, paste.card, sender, {
       kind: "uncut",
@@ -634,29 +558,6 @@ export function planMoveTargets(input: {
 }
 
 /**
- * Where `card` lands on a canvas: just after a drop's `after`,
- * at the end when that card is no longer there or for a canvas's key alone,
- * with the cards given new ranks to make room, written first.
- */
-export function rankOnCanvas(
-  cards: readonly CardRecord[],
-  card: CardId,
-  to: CanvasKey | CanvasTarget,
-): { readonly to: RankedCanvas; readonly first: readonly PlaceStep[] } {
-  const here = cardsOnCanvas(cards, to.canvas).filter(c => c.id !== card)
-  const ranked =
-    to.kind === "canvas-at"
-      ? rankOfDrop(here, to.after)
-      : rankAfter(here, here.length - 1)
-  return {
-    to: { kind: "canvas", canvas: to.canvas, order: ranked.order },
-    first: ranked.respaced.map(
-      (record): PlaceStep => ({ kind: "write", record }),
-    ),
-  }
-}
-
-/**
  * Moves as a person sends them: each target that is no place yet resolved
  * first (`planMoveTargets`), what that writes written before the moves, then
  * planned whole (`planMoveCommand`).
@@ -700,21 +601,6 @@ export type MovesStep =
   | { readonly kind: "steps"; readonly steps: readonly PlaceStep[] }
   | Extract<MoveStep, { kind: "refused" }>
 
-/** `cards` as `steps` leave them, in order. */
-export const afterSteps = (
-  cards: readonly CardRecord[],
-  steps: readonly PlaceStep[],
-): readonly CardRecord[] => steps.reduce(afterStep, cards)
-
-/** `cards` as `step` leaves them. */
-const afterStep = (
-  cards: readonly CardRecord[],
-  step: PlaceStep,
-): readonly CardRecord[] =>
-  step.kind === "remove"
-    ? cards.filter(c => c.id !== step.id)
-    : [...cards.filter(c => c.id !== step.record.id), step.record]
-
 /**
  * Several moves as one (a keep's cards): each planned against the
  * cards as the ones before it left them, and accepted whole, or refused by
@@ -731,7 +617,7 @@ export function planMoves(
     const step = planMove(now, move, sender)
     if (step.kind === "refused") return step
     steps.push(step)
-    now = afterStep(now, step)
+    now = afterSteps(now, [step])
   }
   return { kind: "steps", steps }
 }

@@ -22,7 +22,7 @@ import {
 import { type Static, Type } from "typebox"
 import { ThreadIdSchema, WriterIdSchema } from "./decode.ts"
 import { type HistoryMessage, historyMessage } from "./history.ts"
-import type { PlaceStep } from "./moves.ts"
+import type { PlaceStep } from "./place-steps.ts"
 import { planFactCard, type QueuedCard, queuedOn } from "./queue.ts"
 import { holdOnStop } from "./queue-hold.ts"
 

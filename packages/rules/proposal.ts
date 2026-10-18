@@ -27,8 +27,8 @@ import {
   type ValueWrite,
   type WriterId,
 } from "@pinetrie/core"
-import { afterSteps, type PlaceStep } from "./moves.ts"
 import { type OpenPlan, planBranchOpen } from "./open.ts"
+import { afterSteps, type PlaceStep } from "./place-steps.ts"
 
 /** What a model is told when its arguments are not a proposal. */
 const NOT_A_PROPOSAL =

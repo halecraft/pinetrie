@@ -17,8 +17,8 @@ import {
 } from "@pinetrie/core"
 import { type CardOnCanvas, cardsOnCanvas } from "./canvas-index.ts"
 import { byOrder } from "./card.ts"
-import { afterSteps, type PlaceStep, planMake } from "./moves.ts"
 import { orderAfter } from "./order.ts"
+import { afterSteps, type PlaceStep, planMake } from "./place-steps.ts"
 import { rankAfter } from "./rank.ts"
 
 // ── note columns ────────────────────────────────────────────────

@@ -13,7 +13,6 @@ import {
   type FactCard,
   type FactCardId,
   hasPlaceKind,
-  INVENTORY_SLOTS,
   isTextCard,
   type Move,
   makeCard,
@@ -24,12 +23,11 @@ import {
   type TextCard,
   type TextCardId,
   type ThreadId,
-  type WriterId,
 } from "@pinetrie/core"
 import { byOrder } from "./card.ts"
-import { type PlaceStep, planMake } from "./moves.ts"
 import { toNotes } from "./notes.ts"
 import { orderAfter, orderBetween, respace } from "./order.ts"
+import { inventoryFull, type PlaceStep, planMake } from "./place-steps.ts"
 
 // ── the queue ──────────────────────────────────────
 
@@ -271,19 +269,6 @@ export function planUnsent(input: {
     hold: false,
   }
 }
-
-/** Whether `holder`'s inventory holds `INVENTORY_SLOTS` cards, `card` not counted. */
-export const inventoryFull = (
-  cards: readonly CardRecord[],
-  holder: WriterId,
-  card: CardId,
-): boolean =>
-  cards.filter(
-    c =>
-      c.id !== card &&
-      c.place.kind === "inventory" &&
-      c.place.holder === holder,
-  ).length >= INVENTORY_SLOTS
 
 /**
  * A fact's card: queued on its lane, made by the host for whoever acted

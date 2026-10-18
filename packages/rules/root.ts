@@ -15,7 +15,7 @@ import {
 } from "@pinetrie/core"
 import { isBoardCard } from "./board.ts"
 import { MARK } from "./mark.ts"
-import type { PlaceStep } from "./moves.ts"
+import type { PlaceStep } from "./place-steps.ts"
 import { deleteRecord } from "./records.ts"
 import { ROOT } from "./roots.ts"
 import { THREAD } from "./thread.ts"

@@ -8,8 +8,10 @@ import {
   placed,
   type ThreadId,
 } from "@pinetrie/core"
-import type { CardOnCanvas } from "./canvas-index.ts"
 import { orderAfter, orderBetween, respace } from "./order.ts"
+
+/** A card at a ranked place: on a canvas, on the board. */
+type RankedCard = CardRecord & { readonly place: OrderedPlace }
 
 /**
  * Where a branch of `parent` lands on `canvas`: the index of the
@@ -20,15 +22,12 @@ import { orderAfter, orderBetween, respace } from "./order.ts"
  * move as its first send lands.
  */
 export function branchAfter(
-  canvas: readonly CardOnCanvas[],
+  canvas: readonly RankedCard[],
   parent: ThreadId | null,
 ): number {
   const at = parent === null ? -1 : canvas.findIndex(c => c.id === parent)
   return at < 0 ? canvas.length - 1 : at
 }
-
-/** A card at a ranked place: on a canvas, on the board. */
-type RankedCard = CardRecord & { readonly place: OrderedPlace }
 
 /**
  * A rank for a card going just after index `after` of `canvas`, ranked

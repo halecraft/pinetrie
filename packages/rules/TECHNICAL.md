@@ -64,6 +64,16 @@ follow this list. A name only this package uses is imported from its module.
   columns and where a card leaving a thread goes; the queue's pops and
   carries; handoffs and their targets; reorders, a card's width and its
   command; each sender's history of moves and its undo.
+- `place-steps.ts`: a write to the places document (`PlaceStep`), the one
+  rule every card is made by (`planMake`) and who may move into a place.
+  The planners of moves, queues, notes and canvases all build on it, so it
+  imports none of them; `moves.ts`, which calls those planners, is not
+  imported by them.
+- `relay.ts`, `relay-codec.ts`: another thread's agent asked, and its
+  answer; the relay's shape and an ask card's stored relay, which
+  `card.ts` decodes. The codec imports none of the relay's rules, so a
+  card's record does not load the canvas index and the planners of moves
+  through them.
 - `rank.ts`: a rank on a canvas, a drop's, and where a branch lands.
 - `held.ts`, `copy.ts`: a thread in an inventory (where a command runs,
   who holds it, what a change takes) and a thread copied (ADR-0117,
@@ -396,7 +406,7 @@ are the only code that builds or reads the shape.
   its lane is resumed. What does not survive a process (runs and streams)
   is cleared first (`planClear`, `live.ts`).
 
-# Cards (`card.ts`, `notes.ts`, `queue.ts`, `moves.ts`, `in-place.ts`, `move-history.ts`, ADR-0048, ADR-0059, ADR-0066)
+# Cards (`card.ts`, `notes.ts`, `queue.ts`, `moves.ts`, `place-steps.ts`, `in-place.ts`, `move-history.ts`, ADR-0048, ADR-0059, ADR-0066)
 
 What you type is a card. Its text is a `TextDoc`, written by clients; its
 record is in the places document (`PlacesDoc` in `@pinetrie/schema`), which
@@ -466,10 +476,10 @@ which are swept.
   card is discarded first" holds in two places: here, for a paste, and in
   the client's `moveCards` set for a drop on a filled slot, which
   `planMoves` plans in order.
-- **One rule makes every card** (`planMake`, `moves.ts`): it takes a card
+- **One rule makes every card** (`planMake`, `place-steps.ts`): it takes a card
   already made (`makeCard`, whose place type is its kind's, so a misplaced
   card does not compile) and refuses `exists`, then as any move into its
-  place is (`refuseInto`). Its sender is a person, or `"host"` for the
+  place is (`placeRefusal`). Its sender is a person, or `"host"` for the
   kinds no person moves (a fact), refused only by a full inventory. A
   person's creation (`planMove` with no `from`), a thread's card as it
   opens (`planThreadOpen`: a branch, a new canvas's thread, a copy, a spin-off, or a
@@ -1003,8 +1013,8 @@ trash, have no agent and no runner. Where its card leaves it is
   source. It opens through `planThreadOpen`: its record's `origin` is
   `{ kind: "fork", at: end, how: "copy" }`, kept after its first send, so
   its fork row can say "copied from"; its card is made by **`planMake`**
-  (`moves.ts`), the one rule every card is made by: `exists`, then
-  `refuseInto`'s refusals (a place its kind is never in, another's
+  (`place-steps.ts`), the one rule every card is made by: `exists`, then
+  `placeRefusal`'s refusals (a place its kind is never in, another's
   inventory, a full one). It lands on a canvas by **`rankOnCanvas`**, as a
   move's drop does. No entry is written: its first send is a branch at its
   fork, which the gate lets through by the copy's own holding

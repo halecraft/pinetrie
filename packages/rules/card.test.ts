@@ -75,7 +75,6 @@ import {
   undoAnswer,
 } from "./move-history.ts"
 import {
-  ownsPlace,
   planFromTrash,
   planMove,
   planMoveCommand,
@@ -86,6 +85,7 @@ import {
 } from "./moves.ts"
 import { nearestNoteColumn, notesNear, toNotes } from "./notes.ts"
 import { orderAfter, orderKeys } from "./order.ts"
+import { ownsPlace } from "./place-steps.ts"
 import {
   blankQueued,
   canvasPinnedCards,

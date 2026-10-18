@@ -18,9 +18,9 @@ import {
 import { cardsOnCanvas } from "./canvas-index.ts"
 import { byOrder, cardOrder, isOrdered } from "./card.ts"
 import { marginCards } from "./margin.ts"
-import type { MoveStep, PlaceStep } from "./moves.ts"
 import { notesIn } from "./notes.ts"
 import { orderBetween, respace } from "./order.ts"
+import type { MoveStep, PlaceStep } from "./place-steps.ts"
 import { canvasPinnedCards, isPinned, queuedOn } from "./queue.ts"
 
 // ── reorders ─────────────────────────────────────────────

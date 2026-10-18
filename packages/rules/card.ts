@@ -32,7 +32,7 @@ import {
 import { Type } from "typebox"
 import { decodeWith } from "./decode.ts"
 import { decodeQueuedFact, encodeQueuedFact } from "./fact.ts"
-import { decodeStoredRelay, encodeRelay } from "./relay.ts"
+import { decodeStoredRelay, encodeRelay } from "./relay-codec.ts"
 
 /**
  * A card as the places document stores it: flat strings, "" for none. The

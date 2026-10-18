@@ -22,7 +22,8 @@ import {
   rootOfPlace,
   type ThreadOpen,
 } from "./canvas-index.ts"
-import { type MoveStep, planMove } from "./moves.ts"
+import { planMove } from "./moves.ts"
+import type { MoveStep } from "./place-steps.ts"
 
 /** A spin-off as its sender asks for it. */
 export type SpinOff = Omit<Extract<Intent, { kind: "spin-off" }>, "kind">

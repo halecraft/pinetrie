@@ -26,7 +26,7 @@ import {
   canvasOfPlace,
   canvasOfTarget,
 } from "./canvas-index.ts"
-import type { MoveStep } from "./moves.ts"
+import type { MoveStep } from "./place-steps.ts"
 
 // ── moves' history ─────────────────────────────────────────────
 

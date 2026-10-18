@@ -176,6 +176,7 @@ export {
   NO_CANVAS_INDEX,
   planCanvasOpening,
   planThreadOpen,
+  rankOnCanvas,
   rootOfPlace,
   type ThreadOpen,
   type ThreadOpening,
@@ -380,23 +381,17 @@ export {
   undoAnswer,
 } from "./move-history.ts"
 export {
-  afterSteps,
   type FromTrash,
   lanesToDrain,
-  type MakeStep,
   type MoveCommand,
-  type MoveStep,
   type MovesStep,
-  type PlaceStep,
   pastedCard,
   planFromTrash,
-  planMake,
   planMoveCommand,
   planMoveRequest,
   planMoveTargets,
   planPaste,
   RESTORE,
-  rankOnCanvas,
 } from "./moves.ts"
 export {
   NAME,
@@ -448,6 +443,13 @@ export {
   pinnedReads,
   planPinnedRead,
 } from "./pinned.ts"
+export {
+  afterSteps,
+  type MakeStep,
+  type MoveStep,
+  type PlaceStep,
+  planMake,
+} from "./place-steps.ts"
 export {
   type BranchOutRefusal,
   type Opening,

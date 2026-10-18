@@ -2195,7 +2195,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a fact card can be moved",
-    file: "packages/rules/moves.ts",
+    file: "packages/rules/place-steps.ts",
     from: '  if (!KINDS[kind].moves || !fitsPlace(kind, to.kind)) return "no-place"',
     to: '  if (!fitsPlace(kind, to.kind)) return "no-place"',
     command: unit,
@@ -2380,7 +2380,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a creation overwrites an id in use",
-    file: "packages/rules/moves.ts",
+    file: "packages/rules/place-steps.ts",
     from: '  if (now !== undefined) return { kind: "refused", code: "exists", now }\n  const to = placeKey(card.place)',
     to: "  const to = placeKey(card.place)",
     command: unit,
@@ -2396,7 +2396,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "anyone takes into anyone's inventory",
-    file: "packages/rules/moves.ts",
+    file: "packages/rules/place-steps.ts",
     from: '  key.kind !== "inventory" || key.holder === sender',
     to: "  true",
     command: unit,
@@ -2413,7 +2413,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "an inventory holds a nineteenth card",
-    file: "packages/rules/queue.ts",
+    file: "packages/rules/place-steps.ts",
     from: "  ).length >= INVENTORY_SLOTS",
     to: "  ).length > INVENTORY_SLOTS",
     command: unit,
@@ -2421,7 +2421,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a full inventory counts everyone's cards",
-    file: "packages/rules/queue.ts",
+    file: "packages/rules/place-steps.ts",
     from: "      c.place.holder === holder,\n  ).length",
     to: "      true,\n  ).length",
     command: unit,
@@ -2429,8 +2429,8 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a creation skips the inventory's rules",
-    file: "packages/rules/moves.ts",
-    from: "      : refuseInto(to, cards, card.id, sender)\n  return refusal === null",
+    file: "packages/rules/place-steps.ts",
+    from: "      : placeRefusal(to, cards, card.id, sender)\n  return refusal === null",
     to: "      : null\n  return refusal === null",
     command: unit,
     expect: "the nineteenth card is refused full",
@@ -2510,7 +2510,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "several moves are planned against the cards before any",
     file: "packages/rules/moves.ts",
-    from: '    now = afterStep(now, step)\n  }\n  return { kind: "steps", steps }',
+    from: '    now = afterSteps(now, [step])\n  }\n  return { kind: "steps", steps }',
     to: '  }\n  return { kind: "steps", steps }',
     command: unit,
     expect: "each move planned against the cards the earlier ones left",
@@ -3554,7 +3554,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a drop on a canvas lands at its end",
-    file: "packages/rules/moves.ts",
+    file: "packages/rules/canvas-index.ts",
     from: "      ? rankOfDrop(here, to.after)\n",
     to: "      ? rankAfter(here, here.length - 1)\n",
     command: unit,
@@ -3604,7 +3604,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a canvas's key alone lands first",
-    file: "packages/rules/moves.ts",
+    file: "packages/rules/canvas-index.ts",
     from: "      : rankAfter(here, here.length - 1)\n  return {",
     to: "      : rankAfter(here, -1)\n  return {",
     command: unit,
@@ -3984,7 +3984,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a replacement makes its card before the discard",
     file: "packages/rules/moves.ts",
-    from: "  const before = discard === null ? cards : afterStep(cards, discard)",
+    from: "  const before = discard === null ? cards : afterSteps(cards, [discard])",
     to: "  const before = cards",
     command: unit,
     expect:

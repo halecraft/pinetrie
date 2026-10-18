@@ -14,7 +14,7 @@ import {
 } from "@pinetrie/core"
 import { planThreadOpen } from "./canvas-index.ts"
 import { threadCardHolding } from "./held.ts"
-import type { PlaceStep } from "./moves.ts"
+import type { PlaceStep } from "./place-steps.ts"
 
 /** A copy as its copier asks for it: the source, the end they saw, and where its card goes. */
 export type CopyThread = Omit<Extract<Intent, { kind: "copy-thread" }>, "kind">

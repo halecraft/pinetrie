@@ -25,8 +25,8 @@ import {
 import { Type } from "typebox"
 import { byOrder } from "./card.ts"
 import { decodeRecord, fixedKey } from "./decode.ts"
-import type { PlaceStep } from "./moves.ts"
 import { orderAfter } from "./order.ts"
+import type { PlaceStep } from "./place-steps.ts"
 import { rankAfter } from "./rank.ts"
 import { type RecordSpec, setRecord } from "./records.ts"
 

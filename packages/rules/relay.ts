@@ -18,7 +18,6 @@ import {
 import { Type } from "typebox"
 import {
   EntryIdSchema,
-  isWellFormed,
   List,
   ThreadIdSchema,
   WriterIdSchema,
@@ -26,6 +25,7 @@ import {
 import { foreignLaneWords } from "./held.ts"
 import { type HistoryMessage, historyMessage } from "./history.ts"
 import { reachWords } from "./reach.ts"
+import { RelaySchema } from "./relay-codec.ts"
 import { transcriptLines } from "./request.ts"
 
 const HEARD_TYPE = "pinetrie.heard"
@@ -36,22 +36,6 @@ const HeardSchema = Type.Object({
   from: ThreadIdSchema,
   fromName: Type.String(),
   entries: List(EntryIdSchema),
-})
-
-const AskerSchema = Type.Union([
-  Type.Object({ kind: Type.Literal("person"), writer: WriterIdSchema }),
-  Type.Object({ kind: Type.Literal("agent"), thread: ThreadIdSchema }),
-])
-
-const RelaySchema = Type.Object({
-  from: ThreadIdSchema,
-  fromName: Type.String(),
-  source: EntryIdSchema,
-  asker: AskerSchema,
-  askerName: Type.String(),
-  text: Type.String(),
-  budget: EntryIdSchema,
-  by: WriterIdSchema,
 })
 
 const AnswerSchema = Type.Object({
@@ -73,20 +57,6 @@ export const ANSWER = historyMessage(ANSWER_TYPE, AnswerSchema)
 export type HeardMessage = HistoryMessage<typeof HEARD_TYPE, HeardDetails>
 export type RelayMessage = HistoryMessage<typeof RELAY_TYPE, RelayDetails>
 export type AnswerMessage = HistoryMessage<typeof ANSWER_TYPE, AnswerDetails>
-
-/** An ask card's relay, in the places document's flat strings. */
-export const encodeRelay = (relay: RelayDetails): string =>
-  JSON.stringify(relay)
-
-/** An ask card's stored relay -> the relay; undefined for one malformed. Total. */
-export function decodeStoredRelay(stored: string): RelayDetails | undefined {
-  try {
-    const relay: unknown = JSON.parse(stored)
-    return isWellFormed(RelaySchema, relay) ? relay : undefined
-  } catch {
-    return undefined
-  }
-}
 
 export const decodeHeard = HEARD.decode
 export const decodeRelay = RELAY.decode
