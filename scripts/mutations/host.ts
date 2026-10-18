@@ -24,15 +24,6 @@ export const mutations: readonly Mutation[] = [
       "a lane of its own with no fork record is refused before the adapter is asked",
   },
   {
-    name: "the migration makes a recorded lane owed",
-    file: "apps/pinetrie/host/migrations/0023-lane-forks.ts",
-    from: "    const begun = input.recorded.has(r.lane) || input.started.has(r.lane)",
-    to: "    const begun = input.started.has(r.lane)",
-    command: unit,
-    expect:
-      "a recorded lane and a folder lane with a start state are begun, a files-lost snapshot their lost; any other is owed",
-  },
-  {
     name: "a folder lane's start writes its state itself",
     file: "apps/pinetrie/host/folder/history.ts",
     from: "      return recordedStart(writes)",
@@ -3012,30 +3003,6 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "a thread deleted from the trash leaves the shared files' lineages it read",
-  },
-  {
-    name: "the migration keeps a turn's shared reads",
-    file: "apps/pinetrie/host/migrations/0022-turn-shared-reads.ts",
-    from: "  const { read: _, ...kept } = shared\n",
-    to: "  const kept = shared\n",
-    command: unit,
-    expect: "a turn's shared reads are dropped; its writes and the rest stay",
-  },
-  {
-    name: "a moved run-end report stays under the old namespace too",
-    file: "apps/pinetrie/host/migrations/0024-run-end-report.ts",
-    from: '      { kind: "delete", target: SESSION_TARGET, namespace: OLD, key: lane },\n',
-    to: "",
-    command: unit,
-    expect: "a moved run-end report leaves nothing under the old namespace",
-  },
-  {
-    name: "a model's urgency moves under its old field's name",
-    file: "apps/pinetrie/host/migrations/0024-run-end-report.ts",
-    from: '      return { kind: "modelSaid", urgency: said, reason }',
-    to: '      return { kind: "modelSaid", said, reason }',
-    command: unit,
-    expect: "a model's urgency moves with its reason",
   },
   // ── the roots' trace ──
   {

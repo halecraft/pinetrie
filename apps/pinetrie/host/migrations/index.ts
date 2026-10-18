@@ -11,9 +11,6 @@
 import type { Exchange, Store } from "@kyneta/exchange"
 import { PRODUCT_NAME } from "@pinetrie/core"
 import { SCHEMA_OF, type StoredKind, storedKind } from "../policy.ts"
-import { TURN_SHARED_READS } from "./0022-turn-shared-reads.ts"
-import { LANE_FORKS } from "./0023-lane-forks.ts"
-import { runEndReport } from "./0024-run-end-report.ts"
 
 /** What a migration reads with, and writes with once every read loaded. */
 export interface MigrationRun {
@@ -67,14 +64,10 @@ export interface RecordMigration {
 }
 
 /**
- * Every one-time record migration this build carries, oldest first. Each one
- * Duane's store ran was deleted.
+ * Every one-time record migration this build carries, oldest first: none.
+ * Each one Duane's store ran was deleted.
  */
-export const RECORD_MIGRATIONS: readonly RecordMigration[] = [
-  TURN_SHARED_READS,
-  LANE_FORKS,
-  runEndReport,
-]
+export const RECORD_MIGRATIONS: readonly RecordMigration[] = []
 
 /**
  * A one-time deletion of stored documents no schema of ours opens, run on the

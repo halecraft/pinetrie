@@ -361,21 +361,16 @@ until the next compaction (S120), and the host compacts at startup. So
   second start finds nothing to do. It writes under the document's current
   schema, so its hash stays. The backup is taken after the reads, before
   the first write. Each is deleted, with its mutations, once Duane's store
-  has run it. `0022-turn-shared-reads` (ADR-0135, S224) is registered:
-  each root's revision records lose `disk.shared.read`, the shared files a
-  turn read, which nothing read back. It reads every root, so each start
-  loads them all until it is deleted. `0023-lane-forks` (ADR-0167, S227) is
-  registered: each lane of its own without a fork record gets one, begun
-  when a revision record names it or (a folder lane) it has a start state,
-  its `lost` from `pinetrie.files-lost`, which the startup's sweep then
-  deletes; owed otherwise, from accepted work. It reads every root too.
-  `0024-run-end-report` (ADR-0166) is registered after it: each session
-  record under `pinetrie.verdict` moves to `pinetrie.runEndReport`, its
-  `verdict` named `report` and a model's `said` named `modelSaid` with its
-  `urgency`. `rewriteRecords` keeps a record in its namespace, so this one
-  writes the set and the delete itself. A record in no known shape is not
-  moved, and the same start's sweep of undeclared records deletes it.
-  `0021-entry-words` (ADR-0158) renamed
+  has run it, since a registered one that reads every root (as one built
+  on `recordDocs` over the roots does) loads them all at each start, and
+  `migrate` compacts every document it opened. None is registered now:
+  `0022-turn-shared-reads` (ADR-0135, S224) dropped each root's revision
+  records' `disk.shared.read`; `0023-lane-forks` (ADR-0167, S227) gave
+  each lane of its own without a fork record one, begun or owed, its
+  `lost` from `pinetrie.files-lost`; `0024-run-end-report` (ADR-0166)
+  moved each session record under `pinetrie.verdict` to
+  `pinetrie.runEndReport`. They ran, and were deleted. `0021-entry-words`
+  (ADR-0158) renamed
   each root's stored entries raw, by `customType` (a person's message
   `pinetrie.chat` to `pinetrie.message`, the cards pinned to a task to
   `pinetrie.canvas-pinned`, and `details` naming a canvas), and never an
