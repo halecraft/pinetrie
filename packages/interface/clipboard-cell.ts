@@ -1,21 +1,21 @@
-// interface/clipboard-cell — what the clipboard cell beside the inventory's
-// grid shows: the last copy this tab made, never a slot. No page can read
+// interface/clipboard-cell — what the clipboard chip in the inventory's
+// header shows: the last copy this tab made, never a slot. No page can read
 // the system clipboard before a paste, so it says no more than that.
 
-import { firstLine } from "@pinetrie/core"
+import { firstLine, INVENTORY_SLOTS } from "@pinetrie/core"
 import { firstEmpty, type Slots } from "@pinetrie/session"
 import { addressWords } from "./address-words.ts"
 import { CLIPBOARD_CELL, CLIPBOARD_CELL_TITLE } from "./card-words.ts"
 import type { CardClip, Clip } from "./clip.ts"
 
 /** How the cell draws its copy: what it is ("a message", "a thread", "text") and its first line. */
-export interface CellFace {
+export interface ClipSummary {
   readonly words: string
   readonly line: string
 }
 
 export interface ClipboardCellView {
-  readonly face: CellFace
+  readonly summary: ClipSummary
   /** The cell's heading. */
   readonly words: string
   readonly title: string
@@ -23,24 +23,29 @@ export interface ClipboardCellView {
   readonly keep: boolean
 }
 
-/** The cell for `clip`, the last copy this tab made; null before any. */
+/**
+ * The cell for `clip`, the last copy this tab made; null before any. `held`
+ * is how many cards your inventory holds: at `INVENTORY_SLOTS` keep is not
+ * offered, whatever slot is drawn empty.
+ */
 export function clipboardCellView(
   clip: Clip | null,
   slots: Slots,
+  held: number,
 ): ClipboardCellView | null {
   if (clip === null) return null
   return {
-    face: cellFace(clip),
+    summary: clipSummary(clip),
     words: CLIPBOARD_CELL,
     title: CLIPBOARD_CELL_TITLE,
-    keep: firstEmpty(slots) !== null,
+    keep: held < INVENTORY_SLOTS && firstEmpty(slots) !== null,
   }
 }
 
-/** How long a line the cell shows, as a slot's face does. */
+/** How long a line the cell shows. */
 const LINE = 60
 
-function cellFace(clip: Clip): CellFace {
+function clipSummary(clip: Clip): ClipSummary {
   switch (clip.kind) {
     case "text":
       return { words: "text", line: firstLine(clip.text, LINE) }

@@ -13,8 +13,8 @@ const key = (k: string, over: Partial<KeyLike> = {}): KeyLike => ({
 })
 const at = (over: Partial<GridKeyState> = {}): GridKeyState => ({
   grid: INVENTORY_GRID,
-  rows: 3,
-  selected: 7,
+  rows: 6,
+  selected: 5,
   hasCard: true,
   open: false,
   inText: false,
@@ -24,26 +24,26 @@ const at = (over: Partial<GridKeyState> = {}): GridKeyState => ({
 
 describe("gridKeyAct", () => {
   test.each([
-    ["ArrowLeft", 6],
-    ["h", 6],
-    ["ArrowRight", 8],
-    ["l", 8],
-    ["ArrowUp", 1],
-    ["k", 1],
-    ["ArrowDown", 13],
-    ["j", 13],
+    ["ArrowLeft", 4],
+    ["h", 4],
+    ["ArrowRight", 5],
+    ["l", 5],
+    ["ArrowUp", 3],
+    ["k", 3],
+    ["ArrowDown", 7],
+    ["j", 7],
   ])("%s selects the next cell", (k, cell) => {
     expect(gridKeyAct(key(k), at())).toEqual({ kind: "select", cell })
   })
 
   test("Alt+arrows move the selected card a cell; not with none, nor past an edge", () => {
-    expect(gridKeyAct(key("ArrowRight", { altKey: true }), at())).toEqual({
+    expect(gridKeyAct(key("ArrowLeft", { altKey: true }), at())).toEqual({
       kind: "move",
-      from: 7,
-      to: 8,
+      from: 5,
+      to: 4,
     })
     expect(
-      gridKeyAct(key("ArrowRight", { altKey: true }), at({ hasCard: false })),
+      gridKeyAct(key("ArrowLeft", { altKey: true }), at({ hasCard: false })),
     ).toBeNull()
     expect(
       gridKeyAct(key("ArrowUp", { altKey: true }), at({ selected: 1 })),
@@ -71,9 +71,9 @@ describe("gridKeyAct", () => {
   })
 
   test("a move stops at the last row", () => {
-    expect(gridKeyAct(key("j"), at({ selected: 13 }))).toEqual({
+    expect(gridKeyAct(key("j"), at({ selected: 11 }))).toEqual({
       kind: "select",
-      cell: 13,
+      cell: 11,
     })
   })
 

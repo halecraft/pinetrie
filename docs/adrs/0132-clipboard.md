@@ -18,6 +18,8 @@
   - ADR-0133: a drop or a paste aimed at a filled slot replaces its card,
     which goes to your trash in the same undo step; only a gesture with no
     slot of its own (a take, keep) needs a free one.
+  - ADR-0171: the clipboard cell is a chip in the panel's header, with its
+    keep.
 
 **Context.**
 

@@ -36,6 +36,11 @@
     and opaque files; a reference's quote is a text blob like any other.
   - ADR-0158: the card kind `task` is `canvas`; a topic and a task are a
     canvas by its place, as a note is a text card by its place.
+  - ADR-0171: the three levels of detail are compact, normal and full, and
+    each is a box of a fixed shape: compact half a column, normal one column,
+    full one or more. A kind fills compact as a value, drawn by one component.
+    A folded strip and a shut margin's count are no level. The inventory draws
+    compact slots and its selected card on a bench.
 
 **Context.**
 

@@ -170,6 +170,11 @@ export function noticeWords(notice: CardNotice, reader: Reader): string {
 
 /** The inventory panel's name, and its button in the footer. */
 export const INVENTORY = "inventory"
+/** The panel's own ×, which closes it, as Escape and its toggle do. */
+export const CLOSE_INVENTORY = {
+  label: "×",
+  title: "close your inventory (Esc)",
+} as const
 /** Take into your inventory: one name and one key wherever it is offered. */
 export const TAKE = "take into your inventory (Ctrl+Shift+I)"
 /** The clipboard cell's button: its copy into a free slot. */
@@ -190,9 +195,6 @@ export const DISCARD_CARD_TITLE =
   "discard (Ctrl+Shift+Backspace) · the undo key brings it back"
 /** A slot's ×, which discards its card from your inventory. */
 export const DISCARD_SLOT_TITLE = "discard · the undo key brings it back"
-/** An open card's ×, which folds it back into its slot. */
-export const CLOSE_CARD = "×"
-export const CLOSE_CARD_TITLE = "close (Esc)"
 
 /** A notice's React key: what it is about, and why. */
 export const noticeKey = (notice: CardNotice): string =>

@@ -1,13 +1,13 @@
 // web/margin — an entry's margin, open under it: its comments, each a note
 // anyone on the canvas may edit, and a control to add one. Shut, the margin is
-// its face, the count beside the entry (`MarginFace`). What it says is
+// the count beside the entry (`MarginCount`). What it says is
 // `@pinetrie/interface`'s (`margin.ts`).
 
 import type { CardId, SeatRecord } from "@pinetrie/core"
 import {
   ADD_COMMENT,
   type ColumnAct,
-  marginFaceWords,
+  marginCountWords,
   type Reader,
   type ReadOnly,
   SHUT_MARGIN,
@@ -18,12 +18,12 @@ import { NoteCardEditor } from "./card-editor.tsx"
 import { RENDERINGS } from "./renderings.tsx"
 
 /** A shut margin: how many comments it holds; a press opens it. */
-export function MarginFace(p: { count: number; onOpen: () => void }) {
-  const words = marginFaceWords(p.count)
+export function MarginCount(p: { count: number; onOpen: () => void }) {
+  const words = marginCountWords(p.count)
   return (
     <button
       aria-label={words.title}
-      className="margin-face"
+      className="margin-count"
       onClick={p.onOpen}
       title={words.title}
       type="button"

@@ -44,6 +44,7 @@ import type { Quote } from "./card-intents.ts"
 import type { Clip } from "./clip.ts"
 import type { FocusKey } from "./focus-claim.ts"
 import type { Identity } from "./identity.ts"
+import type { InventoryAct } from "./inventory-state.ts"
 import {
   type Here,
   type Layout,
@@ -196,11 +197,8 @@ export type Effect =
   | { readonly kind: "undoSwap"; readonly direction: MoveDirection }
   /** Keep a refusal made before anything was sent. */
   | { readonly kind: "refuse"; readonly refusal: CardNotice }
-  /** Open the inventory; `brief`: only for the flight of a take into it, if it was closed. */
-  | { readonly kind: "showInventory"; readonly brief: boolean }
-  | { readonly kind: "select"; readonly slot: number }
-  /** Open the selected slot's card in your inventory: a thread's read-only preview. */
-  | { readonly kind: "openSelected" }
+  /** An act on your inventory panel: shown, its selection, its bench (`inventoryReducer`). */
+  | { readonly kind: "inventory"; readonly act: InventoryAct }
   /** An action on proposed changes, which the session tracks (`acting`). */
   | {
       readonly kind: "proposed"

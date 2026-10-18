@@ -12,7 +12,13 @@
          cell shares, so the two split along one line; folded to icons, it is
          3rem (ADR-0088). */
       :root { color-scheme: dark; --page: #14161a; --chrome: #0e1013; --edge: #23272e;
-        --on: #c9d1d9; --surface: var(--page); --side: 15rem; }
+        --on: #c9d1d9; --surface: var(--page); --side: 15rem;
+        /* A card's sizes (ADR-0171): a column, and compact, half a column's
+           inside, as your inventory's bag lays two out (S241). A surface lays
+           out in these and sets no card's size of its own. */
+        --column: 28rem; --bag-pad: .75rem; --slot-gap: .35rem;
+        --compact-w: calc((var(--column) - 2 * var(--bag-pad) - var(--slot-gap)) / 2);
+        --compact-h: 4rem; }
       @media (width < 56rem) { :root { --side: 11.5rem; } }
       /* The sidebar folded to icons (ADR-0088), at any window width. */
       :root[data-list="icons"] { --side: 3rem; }
@@ -230,10 +236,11 @@
          column (S37). */
       .column { flex: 0 0 auto; min-width: 0; display: flex; min-height: 0;
         border-right: 1px solid #23272e; }
-      .column-thread { flex: 0 0 28rem; width: 28rem; min-width: 0; display: flex;
+      .column-thread { flex: 0 0 var(--column); width: var(--column); min-width: 0; display: flex;
         flex-direction: column; min-height: 0; }
       /* A card two columns wide (ADR-0116): its width is everyone's. */
-      .column[data-width="2"] .column-thread { flex-basis: 56rem; width: 56rem; }
+      .column[data-width="2"] .column-thread { flex-basis: calc(2 * var(--column));
+        width: calc(2 * var(--column)); }
       /* A column's header (ADR-0040): who works in it, then where it forks. Every
          track colour in a column is `var(--track)`, set inline on `.column`
          (`trackStyle`), and on the narrow pane's dialog, which is outside it. */
@@ -879,9 +886,9 @@
       .note-column-notes .card-editor.note { margin-bottom: .3rem; }
       /* An entry's margin (ADR-0126): shut, its count under the entry; open,
          its comments, indented as notes beside what they are on. */
-      .margin-face { background: none; border: 0; padding: 0 .75rem; color: #999;
+      .margin-count { background: none; border: 0; padding: 0 .75rem; color: #999;
         font-size: .8rem; cursor: pointer; }
-      .margin-face:hover { color: #ddd; }
+      .margin-count:hover { color: #ddd; }
       .margin { margin: 0 .75rem .5rem 1.5rem; border-left: 2px solid #555;
         padding-left: .5rem; }
       .margin .card-editor.note { margin-bottom: .3rem; }
@@ -1001,33 +1008,77 @@
       .pinned-read-by { color: #6f7784; }
       .pinned-read-text { white-space: pre-wrap; color: #c3c8d0; }
       .pinned-read-retired { margin: .3rem 0 0 .75rem; font-style: italic; }
-      /* Your inventory (ADR-0048): floating over the columns' middle, docked
-         left, centre or right, a 3 × 6 card grid. */
-      .inventory { position: fixed; z-index: 5; top: 30vh; width: max-content; max-width: 94vw;
+      /* Your inventory (ADR-0048, ADR-0171): floating over the columns' middle,
+         docked left, centre or right; a fixed frame two columns wide, the bag
+         of compact slots and the bench. Its size is the viewport's alone, so
+         nothing it shows moves it. Its height follows its rows, and its top
+         rises where 30vh would put its foot under the footer (S241). */
+      .inventory { --rows: 6; position: fixed; z-index: 5;
+        --body-h: calc(var(--rows) * var(--compact-h) + (var(--rows) - 1) * var(--slot-gap)
+          + 2 * var(--bag-pad));
+        --inventory-h: calc(var(--body-h) + 2rem + 1.75rem + 2px);
+        top: max(.5rem, min(30vh, 100vh - var(--inventory-h) - 3.5rem));
+        width: calc(2 * var(--column)); max-width: calc(100vw - 2rem);
+        display: flex; flex-direction: column;
         background: #171a1f; border: 1px solid #3a3f48; border-radius: 8px;
-        box-shadow: 0 8px 32px rgb(0 0 0 / .5); }
+        box-shadow: 0 8px 32px rgb(0 0 0 / .5);
+        /* It grows from its toggle and shrinks back into it (S243): drawn
+           always, hidden while closed; the scale property, not transform, so
+           a dock's drag (translate) composes with it. */
+        transform-origin: var(--origin-x, 50%) var(--origin-y, 100%);
+        transition: scale .2s ease-out, opacity .2s ease-out, display .2s allow-discrete; }
+      .inventory:not([data-shown]) { display: none; scale: .05; opacity: 0; }
+      @starting-style { .inventory[data-shown] { scale: .05; opacity: 0; } }
+      @media (prefers-reduced-motion: reduce) {
+        .inventory { transition: opacity .2s ease-out, display .2s allow-discrete; }
+        .inventory:not([data-shown]) { scale: 1; }
+        @starting-style { .inventory[data-shown] { scale: 1; opacity: 0; } }
+      }
+      /* Docked by left, not a transform: a flight measures a slot by layout,
+         which no transform moves (S243). */
       .inventory[data-dock="left"] { left: 1rem; }
-      .inventory[data-dock="centre"] { left: 50%; transform: translateX(-50%); }
+      .inventory[data-dock="centre"] { left: max(1rem, calc(50vw - var(--column))); }
       .inventory[data-dock="right"] { right: 1rem; }
-      .inventory-frame { padding: .3rem .75rem; font-size: .75rem; color: #8b93a1;
-        cursor: grab; user-select: none; border-bottom: 1px solid #23272e; touch-action: none; }
-      .inventory-body { padding: .75rem; }
-      /* The selected card's preview (ADR-0126): beside the grid, away from the
-         panel's dock edge, one column wide, normal and read only. */
-      .inventory-grid-row { display: flex; gap: .75rem; align-items: flex-start; }
-      .inventory-grid-row > .preview { flex: 0 0 min(28rem, 40vw); width: min(28rem, 40vw); }
-      .inventory-grid-row > .preview[data-side="left"] { order: -1; }
-      /* The clipboard cell (ADR-0132): beside the grid, away from the preview;
-         never a slot. */
-      .clipboard-cell { flex: 0 0 9rem; width: 9rem; display: flex; flex-direction: column;
-        gap: .35rem; padding: .5rem; border: 1px dashed #3a4150; border-radius: 6px;
-        font-size: .75rem; color: #8b93a1; }
-      .clipboard-cell[data-side="left"] { order: -2; }
+      .inventory-header { display: flex; align-items: center; gap: .75rem; height: 2rem;
+        padding: 0 .4rem 0 .75rem; font-size: .75rem; color: #8b93a1; cursor: grab;
+        user-select: none; border-bottom: 1px solid #23272e; touch-action: none; }
+      .inventory-title { flex: none; font-variant-numeric: tabular-nums; }
+      .inventory-close { margin-left: auto; padding: 0 .45rem; background: none; color: #8b93a1;
+        font-size: .9rem; line-height: 1.4; }
+      .inventory-close:hover { color: #ddd; }
+      .inventory-body { display: flex; height: var(--body-h); min-height: 0; }
+      .inventory-bag { flex: 0 0 var(--column); width: var(--column); padding: var(--bag-pad); }
+      /* The bench (ADR-0171): the selected slot, beside the bag, away from
+         the dock's edge; normal and read only, or opened full, scrolling in
+         its own box. */
+      .bench { flex: 0 0 var(--column); width: var(--column); min-width: 0; padding: var(--bag-pad);
+        padding-left: 0; overflow-y: auto; display: flex; flex-direction: column; }
+      .bench[data-side="left"] { order: -1; padding: var(--bag-pad) 0 var(--bag-pad) var(--bag-pad); }
+      .bench > .card-normal { max-height: none; }
+      .bench > .card-frame { margin: 0; }
+      .bench-empty { margin: auto; color: #6f7784; font-size: .8rem; text-align: center; }
+      /* One line, always, so a notice changes no height. */
+      .inventory-status { height: 1.75rem; padding: 0 .75rem; overflow: hidden; white-space: nowrap;
+        text-overflow: ellipsis; font-size: .75rem; line-height: 1.75rem; color: #d0a15f;
+        border-top: 1px solid #23272e; }
+      /* Narrower than two columns, one column: the bag, and the bench in its
+         place while a card is open on it. */
+      @media (width < 58rem) {
+        .inventory { width: var(--column); }
+        .inventory[data-dock="centre"] { left: max(1rem, calc(50vw - var(--column) / 2)); }
+        .bench { display: none; }
+        .inventory[data-bench="open"] .bench { display: flex; padding: var(--bag-pad); }
+        .inventory[data-bench="open"] .inventory-bag { display: none; }
+      }
+      /* The clipboard (ADR-0132), a chip in the header: the last copy this
+         tab made, and its keep; never a slot. */
+      .clipboard-cell { display: flex; align-items: center; gap: .4rem; min-width: 0;
+        padding: .05rem .3rem; border: 1px dashed #3a4150; border-radius: 4px; cursor: default; }
       .clipboard-cell:focus { outline: 2px solid var(--you, #e3b341); outline-offset: 1px; }
-      .clipboard-cell-head { display: flex; gap: .3rem; align-items: center; }
-      .clipboard-cell-face { display: flex; flex-direction: column; gap: .15rem; color: #c9d1d9; min-width: 0; }
-      .clipboard-cell-line { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      .clipboard-cell .keep { align-self: flex-start; }
+      .clipboard-cell-what { flex: none; }
+      .clipboard-cell-line { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        color: #c9d1d9; }
+      .clipboard-cell .keep { flex: none; padding: 0 .45rem; font-size: .72rem; line-height: 1.5; }
       .card-head:focus-visible { outline: 2px solid var(--tone, #8b93a1); outline-offset: -2px; }
       /* A card drawn normal: the card itself, bounded at a column's height. */
       .card-normal { display: flex; flex-direction: column; max-height: 18rem;
@@ -1036,10 +1087,7 @@
       .card-normal-body { padding: .4rem .75rem; overflow-y: auto; min-height: 0; }
       .card-normal-title { font-weight: 600; margin-bottom: .3rem; }
       .card-normal-message { margin-bottom: .5rem; }
-      /* A reference (ADR-0126): a chip in a slot, its quote when previewed. */
-      .reference-face { display: flex; align-items: center; gap: .3rem; height: 100%;
-        padding: .2rem .35rem; font-size: .72rem; border-top: 3px solid var(--you, #e3b341); }
-      .reference-face-label { font-style: italic; color: #c3c8d0; }
+      /* A reference (ADR-0126): its quote, on the bench. */
       .reference-quote { margin: .3rem 0; padding-left: .6rem; border-left: 2px solid #3a3f48; }
       .reference-from { color: #8b93a1; font-weight: normal; }
       .edit-as-text { align-self: flex-start; margin-top: .3rem; }
@@ -1053,13 +1101,9 @@
       a.share-chip::before { content: "📎 "; }
       .share-chip-meta { color: #8b93a1; font-size: .85em; }
       .share-chip-location { color: #f0b72f; font-size: .85em; }
-      .note-column-face { display: flex; align-items: center; gap: .3rem; padding: .2rem .35rem;
-        font-size: .72rem; }
-      .note-column-face-title { font-weight: 600; }
-      .note-column-face-count { margin-left: auto; color: #8b93a1; }
-      /* A card grid (ADR-0113): index cards about 8 × 5.5rem in their cells,
-         empty cells dashed; the open card lifted over its neighbours. */
-      .card-grid { display: grid; grid-auto-rows: 5.5rem; gap: .35rem; }
+      /* A card grid (ADR-0113): compact cards in their cells, empty cells
+         dashed. */
+      .card-grid { display: grid; grid-auto-rows: var(--compact-h); gap: var(--slot-gap); }
       .card-grid-cell { position: relative; min-width: 0; }
       .card-grid-cell > button { width: 100%; height: 100%; padding: 0; text-align: left;
         overflow: hidden; background: #1b1e24; border: 1px solid #2c313a; border-radius: 4px; }
@@ -1074,31 +1118,8 @@
       .card-grid-cell > button[aria-pressed="true"] ~ button.slot-discard,
       .card-grid-cell > button.slot-discard:focus-visible { opacity: 1; }
       .card-grid-cell > button.slot-discard:hover { color: #ddd; }
-      /* The open card covers its cell whole, however short its text, and
-         carries the selection's ring itself: the cell under it is hidden. */
-      .card-grid-open { position: absolute; top: 0; z-index: 3; width: 22rem;
-        min-height: 100%; display: flex; flex-direction: column;
-        outline: 2px solid #9ecbff; border-radius: 6px;
-        box-shadow: 0 8px 24px rgb(0 0 0 / .5); }
-      .card-grid-open > .card-frame { flex: 1; }
-      .card-grid-cell[data-open] > button { opacity: 0; }
-      .card-grid-open[data-side="left"] { left: 0; }
-      .card-grid-open[data-side="right"] { right: 0; }
-      .card-grid-open .card-frame { margin: 0; }
-      /* A thread's card in a slot (ADR-0124): its icon and name, its first
-         line, where it ended, its status; opened, its path read only. */
-      .thread-face { display: flex; flex-direction: column; gap: .1rem; height: 100%;
-        border-top: 3px solid #a371f7; padding: .2rem .35rem; font-size: .72rem;
-        overflow: hidden; }
-      .thread-face-head { display: flex; align-items: center; gap: .3rem; }
-      .thread-face-sprite { width: 1.1rem; height: 1.1rem; }
-      .thread-face-sprite[data-kind="banner"] { image-rendering: pixelated; }
-      .thread-face-name { font-weight: 600; color: #d2a8ff; }
-      .thread-face-first, .thread-face-last, .thread-face-focus { color: #c9d1d9;
-        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      .thread-face-focus { color: #e6edf3; }
-      .thread-face-last { color: #8b93a1; }
-      .thread-face-status { margin-top: auto; color: #e3b341; }
+      /* Room for the × beside a compact's badge. */
+      .card-grid-cell:has(> .slot-discard) .compact-head { padding-right: 1.1rem; }
       .thread-preview { flex: 1; display: flex; flex-direction: column; max-height: 24rem;
         background: #1b1e24; border-radius: 6px; font-size: .8rem; }
       .thread-preview-path { margin: 0; padding: .5rem .75rem; overflow-y: auto; list-style: none; }
@@ -1106,18 +1127,27 @@
       .thread-preview-who { font-size: .7rem; color: #8b93a1; }
       .thread-preview-foot { padding: .4rem .75rem; border-top: 1px solid #23272e;
         display: flex; justify-content: flex-end; }
-      /* A card folded: its place's colour as a strip, its owner, its lines. */
-      .card-face { --tone: #6f7784; display: flex; flex-direction: column; height: 100%;
-        border-top: 3px solid var(--tone); padding: .2rem .35rem; font-size: .72rem; }
-      .card-face[data-tone="queued"] { --tone: #58a6ff; }
-      .card-face[data-tone="pinned"] { --tone: #b392f0; }
-      .card-face[data-tone="inventory"] { --tone: var(--you, #e3b341); }
-      .card-face-head { display: flex; align-items: center; gap: .3rem; color: #8b93a1; }
-      .card-face-head .card-icon { color: var(--tone); }
-      .card-face-owner { width: 1rem; height: 1rem; font-size: .6rem; }
-      .card-face-key { margin-left: auto; color: #6f7784; font-size: .65rem; }
-      .card-face-lines { margin-top: .15rem; white-space: pre-wrap; color: #c3c8d0;
-        display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+      /* A card compact (ADR-0171): its place's colour as a strip, a header
+         row, then its lead and second line as one flow cut at two lines
+         together (S241). Every kind is drawn so, by one component. */
+      .compact { --tone: #6f7784; display: flex; flex-direction: column; height: 100%; min-width: 0;
+        padding: .25rem .45rem; border-top: 3px solid var(--tone); font-size: .78rem;
+        line-height: 1.3; overflow: hidden; }
+      .compact[data-tone="queued"] { --tone: #58a6ff; }
+      .compact[data-tone="pinned"] { --tone: #b392f0; }
+      .compact[data-tone="inventory"] { --tone: var(--you, #e3b341); }
+      .compact-head { display: flex; align-items: center; gap: .3rem; height: 1.1rem; flex: none;
+        min-width: 0; white-space: nowrap; color: #8b93a1; }
+      .compact-head .card-icon { color: var(--tone); }
+      .compact-mark { flex: none; width: 1rem; height: 1rem; font-size: .6rem; }
+      img.compact-mark[data-kind="banner"] { image-rendering: pixelated; }
+      .compact-badge { margin-left: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+        font-size: .68rem; color: #6f7784; }
+      .compact-badge[data-status] { color: #e3b341; }
+      .compact-text { margin-top: .1rem; color: #d0d5dc; display: -webkit-box;
+        -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+        overflow-wrap: anywhere; }
+      .compact-second { color: #8b93a1; }
       /* The × that clears a card's command, in its chip. */
       .card-command-clear { padding: 0 .3rem; font-size: .72rem; background: none; border: none; color: #8b93a1; }
       /* What a new thread starts from, when there is a choice: a line of
@@ -1528,11 +1558,19 @@
         transition: transform 80ms linear; position: relative; z-index: 1; }
       .card-frame[data-dragging], .card-grid-cell[data-dragging], .thread-card[data-dragging],
       .sidebar-item[data-dragging] { position: relative; z-index: 20; }
-      /* A column off the strip is drawn as its card face, under the pointer. */
-      .drag-face { position: fixed; left: 0; top: 0; z-index: 30; pointer-events: none;
-        width: 16rem; max-height: 4rem; overflow: hidden; margin: -1rem 0 0 -8rem;
+      /* A column off the strip is drawn at compact's size, under the pointer:
+         its header, copied. */
+      .drag-ghost { position: fixed; left: 0; top: 0; z-index: 30; pointer-events: none;
+        width: var(--compact-w); height: var(--compact-h); overflow: hidden;
+        margin: -1rem 0 0 calc(var(--compact-w) / -2);
         background: #1d2026; border: 1px solid #3a3f48; border-radius: 6px;
         box-shadow: 0 12px 28px rgb(0 0 0 / .55); }
+      /* A card flying into your inventory: a ghost on the page, as its slot
+         draws it, landing on the slot's box as laid out (S243). */
+      .flight-ghost { position: fixed; z-index: 30; pointer-events: none; transform-origin: 0 0;
+        overflow: hidden; background: #1b1e24; border: 1px solid #2c313a; border-radius: 4px; }
+      .flight-ghost > * { width: 100%; height: 100%; padding: 0; text-align: left;
+        background: none; border: 0; }
       /* What a drop there would do. */
       [data-drop-mark="move"] { outline: 2px solid #8ab4f8; outline-offset: -2px; }
       [data-drop-mark="copy"] { outline: 2px dashed #8ab4f8; outline-offset: -2px; }

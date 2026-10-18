@@ -25,6 +25,8 @@
     says what happens next and holds the one control for it.
   - ADR-0116: a thread card is a thread, held by a task or an inventory; a
     text card on a board state starts a task.
+  - ADR-0171: in your inventory, × discards on the bench as everywhere;
+    leaving the open card is Escape or selecting another slot.
 
 **Context.**
 

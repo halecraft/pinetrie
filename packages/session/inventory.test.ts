@@ -33,7 +33,7 @@ describe("firstEmpty", () => {
     expect(firstEmpty(some, 2)).toBe(1)
     expect(firstEmpty(some)).toBe(1)
     const full = Object.fromEntries(
-      Array.from({ length: 18 }, (_, n) => [String(n), textCardId(`c-${n}`)]),
+      Array.from({ length: 12 }, (_, n) => [String(n), textCardId(`c-${n}`)]),
     )
     expect(firstEmpty(full, 3)).toBeNull()
   })
@@ -86,6 +86,30 @@ describe("settleSlots and planSlots: the repair", () => {
     expect(planSlots([A, B], slots, NO_INTENTS, STEADY)).toEqual({
       set: {},
       clear: [],
+    })
+  })
+
+  test("a 13th held card is drawn in the row past the sixth", () => {
+    const held = Array.from({ length: 13 }, (_, n) => textCardId(`c-${n}`))
+    const slots = Object.fromEntries(
+      held.slice(0, 12).map((c, n) => [String(n), c]),
+    )
+    expect(settleSlots(held, slots, NO_INTENTS)).toEqual({
+      ...slots,
+      "12": held[12],
+    })
+    expect(firstEmpty(settleSlots(held, slots, NO_INTENTS))).toBeNull()
+  })
+
+  test("holding 12 again, a card past the twelfth slot settles into the first empty", () => {
+    const held = Array.from({ length: 12 }, (_, n) => textCardId(`c-${n}`))
+    const slots = Object.fromEntries(
+      held.map((c, n) => [String(n === 3 ? 13 : n), c]),
+    )
+    expect(settleSlots(held, slots, NO_INTENTS)["3"]).toBe(held[3])
+    expect(planSlots(held, slots, NO_INTENTS, STEADY)).toEqual({
+      set: { "3": held[3] },
+      clear: ["13"],
     })
   })
 

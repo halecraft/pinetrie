@@ -10,11 +10,22 @@ export interface Grid {
 /** A move through a grid by arrow or `hjkl`. */
 export type GridStep = "left" | "right" | "up" | "down"
 
-/** Your inventory: 3 rows of 6. */
-export const INVENTORY_GRID = { width: 6, rows: 3 } as const satisfies Grid
+/** Your inventory: 6 rows of 2, two compact slots to a column. */
+export const INVENTORY_GRID = { width: 2, rows: 6 } as const satisfies Grid
 
 /** How many cards an inventory holds: every cell of its grid. */
 export const INVENTORY_SLOTS = INVENTORY_GRID.width * INVENTORY_GRID.rows
+
+/**
+ * The grid that draws `held` cards: the inventory's, with a row for every two
+ * past its slots while someone holds more (a limit lowered, or cards an undo
+ * brought back), so no card they hold is out of sight. Takes still aim at
+ * `INVENTORY_GRID` alone.
+ */
+export const inventoryGrid = (held: number): Grid => ({
+  width: INVENTORY_GRID.width,
+  rows: Math.max(INVENTORY_GRID.rows, Math.ceil(held / INVENTORY_GRID.width)),
+})
 
 /** Whether `n` is a cell of `grid`. */
 export const isCell = (grid: Grid, n: number): boolean =>

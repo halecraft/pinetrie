@@ -182,14 +182,34 @@ export const mutations: readonly Mutation[] = [
       "a fork a host stopped after its clone is run again at the lane's next start",
   },
   {
-    name: "the inventory previews nothing",
+    name: "the bench draws nothing for an empty slot",
     file: "packages/web/inventory-panel.tsx",
-    from: "            {view.preview !== null && (",
-    to: "            {view.preview !== null && false && (",
+    from: '              <div className="bench-empty">',
+    to: '              <div className="bench-empty" hidden>',
     suite: "browser",
     scenario: "page",
     expect:
-      "selecting a slot previews its card beside the grid, read only, and Enter opens it in place instead",
+      "selecting a slot shows its card on the bench, read only, and the panel keeps its size",
+  },
+  {
+    name: "the bench's open card takes no focus",
+    file: "packages/web/inventory-panel.tsx",
+    from: "      ;(box ?? control ?? at)?.focus()",
+    to: "      ;(control ?? at)?.focus()",
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "Enter opens the card on the bench, caret in its box, and Escape folds it back to its slot",
+  },
+  {
+    name: "a pointer over a peek engages nothing",
+    file: "packages/web/inventory-panel.tsx",
+    from: '        if (e.movementX !== 0 || e.movementY !== 0) act({ kind: "engage" })',
+    to: '        if (false) act({ kind: "engage" })',
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "a take while the inventory is closed peeks, and a pointer over it keeps it open",
   },
   // ⇤ and × are one button, its words and intent from `columnHeadEnd`:
   // each mutant skips its own intent.
@@ -599,8 +619,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a column grows to its widest line",
     file: "packages/web/index.html",
-    from: "      .column-thread { flex: 0 0 28rem; width: 28rem; min-width: 0; display: flex;",
-    to: "      .column-thread { flex: 0 0 28rem; display: flex;",
+    from: "      .column-thread { flex: 0 0 var(--column); width: var(--column); min-width: 0; display: flex;",
+    to: "      .column-thread { flex: 0 0 var(--column); display: flex;",
     suite: "browser",
     scenario: "tools",
     expect:
@@ -2750,26 +2770,6 @@ export const mutations: readonly Mutation[] = [
     expect: "what you type is still there after switching tabs",
   },
   {
-    name: "Escape leaves a grid's card open",
-    file: "packages/web/card-grid.tsx",
-    from: '          case "fold":\n            select(view.selected)\n',
-    to: '          case "fold":\n            p.onSelect(view.selected)\n',
-    suite: "browser",
-    scenario: "page",
-    expect:
-      "a card selected in the inventory opens in place, and Escape or its × folds it",
-  },
-  {
-    name: "an open card's × leaves it open",
-    file: "packages/web/renderings.tsx",
-    from: "      onClose={onClose ?? undefined}",
-    to: "      onClose={() => {}}",
-    suite: "browser",
-    scenario: "page",
-    expect:
-      "a card selected in the inventory opens in place, and Escape or its × folds it",
-  },
-  {
     name: "the pin box stays open once you leave it",
     file: "packages/web/column.tsx",
     from: "                        onLeave={() => setPinning(false)}",
@@ -3085,7 +3085,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the panel draws no clipboard cell",
     file: "packages/web/app.tsx",
-    from: "            cell={clipboardCellView(cell, slots)}",
+    from: "            cell={clipboardCellView(cell, slots, held.length)}",
     to: "            cell={null}",
     suite: "browser",
     scenario: "images",

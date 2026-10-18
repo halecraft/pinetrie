@@ -14,6 +14,11 @@ import type { FocusKey } from "./focus-claim.ts"
 import { type ColumnMotion, foldMotion } from "./fold-motion.ts"
 import type { Identity } from "./identity.ts"
 import { afterCanvasMove, type Intent } from "./intent.ts"
+import {
+  cardFlight,
+  type Flight,
+  type InventoryAct,
+} from "./inventory-state.ts"
 import type { LayoutAction } from "./layout.ts"
 import type { ListWidth } from "./list-width.ts"
 import { commentMarkdown } from "./markdown-of.ts"
@@ -46,15 +51,10 @@ export interface AppPorts {
   >
   /** Your attention document: what "not needed" marks. */
   readonly attention: Pick<AttentionStore, "dismiss" | "dismissReady">
-  /** The inventory panel: opened (briefly, for the flight of a take into it), and its selection. */
-  readonly inventory: {
-    readonly show: (brief: boolean) => void
-    readonly select: (slot: number) => void
-    /** Open the selected slot's card. */
-    readonly openSelected: () => void
-  }
-  /** Measure a card's box before it moves, so it flies to where it lands. */
-  readonly fly: (card: CardId) => void
+  /** The inventory panel's acts, which `inventoryReducer` applies. */
+  readonly inventory: (act: InventoryAct) => void
+  /** Measure a card's box before it moves, so it flies to where it lands, as `how` says. */
+  readonly fly: (card: CardId, how: Flight) => void
   /**
    * Move a column into its fold or out of it, calling `commit`, which lands
    * the fold, exactly once: before the motion for an unfold, after it for a
@@ -241,7 +241,7 @@ function performOne(effect: Effect, ports: AppPorts): void {
       ports.insertText(effect.text)
       return
     case "moveCard":
-      if (effect.fly) ports.fly(effect.move.card)
+      if (effect.fly) ports.fly(effect.move.card, cardFlight(effect.move.to))
       void ports.session.moveCard(
         effect.move,
         effect.how,
@@ -251,7 +251,8 @@ function performOne(effect: Effect, ports: AppPorts): void {
       return
     case "queueCard":
       // A card made in the queue comes from nowhere on the page.
-      if (effect.move.from !== null) ports.fly(effect.move.card)
+      if (effect.move.from !== null)
+        ports.fly(effect.move.card, cardFlight(effect.move.to))
       void ports.session.queueCard(
         effect.move,
         effect.hold,
@@ -266,7 +267,8 @@ function performOne(effect: Effect, ports: AppPorts): void {
       ports.session.swapSlots(effect.a, effect.b)
       return
     case "moveCards":
-      for (const { move } of effect.moves) ports.fly(move.card)
+      for (const { move } of effect.moves)
+        ports.fly(move.card, cardFlight(move.to))
       void ports.session
         .moveCards(effect.moves, effect.actedAt, effect.here)
         .then(answer => perform(afterKeep(answer, effect.close), ports))
@@ -282,14 +284,8 @@ function performOne(effect: Effect, ports: AppPorts): void {
     case "refuse":
       ports.session.refuse(effect.refusal)
       return
-    case "showInventory":
-      ports.inventory.show(effect.brief)
-      return
-    case "select":
-      ports.inventory.select(effect.slot)
-      return
-    case "openSelected":
-      ports.inventory.openSelected()
+    case "inventory":
+      ports.inventory(effect.act)
       return
     case "openFold":
       ports.openFold(effect.ask)

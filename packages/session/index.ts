@@ -43,7 +43,6 @@ export {
   heldBy,
   type Intents,
   NO_INTENTS,
-  SLOT_INDICES,
   type Slots,
   settleSlots,
 } from "./inventory.ts"

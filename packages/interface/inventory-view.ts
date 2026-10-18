@@ -1,43 +1,46 @@
 // interface/inventory-view — what the inventory panel draws: `settleSlots`,
-// the one slot rule the repair writes too, as a card grid (`gridView`), each
-// of the first nine slots labelled 1–9, and the selected card's preview.
+// the one slot rule the repair writes too, as a card grid (`gridView`) that
+// grows past its 12 slots only while you hold more, each of the first nine
+// slots labelled 1–9; how many you hold of 12; and the bench, the selected
+// slot drawn beside the grid.
 
 import {
   type CardId,
-  type CardRecord,
-  type CardWidth,
-  INVENTORY_GRID,
+  INVENTORY_SLOTS,
+  inventoryGrid,
   type ThreadId,
+  type ThreadName,
   type WriterId,
 } from "@pinetrie/core"
 import { type Intents, type Slots, settleSlots } from "@pinetrie/session"
-import type { DrawnCard } from "./face.ts"
+import type { DrawnCard } from "./compact.ts"
 import { type GridView, gridView } from "./grid-view.ts"
-import type { ThreadFace } from "./thread-face.ts"
+import type { ThreadGlance } from "./thread-glance.ts"
 
 /**
- * The selected card, drawn beside the grid: normal, one column wide, read only.
- * Opened, it is drawn whole in place instead.
+ * The bench: the selected slot, one column wide. An empty slot says what it
+ * is; a card is drawn normal and read only, or full once opened.
  */
-export interface CardPreview {
-  readonly card: CardRecord
-  readonly detail: "normal"
-  readonly width: CardWidth
-}
+export type Bench =
+  | { readonly kind: "empty"; readonly slot: number }
+  | {
+      readonly kind: "card"
+      readonly card: DrawnCard
+      readonly detail: "normal" | "full"
+    }
 
 interface InventoryView {
   readonly grid: GridView
-  /** How many slots are empty. */
-  readonly free: number
-  /** The selected card's preview; null for an empty slot, or while it is open. */
-  readonly preview: CardPreview | null
+  /** How many cards you hold, of `INVENTORY_SLOTS`: more while over. */
+  readonly held: number
+  readonly bench: Bench
 }
 
 /** "1"–"9" for the first nine slots, else null. */
 export const slotKey = (slot: number): string | null =>
   slot < 9 ? String(slot + 1) : null
 
-/** What the panel draws: `settleSlots`, each slot with its card. */
+/** What the panel draws: `settleSlots`, each slot with its card, and the bench. */
 export function inventoryView(input: {
   readonly held: readonly DrawnCard[]
   readonly slots: Slots
@@ -47,9 +50,11 @@ export function inventoryView(input: {
   readonly me: WriterId
   /** Each card's text, by id; one not yet read is "". */
   readonly texts: ReadonlyMap<CardId, string>
-  /** Each thread's face, for a thread's card. */
-  readonly threads: ReadonlyMap<ThreadId, ThreadFace>
-  /** The selected card is open, drawn whole in its slot. */
+  /** Each thread's glance, for a thread's card. */
+  readonly threads: ReadonlyMap<ThreadId, ThreadGlance>
+  /** Each thread's name, which a reference names as where it is from. */
+  readonly threadNames: ReadonlyMap<ThreadId, ThreadName>
+  /** The bench has the selected card open, drawn full. */
   readonly open: boolean
 }): InventoryView {
   const byId = new Map<CardId, DrawnCard>(
@@ -66,21 +71,34 @@ export function inventoryView(input: {
     if (card !== undefined) placed.set(Number(slot), card)
   }
   const grid = gridView({
-    grid: INVENTORY_GRID,
+    grid: inventoryGrid(input.held.length),
     tone: "inventory",
     placed,
     selected: input.selected,
     me: input.me,
     texts: input.texts,
     threads: input.threads,
+    threadNames: input.threadNames,
     keyOf: slotKey,
   })
   return {
     grid,
-    free: grid.cells.length - placed.size,
-    preview:
-      grid.card === null || input.open
-        ? null
-        : { card: grid.card, detail: "normal", width: 1 },
+    held: input.held.length,
+    bench:
+      grid.card === null
+        ? { kind: "empty", slot: input.selected }
+        : {
+            kind: "card",
+            card: grid.card,
+            detail: input.open ? "full" : "normal",
+          },
   }
 }
+
+/** The panel's count: "8/12", "13/12" while over. */
+export const inventoryCountWords = (held: number): string =>
+  `${held}/${INVENTORY_SLOTS}`
+
+/** What an empty slot on the bench says. */
+export const emptyBenchWords = (slot: number): string =>
+  `slot ${slot + 1} · empty: drop or paste a card here`

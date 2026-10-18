@@ -7,14 +7,15 @@ import {
   type CardInPlace,
   type CardRecord,
   firstEmpty as firstEmptyCell,
+  type Grid,
   hasPlaceKind,
   INVENTORY_GRID,
-  INVENTORY_SLOTS,
+  inventoryGrid,
   isCell,
   type WriterId,
 } from "@pinetrie/core"
 
-/** Slot index ("0"–"17", reading order) to card. */
+/** Slot index ("0"–"11", reading order; more while someone holds more) to card. */
 export type Slots = Readonly<Record<string, CardId>>
 
 /** What to write to the slots: cards into slots, and slots to clear. */
@@ -28,46 +29,46 @@ export type Intents = ReadonlyMap<CardId, number>
 
 export const NO_INTENTS: Intents = new Map()
 
-/** Every slot index, in reading order: the inventory grid's cells. */
-export const SLOT_INDICES: readonly number[] = Array.from(
-  { length: INVENTORY_SLOTS },
-  (_, n) => n,
-)
-
 /** The slots `slots` fills. */
 const takenOf = (slots: Slots): ReadonlySet<number> =>
   new Set(Object.keys(slots).map(Number))
 
 /**
  * The first empty slot in reading order, from `start` if it is empty; null
- * when full (core's `firstEmpty` over the inventory's grid).
+ * when full (core's `firstEmpty` over the inventory's grid). It never names a
+ * slot past the twelfth: those exist only to draw what someone holds past it.
  */
 export const firstEmpty = (slots: Slots, start?: number): number | null =>
   firstEmptyCell(INVENTORY_GRID, takenOf(slots), start)
 
-const isSlot = (n: number): boolean => isCell(INVENTORY_GRID, n)
+/** Every cell of `grid`, in reading order. */
+const cellsOf = (grid: Grid): readonly number[] =>
+  Array.from({ length: grid.width * grid.rows }, (_, n) => n)
 
 /**
  * The slots as they should be: `intents` in their chosen slots; every other
  * card in `held` where a slot names it (the lower, if two do), or else in the
  * first empty slot, cards in id order; slots naming a card not held, or a
  * slot that is no slot, dropped. A held card in a slot an intent chose moves
- * to the first empty one.
+ * to the first empty one. The grid is `inventoryGrid(held.length)`, so a card
+ * past the twelfth slot keeps its place while more than 12 are held, and
+ * settles into the first empty slot once 12 or fewer are.
  */
 export function settleSlots(
   held: readonly CardId[],
   slots: Slots,
   intents: Intents,
 ): Slots {
+  const grid = inventoryGrid(held.length)
   const out: Record<string, CardId> = {}
   const placed = new Set<CardId>()
   for (const [card, slot] of intents) {
-    if (!isSlot(slot) || out[String(slot)] !== undefined) continue
+    if (!isCell(grid, slot) || out[String(slot)] !== undefined) continue
     out[String(slot)] = card
     placed.add(card)
   }
   const isHeld = new Set(held)
-  for (const n of SLOT_INDICES) {
+  for (const n of cellsOf(grid)) {
     const card = slots[String(n)]
     if (card === undefined || !isHeld.has(card) || placed.has(card)) continue
     if (out[String(n)] !== undefined) continue
@@ -76,7 +77,7 @@ export function settleSlots(
   }
   for (const card of [...held].sort()) {
     if (placed.has(card)) continue
-    const n = firstEmpty(out)
+    const n = firstEmptyCell(grid, takenOf(out))
     if (n === null) break
     out[String(n)] = card
     placed.add(card)
@@ -105,6 +106,7 @@ export function planSlots(
   steady: (card: CardId) => boolean,
 ): SlotWrites {
   const settled = settleSlots(held, slots, intents)
+  const grid = inventoryGrid(held.length)
   const chosen = new Set([...intents.values()].map(String))
   const isHeld = new Set(held)
   const set: Record<string, CardId> = {}
@@ -117,7 +119,7 @@ export function planSlots(
         !chosen.has(slot) &&
         !intents.has(card) &&
         settled[slot] === undefined &&
-        (!isSlot(Number(slot)) || isHeld.has(card) || steady(card)),
+        (!isCell(grid, Number(slot)) || isHeld.has(card) || steady(card)),
     )
     .map(([slot]) => slot)
   return { set, clear }

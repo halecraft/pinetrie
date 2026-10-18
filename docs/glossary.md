@@ -77,14 +77,14 @@ words they were written with.
 | **copy** (to the clipboard) | Cmd+C on anything you can read, past or present: written to the clipboard, nothing moved or taken (ADR-0132). | `clipOfFocus`, `planCopy`, `Clip` | Cmd+C taking a reference into your inventory |
 | **cut** | Cmd+X on a card you can discard: a copy, then a discard, one undo step (ADR-0132). | `clipOfFocus`'s `cut`, `isDiscardable` | Cmd+X as a take into the inventory |
 | **paste** | Cmd+V: what the clipboard holds landed where focus is, a new thing keeping its origin; the first paste after a cut moves the cut card. A selection lands as text; an entry, a block or a card as a link in a text box, as a card on a surface (ADR-0132). | `readPaste`, `putLanding`, `planPut`, `planPaste`, `paste` (the command) |  |
-| **clipboard cell** | The inventory panel's cell beside the grid: the last thing copied in pine·trie, not a slot (ADR-0132). | `clipboardCellView`, `ClipboardCell` |  |
+| **clipboard cell** | The chip in the inventory panel's header: the last thing copied in pine·trie, not a slot (ADR-0132, ADR-0171). | `clipboardCellView`, `ClipboardChip` |  |
 | **keep** | Paste the clipboard cell into a free slot: how a message or a block reaches your inventory, as a reference (ADR-0132). | the `keep` intent | taking from the past (a message's take, a block's ❝) |
 | **carrier** | pine·trie's data on the clipboard beside the text: `application/x-pinetrie`, and `data-pinetrie` in `text/html`. It counts only when the pasted text is the text it was written with (ADR-0132). | `Carrier`, `CLIP_ATTRIBUTE` |  |
 | **replace** (a slot) | A drop or a paste aimed at a filled slot of your inventory: the new card takes the slot, and the one there goes to your trash, one undo step (ADR-0133). | `Landing`'s `replace`, `Replacing` | landing in another empty slot |
 | **in your hand** | Your inventory's selected slot: what the put key puts. Every card leaves it when put (ADR-0126, ADR-0132). | `selectedCard` | a reference staying in your hand |
 | **put key** | Puts the card in your hand in the column you were last in (ADR-0126, ADR-0132); never into a text box, which a paste types into. | Ctrl+Shift+O, `keyAct` | the put key's link in a text box |
 | **text card** | Unsent text, with a place, drawn in one frame coloured by that place. | `TextCard`, `TextCardId`, `CardPlace`, `CardFrame`, `cardFrame` | |
-| **thread card** | A thread, as a card: on a canvas, in someone's inventory or a trash, one place either way (ADR-0117, ADR-0124). A thread is a card from the moment its column opens, before its first entry (ADR-0126). | `ThreadCard`, `threadFace`, `planThreadOpen`, `unstartedThreads` | a root, as the board and the sidebar draw it; board item; a fresh column, a new tab's column |
+| **thread card** | A thread, as a card: on a canvas, in someone's inventory or a trash, one place either way (ADR-0117, ADR-0124). A thread is a card from the moment its column opens, before its first entry (ADR-0126). | `ThreadCard`, `threadGlance`, `planThreadOpen`, `unstartedThreads` | a root, as the board and the sidebar draw it; board item; a fresh column, a new tab's column |
 | **your message** | The text card in your composer at a thread's end, which only you see; at a thread not yet started too (ADR-0126). | `composing` (stored as `drafting`), `yourCard` | the composer's card, drafting card (yours); a fresh card |
 | **trash** | Not a place of its own: a discarded card records where it was, and is in the trash of what it left, a canvas's for a column, a note column's for a note, a thread's for your message, your own for your inventory; seen by whoever saw it there, until restored, undone or deleted a week on (ADR-0134). | `trash` (`{ kind: "trash", left }`, stored as `discarded-<kind>`), `DISCARDED`, `surfaceOwner`, `planTrashSweep`, `trashDeadline` | the `gone` place; a person's trash |
 | **restore** (a trashed card) | Bring a trashed card back where it was, at its rank: from a canvas column's trash, or by following a link to a trashed thread; anyone who could see it there may (ADR-0134). Refused when that place is gone or taken. Not a canvas's restore from the archive. | `planFromTrash`'s `restore`, `BACK`, `planRestore` | undo |
@@ -94,8 +94,8 @@ words they were written with.
 | **pinned card** | A text card the agent reads on every run, at the top of its thread's column. | `pinned`, `pinTargetKey`, `PinnedCardEditor` | |
 | **inventory** | Your own grid of cards, text cards and thread cards, on every canvas and device. A thread there is yours alone, read only and run by nobody (ADR-0124). | `inventory`, `InventoryPanel`, `threadCardHolding`, `ThreadPreview` | |
 | **consume** | What a thread's live end does to a card: a send, a fact popped. The card ends; the entry it became is the record. A spin sends its card to the trash instead, so it can be undone (ADR-0126). | | |
-| **face**, **normal**, **whole** | The three levels of detail every kind is drawn at, chosen by the surface it is on: a strip, a grid cell or a mark; the card itself, bounded; all of it, as a column or in the pane. Width is the place's, not a level (ADR-0126). | `Detail`, `DETAIL_ON`, `Face`, `cardFace`, `RENDERINGS` | |
-| **preview** | A selected card in the inventory, drawn normal, one column wide, read only (ADR-0126). | `InventoryView.preview`, `threadPreview` | |
+| **compact**, **normal**, **full** | The three sizes every kind of card is drawn at, chosen by the surface it is on, each a box of its own: compact, half a column wide, a header row and two lines (an inventory slot); normal, one column wide, its height capped (the bench, a dock, a list); full, one column or more, scrolling (a canvas's column, a card opened on the bench). A folded column's strip and a shut margin's count are no size (ADR-0126, ADR-0171). | `Detail`, `DETAIL_ON`, `Compact`, `cardCompact`, `CompactCard`, `RENDERINGS` | face, whole |
+| **bench** | Beside the inventory's grid, the selected slot: its card normal and read only, or full and editable once opened with Enter or a click (ADR-0171). | `Bench`, `InventoryState`, `threadPreview` | preview |
 | **the line** | What divides a thread's queued cards, which the agent reads, from your message, which it does not. | | |
 | **the dock** | A column's foot: the queue, the line and your message (ADR-0113). | | |
 | **the sidebar** | The column down the left of the page, of your open canvases; its ＋ makes a canvas (ADR-0158). | `Sidebar`, `sidebarView`, `OpenThreads` | your list |
@@ -136,7 +136,7 @@ a value is stored.
 | **run** | The agent's work in answer to an ask: the entries it wrote, and any fact steered into it. A run has an ask (ADR-0106). | `AskIndex.work`, `entryAsk` | |
 | **ask** | The message that started a run (ADR-0106). | `askOf`, `indexAsks` (by prompt) | |
 | **fork** | The point, at an entry, where threads diverge; not an entry. Forking before an entry edits it (ADR-0043); after it, branches. | `ThreadOrigin.fork` | |
-| **margin** | An entry's surface, for comments on it; shut, a count beside the entry; open, the comments under it (ADR-0126). | place `margin`, `marginCards`, `marginCounts`, `Margin`, `MarginFace` | |
+| **margin** | An entry's surface, for comments on it; shut, a count beside the entry; open, the comments under it (ADR-0126). | place `margin`, `marginCards`, `marginCounts`, `Margin`, `MarginCount` | |
 | **comment** | A note on an entry, in its margin: people read it; the agent does once a reference to it is queued (ADR-0126). | `comment`, `planComment`, `queueReference`, `commentMarkdown` | annotation |
 | **derivation** | What the host computes from a thread's entries and replaces as they grow: a digest, a run-end report. Never an entry, never a card, never read by the agent; one a model made says so. | `DigestRecord`, `RunEndReportRecord` | host record (for these), annotation |
 
@@ -180,7 +180,7 @@ file of the project.
 | **stack** | A card holding two or more threads of one root, one on top, drawn as one column: only the top runs, and which is on top is shared. Not built with the rest. | ADR-0126 | |
 
 (**thread card**, **copy**, **root**, **note**, **note column**,
-**consume**, **face**, **normal**, **whole** and **preview** are built, and
+**consume**, **compact**, **normal**, **full** and **bench** are built, and
 listed above: threads are cards, notes are in note columns, and "root" is a
 code word alone.)
 

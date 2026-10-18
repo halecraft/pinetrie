@@ -35,7 +35,7 @@ export function revealEffects(
   switch (place.kind) {
     case "inventory":
       return {
-        effects: [{ kind: "showInventory", brief: false }],
+        effects: [{ kind: "inventory", act: { kind: "show", how: "held" } }],
         actedAt: AT_INVENTORY,
       }
     // A card on a canvas: its column, unfolded in its canvas.

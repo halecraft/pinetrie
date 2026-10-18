@@ -73,6 +73,7 @@ import {
   openNote,
   openProfile,
   RAIL_MESSAGES,
+  reachable,
   seeInMenu,
   shownName,
   stepAway,
@@ -1539,7 +1540,7 @@ async function run(check: Checks["check"]): Promise<void> {
       )
       await page.click(`${agentCol} .margin .shut-margin`)
       const counted = await page
-        .waitForSelector(`${agentCol} .margin-face:text-is("💬 1")`, {
+        .waitForSelector(`${agentCol} .margin-count:text-is("💬 1")`, {
           timeout: 10_000,
         })
         .then(
@@ -3720,7 +3721,7 @@ async function run(check: Checks["check"]): Promise<void> {
       const lineShown = await page
         .waitForFunction(
           s => document.querySelector(s)?.textContent === "for later: a plan",
-          `${slotOf(parked)} .card-face-lines`,
+          `${slotOf(parked)} .compact-text`,
           { timeout: 10_000 },
         )
         .then(
@@ -3728,7 +3729,7 @@ async function run(check: Checks["check"]): Promise<void> {
           () => false,
         )
       const firstLine = await page
-        .textContent(`${slotOf(parked)} .card-face-lines`)
+        .textContent(`${slotOf(parked)} .compact-text`)
         .catch(() => "")
       const boxEmptied = await valueIs(downBox, "")
       await waitFor(() => placeOf(parked)?.kind === "inventory", 5_000)
@@ -3761,8 +3762,10 @@ async function run(check: Checks["check"]): Promise<void> {
         `to ${emptySlot}: ${swapped}; back to ${inventorySlot}: ${swappedBack}`,
       )
       // Put: Ctrl+Shift+O puts the selected card in the column last focused.
+      // The panel, open in the middle, may cover the composer: it is
+      // focused from the keyboard.
       const slotIndex = await page.getAttribute(slotOf(parked), "data-slot")
-      await page.click(downBox)
+      await page.focus(downBox)
       await page.click(slotOf(parked))
       await page.keyboard.press("Control+Shift+O")
       const putNote = `${await openNote(page, parked)} textarea`
@@ -3790,8 +3793,12 @@ async function run(check: Checks["check"]): Promise<void> {
         `slot ${slotIndex}: ${undone}; ${placeOf(parked)?.kind}`,
       )
       // Drag: a slot droppedThere on another column's foot puts its card there.
+      // The panel, open in the middle, may cover most of the composer: the
+      // drop aims at a point of it the pointer reaches.
       const agentBox = `${col(0)} textarea[data-card="${parked}"]`
-      await page.dragAndDrop(slotOf(parked), `${col(0)} .composer`)
+      await page.dragAndDrop(slotOf(parked), `${col(0)} .composer`, {
+        targetPosition: await reachable(page, `${col(0)} .composer`),
+      })
       const droppedThere = await valueIs(agentBox, "for later: a plan")
       await waitFor(() => placeOf(parked)?.kind === "composing", 5_000)
       check(
@@ -3808,7 +3815,9 @@ async function run(check: Checks["check"]): Promise<void> {
       // note column made for it there; the undo key takes back
       // both.
       await waitFor(() => placeOf(parked)?.kind === "inventory", 5_000)
-      await page.dragAndDrop(slotOf(parked), "#strip > .canvas-end")
+      await page.dragAndDrop(slotOf(parked), "#strip > .canvas-end", {
+        targetPosition: await reachable(page, "#strip > .canvas-end"),
+      })
       await waitFor(() => placeOf(parked)?.kind === "note", 5_000)
       const wrapPlace = placeOf(parked)
       const wrapColumn =
@@ -3898,22 +3907,30 @@ async function run(check: Checks["check"]): Promise<void> {
         spun >= 0 && landed === target && lifted >= 0,
         `spun ${spun} ms into ${thread} in ${landed}, not ${target}; lifted ${lifted} ms, ${placeOf(parked)?.kind}`,
       )
-      // Selected, a card is previewed beside the grid, read only;
-      // Enter opens it whole in place, over its neighbours, its box
-      // focusable, and the preview hides; Escape there folds it, and focus
-      // is back on its slot. An empty slot first, since a click on
-      // the card already selected opens it.
+      // Selected, a card is shown on the bench beside the grid, normal and
+      // read only, and the panel keeps its size whatever it shows: an empty
+      // slot, a card, the card opened. Enter opens it on the bench, the
+      // caret in its box; Escape folds it, and focus is back on its slot.
+      // An empty slot first, since a click on the card already selected
+      // opens it.
+      const panelBox = () =>
+        page.$eval(".inventory", el => {
+          const r = el.getBoundingClientRect()
+          return `${Math.round(r.width)}×${Math.round(r.height)}`
+        })
       await page.click(slotAt(emptySlot))
+      const emptyBench = await appears(".inventory .bench .bench-empty")
+      const sizeEmpty = await panelBox()
       await page.click(slotOf(parked))
-      const previewed = await page
+      const onBench = await page
         .waitForFunction(
           id => {
-            const preview = document.querySelector(
-              `.inventory .preview .card-normal[data-card="${id}"]`,
+            const normal = document.querySelector(
+              `.inventory .bench .card-normal[data-card="${id}"]`,
             )
             return (
-              preview?.textContent?.includes("for later: a plan") === true &&
-              preview.querySelector("textarea, [contenteditable]") === null
+              normal?.textContent?.includes("for later: a plan") === true &&
+              normal.querySelector("textarea, [contenteditable]") === null
             )
           },
           parked,
@@ -3923,43 +3940,32 @@ async function run(check: Checks["check"]): Promise<void> {
           () => true,
           () => false,
         )
+      const sizeCard = await panelBox()
+      check(
+        "selecting a slot shows its card on the bench, read only, and the panel keeps its size",
+        emptyBench && onBench && sizeEmpty === sizeCard,
+        `empty slot on the bench ${emptyBench}, card ${onBench}, ${sizeEmpty} then ${sizeCard}`,
+      )
       await page.keyboard.press("Enter")
-      const previewHidden = await page
+      const caretInBox = await page
         .waitForFunction(
-          () =>
-            document.querySelector(".inventory .card-grid-open") !== null &&
-            document.querySelector(".inventory .preview") === null,
-          undefined,
-          { timeout: 10_000 },
+          id =>
+            document.activeElement?.matches(
+              `.inventory .bench textarea[data-card="${id}"]`,
+            ) === true,
+          parked,
+          { timeout: 5_000 },
         )
         .then(
           () => true,
           () => false,
         )
-      check(
-        "selecting a slot previews its card beside the grid, read only, and Enter opens it in place instead",
-        previewed && previewHidden,
-        `previewed ${previewed}, hidden once open ${previewHidden}`,
-      )
-      const openInPlace = await page
-        .$eval(slotOf(parked), slot => {
-          const open = slot.parentElement?.querySelector(".card-grid-open")
-          const s = slot.getBoundingClientRect()
-          const o = open?.getBoundingClientRect()
-          return (
-            o !== undefined &&
-            Math.abs(o.top - s.top) < 2 &&
-            o.width > s.width * 1.5 &&
-            open?.querySelector("textarea") !== null
-          )
-        })
-        .catch(() => false)
-      await page.focus(".inventory .card-grid-open textarea")
+      const sizeOpen = await panelBox()
       await page.keyboard.press("Escape")
       const foldedBack = await page
         .waitForFunction(
           sel =>
-            document.querySelector(".inventory .card-grid-open") === null &&
+            document.querySelector(".inventory .bench textarea") === null &&
             document.activeElement === document.querySelector(sel),
           slotOf(parked),
           { timeout: 5_000 },
@@ -3968,26 +3974,49 @@ async function run(check: Checks["check"]): Promise<void> {
           () => true,
           () => false,
         )
-      // The open card's × folds it too, the card still in its slot.
-      await page.keyboard.press("Enter")
-      await page.click(".inventory .card-grid-open .close-card")
-      const closed = await page
-        .waitForFunction(
-          sel =>
-            document.querySelector(".inventory .card-grid-open") === null &&
-            document.querySelector(sel) !== null,
-          slotOf(parked),
-          { timeout: 5_000 },
-        )
-        .then(
-          () => placeOf(parked)?.kind === "inventory",
-          () => false,
-        )
       check(
-        "a card selected in the inventory opens in place, and Escape or its × folds it",
-        openInPlace && foldedBack && closed,
-        `opened ${openInPlace}, folded ${foldedBack}, closed ${closed}`,
+        "Enter opens the card on the bench, caret in its box, and Escape folds it back to its slot",
+        caretInBox &&
+          foldedBack &&
+          sizeOpen === sizeCard &&
+          placeOf(parked)?.kind === "inventory",
+        `caret ${caretInBox}, folded ${foldedBack}, ${sizeOpen}`,
       )
+      // A take while the panel is closed peeks: the panel opens for the
+      // card's landing, and a pointer over it keeps it open, as if you had
+      // opened it. The card is discarded after.
+      await page.click("#bottom .inventory-toggle")
+      await page.click(downBox)
+      await page.keyboard.type("a peek")
+      await page.waitForFunction(
+        s => document.querySelector(s)?.getAttribute("data-card") != null,
+        downBox,
+        { timeout: 10_000 },
+      )
+      const peeked = (await page.getAttribute(downBox, "data-card")) ?? ""
+      await page.keyboard.press("Control+Shift+I")
+      const peeks = await appears('.inventory[data-shown="peek"]')
+      // Its box as laid out: while it grows from its toggle, its drawn box
+      // is a fraction of it.
+      const peekBox = await page.$eval(".inventory", el => {
+        const panel = el as HTMLElement
+        return {
+          x: panel.offsetLeft,
+          y: panel.offsetTop,
+          h: panel.offsetHeight,
+        }
+      })
+      await page.mouse.move(peekBox.x + 40, peekBox.y + peekBox.h / 2, {
+        steps: 2,
+      })
+      const keptOpen = await appears('.inventory[data-shown="held"]')
+      check(
+        "a take while the inventory is closed peeks, and a pointer over it keeps it open",
+        peeks && keptOpen,
+        `peeked ${peeks}, kept open ${keptOpen}`,
+      )
+      await page.click(slotDiscardOf(peeked))
+      await waitFor(() => placeOf(peeked)?.kind === "trash", 5_000)
       await page.click(slotDiscardOf(parked))
       await waitFor(() => placeOf(parked)?.kind === "trash", 5_000)
       const columnsBefore = await page.locator(".column").count()
@@ -4004,7 +4033,8 @@ async function run(check: Checks["check"]): Promise<void> {
       const branch = col(columnsBefore)
       const unstartedBox = `${branch} .composer .input`
       await page.waitForSelector(unstartedBox, { timeout: 15_000 })
-      await page.click(unstartedBox)
+      // The panel, open in the middle, may cover its composer.
+      await page.focus(unstartedBox)
       await page.keyboard.type("half a thought")
       await page.waitForFunction(
         s => document.querySelector(s)?.getAttribute("data-card") != null,
@@ -4065,6 +4095,9 @@ async function run(check: Checks["check"]): Promise<void> {
       // pin moves the composer's card to the strip at the column's top, above
       // its scrolling messages, and the composer is empty again.
       const composerBox = `${col(0)} .composer .input`
+      // The inventory, left open in the middle of the screen, would cover it.
+      if ((await page.locator(".inventory[data-shown]").count()) > 0)
+        await page.click("#bottom .inventory-toggle")
       await page.click(composerBox)
       await page.keyboard.type("keep the tests green")
       await page.waitForFunction(
@@ -4075,7 +4108,7 @@ async function run(check: Checks["check"]): Promise<void> {
       const pinnedCard =
         (await page.getAttribute(composerBox, "data-card")) ?? ""
       // The inventory, left open in the middle of the screen, would cover it.
-      if ((await page.locator(".inventory").count()) > 0)
+      if ((await page.locator(".inventory[data-shown]").count()) > 0)
         await page.click("#bottom .inventory-toggle")
       await chooseOnCard(
         page,
@@ -4137,7 +4170,7 @@ async function run(check: Checks["check"]): Promise<void> {
       // Notes: your message's ⋯ moves it to the note column
       // nearest its thread.
       // The inventory, left open in the middle of the screen, would cover it.
-      if ((await page.locator(".inventory").count()) > 0)
+      if ((await page.locator(".inventory[data-shown]").count()) > 0)
         await page.click("#bottom .inventory-toggle")
       await page.click(composerBox)
       await page.keyboard.type("one thought")
@@ -4381,7 +4414,7 @@ async function run(check: Checks["check"]): Promise<void> {
         `${col(0)} .pinned-strip textarea[data-card="${traced}"]`,
       )
       // The inventory, left open in the middle of the screen, would cover it.
-      if ((await page.locator(".inventory").count()) > 0)
+      if ((await page.locator(".inventory[data-shown]").count()) > 0)
         await page.click("#bottom .inventory-toggle")
       const tracedFrame = `${col(0)} .pinned-strip .card-editor:has(textarea[data-card="${traced}"])`
       const historyOpened = await chooseOnCard(

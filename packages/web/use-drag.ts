@@ -46,7 +46,7 @@ import {
   targetOfElement,
 } from "@pinetrie/interface"
 import { type RefObject, useEffect } from "react"
-import { reducedMotion, settleFolds } from "./motion.ts"
+import { fixedCopy, reducedMotion, settleFolds } from "./motion.ts"
 import { useStable } from "./use-stable.ts"
 
 /** How long a cancelled drag springs back, in ms: none with reduced motion. */
@@ -135,8 +135,8 @@ interface Press {
   /** Each column's centre, in the strip's content coordinates. */
   readonly mids: readonly number[]
   readonly strip: HTMLElement | null
-  /** The card face drawn off the strip, a copy of the handle; null for no column. */
-  readonly face: HTMLElement | null
+  /** The ghost drawn off the strip, a copy of the handle; null for no column. */
+  readonly ghost: HTMLElement | null
 }
 
 export function useDrag(input: {
@@ -275,7 +275,7 @@ export function useDrag(input: {
       speed *= 0.6
       // Only what changed is written: a style written again, the same,
       // still costs the page a style pass over what it touches.
-      // The dragged element translates, never more; hidden while its face
+      // The dragged element translates, never more; hidden while its ghost
       // stands for it off the strip.
       write(
         p.moving,
@@ -285,14 +285,14 @@ export function useDrag(input: {
           : `translate(${plan.dragged.x}px, ${plan.dragged.y}px)`,
       )
       write(p.moving, "opacity", plan.dragged === null ? "0" : "")
-      if (p.face !== null) {
-        if (p.face.hidden !== (plan.face === null))
-          p.face.hidden = plan.face === null
-        if (plan.face !== null)
+      if (p.ghost !== null) {
+        if (p.ghost.hidden !== (plan.ghost === null))
+          p.ghost.hidden = plan.ghost === null
+        if (plan.ghost !== null)
           write(
-            p.face,
+            p.ghost,
             "transform",
-            `translate(${plan.face.x}px, ${plan.face.y}px)`,
+            `translate(${plan.ghost.x}px, ${plan.ghost.y}px)`,
           )
       }
       plan.shifts.forEach((shift, i) => {
@@ -358,7 +358,7 @@ export function useDrag(input: {
       }
       settle(p.moving)
       for (const c of p.columns) settle(c)
-      p.face?.remove()
+      p.ghost?.remove()
       window.setTimeout(() => {
         p.moving.style.transition = ""
         p.moving.style.willChange = ""
@@ -477,14 +477,12 @@ export function useDrag(input: {
         c.style.transition = `transform ${settleMs()}ms ease-out`
       moving.style.transition = "none"
       moving.style.willChange = "transform"
-      // A column's card face: its header, copied, drawn off the strip.
-      let face: HTMLElement | null = null
+      // A column's ghost: its header, copied, drawn off the strip.
+      let ghost: HTMLElement | null = null
       if (column !== null) {
-        face = document.createElement("div")
-        face.className = "drag-face"
-        face.hidden = true
-        face.append(handle.cloneNode(true))
-        document.body.append(face)
+        ghost = fixedCopy(handle, "drag-ghost")
+        ghost.hidden = true
+        document.body.append(ghost)
       }
       const item =
         source.kind === "canvas" ? handle.closest<HTMLElement>(ROOT_ITEM) : null
@@ -496,7 +494,7 @@ export function useDrag(input: {
         pointer: e.pointerId,
         columns,
         strip: column === null ? null : strip,
-        face,
+        ghost,
         mids:
           stripBox === null || strip === null
             ? []

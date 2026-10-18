@@ -680,7 +680,7 @@ describe("planIntent", () => {
       expect(
         plan({ kind: "copyThread", source: TRUNK, to: "inventory" }),
       ).toMatchObject([
-        { kind: "showInventory", brief: true },
+        { kind: "inventory", act: { kind: "show", how: "peek" } },
         {
           kind: "request",
           intent: { move: { to: { kind: "inventory", holder: ME } } },
@@ -697,7 +697,7 @@ describe("planIntent", () => {
           { kind: "copyThread", source: TRUNK, to: "inventory" },
           at(onRoot("1-r1"), indexAsks(index), { ...NO_CARDS, slots }),
         ).map(e => e.kind),
-      ).toEqual(["showInventory", "refuse"])
+      ).toEqual(["inventory", "refuse"])
       const nowhere = {
         ...R1,
         canvases: {
@@ -772,9 +772,9 @@ describe("planIntent", () => {
           at(onRoot("1-r1"), indexAsks(index), { ...NO_CARDS, slots }),
         ),
       ).toEqual([
-        { kind: "showInventory", brief: false },
-        { kind: "select", slot: 4 },
-        { kind: "openSelected" },
+        { kind: "inventory", act: { kind: "show", how: "held" } },
+        { kind: "inventory", act: { kind: "select", slot: 4 } },
+        { kind: "inventory", act: { kind: "open" } },
       ])
       const held = threadLink(LINKED, [inventoryOf(writerId("bea@x.io"))], ME)
       expect(

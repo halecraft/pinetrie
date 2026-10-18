@@ -18,7 +18,7 @@ import {
 import { NO_INTENTS, type Slots, settleSlots } from "@pinetrie/session"
 import { describe, expect, test } from "vitest"
 import { inventoryView, slotKey } from "./inventory-view.ts"
-import { faceStatus, threadFace, threadPreview } from "./thread-face.ts"
+import { glanceStatus, threadGlance, threadPreview } from "./thread-glance.ts"
 
 const ADA = writerId("ada@x.io")
 const A = cardIdFor("ca")
@@ -36,7 +36,7 @@ describe("inventoryView", () => {
     content: { command: null, unsent: null, origin: null },
   })
 
-  test("draws exactly settleSlots, the selection, and first lines", () => {
+  test("draws exactly settleSlots, the selection, and first lines; counts the cards held of 12", () => {
     const held = [record(A), record(B)]
     const slots = slotsOf({ "10": cardIdFor("cb") })
     const view = inventoryView({
@@ -47,6 +47,7 @@ describe("inventoryView", () => {
       me: ADA,
       texts: new Map([[B, "\n  plan: ship it\nsecond line"]]),
       threads: new Map(),
+      threadNames: new Map(),
       open: false,
     })
     const drawn = Object.fromEntries(
@@ -63,17 +64,19 @@ describe("inventoryView", () => {
     )
     expect(view.grid.card?.id).toBe(B)
     expect(view.grid.cells[10]).toMatchObject({
-      face: {
-        lines: "plan: ship it\nsecond line",
-        key: null,
+      compact: {
+        lead: { kind: "text", text: "plan: ship it" },
+        second: "second line",
+        badge: null,
         tone: "inventory",
       },
       selected: true,
     })
-    expect(view.free).toBe(16)
+    expect(view.held).toBe(2)
+    expect(view.grid.cells).toHaveLength(12)
   })
 
-  test("labels the first nine slots 1–9 on their faces", () => {
+  test("labels the first nine slots 1–9 on their compacts", () => {
     const view = inventoryView({
       held: [record(A)],
       slots: slotsOf({ "0": cardIdFor("ca") }),
@@ -82,17 +85,20 @@ describe("inventoryView", () => {
       me: ADA,
       texts: new Map(),
       threads: new Map(),
+      threadNames: new Map(),
       open: false,
     })
-    const face = view.grid.cells[0]?.face
-    expect(face?.kind === "text" && face.key).toBe("1")
-    expect(Array.from({ length: 18 }, (_, n) => slotKey(n))).toEqual([
+    expect(view.grid.cells[0]?.compact?.badge).toEqual({
+      kind: "key",
+      key: "1",
+    })
+    expect(Array.from({ length: 12 }, (_, n) => slotKey(n))).toEqual([
       ..."123456789".split(""),
-      ...Array(9).fill(null),
+      ...Array(3).fill(null),
     ])
   })
 
-  test("previews the selected card, normal and one column wide; an empty slot or an open card, none", () => {
+  test("the bench: an empty slot's number, a card normal, opened full", () => {
     const view = (selected: number, open: boolean) =>
       inventoryView({
         held: [record(A)],
@@ -102,15 +108,17 @@ describe("inventoryView", () => {
         me: ADA,
         texts: new Map(),
         threads: new Map(),
+        threadNames: new Map(),
         open,
-      }).preview
+      }).bench
     expect(view(3, false)).toEqual({
+      kind: "card",
       card: record(A),
       detail: "normal",
-      width: 1,
     })
-    expect(view(4, false)).toBeNull()
-    expect(view(3, true)).toBeNull()
+    expect(view(4, false)).toEqual({ kind: "empty", slot: 4 })
+    expect(view(4, true)).toEqual({ kind: "empty", slot: 4 })
+    expect(view(3, true)).toMatchObject({ detail: "full" })
   })
 
   test("a slot's × is drawn on a card you may discard, never on an empty slot", () => {
@@ -123,17 +131,18 @@ describe("inventoryView", () => {
         me,
         texts: new Map(),
         threads: new Map(),
+        threadNames: new Map(),
         open: false,
       }).grid.cells
     expect(cells(ADA).map(c => c.discards)).toEqual([
       true,
-      ...Array(17).fill(false),
+      ...Array(11).fill(false),
     ])
     expect(cells(writerId("bea@x.io"))[0]?.discards).toBe(false)
   })
 })
 
-test("a thread's card is drawn by its face: its name, its first line, where it ended, and its status", () => {
+test("a thread's glance: its name, its first line, where it ended, and its status", () => {
   const T = threadIdFor("t")
   const index = indexTree(
     fromParents({ "1-r": null, "2-a": "1-r" }, id => ({
@@ -143,7 +152,7 @@ test("a thread's card is drawn by its face: its name, its first line, where it e
     })),
   )
   const thread = threadOfEntry("1-r")
-  const face = threadFace({
+  const glance = threadGlance({
     thread,
     index,
     lanes: [
@@ -161,9 +170,9 @@ test("a thread's card is drawn by its face: its name, its first line, where it e
     focuses: new Map(),
     iconFor: () => null,
   })
-  expect(face).toMatchObject({ name: "amber-fox", queued: 2, stopped: false })
-  expect(faceStatus(face)).toBe("2 cards queued")
-  expect(faceStatus({ ...face, stopped: true, queued: 0 })).toBe("stopped")
+  expect(glance).toMatchObject({ name: "amber-fox", queued: 2, stopped: false })
+  expect(glanceStatus(glance)).toBe("2 cards queued")
+  expect(glanceStatus({ ...glance, stopped: true, queued: 0 })).toBe("stopped")
   const view = inventoryView({
     held: [
       {
@@ -180,16 +189,17 @@ test("a thread's card is drawn by its face: its name, its first line, where it e
     selected: 0,
     me: ADA,
     texts: new Map(),
-    threads: new Map([[T, { ...face, thread: T }]]),
+    threads: new Map([[T, { ...glance, thread: T }]]),
+    threadNames: new Map(),
     open: false,
   })
-  expect(view.grid.cells[0]?.face).toMatchObject({
+  expect(view.grid.cells[0]?.compact).toMatchObject({
     kind: "thread",
-    name: "amber-fox",
+    lead: { kind: "text", text: "amber-fox" },
   })
 })
 
-test("a thread's face reads its first message, not the context entry its first run wrote above it", () => {
+test("a thread's glance reads its first message, not the context entry its first run wrote above it", () => {
   const T = threadIdFor("t")
   const B = threadIdFor("b")
   const index = indexTree(
@@ -210,7 +220,7 @@ test("a thread's face reads its first message, not the context entry its first r
       entry("4-a", "3-b", { role: "assistant", content: "ok" }, { thread: B }),
     ]),
   )
-  const face = threadFace({
+  const glance = threadGlance({
     thread: B,
     index,
     lanes: [],
@@ -218,7 +228,7 @@ test("a thread's face reads its first message, not the context entry its first r
     focuses: new Map(),
     iconFor: () => null,
   })
-  expect([face.first, face.last]).toEqual(["an aside", "ok"])
+  expect([glance.first, glance.last]).toEqual(["an aside", "ok"])
 })
 
 test("a thread's preview is its path from its root, read only", () => {

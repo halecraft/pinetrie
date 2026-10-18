@@ -1,28 +1,24 @@
-// web/card-grid — your inventory's slots, drawn from a `GridView` as index
+// web/card-grid — your inventory's slots, drawn from a `GridView` as compact
 // cards, empty cells dashed. Every cell is a drop target; a card's cell starts
 // its drag. Its keys are `gridKeyAct`'s: arrows and `hjkl` move the selection,
-// Alt+arrows move the selected card, Enter opens it, as a click on the selected
-// card does. Each cell draws its card's face (`DrawFace`), and a card you may
-// discard its ×. The open card is drawn whole and editable in place, over its
-// neighbours, by the caller (`renderOpen`); Escape folds it, and so does the
-// fold the caller is handed. Whether it is open is the caller's too, so
-// the caller can hide what it draws beside the grid while it is. What a
-// selection, a move or a drop does is the caller's: an intent, planned like any
-// other.
+// Alt+arrows move the selected card, Enter opens it on the bench, as a click on
+// the selected card does. Each cell draws its card's compact (`CompactCard`),
+// and a card you may discard its ×. Escape is the page's (`keyAct`), not the
+// grid's: it folds the bench or closes the panel. What a selection, a move or
+// a drop does is the caller's: an intent, planned like any other.
 
 import type { CardRecord } from "@pinetrie/core"
 import {
   DISCARD_CARD,
   DISCARD_SLOT_TITLE,
-  type DrawnCard,
   dragProps,
   dropProps,
   type GridView,
   gridKeyAct,
   type PutTarget,
 } from "@pinetrie/interface"
-import { type ReactNode, useEffect, useRef } from "react"
-import { DrawFace } from "./renderings.tsx"
+import { useRef } from "react"
+import { CompactCard } from "./renderings.tsx"
 import { isTextBox } from "./text-box.ts"
 
 /** The grid's own names: its class, and its cells' class and attribute. */
@@ -37,29 +33,17 @@ export function CardGrid(p: {
   onMove: (card: CardRecord, to: number) => void
   /** A cell's ×: its card to your trash. */
   onDiscard: (card: CardRecord) => void
-  /** The open card, whole: a `CardFrame` around its box; `fold` closes it. */
-  renderOpen: (card: DrawnCard, fold: () => void) => ReactNode
-  /** The selected card is open, drawn whole. */
-  open: boolean
-  onOpen: (open: boolean) => void
+  /** Open the selected card on the bench. */
+  onOpen: () => void
 }) {
   const { view } = p
-  const setOpen = p.onOpen
   const grid = useRef<HTMLDivElement>(null)
   const selectedCard = view.card
-  const shownOpen = p.open && selectedCard !== null
-  // A card that leaves the selected cell folds: put back there (an undo),
-  // it is not open again.
-  useEffect(() => {
-    if (selectedCard === null) setOpen(false)
-  }, [selectedCard, setOpen])
-  /** Select cell `n`, folded, and give it focus. */
+  /** Select cell `n` and give it focus. */
   const select = (n: number) => {
-    setOpen(false)
     p.onSelect(n)
     grid.current?.querySelector<HTMLElement>(`[${names.attr}="${n}"]`)?.focus()
   }
-  const half = view.grid.width / 2
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: the grid's keys; each cell is a button
     <div
@@ -70,7 +54,7 @@ export function CardGrid(p: {
           rows: view.rows,
           selected: view.selected,
           hasCard: selectedCard !== null,
-          open: shownOpen,
+          open: false,
           inText: isTextBox(document.activeElement),
           comments: false,
         })
@@ -84,25 +68,22 @@ export function CardGrid(p: {
             if (selectedCard !== null) p.onMove(selectedCard, act.to)
             return
           case "open":
-            setOpen(true)
+            p.onOpen()
             return
+          // The bench's open card folds by the page's Escape; an inventory's
+          // cells take no comments.
           case "fold":
-            select(view.selected)
-            return
-          // An inventory's cells take no comments.
           case "comment":
             return
         }
       }}
       ref={grid}
-      style={{ gridTemplateColumns: `repeat(${view.grid.width}, 8rem)` }}
+      style={{
+        gridTemplateColumns: `repeat(${view.grid.width}, var(--compact-w))`,
+      }}
     >
       {view.cells.map(cell => (
-        <div
-          className="card-grid-cell"
-          data-open={(shownOpen && cell.selected) || undefined}
-          key={cell.index}
-        >
+        <div className="card-grid-cell" key={cell.index}>
           <button
             aria-pressed={cell.selected}
             className={cell.card === null ? `${names.cell} empty` : names.cell}
@@ -112,16 +93,16 @@ export function CardGrid(p: {
             {...(cell.card === null
               ? {}
               : dragProps({ kind: "card", card: cell.card.id }))}
-            // A click selects, and the panel previews the card; a click on the
-            // card already selected opens it, as Enter does.
+            // A click selects, and the bench shows the card; a click on the
+            // card already selected opens it there, as Enter does.
             onClick={() => {
               const again = cell.selected && cell.card !== null
               select(cell.index)
-              if (again) setOpen(true)
+              if (again) p.onOpen()
             }}
             type="button"
           >
-            {cell.face !== null && <DrawFace face={cell.face} />}
+            {cell.compact !== null && <CompactCard compact={cell.compact} />}
           </button>
           {/* Beside the cell's button, not in it: a button holds no button. */}
           {cell.discards && cell.card !== null && (
@@ -137,14 +118,6 @@ export function CardGrid(p: {
             >
               {DISCARD_CARD}
             </button>
-          )}
-          {shownOpen && cell.selected && cell.card !== null && (
-            <div
-              className="card-grid-open"
-              data-side={cell.index % view.grid.width < half ? "left" : "right"}
-            >
-              {p.renderOpen(cell.card, () => select(view.selected))}
-            </div>
           )}
         </div>
       ))}

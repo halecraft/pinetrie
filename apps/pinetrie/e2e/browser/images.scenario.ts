@@ -318,7 +318,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         // her composer pastes it there as a link to the table. The
         // clipboard cell shows the copy, and keep pastes a reference to it
         // into a slot, previewed as its quote.
-        const refSlot = ".inventory .slot:has(.reference-face)"
+        const refSlot = '.inventory .slot:has(.compact[data-kind="reference"])'
         await pp.evaluate(() => navigator.clipboard.writeText(""))
         await pp.focus(`${col(0)} .msg[data-entry] .table-wrap .table-open`)
         await pp.keyboard.press("ControlOrMeta+c")
@@ -371,10 +371,10 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
             () => true,
             () => false,
           )
-        // Kept into the selected slot, it is previewed at once: a click on
-        // it would open it whole instead.
+        // Kept into the selected slot, it is on the bench at once: a click on
+        // it would open it full instead.
         const previewed = await pp
-          .waitForSelector(".inventory .preview .reference-quote table", {
+          .waitForSelector(".inventory .bench .reference-quote table", {
             timeout: 10_000,
           })
           .then(

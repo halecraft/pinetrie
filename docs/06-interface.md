@@ -488,7 +488,7 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   card's, a slot's, a canvas's, by the mouse or a pen. What is dragged follows
   the pointer, its header raised and leaning with its speed; along the strip
   the other columns slide apart to open the gap it would land in, and off
-  the strip a column shrinks to its card face. What a drop there would do
+  the strip a column shrinks to a slot's size, its header showing. What a drop there would do
   shows on the target: a move, a copy with Alt held, a slot's card to be
   replaced, or grey for a refusal. A drop lands; Escape, or a drop where
   nothing lands, springs it back. With reduced motion the same states show
@@ -1233,9 +1233,8 @@ The rail is E; the column is T. Seeing both at once is the product.
   them back.
 - **× on a card discards it** (ADR-0111), wherever it is: your message, a
   note, a queued or pinned card, or a card in a slot of your inventory,
-  whose × is on its corner, shown on the selected card and on hover; so
-  does Ctrl+Shift+Backspace in its box. A card opened from your inventory
-  is the one exception: its × closes it, as Escape does. Where you did it,
+  whose × is on its corner, shown on the selected card and on hover, and
+  one open on its bench; so does Ctrl+Shift+Backspace in its box. Where you did it,
   the column says "discarded · the undo key (⌘Z outside a box) brings it
   back", and the undo key does, for a week; then the host deletes it.
   Discarding someone else's card leaves them a trace, as a move does.
@@ -1316,36 +1315,65 @@ The rail is E; the column is T. Seeing both at once is the product.
   card is still in your column, saying who moved it. Nor does a note: a
   note column is everyone's scratch.
 
-### Your inventory (ADR-0048 step 4)
+### Your inventory (ADR-0048 step 4, ADR-0171)
 
 - **A panel of your own, floating over the columns**, opened and closed by
   **inventory** in the footer (which counts your cards). It sits in the
   middle of the screen by default; drag its top bar and it settles left,
   centre or right, and this device remembers where. Only you see it, on
   every root and device; nobody else can move a card into or out of it.
-- **A fixed 3 × 6 grid of cards**: each slot shows
-  its card folded, its first three lines under its author's circle; the
-  first nine are numbered 1–9. A thread's card takes one slot, drawn so it
-  is known at a glance (ADR-0124): its icon and name, its first line,
-  the first line of where it ended, and whether it stopped or has cards
-  queued. Opened, it shows the thread's path read only, with no composer,
-  queue or run, and **put** puts it on the canvas you are on, after the
-  column you were last in. Only its holder opens it: a link to it anywhere
-  else says "Bea has it". Click a slot, or move with the arrow keys or
-  `hjkl` while the panel has focus, to select it: beside the grid, on the
-  side away from where the panel is docked, its card is previewed, one
-  column wide and read only (ADR-0126). Enter, or a click on the card
-  already selected, opens it whole in place, over its neighbours, and
-  editable, the preview hidden while it is open, and Escape folds it. Cards keep their slots, gaps included, on every device.
-  Dropping a card on a slot that holds one swaps the two, and so do
-  Alt+arrows.
+- **It never changes size as you use it** (ADR-0171): a frame two columns
+  wide, the bag of slots and the bench beside it, under a header and over
+  one status line. Selecting, opening a card, a notice or a copy moves
+  nothing. Narrower than two columns, it is one column, the bench taking
+  the bag's place while a card is open on it.
+- **The header** says "inventory · 8/12", holds the clipboard chip and its
+  **keep** (below), and **×**, which closes the panel.
+- **The status line** under the bag and the bench says the newest notice
+  ("discarded · the undo key (⌘Z outside a box) brings it back", "inventory
+  full"), and keeps its height when it says nothing.
+- **A fixed grid of 12 slots, two wide and six high**, the first nine
+  numbered 1–9. Each slot shows its card compact, as every card is drawn in
+  a slot whatever its kind: a strip in your colour, its kind's icon and its
+  author's circle (a thread's icon), then two lines, a text card's first
+  lines, a reference's quote and the thread it is from, a thread's name and
+  the first line of where it ended. A thread's slot says whether it stopped
+  or has cards queued (ADR-0124). Cards keep their slots, gaps included, on
+  every device. Dropping a card on a slot that holds one swaps the two, and
+  so do Alt+arrows. Holding more than 12 (an undo brought one back), you
+  see each, in rows past the sixth, and every take is refused "inventory
+  full" until you hold 12 or fewer.
+- **The bench**: click a slot, or move with the arrow keys or `hjkl` while
+  the panel has focus, to select it, and the bench beside the grid, on the
+  side away from where the panel is docked, shows its card one column wide,
+  read only; an empty slot says so ("slot 4 · empty: drop or paste a card
+  here"). **Enter, a click on the bench or on the card already selected,
+  opens it there**, editable, the caret in its box; a reference opened
+  shows **Edit as text**, and a thread its path read only, with no
+  composer, queue or run, and **put**, which puts it on the canvas you are
+  on, after the column you were last in. Only its holder opens it: a link
+  to it anywhere else says "Bea has it". **Escape** folds the open card
+  back to its slot; with none open, it closes the panel. A click that ends
+  a selection of the card's text opens nothing.
+- **Who opened it closes it.** Opened by you (its toggle, a link to a
+  thread you hold, an undo that shows it), it stays until you close it:
+  **×**, Escape, or the toggle; a click elsewhere leaves it open, since you
+  work in the columns while it is. A take while it is closed **peeks**: it
+  opens for the card's landing and closes again, unless you move your
+  pointer over it, focus is in it, you are dragging a card, or you press
+  its toggle, which keep it open.
+  A refusal opens it until you act elsewhere, so you can read why.
+- **It opens and closes in motion**, growing from its toggle and shrinking
+  back into it; with less motion asked for, it fades.
+- **A card held over the closed toggle in a drag opens it**, and dropped on
+  the toggle, it is taken into a free slot.
 - **Take** moves a card into your inventory (a *take into the inventory*,
   ADR-0083): Ctrl+Shift+I in its box or on its header, **Move to your
   inventory** in its ⋯ (marked with the inventory's box and an arrow into
   it, the take's one icon wherever it is offered), or a drag of its header
   onto the panel. A take lands in the selected slot if that is empty, else
   the first empty one, and flies there; a take into the inventory while the
-  panel is closed shows it briefly. With no empty slot it is refused with
+  panel is closed peeks at it. With no empty slot it is refused with
   "inventory full". **A drop or a paste aimed at a filled slot replaces its
   card**, which goes to your trash in the same undo step (ADR-0133); a card
   that may not be discarded there is not replaced ("not replaced: the card
@@ -1373,8 +1401,8 @@ The rail is E; the column is T. Seeing both at once is the product.
   - A copy carries pine·trie's own data beside its text, so a paste in
     another tab or browser still lands as a card; another app gets the
     text, and a copy from another host lands as text.
-  - **The clipboard cell**, beside the grid on the side away from the
-    preview, shows what you last copied in this tab ("last copied here"): a
+  - **The clipboard cell**, a chip in the panel's header, shows what you
+    last copied in this tab ("last copied here"): a
     copy made in another app shows there once you paste it. It is no slot
     and takes no drop; **keep** pastes it into a free slot. Keeping a
     message or a block takes those two steps: copy, then keep.
@@ -1402,8 +1430,8 @@ The rail is E; the column is T. Seeing both at once is the product.
   or, onto a note column, at its end. Dropped on a
   composer, it becomes your message there. Held over a canvas in the sidebar,
   or over ▦, a drag opens it while a ring around it fills. A slot's **×**
-  discards its card; the undo key brings it back. The open card's **×**
-  closes it.
+  discards its card, and so does the **×** of the card open on the bench;
+  the undo key brings it back.
 - **Undo a move** with Cmd+Z (Ctrl+Z elsewhere) while no box has focus;
   Cmd+Shift+Z, Ctrl+Shift+Z or Ctrl+Y redo it (ADR-0066). It undoes your
   newest move in the canvas you are on, from any of your tabs, after a reload
@@ -1444,6 +1472,10 @@ The rail is E; the column is T. Seeing both at once is the product.
 | Cmd+X taking a card into your inventory | Cmd+X cuts it: a copy, then a discard (ADR-0132) |
 | a reference staying in your hand when put, and the put key in a text box | every card leaves your hand when put; Cmd+V types a link (ADR-0132) |
 | a drop on a filled slot landing in the first empty one | the drop replaces the slot's card (ADR-0133) |
+| a 3 × 6 inventory of near-square slots, a reference's slot saying only "a quote" | 12 compact slots, two wide, every kind in one shape (ADR-0171) |
+| a preview beside the grid, and a card opened over its neighbours | the bench: the selected card read only, opened in place there (ADR-0171) |
+| an inventory as wide as what it showed, closed only by its toggle | a fixed frame, closed by ×, Escape or its toggle, opening in motion (ADR-0171) |
+| a card's face and whole | compact and full, each a box of its own size (ADR-0171) |
 
 With no control moving a lane, the `navigate` command had no caller and was
 deleted with `prompt` and `branch`. Lanes now never move at all (ADR-0120).

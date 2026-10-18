@@ -11,6 +11,8 @@
   - ADR-0126: selecting a card in the inventory previews it, read only, at one
     column's width; Enter opens it; a take's stop is a fact card, not a stop
     record.
+  - ADR-0171: a thread's slot shows its name, then the first line of where it
+    ended, and its status as a badge.
 
 **Context.**
 

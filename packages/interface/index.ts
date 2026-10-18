@@ -172,8 +172,7 @@ export {
 export {
   type CatchUps,
   CLEAR_COMMAND,
-  CLOSE_CARD,
-  CLOSE_CARD_TITLE,
+  CLOSE_INVENTORY,
   type ControlWords,
   canvasMarkerWords,
   canvasPinnedMarkerWords,
@@ -213,8 +212,8 @@ export {
   readPaste,
 } from "./clip.ts"
 export {
-  type CellFace,
   type ClipboardCellView,
+  type ClipSummary,
   clipboardCellView,
 } from "./clipboard-cell.ts"
 export type { Codec } from "./codec.ts"
@@ -275,6 +274,20 @@ export {
 } from "./columns.ts"
 export { matchCommands } from "./commands.ts"
 export {
+  type Compact,
+  type CompactBadge,
+  type CompactFacts,
+  type CompactMark,
+  type CompactText,
+  cardCompact,
+  compactWords,
+  DETAIL_ON,
+  type Detail,
+  type DrawnCard,
+  type DrawnKind,
+  KIND_ICON,
+} from "./compact.ts"
+export {
   type Completion,
   type CompletionOption,
   completion,
@@ -313,23 +326,6 @@ export {
   sourceOfElement,
 } from "./drag.ts"
 export type { Effect, IntentState } from "./effects.ts"
-export {
-  cardDetail,
-  cardFace,
-  cardOfFace,
-  DETAIL_ON,
-  type Detail,
-  type DrawnCard,
-  type DrawnKind,
-  type Face,
-  type FaceOf,
-  KIND_ICON,
-  type NoteColumnFace,
-  noteColumnFace,
-  type ReferenceFace,
-  type TextFace,
-  textFaceWords,
-} from "./face.ts"
 export type { Focus } from "./focus.ts"
 export { claimFocus, type FocusKey } from "./focus-claim.ts"
 export {
@@ -340,12 +336,15 @@ export {
   type Rect,
 } from "./fold-motion.ts"
 export {
-  type FoldedFace,
+  type FoldedGlance,
   type FoldedMark,
   foldedMark,
   foldedView,
   foldedWords,
+  glanceCardId,
   NO_MARK,
+  type NoteColumnGlance,
+  noteColumnGlance,
   stripTitle,
   UNFOLD,
   UNNAMED_THREAD,
@@ -426,7 +425,24 @@ export {
   dockCodec,
   snappedDock,
 } from "./inventory-dock.ts"
-export { type CardPreview, inventoryView } from "./inventory-view.ts"
+export {
+  cardFlight,
+  type Flight,
+  INVENTORY_CLOSED,
+  type InventoryAct,
+  type InventoryShown,
+  type InventoryState,
+  inventoryReducer,
+  isInventoryShown,
+  PEEK_MS,
+  type ShowHow,
+} from "./inventory-state.ts"
+export {
+  type Bench,
+  emptyBenchWords,
+  inventoryCountWords,
+  inventoryView,
+} from "./inventory-view.ts"
 export {
   canvasStrip,
   decodeLayout,
@@ -453,7 +469,7 @@ export {
 export {
   ADD_COMMENT,
   COMMENT,
-  marginFaceWords,
+  marginCountWords,
   SHUT_MARGIN,
 } from "./margin.ts"
 export { addressMarkdown } from "./markdown-of.ts"
@@ -722,18 +738,18 @@ export {
   threadCardHeads,
 } from "./thread-card.ts"
 export {
-  bareThreadFace,
-  faceStatus,
+  bareThreadGlance,
   focusTitle,
+  glanceStatus,
   type PreviewRow,
-  type ThreadFace,
   type ThreadFocus,
+  type ThreadGlance,
   type ThreadPreview,
-  threadFace,
   threadFocus,
+  threadGlance,
   threadOpening,
   threadPreview,
-} from "./thread-face.ts"
+} from "./thread-glance.ts"
 export {
   builtInIconUrl,
   type IconLookup,

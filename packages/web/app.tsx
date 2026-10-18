@@ -71,12 +71,15 @@ import {
   heldByOthers,
   historyView,
   type Identity,
+  INVENTORY_CLOSED,
   type Intent,
   type IntentState,
   inboxCount,
   inboxMentions,
   initialLayout,
+  inventoryReducer,
   inventoryThreads,
+  isInventoryShown,
   keyAct,
   type Layout,
   type ListWidth,
@@ -88,6 +91,7 @@ import {
   openColumns,
   openProposedByCanvas,
   ownCards,
+  PEEK_MS,
   type ProposalMemory,
   pageTitle,
   parseQuery,
@@ -131,7 +135,7 @@ import {
   taskSummaries,
   threadAnchor,
   threadCardHeads,
-  threadFace,
+  threadGlance,
   threadIcon,
   threadLink,
   threadPreview,
@@ -219,7 +223,7 @@ import { useAttention } from "./use-attention.ts"
 import { useBlankQueued } from "./use-blank-queued.ts"
 import { useDrag } from "./use-drag.ts"
 import { useFilledCards } from "./use-filled-cards.ts"
-import { FLIGHT_MS, useFlight } from "./use-flight.ts"
+import { useFlight } from "./use-flight.ts"
 import { useFoldMotion } from "./use-fold-motion.ts"
 import { PLACED } from "./use-follow.ts"
 import { useInbox } from "./use-inbox.ts"
@@ -1093,7 +1097,7 @@ export function App({
     settled,
   })
   const needsYou = inboxCount(attention.items, inbox.unseen)
-  // A thread's icon, one lookup for the sidebar and the faces alike, so
+  // A thread's icon, one lookup for the sidebar and the glances alike, so
   // they cannot disagree.
   const iconFor = useCallback(
     (thread: ThreadId) =>
@@ -1324,10 +1328,10 @@ export function App({
     [cards, session.writer],
   )
   const intents = useMemo(() => slotIntents(moves), [moves])
-  // A thread's face: its slot's, and its column's when folded.
-  const threadFaceOf = useCallback(
+  // A thread's glance: its slot's, and its column's when folded.
+  const threadGlanceOf = useCallback(
     (thread: ThreadId) =>
-      threadFace({
+      threadGlance({
         thread,
         index,
         lanes,
@@ -1338,14 +1342,14 @@ export function App({
     [index, lanes, workFacts.names, workFacts.focuses, iconFor],
   )
   // Each thread you hold, as its slot draws it.
-  const threadFaces = useMemo(
+  const threadGlances = useMemo(
     () =>
       new Map(
         held.flatMap(c =>
-          c.kind === "thread" ? [[c.id, threadFaceOf(c.id)] as const] : [],
+          c.kind === "thread" ? [[c.id, threadGlanceOf(c.id)] as const] : [],
         ),
       ),
-    [held, threadFaceOf],
+    [held, threadGlanceOf],
   )
   const slots = useMemo(
     () =>
@@ -1356,12 +1360,40 @@ export function App({
       ),
     [held, storedSlots, intents],
   )
-  const [selected, setSelected] = useState(0)
-  // Each request to open the selected slot's card: a thread's preview.
-  const [openSlot, setOpenSlot] = useState(0)
-  const [inventoryOpen, setInventoryOpen] = useState(false)
-  const openNow = useRef(false)
-  openNow.current = inventoryOpen
+  // Your inventory panel: shown or not and why, its selection, its bench.
+  const [inventory, onInventory] = useReducer(
+    inventoryReducer,
+    INVENTORY_CLOSED,
+  )
+  const { selected } = inventory
+  const inventoryOpen = isInventoryShown(inventory)
+  // A peek closes at its own end, unless a card is being dragged then: the
+  // drag is most likely aimed at the panel, so it stays, as if engaged.
+  const peek = inventory.shown.kind === "peek" ? inventory.shown.id : null
+  useEffect(() => {
+    if (peek === null) return
+    const end = setTimeout(
+      () =>
+        onInventory(
+          document.body.hasAttribute("data-card-drag")
+            ? { kind: "engage" }
+            : { kind: "peek-ended", id: peek },
+        ),
+      PEEK_MS,
+    )
+    return () => clearTimeout(end)
+  }, [peek])
+  // Opened for a refusal, it stays until the person acts outside it.
+  const refusing = inventory.shown.kind === "refusal"
+  useEffect(() => {
+    if (!refusing) return
+    const onPress = (e: PointerEvent) => {
+      if ((e.target as Element | null)?.closest(".inventory") == null)
+        onInventory({ kind: "acted-elsewhere" })
+    }
+    document.addEventListener("pointerdown", onPress, true)
+    return () => document.removeEventListener("pointerdown", onPress, true)
+  }, [refusing])
   const [dock, setDock] = useState<Dock>(() => stores.dock.load() ?? "centre")
   useEffect(() => stores.dock.subscribe(d => setDock(d ?? "centre")), [stores])
   // The sidebar's width: your choice in this tab, else by the window's size.
@@ -1461,17 +1493,7 @@ export function App({
         )
       box?.dispatchEvent(new Event("input", { bubbles: true }))
     },
-    inventory: {
-      // A take into the inventory while the panel is closed shows it for the
-      // card's flight.
-      show: brief => {
-        if (brief && openNow.current) return
-        setInventoryOpen(true)
-        if (brief) setTimeout(() => setInventoryOpen(false), FLIGHT_MS * 2)
-      },
-      select: setSelected,
-      openSelected: () => setOpenSlot(n => n + 1),
-    },
+    inventory: onInventory,
     fly,
     foldColumn,
     intent: intent => onIntent(intent),
@@ -1527,6 +1549,9 @@ export function App({
   // The keys (`keyAct`): decided there, from where focus is; nothing here.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // An Escape something under focus already took (a mention list
+      // closing in a box) is not the page's too.
+      if (e.key === "Escape" && e.defaultPrevented) return
       const intent = keyAct(e, focusFacts(focusContext()))
       if (intent === null) return
       e.preventDefault()
@@ -1684,32 +1709,29 @@ export function App({
           ) : (
             <nav aria-label="your threads" id="sidebar" />
           )}
-          {inventoryOpen && (
-            <InventoryPanel
-              colorOf={colorOf}
-              column={lastColumnKey}
-              dock={dock}
-              held={held}
-              intents={intents}
-              onDock={d => setDock(stores.dock.save(d))}
-              onIntent={onIntent}
-              openRequest={openSlot}
-              previewOf={thread =>
-                threadPreview(thread, index, forkOf.get(thread)?.at ?? null)
-              }
-              notes={noteViews}
-              threadNames={workFacts.names}
-              threads={threadFaces}
-              cell={clipboardCellView(cell, slots)}
-              reader={{ me: session.writer, nameOf }}
-              notices={moves.notices.filter(
-                r => r.actedAt.kind === "inventory",
-              )}
-              selected={selected}
-              session={session}
-              slots={slots}
-            />
-          )}
+          {/* Drawn always, hidden while closed, so it opens and closes in
+          motion. */}
+          <InventoryPanel
+            colorOf={colorOf}
+            column={lastColumnKey}
+            dock={dock}
+            held={held}
+            intents={intents}
+            onDock={d => setDock(stores.dock.save(d))}
+            onIntent={onIntent}
+            previewOf={thread =>
+              threadPreview(thread, index, forkOf.get(thread)?.at ?? null)
+            }
+            notes={noteViews}
+            threadNames={workFacts.names}
+            threads={threadGlances}
+            cell={clipboardCellView(cell, slots, held.length)}
+            reader={{ me: session.writer, nameOf }}
+            notices={moves.notices.filter(r => r.actedAt.kind === "inventory")}
+            state={inventory}
+            session={session}
+            slots={slots}
+          />
           {/* Under a page the stage stays mounted and laid out, only inert.
           Remounted, its columns would lose their scroll; with
           `display: none`, `useStripNarrow` would measure the strip at 0 and
@@ -1789,7 +1811,7 @@ export function App({
                           <Strip
                             onCanvas={onCanvas}
                             noteViews={noteViews}
-                            threadFaceOf={threadFaceOf}
+                            threadGlanceOf={threadGlanceOf}
                             threadTrackOf={threadTrackOf}
                             onIntent={onIntent}
                             projected={projected}
@@ -1916,7 +1938,7 @@ export function App({
             inventory={{
               open: inventoryOpen,
               count: held.length,
-              onToggle: () => setInventoryOpen(open => !open),
+              onToggle: () => onInventory({ kind: "toggle" }),
             }}
             folded={listWidth === "icons"}
           />

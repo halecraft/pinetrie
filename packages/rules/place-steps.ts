@@ -40,11 +40,15 @@ export type MakeStep = Extract<MoveStep, { readonly kind: "write" | "refused" }>
 export const ownsPlace = (key: PlaceKey, sender: WriterId): boolean =>
   key.kind !== "inventory" || key.holder === sender
 
-/** Whether `holder`'s inventory holds `INVENTORY_SLOTS` cards, `card` not counted. */
+/**
+ * Whether `holder`'s inventory holds `INVENTORY_SLOTS` cards, `card` not
+ * counted; null counts every one. The page asks it too, so it refuses a take
+ * as the host would.
+ */
 export const inventoryFull = (
   cards: readonly CardRecord[],
   holder: WriterId,
-  card: CardId,
+  card: CardId | null,
 ): boolean =>
   cards.filter(
     c =>

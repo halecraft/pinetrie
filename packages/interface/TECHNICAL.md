@@ -66,7 +66,7 @@ page's (`storage-keys.ts`, `tab-state.ts`, `same-props.ts`, `colors.ts`).
 
 - **A tab holds the roots it shows** (`planHeldRoots`, `held-roots.ts`): the
   roots of the sidebar, and the one you are on, archived or not, and of each
-  thread in your inventory (`inventoryThreads`), whose slot and preview read
+  thread in your inventory (`inventoryThreads`), whose slot and bench read
   it (ADR-0124). `SessionClient.holdRoots` opens what is new and `destroy`s what
   is not, which leaves the host's copy (S86). A root this client starts is
   held from its first send until the page asks for it, and after that only
@@ -97,7 +97,8 @@ page's (`storage-keys.ts`, `tab-state.ts`, `same-props.ts`, `colors.ts`).
   has it.
 - **A link to a thread is a `ThreadLink`** (`thread-link.ts`, ADR-0117,
   ADR-0124), which only `threadLink(thread, cards, me)` makes (a brand): `open`
-  in a canvas, `mine` in your inventory (its preview opens: `openSelected`),
+  in a canvas, `mine` in your inventory (it opens on the bench: the
+  inventory's `open` act),
   `held` in someone else's, `trashed` in the trash of the canvas it left
   (following it restores it, `planRestore`), `gone` with no card, worded
   "deleted". The inbox's rows, a
@@ -481,9 +482,9 @@ canvas's threads (`canvasRail`). A canvas's signals are its threads', whatever r
   (`@pinetrie/rules`), and the table `satisfies` `NewColumnTable`: every
   kind a canvas holds at least once, each entry under its own kind. A new
   kind of canvas card does not compile until ＋ makes it.
-- **Folded, a column is its card's face** (`foldedView`, ADR-0126): the
-  same `Face` a grid's cell draws for that card (`cardFace`), worded for a
-  strip by `foldedWords` (its title, and a note column's count), headed by
+- **Folded, a column is its strip** (`foldedView`, ADR-0126, ADR-0171):
+  its card's glance (a thread's `ThreadGlance`, a note column's
+  `NoteColumnGlance`; no size of detail), worded for a strip by `foldedWords` (its title, and a note column's count), headed by
   `foldedMark` (a thread's icon or ✦, a note column's nothing), in its
   thread's colour (`threadTrack`, the track its column takes at the same
   end), in its place; `projectColumns` lays the paths out over the unfolded thread
@@ -530,7 +531,7 @@ canvas's threads (`canvasRail`). A canvas's signals are its threads', whatever r
   base news) above its prompt, in its own thread, and no
   column or rail row draws them. Read a thread's shape (its fork, whether
   it started) from `firstOf`; read what a person sees first from
-  `threadFirstMessage` (core), as `threadFace` and `canvasRail`'s stubs do.
+  `threadFirstMessage` (core), as `threadGlance` and `canvasRail`'s stubs do.
 - **A thread not yet started in a thread someone else holds** is decided by
   `canvasColumns` from `holders` (`heldByOthers`): its `UnstartedMode.held`
   names that thread and who; `projectColumns` leaves the thread's entries
@@ -1177,8 +1178,8 @@ which names the entry and its thread (`packages/rules/TECHNICAL.md`,
   can be written) is the `comment` act: `planComment` makes an empty note
   at the margin's end (`newCardEffects`) and arms its box's focus, and the
   column opens that margin, where the box claims it once drawn.
-- **Shut, a margin is a face**: its count under the entry
-  (`marginFaceWords`, `MarginFace`), from `marginCounts` over the cards.
+- **Shut, a margin is its count** under the entry, a signal and no size
+  (`marginCountWords`, `MarginCount`), from `marginCounts` over the cards.
   Open (one per column, the column's state), its comments are drawn normal
   under the entry (`DETAIL_ON.margin`), each a `NoteCardEditor`, with
   *+ comment* and *shut*. The list carries the open margin as a slot
@@ -1399,9 +1400,9 @@ composer*).
   ✦. A missing `pinetrie.icons` is ✦ too: the page never guesses a source,
   since under `drawn` a built-in icon shown first would be replaced seconds
   later by the drawn one. The header, the details, the folded strip
-  (`foldedMark`), the card face (`threadFace`) and the folded list
-  (`canvasIcons`) all ask it; `App` builds the one lookup (`IconLookup`) that
-  the faces and the list share. `ThreadIcon.kind` says how it is drawn: a
+  (`foldedMark`), the glance (`threadGlance`) a slot's compact reads, and the
+  folded list (`canvasIcons`) all ask it; `App` builds the one lookup
+  (`IconLookup`) that the glances and the list share. `ThreadIcon.kind` says how it is drawn: a
   `banner` on black, blended off; a `built-in` sprite on a transparent
   ground, unblended.
 - **The header's focus is its named agent's thread's, by type** (ADR-0173):
@@ -1418,8 +1419,8 @@ composer*).
   identity cannot have one. `identityOf` makes it from `headLane`'s lane
   only once it has a name, so the icon and the name are one thread's.
   Pending, the header shows ✦ alone, and a chat's header
-  names no thread and draws no mark; a chat's icon shows on its
-  face, its strip and in the list. It takes the star's place before the
+  names no thread and draws no mark; a chat's icon shows in its
+  slot, its strip and in the list. It takes the star's place before the
   name (`ThreadMark`): a fixed 1.5rem square, the head row's height, holding
   the star, with the image laid over it absolutely, so its arrival moves
   nothing. The star stays in the text (`✦ name`), hidden under an image. A
@@ -1769,24 +1770,54 @@ list: an archived root's work is done, so it never lights ▦ (`elsewhere`).
   Kyneta can name the writers whose text still stands (ADR-0048, *Who
   contributed*), so that the count follows undo.
 
-## Your inventory (ADR-0048 step 4, ADR-0059)
+## Your inventory (ADR-0048 step 4, ADR-0059, ADR-0171)
 
 A panel floating over the columns (`inventory-panel.tsx`, drawn by `App`),
 docked left, centre or right by this device's choice (`inventory-dock.ts`,
-`snappedDock`, kept as a `deviceState`), holding a 3 × 6 card grid (`CardGrid`,
-*Card grids* below). Open or closed is `App`'s state, never stored.
+`snappedDock`, kept as a `deviceState`): a fixed frame two columns wide,
+the bag (a 2 × 6 grid of compact slots, `CardGrid`, *Card grids* below)
+and the bench, under a header (its count, the clipboard chip, ×) and over
+one status line (the newest notice).
 
-- **The selected card is previewed** (ADR-0126): `inventoryView`'s
-  `preview` is the selected card, normal and one column wide (`CardPreview`),
-  or null for an empty slot or while the card is open. The panel draws it
-  beside the grid, on the side away from its dock edge, read only, by its
-  kind's row of `RENDERINGS` (`packages/web/TECHNICAL.md`, *Renderings*).
-  A click selects; Enter, or a click on the card already selected, opens it
-  whole in place, which is the panel's state, so the preview can hide.
-- **A thread's card is drawn by its face** (`thread-face.ts`, ADR-0124):
-  `threadFace` (name, icon, first line, focus, the first line of where it
-  ended, stopped, cards queued), a case of `Face`; opened, `threadPreview`, its
-  path read only, a `ThreadPreview` that no composer, dock or queue takes.
+- **The panel as this tab holds it is one value** (`InventoryState`,
+  `inventory-state.ts`): shown or not and who opened it (`InventoryShown`),
+  the selected slot, and whether the bench has its card open. Every act on
+  it is an `InventoryAct`, applied by `inventoryReducer` in `App`, as the
+  search's acts are by `searchReducer`; a plan asks for one with the
+  `inventory` effect, and the page with the `inventory` intent. Never
+  stored.
+- **Whoever opened it closes it.** Opened `held` (the toggle, a link to
+  your own held thread, an undo that shows it), it closes by ×, Escape or
+  the toggle, never by a click elsewhere. A take while it was closed
+  `peek`s: the shell ends the peek after `PEEK_MS`, naming it, so an old
+  peek's end closes no newer one; a pointer moved over it (the page skips
+  the move a browser sends with no movement when the panel opens under a
+  still pointer), focus in it, or a card drag in progress when it ends
+  makes it `held` (`engage`), as the toggle pressed during it does. A refusal opens
+  it as `refusal`, closed by the next press outside it (`acted-elsewhere`).
+  A show never lowers what is open: a peek over a held panel leaves it
+  held.
+- **The bench** (`inventoryView`'s `bench`, a `Bench`): the selected slot,
+  one column wide, beside the bag on the side away from the dock's edge:
+  an empty slot's words (`emptyBenchWords`), or its card, normal and read
+  only, full once opened, by its kind's row of `RENDERINGS`
+  (`packages/web/TECHNICAL.md`, *Renderings*). Enter, a click on the
+  selected slot, or a click on the bench opens it; selecting another slot
+  folds it.
+- **Escape with focus in the panel is the panel's** (`keyAct`, before the
+  text box's guard, as the search's Escape): the bench's open card folds,
+  else the panel closes (`inventoryReducer`'s `escape`). An Escape a box
+  already took (a mention list closing) is not the page's: `App`'s
+  listener skips it.
+- **The count is the cards held, of `INVENTORY_SLOTS`**
+  (`inventoryCountWords`): "13/12" while someone holds more, whose grid
+  then grows a row for every two (`inventoryGrid`).
+- **A thread's card is drawn by its glance** (`thread-glance.ts`, ADR-0124):
+  `threadGlance` (name, icon, first line, focus, the first line of where it
+  ended, stopped, cards queued), which its compact reads, its second line
+  the focus a model named, else where it ended; opened, `threadPreview`,
+  its path read only, a `ThreadPreview` that no composer, dock or queue
+  takes.
 - **Two layers**: the host's records say which cards are in your
   inventory, and your inventory document which slot holds each. The session
   keeps the slots and repairs them (`packages/session/TECHNICAL.md`, "Your
@@ -1826,8 +1857,10 @@ docked left, centre or right by this device's choice (`inventory-dock.ts`,
   refusal and maps each case to its effect. Your inventory's target is
   aimed (`slot: number`, a drop or a paste on a slot) or not (`null`, a
   take, keep, Copy to your inventory): aimed and filled, the slot's card is
-  replaced, discarded first (ADR-0133); unaimed, the selected slot if empty,
-  else `firstEmpty`, else refused `full`. A target is: a thread's column by key (a note in the note column nearest
+  replaced, discarded first (ADR-0133); unaimed, refused `full` when you
+  hold `INVENTORY_SLOTS` cards (`inventoryFull`, the host's own rule, so a
+  slot drawn past them while you hold more is never aimed at), else the
+  selected slot if empty, else `firstEmpty`, else refused `full`. A target is: a thread's column by key (a note in the note column nearest
   its thread, `notesTarget`), its composer (your message), a note column (a
   note at its end, ADR-0116), its pinned strip, a slot, a spot on a
   canvas (`canvas`: just after a folded column, or past the last, where
@@ -1841,7 +1874,8 @@ docked left, centre or right by this device's choice (`inventory-dock.ts`,
   `column-view.ts`, and your message there); reading it redraws nothing. A
   drop target carries `data-put-column`, `data-put-composer`,
   `data-put-notes` (a note column's id), `data-put-pinned` or
-  `data-put-slot`, each written by `dropProps` and read by
+  `data-put-slot` (a slot's index, or `any` on the inventory's toggle, an
+  unaimed take), each written by `dropProps` and read by
   `targetOfElement`, so a drop lands exactly where a put can. A column's pinned strip carries `data-put-pinned`: it
   lands where the column's composer would create a card, pinned (`pinTargetKey`),
   an unstarted thread's too. A slot as the target swaps a card already in your
@@ -1881,15 +1915,21 @@ docked left, centre or right by this device's choice (`inventory-dock.ts`,
   `<input>`, a checkbox too.
 - **A move flies** (`use-flight.ts`): `perform` measures the card's element
   before the move (`ports.fly`), and once it is drawn elsewhere that
-  element animates from the old box. A take into the inventory while the
-  panel is closed opens it briefly.
-- **Selectors for the browser suite:** `.inventory` (the panel),
-  `.inventory .slot[data-slot][data-card]` and its `.card-face-lines`, the
-  preview's `.inventory .preview .card-normal[data-card]`, the open card's
-  `.card-grid-open` and its × `.close-card`, `.inventory .put`, a slot's ×
-  `.inventory .slot-discard[data-card]`, `#bottom .inventory-toggle` (`.account-inventory` in the
-  account menu while the sidebar is folded), the clipboard cell's
-  `.inventory .clipboard-cell` and its `.keep`, a card's focusable
+  element animates from the old box, as `cardFlight` says: into your
+  inventory as a ghost on the page, since the panel may still be growing
+  (S243); anywhere else in place. A take into the inventory while the panel
+  is closed peeks.
+- **Selectors for the browser suite:** `.inventory` (the panel, always in
+  the page: `.inventory[data-shown]` is it open, its value `peek`, `held`
+  or `refusal`), `.inventory .slot[data-slot][data-card]` and its
+  `.compact-text`, the bench's `.inventory .bench` with its
+  `.card-normal[data-card]`, its open card's `textarea`, an empty slot's
+  `.bench-empty`, `.inventory .put`, a slot's ×
+  `.inventory .slot-discard[data-card]`, the panel's ×
+  `.inventory .inventory-close`, `#bottom .inventory-toggle`
+  (`.account-inventory` in the account menu while the sidebar is folded),
+  the clipboard chip's `.inventory .clipboard-cell` and its `.keep`, the
+  status line `.inventory-status`, a card's focusable
   `.card-head[data-card]`.
 
 ## Drags (`drag.ts`, ADR-0134)
@@ -1920,7 +1960,7 @@ values; the engine gathers and applies.
   landing's planned drop carries its target, so a drop reads only the
   source and the planned drop.
 - **What a frame draws is a value** (`drawPlan`): the dragged element's
-  translate (never a scale, a rotation or a shadow, S153), the card face's
+  translate (never a scale, a rotation or a shadow, S153), the ghost's
   position off the strip, each column's shift (`neighbourShifts`), the
   target's mark (`dropMark`), the handle's lean, and what a hold there
   opens (`opens`). S153's drawing conditions are its unit tests. A mark
@@ -1932,8 +1972,9 @@ values; the engine gathers and applies.
   the rows (`landingIn`).
 - **What a hold opens is decided from the target** (`heldOpens`), after
   `ITEM_HOVER_MS`: a card onto a sidebar canvas (its row's middle half)
-  opens that canvas, a card over ▦ opens the board, and a canvas's drag opens
-  nothing (ADR-0134). Only what a card could be dropped onto opens, so the
+  opens that canvas, a card over ▦ opens the board, a card over the
+  inventory's toggle opens the panel (a drop there takes, aiming at no
+  slot), and a canvas's drag opens nothing (ADR-0134, ADR-0171). Only what a card could be dropped onto opens, so the
   ring never fills where the drop would make a new canvas. When the shell
   decided this from the row under the pointer, for every source, a canvas
   dragged over another in the sidebar filled the ring and opened it, and
@@ -1997,25 +2038,37 @@ decides is here.
 ## Card grids (`grid-view.ts`, `grid-keys.ts`, ADR-0048)
 
 Your inventory is a grid (`CardGrid`, `packages/web/card-grid.tsx`):
-core's `grid.ts` says what a cell is (`INVENTORY_GRID`, 6 × 3), the first
-empty one (`firstEmpty`) and a step (`step`).
+core's `grid.ts` says what a cell is (`INVENTORY_GRID`, 2 × 6, and
+`inventoryGrid`, which grows a row for every two cards held past its 12),
+the first empty one (`firstEmpty`, which aims at the 12 alone) and a step
+(`step`).
 
-- **`gridView`** lays cards out by cell, each at its least detail
-  (`cardFace`), with the selection and the selected card.
-- **A face is one value for every surface** (`face.ts`, ADR-0126): `Face`
-  is a union with a case per drawn kind (a text card's `TextFace`, a
-  thread's `ThreadFace`, a note column's `NoteColumnFace`), so a grid's
-  cell, a folded column and later a margin's mark draw the same value. The
-  face is the kind's; the frame (tone, state, actions) is the place's
-  (`card-frame.ts`), and the two modules never share a signal: the icon is
-  the kind's (`KIND_ICON`), the colour the place's.
-- **Which level a place draws its cards at** is `DETAIL_ON`, total over
-  `CardPlace["kind"]` (ADR-0126's table), so a new place does not compile
-  until it says; `cardDetail(place, folded)` makes a folded column a face. `inventoryView` places them by
-  `settleSlots`, each of the first nine labelled 1–9 (`slotKey`).
+- **`gridView`** lays cards out by cell, each compact (`cardCompact`),
+  with the selection and the selected card.
+- **Compact is one value for every kind** (`compact.ts`, ADR-0171):
+  `Compact`, the same shape whatever the kind (its icon, the place's tone,
+  a mark, a command, a lead, a second line, a badge), which `cardCompact`
+  builds in a switch total over `DrawnKind` and one component draws
+  (`CompactCard`). A kind fills it and draws nothing of its own, so no kind
+  draws a compact of another shape; that its lead says something is a unit
+  test's, as a type cannot. A reference's lead is its quote, which the page
+  reads from its blob (`CompactText`'s `quote`, drawn as `until` meanwhile).
+  Its words are `compactWords`. The compact is the kind's; the frame
+  (tone, state, actions) is the place's (`card-frame.ts`), and the two
+  never share a signal: the icon is the kind's (`KIND_ICON`), the colour
+  the place's.
+- **Which size a place draws its cards at** is `DETAIL_ON`, total over
+  `CardPlace["kind"]` (ADR-0126's table): compact, normal or full, each a
+  box of its own size (the stylesheet's `--compact-w`, `--compact-h`,
+  `--column`). A folded column's strip and a shut margin's count are no
+  size: the strip draws a glance (*Folded, a column is its strip*).
+  `inventoryView` places cards by `settleSlots`, each of the first nine
+  labelled 1–9 (`slotKey`).
 - **`gridKeyAct`** is the grid's keys while it has focus: arrows and `hjkl`
   select, Alt+arrows move the selected card (a put on that slot, which
-  swaps), Enter opens it, and Escape folds it, from its box too.
+  swaps), Enter opens it, and Escape folds it, from its box too. The
+  inventory's grid passes `open: false`: its Escape is the page's
+  (`keyAct`), which folds the bench or closes the panel.
 
 ## Note columns (`note-column-view.ts`, ADR-0116)
 

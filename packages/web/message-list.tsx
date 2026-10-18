@@ -19,7 +19,7 @@ import {
 import { Fragment, memo, useEffect } from "react"
 import { AskWork } from "./ask-work.tsx"
 import { markCommit } from "./commit-marks.ts"
-import { MarginFace } from "./margin.tsx"
+import { MarginCount } from "./margin.tsx"
 import { Message } from "./message.tsx"
 import {
   type MessageListProps,
@@ -39,12 +39,12 @@ function MessageListView(p: MessageListProps) {
     const node = i === undefined ? undefined : view.nodes[i]
     if (i === undefined || node === undefined) return null
     const comments = p.margins.get(node.id) ?? 0
-    // Its margin: open under it, else its face while it holds comments.
+    // Its margin: open under it, else its count while it holds comments.
     const margin =
       p.openMargin === node.id ? (
         p.marginSlot
       ) : comments > 0 ? (
-        <MarginFace count={comments} onOpen={() => p.onMargin(node.id)} />
+        <MarginCount count={comments} onOpen={() => p.onMargin(node.id)} />
       ) : null
     return (
       <Fragment key={node.id}>

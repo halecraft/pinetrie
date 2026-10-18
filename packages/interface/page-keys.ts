@@ -42,6 +42,10 @@ export function keyAct(event: KeyLike, focus: Focus): Intent | null {
   // Before the text box's guard: the search's field is a text box.
   if (plain && event.key === "Escape" && focus.search === "focused")
     return { kind: "search", act: { kind: "close" } }
+  // Before the text box's guard too: the bench's open card is a text box,
+  // and Escape there folds it.
+  if (plain && event.key === "Escape" && focus.inPanel)
+    return { kind: "inventory", act: { kind: "escape" } }
   if (chord && key === "i")
     return focus.card === null
       ? null

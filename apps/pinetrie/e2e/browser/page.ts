@@ -446,3 +446,25 @@ export const openFromBoard = async (p: Page, r: string) => {
     timeout: 15_000,
   })
 }
+
+/**
+ * A point of `selector`'s element, in its own box, that the pointer reaches:
+ * the first, on a grid of its box from its foot up, that `elementFromPoint`
+ * finds inside it. Your inventory, open over the middle of the screen, can
+ * cover most of a column's foot; a drag aims where it does not. Its centre
+ * when no point is reached, so the drag fails where Playwright says why.
+ */
+export async function reachable(
+  p: Page,
+  selector: string,
+): Promise<{ x: number; y: number }> {
+  return p.$eval(selector, el => {
+    const r = el.getBoundingClientRect()
+    for (let y = r.height - 4; y > 0; y -= 8)
+      for (let x = 8; x < r.width; x += 16) {
+        const hit = document.elementFromPoint(r.left + x, r.top + y)
+        if (hit !== null && el.contains(hit)) return { x, y }
+      }
+    return { x: r.width / 2, y: r.height / 2 }
+  })
+}

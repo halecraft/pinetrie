@@ -1,11 +1,12 @@
-// web/renderings — how each kind of card is drawn at each level of detail
-// (*Renderings*): its face (a grid's cell), normal (the card itself, bounded:
-// the inventory's preview) and whole (opened). One row per kind, declared with
-// `satisfies`, so a kind added later does not compile until it draws all three.
-// A card on a canvas is drawn whole by its column (`Strip`'s switch, total by
-// kind too); a folded one by its face (`FoldedColumn`). What each draws is the
-// interface's values (`cardFace`, `cardFrame`, `threadPreview`); what a row needs
-// beyond its card comes from the surface drawing it (`RenderingContext`).
+// web/renderings — how cards are drawn at each level of detail
+// (*Renderings*): compact (a slot) by one component for every kind
+// (`CompactCard`), and normal (the card itself, bounded: the bench) and full
+// (opened on the bench) by one row per kind, declared with `satisfies`, so a
+// kind added later does not compile until it draws both. A card on a canvas is
+// drawn full by its column (`Strip`'s switch, total by kind too); a folded one
+// as its strip (`FoldedColumn`). What each draws is the interface's values
+// (`cardCompact`, `cardFrame`, `threadPreview`); what a row needs beyond its
+// card comes from the surface drawing it (`RenderingContext`).
 
 import {
   blobUrl,
@@ -19,12 +20,12 @@ import {
 } from "@pinetrie/core"
 import {
   addressWords,
+  type Compact,
   cardFrame,
+  compactWords,
   type Detail,
   type DrawnKind,
   EDIT_AS_TEXT,
-  type Face,
-  type FaceOf,
   type Intent,
   KIND_ICON,
   type NoteColumnView,
@@ -32,7 +33,6 @@ import {
   PUT_TITLE,
   type Reader,
   type ThreadPreview,
-  textFaceWords,
 } from "@pinetrie/interface"
 import { askLine, factLine } from "@pinetrie/rules"
 import { AT_INVENTORY, newCardId, type SessionClient } from "@pinetrie/session"
@@ -41,7 +41,8 @@ import { BoundCardEditor } from "./card-editor.tsx"
 import { InventoryIcon } from "./icons.tsx"
 import { MessageText } from "./message-text.tsx"
 import { Initial } from "./presence.tsx"
-import { ThreadFaceView, ThreadPreviewView } from "./thread-preview.tsx"
+import { ThreadIconImage } from "./thread-icon-image.tsx"
+import { ThreadPreviewView } from "./thread-preview.tsx"
 import { useCardTexts } from "./use-card-texts.ts"
 import { useFetched } from "./use-fetched.ts"
 
@@ -59,8 +60,6 @@ interface RenderingContext {
   /** The column a put lands in: the one last focused; null for none. */
   readonly column: string | null
   readonly onIntent: (intent: Intent) => void
-  /** Folds the card drawn whole back into its slot; null where none is open. */
-  readonly onClose: (() => void) | null
 }
 
 const Rendering = createContext<RenderingContext | null>(null)
@@ -82,12 +81,11 @@ const useRendering = (): RenderingContext => {
 
 type CardOf<K extends DrawnKind> = Extract<CardRecord, { readonly kind: K }>
 
-/** How a kind is drawn at each level. */
+/** How a kind is drawn normal and full. */
 export interface Renderings<K extends DrawnKind> {
   readonly icon: string
-  readonly Face: (p: { face: FaceOf<K> }) => ReactNode
   readonly Normal: (p: { card: CardOf<K>; width: CardWidth }) => ReactNode
-  readonly Whole: (p: { card: CardOf<K>; width: CardWidth }) => ReactNode
+  readonly Full: (p: { card: CardOf<K>; width: CardWidth }) => ReactNode
 }
 
 /** A card's put, onto the column last focused, as its open frame's foot. */
@@ -119,36 +117,66 @@ const PUT_THREAD_TITLE =
   "put this thread on the canvas you are on, after the column you were in"
 
 /**
- * A text card folded: a strip in its place's colour, its kind's icon, its
- * owner's circle, its command's chip, its first three lines, and its slot's key
- * in your inventory. Not an `Avatar`: the browser suite counts people by
- * `.avatar`.
+ * A card at its least detail, every kind alike: its kind's icon, its mark (a
+ * writer's circle, not an `Avatar`, since the browser suite counts people by
+ * `.avatar`; or a thread's icon), its command's chip and its badge, then its
+ * lead and second line as one flow, cut at two lines by its stylesheet.
  */
-function TextFaceView({ face }: { face: FaceOf<"text"> }) {
+export function CompactCard({ compact }: { compact: Compact }) {
   const { reader, colorOf } = useRendering()
-  const words = textFaceWords(face, reader)
+  const words = compactWords(compact, reader)
+  const { mark } = compact
   return (
     <span
-      className="card-face"
-      data-tone={face.tone}
-      title={`${words.owner}: ${face.lines}`}
+      className="compact"
+      data-card={compact.card}
+      data-kind={compact.kind}
+      data-tone={compact.tone}
     >
-      <span className="card-face-head">
+      <span className="compact-head">
         <span aria-hidden className="card-icon">
-          {KIND_ICON.text}
+          {KIND_ICON[compact.kind]}
         </span>
-        <Initial
-          className="card-face-owner"
-          colorOf={colorOf}
-          nameOf={reader.nameOf}
-          writer={face.owner}
-        />
+        {mark.kind === "writer" && (
+          <Initial
+            className="compact-mark"
+            colorOf={colorOf}
+            nameOf={reader.nameOf}
+            writer={mark.writer}
+          />
+        )}
+        {mark.kind === "thread" && mark.icon !== null && (
+          <ThreadIconImage className="compact-mark" icon={mark.icon} />
+        )}
         {words.command !== null && (
           <span className="card-chip">{words.command}</span>
         )}
-        {face.key !== null && <span className="card-face-key">{face.key}</span>}
+        {words.badge !== null && (
+          <span
+            className="compact-badge"
+            data-status={compact.badge?.kind === "status" || undefined}
+          >
+            {words.badge}
+          </span>
+        )}
       </span>
-      <span className="card-face-lines">{face.lines}</span>
+      <CompactFlow compact={compact} owner={words.owner} />
+    </span>
+  )
+}
+
+/** A compact's lead and second line, one flow; a reference's quote once read. */
+function CompactFlow(p: { compact: Compact; owner: string | null }) {
+  const { lead, second } = p.compact
+  const quote = useQuote(lead.kind === "quote" ? lead.quote : null)
+  const text = lead.kind === "text" ? lead.text : (quote?.trim() ?? lead.until)
+  return (
+    <span
+      className="compact-text"
+      title={p.owner === null ? text : `${p.owner}: ${text}`}
+    >
+      {text}
+      {second !== null && <span className="compact-second"> {second}</span>}
     </span>
   )
 }
@@ -188,9 +216,9 @@ function TextNormal(p: { card: CardOf<"text">; width: CardWidth }) {
   )
 }
 
-/** A text card opened: its editor in its frame, with its put. */
-function TextWhole(p: { card: CardOf<"text">; width: CardWidth }) {
-  const { session, reader, onIntent, onClose } = useRendering()
+/** A text card opened on the bench: its editor in its frame, with its put; its × discards it. */
+function TextFull(p: { card: CardOf<"text">; width: CardWidth }) {
+  const { session, reader, onIntent } = useRendering()
   return (
     <BoundCardEditor
       among={null}
@@ -198,7 +226,6 @@ function TextWhole(p: { card: CardOf<"text">; width: CardWidth }) {
       catchUps={null}
       foot={<PutButton card={p.card} title={PUT_TITLE} />}
       key={p.card.id}
-      onClose={onClose ?? undefined}
       onDiscard={() =>
         onIntent({ kind: "discard", card: p.card.id, at: AT_INVENTORY })
       }
@@ -212,7 +239,7 @@ function TextWhole(p: { card: CardOf<"text">; width: CardWidth }) {
   )
 }
 
-/** A thread's card, normal: its face, then its first and last messages. */
+/** A thread's card, normal: its first and last messages. */
 function ThreadNormal(p: { card: CardOf<"thread">; width: CardWidth }) {
   const { previewOf } = useRendering()
   const { rows } = previewOf(p.card.id)
@@ -234,27 +261,13 @@ function ThreadNormal(p: { card: CardOf<"thread">; width: CardWidth }) {
 }
 
 /** A thread's card opened: its path, read only, with its put. */
-function ThreadWhole(p: { card: CardOf<"thread">; width: CardWidth }) {
+function ThreadFull(p: { card: CardOf<"thread">; width: CardWidth }) {
   const { previewOf } = useRendering()
   return (
     <ThreadPreviewView
       foot={<PutButton card={p.card} title={PUT_THREAD_TITLE} />}
       preview={previewOf(p.card.id)}
     />
-  )
-}
-
-function NoteColumnFaceView({ face }: { face: FaceOf<"note-column"> }) {
-  return (
-    <span className="note-column-face" data-card={face.card}>
-      <span aria-hidden className="card-icon">
-        {KIND_ICON["note-column"]}
-      </span>
-      <span className="note-column-face-title">{face.title}</span>
-      {face.notes !== null && (
-        <span className="note-column-face-count">{face.notes}</span>
-      )}
-    </span>
   )
 }
 
@@ -294,25 +307,14 @@ const fetchedQuotes = new Map<Sha256, string>()
 export const fetchedQuote = (quote: Sha256): string | null =>
   fetchedQuotes.get(quote) ?? null
 
-/** A reference's quote, fetched from its blob: it never changes. */
-function useQuote(quote: Sha256): string | null {
-  const [loaded] = useFetched([blobUrl(quote)], r => r.text())
-  if (loaded?.kind !== "ready") return null
+/** A reference's quote, fetched from its blob: it never changes. Null asks for none. */
+function useQuote(quote: Sha256 | null): string | null {
+  const [loaded] = useFetched(quote === null ? [] : [blobUrl(quote)], r =>
+    r.text(),
+  )
+  if (quote === null || loaded?.kind !== "ready") return null
   fetchedQuotes.set(quote, loaded.value)
   return loaded.value
-}
-
-/** A reference's face: a chip naming what it names, with its slot's key. */
-function ReferenceFaceView({ face }: { face: FaceOf<"reference"> }) {
-  return (
-    <span className="reference-face" data-card={face.card}>
-      <span aria-hidden className="card-icon">
-        {KIND_ICON.reference}
-      </span>
-      <span className="reference-face-label">{addressWords(face.address)}</span>
-      {face.key !== null && <span className="card-face-key">{face.key}</span>}
-    </span>
-  )
 }
 
 /** A reference, normal: its quote, read only. */
@@ -334,7 +336,7 @@ function ReferenceNormal(p: { card: CardOf<"reference">; width: CardWidth }) {
  * A reference opened: its quote with the thread it is from, read only, and
  * *Edit as text*, which makes it a text card you can change.
  */
-function ReferenceWhole(p: { card: CardOf<"reference">; width: CardWidth }) {
+function ReferenceFull(p: { card: CardOf<"reference">; width: CardWidth }) {
   const { onIntent, threadNames } = useRendering()
   const quote = useQuote(p.card.content.quote)
   const { address } = p.card.content
@@ -373,20 +375,8 @@ function ReferenceWhole(p: { card: CardOf<"reference">; width: CardWidth }) {
 /** How many notes a note column shows, normal. */
 const NOTES_SHOWN = 3
 
-/** A fact's face: its kind's icon, and its line. */
-function FactFaceView({ face }: { face: FaceOf<"fact"> }) {
-  return (
-    <span className="fact-face" data-card={face.card}>
-      <span aria-hidden className="card-icon">
-        {KIND_ICON.fact}
-      </span>
-      {factLine(face.fact)}
-    </span>
-  )
-}
-
 /**
- * A fact, normal and whole alike: its one line, the host's, waiting for its
+ * A fact, normal and full alike: its one line, the host's, waiting for its
  * thread's end. Nobody edits or moves it.
  */
 function FactLine(p: { card: CardOf<"fact">; width: CardWidth }) {
@@ -397,20 +387,8 @@ function FactLine(p: { card: CardOf<"fact">; width: CardWidth }) {
   )
 }
 
-/** An ask card's face: its kind's icon, and its line. */
-function AskFaceView({ face }: { face: FaceOf<"ask"> }) {
-  return (
-    <span className="fact-face" data-card={face.card}>
-      <span aria-hidden className="card-icon">
-        {KIND_ICON.ask}
-      </span>
-      {askLine(face.relay)}
-    </span>
-  )
-}
-
 /**
- * An ask from another thread, normal and whole alike: its one line, the host's,
+ * An ask from another thread, normal and full alike: its one line, the host's,
  * waiting for its thread's end. Nobody edits or moves it.
  */
 function AskLine(p: { card: CardOf<"ask">; width: CardWidth }) {
@@ -421,102 +399,78 @@ function AskLine(p: { card: CardOf<"ask">; width: CardWidth }) {
   )
 }
 
-/** Every kind, drawn at every level. */
+/** Every kind, drawn normal and full; compact is `CompactCard`, the same for all. */
 export const RENDERINGS = {
   text: {
     icon: KIND_ICON.text,
-    Face: TextFaceView,
     Normal: TextNormal,
-    Whole: TextWhole,
+    Full: TextFull,
   },
   thread: {
     icon: KIND_ICON.thread,
-    Face: ThreadFaceView,
     Normal: ThreadNormal,
-    Whole: ThreadWhole,
+    Full: ThreadFull,
   },
   "note-column": {
     icon: KIND_ICON["note-column"],
-    Face: NoteColumnFaceView,
     Normal: p => <NoteList {...p} limit={NOTES_SHOWN} />,
-    Whole: p => <NoteList {...p} limit={null} />,
+    Full: p => <NoteList {...p} limit={null} />,
   },
   fact: {
     icon: KIND_ICON.fact,
-    Face: FactFaceView,
     Normal: FactLine,
-    Whole: FactLine,
+    Full: FactLine,
   },
   reference: {
     icon: KIND_ICON.reference,
-    Face: ReferenceFaceView,
     Normal: ReferenceNormal,
-    Whole: ReferenceWhole,
+    Full: ReferenceFull,
   },
   ask: {
     icon: KIND_ICON.ask,
-    Face: AskFaceView,
     Normal: AskLine,
-    Whole: AskLine,
+    Full: AskLine,
   },
 } as const satisfies { readonly [K in DrawnKind]: Renderings<K> }
 
 const NoteColumnRow = RENDERINGS["note-column"]
 
-/** `face`, drawn by its kind's row. */
-export function DrawFace({ face }: { face: Face }) {
-  switch (face.kind) {
-    case "text":
-      return <RENDERINGS.text.Face face={face} />
-    case "thread":
-      return <RENDERINGS.thread.Face face={face} />
-    case "note-column":
-      return <NoteColumnRow.Face face={face} />
-    case "fact":
-      return <RENDERINGS.fact.Face face={face} />
-    case "reference":
-      return <RENDERINGS.reference.Face face={face} />
-    case "ask":
-      return <RENDERINGS.ask.Face face={face} />
-  }
-}
-
-/** `card` at `detail` above a face, `width` columns wide, by its kind's row. */
+/** `card` at `detail` above compact, `width` columns wide, by its kind's row. */
 export function DrawCard(p: {
   card: CardRecord
-  detail: Exclude<Detail, "face">
+  detail: Exclude<Detail, "compact">
   width: CardWidth
 }) {
   const { card, width } = p
-  const whole = p.detail === "whole"
+  const full = p.detail === "full"
   switch (card.kind) {
     case "text":
-      return whole ? (
-        <RENDERINGS.text.Whole card={card} width={width} />
+      return full ? (
+        <RENDERINGS.text.Full card={card} width={width} />
       ) : (
         <RENDERINGS.text.Normal card={card} width={width} />
       )
     case "thread":
-      return whole ? (
-        <RENDERINGS.thread.Whole card={card} width={width} />
+      return full ? (
+        <RENDERINGS.thread.Full card={card} width={width} />
       ) : (
         <RENDERINGS.thread.Normal card={card} width={width} />
       )
     case "note-column":
-      return whole ? (
-        <NoteColumnRow.Whole card={card} width={width} />
+      return full ? (
+        <NoteColumnRow.Full card={card} width={width} />
       ) : (
         <NoteColumnRow.Normal card={card} width={width} />
       )
     case "fact":
-      return whole ? (
-        <RENDERINGS.fact.Whole card={card} width={width} />
+      return full ? (
+        <RENDERINGS.fact.Full card={card} width={width} />
       ) : (
         <RENDERINGS.fact.Normal card={card} width={width} />
       )
     case "reference":
-      return whole ? (
-        <RENDERINGS.reference.Whole card={card} width={width} />
+      return full ? (
+        <RENDERINGS.reference.Full card={card} width={width} />
       ) : (
         <RENDERINGS.reference.Normal card={card} width={width} />
       )

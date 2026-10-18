@@ -86,6 +86,9 @@
     trace is one way of drawing it.
   - ADR-0128: an agent can queue a card, in another thread's dock, by asking
     that thread's agent while it is busy.
+  - ADR-0171: the inventory is a 2 × 6 grid of 12 slots, not 3 × 6. A take
+    while it is closed peeks, and the panel closes by ×, Escape and its
+    toggle, opening and closing in motion.
 
 Steps 1 to 7 are built, but for step 6's contributors, which wait for Kyneta.
 Probe 2 is answered by S69, probes 1 and 4, for the inventory, by S75 and S76,

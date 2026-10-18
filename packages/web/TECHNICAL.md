@@ -427,8 +427,8 @@ type (`Strip = [CanvasColumn, ...CardColumn[]]`), so no strip lacks one.
   "↑ N earlier messages" under it, which unfolds it for the column's life.
 - **The rail draws a canvas's forest** (`canvasRail`), with each stub a button
   at its fork's row (`.rail-stub`).
-- **A thread in your inventory** is a `ThreadFaceView` in its slot and a
-  `ThreadPreviewView` opened (`thread-preview.tsx`), whose **put** puts it
+- **A thread in your inventory** is a `CompactCard` in its slot and a
+  `ThreadPreviewView` opened on the bench (`thread-preview.tsx`), whose **put** puts it
   on the canvas you are on. A thread taken into an inventory stops, and its
   holder sees it there read only (ADR-0124): a mention of it opens nowhere
   while someone else holds it (`inbox-menu.tsx`).
@@ -557,8 +557,8 @@ set `data-card-drag`.
 
 - **What the first frame needs is armed at the press**, before the 5 px
   threshold (`DRAG_START`): the strip's box, the columns' widths and
-  centres, the neighbours' transitions, the card face (a copy of the
-  column's header). S153 found a drag's one long frame is its first; armed
+  centres, the neighbours' transitions, the ghost (a copy of the column's
+  header, `fixedCopy`, at compact's size). S153 found a drag's one long frame is its first; armed
   at `pointerdown` it falls before anything is seen to move. Columns still
   springing back from a cancel are reset before they are measured, or a
   quick second drag reads a column where it was drawn, not where it is.
@@ -571,7 +571,7 @@ set `data-card-drag`.
 - **A dragged column only translates.** No scale, rotation or shadow on
   it: on a slow machine a long column so drawn cost frames (S153). The lift
   is on its header (`--lean`, a shadow), and off the strip the column is
-  hidden and its card face drawn under the pointer.
+  hidden and its ghost drawn under the pointer (`.drag-ghost`).
 - **A style is written only when it changes** (`write`). Writing every
   transform each frame, the same as the last, brought the 95th percentile
   frame to 33 ms at 4× throttling; written on change, it is the
@@ -1168,19 +1168,15 @@ the session sends moves and draws them until its copy holds them
   notes (`.note-column-notes`), so the box follows the last note and stays
   in view once they scroll.
 - **`CardGrid`** (`card-grid.tsx`) draws your inventory's `GridView` as
-  index cards, each cell a button (the drop target, `dropProps`, and the
-  card's drag) holding its face (`DrawFace`), and beside that button, never
-  in it, the card's × (`.slot-discard`) when the cell `discards`: hidden by
+  compact cards, each cell a button (the drop target, `dropProps`, and the
+  card's drag) holding its `CompactCard`, and beside that button, never in
+  it, the card's × (`.slot-discard`) when the cell `discards`: hidden by
   opacity, not `visibility`, so it is shown on the selected cell and on
-  hover and stays clickable. Its keys are `gridKeyAct`'s, on the
-  grid; the open card is the caller's (`renderOpen`), drawn over its
-  neighbours from its cell, handed the grid's fold for its ×
-  (`RenderingContext`'s close, `.close-card` in place of `.discard-card`),
-  towards the grid's middle (`data-side`), at
-  least as tall as the cell, which it hides (`data-open`, by opacity so
-  Escape can focus it again), carrying the selection's ring itself. A
-  face's owner is an `Initial`, not an `Avatar`: the suites count people by
-  `.avatar`. A cell's text comes from `useCardTexts`.
+  hover and stays clickable. Its keys are `gridKeyAct`'s, on the grid,
+  Escape aside (the page's); Enter and a click on the selected cell ask
+  the caller to open the card on the bench. A compact's owner is an
+  `Initial`, not an `Avatar`: the suites count people by `.avatar`. A
+  cell's text comes from `useCardTexts`.
 - **One editor for every card: `card-editor.tsx`, in one frame:
   `card-frame.tsx`** (ADR-0111). `CardEditor` is your composer's alone; a
   new note or pinned card is written in a `NewCardBox`, and every card that
@@ -1405,8 +1401,8 @@ stays in view; the strip scrolls past 30vh.
 
 - **One image draws every icon**: `ThreadIconImage` sets `src`, an empty
   `alt` and `data-kind` from a `ThreadIcon` (`@pinetrie/interface`), for
-  the mark (`ThreadMark`), the folded list's `.open-sprite` and a card's
-  `.thread-face-sprite`. The CSS in `index.html` draws by `data-kind`.
+  the mark (`ThreadMark`), the folded list's `.open-sprite` and a slot's
+  `.compact-mark`. The CSS in `index.html` draws by `data-kind`.
 - **Only a banner is blended.** A banner is drawn on black, which
   `mix-blend-mode: lighten` takes out; a built-in icon has a transparent
   ground, and lighten would take out its dark outline too. The rules are
@@ -1424,35 +1420,77 @@ stays in view; the strip scrolls past 30vh.
   sheet in `docs/findings/S188-noun-icons/` (`noun-icons.png`, its order
   `prompts.json`), where each noun's 64 candidates were chosen from.
 
-## Renderings (`renderings.tsx`, ADR-0126)
+## Renderings (`renderings.tsx`, ADR-0126, ADR-0171)
 
-Every kind of card is drawn at three levels of detail, and `RENDERINGS`
-has one row per drawn kind with three components (`Face`, `Normal`,
-`Whole`) and its icon (`KIND_ICON`), declared with `satisfies { [K in
-DrawnKind]: Renderings<K> }`: a kind added to `CardRecord` does not
-compile until it draws all three (`renderings.test.ts` proves it with
-`@ts-expect-error`). `DrawFace` and `DrawCard` pick the row by the card's
-kind, in a switch that is total too. A canvas's card is no `DrawnCard`: the
-board draws it (`boardView`), and an inventory never holds one
-(`heldBy`).
+Every kind of card is drawn at three sizes, compact, normal and full, each
+a box of its own size: the stylesheet's `--compact-w` and `--compact-h`
+(half a column's inside, a header row and two lines) and `--column`. A
+surface lays out in these and sets no card's size of its own: the
+inventory's grid columns are `--compact-w`, its frame two `--column`s.
 
-- **The rows wrap what exists.** A text card's face is `TextFaceView`, its
-  normal its text through `MessageText`, read only and bounded at a
-  column's height (`.card-normal`), its whole its editor in its frame
-  (`BoundCardEditor`, with its put). A thread's face is `ThreadFaceView`,
-  its normal its first and last messages, its whole `ThreadPreviewView`.
-  A note column's face is its title and count, its normal its title and
-  first notes, its whole all of them.
+- **Compact is one component for every kind** (`CompactCard`), drawing
+  `cardCompact`'s value (`packages/interface/TECHNICAL.md`, *Card grids*):
+  a header row, then the lead and the second line as one flow that
+  `-webkit-line-clamp: 2` cuts, `overflow-wrap: anywhere` breaking a URL
+  (S241). A reference's lead is its quote once `useQuote` has it. No kind
+  draws a compact of its own.
+- **Normal and full are one row per kind**: `RENDERINGS` has one row per
+  drawn kind with its `Normal` and `Full` and its icon (`KIND_ICON`),
+  declared with `satisfies { [K in DrawnKind]: Renderings<K> }`: a kind
+  added to `CardRecord` does not compile until it draws both
+  (`renderings.test.ts` proves it with `@ts-expect-error`). `DrawCard`
+  picks the row by the card's kind, in a switch that is total too. A
+  canvas's card is no `DrawnCard`: the board draws it (`boardView`), and an
+  inventory never holds one (`heldBy`).
+- **The rows wrap what exists.** A text card normal is its text through
+  `MessageText`, read only and bounded at a column's height
+  (`.card-normal`); full, its editor in its frame (`BoundCardEditor`, with
+  its put), whose × discards it, on the bench as anywhere. A thread normal
+  is its first and last messages, full `ThreadPreviewView`. A note column
+  normal is its title and first notes, full all of them.
 - **A reference's quote is fetched once per page** (`useQuote`), and kept
   by its blob for a copy to read (`fetchedQuote`): a quote never changes.
 - **A row's components take their card and width alone**; what a surface
   gives them beyond that (the session, the reader, a thread's preview, the
   note columns, where a put lands) is `RenderingContext`, given by
   `RenderingProvider`. The inventory panel gives it.
-- **On a canvas, whole is the column**: `Strip`'s switch over
+- **On a canvas, full is the column**: `Strip`'s switch over
   `CardColumn` draws each kind's column, total in the same way, and a
-  folded one draws its face (`FoldedColumn`, `cardDetail`). The rows' `Whole`
-  is a card opened off a canvas: the inventory's open card.
+  folded one its strip (`FoldedColumn`), which is no size. The rows' `Full`
+  is a card opened off a canvas: the bench's open card.
+
+## Your inventory's panel (`inventory-panel.tsx`, ADR-0171)
+
+- **It is always in the page**, hidden while closed (`display: none`), so
+  it grows from its toggle and shrinks back into it (`scale` and
+  `opacity`, `transition-behavior: allow-discrete` on `display`,
+  `@starting-style` for the first frame; S243). Its presence is no open
+  state: read `data-shown`. Its origin is the toggle's centre in its
+  laid-out box (`offsetLeft`, which no transform moves), set before the
+  first frame is painted.
+- **It is centre-docked by `left`, not a transform**, and it scales with
+  the `scale` property, which a dock's drag (`translate`) composes with.
+  A flight into a slot measures it by layout (`layoutBox`), so a
+  `translateX(-50%)` on the panel would land every ghost half a panel off.
+- **A flight into it is a ghost on the page** (`use-flight.ts`'s
+  `flyGhost`, `fixedCopy`): flown inside the growing panel, a card starts
+  hundreds of pixels from where it was (S243). The slot is hidden until
+  the ghost lands, cancelled or not.
+- **A click on the bench opens its card only when it ends no text
+  selection** (S242): a drag across the normal card's text fires `click`
+  too, and opening would lose the selection.
+- **Opened on the bench, its card takes focus**: its text box, else its
+  first enabled button (a reference's Edit as text, a thread's put), else
+  the bench. Folded by Escape, focus goes back to the selected slot, where
+  the grid's keys are; a card that leaves the bench (put, dropped,
+  discarded) moves no focus, or a key pressed after would land in the
+  panel (Ctrl+Z undoing a swap, not the move), and the bench folds, so a
+  card put in that slot later is not opened.
+- **Its size is the viewport's alone**: the bag and the bench are each a
+  `--column`, its body's height follows its rows (`--rows`), the status
+  line is one line always. Its top is 30vh, or higher where that would put
+  its foot under the footer. Below 58rem of viewport it is one column, the
+  bench taking the bag's place while its card is open (`data-bench`).
 
 ## Selectors in the browser suite
 

@@ -170,3 +170,24 @@ describe("keyAct: search", () => {
     expect(keyAct(k, focus(f))).toEqual(intent)
   })
 })
+
+describe("keyAct: the inventory", () => {
+  const escapes = { kind: "inventory", act: { kind: "escape" } }
+  test.each<[string, KeyLike, Partial<Focus>, unknown]>([
+    [
+      "Escape in the panel is the panel's",
+      key("Escape"),
+      { inPanel: true },
+      escapes,
+    ],
+    [
+      "Escape in the bench's box is the panel's too",
+      key("Escape"),
+      { inPanel: true, inText: true },
+      escapes,
+    ],
+    ["Escape outside it is not", key("Escape"), {}, null],
+  ])("%s", (_, k, f, intent) => {
+    expect(keyAct(k, focus(f))).toEqual(intent)
+  })
+})

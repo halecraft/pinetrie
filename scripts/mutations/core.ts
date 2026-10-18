@@ -817,12 +817,20 @@ export const mutations: readonly Mutation[] = [
     expect: "a move goes from where the card is",
   },
   {
+    name: "the inventory's grid never grows",
+    file: "packages/core/grid.ts",
+    from: "  rows: Math.max(INVENTORY_GRID.rows, Math.ceil(held / INVENTORY_GRID.width)),",
+    to: "  rows: INVENTORY_GRID.rows,",
+    command: unit,
+    expect: "inventoryGrid grows a row for every two cards past 12",
+  },
+  {
     name: "a grid move wraps past the left edge",
     file: "packages/core/grid.ts",
     from: "      return row * width + Math.max(0, col - 1)",
     to: "      return row * width + col - 1",
     command: unit,
-    expect: "step on the 3 × 6 inventory: left at the left edge",
+    expect: "step on the 2 × 6 inventory: left at the left edge",
   },
   {
     name: "an unqueue goes to another thread's notes",

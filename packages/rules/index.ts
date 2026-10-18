@@ -457,6 +457,7 @@ export {
 } from "./pinned.ts"
 export {
   afterSteps,
+  inventoryFull,
   type MakeStep,
   type MoveStep,
   type PlaceStep,

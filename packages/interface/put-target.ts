@@ -84,8 +84,9 @@ const PUT_COMPOSER = "data-put-composer"
 const PUT_PINNED = "data-put-pinned"
 /** The attribute a canvas column's pinned cards carry: its canvas. */
 const PUT_CANVAS_PINNED = "data-put-canvas-pinned"
-/** The attribute a slot carries: its index. */
+/** The attribute a slot carries: its index; the inventory's toggle, `any` (no slot aimed at). */
 const PUT_SLOT = "data-put-slot"
+const ANY_SLOT = "any"
 /** The attribute a note column carries: its id. */
 const PUT_NOTES = "data-put-notes"
 /** The attribute a spot on a canvas carries: its canvas. */
@@ -115,7 +116,9 @@ export function dropProps(target: PutTarget): Readonly<Record<string, string>> {
     case "canvasPinned":
       return { [PUT_CANVAS_PINNED]: target.canvas }
     case "inventory":
-      return target.slot === null ? {} : { [PUT_SLOT]: String(target.slot) }
+      return {
+        [PUT_SLOT]: target.slot === null ? ANY_SLOT : String(target.slot),
+      }
     case "notes":
       return { [PUT_NOTES]: target.column }
     case "canvas":
@@ -169,6 +172,7 @@ export function targetOfElement(el: {
       : { kind: "canvas", canvas: id, after: card }
   }
   const slot = el.getAttribute(PUT_SLOT)
+  if (slot === ANY_SLOT) return { kind: "inventory", slot: null }
   if (slot === null || !/^\d+$/.test(slot)) return null
   return { kind: "inventory", slot: Number(slot) }
 }

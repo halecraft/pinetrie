@@ -2,37 +2,62 @@
 // with its card's mark and title, in its place on the canvas, so the
 // arrangement reads the same for everyone whatever you have folded.
 
-import type { NoteColumnId, ThreadId } from "@pinetrie/core"
+import type { CardId, NoteColumnId, ThreadId } from "@pinetrie/core"
 import type { CardColumn } from "./canvas-columns.ts"
 import type { ControlWords } from "./card-words.ts"
 import type { HeadIcon } from "./column-view.ts"
-import { type FaceOf, noteColumnFace } from "./face.ts"
 import { type NoteColumnView, noteCountWords } from "./note-column-view.ts"
-import type { ThreadFace } from "./thread-face.ts"
+import type { ThreadGlance } from "./thread-glance.ts"
 
-/** The face a folded column draws: a thread's, or a note column's. */
-export type FoldedFace = FaceOf<"thread" | "note-column">
+/** A note column at a glance: its title, and how many notes it holds. */
+export interface NoteColumnGlance {
+  readonly kind: "note-column"
+  readonly card: NoteColumnId
+  readonly title: string
+  /** How many notes it holds; null before the tab has read them. */
+  readonly notes: number | null
+}
+
+/** A note column's glance, from its column as drawn. */
+export function noteColumnGlance(
+  card: NoteColumnId,
+  notes: ReadonlyMap<NoteColumnId, NoteColumnView>,
+): NoteColumnGlance {
+  const view = notes.get(card)
+  return {
+    kind: "note-column",
+    card,
+    title: view?.title ?? "",
+    notes: view?.notes.length ?? null,
+  }
+}
+
+/** What a folded column draws: a thread's glance, or a note column's. */
+export type FoldedGlance = ThreadGlance | NoteColumnGlance
+
+/** The card a folded column's glance is of. */
+export const glanceCardId = (glance: FoldedGlance): CardId =>
+  glance.kind === "thread" ? glance.thread : glance.card
 
 /** A thread not yet named: its name comes with its first send. */
 export const UNNAMED_THREAD = "a thread"
 
 /**
- * A folded column's face (`cardFace`), the same value a grid's cell
- * draws for its card; null for a branch not yet on the canvas, which never
- * folds.
+ * What a folded column draws for its card; null for a branch not yet on the
+ * canvas, which never folds.
  */
 export function foldedView(
   column: CardColumn,
   facts: {
-    readonly threadFaceOf: (thread: ThreadId) => ThreadFace
+    readonly threadGlanceOf: (thread: ThreadId) => ThreadGlance
     readonly notes: ReadonlyMap<NoteColumnId, NoteColumnView>
   },
-): FoldedFace | null {
+): FoldedGlance | null {
   switch (column.kind) {
     case "thread":
-      return column.card === null ? null : facts.threadFaceOf(column.card)
+      return column.card === null ? null : facts.threadGlanceOf(column.card)
     case "notes":
-      return noteColumnFace(column.card, facts.notes)
+      return noteColumnGlance(column.card, facts.notes)
   }
 }
 
@@ -46,16 +71,16 @@ interface FoldedWords {
   readonly hint: string | null
 }
 
-export const foldedWords = (face: FoldedFace): FoldedWords =>
-  face.kind === "thread"
+export const foldedWords = (glance: FoldedGlance): FoldedWords =>
+  glance.kind === "thread"
     ? {
-        title: face.name ?? UNNAMED_THREAD,
+        title: glance.name ?? UNNAMED_THREAD,
         detail: null,
-        hint: face.focus?.text ?? null,
+        hint: glance.focus?.text ?? null,
       }
     : {
-        title: face.title,
-        detail: face.notes === null ? null : noteCountWords(face.notes),
+        title: glance.title,
+        detail: glance.notes === null ? null : noteCountWords(glance.notes),
         hint: null,
       }
 
@@ -77,11 +102,11 @@ export type FoldedMark =
 /** A strip with no mark: a note column's, the canvas column's. */
 export const NO_MARK: FoldedMark = { kind: "none" }
 
-export const foldedMark = (face: FoldedFace): FoldedMark =>
-  face.kind === "thread"
+export const foldedMark = (glance: FoldedGlance): FoldedMark =>
+  glance.kind === "thread"
     ? {
         kind: "thread",
-        icon: face.icon === null ? null : { ...face.icon, fade: false },
+        icon: glance.icon === null ? null : { ...glance.icon, fade: false },
       }
     : NO_MARK
 

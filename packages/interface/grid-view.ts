@@ -1,24 +1,25 @@
 // interface/grid-view — your inventory's slots as they are drawn: cells in
-// reading order, each a face or empty, the selection, and its rows.
+// reading order, each a compact or empty, the selection, and its rows.
 
 import type {
   CardId,
   Grid,
   NoteColumnId,
   ThreadId,
+  ThreadName,
   WriterId,
 } from "@pinetrie/core"
 import type { CardTone } from "./card-frame.ts"
+import { type Compact, cardCompact, type DrawnCard } from "./compact.ts"
 import { isDiscardable } from "./discardable.ts"
-import { cardFace, type DrawnCard, type Face } from "./face.ts"
 import type { NoteColumnView } from "./note-column-view.ts"
-import type { ThreadFace } from "./thread-face.ts"
+import type { ThreadGlance } from "./thread-glance.ts"
 
 export interface GridCell {
   readonly index: number
-  /** Its card, and the card at its least detail (`cardFace`); null for an empty cell. */
+  /** Its card, and the card at its least detail (`cardCompact`); null for an empty cell. */
   readonly card: DrawnCard | null
-  readonly face: Face | null
+  readonly compact: Compact | null
   readonly selected: boolean
   /** Whether its × is drawn: a card you may discard (`isDiscardable`). */
   readonly discards: boolean
@@ -33,12 +34,12 @@ export interface GridView {
   readonly card: DrawnCard | null
 }
 
-/**
- * `placed` (cell to card) drawn on `grid` as `tone`, `selected` selected.
- * `keyOf` labels a cell's face (the inventory's 1–9).
- */
 const NONE: ReadonlyMap<never, never> = new Map<never, never>()
 
+/**
+ * `placed` (cell to card) drawn on `grid` as `tone`, `selected` selected.
+ * `keyOf` labels a cell's compact (the inventory's 1–9).
+ */
 export function gridView(input: {
   readonly grid: Grid
   readonly tone: CardTone
@@ -48,10 +49,12 @@ export function gridView(input: {
   readonly me: WriterId
   /** Each card's text, by id; one not yet read is "". */
   readonly texts: ReadonlyMap<CardId, string>
-  /** Each thread's face, by its id. */
-  readonly threads?: ReadonlyMap<ThreadId, ThreadFace>
+  /** Each thread's glance, by its id. */
+  readonly threads?: ReadonlyMap<ThreadId, ThreadGlance>
   /** Each note column, as its column draws it. */
   readonly notes?: ReadonlyMap<NoteColumnId, NoteColumnView>
+  /** Each thread's name, which a reference names as where it is from. */
+  readonly threadNames?: ReadonlyMap<ThreadId, ThreadName>
   readonly keyOf?: (cell: number) => string | null
 }): GridView {
   const { rows } = input.grid
@@ -60,15 +63,16 @@ export function gridView(input: {
     return {
       index,
       card,
-      face:
+      compact:
         card === null
           ? null
-          : cardFace(card, {
+          : cardCompact(card, {
               tone: input.tone,
               key: input.keyOf?.(index) ?? null,
               texts: input.texts,
               threads: input.threads ?? NONE,
               notes: input.notes ?? NONE,
+              threadNames: input.threadNames ?? NONE,
             }),
       selected: index === input.selected,
       discards: card !== null && isDiscardable(card, input.me),

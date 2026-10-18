@@ -169,7 +169,7 @@ describe("take into the inventory", () => {
     const s = state({ cards: [card(C1, atEnd)], selected: 4 })
     const move = { card: C1, from: atEnd, to: inventory }
     expect(plan({ kind: "takeIntoInventory", card: C1 }, s)).toEqual([
-      { kind: "showInventory", brief: true },
+      { kind: "inventory", act: { kind: "show", how: "peek" } },
       {
         kind: "moveCard",
         move,
@@ -817,7 +817,7 @@ describe("afterUndo: what an undo's answer brings into view", () => {
   test("back in your inventory: the panel", () => {
     expect(
       answered({ kind: "undone", cards: [{ card: C1, place: inventory }] }),
-    ).toEqual([{ kind: "showInventory", brief: false }])
+    ).toEqual([{ kind: "inventory", act: { kind: "show", how: "held" } }])
   })
 
   test("your message back at a thread not yet started: its card unfolded in its canvas", () => {
@@ -1321,6 +1321,23 @@ describe("landing a copy", () => {
     })
   })
 
+  test("an unaimed take is refused full at 12 held, though a slot among them is empty", () => {
+    const held = Array.from({ length: INVENTORY_SLOTS }, (_, n) =>
+      card(cardIdFor(`h${n}`), inventory),
+    )
+    const s = state({
+      cards: held,
+      slots: Object.fromEntries(
+        held.map((c, n) => [String(n === 3 ? INVENTORY_SLOTS : n), c.id]),
+      ),
+    })
+    expect(land(past, { kind: "inventory", slot: null }, s)).toEqual({
+      kind: "refused",
+      code: "full",
+      card: null,
+    })
+  })
+
   test("a replaced slot's card goes to your trash first: a drop's move set, a paste's `replacing`", () => {
     const s = state({
       cards: [card(C1, atEnd), card(C2, inventory)],
@@ -1330,7 +1347,7 @@ describe("landing a copy", () => {
     expect(
       planPut({ kind: "card", card: C1 }, target, "move", s, MINTED),
     ).toMatchObject([
-      { kind: "showInventory" },
+      { kind: "inventory" },
       {
         kind: "moveCards",
         moves: [
@@ -1342,7 +1359,7 @@ describe("landing a copy", () => {
     expect(
       planPut({ kind: "clip", clip: past }, target, "copy", s, MINTED),
     ).toMatchObject([
-      { kind: "showInventory" },
+      { kind: "inventory" },
       {
         kind: "paste",
         to: inventory,

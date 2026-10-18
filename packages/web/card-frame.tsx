@@ -2,8 +2,8 @@
 // drag handle and its signals (its kind's icon, its place, state, who put it
 // there, a command's chip, ⋯ and ×), its body, and a footer of ↑ ↓ and its one
 // primary action. What it shows is `cardFrame`'s value, in `cardFrameWords`'s
-// words; the frame's colour is the place's, the icon the kind's. A card's face
-// is `RENDERINGS`'s (`renderings.tsx`).
+// words; the frame's colour is the place's, the icon the kind's. A card
+// compact is `CompactCard`'s (`renderings.tsx`).
 //
 // The body is the caller's, and keeps its elements while the card comes
 // into being: the composer's box must stay one element for its whole life
@@ -15,8 +15,6 @@ import {
   type CardFrameView,
   type CatchUps,
   CLEAR_COMMAND,
-  CLOSE_CARD,
-  CLOSE_CARD_TITLE,
   type ColumnAct,
   cardFrameWords,
   DISCARD_CARD,
@@ -58,11 +56,6 @@ export function CardFrame(p: {
   /** A move chosen in its ⋯, or a ↑ or ↓. */
   onAct: (act: ColumnAct) => void
   onDiscard: () => void
-  /**
-   * Folds a card opened from its slot: given, its × closes it instead of
-   * discarding, since a person reads × on an open card as close.
-   */
-  onClose?: () => void
   /** The × beside a command's chip, which sends the card as a plain message; null for none. */
   onClearCommand: (() => void) | null
   /** The footer, after the tools: its primary action and quiet words. */
@@ -182,19 +175,7 @@ export function CardFrame(p: {
               triggerClassName="card-menu-trigger"
             />
           )}
-          {p.onClose !== undefined ? (
-            <button
-              aria-label={CLOSE_CARD_TITLE}
-              className="close-card"
-              onClick={p.onClose}
-              title={CLOSE_CARD_TITLE}
-              type="button"
-            >
-              {CLOSE_CARD}
-            </button>
-          ) : (
-            view.discards && <DiscardButton onDiscard={p.onDiscard} />
-          )}
+          {view.discards && <DiscardButton onDiscard={p.onDiscard} />}
         </span>
       </div>
       <div className="card-body">

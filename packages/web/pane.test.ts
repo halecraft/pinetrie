@@ -244,10 +244,11 @@ test("index.html sizes the pane and the thread by pane.ts's numbers", () => {
     COLUMN_EDGE_PX,
     PANE_MAX_REM,
   ])
-  const thread = /\.column-thread \{ flex: 0 0 (\d+)rem; width: (\d+)rem;/.exec(
-    html,
+  const column = /--column: (\d+)rem;/.exec(html)
+  expect(column?.slice(1).map(Number)).toEqual([THREAD_REM])
+  expect(html).toMatch(
+    /\.column-thread \{ flex: 0 0 var\(--column\); width: var\(--column\);/,
   )
-  expect(thread?.slice(1).map(Number)).toEqual([THREAD_REM, THREAD_REM])
   expect(html).toMatch(/#strip \{[^}]*container-type: inline-size;/)
   expect(html).toMatch(
     new RegExp(`\\.column \\{[^}]*border-right: ${COLUMN_EDGE_PX}px solid`),

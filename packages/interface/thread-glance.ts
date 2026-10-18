@@ -1,8 +1,8 @@
-// interface/thread-face — a thread's card in your inventory: known at a glance,
-// as a game's inventory shows what it holds: its name and icon, its first
-// line, what it is doing now, the first line of where it ended, and its
-// status. The whole path is its preview's, when it is opened. A thread's
-// focus is worded here (`threadFocus`), for its column's header too.
+// interface/thread-glance — a thread known at a glance, as a game's inventory
+// shows what it holds: its name and icon, its first line, what it is doing
+// now, the first line of where it ended, and its status. A slot's compact and
+// a folded strip read it; the whole path is its preview's, when it is opened.
+// A thread's focus is worded here (`threadFocus`), for its column's header too.
 
 import {
   type EntryId,
@@ -21,8 +21,8 @@ import {
 } from "@pinetrie/core"
 import type { IconLookup, ThreadIcon } from "./thread-icon.ts"
 
-/** A thread's face in a slot. */
-export interface ThreadFace {
+/** A thread at a glance: what its slot and its folded strip draw. */
+export interface ThreadGlance {
   readonly kind: "thread"
   readonly thread: ThreadId
   /** Its two-word name; null before it has one. */
@@ -31,7 +31,7 @@ export interface ThreadFace {
   readonly icon: ThreadIcon | null
   /** The first line of its first message; "" before it has one (a copy). */
   readonly first: string
-  /** What it is doing now (`threadFocus`), shown above its lines when a model named it. */
+  /** What it is doing now (`threadFocus`), shown in its slot when a model named it. */
   readonly focus: ThreadFocus | null
   /** The first line of the message it ends at, when that is not its first. */
   readonly last: string | null
@@ -41,7 +41,7 @@ export interface ThreadFace {
   readonly queued: number
 }
 
-/** How long a face's lines are kept. */
+/** How long a glance's lines are kept. */
 const LINE = 40
 
 /**
@@ -89,15 +89,15 @@ export function threadFocus(input: {
 export const focusTitle = (focus: ThreadFocus): string =>
   focus.kind === "model" ? `${focus.text}\nwritten by a model` : focus.text
 
-/** `thread`'s face, from its tree and its asks, its lane, its name and icon. */
-export function threadFace(input: {
+/** `thread`'s glance, from its tree and its asks, its lane, its name and icon. */
+export function threadGlance(input: {
   readonly thread: ThreadId
   readonly index: TreeIndex
   readonly lanes: readonly LaneView[]
   readonly names: ReadonlyMap<ThreadId, ThreadName>
   readonly focuses: ReadonlyMap<ThreadId, FocusRecord>
   readonly iconFor: IconLookup
-}): ThreadFace {
+}): ThreadGlance {
   const { thread, index } = input
   const firstId = threadFirstMessage(index, thread)
   const end = threadEnd(index, thread)
@@ -120,8 +120,8 @@ export function threadFace(input: {
   }
 }
 
-/** A thread's face before this tab has read anything of it: its id alone. */
-export const bareThreadFace = (thread: ThreadId): ThreadFace => ({
+/** A thread's glance before this tab has read anything of it: its id alone. */
+export const bareThreadGlance = (thread: ThreadId): ThreadGlance => ({
   kind: "thread",
   thread,
   name: null,
@@ -133,13 +133,13 @@ export const bareThreadFace = (thread: ThreadId): ThreadFace => ({
   queued: 0,
 })
 
-/** A face's status in words: "stopped · 2 cards queued", or null for nothing to say. */
-export function faceStatus(face: ThreadFace): string | null {
+/** A glance's status in words: "stopped · 2 cards queued", or null for nothing to say. */
+export function glanceStatus(glance: ThreadGlance): string | null {
   const parts = [
-    ...(face.stopped ? ["stopped"] : []),
-    ...(face.queued === 0
+    ...(glance.stopped ? ["stopped"] : []),
+    ...(glance.queued === 0
       ? []
-      : [`${face.queued} card${face.queued === 1 ? "" : "s"} queued`]),
+      : [`${glance.queued} card${glance.queued === 1 ? "" : "s"} queued`]),
   ]
   return parts.length === 0 ? null : parts.join(" · ")
 }

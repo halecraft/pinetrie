@@ -205,13 +205,16 @@ export const ITEM_HOVER_MS = 600
 export type HoverOver =
   | { readonly kind: "canvas"; readonly canvas: CanvasId }
   | { readonly kind: "board" }
+  /** Your inventory, from its toggle, where a drop takes the card. */
+  | { readonly kind: "inventory" }
   | { readonly kind: "none" }
 
 const NO_HOVER: HoverOver = { kind: "none" }
 
 /**
  * What holding the drag where it is opens: the sidebar canvas a card is onto
- * (a row's middle, `sidebarSpot`), or the board from ▦. A canvas's drag
+ * (a row's middle, `sidebarSpot`), the board from ▦, or your inventory from
+ * its toggle, which aims at no slot (a drop there takes). A canvas's drag
  * lands only between canvases, never onto one, so it opens nothing.
  */
 function heldOpens(at: DragAt): HoverOver {
@@ -221,7 +224,9 @@ function heldOpens(at: DragAt): HoverOver {
     case "put":
       return over.target.kind === "item"
         ? { kind: "canvas", canvas: over.target.canvas }
-        : NO_HOVER
+        : over.target.kind === "inventory" && over.target.slot === null
+          ? { kind: "inventory" }
+          : NO_HOVER
     case "board":
       return { kind: "board" }
     case "strip":
@@ -230,13 +235,15 @@ function heldOpens(at: DragAt): HoverOver {
   }
 }
 
-/** What being held over `over` opens: a canvas in the sidebar, or the board. */
+/** What being held over `over` opens: a canvas in the sidebar, the board, or your inventory. */
 export function hoverOpens(over: HoverOver): Intent | null {
   switch (over.kind) {
     case "canvas":
       return { kind: "show", here: { kind: "canvas", canvas: over.canvas } }
     case "board":
       return { kind: "board", open: true, focus: false }
+    case "inventory":
+      return { kind: "inventory", act: { kind: "show", how: "held" } }
     case "none":
       return null
   }
@@ -293,8 +300,8 @@ export type DropMark = "root" | "move" | "copy" | "replace" | "refused"
 export interface DrawPlan {
   /** The dragged element's translate; null while it is hidden. Never a scale, a rotation or a shadow on it. */
   readonly dragged: Point | null
-  /** The card face's position, under the pointer; null while the column is drawn instead. */
-  readonly face: Point | null
+  /** The ghost's position, at compact's size under the pointer; null while the column is drawn instead. */
+  readonly ghost: Point | null
   /** Each column's `translateX`, opening the gap a column would land in. */
   readonly shifts: readonly number[]
   readonly mark: DropMark | null
@@ -329,7 +336,7 @@ const MAX_LEAN = 3
 
 /**
  * What to draw this frame. A column is slid along the strip while the
- * pointer is over it, and leaves it as its card face; anything else moves
+ * pointer is over it, and leaves it as its ghost; anything else moves
  * whole. The dragged element only ever translates: a scaled, rotated or
  * shadowed column costs frames on a slow machine, and the lift is drawn on
  * its handle instead. The target's mark and what a hold there opens are
@@ -351,7 +358,7 @@ export function drawPlan(
   if (!armed.column || strip === null)
     return {
       dragged: { x: pointer.x - armed.start.x, y: pointer.y - armed.start.y },
-      face: null,
+      ghost: null,
       shifts: still,
       mark,
       lean,
@@ -363,10 +370,10 @@ export function drawPlan(
     pointer.y >= strip.top &&
     pointer.y <= strip.bottom
   if (!onStrip)
-    return { dragged: null, face: pointer, shifts: still, mark, lean, opens }
+    return { dragged: null, ghost: pointer, shifts: still, mark, lean, opens }
   return {
     dragged: { x: pointer.x - armed.start.x, y: 0 },
-    face: null,
+    ghost: null,
     shifts:
       at.over.kind === "strip" && armed.from !== null
         ? neighbourShifts(armed.from, at.over.gap, armed.widths)

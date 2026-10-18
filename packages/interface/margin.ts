@@ -1,6 +1,6 @@
 // interface/margin — an entry's margin as its column draws it: its comments,
-// notes that people read and the agent does not. Shut, the margin is a face
-// beside its entry, the count of its comments; open, its comments drawn normal
+// notes that people read and the agent does not. Shut, the margin is the count
+// of its comments beside its entry, a signal and no level of detail; open, its comments drawn normal
 // under the entry (`DETAIL_ON`). The words are here, `marginCounts`
 // (`@pinetrie/rules`) the counts, and `Margin` (`packages/web/margin.tsx`)
 // draws it.
@@ -14,8 +14,8 @@ export const COMMENT = {
     "comment on this message: a note beside it, for everyone on the canvas; the agent does not read it",
 } as const
 
-/** A shut margin's face: how many comments it holds. */
-export const marginFaceWords = (
+/** A shut margin's count: how many comments it holds. */
+export const marginCountWords = (
   count: number,
 ): { readonly label: string; readonly title: string } => ({
   label: `💬 ${count}`,

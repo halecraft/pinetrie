@@ -58,7 +58,7 @@ const ports = () => {
         dispose: vi.fn(),
       },
     },
-    inventory: { show: vi.fn(), select: vi.fn(), openSelected: vi.fn() },
+    inventory: vi.fn(),
     attention: { dismiss: vi.fn(), dismissReady: vi.fn() },
     fly: vi.fn(),
     foldColumn: vi.fn(),
@@ -226,7 +226,7 @@ test.each<Row>([
       here: null,
     },
     port: p => p.fly,
-    args: ["c"],
+    args: ["c", "ghost"],
   },
   {
     effect: { kind: "swapSlots", a: 1, b: 2 },
@@ -244,14 +244,9 @@ test.each<Row>([
     args: [TEST_CANVAS, "undo"],
   },
   {
-    effect: { kind: "showInventory", brief: true },
-    port: p => p.inventory.show,
-    args: [true],
-  },
-  {
-    effect: { kind: "select", slot: 4 },
-    port: p => p.inventory.select,
-    args: [4],
+    effect: { kind: "inventory", act: { kind: "select", slot: 4 } },
+    port: p => p.inventory,
+    args: [{ kind: "select", slot: 4 }],
   },
 ])("the $effect.kind effect is one port call", ({ effect, port, args }) => {
   const p = ports()

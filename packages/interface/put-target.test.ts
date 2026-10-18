@@ -61,7 +61,7 @@ describe("one landing rule: every input has full fidelity", () => {
     { kind: "column", key: "k-unstarted" },
     { kind: "composer", key: "k-thread" },
     { kind: "inventory", slot: 0 },
-    { kind: "inventory", slot: 17 },
+    { kind: "inventory", slot: 11 },
     { kind: "column", key: "k-closed" },
     { kind: "pinned", key: "k-thread" },
     { kind: "pinned", key: "k-unstarted" },
@@ -79,6 +79,7 @@ describe("one landing rule: every input has full fidelity", () => {
     { kind: "canvas", canvas: TEST_CANVAS, after: LANE },
     { kind: "canvas", canvas: TEST_CANVAS, after: null },
     { kind: "item", canvas: TEST_CANVAS },
+    { kind: "inventory", slot: null },
   ] satisfies PutTarget[]
   /** A kind of target missing from `targets` fails to compile; a text box is never marked. */
   const everyKind: [

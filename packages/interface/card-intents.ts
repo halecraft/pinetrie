@@ -47,7 +47,7 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
-import { addressLink, canvasOfPlace } from "@pinetrie/rules"
+import { addressLink, canvasOfPlace, inventoryFull } from "@pinetrie/rules"
 import {
   type ActedAt,
   AT_INVENTORY,
@@ -317,7 +317,7 @@ export function putLanding(
       return intoSlot(lands, target.slot, state)
     // A thread's copy has no card to discard first: it needs an empty slot.
     case "thread": {
-      const at = slotFor(target.slot, state)
+      const at = slotFor(target.slot, null, state)
       if (at.kind === "refused") return at
       return at.taken === null
         ? { ...lands, to: { kind: "inventory", slot: at.slot } }
@@ -328,9 +328,15 @@ export function putLanding(
   }
 }
 
-/** Which slot a landing into your inventory takes: free, or the card it would replace. */
+/**
+ * Which slot a landing of `card` (null for a new one) into your inventory
+ * takes: free, or the card it would replace. Unaimed, it is refused `full`
+ * when you hold `INVENTORY_SLOTS` cards, as the host refuses it, though a
+ * slot drawn past them (while you hold more) may be empty.
+ */
 function slotFor(
   aimed: number | null,
+  card: CardId | null,
   state: IntentState,
 ):
   | {
@@ -339,9 +345,11 @@ function slotFor(
       readonly taken: CardId | null
     }
   | Extract<Landing, { readonly kind: "refused" }> {
-  const { slots, selected } = state.cards
+  const { slots, selected, cards, me } = state.cards
   if (aimed !== null)
     return { kind: "slot", slot: aimed, taken: slots[String(aimed)] ?? null }
+  if (inventoryFull(cards, me, card))
+    return { kind: "refused", code: "full", card: null }
   const slot = firstEmpty(slots, selected)
   return slot === null
     ? { kind: "refused", code: "full", card: null }
@@ -354,9 +362,9 @@ function intoSlot(
   aimed: number | null,
   state: IntentState,
 ): Landing {
-  const at = slotFor(aimed, state)
-  if (at.kind === "refused")
-    return { ...at, card: lands.kind === "move" ? lands.card : null }
+  const moved = lands.kind === "move" ? lands.card : null
+  const at = slotFor(aimed, moved, state)
+  if (at.kind === "refused") return { ...at, card: moved }
   const into = { ...lands, to: { kind: "inventory", slot: at.slot } } as const
   if (at.taken === null) return into
   const old = findCard(state.cards, at.taken)
@@ -457,7 +465,7 @@ const refusedAt = (
  * there (`WRAPS`); a composer, your message there
  * (`putInMessage`). A copy is one paste the host makes, or a thread's copy;
  * into a text box, text typed at the caret. Anything landing in your
- * inventory from outside shows the panel briefly.
+ * inventory from outside peeks at the panel.
  */
 export function planPut(
   source: PutSource,
@@ -478,7 +486,7 @@ function effectsOfLanding(
 ): readonly Effect[] {
   const show: readonly Effect[] =
     "to" in landing && landing.to.kind === "inventory"
-      ? [{ kind: "showInventory", brief: true }]
+      ? [{ kind: "inventory", act: { kind: "show", how: "peek" } }]
       : []
   switch (landing.kind) {
     case "none":
@@ -488,7 +496,7 @@ function effectsOfLanding(
       return landing.code === "no-place"
         ? []
         : [
-            { kind: "showInventory", brief: true },
+            { kind: "inventory", act: { kind: "show", how: "refusal" } },
             { kind: "refuse", refusal: refusedAt(landing.code, landing.card) },
           ]
     case "swap":
@@ -1141,7 +1149,9 @@ export function afterUndo(
       const shown =
         outcome.place === null
           ? {
-              effects: [{ kind: "showInventory", brief: false }] as const,
+              effects: [
+                { kind: "inventory", act: { kind: "show", how: "held" } },
+              ] as const,
               actedAt: AT_INVENTORY,
             }
           : revealEffects(outcome.place, state)

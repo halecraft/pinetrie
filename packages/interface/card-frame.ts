@@ -1,7 +1,7 @@
 // interface/card-frame — what a card's frame shows in every place: its header
 // (place, state, who put it there, a command, ⋯ and ×) and its footer (one
-// primary action, and ↑ ↓ in a list). The card's icon and face are its
-// kind's (`face.ts`).
+// primary action, and ↑ ↓ in a list). The card's icon and its compact are
+// its kind's (`compact.ts`).
 
 import type {
   CardCommand,

@@ -151,6 +151,14 @@ export const mutations: readonly Mutation[] = [
     expect: "the start when it is empty, else the first empty in reading order",
   },
   {
+    name: "the slots settle on the 12 alone",
+    file: "packages/session/inventory.ts",
+    from: "  const grid = inventoryGrid(held.length)\n  const out: Record<string, CardId> = {}",
+    to: "  const grid = INVENTORY_GRID\n  const out: Record<string, CardId> = {}",
+    command: unit,
+    expect: "a 13th held card is drawn in the row past the sixth",
+  },
+  {
     name: "unslotted cards are placed in reverse id order",
     file: "packages/session/inventory.ts",
     from: "  for (const card of [...held].sort()) {",
@@ -161,8 +169,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a card in two slots keeps the higher",
     file: "packages/session/inventory.ts",
-    from: "  for (const n of SLOT_INDICES) {\n    const card = slots[String(n)]",
-    to: "  for (const n of [...SLOT_INDICES].reverse()) {\n    const card = slots[String(n)]",
+    from: "  for (const n of cellsOf(grid)) {\n    const card = slots[String(n)]",
+    to: "  for (const n of [...cellsOf(grid)].reverse()) {\n    const card = slots[String(n)]",
     command: unit,
     expect: "a card in two slots keeps the lower",
   },
@@ -194,7 +202,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the repair clears a slot before its card is steady",
     file: "packages/session/inventory.ts",
-    from: "        (!isSlot(Number(slot)) || isHeld.has(card) || steady(card)),",
+    from: "        (!isCell(grid, Number(slot)) || isHeld.has(card) || steady(card)),",
     to: "        true,",
     command: unit,
     expect: "a card not yet steady is neither placed nor has its slot cleared",

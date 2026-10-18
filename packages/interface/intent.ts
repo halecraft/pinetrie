@@ -93,6 +93,7 @@ import {
   viewChangeEffect,
 } from "./effects.ts"
 import type { NameStep } from "./identity.ts"
+import type { InventoryAct } from "./inventory-state.ts"
 import {
   type Here,
   type LayoutAction,
@@ -406,7 +407,8 @@ export type Intent =
       readonly card: TextCardId
       readonly text: string
     }
-  | { readonly kind: "selectSlot"; readonly slot: number }
+  /** An act on your inventory panel: a slot selected, its bench opened, Escape. */
+  | { readonly kind: "inventory"; readonly act: InventoryAct }
   /**
    * Undo or redo your newest move in the canvas you are on, or, with the
    * inventory panel focused, your newest swap.
@@ -642,8 +644,8 @@ function planOf(
             state,
             minted,
           )
-    case "selectSlot":
-      return [{ kind: "select", slot: intent.slot }]
+    case "inventory":
+      return [{ kind: "inventory", act: intent.act }]
     case "undoMove":
       return planUndoMove(intent.direction, intent.inPanel, state)
     case "undoAnswered":
@@ -857,9 +859,9 @@ export function planOpenLink(
       return slot === null
         ? []
         : [
-            { kind: "showInventory", brief: false },
-            { kind: "select", slot },
-            { kind: "openSelected" },
+            { kind: "inventory", act: { kind: "show", how: "held" } },
+            { kind: "inventory", act: { kind: "select", slot } },
+            { kind: "inventory", act: { kind: "open" } },
           ]
     }
     case "restore":

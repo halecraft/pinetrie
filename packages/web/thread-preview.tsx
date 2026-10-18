@@ -3,15 +3,9 @@
 // composer, dock or queue takes, so nothing here sends. To work in it, put it
 // on a canvas.
 
-import {
-  faceStatus,
-  focusTitle,
-  type ThreadFace,
-  type ThreadPreview,
-} from "@pinetrie/interface"
+import type { ThreadPreview } from "@pinetrie/interface"
 import type { ReactNode } from "react"
 import { MessageText } from "./message-text.tsx"
-import { ThreadIconImage } from "./thread-icon-image.tsx"
 
 export function ThreadPreviewView(p: {
   preview: ThreadPreview
@@ -34,30 +28,5 @@ export function ThreadPreviewView(p: {
       </ol>
       <div className="thread-preview-foot">{p.foot}</div>
     </section>
-  )
-}
-
-/** A thread's card in a slot: known at a glance. */
-export function ThreadFaceView({ face }: { face: ThreadFace }) {
-  const status = faceStatus(face)
-  return (
-    <span className="thread-face" data-thread={face.thread}>
-      <span className="thread-face-head">
-        {face.icon !== null && (
-          <ThreadIconImage className="thread-face-sprite" icon={face.icon} />
-        )}
-        <span className="thread-face-name">{face.name ?? "a thread"}</span>
-      </span>
-      {face.focus?.kind === "model" && (
-        <span className="thread-face-focus" title={focusTitle(face.focus)}>
-          {face.focus.text}
-        </span>
-      )}
-      <span className="thread-face-first">{face.first}</span>
-      {face.last !== null && (
-        <span className="thread-face-last">… {face.last}</span>
-      )}
-      {status !== null && <span className="thread-face-status">{status}</span>}
-    </span>
   )
 }

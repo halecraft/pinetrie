@@ -1,8 +1,9 @@
 // web/inventory-toggle — opens and closes your inventory's panel, as an icon in
-// the footer's corner beside your inbox. While the sidebar is folded, the
-// account menu toggles it instead (`account-menu.tsx`).
+// the footer's corner beside your inbox. A card dropped on it is taken into a
+// free slot, and one held over it opens the panel (`heldOpens`). While the
+// sidebar is folded, the account menu toggles it instead (`account-menu.tsx`).
 
-import { inventoryWords } from "@pinetrie/interface"
+import { dropProps, inventoryWords } from "@pinetrie/interface"
 import { InventoryIcon } from "./icons.tsx"
 
 /** Your inventory's toggle: whether its panel is open, and its cards. */
@@ -23,6 +24,7 @@ export function InventoryToggle({
       aria-label={words.label}
       aria-pressed={open}
       className="inventory-toggle"
+      {...dropProps({ kind: "inventory", slot: null })}
       onClick={onToggle}
       title={words.label}
       type="button"

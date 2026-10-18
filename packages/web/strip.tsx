@@ -22,11 +22,10 @@ import {
   type ColumnMatches,
   type Column as ColumnSpec,
   type ColumnView,
-  cardDetail,
-  cardOfFace,
   columnReadOnly,
   dropProps,
   foldedView,
+  glanceCardId,
   type Intent,
   type NoteColumnView,
   newColumnButton,
@@ -35,7 +34,7 @@ import {
   type Stage,
   type Strip as StripView,
   stripCards,
-  type ThreadFace,
+  type ThreadGlance,
 } from "@pinetrie/interface"
 import type { CardOnCanvas } from "@pinetrie/rules"
 import type { ReactElement, RefObject } from "react"
@@ -99,8 +98,8 @@ export function Strip(p: {
   /** The canvas list the canvas's agents are told, its lines. */
   told: readonly string[]
   noteViews: ReadonlyMap<NoteColumnId, NoteColumnView>
-  /** A thread's face, which its column draws when folded. */
-  threadFaceOf: (thread: ThreadId) => ThreadFace
+  /** A thread's glance, which its column draws when folded. */
+  threadGlanceOf: (thread: ThreadId) => ThreadGlance
   /** A folded thread's colour track: the one its column takes. */
   threadTrackOf: (thread: ThreadId) => number
   shared: SharedColumnProps
@@ -163,19 +162,18 @@ export function Strip(p: {
       : null
   const endDrop = canvasDrop(p.onCanvas.at(-1)?.id ?? null)
   const cardColumn = (item: CardColumn): ReactElement | null => {
-    const folded =
-      cardDetail("canvas", item.folded) === "face"
-        ? foldedView(item, {
-            threadFaceOf: p.threadFaceOf,
-            notes: p.noteViews,
-          })
-        : null
+    const folded = item.folded
+      ? foldedView(item, {
+          threadGlanceOf: p.threadGlanceOf,
+          notes: p.noteViews,
+        })
+      : null
     if (folded !== null)
       return (
         <FoldedColumn
-          drop={canvasDrop(cardOfFace(folded))}
-          face={folded}
-          key={cardOfFace(folded)}
+          drop={canvasDrop(glanceCardId(folded))}
+          glance={folded}
+          key={glanceCardId(folded)}
           track={
             folded.kind === "thread" ? p.threadTrackOf(folded.thread) : null
           }

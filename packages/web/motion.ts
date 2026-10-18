@@ -65,3 +65,41 @@ export function settleFolds(): void {
   for (const a of document.getAnimations())
     if (a.id === FOLD_ANIMATION) a.finish()
 }
+
+/**
+ * `el`'s box as laid out, in the viewport: its offsets up to the first fixed
+ * ancestor, which no transform moves, so a slot of a panel still growing
+ * reads where it will be once grown. Scrolling between them is not
+ * counted: the inventory's bag does not scroll.
+ */
+export function layoutBox(el: HTMLElement): {
+  readonly left: number
+  readonly top: number
+  readonly width: number
+  readonly height: number
+} {
+  let left = 0
+  let top = 0
+  let at: HTMLElement | null = el
+  while (at !== null) {
+    left += at.offsetLeft
+    top += at.offsetTop
+    const parent: Element | null = at.offsetParent
+    if (!(parent instanceof HTMLElement)) break
+    left += parent.clientLeft
+    top += parent.clientTop
+    at = parent
+  }
+  return { left, top, width: el.offsetWidth, height: el.offsetHeight }
+}
+
+/**
+ * A fixed copy of `el` drawn over the page, not yet attached: what a drag
+ * draws off the strip, and a flight into the inventory flies.
+ */
+export function fixedCopy(el: Element, className: string): HTMLElement {
+  const copy = document.createElement("div")
+  copy.className = className
+  copy.append(el.cloneNode(true))
+  return copy
+}

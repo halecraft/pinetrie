@@ -161,7 +161,7 @@ const whole: Armed = {
   widths: [],
 }
 
-test("drawPlan: a column only translates, along the strip; off it, its face is drawn instead", () => {
+test("drawPlan: a column only translates, along the strip; off it, its ghost is drawn instead", () => {
   const on = drawPlan(
     armed,
     { x: 700, y: 40 },
@@ -172,7 +172,7 @@ test("drawPlan: a column only translates, along the strip; off it, its face is d
   )
   expect(on).toEqual({
     dragged: { x: 600, y: 0 },
-    face: null,
+    ghost: null,
     shifts: [0, 0, -300],
     mark: null,
     lean: 0,
@@ -186,7 +186,7 @@ test("drawPlan: a column only translates, along the strip; off it, its face is d
     { kind: "nothing" },
     "move",
   )
-  expect([off.dragged, off.face, off.lean]).toEqual([
+  expect([off.dragged, off.ghost, off.lean]).toEqual([
     null,
     { x: 1200, y: 40 },
     3,
@@ -209,7 +209,7 @@ test("drawPlan: a column only translates, along the strip; off it, its face is d
     },
     "move",
   )
-  expect([moved.dragged, moved.face, moved.mark]).toEqual([
+  expect([moved.dragged, moved.ghost, moved.mark]).toEqual([
     { x: 30, y: 40 },
     null,
     "replace",
@@ -253,4 +253,19 @@ test("a canvas's landing is marked as a root drop; a card's as its move or copy"
   } as const
   expect(dropMark(land, "move")).toBe("move")
   expect(dropMark(land, "copy")).toBe("copy")
+})
+
+test("a card held over the closed inventory toggle opens the inventory; over a slot, nothing", () => {
+  expect(
+    opensFor(
+      cardAt({ kind: "put", target: { kind: "inventory", slot: null } }),
+    ),
+  ).toEqual({ kind: "inventory" })
+  expect(
+    opensFor(cardAt({ kind: "put", target: { kind: "inventory", slot: 2 } })),
+  ).toEqual({ kind: "none" })
+  expect(hoverOpens({ kind: "inventory" })).toEqual({
+    kind: "inventory",
+    act: { kind: "show", how: "held" },
+  })
 })

@@ -1,0 +1,89 @@
+<!doctype html><html><head><meta charset="utf-8">
+<style>
+  body { margin:0; background:#14161a; font: 13px system-ui; color:#ccc; height:100vh; }
+  #toggle { position:fixed; left: 200px; bottom: 8px; width: 28px; height: 24px; background:#333; }
+  .at-source { position:fixed; right: 80px; top: 120px; width: 26rem; height: 3rem; background:#2a2f37; }
+  .panel { position:fixed; left:50%; top:30vh; width:56rem; margin-left:-28rem; background:#1b1e23; border:1px solid #333;
+    transform-origin: var(--ox) var(--oy); transition: transform 200ms ease-out, opacity 200ms ease-out, display 200ms allow-discrete, overlay 200ms allow-discrete; }
+  .panel:not(.open) { display:none; transform: scale(.05); opacity:0; }
+  @starting-style { .panel.open { transform: scale(.05); opacity: 0; } }
+  .bag { display:grid; grid-template-columns: repeat(2, 13rem); grid-auto-rows: 4rem; gap:.35rem; padding:.75rem; }
+  .slot { border:1px dashed #444; }
+  .card { background:#e3b341; height: 100%; width: 100%; }
+  .ghost { position: fixed; z-index: 9; background:#e3b341; pointer-events:none; }
+</style></head><body>
+<div id="toggle"></div><div id="source" class="card at-source"></div>
+<aside class="panel" id="panel"><div class="bag">
+  ${'<div class="slot"></div>'.repeat(12)}
+</div></aside>
+<script>
+const panel = document.getElementById("panel")
+panel.querySelector(".bag").innerHTML = '<div class="slot"></div>'.repeat(12)
+window.supports = { startingStyle: CSS.supports("selector(:open)") , allowDiscrete: CSS.supports("transition-behavior: allow-discrete") }
+function originAtToggle() {
+  // the toggle's centre relative to the panel's untransformed layout box
+  const t = document.getElementById("toggle").getBoundingClientRect()
+  const left = innerWidth/2 - 28*16, top = innerHeight*.3
+  panel.style.setProperty("--ox", `${t.left + t.width/2 - left}px`)
+  panel.style.setProperty("--oy", `${t.top + t.height/2 - top}px`)
+}
+const frames = []
+function sample(el, label, ms = 700) {
+  const t0 = performance.now()
+  const tick = () => { const b = el.getBoundingClientRect(); frames.push({ label, t: Math.round(performance.now() - t0), x: Math.round(b.left), y: Math.round(b.top), w: Math.round(b.width) }); if (performance.now() - t0 < ms) requestAnimationFrame(tick) }
+  requestAnimationFrame(tick)
+}
+// the page's flight: measure the destination once drawn, then animate it from the old box
+function flyA(card, slot) {
+  const from = card.getBoundingClientRect()
+  card.classList.remove("at-source"); card.remove(); slot.append(card)
+  requestAnimationFrame(() => {
+    const to = card.getBoundingClientRect()
+    window.lastA = { from: [from.left, from.top], to: [to.left, to.top, to.width] }
+    card.animate([{ transform: `translate(${from.left-to.left}px, ${from.top-to.top}px)`, opacity: .5 }, { transform: "none", opacity: 1 }], { duration: 450, easing: "ease-out" })
+    sample(card, "A")
+  })
+}
+// B: the destination measured as laid out, the panel's transform set aside
+function untransformedBox(el) {
+  // offsetLeft/offsetTop are layout positions: no ancestor's transform moves them
+  let x = 0, y = 0, n = el
+  while (n) { x += n.offsetLeft; y += n.offsetTop; if (getComputedStyle(n).position === "fixed") break; n = n.offsetParent }
+  return { left: x, top: y, width: el.offsetWidth, height: el.offsetHeight }
+}
+function flyB(card, slot) {
+  const from = card.getBoundingClientRect()
+  card.classList.remove("at-source"); card.remove(); slot.append(card)
+  requestAnimationFrame(() => {
+    const to = untransformedBox(card)
+    window.lastB = { from: [from.left, from.top], to: [to.left, to.top, to.width] }
+    card.animate([{ transform: `translate(${from.left-to.left}px, ${from.top-to.top}px)`, opacity: .5 }, { transform: "none", opacity: 1 }], { duration: 450, easing: "ease-out" })
+    sample(card, "B")
+  })
+}
+// C: a ghost on the body flies from the old box to the slot's laid-out box; the card shows when it lands
+function flyC(card, slot) {
+  const from = card.getBoundingClientRect()
+  card.classList.remove("at-source"); card.remove(); slot.append(card); card.style.visibility = "hidden"
+  requestAnimationFrame(() => {
+    const to = untransformedBox(card)
+    const g = document.createElement("div"); g.className = "ghost"
+    Object.assign(g.style, { left: `${to.left}px`, top: `${to.top}px`, width: `${to.width}px`, height: `${to.height}px` })
+    document.body.append(g)
+    window.lastC = { from: [from.left, from.top], to: [to.left, to.top, to.width] }
+    const sx = from.width / to.width, sy = from.height / to.height
+    g.animate([{ transform: `translate(${from.left-to.left}px, ${from.top-to.top}px) scale(${sx}, ${sy})`, transformOrigin: "0 0", opacity: .6 }, { transform: "none", transformOrigin: "0 0", opacity: 1 }], { duration: 450, easing: "ease-out" }).finished.then(() => { g.remove(); card.style.visibility = "" })
+    sample(g, "C")
+  })
+}
+window.run = (how) => {
+  frames.length = 0
+  originAtToggle()
+  panel.classList.add("open")
+  sample(panel, "panel", 300)
+  const card = document.getElementById("source")
+  const slot = panel.querySelectorAll(".slot")[3]; window.slotFinal = () => { const b = slot.getBoundingClientRect(); return [Math.round(b.left), Math.round(b.top), Math.round(b.width)] }
+  ;({ A: flyA, B: flyB, C: flyC })[how](card, slot)
+}
+window.close = () => { frames.length = 0; panel.classList.remove("open"); sample(panel, "panel-close", 400) }
+</script></body></html>

@@ -75,7 +75,7 @@ import { ago, count } from "./counts.ts"
 import { speakerWords } from "./names.ts"
 import { outcomeWords } from "./outcome-words.ts"
 import type { Reader } from "./send.ts"
-import { type ThreadFocus, threadFocus } from "./thread-face.ts"
+import { type ThreadFocus, threadFocus } from "./thread-glance.ts"
 import { type ThreadIcon, threadIcon } from "./thread-icon.ts"
 import { linkWords, type ThreadLink } from "./thread-link.ts"
 
