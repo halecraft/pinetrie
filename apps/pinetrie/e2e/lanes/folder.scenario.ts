@@ -32,6 +32,7 @@ import {
 import { scriptedModel } from "@pinetrie/pi"
 import {
   readAccepted,
+  readBases,
   readConflicts,
   readPlaces,
   readProposedByLane,
@@ -281,7 +282,19 @@ async function folderSection(
         resolveState !== undefined &&
         fInLane.includes("yours f") &&
         told,
-      JSON.stringify({ chose, open: open(), resolveState, fInLane, told }),
+      JSON.stringify({
+        chose,
+        open: open(),
+        resolveState,
+        fInLane,
+        told,
+        // What the catch-up answered, and what the lane's base said before it.
+        caughtUp: toolResults(lane).slice(-2),
+        newest: newestOf(),
+        beforeF,
+        proposed: readProposedByLane(wh.session).get(lane),
+        base: readBases(wh.session).get(lane),
+      }),
     )
 
     // 6. Accepted: the shown merge's files are written into the project's
@@ -297,6 +310,8 @@ async function folderSection(
     }
     await waitFor(() => openWith("b.txt") !== undefined, 60_000)
     const accepted = await wu.proposed(lane, "accept", "")
+    // Accepted work's record follows the accept's state after it answers.
+    await wh.quiet()
     check(
       "an accept writes the shown merge into the project's folder, and leaves nothing of its own there",
       accepted.kind === "accepted" &&
@@ -329,6 +344,7 @@ async function folderSection(
       acceptState === null || beforeAccept === undefined
         ? null
         : await wu.restore({ of: beforeAccept, from: acceptState })
+    await wh.quiet()
     check(
       "a restore of the state before the accept writes its files back into the project's folder",
       restored?.kind === "accepted-moved" &&

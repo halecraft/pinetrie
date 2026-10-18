@@ -42,7 +42,9 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
   const host = await lanes.startHost({
     model: { kind: "scripted", script: scriptedModel() },
     project: { dir, tools: true },
-    log: () => {},
+    log: m => {
+      if (process.env.PINETRIE_E2E_LOG === "1") console.log(m)
+    },
   })
   const newest = () => {
     const r = readAccepted(host.session)
@@ -59,6 +61,10 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       60_000,
     )
     const p = await (await browser.newContext()).newPage()
+    const answers: string[] = []
+    p.on("response", r => {
+      if (r.url().includes("/review")) answers.push(`${r.status()} ${r.url()}`)
+    })
     await asPerson(p, "hana@browser.test", "Hana")
     await p.goto(`${host.httpUrl}#history`, { waitUntil: "domcontentloaded" })
     const entries = ".history-entries > .history-entry"
@@ -115,9 +121,18 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
 
     // Restoring the version before it writes its files back.
     await p.click(`${entries}:nth-child(2) .history-restore`)
-    await p.click(".history-preview .history-restore-confirm", {
-      timeout: 30_000,
-    })
+    await p
+      .click(".history-preview .history-restore-confirm", { timeout: 30_000 })
+      .catch(async (error: unknown) => {
+        // What the page held instead, for a run that cannot be watched.
+        const held = await p
+          .locator(".history")
+          .evaluate(h => h.outerHTML.slice(0, 4000))
+          .catch(() => "no .history")
+        throw new Error(
+          `${String(error)}\naccepted: ${JSON.stringify(newest())}\nreviews fetched: ${JSON.stringify(answers)}\npage: ${held}`,
+        )
+      })
     const restored = await waitFor(
       () =>
         readFileSync(path.join(dir, "a.txt"), "utf8") === "first\n" &&
