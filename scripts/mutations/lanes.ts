@@ -141,6 +141,15 @@ export const mutations: readonly Mutation[] = [
     expect: "fed in pieces, it folds as the whole stream does",
   },
   {
+    name: "a send stream's deletion cancels the entry that replaced it",
+    file: "packages/lanehost/send-stream.ts",
+    from: '    if (was?.change === "added") put({ ...was, change: "changed" })\n',
+    to: '    if (was?.change === "added") changes.delete(path)\n',
+    command: ["pnpm", "exec", "vitest", "run", "packages/lanehost"],
+    expect:
+      "an entry moved aside for a new one at its path, then unlinked, is a change there",
+  },
+  {
     name: "a send stream's orphan stands for nothing",
     file: "packages/lanehost/send-stream.ts",
     from: "        } else if (ORPHAN.test(pathTo)) orphans.set(pathTo, resolve(path))\n",

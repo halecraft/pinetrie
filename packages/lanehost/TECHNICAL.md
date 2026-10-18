@@ -364,6 +364,13 @@ out, every call checked and planned into paths first (`planApply`,
     under those names: each orphan is resolved through the one it sits in;
   - a new entry is made under an orphan, then renamed into place;
   - a renamed file is a `link` and an `unlink`;
+  - an entry replaced by another is moved aside to an orphan when the
+    parent's entry has the higher inode, as it does with the parent the
+    newer snapshot (a restore's preview) or from another disk's line (a
+    lane's tip against a shown merge): the new entry is renamed into its
+    path, then the old unlinked under the orphan. An add then a delete at
+    one path is so a change, never nothing: the stream never deletes an
+    entry it made;
   - a retargeted symlink is an `unlink` and a new `symlink` at one path,
     folded to one change;
   - a write, a truncate, a clone, a mode, an owner or an xattr is a

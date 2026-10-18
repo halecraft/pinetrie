@@ -109,6 +109,45 @@ function streamOf(
 const MKFILE = 3
 const MKDIR = 4
 const RENAME = 9
+const UNLINK = 11
+const RMDIR = 12
+
+test("an entry moved aside for a new one at its path, then unlinked, is a change there", () => {
+  const changes = streamChanges(
+    streamOf([
+      [MKFILE, "o257-5-0"],
+      [RENAME, "a.txt", "o258-9-0"],
+      [RENAME, "o257-5-0", "a.txt"],
+      [MKDIR, "o259-5-0"],
+      [RENAME, "d", "o260-9-0"],
+      [RENAME, "o259-5-0", "d"],
+      [MKFILE, "o261-5-0"],
+      [RENAME, "o261-5-0", "d/x"],
+      [UNLINK, "o258-9-0"],
+      [UNLINK, "o260-9-0/x"],
+      [RMDIR, "o260-9-0"],
+    ]),
+  )
+  expect(changes.map(c => `${c.path} ${c.change} ${c.kind}`)).toEqual([
+    "a.txt changed file",
+    "d changed dir",
+    "d/x changed file",
+  ])
+})
+
+test("two files swapped through an orphan name are both changed", () => {
+  const changes = streamChanges(
+    streamOf([
+      [RENAME, "a", "o300-1-0"],
+      [RENAME, "b", "a"],
+      [RENAME, "o300-1-0", "b"],
+    ]),
+  )
+  expect(changes.map(c => `${c.path} ${c.change}`)).toEqual([
+    "a changed",
+    "b changed",
+  ])
+})
 
 test("a new directory filled under its orphan name, then renamed into place, takes what is under it", () => {
   const changes = streamChanges(

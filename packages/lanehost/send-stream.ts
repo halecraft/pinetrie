@@ -200,11 +200,6 @@ export function sendFold(): SendFold {
     if (set === undefined) under.set(head, new Set([change.path]))
     else set.add(change.path)
   }
-  const remove = (path: string) => {
-    changes.delete(path)
-    const head = orphanHead(path)
-    if (head !== null) under.get(head)?.delete(path)
-  }
 
   /** A path with its first segment, an orphan, put back to what it stands for. */
   const resolve = (p: string): string => {
@@ -218,9 +213,16 @@ export function sendFold(): SendFold {
     const was = changes.get(path)
     put({ path, change: was?.change === "deleted" ? "changed" : "added", kind })
   }
+  /**
+   * A deletion at a path the stream added to is of the entry the new one
+   * replaced, moved aside under an orphan name and unlinked there: the
+   * stream never makes an entry it then deletes. That order is what a
+   * parent newer than the snapshot sent gives, its entry's inode the
+   * higher, so it is processed after the new entry takes its path.
+   */
   const deleted = (path: string, kind: DiskChange["kind"]) => {
     const was = changes.get(path)
-    if (was?.change === "added") remove(path)
+    if (was?.change === "added") put({ ...was, change: "changed" })
     else put({ path, change: "deleted", kind })
   }
   /** What is under the orphan `from` moved under `to`. */
