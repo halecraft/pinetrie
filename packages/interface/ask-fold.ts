@@ -7,15 +7,10 @@
 // ends: the column's follow state keeps the tip from when its reader left
 // the end (`releasedTip`), and a run that ended after it ended "while away".
 
-import type { EntryId } from "@pinetrie/core"
+import type { DigestBody, EntryId } from "@pinetrie/core"
 import type { Segment } from "./ask-segments.ts"
 import type { AskView } from "./ask-view.ts"
-import {
-  type Density,
-  type FoldPart,
-  foldWords,
-  type SummaryAt,
-} from "./ask-words.ts"
+import { type CountsAt, type Density, foldWords } from "./ask-words.ts"
 import { plural } from "./counts.ts"
 
 /** What the reader chose for an ask's work, if anything. */
@@ -56,8 +51,8 @@ export type FoldRow = Pick<
 > & {
   /** The ask's first fold on this path (`Segment.first`). */
   readonly first: boolean
-  /** Its head's words: the ask's summary on its first fold in story, else its step count. */
-  readonly parts: readonly FoldPart[]
+  /** Its head's words: the ask's counts and outcome on its first fold in story, else its step count. */
+  readonly parts: readonly string[]
   /** The files button's label ("3 files"), on the first fold of an ask that changed files. */
   readonly files: string | null
 }
@@ -66,28 +61,39 @@ export type FoldRow = Pick<
 export type AskRow =
   | { readonly kind: "message"; readonly id: EntryId }
   | FoldRow
-  | {
-      readonly kind: "digest"
-      /** Null where the summary carries the headline, or there is none. */
-      readonly headline: string | null
-      readonly points: readonly string[]
-    }
   | { readonly kind: "outcome"; readonly text: string }
+
+/** Where an ask's one summary is drawn. */
+export type SummaryAnchor =
+  /** After outline's line. */
+  | { readonly kind: "line" }
+  /** After the fold row whose first id is `fold`: the ask's first fold. */
+  | { readonly kind: "fold"; readonly fold: EntryId }
+  /** Before the ask's first work row. */
+  | { readonly kind: "start" }
+
+/** An ask's digest as drawn: its headline, its points, and where it goes. */
+export interface AskSummary extends DigestBody {
+  readonly after: SummaryAnchor
+}
 
 export interface AskDraw {
   readonly open: boolean
   /** Outline's line: the summary, in outline; null at any other density. */
-  readonly line: readonly FoldPart[] | null
+  readonly line: readonly string[] | null
+  /** The ask's digest, drawn once at its anchor; null for an ask with none. */
+  readonly summary: AskSummary | null
   readonly rows: readonly AskRow[]
 }
 
 /**
- * What an ask's work draws, every word decided here. Its summary
- * (`foldWords`) is built once and drawn in one place: outline's line, the
- * head of its first fold on this path, or nowhere when it has no fold. The
- * digest's headline is drawn whole under the line or with no summary, and
- * in the first fold's head otherwise. So nothing the ask holds
- * is said twice, however the work is split or opened.
+ * What an ask's work draws, every word decided here. Its counts and outcome
+ * (`foldWords`) are built once and drawn in one place: outline's line, the
+ * head of its first fold on this path, or, with no fold, an outcome row at
+ * its end. Its digest is one field, so it is drawn once: after outline's
+ * line, else after its first fold, else before its work, with its points
+ * in story and raw only. So nothing the ask holds is said twice, however
+ * the work is split or opened.
  */
 export function planAskWork(
   view: AskView,
@@ -107,22 +113,26 @@ export function planAskWork(
       (s): s is Extract<Segment, { kind: "fold" }> =>
         s.kind === "fold" && s.first,
     )?.ids[0] ?? null
-  const at: SummaryAt | null = outline
+  const at: CountsAt | null = outline
     ? "line"
     : firstFold === null
       ? null
       : "fold"
-  const summary = at === null ? [] : foldWords(view, at)
-  const head = (ids: readonly EntryId[]): readonly FoldPart[] =>
-    at === "fold" && ids[0] === firstFold
-      ? summary
-      : [{ text: plural(ids.length, "step"), byModel: false }]
-  const headline = at === "fold" ? null : view.headline
-  const digest: AskRow[] =
-    headline === null && view.points.length === 0
-      ? []
-      : [{ kind: "digest", headline, points: view.points }]
-  const rows: AskRow[] = at === "fold" ? [] : [...digest]
+  const words = at === null ? [] : foldWords(view, at)
+  const head = (ids: readonly EntryId[]): readonly string[] =>
+    at === "fold" && ids[0] === firstFold ? words : [plural(ids.length, "step")]
+  const after: SummaryAnchor =
+    at === "line"
+      ? { kind: "line" }
+      : at === "fold" && firstFold !== null
+        ? { kind: "fold", fold: firstFold }
+        : { kind: "start" }
+  const { digest } = view
+  const summary: AskSummary | null =
+    digest === null
+      ? null
+      : { ...digest, points: outline ? [] : digest.points, after }
+  const rows: AskRow[] = []
   for (const s of parts) {
     if (s.kind === "entry") {
       // Outline keeps what the rail draws apart, and folds the rest.
@@ -139,12 +149,11 @@ export function planAskWork(
       parts: head(s.ids),
       files: first && view.files > 0 ? plural(view.files, "file") : null,
     })
-    if (first && at === "fold") rows.push(...digest)
     if (open) for (const id of s.ids) rows.push({ kind: "message", id })
   }
   if (at === null && view.outcome !== null)
     rows.push({ kind: "outcome", text: view.outcome })
-  return { open, line: outline ? summary : null, rows }
+  return { open, line: outline ? words : null, summary, rows }
 }
 
 /** A press on an ask's fold: the other of what it shows now. */

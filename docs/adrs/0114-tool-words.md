@@ -4,6 +4,9 @@
 - **Area:** `docs/06-interface.md`, `packages/web/TECHNICAL.md`,
   `packages/interface/TECHNICAL.md`, `ARCHITECTURE.md`
 - **Evidence:** S138
+- **Amended by:**
+  - ADR-0173: `bash`, `edit` and `write` take a required `intent`, which never
+    reaches pi.
 
 **Context.** A tool call's row began with the tool's id: `bash mkdir -p
 /tmp/wc && …` read as a shell running `bash mkdir`, and `bash`, `grep` and

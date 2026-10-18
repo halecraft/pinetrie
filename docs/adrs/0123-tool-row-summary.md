@@ -11,6 +11,9 @@
     thumbnail when it is tall; no row opens for it.
   - ADR-0054: `revealed` only marks a running row for its ring; it opens
     nothing.
+- **Amended by:**
+  - ADR-0173: in story, a tool row with an intent leads with it, and its
+    command is in its detail.
 
 Restates what ADR-0049 decided of the floor and of a column's and a row's
 memory across an unmount, which stand. What changes is how much of a row

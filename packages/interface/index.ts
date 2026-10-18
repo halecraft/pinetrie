@@ -36,11 +36,13 @@ export {
 export {
   type AskDraw,
   type AskRow,
+  type AskSummary,
   type FoldFacts,
   type FoldMemory,
   type FoldRow,
   foldMemory,
   planAskWork,
+  type SummaryAnchor,
   toggled,
 } from "./ask-fold.ts"
 export {
@@ -59,7 +61,6 @@ export {
   DENSITIES,
   type Density,
   densityWords,
-  type FoldPart,
   LEFT_WORDS,
   workWords,
 } from "./ask-words.ts"

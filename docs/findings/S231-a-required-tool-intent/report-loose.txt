@@ -1,0 +1,94 @@
+# intent probe: anthropic/claude-opus-5-5 (constrained sampling off)
+
+37 calls, 0 without intent, 0 with an empty one, 0 refused (any reason).
+
+## Explain the digest timing
+
+| tool | intent | call | ok |
+|---|---|---|---|
+| bash | Look around the project and find digest code | `cd /tmp/intent-work && git ls-files \| head -100 && grep -rniE "digest" --include=* -l . \| grep -v node_modules \| head -3` | ✓ |
+| bash | Find host code that handles digests | `cd /tmp/intent-work && grep -rniE "digest" apps/pinetrie/host --include=*.ts -l \| grep -v test; grep -niE "digest" docs/` | ✓ |
+| bash | Read the digest design notes | `cd /tmp/intent-work && sed -n 1160,1215p apps/pinetrie/host/TECHNICAL.md; wc -l apps/pinetrie/host/digests.ts` | ✓ |
+| bash | Read the digest code | `cd /tmp/intent-work && cat apps/pinetrie/host/digests.ts` | ✓ |
+| bash | Find the rule that decides if a digest is due | `cd /tmp/intent-work && f=$(grep -rln "export function planDigest\\|export const planDigest" packages --include=*.ts \| gre` | ✓ |
+| bash | Read the digest timing rule | `cd /tmp/intent-work && sed -n 60,300p packages/rules/digest.ts` | ✓ |
+| bash | Check what counts as a long ask and where it's triggered | `cd /tmp/intent-work && grep -rn "export function isLongAsk" -A15 packages/rules/*.ts \| head -25; grep -n "digests.step\\|` | ✓ |
+| bash | Find the long-ask rule and the trigger point | `cd /tmp/intent-work && grep -rn "isLongAsk" packages --include=*.ts \| grep -v test \| grep -E "export" ; sed -n 715,735p ` | ✓ |
+| bash | Read the long-ask definition | `cd /tmp/intent-work && sed -n 140,160p packages/core/asks.ts` | ✓ |
+
+**Answer:** During a run, the host only considers asking for a digest when something happens, never on a timer. After each recorded turn, the lane's `turnDone` hook in `apps/pinetrie/host/index.ts` calls `digests.step(lane, tip)`. That queues a step in `apps/pinetrie/host/digests.ts` that finds the ask behind the entry it was given (`runPrompt(index, at)`) and passes the decision to `planDigest` in `packages/rules/digest.ts`. Nothing is asked if digests are turned off in the config, if the lane has no root, or if the entry belongs to no ask. `planDigest` also refuses a short ask: one whose run holds fewer
+
+**Your read** (would the intents alone tell you what happened? any vague or wrong?): 
+
+## Run one test file
+
+| tool | intent | call | ok |
+|---|---|---|---|
+| bash | Look at the project setup | `cd /tmp/intent-work && ls; cat package.json 2>/dev/null \| head -40; ls packages/interface \| head -50` | ✓ |
+| bash | Run the ask-fold unit tests | `cd /tmp/intent-work && npx vitest run packages/interface/ask-fold.test.ts 2>&1 \| tail -40` | ✓ |
+
+**Answer:** None fail. I ran `packages/interface/ask-fold.test.ts` with vitest and all 73 tests passed.
+
+**Your read** (would the intents alone tell you what happened? any vague or wrong?): 
+
+## Find the readers
+
+| tool | intent | call | ok |
+|---|---|---|---|
+| bash | Look around the project files | `cd /tmp/intent-work && git ls-files \| head -100 && git ls-files \| wc -l` | ✓ |
+| bash | Search for run-end report naming | `cd /tmp/intent-work && grep -rniE "run[-_ ]?end\|runReport\|run[-_]?summary\|final[-_ ]?report\|end[-_ ]?report" --include=*` | ✓ |
+| bash | Read the run-end report design note and glossary entry | `cd /tmp/intent-work && cat docs/adrs/0166-run-end-report.md; grep -niE -B2 -A4 "run[- ]end" docs/glossary.md` | ✓ |
+| bash | Find code that touches the run-end report record | `cd /tmp/intent-work && grep -rnE "RunEndReportRecord\|RUN_END_REPORT\|runEndReport\|readRunEndReports\|pendingRunEndReport\|r` | ✓ |
+| bash | Check the reading lines in context | `cd /tmp/intent-work && sed -n 425,435p packages/web/app.tsx; echo ---; sed -n 1078,1088p packages/web/app.tsx; echo ---;` | ✓ |
+| bash | Check the report settle logic and archive plan | `cd /tmp/intent-work && sed -n 175,200p packages/rules/run-end-report.ts; sed -n 236,275p packages/rules/run-end-report.t` | ✓ |
+| bash | Get the names of the attention functions | `cd /tmp/intent-work && awk 'NR>=100 && NR<=255 && /^export (function\|const)/ {print NR": "$0}' packages/interface/attent` | ✓ |
+
+**Answer:** I found 6 places in the app code that read the run-end report record directly from storage (`RunEndReportRecord`, stored under `pinetrie.runEndReport`). The rest of the code doesn't read storage itself; it uses what those places pass along. This comes from searching the code for the record's names, not from running anything.  **Where the record is read from storage**  - **`packages/reads/index.ts`**: `readRunEndReports` (lines 696–699) is the shared function that reads every thread's report from `pinetrie.runEndReport`. All the other places below go through it. - **`packages/interface/projecti
+
+**Your read** (would the intents alone tell you what happened? any vague or wrong?): 
+
+## A small rename
+
+| tool | intent | call | ok |
+|---|---|---|---|
+| bash | View the file and find uses of words | `cd /tmp/intent-work; cat packages/rules/digest.ts; grep -rn "words" packages/rules --include=*.ts \| grep -v node_modules` | ✓ |
+| bash | Rename the helper and find the type-check command | `cd /tmp/intent-work; sed -i 's/^const words = /const wordCount = /; s/words(headline)/wordCount(headline)/; s/words(p)/w` | ✓ |
+| edit | Rename words to wordCount | `/tmp/intent-work/packages/rules/digest.ts` | ✓ |
+| bash | Check type-check configuration | `cd /tmp/intent-work; cat tsconfig.json; ls packages/rules/tsconfig.json 2>&1` | ✓ |
+| bash | Confirm the rename and run the type check | `cd /tmp/intent-work; grep -n "wordCount\\|\bwords\b(" packages/rules/digest.ts; npx tsc --noEmit -p . 2>&1 \| tail -30; ec` | ✓ |
+| bash | Check for errors in the rules package and compare with before the change | `cd /tmp/intent-work; npx tsc --noEmit -p . > /tmp/tsc.out 2>&1; wc -l < /tmp/tsc.out; grep -c "TS2307.*@kyneta" /tmp/tsc` | ✓ |
+
+**Answer:** I renamed `words` to `wordCount` in `packages/rules/digest.ts`. The type-check found no errors in `packages/rules`, but the full workspace check still fails, so it isn't a clean pass.  - **The rename:** three lines changed: the definition and its two calls in `parseDigest`. `words` was only used in that file, so nothing else needed updating. `digest.test.ts` has its own unrelated `words` helper, which I didn't touch. - **The type-check:** `packages/rules` has no tsconfig of its own, so I ran the root `tsc --noEmit -p .`. It exits with 2,253 lines of errors in other packages, mostly `packages/c
+
+**Your read** (would the intents alone tell you what happened? any vague or wrong?): 
+
+## A comment from history
+
+| tool | intent | call | ok |
+|---|---|---|---|
+| bash | Find LONG_ASK in code and docs | `cd /tmp/intent-work && grep -rn "LONG_ASK" --exclude-dir=node_modules . \| head -50; ls; ls docs 2>/dev/null` | ✓ |
+| bash | Read the relevant docs passages and code | `cd /tmp/intent-work && sed -n 140,160p packages/core/asks.ts; echo ---; sed -n 40,65p docs/adrs/0093-interface-package.m` | ✓ |
+| bash | Check the change history for LONG_ASK | `cd /tmp/intent-work && (git log --oneline -5 2>&1; jj log -r 'all()' --limit 5 2>&1) \| head -20; git log -S "LONG_ASK" -` | ✓ |
+| bash | Trace the older name and the ADRs it came from | `cd /tmp/intent-work && git log -S "MIN_STRETCH" --format='%h %ad %s' --date=short \| head -20; echo ---; grep -rln "MIN_S` | ✓ |
+| bash | Read the ADR passages and the earliest change that set the value | `cd /tmp/intent-work && sed -n 25,45p docs/adrs/0075-digests.md; echo ---; sed -n 35,48p docs/adrs/0106-asks.md; echo ---` | ✓ |
+| bash | Find where the original value of three was introduced | `cd /tmp/intent-work && git log -S "MIN_RUN" --format='%h %ad %s' --date=short --reverse \| head -5; first=$(git log -S "M` | ✓ |
+| bash | Check the repo's rules on comments | `cd /tmp/intent-work && grep -n -i "comment" AGENTS.md \| head -20; grep -n "^// " packages/core/*.ts \| head -5` | ✓ |
+| bash | Read the comment rules in full | `cd /tmp/intent-work && sed -n 40,65p AGENTS.md` | ✓ |
+| edit | Add the comment explaining why the value is three | `packages/core/asks.ts` | ✓ |
+| bash | Run the checks that police code comments | `cd /tmp/intent-work && npx vitest run scripts/record.test.ts scripts/prose-names.test.ts packages/core/asks.test.ts 2>&1` | ✓ |
+| edit | Smooth the comment's wording | `packages/core/asks.ts` | ✓ |
+
+**Answer:** I found the reason and added the comment above `LONG_ASK` in `packages/core/asks.ts`:  ```ts // Three because it was first the rail's shortest capsule (two dots are no taller than one); kept when the two split. ```  **Where the reason comes from:** - **History:** commit `34fce7d0ae` set the value as `MIN_RUN = 3`, the shortest run the rail draws as a capsule, with the note "two dots are no taller than a capsule". A capsule of 3–9 messages takes two rows, so folding fewer than three saves no space. It was later renamed `MIN_STRETCH`. - **Docs:** ADR-0056 then reused that number to decide which 
+
+**Your read** (would the intents alone tell you what happened? any vague or wrong?): 
+
+## Recent history
+
+| tool | intent | call | ok |
+|---|---|---|---|
+| bash | Show the last five commits and their changes | `git log -5 --stat --format='---%n%h %s%n%b' 2>&1 \| head -200` | ✓ |
+| bash | Read the design notes behind the two feature commits | `sed -n 1,60p docs/adrs/0170-narrowed-ssh-hosts.md; echo ======; sed -n 1,40p docs/findings/S238-known-hosts-names.md` | ✓ |
+
+**Answer:** Here are the last five commits, newest first:  1. **Fix for SSH host limits (f7654ba, ADR-0170).** A lane can be limited to certain SSH servers. If you listed a server by a nickname such as `hql`, the lane ended up allowed nowhere, because SSH saves server keys under the real address (such as `192.168.1.2`), not the nickname. Every connection was refused, and nothing told you. The commit has three parts:    - Nicknames are now turned into the real address using SSH's own settings.    - Startup logs a warning when an allowed server has no saved key.    - When a connection is refused because the
+
+**Your read** (would the intents alone tell you what happened? any vague or wrong?): 

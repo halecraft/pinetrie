@@ -1,6 +1,6 @@
 // interface/rail-view — the view's part of the rail's stretches (`compactRail`).
 
-import type { AgentRun, DigestBody, EntryId, RailRow } from "@pinetrie/core"
+import type { AgentRun, DigestRecord, EntryId, RailRow } from "@pinetrie/core"
 import { digestText } from "@pinetrie/rules"
 import { railLandmarks } from "./rail.ts"
 import type { SearchResult } from "./search.ts"
@@ -50,17 +50,17 @@ export function columnLandmarks(
 
 /**
  * A capsule's tooltip: its ask, when it is one long ask's work, then what it
- * holds (`workWords`), then its digest as the model wrote it (`digestText`),
- * when it has a headline.
+ * holds (`workWords`), then its digest as the model wrote it (`digestText`):
+ * a live one's headline, a final one's headline and points.
  */
 export const stretchWords = (
   ask: string | null,
   work: string,
-  digest: DigestBody | null,
+  digest: DigestRecord | null,
 ): string =>
   [
     ask === null ? work : `${ask} · ${work}`,
-    digest === null || digest.headline === null ? null : digestText(digest),
+    digest === null ? null : digestText(digest),
   ]
     .filter(t => t !== null)
     .join("\n")

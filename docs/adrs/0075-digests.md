@@ -13,6 +13,9 @@
   - ADR-0166: a run's end request closes with "Answer with the urgency line
     alone." or "Answer with the urgency line, then the summary.", and the
     `ask-digest` skill looks for those words.
+  - ADR-0173: every long ask's digest has a headline, and its points come only
+    when the work adds to the last word; `nothing to add` is refused, a live
+    digest has no points, and a refused final reply deletes the live digest.
 
 **Context.** ADR-0056 asked a model for "two or three plain sentences: what
 was asked, what has been done, and what is happening now" for every ask

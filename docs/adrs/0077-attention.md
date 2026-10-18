@@ -30,6 +30,8 @@
   - ADR-0166: the record is `RunEndReportRecord`, stored under
     `pinetrie.runEndReport`; a model's answer is the kind `modelSaid`, with
     its `urgency`.
+  - ADR-0173: a run's end, once its reply is written, is followed by a request
+    of its own for the thread's topic.
 
 Builds on ADR-0076.
 

@@ -1,6 +1,7 @@
 # S229 — Asked for a headline always and points only when they add, does a model give every long ask a headline, and leave the points out when the last word says it all?
 
-- **Status:** Open
+- **Status:** Answered (Duane's read of each headline to come)
+- **Led to:** ADR-0173
 
 ## Brief
 
@@ -55,7 +56,7 @@ the run's model, `packages/pi/config.ts`), with the credentials
 reads the newest 40 ended long asks (`isLongAsk`) with the host's own
 readers and builds each request with `askLines` and `digestRequest`, so
 only the skill differs from the host's request. It writes
-`/tmp/s229/digest-report.md`, where each ask shows its message, its last
+`/tmp/s229/digest-report.txt`, where each ask shows its message, its last
 word, the digest stored now and the candidate reply, with a line for
 Duane's read, and `/tmp/s229/digest.jsonl`. It writes nothing to the
 store.
@@ -67,4 +68,34 @@ It has not met a real model.
 
 ## Answers
 
-Not run yet.
+Run on Duane's Mac, 2026-10-18, on a copy of his session's store, with
+`anthropic/claude-opus-5-5`, the run's model and so the digest's. The
+report is `S229-a-headline-for-every-long-ask/report.txt`.
+
+1. **Today's skill gives almost no ask a headline: 39 of the 40 newest
+   long asks have a stored digest of `nothing to add`.** The 40th has a
+   headline. This is why a reader rarely sees a summary, in any density.
+2. **The candidate skill's replies are all in shape: 40 of 40, none
+   refused.** Every one has a headline of at most 14 words; none uses the
+   old sentinel.
+3. **The headlines say what the ask came to, in words a skimmer can
+   use.** E.g. "Paused `relmhq` VM's 209G disk image is filling hql's root
+   disk", "Couldn't get into the guest: signing is approved for hql only",
+   "Refresh commands cut to a third or quarter; lanes e2e unverified".
+   Many restate the gist of the last word's first line. That is what a
+   headline is for: the column shows it where the last word is folded
+   away (outline), or ahead of a long last word. My read: none is noise;
+   a few read as a status ("awaiting Duane's call…") that the run-end
+   report also says. Duane's read of the report decides the kill
+   criterion's quarter.
+4. **Points come only where the work adds to the last word: 4 of 40.**
+   Each says what the last word leaves out, mostly what is unverified
+   ("E2e tests have not been rerun since the merge", "The inode ordering
+   behind the bug is inferred … not measured"). In the 36 others the
+   last word already covered the work, and the reply was a headline
+   alone.
+
+**So:** the headline is asked for every long ask, and the sentinel goes.
+Whether the points are empty stands for "adds to the last word": the
+model leaves them out exactly when it would have said `nothing to add`,
+so the record needs no flag of its own.

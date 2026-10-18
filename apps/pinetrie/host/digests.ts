@@ -31,7 +31,6 @@ import {
 import {
   type Answer,
   askLines,
-  DIGEST,
   digestRequest,
   digestToWrite,
   type EndReply,
@@ -191,16 +190,15 @@ export function createDigests(deps: {
           },
           plan: async ({ body }, roots) => {
             const now = await roots.root(root)
-            const record = digestToWrite({
+            const write = digestToWrite({
               stored: readDigests(now).get(ask),
               asked: { final: false },
               body,
               prompt: ask,
+              root,
               at: basics.now(),
             })
-            return record === null
-              ? null
-              : { records: [setRecord(DIGEST, record, root)] }
+            return write === null ? null : { records: [write] }
           },
         })
         return null

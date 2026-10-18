@@ -7,6 +7,7 @@ import {
 import { readRunEndReports } from "@pinetrie/reads"
 import {
   DIGEST,
+  deleteRecord,
   parseDigest,
   parseEndReply,
   pendingRunEndReport,
@@ -128,7 +129,6 @@ test("a live digest waits for someone to read the thread", async () => {
       {
         prompt: entryId("e-1"),
         headline: "Fixing the rail",
-        points: [],
         at: 1_000,
         final: false,
       },
@@ -229,43 +229,27 @@ test("a reply in another shape is logged, and a live one writes nothing", async 
 test.each([
   ["a refused one", "It went well.\nVery well."],
   ["nothing to add", "Nothing to add."],
-])(
-  "at the run's end, %s clears the live headline for good",
-  async (_, answer) => {
-    const { b, pi, keeper, digests } = running(answer)
-    const live = setRecord(
+])("at the run's end, %s deletes the live headline", async (_, answer) => {
+  const { b, pi, keeper, digests } = running(answer)
+  putValue(
+    b,
+    setRecord(
       DIGEST,
       {
         prompt: entryId("e-1"),
         headline: "Fixing the rail",
-        points: [],
         at: 1,
         final: false,
       },
       ROOT_ID,
-    )
-    putValue(b, live)
-    await digests.ended(ROOT_ID, lane, entryId("e-1"), failed)
-    await keeper.idle()
-    const cleared = setRecord(
-      DIGEST,
-      {
-        prompt: entryId("e-1"),
-        headline: null,
-        points: [],
-        at: 1_000,
-        final: true,
-      },
-      ROOT_ID,
-    )
-    expect(writtenValues(pi.calls)).toEqual([cleared])
-    putValue(b, cleared)
-    const before = pi.calls.length
-    await digests.ended(ROOT_ID, lane, entryId("e-1"), failed)
-    await keeper.idle()
-    expect(pi.calls.length).toBe(before)
-  },
-)
+    ),
+  )
+  await digests.ended(ROOT_ID, lane, entryId("e-1"), failed)
+  await keeper.idle()
+  expect(writtenValues(pi.calls)).toEqual([
+    deleteRecord(DIGEST, entryId("e-1"), ROOT_ID),
+  ])
+})
 
 test("a short ask is not asked about", async () => {
   const { b, pi, keeper, digests } = running()

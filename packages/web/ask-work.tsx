@@ -5,17 +5,16 @@
 
 import type { EntryId } from "@pinetrie/core"
 import {
+  type AskSummary,
   type AskView,
   type Density,
   type FoldMemory,
-  type FoldPart,
   planAskWork,
   type Segment,
   toggled,
 } from "@pinetrie/interface"
 import { pointsText } from "@pinetrie/rules"
 import {
-  Fragment,
   type ReactNode,
   useCallback,
   useContext,
@@ -31,14 +30,20 @@ const Headline = ({ text }: { text: string }) => (
   </span>
 )
 
-/** A fold line's parts, " · " between them, a headline marked. */
-const FoldLine = ({ parts }: { parts: readonly FoldPart[] }) =>
-  parts.map((p, i) => (
-    <Fragment key={p.byModel ? "headline" : p.text}>
-      {i > 0 && " · "}
-      {p.byModel ? <Headline text={p.text} /> : p.text}
-    </Fragment>
-  ))
+/** A fold line's parts, " · " between them. */
+const FoldLine = ({ parts }: { parts: readonly string[] }) => parts.join(" · ")
+
+/** An ask's digest: its headline, a model's, and its points under it. */
+const Summary = ({ summary }: { summary: AskSummary }) => (
+  <div className="ask-digest">
+    <p>
+      <Headline text={summary.headline} />
+    </p>
+    {summary.points.length > 0 && (
+      <MessageText mode="committed" text={pointsText(summary.points)} />
+    )}
+  </div>
+)
 
 export function AskWork({
   view,
@@ -84,6 +89,12 @@ export function AskWork({
         <FoldLine parts={draw.line} />
       </button>,
     )
+  const { summary } = draw
+  const summaryRow =
+    summary === null ? null : <Summary key="digest" summary={summary} />
+  // The summary goes at its anchor alone: after the line, or before the
+  // work, here; after its fold, below.
+  if (summary !== null && summary.after.kind !== "fold") drawn.push(summaryRow)
   for (const row of draw.rows)
     switch (row.kind) {
       case "message":
@@ -114,20 +125,8 @@ export function AskWork({
             )}
           </div>,
         )
-        break
-      case "digest":
-        drawn.push(
-          <div className="ask-digest" key="digest">
-            {row.headline !== null && (
-              <p>
-                <Headline text={row.headline} />
-              </p>
-            )}
-            {row.points.length > 0 && (
-              <MessageText mode="committed" text={pointsText(row.points)} />
-            )}
-          </div>,
-        )
+        if (summary?.after.kind === "fold" && summary.after.fold === row.ids[0])
+          drawn.push(summaryRow)
         break
       case "outcome":
         drawn.push(

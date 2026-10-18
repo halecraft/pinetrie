@@ -1,6 +1,7 @@
 # S230 — Asked after each run for a thread's topic, or `same`, does a model keep a topic while the work goes on and change it only when the thread moves on?
 
-- **Status:** Open
+- **Status:** Answered (Duane's read of the timelines to come)
+- **Led to:** ADR-0173
 
 ## Brief
 
@@ -53,7 +54,7 @@ thread's first ask and its 29 newest, each with its stored digest's
 headline when there is one. Today most asks have no stored headline
 (S229), so this is the topic with less to go on than the plan gives it;
 a run after S229's skill lands would have more. It writes
-`/tmp/s229/topic-report.md`, one timeline per thread with each change in
+`/tmp/s229/topic-report.txt`, one timeline per thread with each change in
 bold and a line for Duane's read, and `/tmp/s229/topic.jsonl`.
 
 The probe was checked against a three-ask thread a suite's scripted host
@@ -61,4 +62,42 @@ wrote, with a stand-in for the model. It has not met a real model.
 
 ## Answers
 
-Not run yet.
+Run on Duane's Mac, 2026-10-18, on a copy of his session's store, with
+`anthropic/claude-opus-5-5`. The report is
+`S230-a-thread-topic-that-holds/report.txt`. Almost no ask had a stored
+headline (S229: 39 of 40 were `nothing to add`), so the model saw the
+asks alone: less than the plan gives it.
+
+1. **The topic holds: 80 requests over 12 threads, and 76 answered
+   `same`.** A thread of 23 asks (cool-hornet) changed topic once.
+2. **Out of shape: 1 in 80.** "Investigating why the HQL server disk is
+   nearly full" is 9 words, over the skill's 8, and was refused; the next
+   ask set the topic. A reader that refuses at 10 words, with the skill
+   still asking for 8, gives the margin `digestOf` gives a headline (14
+   against the skill's 12).
+3. **Of the 4 changes after the first topic, 2 are the probe's own
+   fault, and 2 are real.**
+   - A failed request (wakeful-bloom's 11th ask) was taken by the probe
+     as a topic, "(the request failed)", and the next ask set it back,
+     reworded. The host keeps the stored topic on a failed request, as
+     it keeps a digest, so neither change happens there.
+   - spry-llama's first ask was a bare `@agent`, topic "Getting started
+     with the agent"; its second, the real work, changed it. A thread's
+     first ask is sometimes empty of meaning, so the header shows the
+     first ask's first line until a topic exists, and a topic named from
+     nothing can be replaced.
+   - cool-hornet broadened "Why accepting changes in the repo got slow"
+     to "Slow startup and slow accepting of changes" once startup was
+     the subject too.
+4. **The risk is the other way: moves missed, not noise.** wakeful-bloom
+   went from the topic header to the `verdict` rename to these probes
+   and kept "Show each conversation's topic in its column header";
+   cool-hornet went on to prompt caching and stored diagnostics under
+   its slowdown topic. Both are arguably one piece of work. Duane's read
+   decides whether these are misses.
+5. **The topics are plain**, as the skill asks: "Throwing away items from
+   a full inventory", "Server needs two Ctrl-C presses to shut down".
+
+**So:** asked after every run, with `same`, the topic does not change
+under the reader. Duane's read of point 4 decides whether the skill
+should lean less on `same`.

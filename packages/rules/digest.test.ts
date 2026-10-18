@@ -1,5 +1,6 @@
 import {
   type DigestBody,
+  type DigestRecord,
   type EntryLike,
   entryId,
   indexAsks,
@@ -13,12 +14,12 @@ import {
   digestDue,
   HEADLINE_WORDS,
   MAX_POINTS,
-  NOTHING_TO_ADD,
   POINT_WORDS,
 } from "./digest.ts"
 import {
   DIGEST,
   decodeRecords,
+  deleteRecord,
   digestRequest,
   digestText,
   digestToWrite,
@@ -28,6 +29,7 @@ import {
 } from "./index.ts"
 
 const P = entryId("p-1")
+const ROOT = rootIdFor("test-root")
 
 describe("digestDue", () => {
   const base = {
@@ -37,10 +39,9 @@ describe("digestDue", () => {
     reading: true,
     now: 100_000,
   }
-  const live = {
+  const live: DigestRecord = {
     prompt: P,
     headline: "x",
-    points: [],
     at: 100_000 - DIGEST_EVERY,
     final: false,
   }
@@ -57,7 +58,7 @@ describe("digestDue", () => {
     ],
     [
       "never once the final one is written",
-      { ended: true, stored: { ...live, final: true } },
+      { ended: true, stored: { ...live, points: [], final: true } },
       false,
     ],
   ])("%s", (_, over, due) => {
@@ -84,14 +85,6 @@ describe("parseDigest and digestText", () => {
       {
         headline: "Moved proposed changes out of core",
         points: ["`core/proposed.ts` is new", "fixtures fixed"],
-      },
-    ],
-    [
-      "nothing to add, in any case",
-      "Nothing to add.",
-      {
-        headline: null,
-        points: [],
       },
     ],
     [
@@ -139,28 +132,34 @@ describe("parseDigest and digestText", () => {
     expect(parseDigest(reply)).toEqual(body)
     if (body !== null) expect(parseDigest(digestText(body))).toEqual(body)
   })
-  test("digestText words no headline as nothing to add", () => {
-    expect(digestText({ headline: null, points: [] })).toBe(NOTHING_TO_ADD)
+  test("a reply of nothing to add is refused", () => {
+    expect(parseDigest("Nothing to add.")).toBeNull()
+    expect(parseDigest("nothing to add")).toBeNull()
+  })
+  test("digestText words a live digest as its headline alone", () => {
     expect(digestText({ headline: "H", points: ["a", "b"] })).toBe(
       "H\n- a\n- b",
+    )
+    expect(digestText({ prompt: P, headline: "H", at: 1, final: false })).toBe(
+      "H",
     )
   })
 })
 
 describe("digestToWrite", () => {
   const body = { headline: "Fixed the rail", points: ["a"] }
-  const stored = (final: boolean) => ({
-    prompt: P,
-    headline: "Fixing the rail",
-    points: [],
-    at: 1,
-    final,
-  })
+  const stored = (final: boolean): DigestRecord =>
+    final
+      ? { prompt: P, headline: "Fixed it", points: [], at: 1, final }
+      : { prompt: P, headline: "Fixing the rail", at: 1, final }
+  const write = (
+    input: Omit<Parameters<typeof digestToWrite>[0], "prompt" | "root" | "at">,
+  ) => digestToWrite({ ...input, prompt: P, root: ROOT, at: 9 })
   test.each<
     [
       string,
-      Omit<Parameters<typeof digestToWrite>[0], "prompt" | "at">,
-      unknown,
+      Omit<Parameters<typeof digestToWrite>[0], "prompt" | "root" | "at">,
+      DigestRecord | null,
     ]
   >([
     [
@@ -171,7 +170,7 @@ describe("digestToWrite", () => {
     [
       "a live one over a live one is written",
       { stored: stored(false), asked: { final: false }, body },
-      { prompt: P, ...body, at: 9, final: false },
+      { prompt: P, headline: body.headline, at: 9, final: false },
     ],
     [
       "a final one is written over the final one",
@@ -183,31 +182,49 @@ describe("digestToWrite", () => {
       { stored: stored(false), asked: { final: false }, body: null },
       null,
     ],
-    [
-      "a refused final one writes an empty final digest",
-      { stored: stored(false), asked: { final: true }, body: null },
-      { prompt: P, headline: null, points: [], at: 9, final: true },
-    ],
   ])("%s", (_, input, written) => {
-    expect(digestToWrite({ ...input, prompt: P, at: 9 })).toEqual(written)
+    expect(write(input)).toEqual(
+      written === null ? null : setRecord(DIGEST, written, ROOT),
+    )
+  })
+  test("a live digest is written without points", () => {
+    const written = write({ stored: undefined, asked: { final: false }, body })
+    expect(written?.kind === "set" && written.value).toEqual({
+      headline: body.headline,
+      at: 9,
+      final: false,
+    })
+  })
+  test("a refused final reply deletes the live digest", () => {
+    expect(
+      write({ stored: stored(false), asked: { final: true }, body: null }),
+    ).toEqual(deleteRecord(DIGEST, P, ROOT))
+    expect(
+      write({ stored: undefined, asked: { final: true }, body: null }),
+    ).toBeNull()
   })
 })
 
 test("the record round-trips; a malformed one, or one stored as text, is dropped", () => {
-  const r = {
+  const r: DigestRecord = {
     prompt: P,
-    headline: "Fixing the rail",
+    headline: "Fixed the rail",
     points: ["`rail.tsx`"],
+    at: 3,
+    final: true,
+  }
+  expect(DIGEST.decode(structuredClone(DIGEST.encode(r)), P)).toEqual(r)
+  const live: DigestRecord = {
+    prompt: P,
+    headline: "Fixing",
     at: 3,
     final: false,
   }
-  expect(DIGEST.decode(structuredClone(DIGEST.encode(r)), P)).toEqual(r)
-  const none = { ...r, headline: null, points: [] }
-  expect(DIGEST.decode(structuredClone(DIGEST.encode(none)), P)).toEqual(none)
+  expect(DIGEST.decode(structuredClone(DIGEST.encode(live)), P)).toEqual(live)
   expect(DIGEST.decode({ text: "done", at: 1, final: true }, P)).toBeUndefined()
   expect([
     ...decodeRecords(DIGEST, [
-      setRecord(DIGEST, r, rootIdFor("test-root")),
+      setRecord(DIGEST, r, ROOT),
       { key: "p-2", value: null },
     ]),
   ]).toEqual([[P, r]])
@@ -315,21 +332,15 @@ describe("planDigest", () => {
     })
   })
 
-  test("the summary so far is worded as the model answers", () => {
+  test("the summary so far is worded as the model answers: a live one, its headline", () => {
     expect(
       plan("p-1", {
         ended: false,
         reading: true,
         now: DIGEST_EVERY,
-        stored: {
-          prompt: P,
-          headline: "Reading",
-          points: ["`a.ts`"],
-          at: 0,
-          final: false,
-        },
+        stored: { prompt: P, headline: "Reading", at: 0, final: false },
       })?.previous,
-    ).toBe("Reading\n- `a.ts`")
+    ).toBe("Reading")
   })
 
   test("a short ask, no work, or not due, is no plan", () => {
@@ -342,4 +353,13 @@ describe("planDigest", () => {
       }),
     ).toBeNull()
   })
+})
+
+test("an old digest, or a live one with points, does not decode", () => {
+  expect(
+    DIGEST.decode({ headline: null, points: [], at: 1, final: true }, P),
+  ).toBeUndefined()
+  expect(
+    DIGEST.decode({ headline: "H", points: ["a"], at: 1, final: false }, P),
+  ).toBeUndefined()
 })

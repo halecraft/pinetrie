@@ -29,13 +29,24 @@ test("stretchWords: a long ask's capsule leads with its ask, then its digest as 
   )
   expect(
     stretchWords("ask", "31 steps", {
+      prompt: entryId("ask"),
+      at: 0,
+      final: true,
       headline: "Fixed the rail",
       points: ["`rail.tsx`"],
     }),
   ).toBe("ask · 31 steps\nFixed the rail\n- `rail.tsx`")
-  expect(stretchWords("ask", "31 steps", { headline: null, points: [] })).toBe(
-    "ask · 31 steps",
-  )
+})
+
+test("a live digest's tooltip is its headline alone", () => {
+  expect(
+    stretchWords("ask", "31 steps", {
+      prompt: entryId("ask"),
+      at: 0,
+      final: false,
+      headline: "Fixing the rail",
+    }),
+  ).toBe("ask · 31 steps\nFixing the rail")
 })
 
 test("capsulePick: the message as far through the run as the click is down it", () => {

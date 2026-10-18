@@ -420,9 +420,10 @@ ask's files open a review of its range of revisions, from the paths each
 turn's revision records. Stop queues a fact naming who pressed it, which
 the run's end appends to the thread for the agent to read. Unless
 `{ "digests": { "enabled": false } }` turns it off, a model writes each long
-ask a digest (`pinetrie.digest`, the `ask-digest` skill, ADR-0075), which no
-agent reads: a headline that leads the ask's fold line, and a few points
-under it in story, or nothing when the agent's last message says it all.
+ask a digest (`pinetrie.digest`, the `ask-digest` skill, ADR-0075,
+ADR-0173), which no agent reads: always a headline, and a few points only
+when the work adds to the agent's last message. It is one summary row, at
+one place in the ask at every density, its points in story and raw.
 
 **A thread's followers are told how its runs end** (ADR-0077). You follow a
 thread once you have written on it (`RootRecord.threads`). At each run's end
@@ -622,13 +623,13 @@ Decided, and waiting for their turn:
   `jj log -r '::remote_bookmarks(remote=glob:"pinetrie-*") ~ ::@'`.
 - **Summaries of asks** (ADR-0106, on by default since ADR-0071, shaped by
   ADR-0075): a model, the one commit messages use, writes each long ask's
-  work a headline and a few points while someone reads the running thread,
-  at most once a minute, and once more when its run ends. An ask of one or
-  two agent messages gets none. `{ "digests": { "enabled": false } }` in
-  your `pinetrie.json` turns them off. Replace the `ask-digest`
-  skill to change what it asks; yours must still ask for a headline line
-  and `- ` points, or `nothing to add`, since a reply in another shape is
-  logged and dropped. With digests on or off, each run's end also asks
+  work a headline while someone reads the running thread, at most once a
+  minute, and a headline with a few points once more when its run ends
+  (ADR-0173). An ask of one or two agent messages gets none.
+  `{ "digests": { "enabled": false } }` in your `pinetrie.json` turns them
+  off. Replace the `ask-digest` skill to change what it asks; yours must
+  still ask for a headline line and `- ` points, since a reply in another
+  shape, `nothing to add` among them, is logged and dropped. With digests on or off, each run's end also asks
   for its urgency line (ADR-0077), a request of its own for a short ask; a
   replaced skill must answer `needs you: <reason>`, `worth a read:
   <reason>` or `done` first, or the run is unclassified.

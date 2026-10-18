@@ -10,7 +10,7 @@
 import type {
   AgentRun,
   AskIndex,
-  DigestBody,
+  DigestRecord,
   EntryId,
   RailRow,
   RevisionRecord,
@@ -89,7 +89,7 @@ export function Rail({
   /** The tree the items were compacted from: a long ask's capsule names its ask. */
   index: TreeIndex
   /** Each ask's model-written digest, which a long ask's capsule shows. */
-  digests: ReadonlyMap<EntryId, DigestBody>
+  digests: ReadonlyMap<EntryId, DigestRecord>
   items: readonly RailItem[]
   /** Ids on any open column's path: marked `data-open`. */
   open: ReadonlySet<EntryId>

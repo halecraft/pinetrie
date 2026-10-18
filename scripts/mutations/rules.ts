@@ -2277,10 +2277,26 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a refused final digest leaves the live headline",
     file: "packages/rules/digest.ts",
-    from: "  const body = input.body ?? (final ? NO_DIGEST : null)\n",
-    to: "  const body = input.body\n",
+    from: "    return final && input.stored !== undefined\n      ? deleteRecord(DIGEST, prompt, root)\n      : null\n",
+    to: "    return null\n",
     command: unit,
-    expect: "a refused final one writes an empty final digest",
+    expect: "a refused final reply deletes the live digest",
+  },
+  {
+    name: "a live digest is written with its points",
+    file: "packages/rules/digest.ts",
+    from: "      : { prompt, headline: body.headline, at, final },\n",
+    to: "      : { prompt, ...body, at, final },\n",
+    command: unit,
+    expect: "a live digest is written without points",
+  },
+  {
+    name: "a live digest's record keeps its points",
+    file: "packages/rules/digest.ts",
+    from: "    { additionalProperties: false },\n",
+    to: "",
+    command: unit,
+    expect: "an old digest, or a live one with points, does not decode",
   },
   {
     name: "a digest's reply is cut to fit",
@@ -2293,10 +2309,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "nothing to add is read as a headline",
     file: "packages/rules/digest.ts",
-    from: "  if (bareLine(reply).toLowerCase() === NOTHING_TO_ADD) return NO_DIGEST\n",
+    from: "  if (bareLine(reply).toLowerCase() === NOTHING_TO_ADD) return null\n",
     to: "",
     command: unit,
-    expect: "nothing to add, in any case",
+    expect: "a reply of nothing to add is refused",
   },
   {
     name: "a short ask is given a digest",

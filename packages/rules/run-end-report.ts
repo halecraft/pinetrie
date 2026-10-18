@@ -19,7 +19,6 @@ import { decodeRecord, threadKey } from "./decode.ts"
 import {
   type Answer,
   type AskLines,
-  DIGEST,
   type DigestPlan,
   digestToWrite,
   parseDigest,
@@ -269,14 +268,15 @@ export function runEndedToWrite(input: {
     )
   }
   if (answer !== "urgency" && reply !== null) {
-    const record = digestToWrite({
+    const write = digestToWrite({
       stored: input.stored.digest,
       asked: { final: true },
       body: reply.digest,
       prompt: ask,
+      root: input.root,
       at: input.at,
     })
-    if (record !== null) writes.push(setRecord(DIGEST, record, input.root))
+    if (write !== null) writes.push(write)
   }
   return writes
 }

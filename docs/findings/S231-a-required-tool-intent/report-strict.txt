@@ -1,0 +1,86 @@
+# intent probe: anthropic/claude-opus-5-5
+
+29 calls, 0 without intent, 0 with an empty one, 0 refused (any reason).
+
+## Explain the digest timing
+
+| tool | intent | call | ok |
+|---|---|---|---|
+| bash | Search the code for digest logic | `cd /tmp/intent-work && ls && grep -rni "digest" --include=* -l . \| grep -v node_modules \| head -50` | ✓ |
+| bash | Find digest code in the packages | `cd /tmp/intent-work && grep -rni "digest" --include=*.ts -l apps packages \| grep -v node_modules \| head -40; cat docs/ad` | ✓ |
+| bash | Read the host's digest scheduling code | `cd /tmp/intent-work && wc -l apps/pinetrie/host/digests.ts && cat apps/pinetrie/host/digests.ts; grep -n "planDigest" -r` | ✓ |
+| bash | Read the digest planning rules and reading check | `cd /tmp/intent-work && sed -n 1,260p packages/rules/digest.ts; grep -rn "export function readsAsk" -A40 packages/rules \|` | ✓ |
+| bash | See where the host triggers a live digest | `cd /tmp/intent-work && sed -n 270,280p packages/rules/digest.ts; sed -n 705,735p apps/pinetrie/host/index.ts; grep -n "M` | ✓ |
+| bash | Find what counts as a long ask | `cd /tmp/intent-work && grep -rn "MIN_STRETCH\\|isLongAsk =" packages/core/*.ts \| grep -v test \| head` | ✓ |
+| bash | Read the long-ask rule | `cd /tmp/intent-work && sed -n 140,160p packages/core/asks.ts; grep -rn "STRETCH" packages/core/*.ts \| grep -v test \| hea` | ✓ |
+
+**Answer:** While a run is going, the host only considers asking for a digest after an agent turn finishes, never on a timer. In `apps/pinetrie/host/index.ts`, the agent's `turnDone` hook calls `digests.step(lane, tip)`, which queues a step that works out which ask the turn belongs to (`runPrompt`) and passes the facts to `planDigest` in `packages/rules/digest.ts`. Nothing is asked if digests are turned off in `pinetrie.json` or the lane has no root. Otherwise the request goes out only when all of these hold:  - **The ask is long:** its run already has at least `LONG_ASK` (3) agent messages (`isLongAsk`).
+
+**Your read** (would the intents alone tell you what happened? any vague or wrong?): 
+
+## Run one test file
+
+| tool | intent | call | ok |
+|---|---|---|---|
+| bash | Look at the test file and project setup | `cd /tmp/intent-work && ls; ls packages/interface \| head -50; cat package.json 2>/dev/null \| head -40` | ✓ |
+| bash | Run the ask-fold unit tests | `cd /tmp/intent-work && npx vitest run packages/interface/ask-fold.test.ts 2>&1 \| tail -60` | ✓ |
+
+**Answer:** None fail. I ran `npx vitest run packages/interface/ask-fold.test.ts` and all 73 tests in the file passed.
+
+**Your read** (would the intents alone tell you what happened? any vague or wrong?): 
+
+## Find the readers
+
+| tool | intent | call | ok |
+|---|---|---|---|
+| bash | Look around the project files | `cd /tmp/intent-work && git ls-files 2>/dev/null \| head -100 \|\| find . -type f \| head -100` | ✓ |
+| bash | Search for run-end report terms | `cd /tmp/intent-work && git ls-files \| wc -l; grep -rniE "run[-_ ]?end\|runEnd\|end[-_ ]?report\|endReport\|run[-_ ]?report\|r` | ✓ |
+| bash | Read the run-end report design note and glossary entry | `cd /tmp/intent-work && cat docs/adrs/0166-run-end-report.md; grep -niE -B2 -A4 "run[- ]end" docs/glossary.md` | ✓ |
+| bash | Find code that touches the run-end report record | `cd /tmp/intent-work && grep -rnE "RunEndReport\|runEndReport\|RUN_END_REPORT\|run-end-report\|readRunEndReports\|pinetrie\.ve` | ✓ |
+| bash | Check surrounding code at each reading spot | `cd /tmp/intent-work && git ls-files \| sed 's/.*\.//' \| sort \| uniq -c \| sort -rn \| head; echo ---; grep -rn "runEndRepor` | ✓ |
+| bash | Read the code around each spot that reads the record | `cd /tmp/intent-work && sed -n 225,235p apps/pinetrie/host/digests.ts; echo ...; sed -n 280,305p apps/pinetrie/host/diges` | ✓ |
+
+**Answer:** I found two places that read the record straight from the store, plus one migration that reads the old copy. Everything else gets the reports passed in from one of those reads. The record is `RunEndReportRecord`, stored under `pinetrie.runEndReport` (ADR-0166).  **Where it is defined and decoded** - `packages/rules/run-end-report.ts`: the `RUN_END_REPORT` record spec and its `decode`. Every read goes through this decoder. - `packages/reads/index.ts` (line 697): `readRunEndReports(doc)`, which returns each thread's report. Almost every reader below calls it.  **Direct reads from the session (ca
+
+**Your read** (would the intents alone tell you what happened? any vague or wrong?): 
+
+## A small rename
+
+| tool | intent | call | ok |
+|---|---|---|---|
+| bash | Find uses of the helper | `cat -n packages/rules/digest.ts; grep -rn "words" packages/rules --include=*.ts \| grep -v node_modules; ls packages/rule` | ✓ |
+| edit | Rename the helper | `packages/rules/digest.ts` | ✓ |
+| bash | See how to type-check | `cat packages/rules/package.json; ls; cat package.json \| head -40` | ✓ |
+| bash | Type-check the code | `grep -n "words\b\\|wordCount" packages/rules/digest.ts \| grep -v "^\s*[0-9]*:\s*/\?\*"; npx tsc --noEmit 2>&1 \| tail -20;` | ✓ |
+| bash | Isolate errors in the rules package | `npx tsc --noEmit > /tmp/tsc.out 2>&1; echo "exit=$?"; wc -l < /tmp/tsc.out; grep -c "^packages/rules\\|^packages/core" /t` | ✓ |
+
+**Answer:** I renamed `words` to `wordCount` in `packages/rules/digest.ts`. The rules package type-checks with no errors, but the repo-wide type-check still fails because of errors in other packages.  - **The rename:** There were three spots: the definition on line 61 and the two calls in `parseDigest` (lines 79 and 82). The helper isn't exported, so nothing else needed changing. `digest.test.ts` has its own separate `words` helper, which I left alone. - **The check:** `packages/rules` has no tsconfig of its own, so I ran the root `tsc --noEmit`. It reported no errors in `packages/rules` or `packages/core
+
+**Your read** (would the intents alone tell you what happened? any vague or wrong?): 
+
+## A comment from history
+
+| tool | intent | call | ok |
+|---|---|---|---|
+| bash | Find LONG_ASK in code and docs | `cd /tmp/intent-work && grep -rn "LONG_ASK" --exclude-dir=node_modules . \| head -50; ls; git log --oneline \| head -20` | ✓ |
+| bash | Read the relevant docs and history | `cd /tmp/intent-work && sed -n 140,156p packages/core/asks.ts; echo ---; sed -n 55,75p docs/findings/S115-what-a-tty-woul` | ✓ |
+| bash | Trace where three came from | `cd /tmp/intent-work && sed -n 25,40p docs/adrs/0075-digests.md; echo ---; sed -n 78,95p docs/adrs/archive/0056-asks.md; ` | ✓ |
+| bash | Check the earliest origin of the rail capsule minimum | `cd /tmp/intent-work && git log -S "MIN_STRETCH" --oneline --reverse \| head -3; f=$(ls docs/adrs/*0031* docs/adrs/archive` | ✓ |
+| bash | Read the original rationale for three | `cd /tmp/intent-work && sed -n 25,35p docs/adrs/0031-rail-runs.md; sed -n 60,66p docs/adrs/0031-rail-runs.md; echo ---; g` | ✓ |
+| edit | Add the one-line comment above LONG_ASK | `/tmp/intent-work/packages/core/asks.ts` | ✓ |
+| bash | Check the file still passes the linter | `cd /tmp/intent-work && npx biome check packages/core/asks.ts 2>&1 \| tail -5; git diff \| cat` | ✓ |
+
+**Answer:** I found the reason in the git history and added this line above `LONG_ASK` in `packages/core/asks.ts`:  ```ts // Three is the rail's old MIN_STRETCH (two dots are no taller than a capsule), kept when ADR-0093 split the two. ```  **Where three came from:** - **ADR-0031:** three started as the size limit for a group of messages on the rail. A group of 3–9 messages is drawn as one capsule two rows tall, so a group of two would save no space over two separate dots. Commit 97ea80f941 put that in code as `MIN_STRETCH = 3`, with the note "two dots are no taller than one." - **ADR-0056 and ADR-0075:**
+
+**Your read** (would the intents alone tell you what happened? any vague or wrong?): 
+
+## Recent history
+
+| tool | intent | call | ok |
+|---|---|---|---|
+| bash | Look at the last five commits | `git log -5 --stat --format='--- %h %s (%an, %ar)%n%b' 2>&1 \| head -200` | ✓ |
+| bash | Read the design note behind the newest commit | `sed -n 1,60p docs/adrs/0170-narrowed-ssh-hosts.md` | ✓ |
+
+**Answer:** Here are the last five commits, newest first. All are by Duane Johnson.  1. **SSH host shortcuts now work as expected** (`f7654ba`, 2 hours ago)    - **The bug:** if you limited a lane to certain servers by a shortcut name (like `hql` instead of its real address `192.168.1.2`), nothing was allowed. SSH stores a server's key under its real address, so the shortcut matched none of them.    - **No warning:** every connection was quietly refused. The agent then told its owner to approve a request that didn't exist.    - **The fix:** shortcut names are now translated to the real address before matc
+
+**Your read** (would the intents alone tell you what happened? any vague or wrong?): 

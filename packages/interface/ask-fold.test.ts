@@ -78,8 +78,7 @@ const view = (over: Partial<AskView> = {}): AskView => ({
   outcome: "OUTCOME",
   live: null,
   outlineHides: id("w"),
-  headline: "HEAD",
-  points: ["p1"],
+  digest: { headline: "HEAD", points: ["p1"] },
   files: 0,
   ...over,
 })
@@ -93,25 +92,35 @@ const reader = (
   ...over,
 })
 
-/** A plan as a reader sees it, a line for each thing drawn. */
-const read = (draw: AskDraw): string[] => [
-  ...(draw.line === null
-    ? []
-    : [`line: ${draw.line.map(p => p.text).join(" · ")}`]),
-  ...draw.rows.map(r => {
+/** A plan as a reader sees it, a line for each thing drawn, the summary at its anchor. */
+const read = (draw: AskDraw): string[] => {
+  const { summary } = draw
+  const said =
+    summary === null
+      ? []
+      : [`digest: ${[summary.headline, ...summary.points].join(" | ")}`]
+  const rows = draw.rows.flatMap(r => {
     switch (r.kind) {
       case "message":
-        return `msg:${r.id}`
+        return [`msg:${r.id}`]
       case "fold":
-        return `fold: ${r.parts.map(p => p.text).join(" · ")}`
-      case "digest":
-        return `digest: ${[r.headline ?? "", ...r.points].filter(t => t !== "").join(" | ")}`
+        return [
+          `fold: ${r.parts.join(" · ")}`,
+          ...(summary?.after.kind === "fold" && summary.after.fold === r.ids[0]
+            ? said
+            : []),
+        ]
       case "outcome":
-        return `outcome: ${r.text}`
+        return [`outcome: ${r.text}`]
     }
     return r satisfies never
-  }),
-]
+  })
+  return [
+    ...(draw.line === null ? [] : [`line: ${draw.line.join(" · ")}`]),
+    ...(summary !== null && summary.after.kind !== "fold" ? said : []),
+    ...rows,
+  ]
+}
 
 const times = (lines: readonly string[], word: string) =>
   lines.join("\n").split(word).length - 1
@@ -125,7 +134,7 @@ describe("planAskWork", () => {
     ),
   )
   test.each(cases)(
-    "the summary is said once: $density, $choice, running $running, $shape",
+    "an ask's counts and digest are said once: $density, $choice, running $running, $shape",
     ({ density, choice, running, shape }) => {
       const parts = shapes[shape] ?? []
       const lines = read(
@@ -148,6 +157,37 @@ describe("planAskWork", () => {
     },
   )
 
+  test.each(
+    DENSITIES.flatMap(density =>
+      Object.keys(shapes).map(shape => ({ density, shape })),
+    ),
+  )(
+    "an ask's summary is anchored after its first fold, or outline's line, or before its work: $density, $shape",
+    ({ density, shape }) => {
+      const parts = shapes[shape] ?? []
+      const first = parts.find(s => s.kind === "fold" && s.first)
+      expect(
+        planAskWork(view(), parts, reader({ density }))?.summary?.after,
+      ).toEqual(
+        density === "outline"
+          ? { kind: "line" }
+          : first?.kind === "fold"
+            ? { kind: "fold", fold: first.ids[0] }
+            : { kind: "start" },
+      )
+    },
+  )
+
+  test.each(["outline", "story", "raw"] as const)(
+    "outline's summary is the headline alone; story's and raw's have its points (%s)",
+    density => {
+      expect(
+        planAskWork(view(), shapes["one fold"] ?? [], reader({ density }))
+          .summary?.points,
+      ).toEqual(density === "outline" ? [] : ["p1"])
+    },
+  )
+
   test("outline, opened: the line says the summary, and its fold only its steps", () => {
     const draw = planAskWork(
       view(),
@@ -156,7 +196,7 @@ describe("planAskWork", () => {
     )
     expect(read(draw)).toEqual([
       "line: OUTCOME · WORK",
-      "digest: HEAD | p1",
+      "digest: HEAD",
       "fold: 3 steps",
       "msg:a",
       "msg:b",
@@ -164,22 +204,6 @@ describe("planAskWork", () => {
       "msg:w",
     ])
   })
-
-  test.each([null, "open"] as const)(
-    "outline: the digest is whole under the line, open or closed (%s)",
-    choice => {
-      const draw = planAskWork(
-        view(),
-        shapes["two folds"] ?? [],
-        reader({ density: "outline", choice }),
-      )
-      expect(draw.rows[0]).toEqual({
-        kind: "digest",
-        headline: "HEAD",
-        points: ["p1"],
-      })
-    },
-  )
 
   test("outline, closed: no fold, and the last word it hides left out", () => {
     const parts = shapes["two folds"] ?? []
@@ -193,41 +217,42 @@ describe("planAskWork", () => {
       )
     expect(at(id("w"))).toEqual([
       "line: OUTCOME · WORK",
-      "digest: HEAD | p1",
+      "digest: HEAD",
       "msg:L",
     ])
     expect(at(null)).toEqual([
       "line: OUTCOME · WORK",
-      "digest: HEAD | p1",
+      "digest: HEAD",
       "msg:L",
       "msg:w",
     ])
   })
 
-  test("story: the first fold carries the summary and the headline, a later one its steps", () => {
+  test("story: the first fold carries the counts, the digest after it, a later fold its steps", () => {
     expect(
       read(planAskWork(view(), shapes["two folds"] ?? [], reader({}))),
     ).toEqual([
-      "fold: HEAD · WORK · OUTCOME",
-      "digest: p1",
+      "fold: WORK · OUTCOME",
+      "digest: HEAD | p1",
       "msg:L",
       "fold: 1 step",
       "msg:w",
     ])
   })
 
-  test("story with no fold: the digest whole, and how it ended last", () => {
+  test("story with no fold: the digest before the work, and how it ended last", () => {
     expect(
       read(planAskWork(view(), shapes["no fold"] ?? [], reader({}))),
     ).toEqual(["digest: HEAD | p1", "msg:w", "outcome: OUTCOME"])
   })
 
-  test("a digest with nothing to draw is no row", () => {
+  test("an ask with no digest has no summary", () => {
     const draw = planAskWork(
-      view({ headline: null, points: [] }),
+      view({ digest: null }),
       shapes["no fold"] ?? [],
       reader({}),
     )
+    expect(draw.summary).toBeNull()
     expect(draw.rows.map(r => r.kind)).toEqual(["message", "outcome"])
   })
 

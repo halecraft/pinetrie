@@ -1213,14 +1213,20 @@ Ada"). It is a prompt, so its run is an ask of its own (`PROMPT_ROLES`).
   once (`refusedCarryOn`). It takes the lane with its tree and asks, or
   null for a lane no root holds, which it refuses `UNKNOWN_TARGET`.
 
-# Digests (`digest.ts`, ADR-0106, ADR-0075)
+# Digests (`digest.ts`, ADR-0106, ADR-0075, ADR-0173)
 
-A model's headline and few points for a long ask's work, unless
-`{ "digests": { "enabled": false } }` is in the config (`digests.enabled`,
-ADR-0071, settled by the host's table). A host-written `pinetrie.digest` value keyed
-by the ask's prompt, `{ headline, points, at, final }`, replaced whole each
-time: a value, not a text, since nothing accumulates (ADR-0014). A null
-headline is a digest with nothing to draw. No agent reads it.
+A model's headline for every long ask's work, and a few points when the
+work adds to its last word, unless `{ "digests": { "enabled": false } }`
+is in the config (`digests.enabled`, ADR-0071, settled by the host's
+table). A host-written `pinetrie.digest` value keyed by the ask's prompt,
+replaced whole each time: a value, not a text, since nothing accumulates
+(ADR-0014). No agent reads it.
+
+- **A live digest has no points, by its type** (`DigestRecord`):
+  `{ headline, at, final: false }` while its run lasts, and
+  `{ headline, points, at, final: true }` once it ends. Its decoder refuses
+  a live record that holds points, and one with no headline (the shape
+  before ADR-0173), and `recordsOf` skips them.
 
 - **`digestDue` is asked on events, never on a timer**: each turn done,
   and the run's end. While the run lasts, only when nothing is asked
@@ -1237,19 +1243,23 @@ headline is a digest with nothing to draw. No agent reads it.
   messages.
 - **`parseDigest` refuses rather than cuts**, as `replyTitle` does, and shares its
   unwrapping (`bareLine`, `request.ts`): the first line is the headline,
-  every other line a `- ` or `* ` point, or the whole reply `nothing to
-  add`. A headline over `HEADLINE_WORDS`, more than `MAX_POINTS` points, a
-  point over `POINT_WORDS`, or a line of prose is null.
+  every other line a `- ` or `* ` point, and none when the work adds
+  nothing. A headline over `HEADLINE_WORDS`, more than `MAX_POINTS` points,
+  a point over `POINT_WORDS`, a line of prose, or the whole reply
+  `nothing to add` (what the skill asked for before ADR-0173, which would
+  read as a headline) is null.
 - **`digestText` is `parseDigest`'s inverse**, and `pointsText` its list: the
   one wording of a digest, for the next request's summary so far, the
-  rail's tooltip and the client's list. `nothing to add` round-trips.
+  rail's tooltip and the client's list. A live digest is its headline.
 - **`digestToWrite` is the whole write decision.** A live reply that comes
   back after the final one was written is dropped: a digest is keyed by its
   prompt, so no other ask's can land on it, as long as the host names the
-  right prompt (`apps/pinetrie/host/TECHNICAL.md`, "Digests"). A refused live
-  reply writes nothing, so the last good digest stays. A refused final
-  reply writes an empty final digest: a live headline says what the run
-  was doing, which is no longer true.
+  right prompt (`apps/pinetrie/host/TECHNICAL.md`, "Digests"). A live
+  reply is written without its points. A refused live reply writes
+  nothing, so the last good digest stays. A refused final reply deletes
+  the stored one: a live headline says what the run was doing, which is
+  no longer true. It returns the write itself, a set or a delete at the
+  digest's root.
 - **`askLines`** is an ask's run as transcript lines, `planDigest`'s and a
   short ask's urgency request's alike.
 - **`digestRequest`** is the skill, the ask, the run's newest work that fits

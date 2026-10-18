@@ -98,37 +98,26 @@ export function workWords(
     .join(" · ")
 }
 
-/** A part of an ask's fold line, and whether a model wrote it (a digest's headline). */
-export interface FoldPart {
-  readonly text: string
-  readonly byModel: boolean
-}
-
-/** Where an ask's summary is drawn: outline's line, or story's first fold. */
-export type SummaryAt = "line" | "fold"
+/** Where an ask's counts are drawn: outline's line, or story's first fold. */
+export type CountsAt = "line" | "fold"
 
 /**
- * An ask's summary, in order, the parts drawn with " · " between them.
+ * An ask's counts and outcome, in order, the parts drawn with " · " between them.
  * `planAskWork` (`ask-fold.ts`) is its only caller. `line` is outline's:
  * while its run lasts, what it does now and what its work holds; once
- * ended, how it ended and what its work holds. It holds no headline, since
- * it is one line cut to the column's width: the digest is drawn whole under
- * it. `fold` is story's first fold: the headline, what its work holds, and
- * how it ended.
+ * ended, how it ended and what its work holds. `fold` is story's first
+ * fold: what its work holds, and how it ended. Neither holds the digest's
+ * headline, which is drawn on its own (`AskDraw.summary`).
  */
 export function foldWords(
-  view: Pick<AskView, "running" | "headline" | "work" | "outcome" | "live">,
-  at: SummaryAt,
-): readonly FoldPart[] {
-  const part = (text: string | null, byModel = false) =>
-    text === null || text === "" ? [] : [{ text, byModel }]
-  if (at === "fold")
-    return [
-      ...part(view.headline, true),
-      ...part(view.work),
-      ...part(view.outcome),
-    ]
-  return [...part(view.running ? view.live : view.outcome), ...part(view.work)]
+  view: Pick<AskView, "running" | "work" | "outcome" | "live">,
+  at: CountsAt,
+): readonly string[] {
+  const parts =
+    at === "fold"
+      ? [view.work, view.outcome]
+      : [view.running ? view.live : view.outcome, view.work]
+  return parts.filter((p): p is string => p !== null && p !== "")
 }
 
 /** How an ask ended, when that needs saying: a stop or a failure. */

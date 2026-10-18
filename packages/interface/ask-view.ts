@@ -5,6 +5,7 @@ import {
   type AskIndex,
   askOutcome,
   askSpan,
+  type DigestBody,
   type DigestRecord,
   type EntryId,
   entryAsk,
@@ -88,10 +89,8 @@ export interface AskView {
    * is the column's last ended ask.
    */
   readonly outlineHides: EntryId | null
-  /** Its model-written digest's headline, live or final. */
-  readonly headline: string | null
-  /** Its final digest's points; none while its digest is live, since those change each time. */
-  readonly points: readonly string[]
+  /** Its model-written digest, live or final; a live one's points are none. */
+  readonly digest: DigestBody | null
   /** How many files its turns changed, for a review: none without a span to read (`askSpan`). */
   readonly files: number
 }
@@ -130,10 +129,7 @@ export function askView(input: {
   /** The column's last ended ask (`lastEndedAsk`). */
   readonly lastEnded: EntryId | null
   readonly revisions: ReadonlyMap<EntryId, RevisionRecord>
-  readonly digests: ReadonlyMap<
-    EntryId,
-    Pick<DigestRecord, "headline" | "points" | "final">
-  >
+  readonly digests: ReadonlyMap<EntryId, DigestRecord>
   /** The column's path up to `releasedTip`; null while it follows its end. */
   readonly releasedPath: ReadonlySet<EntryId> | null
   readonly nameOf: (writer: WriterId) => string
@@ -156,8 +152,13 @@ export function askView(input: {
     outcome: outcomeWords(outcome, input.nameOf),
     live: running ? liveLine(index, asks, ask) : null,
     outlineHides: input.lastEnded === ask ? null : lastWord(index, asks, ask),
-    headline: digest?.headline ?? null,
-    points: digest?.final === true ? digest.points : [],
+    digest:
+      digest === undefined
+        ? null
+        : {
+            headline: digest.headline,
+            points: digest.final ? digest.points : [],
+          },
     files:
       askSpan(index, asks, ask, input.revisions) === null
         ? 0

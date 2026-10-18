@@ -8,11 +8,13 @@ import {
   isLongAsk,
   lastWord,
   projectTranscript,
+  type RootId,
   type TreeIndex,
+  type ValueWrite,
 } from "@pinetrie/core"
 import { Type } from "typebox"
 import { decodeRecord, entryKey } from "./decode.ts"
-import type { RecordSpec } from "./records.ts"
+import { deleteRecord, type RecordSpec, setRecord } from "./records.ts"
 import {
   bareLine,
   fitNewest,
@@ -22,12 +24,19 @@ import {
   transcriptLines,
 } from "./request.ts"
 
-const DigestSchema = Type.Object({
-  headline: Type.Union([Type.String(), Type.Null()]),
-  points: Type.Array(Type.String()),
-  at: Type.Number(),
-  final: Type.Boolean(),
-})
+// A live digest stores no points, so one that holds them does not decode.
+const DigestSchema = Type.Union([
+  Type.Object(
+    { headline: Type.String(), at: Type.Number(), final: Type.Literal(false) },
+    { additionalProperties: false },
+  ),
+  Type.Object({
+    headline: Type.String(),
+    points: Type.Array(Type.String()),
+    at: Type.Number(),
+    final: Type.Literal(true),
+  }),
+])
 
 /** Each ask's digest, at its prompt's entry id. */
 export const DIGEST: RecordSpec<DigestRecord, EntryId, "root"> = {
@@ -36,13 +45,17 @@ export const DIGEST: RecordSpec<DigestRecord, EntryId, "root"> = {
   keyOf: r => r.prompt,
   encode: ({ prompt, ...contents }) => contents,
   decode: (contents, key) =>
-    decodeRecord(DigestSchema, contents, entryKey(key), (r, prompt) => ({
-      prompt,
-      headline: r.headline,
-      points: r.points,
-      at: r.at,
-      final: r.final,
-    })),
+    decodeRecord(DigestSchema, contents, entryKey(key), (r, prompt) =>
+      r.final
+        ? {
+            prompt,
+            headline: r.headline,
+            points: r.points,
+            at: r.at,
+            final: true,
+          }
+        : { prompt, headline: r.headline, at: r.at, final: false },
+    ),
 }
 
 // ── the reply ─────────────────────────────────────────────────────────────
@@ -53,10 +66,10 @@ export const HEADLINE_WORDS = 14
 export const MAX_POINTS = 4
 /** The most words one point may have: the skill asks for thirty. */
 export const POINT_WORDS = 40
-/** The whole reply that says the reader sees everything worth saying already. */
-export const NOTHING_TO_ADD = "nothing to add"
 
-const NO_DIGEST: DigestBody = { headline: null, points: [] }
+// What the skill once asked for when the last word said it all. A reply of
+// it alone is no headline: it would be drawn as one.
+const NOTHING_TO_ADD = "nothing to add"
 
 const words = (text: string): number => text.split(/\s+/).length
 const BULLET = /^[-*] +/
@@ -64,12 +77,13 @@ const BULLET = /^[-*] +/
 /**
  * The model's reply as a digest: its first line the headline
  * (`bareLine`, leading `#`s dropped), every other line a `- ` or `* ` point,
- * or `nothing to add` alone for none. Null for a reply in any other shape,
- * or with a headline, a point or a list too long: the stored digest stays.
+ * and no points when the work adds nothing to the last word. Null for a
+ * reply in any other shape, `nothing to add` among them, or with a
+ * headline, a point or a list too long.
  * It never cuts a reply, since a cut list says something the model did not.
  */
 export function parseDigest(reply: string): DigestBody | null {
-  if (bareLine(reply).toLowerCase() === NOTHING_TO_ADD) return NO_DIGEST
+  if (bareLine(reply).toLowerCase() === NOTHING_TO_ADD) return null
   const [first, ...rest] = reply
     .split("\n")
     .map(l => l.trim())
@@ -90,12 +104,14 @@ export const pointsText = (points: readonly string[]): string =>
 /**
  * A digest in the shape the model is asked to answer in, so
  * `parseDigest(digestText(b))` is `b`: the request's summary so far, and the
- * rail's tooltip.
+ * rail's tooltip. A live digest is its headline alone.
  */
-export const digestText = (body: DigestBody): string =>
-  body.headline === null
-    ? NOTHING_TO_ADD
-    : [body.headline, pointsText(body.points)].filter(t => t !== "").join("\n")
+export const digestText = (digest: DigestBody | DigestRecord): string =>
+  "points" in digest
+    ? [digest.headline, pointsText(digest.points)]
+        .filter(t => t !== "")
+        .join("\n")
+    : digest.headline
 
 // ── the setting ───────────────────────────────────────────────────────────
 
@@ -198,11 +214,12 @@ export function planDigest(input: {
 }
 
 /**
- * The record to write for a reply that came back, or null for none.
- * A live one can come back after the final one was written: it is dropped,
- * so the final one stays. A refused live one leaves the last good digest. A
- * refused final one writes an empty final digest, since a live headline says
- * what the run was doing, which is no longer true once it has ended.
+ * The write for a reply that came back, or null for none. A live one can
+ * come back after the final one was written: it is dropped, so the final one
+ * stays. A live one is written without its points. A refused live one leaves
+ * the last good digest. A refused final one deletes the stored one, since a
+ * live headline says what the run was doing, which is no longer true once it
+ * has ended.
  */
 export function digestToWrite(input: {
   readonly stored: DigestRecord | undefined
@@ -210,13 +227,23 @@ export function digestToWrite(input: {
   /** The reply as `parseDigest` read it; null when refused. */
   readonly body: DigestBody | null
   readonly prompt: EntryId
+  readonly root: RootId
   readonly at: number
-}): DigestRecord | null {
+}): ValueWrite | null {
   const { final } = input.asked
+  const { body, prompt, root, at } = input
   if (!final && input.stored?.final === true) return null
-  const body = input.body ?? (final ? NO_DIGEST : null)
-  if (body === null) return null
-  return { prompt: input.prompt, ...body, at: input.at, final }
+  if (body === null)
+    return final && input.stored !== undefined
+      ? deleteRecord(DIGEST, prompt, root)
+      : null
+  return setRecord(
+    DIGEST,
+    final
+      ? { prompt, ...body, at, final }
+      : { prompt, headline: body.headline, at, final },
+    root,
+  )
 }
 
 /**

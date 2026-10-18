@@ -131,7 +131,6 @@ describe("outcomeWords", () => {
 describe("foldWords", () => {
   const ended = {
     running: false,
-    headline: "Moved proposed changes out of core",
     work: "30 steps · 12 files",
     outcome: "stopped by Bea",
     live: null,
@@ -142,21 +141,18 @@ describe("foldWords", () => {
     outcome: null,
     live: "$ pnpm test",
   }
-  // Each part as it reads, a model's in brackets.
   const read = (...args: Parameters<typeof foldWords>) =>
-    foldWords(...args)
-      .map(p => (p.byModel ? `[${p.text}]` : p.text))
-      .join(" · ")
+    foldWords(...args).join(" · ")
   test.each<[string, Parameters<typeof foldWords>[0], "line" | "fold", string]>(
     [
       [
-        "story: the headline leads, then the work and how it ended",
+        "story: the work, then how it ended",
         ended,
         "fold",
-        "[Moved proposed changes out of core] · 30 steps · 12 files · stopped by Bea",
+        "30 steps · 12 files · stopped by Bea",
       ],
       [
-        "outline: how it ended, then the work; the headline is drawn under it",
+        "outline: how it ended, then the work",
         ended,
         "line",
         "stopped by Bea · 30 steps · 12 files",
@@ -168,20 +164,19 @@ describe("foldWords", () => {
         "$ pnpm test · 30 steps · 12 files",
       ],
       [
-        "story, running: the live headline",
+        "story, running: the work alone",
         running,
         "fold",
-        "[Moved proposed changes out of core] · 30 steps · 12 files",
-      ],
-      [
-        "no headline: the words as before digests",
-        { ...ended, headline: null },
-        "fold",
-        "30 steps · 12 files · stopped by Bea",
+        "30 steps · 12 files",
       ],
     ],
   )("%s", (_, view, where, words) => {
     expect(read(view, where)).toBe(words)
+  })
+  test("a fold's head holds no headline", () => {
+    const view = { ...ended, headline: "Moved proposed changes out of core" }
+    for (const at of ["line", "fold"] as const)
+      expect(read(view, at)).not.toContain("Moved")
   })
 })
 

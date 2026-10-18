@@ -706,9 +706,9 @@ the tree.
 
   | density | an ask shows |
   |---|---|
-  | **outline** | its message, and one line: how it ended, or what it is doing, and its digest; the column's last ended ask also its last word (ADR-0106) |
-  | **story** | its message, a digest line folding its work, and its last word |
-  | **raw** | every message and tool row, under its digest line |
+  | **outline** | its message, and one line: how it ended, or what it is doing, and its counts; its summary's headline under it; the column's last ended ask also its last word (ADR-0106) |
+  | **story** | its message, a digest line folding its work, its summary, and its last word |
+  | **raw** | every message and tool row, under its digest line and its summary |
 
   People's messages show at every density. Outline lists everyone's asks.
 - **An ask's digest line** counts its work: steps, tool calls, files its
@@ -739,11 +739,18 @@ the tree.
   its end in a page you can see marks it, and so does leaving it there.
   Coming back, a dashed line, "since you were here", marks the first
   message after it. It takes no room.
-- **A summary, unless digests are off** (`{ "digests": { "enabled": false } }` in
-  your `pinetrie.json`, ADR-0071, ADR-0146): a model's two or three sentences on an
-  ask's work, under its digest line, set apart from the agent's words. It is
+- **A summary for every long ask, unless digests are off**
+  (`{ "digests": { "enabled": false } }` in your `pinetrie.json`, ADR-0071,
+  ADR-0146, ADR-0173): a model's headline on an ask's work, and up to four
+  points when the work in between adds to the agent's last word. It is one
+  row, set apart from the agent's words and marked as a model's, in one
+  place at every density: under outline's line, else under the ask's first
+  digest line, else above its work. Outline shows the headline alone; story
+  and raw show its points too. A fold's line never holds it. It is
   refreshed at most once a minute while someone reads the running thread,
-  written once more when its run ends, and read by no agent.
+  as a headline alone, written once more with its points when its run
+  ends, and read by no agent. A long ask is one whose work is three agent
+  messages or more.
 
 ### The rail: a root's tree, compactly
 

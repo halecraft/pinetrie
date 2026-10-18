@@ -134,7 +134,13 @@ describe("askView", () => {
       digests: new Map([
         [
           entryId("1-p"),
-          { headline: "Fixed it", points: ["`rail.tsx`"], final: true },
+          {
+            prompt: entryId("1-p"),
+            at: 1,
+            headline: "Fixed it",
+            points: ["`rail.tsx`"],
+            final: true,
+          },
         ],
       ]),
       releasedPath: null,
@@ -149,22 +155,26 @@ describe("askView", () => {
       outcome: null,
       live: null,
       outlineHides: "5-a",
-      headline: "Fixed it",
-      points: ["`rail.tsx`"],
+      digest: { headline: "Fixed it", points: ["`rail.tsx`"] },
     })
   })
-  test("a live digest shows its headline, never its points", () => {
+  test("a live digest shows its headline, and has no points", () => {
     expect(
       view({
         runningAsk: entryId("1-p"),
         digests: new Map([
           [
             entryId("1-p"),
-            { headline: "Fixing it", points: ["`rail.tsx`"], final: false },
+            {
+              prompt: entryId("1-p"),
+              at: 1,
+              headline: "Fixing it",
+              final: false,
+            },
           ],
         ]),
       }),
-    ).toMatchObject({ headline: "Fixing it", points: [] })
+    ).toMatchObject({ digest: { headline: "Fixing it", points: [] } })
   })
   test("its files count only with a span for their review", () => {
     const rev = (

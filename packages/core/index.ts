@@ -922,27 +922,37 @@ export interface QueueHold {
   readonly at: number
 }
 
-/** What a digest says. */
+/** What a digest says: a model's reply on an ask's work, as read. */
 export interface DigestBody {
+  /** One line of at most `HEADLINE_WORDS` words (`@pinetrie/rules`' `digest.ts`). */
+  readonly headline: string
   /**
-   * One line of at most `HEADLINE_WORDS` words (`@pinetrie/rules`'
-   * `digest.ts`); null when the model found
-   * nothing the reader does not see already.
+   * At most `MAX_POINTS` markdown lines, one point each; empty when the work
+   * in between adds nothing to the ask's last word.
    */
-  readonly headline: string | null
-  /** At most `MAX_POINTS` markdown lines, one point each; empty when `headline` is null. */
   readonly points: readonly string[]
 }
 
-/** An ask's digest: replaced whole on each write, so a value, not a text. */
-export interface DigestRecord extends DigestBody {
-  /** The ask's prompt: the digest's key. */
-  readonly prompt: EntryId
-  /** When it was written, in ms since the epoch. */
-  readonly at: number
-  /** Written after its run ended: kept, and never replaced by a live one. */
-  readonly final: boolean
-}
+/**
+ * An ask's digest: replaced whole on each write, so a value, not a text.
+ * A live one, written while its run lasts, has no points: they change on
+ * each write, and only a final digest's are worth drawing.
+ */
+export type DigestRecord =
+  | {
+      /** The ask's prompt: the digest's key. */
+      readonly prompt: EntryId
+      /** When it was written, in ms since the epoch. */
+      readonly at: number
+      readonly final: false
+      readonly headline: string
+    }
+  | ({
+      readonly prompt: EntryId
+      readonly at: number
+      /** Written after its run ended: kept, and never replaced by a live one. */
+      readonly final: true
+    } & DigestBody)
 
 /** How urgently a model says a run's end asks the people in its thread to look. */
 export type ReaderUrgency = "needsYou" | "worthARead" | "done"

@@ -1,6 +1,7 @@
 # S231 — With a required `intent` on `bash`, `read`, `edit` and `write`, how often does a model leave it out, and do its intents tell a person what each call did?
 
-- **Status:** Open
+- **Status:** Answered (Duane's read of the intents to come)
+- **Led to:** ADR-0173
 
 ## Brief
 
@@ -81,4 +82,29 @@ pi's `bash`, and the report was written. It has not met a real model.
 
 ## Answers
 
-Not run yet.
+Run on Duane's Mac, 2026-10-18, with `anthropic/claude-opus-5-5`, in a
+scratch clone of pine·trie. The reports are
+`S231-a-required-tool-intent/report-strict.txt` (tools as pi sends them)
+and `report-loose.txt` (constrained sampling off).
+
+1. **No call left `intent` out, or sent it empty: 0 of 29 with pi's
+   strict tools, and 0 of 37 without them.** Nothing was refused, for
+   any reason. Read from source, a strict tool cannot leave it out; the
+   loose run shows this model does not either. A required `intent` costs
+   no retries.
+2. **The intents say what each call was for, accurately**, including
+   where the command is hard to read: `cd … && grep -rn "MIN_STRETCH\|isLongAsk =" …`
+   is "Find what counts as a long ask"; `git log -S "MIN_STRETCH" …` is
+   "Check the earliest origin of the rail capsule minimum"; `npx vitest
+   run packages/interface/ask-fold.test.ts …` is "Run the ask-fold unit
+   tests". A command that does several things gets an intent for its
+   purpose, not its parts ("Rename the helper and find the type-check
+   command").
+3. **A few use a programmer's words** where a plainer one would do:
+   "Type-check the code", "Isolate errors in the rules package", and
+   names like `LONG_ASK` or "ask-fold". None is wrong or vague in my
+   read; Duane's decides the kill criterion's quarter, and the field's
+   description can ask harder for plain words.
+
+**So:** `intent` is required on `bash`, `edit` and `write`, and story
+shows it in place of the command.

@@ -865,7 +865,8 @@ else reads those rows (tab summaries, archive search, `branchColors`).
   client's (ADR-0093).
   The stretch carries its ask (`RailStretch.ask`), and its tooltip is
   `stretchWords`: `askWords`, `workWords`, then the ask's digest as
-  `digestText` words it (ADR-0075).
+  `digestText` words it (ADR-0075): a live one's headline, a final one's
+  headline and points (ADR-0173).
 - **Every item has `slot`, `span`, `ids`, `track` and `across`;** a dot is
   an item with one id and a span of 1. An edge leaves its parent item's last
   slot, so the renderer never asks which kind an item is, only how to draw
@@ -948,34 +949,35 @@ the columns read one. `segmentPath` (`ask-segments.ts`) decides what a column fo
 - **What `askView` decides:** what its work holds (`work`, `workWords`
   over `askStats`), the outcome's words, the live line while it runs, the
   last word outline hides (none in the column's last ended ask,
-  `lastEndedAsk`, ADR-0106), its digest's headline and, once final, its
-  points (ADR-0075), and how many files a review of it shows: none when
+  `lastEndedAsk`, ADR-0106), its digest's headline and its points, which
+  only a final digest has (`DigestRecord`, ADR-0075, ADR-0173), and how many files a review of it shows: none when
   it has no span (`askSpan`), so its fold offers no review. The pane
   reads the span itself (`askReviewTarget`, `packages/web/pane.ts`).
   `askWords` says an ask the same everywhere: the bar, the working mark's
   title, the rail's tooltip, outline, a search's match. `askLine` reads the
   ask's prompt from the index and words it so, for the rail, the column and
   a match.
-- **An ask's summary is said once** (`planAskWork`). Its summary
-  (`foldWords`: what its work holds, how it ended, and in story its
-  headline, a model's marked as one) is built once and given to one place,
-  `SummaryAt`: outline's line, the head of its first fold, or nowhere when
-  it has no fold, which then draws an `.ask-outcome`. Every other fold
-  head's words are its step count, made in the same helper. Worded apart,
-  an opened outline ask said its work on its line and its first fold.
+- **An ask's counts are said once** (`planAskWork`). What its work holds
+  and how it ended (`foldWords`) are built once and given to one place,
+  `CountsAt`: outline's line, the head of its first fold, or, with no
+  fold, an `.ask-outcome` row at its end. Every other fold head's words are
+  its step count, made in the same helper. Worded apart, an opened outline
+  ask said its work on its line and its first fold.
+- **An ask's digest is one field, drawn once** (`AskDraw.summary`,
+  ADR-0173): its headline, its points, and its anchor (`SummaryAnchor`):
+  after outline's line, else after its first fold row, else before its
+  work. Outline gets the headline alone; story and raw its points too. One
+  field cannot be drawn twice, and no fold's head holds the headline.
+  `AskWork` puts it at its anchor as `.ask-digest`, the headline marked as
+  a model's (`.ask-headline`), the points one `MessageText` over
+  `pointsText`. An ask with no digest has none.
 - **Every row carries its finished words** (`AskDraw`): fold heads, the
-  digest's headline and points, the outcome, and the files label. `AskWork`
-  reads only `view.ask` and `view.running`, and a test reads the plan as a
-  reader would (`ask-fold.test.ts`, "the summary is said once").
+  outcome, and the files label. `AskWork` reads only `view.ask` and
+  `view.running`, and a test reads the plan as a reader would
+  (`ask-fold.test.ts`, "an ask's counts and digest are said once").
   **Gotcha:** words go into a row only in `planAskWork`. A row that took
   them from `AskView` in the shell would bring the duplicate back, unseen
   by that test.
-- **The digest goes where the summary does not carry its headline:** whole
-  in `.ask-digest`, headline above points, in outline (open or closed: the
-  line is cut to one line, and while the run lasts it says what the run
-  does now) and with no fold; else the headline leads the first fold's head
-  and the points, one `MessageText` over `pointsText`, are under it. A
-  digest with neither is no row.
 - **The first fold is `Segment.first`, not the first fold in `parts`:**
   `segmentPath` sets it across the path, so an ask drawn as two rows would
   still give its summary and its files to one fold.
