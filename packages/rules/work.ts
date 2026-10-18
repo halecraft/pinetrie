@@ -14,7 +14,6 @@ import {
   type OwnLane,
   type PointId,
   type ProjectKind,
-  type ProjectRecord,
   type RevisionRecord,
   type SnapshotId,
   snapshotId,
@@ -132,6 +131,22 @@ export const REVISION: RecordSpec<RevisionRecord, EntryId, "root"> = {
           }
         : undefined,
     ),
+}
+
+/**
+ * What the host found where it runs: a host-written `pinetrie.project` value,
+ * rewritten at every start, and only by a host with tools, whose every lane has
+ * its own copy.
+ */
+export interface ProjectRecord {
+  readonly root: string
+  /** What the project's folder was at this start: what a lane's history must be to run. */
+  readonly kind: ProjectKind
+  /**
+   * Whom the host's config names its owner (`owner`): who answers when
+   * a lane asks for their ssh identity. Null with none.
+   */
+  readonly owner: WriterId | null
 }
 
 /** What the host found where it runs, at its one key. */

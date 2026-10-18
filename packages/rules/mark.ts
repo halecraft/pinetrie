@@ -4,10 +4,8 @@ import {
   type AgentId,
   type CanvasId,
   ERR,
-  type MarkRecord,
   type MarkTarget,
   type NoteColumnId,
-  type NoteColumnRecord,
   type Refusal,
   refused,
   THE_AGENT,
@@ -16,7 +14,7 @@ import {
 } from "@pinetrie/core"
 import { Type } from "typebox"
 import { decodeRecord, parseCanvasKey } from "./decode.ts"
-import { NOTE_COLUMN } from "./note-column.ts"
+import { NOTE_COLUMN, type NoteColumnRecord } from "./note-column.ts"
 import { deleteRecord, type RecordSpec, setRecord } from "./records.ts"
 
 // The shape only: the host is the session's one writer, and stores only
@@ -26,6 +24,19 @@ const MarkSchema = Type.Object({
   by: Type.String(),
   at: Type.Number(),
 })
+
+/**
+ * A canvas's title: a host-written `pinetrie.mark` value in the session, keyed by
+ * the canvas's id, so a canvas has at most one.
+ */
+export interface MarkRecord {
+  readonly canvas: CanvasId
+  readonly title: string
+  /** The person who set it, or the agent for a title it made unasked. */
+  readonly by: WriterId | AgentId
+  /** When it was set, in ms since the epoch. */
+  readonly at: number
+}
 
 /** Each canvas's title, at the canvas's id. */
 export const MARK: RecordSpec<MarkRecord, CanvasId, "session"> = {

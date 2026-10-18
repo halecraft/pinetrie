@@ -1,6 +1,5 @@
 import {
   entryId,
-  type ProjectRecord,
   pointId,
   rootIdFor,
   runId,
@@ -19,6 +18,7 @@ import {
   encodeCard,
   ICONS,
   PROJECT,
+  type ProjectRecord,
   pendingRunEndReport,
   RUN_END_REPORT,
   SEAT,

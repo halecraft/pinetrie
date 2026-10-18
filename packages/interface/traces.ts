@@ -3,14 +3,14 @@
 // away; the host leaves it (`planProvenance`) and deletes it once you have seen
 // it (`traces-seen`).
 
-import type {
-  EntryId,
-  TracedPlace,
-  TraceRecord,
-  WriterId,
-} from "@pinetrie/core"
+import type { EntryId, WriterId } from "@pinetrie/core"
 import { MAX_TRACES_SEEN } from "@pinetrie/protocol/codec"
-import { changeVerb, type Verb } from "@pinetrie/rules"
+import {
+  changeVerb,
+  type TracedPlace,
+  type TraceRecord,
+  type Verb,
+} from "@pinetrie/rules"
 
 /** Traces at one spot by one person, doing one thing: one line. */
 export interface TraceGroup {

@@ -4,12 +4,10 @@
 import type {
   CanvasId,
   CardRecord,
-  Workflow,
-  WorkflowState,
   WorkflowStateId,
   WriterId,
 } from "@pinetrie/core"
-import { taskBoard } from "@pinetrie/rules"
+import { taskBoard, type Workflow, type WorkflowState } from "@pinetrie/rules"
 import { type Level, markLevel } from "./attention.ts"
 import { count } from "./counts.ts"
 import type { Intent } from "./intent.ts"

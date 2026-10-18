@@ -2,14 +2,12 @@ import {
   canvasIdFor,
   cardIdOfKind,
   ERR,
-  type MarkRecord,
-  type NoteColumnRecord,
   THE_AGENT,
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
-import { MARK, planMark } from "./mark.ts"
-import { NOTE_COLUMN } from "./note-column.ts"
+import { MARK, type MarkRecord, planMark } from "./mark.ts"
+import { NOTE_COLUMN, type NoteColumnRecord } from "./note-column.ts"
 import { decodeRecords, deleteRecord, setRecord } from "./records.ts"
 
 const ADA = writerId("p-ada")

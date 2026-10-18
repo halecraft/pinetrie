@@ -1,18 +1,16 @@
-// core — the vocabulary every package shares (ids, intents, every record's
-// type) and the reads of the tree. Nothing here may import pi, Kyneta, or a
-// Node builtin (`TECHNICAL.md`). This module only re-exports: a sibling imports
-// the module that declares a name, never this one.
+// core — the vocabulary every package shares (ids, intents) and the reads of
+// the tree. Nothing here may import pi, Kyneta, or a Node builtin
+// (`TECHNICAL.md`). This module only re-exports: a sibling imports the module
+// that declares a name, never this one.
 
 export * from "./accepted.ts"
 export * from "./access.ts"
 export * from "./address.ts"
 export * from "./agents.ts"
 export * from "./asks.ts"
-export * from "./banners.ts"
 export * from "./bases.ts"
 export * from "./board.ts"
 export * from "./cards.ts"
-export * from "./commands.ts"
 export * from "./config.ts"
 export * from "./disks.ts"
 export * from "./edits.ts"
@@ -30,18 +28,15 @@ export * from "./live.ts"
 export * from "./marks.ts"
 export * from "./mentions.ts"
 export * from "./ordering.ts"
-export * from "./participants.ts"
 export * from "./paste.ts"
 export * from "./paths.ts"
 export * from "./places.ts"
 export * from "./product.ts"
 export * from "./proposals.ts"
 export * from "./proposed.ts"
-export * from "./reports.ts"
 export * from "./revisions.ts"
 export * from "./roots.ts"
 export * from "./runs.ts"
-export * from "./setup.ts"
 export * from "./thread-names.ts"
 export * from "./threads.ts"
 export * from "./tools.ts"

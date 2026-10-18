@@ -1,32 +1,10 @@
-// core/accepted — accepted work and a thread's base, as recorded for each kind
-// of project, and what a catch-up would change.
+// core/accepted — a jj project's accepted work and a thread's base, as
+// recorded, and what a catch-up would change. jj builds these records and
+// rules decodes them; the union of each with its folder half is rules'.
 
-import type { CommitId, PointId, ThreadBase } from "./bases.ts"
+import type { CommitId, ThreadBase } from "./bases.ts"
 import type { ThreadId } from "./ids.ts"
 import type { FilesTouched } from "./proposed.ts"
-
-/**
- * A folder project's accepted work, as the host last read the project's
- * folder: its newest state, and what of its history the host keeps.
- */
-export interface FolderAcceptedRecord {
-  readonly kind: "folder"
-  readonly newest: PointId
-  /**
-   * Accepted work's states whose snapshots the host keeps, newest first:
-   * line states and concurrent saves. What the history may review and
-   * restore.
-   */
-  readonly kept: readonly PointId[]
-  readonly at: number
-}
-
-/**
- * Accepted work as the host last read it: a host-written `pinetrie.accepted`
- * value of the project's kind, a cache the page reads. At start the host
- * deletes one of the other kind.
- */
-export type AcceptedRecord = JjAcceptedRecord | FolderAcceptedRecord
 
 /**
  * Accepted work in your repo. The repo is the truth; the host rewrites this
@@ -102,13 +80,6 @@ export interface JjAcceptedRecord {
 }
 
 /**
- * A thread's base as its lane's history says it: a host-written
- * `pinetrie.base` value keyed by lane, of the project's kind, a cache the
- * page reads. At start the host deletes those of the other kind.
- */
-export type BaseRecord = JjBaseRecord | FolderBaseRecord
-
-/**
  * A jj lane's base. `start` is the commit the lane's newest `Pinetrie-Base`
  * trailer names, or accepted commit it forked from when it has none.
  */
@@ -136,26 +107,6 @@ export interface JjBaseRecord {
    * untraced start, or one jj could not diff. A thread is told its base has new
    * work only with `some`, and caught up quietly only with `none`.
    */
-  readonly work: FilesTouched
-}
-
-/**
- * A folder lane's base: accepted work's state it began on or last caught up
- * with. A folder project has no WIP, so its base is always accepted work.
- */
-export interface FolderBaseRecord {
-  readonly kind: "folder"
-  readonly lane: ThreadId
-  readonly start: PointId
-  /**
-   * What catching up would change, read at the lane's newest state and your
-   * folder's then; null when accepted work had not moved.
-   */
-  readonly catchUp: {
-    readonly tip: PointId
-    readonly to: PointId
-    readonly files: readonly string[]
-  } | null
   readonly work: FilesTouched
 }
 

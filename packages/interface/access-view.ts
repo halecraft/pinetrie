@@ -3,14 +3,14 @@
 // refused for a host not allowed, and for the owner the answers the lane's
 // state takes. `accessView` decides; `accessWords` words it.
 
-import type {
-  AccessAnswer,
-  AccessRecord,
-  OutsideHost,
-  PersonalAccess,
-  WriterId,
-} from "@pinetrie/core"
-import { answersFor, displayName } from "@pinetrie/rules"
+import type { AccessAnswer, WriterId } from "@pinetrie/core"
+import {
+  type AccessRecord,
+  answersFor,
+  displayName,
+  type OutsideHost,
+  type PersonalAccess,
+} from "@pinetrie/rules"
 import type { AccessActing } from "@pinetrie/session"
 import { actingSaid } from "./outcome-words.ts"
 

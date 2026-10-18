@@ -8,9 +8,8 @@ import type {
   ConfigLayer,
   ConfigOrigin,
   ConfigRefusal,
-  NoModel,
-  SetupSession,
 } from "@pinetrie/core"
+import type { NoModel, SetupSession } from "@pinetrie/rules"
 
 const LAYER_NAMES: Readonly<Record<ConfigLayer, string>> = {
   system: "the machine's file",

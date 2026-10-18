@@ -28,13 +28,12 @@ import {
   type TextCardId,
   type ThreadId,
   type ThreadStart,
-  type TraceRecord,
   type WorkflowEdit,
   type WorkflowStateId,
   type WriterId,
 } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
-import { isQueuedMessage, yourCard } from "@pinetrie/rules"
+import { isQueuedMessage, type TraceRecord, yourCard } from "@pinetrie/rules"
 import {
   type ActedAt,
   AT_BOARD,

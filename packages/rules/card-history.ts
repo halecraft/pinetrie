@@ -3,8 +3,6 @@
 
 import {
   asPlaceFields,
-  type CardEvent,
-  type CardHistoryRecord,
   type CardId,
   type CardPlace,
   type CardRecord,
@@ -22,9 +20,6 @@ import {
   sameKey,
   surfaceOwner,
   type ThreadId,
-  type TracedKind,
-  type TracedPlace,
-  type TraceRecord,
   type TreeIndex,
   type WriterId,
 } from "@pinetrie/core"
@@ -91,6 +86,61 @@ const keyOrNull = (
   f: Partial<PlaceFields> | null,
 ): PlaceKey | null | undefined =>
   f === null ? null : keyOfFields(asPlaceFields(f))
+
+/**
+ * One change to a living card's place: who made it, from where to where, and
+ * when. What the change was called (queued, took into the inventory, pinned) is
+ * read from the two places when it is worded (`changeVerb`).
+ */
+export interface CardEvent {
+  readonly kind: "created" | "moved" | "undone" | "redone" | "unsent"
+  /** Who made it; null for the host's own write. */
+  readonly by: WriterId | null
+  readonly from: PlaceKey | null
+  readonly to: PlaceKey
+  readonly at: number
+}
+
+/**
+ * A card's history: a host-written `pinetrie.card-history` value in the
+ * session, keyed by the card, and deleted with it.
+ */
+export interface CardHistoryRecord {
+  readonly card: CardId
+  /** Oldest first; at most `HISTORY_EVENTS`, the first always kept. */
+  readonly events: readonly CardEvent[]
+}
+
+/**
+ * The places a trace is left at: a thread's queue and its pinned cards, at the
+ * thread's end, where its column draws it. A note moved by someone else leaves
+ * none: a note column is everyone's scratch. Each has its drawer in
+ * `@pinetrie/rules`' `TRACED`.
+ */
+type TracedKind = "queued" | "pinned"
+
+/** Where a trace was left: a key of a place in `TracedKind`. */
+export type TracedPlace = Extract<PlaceKey, { readonly kind: TracedKind }>
+
+/**
+ * What stays where your card was when someone else moved it, while you were not
+ * looking: a host-written `pinetrie.trace` value in the session, keyed by its
+ * own id, since it outlives its card. Drawn only for its placer, and deleted
+ * once they have seen it.
+ */
+export interface TraceRecord {
+  readonly id: string
+  /** The card's placer before it moved: the one person it is drawn for. */
+  readonly for: WriterId
+  readonly card: CardId
+  readonly by: WriterId
+  readonly from: TracedPlace
+  /** Where the card went; null when it was sent. */
+  readonly to: PlaceKey | null
+  /** The message a send wrote; null for any other move. */
+  readonly message: EntryId | null
+  readonly at: number
+}
 
 /**
  * Each card's history, at the card's id. An event whose place this build

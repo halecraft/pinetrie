@@ -3,7 +3,6 @@
 // answered, here since the host and the page both import it.
 
 import {
-  type AcceptedRecord,
   type ConflictRecord,
   type DiffSpan,
   type EntryId,
@@ -18,6 +17,7 @@ import {
   type ThreadId,
 } from "@pinetrie/core"
 import { Type } from "typebox"
+import type { AcceptedRecord } from "./accepted.ts"
 import { decodeWith } from "./decode.ts"
 import { proposedChangesStatus } from "./proposed.ts"
 

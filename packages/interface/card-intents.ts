@@ -42,12 +42,16 @@ import {
   type TextCardId,
   type ThreadCard,
   type ThreadId,
-  type TraceRecord,
   type TypedMove,
   type WriterId,
 } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
-import { addressLink, canvasOfPlace, inventoryFull } from "@pinetrie/rules"
+import {
+  addressLink,
+  canvasOfPlace,
+  inventoryFull,
+  type TraceRecord,
+} from "@pinetrie/rules"
 import {
   type ActedAt,
   AT_INVENTORY,

@@ -2,12 +2,10 @@
 
 import {
   type ForeignLane,
-  type IconsRecord,
   isTextCard,
   type RootId,
   type RunnableLane,
   SESSION_TARGET,
-  type SetupRecord,
   type ThreadId,
 } from "@pinetrie/core"
 import type { Agent, PiSetup } from "@pinetrie/pi"
@@ -33,6 +31,7 @@ import {
   deleteRecord,
   foreignLaneWords,
   ICONS,
+  type IconsRecord,
   PROJECT,
   planAccessRecovery,
   planCardSweep,
@@ -45,6 +44,7 @@ import {
   RUN_END_REPORT,
   SEAT,
   SETUP,
+  type SetupRecord,
   setIfChanged,
   setRecord,
 } from "@pinetrie/rules"

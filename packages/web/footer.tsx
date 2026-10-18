@@ -9,7 +9,7 @@
 // badge. Nothing here opens a root until you choose, and nothing closes a menu
 // you opened: an open menu keeps a section whose rows have gone, and says so.
 
-import type { AcceptedRecord, WriterId } from "@pinetrie/core"
+import type { WriterId } from "@pinetrie/core"
 import {
   historyLink,
   type Intent,
@@ -17,6 +17,7 @@ import {
   publishView,
   publishWords,
 } from "@pinetrie/interface"
+import type { AcceptedRecord } from "@pinetrie/rules"
 import type { AcceptedActing, SessionClient } from "@pinetrie/session"
 import { type ReactNode, useState, useSyncExternalStore } from "react"
 import { AccountMenu, type Me } from "./account-menu.tsx"

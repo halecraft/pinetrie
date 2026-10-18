@@ -1,39 +1,12 @@
-// core/marks — titles: a canvas's and a note column's, as recorded, and what a
-// typed title asks for.
+// core/marks — titles: what a canvas's or a note column's typed title asks
+// for.
 
-import type { AgentId, CanvasId, NoteColumnId, WriterId } from "./ids.ts"
-
-/**
- * A canvas's title: a host-written `pinetrie.mark` value in the session, keyed by
- * the canvas's id, so a canvas has at most one.
- */
-export interface MarkRecord {
-  readonly canvas: CanvasId
-  readonly title: string
-  /** The person who set it, or the agent for a title it made unasked. */
-  readonly by: WriterId | AgentId
-  /** When it was set, in ms since the epoch. */
-  readonly at: number
-}
+import type { CanvasId, NoteColumnId } from "./ids.ts"
 
 /** What a title names: a canvas, or a note column. */
 export type MarkTarget =
   | { readonly kind: "canvas"; readonly canvas: CanvasId }
   | { readonly kind: "note-column"; readonly column: NoteColumnId }
-
-/**
- * A note column's title: a host-written `pinetrie.note-column` value in the
- * session, keyed by the column's id, absent while untitled. Who made the column
- * is its card's owner, and when is in its id.
- */
-export interface NoteColumnRecord {
-  readonly column: NoteColumnId
-  readonly title: string
-  /** The person who set it. */
-  readonly by: WriterId
-  /** When it was set, in ms since the epoch. */
-  readonly at: number
-}
 
 /** A title's longest form, in UTF-16 code units. */
 export const MAX_TITLE = 80

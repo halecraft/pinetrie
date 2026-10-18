@@ -7,7 +7,8 @@
 // ends: the column's follow state keeps the tip from when its reader left
 // the end (`releasedTip`), and a run that ended after it ended "while away".
 
-import type { DigestBody, EntryId } from "@pinetrie/core"
+import type { EntryId } from "@pinetrie/core"
+import type { DigestBody } from "@pinetrie/rules"
 import type { Segment } from "./ask-segments.ts"
 import type { AskView } from "./ask-view.ts"
 import { type CountsAt, type Density, foldWords } from "./ask-words.ts"

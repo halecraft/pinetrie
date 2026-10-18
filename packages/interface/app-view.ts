@@ -6,7 +6,6 @@
 // memoised child new props.
 
 import {
-  type AccessRecord,
   type AgentWork,
   type ArchivedCanvas,
   ancestry,
@@ -25,10 +24,14 @@ import {
   type ThreadName,
   type TreeIndex,
   threadFirstMessage,
-  type Workflow,
   type WriterId,
 } from "@pinetrie/core"
-import { displayName, proposedChangesStatus } from "@pinetrie/rules"
+import {
+  type AccessRecord,
+  displayName,
+  proposedChangesStatus,
+  type Workflow,
+} from "@pinetrie/rules"
 import { PENDING_TRACK } from "./column-paths.ts"
 import type { Column } from "./columns.ts"
 import type { Intent } from "./intent.ts"

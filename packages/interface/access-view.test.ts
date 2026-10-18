@@ -1,10 +1,9 @@
+import { threadIdFor, writerId } from "@pinetrie/core"
 import {
   type AccessRecord,
+  emptyAccess,
   type PersonalAccess,
-  threadIdFor,
-  writerId,
-} from "@pinetrie/core"
-import { emptyAccess } from "@pinetrie/rules"
+} from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
 import { accessView, accessWords } from "./access-view.ts"
 

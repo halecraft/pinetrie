@@ -1,13 +1,8 @@
-import {
-  type DigestRecord,
-  type EntryLike,
-  entryId,
-  type FocusRecord,
-  indexAsks,
-  indexTree,
-} from "@pinetrie/core"
+import { type EntryLike, entryId, indexAsks, indexTree } from "@pinetrie/core"
 import { FIXTURE_THREAD } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
+import type { DigestRecord } from "./digest.ts"
+import type { FocusRecord } from "./focus.ts"
 import {
   FOCUS,
   FOCUS_REQUEST_HEAD,

@@ -3,14 +3,14 @@
 // The startup lines word the same report (`startup-lines.ts`), with the same
 // words (`setup-words.ts` in `@pinetrie/interface`).
 
+import type { ConfigOrigin } from "@pinetrie/core"
+import type { PiSetup } from "@pinetrie/pi"
 import type {
-  ConfigOrigin,
   ModelLine,
   SetupModel,
   SetupRecord,
   SetupSession,
-} from "@pinetrie/core"
-import type { PiSetup } from "@pinetrie/pi"
+} from "@pinetrie/rules"
 import { type HostReport, SETTINGS } from "./settings.ts"
 
 /**

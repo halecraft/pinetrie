@@ -3,10 +3,6 @@
 // image model is asked, and the record of a drawn or pasted one.
 
 import {
-  type BannerRecord,
-  ICON_SOURCES,
-  type IconSource,
-  type IconsRecord,
   isSha256,
   type Sha256,
   type ThreadId,
@@ -22,6 +18,31 @@ const BannerRecordSchema = Type.Object({
   sha: Type.String({ pattern: "^[0-9a-f]{64}$" }),
   at: Type.Number(),
 })
+
+/**
+ * The image behind a thread's column header: a host-written `pinetrie.banner`
+ * value keyed by the lane. The image is a blob; a replaced one is no longer
+ * referenced, and the blob sweep deletes it.
+ */
+export interface BannerRecord {
+  readonly lane: ThreadId
+  readonly sha: Sha256
+  readonly at: number
+}
+
+/** Where threads' icons come from: the config's `icons.source`. */
+export const ICON_SOURCES = ["built-in", "drawn", "none"] as const
+
+type IconSource = (typeof ICON_SOURCES)[number]
+
+/**
+ * The host's icon source, published for the page as the one
+ * `pinetrie.icons` value: the page shows a built-in icon only under
+ * `built-in`, so it never shows one before a drawn one arrives.
+ */
+export interface IconsRecord {
+  readonly source: IconSource
+}
 
 /** Each thread's column banner, the image's hash, at its lane. */
 export const BANNER: RecordSpec<BannerRecord, ThreadId, "session"> = {

@@ -4,7 +4,6 @@
 import {
   type ArchivedCanvas,
   type CanvasId,
-  type CardHistoryRecord,
   type CardId,
   type CardPlace,
   type CardRecord,
@@ -18,14 +17,14 @@ import {
   type PlaceKey,
   parseCardId,
   placeKey,
-  type Workflow,
 } from "@pinetrie/core"
-import { stateTransition } from "./board.ts"
+import { stateTransition, type Workflow } from "./board.ts"
 import {
   type CanvasIndex,
   canvasOfPlace,
   canvasOfTarget,
 } from "./canvas-index.ts"
+import type { CardHistoryRecord } from "./card-history.ts"
 import type { MoveStep } from "./place-steps.ts"
 
 // ── moves' history ─────────────────────────────────────────────

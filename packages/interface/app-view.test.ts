@@ -9,11 +9,11 @@ import {
   rootIdFor,
   type ThreadId,
   threadIdFor,
-  type Workflow,
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
 import { cardIdFor, entriesById, entry } from "@pinetrie/core/fixtures"
+import type { Workflow } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
 import {
   type AppViewInput,

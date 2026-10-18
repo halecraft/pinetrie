@@ -1,11 +1,10 @@
 import {
-  type BannerRecord,
   blobUrl,
-  type IconsRecord,
   type Sha256,
   type ThreadName,
   threadIdFor,
 } from "@pinetrie/core"
+import type { BannerRecord, IconsRecord } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
 import { builtInIconUrl, threadIcon } from "./thread-icon.ts"
 

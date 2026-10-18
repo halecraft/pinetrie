@@ -1,4 +1,4 @@
-import type { SetupRecord } from "@pinetrie/core"
+import type { SetupRecord } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
 import { setupView } from "./setup-view.ts"
 

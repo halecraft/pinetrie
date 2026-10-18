@@ -7,15 +7,13 @@
 // Versions order by their ctime, the host's clock for every writer.
 
 import {
+  type EntryId,
   entryId,
   isThreadId,
   NO_SHARED,
   SHARED_KEPT,
   type SharedAccess,
-  type SharedLineage,
   type SharedTouch,
-  type SharedVersion,
-  type SharedWriter,
   type Stamp,
   stamp,
   stampTimeUs,
@@ -128,6 +126,51 @@ export function sharedTouches(
 export interface SharedRead {
   readonly path: string
   readonly stamp: Stamp
+}
+
+/** Who made a version of a shared file: a lane's turn, or something no lane observed (you). */
+export type SharedWriter =
+  | { readonly kind: "lane"; readonly lane: ThreadId; readonly entry: EntryId }
+  | { readonly kind: "outside" }
+
+/**
+ * One version of a shared file. `at` is its stamp's ctime in µs
+ * (`stampTimeUs`): the host's clock when it was made, for every writer, so
+ * versions order by it, whatever order they are learnt in.
+ */
+interface SharedVersion {
+  /** Numbered as the host learns of it, from 1. */
+  readonly version: number
+  readonly stamp: Stamp
+  readonly at: number
+  readonly writer: SharedWriter
+  /**
+   * When the version its writer last read was made, or when it found the
+   * file missing; null for one made outside.
+   */
+  readonly baseAt: number | null
+  /**
+   * Writes of two lanes' turns, or two turns of one, both left this stamp:
+   * a release's stamp is read after the call returns, so one of them read
+   * the other's version. Which one made it is unknown.
+   */
+  readonly contested: boolean
+  /**
+   * Another version landed after the one it was based on, and before it;
+   * or it is contested, or based on a contested one.
+   */
+  readonly concurrent: boolean
+}
+
+/** A shared file's versions, oldest first, the newest `SHARED_KEPT`. */
+export interface SharedLineage {
+  /** From the disk's root: `.plans/a.md`. */
+  readonly path: string
+  readonly versions: readonly SharedVersion[]
+  /** The next version's number. */
+  readonly next: number
+  /** What each lane last read of the file, by its id: what its next write is based on. */
+  readonly read: Readonly<Record<string, Stamp>>
 }
 
 /**

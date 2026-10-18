@@ -17,7 +17,6 @@
 // (`RunEndSettled`): the thread's focus is asked from that (`focuses.ts`).
 
 import {
-  type DigestRecord,
   type EntryId,
   indexAsks,
   type RootId,
@@ -37,6 +36,7 @@ import {
   type Answer,
   askLines,
   DIGEST,
+  type DigestRecord,
   digestRequest,
   digestToWrite,
   type EndReply,

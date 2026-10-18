@@ -1,8 +1,6 @@
 // specs — every host record's spec, in one list.
 
 import type {
-  AcceptedRecord,
-  BaseRecord,
   HostNamespace,
   ProjectKind,
   ProposedChangesRecord,
@@ -11,10 +9,10 @@ import type {
   ValueWrite,
 } from "@pinetrie/core"
 
-import { ACCEPTED, ACCEPTED_KEY } from "./accepted.ts"
+import { ACCEPTED, ACCEPTED_KEY, type AcceptedRecord } from "./accepted.ts"
 import { ACCESS } from "./access.ts"
 import { BANNER, ICONS } from "./banner.ts"
-import { BASE } from "./base.ts"
+import { BASE, type BaseRecord } from "./base.ts"
 import { WORKFLOW } from "./board.ts"
 import { BUDGET } from "./budget.ts"
 import { CARD_HISTORY, TRACE } from "./card-history.ts"

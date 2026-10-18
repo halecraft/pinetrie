@@ -1,6 +1,6 @@
-import { type SharedLineage, stamp, threadIdFor } from "@pinetrie/core"
+import { stamp, threadIdFor } from "@pinetrie/core"
 import { readSharedLineages } from "@pinetrie/reads"
-import { SHARED_LINEAGE, setRecord } from "@pinetrie/rules"
+import { SHARED_LINEAGE, type SharedLineage, setRecord } from "@pinetrie/rules"
 import { expect, test } from "vitest"
 import { applyWrites, basics, putValue } from "../fakes.ts"
 import { createSharedLineages, goneWords } from "./shared.ts"

@@ -5,14 +5,13 @@ import {
   type CanvasId,
   type EntryId,
   type LaneRecord,
-  type MarkRecord,
   NO_TEXT,
   parseTitle,
   type RootId,
-  type RootRecord,
   type ThreadId,
   type WriterId,
 } from "@pinetrie/core"
+import type { MarkRecord, RootRecord } from "@pinetrie/rules"
 import type { Canvases } from "./canvases.ts"
 
 export { NO_TEXT }

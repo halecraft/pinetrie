@@ -6,7 +6,7 @@
 import { existsSync } from "node:fs"
 import { homedir } from "node:os"
 import path from "node:path"
-import { errorText, OBSERVER_SOCKET, type ProjectRecord } from "@pinetrie/core"
+import { errorText, OBSERVER_SOCKET } from "@pinetrie/core"
 import {
   type DockerTarget,
   dockerRootless,
@@ -24,6 +24,7 @@ import {
   type FolderDisks,
   type LaneRuntime,
 } from "@pinetrie/lanes"
+import type { ProjectRecord } from "@pinetrie/rules"
 import {
   GVPROXY_HOST_ADDRESS,
   keepLease,

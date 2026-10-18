@@ -3,14 +3,13 @@
 // built in, else nothing (the ✦).
 
 import {
-  type BannerRecord,
   blobUrl,
-  type IconsRecord,
   type Noun,
   type ThreadId,
   type ThreadName,
   threadNameParts,
 } from "@pinetrie/core"
+import type { BannerRecord, IconsRecord } from "@pinetrie/rules"
 
 /**
  * A thread's icon. `banner` is a drawn or pasted image, on the black that

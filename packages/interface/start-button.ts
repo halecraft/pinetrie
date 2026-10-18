@@ -4,8 +4,7 @@
 // thread its main action. Their words are worded here once, whichever ＋
 // draws them.
 
-import type { WorkflowState } from "@pinetrie/core"
-import type { KindOnCanvas } from "@pinetrie/rules"
+import type { KindOnCanvas, WorkflowState } from "@pinetrie/rules"
 import type { Intent } from "./intent.ts"
 import type { CanvasPut } from "./put-target.ts"
 

@@ -1,10 +1,9 @@
+import { pointId, type StateRecord, threadIdFor } from "@pinetrie/core"
 import {
   type FolderAcceptedRecord,
-  pointId,
-  type StateRecord,
-  threadIdFor,
-} from "@pinetrie/core"
-import { proposedChangesStatus, workStripView } from "@pinetrie/rules"
+  proposedChangesStatus,
+  workStripView,
+} from "@pinetrie/rules"
 import { expect, test } from "vitest"
 import { workStripWords } from "./column-view.ts"
 import { conflictsView, conflictsWords } from "./conflicts-view.ts"

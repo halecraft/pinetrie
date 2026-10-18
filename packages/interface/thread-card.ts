@@ -3,12 +3,8 @@
 // (`threadCardHeads`) and read by both views. Its signals are its threads'
 // together, whatever roots they are in. Neutral: never in the thread's colour.
 
-import type {
-  AgentWork,
-  CanvasId,
-  Workflow,
-  WorkflowStateId,
-} from "@pinetrie/core"
+import type { AgentWork, CanvasId, WorkflowStateId } from "@pinetrie/core"
+import type { Workflow } from "@pinetrie/rules"
 import type { Status } from "./attention.ts"
 import type { Intent } from "./intent.ts"
 import { NO_TEXT } from "./root-label.ts"

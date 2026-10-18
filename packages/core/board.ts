@@ -1,23 +1,7 @@
-// core/board — the board: its workflow states, an edit to them, and a canvas
-// in the archive.
+// core/board — the board: an edit to its workflow states, and a canvas in the
+// archive.
 
 import type { CanvasId, WorkflowStateId, WriterId } from "./ids.ts"
-
-/** A workflow state: a column of the board. */
-export interface WorkflowState {
-  readonly id: WorkflowStateId
-  readonly name: string
-}
-
-/**
- * The session's workflow: a host-written `pinetrie.workflow` singleton. The
- * open states in board order, then the archive, which is always there and
- * always last: a root in it is archived.
- */
-export interface Workflow {
-  readonly open: readonly WorkflowState[]
-  readonly archive: WorkflowState
-}
 
 /**
  * A change to the workflow. `state` names the state acted on (null to add

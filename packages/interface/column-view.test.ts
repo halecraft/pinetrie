@@ -14,7 +14,6 @@ import {
   type LaneView,
   NO_CONTENT,
   type PinnedView,
-  type ProjectRecord,
   pointId,
   type RevisionRecord,
   type Sha256,
@@ -31,6 +30,7 @@ import { cardIdFor } from "@pinetrie/core/fixtures"
 import {
   type CatchUpNow,
   type ParentNow,
+  type ProjectRecord,
   proposedChangesStatus,
   workStripView,
 } from "@pinetrie/rules"

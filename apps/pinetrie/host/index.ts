@@ -20,9 +20,7 @@ import {
   atEntry,
   type CardId,
   isTextCardId,
-  type ModelLine,
   type RootId,
-  type SetupSession,
   type ThreadId,
   threadEnd,
 } from "@pinetrie/core"
@@ -60,8 +58,10 @@ import {
 import {
   displayName,
   encodeFact,
+  type ModelLine,
   type QueuedText,
   SETUP,
+  type SetupSession,
   setIfChanged,
 } from "@pinetrie/rules"
 import {

@@ -15,14 +15,11 @@
 // through the element, so no path asks whether a card exists yet.
 
 import type {
-  AcceptedRecord,
   AgentCandidate,
   CardId,
   CardRecord,
-  CommandSummary,
   PinnedView,
   Position,
-  SeatRecord,
   TextPlace,
   ThreadLane,
 } from "@pinetrie/core"
@@ -68,7 +65,13 @@ import {
   startWords,
   textTokens,
 } from "@pinetrie/interface"
-import { type QueuedText, writersOfClients } from "@pinetrie/rules"
+import {
+  type AcceptedRecord,
+  type CommandSummary,
+  type QueuedText,
+  type SeatRecord,
+  writersOfClients,
+} from "@pinetrie/rules"
 import { textClients } from "@pinetrie/schema"
 import {
   columnMessageTarget,

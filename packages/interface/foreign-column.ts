@@ -8,13 +8,12 @@ import {
   type ForeignLane,
   type LaneRecord,
   nearestRevision,
-  type ProjectRecord,
   type RevisionRecord,
   type ThreadId,
   type TreeIndex,
   type WriterId,
 } from "@pinetrie/core"
-import { foreignIn, type RunAt } from "@pinetrie/rules"
+import { foreignIn, type ProjectRecord, type RunAt } from "@pinetrie/rules"
 import type { ReadOnly } from "./app-view.ts"
 import { type Column, unstartedMode } from "./columns.ts"
 import type { Reader } from "./send.ts"

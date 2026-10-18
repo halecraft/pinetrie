@@ -2,11 +2,12 @@
 // none, at start and for a new lane before its first run, and for a thread a
 // column opens before it has a message.
 
-import type { NameRecord, ThreadId } from "@pinetrie/core"
+import type { ThreadId } from "@pinetrie/core"
 import { createKeeper } from "@pinetrie/keeper"
 import { readLaneRecords, readNames, readThreads } from "@pinetrie/reads"
 import {
   NAME,
+  type NameRecord,
   planNames,
   planReserve,
   type ReservePlan,

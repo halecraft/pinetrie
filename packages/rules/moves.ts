@@ -30,10 +30,10 @@ import {
   sameKey,
   surfaceOwner,
   type ThreadId,
-  type Workflow,
   type WriterId,
   wrapperKind,
 } from "@pinetrie/core"
+import type { Workflow } from "./board.ts"
 import { planCanvasOpening, rankOnCanvas } from "./canvas-index.ts"
 import { marginEnd } from "./margin.ts"
 import { makeNoteColumn, noteColumnEnd, toNotes } from "./notes.ts"

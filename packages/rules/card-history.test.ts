@@ -1,7 +1,5 @@
 import {
   atEntry,
-  type CardEvent,
-  type CardHistoryRecord,
   type CardId,
   type CardPlace,
   type CardRecord,
@@ -15,7 +13,6 @@ import {
   rootIdFor,
   type TextCard,
   type TextPlace,
-  type TraceRecord,
   threadIdFor,
   type WriterId,
   writerId,
@@ -23,6 +20,8 @@ import {
 import { cardIdFor } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import {
+  type CardEvent,
+  type CardHistoryRecord,
   type Cause,
   changeVerb,
   HISTORY_EVENTS,
@@ -33,6 +32,7 @@ import {
   TRACE_MAX_AGE_MS,
   TRACED,
   TRASH_KEEP_MS,
+  type TraceRecord,
   trashDeadline,
 } from "./card-history.ts"
 

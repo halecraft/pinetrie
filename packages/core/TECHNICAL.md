@@ -1,17 +1,22 @@
 # `@pinetrie/core`: technical notes
 
-Core is the vocabulary every package shares (ids, intents, every record's
-type) and the reads of the tree. It does no I/O, and imports nothing but its
+Core is the vocabulary every package shares (ids, intents) and the reads
+of the tree. It does no I/O, and imports nothing but its
 own modules: no pi (ADR-0003), no Kyneta, no Node builtin, since the client
 loads it in the browser (`paths.ts` compares paths as strings for that
 reason). Biome enforces the last: `noNodejsModules` is an error, tests
 aside, in every package the page bundles. Everything here is a *plan* in gather, plan, execute: a decision is
 a value, and the host performs it, as pi's own lane loop does.
 
-The rule core, `@pinetrie/rules` and `@pinetrie/jj` keep: a format or type
-that `lanes` or `jj` must read, write or name lives in core, since neither
-can declare `@pinetrie/rules`. What a stored shape says, and how the host
-changes it, is `@pinetrie/rules`', whoever reads it. Core also holds the few
+The rule core, `@pinetrie/rules` and `@pinetrie/jj` keep: a type lives in
+the highest package that all its users can import (ADR-0180). A stored
+shape's type is rules', beside its spec; it is core's only when core's own
+code names it, or a package below rules does: one that declares core and
+not rules (`lanes`, `jj`, `folder`, `schema`, `protocol`, `config`,
+`docker`, `lanehost`). So `LaneRecord`, `JjBaseRecord` and `StateRecord`
+are here, and `SeatRecord` and `SetupRecord` are rules'. What a stored
+shape says, and how the host changes it, is `@pinetrie/rules`', whoever
+reads it. Core also holds the few
 pure helpers several packages share (`paths.ts`, `errorText`), since every
 package that uses one already depends on core. `index.ts` declares nothing:
 it re-exports every module but `fixtures.ts`, which tests import as
@@ -35,17 +40,17 @@ it re-exports every module but `fixtures.ts`, which tests import as
 |---|---|
 | `ids.ts`, `kinds.ts` | every branded id and position; every kind of card |
 | `cards.ts`, `places.ts`, `paste.ts`, `grid.ts` | what a card is, where cards are and the moves between places, a paste, your inventory's grid |
-| `tree.ts`, `asks.ts`, `agents.ts`, `roots.ts`, `address.ts`, `ordering.ts` | the reads of the tree, asks, other threads' agents, each root summarized and its directory record (`RootRecord`), an address's codec, entries' arrival order |
+| `tree.ts`, `asks.ts`, `agents.ts`, `roots.ts`, `address.ts`, `ordering.ts` | the reads of the tree, asks, other threads' agents, each root summarized, an address's codec, entries' arrival order |
 | `threads.ts` | a thread's record and how it began, and the proposal a branch was opened from |
 | `intents.ts` | every command (`Intent`), its refusals (`ERR`), where its writes go (`Target`, `ValueWrite`), a send's place in the tree |
-| `board.ts`, `marks.ts` | the board's workflow states and the archive; a canvas's and a note column's title |
-| `facts.ts`, `reports.ts` | the host's facts in a thread and a queue held; an ask's digest and how a thread's last run ended |
+| `board.ts`, `marks.ts` | an edit to the board's workflow states, and a canvas in the archive; what a typed title asks for |
+| `facts.ts` | the host's facts in a thread |
 | `mentions.ts` | who a message names and compels (`address`), what a relay between agents carries, a person's display name |
-| `thread-names.ts`, `banners.ts`, `participants.ts` | a thread's name and its words; its banner and the icon source; seats, display names and pictures |
-| `config.ts`, `setup.ts`, `access.ts` | config as other packages name it; what the setup page reads; a lane's use of its owner's ssh identity |
+| `thread-names.ts` | a thread's name and its words |
+| `config.ts`, `access.ts` | config as other packages name it; the owner's answers to a lane's use of their ssh identity |
 | `product.ts`, `lane-env.ts` | the product's name and the host's operator; what every lane of its own sees: paths, home, programs, variables |
-| `lanes.ts`, `bases.ts`, `disks.ts`, `commands.ts` | a lane's record and its proof it may run; a thread's base, history states and a copy ready to merge; a lane's disk and snapshots; the `/` commands |
-| `revisions.ts`, `accepted.ts`, `proposed.ts`, `trailers.ts`, `work.ts` | a turn's revision record, proposed changes recorded and reviewed; accepted work and a thread's base recorded; proposed changes' facts and decisions, the commit trailers, where a lane works |
+| `lanes.ts`, `bases.ts`, `disks.ts` | a lane's record and its proof it may run; a thread's base, history states and a copy ready to merge; a lane's disk and snapshots |
+| `revisions.ts`, `accepted.ts`, `proposed.ts`, `trailers.ts`, `work.ts` | a turn's revision record, proposed changes recorded and reviewed; a jj project's accepted work and thread's base, as recorded, and a catch-up's read; proposed changes' facts and decisions, the commit trailers, where a lane works |
 | `folder.ts`, `runs.ts`, `live.ts`, `edits.ts`, `images.ts`, `tools.ts` | a folder project's history; what a command did to a disk; what a turn streams; a text's edits; blobs; the tools |
 | `paths.ts`, `errors.ts` | paths as strings, and a thrown value as text |
 
@@ -151,7 +156,7 @@ it re-exports every module but `fixtures.ts`, which tests import as
   (S85). The search tools run programs
   carried into every lane (`RUNTIME_PROGRAMS`, ADR-0064).
 
-## Records, commands and lanes (`intents.ts`, `board.ts`, `marks.ts`, `config.ts`, `setup.ts`, `lanes.ts`, `bases.ts`, `disks.ts`, `revisions.ts`)
+## Records, commands and lanes (`intents.ts`, `board.ts`, `marks.ts`, `config.ts`, `lanes.ts`, `bases.ts`, `disks.ts`, `revisions.ts`)
 
 - A `Send` is a person's message the host sends: a `send` intent's, or a popped
   queued card's (`SendAt`'s `queue`). `Gated`, an intent or a send, is
@@ -160,26 +165,24 @@ it re-exports every module but `fixtures.ts`, which tests import as
   gate, which imports them.
 - Each host record is one spec, and pi only carries its writes (ADR-0062);
   a record lives in the session's document or a root's (ADR-0063).
-- The board's workflow states and the archive (ADR-0122, ADR-0029); a
-  canvas's title (ADR-0045, ADR-0116) and one a model gives (ADR-0074); a
-  person's picture (ADR-0098); a column's banner (ADR-0050), and the host's
-  icon source, `IconsRecord` (ADR-0143); the commands a pi skill or prompt
-  makes (ADR-0036).
+- An edit to the board's workflow states and a canvas in the archive
+  (ADR-0122, ADR-0029); a canvas's typed title (ADR-0045, ADR-0116). The
+  records of the workflow, a title and one a model gives (ADR-0074), a
+  person's picture (ADR-0098), a column's banner (ADR-0050), the host's
+  icon source (ADR-0143) and the commands a pi skill or prompt makes
+  (ADR-0036) are typed in rules, beside their specs (ADR-0180).
 - A thread's name splits into its two words in one place, `threadNameParts`
   (`thread-names.ts`): a mention's handle, a drawn banner's prompt and a
   built-in icon's noun all read it, and it is null for text that is not an
   adjective and a noun from the lists. Its words are typed `Adjective` and
   `Noun` (the lists are `as const`), so a built-in icon's URL
   (`builtInIconUrl`, interface) can only be built for a noun on the list.
-- The icon sources are `ICON_SOURCES`; `IconSource`, the published record's
-  schema and the `icons.source` setting's kind are all built from it.
 - What config is, as every package that speaks of it names it: its layers
-  (`ConfigLayer`), a file's state, a refusal and an origin, and the
-  published setup record (`SetupRecord`, ADR-0146). Deciding them is
+  (`ConfigLayer`), a file's state, a refusal and an origin. Deciding them is
   `@pinetrie/config`'s. Each closed set (`CONFIG_FILE_STATES`,
-  `REFUSAL_REASONS`, `NO_MODEL_REASONS`) is a list its type and the record's
-  schema are both built from, as the icon sources are. `ModelLine` is the
-  model as pi's setup states it; `SetupModel` is the same with its origins.
+  `REFUSAL_REASONS`) is a list its type and the setup record's schema are
+  both built from. The setup record itself (`SetupRecord`, ADR-0146) is
+  rules'.
 - Where a lane reads a skill (`laneSkillPath`): a project's in its own
   copy, any other at `/mnt/host` and its host path.
 - A turn that changes files is a revision (ADR-0032), on a lane's own disk

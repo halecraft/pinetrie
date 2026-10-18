@@ -2,16 +2,14 @@
 // branched from.
 
 import {
-  type AcceptedRecord,
   ancestry,
   type BaseMerge,
-  type BaseRecord,
   type CommitId,
   commitId,
   type EntryId,
   ERR,
   type ErrCode,
-  type FolderBaseRecord,
+  type FilesTouched,
   type ForkStart,
   forkParent,
   type JjAcceptedRecord,
@@ -30,6 +28,7 @@ import {
   type TreeIndex,
 } from "@pinetrie/core"
 import { Type } from "typebox"
+import type { AcceptedRecord } from "./accepted.ts"
 import { CommitSchema, decodeRecord, PointSchema, threadKey } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 
@@ -82,6 +81,33 @@ const FolderBaseSchema = Type.Object({
 
 /** A lane's base record as stored: jj's or a folder's. */
 const BaseRecordSchema = Type.Union([JjBaseSchema, FolderBaseSchema])
+
+/**
+ * A thread's base as its lane's history says it: a host-written
+ * `pinetrie.base` value keyed by lane, of the project's kind, a cache the
+ * page reads. At start the host deletes those of the other kind.
+ */
+export type BaseRecord = JjBaseRecord | FolderBaseRecord
+
+/**
+ * A folder lane's base: accepted work's state it began on or last caught up
+ * with. A folder project has no WIP, so its base is always accepted work.
+ */
+export interface FolderBaseRecord {
+  readonly kind: "folder"
+  readonly lane: ThreadId
+  readonly start: PointId
+  /**
+   * What catching up would change, read at the lane's newest state and your
+   * folder's then; null when accepted work had not moved.
+   */
+  readonly catchUp: {
+    readonly tip: PointId
+    readonly to: PointId
+    readonly files: readonly string[]
+  } | null
+  readonly work: FilesTouched
+}
 
 /**
  * Each lane's base, as its history says it, of the project's kind, at the

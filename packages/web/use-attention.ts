@@ -10,8 +10,6 @@ import {
   type LaneView,
   laneWork,
   type RootId,
-  type RootRecord,
-  type RunEndReportRecord,
   type ThreadId,
   type WriterId,
 } from "@pinetrie/core"
@@ -34,6 +32,7 @@ import {
   threadWriters,
   unlisted,
 } from "@pinetrie/interface"
+import type { RootRecord, RunEndReportRecord } from "@pinetrie/rules"
 import type { AttentionStore } from "@pinetrie/session"
 import {
   useEffect,

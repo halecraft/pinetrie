@@ -3,7 +3,6 @@ import { cardIdFor } from "@pinetrie/core/fixtures"
 // record reads back whole from what is stored.
 
 import {
-  type BaseRecord,
   canvasIdFor,
   commitId,
   entryId,
@@ -11,7 +10,6 @@ import {
   type ProposedChangesRecord,
   pointFromCommit,
   pointId,
-  type RootRecord,
   rootIdFor,
   SESSION_TARGET,
   type Sha256,
@@ -23,6 +21,7 @@ import {
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
+import type { BaseRecord } from "./base.ts"
 import { BUDGET } from "./budget.ts"
 import {
   ACCEPTED,
@@ -62,6 +61,7 @@ import {
   TRACE,
   WORKFLOW,
 } from "./index.ts"
+import type { RootRecord } from "./roots.ts"
 
 const ADA = writerId("ada@x.io")
 const L = threadIdFor("1")

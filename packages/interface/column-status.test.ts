@@ -1,10 +1,5 @@
-import {
-  entryId,
-  type RunEndReport,
-  type RunEndReportRecord,
-  threadIdFor,
-  writerId,
-} from "@pinetrie/core"
+import { entryId, threadIdFor, writerId } from "@pinetrie/core"
+import type { RunEndReport, RunEndReportRecord } from "@pinetrie/rules"
 import type { Attention } from "@pinetrie/schema"
 import { describe, expect, test } from "vitest"
 import { type AttentionInput, standingRunEnds } from "./attention.ts"

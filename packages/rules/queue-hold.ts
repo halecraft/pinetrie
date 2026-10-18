@@ -5,7 +5,6 @@ import type {
   CanvasId,
   CardCommand,
   CardRecord,
-  QueueHold,
   QueueHoldChange,
   QueueMove,
   ThreadId,
@@ -22,6 +21,18 @@ const QueueHoldSchema = Type.Object({
   by: Type.String({ minLength: 1 }),
   at: Type.Number(),
 })
+
+/**
+ * A thread's queue held: a host-written `pinetrie.queue-hold` value in the
+ * session, keyed by the lane. While it is there no message card is popped, only
+ * facts, until someone releases it.
+ */
+export interface QueueHold {
+  readonly lane: ThreadId
+  readonly by: WriterId
+  /** When it was held, in ms since the epoch. */
+  readonly at: number
+}
 
 /** Each held queue, at its lane. */
 export const QUEUE_HOLD: RecordSpec<QueueHold, ThreadId, "session"> = {

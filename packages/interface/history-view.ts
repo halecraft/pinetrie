@@ -7,7 +7,6 @@
 
 import {
   type DiffSpan,
-  type FolderAcceptedRecord,
   lineStates,
   type PointId,
   type RestorePreview,
@@ -16,7 +15,11 @@ import {
   type ThreadId,
   type WriterId,
 } from "@pinetrie/core"
-import { type ReviewFacts, readableSpan } from "@pinetrie/rules"
+import {
+  type FolderAcceptedRecord,
+  type ReviewFacts,
+  readableSpan,
+} from "@pinetrie/rules"
 import type { RestoreActing } from "@pinetrie/session"
 import { count, whenWords } from "./counts.ts"
 import { actingSaid } from "./outcome-words.ts"

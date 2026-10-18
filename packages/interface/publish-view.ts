@@ -4,9 +4,10 @@
 // (`publishToast`). Whether a command may run is `@pinetrie/rules`'
 // `acceptedActionState`, the rule the host decides by.
 
-import type { AcceptedRecord, JjAcceptedRecord } from "@pinetrie/core"
+import type { JjAcceptedRecord } from "@pinetrie/core"
 import {
   type AcceptedActionState,
+  type AcceptedRecord,
   acceptedActionState,
   acceptedRefusal,
   nothingToPublish,

@@ -4,7 +4,6 @@
 import type {
   CanvasView,
   CardCommand,
-  CardEvent,
   CatchUpCommand,
   CatchUpFrom,
   ListKey,
@@ -13,6 +12,7 @@ import type {
   WriterId,
 } from "@pinetrie/core"
 import {
+  type CardEvent,
   catchUpName,
   changeVerb,
   displayName,

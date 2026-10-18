@@ -4,12 +4,10 @@
 // places': a field there would refuse each whole undo of a move.
 
 import type {
-  CardHistoryRecord,
   CardId,
   CardRecord,
   EntryId,
   ThreadId,
-  TraceRecord,
   WriterId,
 } from "@pinetrie/core"
 import {
@@ -20,12 +18,14 @@ import {
 } from "@pinetrie/reads"
 import {
   CARD_HISTORY,
+  type CardHistoryRecord,
   type Cause,
   deleteRecord,
   type ProvenanceSteps,
   planTraceSweep,
   setRecord,
   TRACE,
+  type TraceRecord,
 } from "@pinetrie/rules"
 import type { PresenceDocHandle } from "@pinetrie/schema"
 import type { Basics } from "./basics.ts"

@@ -15,9 +15,9 @@ import {
   type ThreadRecord,
   type ThreadStart,
   type TreeIndex,
-  type Workflow,
   type WriterId,
 } from "@pinetrie/core"
+import type { Workflow } from "./board.ts"
 import { planThreadOpen, type ThreadOpen } from "./canvas-index.ts"
 
 /** A thread's opening as its column asks for it. */

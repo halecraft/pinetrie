@@ -22,9 +22,7 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import { subscribe } from "@kyneta/schema"
 import {
-  type AccessRecord,
   isThreadId,
-  type PersonalAccess,
   shellWord,
   type ThreadId,
   type WriterId,
@@ -42,7 +40,9 @@ import { readRecords } from "@pinetrie/reads"
 import {
   ACCESS,
   type AccessNews,
+  type AccessRecord,
   emptyAccess,
+  type PersonalAccess,
   planAccessChange,
   planAccessOutside,
   planAccessUse,

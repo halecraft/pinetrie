@@ -1,11 +1,6 @@
-import {
-  type DigestRecord,
-  entryId,
-  type ThreadId,
-  threadIdFor,
-} from "@pinetrie/core"
+import { entryId, type ThreadId, threadIdFor } from "@pinetrie/core"
 import type { PiSetup } from "@pinetrie/pi"
-import { FOCUS, setRecord } from "@pinetrie/rules"
+import { type DigestRecord, FOCUS, setRecord } from "@pinetrie/rules"
 import { writeEntry } from "@pinetrie/schema/fixtures"
 import { expect, test, vi } from "vitest"
 import type { RunEndSettled } from "./digests.ts"

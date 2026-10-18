@@ -20,7 +20,6 @@ import { isDeepStrictEqual } from "node:util"
 import { batch } from "@kyneta/schema"
 import {
   type CanvasId,
-  type CardHistoryRecord,
   type CardId,
   type CardRecord,
   type EntryId,
@@ -29,7 +28,6 @@ import {
   type RootId,
   type TextCardId,
   type ThreadId,
-  type TraceRecord,
   type TreeIndex,
   type WriterId,
 } from "@pinetrie/core"
@@ -40,12 +38,14 @@ import {
   readTreeIndex,
 } from "@pinetrie/reads"
 import {
+  type CardHistoryRecord,
   type Cause,
   encodeCard,
   type PlaceStep,
   type ProvenanceSteps,
   placeEnd,
   planProvenance,
+  type TraceRecord,
   takenIn,
 } from "@pinetrie/rules"
 import type { PlacesDocHandle } from "@pinetrie/schema"

@@ -3,7 +3,6 @@
 import {
   type ArchivedCanvas,
   type CanvasId,
-  type CardHistoryRecord,
   type CardId,
   type CardInPlace,
   type CardPlace,
@@ -15,15 +14,14 @@ import {
   type Refusal,
   refused,
   type ValueWrite,
-  type Workflow,
   type WorkflowEdit,
-  type WorkflowState,
   type WorkflowStateId,
   type WriterId,
   workflowStateIdFor,
 } from "@pinetrie/core"
 import { Type } from "typebox"
 import { byOrder } from "./card.ts"
+import type { CardHistoryRecord } from "./card-history.ts"
 import { decodeRecord, fixedKey } from "./decode.ts"
 import { orderAfter } from "./order.ts"
 import type { PlaceStep } from "./place-steps.ts"
@@ -41,6 +39,22 @@ const WorkflowSchema = Type.Object({
   open: Type.Array(StateSchema, { minItems: 1 }),
   archive: StateSchema,
 })
+
+/** A workflow state: a column of the board. */
+export interface WorkflowState {
+  readonly id: WorkflowStateId
+  readonly name: string
+}
+
+/**
+ * The session's workflow: a host-written `pinetrie.workflow` singleton. The
+ * open states in board order, then the archive, which is always there and
+ * always last: a root in it is archived.
+ */
+export interface Workflow {
+  readonly open: readonly WorkflowState[]
+  readonly archive: WorkflowState
+}
 
 const stateOf = (s: { id: string; name: string }): WorkflowState | undefined =>
   isWorkflowStateId(s.id) ? { id: s.id, name: s.name } : undefined

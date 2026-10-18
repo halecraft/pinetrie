@@ -6,7 +6,6 @@ import {
   entryId,
   isThreadId,
   type RootId,
-  type RootRecord,
   type Sha256,
   type ThreadId,
   type WriterId,
@@ -47,6 +46,44 @@ const threadsOf = (
       isThreadId(lane) ? [[lane, writers as WriterId[]]] : [],
     ),
   )
+
+/**
+ * A root as the sidebar, the board and your inbox see it,
+ * without its document: a host-written `pinetrie.root` value in the session,
+ * keyed by the root's id, refreshed whenever the root's document changes.
+ */
+export interface RootRecord {
+  readonly root: RootId
+  /** Its root entry, the tab's key; null before its first message. */
+  readonly entry: EntryId | null
+  /** Its first message, as the rail finds it (`RootSummary.first`). */
+  readonly first: EntryId | null
+  /** That message's first line: the label while it has no title. */
+  readonly firstLine: string
+  /** Its messages: the rail's rows. */
+  readonly messages: number
+  /** Its newest message: last activity, since ids are uuidv7. */
+  readonly newest: EntryId | null
+  /** Everyone who wrote a chat in it, in order of first message. */
+  readonly writers: readonly WriterId[]
+  /**
+   * Per thread, everyone who wrote a chat on its path from the root to its tip,
+   * in order of first message: its followers.
+   */
+  readonly threads: Readonly<Record<ThreadId, readonly WriterId[]>>
+  /**
+   * Its sends that name someone (`@`), for the inbox to resolve, each with the
+   * thread it is in, which the inbox opens it in.
+   */
+  readonly mentions: readonly {
+    readonly id: EntryId
+    readonly by: WriterId
+    readonly text: string
+    readonly thread: ThreadId
+  }[]
+  /** Every blob it shows or shares (`referencedBlobs`), for the sweep. */
+  readonly blobs: readonly Sha256[]
+}
 
 /**
  * Each root's directory record, at its id. Derived from the root's document

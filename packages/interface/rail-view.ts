@@ -1,7 +1,7 @@
 // interface/rail-view — the view's part of the rail's stretches (`compactRail`).
 
-import type { AgentRun, DigestRecord, EntryId, RailRow } from "@pinetrie/core"
-import { digestText } from "@pinetrie/rules"
+import type { AgentRun, EntryId, RailRow } from "@pinetrie/core"
+import { type DigestRecord, digestText } from "@pinetrie/rules"
 import { railLandmarks } from "./rail.ts"
 import type { SearchResult } from "./search.ts"
 import { itemMatches } from "./search-view.ts"

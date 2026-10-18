@@ -1,6 +1,5 @@
 // core/lanes — a lane as recorded: its own or a foreign one, whether it fits
-// the project, and the proof that it may run; and what the host found where
-// it runs.
+// the project, and the proof that it may run.
 
 import type { ProjectKind } from "./config.ts"
 import type { RootId, ThreadId, WriterId } from "./ids.ts"
@@ -67,20 +66,4 @@ export function proveRunnable(
   const own = record === undefined ? null : ownLane(record)
   const foreign = own === null || kind === null ? null : laneFits(own, kind)
   return foreign ?? (lane as RunnableLane)
-}
-
-/**
- * What the host found where it runs: a host-written `pinetrie.project` value,
- * rewritten at every start, and only by a host with tools, whose every lane has
- * its own copy.
- */
-export interface ProjectRecord {
-  readonly root: string
-  /** What the project's folder was at this start: what a lane's history must be to run. */
-  readonly kind: ProjectKind
-  /**
-   * Whom the host's config names its owner (`owner`): who answers when
-   * a lane asks for their ssh identity. Null with none.
-   */
-  readonly owner: WriterId | null
 }

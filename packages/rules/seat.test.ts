@@ -1,7 +1,13 @@
-import { type SeatRecord, writerId } from "@pinetrie/core"
+import { writerId } from "@pinetrie/core"
 import { expect, test } from "vitest"
 import { decodeRecords, setRecord } from "./records.ts"
-import { planSeatSweep, planSeats, SEAT, writersOfClients } from "./seat.ts"
+import {
+  planSeatSweep,
+  planSeats,
+  SEAT,
+  type SeatRecord,
+  writersOfClients,
+} from "./seat.ts"
 
 const ADA = writerId("ada@x.io")
 const BEA = writerId("bea@x.io")

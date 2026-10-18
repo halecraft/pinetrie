@@ -8,12 +8,7 @@ import { createRequire } from "node:module"
 import { homedir } from "node:os"
 import path from "node:path"
 import { type ConfigPlaces, ownDirs, type StartLayers } from "@pinetrie/config"
-import {
-  errorText,
-  isThreadId,
-  isWithin,
-  type ProjectRecord,
-} from "@pinetrie/core"
+import { errorText, isThreadId, isWithin } from "@pinetrie/core"
 import { createKeeper, type Keeper } from "@pinetrie/keeper"
 import {
   BASE_LANE,
@@ -40,6 +35,7 @@ import {
   slotMounts,
 } from "@pinetrie/lanes"
 import type { PiSetup } from "@pinetrie/pi"
+import type { ProjectRecord } from "@pinetrie/rules"
 import { failed, type LeaseBasics } from "../basics.ts"
 import type { Records } from "../records.ts"
 import {

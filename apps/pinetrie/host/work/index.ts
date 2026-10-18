@@ -16,7 +16,6 @@ import {
   ERR,
   type ForeignLane,
   PROJECT_CONFIG_FILE,
-  type ProjectRecord,
   proveRunnable,
   type ResolvedFact,
   type RunnableLane,
@@ -29,6 +28,7 @@ import type { LaneHooks, PiSetup } from "@pinetrie/pi"
 import { readRunning } from "@pinetrie/reads"
 import {
   type AccessNews,
+  type ProjectRecord,
   planResolveCommand,
   refusedAnswer,
   resolveAnswer,

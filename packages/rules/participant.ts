@@ -5,8 +5,6 @@ import {
   emailLocalPart,
   type ImageRef,
   isSha256,
-  type ParticipantRecord,
-  type PictureRecord,
   type Refusal,
   refused,
   type Sha256,
@@ -23,6 +21,18 @@ import { deleteRecord, type RecordSpec, setRecord } from "./records.ts"
  */
 /** A name or a picture's hash, as stored. */
 const StoredText = Type.String()
+
+/** A writer's display name. */
+interface ParticipantRecord {
+  readonly writer: WriterId
+  readonly name: string
+}
+
+/** A person's picture: a blob, keyed by their writer. */
+interface PictureRecord {
+  readonly writer: WriterId
+  readonly sha256: Sha256
+}
 
 export const PARTICIPANT: RecordSpec<ParticipantRecord, WriterId, "session"> = {
   namespace: "pinetrie.participant",

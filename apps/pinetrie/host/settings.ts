@@ -34,7 +34,6 @@ import {
 } from "@pinetrie/config"
 import {
   type ConfigLayer,
-  ICON_SOURCES,
   PROJECT_CONFIG_FILE,
   type RepoConfig,
   type WriterId,
@@ -53,6 +52,7 @@ import type { ListedFolder } from "@pinetrie/pi"
 import {
   DEFAULT_BUDGET,
   DEFAULT_QUOTE_BYTES,
+  ICON_SOURCES,
   type IconConfig,
   iconConfig,
   isCommandLabel,

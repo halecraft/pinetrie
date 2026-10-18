@@ -7,8 +7,10 @@ export {
   ACCEPTED,
   ACCEPTED_KEY,
   type AcceptedActionState,
+  type AcceptedRecord,
   acceptedActionState,
   acceptedRefusal,
+  type FolderAcceptedRecord,
   nothingToPublish,
   type PublishWork,
   planAcceptedAction,
@@ -21,9 +23,12 @@ export {
   ACCESS,
   ACCESS_ANSWERS,
   type AccessNews,
+  type AccessRecord,
   type AccessRefusal,
   answersFor,
   emptyAccess,
+  type OutsideHost,
+  type PersonalAccess,
   planAccessAnswer,
   planAccessAsk,
   planAccessChange,
@@ -59,22 +64,27 @@ export {
   BANNER_ATTEMPTS,
   type BannerAnswer,
   type BannerAsk,
+  type BannerRecord,
   bannerAnswer,
   bannerDue,
   bannerPrompt,
   bannerStillWanted,
   DEFAULT_ICON_MODEL,
+  ICON_SOURCES,
   ICONS,
   ICONS_KEY,
   type IconConfig,
+  type IconsRecord,
   iconConfig,
   planAsk,
 } from "./banner.ts"
 export {
   BASE,
+  type BaseRecord,
   type CatchUpNow,
   catchUpNow,
   effectiveBase,
+  type FolderBaseRecord,
   type FollowedBase,
   type ForkBegin,
   type ParentNow,
@@ -126,7 +136,9 @@ export {
   tasksInArchive,
   WORKFLOW,
   WORKFLOW_KEY,
+  type Workflow,
   type WorkflowPlan,
+  type WorkflowState,
 } from "./board.ts"
 export {
   addedTokens,
@@ -202,6 +214,8 @@ export {
 } from "./card.ts"
 export {
   CARD_HISTORY,
+  type CardEvent,
+  type CardHistoryRecord,
   type Cause,
   changeVerb,
   HISTORY_EVENTS,
@@ -215,6 +229,8 @@ export {
   TRACE_MAX_AGE_MS,
   TRACED,
   TRASH_KEEP_MS,
+  type TracedPlace,
+  type TraceRecord,
   type TrashSweep,
   traceEnd,
   trashDeadline,
@@ -231,7 +247,9 @@ export {
 export {
   COMMANDS,
   COMMANDS_KEY,
+  type CommandRef,
   type CommandSource,
+  type CommandSummary,
   expandSkill,
   type GatheredCommand,
   isCommandLabel,
@@ -253,6 +271,8 @@ export {
   type AskLines,
   askLines,
   DIGEST,
+  type DigestBody,
+  type DigestRecord,
   digestRequest,
   digestText,
   digestToWrite,
@@ -295,6 +315,7 @@ export {
   FOCUS_WORDS,
   type FocusAsk,
   type FocusPlan,
+  type FocusRecord,
   type FocusReply,
   focusRequest,
   focusToWrite,
@@ -362,7 +383,7 @@ export {
   planStream,
 } from "./live.ts"
 export { type MarginCard, marginCards, marginCounts } from "./margin.ts"
-export { MARK, planMark } from "./mark.ts"
+export { MARK, type MarkRecord, planMark } from "./mark.ts"
 export {
   addressMessage,
   agentByDefault,
@@ -407,12 +428,13 @@ export {
 } from "./moves.ts"
 export {
   NAME,
+  type NameRecord,
   planNames,
   planReserve,
   type ReservePlan,
   readableThreadName,
 } from "./names.ts"
-export { NOTE_COLUMN } from "./note-column.ts"
+export { NOTE_COLUMN, type NoteColumnRecord } from "./note-column.ts"
 export {
   NEW_NOTES_TITLE,
   type NoteCard,
@@ -511,6 +533,7 @@ export {
   planQueueCard,
   planQueueHold,
   QUEUE_HOLD,
+  type QueueHold,
 } from "./queue-hold.ts"
 export { branchAfter, rankAfter, rankOfDrop } from "./rank.ts"
 export {
@@ -584,7 +607,7 @@ export {
   planRootDelete,
   type RootDelete,
 } from "./root.ts"
-export { ROOT } from "./roots.ts"
+export { ROOT, type RootRecord } from "./roots.ts"
 export {
   NOTHING_NEXT,
   parseRoundReply,
@@ -598,6 +621,8 @@ export {
   pendingRunEndReport,
   planRunEnded,
   RUN_END_REPORT,
+  type RunEndReport,
+  type RunEndReportRecord,
   runEndedToWrite,
 } from "./run-end-report.ts"
 export {
@@ -608,16 +633,32 @@ export {
   laneFold,
   tracesWithCommands,
 } from "./runs.ts"
-export { planSeatSweep, planSeats, SEAT, writersOfClients } from "./seat.ts"
-export { SETUP, SETUP_KEY } from "./setup.ts"
+export {
+  planSeatSweep,
+  planSeats,
+  SEAT,
+  type SeatRecord,
+  writersOfClients,
+} from "./seat.ts"
+export {
+  type ModelLine,
+  type NoModel,
+  SETUP,
+  SETUP_KEY,
+  type SetupModel,
+  type SetupRecord,
+  type SetupSession,
+} from "./setup.ts"
 export {
   laneReads,
   planForgottenReaders,
   planGoneLineages,
   planSharedLineages,
   SHARED_LINEAGE,
+  type SharedLineage,
   type SharedRead,
   type SharedWrite,
+  type SharedWriter,
   sharedTouches,
 } from "./shared.ts"
 export {
@@ -700,6 +741,7 @@ export {
   type LaneForkRecord,
   PROJECT,
   PROJECT_KEY,
+  type ProjectRecord,
   planLaneRecords,
   planTurnRecord,
   REVISION,

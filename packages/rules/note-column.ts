@@ -1,6 +1,6 @@
 // note-column — a note column's title.
 
-import type { NoteColumnId, NoteColumnRecord, WriterId } from "@pinetrie/core"
+import type { NoteColumnId, WriterId } from "@pinetrie/core"
 import { Type } from "typebox"
 import { decodeRecord, noteColumnKey } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
@@ -11,6 +11,20 @@ const NoteColumnSchema = Type.Object({
   by: Type.String({ minLength: 1 }),
   at: Type.Number(),
 })
+
+/**
+ * A note column's title: a host-written `pinetrie.note-column` value in the
+ * session, keyed by the column's id, absent while untitled. Who made the column
+ * is its card's owner, and when is in its id.
+ */
+export interface NoteColumnRecord {
+  readonly column: NoteColumnId
+  readonly title: string
+  /** The person who set it. */
+  readonly by: WriterId
+  /** When it was set, in ms since the epoch. */
+  readonly at: number
+}
 
 /** Each titled note column's title, at its id. */
 export const NOTE_COLUMN: RecordSpec<

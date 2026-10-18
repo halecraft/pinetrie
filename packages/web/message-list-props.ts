@@ -4,7 +4,6 @@
 
 import type {
   AskIndex,
-  DigestRecord,
   EntryId,
   RevisionRecord,
   ThreadLane,
@@ -26,6 +25,7 @@ import type {
   ScreenMemory,
   ThreadLink,
 } from "@pinetrie/interface"
+import type { DigestRecord } from "@pinetrie/rules"
 import type { LiveDocHandle } from "@pinetrie/schema"
 import type { ReactNode } from "react"
 import { type PropRule, sameProps } from "./same-props.ts"

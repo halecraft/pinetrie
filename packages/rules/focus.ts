@@ -3,17 +3,16 @@
 
 import {
   type AskIndex,
-  type DigestRecord,
   type EntryId,
   entryId,
   entryMessage,
-  type FocusRecord,
   type ThreadId,
   type TreeIndex,
   threadAsks,
 } from "@pinetrie/core"
 import { Type } from "typebox"
 import { decodeRecord, threadKey } from "./decode.ts"
+import type { DigestRecord } from "./digest.ts"
 import type { RecordSpec } from "./records.ts"
 import { firstAndNewest, oneLine, transcriptLine } from "./request.ts"
 
@@ -22,6 +21,20 @@ const FocusSchema = Type.Object({
   ask: Type.String({ minLength: 1 }),
   at: Type.Number(),
 })
+
+/**
+ * A thread's focus: what it is doing now, in a few words, named by a model
+ * after each of its runs. A session record keyed by its thread.
+ */
+export interface FocusRecord {
+  readonly thread: ThreadId
+  /** At most `FOCUS_WORDS` words. */
+  readonly focus: string
+  /** The ask whose run's end named it: an older ask's focus never replaces it. */
+  readonly ask: EntryId
+  /** When it was written, in ms since the epoch. */
+  readonly at: number
+}
 
 /** Each thread's focus, at its thread. */
 export const FOCUS: RecordSpec<FocusRecord, ThreadId, "session"> = {

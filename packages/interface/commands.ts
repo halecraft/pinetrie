@@ -5,7 +5,7 @@
 // it by any part. Typing `/plan` offers `/duane:skill:plan` and
 // `/pi-pstack:skill:plan` alike.
 
-import type { CommandSummary } from "@pinetrie/core"
+import type { CommandSummary } from "@pinetrie/rules"
 import type { Completion } from "./completion.ts"
 
 /**

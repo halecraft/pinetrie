@@ -11,7 +11,6 @@ import {
   type FactCardId,
   isBusy,
   type LaneView,
-  type QueueHold,
   type Refusal,
   refused,
   runPrompt,
@@ -24,7 +23,7 @@ import { ThreadIdSchema, WriterIdSchema } from "./decode.ts"
 import { type HistoryMessage, historyMessage } from "./history.ts"
 import type { PlaceStep } from "./place-steps.ts"
 import { planFactCard, type QueuedCard, queuedOn } from "./queue.ts"
-import { holdOnStop } from "./queue-hold.ts"
+import { holdOnStop, type QueueHold } from "./queue-hold.ts"
 
 /** What stopping a thread's lane does (`planStop`). */
 type StopPlan =

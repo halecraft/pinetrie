@@ -4,12 +4,12 @@
 import {
   type AcceptedAction,
   type AcceptedFacts,
-  type AcceptedRecord,
   type AcceptedWorkDecision,
   commitId,
   ERR,
   type ErrCode,
   type JjAcceptedRecord,
+  type PointId,
   type PublishDecision,
   type PublishFinish,
 } from "@pinetrie/core"
@@ -84,6 +84,29 @@ const AcceptedRecordSchema = Type.Union([
   JjAcceptedSchema,
   FolderAcceptedSchema,
 ])
+
+/**
+ * A folder project's accepted work, as the host last read the project's
+ * folder: its newest state, and what of its history the host keeps.
+ */
+export interface FolderAcceptedRecord {
+  readonly kind: "folder"
+  readonly newest: PointId
+  /**
+   * Accepted work's states whose snapshots the host keeps, newest first:
+   * line states and concurrent saves. What the history may review and
+   * restore.
+   */
+  readonly kept: readonly PointId[]
+  readonly at: number
+}
+
+/**
+ * Accepted work as the host last read it: a host-written `pinetrie.accepted`
+ * value of the project's kind, a cache the page reads. At start the host
+ * deletes one of the other kind.
+ */
+export type AcceptedRecord = JjAcceptedRecord | FolderAcceptedRecord
 
 /**
  * Accepted work, of the project's kind, at its one key. A record written

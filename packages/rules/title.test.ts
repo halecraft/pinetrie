@@ -5,7 +5,6 @@ import {
   entryId,
   indexTree,
   type LaneRecord,
-  type MarkRecord,
   ROOT,
   rootIdFor,
   THE_AGENT,
@@ -21,6 +20,7 @@ import {
   titleRequest,
   titleStillWanted,
 } from "./index.ts"
+import type { MarkRecord } from "./mark.ts"
 
 const ADA = writerId("ada@example.com")
 const R = rootIdFor("1")

@@ -9,13 +9,9 @@
 
 import { readFile } from "node:fs/promises"
 import path from "node:path"
+import { type ConfigLayer, isWithin, laneSkillPath } from "@pinetrie/core"
 import {
   type CommandRef,
-  type ConfigLayer,
-  isWithin,
-  laneSkillPath,
-} from "@pinetrie/core"
-import {
   type CommandSource,
   expandSkill,
   type GatheredCommand,

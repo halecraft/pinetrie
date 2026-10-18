@@ -13,20 +13,27 @@ renamed; the ADRs and findings use that name.
 
 Where a rule lives, as `@pinetrie/core` and `@pinetrie/jj` state it too:
 
-> Core holds the vocabulary (ids, intents, every record's type) and the
-> reads of the tree. A format or type that `lanes` or `jj` must read,
-> write or name lives in core too, since neither can declare
-> `@pinetrie/rules`. What a stored shape says, and how the host changes it,
-> is `@pinetrie/rules`', whoever reads it. One client's own in-flight state
-> (its moves, held roots, slot repair, commands out) is
-> `@pinetrie/session`'s. What a person sees and can do, and its words, is
-> `@pinetrie/interface`'s, for any client; how the page draws it is
-> `@pinetrie/web`'s (ADR-0093).
+> A type lives in the highest package that all its users can import
+> (ADR-0180). Core holds the vocabulary (ids, intents) and the reads of
+> the tree. A stored shape's type is `@pinetrie/rules`', beside its spec,
+> with the types only it uses. A type core's own code names, or one a
+> package below rules must read, write or name (one that declares
+> `@pinetrie/core` and not `@pinetrie/rules`: `lanes`, `jj`, `folder`
+> among them), lives in core instead. What a stored shape says, and how
+> the host changes it, is `@pinetrie/rules`', whoever reads it. One
+> client's own in-flight state (its moves, held roots, slot repair,
+> commands out) is `@pinetrie/session`'s. What a person sees and can do,
+> and its words, is `@pinetrie/interface`'s, for any client; how the page
+> draws it is `@pinetrie/web`'s (ADR-0093).
 
 So `planStop` is here beside `STOP`, and `agentByDefault` beside
 `addressMessage`; `address`, `parseMentions` and `cardMove`, which know no
 record, are core's; the trailer format and the proposed changes' facts and decisions
 are core's (`trailers.ts`, `proposed.ts`), since `@pinetrie/jj` reads them.
+A record's type is beside its spec (`SeatRecord` beside `SEAT`), unless
+core or a package below rules names it: `LaneRecord` and `JjBaseRecord`
+are core's, since jj names them, and `BaseRecord`, the union of
+`JjBaseRecord` and `FolderBaseRecord`, is here.
 
 ## Where things are
 
@@ -1331,6 +1338,12 @@ the model or why there is none, the providers with a credential and where
 it is (never the credential), the refused packages and the context files.
 The commands are `pinetrie.commands`'.
 
+- `ModelLine` is the model as pi's setup states it; `SetupModel` is the
+  same with its origins. `NoModel`, why there is none, is built from
+  `NO_MODEL_REASONS`, as the record's schema is, so the two cannot accept
+  different reasons. The config's own closed sets (`CONFIG_FILE_STATES`,
+  `REFUSAL_REASONS`) are core's, since `@pinetrie/config` names them.
+
 # Titles (`title.ts`, ADR-0074)
 
 A model's few words for a canvas, written as its mark (`MARK`, ADR-0116),
@@ -1918,9 +1931,10 @@ commit-message request `request.ts` (`describeRequest`).
 | where icons come from, for the page (ADR-0143) | `pinetrie.icons` | `icons` (`ICONS_KEY`) | at host start, when changed |
 
 - **`iconConfig`** builds the host's icon source from the settled
-  `icons.source` (one of `ICON_SOURCES`, core; `built-in` when no layer
+  `icons.source` (one of `ICON_SOURCES`; `built-in` when no layer
   sets it) and `icons.model`: a drawn icon's model is the one set, else
-  `DEFAULT_ICON_MODEL`. `IconsRecordSchema` takes the same list, so the
+  `DEFAULT_ICON_MODEL`. `IconSource`, `IconsRecordSchema` and the
+  host's `icons.source` setting are all built from that list, so the
   config and the published record cannot accept different sources.
 - **Both decisions take whether the host draws** (the source is `drawn`),
   and have no outcome in common. `bannerDue`: a thread just named, or at its

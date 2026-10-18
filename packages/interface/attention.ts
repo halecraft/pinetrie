@@ -6,13 +6,15 @@ import type {
   AgentWork,
   CanvasId,
   EntryId,
-  RootRecord,
-  RunEndReport,
-  RunEndReportRecord,
   ThreadId,
   WriterId,
 } from "@pinetrie/core"
 import { PRODUCT_NAME } from "@pinetrie/core"
+import type {
+  RootRecord,
+  RunEndReport,
+  RunEndReportRecord,
+} from "@pinetrie/rules"
 import type { Attention } from "@pinetrie/schema"
 import type { OpenProposedChanges, SshAsk } from "./app-view.ts"
 

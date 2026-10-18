@@ -1,20 +1,22 @@
 import {
-  type BannerRecord,
   blobUrl,
   type CanvasId,
   canvasIdFor,
   entryId,
-  type IconsRecord,
-  type MarkRecord,
   type Sha256,
   type ThreadId,
   type ThreadName,
   threadIdFor,
-  type Workflow,
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
+import type {
+  BannerRecord,
+  IconsRecord,
+  MarkRecord,
+  Workflow,
+} from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
 import type { Item, Status } from "./attention.ts"
 import { tree } from "./fixtures.ts"

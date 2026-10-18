@@ -2,7 +2,7 @@
 // config, and what it loaded. Every label is a value here and worded in
 // `setup-words.ts`, the words the host's startup lines say too.
 
-import type { CommandSummary, SetupRecord } from "@pinetrie/core"
+import type { CommandSummary, SetupRecord } from "@pinetrie/rules"
 import {
   credentialWords,
   fileStateWords,

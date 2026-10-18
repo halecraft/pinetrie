@@ -16,24 +16,16 @@ import {
   type AgentRun,
   type AskIndex,
   type CanvasId,
-  type CardHistoryRecord,
   type CardId,
   type CardRecord,
-  type DigestRecord,
   type EntryId,
   indexAsks,
   type LaneView,
-  type MarkRecord,
   type NoteColumnId,
-  type NoteColumnRecord,
   type RootId,
-  type RunEndReportRecord,
-  type SeatRecord,
   type ThreadId,
   type ThreadRecord,
-  type TraceRecord,
   type TreeIndex,
-  type Workflow,
 } from "@pinetrie/core"
 import {
   readAccepted,
@@ -69,6 +61,16 @@ import {
   readTraces,
   readWorkflow,
 } from "@pinetrie/reads"
+import type {
+  CardHistoryRecord,
+  DigestRecord,
+  MarkRecord,
+  NoteColumnRecord,
+  RunEndReportRecord,
+  SeatRecord,
+  TraceRecord,
+  Workflow,
+} from "@pinetrie/rules"
 import {
   type LiveDocHandle,
   type RootDocHandle,

@@ -1,14 +1,12 @@
 import {
   type CanvasCard,
   type CanvasId,
-  type CardHistoryRecord,
   type CardId,
   type CardRecord,
   canvasIdFor,
   cardIdOfKind,
   ERR,
   livePlace,
-  type Workflow,
   type WorkflowEdit,
   type WorkflowStateId,
   workflowStateIdFor,
@@ -28,7 +26,9 @@ import {
   taskBoard,
   tasksInArchive,
   WORKFLOW as WORKFLOW_SPEC,
+  type Workflow,
 } from "./board.ts"
+import type { CardHistoryRecord } from "./card-history.ts"
 import { orderKey } from "./order.ts"
 import { setRecord } from "./records.ts"
 

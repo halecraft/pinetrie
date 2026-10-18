@@ -4,8 +4,7 @@
 // loads it before lane work, and `createAgent` builds every harness from it.
 
 import path from "node:path"
-import type { ModelLine } from "@pinetrie/core"
-import { labelCommands, type ModelRef } from "@pinetrie/rules"
+import { labelCommands, type ModelLine, type ModelRef } from "@pinetrie/rules"
 import type { AgentDirBinding } from "./agent-dir.ts"
 import { type Banners, banners } from "./banner.ts"
 import { type CommandFiles, commandFiles } from "./commands.ts"

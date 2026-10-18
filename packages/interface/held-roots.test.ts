@@ -1,12 +1,12 @@
 import {
   canvasIdFor,
   entryId,
-  type RootRecord,
   rootIdFor,
   type ThreadId,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
+import type { RootRecord } from "@pinetrie/rules"
 import { landedThreadCard } from "@pinetrie/rules/fixtures"
 import { describe, expect, test } from "vitest"
 import { canvasesWith } from "./fixtures.ts"

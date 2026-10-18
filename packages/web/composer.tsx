@@ -4,7 +4,6 @@
 import type {
   AgentCandidate,
   CardId,
-  CommandSummary,
   EntryId,
   Position,
   TextCard,
@@ -22,6 +21,7 @@ import {
   type Reader,
   type ReadOnly,
 } from "@pinetrie/interface"
+import type { CommandSummary } from "@pinetrie/rules"
 import type { SessionClient } from "@pinetrie/session"
 import { CardEditor, type Where } from "./card-editor.tsx"
 import { nameFor } from "./presence.tsx"

@@ -5,7 +5,6 @@
 import {
   fnv1a,
   NAME_PAIRS,
-  type NameRecord,
   namePair,
   type ThreadId,
   type ThreadName,
@@ -39,6 +38,13 @@ export const readableThreadName = (
   names: ReadonlyMap<ThreadId, ThreadName>,
   lane: ThreadId,
 ): string => names.get(lane) ?? lane.slice(-8)
+
+/** A lane's name: a host-written `pinetrie.name` value keyed by the lane. */
+export interface NameRecord {
+  readonly lane: ThreadId
+  readonly name: ThreadName
+  readonly at: number
+}
 
 /**
  * A name for each lane that has none, oldest lane first, each avoiding the

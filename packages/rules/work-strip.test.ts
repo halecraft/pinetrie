@@ -1,8 +1,6 @@
 import {
   type CardCommand,
   commitId,
-  type FolderAcceptedRecord,
-  type FolderBaseRecord,
   type JjAcceptedRecord,
   type JjBaseRecord,
   type JjProposedChangesRecord,
@@ -12,6 +10,8 @@ import {
   threadIdFor,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
+import type { FolderAcceptedRecord } from "./accepted.ts"
+import type { FolderBaseRecord } from "./base.ts"
 import {
   type CatchUpNow,
   catchUpNow,

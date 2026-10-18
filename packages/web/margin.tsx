@@ -3,7 +3,7 @@
 // the count beside the entry (`MarginCount`). What it says is
 // `@pinetrie/interface`'s (`margin.ts`).
 
-import type { CardId, SeatRecord } from "@pinetrie/core"
+import type { CardId } from "@pinetrie/core"
 import {
   ADD_COMMENT,
   type ColumnAct,
@@ -12,7 +12,7 @@ import {
   type ReadOnly,
   SHUT_MARGIN,
 } from "@pinetrie/interface"
-import type { MarginCard } from "@pinetrie/rules"
+import type { MarginCard, SeatRecord } from "@pinetrie/rules"
 import type { SessionClient } from "@pinetrie/session"
 import { NoteCardEditor } from "./card-editor.tsx"
 import { RENDERINGS } from "./renderings.tsx"

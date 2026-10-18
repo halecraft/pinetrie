@@ -1,7 +1,7 @@
 // cards — what a card is: an identity, one place and content; each kind's
 // content, the one maker of a record (`makeCard`), where a card's words are
-// read (`cardTextSource`), a text card's commands, and a card's history and
-// traces. Where cards are, and how they move, is `places.ts`'.
+// read (`cardTextSource`) and a text card's commands. Where cards are, and how
+// they move, is `places.ts`'.
 
 import type { Address } from "./address.ts"
 import type { CatchUpFrom } from "./bases.ts"
@@ -15,10 +15,10 @@ import type {
   UndeliveredFact,
 } from "./facts.ts"
 import type { ConflictChoice } from "./folder.ts"
-import type { CardId, EntryId, TextCardId, ThreadId, WriterId } from "./ids.ts"
+import type { TextCardId, ThreadId, WriterId } from "./ids.ts"
 import type { Sha256 } from "./images.ts"
 import type { RelayDetails } from "./mentions.ts"
-import type { IdOf, PlaceKey, PlaceOf } from "./places.ts"
+import type { IdOf, PlaceOf } from "./places.ts"
 
 /**
  * The commands that catch a thread up. The first two bring the thread up to
@@ -248,58 +248,3 @@ export const makeCard = <K extends PlacedKind>(
   content: ContentOf[K],
   by: WriterId,
 ): Card<K> => ({ kind, id, owner: by, placer: by, place, content })
-
-/**
- * One change to a living card's place: who made it, from where to where, and
- * when. What the change was called (queued, took into the inventory, pinned) is
- * read from the two places when it is worded (`changeVerb`).
- */
-export interface CardEvent {
-  readonly kind: "created" | "moved" | "undone" | "redone" | "unsent"
-  /** Who made it; null for the host's own write. */
-  readonly by: WriterId | null
-  readonly from: PlaceKey | null
-  readonly to: PlaceKey
-  readonly at: number
-}
-
-/**
- * A card's history: a host-written `pinetrie.card-history` value in the
- * session, keyed by the card, and deleted with it.
- */
-export interface CardHistoryRecord {
-  readonly card: CardId
-  /** Oldest first; at most `HISTORY_EVENTS`, the first always kept. */
-  readonly events: readonly CardEvent[]
-}
-
-/**
- * The places a trace is left at: a thread's queue and its pinned cards, at the
- * thread's end, where its column draws it. A note moved by someone else leaves
- * none: a note column is everyone's scratch. Each has its drawer in
- * `@pinetrie/rules`' `TRACED`.
- */
-export type TracedKind = "queued" | "pinned"
-
-/** Where a trace was left: a key of a place in `TracedKind`. */
-export type TracedPlace = Extract<PlaceKey, { readonly kind: TracedKind }>
-
-/**
- * What stays where your card was when someone else moved it, while you were not
- * looking: a host-written `pinetrie.trace` value in the session, keyed by its
- * own id, since it outlives its card. Drawn only for its placer, and deleted
- * once they have seen it.
- */
-export interface TraceRecord {
-  readonly id: string
-  /** The card's placer before it moved: the one person it is drawn for. */
-  readonly for: WriterId
-  readonly card: CardId
-  readonly by: WriterId
-  readonly from: TracedPlace
-  /** Where the card went; null when it was sent. */
-  readonly to: PlaceKey | null
-  /** The message a send wrote; null for any other move. */
-  readonly message: EntryId | null
-  readonly at: number
-}

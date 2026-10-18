@@ -3,12 +3,14 @@
 import type {
   CardRecord,
   ForeignLane,
-  RunEndReportRecord,
   RunnableLane,
   ThreadId,
 } from "@pinetrie/core"
 import { queuedOn } from "./queue.ts"
-import { unclassifiedPending } from "./run-end-report.ts"
+import {
+  type RunEndReportRecord,
+  unclassifiedPending,
+} from "./run-end-report.ts"
 
 /**
  * What a starting host runs. A lane a crash interrupted holds its operation

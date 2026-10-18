@@ -19,15 +19,18 @@ each decision as a value typed in `@pinetrie/core` (`core/proposed.ts`), this
 package reads the facts it is made from and turns it into steps, and the
 host connects the two. The rule all three packages keep:
 
-> Core holds the vocabulary (ids, intents, every record's type) and the
-> reads of the tree. A format or type that lanes or jj must read, write
-> or name lives in core too, since neither can declare @pinetrie/rules.
-> What a stored shape says, and how the host changes it, is
-> @pinetrie/rules', whoever reads it. One client's own in-flight state
-> (its moves, held roots, slot repair, commands out) is
-> @pinetrie/session's. What a person sees and can do, and its words, is
-> @pinetrie/interface's, for any client; how the page draws it is
-> @pinetrie/web's (ADR-0093).
+> A type lives in the highest package that all its users can import
+> (ADR-0180). Core holds the vocabulary (ids, intents) and the reads of
+> the tree. A stored shape's type is @pinetrie/rules', beside its spec,
+> with the types only it uses. A type core's own code names, or one a
+> package below rules must read, write or name (one that declares
+> @pinetrie/core and not @pinetrie/rules: lanes, jj, folder
+> among them), lives in core instead. What a stored shape says, and how
+> the host changes it, is @pinetrie/rules', whoever reads it. One
+> client's own in-flight state (its moves, held roots, slot repair,
+> commands out) is @pinetrie/session's. What a person sees and can do,
+> and its words, is @pinetrie/interface's, for any client; how the page
+> draws it is @pinetrie/web's (ADR-0093).
 
 `index.ts` names its exports of your repo: only what other packages use;
 a lane's repo (`lane/`) it exports whole. The separate

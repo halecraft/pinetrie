@@ -3,6 +3,9 @@
 - **Status:** Accepted (Duane, 2026-10-05)
 - **Area:** `packages/interface/TECHNICAL.md`, `ARCHITECTURE.md`
 - **Evidence:** S54, S59, S115
+- **Amended by:**
+  - ADR-0180: the placement rule the packages' notes share now says where a
+    record's type lives; what the page shows is unchanged.
 
 **Context.** `@pinetrie/core` is a dependency of every package, `lanes`,
 `repo`, `pi` and the host among them, yet it held the columns' paths, the

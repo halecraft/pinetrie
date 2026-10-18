@@ -1,5 +1,4 @@
 import {
-  type CardEvent,
   cardIdOfKind,
   entryId,
   type PlaceKey,
@@ -10,6 +9,7 @@ import {
   writerId,
 } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
+import type { CardEvent } from "@pinetrie/rules"
 import type { CardNotice } from "@pinetrie/session"
 import { describe, expect, test } from "vitest"
 import {

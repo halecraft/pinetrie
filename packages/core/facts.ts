@@ -1,6 +1,6 @@
 // core/facts — what the host tells a thread as a fact in it: who stopped a run,
 // who joined or left, an ask unanswered or undelivered, a round spent, a branch
-// made, a budget spent; and a queue held.
+// made, a budget spent.
 
 import type { ArchivedCanvas } from "./board.ts"
 import type { CanvasId, EntryId, ThreadId, WriterId } from "./ids.ts"
@@ -124,16 +124,4 @@ export interface BudgetSpentFact {
   readonly budget: EntryId
   readonly limit: number
   readonly by: WriterId
-}
-
-/**
- * A thread's queue held: a host-written `pinetrie.queue-hold` value in the
- * session, keyed by the lane. While it is there no message card is popped, only
- * facts, until someone releases it.
- */
-export interface QueueHold {
-  readonly lane: ThreadId
-  readonly by: WriterId
-  /** When it was held, in ms since the epoch. */
-  readonly at: number
 }

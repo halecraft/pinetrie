@@ -2,15 +2,14 @@
 // is caught up instead.
 
 import {
-  type AcceptedRecord,
-  type BaseRecord,
   type BehindView,
   CATCH_UP_TOOL,
   type PointId,
   type ProposedChangesRecord,
 } from "@pinetrie/core"
 import { Type } from "typebox"
-import { catchUpNow } from "./base.ts"
+import type { AcceptedRecord } from "./accepted.ts"
+import { type BaseRecord, catchUpNow } from "./base.ts"
 import { baseMovedOn, CatchUpFromSchema } from "./catch-up-from.ts"
 import { List, PointSchema } from "./decode.ts"
 import { type HistoryMessage, historyMessage } from "./history.ts"

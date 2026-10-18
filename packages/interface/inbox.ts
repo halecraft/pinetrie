@@ -12,10 +12,10 @@ import {
   type EntryId,
   parseMentions,
   type RootId,
-  type RootRecord,
   type ThreadId,
   type WriterId,
 } from "@pinetrie/core"
+import type { RootRecord } from "@pinetrie/rules"
 
 /** A message that mentions you. */
 export interface InboxItem {

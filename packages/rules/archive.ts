@@ -17,7 +17,6 @@ import {
   type PointId,
   type Refusal,
   type RevisionRecord,
-  type RunEndReportRecord,
   refused,
   type SnapshotId,
   type ThreadId,
@@ -30,7 +29,10 @@ import {
   canvasOfCard,
   canvasOfTarget,
 } from "./canvas-index.ts"
-import { unclassifiedPending } from "./run-end-report.ts"
+import {
+  type RunEndReportRecord,
+  unclassifiedPending,
+} from "./run-end-report.ts"
 import { planRetention } from "./work.ts"
 
 /** Into the archive, or out of it: `stateTransition`'s crossings. */

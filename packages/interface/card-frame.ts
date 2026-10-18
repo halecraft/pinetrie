@@ -10,11 +10,14 @@ import type {
   CardRecord,
   Position,
   ThreadId,
-  WorkflowState,
   WriterId,
 } from "@pinetrie/core"
 import { cardCommand, fitsPlace, KINDS } from "@pinetrie/core"
-import { displayName, type PinnedStatus } from "@pinetrie/rules"
+import {
+  displayName,
+  type PinnedStatus,
+  type WorkflowState,
+} from "@pinetrie/rules"
 import { reorderByStep } from "./card-intents.ts"
 import {
   type CatchUps,

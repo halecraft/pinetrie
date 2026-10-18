@@ -1,10 +1,6 @@
-import {
-  type BannerRecord,
-  type Sha256,
-  type ThreadName,
-  threadIdFor,
-} from "@pinetrie/core"
+import { type Sha256, type ThreadName, threadIdFor } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
+import type { BannerRecord } from "./banner.ts"
 import {
   BANNER,
   type BannerAsk,

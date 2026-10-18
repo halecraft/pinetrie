@@ -4,12 +4,12 @@
 // each makes the host write, and in what order.
 
 import type {
-  BaseRecord,
   Placed,
   ProposedChangesInRepo,
   ProposedChangesRecord,
 } from "@pinetrie/core"
 import type { ProposedChangesEffects, RepoStep } from "@pinetrie/jj"
+import type { BaseRecord } from "@pinetrie/rules"
 
 export interface ProposedChangesPorts {
   /** The lane's base record, written when it differs from the page's. */

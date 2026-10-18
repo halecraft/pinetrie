@@ -4,7 +4,6 @@
 // `card-editor.tsx` draws them.
 
 import {
-  type AcceptedRecord,
   type AgentCandidate,
   type CanvasId,
   type CardCommand,
@@ -12,7 +11,6 @@ import {
   type QueueHoldChange,
   type Recipients,
   type SendMode,
-  type SetupRecord,
   sendWaits,
   type ThreadId,
   type ThreadLane,
@@ -20,10 +18,12 @@ import {
 } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import {
+  type AcceptedRecord,
   addressMessage,
   agentByDefault,
   displayName,
   parseCommand,
+  type SetupRecord,
 } from "@pinetrie/rules"
 import type { SendHow } from "@pinetrie/session"
 import type { Prefill } from "./columns.ts"

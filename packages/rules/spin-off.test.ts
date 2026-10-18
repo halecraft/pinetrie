@@ -1,5 +1,4 @@
 import {
-  type CardHistoryRecord,
   type CardId,
   type CardRecord,
   canvasIdFor,
@@ -15,6 +14,7 @@ import {
 import { canvasCard, cardIdFor } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import { type CanvasIndex, NO_CANVAS_INDEX } from "./canvas-index.ts"
+import type { CardHistoryRecord } from "./card-history.ts"
 import { landedThreadCard } from "./fixtures.ts"
 import { planRootDelete } from "./root.ts"
 import { planLiftRoot, planSpinOff, type SpunThread } from "./spin-off.ts"

@@ -1,14 +1,12 @@
 import {
   type AskOutcome,
-  type DigestRecord,
   entryId,
-  type RunEndReportRecord,
   rootIdFor,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
-import type { AskLines, DigestPlan } from "./digest.ts"
+import type { AskLines, DigestPlan, DigestRecord } from "./digest.ts"
 import {
   DIGEST,
   decodeRecords,
@@ -20,7 +18,7 @@ import {
   RUN_END_REPORT,
   runEndedToWrite,
 } from "./index.ts"
-import { REASON_WORDS } from "./run-end-report.ts"
+import { REASON_WORDS, type RunEndReportRecord } from "./run-end-report.ts"
 
 const ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 const LANE = threadIdFor("1")

@@ -3,13 +3,12 @@ import {
   canvasIdFor,
   type EntryId,
   entryId,
-  type RunEndReport,
-  type RunEndReportRecord,
   type ThreadId,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
+import type { RunEndReport, RunEndReportRecord } from "@pinetrie/rules"
 import type { Attention } from "@pinetrie/schema"
 import { describe, expect, test } from "vitest"
 import type { OpenProposedChanges } from "./app-view.ts"

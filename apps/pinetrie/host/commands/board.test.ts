@@ -3,7 +3,6 @@ import {
   entryId,
   runId,
   threadIdFor,
-  type Workflow,
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -13,6 +12,7 @@ import {
   RUN_END_REPORT,
   setRecord,
   WORKFLOW,
+  type Workflow,
 } from "@pinetrie/rules"
 import { beginRun, writeEntry, writeLaneTip } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"

@@ -36,7 +36,6 @@ import {
   pathIds,
   type TextCard,
   type ThreadId,
-  type WorkflowState,
   type WorkflowStateId,
 } from "@pinetrie/core"
 import {
@@ -166,6 +165,7 @@ import {
   taskBoard,
   tasksInArchive,
   unstartedThreads,
+  type WorkflowState,
 } from "@pinetrie/rules"
 import {
   heldBy,

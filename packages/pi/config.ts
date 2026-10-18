@@ -18,8 +18,8 @@ import {
   type ImageModel,
   type Models as ImageModels,
 } from "@earendil-works/pi-ai"
-import { type ConfigLayer, isWithin, type NoModel } from "@pinetrie/core"
-import type { GatheredCommand, ModelRef } from "@pinetrie/rules"
+import { type ConfigLayer, isWithin } from "@pinetrie/core"
+import type { GatheredCommand, ModelRef, NoModel } from "@pinetrie/rules"
 import type { AgentDirBinding } from "./agent-dir.ts"
 import { gatherCommands, type Listing, pinetrieCommands } from "./commands.ts"
 import {

@@ -12,7 +12,6 @@
 
 import {
   ERR,
-  type FolderBaseRecord,
   type FolderProposedChangesRecord,
   type PointId,
   type StateRecord,
@@ -35,6 +34,7 @@ import {
   answerDiff,
   BASE,
   deleteRecord,
+  type FolderBaseRecord,
   MAX_DIFF_BYTES,
   PROPOSED_CHANGES,
   planReviewRead,

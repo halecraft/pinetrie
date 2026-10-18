@@ -9,10 +9,10 @@ import type {
   CardRecord,
   EntryId,
   RootId,
-  RootRecord,
   ThreadId,
   WriterId,
 } from "@pinetrie/core"
+import type { RootRecord } from "@pinetrie/rules"
 import type { Canvases } from "./canvases.ts"
 import type { Layout } from "./layout.ts"
 

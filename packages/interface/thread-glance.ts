@@ -6,7 +6,6 @@
 
 import {
   type EntryId,
-  type FocusRecord,
   firstLine,
   indexAsks,
   type LaneView,
@@ -19,6 +18,7 @@ import {
   threadEnd,
   threadFirstMessage,
 } from "@pinetrie/core"
+import type { FocusRecord } from "@pinetrie/rules"
 import type { IconLookup, ThreadIcon } from "./thread-icon.ts"
 
 /** A thread at a glance: what its slot and its folded strip draw. */

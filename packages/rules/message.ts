@@ -8,7 +8,6 @@ import {
   CATCH_UP_TOOL,
   type CanvasId,
   CONFLICT_TOOL,
-  type CommandRef,
   ERR,
   IMAGE_MIMES,
   type ImageMime,
@@ -41,6 +40,7 @@ import { type Static, Type } from "typebox"
 import { type BaseNews, behindLine, decodeBehind } from "./behind.ts"
 import { canvasFactLine, decodeCanvas, decodeCanvasFact } from "./canvas.ts"
 import { decodeCanvasPinned } from "./canvas-pinned.ts"
+import type { CommandRef } from "./commands.ts"
 import { decodeWith, ThreadIdSchema } from "./decode.ts"
 import { decodeFact, factLine } from "./fact.ts"
 import { decodeLand, type LandMessage, landLine } from "./land.ts"

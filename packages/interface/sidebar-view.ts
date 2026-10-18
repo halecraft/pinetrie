@@ -2,15 +2,13 @@
 // to icons: `Sidebar` (`sidebar.tsx`) draws it, and each click sends the
 // intent it names.
 
-import type {
-  CanvasId,
-  MarkRecord,
-  ThreadId,
-  ThreadName,
-  Workflow,
-} from "@pinetrie/core"
+import type { CanvasId, ThreadId, ThreadName } from "@pinetrie/core"
 import { PRODUCT_NAME } from "@pinetrie/core"
-import { readableThreadName } from "@pinetrie/rules"
+import {
+  type MarkRecord,
+  readableThreadName,
+  type Workflow,
+} from "@pinetrie/rules"
 import type { Moments, Status } from "./attention.ts"
 import {
   boardPlaceWords,

@@ -8,24 +8,24 @@
 
 import type {
   CanvasId,
-  CardHistoryRecord,
   CardId,
   CardRecord,
-  MarkRecord,
   NoteColumnId,
-  NoteColumnRecord,
   ThreadId,
   ThreadName,
-  Workflow,
   WorkflowStateId,
   WriterId,
 } from "@pinetrie/core"
 import {
   type CanvasRole,
+  type CardHistoryRecord,
   canvasRole,
+  type MarkRecord,
   NEW_NOTES_TITLE,
+  type NoteColumnRecord,
   trashDeadline,
   trashedTime,
+  type Workflow,
 } from "@pinetrie/rules"
 import { type ControlWords, who } from "./card-words.ts"
 import { agoWords, spanWords, until } from "./counts.ts"

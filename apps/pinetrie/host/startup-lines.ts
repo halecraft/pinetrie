@@ -9,7 +9,6 @@ import type {
   ConfigFileState,
   ConfigOrigin,
   ConfigRefusal,
-  ModelLine,
   ThreadId,
 } from "@pinetrie/core"
 import {
@@ -18,7 +17,7 @@ import {
   originWords,
   refusalWords,
 } from "@pinetrie/interface"
-
+import type { ModelLine } from "@pinetrie/rules"
 import type {
   AllowedHost,
   DroppedIdentity,

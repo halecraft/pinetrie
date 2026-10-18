@@ -4,7 +4,6 @@ import {
   type AgentId,
   ERR,
   type LaneRecord,
-  type MarkRecord,
   type Position,
   parseTitle,
   projectTranscript,
@@ -18,6 +17,7 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import type { ModelRef } from "./config.ts"
+import type { MarkRecord } from "./mark.ts"
 import {
   firstAndNewest,
   oneLine,

@@ -1,11 +1,11 @@
 import {
-  type FolderAcceptedRecord,
   type PointId,
   pointId,
   type StateRecord,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
+import type { FolderAcceptedRecord } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
 import { whenWords } from "./counts.ts"
 import { historyView, madeWords } from "./history-view.ts"

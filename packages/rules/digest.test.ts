@@ -1,6 +1,4 @@
 import {
-  type DigestBody,
-  type DigestRecord,
   type EntryLike,
   entryId,
   indexAsks,
@@ -11,6 +9,8 @@ import { FIXTURE_THREAD } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   DIGEST_EVERY,
+  type DigestBody,
+  type DigestRecord,
   digestDue,
   HEADLINE_WORDS,
   MAX_POINTS,

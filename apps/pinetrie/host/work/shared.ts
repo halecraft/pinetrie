@@ -12,7 +12,6 @@ import type {
   EntryId,
   SharedAccess,
   SharedTouch,
-  SharedWriter,
   ThreadId,
   TurnShared,
 } from "@pinetrie/core"
@@ -27,6 +26,7 @@ import {
   REVISION,
   SHARED_LINEAGE,
   type SharedRead,
+  type SharedWriter,
   setRecord,
   sharedTouches,
 } from "@pinetrie/rules"

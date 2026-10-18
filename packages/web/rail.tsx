@@ -10,7 +10,6 @@
 import type {
   AgentRun,
   AskIndex,
-  DigestRecord,
   EntryId,
   RailRow,
   RevisionRecord,
@@ -40,6 +39,7 @@ import {
   type ViewportStore,
   workWords,
 } from "@pinetrie/interface"
+import type { DigestRecord } from "@pinetrie/rules"
 import type { SessionClient } from "@pinetrie/session"
 import {
   type ComponentProps,

@@ -1,7 +1,6 @@
 import {
   entryId,
   type SharedAccess,
-  type SharedLineage,
   type Stamp,
   stamp,
   threadIdFor,
@@ -14,6 +13,7 @@ import {
   planGoneLineages,
   planSharedLineages,
   SHARED_LINEAGE,
+  type SharedLineage,
   type SharedWrite,
   sharedTouches,
 } from "./shared.ts"

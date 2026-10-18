@@ -2,7 +2,8 @@
 // commands while the text is a `/` and a first word (`commands.ts`), else
 // whom the mention at the caret may name (`mentions.ts`).
 
-import type { AgentCandidate, CommandSummary } from "@pinetrie/core"
+import type { AgentCandidate } from "@pinetrie/core"
+import type { CommandSummary } from "@pinetrie/rules"
 import { commandCompletion } from "./commands.ts"
 import { mentionCompletion } from "./mentions.ts"
 import type { Reader } from "./send.ts"

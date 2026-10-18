@@ -2,7 +2,6 @@
 // back into the card.
 
 import {
-  type CardHistoryRecord,
   type CardId,
   type CardRecord,
   type Intent,
@@ -22,6 +21,7 @@ import {
   rootOfPlace,
   type ThreadOpen,
 } from "./canvas-index.ts"
+import type { CardHistoryRecord } from "./card-history.ts"
 import { planMove } from "./moves.ts"
 import type { MoveStep } from "./place-steps.ts"
 

@@ -5,13 +5,12 @@ import {
   canvasIdFor,
   entryId,
   threadIdFor,
-  type Workflow,
   type WriterId,
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
 import { canvasCard } from "@pinetrie/core/fixtures"
-import { orderKeys, taskBoard } from "@pinetrie/rules"
+import { orderKeys, taskBoard, type Workflow } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
 import type { Status } from "./attention.ts"
 import {

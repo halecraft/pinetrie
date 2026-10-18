@@ -5,8 +5,6 @@ import {
   type AskIndex,
   askOutcome,
   askSpan,
-  type DigestBody,
-  type DigestRecord,
   type EntryId,
   entryAsk,
   entryMessage,
@@ -16,6 +14,7 @@ import {
   type TreeIndex,
   type WriterId,
 } from "@pinetrie/core"
+import type { DigestBody, DigestRecord } from "@pinetrie/rules"
 import { askStats, type Segment } from "./ask-segments.ts"
 import { outcomeWords, workWords } from "./ask-words.ts"
 import { callPurpose } from "./tool-words.ts"

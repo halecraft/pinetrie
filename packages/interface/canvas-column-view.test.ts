@@ -5,10 +5,10 @@ import {
   entryId,
   NO_CONTENT,
   threadIdFor,
-  type Workflow,
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
+import type { Workflow } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
 import {
   boardPlaceWords,

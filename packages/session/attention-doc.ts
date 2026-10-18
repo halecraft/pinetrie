@@ -4,8 +4,9 @@
 
 import type { Exchange } from "@kyneta/exchange"
 import { batch } from "@kyneta/schema"
-import type { EntryId, RootRecord, ThreadId, WriterId } from "@pinetrie/core"
+import type { EntryId, ThreadId, WriterId } from "@pinetrie/core"
 import { personDocId } from "@pinetrie/protocol/writers"
+import type { RootRecord } from "@pinetrie/rules"
 import { type Attention, AttentionDoc, readAttention } from "@pinetrie/schema"
 import { personDoc } from "./person-doc.ts"
 import { NO_READS, type ReadMemory, readStep } from "./read-marks.ts"

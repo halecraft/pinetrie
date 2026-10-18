@@ -1,6 +1,6 @@
 // seat — which person each seat is, as the host saw it.
 
-import type { SeatRecord, WriterId } from "@pinetrie/core"
+import type { WriterId } from "@pinetrie/core"
 import { Type } from "typebox"
 import { decodeRecord, textKey } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
@@ -10,6 +10,19 @@ const SeatSchema = Type.Object({
   writer: Type.String(),
   at: Type.Number(),
 })
+
+/**
+ * A seat the host has seen: its Kyneta peer, the Yjs `clientID` its operations
+ * carry, and the person it is. A host-written `pinetrie.seat` value keyed by
+ * the peer, so anyone can name who wrote in a text after the seat has gone.
+ */
+export interface SeatRecord {
+  readonly peer: string
+  readonly clientId: number
+  readonly writer: WriterId
+  /** When the host first saw it, which orders contributors. */
+  readonly at: number
+}
 
 /**
  * Each seat, at its Kyneta peer id: the seat's identity, as presence's

@@ -1,12 +1,12 @@
 import {
   type EntryId,
   entryId,
-  type RootRecord,
   rootIdFor,
   threadIdFor,
   type WriterId,
   writerId,
 } from "@pinetrie/core"
+import type { RootRecord } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
 import {
   type Inbox,

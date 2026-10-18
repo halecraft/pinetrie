@@ -8,7 +8,6 @@
 // write that changes nothing.
 
 import {
-  type BaseRecord,
   type CatchUpRead,
   type JjBaseRecord,
   laneFirstPrompt,
@@ -33,6 +32,7 @@ import {
 import {
   archivedIn,
   BASE,
+  type BaseRecord,
   deleteRecord,
   PROPOSED_CHANGES,
   setIfChanged,

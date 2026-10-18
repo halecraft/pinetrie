@@ -2,8 +2,6 @@
 
 import {
   type AskIndex,
-  type DigestBody,
-  type DigestRecord,
   type EntryId,
   isLongAsk,
   lastWord,
@@ -38,6 +36,38 @@ const DigestSchema = Type.Union([
     final: Type.Literal(true),
   }),
 ])
+
+/** What a digest says: a model's reply on an ask's work, as read. */
+export interface DigestBody {
+  /** One line of at most `HEADLINE_WORDS` words (`@pinetrie/rules`' `digest.ts`). */
+  readonly headline: string
+  /**
+   * At most `MAX_POINTS` markdown lines, one point each; empty when the work
+   * in between adds nothing to the ask's last word.
+   */
+  readonly points: readonly string[]
+}
+
+/**
+ * An ask's digest: replaced whole on each write, so a value, not a text.
+ * A live one, written while its run lasts, has no points: they change on
+ * each write, and only a final digest's are worth drawing.
+ */
+export type DigestRecord =
+  | {
+      /** The ask's prompt: the digest's key. */
+      readonly prompt: EntryId
+      /** When it was written, in ms since the epoch. */
+      readonly at: number
+      readonly final: false
+      readonly headline: string
+    }
+  | ({
+      readonly prompt: EntryId
+      readonly at: number
+      /** Written after its run ended: kept, and never replaced by a live one. */
+      readonly final: true
+    } & DigestBody)
 
 /** Each ask's digest, at its prompt's entry id. */
 export const DIGEST: RecordSpec<DigestRecord, EntryId, "root"> = {

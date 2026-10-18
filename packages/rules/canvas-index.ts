@@ -30,11 +30,10 @@ import {
   type TreeIndex,
   threadOfPlace,
   type ValueWrite,
-  type Workflow,
   type WorkflowStateId,
   type WriterId,
 } from "@pinetrie/core"
-import { boardEnd } from "./board.ts"
+import { boardEnd, type Workflow } from "./board.ts"
 import { type MakeStep, type PlaceStep, planMake } from "./place-steps.ts"
 import { branchAfter, rankAfter, rankOfDrop } from "./rank.ts"
 import { setRecord } from "./records.ts"
