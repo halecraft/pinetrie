@@ -47,7 +47,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       lanes.sectionHost({
         dir: work,
         model: { kind: "scripted", script },
-        ...stored.options,
+        ...stored,
       })
     let section = await start()
     let th = section.host
@@ -117,7 +117,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     unwatch()
     await th.quiet()
     const base64Slice = RED_PNG.toString("base64").slice(20, 70)
-    await recordsHold(stored.opened.store, base64Slice)
+    await recordsHold(stored.store.store, base64Slice)
 
     // 3. After a restart on the same file and the grace, the sweep keeps it,
     // and it still reaches the model.

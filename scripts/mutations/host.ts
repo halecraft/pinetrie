@@ -2193,20 +2193,107 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a store migration deletes nothing",
     file: "apps/pinetrie/host/migrations/index.ts",
-    from: "      await store.delete(id)\n",
+    from: "      for (const id of ids) await store.delete(id)\n",
     to: "",
     command: unit,
     expect:
-      "deleteStored deletes what each migration dooms, once, after one copy",
+      "prepareStore records a new store's names first, copies the store once before the first deletion",
   },
   {
     name: "the store is copied before each store migration",
     file: "apps/pinetrie/host/migrations/index.ts",
-    from: "      backup = null\n",
+    from: "        backup = null\n",
     to: "",
     command: unit,
     expect:
-      "deleteStored deletes what each migration dooms, once, after one copy",
+      "prepareStore records a new store's names first, copies the store once before the first deletion",
+  },
+  {
+    name: "a store migration that deleted nothing is not recorded",
+    file: "apps/pinetrie/host/migrations/index.ts",
+    from: "      log(`[host] ${migration.name}: ${ids.length} document(s) deleted`)\n    }\n    ledger.record([migration.name], now())\n",
+    to: "      log(`[host] ${migration.name}: ${ids.length} document(s) deleted`)\n      ledger.record([migration.name], now())\n    }\n",
+    command: unit,
+    expect: "records each due store migration, one that deleted nothing too",
+  },
+  {
+    name: "a store with nothing stored is planned as in use",
+    file: "apps/pinetrie/host/migrations/index.ts",
+    from: "  if (input.storedIds.length === 0)\n",
+    to: "  if (input.storedIds.length < 0)\n",
+    command: unit,
+    expect:
+      "a store with nothing stored is new: it records every carried and retired name",
+  },
+  {
+    name: "a store that never ran a retired migration opens",
+    file: "apps/pinetrie/host/migrations/index.ts",
+    from: '  if (missing.length > 0) return { kind: "refuse", missing }\n',
+    to: "",
+    command: unit,
+    expect: "a store in use that lacks retired names is refused, naming each",
+  },
+  {
+    name: "a record migration runs whatever the ledger says",
+    file: "apps/pinetrie/host/migrations/index.ts",
+    from: "    records: registry.records.filter(m => !ran.has(m.name)),\n",
+    to: "    records: registry.records,\n",
+    command: unit,
+    expect: "a store in use runs only the one-time migrations its ledger lacks",
+  },
+  {
+    name: "the stored command Lines are kept",
+    file: "apps/pinetrie/host/migrations/index.ts",
+    from: "  const lines = ids.filter(id => id.startsWith(linePrefix))\n",
+    to: "  const lines: string[] = []\n",
+    command: unit,
+    expect:
+      "the stored command Lines are deleted, and a store holding only Lines is in use",
+  },
+  {
+    name: "the hash check sees what a store migration deletes",
+    file: "apps/pinetrie/host/migrations/index.ts",
+    from: "    stored: new Map([...input.stored].filter(([id]) => keptSet.has(id))),\n",
+    to: "    stored: new Map(\n      [...input.stored].filter(([id]) => !id.startsWith(linePrefix)),\n    ),\n",
+    command: unit,
+    expect:
+      "a store migration's documents are deleted before the hash check, which does not see them",
+  },
+  {
+    name: "migrate records before the flush",
+    file: "apps/pinetrie/host/migrations/index.ts",
+    from: "  await exchange.flush()\n  // A write is in the file only once the flush resolves: a name recorded\n  // before it could outlive the write it stands for.\n  input.opened.ledger.record(\n    input.records.map(m => m.name),\n    input.now(),\n  )\n",
+    to: "  input.opened.ledger.record(\n    input.records.map(m => m.name),\n    input.now(),\n  )\n  await exchange.flush()\n",
+    command: unit,
+    expect:
+      "migrate records each due record migration after the flush, one that found nothing too",
+  },
+  {
+    name: "migrate records only the record migrations that wrote",
+    file: "apps/pinetrie/host/migrations/index.ts",
+    from: "    input.records.map(m => m.name),\n",
+    to: "    writes.filter(w => w.docs === null).map(w => w.name),\n",
+    command: unit,
+    expect:
+      "migrate records each due record migration after the flush, one that found nothing too",
+  },
+  {
+    name: "the ledger's table goes with the connection",
+    file: "apps/pinetrie/host/migrations/ledger.ts",
+    from: "  db.exec(`CREATE TABLE IF NOT EXISTS pinetrie_migrations (",
+    to: "  db.exec(`CREATE TEMP TABLE IF NOT EXISTS pinetrie_migrations (",
+    command: unit,
+    expect:
+      "a file's ledger survives a reopen, and the store's backup copies it",
+  },
+  {
+    name: "a migration's name given twice is no clash",
+    file: "apps/pinetrie/host/migrations/index.ts",
+    from: "    if (seen.has(name)) return name\n",
+    to: "",
+    command: unit,
+    expect:
+      "migrationNameClash finds a name given twice; the build's registries have none",
   },
   {
     name: "a stack of moves is reported as unknown",

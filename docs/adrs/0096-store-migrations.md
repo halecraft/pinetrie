@@ -3,6 +3,10 @@
 - **Status:** Accepted (Duane, 2026-10-08)
 - **Area:** `apps/pinetrie/host/TECHNICAL.md`, `packages/rules/TECHNICAL.md`
 - **Evidence:** S120
+- **Amended by:**
+  - ADR-0174: a one-time record or store migration is skipped on a store whose
+    ledger names it, and one deleted from the build leaves its name, so a
+    store that never ran it is refused instead of opened.
 
 Formalizes the carry-overs of ADR-0066 and ADR-0085, which ran at startup and
 were deleted once they had run, and replaces the one-off script of ADR-0063

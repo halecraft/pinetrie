@@ -13,18 +13,13 @@ import type { SuiteClock } from "../harness.ts"
 export const sleep = (ms: number): Promise<void> =>
   new Promise(r => setTimeout(r, ms))
 /**
- * A store on `file`, and the `startHost` options that use it, on one clock.
+ * The `startHost` options for a store on `file` and the host, on one clock.
  * The blobs stamp each image with the clock the host's sweep reads: a store
  * left on the real clock, behind a host moved ahead, makes every image it
  * stamps look a day old, and the sweep deletes it.
  */
-export function clockedStore(file: string, clock: SuiteClock) {
-  const opened = openStore(file, { now: clock.now })
-  return {
-    opened,
-    options: { store: opened.store, blobs: opened.blobs, now: clock.now },
-  } as const
-}
+export const clockedStore = (file: string, clock: SuiteClock) =>
+  ({ store: openStore(file, { now: clock.now }), now: clock.now }) as const
 
 export const startedRunId = (o: Outcome) =>
   o.kind === "started" ? o.runId : ""

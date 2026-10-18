@@ -73,8 +73,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       lanes.startHost({
         model: { kind: "scripted", script },
         project: { dir: work, tools: true },
-        store,
-        blobs: opened.blobs,
+        store: { ...opened, store },
         log,
       })
     let th = await open(() => {})

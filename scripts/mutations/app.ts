@@ -636,9 +636,9 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the startup sweep deletes nothing",
-    file: "apps/pinetrie/host/index.ts",
-    from: "    await store.delete(id)",
-    to: "    void id",
+    file: "apps/pinetrie/host/migrations/index.ts",
+    from: "  for (const line of plan.lines) await store.delete(line)",
+    to: "  for (const line of plan.lines) void line",
     suite: "host",
     scenario: "tools",
     expect:
@@ -1819,8 +1819,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "images are kept in memory, not the store's file",
     file: "apps/pinetrie/host/store.ts",
-    from: "  return { store, blobs: sqliteBlobs(db, options.now), backup }",
-    to: '  return { store, blobs: sqliteBlobs(new DatabaseSync(":memory:"), options.now), backup }',
+    from: "    blobs: sqliteBlobs(db, options.now),",
+    to: '    blobs: sqliteBlobs(new DatabaseSync(":memory:"), options.now),',
     suite: "host",
     scenario: "images",
     expect:

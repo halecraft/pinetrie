@@ -504,8 +504,8 @@ which are swept.
   kind, so neither can touch a field its kind does not store. Your
   message, a pinned card and a queued card name their thread alone (stored
   in `lane`), and resolve to its end (`placeEnd`, `threadEnd`): every entry
-  names its thread (ADR-0125). Their rows keep no `at` (migration
-  `0009-card-content` cleared the old ones); the row's `at` field is a
+  names its thread (ADR-0125). Their rows keep no `at` (a migration,
+  since deleted, cleared the old ones); the row's `at` field is a
   comment's entry. A canvas card has its canvas, rank and width; a card in a
   trash is stored as the place it left, its row's kind that place's
   prefixed `discarded-` (`discarded-note`, `discarded-canvas`, …), so no
@@ -520,7 +520,7 @@ which are swept.
   under the kind `drafting` it had before notes, so no row changed with
   the split; a note is stored as `note`, its note column in `column` and its
   rank in `order` (ADR-0116). A card at a thread whose stored `lane` is no
-  thread's id does not decode: migration `0005-tasks` (deleted once run)
+  thread's id does not decode: a migration (deleted once run)
   gave every such row its thread. A card's kind is its id's prefix
   (`kindOfCard`), and its id is parsed where it comes in (`parseCardId`):
   a text card's is a bare lowercase uuidv7, a note column's, a fact's, a
@@ -652,7 +652,7 @@ which are swept.
   only, those of a canvas the session does not hold. A person's history
   outside any canvas (`moves:<writer>`) is kept, and an id that names no
   history is left: the histories once kept by root were retired by
-  migration `0005-tasks`, since deleted.
+  ADR-0116's migration, since deleted.
 - **A card at a thread's end is resolved, never stored as an end**: your
   message, a pinned card. `placeEnd` is its thread's end (`threadEnd`), so
   the card follows its thread as the thread grows; a thread not yet
@@ -1352,7 +1352,7 @@ Host-written records, each a `RecordSpec` (above) with a total decoder:
 |---|---|---|---|
 | a lane's setting: the root it works in, and the kind of history its own copy keeps (`history`: `"jj"`, `"folder"`, or null for no copy of its own) (ADR-0102, ADR-0150) | `pinetrie.lane` | the lane | once, when the lane is created |
 | a lane of its own's fork: the WIP it starts from (`base`, null for accepted work), and `state`: `owed`, or `begun` with `lost`, the snapshot its source would have cloned when that was not kept (ADR-0167) | `pinetrie.lane-fork` | the lane | owed with `LANE` (`planLaneRecords`), and again by a fork run over a begun lane; begun at the fork's end, with its history's start records (`forkEnd`, the host's) |
-| the state (`point`) and disk at an entry, and the paths its turn changed, written whole: every field present (`0016-revision-point` moved the older shapes) | `pinetrie.revision` | the entry | for every run's prompt, and every assistant message of a lane of its own that made tool calls |
+| the state (`point`) and disk at an entry, and the paths its turn changed, written whole: every field present (a migration, since deleted, moved the older shapes) | `pinetrie.revision` | the entry | for every run's prompt, and every assistant message of a lane of its own that made tool calls |
 | what the host found where it runs: its root, its kind (`jj` or `folder`, what a lane's history must be to run), and its owner; a record from before the kind decodes as none until the host's start rewrites it | `pinetrie.project` | `project` | at every start |
 
 - **Every run's prompt has a revision record**, so the nearest record above

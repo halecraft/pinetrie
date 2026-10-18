@@ -4,20 +4,27 @@ import path from "node:path"
 import { DatabaseSync } from "node:sqlite"
 import { createInMemoryStore, Exchange } from "@kyneta/exchange"
 import { batch, json, Schema } from "@kyneta/schema"
-import { LIVE_DOC_ID } from "@pinetrie/protocol/messages"
+import { CONTROL_TOPIC, LIVE_DOC_ID } from "@pinetrie/protocol/messages"
 import { afterEach, describe, expect, test } from "vitest"
+import { lineDocPrefix } from "../lines.ts"
 import { SCHEMA_OF, type StoredKind } from "../policy.ts"
 import { openStore } from "../store.ts"
 import {
-  deleteStored,
   type Migration,
   migrate,
+  migrationNameClash,
+  ONE_TIME_MIGRATIONS,
+  type OneTimeRegistry,
+  oneTimeNames,
   planOpen,
-  planStoredOpen,
+  planStart,
+  planStoredStart,
+  prepareStore,
   type RecordMigration,
   readStored,
   type StoreMigration,
 } from "./index.ts"
+import { type MigrationLedger, memoryLedger } from "./ledger.ts"
 
 const hashes: Record<StoredKind, string> = {
   session: "h-session",
@@ -144,10 +151,9 @@ describe("this build's schemas against a store", () => {
     await ex.whenHydrated(LIVE_DOC_ID)
     batch(doc, d => d.x.set("k", 1))
     await ex.flush()
-    expect(planStoredOpen(await readStored(store))).toMatchObject({
+    expect(planStoredStart(await readStored(store), new Set())).toMatchObject({
       kind: "refuse",
-      docId: LIVE_DOC_ID,
-      stored: Other.schemaHash,
+      refusal: { kind: "hash", docId: LIVE_DOC_ID, stored: Other.schemaHash },
     })
   })
 })
@@ -192,6 +198,24 @@ describe("migrate", () => {
     return file
   }
 
+  /** `ledger`, and `ex`'s flushes, each pushing to one list of calls. */
+  function callsOf(ex: Exchange, inner: MigrationLedger) {
+    const calls: string[] = []
+    const flush = ex.flush.bind(ex)
+    ex.flush = async () => {
+      calls.push("flush")
+      await flush()
+    }
+    const ledger: MigrationLedger = {
+      ran: inner.ran,
+      record(names, at) {
+        calls.push(`record ${names.join(", ")}`)
+        inner.record(names, at)
+      },
+    }
+    return { ledger, calls }
+  }
+
   async function run(file: string) {
     const opened = openStore(file)
     const ex = new Exchange({
@@ -219,6 +243,7 @@ describe("migrate", () => {
       },
     }
     const lines: string[] = []
+    const { ledger, calls } = callsOf(ex, opened.ledger)
     const warn = console.warn
     console.warn = () => {}
     try {
@@ -228,15 +253,16 @@ describe("migrate", () => {
           run: [{ migration, docIds: ["d"] }],
           unknown: [],
         },
-        records: [],
-        storedIds: [],
+        records: [{ name: "test-nothing", run: async () => null }],
+        storedIds: ["d"],
         exchange: ex,
-        backup: opened.backup,
+        opened: { ...opened, ledger },
+        now: () => 1,
         log: line => lines.push(line),
       })
-      return { wrote, lines, error: null }
+      return { wrote, lines, calls, error: null }
     } catch (error) {
-      return { wrote, lines, error: String(error) }
+      return { wrote, lines, calls, error: String(error) }
     } finally {
       console.warn = warn
       await ex.shutdown()
@@ -262,9 +288,62 @@ describe("migrate", () => {
 
   test("a stored record that fails to load stops the migration before it writes", async () => {
     const file = await stored(true)
-    const { wrote, error } = await run(file)
+    const { wrote, calls, error } = await run(file)
     expect(wrote).toEqual([])
     expect(error).toContain("stopped a migration before it wrote anything")
+    expect(calls.filter(c => c.startsWith("record"))).toEqual([])
+  })
+
+  test("migrate records each due record migration after the flush, one that found nothing too", async () => {
+    const { calls, error } = await run(await stored(false))
+    expect(error).toBeNull()
+    expect(calls).toEqual(["flush", "record test-nothing"])
+  })
+
+  test("a record migration runs at the first start of a store whose ledger lacks it, and not at the next", async () => {
+    const file = await stored(false)
+    let runs = 0
+    const probe: RecordMigration = {
+      name: "test-probe",
+      run: async ({ exchange, hydrated }) => {
+        runs++
+        exchange.get("d", Doc)
+        await hydrated("d")
+        return null
+      },
+    }
+    const start = async () => {
+      const opened = openStore(file)
+      const plan = planStart({
+        stored: await readStored(opened.store),
+        ran: opened.ledger.ran(),
+        registry: { store: [], records: [probe], retired: [] },
+        kindOf: () => "kyneta",
+        hashOf: kind => hashes[kind],
+        migrations: [],
+      })
+      if (plan.kind === "refuse") throw new Error("refused")
+      await prepareStore(opened, plan, { now: () => 1, log: () => {} })
+      const ex = new Exchange({
+        principal: "host",
+        type: "service",
+        transports: [],
+        store: opened.store,
+      })
+      await migrate({
+        plan: plan.open,
+        records: plan.records,
+        storedIds: plan.kept,
+        exchange: ex,
+        opened,
+        now: () => 1,
+        log: () => {},
+      })
+      await ex.shutdown()
+    }
+    await start()
+    await start()
+    expect(runs).toBe(1)
   })
 
   test("a record migration writes only when it finds its old shape, backed up first; one that finds none writes nothing, and is not backed up for", async () => {
@@ -299,7 +378,8 @@ describe("migrate", () => {
         records: [rename],
         storedIds: [...(await readStored(opened.store)).keys()],
         exchange: ex,
-        backup: opened.backup,
+        opened,
+        now: () => 1,
         log: line => lines.push(line),
       })
       const doc = ex.get("d", Doc)
@@ -318,48 +398,189 @@ describe("migrate", () => {
   })
 })
 
-test("deleteStored deletes what each migration dooms, once, after one copy", async () => {
-  const stored = new Set([
-    "line:old:b→a",
-    "line:old:a→b",
-    "pinetrie:session",
-    "root:r-1",
-  ])
-  const store = {
-    async *listDocIds() {
-      yield* [...stored]
-    },
-    delete: async (id: string) => void stored.delete(id),
-  }
-  const lines: StoreMigration = {
-    name: "old-lines",
-    doomed: ids => ids.filter(id => id.startsWith("line:old:")),
-  }
-  const roots: StoreMigration = {
-    name: "roots",
-    doomed: ids => ids.filter(id => id.startsWith("root:")),
-  }
-  const copies: string[] = []
-  const logged: string[] = []
-  const run = () =>
-    deleteStored({
-      store,
-      migrations: [lines, roots],
-      backup: name => {
-        copies.push(name)
-        return `db.before-${name}`
-      },
-      log: line => logged.push(line),
+describe("planStart", () => {
+  const line = (n: string) => `${lineDocPrefix(CONTROL_TOPIC)}${n}`
+  const nothing = (name: string): RecordMigration => ({
+    name,
+    run: async () => null,
+  })
+  const deleting = (name: string, prefix: string): StoreMigration => ({
+    name,
+    doomed: ids => ids.filter(id => id.startsWith(prefix)),
+  })
+  const start = (
+    stored: Record<string, string>,
+    ran: readonly string[],
+    registry: OneTimeRegistry,
+  ) =>
+    planStart({
+      stored: new Map(Object.entries(stored)),
+      ran: new Set(ran),
+      registry,
+      kindOf,
+      hashOf: kind => hashes[kind],
+      migrations: [],
     })
-  await run()
-  expect([...stored]).toEqual(["pinetrie:session"])
-  expect(copies).toEqual(["old-lines"])
-  expect(logged).toEqual([
-    "[host] store copied to db.before-old-lines",
-    "[host] old-lines: 2 document(s) deleted",
-    "[host] roots: 1 document(s) deleted",
+  const registry: OneTimeRegistry = {
+    store: [deleting("s-1", "root:old")],
+    records: [nothing("r-1"), nothing("r-2")],
+    retired: ["gone-1", "gone-2"],
+  }
+
+  test("a store with nothing stored is new: it records every carried and retired name, and runs and deletes nothing", () => {
+    expect(start({}, [], registry)).toMatchObject({
+      kind: "open",
+      record: ["s-1", "r-1", "r-2", "gone-1", "gone-2"],
+      lines: [],
+      deletions: [],
+      records: [],
+    })
+  })
+
+  test("a store in use that lacks retired names is refused, naming each", () => {
+    expect(
+      start({ "pinetrie:session": "h-session" }, ["gone-2"], registry),
+    ).toEqual({
+      kind: "refuse",
+      refusal: { kind: "retired", missing: ["gone-1"] },
+    })
+    expect(start({ "pinetrie:session": "h-session" }, [], registry)).toEqual({
+      kind: "refuse",
+      refusal: { kind: "retired", missing: ["gone-1", "gone-2"] },
+    })
+  })
+
+  test("a store in use runs only the one-time migrations its ledger lacks", () => {
+    const plan = start(
+      { "pinetrie:session": "h-session", "root:old-1": "h-root" },
+      ["gone-1", "gone-2", "s-1", "r-1"],
+      registry,
+    )
+    expect(plan).toMatchObject({ kind: "open", record: [], deletions: [] })
+    if (plan.kind !== "open") return
+    expect(plan.records.map(m => m.name)).toEqual(["r-2"])
+    expect(plan.kept).toEqual(["pinetrie:session", "root:old-1"])
+  })
+
+  test("a ledger name neither carried nor retired is reported", () => {
+    expect(
+      start(
+        { "pinetrie:session": "h-session" },
+        ["gone-1", "gone-2", "z-newer", "a-newer", "r-1"],
+        registry,
+      ),
+    ).toMatchObject({ kind: "open", unknownNames: ["a-newer", "z-newer"] })
+  })
+
+  test("the stored command Lines are deleted, and a store holding only Lines is in use", () => {
+    expect(
+      start({ [line("a→b")]: "h-line", "pinetrie:session": "h-session" }, [], {
+        store: [],
+        records: [],
+        retired: [],
+      }),
+    ).toMatchObject({
+      kind: "open",
+      lines: [line("a→b")],
+      kept: ["pinetrie:session"],
+      open: { unknown: [] },
+    })
+    expect(start({ [line("a→b")]: "h-line" }, [], registry)).toMatchObject({
+      kind: "refuse",
+      refusal: { kind: "retired" },
+    })
+  })
+
+  test("a store migration's documents are deleted before the hash check, which does not see them", () => {
+    const plan = start(
+      {
+        "pinetrie:session": "h-session",
+        "root:old-1": "h-stale",
+        "root:r-1": "h-root",
+      },
+      ["gone-1", "gone-2"],
+      registry,
+    )
+    expect(plan).toMatchObject({
+      kind: "open",
+      deletions: [{ ids: ["root:old-1"] }],
+      kept: ["pinetrie:session", "root:r-1"],
+    })
+  })
+
+  test("a hash refusal is planned before anything is deleted", () => {
+    expect(
+      start(
+        { "root:old-1": "h-root", "root:r-1": "h-stale" },
+        ["gone-1", "gone-2"],
+        registry,
+      ),
+    ).toEqual({
+      kind: "refuse",
+      refusal: {
+        kind: "hash",
+        docId: "root:r-1",
+        stored: "h-stale",
+        expected: "h-root",
+      },
+    })
+  })
+})
+
+test("prepareStore records a new store's names first, copies the store once before the first deletion, and records each due store migration, one that deleted nothing too", async () => {
+  const calls: string[] = []
+  const inner = memoryLedger()
+  const opened = {
+    store: { delete: async (id: string) => void calls.push(`delete ${id}`) },
+    ledger: {
+      ran: inner.ran,
+      record(names: readonly string[], at: number) {
+        if (names.length > 0) calls.push(`record ${names.join(", ")}`)
+        inner.record(names, at)
+      },
+    },
+    backup: (name: string) => {
+      calls.push(`copy ${name}`)
+      return `db.before-${name}`
+    },
+  }
+  const migration = (name: string): StoreMigration => ({
+    name,
+    doomed: () => [],
+  })
+  await prepareStore(
+    opened,
+    {
+      kind: "open",
+      record: ["fresh"],
+      lines: ["line:old"],
+      deletions: [
+        { migration: migration("none"), ids: [] },
+        { migration: migration("roots"), ids: ["root:a", "root:b"] },
+        { migration: migration("more"), ids: ["root:c"] },
+      ],
+      open: { kind: "open", run: [], unknown: [] },
+      records: [],
+      kept: [],
+      unknownNames: [],
+    },
+    { now: () => 1, log: () => {} },
+  )
+  expect(calls).toEqual([
+    "record fresh",
+    "delete line:old",
+    "record none",
+    "copy roots",
+    "delete root:a",
+    "delete root:b",
+    "record roots",
+    "delete root:c",
+    "record more",
   ])
-  await run()
-  expect(copies).toEqual(["old-lines"])
-  expect(logged).toHaveLength(3)
+})
+
+test("migrationNameClash finds a name given twice; the build's registries have none", () => {
+  expect(migrationNameClash(["a", "b", "c"])).toBeNull()
+  expect(migrationNameClash(["a", "b", "a"])).toBe("a")
+  expect(migrationNameClash(oneTimeNames(ONE_TIME_MIGRATIONS))).toBeNull()
 })

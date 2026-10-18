@@ -41,7 +41,7 @@ async function run(check: Checks["check"]): Promise<void> {
     const start = () =>
       startSuiteHost({
         model: { kind: "scripted", script },
-        ...stored.options,
+        ...stored,
         log: () => {},
       })
     let ih = await start()
@@ -136,7 +136,7 @@ async function run(check: Checks["check"]): Promise<void> {
     // 6. No image bytes in the session's records, compacted.
     await ih.quiet()
     const base64Slice = RED_PNG.toString("base64").slice(20, 70)
-    await recordsHold(stored.opened.store, base64Slice)
+    await recordsHold(stored.store.store, base64Slice)
 
     // 7. Deleting what nothing shows, after the grace; a card's image stays,
     // across a restart.

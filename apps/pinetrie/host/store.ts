@@ -6,8 +6,9 @@
 // records, `pinetrie:live`, the places, and one `RootDoc` per root, which is
 // that root's pi storage. It is not a pi session file. A document opens under a
 // changed schema without complaint, and a dropped field's data is deleted at
-// the next compaction. The host's images are in the same file, in
-// `pinetrie_blobs` (`blobs.ts`), on the same connection.
+// the next compaction. The host's blobs are in the same file, in
+// `pinetrie_blobs` (`blobs.ts`), and the one-time migrations it has run in
+// `pinetrie_migrations` (`migrations/ledger.ts`), on the same connection.
 //
 // The store owns its file. Kyneta's SQLite store issues the same seat on every
 // open, so the host keeps its peer id across restarts; that is sound only while
@@ -24,6 +25,7 @@ import type { Store } from "@kyneta/exchange"
 import { createSqliteStore } from "@kyneta/sqlite-store"
 import { type BlobStore, PRODUCT_NAME } from "@pinetrie/core"
 import { sqliteBlobs } from "./blobs.ts"
+import { type MigrationLedger, sqliteLedger } from "./migrations/ledger.ts"
 
 /** How long taking the file waits for another owner to close it. */
 const BUSY_TIMEOUT_MS = 5_000
@@ -65,10 +67,22 @@ export function openDatabase(
 }
 
 /**
- * The session's store and the host's blobs, over one connection to `file`.
- * Closing the store closes the connection, and with it the blobs. `backup`
- * writes a consistent copy beside the file, through the same connection,
- * since the store holds the file's lock, and returns its path.
+ * A store with what describes it: its blobs and its ledger live beside it,
+ * so they come with it. `backup` copies a file store and returns the copy's
+ * path; a store in memory has none.
+ */
+export interface OpenedStore {
+  readonly store: Store
+  readonly blobs: BlobStore
+  readonly ledger: MigrationLedger
+  readonly backup: ((suffix: string) => string) | null
+}
+
+/**
+ * The session's store, the host's blobs and the migrations' ledger, over one
+ * connection to `file`. Closing the store closes the connection, and with it
+ * the blobs and the ledger. `backup` writes a consistent copy beside the
+ * file, through the same connection, since the store holds the file's lock.
  */
 export function openStore(
   file: string,
@@ -77,11 +91,7 @@ export function openStore(
     /** The blobs' clock, which stamps each one as it is stored or touched. */
     readonly now?: () => number
   } = {},
-): {
-  readonly store: Store
-  readonly blobs: BlobStore
-  readonly backup: (suffix: string) => string
-} {
+): OpenedStore & { readonly backup: (suffix: string) => string } {
   const db = openDatabase(file, options)
   const store = createSqliteStore({
     exec: (sql, ...params) => void db.prepare(sql).run(...(params as never[])),
@@ -106,5 +116,10 @@ export function openStore(
     db.prepare("VACUUM INTO ?").run(to)
     return to
   }
-  return { store, blobs: sqliteBlobs(db, options.now), backup }
+  return {
+    store,
+    blobs: sqliteBlobs(db, options.now),
+    ledger: sqliteLedger(db),
+    backup,
+  }
 }

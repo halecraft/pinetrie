@@ -642,7 +642,10 @@ Decided, and waiting for their turn:
 - `PINETRIE_MODEL` (`provider/id`) overrides the model. A starting host
   checks every stored document's schema before it opens any: it runs the
   migrations registered for a stored schema, and refuses to start, naming
-  the document and both schema hashes, when none is (ADR-0096).
+  the document and both schema hashes, when none is (ADR-0096). Each store
+  records the one-time migrations it has run, and runs only those it lacks;
+  a store that never ran one this build has since deleted is refused,
+  naming it (ADR-0174).
 
 ## 7. Working agreements
 

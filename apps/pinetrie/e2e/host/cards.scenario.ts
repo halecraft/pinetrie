@@ -950,8 +950,10 @@ async function run(check: Checks["check"]): Promise<void> {
     const reopened = openStore(dbFile)
     ch = await startSuiteHost({
       model: { kind: "scripted", script },
-      store: slowToLoad(reopened.store, cardDocId(empty), LATE_LOAD_MS),
-      blobs: reopened.blobs,
+      store: {
+        ...reopened,
+        store: slowToLoad(reopened.store, cardDocId(empty), LATE_LOAD_MS),
+      },
       log: () => {},
     })
     // Read as `startHost` returns, before any client could connect.

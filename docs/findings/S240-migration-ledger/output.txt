@@ -1,0 +1,24 @@
+One run per mode, then `read` (Linux lane, Node 24, node:sqlite):
+
+== unflushed
+{"storedBefore":0,"journal":{"journal_mode":"delete"},"synchronous":{"synchronous":2}}
+{"records":{},"ledger":[{"name":"unflushed"}],"tables":[{"name":"kyneta_doc_meta"},{"name":"kyneta_records"},{"name":"kyneta_store_meta"},{"name":"pinetrie_migrations"}]}
+== lateflush
+{"storedBefore":0,"journal":{"journal_mode":"delete"},"synchronous":{"synchronous":2}}
+{"records":{"lateflush":{"v":1}},"ledger":[{"name":"lateflush"}],"tables":[...]}
+== flushed
+{"storedBefore":0,"journal":{"journal_mode":"delete"},"synchronous":{"synchronous":2}}
+{"records":{"flushed":{"v":1}},"ledger":[{"name":"flushed"}],"tables":[...]}
+== compacted
+{"storedBefore":0,"journal":{"journal_mode":"delete"},"synchronous":{"synchronous":2}}
+{"records":{"compacted":{"v":1}},"ledger":[{"name":"compacted"}],"tables":[...]}
+== second start on flushed, then `read … backup`
+{"storedBefore":1,...}
+{"records":{"flushed":{"v":1}},"ledger":[{"name":"flushed"}],...}
+{"copyLedger":[{"name":"flushed"}]}
+
+Twenty fresh files per mode, each killed with SIGKILL after its mark:
+
+unflushed: write present 0/20, ledger row 20/20
+flushed:   write present 20/20, ledger row 20/20
+compacted: write present 20/20, ledger row 20/20

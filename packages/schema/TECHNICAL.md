@@ -37,8 +37,8 @@ so a thread's first entry, its end and an entry's thread are read from the
 rows (`TreeIndex.firstOf`, `endOf`), never inferred by walking the tree. A
 walk lost a thread's end when a branch's first run had written its context
 entries above the chat naming it (S143). The column is never empty. A
-store from before it is refused at startup: `0008-entry-thread`, which
-labelled every row, ran on Duane's store and was deleted.
+store from before it is refused at startup: the migration that labelled
+every row ran on Duane's store and was deleted.
 
 Everything pine·trie reasons about is a column. Everything pi owns is in
 `payload`. We type what we traverse. Two readers lift what pine·trie reads out
@@ -250,8 +250,8 @@ document.
 `PlacesDoc` holds every card's record, keyed by card id: `yjs.bind` of a
 record of flat string rows (`owner`, `kind`, `root`, `at`, `lane`,
 `column`, `order`, `by`, `seen`, `command`, `unsent`, `placer`,
-`holder`, `canvas`, `width`, "" for none; `width` from migration
-`0005-tasks`, ADR-0116, and `canvas`, named `task` until ADR-0158's
+`holder`, `canvas`, `width`, "" for none; `width` from ADR-0116's
+migration, and `canvas`, named `task` until ADR-0158's
 migration), decoded in `@pinetrie/rules` (`decodeCard`),
 and `rev`. Its id is `pinetrie:card-places` (`PLACES_DOC_ID`). Only the host
 writes it, each write one change of its writer (`apps/pinetrie/host/places.ts`).
@@ -273,11 +273,11 @@ would refuse each whole undo of a move (S82).
   where it is** (your message, a pinned or a queued card, ADR-0116,
   ADR-0126): no root, which is the thread's record's, and no `at`, since its
   end is found from the thread (every entry names its thread, ADR-0125);
-  record migration `0009-card-content` cleared the `at` these rows and
+  a record migration, since deleted, cleared the `at` these rows and
   their history events kept. The row's `at` is a comment's entry.
 - **A fact is a card of its own kind** (ADR-0126): its id starts `x-` (`f-`
   is a file card's), its row is a `queued` one, and its fact is JSON in
-  `fact`. An ask card's relay is JSON in its own `relay` (ADR-0128). Record migration `0009-card-content` moved each fact stored on a
+  `fact`. An ask card's relay is JSON in its own `relay` (ADR-0128). A record migration, since deleted, moved each fact stored on a
   text card's bare id to a new `x-` id, with its history.
 - **A canvas row** (`canvas`, ADR-0116) names its canvas, its rank in
   `order` and its width (`"1"` or `"2"`): a thread's card on its canvas's
@@ -295,7 +295,7 @@ would refuse each whole undo of a move (S82).
   the split.
 - **A note is stored as `note`, its note column in `column` and its rank in
   `order`** (ADR-0116), no `at` and no `lane`: the fields a row had, so the
-  schema's hash held, and record migration `0006-note-columns` (run, then
+  schema's hash held, and a record migration (run, then
   deleted) moved each thread's notes from their cells into a note column
   beside it. A note
   column is a `canvas` row whose id starts `n-`.
@@ -325,12 +325,12 @@ would refuse each whole undo of a move (S82).
   `discarded-canvas`, `discarded-drafting`, …), so no field was added and
   the schema's hash held. Who trashed it is the row's `placer`. A row of
   the old shape, `discarded` with `holder` and `canvas`, does not decode:
-  record migration `0014-trash-left` deletes them. A card spun into a
+  a record migration, since deleted, removed them. A card spun into a
   thread is in a trash too; its thread's record names it (`origin`
   `spun`).
 - **The row has no `root`** (ADR-0126): only a fresh card's row named one,
-  and a branch or a new canvas's thread is a thread card now. Migration
-  `0012-unstarted-threads` dropped it with its data moved: each fresh
+  and a branch or a new canvas's thread is a thread card now. A migration,
+  since deleted, dropped it with its data moved: each fresh
   column became its thread opened, a spun card a discarded one, an ask's
   relay moved from `fact` to `relay`.
 - **`holder`** is whose inventory holds a card (`CardPlace` `inventory`);
@@ -344,8 +344,8 @@ A person has one document of each kind in `PERSON_DOC_KINDS`, at
 `@pinetrie/protocol/writers`): each a Yjs document written only by that
 person's tabs.
 
-- **The host stores and relays them, and never writes them**, but once: its
-  `0018-dismissed-ready` migration, at startup, before any tab opens one. Its policy
+- **The host stores and relays them, and never writes them**, but once: a
+  migration, since deleted, at startup, before any tab opens one. Its policy
   shares each only with peers whose principal is its writer
   (`holdsPersonDoc`, `apps/pinetrie/host/policy.ts`), and `resolveDoc` names
   its kind so the host interprets it with its schema.

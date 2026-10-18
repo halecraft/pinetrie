@@ -25,7 +25,7 @@ async function run(check: Checks["check"]): Promise<void> {
       mkdtempSync(path.join(tmpdir(), "pinetrie-presence-")),
       "pinetrie.db",
     )
-    const phStore = openStore(dbFile).store
+    const phStore = openStore(dbFile)
     const ph = await startSuiteHost({
       model: { kind: "scripted", script: scriptedModel() },
       store: phStore,

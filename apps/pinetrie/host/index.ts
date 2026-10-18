@@ -8,12 +8,7 @@
 import { rm } from "node:fs/promises"
 import { homedir } from "node:os"
 import path from "node:path"
-import {
-  createInMemoryStore,
-  Exchange,
-  type Store,
-  whenHydrated,
-} from "@kyneta/exchange"
+import { createInMemoryStore, Exchange, whenHydrated } from "@kyneta/exchange"
 import { Interpret, Reject } from "@kyneta/schema"
 import { WebsocketServerTransport } from "@kyneta/websocket-transport/server"
 import {
@@ -23,7 +18,6 @@ import {
 } from "@pinetrie/config"
 import {
   atEntry,
-  type BlobStore,
   type CardId,
   isTextCardId,
   type ModelLine,
@@ -46,7 +40,6 @@ import {
 } from "@pinetrie/pi"
 import { Control } from "@pinetrie/protocol/line"
 import {
-  CONTROL_TOPIC,
   HOST_PRINCIPAL,
   LIVE_DOC_ID,
   PLACES_DOC_ID,
@@ -124,16 +117,14 @@ import {
 } from "./housekeeping.ts"
 import { startHttp } from "./http.ts"
 import { createLater } from "./later.ts"
-import { lineDocPrefix } from "./lines.ts"
 import {
-  deleteStored,
   migrate,
-  planStoredOpen,
-  RECORD_MIGRATIONS,
+  planStoredStart,
+  prepareStore,
   readStored,
   refusalLine,
-  STORE_MIGRATIONS,
 } from "./migrations/index.ts"
+import { memoryLedger } from "./migrations/ledger.ts"
 import { createMoveHistories } from "./move-history.ts"
 import { createNames } from "./names.ts"
 import type { PageSource } from "./page.ts"
@@ -171,7 +162,7 @@ import { createSplitCall } from "./split-call.ts"
 import { watchStalls } from "./stalls.ts"
 import { recover, recoverRoot } from "./startup.ts"
 import { agentReadyLine, reportLines, startupLaps } from "./startup-lines.ts"
-import { openStore } from "./store.ts"
+import { type OpenedStore, openStore } from "./store.ts"
 import { createTitles } from "./titles.ts"
 import { startLaneWork } from "./work/index.ts"
 import { findProject } from "./work/runtime.ts"
@@ -234,26 +225,21 @@ export interface StartHostOptions {
    */
   readonly ssh?: PersonalSshPlaces
   /**
-   * Where the session is kept: a SQLite file; a Kyneta store a caller made, as
-   * a suite does to read it while the host runs; or, absent or null, a store in
-   * memory. Shutting the host down closes the store, whoever made it. Every
-   * host has a store: Kyneta compacts only a document with one, and compaction
-   * is also what trims the session's in-memory op log.
+   * Where the session is kept: a SQLite file; a store a caller opened
+   * (`openStore`), as a suite does to read it while the host runs, with its
+   * blobs and ledger; or, absent or null, a store in memory. Shutting the host
+   * down closes the store, whoever opened it. Every host has a store: Kyneta
+   * compacts only a document with one, and compaction is also what trims the
+   * session's in-memory op log.
    */
-  readonly store?: string | Store | null
+  readonly store?: string | OpenedStore | null
   /** Where the page comes from: Vite unless given (`pnpm serve` gives the built page). */
   readonly page?: PageSource
   /**
-   * The images, for a caller that gives a `Store` it made: pass the `blobs`
-   * `openStore` gave with it, so a restart keeps them. A store given as a file
-   * keeps its own; otherwise they are held in memory.
-   */
-  readonly blobs?: BlobStore
-  /**
    * Where the host reads the time: its own (`Basics.now`) and the blobs it
-   * opens or keeps in memory. `blobs` given here keep their own clock, which
-   * must be this one: a store behind the host's clock makes every blob it
-   * stamps look old to the sweep.
+   * opens or keeps in memory. A store a caller opened keeps its blobs' clock,
+   * which must be this one (`openStore`'s `now`): a store behind the host's
+   * clock makes every blob it stamps look old to the sweep.
    */
   readonly now?: () => number
   /** How long presence lasts without a refresh; a suite shortens it. */
@@ -338,7 +324,6 @@ export async function startHost({
   },
   store: storeFile = null,
   page = { kind: "vite" },
-  blobs: givenBlobs,
   now = Date.now,
   presenceDecay = PRESENCE_DECAY,
   keepRootsRead = false,
@@ -382,34 +367,29 @@ export async function startHost({
 
   // --- transport + exchange ------------------------------------------------
   const serverTransport = new WebsocketServerTransport()
-  const opened =
+  const opened: OpenedStore =
     typeof storeFile === "string"
       ? openStore(storeFile, { now })
-      : {
-          store: storeFile ?? createInMemoryStore(),
-          blobs: givenBlobs ?? memoryBlobs(now),
+      : (storeFile ?? {
+          store: createInMemoryStore(),
+          blobs: memoryBlobs(now),
+          ledger: memoryLedger(),
           backup: null,
-        }
+        })
   const { store, blobs } = opened
-  // Every stored command Line belongs to a client seat that cannot return: a
-  // client keeps no store and does not reconnect (host/lines.ts).
-  for await (const id of store.listDocIds(lineDocPrefix(CONTROL_TOPIC)))
-    await store.delete(id)
-  await deleteStored({
-    store,
-    migrations: STORE_MIGRATIONS,
-    backup: opened.backup,
-    log,
-  })
   // Each stored document's schema, checked before anything opens one: opened
-  // under a changed schema, a dropped field's data goes at the next compaction.
-  const stored = await readStored(store)
-  lap("opening the store")
-  const openPlan = planStoredOpen(stored)
-  if (openPlan.kind === "refuse") {
+  // under a changed schema, a dropped field's data goes at the next
+  // compaction. Read before anything is deleted, so one plan decides it all.
+  const startPlan = planStoredStart(
+    await readStored(store),
+    opened.ledger.ran(),
+  )
+  if (startPlan.kind === "refuse") {
     await store.close()
-    throw new Error(refusalLine(openPlan))
+    throw new Error(refusalLine(startPlan.refusal))
   }
+  await prepareStore(opened, startPlan, { now, log })
+  lap("opening the store")
   // Clients find the host by its principal and address their Lines to the seat
   // Kyneta issues it. The host has no WRITER identity: writers are the
   // connected clients, named by their principals, and they own no lanes; lanes
@@ -433,11 +413,12 @@ export async function startHost({
   })
 
   await migrate({
-    plan: openPlan,
-    records: RECORD_MIGRATIONS,
-    storedIds: [...stored.keys()],
+    plan: startPlan.open,
+    records: startPlan.records,
+    storedIds: startPlan.kept,
     exchange,
-    backup: opened.backup,
+    opened,
+    now,
     log,
   })
   lap("the store's migrations")

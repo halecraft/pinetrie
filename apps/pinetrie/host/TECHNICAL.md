@@ -36,7 +36,7 @@ wires them.
 | `docs.ts` | `HostDocuments`: the documents the host always holds (the session's, `pinetrie:live`, the places) and the reads of the session that name a root; `planLoads`, the roots a starting host opens |
 | `roots.ts` | every root's document (ADR-0162): `StepDocs`, a step's own, and `Lease`; pi's port; `planUpkeep` and the upkeep; `onOpened`, `onReleasing`, `onFirstLoad` (§ Roots: steps, leases and the upkeep) |
 | `records.ts` | the host's writes of its records (ADR-0095): `createRecords`, the session's, which every module made at startup takes, and `createStepRecords`, a step's or a lease's, which writes a root's too; a write's home is in its type (`ValueWrite<H>`) |
-| `migrations/` | each stored document's schema, checked before anything opens it, and the migrations from a stored hash (§ The stored schemas, ADR-0096) |
+| `migrations/` | the start's one plan for its store (`planStart`): each stored document's schema, checked before anything opens it, the migrations from a stored hash, and the one-time migrations the store's ledger lacks (`ledger.ts`) (§ The stored schemas, ADR-0096, ADR-0174) |
 | `directory.ts` | each root's directory record, refreshed as its document changes: `startDirectory`, started with the records, and the startup rebuild of records that do not decode (`planRebuild`) |
 | `cards.ts` | the card port (ADR-0048), about texts only: who wrote in a card, destroying one, loading and reading texts for the queue's pops and a run's pinned cards, waiting until a text holds a version (`whenHolds`, which an `AbortSignal` gives up), and the texts of given cards gathered for the sweeps; where the shell opens card documents |
 | `seats.ts` | each connected seat's person (ADR-0037), written once as a `pinetrie.seat` record (started after `recover`), and unloading the histories of moves of a person with no seat left |
@@ -46,7 +46,7 @@ wires them.
 | `http.ts` | the HTTP server: admission, the page (Vite or the built one), the websocket, blobs, proposed changes read, invites |
 | `responses.ts` | every answer the host writes itself, as a pure `HttpAnswer` |
 | `routes.ts` | what a request or an upgrade gets, pure: admission first (`planRequest`, `planUpgrade`), then which requests are the host's (`route`) |
-| `admission.ts`, `policy.ts`, `lines.ts`, `blobs.ts`, `store.ts` | the invite key and links (ADR-0107; a blob, like the page, is admitted only from this host's own page on loopback, ADR-0042), the write policy, departed seats (a seat is fresh per page load, ADR-0037), the blob store (images, ADR-0042, and references' quotes as markdown, ADR-0126), the SQLite store, on `node:sqlite`, so with no native dependency (S22), which owns its file: it takes the file's lock, and a second connection, process or reader is refused (S47) |
+| `admission.ts`, `policy.ts`, `lines.ts`, `blobs.ts`, `store.ts` | the invite key and links (ADR-0107; a blob, like the page, is admitted only from this host's own page on loopback, ADR-0042), the write policy, departed seats (a seat is fresh per page load, ADR-0037), the blob store (images, ADR-0042, and references' quotes as markdown, ADR-0126), the SQLite store, on `node:sqlite`, so with no native dependency (S22), which owns its file: it takes the file's lock, and a second connection, process or reader is refused (S47); `openStore` gives it with its blobs and ledger as one `OpenedStore`, which is what `startHost` takes |
 | `work/` | lane containers and disks (§ Lane work: ADR-0032, ADR-0033, ADR-0034), through the project's adapter, whose kind it never names (ADR-0142) |
 | `project.ts` | the project's adapter, chosen once by its kind (`projectAdapter`: an exhaustive switch, `assertNever` its default): jj's for a jj workspace, the folder's for any other folder; a folder lanes cannot serve (`projectDirWords`) is refused before any runtime is asked |
 | `folder/` | a folder project's adapter, as it is built (§ A folder project's adapter): the project's folder's reads (`scan.ts`, `line.ts`) and watcher (`watch.ts`), its writes (`writes.ts`, `write.ts`), what is kept (`keep.ts`), its reviews (`review.ts`), the only code that touches the project's folder (ADR-0142) |
@@ -304,90 +304,102 @@ same for every run (`packages/pi/TECHNICAL.md`, S85).
   every card command; a drain, a title and proposed changes each build their own,
   once a step. Only an undo reads it again, after its revert wrote.
 
-## The stored schemas (`migrations/`, ADR-0096)
+## The stored schemas (`migrations/`, ADR-0096, ADR-0174)
 
 A document opened under a changed schema keeps a dropped field's data only
 until the next compaction (S120), and the host compacts at startup. So
-`startHost` checks every stored document's schema before its first `get`:
+`startHost` checks every stored document's schema before its first `get`,
+reading the store once, planning once, then acting:
 
-- **`deleteStored`** runs first, after the stored command Lines are
-  deleted: each `StoreMigration` (`STORE_MIGRATIONS`) names, from every
-  stored id, the documents nothing writes any more, and they are deleted
-  from the store, after one `backup`. Each is one-time, like a
-  `RecordMigration`. None is registered now: `0017-stale-documents` ran,
-  and was deleted.
-- **`readStored`** reads each document's stored schema hash through the
-  `Store` (`listDocIds`, `currentMeta`). **`planStoredOpen`** compares each with the hash of the schema its
-  kind opens with (`storedKind` and `SCHEMA_OF`, `policy.ts`, which `resolve`
-  uses too): open as it is, run the migrations registered from a stored
-  hash, or refuse to start, naming the document and both hashes. A stack
-  of moves has Kyneta's own schema and is skipped; any other id no schema
-  of ours opens is logged and left alone.
-- **`migrate`** runs the plan on the host's Exchange: every migration's reads
-  first, then, if every stored record loaded, its writes; then it compacts
-  and unloads what it opened. Before a migration that moves data it copies
-  a file store (`backup`, `VACUUM INTO` on the store's connection, to
+- **Gather.** `readStored` reads each document's stored schema hash
+  through the `Store` (`listDocIds`, `currentMeta`), before anything is
+  deleted, and the ledger gives the names of the one-time migrations the
+  store has run (`MigrationLedger.ran`).
+- **Plan.** **`planStart`** (pure; `planStoredStart` binds the build's
+  registries, `storedKind` and `SCHEMA_OF`, `policy.ts`, which `resolve`
+  uses too) decides everything the start does to the store:
+  - **The ledger's part** (`planLedger`): a store with nothing stored is
+    new, and records every carried and retired name and runs none. A store
+    in use whose ledger lacks a retired name is refused, naming each. Else
+    the carried one-time migrations the ledger lacks are due, and a ledger
+    name the build neither carries nor retired is logged
+    (`unknownMigrationsLine`): a newer build ran it.
+  - **The stored command Lines** are deleted: each belongs to a client
+    seat that cannot return (`lines.ts`).
+  - **Each due `StoreMigration`** names, from the ids the ones before it
+    left, the documents nothing writes any more.
+  - **`planOpen`**, over what is kept, compares each stored hash with the
+    hash of the schema its kind opens with: open as it is, run the
+    migrations registered from a stored hash, or refuse, naming the
+    document and both hashes. A stack of moves has Kyneta's own schema and
+    is skipped; any other id no schema of ours opens is logged and left
+    alone. It does not see what a store migration deletes.
+  - **Every refusal comes before anything is deleted**, so a refused store
+    is as it was. `refusalLine` words both kinds.
+- **Act.** **`prepareStore`** records a new store's names, deletes the
+  Lines, then each store migration's documents, after one `backup` before
+  the first that deletes anything, recording each due store migration's
+  name after its deletes, one that deleted nothing too. **`migrate`** then
+  runs on the host's Exchange: every migration's reads first, then, if
+  every stored record loaded, its writes; then the flush, then the names
+  of the due record migrations, written or not, then it compacts and
+  unloads what it opened. Before a migration that moves data it copies a
+  file store (`backup`, `VACUUM INTO` on the store's connection, to
   `<file>.before-<migration>`). Kyneta reports a record it could not load
   only as a `console.warn`, so `migrate` watches for that warning while it
-  reads; one stops it before it writes. A read-only open leaves a stored
-  hash as it was (S120), so a stopped migration leaves the store to be
-  planned the same way next time.
-- **One file per migration**, deleted once Duane's store has passed it; a
+  reads; one stops it before it writes or records. A read-only open leaves
+  a stored hash as it was (S120), so a stopped migration leaves the store
+  to be planned the same way next time.
+- **The ledger** (`migrations/ledger.ts`, ADR-0174) is `pinetrie_migrations`
+  (`name`, `ran`), a table in the store's file on the store's connection,
+  as `pinetrie_blobs` is; `backup` copies it. A host on an in-memory store
+  keeps it in memory. A name is recorded only once its work is in the
+  file: after `exchange.flush()` for a record migration, since before the
+  flush Kyneta has not appended the write (S240), and after the deletes for
+  a store migration, since `Store.delete` commits before it resolves. A
+  host that dies between the work and the row runs the migration again,
+  which finds nothing to do. Hash migrations are not in the ledger: a
+  document's stored hash already says which schema wrote it.
+- **Gotcha: a power cut on macOS can keep a row and lose its write.**
+  SQLite's default sync there does not flush the drive's cache, so a power
+  cut during the start that runs a migration can skip it for good. The
+  risk is accepted (ADR-0174).
+- **One file per migration**, named `NNNN-slug.ts`. The numbering starts
+  again at `0001` with the ledger (ADR-0174): the migrations numbered
+  before it were all deleted, and their history is in their ADRs. A name is
+  permanent: the ledger keys a migration by it, so a renamed one runs again
+  on every store (`migrationNameClash` checks the build's names are
+  distinct).
+- **A hash migration is deleted once Duane's store has passed it**; a
   store still on its hash is then refused. A change that moves no data is a
   migration with no `run`: registering it is the acknowledgement.
+- **A one-time migration is deleted when its author chooses**: its file and
+  mutations go, and its name moves to `RETIRED_MIGRATIONS`, so a store that
+  never ran it is refused instead of opened in the old shape.
 - **Each stored schema's hash is pinned** (`migrations/index.test.ts`):
   a change to one fails that test until a migration from the old hash is
   registered, so no schema changes by accident.
-- **None is registered now.** ADR-0158's rename ran on Duane's store and
-  was deleted: `0019-canvas-places` (each places row's `task` named
-  `canvas`, the cards pinned to a task pinned to its canvas, card
-  histories and traces the same, default states renamed Topics, Active
-  and Archive, every stack of moves retired) and `0020-canvas-open` (each
-  open list's `tasks` named `canvases`). A Yjs document keys each field by
-  an identity hash, not its name, so a renamed field is read from a
-  snapshot opened under the old schema (`createDoc` over `exportEntirety`):
-  a probe showed the current schema reads a stored row's old field as
-  nothing. `0012-unstarted-threads`, `0013-task-cards` and
-  `0018-dismissed-ready` ran before them, and were deleted.
-- **None with no `run` is registered now:** `0001-live-row`, `0002-records` (ADR-0095),
-  `0005-tasks`' places and sidebars (ADR-0116) and `0008-entry-thread`
-  (every root's rows given the thread column, a context entry in the
-  thread of the prompt below it, ADR-0125) ran, and were deleted.
+- **A renamed field is read from a snapshot under the old schema.** A Yjs
+  document keys each field by an identity hash, not its name, so the
+  current schema reads a stored row's old field as nothing; a migration
+  reads it from `createDoc` over `exportEntirety`, opened under the old
+  schema.
 - **A change to a record's contents moves no hash**: records are JSON in a
   document's `records`, and so does a change to the values of the places'
-  rows, whose fields stay. A `RecordMigration` (`RECORD_MIGRATIONS`) is
-  one-time: `migrate` runs each one's reads with the hash migrations', and
-  it returns a write only when what it read is in the old shape, so a
-  second start finds nothing to do. It writes under the document's current
-  schema, so its hash stays. The backup is taken after the reads, before
-  the first write. Each is deleted, with its mutations, once Duane's store
-  has run it, since a registered one that reads every root (as one built
-  on `recordDocs` over the roots does) loads them all at each start, and
-  `migrate` compacts every document it opened. None is registered now:
-  `0022-turn-shared-reads` (ADR-0135, S224) dropped each root's revision
-  records' `disk.shared.read`; `0023-lane-forks` (ADR-0167, S227) gave
-  each lane of its own without a fork record one, begun or owed, its
-  `lost` from `pinetrie.files-lost`; `0024-run-end-report` (ADR-0166)
-  moved each session record under `pinetrie.verdict` to
-  `pinetrie.runEndReport`. They ran, and were deleted. `0021-entry-words`
-  (ADR-0158) renamed
-  each root's stored entries raw, by `customType` (a person's message
-  `pinetrie.chat` to `pinetrie.message`, the cards pinned to a task to
-  `pinetrie.canvas-pinned`, and `details` naming a canvas), and never an
-  entry's `content`, id or parent, so a thread's history and its prompt
-  cache stayed as they were. It, `0009-card-content`, `0011-thread-origin`,
-  `0014-trash-left`, `0015-lane-history` and `0016-revision-point` ran, and
-  were deleted. A migration that only
-  reshapes one namespace's records, record by record, is a pure rewrite
-  over `rewriteRecords` (`migrations/rewrite.ts`, over `recordDocs`, which
-  any record migration reads a home's documents with), which reads every
-  document the namespace lives in before it writes any. `0003-workflow-archive` (the
-  workflow's `closed` state renamed `archive`), `0004-threads` (each thread
-  named in its first message, ADR-0117), `0005-tasks`' records (a canvas per
-  root, ADR-0116), `0006-note-columns` (each thread's notes moved from
-  its notes board's cells into a note column beside it, ADR-0116) and
-  `0007-thread-origin` (each thread record's `fork` replaced by its
-  `origin`, ADR-0117) ran, and were deleted.
+  rows, whose fields stay. A `RecordMigration` (`RECORD_MIGRATIONS`) runs
+  on a store whose ledger lacks it: `migrate` runs each one's reads with
+  the hash migrations', and it returns a write only when what it read is
+  in the old shape, so a run again after a crash finds nothing to do. It
+  writes under the document's current schema, so its hash stays. The
+  backup is taken after the reads, before the first write. One that reads
+  every root (as one built on `recordDocs` over the roots does) loads them
+  all, once per store.
+- **None of any kind is registered now**, and none is retired.
+- **A migration that only reshapes one namespace's records,** record by
+  record, is a pure rewrite over `rewriteRecords` (`migrations/rewrite.ts`,
+  over `recordDocs`, which any record migration reads a home's documents
+  with), which reads every document the namespace lives in before it
+  writes any.
 
 ## Blobs hold any file (`blobs.ts`, ADR-0126, ADR-0151)
 
@@ -418,10 +430,10 @@ until the next compaction (S120), and the host compacts at startup. So
   and its message will show the copy.
 - **The sweep reads the host's clock, and so do the blobs** (ADR-0139):
   `startHost`'s `now` is `Basics.now`, and the clock of the blobs it opens
-  (`openStore`'s `now`) or keeps in memory. A caller that passes its own
-  `blobs` must give them the same clock: a store behind the host's stamps
-  each blob as old, and the next sweep deletes it, though nothing has had
-  its `BLOB_GRACE_MS`. A suite moves the clock instead of waiting out the
+  (`openStore`'s `now`) or keeps in memory. A caller that opens its own
+  store (an `OpenedStore`) must open it on the same clock: a store behind
+  the host's stamps each blob as old, and the next sweep deletes it, though
+  nothing has had its `BLOB_GRACE_MS`. A suite moves the clock instead of waiting out the
   grace (`suiteClock`, `clockedStore`).
 - **A message's links are quoted for the model** (`linkedQuotes`,
   `withQuotes`): `sendMessage` gathers each past referent its text links to
@@ -1801,8 +1813,8 @@ adapter's.
 
 - **Test a decision as a value** where the shell has one: `planRunEnd`,
   `planInvites`, the responses, `planSettle`, `planInvocation`,
-  `storeChoice`, the startup lines' words (`startup-lines.ts`), `isHeld`, and
-  `planStartup` (`@pinetrie/rules`).
+  `storeChoice`, the startup lines' words (`startup-lines.ts`), `isHeld`,
+  `planStart` (the store's start), and `planStartup` (`@pinetrie/rules`).
 - **Otherwise, drive a module with `record<T>()`** for exactly the port it
   takes, and a real `newSessionDoc()`. A method the test did not give throws,
   naming itself, so a module that touches an undeclared port fails at once.
@@ -1830,8 +1842,9 @@ adapter's.
 - **A mutation uses a suite only for what no unit test can show.** The
   host's that remain, and the fact each proves:
   - `index.ts`: the host waits for its stored session; startup compacts; a
-    run's end compacts; stale command Lines are deleted at start; it serves
-    only after `recover`;
+    run's end compacts; it serves only after `recover`;
+  - `migrations/index.ts`'s `prepareStore`: stale command Lines are deleted
+    at start;
   - `http.ts`: the request and upgrade handlers carry out a plan's refusal;
   - `packages/rules/message.ts`'s `attributed`: the model is told who spoke, which
     shows that pi's conversion sends `content`;
