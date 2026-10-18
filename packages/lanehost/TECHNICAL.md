@@ -370,7 +370,7 @@ out, every call checked and planned into paths first (`planApply`,
     lane's tip against a shown merge): the new entry is renamed into its
     path, then the old unlinked under the orphan. An add then a delete at
     one path is so a change, never nothing: the stream never deletes an
-    entry it made;
+    entry it made (S228);
   - a retargeted symlink is an `unlink` and a new `symlink` at one path,
     folded to one change;
   - a write, a truncate, a clone, a mode, an owner or an xattr is a

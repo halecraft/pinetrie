@@ -1,6 +1,8 @@
 // The streams were recorded on the lane VM (btrfs-progs 6.17.1): a
-// pair with no change, a pair with each kind of change, and a whole
-// subvolume with no parent.
+// pair with no change, a pair with each kind of change, a whole
+// subvolume with no parent; a file and a directory replaced, sent with
+// the older snapshot as the parent and with the newer, and two disks
+// made from one snapshot on different lines.
 
 import { readFileSync } from "node:fs"
 import path from "node:path"
@@ -62,6 +64,22 @@ describe("a send stream folded into one change per path", () => {
     )
     expect(at("whole")).toHaveProperty("d/sub/b", "added file")
   })
+  test("a replaced entry is a change, whichever snapshot is the parent", () => {
+    const replaced = {
+      "a.txt": "changed file",
+      d: "changed dir",
+      "d/x": "changed file",
+    }
+    expect(at("replaced")).toEqual(replaced)
+    expect(at("replaced-from-newer")).toEqual(replaced)
+  })
+  test("two disks of different lines differ by the files each made", () => {
+    expect(at("across-lines")).toEqual({
+      "b.txt": "deleted file",
+      "c.txt": "added file",
+      "f.txt": "changed file",
+    })
+  })
   test("bytes that are not a stream are refused", () => {
     expect(() => streamChanges(new Uint8Array([1, 2, 3]))).toThrow(
       "not a btrfs send stream",
@@ -109,31 +127,6 @@ function streamOf(
 const MKFILE = 3
 const MKDIR = 4
 const RENAME = 9
-const UNLINK = 11
-const RMDIR = 12
-
-test("an entry moved aside for a new one at its path, then unlinked, is a change there", () => {
-  const changes = streamChanges(
-    streamOf([
-      [MKFILE, "o257-5-0"],
-      [RENAME, "a.txt", "o258-9-0"],
-      [RENAME, "o257-5-0", "a.txt"],
-      [MKDIR, "o259-5-0"],
-      [RENAME, "d", "o260-9-0"],
-      [RENAME, "o259-5-0", "d"],
-      [MKFILE, "o261-5-0"],
-      [RENAME, "o261-5-0", "d/x"],
-      [UNLINK, "o258-9-0"],
-      [UNLINK, "o260-9-0/x"],
-      [RMDIR, "o260-9-0"],
-    ]),
-  )
-  expect(changes.map(c => `${c.path} ${c.change} ${c.kind}`)).toEqual([
-    "a.txt changed file",
-    "d changed dir",
-    "d/x changed file",
-  ])
-})
 
 test("two files swapped through an orphan name are both changed", () => {
   const changes = streamChanges(

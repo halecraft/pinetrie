@@ -16,6 +16,7 @@ import {
 } from "node:fs/promises"
 import path from "node:path"
 import { runCommand } from "@pinetrie/channel"
+import type { DiskChange } from "@pinetrie/core"
 import { afterAll, describe, expect, test } from "vitest"
 import { answer } from "./answer.ts"
 import { isSubvolume } from "./disks.ts"
@@ -188,6 +189,50 @@ describe.skipIf(!onBtrfs)(
       expect(walked.changes.map(c => `${c.path} ${c.change}`)).toEqual(
         sent.map(c => `${c.path} ${c.change}`),
       )
+    })
+    test("the walk's diff of the recorded replacement, either way, is what send's streams say of its files", async () => {
+      const lane = disks.lane("replace")
+      const snap = (snapshot: string) =>
+        disk({
+          kind: "disk",
+          project: KEY,
+          op: { kind: "snapshot", lane: "replace", snapshot },
+        })
+      await disk({
+        kind: "disk",
+        project: KEY,
+        op: { kind: "create", lane: "replace" },
+      })
+      await mkdir(path.join(lane, "d"))
+      await writeFile(path.join(lane, "a.txt"), "one\n")
+      await writeFile(path.join(lane, "d", "x"), "x\n")
+      await writeFile(path.join(lane, "keep.txt"), "keep\n")
+      await snap("older")
+      await rm(path.join(lane, "a.txt"))
+      await writeFile(path.join(lane, "a.txt"), "two\n")
+      await rm(path.join(lane, "d"), { recursive: true })
+      await mkdir(path.join(lane, "d"))
+      await writeFile(path.join(lane, "d", "x"), "y\n")
+      await snap("newer")
+      // A walk counts a directory changed only by its mode, so a replaced
+      // one is no change to it: the two agree on what is not a directory.
+      const files = (changes: readonly DiskChange[]) =>
+        changes.filter(c => c.kind !== "dir").map(c => `${c.path} ${c.change}`)
+      for (const [from, to, fixture] of [
+        ["older", "newer", "replaced"],
+        ["newer", "older", "replaced-from-newer"],
+      ] as const) {
+        const walked = await answer(
+          { kind: "diff", project: KEY, from, to },
+          servingFrom(["disks", HERE, '{"rootless":true}']),
+        )
+        const sent = streamChanges(
+          readFileSync(
+            path.join(import.meta.dirname, "fixtures", `${fixture}.stream`),
+          ),
+        )
+        expect(files(walked.changes)).toEqual(files(sent))
+      }
     })
     test("a lane's delete takes a nested disk holding read-only snapshots, and a lane disk holding one", async () => {
       const btrfs = async (...args: string[]) => {

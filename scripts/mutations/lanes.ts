@@ -146,8 +146,7 @@ export const mutations: readonly Mutation[] = [
     from: '    if (was?.change === "added") put({ ...was, change: "changed" })\n',
     to: '    if (was?.change === "added") changes.delete(path)\n',
     command: ["pnpm", "exec", "vitest", "run", "packages/lanehost"],
-    expect:
-      "an entry moved aside for a new one at its path, then unlinked, is a change there",
+    expect: "a replaced entry is a change, whichever snapshot is the parent",
   },
   {
     name: "a send stream's orphan stands for nothing",

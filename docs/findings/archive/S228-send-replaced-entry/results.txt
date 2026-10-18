@@ -1,0 +1,77 @@
+btrfs-progs v6.17.1
+-EXPERIMENTAL -INJECT -STATIC +LZO +ZSTD +UDEV +FSVERITY +ZONED CRYPTO=builtin
+
+== inodes (ls -iR)
+A:   257 a.txt, 258 d, 259 d/x, 260 keep.txt
+B:   261 a.txt, 262 d, 263 d/x, 260 keep.txt
+T:   257 a.txt, 261 b.txt, 258 d, 259 d/x, 262 f.txt, 260 keep.txt
+SH:  257 a.txt, 261 c.txt, 258 d, 259 d/x, 263 f.txt, 260 keep.txt
+
+== forward
+snapshot        ./B                             uuid=3c3fc8ba-39b5-8d48-93de-233df83630e0 transid=525250 parent_uuid=f6622b31-809e-db46-bbaa-f3571e2e34d3 parent_transid=525248
+unlink          ./B/a.txt
+rename          ./B/d                           dest=./B/o258-525248-0
+unlink          ./B/o258-525248-0/x
+rmdir           ./B/o258-525248-0
+mkfile          ./B/o261-525250-0
+rename          ./B/o261-525250-0               dest=./B/a.txt
+update_extent   ./B/a.txt                       offset=0 len=4
+chown           ./B/a.txt                       gid=0 uid=0
+chmod           ./B/a.txt                       mode=644
+utimes          ./B/a.txt                       atime=2026-10-18T01:29:26+0000 mtime=2026-10-18T01:29:26+0000 ctime=2026-10-18T01:29:26+0000
+mkdir           ./B/o262-525250-0
+rename          ./B/o262-525250-0               dest=./B/d
+chown           ./B/d                           gid=0 uid=0
+chmod           ./B/d                           mode=755
+mkfile          ./B/o263-525250-0
+rename          ./B/o263-525250-0               dest=./B/d/x
+update_extent   ./B/d/x                         offset=0 len=2
+chown           ./B/d/x                         gid=0 uid=0
+chmod           ./B/d/x                         mode=644
+utimes          ./B/d/x                         atime=2026-10-18T01:29:26+0000 mtime=2026-10-18T01:29:26+0000 ctime=2026-10-18T01:29:26+0000
+utimes          ./B/d                           atime=2026-10-18T01:29:26+0000 mtime=2026-10-18T01:29:26+0000 ctime=2026-10-18T01:29:26+0000
+utimes          ./B/                            atime=2026-10-18T01:29:26+0000 mtime=2026-10-18T01:29:26+0000 ctime=2026-10-18T01:29:26+0000
+
+== reverse
+snapshot        ./A                             uuid=f6622b31-809e-db46-bbaa-f3571e2e34d3 transid=525248 parent_uuid=3c3fc8ba-39b5-8d48-93de-233df83630e0 parent_transid=525250
+mkfile          ./A/o257-525248-0
+rename          ./A/a.txt                       dest=./A/o261-525250-0
+rename          ./A/o257-525248-0               dest=./A/a.txt
+update_extent   ./A/a.txt                       offset=0 len=4
+chown           ./A/a.txt                       gid=0 uid=0
+chmod           ./A/a.txt                       mode=644
+utimes          ./A/a.txt                       atime=2026-10-18T01:29:26+0000 mtime=2026-10-18T01:29:26+0000 ctime=2026-10-18T01:29:26+0000
+mkdir           ./A/o258-525248-0
+rename          ./A/d                           dest=./A/o262-525250-0
+rename          ./A/o258-525248-0               dest=./A/d
+chown           ./A/d                           gid=0 uid=0
+chmod           ./A/d                           mode=755
+mkfile          ./A/o259-525248-0
+rename          ./A/o259-525248-0               dest=./A/d/x
+update_extent   ./A/d/x                         offset=0 len=2
+chown           ./A/d/x                         gid=0 uid=0
+chmod           ./A/d/x                         mode=644
+utimes          ./A/d/x                         atime=2026-10-18T01:29:26+0000 mtime=2026-10-18T01:29:26+0000 ctime=2026-10-18T01:29:26+0000
+unlink          ./A/o261-525250-0
+unlink          ./A/o262-525250-0/x
+rmdir           ./A/o262-525250-0
+utimes          ./A/                            atime=2026-10-18T01:29:26+0000 mtime=2026-10-18T01:29:26+0000 ctime=2026-10-18T01:29:26+0000
+utimes          ./A/d                           atime=2026-10-18T01:29:26+0000 mtime=2026-10-18T01:29:26+0000 ctime=2026-10-18T01:29:26+0000
+
+== across
+snapshot        ./SH                            uuid=c64e62ff-d757-df46-aa2b-3652bc6e08ca transid=525256 parent_uuid=83b056de-e13d-1c4d-8385-134d84979f18 parent_transid=525252
+unlink          ./SH/b.txt
+mkfile          ./SH/o261-525254-0
+rename          ./SH/o261-525254-0              dest=./SH/c.txt
+update_extent   ./SH/c.txt                      offset=0 len=6
+chown           ./SH/c.txt                      gid=0 uid=0
+chmod           ./SH/c.txt                      mode=644
+utimes          ./SH/c.txt                      atime=2026-10-18T01:29:26+0000 mtime=2026-10-18T01:29:26+0000 ctime=2026-10-18T01:29:26+0000
+unlink          ./SH/f.txt
+mkfile          ./SH/o263-525256-0
+rename          ./SH/o263-525256-0              dest=./SH/f.txt
+update_extent   ./SH/f.txt                      offset=0 len=39
+chown           ./SH/f.txt                      gid=0 uid=0
+chmod           ./SH/f.txt                      mode=644
+utimes          ./SH/f.txt                      atime=2026-10-18T01:29:26+0000 mtime=2026-10-18T01:29:26+0000 ctime=2026-10-18T01:29:26+0000
+utimes          ./SH/                           atime=2026-10-18T01:29:26+0000 mtime=2026-10-18T01:29:26+0000 ctime=2026-10-18T01:29:26+0000

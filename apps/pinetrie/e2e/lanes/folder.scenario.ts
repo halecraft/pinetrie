@@ -288,10 +288,9 @@ async function folderSection(
         resolveState,
         fInLane,
         told,
-        // What the catch-up answered, and what the lane's base said before it.
-        caughtUp: toolResults(lane).slice(-2),
-        newest: newestOf(),
-        beforeF,
+        // The catch-up's answer, by its first line (a conflict's is the
+        // whole resolution skill), and the records it decided from.
+        caughtUp: toolResults(lane).at(-1)?.split("\n")[0],
         proposed: readProposedByLane(wh.session).get(lane),
         base: readBases(wh.session).get(lane),
       }),

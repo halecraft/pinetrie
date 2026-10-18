@@ -63,7 +63,8 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     const p = await (await browser.newContext()).newPage()
     const answers: string[] = []
     p.on("response", r => {
-      if (r.url().includes("/review")) answers.push(`${r.status()} ${r.url()}`)
+      if (new URL(r.url()).pathname.startsWith("/review/"))
+        answers.push(`${r.status()} ${r.url()}`)
     })
     await asPerson(p, "hana@browser.test", "Hana")
     await p.goto(`${host.httpUrl}#history`, { waitUntil: "domcontentloaded" })
