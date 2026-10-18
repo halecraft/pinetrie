@@ -168,17 +168,25 @@ root's record is written only through a step's documents (ADR-0162).
   where it is, who opened it or when; its card and its card's history do.
 - **`ACCESS`** (`access.ts`, ADR-0140): a lane's ssh identities, keyed by
   lane, in the session: its use of its owner's (waiting, approved,
-  refused, unanswered), and the service identities and hosts it used, each
-  name once. `ACCESS_ANSWERS` is what the owner may answer from each state:
-  `planAccessAnswer` refuses any other, and the page offers exactly these.
-  `planAccessChange` says what a change does to a held signature (release,
-  refuse, or cut), and `planAccessRecovery` what a starting host leaves
-  (nothing waiting, and no refusal for a host outside). The record also
-  keeps the last signature refused for a host outside the owner's
+  refused), each state naming the host it last asked for, and the service
+  identities and hosts it used, each name once. `ACCESS_ANSWERS` is what
+  the owner may answer from each state: `planAccessAnswer` refuses any
+  other, keeps the host, and the page offers exactly these.
+  `planPersonalSign` answers a signature at once from the record: no
+  signature waits (ADR-0178). `planAccessChange` turns a change of state
+  into news (asked, approved, refused, revoked), read from the record, so
+  one change is one piece of news whoever wrote it. `planAccessRecovery`
+  keeps every request and clears a refusal for a host outside. The record
+  also keeps the last signature refused for a host outside the owner's
   `lanes.ssh.hosts` (`planAccessOutside`, ADR-0170), which no answer
-  changes; a record stored before it was added does not decode, and its
-  lane asks again. The owner is the project record's (`PROJECT`'s
+  changes. A record stored before a change of its shape does not decode,
+  and its lane asks again. The owner is the project record's (`PROJECT`'s
   `owner`), never a lane's.
+- **What a lane is told of its ssh** (`ssh-news.ts`, ADR-0178): a request,
+  a refusal and a revoke as an ssh fact (`SSH_FACT`, drawn as a fact row,
+  `sshFactLine`), which never starts a run; an approval as its owner's
+  carry-on with the reason `ssh-approved`, which wakes it. `planSshNews`
+  returns both kinds as one value, so a waking message is always a prompt.
 - **`QUEUE_HOLD`** (`queue-hold.ts`, ADR-0048 step 7): a thread's queue
   held, keyed by lane, in the session: who held it and when.
 - **`STATE`** and **`CONFLICT`** (`folder-records.ts`, ADR-0142): a folder
@@ -1208,7 +1216,13 @@ queue (`holdOnStop`, ADR-0048 step 7), written before the abort.
 (`pinetrie.carry-on`, role `carry-on`), a history message. Its `content` tells the model who asked it to carry on, and that
 what it was writing when stopped was not kept; its `details` hold the lane,
 who resumed and their name then, for the column's line ("↻ resumed by
-Ada"). It is a prompt, so its run is an ask of its own (`PROMPT_ROLES`).
+Ada"), and why (`reason`). It is a prompt, so its run is an ask of its own
+(`PROMPT_ROLES`), and its run is the resumer's (`promptAuthor`): their
+budget, and their inbox when it ends.
+- **A carry-on also wakes a lane its owner let use their ssh** (ADR-0178):
+  its reason `ssh-approved`, with the host, and its line "↻ resumed by
+  Duane: approved ssh for hql". Only `planSshNews` makes one; the Resume
+  button's `planCarryOn` gives the reason `stopped`.
 
 - **`carryOnState` is the one rule**, read by the host's `planCarryOn` and
   the dock's `laneNext` (`@pinetrie/interface`): the lane does not run and has no cards waiting,

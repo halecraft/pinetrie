@@ -16,7 +16,7 @@ OpenSSH behaves was measured there, against OpenSSH 10.0p2.
 
 | module | holds |
 |---|---|
-| `settings.ts` | `lanes.ssh` as the host's config settled it, decided (`sshSettings`); host patterns as written, case kept (`parseHostPatterns`); and what the host adds (`settingsOnHost`) |
+| `settings.ts` | `lanes.ssh` as the host's config settled it, decided (`personalSsh`); host patterns as written, case kept (`parseHostPatterns`); and what the host adds (`personalOnHost`) |
 | `patterns.ts` | ssh's host patterns, a list's comma lists split once (`hostPatternList`), matched as OpenSSH's `match_pattern_list` (`isHostAllowed`) |
 | `names.ts` | what a lane hands the host, branded once checked: `SshName`, `SshPort`, `LaneToken` |
 | `hop-line.ts` | the first line of a hop's connection, decoded only through a token that checks |
@@ -40,9 +40,8 @@ OpenSSH behaves was measured there, against OpenSSH 10.0p2.
   project's, so your choice wins; a system file's `false` forbids it. This
   package takes the settled value and who decided it (`PersonalChoice`): a
   person's grant reaches every lane, a project's only the lanes that keep
-  it. Your files alone narrow it (`hosts`) or set the wait
-  (`approvalSeconds`, 10 to 600, else 120 and a refusal). Refused `hosts`
-  turn it off rather than widening it to every host.
+  it. Your files alone narrow it (`hosts`). Refused `hosts` turn it off
+  rather than widening it to every host.
 - **A token carries its lane:** `<lane, base64url>.<HMAC-SHA256, hex>`. The
   host keeps no table of tokens: `tokenLane` reads the lane back and
   compares the MAC in constant time. A lane is only ever known through a
@@ -60,7 +59,10 @@ OpenSSH behaves was measured there, against OpenSSH 10.0p2.
   (S174 item 5).
 - **A personal key asks** the app's policy, naming the host the session was
   bound to: as the lane's `known_hosts` names its key, else the broker's
-  newest name for the lane, else the key's fingerprint.
+  newest name for the lane, else the key's fingerprint. The app answers at
+  once, and the relay holds nothing: a key not yet approved is refused,
+  the request waits in the lane's record for its owner, however long, and
+  an approval wakes the lane to try again (ADR-0178).
 - **Narrowed personal hosts are enforced by host key, not by config.** A
   personal sign is refused unless its session (the first string of a
   login's data) was bound to a key from the person's kept `known_hosts`
@@ -116,10 +118,11 @@ OpenSSH behaves was measured there, against OpenSSH 10.0p2.
   connection, and a nested lane's rootless Docker mounts the socket as
   another user. Its first line is read (at most `HOP_LINE_LIMIT` bytes)
   and checked; anything else is closed.
-- **The app is asked one question,** `mayUsePersonal(lane, host)`, and told
-  one thing, `used` (a service identity signed, the broker connected a
-  name). Approvals, records and timeouts are the app's: the package never
-  sees a thread.
+- **The app is asked one question,** `mayUsePersonal(lane, host)`, which it
+  answers at once (ADR-0178), and told two things: `used` (a service
+  identity signed, the broker connected a name) and `outside` (a personal
+  signature refused for a host not allowed). Approvals and records are the
+  app's: the package never sees a thread.
 - **An agent connection is relayed one request at a time,** as the protocol
   is, each lane connection with its own connections to the service agent
   and the person's. Every request that needs them lists both agents
@@ -148,8 +151,9 @@ OpenSSH behaves was measured there, against OpenSSH 10.0p2.
 
 ## Gotchas
 
-- **A default sshd ends a login at 120 s** (`LoginGraceTime`): a personal
-  signature held longer than that fails at the server, whatever the wait.
+- **A default sshd ends a login at 120 s** (`LoginGraceTime`), whatever an
+  agent holds (S174 item 2): why no personal signature waits for its owner
+  (ADR-0178).
 - **ssh reads only the last `-F`;** a file of absolute `Include`s combines
   two. A relative `Include` resolves under `~/.ssh/`, and one not found is
   skipped without a word.

@@ -149,10 +149,7 @@ test("startupLaps: a phase of a second or more is said with its time since the l
 
 test("an allowed host with no known key is said at start", () => {
   const lines = sshLines({
-    settings: {
-      personal: { kind: "on", hosts: ["hql", "*.lan"], own: true },
-      approvalSeconds: 120,
-    },
+    personal: { kind: "on", hosts: ["hql", "*.lan"], own: true },
     checks: [],
     failed: [],
     added: [],

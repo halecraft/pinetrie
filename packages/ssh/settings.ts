@@ -1,8 +1,8 @@
 // ssh/settings — whether lanes may hold the person's own identity, from what
 // the host's config settled: `lanes.ssh.personal` (the project grants it, the
-// person grants or declines it, the machine may forbid it), `lanes.ssh.hosts`
-// and `lanes.ssh.approvalSeconds`. Their files are decoded by the host's
-// table; this decides from the values.
+// person grants or declines it, the machine may forbid it) and
+// `lanes.ssh.hosts`. Their files are decoded by the host's table; this
+// decides from the values.
 
 import type { HostPatterns } from "./patterns.ts"
 
@@ -33,16 +33,6 @@ export type PersonalSsh =
       readonly own: boolean
     }
 
-export interface SshSettings {
-  readonly personal: PersonalSsh
-  /** Seconds a personal signature waits for its owner. */
-  readonly approvalSeconds: number
-}
-
-export const DEFAULT_APPROVAL_SECONDS = 120
-export const MIN_APPROVAL_SECONDS = 10
-export const MAX_APPROVAL_SECONDS = 600
-
 /** `lanes.ssh.personal` as settled: its value, and who decided it. */
 export interface PersonalChoice {
   readonly on: boolean
@@ -70,20 +60,16 @@ export function parseHostPatterns(v: unknown): readonly string[] | null {
 }
 
 /**
- * The settings from the settled choice, hosts and wait. `hosts` is
+ * Personal identity from the settled choice and hosts. `hosts` is
  * `"invalid"` when the person's hosts were refused: a malformed list turns
  * personal identity off rather than widening it to every host.
  */
-export function sshSettings(input: {
+export function personalSsh(input: {
   readonly personal: PersonalChoice
   readonly hosts: HostPatterns | "invalid"
-  readonly approvalSeconds: number
-}): SshSettings {
-  const { personal, hosts, approvalSeconds } = input
-  const off = (why: PersonalOff): SshSettings => ({
-    personal: { kind: "off", why },
-    approvalSeconds,
-  })
+}): PersonalSsh {
+  const { personal, hosts } = input
+  const off = (why: PersonalOff): PersonalSsh => ({ kind: "off", why })
   if (!personal.on)
     return off(
       personal.decider === "machine"
@@ -93,21 +79,18 @@ export function sshSettings(input: {
           : "not-granted",
     )
   if (hosts === "invalid") return off("invalid-hosts")
-  return {
-    personal: { kind: "on", hosts, own: personal.decider === "person" },
-    approvalSeconds,
-  }
+  return { kind: "on", hosts, own: personal.decider === "person" }
 }
 
 /** Personal identity turned off for a reason the host knows, or kept. */
-export const settingsOnHost = (
-  settings: SshSettings,
+export const personalOnHost = (
+  personal: PersonalSsh,
   host: { readonly owner: boolean; readonly agent: boolean },
-): SshSettings =>
-  settings.personal.kind === "off"
-    ? settings
+): PersonalSsh =>
+  personal.kind === "off"
+    ? personal
     : !host.owner
-      ? { ...settings, personal: { kind: "off", why: "no-owner" } }
+      ? { kind: "off", why: "no-owner" }
       : !host.agent
-        ? { ...settings, personal: { kind: "off", why: "no-agent" } }
-        : settings
+        ? { kind: "off", why: "no-agent" }
+        : personal

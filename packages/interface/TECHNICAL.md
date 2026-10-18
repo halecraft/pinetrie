@@ -1227,7 +1227,9 @@ which names the entry and its thread (`packages/rules/TECHNICAL.md`,
 - **An ask needs its owner wherever they are:** `appView`'s `sshAsks` raise
   an inbox item (`Raised` `ssh`) for the owner alone, whether or not they
   follow the thread and while its lane runs, since the lane asks mid-run.
-  It has no "not needed": answering clears it.
+  It has no "not needed": answering clears it. A request waits until it is
+  answered, however long, so its item lasts that long too, and its row is
+  marked as needing the owner (ADR-0178).
 
 ## What a column shows (`column-view.ts`, ADR-0040)
 

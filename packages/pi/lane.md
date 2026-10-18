@@ -165,8 +165,12 @@ changes pine·trie can keep this note true. You can skip them.
   guidelines name. <!-- packages/ssh/relay-step.ts relayStep -->
 - "agent refused operation" means one of these, and the access row of your
   column's header tells your owner which:
-  - your owner has not answered yet: ssh waits, up to their approval time;
-  - they refused, or nobody answered in time;
+  - your owner has not answered yet: refused at once, and a note in your
+    run says they were asked. Do not retry: finish what you can, and end
+    your turn saying you wait for their approval. Their approval wakes you
+    to try again. <!-- packages/rules/access.ts planPersonalSign -->
+    <!-- packages/rules/ssh-news.ts planSshNews -->
+  - they refused it, or took it back: a note says so. Do not ask again.
   - the host is not one they allow: refused at once, without asking them.
     The host matches a host by its key, under the name ssh checks it as.
     <!-- packages/ssh/resolve.ts checkedHostName -->

@@ -61,10 +61,7 @@ import {
   type TitleConfig,
 } from "@pinetrie/rules"
 import {
-  DEFAULT_APPROVAL_SECONDS,
   type HostPatterns,
-  MAX_APPROVAL_SECONDS,
-  MIN_APPROVAL_SECONDS,
   type PersonalChoice,
   parseHostPatterns,
 } from "@pinetrie/ssh"
@@ -264,14 +261,6 @@ export const SETTINGS = defineTable({
       order: ["user", "local"],
     },
   ),
-  "lanes.ssh.approvalSeconds": pick(
-    count({ min: MIN_APPROVAL_SECONDS, max: MAX_APPROVAL_SECONDS }),
-    {
-      fallback: DEFAULT_APPROVAL_SECONDS,
-      describe: "how long a lane's use of your identity waits for you",
-      order: ["user", "local"],
-    },
-  ),
   "accepted.bookmark": pick(bookmark, {
     fallback: DEFAULT_REPO.acceptedBookmark,
     describe: "accepted work's bookmark",
@@ -425,13 +414,12 @@ export const titleSettings = (settled: HostSettled): TitleConfig => ({
 })
 
 /**
- * `lanes.ssh`'s settled values, as `sshSettings` takes them. Refused hosts
+ * `lanes.ssh`'s settled values, as `personalSsh` takes them. Refused hosts
  * are `"invalid"`: they turn personal identity off rather than widening it.
  */
 export function sshChoice(report: HostReport): {
   readonly personal: PersonalChoice
   readonly hosts: HostPatterns | "invalid"
-  readonly approvalSeconds: number
 } {
   const { settled, refusals } = report
   const personal = settled["lanes.ssh.personal"]
@@ -452,7 +440,6 @@ export function sshChoice(report: HostReport): {
     hosts: refusals.some(r => r.key === "lanes.ssh.hosts")
       ? "invalid"
       : settled["lanes.ssh.hosts"].value,
-    approvalSeconds: settled["lanes.ssh.approvalSeconds"].value,
   }
 }
 

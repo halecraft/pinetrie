@@ -19,6 +19,8 @@ Numbered 0127 until 2026-10-10, when two files held that number.
   - ADR-0160: a budget chosen in the composer, a top-up, dismissing a member,
     a relayed run's verdict in the asking thread and the asked thread's
     "talking in" header are shelved; `read_thread` is still to build.
+  - ADR-0178: an owner's answer to a lane's ssh request wakes that lane, as an
+    answer to an agent's ask wakes the asker. A refusal wakes nobody.
 
 **Context.** Each thread has at most one agent, its lane's (ADR-0019,
 ADR-0021), and `@agent` names it. A common wish is to bring another

@@ -57,13 +57,19 @@ describe("the owner", () => {
 
   test("can take an approval back, and approve after a refusal", () => {
     expect(
-      row(at({ kind: "approved", by: DUANE, at: 1 }, { hosts: ["pop"] })),
+      row(
+        at(
+          { kind: "approved", host: "pop", by: DUANE, at: 1 },
+          { hosts: ["pop"] },
+        ),
+      ),
     ).toMatchObject({
       line: "🔑 your ssh · pop",
       answers: [{ answer: "revoke", label: "revoke" }],
     })
     expect(
-      row(at({ kind: "refused", by: DUANE, at: 1, revoked: true }))?.answers,
+      row(at({ kind: "refused", host: "pop", by: DUANE, at: 1, revoked: true }))
+        ?.answers,
     ).toEqual([{ answer: "approve", label: "approve" }])
   })
 })
@@ -76,19 +82,22 @@ describe("everyone else", () => {
     })
   })
 
-  test("sees whose ssh it holds, refused, revoked or unanswered", () => {
-    expect(row(at({ kind: "approved", by: DUANE, at: 1 }), BEA)?.line).toBe(
-      "🔑 Duane's ssh",
-    )
+  test("sees whose ssh it holds, refused or revoked", () => {
     expect(
-      row(at({ kind: "refused", by: DUANE, at: 1, revoked: false }), BEA)?.line,
+      row(at({ kind: "approved", host: "pop", by: DUANE, at: 1 }), BEA)?.line,
+    ).toBe("🔑 Duane's ssh")
+    expect(
+      row(
+        at({ kind: "refused", host: "pop", by: DUANE, at: 1, revoked: false }),
+        BEA,
+      )?.line,
     ).toBe("🔑 Duane's ssh refused")
     expect(
-      row(at({ kind: "refused", by: DUANE, at: 1, revoked: true }), BEA)?.line,
+      row(
+        at({ kind: "refused", host: "pop", by: DUANE, at: 1, revoked: true }),
+        BEA,
+      )?.line,
     ).toBe("🔑 Duane's ssh revoked")
-    expect(row(at({ kind: "unanswered", host: null, at: 1 }), BEA)?.line).toBe(
-      "🔑 Duane's ssh: no answer for a host",
-    )
   })
 })
 
@@ -96,7 +105,7 @@ test("service identities come first, with the hosts the lane reached", () => {
   expect(
     row(
       at(
-        { kind: "approved", by: DUANE, at: 1 },
+        { kind: "approved", host: "pop", by: DUANE, at: 1 },
         { services: ["deploy"], hosts: ["git.internal", "pop"] },
       ),
       BEA,

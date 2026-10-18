@@ -18,11 +18,13 @@ import type {
   CanvasFactMessage,
   CanvasMessage,
   CanvasPinnedMessage,
+  CarryOnMessage,
   FactMessage,
   HeardMessage,
   PersonMessage,
   PinnedMessage,
   PromptMessage,
+  SshFactMessage,
   UpdateMessage,
 } from "@pinetrie/rules"
 import {
@@ -137,11 +139,17 @@ export interface ThreadLaneHandle {
   /**
    * Append with no run, through the pi `Lane`: it plans from its own cached
    * tip, so a write that bypasses it would be dropped from its next turn.
-   * A chat, or a host's fact: an update, or what a command on the thread's
-   * proposed changes did.
+   * A chat, or a host's fact: an update, what a command on the thread's
+   * proposed changes did, or its ssh news.
    */
   append(
-    message: PersonMessage | UpdateMessage | FactMessage | AnswerMessage,
+    message:
+      | PersonMessage
+      | UpdateMessage
+      | FactMessage
+      | AnswerMessage
+      | CarryOnMessage
+      | SshFactMessage,
   ): Promise<AppendOutcome>
   /**
    * Run one turn with `message` as the prompt itself. What of the lane's
@@ -156,14 +164,19 @@ export interface ThreadLaneHandle {
   ): Promise<RunOutcome>
   /**
    * Tell a running lane something that changed while it runs: its base has
-   * new work, a card was added to or taken from its canvas, or an agent it
-   * asked answered. pi places the message after the tool results of the
+   * new work, a card was added to or taken from its canvas, an agent it
+   * asked answered, or its owner answered its ssh request. pi places the message after the tool results of the
    * turn in flight, at its next boundary, appended, so the prompt cache
    * holds. A steer that arrives after the run's last tool call makes one
    * more request.
    */
   steer(
-    message: BehindMessage | CanvasFactMessage | AnswerMessage,
+    message:
+      | BehindMessage
+      | CanvasFactMessage
+      | AnswerMessage
+      | CarryOnMessage
+      | SshFactMessage,
   ): Promise<WriteOutcome>
   /** Resume the operation a crash interrupted, in the lane's own directory. */
   resume(): Promise<WriteOutcome>

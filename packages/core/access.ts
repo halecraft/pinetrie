@@ -5,29 +5,30 @@ import type { ThreadId, WriterId } from "./ids.ts"
 
 /**
  * A lane's use of its owner's ssh identity: asked, and what the owner
- * answered. The host's to change: a request held while it is `waiting` is
- * released or refused as it changes.
+ * answered, each state naming the host the lane last asked for. No
+ * signature is held on it: a lane not approved is refused at once, and each
+ * change of state is news to the lane.
  */
 export type PersonalAccess =
   | {
       readonly kind: "waiting"
-      /** The host it is for; null when the lane's session named none. */
+      /** Null when the lane's session named no host. */
       readonly host: string | null
       readonly since: number
     }
-  | { readonly kind: "approved"; readonly by: WriterId; readonly at: number }
+  | {
+      readonly kind: "approved"
+      readonly host: string | null
+      readonly by: WriterId
+      readonly at: number
+    }
   | {
       readonly kind: "refused"
+      readonly host: string | null
       readonly by: WriterId
       readonly at: number
       /** Approved, then taken back. */
       readonly revoked: boolean
-    }
-  /** Nobody answered in time, or the host stopped while it waited. */
-  | {
-      readonly kind: "unanswered"
-      readonly host: string | null
-      readonly at: number
     }
 
 /**

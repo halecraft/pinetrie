@@ -15,8 +15,8 @@ import {
   planAccessChange,
   planAccessOutside,
   planAccessRecovery,
-  planAccessTimeout,
   planAccessUse,
+  planPersonalSign,
 } from "./access.ts"
 
 const LANE = threadIdFor("t-1")
@@ -25,9 +25,8 @@ const BEA = writerId("bea@x.io")
 
 const STATES: Record<PersonalAccess["kind"], PersonalAccess> = {
   waiting: { kind: "waiting", host: "pop", since: 1 },
-  approved: { kind: "approved", by: DUANE, at: 1 },
-  refused: { kind: "refused", by: DUANE, at: 1, revoked: false },
-  unanswered: { kind: "unanswered", host: "pop", at: 1 },
+  approved: { kind: "approved", host: "pop", by: DUANE, at: 1 },
+  refused: { kind: "refused", host: "pop", by: DUANE, at: 1, revoked: false },
 }
 const at = (personal: PersonalAccess | null): AccessRecord => ({
   ...emptyAccess(LANE),
@@ -71,45 +70,39 @@ describe("planAccessAnswer", () => {
 
   test("a revoke is a refusal that says it was approved first", () => {
     expect(answer(at(STATES.approved), "revoke")).toEqual({
-      record: at({ kind: "refused", by: DUANE, at: 2, revoked: true }),
+      record: at({
+        kind: "refused",
+        host: "pop",
+        by: DUANE,
+        at: 2,
+        revoked: true,
+      }),
     })
+  })
+
+  test("an answer keeps the host its request named", () => {
+    const approved = answer(at(STATES.waiting), "approve")
+    expect("record" in approved && approved.record.personal?.host).toBe("pop")
   })
 })
 
 describe("asking", () => {
-  test("a lane that never asked, or was not answered, waits", () => {
-    for (const personal of [null, STATES.unanswered])
-      expect(
-        planAccessAsk({
-          record: at(personal),
-          host: "pop",
-          now: 3,
-        }).personal,
-      ).toEqual({ kind: "waiting", host: "pop", since: 3 })
+  test("a lane that never asked waits", () => {
+    expect(
+      planAccessAsk({ record: at(null), host: "pop", now: 3 }).personal,
+    ).toEqual({ kind: "waiting", host: "pop", since: 3 })
   })
 
   test("a refused lane stays refused", () => {
     expect(
-      planAccessAsk({
-        record: at(STATES.refused),
-        host: "pop",
-        now: 3,
-      }),
+      planAccessAsk({ record: at(STATES.refused), host: "pop", now: 3 }),
     ).toEqual(at(STATES.refused))
   })
 
-  test("nobody answering leaves it unanswered", () => {
-    expect(planAccessTimeout(at(STATES.waiting), 5).personal).toEqual({
-      kind: "unanswered",
-      host: "pop",
-      at: 5,
-    })
-  })
-
-  test("a starting host leaves nothing waiting", () => {
+  test("a starting host keeps a lane's request", () => {
     expect(
-      planAccessRecovery([at(STATES.waiting), at(STATES.approved)], 9),
-    ).toEqual([at({ kind: "unanswered", host: "pop", at: 9 })])
+      planAccessRecovery([at(STATES.waiting), at(STATES.approved)]),
+    ).toEqual([])
   })
 
   test("a starting host clears a refusal for a host outside", () => {
@@ -117,7 +110,30 @@ describe("asking", () => {
       ...at(STATES.approved),
       outside: { host: "hql", key: "SHA256:k", at: 1 },
     }
-    expect(planAccessRecovery([refused], 9)).toEqual([at(STATES.approved)])
+    expect(planAccessRecovery([refused])).toEqual([at(STATES.approved)])
+  })
+})
+
+describe("planPersonalSign", () => {
+  const sign = (record: AccessRecord, mayAsk = true) =>
+    planPersonalSign({ record, mayAsk, host: "hql", now: 4 })
+
+  test("an approved lane signs; any other is refused at once", () => {
+    expect(sign(at(STATES.approved))).toEqual({ signs: true, write: null })
+    for (const state of [STATES.waiting, STATES.refused])
+      expect(sign(at(state))).toEqual({ signs: false, write: null })
+  })
+
+  test("a lane that never asked asks as it is refused", () => {
+    expect(sign(at(null))).toEqual({
+      signs: false,
+      write: at({ kind: "waiting", host: "hql", since: 4 }),
+    })
+  })
+
+  test("a lane that may not ask writes nothing", () => {
+    for (const personal of [null, STATES.approved])
+      expect(sign(at(personal), false)).toEqual({ signs: false, write: null })
   })
 })
 
@@ -144,24 +160,35 @@ test("a use is recorded once, in first-use order", () => {
 })
 
 describe("planAccessChange", () => {
-  test("an approval releases what waits", () => {
-    expect(planAccessChange(STATES.waiting, STATES.approved)).toBe("release")
+  const OWNER = writerId("owner@x.io")
+  const change = (prev: PersonalAccess | null, next: PersonalAccess | null) =>
+    planAccessChange(prev, next, OWNER)
+
+  test("a request is news once, and each answer is news", () => {
+    expect(change(null, STATES.waiting)).toEqual({
+      kind: "asked",
+      host: "pop",
+      owner: OWNER,
+    })
+    expect(change(STATES.waiting, STATES.waiting)).toBeNull()
+    expect(change(STATES.waiting, STATES.approved)).toEqual({
+      kind: "approved",
+      host: "pop",
+      owner: DUANE,
+    })
+    expect(change(STATES.waiting, STATES.refused)?.kind).toBe("refused")
+    expect(change(STATES.refused, STATES.approved)?.kind).toBe("approved")
   })
-  test("a refusal or no answer refuses what waits", () => {
-    expect(planAccessChange(STATES.waiting, STATES.refused)).toBe("refuse")
-    expect(planAccessChange(STATES.waiting, STATES.unanswered)).toBe("refuse")
-  })
-  test("only taking back an approval cuts the lane's sessions", () => {
+
+  test("taking back an approval is revoked news", () => {
     expect(
-      planAccessChange(STATES.approved, {
+      change(STATES.approved, {
         kind: "refused",
+        host: "pop",
         by: DUANE,
-        at: 2,
+        at: 1,
         revoked: true,
       }),
-    ).toBe("cut")
-  })
-  test("asking changes nothing that waits", () => {
-    expect(planAccessChange(null, STATES.waiting)).toBeNull()
+    ).toEqual({ kind: "revoked", host: "pop", owner: DUANE })
   })
 })

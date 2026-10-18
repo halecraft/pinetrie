@@ -243,6 +243,7 @@ test("the owner's answer to a lane's ssh is written; anyone else's is refused", 
   })
   expect(readRecords(b.session, ACCESS).get(lane)?.personal).toEqual({
     kind: "approved",
+    host: "pop",
     by: ada,
     at: 1_000,
   })

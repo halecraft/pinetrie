@@ -659,7 +659,10 @@ item 18, and in `lanes.test.ts` against the harness.
     none when it may sign for any (ADR-0170). Both lane notes list each
     cause of "agent refused operation", since ssh prints no more, and
     tell the agent not to turn off host key checking, which the relay's
-    limit rests on.
+    limit rests on. A request its owner has not answered is refused at
+    once, and the agent is told so by a steered ssh fact, which says to
+    end its turn; the approval wakes it with its owner's carry-on
+    (ADR-0178).
   - **Guidelines, not a section of its own.** pi joins its sections into one
     string, and a provider may rebuild that string by its tags:
     `pi-anthropic-auth` keeps `<rules>` and drops `<docs>` (S23, addendum).

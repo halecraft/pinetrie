@@ -582,8 +582,8 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   identities its lane holds** (ADR-0140): its service identities, then
   your identity's state, then the hosts it reached ("🔑 deploy, Duane's
   ssh · pop"). A lane waiting for you reads "🔑 wants your ssh for pop"
-  with **approve** and **refuse**; an approved one proposed changes **revoke**, and
-  a refused, revoked or unanswered one **approve**. Only the owner sees
+  with **approve** and **refuse**, marked as needing you; an approved one
+  **revoke**, and a refused or revoked one **approve**. Only the owner sees
   the buttons; everyone else reads "🔑 waiting for Duane". While your
   answer is out its buttons wait, and a refusal is said there. A
   signature refused because its host is outside your `lanes.ssh.hosts` is
@@ -592,7 +592,11 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   answer, and a host clears it as it starts. A lane that never asked,
   used no service identity and was refused no host has no row. A lane
   waiting for you is also in your inbox ("wants your ssh for pop"),
-  whether or not you follow it; answering clears it.
+  whether or not you follow it; answering clears it. A request waits until
+  you answer, however long (ADR-0178): the lane's ssh is refused meanwhile,
+  and its agent is told to end its turn. Your approval wakes the lane, its
+  thread reading "↻ resumed by Duane: approved ssh for pop", and it tries
+  again.
 - **In a folder project** (ADR-0142), the strip's proposed changes are the files the
   thread's newest state changes against accepted work's newest, reviewed as
   files, each with its line counts and its unified diff; it has no bookmark,

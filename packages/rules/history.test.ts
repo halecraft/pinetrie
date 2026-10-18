@@ -19,6 +19,7 @@ import { LAND } from "./land.ts"
 import { renderableMessage } from "./message.ts"
 import { PINNED } from "./pinned.ts"
 import { ANSWER, HEARD, RELAY } from "./relay.ts"
+import { SSH_FACT } from "./ssh-news.ts"
 import { STACK } from "./stack.ts"
 import { CARRY_ON } from "./stop.ts"
 import { UPDATE } from "./update.ts"
@@ -35,6 +36,7 @@ const MESSAGE_SPECS = [
   CANVAS_PINNED,
   CANVAS,
   CANVAS_FACT,
+  SSH_FACT,
   HEARD,
   RELAY,
   ANSWER,
@@ -89,7 +91,12 @@ const SAMPLES: Record<CustomType, unknown> = {
     overlap: [],
     conflicts: [],
   },
-  "pinetrie.carry-on": { lane: LANE, by: ADA, name: "Ada" },
+  "pinetrie.carry-on": {
+    lane: LANE,
+    by: ADA,
+    name: "Ada",
+    reason: { kind: "ssh-approved", host: "hql" },
+  },
   "pinetrie.pinned": {
     lane: LANE,
     cards: [{ id: textCardId("k-1"), text: "do it", by: ADA }],
@@ -113,6 +120,7 @@ const SAMPLES: Record<CustomType, unknown> = {
     title: "Decisions",
     change: "added",
   },
+  "pinetrie.ssh-fact": { news: "asked", host: "hql", ownerName: "Ada" },
   "pinetrie.heard": {
     from: LANE,
     fromName: "amber-fox",
@@ -152,6 +160,7 @@ const ROLES: Record<CustomType, string> = {
   "pinetrie.canvas-pinned": "canvas-pinned",
   "pinetrie.canvas": "canvas",
   "pinetrie.canvas-fact": "fact",
+  "pinetrie.ssh-fact": "fact",
   "pinetrie.heard": "heard",
   "pinetrie.relay": "relay",
   "pinetrie.answer": "answer",

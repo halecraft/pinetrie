@@ -1,8 +1,8 @@
 // access — a lane's ssh identities, as the column's header shows them, and
-// how its use of its owner's identity changes: asked, answered, timed out,
-// refused for a host not allowed, and recovered after a host stops. The
-// host's relay follows the record, so each change to its owner's answer is
-// also what happens to a request held for the owner.
+// how its use of its owner's identity changes: asked, answered, refused for
+// a host not allowed, and cleared as a host starts. The relay answers each
+// signature from the record at once, and each change to it is news to the
+// lane.
 
 import type {
   AccessAnswer,
@@ -25,19 +25,16 @@ const PersonalSchema = Type.Union([
   }),
   Type.Object({
     kind: Type.Literal("approved"),
+    host: HostSchema,
     by: WriterIdSchema,
     at: Type.Number(),
   }),
   Type.Object({
     kind: Type.Literal("refused"),
+    host: HostSchema,
     by: WriterIdSchema,
     at: Type.Number(),
     revoked: Type.Boolean(),
-  }),
-  Type.Object({
-    kind: Type.Literal("unanswered"),
-    host: HostSchema,
-    at: Type.Number(),
   }),
 ])
 
@@ -90,7 +87,6 @@ export const ACCESS_ANSWERS: Readonly<
   waiting: ["approve", "refuse"],
   approved: ["revoke"],
   refused: ["approve"],
-  unanswered: ["approve"],
 }
 
 /** The answers the owner may give a lane now; none before it has asked. */
@@ -99,7 +95,7 @@ export const answersFor = (record: AccessRecord): readonly AccessAnswer[] =>
 
 export type AccessRefusal = "not_owner" | "nothing_to_answer"
 
-/** An answer, as the record it makes, or why it is refused. */
+/** An answer, as the record it makes, or why it is refused. It keeps the host the lane asked for. */
 export function planAccessAnswer(input: {
   readonly record: AccessRecord
   readonly answer: AccessAnswer
@@ -110,13 +106,15 @@ export function planAccessAnswer(input: {
   const { record, answer, sender, now } = input
   if (input.owner === null || sender !== input.owner)
     return { refused: "not_owner" }
-  if (!answersFor(record).includes(answer))
+  if (record.personal === null || !answersFor(record).includes(answer))
     return { refused: "nothing_to_answer" }
+  const { host } = record.personal
   const personal: PersonalAccess =
     answer === "approve"
-      ? { kind: "approved", by: sender, at: now }
+      ? { kind: "approved", host, by: sender, at: now }
       : {
           kind: "refused",
+          host,
           by: sender,
           at: now,
           revoked: answer === "revoke",
@@ -124,51 +122,48 @@ export function planAccessAnswer(input: {
   return { record: { ...record, personal } }
 }
 
-/** A lane asks for its owner's identity: it waits, unless it was answered already. */
-export function planAccessAsk(input: {
+/** A lane asks for its owner's identity: it waits, unless it asked or was answered already. */
+export const planAccessAsk = (input: {
   readonly record: AccessRecord
   readonly host: string | null
   readonly now: number
-}): AccessRecord {
-  const { record } = input
-  const kind = record.personal?.kind
-  return kind === undefined || kind === "unanswered"
+}): AccessRecord =>
+  input.record.personal === null
     ? {
-        ...record,
-        personal: {
-          kind: "waiting",
-          host: input.host,
-          since: input.now,
-        },
+        ...input.record,
+        personal: { kind: "waiting", host: input.host, since: input.now },
       }
-    : record
-}
-
-/** Nobody answered a lane that waits: it is unanswered, and asks again next time. */
-export const planAccessTimeout = (
-  record: AccessRecord,
-  now: number,
-): AccessRecord =>
-  record.personal?.kind === "waiting"
-    ? {
-        ...record,
-        personal: { kind: "unanswered", host: record.personal.host, at: now },
-      }
-    : record
+    : input.record
 
 /**
- * A starting host's records: nothing waits for an answer any longer, since
- * the requests that waited went with the host that held them, and no
- * refusal for a host not allowed is kept, since the allowed hosts are read
- * again at start.
+ * A personal signature's answer, at once, from the lane's record: an
+ * approved lane signs; any other is refused, and a lane that never asked
+ * asks as it is refused. A lane that may not ask writes nothing.
+ */
+export function planPersonalSign(input: {
+  readonly record: AccessRecord
+  readonly mayAsk: boolean
+  readonly host: string | null
+  readonly now: number
+}): { readonly signs: boolean; readonly write: AccessRecord | null } {
+  const { record } = input
+  if (!input.mayAsk) return { signs: false, write: null }
+  if (record.personal?.kind === "approved") return { signs: true, write: null }
+  return {
+    signs: false,
+    write: record.personal === null ? planAccessAsk(input) : null,
+  }
+}
+
+/**
+ * A starting host's records: no refusal for a host not allowed is kept,
+ * since the allowed hosts are read again at start. A request is kept: no
+ * signature waited on it, so a stop lost nothing.
  */
 export const planAccessRecovery = (
   records: readonly AccessRecord[],
-  now: number,
 ): readonly AccessRecord[] =>
-  records
-    .filter(r => r.personal?.kind === "waiting" || r.outside !== null)
-    .map(r => ({ ...planAccessTimeout(r, now), outside: null }))
+  records.filter(r => r.outside !== null).map(r => ({ ...r, outside: null }))
 
 /**
  * A signature refused for a host not allowed, recorded; null when it is the
@@ -204,22 +199,40 @@ export function planAccessUse(
     : { ...record, hosts: [...list, use.name] }
 }
 
-/** What a change to a lane's record does to its requests held for the owner. */
-export type AccessEffect =
-  /** Approved: sign what waits. */
-  | "release"
-  /** Refused or unanswered: refuse what waits. */
-  | "refuse"
-  /** Approved, then refused: refuse what waits, and end every session it holds. */
-  | "cut"
+/** What a change to a lane's record tells it; each names its host and owner. */
+export interface AccessNews {
+  /**
+   * `asked`: it waits for its owner. `approved`: it may sign. `refused`:
+   * its request was refused. `revoked`: an approval was taken back, and its
+   * sessions end.
+   */
+  readonly kind: "asked" | "approved" | "refused" | "revoked"
+  readonly host: string | null
+  readonly owner: WriterId
+}
 
+/**
+ * The news a change to a lane's record makes; null for no change of state.
+ * It is read from the record, not from who wrote it, so two signatures that
+ * both wrote `waiting` make one change, and one piece of news. `owner` names
+ * a request's owner; an answer names its own `by`.
+ */
 export function planAccessChange(
   prev: PersonalAccess | null,
   next: PersonalAccess | null,
-): AccessEffect | null {
+  owner: WriterId,
+): AccessNews | null {
   if (next === null || prev?.kind === next.kind) return null
-  if (next.kind === "approved") return "release"
-  if (next.kind === "refused" && prev?.kind === "approved") return "cut"
-  if (next.kind === "refused" || next.kind === "unanswered") return "refuse"
-  return null
+  switch (next.kind) {
+    case "waiting":
+      return { kind: "asked", host: next.host, owner }
+    case "approved":
+      return { kind: "approved", host: next.host, owner: next.by }
+    case "refused":
+      return {
+        kind: prev?.kind === "approved" ? "revoked" : "refused",
+        host: next.host,
+        owner: next.by,
+      }
+  }
 }

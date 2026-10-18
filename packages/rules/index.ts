@@ -20,7 +20,7 @@ export {
 export {
   ACCESS,
   ACCESS_ANSWERS,
-  type AccessEffect,
+  type AccessNews,
   type AccessRefusal,
   answersFor,
   emptyAccess,
@@ -29,8 +29,8 @@ export {
   planAccessChange,
   planAccessOutside,
   planAccessRecovery,
-  planAccessTimeout,
   planAccessUse,
+  planPersonalSign,
 } from "./access.ts"
 export {
   type CatchUpRefusal,
@@ -657,11 +657,21 @@ export {
   type SpinOffRefusal,
   type SpunThread,
 } from "./spin-off.ts"
+export {
+  decodeSshFact,
+  planSshNews,
+  SSH_FACT_TYPE,
+  type SshDelivery,
+  type SshFact,
+  type SshFactMessage,
+  sshFactLine,
+} from "./ssh-news.ts"
 export { decodeStack, planStack, type StackMessage } from "./stack.ts"
 export { planStartup } from "./startup.ts"
 export {
   type CarryOnMessage,
   carryOnState,
+  decodeCarryOn,
   endedOutcome,
   planCarryOn,
   planStop,

@@ -37,6 +37,7 @@ import {
   pendingRunEndReport,
   planMessage,
   planResolution,
+  planSshNews,
   planStack,
   planStartup,
   promptAuthor,
@@ -742,6 +743,19 @@ describe("promptAuthor", () => {
       ),
     ).toBe(ADA)
     expect(promptAuthor({ role: "user", content: "hi" })).toBeNull()
+  })
+
+  test("a carry-on's run is its owner's", () => {
+    expect(
+      promptAuthor(
+        planSshNews(
+          { kind: "approved", host: "hql", owner: ADA },
+          threadIdFor("1"),
+          "Ada",
+          1,
+        ).message,
+      ),
+    ).toBe(ADA)
   })
 })
 

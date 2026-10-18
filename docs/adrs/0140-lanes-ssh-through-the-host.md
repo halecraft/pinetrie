@@ -22,6 +22,10 @@
     them. A personal signature refused because its host key is outside them is
     recorded in the lane's access record and logged, not dropped without a
     word.
+  - ADR-0178: a lane's first personal signature is refused at once, not held.
+    Its request waits in the lane's access record for as long as the owner
+    takes, with no `approvalSeconds`, and an approval wakes the lane to try
+    again.
 
 **Context.**
 

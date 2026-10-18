@@ -19,6 +19,7 @@ import { renderableMessage } from "./message.ts"
 import { orderAfter } from "./order.ts"
 import { type QueuedCard, queuedOn } from "./queue.ts"
 import {
+  carryOnLine,
   carryOnState,
   decodeCarryOn,
   endedOutcome,
@@ -327,11 +328,22 @@ describe("carrying on", () => {
       lane: s,
       by: ada,
       name: "Ada",
+      reason: { kind: "stopped" },
     })
     expect(renderableMessage(planned.message)).toEqual({
       role: "carry-on",
       content: "↻ resumed by Ada",
     })
+  })
+  test("a carry-on says why it resumed", () => {
+    expect(
+      carryOnLine({
+        lane: s,
+        by: ada,
+        name: "Ada",
+        reason: { kind: "ssh-approved", host: "hql" },
+      }),
+    ).toBe("↻ resumed by Ada: approved ssh for hql")
   })
   test("planCarryOn: a refusal is worded", () => {
     const o = over([ask, aborted], { running: true })

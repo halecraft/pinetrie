@@ -33,13 +33,10 @@ export {
   writeCombinedConfig,
 } from "./resolve.ts"
 export {
-  DEFAULT_APPROVAL_SECONDS,
-  MAX_APPROVAL_SECONDS,
-  MIN_APPROVAL_SECONDS,
   type PersonalChoice,
   type PersonalOff,
+  type PersonalSsh,
   parseHostPatterns,
-  type SshSettings,
-  settingsOnHost,
-  sshSettings,
+  personalOnHost,
+  personalSsh,
 } from "./settings.ts"

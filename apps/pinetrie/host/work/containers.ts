@@ -117,7 +117,8 @@ export function createContainers(deps: {
   // A lane whose use of its owner's identity is taken back: its sessions
   // through the host are closed already; any that went around the host end
   // here, if it runs.
-  setup.ssh.onCut(lane => {
+  setup.ssh.onNews((lane, news) => {
+    if (news.kind !== "revoked") return
     if (!registry.isOwn(lane) || !readRunning(basics.live, lane)) return
     void keeper.track(
       registry

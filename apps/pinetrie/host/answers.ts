@@ -3,7 +3,8 @@
 // end, and the round. Each lands after a gap, so each is a late step
 // (`later.ts`): planned when it runs, from the documents as they are then.
 // An answer for an asker out of reach is the answering thread's
-// `undelivered` fact, never a message the asker would get.
+// `undelivered` fact, never a message the asker would get. Where an answer
+// goes in its asker's thread is `delivery.ts`'.
 
 import {
   type Away,
@@ -19,8 +20,8 @@ import {
   type ThreadId,
   threadMembers,
 } from "@pinetrie/core"
-import type { Agent, PiSetup, Scribe } from "@pinetrie/pi"
-import { readThreads, readTreeIndex } from "@pinetrie/reads"
+import type { Agent, PiSetup } from "@pinetrie/pi"
+import { readTreeIndex } from "@pinetrie/reads"
 import {
   type AnswerMessage,
   type AnswerPlan,
@@ -28,19 +29,18 @@ import {
   encodeAnswer,
   parseRoundReply,
   planAnswer,
-  planDelivery,
   roundRequest,
   transcriptLines,
 } from "@pinetrie/rules"
 import { readEntryMessage } from "@pinetrie/schema"
 import type { Basics, HostKeeper } from "./basics.ts"
 import type { Budgets } from "./budgets.ts"
+import type { Deliver } from "./delivery.ts"
 import type { Later, LateWrite } from "./later.ts"
 import type { Relays } from "./relays.ts"
 import type { StepDocs } from "./roots.ts"
-import type { RunDocs, Runs } from "./runs.ts"
+import type { RunDocs } from "./runs.ts"
 import { threadsNow } from "./threads-now.ts"
-import type { LaneWork } from "./work/index.ts"
 
 export interface Answers {
   /**
@@ -73,15 +73,12 @@ export function createAnswers(deps: {
   /** A relay into another thread, gated by both threads' reach when it runs. */
   readonly relays: Pick<Relays, "deliver">
   readonly agent: Pick<Agent, "lane">
-  readonly scribe: Pick<Scribe, "appendToTree">
-  readonly start: Runs["start"]
-  /** Whether a run may start on a lane (`LaneWork.runnable`). */
-  readonly runnable: LaneWork["runnable"]
+  /** Where an answer goes in its asker's thread (`delivery.ts`). */
+  readonly deliver: Deliver
   readonly budgets: Budgets
   readonly piSetup: Pick<PiSetup, "complete" | "skill">
 }): Answers {
   const { basics, budgets, later } = deps
-  const { session } = basics
   const threads = threadsNow(basics)
   // Answers that wake nobody, for a lane that was running when they came:
   // appended when its run ends, never steered into it, so its agent does
@@ -137,7 +134,7 @@ export function createAnswers(deps: {
     }
   }
 
-  /** `message` into the asker's thread, as `planDelivery` places it. */
+  /** `message` into the asker's thread; one that must wait for its run's end is held. */
   async function deliver(
     roots: StepDocs,
     lane: ThreadId,
@@ -145,59 +142,18 @@ export function createAnswers(deps: {
     message: AnswerMessage,
     wakes: boolean,
   ): Promise<void> {
-    const from = await threads.thread(roots, relay.from)
-    if (from === null) return
-    const to = planDelivery({
-      lane: from.lane,
-      compelled: wakes,
-      mode: "queue",
-      race: null,
-      steers: wakes,
-    })
-    switch (to.kind) {
-      case "run": {
-        // An asker of another kind runs nothing: the answer waits in its
-        // thread, as one that wakes nobody does.
-        const runnable = deps.runnable(to.thread)
-        if (typeof runnable === "object")
-          await deps.agent.lane(to.thread).append(message)
-        else
-          deps.start(roots, runnable, {
-            kind: "prompt",
-            message,
-            pinnedSeen: [],
-            heard: null,
-          })
-        return
-      }
-      case "steer":
-        await deps.agent.lane(to.thread).steer(message)
-        return
-      case "appendToLane":
-        await deps.agent.lane(to.thread).append(message)
-        return
-      case "appendToTree": {
-        const root = readThreads(session).get(relay.from)?.root
-        if (root !== undefined && from.end !== null)
-          await deps.scribe.appendToTree(
-            message,
-            { root, at: { kind: "entry", id: from.end } },
-            relay.from,
-          )
-        return
-      }
-      case "busy":
-        // It wakes nobody: it waits for the run to end.
-        pending.set(relay.from, [
-          ...(pending.get(relay.from) ?? []),
-          { message, relay, lane },
-        ])
-        return
-      case "createAndRun":
-      case "conflict":
-        // An answer never creates a lane, nor races anyone.
-        return
-    }
+    const placed = await deps.deliver(
+      roots,
+      relay.from,
+      wakes ? { wakes: true, message } : { wakes: false, message },
+      wakes,
+    )
+    // It wakes nobody: it waits for the run to end.
+    if (placed === "busy")
+      pending.set(relay.from, [
+        ...(pending.get(relay.from) ?? []),
+        { message, relay, lane },
+      ])
   }
 
   /** Each answer held for `asker`, appended, or its answerer told it reached nobody. */

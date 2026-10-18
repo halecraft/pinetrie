@@ -1,6 +1,7 @@
 # S71 — what pi says about a run's prompt when the run ends
 
 - **Status:** Answered
+- **Led to:** ADR-0178
 
 Measured in a lane (Linux, Node 24, pi 0.87.1), for
 `PLAN-2026-10-02-final-digest-ask`. The question: could `runs.ts` learn the

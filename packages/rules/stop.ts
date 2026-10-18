@@ -153,6 +153,14 @@ const CarryOnDetailsSchema = Type.Object({
   by: WriterIdSchema,
   /** Who resumed, as named when they did: the column's line shows it. */
   name: Type.String(),
+  /** Why: a stopped run carried on, or the owner's ssh approved, which wakes the lane. */
+  reason: Type.Union([
+    Type.Object({ kind: Type.Literal("stopped") }),
+    Type.Object({
+      kind: Type.Literal("ssh-approved"),
+      host: Type.Union([Type.String(), Type.Null()]),
+    }),
+  ]),
 })
 
 type CarryOnDetails = Static<typeof CarryOnDetailsSchema>
@@ -168,9 +176,11 @@ export type CarryOnMessage = HistoryMessage<
 /** A stored message -> its carry-on details, or undefined if it is not one. */
 export const decodeCarryOn = CARRY_ON.decode
 
-/** The one line a column shows for a carry-on message. */
+/** The line a column shows for a carry-on message, with why when it is not a stop. */
 export const carryOnLine = (d: CarryOnDetails): string =>
-  `↻ resumed by ${d.name}`
+  d.reason.kind === "stopped"
+    ? `↻ resumed by ${d.name}`
+    : `↻ resumed by ${d.name}: approved ssh for ${d.reason.host ?? "a host"}`
 
 type CarryOnState =
   | { readonly kind: "ok" }
@@ -237,7 +247,12 @@ export function planCarryOn(
   return {
     kind: "start",
     message: CARRY_ON.encode(
-      { lane: here.lane.name, by: who.by, name: who.name },
+      {
+        lane: here.lane.name,
+        by: who.by,
+        name: who.name,
+        reason: { kind: "stopped" },
+      },
       `${who.name} asked you to carry on from where you were stopped. ` +
         "Anything you were writing when you were stopped was not kept.",
       who.timestamp,

@@ -56,6 +56,7 @@ import {
   type RelayMessage,
 } from "./relay.ts"
 import { fittedLine } from "./shares.ts"
+import { decodeSshFact, sshFactLine } from "./ssh-news.ts"
 import { decodeStack, type StackMessage, stackLine } from "./stack.ts"
 import { type CarryOnMessage, carryOnLine, decodeCarryOn } from "./stop.ts"
 import { decodeUpdate, updateLine } from "./update.ts"
@@ -430,6 +431,9 @@ export function renderableMessage(message: unknown): AgentMessageLike {
   const canvasFact = decodeCanvasFact(message)
   if (canvasFact !== undefined)
     return { role: "fact", content: canvasFactLine(canvasFact) }
+  const sshFact = decodeSshFact(message)
+  if (sshFact !== undefined)
+    return { role: "fact", content: sshFactLine(sshFact) }
   const result = toolResultFacts(message)
   if (result !== undefined)
     return { ...(message as AgentMessageLike), ...result }
@@ -458,8 +462,8 @@ export function renderableMessage(message: unknown): AgentMessageLike {
 
 /**
  * The person behind a run, from its prompt as stored: a chat's
- * author, a land or stack message's `by`, or for an ask relayed from another
- * thread and an answer, the person behind the chain. Null for
+ * author, a land, stack or carry-on message's `by`, or for an ask relayed
+ * from another thread and an answer, the person behind the chain. Null for
  * anything else.
  */
 export function promptAuthor(message: unknown): WriterId | null {
@@ -468,6 +472,7 @@ export function promptAuthor(message: unknown): WriterId | null {
   return (
     decodeLand(message)?.by ??
     decodeStack(message)?.by ??
+    decodeCarryOn(message)?.by ??
     decodeRelay(message)?.by ??
     decodeAnswer(message)?.by ??
     null
@@ -612,7 +617,7 @@ export function planDelivery(input: {
   readonly compelled: boolean
   readonly mode: PlanMode
   readonly race: { readonly by: WriterId } | null
-  /** It may enter a running lane by a steer: only an answer. */
+  /** It may enter a running lane by a steer: an answer, or a lane's ssh news. */
   readonly steers: boolean
 }): Delivery {
   const { lane, compelled, mode, race } = input

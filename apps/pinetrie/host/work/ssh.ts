@@ -1,9 +1,10 @@
 // host/work/ssh — lanes' ssh through the host (`@pinetrie/ssh`): what the
 // host reads of the person's and the service folder's ssh files, the files
 // every lane is given, the socket lanes reach it through, and the owner's
-// answers, which live in each lane's `pinetrie.access` record. The relay
-// asks; this module waits on the record, and carries out what each change
-// to it means (`planAccessChange`).
+// answers, which live in each lane's `pinetrie.access` record. The relay's
+// question is answered at once from the record (`planPersonalSign`), and
+// each change to the record is news (`planAccessChange`), which lane work
+// passes on.
 
 import { randomBytes } from "node:crypto"
 import {
@@ -40,12 +41,12 @@ import {
 import { readRecords } from "@pinetrie/reads"
 import {
   ACCESS,
+  type AccessNews,
   emptyAccess,
-  planAccessAsk,
   planAccessChange,
   planAccessOutside,
-  planAccessTimeout,
   planAccessUse,
+  planPersonalSign,
   setRecord,
 } from "@pinetrie/rules"
 import {
@@ -63,16 +64,15 @@ import {
   laneToken,
   missingIncludes,
   parseResolved,
+  personalOnHost,
+  personalSsh,
   planLaneSsh,
   resolveArgv,
   runProgram,
   SOCKET_ENV,
   type SshHost,
   type SshName,
-  type SshSettings,
   serviceKeyCheck,
-  settingsOnHost,
-  sshSettings,
   startServiceAgent,
   startSshHost,
   TOKEN_ENV,
@@ -109,8 +109,11 @@ export interface LaneSsh {
     readonly personal: HostPatterns | null
     readonly services: readonly string[]
   }
-  /** `listener` hears a lane whose sessions must end now. */
-  onCut(listener: (lane: ThreadId) => void): void
+  /**
+   * `listener` hears each change to a lane's use of your identity, once:
+   * asked, approved, refused, or revoked, whose sessions have ended.
+   */
+  onNews(listener: (lane: ThreadId, news: AccessNews) => void): void
   close(): Promise<void>
 }
 
@@ -118,7 +121,7 @@ const NO_SSH: LaneSsh = {
   attachedFor: () => NOTHING_ATTACHED,
   mounts: [],
   holdsFor: () => ({ personal: null, services: [] }),
-  onCut: () => {},
+  onNews: () => {},
   close: async () => {},
 }
 
@@ -227,7 +230,7 @@ export async function startLaneSsh(input: {
   /** Where the lanes' ssh files and the secret are kept (`sessionFiles`). */
   readonly files: Pick<LaneFiles, "laneSsh" | "sshSecret">
   /** `lanes.ssh`'s settled values, under accepted work's grant (`sshChoice`). */
-  readonly choice: Parameters<typeof sshSettings>[0]
+  readonly choice: Parameters<typeof personalSsh>[0]
   /** The service identities' folder: `ssh/` in pine·trie's config directory. */
   readonly serviceDir: string
   /** Whether a lane's own config keeps the project's grant (`effectiveLaneConfig`). */
@@ -241,12 +244,11 @@ export async function startLaneSsh(input: {
   const { log } = basics
 
   // --- round 1: the files, and the combined config `ssh -G` reads --------
-  const settings: SshSettings = settingsOnHost(sshSettings(input.choice), {
+  const identity = personalOnHost(personalSsh(input.choice), {
     owner: input.owner !== null,
     agent: places.agent !== null,
   })
-  const { personal: personalSsh } = settings
-  const personalOn = personalSsh.kind === "on"
+  const personalOn = identity.kind === "on"
   const home = path.dirname(places.dir)
   const { serviceDir } = input
   const keyFiles = await serviceKeyFiles(serviceDir)
@@ -281,12 +283,12 @@ export async function startLaneSsh(input: {
 
   // --- round 2: the allowed hosts, as ssh checks their keys ---------------
   const allowed: AllowedHosts | null =
-    personalSsh.kind === "off"
+    identity.kind === "off"
       ? null
-      : personalSsh.hosts === "all"
+      : identity.hosts === "all"
         ? "all"
         : await Promise.all(
-            hostPatternList(personalSsh.hosts).map(
+            hostPatternList(identity.hosts).map(
               async (p): Promise<AllowedHost> =>
                 p.kind === "name"
                   ? {
@@ -310,7 +312,7 @@ export async function startLaneSsh(input: {
   const serviceAgent = await startServiceAgent({ dir: input.dir, keys: usable })
   const added: readonly UsableServiceKey[] = serviceAgent?.added ?? []
   for (const line of sshLines({
-    settings,
+    personal: identity,
     checks,
     failed: serviceAgent?.failed ?? [],
     added: added.map(k => k.name),
@@ -333,47 +335,32 @@ export async function startLaneSsh(input: {
     await writeFile(path.join(laneSsh, "keys", name), `${pub}\n`)
   const secret = await sshSecret(secretFile)
 
-  /** Requests held for each lane's owner, each settled as its record changes. */
-  const waiting = new Map<ThreadId, ((may: boolean) => void)[]>()
-  const cutListeners: ((lane: ThreadId) => void)[] = []
-  /** Each ask's deadline: cleared at close, so none writes after the documents close. */
-  const timers = new Set<NodeJS.Timeout>()
+  const newsListeners: ((lane: ThreadId, news: AccessNews) => void)[] = []
   const readAccess = (lane: ThreadId): AccessRecord =>
     readRecords(basics.session, ACCESS).get(lane) ?? emptyAccess(lane)
   const write = (record: AccessRecord) =>
     records.writeValues([setRecord(ACCESS, record)])
-  const settle = (lane: ThreadId, may: boolean) => {
-    for (const resolve of waiting.get(lane) ?? []) resolve(may)
-    waiting.delete(lane)
-  }
 
   /**
    * Whether a lane may ask for your identity at all: your config grants it,
    * or the project does and the lane's own config has not given it up.
    */
   const laneMayAsk = (lane: LaneOwner): boolean =>
-    personalSsh.kind === "on" &&
-    (personalSsh.own || (isThreadId(lane) && input.laneGrant(lane)))
+    identity.kind === "on" &&
+    (identity.own || (isThreadId(lane) && input.laneGrant(lane)))
 
-  async function mayUsePersonal(lane: string, host: string | null) {
-    if (!isThreadId(lane) || !laneMayAsk(lane)) return false
-    const record = readAccess(lane)
-    if (record.personal?.kind === "approved") return true
-    if (record.personal?.kind === "refused") return false
-    const asked = new Promise<boolean>(resolve => {
-      waiting.set(lane, [...(waiting.get(lane) ?? []), resolve])
+  // Answered at once from the record; a lane that never asked asks as it is
+  // refused, and that change is the news `follow` tells it.
+  const mayUsePersonal = (lane: string, host: string | null): boolean => {
+    if (!isThreadId(lane)) return false
+    const planned = planPersonalSign({
+      record: readAccess(lane),
+      mayAsk: laneMayAsk(lane),
+      host,
+      now: basics.now(),
     })
-    if (record.personal?.kind !== "waiting") {
-      await write(planAccessAsk({ record, host, now: basics.now() }))
-      const timer = setTimeout(() => {
-        timers.delete(timer)
-        const now = readAccess(lane)
-        if (now.personal?.kind === "waiting")
-          void write(planAccessTimeout(now, basics.now()))
-      }, settings.approvalSeconds * 1000)
-      timers.add(timer)
-    }
-    return asked
+    if (planned.write !== null) void write(planned.write)
+    return planned.signs
   }
 
   const host: SshHost = await startSshHost({
@@ -399,8 +386,9 @@ export async function startLaneSsh(input: {
     },
   })
 
-  // Every change to a lane's record is carried out here, whoever made it:
-  // an answer, a timeout, a starting host's recovery.
+  // Every change to a lane's record is news here, whoever made it: a
+  // request, an answer. `seen` starts from the records, so a request a
+  // restart carried over is not told twice.
   const seen = new Map<ThreadId, PersonalAccess | null>(
     [...readRecords(basics.session, ACCESS)].map(([lane, r]) => [
       lane,
@@ -408,16 +396,17 @@ export async function startLaneSsh(input: {
     ]),
   )
   const follow = () => {
+    if (input.owner === null) return
     for (const [lane, record] of readRecords(basics.session, ACCESS)) {
-      const effect = planAccessChange(seen.get(lane) ?? null, record.personal)
+      const news = planAccessChange(
+        seen.get(lane) ?? null,
+        record.personal,
+        input.owner,
+      )
       seen.set(lane, record.personal)
-      if (effect === "release") settle(lane, true)
-      else if (effect === "refuse") settle(lane, false)
-      else if (effect === "cut") {
-        settle(lane, false)
-        host.cut(lane)
-        for (const listener of cutListeners) listener(lane)
-      }
+      if (news === null) continue
+      if (news.kind === "revoked") host.cut(lane)
+      for (const listener of newsListeners) listener(lane, news)
     }
   }
   const unsubscribe = subscribe(basics.session.records, follow)
@@ -444,16 +433,12 @@ export async function startLaneSsh(input: {
     mounts,
     holdsFor: lane => ({
       personal:
-        personalSsh.kind === "on" && laneMayAsk(lane)
-          ? personalSsh.hosts
-          : null,
+        identity.kind === "on" && laneMayAsk(lane) ? identity.hosts : null,
       services: added.map(k => k.name),
     }),
-    onCut: listener => void cutListeners.push(listener),
+    onNews: listener => void newsListeners.push(listener),
     async close() {
       unsubscribe()
-      for (const timer of timers) clearTimeout(timer)
-      for (const lane of [...waiting.keys()]) settle(lane, false)
       await host.close()
       serviceAgent?.close()
     },

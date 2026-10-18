@@ -1,6 +1,7 @@
 // e2e/lanes/ssh — a lane's ssh through its host, in a real container: the
-// service identity and the owner's, the owner's approval, a forged token,
-// the broker, and a revoke.
+// service identity and the owner's, the owner's request refused at once and
+// told, the approval that wakes the lane, a forged token, the broker, and a
+// revoke.
 
 import { spawn } from "node:child_process"
 import {
@@ -14,13 +15,23 @@ import {
 import net from "node:net"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import { ROOT, shellWord, type ThreadId } from "@pinetrie/core"
+import {
+  ancestry,
+  entryId,
+  ROOT,
+  shellWord,
+  type ThreadId,
+} from "@pinetrie/core"
 import { runtimeNode } from "@pinetrie/lanes"
 import { readAccess } from "@pinetrie/reads"
+import { decodeCarryOn, decodeSshFact } from "@pinetrie/rules"
+import { rowMessage } from "@pinetrie/schema"
 import { HOP_IN_LANE } from "../../host/work/ssh.ts"
 import type { Checks } from "../checks.ts"
 import { command, commandOutput } from "../command.ts"
 import {
+  heldEntries,
+  heldTree,
   join,
   START_AGENT,
   SUITE_CONFIG,
@@ -140,17 +151,21 @@ async function sshSection(check: Checks["check"], lanes: LaneHosts) {
     await h.idle()
     const lane = h.laneWith("made")?.name
     if (lane === undefined) throw new Error("no lane was made")
-    await cli(["start", container(lane)])
-    // The hop starts with the container: ready once `ssh-add` reaches an
-    // agent (exit 2 is "cannot connect"). A socket file proves nothing, since
-    // one an earlier start left outlives the stop.
-    await waitFor(
-      async () =>
-        (
-          await inLaneLater(lane, "ssh-add -l >/dev/null 2>&1; echo $?")
-        ).trim() !== "2",
-      30_000,
-    ).catch(() => 0)
+    // A lane's container stops when its run ends: started again, its hop
+    // is ready once `ssh-add` reaches an agent (exit 2 is "cannot
+    // connect"). A socket file proves nothing, since one an earlier start
+    // left outlives the stop.
+    const startLane = async () => {
+      await cli(["start", container(lane)])
+      await waitFor(
+        async () =>
+          (
+            await inLaneLater(lane, "ssh-add -l >/dev/null 2>&1; echo $?")
+          ).trim() !== "2",
+        30_000,
+      ).catch(() => 0)
+    }
+    await startLane()
 
     const listed = await inLaneLater(lane, `ssh-add -L`)
     const [first, second] = listed.trim().split("\n")
@@ -161,6 +176,27 @@ async function sshSection(check: Checks["check"], lanes: LaneHosts) {
       listed.slice(0, 200),
     )
 
+    /** Every message on the lane's path, oldest first. */
+    const laneMessages = (): readonly unknown[] => {
+      const index = heldTree(h.host)
+      const onPath = new Set(
+        ancestry(index, h.laneWith("made")?.tip ?? null).path,
+      )
+      return Object.values(heldEntries(h.host))
+        .filter(r => onPath.has(entryId(r.id)))
+        .sort((a, b) => (a.id < b.id ? -1 : 1))
+        .map(r => rowMessage(r))
+    }
+    const sshFacts = () =>
+      laneMessages().flatMap(m => {
+        const fact = decodeSshFact(m)
+        return fact === undefined ? [] : [fact]
+      })
+    const wokeBy = () =>
+      laneMessages().flatMap(m => {
+        const carryOn = decodeCarryOn(m)
+        return carryOn === undefined ? [] : [carryOn]
+      })
     const sign = (line: number) =>
       `ssh-add -L | sed -n ${line}p > /tmp/k.pub && echo x > /tmp/m && ssh-keygen -Y sign -n file -f /tmp/k.pub /tmp/m >/dev/null 2>&1 && echo SIGNED`
     const service = await inLaneLater(lane, sign(1))
@@ -171,27 +207,33 @@ async function sshSection(check: Checks["check"], lanes: LaneHosts) {
       service.slice(0, 200),
     )
 
-    const personal = inLaneLater(lane, sign(2))
-    // A lane that never waits fails the check below, not the scenario.
-    await waitFor(
-      () => readAccess(h.host.session).get(lane)?.personal?.kind === "waiting",
-      30_000,
-    ).catch(() => 0)
-    let signedEarly = false
-    void personal.then(() => {
-      signedEarly = true
-    })
-    // The record waits only while the relay holds the signature, so the
-    // exec cannot have ended by now unless it was signed unasked.
-    const waited =
-      !signedEarly &&
-      readAccess(h.host.session).get(lane)?.personal?.kind === "waiting"
-    await owner.access(lane, "approve")
-    const signed = await personal
+    // Not approved: refused at once, the owner asked, and the lane told.
+    const refused = await inLaneLater(lane, sign(2))
+    await waitFor(() => sshFacts().some(f => f.news === "asked"), 30_000).catch(
+      () => 0,
+    )
     check(
-      "a personal signature waits for its owner's approval",
-      waited && signed.includes("SIGNED"),
-      signed.slice(0, 200),
+      "a personal signature is refused at once, its owner asked, and the lane told",
+      !refused.includes("SIGNED") &&
+        readAccess(h.host.session).get(lane)?.personal?.kind === "waiting" &&
+        sshFacts().some(f => f.news === "asked"),
+      `${refused.slice(0, 120)} · ${readAccess(h.host.session).get(lane)?.personal?.kind} · ${JSON.stringify(sshFacts())}`,
+    )
+
+    // The approval wakes the lane with its owner's carry-on, whose run the
+    // scripted model answers; the next signature signs.
+    h.script.use([{ text: "retried" }])
+    await owner.access(lane, "approve")
+    await waitFor(() => wokeBy().length > 0, 60_000).catch(() => 0)
+    await h.idle()
+    await startLane()
+    const signed = await inLaneLater(lane, sign(2))
+    check(
+      "an approval wakes the lane, and its next signature signs",
+      wokeBy().some(c => c.reason.kind === "ssh-approved") &&
+        h.laneWith("retried")?.name === lane &&
+        signed.includes("SIGNED"),
+      `${JSON.stringify(wokeBy())} · ${signed.slice(0, 120)}`,
     )
 
     const forged = await inLaneLater(

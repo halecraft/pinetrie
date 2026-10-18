@@ -100,6 +100,7 @@ import { createCanvasNews } from "./canvas-news.ts"
 import { startCards } from "./cards.ts"
 import { createCommands } from "./commands/index.ts"
 import { startControl } from "./control.ts"
+import { createDelivery } from "./delivery.ts"
 import { createDigests, writePendingRunEndReport } from "./digests.ts"
 import { startDirectory } from "./directory.ts"
 import {
@@ -159,6 +160,7 @@ import { createSettle } from "./settle.ts"
 import { planSetupRecord } from "./setup-record.ts"
 import { planShutdown, type ShutdownStep } from "./shutdown.ts"
 import { createSplitCall } from "./split-call.ts"
+import { createSshNews } from "./ssh-news.ts"
 import { watchStalls } from "./stalls.ts"
 import { recover, recoverRoot } from "./startup.ts"
 import { agentReadyLine, reportLines, startupLaps } from "./startup-lines.ts"
@@ -770,6 +772,14 @@ export async function startHost({
     placesWriter,
   })
   relaysLate = relays
+  // Where a host's message goes in a thread: an answer, a lane's ssh news.
+  const deliver = createDelivery({
+    basics,
+    agent,
+    scribe,
+    start: runs.start,
+    runnable: lane => work.runnable(lane),
+  })
   const answers = createAnswers({
     basics,
     later,
@@ -777,12 +787,14 @@ export async function startHost({
     runs: runDocs,
     relays,
     agent,
-    scribe,
-    start: runs.start,
-    runnable: lane => work.runnable(lane),
+    deliver,
     budgets,
     piSetup,
   })
+  // A lane is told each change to its use of its owner's ssh; an approval
+  // wakes it.
+  const sshNews = createSshNews({ basics, later, deliver })
+  work.onSshNews((lane, news) => sshNews.told(lane, news))
   const commands = createCommands({
     basics,
     agent,

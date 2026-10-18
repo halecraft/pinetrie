@@ -367,10 +367,10 @@ column's header. Turn it on for every project, and say who approves, in
 your `pinetrie.json`:
 
 ```json
-{ "owner": "you@example.com", "lanes": { "ssh": { "personal": true, "hosts": ["pop", "*.lan"], "approvalSeconds": 120 } } }
+{ "owner": "you@example.com", "lanes": { "ssh": { "personal": true, "hosts": ["pop", "*.lan"] } } }
 ```
 
-`hosts` and `approvalSeconds` are optional; a project grants it with
+`hosts` is optional; a project grants it with
 `lanes.ssh.personal: true`, `false` in yours declines it, and `false` in the
 machine's forbids it. Service identities
 are key pairs in `~/.config/pinetrie/ssh/`, with an optional ssh `config`

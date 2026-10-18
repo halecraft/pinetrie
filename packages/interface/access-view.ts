@@ -97,9 +97,7 @@ export function accessWords(
           : `waiting for ${view.owner?.name ?? "its owner"}`
         : personal.kind === "approved"
           ? whose
-          : personal.kind === "refused"
-            ? `${whose} ${personal.revoked ? "revoked" : "refused"}`
-            : `${whose}: no answer for ${forHost(personal.host)}`
+          : `${whose} ${personal.revoked ? "revoked" : "refused"}`
   const outside =
     view.outside === null
       ? null

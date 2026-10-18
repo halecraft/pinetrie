@@ -62,11 +62,12 @@ export interface SshHostOptions {
   /** The file of `Include`s the broker resolves with; null with no broker. */
   readonly combinedConfig: CombinedConfig | null
   readonly run?: Run
-  /** May `lane` sign with the person's identity, for `host`? Resolves when decided. */
-  readonly mayUsePersonal: (
-    lane: string,
-    host: string | null,
-  ) => Promise<boolean>
+  /**
+   * May `lane` sign with the person's identity, for `host`? Answered at
+   * once: a signature waits for nobody, since sshd ends a login at its
+   * `LoginGraceTime` whatever the relay holds.
+   */
+  readonly mayUsePersonal: (lane: string, host: string | null) => boolean
   /** A service identity signed, or the broker connected a name, for `lane`. */
   readonly used: (lane: string, use: SshUse) => void
   /** A personal signature for `lane` refused, unasked: its host is not allowed. */
@@ -205,7 +206,7 @@ export async function startSshHost(options: SshHostOptions): Promise<SshHost> {
           return reply ?? FAILURE
         }
         case "ask": {
-          const may = await options.mayUsePersonal(lane, step.host)
+          const may = options.mayUsePersonal(lane, step.host)
           return may
             ? ((await personal?.request(encodeSign(step.request))) ?? FAILURE)
             : FAILURE

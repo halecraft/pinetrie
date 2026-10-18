@@ -489,8 +489,12 @@
       .work button:disabled { opacity: .5; cursor: progress; }
       .work.access .access-line { font-size: .75rem; color: #aab; }
       .work.access[data-state="waiting"] .access-line { color: #e8c07a; }
-      .work.access[data-state="refused"] .access-line,
-      .work.access[data-state="unanswered"] .access-line { color: #8b93a1; }
+      /* A request waits for its owner until answered: marked as needing
+         them, the amber of a needs-you signal, approve filled as the action. */
+      .work.access[data-state="waiting"] { margin-top: .2rem; padding: .25rem .4rem;
+        border-left: 2px solid #e0c080; background: #2e2a1f; border-radius: 0 3px 3px 0; }
+      .work.access[data-state="waiting"] .access-approve { background: #4f7a4f; color: #eef6ee; }
+      .work.access[data-state="refused"] .access-line { color: #8b93a1; }
       .work .access-note { font-size: .75rem; color: #e8c07a; }
       .work .access-approve { border-color: #4f7a4f; color: #a8d8a8; }
 

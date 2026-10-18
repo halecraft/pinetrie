@@ -14,6 +14,7 @@ import { beginRun, writeEntry } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import { createAnswers } from "./answers.ts"
 import type { Budgets } from "./budgets.ts"
+import { createDelivery } from "./delivery.ts"
 import {
   archiveCanvas,
   basics,
@@ -86,11 +87,15 @@ function setUp() {
     runs: { docOf: () => b.root },
     relays: { deliver: async () => ({ kind: "ran" }) },
     agent: { lane: () => asker.lane } as Pick<Agent, "lane">,
-    scribe: record<Pick<Scribe, "appendToTree">>().port,
-    start: () => {
-      throw new Error("no run starts")
-    },
-    runnable: RUNS_ANY.runnable,
+    deliver: createDelivery({
+      basics: b,
+      agent: { lane: () => asker.lane } as Pick<Agent, "lane">,
+      scribe: record<Pick<Scribe, "appendToTree">>().port,
+      start: () => {
+        throw new Error("no run starts")
+      },
+      runnable: RUNS_ANY.runnable,
+    }),
     budgets: record<Budgets>({
       spent: () => false,
       runEnded: async () => {},

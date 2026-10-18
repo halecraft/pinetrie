@@ -58,7 +58,9 @@ wires them.
 | `focuses.ts` | each thread's focus (ADR-0173): asked once its run's end has settled (`RunEndSettled`, from `Digests.ended`), from its asks and their headlines; every step a late one |
 | `ask-model.ts` | one request to a model outside every thread with one of pine·trie's skills (`askModel`): the skill, the request, its tokens, the reply read and each refused part of it logged; digests, titles and focuses go through it |
 | `relays.ts` | another thread's agent asked (ADR-0128): `ask` and `leave` (the tools' hooks), `relayMessage` (a person's chat that asks or invites), `relayCard` (an ask card popped), `deliver` (a relay into a thread, for these and the round) |
-| `answers.ts` | what a relayed run sends back once it has ended (ADR-0128): its answer, the answers held for a busy asker, and the round, each a late step (`Answers.ended`, from `runs.onEnded`) |
+| `answers.ts` | what a relayed run sends back once it has ended (ADR-0128): its answer, placed by `delivery.ts`, the answers held for a busy asker, and the round, each a late step (`Answers.ended`, from `runs.onEnded`) |
+| `delivery.ts` | where a host's message goes in a thread (`createDelivery`, by `planDelivery`): a run for one that wakes an idle lane, a steer into a running one, or an append; only a prompt wakes, since only a prompt starts a run. Shared by answers and ssh news |
+| `ssh-news.ts` | each change to a lane's use of its owner's ssh, told to the lane (ADR-0178): heard from lane work's `onSshNews`, planned by `planSshNews`, delivered in a late step on the lane's thread |
 | `threads-now.ts` | a thread as it is now, for the relays, the answers and the late steps: its reach, its tree, end and lane (`thread`, which opens only a live thread's root), and the names a message uses |
 | `budgets.ts` | what agents talking spend (ADR-0128): the budget a run spends, read from its prompt (`promptBudget`), counted per request, written when it goes over and at a run's end, and the gate before each request |
 | `later.ts` | `Later`: every write the host decides before a gap and makes after it (§ Late writes), its gate (`lateAway`), and a model request outside the keeper (`outside`) |
@@ -605,8 +607,9 @@ as it first loads (§ Roots: steps, leases and the upkeep).
   4. lane work, with them;
   5. the agent, last, with lane work's `access` and `hooks`, banners'
      `request` and digests' `step`; then base news, which steers its lanes
-     and joins lane work's `onBaseChanged`, the runs, the commands and the
-     drain.
+     and joins lane work's `onBaseChanged`, the runs, the delivery, the
+     answers, ssh news, which joins lane work's `onSshNews`, the commands
+     and the drain.
 
   A base change announced before base news joins is lost harmlessly: it
   steers only a running lane, and no lane runs before `recover`. The
@@ -1524,7 +1527,7 @@ adapter's.
   once written; a step queued while another forks would otherwise carry
   "owed" and fork the lane twice.
 
-## Lanes' ssh (`work/ssh.ts`, ADR-0140, ADR-0170)
+## Lanes' ssh (`work/ssh.ts`, ADR-0140, ADR-0170, ADR-0178)
 
 - **Its socket's path comes first:** `prepareSshDir` makes its directory
   before the runtime is found, since the Mac's lease names the socket
@@ -1540,23 +1543,32 @@ adapter's.
   `lanes.ssh.hosts` allows is resolved to the name ssh checks its key
   under, before the lane's files are planned. A name with no key in your
   `known_hosts` is said in the log.
-- **The record is the one truth.** The relay asks `mayUsePersonal`: an
-  approved lane signs, a refused one does not, and anything else writes
-  `waiting` and holds the signature until the record changes or
-  `approvalSeconds` pass (`unanswered`). The `ssh-access` command only
-  writes the record; a subscription to the session's records carries out
-  each change (`planAccessChange`): release, refuse, or cut, which closes
-  the lane's connections through the host and runs `KILL_SSH` in it.
+- **The record is the one truth, and no signature waits on it**
+  (ADR-0178). The relay's `mayUsePersonal` is answered at once
+  (`planPersonalSign`): an approved lane signs, any other is refused, and
+  a lane that never asked writes `waiting` as it is refused. The
+  `ssh-access` command only writes the record.
+- **Each change to the record is news, once** (`planAccessChange`,
+  `LaneSsh.onNews`, lane work's `onSshNews`): asked, approved, refused or
+  revoked. It is read from the record, not from whoever wrote it, so two
+  signatures that both wrote `waiting` make one change and one piece of
+  news. A revoke closes the lane's connections through the host
+  (`host.cut`), and containers run `KILL_SSH` in it.
+- **Ssh news reaches the lane** (`ssh-news.ts`, made after the agent,
+  beside base news): a late step on the lane's thread, so a thread out of
+  reach is skipped, placed by the delivery an answer uses (`delivery.ts`).
+  A request, a refusal and a revoke are ssh facts, steered into a running
+  lane or appended; an approval is its owner's carry-on, which wakes an
+  idle lane (`planSshNews`).
 - **A signature refused for a host outside your allowed ones** is written
   to the lane's record (`planAccessOutside`) and logged, once each time
   its host or key changes, so a lane that retries writes nothing
   (ADR-0170).
-- **A starting host leaves nothing waiting** (`recover`,
-  `planAccessRecovery`): a held signature goes with the host that held it.
-  It also clears a refusal for a host outside, since your allowed hosts
-  are read again then.
-- **Shutdown** is part of lane work's close (`"work"`): every waiting
-  signature is refused, each ask's deadline cleared, the socket and the
+- **A starting host keeps every request** (`recover`,
+  `planAccessRecovery`): no signature waited on one, so a stop lost
+  nothing. It clears a refusal for a host outside, since your allowed
+  hosts are read again then.
+- **Shutdown** is part of lane work's close (`"work"`): the socket and the
   service agent closed, and the socket's directory removed.
 - **No suite reads the person's ssh:** `startHost`'s `ssh` names the
   folder and agent, and the harness gives every suite host an empty one

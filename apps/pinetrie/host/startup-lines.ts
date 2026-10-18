@@ -24,9 +24,9 @@ import type {
   DroppedIdentity,
   OutsideRefusal,
   PersonalOff,
+  PersonalSsh,
   ServiceKeyCheck,
   ServiceKeyRefusal,
-  SshSettings,
 } from "@pinetrie/ssh"
 import type { StoreChoice } from "./invocation.ts"
 import type { OpenedPlan } from "./sessions.ts"
@@ -141,7 +141,7 @@ const DROPPED: Readonly<Record<DroppedIdentity["why"], string>> = {
 
 /** What a starting host says of lanes' ssh: what they hold, and each thing it refused. */
 export function sshLines(facts: {
-  readonly settings: SshSettings
+  readonly personal: PersonalSsh
   readonly checks: readonly ServiceKeyCheck[]
   readonly failed: readonly { readonly name: string; readonly said: string }[]
   /** The service identities the agent holds. */
@@ -152,11 +152,11 @@ export function sshLines(facts: {
   readonly hasSsh: boolean
   readonly hasAgent: boolean
 }): readonly string[] {
-  const { personal, approvalSeconds } = facts.settings
+  const { personal } = facts
   const holds = [
     ...(personal.kind === "on"
       ? [
-          `your identity (on approval, ${approvalSeconds} s${personal.hosts === "all" ? "" : `; hosts: ${personal.hosts.join(", ")}`})`,
+          `your identity (on approval${personal.hosts === "all" ? "" : `; hosts: ${personal.hosts.join(", ")}`})`,
         ]
       : []),
     ...(facts.added.length === 0

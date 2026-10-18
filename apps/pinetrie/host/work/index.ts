@@ -28,6 +28,7 @@ import { createKeeper } from "@pinetrie/keeper"
 import type { LaneHooks, PiSetup } from "@pinetrie/pi"
 import { readRunning } from "@pinetrie/reads"
 import {
+  type AccessNews,
   planResolveCommand,
   refusedAnswer,
   resolveAnswer,
@@ -77,6 +78,8 @@ export type LaneWork = Pick<
     quiet(): Promise<void>
     /** `listener` hears each lane whose base record changed. */
     onBaseChanged(listener: (lane: ThreadId) => void): void
+    /** `listener` hears each change to a lane's use of its owner's ssh, once. */
+    onSshNews(listener: (lane: ThreadId, news: AccessNews) => void): void
     /**
      * A person's choice of `lane`'s conflict's version at `path`, refused
      * while the thread runs: the conflict closed as a state of the lane's,
@@ -320,6 +323,7 @@ export async function startLaneWork(input: {
     onBaseChanged(listener) {
       baseListeners.push(listener)
     },
+    onSshNews: listener => setup.ssh.onNews(listener),
     runnable: lane => proveRunnable(lane, registry.recordOf(lane), opened.kind),
   }
 }
@@ -356,6 +360,7 @@ const NO_LANES: LaneWork = {
   quiet: async () => {},
   close: async () => {},
   onBaseChanged: () => {},
+  onSshNews: () => {},
   // Every lane runs with no tools here, whatever its history.
   runnable: lane => proveRunnable(lane, undefined, null),
 }

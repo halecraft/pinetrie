@@ -143,7 +143,7 @@ async function host(
     serviceKeys: [],
     hostKeys: ALL,
     combinedConfig: null,
-    mayUsePersonal: async () => false,
+    mayUsePersonal: () => false,
     used: () => {},
     outside: () => {},
     ...over,
@@ -194,32 +194,21 @@ describe("the relay", () => {
     expect(used).toEqual([["t-a", { kind: "service", name: "deploy" }]])
   })
 
-  test("a personal sign waits for the policy, then signs", async () => {
+  test("a personal sign is answered at once from the policy", async () => {
     const dir = tempDir()
     const personal = await fakeAgent(dir, "personal", [MINE])
-    let answer: (may: boolean) => void = () => {}
     const asked: unknown[] = []
     const h = await host({
       dir,
       personalAgent: personal.socket,
       mayUsePersonal: (lane, host) => {
         asked.push([lane, host])
-        return new Promise(r => {
-          answer = r
-        })
+        return true
       },
     })
     const lane = await laneAgent(h.socket, "t-a")
-    let replied: Uint8Array | null | undefined
-    const reply = lane.request(encodeSign(sign(MINE))).then(r => {
-      replied = r
-    })
-    await new Promise(r => setTimeout(r, 50))
+    expect(await lane.request(encodeSign(sign(MINE)))).toEqual(SIGNATURE)
     expect(asked).toEqual([["t-a", null]])
-    expect(replied).toBeUndefined()
-    answer(true)
-    await reply
-    expect(replied).toEqual(SIGNATURE)
   })
 
   test("a personal sign the policy refuses fails", async () => {
@@ -252,7 +241,7 @@ describe("the relay", () => {
         personal: new Set([Buffer.from("popkey").toString("base64")]),
         names: new Map(),
       },
-      mayUsePersonal: async () => {
+      mayUsePersonal: () => {
         asked++
         return true
       },
@@ -279,7 +268,7 @@ describe("the relay", () => {
       serviceAgent: service.socket,
       personalAgent: personal.socket,
       hostKeys: { personal: new Set(), names: new Map([[popKey, "pop"]]) },
-      mayUsePersonal: async () => {
+      mayUsePersonal: () => {
         asked++
         return true
       },

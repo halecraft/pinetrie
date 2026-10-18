@@ -2,16 +2,16 @@ import { describe, expect, test } from "vitest"
 import {
   type PersonalChoice,
   parseHostPatterns,
-  settingsOnHost,
-  sshSettings,
+  personalOnHost,
+  personalSsh,
 } from "./settings.ts"
 
 const settings = (
   personal: PersonalChoice,
-  hosts: Parameters<typeof sshSettings>[0]["hosts"] = "all",
-) => sshSettings({ personal, hosts, approvalSeconds: 120 }).personal
+  hosts: Parameters<typeof personalSsh>[0]["hosts"] = "all",
+) => personalSsh({ personal, hosts })
 
-describe("sshSettings", () => {
+describe("personalSsh", () => {
   test("personal identity is off unless someone grants it", () => {
     expect(settings({ on: false, decider: "none" })).toEqual({
       kind: "off",
@@ -71,36 +71,32 @@ test("host patterns keep the case they were written in; anything but a list is n
     expect(parseHostPatterns(bad)).toBeNull()
 })
 
-describe("settingsOnHost", () => {
-  const on = sshSettings({
+describe("personalOnHost", () => {
+  const on = personalSsh({
     personal: { on: true, decider: "project" },
     hosts: "all",
-    approvalSeconds: 120,
   })
 
   test("no owner turns personal identity off", () => {
-    expect(settingsOnHost(on, { owner: false, agent: true }).personal).toEqual({
+    expect(personalOnHost(on, { owner: false, agent: true })).toEqual({
       kind: "off",
       why: "no-owner",
     })
   })
 
   test("no agent turns personal identity off", () => {
-    expect(settingsOnHost(on, { owner: true, agent: false }).personal).toEqual({
+    expect(personalOnHost(on, { owner: true, agent: false })).toEqual({
       kind: "off",
       why: "no-agent",
     })
   })
 
   test("a reason already given stays", () => {
-    const off = sshSettings({
+    const off = personalSsh({
       personal: { on: false, decider: "none" },
       hosts: "all",
-      approvalSeconds: 120,
     })
-    expect(
-      settingsOnHost(off, { owner: false, agent: false }).personal,
-    ).toEqual({
+    expect(personalOnHost(off, { owner: false, agent: false })).toEqual({
       kind: "off",
       why: "not-granted",
     })

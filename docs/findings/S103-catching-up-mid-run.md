@@ -1,7 +1,7 @@
 # S103 — A lane can catch up in the middle of a run, if the call is alone in its batch and its turn's record names the merge
 
 - **Status:** Answered
-- **Led to:** ADR-0080, ADR-0104, ADR-0105, ADR-0108
+- **Led to:** ADR-0080, ADR-0104, ADR-0105, ADR-0108, ADR-0178
 
 **Question.** ADR-0080 gives the agent a `catch_up` tool. Today a catch-up
 runs only between runs (`prepareUpdate`, `apps/pinetrie/host/work/update.ts`),

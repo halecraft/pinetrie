@@ -221,12 +221,11 @@ export async function recover(deps: StartupDeps): Promise<void> {
   })
   const changed = [
     ...planned.unclassified.map(v => setRecord(RUN_END_REPORT, v)),
-    // A lane that waited for its owner's answer waits no longer: the request
-    // went with the host that held it.
-    ...planAccessRecovery(
-      [...readRecords(doc, ACCESS).values()],
-      deps.basics.now(),
-    ).map(r => setRecord(ACCESS, r)),
+    // A refusal for a host outside the allowed ones goes: they are read
+    // again as the host starts. A lane's request stays until answered.
+    ...planAccessRecovery([...readRecords(doc, ACCESS).values()]).map(r =>
+      setRecord(ACCESS, r),
+    ),
     ...(work.project === null
       ? []
       : setIfChanged(PROJECT, work.project, readProject(doc) ?? undefined)),
