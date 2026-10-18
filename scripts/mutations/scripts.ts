@@ -50,6 +50,13 @@ const functionNames = [
   "scripts/function-names.test.ts",
 ]
 const words = ["pnpm", "exec", "vitest", "run", "scripts/words.test.ts"]
+const importCycles = [
+  "pnpm",
+  "exec",
+  "vitest",
+  "run",
+  "scripts/import-cycles.test.ts",
+]
 const scenarios = [
   "pnpm",
   "exec",
@@ -489,6 +496,54 @@ export const mutations: readonly Mutation[] = [
       "Of = (name: string) => name\nexport const isLeaningName = (name: string): boolean =>\n",
     command: functionNames,
     expect: "no exported function's name ends in a bare Of, To or At",
+  },
+  {
+    name: "an import type loads its module",
+    file: "scripts/import-cycles.ts",
+    from: '        ? statement.importKind === "type"\n',
+    to: "        ? false\n",
+    command: importCycles,
+    expect: "every relative import and re-export loads, each once",
+  },
+  {
+    name: "a re-export loads nothing",
+    file: "scripts/import-cycles.ts",
+    from: '        : statement.type === "ExportNamedDeclaration" ||\n',
+    to: '        : statement.type === "Nothing" ||\n',
+    command: importCycles,
+    expect: "every relative import and re-export loads, each once",
+  },
+  {
+    name: "a module in no cycle is one",
+    file: "scripts/import-cycles.ts",
+    from: "    if (!reach(module).has(module)) continue\n",
+    to: "",
+    command: importCycles,
+    expect: "a chain and a diamond hold no cycle",
+  },
+  {
+    name: "a cycle holds everything its module reaches",
+    file: "scripts/import-cycles.ts",
+    from: "      .filter(m => reach(m).has(module))\n",
+    to: "",
+    command: importCycles,
+    expect: "each cycle is its modules sorted",
+  },
+  {
+    name: "a module never reaches itself",
+    file: "scripts/import-cycles.ts",
+    from: "    reached.set(start, seen)\n",
+    to: "    seen.delete(start)\n    reached.set(start, seen)\n",
+    command: importCycles,
+    expect: "a module that loads itself is a cycle",
+  },
+  {
+    name: "a queue's rules load the planners of moves",
+    file: "packages/rules/queue.ts",
+    from: 'import { inventoryFull, type PlaceStep, planMake } from "./place-steps.ts"\n',
+    to: 'import "./moves.ts"\nimport { inventoryFull, type PlaceStep, planMake } from "./place-steps.ts"\n',
+    command: importCycles,
+    expect: "the source holds no import cycle but those allowed",
   },
   {
     name: "a table's retired names are cited",

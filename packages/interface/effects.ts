@@ -306,6 +306,20 @@ export interface CardFacts {
   readonly composers: ComposerPlaces
 }
 
+export const findCard = (
+  facts: Pick<CardFacts, "cards">,
+  card: CardId,
+): CardRecord | undefined => facts.cards.find(c => c.id === card)
+
+/**
+ * The canvas an undo of moves acts in, and a discard's history: the canvas you
+ * are on. None on nothing.
+ */
+export function canvasOfTab(state: IntentState): CanvasId | null {
+  const active = state.layout.active
+  return active?.kind === "canvas" ? active.canvas : null
+}
+
 /** An effect on the layout, and one on the sidebar: the constructors the planners share. */
 export const layout = (action: LayoutAction): Effect => ({
   kind: "layout",

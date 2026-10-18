@@ -1,7 +1,6 @@
 // relay-codec — a relay's shape, and an ask card's relay as the places
-// document stores it. The card's record decodes it, so this imports nothing
-// of the relay's rules: through them, the card's record would load the
-// canvas index and every planner of moves.
+// document stores it. The card's record decodes it, so this imports none of
+// the relay's rules, which load the card's record.
 
 import type { RelayDetails } from "@pinetrie/core"
 import { Type } from "typebox"

@@ -1,6 +1,6 @@
 // place-steps — a write to the places document, and the one rule every card
 // is made by. The planners of moves, queues, notes and canvases all import
-// it, so it imports none of them: an import of one here closes a cycle.
+// it, so it imports none of them.
 
 import {
   type CardId,

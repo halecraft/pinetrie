@@ -42,8 +42,9 @@ page's (`storage-keys.ts`, `tab-state.ts`, `same-props.ts`, `colors.ts`).
   its own documents and what it has in flight, and decides nothing about
   what is shown. This package depends on it.
 - **An input's whole chain is here:** an `Intent` (`intent.ts`) is planned
-  by `planIntent` into `Effect`s (`effects.ts`, with `IntentState`, `show`
-  and `planOpenEntry`, which the card intents and the reveal plan with too),
+  by `planIntent` into `Effect`s (`effects.ts`, with `IntentState`, `show`,
+  `planOpenEntry`, `findCard` and `canvasOfTab`, which the card intents,
+  the spin-off and the reveal plan with too),
   and `perform` (`perform.ts`) carries each out through `AppPorts`. A client
   implements the ports. An effect a client has no use for, such as `fly` in
   a terminal, is a port that does nothing.

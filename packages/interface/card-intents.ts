@@ -66,8 +66,10 @@ import type { Minted } from "./columns.ts"
 import { type Discardable, isDiscardable } from "./discardable.ts"
 import {
   type CardFacts,
+  canvasOfTab,
   closeCanvasEffects,
   type Effect,
+  findCard,
   type IntentState,
   planOpenEntry,
   viewChangeEffect,
@@ -148,11 +150,6 @@ export const cardSlot = (slots: Slots, card: CardId): number | null => {
   const found = Object.entries(slots).find(([, c]) => c === card)
   return found === undefined ? null : Number(found[0])
 }
-
-export const findCard = (
-  facts: Pick<CardFacts, "cards">,
-  card: CardId,
-): CardRecord | undefined => facts.cards.find(c => c.id === card)
 
 /** `card`'s record when it is a text card's: what moves between a thread's places. */
 export const findTextCard = (
@@ -1107,15 +1104,6 @@ export const afterKeep = (
   answer: MoveAnswer,
   close: readonly Effect[],
 ): readonly Effect[] => (answer.kind === "accepted" ? close : [])
-
-/**
- * The canvas an undo of moves acts in, and a discard's history: the canvas you
- * are on. None on nothing.
- */
-export function canvasOfTab(state: IntentState): CanvasId | null {
-  const active = state.layout.active
-  return active?.kind === "canvas" ? active.canvas : null
-}
 
 /**
  * Undo or redo your newest move in the canvas you are on, or, on none, in

@@ -2764,7 +2764,7 @@ export const mutations: readonly Mutation[] = [
 
   {
     name: "an undo in a canvas names no canvas",
-    file: "packages/interface/card-intents.ts",
+    file: "packages/interface/effects.ts",
     from: '  return active?.kind === "canvas" ? active.canvas : null',
     to: "  return null",
     command: unit,

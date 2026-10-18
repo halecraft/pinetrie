@@ -68,15 +68,11 @@ follow this list. A name only this package uses is imported from its module.
   carries; handoffs and their targets; reorders, a card's width and its
   command; each sender's history of moves and its undo.
 - `place-steps.ts`: a write to the places document (`PlaceStep`), the one
-  rule every card is made by (`planMake`) and who may move into a place.
-  The planners of moves, queues, notes and canvases all build on it, so it
-  imports none of them; `moves.ts`, which calls those planners, is not
-  imported by them.
+  rule every card is made by (`planMake`) and who may move into a place,
+  which the planners of moves, queues, notes and canvases all build on.
 - `relay.ts`, `relay-codec.ts`: another thread's agent asked, and its
   answer; the relay's shape and an ask card's stored relay, which
-  `card.ts` decodes. The codec imports none of the relay's rules, so a
-  card's record does not load the canvas index and the planners of moves
-  through them.
+  `card.ts` decodes.
 - `rank.ts`: a rank on a canvas, a drop's, and where a branch lands.
 - `held.ts`, `copy.ts`: a thread in an inventory (where a command runs,
   who holds it, what a change takes) and a thread copied (ADR-0117,

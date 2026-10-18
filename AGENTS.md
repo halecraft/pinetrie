@@ -74,6 +74,11 @@ spent spikes: history, which search skips unless you name the folder.
   arguments to finish the phrase. `scripts/function-names.test.ts` fails
   on an exported one; a module's own helper that does is renamed when its
   code is next changed for its own reasons.
+- No module is in a cycle of the modules it loads: what two modules share
+  goes in a third that imports neither. `import { type A }` loads its
+  module; only `import type` does not. `scripts/import-cycles.test.ts`
+  fails on a cycle outside `ALLOWED_CYCLES`, which holds only one the
+  design needs, with its reason, and only shrinks.
 - Only `packages/pi` imports pi (ADR-0003). Package boundaries are enforced by
   resolution; `workspace.test.ts` checks the manifests.
 - Verify, don't assume: read the source of pi and Kyneta, or measure with a

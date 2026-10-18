@@ -13,9 +13,15 @@ import {
 } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import type { HostRequest } from "@pinetrie/session"
-import { canvasOfTab, findCard } from "./card-intents.ts"
 import type { Minted } from "./columns.ts"
-import { type Effect, type IntentState, layout, list } from "./effects.ts"
+import {
+  canvasOfTab,
+  type Effect,
+  findCard,
+  type IntentState,
+  layout,
+  list,
+} from "./effects.ts"
 
 /** Where a card becomes a thread: a state on the board, or a place in the sidebar. */
 type SpinTarget =

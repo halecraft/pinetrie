@@ -48,7 +48,6 @@ import {
   canvasSpot,
   cardSlot,
   clipFacts,
-  findCard,
   findTextCard,
   moveCard,
   type PutHow,
@@ -83,6 +82,7 @@ import {
 import {
   closeCanvasEffects,
   type Effect,
+  findCard,
   foldViewEffect,
   type IntentState,
   layout,
