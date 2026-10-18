@@ -1,5 +1,7 @@
+import { readFileSync } from "node:fs"
+import path from "node:path"
 import { threadIdFor } from "@pinetrie/core"
-import { projectDisks } from "@pinetrie/lanehost"
+import { INNER_DOCKER_DATA_ROOT_DIR, projectDisks } from "@pinetrie/lanehost"
 import {
   type ContainerShape,
   type LaneSpec,
@@ -27,6 +29,7 @@ import {
   projectKey,
   renderHelper,
   renderRun,
+  unneededImageTags,
 } from "./plan.ts"
 import type { DockerTarget } from "./target.ts"
 
@@ -383,9 +386,19 @@ describe("the sweeps", () => {
       ]),
     ).toEqual(["a", "extra"])
   })
+  test("a root is a whole path: slot 1's is not slot 10's", () => {
+    expect(
+      planSlotSweep("/mnt/host-shares/1", [
+        c("one", {}, ["/mnt/host-shares/1/abc"]),
+        c("ten", {}, ["/mnt/host-shares/10/abc"]),
+      ]),
+    ).toEqual(["one"])
+  })
   test("the startup sweep takes the containers and disks of projects whose root is gone", () => {
     expect(
       planProjectSweep({
+        ownKey: "own",
+        lanesDir: "/lanes",
         projects: [
           { key: "k1", rootExists: true },
           { key: "k2", rootExists: false },
@@ -395,8 +408,97 @@ describe("the sweeps", () => {
           c("b", { "pinetrie.project": "k2" }),
         ],
       }),
-    ).toEqual({ containers: ["b"], projects: ["k2"] })
+    ).toEqual({ containers: ["b"], projects: ["k2"], unlistedNetworks: [] })
   })
+  test("it takes an unlisted project's containers in its lanes directory, and none elsewhere", () => {
+    const under = "/lanes/projects/x/lanes/t"
+    expect(
+      planProjectSweep({
+        ownKey: "own",
+        lanesDir: "/lanes",
+        projects: [],
+        containers: [
+          c("mine", { "pinetrie.project": "own" }, [under]),
+          c("cloned", { "pinetrie.project": "x" }, [under, "/lanes/x2"]),
+          c("other-dir", { "pinetrie.project": "y" }, ["/other/lanes/t"]),
+          c("half", { "pinetrie.project": "z" }, [under, "/elsewhere"]),
+          c("next-door", { "pinetrie.project": "w" }, ["/lanes2/t"]),
+          c("no-binds", { "pinetrie.project": "v" }),
+        ],
+      }),
+    ).toEqual({ containers: ["cloned"], projects: [], unlistedNetworks: ["x"] })
+  })
+  test("an unlisted project's network stays while it has a container left", () => {
+    expect(
+      planProjectSweep({
+        ownKey: "own",
+        lanesDir: "/lanes",
+        projects: [],
+        containers: [
+          c("in", { "pinetrie.project": "x" }, ["/lanes/a"]),
+          c("out", { "pinetrie.project": "x" }, ["/elsewhere"]),
+        ],
+      }).unlistedNetworks,
+    ).toEqual([])
+  })
+})
+
+describe("unneededImageTags: what a host removes after a build", () => {
+  const unneeded = (
+    needed: readonly string[],
+    images: readonly (readonly [string, readonly string[]])[],
+    used: readonly string[] = [],
+  ) =>
+    unneededImageTags({
+      neededTags: new Set(needed),
+      listedImages: images.map(([id, tags]) => ({ id, tags })),
+      imageIdsContainersUse: new Set(used),
+    })
+  test("a needed tag is never removed, though it shares a repository with another", () => {
+    expect(
+      unneeded(
+        ["pinetrie-lane:default", "pinetrie-lane:project"],
+        [
+          ["a", ["pinetrie-lane:default"]],
+          ["b", ["pinetrie-lane:project"]],
+          ["c", ["pinetrie-lane:old"]],
+        ],
+      ),
+    ).toEqual(["pinetrie-lane:old"])
+  })
+  test("an image a container was made from keeps all its tags", () => {
+    expect(
+      unneeded(
+        [],
+        [
+          ["a", ["pinetrie-observer:old", "pinetrie-observer:older"]],
+          ["b", ["pinetrie-lanehost:old"]],
+        ],
+        ["a"],
+      ),
+    ).toEqual(["pinetrie-lanehost:old"])
+  })
+  test("an image of any other repository is never touched", () => {
+    expect(
+      unneeded(
+        [],
+        [
+          ["a", ["alpine:3.23", "pinetrie-lanes:x", "my/pinetrie-lane:y"]],
+          ["b", ["pinetrie-lane:x"]],
+        ],
+      ),
+    ).toEqual(["pinetrie-lane:x"])
+  })
+})
+
+test("the lane image's inner Docker keeps its data at the data root a fork clones", () => {
+  const containerfile = readFileSync(
+    path.join(import.meta.dirname, "..", "lanes", "image", "Containerfile"),
+    "utf8",
+  )
+  expect(containerfile).toContain(
+    `--data-root ${NESTED_MOUNT}/${INNER_DOCKER_DATA_ROOT_DIR} `,
+  )
 })
 
 test("imageEnvPath: an image's PATH, else the standard one", () => {

@@ -9,6 +9,9 @@ import {
   configWidenings,
   effectiveLaneConfig,
   imageRefusal,
+  innerDockerDataRootStep,
+  innerDockerDataRootsAfterClone,
+  innerDockerDataRootsAfterRunEnd,
   isBaseCurrent,
   isCopyableBase,
   type LaneSpec,
@@ -17,6 +20,7 @@ import {
   laneGitConfig,
   laneIgnores,
   NO_GRANTS,
+  NO_INNER_DOCKER_DATA_ROOTS,
   NOTHING_ATTACHED,
   parseBaseFacts,
   planBaseFacts,
@@ -26,6 +30,7 @@ import {
   planFork,
   planHostMounts,
   planImages,
+  planInnerDockerDataRootSource,
   planLaneStart,
   planLinks,
   planMounts,
@@ -377,6 +382,7 @@ test("planFork: the container and disk deleted, the restore, the container, the 
     spec,
     env: {},
     setup: forkSetup(null, [{ in: "lane", argv: ["setup"] }]),
+    innerDockerDataRoot: { kind: "keep" },
   })
   expect(argvs(steps)).toEqual([
     `runtime: ${JSON.stringify({ kind: "remove", container: `pinetrie-${LANE}` })}`,
@@ -388,12 +394,103 @@ test("planFork: the container and disk deleted, the restore, the container, the 
   ])
 })
 
+test("planFork: a nested lane's data root is made after the delete and before the container runs", () => {
+  const nested: LaneSpec = { ...spec, grants: { ...spec.grants, nested: true } }
+  const other = threadIdFor("2")
+  const { steps } = planFork({
+    source: { snapshot: snapshotId("e1") },
+    spec: nested,
+    env: {},
+    setup: forkSetup(null, []),
+    innerDockerDataRoot: { kind: "clone", cloneFromLane: other, atRunEnd: 3 },
+  })
+  expect(argvs(steps).slice(0, 4)).toEqual([
+    `runtime: ${JSON.stringify({ kind: "remove", container: `pinetrie-${LANE}` })}`,
+    `runtime: ${JSON.stringify({ kind: "delete", lane: LANE })}`,
+    `runtime: ${JSON.stringify({ kind: "innerDockerDataRoot", lane: LANE, cloneFromLane: other })}`,
+    `runtime: ${JSON.stringify({ kind: "restore", lane: LANE, from: "e1" })}`,
+  ])
+})
+
+describe("a nested lane's inner Docker data root: the last run's lane's, cloned", () => {
+  const [A, B, C] = [threadIdFor("a"), threadIdFor("b"), threadIdFor("c")]
+  const afterRun = (...lanes: (typeof A)[]) =>
+    lanes.reduce(innerDockerDataRootsAfterRunEnd, NO_INNER_DOCKER_DATA_ROOTS)
+  const atStart = (roots: typeof NO_INNER_DOCKER_DATA_ROOTS, lane: typeof A) =>
+    planInnerDockerDataRootSource({
+      roots,
+      lane,
+      clonedAtRunEnd: roots.clonedAtRunEnd.get(lane) ?? null,
+      forkSourceLane: null,
+    })
+  test("with no run ended, every lane keeps its own", () => {
+    expect(atStart(NO_INNER_DOCKER_DATA_ROOTS, A)).toEqual({ kind: "keep" })
+  })
+  test("the last run's lane keeps its own; another clones it, then keeps it until another run ends", () => {
+    const roots = afterRun(A, B)
+    expect(atStart(roots, B)).toEqual({ kind: "keep" })
+    const source = atStart(roots, A)
+    expect(source).toEqual({ kind: "clone", cloneFromLane: B, atRunEnd: 2 })
+    const cloned = innerDockerDataRootsAfterClone(roots, A, source)
+    expect(atStart(cloned, A)).toEqual({ kind: "keep" })
+    expect(atStart(innerDockerDataRootsAfterRunEnd(cloned, C), A)).toEqual({
+      kind: "clone",
+      cloneFromLane: C,
+      atRunEnd: 3,
+    })
+  })
+  test("a fork clones the last run's lane, else its source lane, else keeps", () => {
+    const atFork = (
+      roots: typeof NO_INNER_DOCKER_DATA_ROOTS,
+      lane: typeof A,
+      forkSourceLane: typeof A | null,
+    ) =>
+      planInnerDockerDataRootSource({
+        roots,
+        lane,
+        clonedAtRunEnd: null,
+        forkSourceLane,
+      })
+    expect(atFork(afterRun(B), A, C)).toEqual({
+      kind: "clone",
+      cloneFromLane: B,
+      atRunEnd: 1,
+    })
+    // The fork's delete dropped the last run's own: its source's instead.
+    expect(atFork(afterRun(A), A, C)).toEqual({
+      kind: "clone",
+      cloneFromLane: C,
+      atRunEnd: null,
+    })
+    expect(atFork(NO_INNER_DOCKER_DATA_ROOTS, A, null)).toEqual({
+      kind: "keep",
+    })
+    expect(atFork(NO_INNER_DOCKER_DATA_ROOTS, A, A)).toEqual({ kind: "keep" })
+  })
+  test("only a nested lane's start makes its data root", () => {
+    const keep = { kind: "keep" } as const
+    const start = { kind: "container", plan: "start" } as const
+    expect(innerDockerDataRootStep(spec, start, keep)).toBeNull()
+    expect(
+      innerDockerDataRootStep(
+        { ...spec, grants: { ...spec.grants, nested: true } },
+        start,
+        keep,
+      ),
+    ).toEqual({
+      in: "runtime",
+      op: { kind: "innerDockerDataRoot", lane: LANE, cloneFromLane: null },
+    })
+  })
+})
+
 test("planFork restores from the adapter's snapshot when it names one", () => {
   const { steps } = planFork({
     source: { snapshot: snapshotId("e1") },
     spec,
     env: {},
     setup: forkSetup(snapshotId("line-1"), []),
+    innerDockerDataRoot: { kind: "keep" },
   })
   expect(steps[2]).toEqual({
     in: "runtime",
@@ -620,6 +717,7 @@ test("the base's scratch lane is no thread's: nothing that takes a thread takes 
     spec: { ...spec, lane: BASE_LANE },
     env: {},
     setup: forkSetup(null, []),
+    innerDockerDataRoot: { kind: "keep" },
   })
   expect([laneContainer(BASE_LANE), setup.steps.length]).toEqual([
     "pinetrie-base-scratch",

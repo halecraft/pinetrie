@@ -46,8 +46,12 @@ the helper, S122 to S131 for Docker and the lane VM.
   - `exec -i` that carries stdin's end to the helper (`execArgv`);
   - the base kept as a snapshot like any other (`BASE_SNAPSHOT`), per
     project;
-  - images built from a Containerfile, and a throwaway container's stdout as
-    bytes (`runInImage`), from which the lane runtime is extracted.
+  - the lane images a host needs, built unless it has them, each built
+    again when a container is made from it after another host removed it,
+    and every other image of pine·trie's it keeps removed after a build
+    once nothing uses it (`ensureLaneImages`, ADR-0169); and a throwaway
+    container's stdout as bytes (`runInImage`), from which the lane runtime
+    is extracted.
 - **Who implements it:** `@pinetrie/docker` (`dockerRuntime`, the Mac's lane
   VM and Linux), the one implementation.
 - **A folder project's merges are a port of their own,** `FolderDisks`
@@ -190,7 +194,8 @@ paths are its diff." would compare a function with itself.
   The host computes it once and hands each part in; nothing of pine·trie's
   is written in the project, for any kind (ADR-0142).
 - `image.ts`, `runtime.ts`: the image and the lane runtime. `image.ts`
-  gathers what `planImages` needs and builds what it plans.
+  gathers what `planImages` needs and hands its plans to the runtime
+  (`ensureLaneImages`), which builds them.
 - `runtime-port.ts`: `LaneRuntime`, every call the host makes to a
   runtime, and `DiskOp`. This package implements no runtime: Docker's is
   `@pinetrie/docker`'s (`dockerRuntime`).
@@ -201,7 +206,9 @@ paths are its diff." would compare a function with itself.
 
 - **Every disk operation is a `DiskOp`** (`runtime-port.ts`), carried out by
   the runtime the host hands in: create, restore from a snapshot, snapshot,
-  delete, and delete snapshots. Docker's keeps both as btrfs subvolumes,
+  delete, delete snapshots, and a nested lane's inner Docker data root
+  (`innerDockerDataRoot`: a clone of another lane's in place of its own,
+  or its own as it is). Docker's keeps both as btrfs subvolumes,
   and carries each operation out as a call to lanehost's `disks` role over a
   held channel (ADR-0129, `packages/lanehost/TECHNICAL.md`).
 - **A snapshot is read-only:** a restore is a writable snapshot of it, and
@@ -259,7 +266,11 @@ paths are its diff." would compare a function with itself.
   `Forked`; a lane's fork record says begun only through the host's
   `forkEnd`, which takes a `Forked` and the history's `StartRecords`
   (`startRecords`, which only an adapter makes, with `recordedStart`), so
-  no record says begun for a fork whose steps did not run. Between the
+  no record says begun for a fork whose steps did not run. A nested lane's
+  fork makes its inner Docker data root after the delete, which dropped
+  it, and before the run, whose inner Docker starts on it: a clone of the
+  project's nested lane that ran last, else of the lane whose disk the
+  fork clones (ADR-0169). Between the
   clone and the setup, one step
   removes `/workspace/.pineta-lane` (`OLD_LANE_CONFIG_DIR`, tagged
   `pre-rename:`): a snapshot of a lane made before the rename holds that
@@ -324,8 +335,11 @@ paths are its diff." would compare a function with itself.
   (ADR-0041). Its
   build is pinned by `PLAYWRIGHT_VERSION`: `prepareImages` takes it from the
   host, which resolves the app's `@playwright/test`, so a Playwright upgrade
-  builds the image again. The image's `ENV` reaches an agent's commands, so
-  `chromium.launch()` finds the browser with nothing set. A project image
+  builds the image again. Each file the Containerfile copies in from beside
+  it (`daemon.json`, the inner Docker's config) is one of its sources
+  (`filesContainerfileCopies`), so a change to one is a new tag. The
+  image's `ENV` reaches an agent's commands, so `chromium.launch()` finds
+  the browser with nothing set. A project image
   gets no such argument, no browser and no python3 unless it installs them.
 - **Whether a lane runs the default image is known at startup**, before the
   images are built: the project has no `projectContainerfile(root)`. The
@@ -357,6 +371,18 @@ paths are its diff." would compare a function with itself.
   The facts are one read of its revision records, its history's
   `keptSnapshot` and one listing of every snapshot (`LaneMade`), asked only
   when the container must be made.
+- **A nested lane's inner Docker data root is made before its container
+  starts,** whenever the container is made or a stopped one started
+  (`innerDockerDataRootStep`, which takes only a
+  `LaneStartWithStoppedContainer`, so none is planned for a running one).
+  It is a clone of the project's nested lane whose container stopped last
+  after a run, unless the lane's own is as of that run already
+  (`planInnerDockerDataRootSource`, from the host's
+  `InnerDockerDataRoots`); a kept one is still made a subvolume if it is
+  not. The data root is a cache, never snapshotted: a clone is of the
+  source's state now, and lanehost keeps a lane's own when the source's
+  has gone, so a lane deleted since needs no bookkeeping (ADR-0169,
+  S233, S236).
 - **A jj lane's fork record is the only proof its setup ran** (S226). A
   lost record would fork the lane again, deleting its disk, so only a fork
   about to run writes a begun lane owed again.

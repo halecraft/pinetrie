@@ -11,11 +11,15 @@ import {
 import type { Keeper } from "@pinetrie/keeper"
 import {
   executeOrThrow,
+  innerDockerDataRootStep,
   KILL_SSH,
   type LaneGrants,
   type LaneHistory,
   type LaneMade,
+  type LaneSpec,
+  type LaneStartWithStoppedContainer,
   laneNote,
+  nestedLaneDockerNote,
   PINETRIE_MOUNT,
   planContainer,
   planDisk,
@@ -36,6 +40,7 @@ import { failed, type LeaseBasics } from "../basics.ts"
 import type { NewLanes } from "./create.ts"
 import type { ProposedChangesActs } from "./destination.ts"
 import { removeStaleOutputs } from "./disk.ts"
+import type { InnerDockerDataRootsHeld } from "./inner-docker-data-roots.ts"
 import type { LaneRegistry } from "./registry.ts"
 import type { Setup } from "./setup.ts"
 
@@ -54,13 +59,17 @@ export function laneFacts(input: {
     // Every grant is told, or excluded by name in the `satisfies` type. The
     // literal stays inline: only there does tsc also refuse a key that
     // `LaneFacts` lacks. Host ports are excluded: whether `$PINETRIE_HOST` is
-    // set depends on the runtime's target, which this does not see.
+    // set depends on the runtime's target, which this does not see. `nested`
+    // is told under a name of its own, as the path of the note on its Docker.
     grants: {
       ssh: input.ssh,
-      nested: grants.nested,
+      nestedDockerNote: grants.nested ? nestedLaneDockerNote : null,
       env: grants.env,
       mounts: grants.mounts.map(m => m.target),
-    } satisfies Record<Exclude<keyof LaneGrants, "hostPorts">, unknown>,
+    } satisfies Record<
+      Exclude<keyof LaneGrants, "hostPorts" | "nested">,
+      unknown
+    > & { readonly nestedDockerNote: string | null },
     defaultImage: input.defaultImage,
     install: PINETRIE_MOUNT,
     note: laneNote(input.kind),
@@ -99,8 +108,10 @@ export function createContainers(deps: {
   readonly proposed: Pick<ProposedChangesActs, "runEnded">
   /** A lane's fork (`work/create.ts`), run by its start. */
   readonly fork: NewLanes["fork"]
+  readonly innerDockerDataRoots: InnerDockerDataRootsHeld
 }): Containers {
-  const { basics, setup, registry, keeper, proposed } = deps
+  const { basics, setup, registry, keeper, proposed, innerDockerDataRoots } =
+    deps
   const { session, log } = basics
 
   // A lane whose use of its owner's identity is taken back: its sessions
@@ -139,6 +150,23 @@ export function createContainers(deps: {
     }
   }
 
+  /**
+   * A nested lane's inner Docker data root, made from the last run's lane's
+   * before its container starts: `start` is one whose container is stopped
+   * or not yet made, so no inner Docker runs on it.
+   */
+  async function makeInnerDockerDataRoot(
+    spec: LaneSpec,
+    start: LaneStartWithStoppedContainer,
+    runners: Parameters<typeof executeOrThrow>[1],
+  ): Promise<void> {
+    const source = innerDockerDataRoots.sourceAtStart(spec.lane)
+    const step = innerDockerDataRootStep(spec, start, source)
+    if (step === null) return
+    await executeOrThrow([step], runners)
+    innerDockerDataRoots.made(spec.lane, source)
+  }
+
   async function startContainer(
     record: OwnLane,
     h: LaneHistory,
@@ -175,6 +203,12 @@ export function createContainers(deps: {
         await deps.fork(lane, h, handle, record, fork)
         break
       case "container":
+        if (decided.plan === "start")
+          await makeInnerDockerDataRoot(
+            spec,
+            { kind: "container", plan: "start" },
+            handle.runners,
+          )
         await handle.start(decided.plan === "start" ? "stopped" : "running")
         break
       case "disk":
@@ -183,6 +217,7 @@ export function createContainers(deps: {
           await handle.stop()
           await runtime.remove(container)
         }
+        await makeInnerDockerDataRoot(spec, decided, handle.runners)
         if (decided.kind === "disk")
           await executeOrThrow([planStart(spec, process.env)], handle.runners)
         else {
@@ -250,7 +285,13 @@ export function createContainers(deps: {
       const handle = registry.handleOf(lane)
       void keeper.track(
         handle.queue
-          .enqueue(() => handle.stop())
+          .enqueue(async () => {
+            await handle.stop()
+            // Stopped: from now its inner Docker data root is the one to
+            // clone, and no Docker runs on it unless it starts again.
+            if (setup.specOf(lane, await setup.ready).grants.nested)
+              innerDockerDataRoots.stoppedAfterRun(lane)
+          })
           .catch(failed(basics, "stopping", lane)),
       )
     },

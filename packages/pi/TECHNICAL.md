@@ -623,9 +623,11 @@ item 18, and in `lanes.test.ts` against the harness.
     never its value (`INNER_DOCKER_HOST`, in `@pinetrie/docker`), so pi
     holds no copy of the address. Only those lanes' prefixes carry the
     line. The host's `laneFacts` decides which grants a lane is told.
-    ADR-0169, accepted and not yet built, adds to that line where to read
-    about the Docker it runs, a note of its own that only those lanes are
-    pointed to; the lane note says no more of it.
+    The grant is told as the path of the Docker note
+    (`LaneFacts.grants.nestedDockerNote`, null without it), and the line
+    ends with it: read that note before building or running images
+    (ADR-0169). So no lane without the grant is told of the note, and a
+    lane with it cannot be told the grant without the note's path.
   - **Guidelines, not a section of its own.** pi joins its sections into one
     string, and a provider may rebuild that string by its tags:
     `pi-anthropic-auth` keeps `<rules>` and drops `<docs>` (S23, addendum).
@@ -638,6 +640,14 @@ item 18, and in `lanes.test.ts` against the harness.
     read in the lane through pine·trie's own mount (`laneNote` in
     `@pinetrie/lanes`). Each fact in either names its source, which a unit
     test checks still exists.
+  - **The Docker note** (`lane-docker.md`, `nestedLaneDockerNote`) is a
+    nested lane's alone: what its inner Docker's data root is (a cache,
+    replaced at a run's start by a clone of the project's nested lane that
+    ran last), what pine·trie removes after a build, and the cache's cap.
+    Both lane notes name it where they mention `lanes.nested`, and say no
+    more of it. Its facts name their sources as the lane notes' do, and the
+    same test checks them; it states no timing, since a measurement has no
+    code to cite.
     Each fact in it names its source as `<!-- <path> <symbol> -->`, and
     `lanes.test.ts` fails when a named file or symbol is gone. A change that
     makes a line of the block or the note false must change it.

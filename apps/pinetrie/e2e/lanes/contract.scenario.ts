@@ -1,7 +1,8 @@
 // e2e/lanes/contract — what the Docker runtime must hold that no unit test can
 // show: snapshots under writes, the working copy read-only on the Mac's side, a
-// half-close through the launcher, no vsock from a lane, and two hosts' slots
-// apart. On the Mac it runs a VM of its own, from this checkout's launcher and
+// half-close through the launcher, no vsock from a lane, two hosts' slots
+// apart, and the images a host keeps: Docker's refusal to remove one a
+// container uses, and a create refused for a missing image. On the Mac it runs a VM of its own, from this checkout's launcher and
 // the built image, so a change to the launcher is what runs, and the person's
 // hosts are untouched.
 
@@ -173,6 +174,12 @@ async function dockerContract(
     return name
   }
   const laneRuntimes = new Map<ThreadId, LaneRuntime>()
+  const contractImage = (name: string) =>
+    `pinetrie-lane:contract-${process.pid}-${name}`
+  const heldContainer = `pinetrie-contract-${process.pid}-held`
+  const imagesDir = realpathSync(
+    mkdtempSync(path.join(tmpdir(), "pinetrie-images-")),
+  )
   const exec = (name: ThreadId, script: string) => {
     const on = laneRuntimes.get(name) ?? runtime
     const [p = "docker", ...rest] = on.execArgv(laneContainer(name), [
@@ -224,6 +231,55 @@ async function dockerContract(
     })
     for (const image of [NODE_IMAGE, PYTHON_IMAGE, ALPINE_IMAGE])
       await runtime.runInImage(image, ["true"])
+
+    // ── the images a host needs: after a build, pine·trie's others that no
+    // container uses go; and a tag removed under it is built again ──
+    const imageFor = (name: string) =>
+      `FROM ${ALPINE_IMAGE}\nLABEL pinetrie.contract=${process.pid}-${name}\n`
+    for (const name of ["unused", "held"])
+      await quietCli(
+        ["buildx", "build", "--load", "-t", contractImage(name), "-"],
+        imageFor(name),
+      )
+    await quietCli([
+      "create",
+      "--name",
+      heldContainer,
+      contractImage("held"),
+      "true",
+    ])
+    writeFileSync(path.join(imagesDir, "Containerfile"), imageFor("rebuilt"))
+    const rebuilt = {
+      file: path.join(imagesDir, "Containerfile"),
+      tag: contractImage("rebuilt"),
+      buildArgs: [],
+    }
+    await runtime.ensureLaneImages([rebuilt], () => {})
+    const listed = await quietCli([
+      "images",
+      "--format",
+      "{{.Repository}}:{{.Tag}}",
+    ])
+    check(
+      "after a build, an image of pine·trie's no container uses is removed, and one a stopped container uses stays",
+      !listed.includes(contractImage("unused")) &&
+        listed.includes(contractImage("held")),
+      listed
+        .split("\n")
+        .filter(t => t.includes("contract"))
+        .join(", "),
+    )
+    await quietCli(["rmi", rebuilt.tag])
+    // A create that fails is the check's failure, not the scenario's error.
+    const up = await lane(rebuilt.tag).then(
+      made => exec(made, "echo up"),
+      (error: unknown) => ({ stdout: "", stderr: String(error) }),
+    )
+    check(
+      "a lane whose image another host removed is made, its image built again",
+      up.stdout.trim() === "up",
+      `${up.stdout}${up.stderr}`,
+    )
 
     // ── lanehost's privileged role: the host's grant made it ──
     const privileged = (
@@ -505,6 +561,11 @@ async function dockerContract(
       await on.remove(laneContainer(l)).catch(() => {})
       await on.disk({ kind: "delete", lane: l }).catch(() => {})
     }
+    // After the lanes: a lane's container holds its image.
+    await quietCli(["rm", "-f", heldContainer])
+    for (const name of ["unused", "held", "rebuilt"])
+      await quietCli(["rmi", contractImage(name)])
+    rmSync(imagesDir, { recursive: true, force: true })
     closedPort.stop()
     grantedPort.stop()
     await runtime

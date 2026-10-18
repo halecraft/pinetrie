@@ -41,6 +41,7 @@ const sources: ImageSources = {
   init: "init",
   clock: "clock",
   "stage1-init": "stage1",
+  "daemon.json": "{}",
 }
 
 test("imageKey: stable, and changed by any of the image's sources", () => {
@@ -49,6 +50,10 @@ test("imageKey: stable, and changed by any of the image's sources", () => {
   expect(imageKey({ ...sources })).toBe(key)
   for (const name of IMAGE_FILES)
     expect(imageKey({ ...sources, [name]: `${sources[name]} ` })).not.toBe(key)
+})
+
+test("Docker's daemon.json is one of the image's sources", () => {
+  expect(IMAGE_FILES).toContain("daemon.json")
 })
 
 test("vmStateDir: under XDG_STATE_HOME, else ~/.local/state; images by key", () => {

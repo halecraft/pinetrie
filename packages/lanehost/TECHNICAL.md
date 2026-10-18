@@ -219,9 +219,9 @@ host, whatever their projects.
   (ENOTEMPTY, S148), so the order is drop, then move.
 - **A drop deletes whatever is there:** a subvolume by btrfs, made writable
   first, since a read-only one is refused until then (S148); anything else
-  by `rm -rf`. An inner Docker makes subvolumes inside a nested lane's disk,
-  and `rmdir` of an empty subvolume is a delete with
-  `user_subvol_rm_allowed`.
+  by `rm -rf`. A nested lane's disk holds subvolumes (its inner Docker's
+  data root, an inner lanehost's lanes and snapshots), and `rmdir` of an
+  empty subvolume is a delete with `user_subvol_rm_allowed`.
 - **A subvolume that holds others is refused whole, and `rm -rf` stops at
   a read-only one** (EROFS, S179): an inner lanehost's snapshots in a
   nested disk, or a subvolume an agent made in its lane. So where the
@@ -238,6 +238,19 @@ host, whatever their projects.
   bring one back.
 - **A subvolume is told by its root's inode, 256** (`isSubvolume`):
   `btrfs subvolume show` needs `CAP_SYS_ADMIN` (S125).
+- **A nested lane's disk holds its inner Docker's data root as a subvolume
+  of its own** (`INNER_DOCKER_DATA_ROOT_DIR`, `docker`), so it is cloned
+  without the inner lanehost's `projects/` beside it (ADR-0169). The
+  `nestedDisk` call makes the nested disk the rootless user's, then the
+  data root (`planInnerDockerDataRootSteps`, from facts gathered first):
+  - a lane named to clone from whose data root is a subvolume: the lane's
+    own dropped, then a writable snapshot of that one, which keeps its
+    owner (S233);
+  - otherwise, a source gone included, the lane's own as it is, made a
+    subvolume owned by the rootless user when it is not one: a plain
+    `docker/` from before is dropped, its images with it.
+
+  A lane is never its own source: its data root would be dropped first.
 
 ## A folder project's merges (`folder.ts`)
 

@@ -111,6 +111,9 @@ changes pine·trie can keep this note true. You can skip them.
   lanes lanes of their own (`lanes.nested` in `pinetrie.json`): then a
   rootless Docker answers at `$DOCKER_HOST`. There is no
   `/var/run/docker.sock`: point a tool that assumes it at `$DOCKER_HOST`.
+  Before building or running images there, read
+  `/pinetrie/packages/pi/lane-docker.md`.
+  <!-- packages/lanes/lane.ts nestedLaneDockerNote -->
   <!-- packages/lanes/plan.ts LaneGrants -->
   <!-- packages/docker/plan.ts INNER_DOCKER_HOST -->
 - The person's machine's own services (bound to its loopback) are out of

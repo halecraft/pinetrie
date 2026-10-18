@@ -7,11 +7,20 @@
 //   <lanesDir>/projects/<projectKey>/lanes/<lane>    each lane's subvolume, and
 //                                                    `folder-line` while a read makes a state
 //   <lanesDir>/projects/<projectKey>/snapshots/<id>  snapshots, the base too
-//   <lanesDir>/projects/<projectKey>/nested/<lane>   a nested lane's inner lanes
+//   <lanesDir>/projects/<projectKey>/nested/<lane>   a nested lane's inner lanes, and
+//                                                    `docker`, its inner Docker's data root
 //   <lanesDir>/projects/<projectKey>/states/<lane>   a folder lane's states, which
 //                                                    its container sees read-only
 
 import { isDiskName } from "@pinetrie/core"
+
+/**
+ * A nested lane's inner Docker data root, in its nested disk: a subvolume of
+ * its own, so it is cloned without the inner lanehost's projects beside it.
+ * The lane image's `pinetrie-inner-docker` starts the inner Docker on this
+ * directory under the nested disk's mount.
+ */
+export const INNER_DOCKER_DATA_ROOT_DIR = "docker"
 
 /** Where one project's disks are on Docker's machine. */
 export function projectDisks(lanesDir: string, key: string) {
@@ -25,6 +34,8 @@ export function projectDisks(lanesDir: string, key: string) {
     statesDir: `${dir}/states`,
     lane: (lane: string) => `${dir}/lanes/${lane}`,
     nested: (lane: string) => `${dir}/nested/${lane}`,
+    innerDockerDataRoot: (lane: string) =>
+      `${dir}/nested/${lane}/${INNER_DOCKER_DATA_ROOT_DIR}`,
     snapshot: (id: string) => `${dir}/snapshots/${id}`,
     states: (lane: string) => `${dir}/states/${lane}`,
   }

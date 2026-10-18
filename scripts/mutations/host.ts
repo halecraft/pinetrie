@@ -105,8 +105,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a nested lane is never told of its Docker",
     file: "apps/pinetrie/host/work/containers.ts",
-    from: "      nested: grants.nested,",
-    to: "      nested: false,",
+    from: "      nestedDockerNote: grants.nested ? nestedLaneDockerNote : null,",
+    to: "      nestedDockerNote: null,",
     command: unit,
     expect: "laneFacts: a lane is told each grant its config holds",
   },

@@ -39,8 +39,11 @@ RUN npx -y "playwright@${PLAYWRIGHT_VERSION}" install --with-deps chromium-headl
  && rm -rf /var/lib/apt/lists/* /root/.npm
 # Lanes inside a lane: rootless Docker, from Docker's static
 # bundles, which a lane granted `lanes.nested` starts as `rootless` (uid 1000)
-# on its inner lanes' btrfs subvolume (`pinetrie-inner-docker`). runc's
-# NoNewKeyring is its default: Docker's seccomp profile refuses `keyctl`.
+# on its data root, a btrfs subvolume of its own (`pinetrie-inner-docker`).
+# Its daemon.json, copied in from beside this file, makes runc's NoNewKeyring
+# its default (Docker's seccomp profile refuses `keyctl`), and caps BuildKit's
+# cache beside its images: the defaults are fractions of the lane VM's whole
+# disk, which no lane's cache would reach.
 # BuildKit starts runc itself, not through that default, so `runc` in
 # /usr/local/sbin, first on the inner Docker's PATH, adds --no-new-keyring. The
 # docker CLI and buildx are for a pine·trie host running in the lane.
@@ -71,12 +74,10 @@ RUN apt-get update -qq \
  && echo "rootless:100000:65536" > /etc/subuid \
  && echo "rootless:100000:65536" > /etc/subgid \
  && mkdir -p /home/rootless/.config/docker \
- && echo '{"default-runtime":"nokeyring","runtimes":{"nokeyring":{"runtimeType":"io.containerd.runc.v2","options":{"NoNewKeyring":true}}}}' \
-    > /home/rootless/.config/docker/daemon.json \
  && chown -R rootless:rootless /home/rootless \
  && printf '%s\n' \
     '#!/bin/sh' \
-    '# A nested lane'"'"'s inner Docker: rootless, as uid 1000, on its inner lanes'"'"' subvolume.' \
+    '# A nested lane'"'"'s inner Docker: rootless, as uid 1000, on its data root, a subvolume of its own in its inner lanes'"'"' disk.' \
     '[ -d /var/lib/pinetrie-lanes ] || exit 0' \
     '# /run outlives a stopped container, and this runs at each start: a pid file' \
     '# or socket of the daemon before the stop would refuse this one.' \
@@ -98,3 +99,4 @@ RUN apt-get update -qq \
     'exec /usr/local/bin/runc "$@"' \
     > /usr/local/sbin/runc \
  && chmod +x /usr/local/sbin/runc
+COPY --chown=rootless:rootless daemon.json /home/rootless/.config/docker/daemon.json

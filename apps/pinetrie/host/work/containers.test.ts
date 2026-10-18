@@ -1,4 +1,8 @@
-import { type LaneGrants, NO_GRANTS } from "@pinetrie/lanes"
+import {
+  type LaneGrants,
+  NO_GRANTS,
+  nestedLaneDockerNote,
+} from "@pinetrie/lanes"
 import { expect, test } from "vitest"
 import { laneFacts } from "./containers.ts"
 
@@ -13,7 +17,7 @@ test("laneFacts: a lane is told each grant its config holds", () => {
     }).grants
   expect(facts(NO_GRANTS)).toEqual({
     ssh: { personal: false, services: [] },
-    nested: false,
+    nestedDockerNote: null,
     env: [],
     mounts: [],
   })
@@ -31,7 +35,7 @@ test("laneFacts: a lane is told each grant its config holds", () => {
     }),
   ).toEqual({
     ssh: { personal: false, services: [] },
-    nested: true,
+    nestedDockerNote: nestedLaneDockerNote,
     env: ["CI", "NPM_TOKEN"],
     mounts: ["/data", "/ref"],
   })

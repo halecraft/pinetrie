@@ -16,6 +16,7 @@ export { FILE_OUT } from "./file-out.ts"
 export { type Grant, grantChain } from "./grants.ts"
 export {
   FOLDER_MOUNT,
+  INNER_DOCKER_DATA_ROOT_DIR,
   isProjectKey,
   LANE_FILES,
   type ProjectDisks,

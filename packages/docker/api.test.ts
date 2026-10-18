@@ -5,7 +5,14 @@ import {
 } from "@pinetrie/lanehost"
 import { PINETRIE_MOUNT, runtimeNode } from "@pinetrie/lanes"
 import { describe, expect, test } from "vitest"
-import { createBody, memoryBytes, parseListed } from "./api.ts"
+import {
+  createBody,
+  isCreateRefusedForMissingImage,
+  isImageRemovalSettled,
+  memoryBytes,
+  parseImages,
+  parseListed,
+} from "./api.ts"
 import { type ContainerSpec, renderObserver } from "./plan.ts"
 
 const spec: ContainerSpec = {
@@ -130,4 +137,43 @@ describe("parseListed: the API's container list", () => {
   test("an answer that is not a list lists nothing", () => {
     expect(parseListed("not json")).toEqual([])
   })
+})
+
+test("parseImages: each image's id and tags; an untagged one has none", () => {
+  const body = JSON.stringify([
+    { Id: "sha256:a", RepoTags: ["pinetrie-lane:1", "pinetrie-lane:2"] },
+    { Id: "sha256:b", RepoTags: null },
+    { RepoTags: ["no-id:1"] },
+  ])
+  expect(parseImages(body)).toEqual([
+    { id: "sha256:a", tags: ["pinetrie-lane:1", "pinetrie-lane:2"] },
+    { id: "sha256:b", tags: [] },
+  ])
+  expect(parseImages("not json")).toEqual([])
+})
+
+test("a create refused for a missing image is told from any other refusal", () => {
+  const answered = (status: number, message: string) => ({
+    status,
+    body: JSON.stringify({ message }),
+  })
+  expect(
+    isCreateRefusedForMissingImage(
+      answered(404, "No such image: pinetrie-lane:abc"),
+    ),
+  ).toBe(true)
+  expect(
+    isCreateRefusedForMissingImage(
+      answered(404, "network pinetrie-k not found"),
+    ),
+  ).toBe(false)
+  expect(
+    isCreateRefusedForMissingImage(answered(409, "No such image: x")),
+  ).toBe(false)
+})
+
+test("an image's removal is settled when done, gone, or held by a container", () => {
+  const status = (s: number) => isImageRemovalSettled({ status: s, body: "" })
+  expect([200, 404, 409].map(status)).toEqual([true, true, true])
+  expect(status(500)).toBe(false)
 })

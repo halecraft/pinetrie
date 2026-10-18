@@ -119,18 +119,84 @@ export function planDisk(
   }
 }
 
-/** A nested lane's inner lanes' subvolume, made if missing, owned by the rootless user. */
-export function planNestedDisk(
+/** What is at a path a data root may be at. */
+export type DataRootState = "subvolume" | "notSubvolume" | "absent"
+
+/** What is on disk for a lane's inner Docker data root, and for the one it may clone. */
+export interface InnerDockerDataRootFacts {
+  readonly ownDataRoot: DataRootState
+  /** Null when no lane to clone from was named. */
+  readonly sourceDataRoot: DataRootState | null
+}
+
+/**
+ * A nested lane's disk, the rootless user's, and its inner Docker data root
+ * in it: a writable snapshot of `cloneFromLane`'s when that one is a
+ * subvolume, in place of the lane's own; else the lane's own, made a
+ * subvolume owned by the rootless user unless it is one. So a lane to clone
+ * from whose data root has gone leaves the lane's as it is. Throws on a name
+ * that is not a disk's.
+ */
+export function planInnerDockerDataRootSteps(
   lane: string,
+  cloneFromLane: string | null,
+  facts: InnerDockerDataRootFacts,
   disks: ProjectDisks,
 ): readonly DiskStep[] {
-  if (!isDiskName(lane))
-    throw new Error(`not a disk's name: ${JSON.stringify(lane)}`)
-  const at = disks.nested(lane)
-  return [
-    { kind: "parent", path: at },
-    { kind: "ensure", path: at, uid: ROOTLESS_UID },
+  const bad = [lane, cloneFromLane].find(n => n !== null && !isDiskName(n))
+  if (bad !== undefined)
+    throw new Error(`not a disk's name: ${JSON.stringify(bad)}`)
+  const nested = disks.nested(lane)
+  const dataRoot = disks.innerDockerDataRoot(lane)
+  const disk: DiskStep[] = [
+    { kind: "parent", path: nested },
+    { kind: "ensure", path: nested, uid: ROOTLESS_UID },
   ]
+  // The lane itself is never a source: its data root would be dropped first.
+  if (
+    cloneFromLane !== null &&
+    cloneFromLane !== lane &&
+    facts.sourceDataRoot === "subvolume"
+  )
+    return [
+      ...disk,
+      { kind: "drop", path: dataRoot },
+      {
+        kind: "snapshot",
+        from: disks.innerDockerDataRoot(cloneFromLane),
+        to: dataRoot,
+        readonly: false,
+      },
+    ]
+  if (facts.ownDataRoot === "subvolume") return disk
+  return [
+    ...disk,
+    ...(facts.ownDataRoot === "notSubvolume"
+      ? [{ kind: "drop", path: dataRoot } as const]
+      : []),
+    { kind: "ensure", path: dataRoot, uid: ROOTLESS_UID },
+  ]
+}
+
+/** What `planInnerDockerDataRootSteps` decides from, read from the disk. */
+export async function innerDockerDataRootFacts(
+  lane: string,
+  cloneFromLane: string | null,
+  disks: ProjectDisks,
+): Promise<InnerDockerDataRootFacts> {
+  const state = async (at: string): Promise<DataRootState> =>
+    (await isSubvolume(at))
+      ? "subvolume"
+      : (await exists(at))
+        ? "notSubvolume"
+        : "absent"
+  return {
+    ownDataRoot: await state(disks.innerDockerDataRoot(lane)),
+    sourceDataRoot:
+      cloneFromLane === null || !isDiskName(cloneFromLane)
+        ? null
+        : await state(disks.innerDockerDataRoot(cloneFromLane)),
+  }
 }
 
 /** A subvolume's root is inode 256: `btrfs subvolume show` needs a capability. */

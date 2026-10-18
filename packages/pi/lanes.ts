@@ -71,8 +71,11 @@ export interface LaneFacts {
       readonly personal: boolean
       readonly services: readonly string[]
     }
-    /** Lanes of its own: a rootless Docker, which `$DOCKER_HOST` names. */
-    readonly nested: boolean
+    /**
+     * Lanes of its own: a rootless Docker, which `$DOCKER_HOST` names. The
+     * path in the lane of the note on that Docker when granted, else null.
+     */
+    readonly nestedDockerNote: string | null
     /** Names of environment variables passed in. */
     readonly env: readonly string[]
     /** Where each granted read-only mount is, in the lane. */
@@ -126,7 +129,7 @@ export function laneGuidelines(facts: LaneFacts): string[] {
       : [`read-only files at ${grants.mounts.join(", ")}`]),
   ]
   const lacks = [
-    ...(grants.nested ? [] : ["container runtime"]),
+    ...(grants.nestedDockerNote === null ? ["container runtime"] : []),
     "model keys",
     "credentials",
   ]
@@ -141,11 +144,11 @@ export function laneGuidelines(facts: LaneFacts): string[] {
         `${dir}/${p} is shared live with the person and other threads, never committed.`,
     ),
     `No ${listed(lacks, "or")}${allowed.length === 0 ? "" : ` except ${allowed.join(", ")}`}. The internet works; the person's localhost does not.`,
-    ...(grants.nested
-      ? [
-          "Docker runs here, rootless, at $DOCKER_HOST. There is no /var/run/docker.sock: point a tool that assumes it at $DOCKER_HOST.",
-        ]
-      : []),
+    ...(grants.nestedDockerNote === null
+      ? []
+      : [
+          `Docker runs here, rootless, at $DOCKER_HOST. There is no /var/run/docker.sock: point a tool that assumes it at $DOCKER_HOST. Before building or running images here, read ${grants.nestedDockerNote}.`,
+        ]),
     `Search with the ${GREP_TOOL} and ${FIND_TOOL} tools. In bash, ${listed(Object.keys(PREFERRED_OVER), "and")} are on PATH: prefer them to ${listed(Object.values(PREFERRED_OVER), "and")}.`,
     ...(facts.defaultImage
       ? [

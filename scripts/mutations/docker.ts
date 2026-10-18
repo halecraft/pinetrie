@@ -51,6 +51,83 @@ export const mutations: readonly Mutation[] = [
     expect:
       "every shape keeps a PID namespace of its own: the observer's lane is it",
   },
+  {
+    name: "a host removes a tag it needs",
+    file: plan,
+    from: "        !input.neededTags.has(tag) &&\n",
+    to: "",
+    command: unit("packages/docker"),
+    expect:
+      "a needed tag is never removed, though it shares a repository with another",
+  },
+  {
+    name: "a host removes an image a container uses",
+    file: plan,
+    from: "    .filter(image => !input.imageIdsContainersUse.has(image.id))\n",
+    to: "",
+    command: unit("packages/docker"),
+    expect: "an image a container was made from keeps all its tags",
+  },
+  {
+    name: "a host removes another repository's images",
+    file: plan,
+    from: "        PINETRIE_IMAGE_REPOSITORIES.includes(tagRepository(tag)),\n",
+    to: "        true,\n",
+    command: unit("packages/docker"),
+    expect: "an image of any other repository is never touched",
+  },
+  {
+    name: "a missing image at a container's create is never told",
+    file: "packages/docker/api.ts",
+    from: "  answered.status === 404 && /no such image/i.test(apiMessage(answered))\n",
+    to: "  false\n",
+    command: unit("packages/docker"),
+    expect:
+      "a create refused for a missing image is told from any other refusal",
+  },
+  {
+    name: "an image a container holds is a failed removal",
+    file: "packages/docker/api.ts",
+    from: "  ok(answered) || answered.status === 404 || answered.status === 409\n",
+    to: "  ok(answered) || answered.status === 404\n",
+    command: unit("packages/docker"),
+    expect:
+      "an image's removal is settled when done, gone, or held by a container",
+  },
+  {
+    name: "the inner Docker keeps its data beside the data root",
+    file: "packages/lanes/image/Containerfile",
+    from: "dockerd-rootless.sh --data-root /var/lib/pinetrie-lanes/docker ",
+    to: "dockerd-rootless.sh --data-root /var/lib/pinetrie-lanes/inner ",
+    command: unit("packages/docker"),
+    expect:
+      "the lane image's inner Docker keeps its data at the data root a fork clones",
+  },
+  {
+    name: "a root matches any path that starts with its text",
+    file: plan,
+    from: "  return bind === dir || bind.startsWith(`${dir}/`)\n",
+    to: "  return bind.startsWith(dir)\n",
+    command: unit("packages/docker"),
+    expect: "a root is a whole path: slot 1's is not slot 10's",
+  },
+  {
+    name: "the sweep takes an unlisted project's containers anywhere",
+    file: plan,
+    from: "    c.binds.every(b => isBindUnder(input.lanesDir, b))\n",
+    to: "    true\n",
+    command: unit("packages/docker"),
+    expect:
+      "it takes an unlisted project's containers in its lanes directory, and none elsewhere",
+  },
+  {
+    name: "an unlisted project's network goes with containers left",
+    file: plan,
+    from: "    unlistedNetworks: [...unlisted].filter(k => !left.has(k)).sort(),\n",
+    to: "    unlistedNetworks: [...unlisted].sort(),\n",
+    command: unit("packages/docker"),
+    expect: "an unlisted project's network stays while it has a container left",
+  },
   // ── the lanes suite, proven in a lane ──
   {
     name: "lanes share the network of the machine Docker runs on",
@@ -212,8 +289,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a slot's sweep takes containers of other slots",
     file: plan,
-    from: ".filter(c => c.binds.some(b => b.startsWith(root)))",
-    to: ".filter(c => c.binds.length > 0)",
+    from: "    .filter(c => c.binds.some(b => isBindUnder(root, b)))\n",
+    to: "    .filter(c => c.binds.length > 0)\n",
     command: unit("packages/docker"),
     expect:
       "a slot's sweep takes every container with a bind into it, whatever its labels",
@@ -221,8 +298,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the startup sweep takes a live project's containers",
     file: plan,
-    from: '      .filter(c => gone.has(c.labels[PROJECT_LABEL] ?? ""))',
-    to: "      .filter(c => c.labels[PROJECT_LABEL] !== undefined)",
+    from: "    c => gone.has(projectOf(c)) || isOrphan(c),\n",
+    to: "    c => c.labels[PROJECT_LABEL] !== undefined,\n",
     command: unit("packages/docker"),
     expect:
       "the startup sweep takes the containers and disks of projects whose root is gone",
@@ -418,5 +495,25 @@ export const mutations: readonly Mutation[] = [
     scenario: "contract",
     expect:
       "a host whose lane VM stops leases again, and a new lane runs and reads its working copy",
+  },
+  {
+    name: "a lane's missing image is pulled, never built",
+    file: "packages/docker/api.ts",
+    from: "    if (!(await buildMissing(spec.image))) {\n",
+    to: "    if (true) {\n",
+    suite: "lanes",
+    scenario: "contract",
+    expect:
+      "a lane whose image another host removed is made, its image built again",
+  },
+  {
+    name: "a host lists no images, so removes none",
+    file: "packages/docker/api.ts",
+    from: "  return ok(answered) ? parseImages(answered.body) : []\n",
+    to: "  return []\n",
+    suite: "lanes",
+    scenario: "contract",
+    expect:
+      "after a build, an image of pine·trie's no container uses is removed, and one a stopped container uses stays",
   },
 ]

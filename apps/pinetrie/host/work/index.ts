@@ -40,6 +40,7 @@ import { type Archive, createArchive } from "./archive.ts"
 import { type Containers, createContainers } from "./containers.ts"
 import { createNewLanes, type NewLanes, prepareLane } from "./create.ts"
 import type { ActRefusal, Destination } from "./destination.ts"
+import { holdInnerDockerDataRoots } from "./inner-docker-data-roots.ts"
 import { createRegistry } from "./registry.ts"
 import { type OpenedProject, startSetup } from "./setup.ts"
 import { createSharedLineages } from "./shared.ts"
@@ -207,6 +208,7 @@ export async function startLaneWork(input: {
     records: input.records,
     shared: sharedLineages,
   })
+  const innerDockerDataRoots = holdInnerDockerDataRoots()
   const newLanes = createNewLanes({
     basics,
     setup,
@@ -214,6 +216,7 @@ export async function startLaneWork(input: {
     ensureNames: input.ensureNames,
     pendingRecords: turns.pendingRecords,
     destination,
+    innerDockerDataRoots,
   })
   // After `turns` and `newLanes`: a fork waits on the records `turnDone` adds.
   const containers = createContainers({
@@ -223,6 +226,7 @@ export async function startLaneWork(input: {
     keeper,
     proposed: destination.proposed,
     fork: newLanes.fork,
+    innerDockerDataRoots,
   })
   const updates = createUpdates({
     basics,

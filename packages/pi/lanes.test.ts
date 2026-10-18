@@ -51,7 +51,7 @@ const facts = (over: Partial<LaneFacts> = {}): LaneFacts => ({
   shared: [],
   grants: {
     ssh: { personal: false, services: [] },
-    nested: false,
+    nestedDockerNote: null,
     env: [],
     mounts: [],
   },
@@ -207,7 +207,7 @@ describe("laneGuidelines", () => {
         facts({
           grants: {
             ssh: { personal: true, services: ["deploy", "ci"] },
-            nested: false,
+            nestedDockerNote: null,
             env: ["NPM_TOKEN", "CI"],
             mounts: ["/data", "/ref"],
           },
@@ -221,7 +221,7 @@ describe("laneGuidelines", () => {
         facts({
           grants: {
             ssh: { personal: false, services: [] },
-            nested: false,
+            nestedDockerNote: null,
             env: ["CI"],
             mounts: [],
           },
@@ -235,11 +235,27 @@ describe("laneGuidelines", () => {
     expect(without).toContain("No container runtime, model keys or credentials")
     expect(without).not.toContain("DOCKER_HOST")
     const granted = facts().grants
-    const told = text(facts({ grants: { ...granted, nested: true } }))
+    const told = text(
+      facts({
+        grants: {
+          ...granted,
+          nestedDockerNote: "/pinetrie/packages/pi/lane-docker.md",
+        },
+      }),
+    )
     expect(told).toContain("No model keys or credentials")
     expect(told).toContain("at $DOCKER_HOST")
     expect(told).toContain("There is no /var/run/docker.sock")
     expect(told).not.toContain("container runtime")
+  })
+
+  test("a nested lane is pointed at the note on its Docker; no other lane is", () => {
+    const note = "/pinetrie/packages/pi/lane-docker.md"
+    const granted = facts().grants
+    expect(
+      text(facts({ grants: { ...granted, nestedDockerNote: note } })),
+    ).toContain(`Before building or running images here, read ${note}.`)
+    expect(text(facts())).not.toContain("lane-docker.md")
   })
 
   test("names the browser and python3 only on the default image", () => {
@@ -264,13 +280,19 @@ describe("laneGuidelines", () => {
       )
   })
 
-  test.each(["lane.md", "lane-folder.md"])(
+  // The least each note cites, so a change to the comments' form that the
+  // pattern below misses fails here rather than passing with none read.
+  test.each([
+    ["lane.md", 20],
+    ["lane-folder.md", 20],
+    ["lane-docker.md", 6],
+  ])(
     "every source %s names is a file that still has its symbol",
-    name => {
+    (name, least) => {
       const repo = path.join(import.meta.dirname, "../..")
       const note = readFileSync(path.join(import.meta.dirname, name), "utf8")
       const sources = [...note.matchAll(/<!-- (\S+) (\S+) -->/g)]
-      expect(sources.length).toBeGreaterThan(20)
+      expect(sources.length).toBeGreaterThan(least)
       const missing = sources.flatMap(([, file = "", symbol = ""]) => {
         const at = path.join(repo, file)
         if (!existsSync(at)) return [`${file} (no such file)`]
@@ -289,7 +311,7 @@ describe("laneGuidelines", () => {
         defaultImage: true,
         grants: {
           ssh: { personal: true, services: ["deploy"] },
-          nested: true,
+          nestedDockerNote: "/pinetrie/packages/pi/lane-docker.md",
           env: ["A"],
           mounts: ["/m"],
         },

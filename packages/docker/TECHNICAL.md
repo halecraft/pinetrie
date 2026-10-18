@@ -41,12 +41,44 @@ declares it (`workspace.test.ts`).
   becomes the profile's content, read when the container is made, and
   `systempaths=unconfined` empties the masked and read-only paths. A
   mount is JSON, so any path can be named.
-- **An image that is not here is pulled** at a container's create, as
-  `docker run` would.
+- **An image that is not here is built or pulled** at a container's
+  create: built again from how this host built it when it is one of its
+  own (another host removed it, below), else pulled, as `docker run` would
+  (`isCreateRefusedForMissingImage`).
 - **The CLI stays for three things:** `buildx build`, `exec -i` (a lane's
   channel and lanehost's), and a throwaway container's stdout as bytes
   (`runInImage`). The startup's check that the CLI and buildx answer is the
   CLI's too.
+
+## The images a host keeps (ADR-0169)
+
+- **One way to have an image** (`ensureImage`, the runtime's own): the lane
+  images the host is given (`ensureLaneImages`), lanehost's and the
+  observer's. Each is recorded as needed with how it is built (an
+  `ImageRecipe`), then built unless Docker has it. The needed set is those
+  recorded, and this host's lanehost and observer tags, built or not.
+- **After any build of its own, the host removes pine·trie's images it does
+  not need** (`unneededImageTags`): a tag of `pinetrie-lane`,
+  `pinetrie-lanehost` or `pinetrie-observer` not in the needed set, on no
+  image a container, running or stopped, was made from. The removal is a
+  value, so no needed tag can be in it whatever repository it shares:
+  pine·trie's default lane image and a project's own are both
+  `pinetrie-lane`, so `ensureLaneImages` records every plan before it
+  builds any. Docker's own refusal of an image a container uses spares
+  another host's on the same Docker; a 404 or 409 is settled
+  (`isImageRemovalSettled`), anything else logged.
+- **Only after a build:** a host that builds nothing has nothing newer to
+  keep, and may share the Docker with a host of the older version.
+- **A tag another host removed is built again** when a container is made
+  from it (`runContainer`'s `buildMissing`), lanehost's and the observer's
+  containers included.
+- **The cache beside the images is the daemon's to cap:** the lane VM's
+  dockerd reads `packages/vm/image/daemon.json`, and a nested lane's
+  rootless one `packages/lanes/image/daemon.json`, each with BuildKit's
+  `builder.gc` at 512 MB (S234, S237). BuildKit counts and removes only
+  cache no image uses, a minute after a build, so it trims an older
+  version's cache once the host has removed its tag. A person's own Docker
+  on Linux keeps its own policy.
 
 ## Disks: lanehost's (ADR-0129)
 
@@ -143,7 +175,13 @@ never reaches the VM's Docker or the launcher's ports.
   slot, and `SLOT_LABEL` serves to name lanehost's containers.
 - **At startup, once the slot is filled:** the containers and disks of every
   project whose root is gone (`sweepProjects`), as the suites' throwaway
-  projects are.
+  projects are; and the containers of a project lanehost does not list,
+  as a nested lane's inner Docker cloned from another lane's carries (S235),
+  but only those whose binds all lie in this host's lanes directory: another
+  lanes directory on the same Docker lists its own. Such a project's
+  network goes with the last of its containers.
+- **A root is a whole path** (`isBindUnder`): `/mnt/host-shares/1` is not a
+  root of `/mnt/host-shares/10/…`, with or without its trailing `/`.
 
 ## Lanes inside a lane (`lanes.nested`, S125)
 
@@ -166,19 +204,20 @@ never reaches the VM's Docker or the launcher's ports.
   `node packages/docker/seccomp-nested.ts --fetch` rewrites both files;
   `seccomp-nested.test.ts` checks the one follows from the other.
 - **runc's `NoNewKeyring`** is the inner Docker's default runtime: Docker's
-  profile refuses `keyctl`, which runc's session keyring needs (S125).
+  profile refuses `keyctl`, which runc's session keyring needs (S125). It
+  is set in the lane image's `daemon.json`, beside the cache cap.
 - **A nested lane's own host knows its Docker is rootless** from
   `docker info`'s `SecurityOptions` (`dockerRootless`, S148): no
   capability it grants reaches the host's user namespace.
 - **Inner lanes have no limits of their own,** and cannot be privileged
   (S125): the outer lane's limits hold for all of them.
-- **The inner Docker's data root is made empty and never pruned:** each
-  new nested lane builds the lane image from cold, and every version it
-  builds stays (S232). ADR-0169, accepted and not yet built, makes the
-  data root a subvolume cloned from the project's nested lane that ran
-  last, at each fork and each run's start; has a host that builds an
-  image remove pine·trie's images it does not need that no container
-  uses; and caps the daemon's cache beside its images (S234, S236).
+- **The inner Docker's data root is a subvolume of its own,**
+  `nested/<lane>/docker`, so it is cloned without the inner lanehost's
+  projects beside it (ADR-0169). At each fork and each run's start it is
+  replaced by a clone of the project's nested lane that ran last
+  (`packages/lanes/TECHNICAL.md`, Containers), so a version one lane built
+  reaches the others for the cost of a clone (S233, S236); and the host in
+  the lane prunes it as any host prunes its Docker (above).
 - **A host in a nested lane** gets `docker-host` from `planRuntime`, its
   lanes directory `/var/lib/pinetrie-lanes`. Its lanes' root is uid 1000
   outside, so a directory they write must be that user's: the suites hand

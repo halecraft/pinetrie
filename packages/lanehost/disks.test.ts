@@ -10,6 +10,7 @@ import {
   readFile,
   rename,
   rm,
+  stat,
   statfs,
   symlink,
   writeFile,
@@ -249,7 +250,12 @@ describe.skipIf(!onBtrfs)(
         project: KEY,
         op: { kind: "create", lane: "n" },
       })
-      await disk({ kind: "nestedDisk", project: KEY, lane: "n" })
+      await disk({
+        kind: "nestedDisk",
+        project: KEY,
+        lane: "n",
+        cloneFromLane: null,
+      })
       // As an inner lanehost leaves them: a lane, and a read-only snapshot
       // of it, two levels down.
       const inner = path.join(disks.nested("n"), "projects/p")
@@ -281,6 +287,33 @@ describe.skipIf(!onBtrfs)(
       })
       expect(await isSubvolume(disks.lane("n"))).toBe(false)
       expect(await isSubvolume(disks.nested("n"))).toBe(false)
+    })
+    test("a nested disk's data root: made the rootless user's, then a clone of another lane's", async () => {
+      const nestedDisk = (lane: string, cloneFromLane: string | null) =>
+        disk({ kind: "nestedDisk", project: KEY, lane, cloneFromLane })
+      // As a lane made before its data root was a subvolume left it.
+      await mkdir(path.join(disks.nested("old"), "docker", "image"), {
+        recursive: true,
+      })
+      await nestedDisk("old", null)
+      expect(await isSubvolume(disks.innerDockerDataRoot("old"))).toBe(true)
+      await nestedDisk("source", null)
+      await writeFile(path.join(disks.innerDockerDataRoot("source"), "f"), "1")
+      await nestedDisk("old", "source")
+      const cloned = disks.innerDockerDataRoot("old")
+      expect(await isSubvolume(cloned)).toBe(true)
+      expect(await readFile(path.join(cloned, "f"), "utf8")).toBe("1")
+      expect((await stat(cloned)).uid).toBe(1000)
+      // Writable, and its own: the source does not see what the clone writes.
+      await writeFile(path.join(cloned, "g"), "2")
+      await expect(
+        stat(path.join(disks.innerDockerDataRoot("source"), "g")),
+      ).rejects.toThrow()
+      // A source whose data root has gone leaves the lane's as it is.
+      await nestedDisk("old", "gone")
+      expect(await readFile(path.join(cloned, "g"), "utf8")).toBe("2")
+      for (const lane of ["old", "source"])
+        await disk({ kind: "disk", project: KEY, op: { kind: "delete", lane } })
     })
     test("a project's record and listing, and its removal", async () => {
       await answer(

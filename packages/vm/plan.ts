@@ -11,6 +11,7 @@ export const IMAGE_FILES = [
   "init",
   "clock",
   "stage1-init",
+  "daemon.json",
 ] as const
 export type ImageFile = (typeof IMAGE_FILES)[number]
 
@@ -22,8 +23,8 @@ export const IMAGE_OUTPUTS = ["Image", "stage1.cpio", "system.erofs"] as const
 
 /**
  * The image's identity: a hash of its sources. The manifest pins every
- * package; the scripts decide what is done with them, so a change to either
- * makes another image.
+ * package; the scripts decide what is done with them, and `daemon.json` how
+ * Docker runs, so a change to any makes another image.
  */
 export function imageKey(sources: ImageSources): string {
   const hash = createHash("sha256")

@@ -1,8 +1,9 @@
 // e2e/lanes/vm-image — the Mac builds the lane VM's image with no Docker
 // engine, in a VM of its own, and a lease boots it. What a build decides is
 // `packages/vm`'s, unit-tested; this proves the builder, its initrd and the
-// guest's `/init` do it. Its own state directory starts with no image, and
-// shares only the person's binaries and the pinned downloads.
+// guest's `/init` do it, Docker's config the image carries among it. Its own
+// state directory starts with no image, and shares only the person's
+// binaries and the pinned downloads.
 
 import { rmSync } from "node:fs"
 import os from "node:os"
@@ -77,15 +78,35 @@ async function run(check: Checks["check"]): Promise<void> {
           ])
         ).trim()
         const image = lease.identity.image
+        const policy = await command("docker", [
+          "-H",
+          `unix://${lease.docker}`,
+          "buildx",
+          "inspect",
+          "--bootstrap",
+        ]).catch((error: unknown) => String(error))
         await lease.close()
         return {
           ok: os === "linux" && image === path.basename(dir),
           said: `${os} ${image}`,
+          policy,
         }
       },
-      (error: unknown) => ({ ok: false, said: String(error) }),
+      (error: unknown) => ({
+        ok: false,
+        said: String(error),
+        policy: String(error),
+      }),
     )
     check("a lease boots the image it built", booted.ok, booted.said)
+    check(
+      "the booted VM's Docker caps BuildKit's cache beside its images",
+      /Max Used Space:\s+512MiB/.test(booted.policy),
+      booted.policy
+        .split("\n")
+        .filter(l => /Space/.test(l))
+        .join("; "),
+    )
   } finally {
     // A lease that failed may leave its launcher holding the connection, so
     // it is stopped rather than left to idle out.

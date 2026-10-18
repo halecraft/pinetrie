@@ -31,6 +31,16 @@ export type DiskOp =
     }
   | { readonly kind: "delete"; readonly lane: LaneOwner }
   | { readonly kind: "deleteSnapshots"; readonly ids: readonly SnapshotId[] }
+  /**
+   * A nested lane's inner Docker data root: a clone of `cloneFromLane`'s in
+   * place of its own when that one is there, else its own as it is. Only
+   * while the lane's container is stopped or not yet made.
+   */
+  | {
+      readonly kind: "innerDockerDataRoot"
+      readonly lane: LaneOwner
+      readonly cloneFromLane: LaneOwner | null
+    }
 
 /**
  * What a step asks of the runtime: a disk operation, a lane's container made
@@ -82,8 +92,17 @@ export interface LaneRuntime {
   remove(container: string): Promise<void>
   /** `argv` run in a running container with stdin attached (`exec -i`). */
   execArgv(container: string, argv: readonly string[]): readonly string[]
-  imageExists(tag: string): Promise<boolean>
-  buildImage(plan: ImagePlan): Promise<void>
+  /**
+   * The lane images a host needs: each built unless the runtime has it,
+   * `building` told first. The runtime keeps them as needed, removes its
+   * other images of pine·trie's that nothing uses after any build, and
+   * builds one again when a container is made from it after another host
+   * removed it.
+   */
+  ensureLaneImages(
+    plans: readonly ImagePlan[],
+    building: (plan: ImagePlan) => void,
+  ): Promise<void>
   /** The image's own `PATH`. */
   imagePath(tag: string): Promise<string>
   /** `argv` in a throwaway container of `tag`; its stdout as bytes. */

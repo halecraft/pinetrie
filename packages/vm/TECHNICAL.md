@@ -14,8 +14,9 @@ nothing, and knows nothing of lanes (`workspace.test.ts`).
 - **`docker-engine`, not `docker`:** the VM needs no CLI or buildx (lane
   images are built from the host's CLI), and `docker` pulls both.
 - **`kmod` is listed:** `modprobe` must read Alpine's `.ko.gz` modules.
-- **The image's identity is `imageKey`,** a hash of the manifest and the
-  three scripts, since a script's change makes another image too. A build
+- **The image's identity is `imageKey`,** a hash of every file in
+  `IMAGE_FILES`: the manifest, the scripts and Docker's `daemon.json`,
+  since a change to any makes another image. A build
   lands in `$XDG_STATE_HOME/pinetrie/vm/images/<key>/`, unpacked into a
   temporary directory and checked against its `SHA256SUMS` first.
 - **Never run another distribution's `depmod`** on the modules: Debian's
@@ -33,7 +34,10 @@ nothing, and knows nothing of lanes (`workspace.test.ts`).
   `/dev/net/tun` made 0666 (no udev, S127); the btrfs data disk with
   `user_subvol_rm_allowed`, formatted on first boot and grown to fill
   `data.img` at every boot; each slot's share at
-  `/mnt/host-shares/<i>`; Docker on vsock 2375 and each slot's ssh agent;
+  `/mnt/host-shares/<i>`; Docker on vsock 2375, started with
+  `--config-file /etc/pinetrie/daemon.json` (the image's `daemon.json`,
+  which caps BuildKit's cache beside its images: its defaults are
+  fractions of the data disk, S234, S237, ADR-0169), and each slot's ssh agent;
   `sync` on vsock 2377 for the launcher's stop; the clock (below). No
   shell listens on any port. `socat -t 3600`: without it, socat cuts a
   stream 0.5 s after its input ends (S128, S129).

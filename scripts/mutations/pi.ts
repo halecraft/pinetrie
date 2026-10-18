@@ -5,6 +5,15 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/pi"]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a nested lane is never pointed at the note on its Docker",
+    file: "packages/pi/lanes.ts",
+    from: " Before building or running images here, read ${grants.nestedDockerNote}.`,\n",
+    to: "`,\n",
+    command: unit,
+    expect:
+      "a nested lane is pointed at the note on its Docker; no other lane is",
+  },
+  {
     name: "save_blob writes the bytes as text",
     file: "packages/pi/save-blob.ts",
     from: "      const wrote = await toolContext.env.writeFile(at, answer.bytes, context)",
@@ -270,7 +279,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a lane granted lanes inside is told it has no container runtime",
     file: "packages/pi/lanes.ts",
-    from: '    ...(grants.nested ? [] : ["container runtime"]),',
+    from: '    ...(grants.nestedDockerNote === null ? ["container runtime"] : []),',
     to: '    "container runtime",',
     command: unit,
     expect: "names Docker at $DOCKER_HOST only when lanes inside are granted",

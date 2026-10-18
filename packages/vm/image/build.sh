@@ -92,7 +92,8 @@ size=$(od -An -t u4 -j 12 -N 4 "$z" | tr -d ' ')
 tail -c +$((off + 1)) "$z" | head -c "$size" | gunzip > "$out/Image"
 [ "$(dd if="$out/Image" bs=1 skip=56 count=4 2>/dev/null)" = ARMd ] || fail "the unpacked kernel is not an arm64 Image"
 
-# 6. The system: `init` as /init, `clock`, the modules it loads, and nothing in /boot
+# 6. The system: `init` as /init, `clock`, the modules it loads, Docker's
+#    `daemon.json`, and nothing in /boot
 #    (the kernel is the Image) or apk's cache.
 cp "$src/init" "$root/init"
 chmod 755 "$root/init"
@@ -101,6 +102,7 @@ cp "$src/clock" "$root/usr/local/sbin/pinetrie-clock"
 chmod 755 "$root/usr/local/sbin/pinetrie-clock"
 mkdir -p "$root/etc/pinetrie"
 jq -r '.modules[]' "$m" > "$root/etc/pinetrie/modules"
+cp "$src/daemon.json" "$root/etc/pinetrie/daemon.json"
 rm -rf "$root/boot" "$root/var/cache/apk"/*
 mkfs.erofs --quiet -zlz4hc "$out/system.erofs" "$root"
 

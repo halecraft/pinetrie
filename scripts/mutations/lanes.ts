@@ -7,6 +7,77 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/lanes"]
 const plan = "packages/lanes/plan.ts"
 
 export const mutations: readonly Mutation[] = [
+  // ── the images ──
+  {
+    name: "a Containerfile copies nothing in",
+    file: plan,
+    from: '    return words.filter(w => !w.startsWith("--")).slice(0, -1)\n',
+    to: "    return []\n",
+    command: unit,
+    expect: "the files a Containerfile copies in, never another stage's",
+  },
+  {
+    name: "the default image's tag ignores the files it copies in",
+    file: "packages/lanes/image.ts",
+    from: "      sources,\n",
+    to: "      sources: [],\n",
+    command: unit,
+    expect: "the default image's tag follows the files it copies in",
+  },
+  {
+    name: "the lane image's daemon keeps BuildKit's defaults",
+    file: "packages/lanes/image/daemon.json",
+    from: '      "defaultMaxUsedSpace": "512MB",\n',
+    to: '      "defaultMaxUsedSpace": "215GB",\n',
+    command: unit,
+    expect:
+      "both daemons cap BuildKit's cache with one setting; the lane's keeps runc's NoNewKeyring",
+  },
+  // ── a nested lane's inner Docker data root ──
+  {
+    name: "a forked last run's lane clones its dropped data root",
+    file: plan,
+    from: "  if (last !== null && last.lane !== input.lane)\n",
+    to: "  if (last !== null)\n",
+    command: unit,
+    expect:
+      "a fork clones the last run's lane, else its source lane, else keeps",
+  },
+  {
+    name: "a lane clones again though its data root is as of the last run",
+    file: plan,
+    from: "    return input.clonedAtRunEnd === last.atRunEnd\n",
+    to: "    return false\n",
+    command: unit,
+    expect:
+      "the last run's lane keeps its own; another clones it, then keeps it until another run ends",
+  },
+  {
+    name: "a fork never falls back to its source lane",
+    file: plan,
+    from: "  if (input.forkSourceLane !== null && input.forkSourceLane !== input.lane)\n",
+    to: "  if (false)\n",
+    command: unit,
+    expect:
+      "a fork clones the last run's lane, else its source lane, else keeps",
+  },
+  {
+    name: "a lane that is not nested makes a data root",
+    file: plan,
+    from: "  if (!spec.grants.nested) return null\n",
+    to: "",
+    command: unit,
+    expect: "only a nested lane's start makes its data root",
+  },
+  {
+    name: "a fork makes its data root after its container runs",
+    file: plan,
+    from: "    ...(dataRoot === null ? [] : [dataRoot]),\n    ...planDisk({ ...input, from: input.setup.from ?? input.source.snapshot }),\n",
+    to: "    ...planDisk({ ...input, from: input.setup.from ?? input.source.snapshot }),\n    ...(dataRoot === null ? [] : [dataRoot]),\n",
+    command: unit,
+    expect:
+      "planFork: a nested lane's data root is made after the delete and before the container runs",
+  },
   // ── a lane's start, and its fork ──
   {
     name: "a fork owed starts on whatever disk is there",

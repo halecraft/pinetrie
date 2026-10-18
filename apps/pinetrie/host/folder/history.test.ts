@@ -136,6 +136,8 @@ async function makeRig(): Promise<FolderRig> {
   }
   const runtime: LaneRuntime = {
     disk: async op => {
+      if (op.kind === "innerDockerDataRoot")
+        throw new Error("the rig's lanes are not nested")
       await call({ kind: "disk", project: key, op })
     },
     diskExists: lane => call({ kind: "diskExists", project: key, lane }),
@@ -153,8 +155,7 @@ async function makeRig(): Promise<FolderRig> {
     stop: unused("stop"),
     remove: unused("remove"),
     execArgv: unused("execArgv"),
-    imageExists: unused("imageExists"),
-    buildImage: unused("buildImage"),
+    ensureLaneImages: unused("ensureLaneImages"),
     imagePath: unused("imagePath"),
     runInImage: unused("runInImage"),
   }

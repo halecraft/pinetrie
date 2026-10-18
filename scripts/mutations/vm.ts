@@ -7,6 +7,14 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/vm"]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "the image leaves out Docker's daemon.json",
+    file: "packages/vm/plan.ts",
+    from: '  "daemon.json",\n] as const',
+    to: "] as const",
+    command: unit,
+    expect: "Docker's daemon.json is one of the image's sources",
+  },
+  {
     name: "the launcher's disks take Apple's full synchronization",
     file: "packages/vm/plan.ts",
     from: '  synchronization: "fsync",\n',
@@ -333,5 +341,14 @@ export const mutations: readonly Mutation[] = [
     suite: "lanes",
     scenario: "vm-image",
     expect: "a lease boots the image it built",
+  },
+  {
+    name: "the VM's Docker reads no daemon.json",
+    file: "packages/vm/image/init",
+    from: " --config-file /etc/pinetrie/daemon.json",
+    to: "",
+    suite: "lanes",
+    scenario: "vm-image",
+    expect: "the booted VM's Docker caps BuildKit's cache beside its images",
   },
 ]

@@ -48,6 +48,7 @@ test("a fork takes only a fork's setup, and the base only a checkout", () => {
       env: {},
       // @ts-expect-error: a base's checkout is no fork's setup
       setup: base,
+      innerDockerDataRoot: { kind: "keep" },
     })
   const refresh = (
     input: Omit<Parameters<typeof refreshBase>[0], "accepted">,

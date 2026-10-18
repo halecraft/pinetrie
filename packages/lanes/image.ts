@@ -4,11 +4,12 @@
 // own `pinetrie.Containerfile` at its root replaces it for the project's lanes.
 // Either is built once per change of its content and build arguments: the
 // host's jj version for both, and the app's Playwright version for pine·trie's
-// (`planImages`). The runtime builds and runs them.
+// (`planImages`). pine·trie's also changes with each file it copies in from
+// beside it (`daemon.json`). The runtime builds and runs them.
 
 import { readFile } from "node:fs/promises"
 import path from "node:path"
-import { type ImagePlan, imageRefusal, planImages } from "./plan.ts"
+import { filesContainerfileCopies, imageRefusal, planImages } from "./plan.ts"
 import { describeFailure, run } from "./run.ts"
 import type { LaneRuntime } from "./runtime-port.ts"
 
@@ -26,23 +27,12 @@ export const projectContainerfile = (root: string): string =>
   path.join(root, "pinetrie.Containerfile")
 
 /** The host's jj version, which the default image's jj is pinned to. */
-async function hostJjVersion(): Promise<string> {
+export async function hostJjVersion(): Promise<string> {
   const ran = await run("jj", ["--version"])
   const m = /jj (\d+\.\d+\.\d+)/.exec(ran.stdout)
   if (!ran.ok || m?.[1] === undefined)
     throw new Error(describeFailure("jj --version", ran))
   return m[1]
-}
-
-/** Build `plan`'s image unless its tag exists. */
-async function ensureImage(
-  runtime: LaneRuntime,
-  plan: ImagePlan,
-  log: (m: string) => void,
-): Promise<void> {
-  if (await runtime.imageExists(plan.tag)) return
-  log(`[host] building the lane image ${plan.tag} from ${plan.file}`)
-  await runtime.buildImage(plan)
 }
 
 /**
@@ -53,7 +43,7 @@ async function ensureImage(
  * lanes run.
  */
 export async function prepareImages(
-  runtime: LaneRuntime,
+  runtime: Pick<LaneRuntime, "ensureLaneImages">,
   root: string,
   playwrightVersion: string,
   log: (m: string) => void,
@@ -64,19 +54,28 @@ export async function prepareImages(
     readFile(DEFAULT_CONTAINERFILE, "utf8"),
     readFile(own, "utf8").catch(() => null),
   ])
+  const sources = await Promise.all(
+    filesContainerfileCopies(pinetrie).map(f =>
+      readFile(path.join(path.dirname(DEFAULT_CONTAINERFILE), f), "utf8"),
+    ),
+  )
   const plans = planImages({
     pinetrie: {
       file: DEFAULT_CONTAINERFILE,
       content: pinetrie,
-      sources: [],
+      sources,
     },
     project:
       project === null ? null : { file: own, content: project, sources: [] },
     jjVersion,
     playwrightVersion,
   })
-  await ensureImage(runtime, plans.pinetrie, log)
-  if (plans.project !== null) await ensureImage(runtime, plans.project, log)
+  // Both in one call: a build removes the images the runtime has not been
+  // given yet, and the project's own would go while the default one built.
+  await runtime.ensureLaneImages(
+    plans.project === null ? [plans.pinetrie] : [plans.pinetrie, plans.project],
+    plan => log(`[host] building the lane image ${plan.tag} from ${plan.file}`),
+  )
   return {
     lane: (plans.project ?? plans.pinetrie).tag,
     runtimeFrom: plans.pinetrie.tag,

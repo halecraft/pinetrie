@@ -6,9 +6,10 @@ import { mkdir } from "node:fs/promises"
 import { diffBySend, diffByWalk } from "./diff.ts"
 import {
   executeDiskSteps,
+  innerDockerDataRootFacts,
   isSubvolume,
   planDisk,
-  planNestedDisk,
+  planInnerDockerDataRootSteps,
   readSnapshotFile,
   snapshotsIn,
 } from "./disks.ts"
@@ -85,11 +86,18 @@ async function answerAny(
         recursive: true,
       })
       return null
-    case "nestedDisk":
+    case "nestedDisk": {
+      const disks = disksOf(serving, call.project)
       await executeDiskSteps(
-        planNestedDisk(call.lane, disksOf(serving, call.project)),
+        planInnerDockerDataRootSteps(
+          call.lane,
+          call.cloneFromLane,
+          await innerDockerDataRootFacts(call.lane, call.cloneFromLane, disks),
+          disks,
+        ),
       )
       return null
+    }
     case "read":
       return readSnapshotFile(
         disksOf(serving, call.project),

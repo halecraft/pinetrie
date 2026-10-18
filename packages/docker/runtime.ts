@@ -28,6 +28,7 @@ import {
 } from "@pinetrie/lanehost"
 import {
   type FolderDisks,
+  type ImagePlan,
   type LaneRuntime,
   type Mount,
   PINETRIE_MOUNT,
@@ -38,15 +39,19 @@ import {
 } from "@pinetrie/lanes"
 import {
   apiMessage,
+  containerImageIds,
   containerPid,
   createNetwork,
   imageEnv,
   imageExists,
   inspectContainer,
+  isImageRemovalSettled,
+  listImages,
   listLabelled,
   networkExists,
   networkSubnet,
   removeContainer,
+  removeImage,
   removeNetwork,
   runContainer,
   startContainer,
@@ -74,6 +79,7 @@ import {
   renderHelper,
   renderObserver,
   renderRun,
+  unneededImageTags,
 } from "./plan.ts"
 import { NESTED_PROFILE } from "./seccomp-nested.ts"
 import type { DockerTarget } from "./target.ts"
@@ -88,10 +94,29 @@ async function ensureNetwork(target: DockerTarget, key: string): Promise<void> {
     throw new Error(`docker network create ${network}: ${apiMessage(made)}`)
 }
 
+/**
+ * How an image a host needs is built: from a Containerfile, or the observer's
+ * build, which takes the lane runtime and pine·trie's packages as named
+ * contexts.
+ */
+type ImageRecipe =
+  | { readonly kind: "containerfile"; readonly plan: ImagePlan }
+  | {
+      readonly kind: "observer"
+      readonly tag: string
+      readonly file: string
+      readonly runtime: string
+      readonly packages: string
+    }
+
+const recipeTag = (recipe: ImageRecipe): string =>
+  recipe.kind === "containerfile" ? recipe.plan.tag : recipe.tag
+
 /** A container made from `spec`, labelled with its hash, as `planContainer` decides. */
 async function ensureContainer(
   target: DockerTarget,
   spec: ContainerSpec,
+  buildMissing: (image: string) => Promise<boolean>,
 ): Promise<void> {
   const want = specHash(spec)
   const decided = planContainer({
@@ -104,7 +129,7 @@ async function ensureContainer(
     return
   }
   if (decided === "recreate") await removeContainer(target, spec.name)
-  const made = await runContainer(target, labelled(spec, want))
+  const made = await runContainer(target, labelled(spec, want), buildMissing)
   // Another host may have made it at the same moment.
   if (
     made.status >= 300 &&
@@ -128,8 +153,9 @@ export interface DockerRuntime extends LaneRuntime {
   /**
    * This project's root recorded beside its disks and its lanes' network
    * made, then the containers and disks of every project whose root is
-   * gone, as the suites' throwaway projects are. Returns the gone projects'
-   * keys.
+   * gone, as the suites' throwaway projects are, and the containers in the
+   * lanes directory of projects it does not hold (`planProjectSweep`).
+   * Returns the gone projects' keys.
    */
   sweepProjects(): Promise<readonly string[]>
   /**
@@ -153,7 +179,10 @@ export function dockerRuntime(input: {
   readonly lanesDir: string
   /** The project's root on the host. */
   readonly root: string
-  /** Where each call to lanehost is logged; none in the suites' own runtimes. */
+  /**
+   * Where each call to lanehost, and an image it could not remove, is
+   * logged; none in the suites' own runtimes.
+   */
   readonly log?: (line: string) => void
   /**
    * Where lanes are observed: the machine role's container, made or joined
@@ -178,17 +207,71 @@ export function dockerRuntime(input: {
     content =>
       `pinetrie-lanehost:${createHash("sha256").update(content).digest("hex").slice(0, 12)}`,
   )
-  /** The image, built once per runtime; a failed build is tried again. */
+  const version = observerSources().then(observerVersion)
+
+  /** Every image this host has ensured, by tag: what it needs, and how to build each again. */
+  const recipes = new Map<string, ImageRecipe>()
+  /** The tags this host needs: those it ensured, and its lanehost and observer images, built or not. */
+  const neededTags = async (): Promise<ReadonlySet<string>> =>
+    new Set([
+      ...recipes.keys(),
+      await lanehostTag,
+      observerImage(await version),
+    ])
+  async function removeUnneededImages(): Promise<void> {
+    const [listedImages, imageIdsContainersUse, needed] = await Promise.all([
+      listImages(target),
+      containerImageIds(target),
+      neededTags(),
+    ])
+    if (imageIdsContainersUse === null) return
+    for (const tag of unneededImageTags({
+      neededTags: needed,
+      listedImages,
+      imageIdsContainersUse,
+    })) {
+      const removed = await removeImage(target, tag)
+      if (!isImageRemovalSettled(removed))
+        input.log?.(`[host] could not remove ${tag}: ${apiMessage(removed)}`)
+    }
+  }
+  async function build(recipe: ImageRecipe): Promise<void> {
+    if (recipe.kind === "containerfile") await buildImage(target, recipe.plan)
+    else await buildObserverImage(target, recipe)
+    // Only after a build: a host that builds nothing has nothing newer to
+    // keep, and may share this Docker with a host of the older version.
+    await removeUnneededImages()
+  }
+  /**
+   * Record `recipe` as needed, and build its tag unless Docker has it,
+   * telling `building` first.
+   */
+  async function ensureImage(
+    recipe: ImageRecipe,
+    building: () => void = () => {},
+  ): Promise<void> {
+    recipes.set(recipeTag(recipe), recipe)
+    if (await imageExists(target, recipeTag(recipe))) return
+    building()
+    await build(recipe)
+  }
+  /** A tag another host removed after this one ensured it, built again. */
+  const buildMissing = async (image: string): Promise<boolean> => {
+    const recipe = recipes.get(image)
+    if (recipe === undefined) return false
+    await build(recipe)
+    return true
+  }
+
+  /** The image, ensured once per runtime; a failed build is tried again. */
   let built: Promise<string> | null = null
   const lanehostImage = (): Promise<string> => {
     if (built === null) {
       const building = lanehostTag.then(async tag => {
-        if (!(await imageExists(target, tag)))
-          await buildImage(target, {
-            file: LANEHOST_CONTAINERFILE,
-            tag,
-            buildArgs: [],
-          })
+        await ensureImage({
+          kind: "containerfile",
+          plan: { file: LANEHOST_CONTAINERFILE, tag, buildArgs: [] },
+        })
         return tag
       })
       built = building
@@ -218,7 +301,7 @@ export function dockerRuntime(input: {
       root,
       ...serving,
     }
-    await ensureContainer(target, renderHelper(shape, target))
+    await ensureContainer(target, renderHelper(shape, target), buildMissing)
     return openChannel(
       execArgv(name, [
         ...runtimeNode(`${PINETRIE_MOUNT}/${SERVER}`),
@@ -233,7 +316,6 @@ export function dockerRuntime(input: {
     ...(input.log === undefined ? {} : { log: input.log }),
   })
 
-  const version = observerSources().then(observerVersion)
   /**
    * A channel to the machine's observer: its image built and its container
    * made, by this host or joined when another host of its version made it
@@ -247,15 +329,14 @@ export function dockerRuntime(input: {
       )
     const v = await version
     const name = observerContainer(v)
-    const tag = observerImage(v)
-    if (!(await imageExists(target, tag)))
-      await buildObserverImage(target, {
-        file: OBSERVER_CONTAINERFILE,
-        tag,
-        runtime: serving.runtime,
-        packages: `${serving.install}/packages`,
-      })
-    await ensureContainer(target, renderObserver(v))
+    await ensureImage({
+      kind: "observer",
+      tag: observerImage(v),
+      file: OBSERVER_CONTAINERFILE,
+      runtime: serving.runtime,
+      packages: `${serving.install}/packages`,
+    })
+    await ensureContainer(target, renderObserver(v), buildMissing)
     return openChannel(
       execArgv(name, [
         ...runtimeNode(`${PINETRIE_MOUNT}/${OBSERVER_CONNECT}`),
@@ -340,7 +421,14 @@ export function dockerRuntime(input: {
       serving = { install, runtime }
     },
     disk: async op => {
-      await lanehost.call({ kind: "disk", project: key, op })
+      if (op.kind === "innerDockerDataRoot")
+        await lanehost.call({
+          kind: "nestedDisk",
+          project: key,
+          lane: op.lane,
+          cloneFromLane: op.cloneFromLane,
+        })
+      else await lanehost.call({ kind: "disk", project: key, op })
     },
     diskExists: lane =>
       lanehost.call({ kind: "diskExists", project: key, lane }),
@@ -389,6 +477,7 @@ export function dockerRuntime(input: {
           kind: "nestedDisk",
           project: key,
           lane: shape.lane,
+          cloneFromLane: null,
         })
       // A bind mount's source must be there before the container is made.
       if (shape.states)
@@ -399,7 +488,11 @@ export function dockerRuntime(input: {
         })
       await projectNetworkReady()
       const spec = runSpec(shape)
-      const made = await runContainer(target, labelled(spec, specHash(spec)))
+      const made = await runContainer(
+        target,
+        labelled(spec, specHash(spec)),
+        buildMissing,
+      )
       if (made.status >= 300)
         throw new Error(`docker run ${spec.name} failed: ${apiMessage(made)}`)
     },
@@ -425,8 +518,13 @@ export function dockerRuntime(input: {
       await removeContainer(target, name)
     },
     execArgv,
-    imageExists: tag => imageExists(target, tag),
-    buildImage: plan => buildImage(target, plan),
+    async ensureLaneImages(plans, building) {
+      // Every plan recorded before any builds: a build removes what is not.
+      for (const plan of plans)
+        recipes.set(plan.tag, { kind: "containerfile", plan })
+      for (const plan of plans)
+        await ensureImage({ kind: "containerfile", plan }, () => building(plan))
+    },
     imagePath: async tag => imageEnvPath(await imageEnv(target, tag)),
     runInImage: (tag, argv) => runInImage(target, tag, argv),
     async sweepProjects() {
@@ -442,6 +540,8 @@ export function dockerRuntime(input: {
         })
       }
       const planned = planProjectSweep({
+        ownKey: key,
+        lanesDir,
         projects,
         containers: await listLabelled(target, PROJECT_LABEL),
       })
@@ -451,6 +551,8 @@ export function dockerRuntime(input: {
         await firewall(k, "", [])
         await lanehost.call({ kind: "removeProject", project: k })
       }
+      for (const k of planned.unlistedNetworks)
+        await removeNetwork(target, projectNetwork(k))
       return planned.projects
     },
     vmRestarted() {

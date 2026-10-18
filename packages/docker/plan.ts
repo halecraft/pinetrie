@@ -298,6 +298,47 @@ export const observerContainer = (version: string): string =>
 export const observerImage = (version: string): string =>
   `pinetrie-observer:${version}`
 
+/** The repositories pine·trie builds into: no other image is ever removed. */
+export const PINETRIE_IMAGE_REPOSITORIES: readonly string[] = [
+  "pinetrie-lane",
+  "pinetrie-lanehost",
+  "pinetrie-observer",
+]
+
+/** An image as Docker lists it: its id and its tags (`repository:tag`). */
+export interface ListedImage {
+  readonly id: string
+  readonly tags: readonly string[]
+}
+
+/**
+ * The tags of pine·trie's that a host may remove after a build: in one of its
+ * repositories, not among the tags the host needs, and on no image a
+ * container, running or stopped, was made from. A needed tag is never
+ * returned, whatever repository it shares: pine·trie's default lane image and
+ * a project's own are both `pinetrie-lane`, and a host may need both.
+ */
+export function unneededImageTags(input: {
+  readonly neededTags: ReadonlySet<string>
+  readonly listedImages: readonly ListedImage[]
+  readonly imageIdsContainersUse: ReadonlySet<string>
+}): readonly string[] {
+  return input.listedImages
+    .filter(image => !input.imageIdsContainersUse.has(image.id))
+    .flatMap(image => image.tags)
+    .filter(
+      tag =>
+        !input.neededTags.has(tag) &&
+        PINETRIE_IMAGE_REPOSITORIES.includes(tagRepository(tag)),
+    )
+}
+
+/** A tag's repository: `pinetrie-lane:abc` is `pinetrie-lane`. */
+const tagRepository = (tag: string): string => {
+  const colon = tag.lastIndexOf(":")
+  return colon > tag.lastIndexOf("/") ? tag.slice(0, colon) : tag
+}
+
 /**
  * What the machine role's container is granted, and nothing more: loading
  * and reading BPF programs (`BPF`, `PERFMON`) and an lstat through a lane's
@@ -462,6 +503,12 @@ export interface Listed {
   readonly binds: readonly string[]
 }
 
+/** Whether `bind` is `root` or a path inside it, by whole path segments. */
+export const isBindUnder = (root: string, bind: string): boolean => {
+  const dir = root.endsWith("/") ? root.slice(0, -1) : root
+  return bind === dir || bind.startsWith(`${dir}/`)
+}
+
 /**
  * Before a slot is filled: every container with a bind under `root`, the
  * slot's place in Docker's machine. They belong to a host that died holding
@@ -473,13 +520,23 @@ export const planSlotSweep = (
   root: string,
   containers: readonly Listed[],
 ): readonly string[] =>
-  containers.filter(c => c.binds.some(b => b.startsWith(root))).map(c => c.name)
+  containers
+    .filter(c => c.binds.some(b => isBindUnder(root, b)))
+    .map(c => c.name)
 
 /**
  * At startup: the containers and disks of every project whose root is gone,
- * as the suites' throwaway projects are.
+ * as the suites' throwaway projects are; and the containers of a project the
+ * lanes directory does not hold at all, as an inner Docker cloned from
+ * another lane's carries. Only those whose binds all lie in this host's lanes
+ * directory: another lanes directory on the same Docker lists its own
+ * projects, and its containers bind there. An unlisted project's network goes
+ * only with the last of its containers.
  */
 export function planProjectSweep(input: {
+  /** This host's project, which the listing leaves out. */
+  readonly ownKey: string
+  readonly lanesDir: string
   readonly projects: readonly {
     readonly key: string
     readonly rootExists: boolean
@@ -487,16 +544,31 @@ export function planProjectSweep(input: {
   readonly containers: readonly Listed[]
 }): {
   readonly containers: readonly string[]
+  /** Listed projects whose root is gone: their disks, networks and grants go. */
   readonly projects: readonly string[]
+  /** Unlisted projects none of whose containers are left: their networks go. */
+  readonly unlistedNetworks: readonly string[]
 } {
   const gone = new Set(
     input.projects.filter(p => !p.rootExists).map(p => p.key),
   )
+  const listed = new Set([input.ownKey, ...input.projects.map(p => p.key)])
+  const projectOf = (c: Listed) => c.labels[PROJECT_LABEL] ?? ""
+  const isOrphan = (c: Listed) =>
+    !listed.has(projectOf(c)) &&
+    c.binds.length > 0 &&
+    c.binds.every(b => isBindUnder(input.lanesDir, b))
+  const removed = input.containers.filter(
+    c => gone.has(projectOf(c)) || isOrphan(c),
+  )
+  const unlisted = new Set(removed.map(projectOf).filter(k => !listed.has(k)))
+  const left = new Set(
+    input.containers.filter(c => !removed.includes(c)).map(projectOf),
+  )
   return {
-    containers: input.containers
-      .filter(c => gone.has(c.labels[PROJECT_LABEL] ?? ""))
-      .map(c => c.name),
+    containers: removed.map(c => c.name),
     projects: [...gone].sort(),
+    unlistedNetworks: [...unlisted].filter(k => !left.has(k)).sort(),
   }
 }
 

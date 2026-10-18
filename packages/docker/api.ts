@@ -6,7 +6,7 @@ import { readFile } from "node:fs/promises"
 import http from "node:http"
 import type { ContainerFacts } from "@pinetrie/lanes"
 import { SPEC_LABEL } from "@pinetrie/lanes"
-import type { ContainerSpec, Listed } from "./plan.ts"
+import type { ContainerSpec, Listed, ListedImage } from "./plan.ts"
 import type { DockerTarget } from "./target.ts"
 
 export interface Answered {
@@ -64,6 +64,18 @@ export function apiMessage(answered: Answered): string {
 }
 
 const ok = (a: Answered) => a.status >= 200 && a.status < 300
+
+/** Whether a container's create was refused because its image is not here. */
+export const isCreateRefusedForMissingImage = (answered: Answered): boolean =>
+  answered.status === 404 && /no such image/i.test(apiMessage(answered))
+
+/**
+ * Whether an image's removal needs nothing more: done, gone already (404), or
+ * refused because a container uses it (409). The last two happen when another
+ * host acted after the listing the removal was planned from.
+ */
+export const isImageRemovalSettled = (answered: Answered): boolean =>
+  ok(answered) || answered.status === 404 || answered.status === 409
 
 /** `request`, throwing a failure as an error naming what was asked. */
 async function requestOrThrow(
@@ -155,10 +167,14 @@ function imageRef(image: string): { from: string; tag: string } {
     : { from: image, tag: "latest" }
 }
 
-/** Make the container `spec` names, then start it. An image not here is pulled first. */
+/**
+ * Make the container `spec` names, then start it. An image not here is built
+ * by `buildMissing` when it knows how (it answers true), else pulled.
+ */
 export async function runContainer(
   target: Pick<DockerTarget, "socket">,
   spec: ContainerSpec,
+  buildMissing: (image: string) => Promise<boolean> = async () => false,
 ): Promise<Answered> {
   const profiles = new Map<string, string>()
   for (const o of spec.securityOpt)
@@ -169,14 +185,16 @@ export async function runContainer(
   const body = createBody(spec, file => profiles.get(file) ?? "")
   const path = `/containers/create?name=${at(spec.name)}`
   let made = await request(target, "POST", path, body)
-  if (made.status === 404 && /no such image/i.test(apiMessage(made))) {
-    const { from, tag } = imageRef(spec.image)
-    await requestOrThrow(
-      target,
-      `pulling ${spec.image}`,
-      "POST",
-      `/images/create?fromImage=${at(from)}&tag=${at(tag)}`,
-    )
+  if (isCreateRefusedForMissingImage(made)) {
+    if (!(await buildMissing(spec.image))) {
+      const { from, tag } = imageRef(spec.image)
+      await requestOrThrow(
+        target,
+        `pulling ${spec.image}`,
+        "POST",
+        `/images/create?fromImage=${at(from)}&tag=${at(tag)}`,
+      )
+    }
     made = await request(target, "POST", path, body)
   }
   if (!ok(made)) return made
@@ -292,6 +310,64 @@ export const imageExists = async (
   tag: string,
 ): Promise<boolean> =>
   ok(await request(target, "GET", `/images/${at(tag)}/json`))
+
+/** Every image, with its tags; an answer that is not a list lists nothing. */
+export async function listImages(
+  target: Pick<DockerTarget, "socket">,
+): Promise<readonly ListedImage[]> {
+  const answered = await request(target, "GET", "/images/json")
+  return ok(answered) ? parseImages(answered.body) : []
+}
+
+/** The API's image list as `ListedImage`s. */
+export function parseImages(body: string): readonly ListedImage[] {
+  try {
+    const rows = JSON.parse(body) as {
+      Id?: unknown
+      RepoTags?: unknown[] | null
+    }[]
+    return rows.flatMap(r =>
+      typeof r.Id === "string"
+        ? [
+            {
+              id: r.Id,
+              tags: (r.RepoTags ?? []).filter(
+                (t): t is string => typeof t === "string",
+              ),
+            },
+          ]
+        : [],
+    )
+  } catch {
+    return []
+  }
+}
+
+/**
+ * The image ids every container, running or stopped, was made from. Null when
+ * Docker does not answer with a list: then nothing may be removed, since any
+ * image could be in use.
+ */
+export async function containerImageIds(
+  target: Pick<DockerTarget, "socket">,
+): Promise<ReadonlySet<string> | null> {
+  const answered = await request(target, "GET", "/containers/json?all=true")
+  if (!ok(answered)) return null
+  try {
+    const rows = JSON.parse(answered.body) as { ImageID?: unknown }[]
+    return new Set(
+      rows.flatMap(r => (typeof r.ImageID === "string" ? [r.ImageID] : [])),
+    )
+  } catch {
+    return null
+  }
+}
+
+/** Remove one tag, without force: Docker refuses one a container uses. */
+export const removeImage = (
+  target: Pick<DockerTarget, "socket">,
+  tag: string,
+): Promise<Answered> => request(target, "DELETE", `/images/${at(tag)}`)
 
 /** An image's own environment (`Config.Env`); throws when it is not here. */
 export async function imageEnv(

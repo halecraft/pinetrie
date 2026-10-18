@@ -48,6 +48,7 @@ import {
 import type { Basics, LeaseBasics } from "../basics.ts"
 import type { Records } from "../records.ts"
 import type { Destination } from "./destination.ts"
+import type { InnerDockerDataRootsHeld } from "./inner-docker-data-roots.ts"
 import type { Setup } from "./setup.ts"
 import type { Turns } from "./turns.ts"
 
@@ -199,6 +200,7 @@ export function createNewLanes(deps: {
   readonly ensureNames: () => Promise<void>
   readonly pendingRecords: Turns["pendingRecords"]
   readonly destination: Pick<Destination, "begin">
+  readonly innerDockerDataRoots: InnerDockerDataRootsHeld
 }): NewLanes {
   const { basics, setup, destination } = deps
   const { session } = basics
@@ -249,11 +251,16 @@ export function createNewLanes(deps: {
       })
       if (source.kind === "foreign") throw new Error(foreignLaneWords(source))
       const forkSetup = h.forkSteps(source.start)
+      const dataRoot = deps.innerDockerDataRoots.sourceAtFork(
+        lane,
+        facts.above.snapshotLane,
+      )
       const steps = planFork({
         source,
         spec: setup.specOf(lane, r),
         env: process.env,
         setup: forkSetup,
+        innerDockerDataRoot: dataRoot,
       })
       // execute: a fork run again is owed until its end, like the first
       if (fork.state === "begun")
@@ -263,6 +270,7 @@ export function createNewLanes(deps: {
       if (forkSetup.from === null && source.snapshot === BASE_SNAPSHOT)
         await setup.baseAtAccepted()
       const forked = await executeFork(steps, handle.runners)
+      deps.innerDockerDataRoots.made(lane, dataRoot)
       const start = await h.startRecords(source.start)
       await deps.records.writeValues(
         forkEnd({ fork, lost: source.lost, forked, start }),

@@ -86,10 +86,16 @@ the host does: ADR-0129). A suite's own helpers are beside its scenarios:
   and `pnpm run e2e:browser` 223 s (177 passed). `pnpm run verify` runs
   the first two.
 - **A lane builds the lane image from its own checkout,** tagged by its
-  inputs, and every version it builds stays in its inner Docker (S232).
-  ADR-0169, accepted and not yet built, shares the inner Docker between a
-  project's nested lanes, and this doc will say what a change to the lane
-  image's Containerfile or the app's Playwright version then costs them.
+  inputs: `packages/lanes/image/Containerfile`, the files it copies in
+  (its `daemon.json`), the host's jj version and the app's Playwright
+  version (`planImages`). Its inner Docker is shared by cloning: at a run's
+  start a nested lane takes a copy of the project's nested lane that ran
+  last (ADR-0169). So a change to any of those inputs gives a new tag that
+  each nested lane builds, about 3 minutes of build steps from cold
+  (S232), once it reaches that lane; while some lanes have the change and
+  some do not, each takes the other's copy at its next run and builds its
+  own version again. Such changes are better made together, in one thread,
+  than in many at once.
 - **In a nested lane, inner lanes write as uid 1000,** the rootless user:
   each throwaway project is opened to others' search (`committedProject`),
   and only the paths lanes write are handed to that user
@@ -146,7 +152,7 @@ here, so a superseded ADR leads to the scenarios to revisit.
 | `host/titles` | a root titled by a model (ADR-0074), its canvas's title (ADR-0116) |
 | `host/tools` | the host (ADR-0107), a lane's own copy (ADR-0034), compaction (ADR-0023, ADR-0063), Stop as a fact (ADR-0106, ADR-0126), Resume (ADR-0082) |
 | `lanes/catch-up` | catching up mid-run (ADR-0080, S103), a publish that accepts (ADR-0099) and moves main (ADR-0090) |
-| `lanes/contract` | the Docker runtime (ADR-0130), lanehost's roles and diffs (ADR-0129), the Mac's fence (S136) |
+| `lanes/contract` | the Docker runtime (ADR-0130), lanehost's roles and diffs (ADR-0129), the Mac's fence (S136), the images a host keeps (ADR-0169) |
 | `lanes/folder` | a folder project: its lanes, proposed changes, catch-ups and their conflicts (ADR-0142), and a folder lane refused once the folder is a jj repo (ADR-0150) |
 | `lanes/images` | the default image's browser (ADR-0041) |
 | `lanes/proposal` | an agent's proposal of branches, Start's lanes, order and messages, and its fact (ADR-0157, S218) |
@@ -154,7 +160,7 @@ here, so a superseded ADR leads to the scenarios to revisit.
 | `lanes/recipe` | derived state rebuilt from its key (ADR-0131) |
 | `lanes/shared` | shared directories (ADR-0035) |
 | `lanes/ssh` | a lane's ssh through its host: service identities, the owner's approval, the broker and a revoke (ADR-0140, S174) |
-| `lanes/vm-image` | the lane VM's image built on the Mac in a VM of its own, and booted (ADR-0147) |
+| `lanes/vm-image` | the lane VM's image built on the Mac in a VM of its own, and booted (ADR-0147), its Docker's cache capped (ADR-0169) |
 | `observer/kernel` | the observer that attributes a lane's file calls to its runs, on the lane VM's own kernel (ADR-0135; S172, S176) |
 | `browser/page` | who you are (ADR-0037) and your profile (ADR-0098); a canvas of columns, their folds and moves (ADR-0116, ADR-0134, ADR-0137); the sidebar (ADR-0030, ADR-0122), the board and its archive (ADR-0029, ADR-0122), the inbox (ADR-0091); the dock's queue (ADR-0113); cards, your inventory and undo (ADR-0048, ADR-0052, ADR-0127); copy, cut and paste (ADR-0132); the rail's outline of a column (ADR-0058); a second window's presence (ADR-0024); what a reload keeps (ADR-0027) |
 | `browser/tools` | asks (ADR-0106), where a new thread starts (ADR-0104), lanes for every agent (ADR-0102), search (ADR-0101), commands (ADR-0036), tool rows (ADR-0114, ADR-0123, S142), the dock's queue (ADR-0113), the header and the work strip (ADR-0039, ADR-0040, ADR-0105), the review (ADR-0047; render counts, S54), the board's work (ADR-0091), the rail's capsules (ADR-0031), digests (ADR-0071), threads and their tracks (ADR-0117, ADR-0125), your list (ADR-0030), a proposal's card, Open and Send (ADR-0157); a column's height and width while its agent works (S35, S37), following past a pick (S33) |

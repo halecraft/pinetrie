@@ -50,11 +50,17 @@ export type LanehostCall =
       readonly project: string
       readonly lane: string
     }
-  /** A nested lane's inner lanes' subvolume, made if missing, the rootless user's. */
+  /**
+   * A nested lane's inner lanes' subvolume, made if missing, the rootless
+   * user's; and its inner Docker data root in it, a clone of
+   * `cloneFromLane`'s when that one is there, else its own, made a subvolume
+   * when it is not one.
+   */
   | {
       readonly kind: "nestedDisk"
       readonly project: string
       readonly lane: string
+      readonly cloneFromLane: string | null
     }
   /**
    * A file inside a snapshot, by its path from the snapshot's root; null

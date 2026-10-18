@@ -75,7 +75,10 @@ else
   t "network: no DHCP answer in 10 s; Docker starts without it"
 fi
 
-dockerd --host unix:///var/run/docker.sock --data-root /var/lib/lanehost/docker > /run/dockerd.log 2>&1 &
+# Its daemon.json caps BuildKit's cache beside its images: the defaults are
+# fractions of the data disk, and the root is read-only, so the file is the
+# image's.
+dockerd --host unix:///var/run/docker.sock --data-root /var/lib/lanehost/docker --config-file /etc/pinetrie/daemon.json > /run/dockerd.log 2>&1 &
 # Each slot's ssh agent: a socket lanes bind, connected to the launcher's
 # vsock port for that slot, which reaches its host's agent.
 i=0

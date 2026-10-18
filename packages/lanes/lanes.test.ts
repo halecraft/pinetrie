@@ -42,8 +42,7 @@ function recordingRuntime(seen: string[]): LaneRuntime {
     start: no,
     stop: no,
     remove: no,
-    imageExists: no,
-    buildImage: no,
+    ensureLaneImages: no,
     imagePath: no,
     runInImage: no,
   }

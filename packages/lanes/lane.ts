@@ -34,6 +34,9 @@ export const laneNote = (kind: ProjectKind): string =>
     ? `${PINETRIE_MOUNT}/packages/pi/lane.md`
     : `${PINETRIE_MOUNT}/packages/pi/lane-folder.md`
 
+/** The note on its inner Docker that a nested lane is pointed at, inside the lane. */
+export const nestedLaneDockerNote = `${PINETRIE_MOUNT}/packages/pi/lane-docker.md`
+
 /** The command that opens a lane's channel: the helper on the runtime's Node. */
 export const helperCommand = (
   runtime: Pick<LaneRuntime, "execArgv">,

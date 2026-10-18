@@ -6,7 +6,7 @@ import { describe, expect, test } from "vitest"
 import { answer } from "./answer.ts"
 import {
   planDisk,
-  planNestedDisk,
+  planInnerDockerDataRootSteps,
   readSnapshotFile,
   subvolumesDeepestFirst,
 } from "./disks.ts"
@@ -101,11 +101,75 @@ describe("planDisk: each disk operation as steps", () => {
       { kind: "drop", path: disks.snapshot("b") },
     ])
   })
-  test("a nested lane's inner disk is the rootless user's", () => {
-    expect(planNestedDisk("l", disks).at(-1)).toEqual({
-      kind: "ensure",
-      path: disks.nested("l"),
-      uid: 1000,
+  describe("a nested lane's inner Docker data root", () => {
+    const facts = (
+      ownDataRoot: "subvolume" | "notSubvolume" | "absent",
+      sourceDataRoot: "subvolume" | "notSubvolume" | "absent" | null = null,
+    ) => ({ ownDataRoot, sourceDataRoot })
+    const nestedDisk = [
+      { kind: "parent", path: disks.nested("l") },
+      { kind: "ensure", path: disks.nested("l"), uid: 1000 },
+    ]
+    test("a source that is a subvolume is cloned, writable, in place of the lane's own", () => {
+      expect(
+        planInnerDockerDataRootSteps(
+          "l",
+          "m",
+          facts("subvolume", "subvolume"),
+          disks,
+        ),
+      ).toEqual([
+        ...nestedDisk,
+        { kind: "drop", path: disks.innerDockerDataRoot("l") },
+        {
+          kind: "snapshot",
+          from: disks.innerDockerDataRoot("m"),
+          to: disks.innerDockerDataRoot("l"),
+          readonly: false,
+        },
+      ])
+    })
+    test("a source whose data root has gone leaves the lane's own as it is", () => {
+      expect(
+        planInnerDockerDataRootSteps(
+          "l",
+          "m",
+          facts("subvolume", "absent"),
+          disks,
+        ),
+      ).toEqual(nestedDisk)
+    })
+    test("the lane itself is never its source", () => {
+      expect(
+        planInnerDockerDataRootSteps(
+          "l",
+          "l",
+          facts("subvolume", "subvolume"),
+          disks,
+        ),
+      ).toEqual(nestedDisk)
+    })
+    test("a plain directory is made a subvolume, and a missing one made, the rootless user's", () => {
+      const made = {
+        kind: "ensure",
+        path: disks.innerDockerDataRoot("l"),
+        uid: 1000,
+      }
+      expect(
+        planInnerDockerDataRootSteps("l", null, facts("notSubvolume"), disks),
+      ).toEqual([
+        ...nestedDisk,
+        { kind: "drop", path: disks.innerDockerDataRoot("l") },
+        made,
+      ])
+      expect(
+        planInnerDockerDataRootSteps("l", null, facts("absent"), disks),
+      ).toEqual([...nestedDisk, made])
+    })
+    test("a name that is not a disk's is refused", () => {
+      expect(() =>
+        planInnerDockerDataRootSteps("l", "../x", facts("absent"), disks),
+      ).toThrow("not a disk's name")
     })
   })
   test("subvolumesDeepestFirst puts each subvolume before every one above it", () => {
