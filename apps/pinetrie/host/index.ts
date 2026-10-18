@@ -17,12 +17,10 @@ import {
   readStartLayers,
 } from "@pinetrie/config"
 import {
-  atEntry,
   type CardId,
   isTextCardId,
   type RootId,
   type ThreadId,
-  threadEnd,
 } from "@pinetrie/core"
 import { prepareProjectDir } from "@pinetrie/jj"
 import { createKeeper } from "@pinetrie/keeper"
@@ -47,17 +45,13 @@ import {
 import { writersPolicy } from "@pinetrie/protocol/writers"
 import {
   readLaneRecords,
-  readParticipantNames,
   readReadingCanvases,
   readRoots,
   readRunning,
   readSetup,
   readThreads,
-  readTreeIndex,
 } from "@pinetrie/reads"
 import {
-  displayName,
-  encodeFact,
   type ModelLine,
   type QueuedText,
   SETUP,
@@ -90,6 +84,7 @@ import {
   failed,
   type HostKeeper,
   type HostKey,
+  inStep,
   type LeaseBasics,
   slow,
 } from "./basics.ts"
@@ -110,12 +105,8 @@ import {
   rootsOpenedWords,
 } from "./docs.ts"
 import { createFocuses } from "./focuses.ts"
-import {
-  sweepBlobs,
-  sweepHistories,
-  sweepHolds,
-  sweepTrash,
-} from "./housekeeping.ts"
+import { forward } from "./forward.ts"
+import { type SweepDeps, sweepUnused } from "./housekeeping.ts"
 import { startHttp } from "./http.ts"
 import { createLater } from "./later.ts"
 import {
@@ -453,8 +444,9 @@ export async function startHost({
   const docs = hostDocuments({ session, live, places })
   // Every root's document, reached only through a step of the documents'
   // keeper or a lease (`roots.ts`). The upkeep is queued on the keeper, made
-  // below: bound late.
-  let queueUpkeepLate: () => Promise<void> = async () => {}
+  // below; one due before is dropped, since `recover`'s settle queues an
+  // upkeep after every load before it.
+  const upkeepDue = forward<[]>("the upkeep", "drop")
   // `PINETRIE_ROOT_TRACE=<file>` logs every use of a root, to replay offline.
   const rootTrace =
     env.PINETRIE_ROOT_TRACE === undefined || env.PINETRIE_ROOT_TRACE === ""
@@ -465,20 +457,16 @@ export async function startHost({
   const roots = createRoots({
     exchange,
     session,
-    queueUpkeep: () => void queueUpkeepLate(),
+    queueUpkeep: upkeepDue.call,
     failed: error => failed(basics, "compaction")(error),
     keepLastRead: keepRootsRead,
     ...(rootTrace === null ? {} : { trace: rootTrace.trace }),
   })
   // Each root's first load is recovered (`recoverRoot`) in a step of its own,
   // once the agent and the runs exist: the roots that load before are held
-  // here until then.
-  const firstLoads: RootId[] = []
-  let recoverLate: ((root: RootId) => void) | null = null
-  roots.onFirstLoad(root => {
-    if (recoverLate === null) firstLoads.push(root)
-    else recoverLate(root)
-  })
+  // until then.
+  const recoverFirstLoad = forward<[RootId]>("recovering a root", "hold")
+  roots.onFirstLoad(recoverFirstLoad.call)
   const basics: Basics = {
     session,
     live,
@@ -606,17 +594,19 @@ export async function startHost({
   // The directory follows the roots opened above as well as those opened
   // later (`onOpened`).
   startDirectory({ basics, keeper, records, roots })
-  // Each thread's banner: a pasted one under any icon source, a drawn one only
-  // under `drawn`.
-  // Every write the host decides before a gap and makes after it. Its
-  // drain is bound late, as the budgets' is.
-  let queueDrainLate: (lane: ThreadId) => void = () => {}
+  // Every write the host decides before a gap and makes after it. Its drain
+  // is bound once the commands it sends through exist; one asked before is
+  // dropped, since its fact stays queued and `recover`'s settle drains every
+  // lane with cards queued.
+  const drainDue = forward<[ThreadId]>("the drain", "drop")
   const later = createLater({
     basics,
     keeper,
     placesWriter,
-    drain: lane => queueDrainLate(lane),
+    drain: drainDue.call,
   })
+  // Each thread's banner: a pasted one under any icon source, a drawn one only
+  // under `drawn`.
   const banners = createBanners({
     basics,
     later,
@@ -689,17 +679,21 @@ export async function startHost({
   })
   lap("starting lane work")
 
-  // `put_image` acts through the commands, made after the agent.
-  let putImageLate: ReturnType<typeof createPutImage> | null = null
-  const putImageNow = (): ReturnType<typeof createPutImage> => {
-    if (putImageLate === null) throw new Error("the commands are not made yet")
-    return putImageLate
-  }
-  let relaysLate: Relays | null = null
-  const relaysNow = (): Relays => {
-    if (relaysLate === null) throw new Error("the relays are not made yet")
-    return relaysLate
-  }
+  // `put_image` acts through the commands, and the agent's tools ask the
+  // relays, which start runs over the agent: each bound once what carries it
+  // out exists. Only a run calls them, and none runs before.
+  const putImage = forward<
+    Parameters<ReturnType<typeof createPutImage>>,
+    ReturnType<ReturnType<typeof createPutImage>>
+  >("the commands", "refuse")
+  const askAgent = forward<
+    Parameters<Relays["ask"]>,
+    ReturnType<Relays["ask"]>
+  >("the relays", "refuse")
+  const leaveThread = forward<
+    Parameters<Relays["leave"]>,
+    ReturnType<Relays["leave"]>
+  >("the relays", "refuse")
 
   // --- the agent, at work in threads' lanes ---------------------------------
   const agent = await createAgent({
@@ -716,10 +710,10 @@ export async function startHost({
             hooks: {
               ...work.hooks,
               askSplit,
-              ask: (lane, to, text) => relaysNow().ask(lane, to, text),
-              leave: (lane, thread) => relaysNow().leave(lane, thread),
+              ask: askAgent.call,
+              leave: leaveThread.call,
               readBlob: createReadBlob({ runs: runDocs, blobs }),
-              putImage: (lane, ask) => putImageNow()(lane, ask),
+              putImage: putImage.call,
               // A turn recorded, then a live digest of the ask `tip` is in,
               // when due.
               turnDone: async (lane, tip) => {
@@ -779,7 +773,8 @@ export async function startHost({
     drain: lane => queueDrain(lane),
     placesWriter,
   })
-  relaysLate = relays
+  askAgent.bind(relays.ask)
+  leaveThread.bind(relays.leave)
   // Where a host's message goes in a thread: an answer, a lane's ssh news.
   const deliver = createDelivery({
     basics,
@@ -833,10 +828,12 @@ export async function startHost({
     later,
     relays,
   })
-  putImageLate = createPutImage({
-    basics,
-    perform: (writer, intent) => commands.perform(writer, intent),
-  })
+  putImage.bind(
+    createPutImage({
+      basics,
+      perform: (writer, intent) => commands.perform(writer, intent),
+    }),
+  )
   // The drain's waits for its top card: its text, someone's typing in it to
   // stop, or a blank card to be written in.
   const wait = createWaits({ places, drain: lane => queueDrain(lane) })
@@ -852,7 +849,7 @@ export async function startHost({
     await step.lane(lane)
     return drainQueue(
       {
-        basics,
+        basics: inStep(basics, step),
         records: step.records,
         texts: cardPort,
         blobs,
@@ -876,48 +873,34 @@ export async function startHost({
         blank,
         placesWriter,
         relay: (to, relay) => relays.relayCard(step, to, relay),
-        appendLaneless: async (thread, fact) => {
-          if (docs.rootOfLane(thread) !== null) return false
-          const root = readThreads(session).get(thread)?.root
-          if (root === undefined) return false
-          const end = threadEnd(readTreeIndex(await step.root(root)), thread)
-          if (end === null) return false
-          const names = readParticipantNames(session)
-          await scribe.appendToTree(
-            encodeFact(
-              fact,
-              displayName(fact.by, names.get(fact.by)),
-              basics.now(),
-            ),
-            { root, at: atEntry(end) },
-            thread,
-          )
-          return true
-        },
+        scribe,
       },
       lane,
     )
   }
+  // What no one will use again, swept at the start and after each settle
+  // (`planSweeps`).
+  const sweeps: SweepDeps = {
+    basics: leaseBasics,
+    blobs,
+    grace: BLOB_GRACE_MS,
+    texts: cardPort.texts,
+    store,
+    histories,
+    records,
+    placesWriter,
+    work,
+    provenance,
+  }
   // The upkeep (`roots.ts`): what runs changed compacted, the roots nothing
-  // holds let go; after a settle, the images, histories, holds, trash and
-  // traces swept. One body for every caller: a `later` keeps the body of
-  // the call that queued it.
+  // holds let go; after a settle, the sweeps. One body for every caller: a
+  // `later` keeps the body of the call that queued it.
   const upkeep = (): Promise<void> =>
     queueUpkeepOn(keeper, async step => {
       const { settled } = await roots.upkeep(step)
-      if (!settled) return
-      await sweepBlobs({
-        basics,
-        blobs,
-        grace: BLOB_GRACE_MS,
-        texts: cardPort.texts,
-      }).catch(failed(basics, "deleting unreferenced images"))
-      await sweepHistories({ basics, store, histories, startup: false })
-      await sweepHolds({ basics, records })
-      await sweepTrash({ basics: leaseBasics, placesWriter, work })
-      await provenance.sweep()
+      if (settled) await sweepUnused(sweeps, "upkeep")
     })
-  queueUpkeepLate = upkeep
+  upkeepDue.bind(() => void upkeep())
   const settle = createSettle({
     basics,
     keeper,
@@ -951,7 +934,7 @@ export async function startHost({
     if (readRunning(live, lane)) return
     void keeper.once(`drain:${lane}`, step => drain(step, lane))
   }
-  queueDrainLate = queueDrain
+  drainDue.bind(queueDrain)
   /**
    * Resolves when no queued step remains (a compaction after a run among
    * them), no lane's queue has work, and every write has reached the store.
@@ -997,20 +980,15 @@ export async function startHost({
   )
   // Every other root is recovered as it first loads, in a step of its own:
   // `recover` did those it opened.
-  recoverLate = root => {
+  recoverFirstLoad.bind(root => {
+    if (opening.includes(root)) return
     void keeper
       .run(step =>
         recoverRoot({ basics, agent, work, start: runs.start }, step, root),
       )
       .catch(failed(basics, "recovering a root"))
-  }
-  for (const root of firstLoads) if (!opening.includes(root)) recoverLate(root)
-  await sweepHistories({ basics, store, histories, startup: true })
-  await sweepHolds({ basics, records })
-  await keeper.run(() =>
-    sweepTrash({ basics: leaseBasics, placesWriter, work }),
-  )
-  await provenance.sweep()
+  })
+  await keeper.run(() => sweepUnused(sweeps, "start"))
   const seats = startSeats({ exchange, basics, keeper, records, histories })
   const control = startControl({
     exchange,

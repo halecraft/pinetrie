@@ -35,12 +35,81 @@ import {
   QUEUE_HOLD,
   TRASH_KEEP_MS,
 } from "@pinetrie/rules"
-import type { Basics, LeaseBasics } from "./basics.ts"
+import { type Basics, failed, type LeaseBasics } from "./basics.ts"
 import type { CardPort } from "./cards.ts"
 import type { MoveHistories } from "./move-history.ts"
 import type { Places } from "./places.ts"
+import type { Provenance } from "./provenance.ts"
 import type { Records } from "./records.ts"
 import type { LaneWork } from "./work/index.ts"
+
+/**
+ * When the host sweeps unused resources: once at its start (after
+ * `recover`), and at each upkeep that follows a settle.
+ */
+export type SweepTime = "start" | "upkeep"
+
+/** One sweep: images, histories of moves, holds, the trash, or traces. */
+export type Sweep = "blobs" | "histories" | "holds" | "trash" | "traces"
+
+/**
+ * The sweeps at `when`, in the order they run. Only an upkeep sweeps
+ * images: a start's settle queues an upkeep that does.
+ */
+export const planSweeps = (when: SweepTime): readonly Sweep[] =>
+  when === "start"
+    ? ["histories", "holds", "trash", "traces"]
+    : ["blobs", "histories", "holds", "trash", "traces"]
+
+export interface SweepDeps {
+  readonly basics: Pick<
+    LeaseBasics,
+    "session" | "places" | "leases" | "log" | "now"
+  >
+  readonly blobs: BlobStore
+  /** How long an image nothing shows is kept, from its upload or last touch. */
+  readonly grace: number
+  readonly texts: CardPort["texts"]
+  readonly store: Pick<Store, "listDocIds">
+  readonly histories: Pick<MoveHistories, "retire">
+  readonly records: Pick<Records, "writeValues">
+  readonly placesWriter: Places
+  readonly work: Pick<LaneWork, "teardown" | "destination" | "forgetReaders">
+  readonly provenance: Pick<Provenance, "sweep">
+}
+
+/**
+ * Carry out `planSweeps(when)` in one step of the documents' keeper, which
+ * the caller holds: the trash's change of the places needs one. A failed
+ * image sweep is logged and the others go on; any other failure ends the
+ * sweeps, as the caller's.
+ */
+export async function sweepUnused(
+  deps: SweepDeps,
+  when: SweepTime,
+): Promise<void> {
+  const { basics } = deps
+  for (const sweep of planSweeps(when))
+    switch (sweep) {
+      case "blobs":
+        await sweepBlobs(deps).catch(
+          failed(basics, "deleting unreferenced images"),
+        )
+        break
+      case "histories":
+        await sweepHistories({ ...deps, startup: when === "start" })
+        break
+      case "holds":
+        await sweepHolds(deps)
+        break
+      case "trash":
+        await sweepTrash(deps)
+        break
+      case "traces":
+        await deps.provenance.sweep()
+        break
+    }
+}
 
 /**
  * Delete the blobs nothing shows or quotes any more: gather every card's text

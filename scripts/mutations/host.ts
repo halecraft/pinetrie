@@ -980,6 +980,88 @@ export const mutations: readonly Mutation[] = [
     expect: "a failed drain is logged; the other lanes drain",
   },
 
+  // ── calls bound later ──
+  {
+    name: "a held call is dropped at the bind",
+    file: "apps/pinetrie/host/forward.ts",
+    from: "      for (const args of held.splice(0)) carry(...args)\n",
+    to: "",
+    command: unit,
+    expect: "held calls are made at the bind, in order, and later ones at once",
+  },
+  {
+    name: "a dropped call is held",
+    file: "apps/pinetrie/host/forward.ts",
+    from: '      if (before === "hold") held.push(args)',
+    to: "      held.push(args)",
+    command: unit,
+    expect: "a dropped call is never made, and later ones are made at once",
+  },
+  {
+    name: "a refused call is dropped",
+    file: "apps/pinetrie/host/forward.ts",
+    from: '      if (before === "refuse") throw new Error(`${what} is not made yet`)\n',
+    to: "",
+    command: unit,
+    expect:
+      "a refused call throws before the bind, and returns the bound call's value after",
+  },
+  {
+    name: "a second bind replaces the first",
+    file: "apps/pinetrie/host/forward.ts",
+    from: "      if (bound !== null) throw new Error(`${what} is bound already`)\n",
+    to: "",
+    command: unit,
+    expect: "a second bind throws",
+  },
+
+  // ── the sweeps ──
+  {
+    name: "a failed image sweep ends the sweeps",
+    file: "apps/pinetrie/host/housekeeping.ts",
+    from: '        await sweepBlobs(deps).catch(\n          failed(basics, "deleting unreferenced images"),\n        )\n',
+    to: "        await sweepBlobs(deps)\n",
+    command: unit,
+    expect: "a failed image sweep is logged, and the sweeps after it run",
+  },
+  {
+    name: "a starting host sweeps the images",
+    file: "apps/pinetrie/host/housekeeping.ts",
+    from: '    ? ["histories", "holds", "trash", "traces"]',
+    to: '    ? ["blobs", "histories", "holds", "trash", "traces"]',
+    command: unit,
+    expect: "a starting host's sweeps leave the images to its first upkeep",
+  },
+  {
+    name: "every upkeep retires what only a start may",
+    file: "apps/pinetrie/host/housekeeping.ts",
+    from: '        await sweepHistories({ ...deps, startup: when === "start" })',
+    to: "        await sweepHistories({ ...deps, startup: true })",
+    command: unit,
+    expect:
+      "only a starting host retires the history of a canvas no place holds",
+  },
+
+  // ── a fact on a thread with no lane ──
+  {
+    name: "a laneless thread's fact goes to a lane",
+    file: "apps/pinetrie/host/queued-card-pop.ts",
+    from: "  if (basics.docs.rootOfLane(thread) !== null) return null\n",
+    to: "  return null\n",
+    command: unit,
+    expect:
+      "a fact on a thread with no lane is appended at the thread's end through the scribe",
+  },
+  {
+    name: "a laneless thread's fact goes at its root",
+    file: "apps/pinetrie/host/queued-card-pop.ts",
+    from: "  return end === null ? null : { root, at: atEntry(end) }",
+    to: '  return end === null ? null : { root, at: { kind: "root" } }',
+    command: unit,
+    expect:
+      "a fact on a thread with no lane is appended at the thread's end through the scribe",
+  },
+
   {
     name: "the dispatcher skips the archive gate",
     file: "apps/pinetrie/host/commands/gate.ts",

@@ -1,7 +1,9 @@
 import {
+  canvasIdFor,
   cardIdOfKind,
   livePlace,
   makeCard,
+  movesDocId,
   rootIdFor,
   type Sha256,
   storedText,
@@ -17,7 +19,12 @@ import { newRootDoc } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import { memoryBlobs } from "./blobs.ts"
 import { basics, CANVAS_ID, placesFor, putValue, seedPlaces } from "./fakes.ts"
-import { sweepBlobs, sweepTrash } from "./housekeeping.ts"
+import {
+  type SweepDeps,
+  sweepBlobs,
+  sweepTrash,
+  sweepUnused,
+} from "./housekeeping.ts"
 
 // A 1×1 PNG: what the store keeps is only its bytes, type and size.
 const ADA = writerId("ada@x.io")
@@ -205,4 +212,80 @@ test("a thread deleted from the trash leaves the shared files' lineages it read"
     },
   })
   expect(forgotten).toEqual([new Set([thread])])
+})
+
+/** A history of moves on a canvas no place holds: only a starting host retires it. */
+const GONE_HISTORY = movesDocId(ADA, {
+  kind: "canvas",
+  canvas: canvasIdFor("01a0ffd2-0000-7000-8000-0000000000c9"),
+})
+
+/**
+ * The sweeps' dependencies over `b`, recording each sweep reached and the
+ * histories retired: the image store's list throws, so an image sweep
+ * fails, and the store holds `GONE_HISTORY`.
+ */
+function sweepsOver(b: ReturnType<typeof basics>) {
+  const reached: string[] = []
+  const retired: string[] = []
+  const deps: SweepDeps = {
+    basics: b,
+    blobs: {
+      ...memoryBlobs(),
+      list: () => {
+        throw new Error("no list")
+      },
+    },
+    grace: 0,
+    texts: async () => [],
+    store: {
+      async *listDocIds() {
+        reached.push("histories")
+        yield GONE_HISTORY
+      },
+    },
+    histories: {
+      retire: async ids => {
+        retired.push(...ids)
+      },
+    },
+    records: { writeValues: async () => {} },
+    placesWriter: placesFor(b).placesWriter,
+    work: {
+      destination: null,
+      teardown: async () => {},
+      forgetReaders: async () => {},
+    },
+    provenance: {
+      sweep: async () => {
+        reached.push("traces")
+      },
+    },
+  }
+  return { deps, reached, retired }
+}
+
+test("a failed image sweep is logged, and the sweeps after it run", async () => {
+  const b = basics()
+  const { deps, reached } = sweepsOver(b)
+  await sweepUnused(deps, "upkeep")
+  expect(b.lines[0]).toBe("[host] deleting unreferenced images failed: no list")
+  expect(reached).toEqual(["histories", "traces"])
+})
+
+test("a starting host's sweeps leave the images to its first upkeep", async () => {
+  const b = basics()
+  const { deps, reached } = sweepsOver(b)
+  await sweepUnused(deps, "start")
+  expect(b.lines.filter(l => l.includes("images"))).toEqual([])
+  expect(reached).toEqual(["histories", "traces"])
+})
+
+test("only a starting host retires the history of a canvas no place holds", async () => {
+  const atStart = sweepsOver(basics())
+  await sweepUnused(atStart.deps, "start")
+  expect(atStart.retired).toEqual([GONE_HISTORY])
+  const atUpkeep = sweepsOver(basics())
+  await sweepUnused(atUpkeep.deps, "upkeep")
+  expect(atUpkeep.retired).toEqual([])
 })

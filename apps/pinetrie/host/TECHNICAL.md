@@ -30,9 +30,10 @@ wires them.
 | `canvas-news.ts` | a card added to a running thread's canvas or taken from it, steered into its lane as a fact line (`planCanvasFacts`), heard from `Provenance.onChanged`; never a queued fact card, which would wait for the run's end |
 | `base-news.ts` | what a thread is told of its base's new work (ADR-0080): `atStart`, a chat's run's behind entry; `baseChanged`, a steer into a running lane, at most once per base commit (`told`), heard from lane work's `onBaseChanged`; `runEnded` forgets what was steered. Made after the agent, whose lanes it steers |
 | `split-call.ts` | `split_proposed_changes` (ADR-0080): a split card queued on the thread, popped when its run ends: pi calls it only during a run, so its step is queued before the run's end queues the drain, which the keeper runs after it |
-| `queued-card-pop.ts` | popping a lane's queued cards to send them (ADR-0048, ADR-0083): `popNextQueuedCard`, and `drain`, which carries each out as `planCarry` decides: a fact appended, a catch-up, a split's run, a message sent (ADR-0108, ADR-0080); and `createWaits`, the drain's waits for its top card's text or for someone's typing in it to stop (ADR-0048 step 7) |
+| `queued-card-pop.ts` | popping a lane's queued cards to send them (ADR-0048, ADR-0083): `popNextQueuedCard`, and `drain`, which carries each out as `planCarry` decides: a fact appended (through the scribe at the thread's end for a thread with no lane, `lanelessSpot`), a catch-up, a split's run, a message sent (ADR-0108, ADR-0080); and `createWaits`, the drain's waits for its top card's text or for someone's typing in it to stop (ADR-0048 step 7) |
 | `settle.ts` | what happens between runs: drains, then the upkeep (§ Roots: steps, leases and the upkeep) |
-| `housekeeping.ts` | deleting images nothing shows (ADR-0042), retiring histories of moves (`sweepHistories`), deleting holds on queues nobody can use (`sweepHolds`, ADR-0048 step 7), and trashed cards past their week (`sweepTrash`) |
+| `housekeeping.ts` | deleting images nothing shows (ADR-0042), retiring histories of moves (`sweepHistories`), deleting holds on queues nobody can use (`sweepHolds`, ADR-0048 step 7), and trashed cards past their week (`sweepTrash`); which of them a start and an upkeep run, in order (`planSweeps`), carried out in one keeper step by `sweepUnused` |
+| `forward.ts` | `forward`: a call `startHost` hands to a module made before what carries it out, bound once that exists; a call before the bind is held, dropped or refused, as its site says (§ Startup) |
 | `docs.ts` | `HostDocuments`: the documents the host always holds (the session's, `pinetrie:live`, the places) and the reads of the session that name a root; `planLoads`, the roots a starting host opens |
 | `roots.ts` | every root's document (ADR-0162): `StepDocs`, a step's own, and `Lease`; pi's port; `planUpkeep` and the upkeep; `onOpened`, `onReleasing`, `onFirstLoad` (§ Roots: steps, leases and the upkeep) |
 | `records.ts` | the host's writes of its records (ADR-0095): `createRecords`, the session's, which every module made at startup takes, and `createStepRecords`, a step's or a lease's, which writes a root's too; a write's home is in its type (`ValueWrite<H>`) |
@@ -513,10 +514,13 @@ store, its migrations, loading the session, places and live documents,
 opening the project and its config, pi's setup, the roots, and lane work. A
 start's quiet gap is one of these, and its line names which.
 
-After `recover`, `sweepHistories` retires the histories of moves no one will undo again (§
-Moves' history), and `sweepHolds` deletes the holds on queues whose lane no
-root holds or whose root is archived (ADR-0048 step 7). Both run again after
-each run's end, in the upkeep's sweep.
+After `recover`, `sweepUnused` runs a start's sweeps (`planSweeps`) in one
+keeper step: `sweepHistories` retires the histories of moves no one will
+undo again (§ Moves' history), those of a root the directory does not name
+among them; `sweepHolds` deletes the holds on queues whose lane no root
+holds or whose root is archived (ADR-0048 step 7); then the trash and the
+traces. Each runs again in the upkeep after a settle, which sweeps the
+images too: `recover`'s settle queues the first.
 
 `recover` runs, in order: the clear of `pinetrie:live` (`planClear`: no
 stream survives a process), a new store's default workflow
@@ -648,6 +652,25 @@ as it first loads (§ Roots: steps, leases and the upkeep).
   commands and the queue's drain still refer to each other (a command asks
   for a drain, a drain sends through the commands), as closures that run
   only once both exist.
+
+- **Five calls cross the order above, each a `forward` bound once what
+  carries it out exists** (`forward.ts`). Each site chooses what a call
+  before its bind does:
+  - the roots' upkeep, due from the first load, before the keeper and the
+    sweeps exist: dropped, since `recover`'s settle queues an upkeep after
+    every load before it. Held, it would run before `recover` and let go of
+    the roots it opened for it.
+  - a root's first load, recovered by `recoverRoot` once the agent and the
+    runs exist: held, and made at the bind, after `recover`, which
+    recovered the roots it opened itself.
+  - `Later`'s drain, made before the commands it sends through: dropped,
+    since its fact stays queued and `recover`'s settle drains every lane
+    with cards queued. Held, a drain would send before `recover`, which no
+    command may (below).
+  - the agent's `ask` and `leave`, before the relays, which start runs over
+    the agent, and its `put_image`, which acts through the commands: refused,
+    since only a run calls them, and none runs before the relays and the
+    commands exist.
 
 - **The runtime is Docker** (`work/runtime.ts`, ADR-0130): the lane VM's on
   the Mac and the host's own on Linux (`planRuntime`). On the Mac, a host
@@ -1327,7 +1350,7 @@ queued cards, which `planArchive` refuses.
   answer, a round fact or a relay (`Relays.deliver`, in an `after`),
   planned when it comes, behind the asking thread's gate.
 - **A thread with no lane** is told its facts at its end through the
-  scribe (`appendLaneless`, the drain's), since only a lane appends; a
+  scribe (`lanelessSpot`, the drain's), since only a lane appends; a
   person's message to one is written through the scribe too (S21).
 - **The budget is read from the run's prompt** (`promptBudget`): a
   relay's or an answer's names it, a person's message is its own, and only

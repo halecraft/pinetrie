@@ -1,4 +1,5 @@
 import {
+  atEntry,
   type CardCommand,
   type CardId,
   cardIdOfKind,
@@ -9,6 +10,7 @@ import {
   rootIdFor,
   runId,
   type Sha256,
+  type Spot,
   storedText,
   textCardId,
   threadIdFor,
@@ -33,6 +35,7 @@ import {
   beginRun,
   newPlacesDoc,
   newPresenceDoc,
+  writeEntry,
 } from "@pinetrie/schema/fixtures"
 import { describe, expect, test } from "vitest"
 import { memoryBlobs } from "./blobs.ts"
@@ -48,6 +51,7 @@ import {
   record,
   seedChange,
   seedPlaces,
+  threadRow,
 } from "./fakes.ts"
 import {
   createWaits,
@@ -257,13 +261,21 @@ function setUp(
   const presence = newPresenceDoc()
   const events: string[] = []
   const appended: unknown[] = []
+  const spots: Spot[] = []
   const sends = [...answers]
   const blobs = memoryBlobs()
   const deps: QueuedCardPopDeps = {
     basics: b,
     blobs,
     relay: async () => "next",
-    appendLaneless: async () => false,
+    scribe: record<QueuedCardPopDeps["scribe"]>({
+      appendToTree: async (message, spot, thread) => {
+        events.push(`scribe ${message.customType} in ${thread}`)
+        spots.push(spot)
+        appended.push(message)
+        return { kind: "appended", id: entryId("f-2") }
+      },
+    }).port,
     records: { writeValues: async writes => applyWrites(b, writes) },
     agent: record<QueuedCardPopDeps["agent"]>({
       lane: () =>
@@ -328,7 +340,7 @@ function setUp(
       },
     }).placesWriter,
   }
-  return { b, events, deps, appended, presence, blobs }
+  return { b, events, deps, appended, spots, presence, blobs }
 }
 
 describe("drain", () => {
@@ -863,36 +875,36 @@ describe("the drain's waits for its top card", () => {
 })
 
 describe("drain: a fact", () => {
+  const fact = {
+    kind: "accepted",
+    lane: LANE,
+    by: ADA,
+    as: "kabcdefgh",
+    bookmark: "pinetrie-accepted",
+    to: { kind: "accepted" },
+  } as const
+  /** `fact`, queued on top of `LANE`. */
+  const factCard = encodeCard({
+    kind: "fact" as const,
+    id: FACT,
+    owner: ADA,
+    placer: ADA,
+    place: {
+      kind: "queued",
+      thread: LANE,
+      order: "a",
+      by: ADA,
+      seen: "",
+    },
+    content: { fact },
+  })
+
   test("a queued fact is appended as the fact, its card gone, and the drain goes on", async () => {
     const { b, events, deps, appended } = setUp(
       { [cardIdFor("c2")]: "next" },
       [],
     )
-    const fact = {
-      kind: "accepted",
-      lane: LANE,
-      by: ADA,
-      as: "kabcdefgh",
-      bookmark: "pinetrie-accepted",
-      to: { kind: "accepted" },
-    } as const
-    b.places.cards.set(
-      FACT,
-      encodeCard({
-        kind: "fact" as const,
-        id: FACT,
-        owner: ADA,
-        placer: ADA,
-        place: {
-          kind: "queued",
-          thread: LANE,
-          order: "a",
-          by: ADA,
-          seen: "",
-        },
-        content: { fact },
-      }),
-    )
+    b.places.cards.set(FACT, factCard)
     queue(b.places, cardIdFor("c2"), "b")
     await drain(deps, LANE)
     // A fact has no text: nothing of it is hydrated or destroyed.
@@ -904,6 +916,22 @@ describe("drain: a fact", () => {
     ])
     expect(appended.map(decodeFact)).toEqual([fact])
     expect(textsIn(b.places)).toEqual([])
+  })
+
+  test("a fact on a thread with no lane is appended at the thread's end through the scribe", async () => {
+    const { b, events, deps, appended, spots } = setUp({}, [])
+    // A chat an agent was asked from: its thread has a record and an entry,
+    // and no lane.
+    const laneless: QueuedCardPopDeps = {
+      ...deps,
+      basics: { ...b, docs: { ...b.docs, rootOfLane: () => null } },
+    }
+    writeEntry(b.root, threadRow("e-1", null, LANE))
+    b.places.cards.set(FACT, factCard)
+    await drain(laneless, LANE)
+    expect(events).toEqual([`scribe pinetrie.fact in ${LANE}`])
+    expect(spots).toEqual([{ root: ROOT_ID, at: atEntry(entryId("e-1")) }])
+    expect(appended.map(decodeFact)).toEqual([fact])
   })
 })
 

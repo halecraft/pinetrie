@@ -11,6 +11,7 @@
 
 import { subscribe } from "@kyneta/schema"
 import {
+  atEntry,
   type BlobStore,
   type CardId,
   type CardRecord,
@@ -22,10 +23,12 @@ import {
   type RootId,
   type Send,
   type Sha256,
+  type Spot,
   type TextCardId,
   type ThreadId,
+  threadEnd,
 } from "@pinetrie/core"
-import type { Agent } from "@pinetrie/pi"
+import type { Agent, Scribe } from "@pinetrie/pi"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import {
   readParticipantNames,
@@ -33,6 +36,8 @@ import {
   readQueueHolds,
   readRunning,
   readThreadName,
+  readThreads,
+  readTreeIndex,
   readTypingIn,
 } from "@pinetrie/reads"
 import {
@@ -55,7 +60,7 @@ import {
   threadCardHolding,
 } from "@pinetrie/rules"
 import type { PlacesDocHandle, PresenceDocHandle } from "@pinetrie/schema"
-import type { Basics } from "./basics.ts"
+import type { StepBasics } from "./basics.ts"
 import type { CardPort } from "./cards.ts"
 import type { OpenChange, Places } from "./places.ts"
 import type { Records } from "./records.ts"
@@ -163,17 +168,20 @@ export const sendOfPoppedQueuedCard = (
 })
 
 export interface QueuedCardPopDeps {
+  /** The drain's step's: a fact for a thread with no lane reads its root. */
   readonly basics: Pick<
-    Basics,
-    "session" | "live" | "places" | "log" | "now" | "newId"
+    StepBasics,
+    "session" | "live" | "places" | "docs" | "roots" | "log" | "now" | "newId"
   >
   /** A queue's hold, written when an unsent card has nowhere to go. */
   readonly records: Pick<Records, "writeValues">
   /** Who is typing in which card (`typingIn`): the pop waits for them. */
   readonly presence: PresenceDocHandle
   readonly texts: Pick<CardPort, "hydrate" | "textNow" | "holds">
-  /** Where a fact is appended. */
+  /** Where a fact is appended, in a thread with a lane. */
   readonly agent: Pick<Agent, "lane">
+  /** Where a fact is appended, in a thread with no lane: only a lane appends. */
+  readonly scribe: Pick<Scribe, "appendToTree">
   readonly work: Pick<LaneWork, "prepareUpdate" | "prepareSplit" | "runnable">
   /** Start a run in the drain's step, whose documents lease its root. */
   readonly start: (
@@ -199,14 +207,6 @@ export interface QueuedCardPopDeps {
     lane: ThreadId,
     relay: RelayDetails,
   ) => Promise<"ran" | "next">
-  /**
-   * Append a fact to a thread with no lane, at its end: a chat an agent
-   * was asked from. False when it could not be.
-   */
-  readonly appendLaneless: (
-    thread: ThreadId,
-    fact: QueuedFact,
-  ) => Promise<boolean>
 }
 
 /**
@@ -337,6 +337,22 @@ async function carryOut(
 }
 
 /**
+ * Where a fact goes in `thread` when it has no lane (a chat an agent was
+ * asked from): its end, in its root. Null for a thread with a lane, which
+ * appends its own, and for one with no record or no entry.
+ */
+export async function lanelessSpot(
+  basics: Pick<StepBasics, "session" | "docs" | "roots">,
+  thread: ThreadId,
+): Promise<Spot | null> {
+  if (basics.docs.rootOfLane(thread) !== null) return null
+  const root = readThreads(basics.session).get(thread)?.root
+  if (root === undefined) return null
+  const end = threadEnd(readTreeIndex(await basics.roots.root(root)), thread)
+  return end === null ? null : { root, at: atEntry(end) }
+}
+
+/**
  * A fact the host queued, appended to the thread: the lane is idle, since the
  * pop found it so. One that cannot be appended is logged and dropped: nobody
  * could send it from below the line.
@@ -347,17 +363,16 @@ async function appendFact(
   fact: QueuedFact,
 ): Promise<"next"> {
   const { session, log, now } = deps.basics
-  if (await deps.appendLaneless(lane, fact)) return "next"
-  const appended = await deps.agent
-    .lane(lane)
-    .append(
-      encodeFact(
-        fact,
-        displayName(fact.by, readParticipantNames(session).get(fact.by)),
-        now(),
-      ),
-    )
-    .catch((error: unknown) => ({ kind: "failed", message: errorText(error) }))
+  const message = encodeFact(
+    fact,
+    displayName(fact.by, readParticipantNames(session).get(fact.by)),
+    now(),
+  )
+  const spot = await lanelessSpot(deps.basics, lane)
+  const appended = await (spot === null
+    ? deps.agent.lane(lane).append(message)
+    : deps.scribe.appendToTree(message, spot, lane)
+  ).catch((error: unknown) => ({ kind: "failed", message: errorText(error) }))
   if (appended.kind !== "appended")
     log(
       `[host] ${readThreadName(session, lane)}: a fact was not written: ${"message" in appended ? appended.message : appended.kind}`,
