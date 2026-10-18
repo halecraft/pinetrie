@@ -31,7 +31,8 @@ nothing, and knows nothing of lanes (`workspace.test.ts`).
   erofs system image under a tmpfs overlay and switches to it.
 - **`init`, PID 1:** drivers by modalias, then the manifest's modules;
   `/dev/net/tun` made 0666 (no udev, S127); the btrfs data disk with
-  `user_subvol_rm_allowed`, formatted on first boot; each slot's share at
+  `user_subvol_rm_allowed`, formatted on first boot and grown to fill
+  `data.img` at every boot; each slot's share at
   `/mnt/host-shares/<i>`; Docker on vsock 2375 and each slot's ssh agent;
   `sync` on vsock 2377 for the launcher's stop; the clock (below). No
   shell listens on any port. `socat -t 3600`: without it, socat cuts a
@@ -248,6 +249,13 @@ sweep of what binds into it.
 
 ## Gotchas
 
+- **A full data disk stops the VM serving any host:** dockerd cannot
+  write its metadata, never answers, and every lease fails waiting for
+  it. No shell reaches the guest, so the way back is a bigger file:
+  with the launcher stopped, `truncate -s <size> data.img` on the Mac
+  (the launcher makes the file only when it is missing), and `init`
+  grows the filesystem at the next boot. Nothing trims the file, so
+  space freed in the guest is reused there and never returned to the Mac.
 - **socat's `-t`:** without it, socat cuts a stream 0.5 s after its input
   ends (S128, S129).
 - **`/dev/net/tun` is 0600 without udev;** the init makes it 0666 for
