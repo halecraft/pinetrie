@@ -7,6 +7,7 @@ import {
   BASE_LANE,
   configChangeNote,
   configWidenings,
+  decideLaneStart,
   effectiveLaneConfig,
   imageRefusal,
   innerDockerDataRootStep,
@@ -14,6 +15,8 @@ import {
   innerDockerDataRootsAfterRunEnd,
   isBaseCurrent,
   isCopyableBase,
+  type LaneFactReader,
+  type LaneMade,
   type LaneSpec,
   type LaneStep,
   laneContainer,
@@ -22,6 +25,7 @@ import {
   NO_GRANTS,
   NO_INNER_DOCKER_DATA_ROOTS,
   NOTHING_ATTACHED,
+  NOTHING_MADE,
   parseBaseFacts,
   planBaseFacts,
   planContainer,
@@ -602,30 +606,34 @@ describe("the host: its root", () => {
   })
   test("planLaneStart: a fork owed runs whatever is there", () => {
     for (const container of ["create", "recreate", "start", "running"] as const)
-      expect(planLaneStart({ fork: "owed", container, made: null })).toEqual({
-        kind: "fork",
-      })
+      expect(
+        planLaneStart({ fork: "owed", container, made: NOTHING_MADE }),
+      ).toEqual({ kind: "fork" })
   })
 
-  test("planLaneStart: a begun lane's container there is started; one to make asks for its facts", () => {
+  test("planLaneStart: a begun lane's container there is started; one to make asks for its disk", () => {
     expect(
-      planLaneStart({ fork: "begun", container: "running", made: null }),
+      planLaneStart({
+        fork: "begun",
+        container: "running",
+        made: NOTHING_MADE,
+      }),
     ).toEqual({ kind: "container", plan: "running" })
     expect(
-      planLaneStart({ fork: "begun", container: "create", made: null }),
-    ).toEqual({ kind: "gather" })
+      planLaneStart({ fork: "begun", container: "create", made: NOTHING_MADE }),
+    ).toEqual({ kind: "gather", need: { kind: "disk" } })
   })
 
   describe("planLaneStart: a begun lane whose container must be made", () => {
-    const made = {
-      disk: false,
-      own: [snapshotId("e2"), snapshotId("e1")],
-      recorded: true,
-      kept: snapshotId("turn-1"),
-      listed: new Set([snapshotId("e1"), snapshotId("turn-1")]),
-    }
-    const start = (m: Partial<typeof made>, container = "create" as const) =>
-      planLaneStart({ fork: "begun", container, made: { ...made, ...m } })
+    const [e2, e1, kept] = [
+      snapshotId("e2"),
+      snapshotId("e1"),
+      snapshotId("turn-1"),
+    ]
+    const history = { own: [e2, e1], recorded: true, kept }
+    const gone: LaneMade = { disk: false, history, exists: new Map() }
+    const start = (m: Partial<LaneMade>, container = "create" as const) =>
+      planLaneStart({ fork: "begun", container, made: { ...gone, ...m } })
 
     test("planLaneStart: a disk starts from it", () => {
       expect(start({ disk: true })).toEqual({ kind: "disk", recreate: false })
@@ -633,28 +641,103 @@ describe("the host: its root", () => {
         planLaneStart({
           fork: "begun",
           container: "recreate",
-          made: { ...made, disk: true },
+          made: { ...gone, disk: true },
         }),
       ).toEqual({ kind: "disk", recreate: true })
     })
 
-    test("planLaneStart: with no disk, the newest of its snapshots that exists, then its kept state's", () => {
-      expect(start({})).toEqual({
-        kind: "snapshot",
-        from: "e1",
-        recreate: false,
+    test("planLaneStart: with no disk, its history is asked for, then each snapshot newest first", () => {
+      expect(start({ history: null })).toEqual({
+        kind: "gather",
+        need: { kind: "history" },
       })
-      expect(start({ own: [] })).toEqual({
-        kind: "snapshot",
-        from: "turn-1",
-        recreate: false,
+      expect(start({})).toEqual({
+        kind: "gather",
+        need: { kind: "snapshot", snapshot: e2 },
+      })
+      expect(start({ exists: new Map([[e2, false]]) })).toEqual({
+        kind: "gather",
+        need: { kind: "snapshot", snapshot: e1 },
       })
     })
 
+    test("planLaneStart: with no disk, the newest of its snapshots that exists, then its kept state's", () => {
+      expect(
+        start({
+          exists: new Map([
+            [e2, false],
+            [e1, true],
+          ]),
+        }),
+      ).toEqual({ kind: "snapshot", from: e1, recreate: false })
+      expect(
+        start({
+          exists: new Map([
+            [e2, false],
+            [e1, false],
+            [kept, true],
+          ]),
+        }),
+      ).toEqual({ kind: "snapshot", from: kept, recreate: false })
+    })
+
     test("planLaneStart: with nothing kept, a lane that recorded no turn forks again, and one that did is retired", () => {
-      const gone = { listed: new Set<ReturnType<typeof snapshotId>>() }
-      expect(start({ ...gone, recorded: false })).toEqual({ kind: "fork" })
-      expect(start(gone)).toEqual({ kind: "retired" })
+      const none = new Map([
+        [e2, false],
+        [e1, false],
+        [kept, false],
+      ])
+      expect(
+        start({ history: { ...history, recorded: false }, exists: none }),
+      ).toEqual({ kind: "fork" })
+      expect(start({ exists: none })).toEqual({ kind: "retired" })
+    })
+  })
+
+  describe("decideLaneStart: what a start reads", () => {
+    const [e3, e2, e1] = [snapshotId("e3"), snapshotId("e2"), snapshotId("e1")]
+    /** A reader over `disk` and the snapshots `there`, counting each read. */
+    const reader = (disk: boolean, there: readonly string[]) => {
+      const reads: string[] = []
+      const read: LaneFactReader = {
+        async disk() {
+          reads.push("disk")
+          return disk
+        },
+        async history() {
+          reads.push("history")
+          return { own: [e3, e2, e1], recorded: true, kept: null }
+        },
+        async snapshotExists(s) {
+          reads.push(s)
+          return there.includes(s)
+        },
+      }
+      return { read, reads }
+    }
+
+    test("decideLaneStart: a lane whose disk is there reads nothing else", async () => {
+      const { read, reads } = reader(true, [])
+      expect(
+        await decideLaneStart({ fork: "begun", container: "create" }, read),
+      ).toEqual({ kind: "disk", recreate: false })
+      expect(reads).toEqual(["disk"])
+    })
+
+    test("decideLaneStart: a lane whose disk is gone checks its snapshots only until one is there", async () => {
+      const { read, reads } = reader(false, [e2, e1])
+      expect(
+        await decideLaneStart({ fork: "begun", container: "create" }, read),
+      ).toEqual({ kind: "snapshot", from: e2, recreate: false })
+      expect(reads).toEqual(["disk", "history", "e3", "e2"])
+    })
+
+    test("decideLaneStart: a container there reads nothing", async () => {
+      const { read, reads } = reader(false, [])
+      expect(
+        await decideLaneStart({ fork: "begun", container: "start" }, read),
+      ).toEqual({ kind: "container", plan: "start" })
+      expect(reads).toEqual([])
     })
   })
 })

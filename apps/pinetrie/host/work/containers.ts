@@ -10,12 +10,13 @@ import {
 } from "@pinetrie/core"
 import type { Keeper } from "@pinetrie/keeper"
 import {
+  decideLaneStart,
   executeOrThrow,
   innerDockerDataRootStep,
   KILL_SSH,
+  type LaneFactReader,
   type LaneGrants,
   type LaneHistory,
-  type LaneMade,
   type LaneSpec,
   type LaneStartWithStoppedContainer,
   laneNote,
@@ -23,7 +24,6 @@ import {
   PINETRIE_MOUNT,
   planContainer,
   planDisk,
-  planLaneStart,
   planShape,
   planStart,
   RUNTIME_BIN,
@@ -129,27 +129,29 @@ export function createContainers(deps: {
   })
 
   /**
-   * What a begun lane's start reads once its container must be made: its
-   * disk, the snapshots its revision records name and whether it has any,
-   * its history's kept snapshot, and one listing of every snapshot.
+   * What a begun lane's start reads once its container must be made, each
+   * fact only when its plan asks: its disk; its revision records'
+   * snapshots, whether it has any, and its history's kept snapshot; and
+   * whether a snapshot is there, one at a time.
    */
-  async function made(lane: ThreadId, h: LaneHistory): Promise<LaneMade> {
-    const { runtime } = setup
-    await using held = basics.leases.lane(lane)
-    const [disk, revisions, kept, listed] = await Promise.all([
-      runtime.diskExists(lane),
-      held === null ? [] : held.ready.then(doc => readLaneRevisions(doc, lane)),
-      h.keptSnapshot(),
-      runtime.snapshots(),
-    ])
-    return {
-      disk,
-      own: revisions.flatMap(r => (r.snapshot === null ? [] : [r.snapshot])),
-      recorded: revisions.length > 0,
-      kept,
-      listed: new Set(listed),
-    }
-  }
+  const factsOf = (lane: ThreadId, h: LaneHistory): LaneFactReader => ({
+    disk: () => setup.runtime.diskExists(lane),
+    async history() {
+      await using held = basics.leases.lane(lane)
+      const [revisions, kept] = await Promise.all([
+        held === null
+          ? []
+          : held.ready.then(doc => readLaneRevisions(doc, lane)),
+        h.keptSnapshot(),
+      ])
+      return {
+        own: revisions.flatMap(r => (r.snapshot === null ? [] : [r.snapshot])),
+        recorded: revisions.length > 0,
+        kept,
+      }
+    },
+    snapshotExists: snapshot => setup.runtime.snapshotExists(snapshot),
+  })
 
   /**
    * A nested lane's inner Docker data root, made from the last run's lane's
@@ -190,12 +192,10 @@ export function createContainers(deps: {
       facts: await runtime.containerFacts(container),
       want: shapeSpecHash(runtime, planShape(spec, process.env)),
     })
-    const facts = { fork: fork.state, container: containerPlan }
-    const first = planLaneStart({ ...facts, made: null })
-    const decided =
-      first.kind === "gather"
-        ? planLaneStart({ ...facts, made: await made(lane, h) })
-        : first
+    const decided = await decideLaneStart(
+      { fork: fork.state, container: containerPlan },
+      factsOf(lane, h),
+    )
     switch (decided.kind) {
       case "fork":
         // A fork stopped part way may have left its container running, its

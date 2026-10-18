@@ -1008,6 +1008,17 @@ rejects `shutdown()`.
   alone; refused, the card goes back. The text is sent through
   `sendPoppedQueuedCard` in mode `queue`, cleared by the gate, as its queuer (`by`), with the card's other
   writers as contributors. A card with no text starts no run.
+- **A catch-up holds its step through the lane's start and merge,** a
+  queued card's (`catchUpThenSend`) and a chat's caught up first
+  (`catchUpFirst`, `commands/send.ts`) alike, so every command and drain
+  waits for them. That is what keeps a later message to the lane after the
+  merge's entry and the text it carries: let go between the merge and
+  its settle, the step would have to mark the lane busy and every command
+  to it would have to queue behind the mark. Its lanehost calls are each
+  bounded instead: a start reads its disk, and lists no snapshot
+  (`decideLaneStart`, `packages/lanes/TECHNICAL.md`), since a listing that
+  stats every snapshot held a drain for 10 s (S247). A run's own start
+  (`beforeRun`) is queued on the lane and awaited by no step.
 - **A card the host could not send goes back below the line, whole**
   (`planUnsent`): a note in the note column nearest its thread, made in the
   same step when its canvas has none (ADR-0116), saying why, and never queued
@@ -1396,7 +1407,7 @@ adapter's.
 | `shared.ts` | the shared files' lineages (`pinetrie.shared`, ADR-0135), one recorder for every lane and the watcher, so none reads and writes a lineage at once: a turn's accesses of shared files (`classifyWritesOnQueue` hands them over), based on what the lane last read, numbered and flagged (`planSharedLineages`) after the turn's queued step, since the lineages are every lane's; the watcher's stamps (`seen`); a whole directory's scan (`scanned`), whose missing files' lineages go once every version is older than the host's start (`planGoneLineages`); and a thread deleted from the trash, which leaves every lineage it read (`forgetReaders`, from `sweepTrash`). An earlier turn found concurrent after its rival is learnt has its revision record rewritten; one whose record is not written yet keeps what it says |
 | `shared-watch.ts` | your writes to the shared directories as they are made (S169): each directory of accepted work's watched (`watch-dir.ts`, with no quiet window), each file an event names stat'ed into the stamp a lane would read, and handed to `shared.ts`. A scan at each start, and after a dropped-events error, finds what changed unseen, and what is gone. A listing that fails throws, so it never reads as every file gone; only a missing directory lists none. A delete event lets nothing go: the next scan does. It follows accepted work's list (`LaneConfigs.onShared`). Lanes' writes come by here too, and are claimed when their turns are recorded |
 | `registry.ts` | `LaneRegistry`: each lane's handle, its record, whether it is a lane of its own; the only module that touches the handles; `withHistory`, the one way to a lane's `LaneHistory`, which queues its function on the lane's queue with the history, the handle and the lane's record; refused, with nothing queued, for a lane with no record, no copy of its own, no fork record, or a history the adapter does not keep |
-| `containers.ts` | `access` (its prompt's facts from the lane's grants, `laneFacts`, pure), a container's start (`planContainer`, then `planLaneStart` from the lane's fork record, gathering its disk, revision records' snapshots, `keptSnapshot` and one listing of snapshots only when the container must be made; a fork owed runs `create.ts`'s fork; after a restore from a snapshot, the history's `afterRestore`, for jj `pre-rename:`, since a snapshot made before the rename holds the old names (S114); run from a queued step, which hands it the history; every start loses stale outputs, `removeStaleOutputs`), `beforeRun`, `runEnded` |
+| `containers.ts` | `access` (its prompt's facts from the lane's grants, `laneFacts`, pure), a container's start (`planContainer`, then `decideLaneStart` from the lane's fork record, which reads, only when the container must be made, its disk, and with that gone its revision records' snapshots and `keptSnapshot`, then each snapshot newest first until one is there (`factsOf`); a fork owed runs `create.ts`'s fork; after a restore from a snapshot, the history's `afterRestore`, for jj `pre-rename:`, since a snapshot made before the rename holds the old names (S114); run from a queued step, which hands it the history; every start loses stale outputs, `removeStaleOutputs`), `beforeRun`, `runEnded` |
 | `inner-docker-data-roots.ts` | the host's one `InnerDockerDataRoots` (ADR-0169), in memory: which nested lane's container stopped last after a run, and which run end each lane's inner Docker data root is as of. `containers.ts` names a lane the last in the step that stops it at its run's end, after the stop, so it is stopped when others clone it; a start or a fork asks where a data root comes from, and records it once its step ran. After a host's start there is no last run's lane until a run ends |
 | `turns.ts` | pi's `turnDone`: the turn's revision (`recordTurn`), its classes and snapshot (`disk.ts`), its whole-disk diff, and what follows its commit (`follow`, for jj its fetch), fired once the snapshot step is queued (`queueTurnEnd`); the turn records still being written (`pendingRecords`). A revision is titled by its message's first line, else what its first call is for (`revisionTitle`, `callPurpose` from `@pinetrie/interface`): its intent (ADR-0173), "Run the unit tests", else its words (ADR-0114: `shell pnpm test`, not `bash …`). A lane is fetched into your repo only after a turn that commits, so a lane that never changed a file has no `tip@pinetrie-<lane>`, no refresh and no `pinetrie.base` until it catches up (a clean merge is fetched) |
 | `create.ts` | a new lane: `checkBegin`; its record, its fork owed, and its name (`prepareLane`, one for hosts with and without lanes, writing `planLaneRecords`; its `history` the kind of the disk it will clone, `sourceHistory`); its fork, which the lane's start runs (`fork`: where it begins read from its thread's record, `forkEntry`; `forkFacts` waits for `pendingRecords`; `forkSource` refuses a disk of another kind than the record's, thrown with `foreignLaneWords`; `planFork`'s steps through `executeFork`; then one write, `forkEnd`) |
@@ -1724,7 +1735,10 @@ adapter's.
   changed, then deletes what goes, one call at a time, so an earlier
   gather never writes over a later. It runs at start, at each run's end,
   and on every move of accepted work, since `folder.history.states`'
-  window moves with it. Every `STATE` record stays.
+  window moves with it. Every `STATE` record stays. It is the one
+  listing of every snapshot, which stats each (S247): it needs them all to
+  find the ones nothing keeps, and nobody waits on it, since it runs
+  tracked, off the documents' keeper.
 - **A person's choice of a conflict's version is a resolution, as the
   agent's is** (`LaneWork.resolve`, `work/index.ts`): refused while the
   thread runs or for a lane not the host's own (`planResolveCommand`);

@@ -361,16 +361,20 @@ paths are its diff." would compare a function with itself.
   - a fork owed runs, whatever is there (S226: a jj lane's half-made disk
     looks like a whole one, so only the record can say);
   - a begun lane's container that is there starts;
-  - one to make asks for its facts (`gather`), then starts on its disk;
-    else restores its newest snapshot that exists, its revision records'
-    before its kept state's (a turn that changed only ignored files leaves
-    the state older); else, with no turn recorded, forks again, since its
-    files are its fork's (S227); else it is retired: the files it recorded
-    are gone, and a branch from it continues.
-
-  The facts are one read of its revision records, its history's
-  `keptSnapshot` and one listing of every snapshot (`LaneMade`), asked only
-  when the container must be made.
+  - one to make starts on its disk; else restores its newest snapshot
+    that exists, its revision records' before its kept state's (a turn
+    that changed only ignored files leaves the state older); else, with no
+    turn recorded, forks again, since its files are its fork's (S227);
+    else it is retired: the files it recorded are gone, and a branch from
+    it continues.
+- **A start reads one fact at a time, each only when its plan asks**
+  (`planLaneStart`'s `gather`, read by `decideLaneStart` through a
+  `LaneFactReader`): whether its disk is there; only with it gone, its
+  revision records' snapshots and its history's `keptSnapshot` (a load of
+  its root); then each snapshot, newest first, until one is there. So a
+  lane whose disk is there reads only that. A listing of every snapshot
+  stats each one, which took 9 s cold on Duane's Mac (S247), so no start
+  lists them.
 - **A nested lane's inner Docker data root is made before its container
   starts,** whenever the container is made or a stopped one started
   (`innerDockerDataRootStep`, which takes only a

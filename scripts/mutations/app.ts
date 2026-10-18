@@ -165,8 +165,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a restored lane finds no snapshot",
     file: "apps/pinetrie/host/work/containers.ts",
-    from: "      listed: new Set(listed),",
-    to: "      listed: new Set(),",
+    from: "    snapshotExists: snapshot => setup.runtime.snapshotExists(snapshot),",
+    to: "    snapshotExists: async () => false,",
     suite: "lanes",
     scenario: "main",
     expect: "after restoring, a lane runs again on its newest snapshot",
@@ -174,8 +174,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a start reads every fork as begun",
     file: "apps/pinetrie/host/work/containers.ts",
-    from: "    const facts = { fork: fork.state, container: containerPlan }",
-    to: '    const facts = { fork: "begun" as const, container: containerPlan }',
+    from: "      { fork: fork.state, container: containerPlan },",
+    to: '      { fork: "begun" as const, container: containerPlan },',
     suite: "lanes",
     scenario: "main",
     expect:

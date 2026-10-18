@@ -90,7 +90,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a lane that recorded no turn is retired, never forked again",
     file: plan,
-    from: '  return made.recorded ? { kind: "retired" } : { kind: "fork" }',
+    from: '  return history.recorded ? { kind: "retired" } : { kind: "fork" }',
     to: '  return { kind: "retired" }',
     command: unit,
     expect:
@@ -99,8 +99,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a start restores a snapshot that is gone",
     file: plan,
-    from: "    s => made.listed.has(s),",
-    to: "    () => true,",
+    from: '    if (there) return { kind: "snapshot", from: snapshot, recreate }\n',
+    to: '    return { kind: "snapshot", from: snapshot, recreate }\n',
     command: unit,
     expect:
       "planLaneStart: with no disk, the newest of its snapshots that exists, then its kept state's",
@@ -108,11 +108,28 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a lane's kept state's snapshot is never restored",
     file: plan,
-    from: "  const from = [...made.own, ...(made.kept === null ? [] : [made.kept])].find(",
-    to: "  const from = [...made.own].find(",
+    from: "    ...(history.kept === null ? [] : [history.kept]),\n",
+    to: "",
     command: unit,
     expect:
       "planLaneStart: with no disk, the newest of its snapshots that exists, then its kept state's",
+  },
+  {
+    name: "a start reads its history with its disk there",
+    file: plan,
+    from: '  if (made.disk) return { kind: "disk", recreate }\n',
+    to: '  if (made.disk && made.history !== null) return { kind: "disk", recreate }\n',
+    command: unit,
+    expect: "decideLaneStart: a lane whose disk is there reads nothing else",
+  },
+  {
+    name: "a start checks its oldest snapshot first",
+    file: plan,
+    from: "    ...history.own,\n",
+    to: "    ...[...history.own].reverse(),\n",
+    command: unit,
+    expect:
+      "decideLaneStart: a lane whose disk is gone checks its snapshots only until one is there",
   },
   {
     name: "a fork clones over whatever a stopped fork left",
@@ -621,7 +638,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a lane with no disk and no snapshot is not told it is retired",
     file: "packages/lanes/plan.ts",
-    from: '  return made.recorded ? { kind: "retired" } : { kind: "fork" }',
+    from: '  return history.recorded ? { kind: "retired" } : { kind: "fork" }',
     to: '  return { kind: "fork" }',
     command: unit,
     expect:
