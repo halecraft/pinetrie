@@ -1,4 +1,4 @@
-import { pointId, threadIdFor, writerId } from "@pinetrie/core"
+import { type DiskPath, pointId, threadIdFor, writerId } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { planResolution, renderableMessage } from "./index.ts"
 import {
@@ -9,10 +9,22 @@ import {
   type PromptBudget,
   resolutionFloor,
 } from "./land.ts"
+import { REMOVALS_HEADING, REMOVALS_MOST, removalsText } from "./removals.ts"
 
 const LANE = threadIdFor("1")
 const ADA = writerId("ada")
 const C1 = pointId("c1")
+const NONE = removalsText([])
+/** Removals of the most text there may be, naming no file a test looks for. */
+const FULL = removalsText(
+  Array.from({ length: 5 }, (_, i) => ({
+    paths: [`${"d".repeat(150)}${i}` as DiskPath],
+    cause: { kind: "changed", path: "c".repeat(150) },
+    command: "y".repeat(300),
+  })),
+)
+/** The tokens `FULL` takes in a message, by `allowanceOf`'s estimate. */
+const RESERVE = Math.ceil(`\n\n## ${REMOVALS_HEADING}\n\n${FULL}`.length / 4)
 
 /** pi's estimate of a custom message (`packages/pi/compaction.ts`): a token per four characters. */
 const allowanceOf = (tokens: number): PromptBudget => ({
@@ -105,10 +117,12 @@ describe("planResolution: the land message", () => {
       `${"a".repeat(size / 2)}\n<<<<<<< conflict 1 of 1\nCONFLICT\n>>>>>>> conflict 1 of 1 ends\n${"b".repeat(size / 2)}`,
     )
   const details = { lane: LANE, merged: [C1], by: ADA }
+  /** A resolution whose files have about `tokens`, beside the most removals there may be. */
   const plan = (files: ConflictFile[], tokens: number, intent = "") =>
     planResolution({
-      floor: floorOf(tokens, intent),
+      floor: floorOf(tokens + RESERVE, intent),
       files,
+      removals: FULL,
       details,
       timestamp: 1,
     })
@@ -203,7 +217,9 @@ describe("planResolution: the land message", () => {
           ),
         ]) {
           const m = plan(files, tokens)
-          expect(Math.ceil(m.content.length / 4)).toBeLessThanOrEqual(tokens)
+          expect(Math.ceil(m.content.length / 4)).toBeLessThanOrEqual(
+            tokens + RESERVE,
+          )
         }
   })
   test("a conflict of 38 large files shows each by name, within 20 000 tokens", () => {
@@ -214,7 +230,7 @@ describe("planResolution: the land message", () => {
         `${"a".repeat(12_100)}\n<<<<<<< c\n${"x".repeat(2_800)}\n>>>>>>> c ends\n${"b".repeat(12_100)}`,
       ),
     )
-    const m = plan(files, 20_000)
+    const m = plan(files, 20_000 - RESERVE)
     expect(Math.ceil(m.content.length / 4)).toBeLessThanOrEqual(20_000)
     expect(m.content).toContain("## f37.ts")
     expect(m.content).toContain("each file below is named only")
@@ -222,21 +238,73 @@ describe("planResolution: the land message", () => {
   test("the floor: too large only when the skill and the person's text overflow", () => {
     expect(
       resolutionFloor({
-        budget: allowanceOf(100),
+        budget: allowanceOf(100 + RESERVE),
         skill: null,
         intent: "x".repeat(1_000),
         latest: "Accepted work",
       }),
-    ).toMatchObject({ kind: "too-large", budget: 100 })
-    const floor = floorOf(90)
+    ).toMatchObject({ kind: "too-large", budget: 100 + RESERVE })
+  })
+  test("the floor's reserve keeps the removals", () => {
+    expect(FULL.length).toBe(REMOVALS_MOST)
+    const bare = floorOf(100_000).content
+    expect(
+      resolutionFloor({
+        budget: allowanceOf(Math.ceil(bare.length / 4)),
+        skill: { path: "/s/SKILL.md", content: "SKILL TEXT", hash: "h" },
+        intent: "",
+        latest: "Accepted work",
+      }).kind,
+    ).toBe("too-large")
     for (const n of [1, 50]) {
       const files = Array.from({ length: n }, (_, i) =>
         large(`f${i}.ts`, 2_000),
       )
-      expect(
-        planResolution({ floor, files, details, timestamp: 1 }).content,
-      ).toBe(floor.content)
+      const m = plan(files, 90)
+      expect(m.content).toContain(FULL)
+      expect(m.content).toContain("files conflict")
+      expect(m.content).not.toContain("f0.ts")
+      expect(Math.ceil(m.content.length / 4)).toBeLessThanOrEqual(90 + RESERVE)
     }
+  })
+  test("a floor whose removals would not fit sends the floor's own message", () => {
+    const floor = floorOf(90 + RESERVE)
+    // An estimate that grows with no length: removals cost more than measured.
+    const lying: Floor = {
+      ...floor,
+      budget: {
+        tokens: floor.budget.tokens,
+        estimate: c =>
+          c.includes(REMOVALS_HEADING) ? Number.POSITIVE_INFINITY : 0,
+      },
+    }
+    expect(
+      planResolution({
+        floor: lying,
+        files: [large("a.ts", 2_000)],
+        removals: FULL,
+        details,
+        timestamp: 1,
+      }).content,
+    ).toBe(floor.content)
+  })
+  test("removals sit before what the person asked", () => {
+    const m = plan([file("a.ts", 1)], 100_000, "then run the tests")
+    expect(m.content.indexOf(`## ${REMOVALS_HEADING}`)).toBeGreaterThan(
+      m.content.indexOf("## a.ts"),
+    )
+    expect(m.content.indexOf(`## ${REMOVALS_HEADING}`)).toBeLessThan(
+      m.content.indexOf("## What the person asked"),
+    )
+    expect(
+      planResolution({
+        floor: floorOf(100_000),
+        files: [file("a.ts", 1)],
+        removals: NONE,
+        details,
+        timestamp: 1,
+      }).content,
+    ).not.toContain(REMOVALS_HEADING)
   })
   test("the column shows one line, never the prompt", () => {
     const m = plan([file("a.ts", 1), file("b.ts", 1)], 100_000)

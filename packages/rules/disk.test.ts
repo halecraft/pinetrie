@@ -15,6 +15,7 @@ import {
   nextRegistry,
   planStaleOutputs,
   registryAfter,
+  staleCause,
   topmost,
   turnDisk,
   unattributed,
@@ -634,6 +635,8 @@ describe("planStaleOutputs", () => {
   }
   const holds = (run: string) => ({ run, broken: null })
   const breaks = (run: string) => ({ run, broken: "pnpm-lock.yaml" })
+  const removed = (planned: ReturnType<typeof planStaleOutputs>) =>
+    planned.removals.flatMap(r => r.paths)
 
   test("a broken recipe's outputs go, its caches stay, and the registry keeps them", () => {
     const planned = planStaleOutputs({
@@ -641,7 +644,7 @@ describe("planStaleOutputs", () => {
       checks: [breaks("install"), holds("build")],
       image: "img",
     })
-    expect(planned.remove).toEqual(["node_modules"])
+    expect(removed(planned)).toEqual(["node_modules"])
     expect(planned.registry).toEqual({
       recipes: [registry.recipes[1]],
       roots: {
@@ -651,26 +654,62 @@ describe("planStaleOutputs", () => {
     })
   })
 
+  test("a removal names what went, its cause and its command, never a cache", () => {
+    const planned = planStaleOutputs({
+      registry: {
+        ...registry,
+        recipes: [
+          {
+            run: "install",
+            key: { ...key, command: "pnpm i && pnpm test" },
+            outputs: out(
+              "packages/a/node_modules",
+              "node_modules",
+              ".pnpm-store",
+            ),
+          },
+          { run: "build", key, outputs: out("dist") },
+        ],
+      },
+      checks: [breaks("install"), holds("build")],
+      image: "img",
+    })
+    expect(planned.removals).toEqual([
+      {
+        paths: ["node_modules", "packages/a/node_modules"],
+        cause: { kind: "changed", path: "pnpm-lock.yaml" },
+        command: "pnpm i && pnpm test",
+      },
+    ])
+  })
+
   test("every key holds: nothing goes", () => {
     const planned = planStaleOutputs({
       registry,
       checks: [holds("install"), holds("build")],
       image: "img",
     })
-    expect(planned).toEqual({ remove: [], registry })
+    expect(planned).toEqual({ removals: [], registry })
   })
 
   test("another image, or no answer for a recipe, breaks it", () => {
     expect(
-      planStaleOutputs({
-        registry,
-        checks: [holds("install"), holds("build")],
-        image: "other",
-      }).remove,
+      removed(
+        planStaleOutputs({
+          registry,
+          checks: [holds("install"), holds("build")],
+          image: "other",
+        }),
+      ),
     ).toEqual(["dist", "node_modules"])
     expect(
-      planStaleOutputs({ registry, checks: [holds("install")], image: "img" })
-        .remove,
+      removed(
+        planStaleOutputs({
+          registry,
+          checks: [holds("install")],
+          image: "img",
+        }),
+      ),
     ).toEqual(["dist"])
   })
 
@@ -680,9 +719,35 @@ describe("planStaleOutputs", () => {
       roots: {},
     }
     expect(
-      planStaleOutputs({ registry: odd, checks: [breaks("x")], image: "img" })
-        .remove,
+      removed(
+        planStaleOutputs({
+          registry: odd,
+          checks: [breaks("x")],
+          image: "img",
+        }),
+      ),
     ).toEqual(["ok"])
+  })
+})
+
+describe("staleCause", () => {
+  const recipe = {
+    run: "r",
+    key: { command: "c", image: "img", inputs: {}, missing: [], shared: {} },
+    outputs: out("dist"),
+  }
+  test("a recipe's cause is the unanswered check, else the changed path, else the image", () => {
+    expect(staleCause(recipe, undefined, "other")).toEqual({
+      kind: "unchecked",
+    })
+    expect(staleCause(recipe, { run: "r", broken: "a.txt" }, "other")).toEqual({
+      kind: "changed",
+      path: "a.txt",
+    })
+    expect(staleCause(recipe, { run: "r", broken: null }, "other")).toEqual({
+      kind: "image",
+    })
+    expect(staleCause(recipe, { run: "r", broken: null }, "img")).toBeNull()
   })
 })
 

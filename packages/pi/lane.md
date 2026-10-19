@@ -67,9 +67,13 @@ changes pine·trie can keep this note true. You can skip them.
   When getting the latest changes a file a recipe read (a lockfile, a
   `package.json`), pine·trie removes what that recipe made, so nothing a
   deleted package installed stays behind; caches such as pnpm's store
-  stay. Make the rest again as you would after a pull.
+  stay. The message after getting the latest names what went, the file
+  that changed, and the last command seen writing there: a hint, since that
+  is a whole tool call (`pnpm install && pnpm test`) and may not be the one
+  to run. Make the rest again as you would after a pull.
   <!-- apps/pinetrie/host/work/disk.ts removeStaleOutputs -->
   <!-- packages/rules/disk.ts planStaleOutputs -->
+  <!-- packages/rules/removals.ts removalsText -->
 - Each turn's record classes what its commands wrote: derived (made from
   source, under `.gitignore`), local (ignored, made from nothing tracked),
   directories made from source that `.gitignore` misses, and source files

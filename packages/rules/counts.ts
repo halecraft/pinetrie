@@ -21,6 +21,16 @@ export function byteWords(bytes: number): string {
   return `${n >= 100 ? Math.round(n) : Number(n.toFixed(1))} ${units[unit]}`
 }
 
+/** The first `shown` names, then how many more, as a list: "a, b and c", "a, b, c and 2 more". */
+export function namesAndMore(names: readonly string[], shown: number): string {
+  const more = names.length - shown
+  const listed = more > 0 ? [...names.slice(0, shown), `${more} more`] : names
+  const last = listed.at(-1) ?? ""
+  return listed.length < 2
+    ? last
+    : `${listed.slice(0, -1).join(", ")} and ${last}`
+}
+
 /** A count that says "no" for none: "no images", "1 image", "3 images". */
 export const countOrNone = (n: number, one: string, many: string): string =>
   n === 0 ? `no ${many}` : count(n, one, many)

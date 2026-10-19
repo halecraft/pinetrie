@@ -172,7 +172,7 @@ export function laneGuidelines(facts: LaneFacts): string[] {
           "Chromium's headless shell is installed ($PLAYWRIGHT_BROWSERS_PATH), and so is python3.",
         ]
       : []),
-    `Nothing installs dependencies for you. After getting the latest, ${PRODUCT_NAME} removes what commands made from files that changed (node_modules, a build): make them again as you would after a pull.`,
+    `Nothing installs dependencies for you. After getting the latest, ${PRODUCT_NAME} removes what commands made from files that changed (node_modules, a build), and its message names what went: make them again as you would after a pull.`,
     "Keep what commands make out of the repo: when one makes a directory .gitignore misses (dist/, node_modules/), add it to .gitignore.",
     `More about the lane, when you need it: ${facts.note}`,
   ]

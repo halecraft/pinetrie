@@ -11,6 +11,7 @@ import {
   latestSourceName,
   latestWords,
 } from "./latest-from.ts"
+import { REMOVALS_HEADING, type RemovalsText } from "./removals.ts"
 
 const UpdateDetailsSchema = Type.Object({
   lane: ThreadIdSchema,
@@ -47,14 +48,16 @@ export const folderLatest = (from: "folder" | "parent"): string =>
     : "the newest work of the thread this one branched from"
 
 /**
- * The update message, for the model: what came in, and which of this thread's
- * files changed, or that none did. The commits are empty when all that came in
+ * The update message, for the model: what came in, which of this thread's
+ * files changed, or that none did, and then what getting the latest removed
+ * from the disk, if anything. The commits are empty when all that came in
  * was accepted thread commits of work the copy holds, which a catch-up joins
  * and does not list (`withoutAcceptedThreadCommits`, `@pinetrie/lanes`).
  */
 export function encodeUpdate(
   details: UpdateDetails,
   timestamp: number,
+  removals: RemovalsText,
 ): UpdateMessage {
   const commits =
     details.commits.length === 0
@@ -62,12 +65,14 @@ export function encodeUpdate(
       : details.commits.map(c => `- ${firstLine(c, 200)}\n`).join("")
   const what = latestWords(details.from)
   const files = details.files.map(f => `- ${f}\n`).join("")
-  return UPDATE.encode(
-    details,
+  const merged =
     files === ""
       ? `${what} was merged into this thread's own copy. It changed no file in this copy, so what you read before still holds.\n\nWhat came in:\n${commits}`
       : `${what} was merged into this thread's own copy, so these files changed under you. Read them again before relying on what you saw earlier.\n\n` +
-          `What came in:\n${commits}\nFiles that changed:\n${files}`,
+        `What came in:\n${commits}\nFiles that changed:\n${files}`
+  return UPDATE.encode(
+    details,
+    removals === "" ? merged : `${merged}\n${REMOVALS_HEADING}:\n${removals}`,
     timestamp,
   )
 }

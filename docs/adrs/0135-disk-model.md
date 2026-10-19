@@ -64,6 +64,9 @@
   - ADR-0145: a run's events are folded on the host as they arrive, not
     gathered until the turn's drain; a flush is still the barrier before a
     drain reads them.
+  - ADR-0184: the stale outputs removed on getting the latest are told to the
+    agent in the update message's text: each removal's paths, the input that
+    changed, and the last command seen writing there, worded as a hint.
 
 **Context.** pine·trie leans on jj for what a project's state is, and on
 jj's ignore rules for which files belong to it. Five problems follow:

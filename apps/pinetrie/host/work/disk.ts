@@ -28,6 +28,7 @@ import {
   ignoreQuery,
   planStaleOutputs,
   registryAfter,
+  type StaleRemoval,
   turnDisk,
   unattributed,
   writesToClass,
@@ -84,23 +85,26 @@ async function writeRegistry(
 /**
  * On the lane's queue, at a container's start and after an update's merge:
  * each derived output whose recipe's key no longer holds deleted, caches
- * kept, and the registry rewritten.
+ * kept, and the registry rewritten. Returns the removals once their paths
+ * are gone, for getting the latest to tell; it deletes nothing they do not
+ * name.
  */
 export async function removeStaleOutputs(
   handle: LaneHandle<LaneChannel>,
   image: string,
-): Promise<void> {
+): Promise<readonly StaleRemoval[]> {
   const { channel } = await handle.link()
   const registry = await readRegistry(channel)
-  if (registry.recipes.length === 0) return
+  if (registry.recipes.length === 0) return []
   const planned = planStaleOutputs({
     registry,
     checks: await channel.checkRecipes(registry.recipes),
     image,
   })
-  if (planned.remove.length > 0) {
+  const paths = planned.removals.flatMap(r => r.paths)
+  if (paths.length > 0) {
     const removed = await channel.run(
-      ["rm", "-rf", "--", ...planned.remove.map(p => `${WORKSPACE_ROOT}/${p}`)],
+      ["rm", "-rf", "--", ...paths.map(p => `${WORKSPACE_ROOT}/${p}`)],
       false,
     )
     if (removed.code !== 0)
@@ -108,6 +112,7 @@ export async function removeStaleOutputs(
   }
   if (planned.registry.recipes.length < registry.recipes.length)
     await writeRegistry(channel, planned.registry)
+  return planned.removals
 }
 
 /**

@@ -17,6 +17,7 @@ import {
   LANE_HOME_PATH,
   type ListedPaths,
   NO_SHARED,
+  type NonEmpty,
   type Recipe,
   type RecipeCheck,
   type Registry,
@@ -29,6 +30,7 @@ import {
 } from "@pinetrie/core"
 import { Type } from "typebox"
 import { decodeWith } from "./decode.ts"
+import type { RemovalCause, StaleRemoval } from "./removals.ts"
 
 /** What a path a turn wrote is. */
 export type PathClass = "source" | "derived" | "private"
@@ -435,45 +437,75 @@ export function nextRegistry(input: {
 }
 
 /**
- * A new disk's stale outputs: each recipe whose key broke (an
- * input, a failed lookup or a shared file changed, or another image), and
- * the paths of its outputs to delete, its caches kept. A recipe the check
- * did not answer for is broken. Outputs are `DiskPath`s, checked as the
- * registry is read, so none leaves the disk; and never pine·trie's or a
- * repo's own is deleted. The registry after drops the
- * broken recipes and every root they alone held, but caches.
+ * Why a recipe no longer holds on a disk, or null while it holds: no check
+ * answered for it, else the path its check found changed (an input, a
+ * failed lookup now found, or a shared file), else another image.
+ */
+export function staleCause(
+  recipe: Recipe,
+  check: RecipeCheck | undefined,
+  image: string,
+): RemovalCause | null {
+  if (check === undefined) return { kind: "unchecked" }
+  if (check.broken !== null) return { kind: "changed", path: check.broken }
+  if (recipe.key.image !== image) return { kind: "image" }
+  return null
+}
+
+/**
+ * A new disk's stale outputs, as removals: one for each stale recipe
+ * (`staleCause`) that has outputs to delete, its caches and what a holding
+ * recipe keeps left. The caller deletes exactly what the removals name, so
+ * what is told is what went. Each path is in one removal, the first stale
+ * recipe's in the registry's order, and removals are sorted by their first
+ * path. Outputs are `DiskPath`s, checked as the registry is read, so none
+ * leaves the disk; and never pine·trie's or a repo's own is deleted. The
+ * registry after drops the stale recipes and every root they alone held,
+ * but caches.
  */
 export function planStaleOutputs(input: {
   readonly registry: Registry
   readonly checks: readonly RecipeCheck[]
   /** The lane's image now, by its tag. */
   readonly image: string
-}): { readonly remove: readonly DiskPath[]; readonly registry: Registry } {
+}): {
+  readonly removals: readonly StaleRemoval[]
+  readonly registry: Registry
+} {
   const { registry } = input
-  const broken = new Set(
-    registry.recipes
-      .filter(r => {
-        const check = input.checks.find(c => c.run === r.run)
-        return (
-          check === undefined ||
-          check.broken !== null ||
-          r.key.image !== input.image
-        )
-      })
-      .map(r => r.run),
-  )
-  const recipes = registry.recipes.filter(r => !broken.has(r.run))
+  type Stale = { readonly recipe: Recipe; readonly cause: RemovalCause }
+  const stale = registry.recipes.flatMap((recipe): Stale[] => {
+    const check = input.checks.find(c => c.run === recipe.run)
+    const cause = staleCause(recipe, check, input.image)
+    return cause === null ? [] : [{ recipe, cause }]
+  })
+  const staleRecipes = new Set(stale.map(s => s.recipe))
+  const recipes = registry.recipes.filter(r => !staleRecipes.has(r))
   const kept = new Set<string>(recipes.flatMap(r => r.outputs))
   const isKept = (root: string) => {
     const r = registry.roots[root]
     return kept.has(root) || (r !== undefined && isCache(r))
   }
-  const remove = registry.recipes
-    .filter(r => broken.has(r.run))
-    .flatMap(r => r.outputs)
-    .filter(o => !isKept(o) && !isSkipped(o, []))
+  const owner = new Map<DiskPath, Stale>()
+  for (const s of stale)
+    for (const o of s.recipe.outputs)
+      if (!isKept(o) && !isSkipped(o, []) && !owner.has(o)) owner.set(o, s)
+  // Walked in path order, so each removal's paths come sorted, and the
+  // removals by their first path.
+  const paths = new Map<Stale, NonEmpty<DiskPath>>()
+  for (const [o, s] of [...owner].sort(([a], [b]) => (a < b ? -1 : 1))) {
+    const was = paths.get(s)
+    paths.set(s, was === undefined ? [o] : [...was, o])
+  }
+  const removals = [...paths].map(
+    ([s, ps]): StaleRemoval => ({
+      paths: ps,
+      cause: s.cause,
+      command: s.recipe.key.command,
+    }),
+  )
   return {
-    remove: [...new Set(remove)].sort(),
+    removals,
     registry: {
       recipes,
       roots: Object.fromEntries(

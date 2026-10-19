@@ -63,7 +63,9 @@ import {
   planResolution,
   planUpdateFrom,
   refusedAnswer,
+  removalsText,
   resolutionFloor,
+  type StaleRemoval,
   type ToolAnswer,
   type UpdateMessage,
   type UpdateRefusal,
@@ -181,13 +183,17 @@ export async function withLaneStarted(
   return prepared
 }
 
-/** What a merge found, with what a resolution's prompt needs when it conflicted. */
-type SettleFacts =
+/**
+ * What a merge found, with what a resolution's prompt needs when it
+ * conflicted, and what getting the latest removed from the disk after it.
+ */
+type SettleFacts = (
   | Exclude<Merged, { readonly kind: "conflicted" | "refused" }>
   | (Extract<Merged, { readonly kind: "conflicted" }> & {
       /** What the prompt must fit, settled before the merge (`planGetLatest`). */
       readonly floor: Floor
     })
+) & { readonly removed: readonly StaleRemoval[] }
 
 /** What the thread gets after a merge. */
 export type Settle =
@@ -206,7 +212,8 @@ const touching = (revisions: readonly TouchedRevision[], path: string) =>
  * What a merge comes to. Clean: the update, written in the thread. Nothing:
  * nothing for the thread. Conflicted: the resolution's prompt, within the
  * floor's budget, each file with why each side changed it, and the card's
- * text after. What the merge's adapter does after it is its own
+ * text after. Both messages say what was removed from the disk after the
+ * merge. What the merge's adapter does after it is its own
  * (`MergeDone.follow`).
  */
 export function planSettle(
@@ -221,6 +228,7 @@ export function planSettle(
 ): Settle {
   const { lane, by, from } = ctx
   const upToDate = mergedFrom(from)
+  const removals = removalsText(facts.removed)
   switch (facts.kind) {
     case "nothing":
       return { kind: "nothing" }
@@ -237,6 +245,7 @@ export function planSettle(
             by,
           },
           ctx.now,
+          removals,
         ),
         merge: facts.merge,
       }
@@ -264,6 +273,7 @@ export function planSettle(
               reasons: touching(facts.theirs, path).map(d => firstLine(d, 200)),
             },
           })),
+          removals,
           details: { lane, merged: [facts.from], by },
           timestamp: ctx.now,
         }),
@@ -473,15 +483,18 @@ export function createUpdates(deps: {
         )
         if (merged.kind === "refused") return refused(merged.reason)
         // The merge may have changed what a recipe read: its outputs go
-        // before anything snapshots the disk, a catch_up's turn included.
-        await removeStaleOutputs(handle, (await setup.ready).image).catch(
-          failed(basics, "removing stale outputs", lane),
-        )
+        // before anything snapshots the disk, a catch_up's turn included,
+        // and what went is kept for the message. A failed removal tells
+        // nothing.
+        const removed =
+          (await removeStaleOutputs(handle, (await setup.ready).image).catch(
+            failed(basics, "removing stale outputs", lane),
+          )) ?? []
         // A conflict's prompt fits the floor settled before the merge.
         const facts: SettleFacts =
           merged.kind === "conflicted"
-            ? { ...merged, floor: getLatest.floor }
-            : merged
+            ? { ...merged, floor: getLatest.floor, removed }
+            : { ...merged, removed }
         return { kind: "merged", from, facts, follow }
       },
     )

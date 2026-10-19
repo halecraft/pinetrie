@@ -3,6 +3,11 @@
 import { type Static, Type } from "typebox"
 import { List, PointSchema, ThreadIdSchema, WriterIdSchema } from "./decode.ts"
 import { type HistoryMessage, historyMessage } from "./history.ts"
+import {
+  REMOVALS_HEADING,
+  REMOVALS_MOST,
+  type RemovalsText,
+} from "./removals.ts"
 import { leftOut } from "./request.ts"
 
 export const LAND_TYPE = "pinetrie.land"
@@ -129,8 +134,9 @@ declare const floorBrand: unique symbol
 
 /**
  * The smallest land message (`count`) for a skill, an ask and whose work
- * came in, measured and within its budget. Only `resolutionFloor` makes one,
- * so a `planResolution` given one always has a message that fits.
+ * came in, measured within its budget with room for `REMOVALS_MOST`
+ * characters of removals. Only `resolutionFloor` makes one, so a
+ * `planResolution` given one always has a message that fits.
  */
 export interface Floor {
   readonly [floorBrand]: true
@@ -140,7 +146,7 @@ export interface Floor {
   readonly intent: string
   /** Whose work came in, as the model reads it: "Accepted work", a WIP's, or a thread's. */
   readonly latest: string
-  /** The `count` message's content. */
+  /** The `count` message's content, without removals. */
   readonly content: string
 }
 
@@ -186,19 +192,28 @@ function introOf(
 const askedOf = (intent: string): string =>
   intent === "" ? "" : `\n\n## What the person asked\n\n${intent}`
 
-/** A land message's content from its parts; the person's text always last. */
+/** What getting the latest removed, under its own heading; "" for none. */
+const removedOf = (removals: string): string =>
+  removals === "" ? "" : `\n\n## ${REMOVALS_HEADING}\n\n${removals}`
+
+/**
+ * A land message's content from its parts: what getting the latest removed
+ * after the files, and the person's text always last.
+ */
 const joined = (
   skill: LandSkill | null,
   intro: string,
   body: string,
+  removed: string,
   asked: string,
 ): string =>
-  `${`${skill === null ? "" : `${skill.content.trim()}\n\n`}${intro}\n\n${body}`.trimEnd()}${asked}`
+  `${`${skill === null ? "" : `${skill.content.trim()}\n\n`}${intro}\n\n${body}`.trimEnd()}${removed}${asked}`
 
 /**
- * The floor for a resolution: its `count` message, measured. Too large only
- * when the skill and the person's text alone overflow the budget; then the
- * caller refuses before it merges.
+ * The floor for a resolution: its `count` message, measured with room for
+ * `REMOVALS_MOST` characters of removals, which are known only after the
+ * merge. Too large only when the skill and the person's text alone, with
+ * that room, overflow the budget; then the caller refuses before it merges.
  */
 export function resolutionFloor(input: {
   readonly budget: PromptBudget
@@ -207,13 +222,17 @@ export function resolutionFloor(input: {
   readonly latest: string
 }): FloorFound {
   const intent = input.intent.trim()
-  const content = joined(
+  const intro = introOf(input.latest, 0, "count")
+  const asked = askedOf(intent)
+  const content = joined(input.skill, intro, "", "", asked)
+  const reserved = joined(
     input.skill,
-    introOf(input.latest, 0, "count"),
+    intro,
     "",
-    askedOf(intent),
+    removedOf("x".repeat(REMOVALS_MOST)),
+    asked,
   )
-  const tokens = input.budget.estimate(content)
+  const tokens = input.budget.estimate(reserved)
   if (tokens > input.budget.tokens)
     return { kind: "too-large", tokens, budget: input.budget.tokens }
   const floor = { ...input, intent, content } as Floor
@@ -259,29 +278,36 @@ const renderFile = (f: ConflictFile, shown: FileShown, k: number): string =>
 /**
  * The land message for a resolution: the skill's text, then the conflicted
  * files with both sides labelled (the labels are always present and
- * the destination's side is never dropped), then what the person asked, the
- * text of the card that brought the thread up to date.
+ * the destination's side is never dropped), then what getting the latest
+ * removed from the disk, then what the person asked, the text of the card
+ * that brought the thread up to date.
  *
  * It fits `floor.budget`, measured on the whole message. The
  * files are shown the fullest way that fits with each side's newest reason
  * (`ConflictShown`), the same way for every file; then each side keeps as
  * many newest reasons as fit. So the code gives way before the reasons do:
  * the agent can read the files in its lane again, and its own reasons may be
- * compacted away. When no way fits, the message is the floor's.
+ * compacted away. When no way fits, the message is the floor's `count`
+ * message with the removals, measured: the floor reserved room for them.
+ * Were even that over, the floor's own message, measured when it was made,
+ * is sent, so the result fits whatever the estimate does.
  */
 export function planResolution(input: {
   readonly floor: Floor
   readonly files: readonly ConflictFile[]
+  readonly removals: RemovalsText
   readonly details: Omit<LandDetails, "files" | "skill">
   readonly timestamp: number
 }): LandMessage {
   const { floor, files } = input
   const asked = askedOf(floor.intent)
+  const removed = removedOf(input.removals)
   const contentOf = (shown: FileShown, k: number) =>
     joined(
       floor.skill,
       introOf(floor.latest, files.length, shown),
       files.map(f => renderFile(f, shown, k)).join("\n"),
+      removed,
       asked,
     )
   const fits = (content: string) =>
@@ -301,7 +327,14 @@ export function planResolution(input: {
       }
       return best
     }
-    return floor.content
+    const least = joined(
+      floor.skill,
+      introOf(floor.latest, 0, "count"),
+      "",
+      removed,
+      asked,
+    )
+    return fits(least) ? least : floor.content
   })()
   return LAND.encode(
     {

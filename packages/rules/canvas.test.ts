@@ -395,7 +395,7 @@ describe("a media column on the canvas", () => {
     })
     const list = canvasList(facts({ onCanvas, glances }))
     expect(list.lines).toEqual([
-      `media column "Mockups" (${M}), 2 images: "home" (${images[0]?.id}, 2 versions), "${UNTITLED_IMAGE}" (${images[1]?.id}, 1 version), put by Ada`,
+      `media column "Mockups" (${M}), 2 images: "home" (${images[0]?.id}, 2 versions) and "${UNTITLED_IMAGE}" (${images[1]?.id}, 1 version), put by Ada`,
     ])
   })
 

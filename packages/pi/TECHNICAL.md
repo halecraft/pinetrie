@@ -641,7 +641,8 @@ item 18, and in `lanes.test.ts` against the harness.
   adds a block of guidelines, `laneGuidelines(facts)` in `lanes.ts`
   (ADR-0121): what holds in every lane, filled in with the lane's own
   values, in about 300 tokens, among them that nothing installs for it, and
-  that getting the latest removes what was made from files that changed (ADR-0135).
+  that getting the latest removes what was made from files that changed
+  (ADR-0135), and that its message names what went (ADR-0184).
   The model is sent the conversation as stored: nothing is rewritten.
   - **A lane granted `lanes.nested` is told its Docker** answers at
     `$DOCKER_HOST`, and that there is no `/var/run/docker.sock`; its

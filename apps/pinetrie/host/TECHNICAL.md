@@ -1473,7 +1473,7 @@ adapter's.
 | `inner-docker-data-roots.ts` | the host's one `InnerDockerDataRoots` (ADR-0169), in memory: which nested lane's container stopped last after a run, and which run end each lane's inner Docker data root is as of. `containers.ts` names a lane the last in the step that stops it at its run's end, after the stop, so it is stopped when others clone it; a start or a fork asks where a data root comes from, and records it once its step ran. After a host's start there is no last run's lane until a run ends |
 | `turns.ts` | pi's `turnDone`: the turn's revision (`recordTurn`), its classes and snapshot (`disk.ts`), its whole-disk diff, and what follows its commit (`follow`, for jj its fetch), fired once the snapshot step is queued (`queueTurnEnd`); the turn records still being written (`pendingRecords`). A revision is titled by its message's first line, else what its first call is for (`revisionTitle`, `callPurpose` from `@pinetrie/interface`): its intent (ADR-0173), "Run the unit tests", else its words (ADR-0114: `shell pnpm test`, not `bash …`). A lane is fetched into your repo only after a turn that commits, so a lane that never changed a file has no `tip@pinetrie-<lane>`, no refresh and no `pinetrie.base` until it gets the latest (a clean merge is fetched) |
 | `create.ts` | a new lane: `checkBegin`; its record, its fork owed, and its name (`prepareLane`, one for hosts with and without lanes, writing `planLaneRecords`; its `history` the kind of the disk it will clone, `sourceHistory`); its fork, which the lane's start runs (`fork`: where it begins read from its thread's record, `forkEntry`; `forkFacts` waits for `pendingRecords`; `forkSource` refuses a disk of another kind than the record's, thrown with `foreignLaneWords`; `planFork`'s steps through `executeFork`; then one write, `forkEnd`) |
-| `update.ts` | an update (`withLaneStarted`, then one queued step, `planSettle` and `applySettle`, which fires the merge's `follow` after `recordUpdate`); `getLatestInRun`, the agent's `catch_up`; `askedAboutConflict`, which asks the lane's history for conflicts in its copy |
+| `update.ts` | an update (`withLaneStarted`, then one queued step, `planSettle` and `applySettle`, which fires the merge's `follow` after `recordUpdate`), whose message says what the merge's stale outputs removed; `getLatestInRun`, the agent's `catch_up`; `askedAboutConflict`, which asks the lane's history for conflicts in its copy |
 | `archive.ts` | a close's or a reopen's teardown (`planArchive`'s), off the documents' keeper; its lanes' history moved in the destination (`lanesMoved`) |
 | `shares.ts` | what lanes may mount and reach, shared into the lane VM's slots and granted: the decision (`planShareAndGrant`) and, on the Mac, its state behind one queue (`createShares`: a share, a new lease's reset, the extra slots' close) |
 | `runtime.ts` | the one place that picks the runtime, from the project as startup found it (`ProjectDir`): gathers, plans (`planRuntime`), and builds the `LaneRuntime` lanes of their own get (`Setup.runtime`), wiring `@pinetrie/vm`'s lease to `@pinetrie/docker` on the Mac |
@@ -1535,9 +1535,15 @@ adapter's.
   right after an update's merge, in the same queued step, since an agent's
   `catch_up` merges with its container running. The
   helper checks each recipe's key (`checkRecipes`), `planStaleOutputs`
-  says what goes, the paths are deleted and the registry rewritten. A
-  failure is reported and the step goes on: a stale output is a rebuild
-  the agent misses, not a broken lane.
+  says what goes as removals, exactly their paths are deleted, and the
+  registry rewritten. A failure is reported and the step goes on: a stale
+  output is a rebuild the agent misses, not a broken lane.
+- **Getting the latest tells what it removed** (`update.ts`, ADR-0184):
+  `removeStaleOutputs` returns its removals, they join the merge's facts
+  (`SettleFacts.removed`, required, so both the agent's `catch_up` and
+  your get-latest carry them), and `planSettle` words them into the
+  update or land message. A failed removal tells nothing. A container
+  start's removals are not told: no message carries them.
 - **Every grant is told to the lane, or left out by name** (`laneFacts`,
   `containers.ts`): its `grants` literal `satisfies` a record of
   `LaneGrants`' keys, so a new grant fails `tsc` until the lane's facts say

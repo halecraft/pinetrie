@@ -240,7 +240,9 @@ relayed by the host outside, and registers only lanes below its own.
 From those runs and `.gitignore`, each path is source, derived or local. A
 recipe is a recorded run, and a disk made for a new state (an update's
 merge, a container on another image) loses the outputs whose recipe no
-longer holds there, caches kept. pine·trie runs no project command itself:
+longer holds there, caches kept; getting the latest tells the agent what
+went, why, and the last command seen writing there, as a hint
+(ADR-0184). pine·trie runs no project command itself:
 nothing installs for a lane, and the base is the base before it, checked
 out at accepted work. A lane's grants and shared directories are accepted
 work's `pinetrie.json`, less what the lane's own copy gives up: only an

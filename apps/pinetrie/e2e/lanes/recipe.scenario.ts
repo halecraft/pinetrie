@@ -1,6 +1,7 @@
 // e2e/lanes/recipe — what commands make is learnt, not declared: a turn's
-// record classes what its runs wrote; and a catch up, or a run's start, after
-// a file a recipe read changed removes what it made, its cache kept. The
+// record classes what its runs wrote; and getting the latest, or a run's
+// start, after a file a recipe read changed removes what it made, its cache
+// kept, and getting the latest says what went. The
 // project's build is offline: it writes `out-<p>/marker` for each package
 // `pkgs.txt` lists, and each package into `.store/`, a cache with a
 // `CACHEDIR.TAG`.
@@ -80,20 +81,20 @@ async function recipeSection(
   /** The lane whose thread holds `text`. */
   const laneWith = (text: string) =>
     laneHolding(wh, readPlaces(wh.places), text)?.name
-  /** The last tool result's text in a lane's thread. */
-  const lastResult = (lane: ThreadId | undefined): string => {
-    if (lane === undefined) return ""
+  /** The tool results' texts in a lane's thread, oldest first. */
+  const results = (lane: ThreadId | undefined): string[] => {
+    if (lane === undefined) return []
     const onPath = new Set(ancestry(tree(), laneTip(lane)).path)
-    return (
-      Object.values(heldEntries(wh))
-        .filter(r => onPath.has(entryId(r.id)))
-        .sort((a, b) => (a.id < b.id ? -1 : 1))
-        .map(r => rowMessage(r) as { role?: string })
-        .filter(m => m.role === "toolResult")
-        .map(m => messageText(m as never))
-        .at(-1) ?? ""
-    )
+    return Object.values(heldEntries(wh))
+      .filter(r => onPath.has(entryId(r.id)))
+      .sort((a, b) => (a.id < b.id ? -1 : 1))
+      .map(r => rowMessage(r) as { role?: string })
+      .filter(m => m.role === "toolResult")
+      .map(m => messageText(m as never))
   }
+  /** The last tool result's text in a lane's thread. */
+  const lastResult = (lane: ThreadId | undefined): string =>
+    results(lane).at(-1) ?? ""
   /** The revision records of a lane's thread, oldest first. */
   const recordsOf = (lane: ThreadId): RevisionRecord[] => {
     const records = heldRootRecords(wh, readRevisions)
@@ -172,13 +173,25 @@ async function recipeSection(
       { tool: "bash", args: { command: `${GONE}; ls .store` } },
       { text: "caught up" },
     ])
-    await wu.send("@agent catch up", at(laneTip(first)), { thread: first })
+    await wu.send("@agent get the latest", at(laneTip(first)), {
+      thread: first,
+    })
     await idle()
     const after = lastResult(first)
     check(
-      "a catch up that changes what a recipe read removes what it made, and keeps its cache",
+      "getting the latest after what a recipe read changed removes what it made, and keeps its cache",
       after.trim() === "checked\nCACHEDIR.TAG\na\nb\nc",
       JSON.stringify(after),
+    )
+    // The catch_up's answer is the tool result before the last.
+    const told = results(first).at(-2) ?? ""
+    check(
+      "getting the latest names what it removed, the path that changed, and the last command seen writing there",
+      told.includes("`pkgs.txt` changed") &&
+        told.includes("`out-a`") &&
+        told.includes("`sh build.sh`") &&
+        !told.includes(".store"),
+      JSON.stringify(told),
     )
 
     // The lane builds, then changes what the build read: its next run

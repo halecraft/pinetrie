@@ -847,7 +847,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a lane is not told nothing installs for it",
     file: "packages/pi/lanes.ts",
-    from: "    `Nothing installs dependencies for you. After getting the latest, ${PRODUCT_NAME} removes what commands made from files that changed (node_modules, a build): make them again as you would after a pull.`,\n",
+    from: "    `Nothing installs dependencies for you. After getting the latest, ${PRODUCT_NAME} removes what commands made from files that changed (node_modules, a build), and its message names what went: make them again as you would after a pull.`,\n",
     to: "",
     command: unit,
     expect:

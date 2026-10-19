@@ -3473,4 +3473,13 @@ export const mutations: readonly Mutation[] = [
     expect:
       "read_card hands the model an image's stored bytes, its words beside them",
   },
+  {
+    name: "a settle drops its removals",
+    file: "apps/pinetrie/host/work/update.ts",
+    from: "  const removals = removalsText(facts.removed)\n",
+    to: "  const removals = removalsText([])\n",
+    command: unit,
+    expect:
+      "a settle's message names what getting the latest removed, clean or conflicted",
+  },
 ]

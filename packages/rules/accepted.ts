@@ -14,6 +14,7 @@ import {
   type PublishFinish,
 } from "@pinetrie/core"
 import { Type } from "typebox"
+import { namesAndMore } from "./counts.ts"
 import {
   CommitSchema,
   decodeRecord,
@@ -337,12 +338,6 @@ export function planPublishFinish(input: {
   return { ...move, accept: after.workingCopy.ahead > 0 }
 }
 
-/** Files named, the first three, then how many more. */
-export const named = (files: readonly string[]): string =>
-  files.length <= 3
-    ? files.join(", ")
-    : `${files.slice(0, 3).join(", ")} and ${files.length - 3} more`
-
 const commits = (n: number) => (n === 1 ? "1 commit" : `${n} commits`)
 
 /**
@@ -366,9 +361,9 @@ export function acceptedRefusal(
     case ERR.WORKING_COPY_CONFLICT: {
       const would = workingCopy.getLatest?.conflicts ?? []
       if (workingCopy.conflicts.files.length > 0)
-        return `the working copy has conflicts in ${named(workingCopy.conflicts.files)}`
+        return `the working copy has conflicts in ${namesAndMore(workingCopy.conflicts.files, 3)}`
       if (would.length > 0)
-        return `bringing the working copy the latest would conflict in ${named(would)}`
+        return `bringing the working copy the latest would conflict in ${namesAndMore(would, 3)}`
       return `${commits(workingCopy.conflicts.commits)} of yours ${workingCopy.conflicts.commits === 1 ? "has" : "have"} conflicts`
     }
     default:

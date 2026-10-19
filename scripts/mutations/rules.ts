@@ -549,8 +549,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "another image leaves a recipe whole",
     file: "packages/rules/disk.ts",
-    from: "          r.key.image !== input.image\n",
-    to: "          false\n",
+    from: '  if (recipe.key.image !== image) return { kind: "image" }\n',
+    to: '  if (false) return { kind: "image" }\n',
     command: unit,
     expect: "another image, or no answer for a recipe, breaks it",
   },
@@ -1700,7 +1700,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a resolution past every way writes its files whole",
     file: "packages/rules/land.ts",
-    from: "    return floor.content",
+    from: "    return fits(least) ? least : floor.content",
     to: '    return contentOf("whole", 1)',
     command: unit,
     expect: "whatever the files and reasons, the message fits its budget",
@@ -4515,8 +4515,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a media column's line names every image",
     file: "packages/rules/canvas.ts",
-    from: "    .slice(0, MEDIA_LINE_CAP)\n",
-    to: "",
+    from: "    MEDIA_LINE_CAP,\n  )\n",
+    to: "    Number.POSITIVE_INFINITY,\n  )\n",
     command: unit,
     expect: "names at most MEDIA_LINE_CAP images, and counts the rest",
   },
@@ -4581,5 +4581,65 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "an image moved to a spot in another column lands just before the image named there",
+  },
+  // ── what getting the latest removed ──
+  {
+    name: "a stale recipe blames the image first",
+    file: "packages/rules/disk.ts",
+    from: '  if (check.broken !== null) return { kind: "changed", path: check.broken }\n  if (recipe.key.image !== image) return { kind: "image" }\n',
+    to: '  if (recipe.key.image !== image) return { kind: "image" }\n  if (check.broken !== null) return { kind: "changed", path: check.broken }\n',
+    command: unit,
+    expect:
+      "a recipe's cause is the unanswered check, else the changed path, else the image",
+  },
+  {
+    name: "a removal forgets its command",
+    file: "packages/rules/disk.ts",
+    from: "      command: s.recipe.key.command,\n",
+    to: '      command: "",\n',
+    command: unit,
+    expect:
+      "a removal names what went, its cause and its command, never a cache",
+  },
+  {
+    name: "a removal's command is left whole",
+    file: "packages/rules/removals.ts",
+    from: "const COMMAND_MOST = 200\n",
+    to: "const COMMAND_MOST = 2_000\n",
+    command: unit,
+    expect: "a command is one line, cut at 200 characters",
+  },
+  {
+    name: "removals' text is left whole",
+    file: "packages/rules/removals.ts",
+    from: "    text.length > REMOVALS_MOST ?",
+    to: "    false ?",
+    command: unit,
+    expect: "the text is cut at REMOVALS_MOST",
+  },
+  {
+    name: "the floor reserves no room for removals",
+    file: "packages/rules/land.ts",
+    from: "  const tokens = input.budget.estimate(reserved)\n",
+    to: "  const tokens = input.budget.estimate(content)\n",
+    command: unit,
+    expect: "the floor's reserve keeps the removals",
+  },
+  {
+    name: "a floor's last message trusts the estimate",
+    file: "packages/rules/land.ts",
+    from: "    return fits(least) ? least : floor.content",
+    to: "    return least",
+    command: unit,
+    expect:
+      "a floor whose removals would not fit sends the floor's own message",
+  },
+  {
+    name: "removals follow what the person asked",
+    file: "packages/rules/land.ts",
+    from: "}${removed}${asked}`",
+    to: "}${asked}${removed}`",
+    command: unit,
+    expect: "removals sit before what the person asked",
   },
 ]

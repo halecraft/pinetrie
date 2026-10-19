@@ -2,6 +2,7 @@ import {
   type AcceptanceDecision,
   type CommitId,
   commitId,
+  type DiskPath,
   ERR,
   type FilesTouched,
   type JjAcceptedRecord,
@@ -48,7 +49,10 @@ import {
   isAsShown,
   isProposedMoved,
 } from "./proposed.ts"
+import { removalsText } from "./removals.ts"
 import { decodeUpdate } from "./update.ts"
+
+const NONE = removalsText([])
 
 const LANE = threadIdFor("1")
 const ADA = writerId("ada@x.io")
@@ -484,7 +488,7 @@ describe("the update and stack messages", () => {
     by: ADA,
   }
   test("an update round-trips, shows one line, and tells the model what changed", () => {
-    const m = encodeUpdate(details, 5)
+    const m = encodeUpdate(details, 5, NONE)
     expect(decodeUpdate(structuredClone(m))).toEqual(details)
     expect(m.content).toContain("- c.txt")
     expect(renderableMessage(m)).toEqual({
@@ -502,10 +506,10 @@ describe("the update and stack messages", () => {
       ...details,
       from: { kind: "unfinished" as const, bookmark: "wip/a" },
     }
-    expect(renderableMessage(encodeUpdate(unfinished, 5))).toMatchObject({
+    expect(renderableMessage(encodeUpdate(unfinished, 5, NONE))).toMatchObject({
       content: "↓ got the latest from wip/a: 2 files changed",
     })
-    expect(encodeUpdate(unfinished, 5).content).toContain(
+    expect(encodeUpdate(unfinished, 5, NONE).content).toContain(
       "The work on wip/a was merged",
     )
   })
@@ -518,7 +522,7 @@ describe("the update and stack messages", () => {
         name: "amber-fox" as ThreadName,
       },
     }
-    const m = encodeUpdate(fromParent, 5)
+    const m = encodeUpdate(fromParent, 5, NONE)
     expect(decodeUpdate(structuredClone(m))).toEqual(fromParent)
     expect(renderableMessage(m)).toEqual({
       role: "update",
@@ -529,8 +533,25 @@ describe("the update and stack messages", () => {
       "The work of the thread this one branched from (amber-fox) was merged",
     )
   })
+  test("an update ends with what getting the latest removed, its details unchanged", () => {
+    const removed = removalsText([
+      {
+        paths: ["node_modules" as DiskPath],
+        cause: { kind: "changed", path: "pnpm-lock.yaml" },
+        command: "pnpm install",
+      },
+    ])
+    const m = encodeUpdate(details, 5, removed)
+    expect(
+      m.content.endsWith(`\n\nWhat getting the latest removed:\n${removed}`),
+    ).toBe(true)
+    expect(m.details).toEqual(details)
+    expect(encodeUpdate(details, 5, NONE).content).not.toContain(
+      "What getting the latest removed",
+    )
+  })
   test("an update that changed no file says so, and one with no commits says why", () => {
-    const m = encodeUpdate({ ...details, commits: [], files: [] }, 5)
+    const m = encodeUpdate({ ...details, commits: [], files: [] }, 5, NONE)
     expect(m.content).toContain(
       "Accepted work was merged into this thread's own copy. It changed no file in this copy, so what you read before still holds.",
     )

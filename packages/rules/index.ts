@@ -626,6 +626,7 @@ export {
   relayRefusalText,
   unreachableRefusal,
 } from "./relay.ts"
+export { removalsText, type StaleRemoval } from "./removals.ts"
 export { describeRequest, transcriptLines } from "./request.ts"
 export { planResolveCommand, type ResolveCommand } from "./resolve.ts"
 export {

@@ -342,14 +342,24 @@ export const mutations: readonly Mutation[] = [
       "after the folder became a jj repo, its folder lane is refused, saying why",
   },
   {
-    name: "a catch up leaves stale outputs",
+    name: "getting the latest leaves stale outputs",
     file: "apps/pinetrie/host/work/update.ts",
-    from: "        await removeStaleOutputs(handle, (await setup.ready).image).catch(\n",
-    to: "        await Promise.resolve().catch(\n",
+    from: "          (await removeStaleOutputs(handle, (await setup.ready).image).catch(\n",
+    to: "          (await Promise.resolve([]).catch(\n",
     suite: "lanes",
     scenario: "recipe",
     expect:
-      "a catch up that changes what a recipe read removes what it made, and keeps its cache",
+      "getting the latest after what a recipe read changed removes what it made, and keeps its cache",
+  },
+  {
+    name: "getting the latest keeps its removals to itself",
+    file: "apps/pinetrie/host/work/update.ts",
+    from: "            ? { ...merged, floor: getLatest.floor, removed }\n            : { ...merged, removed }\n",
+    to: "            ? { ...merged, floor: getLatest.floor, removed: [] }\n            : { ...merged, removed: [] }\n",
+    suite: "lanes",
+    scenario: "recipe",
+    expect:
+      "getting the latest names what it removed, the path that changed, and the last command seen writing there",
   },
   {
     name: "a run starts on stale outputs",

@@ -1611,6 +1611,23 @@ Host-written records, each a `RecordSpec` (above) with a total decoder:
       outputs are `DiskPath`s (core), checked as the file is read: what
       `planStaleOutputs` deletes can never leave the disk, whoever wrote
       the file, the agent included.
+    - **What a new disk loses is a list of removals** (`planStaleOutputs`,
+      `removals.ts`, ADR-0184). `staleCause` decides each recipe once: no
+      check answered for it, else the path its check found changed, else
+      another image, else it holds. The plan returns only removals, one
+      for each stale recipe with outputs left once caches and what a
+      holding recipe keeps are taken out, and the host deletes exactly
+      the paths they name, so what the agent is told is what went. A
+      removal's paths are `NonEmpty`, and each path is in one removal
+      only. Its command is the recipe's: a whole tool call's text, and
+      the last to write under the outputs, never certainly their maker,
+      so the words call it a hint.
+    - **Removals reach a message only as `RemovalsText`**, which only
+      `removalsText` makes: it words at most three removals and three
+      paths each, cuts a command to one line of 200 characters, and cuts
+      the whole at `REMOVALS_MOST`. A new caller words removals through
+      it, never passes a string, or the floor's reserve (below) stops
+      bounding them.
   - Every record with a state carries its `conflicts`, a prompt's
     included, since a branch from it is cloned with them (ADR-0072);
     `pointConflicts` (core) reads them by point.
@@ -2092,8 +2109,11 @@ or that none did. A merge that changed no file is still an update: the
 `merged` commit it carries is how `parentNow` knows what the lane got the latest
 with, and its revision is where a branch below it starts. `latestWords`
 words whose work came in, for the update and for a resolution's prompt.
-The card that brought the thread up to date carries what the person wants
-done with it (ADR-0108); its text is sent after the update. A stack message (`pinetrie.stack`, role `stack`) is the prompt of the run that
+The update's text ends with what getting the latest removed from the disk,
+under `REMOVALS_HEADING` (ADR-0184); `details` do not hold it, since
+nothing reads it back. The card that brought the thread up to date carries
+what the person wants done with it (ADR-0108); its text is sent after the
+update. A stack message (`pinetrie.stack`, role `stack`) is the prompt of the run that
 splits proposed changes: the `proposed-changes-stack` skill, the commit the stack starts from,
 the tip it must match, and the bookmark to leave on it.
 
@@ -2207,12 +2227,18 @@ line, never the prompt.
   most that fit, the older counted by `leftOut`. The code gives way before
   the reasons, since the agent can read the files in its lane again.
 - **The floor is made before the merge** (`resolutionFloor`): the `count`
-  message, from the skill, the person's text and whose work came in. It
-  states no number of files, so the message measured before the merge is
-  the one `planResolution` returns when nothing fuller fits. Only
-  `resolutionFloor` makes a `Floor`, and `planResolution` requires one, so
-  it always has a message within the budget. A floor too large is the
+  message, from the skill, the person's text and whose work came in,
+  measured with room for `REMOVALS_MOST` characters of removals, which are
+  known only after the merge (ADR-0184). It states no number of files.
+  When nothing fuller fits, `planResolution` returns the `count` message
+  with the merge's removals, measured; were even that over, the floor's
+  own message, measured when it was made. Only `resolutionFloor` makes a
+  `Floor`, and `planResolution` requires one, so it always has a message
+  within the budget, whatever the estimate does. A floor too large is the
   host's refusal (`planGetLatest`), with the lane untouched.
+- **What getting the latest removed has its own slot** (`joined`), under
+  `REMOVALS_HEADING`, after the files and before what the person asked,
+  which stays last.
 - **`jj resolve --list` is the list of what is left**, and every prompt says
   so: a file not shown whole is read in the lane.
 - In every way but the `count`, each file keeps its path and both labelled

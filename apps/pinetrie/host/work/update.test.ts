@@ -1,6 +1,7 @@
 import {
   type BaseMerge,
   commitId,
+  type DiskPath,
   entryId,
   GET_LATEST_TOOL,
   NOBODY,
@@ -22,6 +23,8 @@ import {
   type Floor,
   getLatestRefusal,
   type PromptBudget,
+  removalsText,
+  type StaleRemoval,
   setRecord,
 } from "@pinetrie/rules"
 import { newRootDoc, writeEntry, writeLaneTip } from "@pinetrie/schema/fixtures"
@@ -44,6 +47,8 @@ import {
  * A registry whose lanes are their own or not, each step run on one queue
  * with `history`: a stand-in for the adapter's.
  */
+const NONE = removalsText([])
+
 const registryWith = (history: LaneHistory, own = true) => {
   const queue = createQueue()
   return record<Parameters<typeof createUpdates>[0]["registry"]>({
@@ -179,6 +184,7 @@ describe("planSettle: what a merge comes to", () => {
       merge: MERGE,
       files: ["a.txt"],
       commits: ["yours one"],
+      removed: [],
     } as const
     expect(planSettle(facts, ctx)).toEqual({
       kind: "clean",
@@ -192,6 +198,7 @@ describe("planSettle: what a merge comes to", () => {
           by: ADA,
         },
         7,
+        NONE,
       ),
       merge: MERGE,
     })
@@ -213,15 +220,58 @@ describe("planSettle: what a merge comes to", () => {
           by: ADA,
         },
         7,
+        NONE,
       ),
     })
   })
+  test("a settle's message names what getting the latest removed, clean or conflicted", () => {
+    const removed: readonly StaleRemoval[] = [
+      {
+        paths: ["node_modules" as DiskPath],
+        cause: { kind: "changed", path: "pnpm-lock.yaml" },
+        command: "pnpm install",
+      },
+    ]
+    const told = "`pnpm-lock.yaml` changed, so what was made from it went"
+    const clean = planSettle(
+      {
+        kind: "clean",
+        from: ACCEPTED,
+        ours: OURS,
+        merge: MERGE,
+        files: [],
+        commits: [],
+        removed,
+      },
+      ctx,
+    )
+    if (clean.kind !== "clean") throw new Error("not clean")
+    expect(clean.message.content).toContain(told)
+    const conflicted = planSettle(
+      {
+        kind: "conflicted",
+        from: ACCEPTED,
+        contents: [{ path: "a.txt", content: "<<<<<<< a" }],
+        ours: [],
+        theirs: [],
+        floor: floorFor(acceptedFrom, "keep both sides"),
+        removed,
+      },
+      ctx,
+    )
+    if (conflicted.kind !== "conflicted") throw new Error("not conflicted")
+    expect(conflicted.message.content).toContain(told)
+    expect(conflicted.message.content.endsWith("keep both sides")).toBe(true)
+  })
   test("nothing merged: nothing for the thread, with a mark or without", () => {
     expect(
-      planSettle({ kind: "nothing", ours: OURS, mark: MERGE }, ctx),
+      planSettle(
+        { kind: "nothing", ours: OURS, mark: MERGE, removed: [] },
+        ctx,
+      ),
     ).toEqual({ kind: "nothing" })
     expect(
-      planSettle({ kind: "nothing", ours: OURS, mark: null }, ctx),
+      planSettle({ kind: "nothing", ours: OURS, mark: null, removed: [] }, ctx),
     ).toEqual({ kind: "nothing" })
   })
   test("conflicted: each file's reasons are the revisions that touched it, ours attributed; the land message ends with the card's text", () => {
@@ -252,6 +302,7 @@ describe("planSettle: what a merge comes to", () => {
           { description: "yours b\n", paths: ["b.txt"] },
         ],
         floor: floorFor(acceptedFrom, "keep both sides"),
+        removed: [],
       },
       { ...ctx, index: readTreeIndex(doc) },
     )
@@ -282,6 +333,7 @@ describe("planSettle: what a merge comes to", () => {
         merge: MERGE,
         files: ["a.txt"],
         commits: [],
+        removed: [],
       },
       { ...ctx, from: parent },
     )
@@ -297,6 +349,7 @@ describe("planSettle: what a merge comes to", () => {
         ours: [],
         theirs: [],
         floor: floorFor(parent, ""),
+        removed: [],
       },
       { ...ctx, from: parent },
     )
@@ -338,6 +391,7 @@ describe("applySettle: a settle's writes", () => {
         by: ADA,
       },
       1,
+      NONE,
     ),
     merge: MERGE,
   }

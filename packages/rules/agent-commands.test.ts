@@ -23,6 +23,7 @@ import {
   resolveAnswer,
   splitRefusal,
 } from "./index.ts"
+import { removalsText } from "./removals.ts"
 
 /** A resolution's floor with room to spare. */
 function floor(): Floor {
@@ -135,6 +136,7 @@ describe("getLatestAnswer", () => {
         by: ADA,
       },
       1,
+      removalsText([]),
     )
     expect(
       getLatestAnswer({ kind: "clean", message: update, merged: PC }),
@@ -146,6 +148,7 @@ describe("getLatestAnswer", () => {
     const land = planResolution({
       floor: floor(),
       files: [],
+      removals: removalsText([]),
       details: { lane: LANE, merged: [PC], by: ADA },
       timestamp: 1,
     })

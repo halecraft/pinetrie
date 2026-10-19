@@ -47,6 +47,7 @@ import {
   withMessageImages,
 } from "./index.ts"
 import { detailsFromStored } from "./message.ts"
+import { removalsText } from "./removals.ts"
 
 /** A resolution's floor with room to spare. */
 function floor(): Floor {
@@ -722,6 +723,7 @@ describe("promptAuthor", () => {
         planResolution({
           floor: floor(),
           files: [],
+          removals: removalsText([]),
           details: { lane: threadIdFor("1"), merged: [], by: ADA },
           timestamp: 1,
         }),

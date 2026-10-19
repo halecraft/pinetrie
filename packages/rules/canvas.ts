@@ -15,7 +15,7 @@ import type {
 import { Type } from "typebox"
 import { type CardOnCanvas, isCardOnCanvas } from "./canvas-index.ts"
 import type { CardTitleRecord } from "./card-title.ts"
-import { count, noteCountWords } from "./counts.ts"
+import { count, namesAndMore, noteCountWords } from "./counts.ts"
 import { CanvasIdSchema, List, WriterIdSchema } from "./decode.ts"
 import { type HistoryMessage, historyMessage } from "./history.ts"
 import { type ImageInColumn, imagesIn } from "./media.ts"
@@ -131,16 +131,14 @@ export function columnGlances(input: {
 }
 
 /** A media column's images as its line names them, the rest counted. */
-const imagesLine = (images: readonly ImageGlance[]): string => {
-  const named = images
-    .slice(0, MEDIA_LINE_CAP)
-    .map(
+const imagesLine = (images: readonly ImageGlance[]): string =>
+  namesAndMore(
+    images.map(
       i =>
         `"${i.title}" (${i.id}, ${count(i.versions, "version", "versions")})`,
-    )
-  const more = images.length - named.length
-  return [...named, ...(more > 0 ? [`and ${more} more`] : [])].join(", ")
-}
+    ),
+    MEDIA_LINE_CAP,
+  )
 
 /**
  * One card's line. A thread is named by its two words, else by "a thread";
