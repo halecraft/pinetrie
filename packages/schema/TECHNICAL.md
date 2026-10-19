@@ -395,7 +395,8 @@ A session is a document per root, the session's own, and `pinetrie:live`.
 
 | document | id | schema | holds |
 |---|---|---|---|
-| a root's | `root:<RootId>` (`rootDocId`, core) | `RootDoc` | its entries, usage rows, pi's values and lists for its lanes, checkpoints, and in `records` the host's records keyed by its entries (revision, mark, stop, digest) |
+| a root's | `root:<RootId>` (`rootDocId`, core) | `RootDoc` | its entries, usage rows, pi's values and lists for its lanes, and in `records` the host's records keyed by its entries (revision, mark, stop, digest) |
+| a root's scratch | `scratch:<RootId>` (`scratchDocId`, core) | `ScratchDoc` | pi's pending state that belongs to one operation: a streaming reply's frames, a running tool's checkpoints and their text. Only the host holds it, while a run there needs it; nothing the page reads (ADR-0188) |
 | the session's | `pinetrie:session` | `SessionDoc` | in `records`, the records read across roots: the directory (`pinetrie.root`), every lane's record (`pinetrie.lane`, naming its root), names, offers, banners, bases, the board's states (`pinetrie.workflow`), seats, participants and the singletons |
 | what streams | `pinetrie:live` | `LiveDoc` | streams, their text, active runs |
 
@@ -412,11 +413,17 @@ A session is a document per root, the session's own, and `pinetrie:live`.
 - **A root's id is a `RootId`, not its root entry's** (`r-<uuidv7>`): Start
   Agent creates a lane at the root before pi writes the first entry. The
   directory record maps one to the other.
-- **Every document is compacted alone.** A run's end compacts the roots its
-  lanes ran in, the session, `pinetrie:live` and the places, and a root is
-  compacted as the host lets it go (`planUpkeep`,
-  `apps/pinetrie/host/roots.ts`). The largest root in the session that
-  motivated this took 182 ms (S84).
+- **Every document is compacted alone, and only when it is due.** After a
+  run's end the upkeep weighs the roots its lanes ran in, the roots it lets
+  go, the session, `pinetrie:live` and the places, and compacts each whose
+  stored changes outweigh its whole record (`isCompactionDue`, `planUpkeep`,
+  `apps/pinetrie/host/roots.ts`, ADR-0188). The largest root in the session
+  that motivated this took 182 ms (S84); one of 1,512 records, 1.4 s (S263).
+- **`RootDoc` and `ScratchDoc` share pi's pending fields** (`values`,
+  `lists`, `checkpointText`), declared once, so `KynetaStorage` writes either
+  through `PendingFieldsHandle`. The root's fields keep their order: its
+  stored schema's hash depends on it. A scratch document is destroyed
+  between runs, never compacted.
 
 ## Persistence
 
@@ -466,8 +473,9 @@ its deletion (S114).
 `RootDoc` and `SessionDoc` are `json.bind`: plain JSON, serialized writes, one writer (the
 host). No replica writes it, so it needs no CRDT merging, and the browser loads
 no Loro and no wasm. Its in-memory op log grows with every edit until
-compacted (S25), so the host compacts it between runs (`apps/pinetrie/host/settle.ts`:
-after a run ends, and at startup), each root's alone (ADR-0063): the store's
+compacted (S25), so the host compacts it between runs when it is due
+(`apps/pinetrie/host/settle.ts`: after a run ends, by `isCompactionDue`;
+and at startup), each root's alone (ADR-0063): the store's
 records become the document as it stands, and the log is trimmed. What is lost is the history of edits to transient
 state: streams and cleared values. The tree is explicit and
 immutable, so no conversation is lost. A client behind the compacted point

@@ -29,11 +29,25 @@ if (target === "memory") {
 } else {
   const { KynetaStorage } = await import("@pinetrie/pi")
   const { threadIdFor } = await import("@pinetrie/core")
+  // "kyneta-scratch" gives the storage a scratch document, as the host
+  // does; "kyneta" none, so every key is in the root's.
+  const fixtures =
+    target === "kyneta-scratch"
+      ? await import(
+          createRequire(require_.resolve("@pinetrie/pi")).resolve(
+            "@pinetrie/schema/fixtures",
+          )
+        )
+      : null
   factory = async () => {
+    const scratch = fixtures?.newScratchDoc()
     // pi's suite commits entries outside any thread; pine·trie's never do,
     // so only this storage is given a thread to fall back to.
     const storage = new KynetaStorage({
       fallbackThread: threadIdFor("c0f0a0ce"),
+      ...(scratch === undefined
+        ? {}
+        : { scratch: { held: () => scratch, make: async () => scratch } }),
     })
     return { storage, async [Symbol.asyncDispose]() {} }
   }

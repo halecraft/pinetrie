@@ -152,6 +152,14 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           10_000,
         )
       }
+    // pi's pending state (the reply's frames, the command's checkpoints) is
+    // in the root's scratch document while the run goes.
+    const scratchStored = async () => {
+      const ids: string[] = []
+      for await (const id of stored.listDocIds("scratch:")) ids.push(id)
+      return ids
+    }
+    const scratchDuring = await scratchStored()
     if (l3 !== undefined) await inLaneQuiet(l3.name, gateClose(long))
     await tidle()
     const resultText = () =>
@@ -186,6 +194,12 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         ? { records: Number.POSITIVE_INFINITY, bytes: 0 }
         : await storedRecords(stored, rootDocId(ranIn))
     const ranBytes = ranDoc == null ? 0 : rootBytes(ranDoc)
+    const scratchAfter = await scratchStored()
+    check(
+      "a run's pending state is in its root's scratch document, which its end destroys",
+      scratchDuring.length === 1 && scratchAfter.length === 0,
+      `${scratchDuring.length} while it ran, ${scratchAfter.length} after`,
+    )
     check(
       "after the run, the store holds the compacted session",
       compacted.records <= 3 && compacted.bytes <= 2 * ranBytes,

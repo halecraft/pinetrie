@@ -14,7 +14,13 @@ import { threadIdFor } from "@pinetrie/core"
 import { LANE_TIP, physicalKey } from "@pinetrie/schema"
 import { describe, expect, test } from "vitest"
 import { CHECKPOINT_NAMESPACE } from "./checkpoint.ts"
-import { planCommit, threadOfEntries } from "./commit.ts"
+import {
+  type DocOp,
+  type PendingOp,
+  planCommit,
+  splitCommit,
+  threadOfEntries,
+} from "./commit.ts"
 import { emptyUsage } from "./deep.ts"
 
 const THREAD = threadIdFor("a")
@@ -154,4 +160,27 @@ describe("threadOfEntries: a commit's entries are in the thread its context name
       }).ops,
     ).toHaveLength(1)
   })
+})
+
+test("splitCommit: the scratch document's sets, the root's operations, then its deletes, with no empty part", () => {
+  const set = (pkey: string): DocOp => ({
+    kind: "element",
+    pkey,
+    element: { eid: pkey, value: 1 },
+  })
+  const gone = (pkey: string): DocOp => ({
+    kind: "delete",
+    field: "lists",
+    pkey,
+  })
+  const ops = [gone("s1"), set("r1"), set("s2"), gone("r2"), set("s3")]
+  const inScratch = (op: PendingOp) => op.pkey.startsWith("s")
+  expect(splitCommit(ops, inScratch)).toEqual([
+    { target: "scratch", ops: [set("s2"), set("s3")] },
+    { target: "root", ops: [set("r1"), gone("r2")] },
+    { target: "scratch", ops: [gone("s1")] },
+  ])
+  expect(splitCommit([set("r1")], inScratch)).toEqual([
+    { target: "root", ops: [set("r1")] },
+  ])
 })

@@ -1,22 +1,31 @@
 import { globSync, readFileSync } from "node:fs"
 import path from "node:path"
+import { batch } from "@kyneta/schema"
 import {
   type RootId,
   rootDocId,
   rootIdFor,
   SESSION_TARGET,
+  scratchDocId,
   threadIdFor,
 } from "@pinetrie/core"
 import { LIVE_DOC_ID, SESSION_DOC_ID } from "@pinetrie/protocol/messages"
 import { readRootRecord, readRoots } from "@pinetrie/reads"
 import { ROOT, setRecord } from "@pinetrie/rules"
-import { applyRecordWrites, RootDoc } from "@pinetrie/schema"
+import { applyRecordWrites, RootDoc, ScratchDoc } from "@pinetrie/schema"
 import { newRootDoc, writeEntry } from "@pinetrie/schema/fixtures"
 import { describe, expect, test } from "vitest"
 import { startDirectory } from "./directory.ts"
 import { basics, hostRoots, putCanvas, ROOT_ID, threadRow } from "./fakes.ts"
 import { createRecords } from "./records.ts"
-import { NotHeld, planUpkeep, StepEnded } from "./roots.ts"
+import {
+  dueCompactions,
+  isCompactionDue,
+  NotHeld,
+  planScratchDestroys,
+  planUpkeep,
+  StepEnded,
+} from "./roots.ts"
 
 const [A, B, C] = ["a", "b", "c"].map(n =>
   rootIdFor(`01a0ffd2-0000-7000-8000-00000000000${n}`),
@@ -40,7 +49,7 @@ describe("planUpkeep", () => {
     expect(plan().unload).toEqual([A, B, C])
   })
 
-  test("a root is compacted before it is let go, and the session's documents only after a settle", () => {
+  test("every root let go or a run changed is a candidate for compaction, and the session's documents only after a settle", () => {
     expect(plan({ leased: new Set([A, B]) }).compact).toEqual([rootDocId(C)])
     const settled = plan({
       settled: new Set([A, rootIdFor("not-loaded")]),
@@ -198,6 +207,57 @@ describe("the upkeep", () => {
     expect(compacted).toContain(SESSION_DOC_ID)
   })
 
+  test("a root let go with no compaction due is unloaded, not compacted", async () => {
+    const whole = { whole: 100, after: { count: 0, bytes: 0 } }
+    const { keeper, roots, compacted } = hostRoots({
+      sizes: ids => new Map(ids.map(id => [id, whole])),
+    })
+    await keeper.run(async step => step.root(A))
+    await keeper.idle()
+    expect(roots.loaded()).toEqual([])
+    expect(compacted).not.toContain(rootDocId(A))
+  })
+
+  test("an empty scratch document is destroyed once no lane runs in its root, and one in use is kept", async () => {
+    let running = new Set<RootId>([A])
+    const { keeper, roots, exchange } = hostRoots({ running: () => running })
+    await using _held = await keeper.run(async step => step.lease(A))
+    const scratch = await roots.pi.makeScratch(A)
+    await keeper.idle()
+    expect(roots.pi.scratch(A)).toBe(scratch)
+    running = new Set()
+    roots.settled([A])
+    await keeper.idle()
+    expect(roots.pi.scratch(A)).toBeUndefined()
+    expect(await exchange.open(scratchDocId(A), ScratchDoc)).toBeUndefined()
+  })
+
+  test("a scratch document made for pi can be written at once", async () => {
+    const { keeper, roots } = hostRoots()
+    await using _held = await keeper.run(async step => step.lease(A))
+    const made = await roots.pi.makeScratch(A)
+    batch(made, d => d.values.set("pi.pending.tool_output\u0000op:c", 1))
+    expect(roots.pi.scratch(A)?.values.keys()).toHaveLength(1)
+  })
+
+  test("pi is handed a root only once its stored scratch document has arrived", async () => {
+    const { keeper, roots, exchange } = hostRoots()
+    const stored = exchange.get(scratchDocId(A), ScratchDoc)
+    await exchange.whenHydrated(scratchDocId(A))
+    batch(stored, d => {
+      d.lists.set("pi.pending.assistant_frame\u0000op:r", [
+        { eid: "e", value: 1 },
+      ])
+    })
+    await exchange.flush()
+    exchange.unload(scratchDocId(A))
+    await keeper.run(async step => {
+      await step.root(A)
+      await roots.pi.root(A)
+      expect(roots.pi.scratch(A)?.lists.keys()).toHaveLength(1)
+    })
+  })
+
   test("a failed compaction is heard, and the root is let go all the same", async () => {
     const heard: unknown[] = []
     const { keeper, roots, exchange } = hostRoots({
@@ -255,6 +315,42 @@ describe("the host's sources", () => {
       unloads.filter(
         u => !u.startsWith("migrations/") && !u.startsWith("move-history.ts"),
       ),
-    ).toEqual(["roots.ts: rootDocId(root)"])
+    ).toEqual(["roots.ts: rootDocId(root)", "roots.ts: scratchDocId(root)"])
   })
+})
+
+test("dueCompactions: with sizes, only the candidates due, in order; with none, every one", () => {
+  const size = (whole: number, count: number, bytes: number) => ({
+    whole,
+    after: { count, bytes },
+  })
+  const sizes = new Map([
+    ["a", size(10_000, 1001, 100)],
+    ["b", size(100, 3, 101)],
+    ["c", size(10_000, 3, 100)],
+  ])
+  expect(dueCompactions(["c", "b", "a", "d"], sizes)).toEqual(["b", "a"])
+  expect(dueCompactions(["c", "b"], null)).toEqual(["c", "b"])
+})
+
+test("isCompactionDue: once what a document stores beyond its whole record outweighs it, or passes a thousand records", () => {
+  const due = (whole: number, count: number, bytes: number) =>
+    isCompactionDue({ whole, after: { count, bytes } })
+  expect([
+    due(100, 1, 100),
+    due(100, 1, 101),
+    due(10_000, 1000, 1),
+    due(10_000, 1001, 1),
+    due(0, 1, 1),
+    due(0, 0, 0),
+  ]).toEqual([false, true, false, true, true, false])
+})
+
+test("planScratchDestroys: an empty scratch document of a root no lane runs in, and no other", () => {
+  const scratch = new Map([
+    [A, { empty: true }],
+    [B, { empty: true }],
+    [C, { empty: false }],
+  ])
+  expect(planScratchDestroys({ scratch, running: new Set([B]) })).toEqual([A])
 })

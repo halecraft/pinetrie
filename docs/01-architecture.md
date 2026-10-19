@@ -365,6 +365,11 @@ pinetrie:session   SessionDoc               session-wide host records:
 root:<RootId>    RootDoc, one a root      that root's pi storage (entries,
                                           values, lists) and the records keyed
                                           by its entries (revision, digest)
+scratch:<RootId> ScratchDoc, one a root   pi's pending state while a run in
+                 while a run needs it     that root needs it (a reply's frames,
+                                          a tool's checkpoints): the host's
+                                          only, shared with no client,
+                                          destroyed between runs (ADR-0188)
 pinetrie:live      LiveDoc                  streams and active runs: compacted
                                           at every run's end, needed by no
                                           restarted host

@@ -20,7 +20,12 @@
 // the host destroyed it. Every other document is left to Kyneta's default.
 
 import { type Policy, routeLine } from "@kyneta/exchange"
-import { MOVES_DOC_PREFIX, type RootId, rootOfDocId } from "@pinetrie/core"
+import {
+  MOVES_DOC_PREFIX,
+  type RootId,
+  rootOfDocId,
+  rootOfScratchDocId,
+} from "@pinetrie/core"
 import {
   LIVE_DOC_ID,
   PLACES_DOC_ID,
@@ -40,6 +45,7 @@ import {
   OpenDoc,
   PlacesDoc,
   RootDoc,
+  ScratchDoc,
   SessionDoc,
   TextDoc,
 } from "@pinetrie/schema"
@@ -54,6 +60,7 @@ export const SCHEMA_OF = {
   live: LiveDoc,
   places: PlacesDoc,
   root: RootDoc,
+  scratch: ScratchDoc,
   text: TextDoc,
   inventory: InventoryDoc,
   attention: AttentionDoc,
@@ -74,12 +81,15 @@ export function storedKind(docId: string): StoredKind | "kyneta" | undefined {
   if (docId === LIVE_DOC_ID) return "live"
   if (docId === PLACES_DOC_ID) return "places"
   if (rootOfDocId(docId) !== undefined) return "root"
+  if (isScratch(docId)) return "scratch"
   if (cardIdOfDoc(docId) !== undefined) return "text"
   return ownerOfPersonDoc(docId)?.kind
 }
 
 const isUndo = (docId: string): boolean => docId.startsWith("undo:")
 const isMoves = (docId: string): boolean => docId.startsWith(MOVES_DOC_PREFIX)
+const isScratch = (docId: string): boolean =>
+  rootOfScratchDocId(docId) !== undefined
 
 /**
  * What the host makes of a document a client announces and the host does not
@@ -103,6 +113,7 @@ export function resolveDoc(
       return root !== undefined && known(root) ? "root" : "reject"
     }
     case "kyneta":
+    case "scratch":
       return "reject"
     case "session":
     case "live":
@@ -121,17 +132,17 @@ export function resolveDoc(
 export function acceptsWrite(docId: string): boolean | undefined {
   if (docId === PRESENCE_DOC_ID) return true
   if (cardIdOfDoc(docId) !== undefined) return true
-  if (isUndo(docId) || isMoves(docId)) return false
+  if (isUndo(docId) || isMoves(docId) || isScratch(docId)) return false
   return undefined
 }
 
 export const hostPolicy: Policy = {
   name: "pinetrie.host",
   // A Line's documents only between its ends, in both directions; a
-  // person's document only with its person; a tab's undo stack and a stack of
-  // moves with no one.
+  // person's document only with its person; a tab's undo stack, a stack of
+  // moves and a scratch document with no one.
   canShare: (docId, peer) =>
-    isUndo(docId) || isMoves(docId)
+    isUndo(docId) || isMoves(docId) || isScratch(docId)
       ? false
       : (routeLine(docId, peer) ?? holdsPersonDoc(docId, peer.principal)),
   canAccept: (docId, peer) =>

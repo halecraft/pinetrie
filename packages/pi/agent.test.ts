@@ -44,9 +44,14 @@ import {
   readNamespace,
   rowMessage,
   rowRetainedTail,
+  type ScratchDocHandle,
   type SessionDocHandle,
 } from "@pinetrie/schema"
-import { newRootDoc, newSessionDoc } from "@pinetrie/schema/fixtures"
+import {
+  newRootDoc,
+  newScratchDoc,
+  newSessionDoc,
+} from "@pinetrie/schema/fixtures"
 import { describe, expect, test } from "vitest"
 import { type CreateAgentOptions, newId } from "./agent.ts"
 import { NO_RESOURCES } from "./config.ts"
@@ -163,9 +168,20 @@ describe("a pi session per root", () => {
       if (known === undefined) throw new Error(`no root ${id}`)
       return known
     },
+    ...scratchOf(new Map<RootId, ScratchDocHandle>()),
+    stored: async () => {},
     rootOfLane: (lane: ThreadId) =>
       recordsIn(LANE, readNamespace(session, LANE.namespace)).get(lane)?.root ??
       null,
+  })
+  /** Each root's scratch document in `held`, made when asked to. */
+  const scratchOf = (held: Map<RootId, ScratchDocHandle>) => ({
+    scratch: (id: RootId) => held.get(id),
+    makeScratch: async (id: RootId) => {
+      const made = held.get(id) ?? newScratchDoc()
+      held.set(id, made)
+      return made
+    },
   })
 
   test("each root's lane writes in its own document, and a later agent finds each by its record", async () => {

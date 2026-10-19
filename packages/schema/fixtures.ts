@@ -18,6 +18,8 @@ import {
   physicalKey,
   RootDoc,
   type RootDocHandle,
+  ScratchDoc,
+  type ScratchDocHandle,
   SessionDoc,
   type SessionDocHandle,
   type StoredEntryRow,
@@ -26,6 +28,9 @@ import {
 
 /** A root's document with no Exchange. */
 export const newRootDoc = (): RootDocHandle => createDoc(RootDoc)
+
+/** A root's scratch document with no Exchange. */
+export const newScratchDoc = (): ScratchDocHandle => createDoc(ScratchDoc)
 
 /** The session's document with no Exchange. */
 export const newSessionDoc = (): SessionDocHandle => createDoc(SessionDoc)

@@ -957,11 +957,51 @@ the value record keeps a shell (`sealed: true`), and the text goes to
 rejoin them; a delete removes both. Any other shape is stored whole.
 `sealCheckpoint`/`unsealCheckpoint` are the pure rule. Conformance stays 21/21.
 
-Every pending namespace is stored in the root, `pi.pending.assistant_frame`
-among them: one appended element, and so one stored record, for each frame
-of a streaming reply, deleted once its entry is written (S262). ADR-0188,
-accepted and not yet built, moves it and `pi.pending.tool_output` to a scratch document named
-by the root, which exists only while a run there needs it and is destroyed at its end.
+### pi's pending state, in the root's scratch document (ADR-0188)
+
+pi commits each frame of a streaming reply to `pi.pending.assistant_frame`,
+one appended element and so one stored record a frame, and deletes the list
+once the reply's entry is written; a running tool's checkpoints go to
+`pi.pending.tool_output` (S262). Neither outlives its operation, and no tab
+reads them. So `KynetaStorage` keeps them in the root's scratch document
+(`scratch:<RootId>`, `ScratchDoc`), not in the root, and the host destroys it
+between runs (`apps/pinetrie/host/TECHNICAL.md`, § Roots).
+
+- **`SCRATCH_NAMESPACES` and `isScratchKey`** (`stored-values.ts`) say which
+  keys go there: the frames, by the name pi's `pendingAssistantFrames` gives,
+  and `CHECKPOINT_NAMESPACE`, with its `checkpointText`. A queued message's
+  `pi.pending.entry` stays in the root: it can wait in a lane's inbox past an
+  operation.
+- **`#pendingDocument` is the one router.** Every write of a value, a list's
+  element or a delete, every read of one, and the index's observation take
+  their document from it. The two documents never hold the same key, so the
+  index needs nothing more: a replayed change from either marks its keys, by
+  `dirtyFrom` as before.
+- **The storage asks for the scratch document at each use** (`ScratchSource`,
+  given by the scribe from `AgentDocuments.scratch` and `makeScratch`): a read
+  takes the one held, if any; a write has one made. Kyneta stores a document
+  as soon as `get` makes one, so a read never makes one; and it refuses a
+  write until the document has hydrated, so `makeScratch` resolves once it
+  can be written. A handle not seen before (after a destroy) is subscribed
+  to, and its values and lists read again.
+- **A commit is written in parts** (`splitCommit`, `commit.ts`): the scratch
+  document's sets, the root's operations, then the scratch document's
+  deletes. Before a part in the other document, the commit waits until the
+  store holds every write so far (`stored`, the host's `exchange.flush`):
+  Kyneta orders a store's calls per document only. So a crash between two
+  parts leaves pending data that nothing points at, never a state pointing at
+  pending data that is gone. pi commits a scratch set with a root write
+  nowhere today; only a commit ending a reply or a tool waits, once.
+- **Gotcha: `#applyCommit` is async.** A read made while a commit waits for
+  the store sees the root's part and not yet the deletes, and the index takes
+  the commit's arrivals only after its last part.
+- Without a `scratch` (tests, `oneRoot` aside), every key stays in the root.
+  The conformance suite runs both ways, 21/21 each
+  (`apps/conformance/run-conformance.ts`, `kyneta` and `kyneta-scratch`).
+- **A root that held frames before this change** keeps them there: they are
+  read from the scratch document now, so neither read nor deleted. They are
+  only a reply interrupted across the change, and its recovery has no
+  frames.
 
 `KynetaStorage` re-indexes only for **replayed** changes (hydration, or edits
 synced from another replica): its own commits index themselves. Which indexes a

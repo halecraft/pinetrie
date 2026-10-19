@@ -43,8 +43,14 @@ export const rootsOpenedWords = (counts: {
 export const planLoads = (
   running: readonly ThreadId[],
   rootOfLane: (lane: ThreadId) => RootId | undefined,
+): readonly RootId[] => rootsOfLanes(running, rootOfLane)
+
+/** The roots `lanes` work in, once each, in order by id; a lane no root holds names none. */
+export const rootsOfLanes = (
+  lanes: readonly ThreadId[],
+  rootOfLane: (lane: ThreadId) => RootId | undefined,
 ): readonly RootId[] =>
-  [...new Set(running.flatMap(lane => rootOfLane(lane) ?? []))].sort()
+  [...new Set(lanes.flatMap(lane => rootOfLane(lane) ?? []))].sort()
 
 export function hostDocuments(input: {
   readonly session: SessionDocHandle

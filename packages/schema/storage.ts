@@ -21,25 +21,41 @@ import { StoredEntryRowSchema } from "./pi-layout.ts"
 const RecordsField = Schema.record(Schema.record(Schema.any()))
 
 /**
+ * pi's values and lists, and the text of its tool-output checkpoints, which
+ * `KynetaStorage` writes as edits. A root's document and its scratch
+ * document both hold them, declared once so the two cannot drift.
+ */
+const PENDING_FIELDS = {
+  values: Schema.record(Schema.any()),
+  lists: Schema.record(Schema.list(Schema.any())),
+  checkpointText: Schema.record(Schema.text()),
+}
+
+/**
  * A root's document: pi's storage, and the host's records keyed by its
  * entries. Authoritative JSON: the host is its only writer, and compacts it
- * between runs.
+ * when what it stores beyond its whole record outweighs it.
  *
  * `entries` is keyed by entry id, so a retried write replaces the same row.
- * `usageRows`, `values` and `lists` are pi's bookkeeping, typed `any`.
- * `checkpointText` holds the text of pi's tool-output checkpoints, written as
- * edits by `KynetaStorage`.
+ * `usageRows`, `values` and `lists` are pi's bookkeeping, typed `any`. The
+ * fields keep their order: the stored schema's hash depends on it.
  */
 export const RootDoc = json.bind(
   Schema.struct({
     entries: Schema.record(StoredEntryRowSchema),
     usageRows: Schema.record(Schema.any()),
-    values: Schema.record(Schema.any()),
-    lists: Schema.record(Schema.list(Schema.any())),
-    checkpointText: Schema.record(Schema.text()),
+    ...PENDING_FIELDS,
     records: RecordsField,
   }),
 )
+
+/**
+ * A root's scratch document: pi's pending state that belongs to one
+ * operation (a streaming reply's frames, a running tool's checkpoints),
+ * written only by the host and held by no tab. It exists while a run in its
+ * root needs it, and is destroyed, never compacted.
+ */
+export const ScratchDoc = json.bind(Schema.struct(PENDING_FIELDS))
 
 /** The session's document: the host's records read across roots, the directory among them. */
 export const SessionDoc = json.bind(Schema.struct({ records: RecordsField }))
@@ -47,6 +63,16 @@ export const SessionDoc = json.bind(Schema.struct({ records: RecordsField }))
 /** A root's document, as the Exchange gives it. */
 export type RootDocHandle =
   typeof RootDoc extends BoundSchema<infer S, infer N> ? DocRef<S, N> : never
+
+/** A root's scratch document, as the Exchange gives it. */
+export type ScratchDocHandle =
+  typeof ScratchDoc extends BoundSchema<infer S, infer N> ? DocRef<S, N> : never
+
+/** What either a root's document or its scratch document gives pi's values, lists and checkpoint text. */
+export type PendingFieldsHandle = Pick<
+  RootDocHandle,
+  keyof typeof PENDING_FIELDS
+>
 
 /** The session's document, as the Exchange gives it. */
 export type SessionDocHandle =

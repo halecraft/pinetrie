@@ -87,7 +87,10 @@ interface Held {
 }
 
 export function createScribe(options: {
-  readonly documents: Pick<AgentDocuments, "root">
+  readonly documents: Pick<
+    AgentDocuments,
+    "root" | "scratch" | "makeScratch" | "stored"
+  >
   /**
    * This PROCESS's replica id, used by storage for write tokens. It is not a
    * writer's identity: writers are people, identified by the transport.
@@ -112,6 +115,11 @@ export function createScribe(options: {
       },
       new KynetaStorage({
         doc,
+        scratch: {
+          held: () => documents.scratch(root),
+          make: () => documents.makeScratch(root),
+        },
+        stored: () => documents.stored(),
         peerId: replicaId,
         ...(options.blobs === undefined ? {} : { blobs: options.blobs }),
       }),

@@ -47,7 +47,7 @@ wires them.
 | `http.ts` | the HTTP server: admission, the page (Vite or the built one), the websocket, blobs, proposed changes read, invites |
 | `responses.ts` | every answer the host writes itself, as a pure `HttpAnswer` |
 | `routes.ts` | what a request or an upgrade gets, pure: admission first (`planRequest`, `planUpgrade`), then which requests are the host's (`route`) |
-| `admission.ts`, `policy.ts`, `lines.ts`, `blobs.ts`, `store.ts` | the invite key and links (ADR-0107; a blob, like the page, is admitted only from this host's own page on loopback, ADR-0042), the write policy, departed seats (a seat is fresh per page load, ADR-0037), the blob store (images, ADR-0042, and references' quotes as markdown, ADR-0126), the SQLite store, on `node:sqlite`, so with no native dependency (S22), which owns its file: it takes the file's lock, and a second connection, process or reader is refused (S47); `openStore` gives it with its blobs and ledger as one `OpenedStore`, which is what `startHost` takes |
+| `admission.ts`, `policy.ts`, `lines.ts`, `blobs.ts`, `store.ts` | the invite key and links (ADR-0107; a blob, like the page, is admitted only from this host's own page on loopback, ADR-0042), the write policy, departed seats (a seat is fresh per page load, ADR-0037), the blob store (images, ADR-0042, and references' quotes as markdown, ADR-0126), the SQLite store, on `node:sqlite`, so with no native dependency (S22), which owns its file: it takes the file's lock, and a second connection, process or reader is refused (S47); `openStore` gives it with its blobs, its ledger and what each document stores beside its whole record (`storedSizes`) as one `OpenedStore`, which is what `startHost` takes |
 | `work/` | lane containers and disks (§ Lane work: ADR-0032, ADR-0033, ADR-0034), through the project's adapter, whose kind it never names (ADR-0142) |
 | `project.ts` | the project's adapter, chosen once by its kind (`projectAdapter`: an exhaustive switch, `assertNever` its default): jj's for a jj workspace, the folder's for any other folder; a folder lanes cannot serve (`projectDirWords`) is refused before any runtime is asked |
 | `folder/` | a folder project's adapter, as it is built (§ A folder project's adapter): the project's folder's reads (`scan.ts`, `line.ts`) and watcher (`watch.ts`), its writes (`writes.ts`, `write.ts`), what is kept (`keep.ts`), its reviews (`review.ts`), the only code that touches the project's folder (ADR-0142) |
@@ -256,26 +256,57 @@ same for every run (`packages/pi/TECHNICAL.md`, S85).
   once per root and keeps the session; that stays sound because the
   upkeep runs the scribe's `release` before it lets the root go.
 - **One upkeep reconciles storage and memory** (`planUpkeep`, the keeper's
-  `later("upkeep")`, queued by `queueUpkeepOn`). It compacts the loaded
-  roots settles named and every root it lets go, then, after a settle, the
-  session's documents; runs each released root's `onReleasing` listeners
-  (the scribe's `release`, the directory's last write); lets go of every
-  loaded root no lease and no tab holds; and watches each root a tab holds
-  until none does. A load, a lease's release, a settle and a change to a
-  watched root's tabs each queue it. A failed
-  compaction is logged and the root let go all the same: Kyneta unloads it
-  only once the store holds every write. Only the upkeep unloads a root;
-  a test reads the sources and fails on any other `exchange.unload`, the
-  migrations' and the stacks of moves' aside.
-- **The upkeep compacts whatever it names, however little it holds
-  beyond its whole record** (S263): a compaction reads every stored
-  record, takes them into the replica and rewrites the document, on the
-  event loop. A running root's records are mostly pi's reply frames, one
-  each, so a long run's end stalls the host for a second or more.
-  ADR-0188, accepted and not yet built, moves them to a scratch document
-  named by the root, which exists only while a run there needs it, and
-  compacts a document only once its stored changes outweigh its whole
-  record.
+  `later("upkeep")`, queued by `queueUpkeepOn`). Of the loaded roots
+  settles named, every root it lets go and, after a settle, the session's
+  documents, it compacts those due (below); runs each released root's
+  `onReleasing` listeners (the scribe's `release`, the directory's last
+  write); lets go of every loaded root no lease and no tab holds; destroys
+  each empty scratch document in a root no lane runs in; and watches each
+  root a tab holds until none does. A load, a lease's release, a settle and
+  a change to a watched root's tabs each queue it. A failed compaction is
+  logged and the root let go all the same: Kyneta unloads it only once the
+  store holds every write, so letting go needs no compaction. Only the
+  upkeep unloads a root and its scratch document; a test reads the sources
+  and fails on any other `exchange.unload`, the migrations' and the stacks
+  of moves' aside.
+- **A document is compacted only when it is due** (`dueCompactions` over
+  `planUpkeep`'s candidates, `isCompactionDue`, ADR-0188): once what it stores beyond its newest whole record outweighs
+  that record in bytes, or counts more than a thousand records. A
+  compaction reads every stored record, takes them into the replica and
+  rewrites the document, all on the event loop (the store is synchronous),
+  and costs with the records it reads (S263: about 1.4 s for a root of
+  1,512 records). The upkeep reads each candidate's sizes first, from the
+  store's own table (`storedSizes`, `store.ts`: one query per document, a
+  whole record told by its payload's first characters, no payload parsed).
+  Only the candidates' sizes are read. Kyneta's first write of a document
+  is a whole record too. A store that cannot say (one in memory,
+  `sizes: null`) has each candidate compacted.
+  The candidates are built from roots' ids and the session's three, so a
+  scratch document is never compacted.
+- **Each compaction is timed**, and one longer than half a second is
+  logged (`compactionLine`): `[host] compacted <doc> (<n> records, <n> KB)
+  in <n> ms`, the records and bytes as the store said before it.
+- **A root's scratch document** (`scratch:<RootId>`, `ScratchDoc`) holds
+  pi's pending state that belongs to one operation: a streaming reply's
+  frames and a running tool's checkpoints (`packages/pi/TECHNICAL.md`, "pi's
+  pending state"). Its life:
+  - **Loaded with its root when the store holds one** (`exchange.open`,
+    which never makes one), and the root's `ready` waits for both: pi is
+    never handed a root whose stored scratch document has not arrived, so
+    recovery after a crash reads it.
+  - **Made by pi's first pending write** (`pi.makeScratch`), which resolves
+    once it has hydrated: Kyneta refuses a write before.
+  - **Destroyed when it is empty and no lane runs in its root**
+    (`planScratchDestroys`; the running lanes from `pinetrie:live`, through
+    `rootsOfLanes`), whether the root stays or is let go. A run's lane
+    leaves `pinetrie:live` before its settle queues the upkeep, so the run
+    just ended keeps none. It is decided and done after the upkeep's last
+    await, with none in between, so nothing changes under the decision.
+    One that is not empty (a run a crash ended) is unloaded with its root,
+    for the next run there to recover.
+  - **Never compacted, never shared**: the policy refuses it to every tab
+    and takes no write of a client's to it (`policy.ts`), and its kind is
+    registered for the start's check of stored schemas (`SCHEMA_OF`).
 - **`PINETRIE_ROOT_TRACE=<file>` logs how roots are used** (`root-trace.ts`),
   one JSON object a line: each use (through a step, a lease or a tab's
   ask), whether it loaded the root, and the host code that asked; each
@@ -1896,7 +1927,7 @@ adapter's.
   commit, never read to decide), the lane's tip entry and the unfinished work line.
   **The tip and the unfinished work line are read only after a decision to build or
   rebuild** (`isBuild`), both under one lease (`messageFacts`): reading them
-  loads the lane's root, which the upkeep then compacts and lets go, and
+  loads the lane's root, which the upkeep then lets go, and
   every lane is refreshed at a start and whenever accepted work moves,
   most deciding nothing that writes a message. `refresh.test.ts` counts
   the leases.

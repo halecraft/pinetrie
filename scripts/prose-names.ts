@@ -104,6 +104,7 @@ export const spentOutside = (
  */
 export const OUTSIDE_NAMES: ReadonlySet<string> = new Set([
   // Kyneta
+  "toRow",
   "computeSupportedHashes",
   "discriminatedUnion",
   "docStatus",
@@ -120,7 +121,6 @@ export const OUTSIDE_NAMES: ReadonlySet<string> = new Set([
   "InMemoryStorageState",
   "ModelsImpl",
   "OPENROUTER_API_KEY",
-  "pendingToolOutput",
   "toolExecution",
   "withUsageEstimate",
   // jj

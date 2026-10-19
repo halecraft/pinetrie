@@ -7,9 +7,14 @@ import { LANE, recordsIn } from "@pinetrie/rules"
 import {
   type RootDocHandle,
   readNamespace,
+  type ScratchDocHandle,
   type SessionDocHandle,
 } from "@pinetrie/schema"
-import { newRootDoc, newSessionDoc } from "@pinetrie/schema/fixtures"
+import {
+  newRootDoc,
+  newScratchDoc,
+  newSessionDoc,
+} from "@pinetrie/schema/fixtures"
 import type { AgentDocuments } from "./agent.ts"
 
 /** The root a test's lanes and entries are in. */
@@ -22,6 +27,7 @@ export function oneRoot(
   session: SessionDocHandle = newSessionDoc(),
 ): AgentDocuments {
   const roots = new Map<RootId, RootDocHandle>([[ONE_ROOT, root]])
+  const scratches = new Map<RootId, ScratchDocHandle>()
   return {
     async root(id) {
       const known = roots.get(id)
@@ -30,6 +36,15 @@ export function oneRoot(
       roots.set(id, made)
       return made
     },
+    scratch: id => scratches.get(id),
+    async makeScratch(id) {
+      const known = scratches.get(id)
+      if (known !== undefined) return known
+      const made = newScratchDoc()
+      scratches.set(id, made)
+      return made
+    },
+    stored: async () => {},
     rootOfLane: (lane: ThreadId) =>
       recordsIn(LANE, readNamespace(session, LANE.namespace)).get(lane)?.root ??
       ONE_ROOT,

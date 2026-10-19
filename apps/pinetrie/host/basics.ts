@@ -109,6 +109,18 @@ export function slowStepLine(
   return `${head}: ${[...spent, ran].join(", ")}`
 }
 
+/** A compaction longer than this is logged (`compactionLine`), as a slow command is. */
+export const SLOW_COMPACTION_MS = 500
+
+/** A compaction's line: `[host] compacted <doc> (<n> records, <n> KB) in <n> ms`. */
+export const compactionLine = (c: {
+  readonly docId: string
+  readonly records: number
+  readonly bytes: number
+  readonly ms: number
+}): string =>
+  `[host] compacted ${c.docId} (${c.records} record${c.records === 1 ? "" : "s"}, ${Math.round(c.bytes / 1000)} KB) in ${Math.round(c.ms)} ms`
+
 /** An `onSlow` handler that logs `slowStepLine`. */
 export function slow(
   basics: Pick<Basics, "log">,

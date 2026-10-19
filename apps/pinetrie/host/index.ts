@@ -82,11 +82,13 @@ import { createBanners } from "./banners.ts"
 import { createBaseNews } from "./base-news.ts"
 import {
   type Basics,
+  compactionLine,
   failed,
   type HostKeeper,
   type HostKey,
   inStep,
   type LeaseBasics,
+  SLOW_COMPACTION_MS,
   slow,
 } from "./basics.ts"
 import { memoryBlobs } from "./blobs.ts"
@@ -102,6 +104,7 @@ import {
   type HostDocuments,
   hostDocuments,
   planLoads,
+  rootsOfLanes,
   rootsOpenedWords,
 } from "./docs.ts"
 import { createFocuses } from "./focuses.ts"
@@ -370,6 +373,7 @@ export async function startHost({
           blobs: memoryBlobs(now),
           ledger: memoryLedger(),
           backup: null,
+          sizes: null,
         })
   const { store, blobs } = opened
   // Each stored document's schema, checked before anything opens one: opened
@@ -460,6 +464,19 @@ export async function startHost({
     session,
     queueUpkeep: upkeepDue.call,
     failed: error => failed(basics, "compaction")(error),
+    sizes: opened.sizes,
+    // A run's lane is cleared from `pinetrie:live` before its settle queues
+    // the upkeep, so the run that just ended keeps no scratch document.
+    running: () =>
+      new Set(
+        rootsOfLanes(
+          readActiveLanes(live),
+          lane => readLaneRecords(session).get(lane)?.root,
+        ),
+      ),
+    compacted: c => {
+      if (c.ms > SLOW_COMPACTION_MS) log(compactionLine(c))
+    },
     keepLastRead: keepRootsRead,
     ...(rootTrace === null ? {} : { trace: rootTrace.trace }),
   })
@@ -913,7 +930,8 @@ export async function startHost({
       return upkeep()
     },
   })
-  // A run's end: the lane drains and the session compacts. A thread whose banner failed tries again. The
+  // A run's end: the lane drains and the upkeep follows, compacting what is
+  // due. A thread whose banner failed tries again. The
   // final digest is for the run's prompt: the drain queued before it may
   // append to the lane or start its next run. The thread's focus is asked
   // once that has settled, from what it wrote.

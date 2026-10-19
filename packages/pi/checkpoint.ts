@@ -4,7 +4,8 @@
 // `pi.pending.tool_output` value every 2 s, for recovery after a crash. Stored
 // as a value, each write is a new copy: 231–235 KB for one 51 KB result.
 // `KynetaStorage` stores the text part in `checkpointText` instead, written as
-// edits, and keeps the rest of the value as a small shell.
+// edits, and keeps the rest of the value as a small shell, both in the root's
+// scratch document when the storage has one (`isScratchKey`).
 
 /** pi's namespace for tool-output checkpoints (`pendingToolOutput`). */
 export const CHECKPOINT_NAMESPACE = "pi.pending.tool_output"

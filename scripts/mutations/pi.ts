@@ -1117,4 +1117,31 @@ export const mutations: readonly Mutation[] = [
     expect:
       "read_card's result is the host's words, then its image, which the model sees",
   },
+  {
+    name: "no key goes to the scratch document",
+    file: "packages/pi/stored-values.ts",
+    from: "  return nul >= 0 && SCRATCH_NAMESPACES.has(pkey.slice(0, nul))\n",
+    to: "  return false\n",
+    command: unit,
+    expect:
+      "a reply's frames and a tool's checkpoint are kept in it; entries and a queued message in the root",
+  },
+  {
+    name: "a commit's scratch deletes come before the root's operations",
+    file: "packages/pi/commit.ts",
+    from: '    { target: "scratch", ops: scratch.filter(op => op.kind !== "delete") },\n',
+    to: '    { target: "scratch", ops: scratch },\n',
+    command: unit,
+    expect:
+      "splitCommit: the scratch document's sets, the root's operations, then its deletes, with no empty part",
+  },
+  {
+    name: "a commit never waits for the store between documents",
+    file: "packages/pi/storage.ts",
+    from: "      if (last !== null && part.target !== last) await this.#storedNow()\n",
+    to: "",
+    command: unit,
+    expect:
+      "a commit ending a reply writes the root, waits for the store, then deletes the frames",
+  },
 ]

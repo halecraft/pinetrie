@@ -705,6 +705,8 @@ export function hostRoots(
     readonly failed?: (error: unknown) => void
     readonly keepLastRead?: boolean
     readonly trace?: RootTrace
+    readonly sizes?: Parameters<typeof createRoots>[0]["sizes"]
+    readonly running?: () => ReadonlySet<RootId>
   } = {},
 ) {
   const exchange = new Exchange({
@@ -732,6 +734,8 @@ export function hostRoots(
       ? {}
       : { keepLastRead: input.keepLastRead }),
     ...(input.trace === undefined ? {} : { trace: input.trace }),
+    ...(input.sizes === undefined ? {} : { sizes: input.sizes }),
+    ...(input.running === undefined ? {} : { running: input.running }),
   })
   const keeper = createKeeper<HostKey, StepDocs>({ context: roots.context })
   return {

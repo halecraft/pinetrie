@@ -167,6 +167,41 @@ export function planCommit(
   return { ops, batch: { arrivals, through: writes.at(-1)?.seq ?? 0 } }
 }
 
+/** An operation on pi's values or lists: one a root's scratch document may hold. */
+export type PendingOp = Exclude<DocOp, { readonly kind: "entry" | "usage" }>
+
+export const isPendingOp = (op: DocOp): op is PendingOp =>
+  op.kind !== "entry" && op.kind !== "usage"
+
+/** One document's share of a commit, written in one batch; the scratch document's are pending operations alone. */
+export type CommitPart =
+  | { readonly target: "scratch"; readonly ops: readonly PendingOp[] }
+  | { readonly target: "root"; readonly ops: readonly DocOp[] }
+
+/**
+ * A commit's operations in the order the store must hold them: the scratch
+ * document's sets, then the root's operations, then the scratch document's
+ * deletes, each part in its order, an empty one dropped. Whoever writes the
+ * parts waits for the store between two of different documents, so a crash
+ * between them leaves pending data that nothing points at, never a state
+ * that points at pending data that is gone.
+ */
+export function splitCommit(
+  ops: readonly DocOp[],
+  isScratch: (op: PendingOp) => boolean,
+): readonly CommitPart[] {
+  const scratch = ops.filter(isPendingOp).filter(isScratch)
+  const parts: CommitPart[] = [
+    { target: "scratch", ops: scratch.filter(op => op.kind !== "delete") },
+    {
+      target: "root",
+      ops: ops.filter(op => !isPendingOp(op) || !isScratch(op)),
+    },
+    { target: "scratch", ops: scratch.filter(op => op.kind === "delete") },
+  ]
+  return parts.filter(part => part.ops.length > 0)
+}
+
 /** The inline images (base64) in a write that `planCommit` may store as references. */
 export function committedImages(write: CommittedWrite): readonly string[] {
   if (write.kind === "entry")

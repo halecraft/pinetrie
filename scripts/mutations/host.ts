@@ -641,8 +641,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a starting host opens no interrupted run's root",
     file: "apps/pinetrie/host/docs.ts",
-    from: "  [...new Set(running.flatMap(lane => rootOfLane(lane) ?? []))].sort()",
-    to: "  [...new Set(running.flatMap(() => []))].sort()",
+    from: "  [...new Set(lanes.flatMap(lane => rootOfLane(lane) ?? []))].sort()",
+    to: "  [...new Set(lanes.flatMap(() => []))].sort()",
     command: unit,
     expect: "planLoads: the roots of the lanes a crash interrupted a run in",
   },
@@ -846,11 +846,11 @@ export const mutations: readonly Mutation[] = [
   {
     name: "what streams is never compacted",
     file: "apps/pinetrie/host/roots.ts",
-    from: "        : [SESSION_DOC_ID, PLACES_DOC_ID, LIVE_DOC_ID]),",
-    to: "        : [SESSION_DOC_ID, PLACES_DOC_ID]),",
+    from: "const SESSION_DOCUMENTS = [SESSION_DOC_ID, PLACES_DOC_ID, LIVE_DOC_ID] as const",
+    to: "const SESSION_DOCUMENTS = [SESSION_DOC_ID, PLACES_DOC_ID] as const",
     command: unit,
     expect:
-      "a root is compacted before it is let go, and the session's documents only after a settle",
+      "every root let go or a run changed is a candidate for compaction, and the session's documents only after a settle",
   },
   {
     name: "a run's end compacts no root",
@@ -859,7 +859,7 @@ export const mutations: readonly Mutation[] = [
     to: "    []\n",
     command: unit,
     expect:
-      "a root is compacted before it is let go, and the session's documents only after a settle",
+      "every root let go or a run changed is a candidate for compaction, and the session's documents only after a settle",
   },
   {
     name: "the image sweep forgets what roots show",
@@ -1400,8 +1400,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the policy shares a tab's undo stack",
     file: "apps/pinetrie/host/policy.ts",
-    from: "    isUndo(docId) || isMoves(docId)\n      ? false\n      : (routeLine",
-    to: "    isMoves(docId)\n      ? false\n      : (routeLine",
+    from: "    isUndo(docId) || isMoves(docId) || isScratch(docId)\n      ? false\n      : (routeLine",
+    to: "    isMoves(docId) || isScratch(docId)\n      ? false\n      : (routeLine",
     command: unit,
     expect: "a tab's undo stack is shared with no one",
   },
@@ -1704,8 +1704,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the policy shares a stack of moves",
     file: "apps/pinetrie/host/policy.ts",
-    from: "    isUndo(docId) || isMoves(docId)\n      ? false",
-    to: "    isUndo(docId)\n      ? false",
+    from: "    isUndo(docId) || isMoves(docId) || isScratch(docId)\n      ? false",
+    to: "    isUndo(docId) || isScratch(docId)\n      ? false",
     command: unit,
     expect:
       "a stack of moves is the host's: shared with no one, taken from no one",
@@ -2292,8 +2292,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a root is checked against the live document's schema",
     file: "apps/pinetrie/host/policy.ts",
-    from: "  root: RootDoc,\n  text: TextDoc,",
-    to: "  root: SessionDoc,\n  text: TextDoc,",
+    from: "  root: RootDoc,\n  scratch: ScratchDoc,",
+    to: "  root: SessionDoc,\n  scratch: ScratchDoc,",
     command: unit,
     expect: "storedKind: each stored document's kind",
   },
@@ -2977,8 +2977,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "pi is handed a root nothing holds",
     file: "apps/pinetrie/host/roots.ts",
-    from: "          (!stepping.has(root) && (leases.get(root) ?? 0) === 0)\n",
-    to: "          false\n",
+    from: "      (!stepping.has(root) && (leases.get(root) ?? 0) === 0)\n",
+    to: "      false\n",
     command: unit,
     expect:
       "pi is refused a root no step or lease holds, and handed one a step loaded",
@@ -3498,5 +3498,59 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "a settle's message names what getting the latest removed, clean or conflicted",
+  },
+  {
+    name: "every document a candidate is compacted, due or not",
+    file: "apps/pinetrie/host/roots.ts",
+    from: "  size.after.bytes > size.whole || size.after.count > MOST_AFTER_WHOLE\n",
+    to: "  true\n",
+    command: unit,
+    expect:
+      "dueCompactions: with sizes, only the candidates due, in order; with none, every one",
+  },
+  {
+    name: "a scratch document is destroyed while a lane runs in its root",
+    file: "apps/pinetrie/host/roots.ts",
+    from: "    .filter(([root, { empty }]) => empty && !input.running.has(root))\n",
+    to: "    .filter(([, { empty }]) => empty)\n",
+    command: unit,
+    expect:
+      "planScratchDestroys: an empty scratch document of a root no lane runs in, and no other",
+  },
+  {
+    name: "pi is handed a root before its stored scratch document arrives",
+    file: "apps/pinetrie/host/roots.ts",
+    from: "      ready: Promise.all([exchange.whenHydrated(id), stored]).then(([, s]) => {\n",
+    to: "      ready: Promise.all([exchange.whenHydrated(id), undefined]).then(([, s]) => {\n",
+    command: unit,
+    expect:
+      "pi is handed a root only once its stored scratch document has arrived",
+  },
+  {
+    name: "a made scratch document is handed over before it hydrates",
+    file: "apps/pinetrie/host/roots.ts",
+    from: "        await exchange.whenHydrated(id)\n        entry.scratch ??= made\n",
+    to: "        entry.scratch ??= made\n",
+    command: unit,
+    expect: "a scratch document made for pi can be written at once",
+  },
+  {
+    name: "the policy shares a scratch document",
+    file: "apps/pinetrie/host/policy.ts",
+    from: "  canShare: (docId, peer) =>\n    isUndo(docId) || isMoves(docId) || isScratch(docId)\n",
+    to: "  canShare: (docId, peer) =>\n    isUndo(docId) || isMoves(docId)\n",
+    command: unit,
+    expect:
+      "a root's scratch document is the host's: shared with no one, taken from no one, refused from a client",
+  },
+  {
+    name: "the upkeep takes every lane for running, and keeps every scratch document",
+    file: "apps/pinetrie/host/index.ts",
+    from: "          readActiveLanes(live),\n          lane => readLaneRecords(session).get(lane)?.root,\n",
+    to: "          [...readLaneRecords(session).keys()],\n          lane => readLaneRecords(session).get(lane)?.root,\n",
+    suite: "host",
+    scenario: "tools",
+    expect:
+      "a run's pending state is in its root's scratch document, which its end destroys",
   },
 ]

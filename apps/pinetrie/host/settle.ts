@@ -6,8 +6,8 @@ import type { StepDocs } from "./roots.ts"
 
 /**
  * Drain each lane given, then the upkeep, which compacts the lanes' roots and
- * the session's documents, sweeps the images, and lets go of the roots nothing
- * holds (`roots.ts`). Each drain is the keeper's `once` (`drain:<lane>`), the
+ * the session's documents that are due, sweeps the images, and lets go of the
+ * roots nothing holds (`roots.ts`). Each drain is the keeper's `once` (`drain:<lane>`), the
  * key a card's move drains by too, so a drain already waiting covers the
  * settle's. The upkeep is its `later` ("upkeep"): it starts only when no
  * command or drain waits, so a message waiting for the lane does not wait for
@@ -19,7 +19,7 @@ export function createSettle(input: {
   readonly basics: Pick<Basics, "session" | "log">
   readonly keeper: Pick<HostKeeper, "once">
   readonly drain: (roots: StepDocs, lane: ThreadId) => Promise<void>
-  /** The root a lane works in: its document is compacted with the session's. */
+  /** The root a lane works in: the upkeep weighs compacting it with the session's documents. */
   readonly rootOf: (lane: ThreadId) => RootId | null
   /** Name the roots the next upkeep compacts, and queue it. */
   readonly settled: (roots: readonly RootId[]) => Promise<void>

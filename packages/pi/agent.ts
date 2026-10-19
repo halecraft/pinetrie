@@ -29,7 +29,11 @@ import {
   type RequestTokens,
   withMessageImages,
 } from "@pinetrie/rules"
-import { type RootDocHandle, readLaneTip } from "@pinetrie/schema"
+import {
+  type RootDocHandle,
+  readLaneTip,
+  type ScratchDocHandle,
+} from "@pinetrie/schema"
 import { carryContext, carryPrompt, withCarried } from "./carry.ts"
 import { PINETRIE_COMPACTION } from "./compaction.ts"
 import { NO_MODEL_STAND_IN } from "./config.ts"
@@ -76,6 +80,15 @@ export interface AgentDocuments {
    * its session until `release`.
    */
   root(root: RootId): Promise<RootDocHandle>
+  /**
+   * The root's scratch document (`KynetaStorage`'s `scratch`): the one
+   * loaded, if any. Refused as `root` is, for a root nothing holds.
+   */
+  scratch(root: RootId): ScratchDocHandle | undefined
+  /** The root's scratch document, made if there is none, once it can be written. Refused as `scratch` is. */
+  makeScratch(root: RootId): Promise<ScratchDocHandle>
+  /** Resolves once the store holds every write made so far. */
+  stored(): Promise<void>
   /** The root a lane works in, from its record; null for a lane no root holds. */
   rootOfLane(lane: ThreadId): RootId | null
 }

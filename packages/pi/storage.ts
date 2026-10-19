@@ -1,7 +1,8 @@
-// pi/storage — our implementation of pi's `Storage` port, over a Kyneta doc.
+// pi/storage — our implementation of pi's `Storage` port, over a root's Kyneta
+// doc and, for pi's operation-scoped pending state, the root's scratch doc.
 //
 // `seq` is a replica-local arrival index, never stored (`arrivals.ts`). Two
-// paths index the document: a local commit indexes its own
+// paths index the documents: a local commit indexes its own
 // writes with pi's seqs, and a replayed change (hydration, or a merge from
 // another replica) marks keys dirty, which the next read indexes. Both end in
 // `ArrivalIndex.apply`.
@@ -41,19 +42,24 @@ import {
 } from "@pinetrie/core"
 import {
   applyTextEdits,
+  type PendingFieldsHandle,
   physicalKey,
   RootDoc,
   type RootDocHandle,
+  type ScratchDocHandle,
   type StoredValueRecord,
   valuePrefix,
 } from "@pinetrie/schema"
 import { ArrivalIndex, type Observed, planArrivals } from "./arrivals.ts"
 import {
+  type CommitPart,
   type CommittedWrite,
   committedImages,
   type DocOp,
+  type PendingOp,
   planCommit,
   type StoredUsageRow,
+  splitCommit,
 } from "./commit.ts"
 import {
   CLEAN,
@@ -76,14 +82,22 @@ import {
 } from "./queries.ts"
 import type { BlobOf, RefOf } from "./stored-images.ts"
 import { fromStoredRow } from "./stored-row.ts"
-import { decodeValue, type StoredListElement } from "./stored-values.ts"
+import {
+  decodeValue,
+  isScratchKey,
+  type StoredListElement,
+} from "./stored-values.ts"
 import { threadOfContext } from "./thread-context.ts"
 
 let tokenCounter = 0
 const makeToken = (peer: string): string =>
   `${peer}-${(tokenCounter++).toString(36)}-${Math.random().toString(36).slice(2, 8)}`
 
-/** Store one planned operation. The only code that writes the document on commit. */
+/**
+ * Store one planned operation in a root's document: an entry or a usage row
+ * there, any other in `writePendingOp`. Only `KynetaStorage`'s commit calls
+ * it, for the root's part.
+ */
 function writeOp(d: RootDocHandle, op: DocOp): void {
   switch (op.kind) {
     case "entry":
@@ -92,6 +106,17 @@ function writeOp(d: RootDocHandle, op: DocOp): void {
     case "usage":
       d.usageRows.set(op.row.id, op.row)
       return
+    default:
+      writePendingOp(d, op)
+  }
+}
+
+/**
+ * Store a value, a list's element or a delete in `d`: a root's document, or
+ * its scratch document for a scratch key (`isScratchKey`).
+ */
+function writePendingOp(d: PendingFieldsHandle, op: PendingOp): void {
+  switch (op.kind) {
     case "value": {
       d.values.set(op.pkey, op.record)
       if (op.text === undefined) {
@@ -124,8 +149,28 @@ function writeOp(d: RootDocHandle, op: DocOp): void {
   }
 }
 
+/** Where `KynetaStorage` finds a root's scratch document. */
+export interface ScratchSource {
+  held(): ScratchDocHandle | undefined
+  make(): Promise<ScratchDocHandle>
+}
+
 interface KynetaStorageOptions {
   readonly doc?: RootDocHandle
+  /**
+   * The root's scratch document, which holds the keys `isScratchKey` names:
+   * `held`, the one loaded now, for a read; `make`, that one or a new one
+   * once it can be written, for a write (making one stores it, so a read
+   * never does). Asked at each use, never kept across one: the host
+   * destroys it between runs. Without it, every key is in `doc`.
+   */
+  readonly scratch?: ScratchSource
+  /**
+   * Resolves once the store holds every write made so far: waited for
+   * between a commit's parts in different documents. Without it, nothing
+   * is waited for.
+   */
+  readonly stored?: () => Promise<void>
   readonly peerId?: string
   readonly now?: () => number
   /**
@@ -148,6 +193,12 @@ interface KynetaStorageOptions {
  */
 export class KynetaStorage implements Storage {
   readonly #doc: RootDocHandle
+  readonly #scratch: ScratchSource | undefined
+  readonly #storedNow: () => Promise<void>
+  /** The scratch document last handed over, and its subscription's end. */
+  #scratchHeld:
+    | { readonly doc: ScratchDocHandle; readonly unsubscribe: () => void }
+    | undefined
   readonly #blobs: Pick<BlobStore, "get" | "ref"> | undefined
   readonly #fallbackThread: ThreadId | undefined
   readonly #now: () => number
@@ -164,16 +215,72 @@ export class KynetaStorage implements Storage {
     this.#now = options.now ?? Date.now
     this.#peer = options.peerId ?? "p"
     this.#doc = options.doc ?? createDoc(RootDoc)
+    this.#scratch = options.scratch
+    this.#storedNow = options.stored ?? (async () => {})
     this.#blobs = options.blobs
     this.#fallbackThread = options.fallbackThread
 
-    // Only state no writer on this replica made (`replay: true`: a merge, a
-    // reset) needs reconciling. Local commits index themselves.
-    this.#unsubscribe = subscribe(this.#doc, cs => {
-      if (cs.replay !== true) return
-      this.#scope = join(this.#scope, dirtyScope(cs.changes))
-    })
+    this.#unsubscribe = subscribe(this.#doc, this.#replayed)
   }
+
+  /**
+   * Only state no writer on this replica made (`replay: true`: a merge, a
+   * reset, a hydration) needs reconciling. Local commits index themselves.
+   */
+  #replayed = (cs: {
+    readonly replay?: boolean
+    readonly changes: Parameters<typeof dirtyScope>[0]
+  }): void => {
+    if (cs.replay !== true) return
+    this.#scope = join(this.#scope, dirtyScope(cs.changes))
+  }
+
+  // ---- the two documents: which holds a key -------------------------------
+
+  /**
+   * The scratch document, as `scratch` hands it over now, followed: one not
+   * seen before (the first, or a fresh one after a destroy) is subscribed to
+   * as the root is, and its values and lists are read again, since it may
+   * hold what a crash left. The one it replaces was empty when destroyed, so
+   * the index holds none of its keys.
+   */
+  #scratchDoc(): ScratchDocHandle | undefined {
+    const doc = this.#scratch?.held()
+    return doc === undefined ? undefined : this.#follow(doc)
+  }
+
+  /** The scratch document to write, made if there is none, followed as `#scratchDoc` follows it. */
+  async #scratchToWrite(): Promise<ScratchDocHandle | undefined> {
+    const doc = await this.#scratch?.make()
+    return doc === undefined ? undefined : this.#follow(doc)
+  }
+
+  /** `doc`, subscribed to if it is not the one followed already. */
+  #follow(doc: ScratchDocHandle): ScratchDocHandle {
+    if (doc === this.#scratchHeld?.doc) return doc
+    this.#scratchHeld?.unsubscribe()
+    this.#scratchHeld = {
+      doc,
+      unsubscribe: subscribe(doc, this.#replayed),
+    }
+    this.#scope = join(this.#scope, { ...CLEAN, values: "all", lists: "all" })
+    return doc
+  }
+
+  /**
+   * The document that holds `pkey`: the scratch document for a scratch key,
+   * else the root. The only way a pending key reaches a document. Undefined
+   * for a scratch key with no scratch document now, which holds nothing.
+   */
+  #pendingDocument(pkey: string): PendingFieldsHandle | undefined {
+    return this.#scratch !== undefined && isScratchKey(pkey)
+      ? this.#scratchDoc()
+      : this.#doc
+  }
+
+  /** Whether a pending operation is written to the scratch document. */
+  #inScratch = (op: PendingOp): boolean =>
+    this.#scratch !== undefined && isScratchKey(op.pkey)
 
   // ---- reconciliation: give newly observed items the next local seqs -----
 
@@ -214,9 +321,11 @@ export class KynetaStorage implements Storage {
       if (row !== undefined) usage.set(id, row.usage)
     }
 
+    const scratch = this.#scratchDoc()
     const values = new Map<string, { wid: string | undefined } | undefined>()
     for (const pkey of keysOf(scope.values, () => [
       ...Object.keys(doc.values()),
+      ...Object.keys(scratch?.values() ?? {}),
       ...index.valueKeys(),
     ])) {
       const record = this.#record(pkey)
@@ -226,9 +335,10 @@ export class KynetaStorage implements Storage {
     const lists = new Map<string, readonly string[] | undefined>()
     for (const pkey of keysOf(scope.lists, () => [
       ...Object.keys(doc.lists()),
+      ...Object.keys(scratch?.lists() ?? {}),
       ...index.listKeys(),
     ])) {
-      const list = doc.lists.at(pkey)
+      const list = this.#pendingDocument(pkey)?.lists.at(pkey)
       lists.set(
         pkey,
         list === undefined
@@ -250,7 +360,9 @@ export class KynetaStorage implements Storage {
   }
 
   #record(pkey: string): StoredValueRecord | undefined {
-    return this.#doc.values.get(pkey) as StoredValueRecord | undefined
+    return this.#pendingDocument(pkey)?.values.get(pkey) as
+      | StoredValueRecord
+      | undefined
   }
 
   /** A blob's bytes, for the rejoin: none without a store. */
@@ -287,7 +399,7 @@ export class KynetaStorage implements Storage {
       address: value<T>(record.namespace, record.key),
       value: decodeValue(
         record,
-        () => this.#doc.checkpointText.at(pkey)?.() ?? "",
+        () => this.#pendingDocument(pkey)?.checkpointText.at(pkey)?.() ?? "",
         this.#blobOf,
       ) as T,
       seq,
@@ -325,7 +437,10 @@ export class KynetaStorage implements Storage {
     return result
   }
 
-  #applyCommit(writes: Write[], named: ThreadId | undefined): CommitResult {
+  async #applyCommit(
+    writes: Write[],
+    named: ThreadId | undefined,
+  ): Promise<CommitResult> {
     this.#reconcile() // never allocate a seq below an already-observed one
     const firstSeq = this.#index.lastSeq + 1
     const prepared = prepareStorageCommit(writes, firstSeq, this.#now())
@@ -340,12 +455,31 @@ export class KynetaStorage implements Storage {
       named,
       fallback: this.#fallbackThread,
     })
-    batch(this.#doc, d => {
-      for (const op of plan.ops) writeOp(d, op)
-    })
-    // After the batch, so a write that throws leaves the index as it was.
+    let last: CommitPart["target"] | null = null
+    for (const part of splitCommit(plan.ops, this.#inScratch)) {
+      if (last !== null && part.target !== last) await this.#storedNow()
+      await this.#writePart(part)
+      last = part.target
+    }
+    // After the parts, so a write that throws leaves the index as it was.
     this.#index.apply(plan.batch)
     return { ...prepared.result, stats: this.#index.stats() }
+  }
+
+  /** One part of a commit, in one batch of its document. */
+  async #writePart(part: CommitPart): Promise<void> {
+    if (part.target === "root") {
+      batch(this.#doc, d => {
+        for (const op of part.ops) writeOp(d, op)
+      })
+      return
+    }
+    const scratch = await this.#scratchToWrite()
+    if (scratch === undefined)
+      throw new Error("the root's scratch document could not be made")
+    batch(scratch, d => {
+      for (const op of part.ops) writePendingOp(d, op)
+    })
   }
 
   // --- queries ------------------------------------------------------------
@@ -394,7 +528,7 @@ export class KynetaStorage implements Storage {
     const resolved = resolveListReadOptions(options)
     const pkey = physicalKey(address.namespace, address.key)
     const line = this.#index.list(pkey)
-    const stored = this.#doc.lists.at(pkey)
+    const stored = this.#pendingDocument(pkey)?.lists.at(pkey)
     if (line === undefined || stored === undefined) return []
     const values = new Map(
       (stored() as readonly StoredListElement[]).map(e => [e.eid, e.value]),
@@ -462,6 +596,8 @@ export class KynetaStorage implements Storage {
     this.#closePromise = this.#commitQueue.then(() => {
       this.#state = "closed"
       this.#unsubscribe()
+      this.#scratchHeld?.unsubscribe()
+      this.#scratchHeld = undefined
     })
     return this.#closePromise
   }

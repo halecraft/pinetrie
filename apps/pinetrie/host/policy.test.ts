@@ -4,6 +4,7 @@ import {
   movesDocId,
   rootDocId,
   rootIdFor,
+  scratchDocId,
   writerId,
 } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
@@ -22,6 +23,7 @@ import {
   OpenDoc,
   PlacesDoc,
   RootDoc,
+  ScratchDoc,
   SessionDoc,
   TextDoc,
 } from "@pinetrie/schema"
@@ -132,6 +134,20 @@ test("a stack of moves is the host's: shared with no one, taken from no one, ref
   ]).toEqual([false, false, "reject"])
 })
 
+test("a root's scratch document is the host's: shared with no one, taken from no one, refused from a client", () => {
+  const SCRATCH = scratchDocId(KNOWN)
+  const peer = {
+    peerId: "seat-a",
+    principal: "ada@x.io",
+    type: "user",
+  } as const
+  expect([
+    hostPolicy.canShare?.(SCRATCH, peer),
+    hostPolicy.canAccept?.(SCRATCH, peer),
+    resolveDoc(SCRATCH, () => true),
+  ]).toEqual([false, false, "reject"])
+})
+
 test("storedKind: each stored document's kind, by which its schema is checked at start", () => {
   const OPEN = personDocId("open", writerId("ada@x.io"))
   const kinds = [
@@ -139,6 +155,7 @@ test("storedKind: each stored document's kind, by which its schema is checked at
     [LIVE_DOC_ID, "live", LiveDoc],
     [PLACES_DOC_ID, "places", PlacesDoc],
     [rootDocId(KNOWN), "root", RootDoc],
+    [scratchDocId(KNOWN), "scratch", ScratchDoc],
     [CARD, "text", TextDoc],
     [INVENTORY, "inventory", InventoryDoc],
     [ATTENTION, "attention", AttentionDoc],

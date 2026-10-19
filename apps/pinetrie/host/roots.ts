@@ -5,9 +5,11 @@
 // documents' keeper hands each step (`context`) and revokes as it ends, or
 // through a `Lease`: taken in a step, or outside one by work that runs off the
 // keeper (`leases`), and disposed when done. pi's port (`pi`) answers only for
-// a root one of them holds. One upkeep step (`upkeep`, the keeper's `later`)
-// compacts what runs changed and lets go of every loaded root that no lease
-// and no tab holds. Nothing else unloads a root. So, by construction:
+// a root one of them holds, and its scratch document with it. One upkeep step
+// (`upkeep`, the keeper's `later`) compacts what runs changed and is due, lets
+// go of every loaded root that no lease and no tab holds, and destroys each
+// empty scratch document in a root no lane runs in. Nothing else unloads a
+// root. So, by construction:
 //
 // - L1. A root a step loaded stays loaded until the step ends: only the
 //   upkeep step unloads, and it is a step of the same keeper.
@@ -27,6 +29,7 @@ import {
   type RootId,
   rootDocId,
   rootOfDocId,
+  scratchDocId,
   type ThreadId,
 } from "@pinetrie/core"
 import type { StepContext } from "@pinetrie/keeper"
@@ -40,11 +43,14 @@ import { readLaneRecords, readRoots } from "@pinetrie/reads"
 import {
   RootDoc,
   type RootDocHandle,
+  ScratchDoc,
+  type ScratchDocHandle,
   type SessionDocHandle,
 } from "@pinetrie/schema"
 import type { HostKeeper } from "./basics.ts"
 import { createStepRecords, type StepRecords } from "./records.ts"
 import { callerNow, type RootTrace } from "./root-trace.ts"
+import type { StoredSize } from "./store.ts"
 
 /** A call through a step's documents after the step ended. */
 export class StepEnded extends Error {
@@ -117,11 +123,29 @@ export interface UpkeepPlan {
   readonly watch: readonly RootId[]
 }
 
+/** The session's documents, compacted after a settle when due. */
+const SESSION_DOCUMENTS = [SESSION_DOC_ID, PLACES_DOC_ID, LIVE_DOC_ID] as const
+
+/** The most records a document keeps beyond its whole one before it is compacted. */
+const MOST_AFTER_WHOLE = 1000
+
+/**
+ * Whether compacting a document is worth what it costs: once what it stores
+ * beyond its whole record outweighs that record, or counts more than
+ * `MOST_AFTER_WHOLE` records. A compaction reads and rewrites the whole
+ * document, and costs with the number of records it reads; what it saves is
+ * the records a load replays.
+ */
+export const isCompactionDue = (size: StoredSize): boolean =>
+  size.after.bytes > size.whole || size.after.count > MOST_AFTER_WHOLE
+
 /**
  * One upkeep: the loaded roots runs changed and every root it lets go are
- * compacted, then the session's documents when a settle asked; every loaded
- * root no lease and no tab holds is let go; each root a tab holds, not
- * watched yet, is watched. A root let go earlier was compacted as it went.
+ * its candidates for compaction, then the session's documents when a settle
+ * asked; every loaded root no lease and no tab holds is let go; each root a
+ * tab holds, not watched yet, is watched. Which candidates are compacted is
+ * `dueCompactions`'. The candidates are built from roots' ids and the
+ * session's three alone, so a scratch document is never one.
  */
 export function planUpkeep(input: {
   /** The roots runs changed since the last upkeep, when a settle asked for one; else null. */
@@ -142,9 +166,7 @@ export function planUpkeep(input: {
   return {
     compact: [
       ...roots.map(rootDocId),
-      ...(input.settled === null
-        ? []
-        : [SESSION_DOC_ID, PLACES_DOC_ID, LIVE_DOC_ID]),
+      ...(input.settled === null ? [] : SESSION_DOCUMENTS),
     ],
     unload,
     watch: input.loaded
@@ -152,6 +174,43 @@ export function planUpkeep(input: {
       .sort(),
   }
 }
+
+/**
+ * The candidates whose compaction is due (`isCompactionDue`), in order; with
+ * no sizes (a store that cannot say), every one.
+ */
+export const dueCompactions = (
+  candidates: readonly string[],
+  sizes: ReadonlyMap<string, StoredSize> | null,
+): readonly string[] =>
+  sizes === null
+    ? candidates
+    : candidates.filter(id => {
+        const size = sizes.get(id)
+        return size !== undefined && isCompactionDue(size)
+      })
+
+/**
+ * The roots whose scratch document the upkeep destroys: each one empty, in a
+ * root no lane runs in. One that holds something (a run a crash ended)
+ * stays for the next run there to recover.
+ */
+export function planScratchDestroys(input: {
+  /** Each loaded root with a scratch document, and whether it is empty. */
+  readonly scratch: ReadonlyMap<RootId, { readonly empty: boolean }>
+  readonly running: ReadonlySet<RootId>
+}): readonly RootId[] {
+  return [...input.scratch]
+    .filter(([root, { empty }]) => empty && !input.running.has(root))
+    .map(([root]) => root)
+    .sort()
+}
+
+/** Whether a scratch document holds nothing: pi's cleanup has deleted every pending value and list. */
+const isEmptyScratch = (doc: ScratchDocHandle): boolean =>
+  doc.values.keys().length === 0 &&
+  doc.lists.keys().length === 0 &&
+  doc.checkpointText.keys().length === 0
 
 /** Whether a tab holds a root, taking it or having it, and a way to hear that change. */
 export interface PeerStates {
@@ -172,7 +231,14 @@ const kynetaPeers: PeerStates = {
 /** A loaded root. */
 interface Loaded {
   readonly doc: RootDocHandle
+  /**
+   * Resolves once the root and its scratch document, when the store holds
+   * one, have both arrived. pi is handed a root only through it, so
+   * recovery after a crash always reads the scratch document.
+   */
   readonly ready: Promise<RootDocHandle>
+  /** Its scratch document: the one stored, or one a pending write made; none between runs. */
+  scratch: ScratchDocHandle | undefined
   /**
    * Loaded for a tab's ask and not yet seen held by one: kept as shown
    * before Kyneta lists the tab, or it would go before the tab has it.
@@ -186,7 +252,10 @@ export interface Roots {
   /** The documents' keeper's step context: each step's `StepDocs`. */
   readonly context: StepContext<StepDocs>
   /** pi's port: only a root a step or a lease holds. */
-  readonly pi: Pick<AgentDocuments, "root" | "rootOfLane">
+  readonly pi: Pick<
+    AgentDocuments,
+    "root" | "rootOfLane" | "scratch" | "makeScratch" | "stored"
+  >
   /** Leases taken off the keeper. */
   readonly leases: Leases
   /**
@@ -227,6 +296,15 @@ export interface Roots {
   close(): void
 }
 
+/** One compaction the upkeep ran. */
+export interface Compaction {
+  readonly docId: string
+  /** The records it read, and their bytes, as the store said before it. */
+  readonly records: number
+  readonly bytes: number
+  readonly ms: number
+}
+
 export function createRoots(input: {
   readonly exchange: Exchange
   readonly session: SessionDocHandle
@@ -238,6 +316,14 @@ export function createRoots(input: {
    * once the store holds every write.
    */
   readonly failed?: (error: unknown) => void
+  /** What each document stores beside its whole record; null for a store that cannot say, whose candidates are each compacted. */
+  readonly sizes?:
+    | ((docIds: readonly string[]) => ReadonlyMap<string, StoredSize>)
+    | null
+  /** The roots a lane runs in now: their scratch documents are kept. */
+  readonly running?: () => ReadonlySet<RootId>
+  /** Hears each compaction the upkeep ran: its document, the records and bytes it read, and how long it took. */
+  readonly compacted?: (compaction: Compaction) => void
   readonly peers?: PeerStates
   /** Keep each root's newest handle for `lastRead`: a suite's, never a host's in use. */
   readonly keepLastRead?: boolean
@@ -268,10 +354,13 @@ export function createRoots(input: {
     const id = rootDocId(root)
     const doc = exchange.get(id, RootDoc)
     if (input.keepLastRead === true) newest.set(root, doc)
+    // `open` never makes a scratch document: one is made by a pending write.
+    const stored = exchange.open(scratchDocId(root), ScratchDoc)
     const entry: Loaded = {
       doc,
-      ready: exchange.whenHydrated(id).then(() => {
+      ready: Promise.all([exchange.whenHydrated(id), stored]).then(([, s]) => {
         if (loaded.get(root) === entry) {
+          if (s !== undefined) entry.scratch ??= s
           entry.heard = true
           for (const listener of opened) listener(root, doc)
           if (!everLoaded.has(root)) {
@@ -281,6 +370,7 @@ export function createRoots(input: {
         }
         return doc
       }),
+      scratch: undefined,
       asked,
       heard: false,
     }
@@ -391,6 +481,7 @@ export function createRoots(input: {
         watching.get(r)?.()
         watching.delete(r)
         exchange.destroy(rootDocId(r))
+        exchange.destroy(scratchDocId(r))
       },
       records: createStepRecords({ session, root }),
     }
@@ -402,6 +493,17 @@ export function createRoots(input: {
     }
   }
   const ends = new WeakMap<StepDocs, () => void>()
+
+  /** `root`'s entry, if a step or a lease holds it; else pi is refused it. */
+  function held(root: RootId): Loaded {
+    const entry = loaded.get(root)
+    if (
+      entry === undefined ||
+      (!stepping.has(root) && (leases.get(root) ?? 0) === 0)
+    )
+      throw new NotHeld(root)
+    return entry
+  }
 
   return {
     context: {
@@ -418,14 +520,21 @@ export function createRoots(input: {
     },
     pi: {
       async root(root) {
-        const entry = loaded.get(root)
-        if (
-          entry === undefined ||
-          (!stepping.has(root) && (leases.get(root) ?? 0) === 0)
-        )
-          throw new NotHeld(root)
-        return entry.ready
+        return held(root).ready
       },
+      scratch: root => held(root).scratch,
+      async makeScratch(root) {
+        const entry = held(root)
+        if (entry.scratch !== undefined) return entry.scratch
+        const id = scratchDocId(root)
+        const made = exchange.get(id, ScratchDoc)
+        // Kyneta refuses a write until the document has hydrated, even one
+        // the store has never held.
+        await exchange.whenHydrated(id)
+        entry.scratch ??= made
+        return entry.scratch
+      },
+      stored: () => exchange.flush(),
       rootOfLane: lane => readLaneRecords(session).get(lane)?.root ?? null,
     },
     leases: {
@@ -471,7 +580,7 @@ export function createRoots(input: {
       }
       const settled = settledRoots
       settledRoots = null
-      // plan
+      // plan, then what is due of its candidates, by their sizes
       const plan = planUpkeep({
         settled,
         loaded: [...loaded.keys()],
@@ -479,32 +588,72 @@ export function createRoots(input: {
         shown,
         watching: new Set(watching.keys()),
       })
-      if (plan.compact.length > 0 || plan.unload.length > 0)
+      const sizes = input.sizes?.(plan.compact) ?? null
+      const compact = dueCompactions(plan.compact, sizes)
+      if (compact.length > 0 || plan.unload.length > 0)
         input.trace?.({
           kind: "upkeep",
           loaded: loaded.size,
           leased: leases.size,
           shown: [...shown].sort(),
-          compact: plan.compact,
+          compact,
           unload: plan.unload,
         })
-      // execute: each root released before it is compacted, so what its
-      // holders write as they let go is in its compaction, then let go
-      const going = new Set(plan.unload)
+      // execute: each root released first, so what its holders write as
+      // they let go is in a compaction that is due; then the compactions
+      const going = new Map<RootId, Loaded>()
       for (const root of plan.unload) {
+        const entry = loaded.get(root)
+        if (entry !== undefined) going.set(root, entry)
         loaded.delete(root)
         watching.get(root)?.()
         watching.delete(root)
         await release(root, "unload")
       }
-      for (const id of plan.compact)
-        await exchange.compact(id).catch((error: unknown) => {
-          input.failed?.(error)
-        })
-      // Decided again after the last await: a lease taken off the keeper
-      // meanwhile loaded the root again, and keeps it.
-      for (const root of going)
-        if (!loaded.has(root)) exchange.unload(rootDocId(root))
+      for (const id of compact) {
+        const size = sizes?.get(id)
+        const started = performance.now()
+        const done = await exchange.compact(id).then(
+          () => true,
+          (error: unknown) => {
+            input.failed?.(error)
+            return false
+          },
+        )
+        if (done)
+          input.compacted?.({
+            docId: id,
+            records: (size?.after.count ?? 0) + (size?.whole === 0 ? 0 : 1),
+            bytes: (size?.after.bytes ?? 0) + (size?.whole ?? 0),
+            ms: performance.now() - started,
+          })
+      }
+      // After the last await, with none until it ends: what is let go, and
+      // which scratch documents are empty in a root no lane runs in, is
+      // read, decided and acted on at once, so what was decided is still
+      // true when it acts. A root a lease took off the keeper meanwhile
+      // loaded again is kept.
+      const leaving = [...going].filter(([root]) => !loaded.has(root))
+      const scratch = new Map<RootId, { readonly empty: boolean }>()
+      for (const [root, entry] of [...loaded, ...leaving])
+        if (entry.scratch !== undefined)
+          scratch.set(root, { empty: isEmptyScratch(entry.scratch) })
+      const destroyed = new Set(
+        planScratchDestroys({
+          scratch,
+          running: input.running?.() ?? new Set(),
+        }),
+      )
+      for (const root of destroyed) {
+        const entry = loaded.get(root)
+        if (entry !== undefined) entry.scratch = undefined
+        exchange.destroy(scratchDocId(root))
+      }
+      for (const [root, entry] of leaving) {
+        exchange.unload(rootDocId(root))
+        if (entry.scratch !== undefined && !destroyed.has(root))
+          exchange.unload(scratchDocId(root))
+      }
       for (const root of plan.watch) {
         const entry = loaded.get(root)
         if (entry === undefined) continue

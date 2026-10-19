@@ -195,6 +195,19 @@ export function rootOfDocId(docId: string): RootId | undefined {
   return isRootId(root) ? root : undefined
 }
 
+const SCRATCH_DOC_PREFIX = "scratch:"
+
+/** The id of a root's scratch document, which holds pi's pending state while a run there needs it. */
+export const scratchDocId = (root: RootId): string =>
+  `${SCRATCH_DOC_PREFIX}${root}`
+
+/** A document id -> the root whose scratch document it is, or undefined for any other document. */
+export function rootOfScratchDocId(docId: string): RootId | undefined {
+  if (!docId.startsWith(SCRATCH_DOC_PREFIX)) return undefined
+  const root = docId.slice(SCRATCH_DOC_PREFIX.length)
+  return isRootId(root) ? root : undefined
+}
+
 export const MOVES_DOC_PREFIX = "moves:"
 
 /**

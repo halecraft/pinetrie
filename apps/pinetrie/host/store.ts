@@ -76,6 +76,68 @@ export interface OpenedStore {
   readonly blobs: BlobStore
   readonly ledger: MigrationLedger
   readonly backup: ((suffix: string) => string) | null
+  /** What each document stores beside its whole record (`storedSizes`); null for a store that cannot say. */
+  readonly sizes:
+    | ((docIds: readonly string[]) => ReadonlyMap<string, StoredSize>)
+    | null
+}
+
+/**
+ * What a document stores: the bytes of its newest whole record (0 for one
+ * never compacted), and the count and bytes of the records after it.
+ */
+export interface StoredSize {
+  readonly whole: number
+  readonly after: { readonly count: number; readonly bytes: number }
+}
+
+/** A stored entry record as `storedSizes` reads it: its bytes, and whether it is a whole record. */
+interface SizedRow {
+  readonly bytes: number
+  readonly whole: boolean
+}
+
+/** `rows`, in the order stored, as one document's `StoredSize`. */
+export function sizeOfRows(rows: readonly SizedRow[]): StoredSize {
+  const last = rows.findLastIndex(r => r.whole)
+  const after = rows.slice(last + 1)
+  return {
+    whole: last < 0 ? 0 : (rows[last]?.bytes ?? 0),
+    after: {
+      count: after.length,
+      bytes: after.reduce((n, r) => n + r.bytes, 0),
+    },
+  }
+}
+
+/**
+ * Kyneta's SQLite store writes an entry record's payload as JSON with `kind`
+ * first (`toRow`, `@kyneta/sql-core`), so a whole record's begins with this,
+ * and is told apart without parsing a payload of megabytes.
+ */
+const WHOLE_PAYLOAD = '{"kind":"entirety"'
+
+/** Each document's `StoredSize`, read from Kyneta's records table: one query per document, payloads never read. */
+function storedSizes(
+  db: DatabaseSync,
+  docIds: readonly string[],
+): ReadonlyMap<string, StoredSize> {
+  const rows = db.prepare(
+    `SELECT COALESCE(LENGTH(payload), 0) + COALESCE(LENGTH(blob), 0) AS bytes,
+            substr(payload, 1, ${WHOLE_PAYLOAD.length}) AS head
+       FROM kyneta_records WHERE doc_id = ? AND kind = 'entry' ORDER BY seq`,
+  )
+  return new Map(
+    docIds.map(id => [
+      id,
+      sizeOfRows(
+        (rows.all(id) as { bytes: number; head: string | null }[]).map(r => ({
+          bytes: r.bytes,
+          whole: r.head === WHOLE_PAYLOAD,
+        })),
+      ),
+    ]),
+  )
 }
 
 /**
@@ -121,5 +183,6 @@ export function openStore(
     blobs: sqliteBlobs(db, options.now),
     ledger: sqliteLedger(db),
     backup,
+    sizes: docIds => storedSizes(db, docIds),
   }
 }

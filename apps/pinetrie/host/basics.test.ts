@@ -1,7 +1,7 @@
 import { threadIdFor } from "@pinetrie/core"
 import { KeeperClosed } from "@pinetrie/keeper"
 import { expect, test } from "vitest"
-import { failed, slowStepLine } from "./basics.ts"
+import { compactionLine, failed, slowStepLine } from "./basics.ts"
 import { basics } from "./fakes.ts"
 
 test("failed logs the host's line, with the thread when it names a lane", () => {
@@ -51,4 +51,18 @@ test("failed logs nothing for a step a closed keeper refused", () => {
   const b = basics()
   failed(b, "refreshing its proposed changes")(new KeeperClosed())
   expect(b.lines).toEqual([])
+})
+
+test("a compaction's line names its document, the records and kilobytes it read, and its time", () => {
+  expect(
+    compactionLine({
+      docId: "root:r-1",
+      records: 1512,
+      bytes: 11_400_000,
+      ms: 1408.6,
+    }),
+  ).toBe("[host] compacted root:r-1 (1512 records, 11400 KB) in 1409 ms")
+  expect(
+    compactionLine({ docId: "pinetrie:live", records: 1, bytes: 400, ms: 600 }),
+  ).toBe("[host] compacted pinetrie:live (1 record, 0 KB) in 600 ms")
 })
