@@ -4,16 +4,21 @@ import type {
   AgentWork,
   CanvasId,
   CanvasView,
+  CardId,
   CardRecord,
-  NoteColumnId,
+  ImageId,
   ThreadId,
   ThreadName,
+  TitledCardId,
   WriterId,
 } from "@pinetrie/core"
 import { Type } from "typebox"
 import { type CardOnCanvas, isCardOnCanvas } from "./canvas-index.ts"
+import type { CardTitleRecord } from "./card-title.ts"
 import { CanvasIdSchema, List, WriterIdSchema } from "./decode.ts"
 import { type HistoryMessage, historyMessage } from "./history.ts"
+import { type ImageInColumn, imagesIn } from "./media.ts"
+import { NEW_NOTES_TITLE, notesIn } from "./notes.ts"
 import { attribute, neutral } from "./pinned.ts"
 
 export const CANVAS_TYPE = "pinetrie.canvas"
@@ -57,10 +62,8 @@ export interface CanvasFacts {
   readonly names: ReadonlyMap<ThreadId, ThreadName>
   /** What each thread's agent is doing; a thread absent is idle. */
   readonly work: ReadonlyMap<ThreadId, AgentWork>
-  /** Each note column's title, else `NEW_NOTES_TITLE`. */
-  readonly noteTitles: ReadonlyMap<NoteColumnId, string>
-  /** How many notes each note column holds. */
-  readonly noteCounts: ReadonlyMap<NoteColumnId, number>
+  /** What the list says of each column on the canvas (`columnGlances`). */
+  readonly glances: ReadonlyMap<CardId, ColumnGlance>
   readonly nameOf: (writer: WriterId) => string
 }
 
@@ -71,6 +74,76 @@ const STATE_WORDS: Readonly<Record<AgentWork, string>> = {
 }
 
 const notesWords = (n: number): string => (n === 1 ? "1 note" : `${n} notes`)
+
+const imagesWords = (n: number): string => (n === 1 ? "1 image" : `${n} images`)
+
+const versionsWords = (n: number): string =>
+  n === 1 ? "1 version" : `${n} versions`
+
+/** How many images a media column's line names; the rest are counted. */
+export const MEDIA_LINE_CAP = 12
+
+/** What the list says of a column: its title, and its notes' count or its images. */
+export type ColumnGlance =
+  | {
+      readonly kind: "note-column"
+      readonly title: string
+      readonly notes: number
+    }
+  | {
+      readonly kind: "media"
+      readonly title: string
+      readonly images: readonly ImageGlance[]
+    }
+
+/** An image as a media column's line names it: never the image itself. */
+export interface ImageGlance {
+  readonly id: ImageId
+  readonly title: string
+  readonly versions: number
+}
+
+/** The title an image without a title record reads. */
+export const UNTITLED_IMAGE = "untitled image"
+
+/** The title a media column without a title record reads. */
+export const NEW_MEDIA_TITLE = "Images"
+
+/** What the canvas list says of each column in `onCanvas`. */
+export function columnGlances(input: {
+  readonly cards: readonly CardRecord[]
+  readonly onCanvas: readonly CardOnCanvas[]
+  readonly titles: ReadonlyMap<TitledCardId, CardTitleRecord>
+}): ReadonlyMap<CardId, ColumnGlance> {
+  const glances = new Map<CardId, ColumnGlance>()
+  for (const c of input.onCanvas)
+    if (c.kind === "note-column")
+      glances.set(c.id, {
+        kind: "note-column",
+        title: input.titles.get(c.id)?.title ?? NEW_NOTES_TITLE,
+        notes: notesIn(input.cards, c.id).length,
+      })
+    else if (c.kind === "media")
+      glances.set(c.id, {
+        kind: "media",
+        title: input.titles.get(c.id)?.title ?? NEW_MEDIA_TITLE,
+        images: imagesIn(input.cards, c.id).map(i => ({
+          id: i.id,
+          title: input.titles.get(i.id)?.title ?? UNTITLED_IMAGE,
+          versions: i.content.versions.length,
+        })),
+      })
+  return glances
+}
+
+/** A media column's images as its line names them, the rest counted. */
+const imagesLine = (images: readonly ImageGlance[]): string => {
+  const named = images
+    .slice(0, MEDIA_LINE_CAP)
+    .map(i => `"${i.title}" (${i.id}, ${versionsWords(i.versions)})`)
+  const more = images.length - named.length
+  return [...named, ...(more > 0 ? [`and ${more} more`] : [])].join(", ")
+}
 
 /**
  * One card's line. A thread is named by its two words, else by "a thread";
@@ -86,8 +159,18 @@ function cardLine(c: CardOnCanvas, f: CanvasFacts): string {
       return `thread ${name}, ${work === undefined ? "idle" : STATE_WORDS[work]}, ${by}`
     }
     case "note-column": {
-      const title = f.noteTitles.get(c.id) ?? ""
-      return `note column "${title}", ${notesWords(f.noteCounts.get(c.id) ?? 0)}, ${by}`
+      const g = f.glances.get(c.id)
+      const title = g?.title ?? NEW_NOTES_TITLE
+      const notes = g?.kind === "note-column" ? g.notes : 0
+      return `note column "${title}", ${notesWords(notes)}, ${by}`
+    }
+    case "media": {
+      const g = f.glances.get(c.id)
+      const title = g?.title ?? NEW_MEDIA_TITLE
+      const images = g?.kind === "media" ? g.images : []
+      return images.length === 0
+        ? `media column "${title}", no images, ${by}`
+        : `media column "${title}", ${imagesWords(images.length)}: ${imagesLine(images)}, ${by}`
     }
     // A new kind of canvas card does not compile until it has its line.
     default:
@@ -164,11 +247,12 @@ export interface CanvasFact {
   readonly canvas: CanvasId
   readonly by: WriterId
   /**
-   * The card's title as the list names it: a thread's name, a note column's
-   * title; for `moved`, the title of the canvas it moved to.
+   * The card's title as the list names it: a thread's name, a column's
+   * title, an image's with its column's; for `moved`, the title of the
+   * canvas it moved to.
    */
   readonly title: string
-  readonly change: "added" | "taken" | "moved"
+  readonly change: "added" | "taken" | "moved" | "versioned"
 }
 
 export const CANVAS_FACT_TYPE = "pinetrie.canvas-fact"
@@ -183,6 +267,7 @@ const CanvasFactDetailsSchema = Type.Object({
     Type.Literal("added"),
     Type.Literal("taken"),
     Type.Literal("moved"),
+    Type.Literal("versioned"),
   ]),
 })
 
@@ -213,6 +298,8 @@ export function canvasFactLine(fact: ToldCanvasFact): string {
       return `${fact.byName} added ${fact.title} to the canvas`
     case "taken":
       return `${fact.byName} took ${fact.title} from the canvas`
+    case "versioned":
+      return `${fact.byName} added a version of ${fact.title}`
     case "moved":
       return `${fact.byName} moved this thread to the canvas "${fact.title}"`
   }
@@ -256,6 +343,8 @@ export function planCanvasFacts(input: {
   readonly running: ReadonlySet<ThreadId>
   /** A card's title as the list names it. */
   readonly titleOf: (card: CardOnCanvas) => string
+  /** An image's title as a fact names it, with its column's. */
+  readonly imageTitleOf: (image: ImageInColumn) => string
   /** A canvas's title, as its canvas list names it. */
   readonly canvasTitleOf: (canvas: CanvasId) => string
 }): readonly CanvasSteer[] {
@@ -300,14 +389,68 @@ export function planCanvasFacts(input: {
         },
       })
   }
-  const told = changes.flatMap(({ canvas, card, change }) =>
+  const said: {
+    canvas: CanvasId
+    title: string
+    change: CanvasFact["change"]
+    card: CardId
+  }[] = changes.map(c => ({
+    ...c,
+    title: input.titleOf(c.card),
+    card: c.card.id,
+  }))
+  // An image is on its column's canvas: added, taken, or given a version.
+  const canvasOfColumn = (cards: Map<CardId, CardRecord>, column: CardId) => {
+    const c = cards.get(column)
+    return c !== undefined && isCardOnCanvas(c) ? c.place.canvas : null
+  }
+  const inColumn = (c: CardRecord | undefined): ImageInColumn | undefined =>
+    c?.kind === "image" && c.place.kind === "image"
+      ? { ...c, place: c.place }
+      : undefined
+  for (const id of new Set([...was.keys(), ...is.keys()])) {
+    const before = inColumn(was.get(id))
+    const after = inColumn(is.get(id))
+    const from =
+      before === undefined ? null : canvasOfColumn(was, before.place.column)
+    const to =
+      after === undefined ? null : canvasOfColumn(is, after.place.column)
+    if (from !== to) {
+      if (from !== null && before !== undefined)
+        said.push({
+          canvas: from,
+          title: input.imageTitleOf(before),
+          change: "taken",
+          card: id,
+        })
+      if (to !== null && after !== undefined)
+        said.push({
+          canvas: to,
+          title: input.imageTitleOf(after),
+          change: "added",
+          card: id,
+        })
+    } else if (
+      to !== null &&
+      after !== undefined &&
+      before !== undefined &&
+      after.content.versions.length > before.content.versions.length
+    )
+      said.push({
+        canvas: to,
+        title: input.imageTitleOf(after),
+        change: "versioned",
+        card: id,
+      })
+  }
+  const told = said.flatMap(({ canvas, card, title, change }) =>
     (input.threadsOf.get(canvas) ?? [])
-      .filter(lane => lane !== card.id && input.running.has(lane))
+      .filter(lane => lane !== card && input.running.has(lane))
       .map(
         (lane): CanvasSteer => ({
           kind: "steer",
           lane,
-          fact: { canvas, by, title: input.titleOf(card), change },
+          fact: { canvas, by, title, change },
         }),
       ),
   )

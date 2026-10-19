@@ -299,6 +299,7 @@ export {
   conflictsWords,
 } from "./conflicts-view.ts"
 export { copyText } from "./copy-text.ts"
+export { countWords, type ListKind } from "./count-words.ts"
 export { byteWords, plural, whenWords } from "./counts.ts"
 export {
   type Armed,
@@ -342,8 +343,9 @@ export {
   foldedView,
   foldedWords,
   glanceCardId,
+  type ListGlance,
+  mediaColumnGlance,
   NO_MARK,
-  type NoteColumnGlance,
   noteColumnGlance,
   stripTitle,
   UNFOLD,
@@ -467,12 +469,22 @@ export {
   type LiveWork,
 } from "./live.ts"
 export {
-  ADD_COMMENT,
+  addCommentWords,
   COMMENT,
+  type MarginBeside,
   marginCountWords,
-  SHUT_MARGIN,
+  shutMarginWords,
 } from "./margin.ts"
 export { addressMarkdown } from "./markdown-of.ts"
+export {
+  commentVersionWords,
+  type ImageView,
+  MEDIA_EMPTY,
+  type MediaColumnView,
+  mediaColumns,
+  PUT_ON_CANVAS,
+  versionWords,
+} from "./media-column-view.ts"
 export {
   type MessageAct,
   type MessageTools,
@@ -497,7 +509,6 @@ export {
   canvasNoteColumns,
   NOTES_EMPTY,
   type NoteColumnView,
-  noteCountWords,
 } from "./note-column-view.ts"
 export { actingSaid } from "./outcome-words.ts"
 export {
@@ -601,6 +612,7 @@ export {
   type Tick,
 } from "./rail-view.ts"
 export {
+  cardBeforeGap,
   edgeScroll,
   keyMove,
   landing,

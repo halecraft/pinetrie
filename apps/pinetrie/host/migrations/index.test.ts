@@ -67,7 +67,7 @@ describe("the stored schemas", () => {
     expect(now).toEqual({
       session: "0223893f102c08dc9c7b6f976f712a842a",
       live: "028e3f891b8953894c3667be8ca55a5946",
-      places: "0283794d78e992727e2e933fa029b70753",
+      places: "021c2551de2c5407d0256bc79fb580ee86",
       root: "02065b897f9f33229f2318be54d33c6e76",
       text: "02cd0629243854b7d6f39abbc4ace6f345",
       inventory: "02d94dfca6ca2d2c5f9bb328f45759aa5b",

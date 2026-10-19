@@ -13,7 +13,7 @@ const at = {
 } as const
 const TOPICS = { id: workflowStateIdFor("t"), name: "Topics" }
 
-test("＋ past the last column makes an agent thread; its ▾, a chat and a note column, all at its spot", () => {
+test("＋ past the last column makes an agent thread; its ▾, a chat, a note column and a media column, all at its spot", () => {
   const button = newColumnButton(at)
   expect(button.main.intent).toEqual({
     kind: "addColumn",
@@ -23,8 +23,13 @@ test("＋ past the last column makes an agent thread; its ▾, a chat and a note
   expect(button.more?.items.map(i => i.intent)).toEqual([
     { kind: "addColumn", make: { kind: "thread", opens: "chat" }, at },
     { kind: "addColumn", make: { kind: "note-column" }, at },
+    { kind: "addColumn", make: { kind: "media" }, at },
   ])
-  expect(button.more?.items.map(i => i.label)).toEqual(["chat", "note column"])
+  expect(button.more?.items.map(i => i.label)).toEqual([
+    "chat",
+    "note column",
+    "media column",
+  ])
 })
 
 test("＋ canvas makes a canvas, with no ▾", () => {
@@ -48,6 +53,7 @@ test("the table of new columns holds every kind, each column under its own", () 
   const whole = {
     thread: [{ kind: "thread", opens: "agent" }],
     "note-column": [{ kind: "note-column" }],
+    media: [{ kind: "media" }],
   } as const satisfies NewColumnTable
   // @ts-expect-error a kind with nothing to make
   const empty = { ...whole, thread: [] } as const satisfies NewColumnTable

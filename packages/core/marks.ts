@@ -1,12 +1,22 @@
-// core/marks — titles: what a canvas's or a note column's typed title asks
+// core/marks — titles: what a canvas's or a titled card's typed title asks
 // for.
 
-import type { CanvasId, NoteColumnId } from "./ids.ts"
+import type { CanvasId, CardId } from "./ids.ts"
+import { kindOfCard } from "./ids.ts"
+import { isTitledKind, type TitledKind } from "./kinds.ts"
+import type { IdOf } from "./places.ts"
 
-/** What a title names: a canvas, or a note column. */
+/** A card with a title of its own: a note column, a media column or an image. */
+export type TitledCardId = IdOf<TitledKind>
+
+/** Whether `card` has a title of its own (`KINDS`' `titled`). */
+export const isTitledCardId = (card: CardId): card is TitledCardId =>
+  isTitledKind(kindOfCard(card))
+
+/** What a title names: a canvas, or a titled card. */
 export type MarkTarget =
   | { readonly kind: "canvas"; readonly canvas: CanvasId }
-  | { readonly kind: "note-column"; readonly column: NoteColumnId }
+  | { readonly kind: "card"; readonly card: TitledCardId }
 
 /** A title's longest form, in UTF-16 code units. */
 export const MAX_TITLE = 80

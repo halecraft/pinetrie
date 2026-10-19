@@ -4,6 +4,7 @@
 // A gap is a place between columns: gap 0 is before the first, gap n after
 // the last of n. A column dropped in the gap either side of itself does not move.
 
+import type { CardId } from "@pinetrie/core"
 /** The gap a pointer at `x` is in: the number of columns whose centre is left of it. */
 export function pointerGap(mids: readonly number[], x: number): number {
   return mids.filter(mid => mid < x).length
@@ -59,4 +60,21 @@ export function edgeScroll(x: number, left: number, right: number): number {
   if (x - left < EDGE_ZONE) return 0 - pull(x - left)
   if (right - x < EDGE_ZONE) return pull(right - x)
   return 0
+}
+
+/**
+ * The card a drop at `x` on the strip lands after, from each drawn column's
+ * card and centre in the strip's content (`mid`), in order: the column
+ * before the gap the point is in (`pointerGap`); null for before every one.
+ * A file dropped there is put as images in a media column made at that spot.
+ */
+export function cardBeforeGap(
+  columns: readonly { readonly card: CardId; readonly mid: number }[],
+  x: number,
+): CardId | null {
+  const gap = pointerGap(
+    columns.map(c => c.mid),
+    x,
+  )
+  return columns[gap - 1]?.card ?? null
 }

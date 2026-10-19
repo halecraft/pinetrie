@@ -6,7 +6,7 @@
 import type { Store } from "@kyneta/exchange"
 import {
   type BlobStore,
-  cardTextSource,
+  cardBlobs,
   type EntryId,
   isTextCard,
   MOVES_DOC_PREFIX,
@@ -44,8 +44,9 @@ import type { LaneWork } from "./work/index.ts"
 
 /**
  * Delete the blobs nothing shows or quotes any more: gather every card's text
- * (`CardPort.texts` of the cards `places` holds) and every reference's quote
- * (`cardTextSource`), then the store's list and the session's references
+ * (`CardPort.texts` of the cards `places` holds) and every blob a card holds
+ * (`cardBlobs`: a reference's quote, an image's versions), then the store's
+ * list and the session's references
  * (`readReferencedBlobs`: roots' blobs, banners and people's pictures), with
  * each one's fitted copy, with no await between them, `planSweep`, delete.
  */
@@ -61,12 +62,9 @@ export async function sweepBlobs(input: {
   const cards = readPlaces(input.basics.places)
   const ids = cards.filter(isTextCard).map(c => c.id)
   const texts = (await input.texts(ids)).map(t => t.text)
-  // A reference's quote is a blob its card holds.
-  const quotes = cards.flatMap(c => {
-    const source = cardTextSource(c)
-    return source.kind === "blob" ? [source.sha] : []
-  })
-  const shown = new Set([...readReferencedBlobs(doc, texts), ...quotes])
+  // A reference's quote and an image's versions are blobs their cards hold.
+  const held = cards.flatMap(cardBlobs)
+  const shown = new Set([...readReferencedBlobs(doc, texts), ...held])
   // A draft names an image's original; its fitted copy is what the message
   // will show once sent.
   const referenced = new Set<Sha256>(

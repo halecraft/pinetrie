@@ -18,6 +18,7 @@ import {
 import { cardsOnCanvas } from "./canvas-index.ts"
 import { byOrder, cardOrder, isOrdered } from "./card.ts"
 import { marginCards } from "./margin.ts"
+import { imagesIn } from "./media.ts"
 import { notesIn } from "./notes.ts"
 import { orderBetween, respace } from "./order.ts"
 import type { MoveStep, PlaceStep } from "./place-steps.ts"
@@ -54,8 +55,8 @@ interface ReorderRule<K extends ReorderAt["kind"]> {
  * - A canvas's pinned cards: its own, the neighbours next to each
  *   other.
  * - A note column: its notes, the neighbours next to each other.
- * - An entry's margin: its comments, the neighbours next to each
- *   other.
+ * - A media column: its images, the neighbours next to each other.
+ * - A margin: its comments, the neighbours next to each other.
  * - A canvas: its canvas's cards (`cardsOnCanvas`), the neighbours next to each
  *   other.
  */
@@ -80,8 +81,13 @@ export const REORDERS: { readonly [K in ReorderAt["kind"]]: ReorderRule<K> } = {
     adjacent: true,
     passesFacts: true,
   },
+  image: {
+    siblings: (cards, at) => imagesIn(cards, at.column),
+    adjacent: true,
+    passesFacts: true,
+  },
   margin: {
-    siblings: (cards, at) => marginCards(cards, at.entry),
+    siblings: (cards, at) => marginCards(cards, at.on),
     adjacent: true,
     passesFacts: true,
   },

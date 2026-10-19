@@ -17,6 +17,8 @@
     yet started; Fold leaves ⋯, and Move to trash ends it.
   - ADR-0177: a thread not yet started is trashed from its header by a bin,
     not ×.
+  - ADR-0182: a file dropped on the strip, between or onto columns, lands as
+    images; an image in a message is a drag handle of its own.
 
 **Context.**
 

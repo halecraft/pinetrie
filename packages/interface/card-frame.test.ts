@@ -4,6 +4,7 @@ import {
   canvasIdFor,
   cardIdOfKind,
   entryId,
+  entryMargin,
   type Sha256,
   type TextCard,
   type TextPlace,
@@ -136,7 +137,12 @@ describe("cardFrame", () => {
     ],
     [
       "a comment: a reference queued on its thread, which leaves it where it is; your inventory",
-      { kind: "margin", entry: entryId("e-1"), thread: LANE, order: "a" },
+      {
+        kind: "margin",
+        on: entryMargin(LANE, entryId("e-1")),
+        order: "a",
+        seen: "",
+      },
       "note",
       [
         {

@@ -4,16 +4,19 @@
 // sent among them. What is drawn is decided in `@pinetrie/interface` (`canvasStrip`);
 // this draws it. A column's header is its drag handle (`use-drag.ts`).
 
-import type {
-  CanvasId,
-  CanvasPinnedView,
-  CardId,
-  EntryId,
-  ForeignLane,
-  NoteColumnId,
-  TextCard,
-  ThreadId,
-  WriterId,
+import {
+  type CanvasId,
+  type CanvasPinnedView,
+  type CardId,
+  type CardRecord,
+  type EntryId,
+  type ForeignLane,
+  type MediaId,
+  type NoteColumnId,
+  parseCardId,
+  type TextCard,
+  type ThreadId,
+  type WriterId,
 } from "@pinetrie/core"
 import {
   type CanvasColumnView,
@@ -22,11 +25,13 @@ import {
   type ColumnMatches,
   type Column as ColumnSpec,
   type ColumnView,
+  cardBeforeGap,
   columnReadOnly,
   dropProps,
   foldedView,
   glanceCardId,
   type Intent,
+  type MediaColumnView,
   type NoteColumnView,
   newColumnButton,
   type Reader,
@@ -37,12 +42,16 @@ import {
   type ThreadGlance,
 } from "@pinetrie/interface"
 import type { CardOnCanvas } from "@pinetrie/rules"
+import { newImageId } from "@pinetrie/session"
 import type { ReactElement, RefObject } from "react"
 import { useMemo } from "react"
 import { AddButton } from "./add-button.tsx"
 import { CanvasColumn } from "./canvas-column.tsx"
 import { Column, type ColumnProps } from "./column.tsx"
+import { fileDropAtProps } from "./file-drop.ts"
 import { FoldedColumn } from "./folded-column.tsx"
+import { uploadImages } from "./image-upload.ts"
+import { MediaColumn } from "./media-column.tsx"
 import type { MenuItem } from "./menu.tsx"
 import { NoteColumn } from "./note-column.tsx"
 import type { ReadersProps } from "./root-signals.tsx"
@@ -98,6 +107,9 @@ export function Strip(p: {
   /** The canvas list the canvas's agents are told, its lines. */
   told: readonly string[]
   noteViews: ReadonlyMap<NoteColumnId, NoteColumnView>
+  mediaViews: ReadonlyMap<MediaId, MediaColumnView>
+  /** Every card: an image's comments are read from its margin. */
+  cards: readonly CardRecord[]
   /** A thread's glance, which its column draws when folded. */
   threadGlanceOf: (thread: ThreadId) => ThreadGlance
   /** A folded thread's colour track: the one its column takes. */
@@ -166,6 +178,7 @@ export function Strip(p: {
       ? foldedView(item, {
           threadGlanceOf: p.threadGlanceOf,
           notes: p.noteViews,
+          media: p.mediaViews,
         })
       : null
     if (folded !== null)
@@ -202,13 +215,62 @@ export function Strip(p: {
           />
         )
       }
+      case "media": {
+        const media = p.mediaViews.get(item.card)
+        return media === undefined ? null : (
+          <MediaColumn
+            cards={p.cards}
+            key={item.card}
+            onIntent={p.onIntent}
+            onTyping={card => p.typing(null, card)}
+            readOnly={readOnly}
+            reader={p.reader}
+            seats={p.shared.seats}
+            session={p.shared.session}
+            view={media}
+            width={item.width}
+          />
+        )
+      }
       default:
         return item satisfies never
     }
   }
+  // Files dropped where no card takes them: images in a media column made
+  // at the gap the drop is in, as a column dropped there would land.
+  const canvasAt =
+    stage.kind === "canvas" && readOnly === null ? stage.canvas : null
+  const filesAt = async (files: readonly File[], x: number) => {
+    const strip = p.stripRef.current
+    if (canvasAt === null || strip === null) return
+    const box = strip.getBoundingClientRect()
+    const columns = [
+      ...strip.querySelectorAll<HTMLElement>(":scope > [data-card]"),
+    ].flatMap(el => {
+      const card = parseCardId(el.dataset.card ?? "")
+      const r = el.getBoundingClientRect()
+      return card === undefined
+        ? []
+        : [{ card, mid: r.left - box.left + strip.scrollLeft + r.width / 2 }]
+    })
+    // Where it lands is decided at the drop, before the upload, so a strip
+    // that moves meanwhile does not move it.
+    const after = cardBeforeGap(columns, x - box.left + strip.scrollLeft)
+    const up = await uploadImages(files)
+    p.onIntent({
+      kind: "putImages",
+      images: up.images.map(i => ({ ...i, card: newImageId() })),
+      to: { kind: "canvas-at", canvas: canvasAt, after },
+    })
+  }
   return (
     <div
       {...(endDrop === null ? {} : dropProps(endDrop))}
+      {...(canvasAt === null
+        ? {}
+        : fileDropAtProps((files, at) => {
+            void filesAt(files, at.x)
+          }))}
       id="strip"
       ref={p.stripRef}
     >

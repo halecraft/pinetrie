@@ -1,6 +1,8 @@
 import {
   cardIdOfKind,
   entryId,
+  entryMargin,
+  imageMargin,
   type PlaceKey,
   rootIdFor,
   type ThreadName,
@@ -275,6 +277,19 @@ test("a new card's box is drawn as its list is: a note's and a comment's as note
     placeholder: "what the agent should keep in mind on every run",
   })
   expect(
-    newCardBox({ kind: "margin", entry: entryId("2-a"), thread }),
+    newCardBox({
+      kind: "margin",
+      on: entryMargin(thread, entryId("2-a")),
+      seen: "",
+    }),
   ).toMatchObject({ tone: "note", placeholder: "write a comment" })
+  expect(
+    newCardBox({
+      kind: "margin",
+      on: imageMargin(
+        cardIdOfKind("image", "01a0ffd2-0000-7000-8000-000000000001"),
+      ),
+      seen: "",
+    }).title,
+  ).toMatch(/^a comment on this image/)
 })

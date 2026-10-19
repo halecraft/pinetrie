@@ -243,8 +243,7 @@ export function newCardBox(to: ListKey): NewCardBoxView {
       return {
         tone: "note",
         placeholder: "write a comment",
-        title:
-          "a comment on this message, which everyone in the canvas sees and no agent reads",
+        title: `a comment on this ${to.on.kind === "entry" ? "message" : "image"}, which everyone in the canvas sees and no agent reads`,
       }
   }
 }

@@ -14,22 +14,28 @@ export const COMMENT = {
     "comment on this message: a note beside it, for everyone on the canvas; the agent does not read it",
 } as const
 
+/** What a margin is beside: a message, or an image in a media column. */
+export type MarginBeside = "message" | "image"
+
 /** A shut margin's count: how many comments it holds. */
 export const marginCountWords = (
   count: number,
+  beside: MarginBeside,
 ): { readonly label: string; readonly title: string } => ({
   label: `💬 ${count}`,
-  title: `${plural(count, "comment")} on this message: open them (Enter)`,
+  title: `${plural(count, "comment")} on this ${beside}: open them${beside === "message" ? " (Enter)" : ""}`,
 })
 
 /** The control that shuts an open margin. */
-export const SHUT_MARGIN = {
-  label: "shut",
-  title: "shut this message's comments (Escape)",
-} as const
+export const shutMarginWords = (beside: MarginBeside) =>
+  ({
+    label: "shut",
+    title: `shut this ${beside}'s comments${beside === "message" ? " (Escape)" : ""}`,
+  }) as const
 
-/** The control that adds a comment in an open margin (`c` on the message). */
-export const ADD_COMMENT = {
-  label: "+ comment",
-  title: "add a comment on this message (c)",
-} as const
+/** The control that adds a comment in an open margin (`c` on a message). */
+export const addCommentWords = (beside: MarginBeside) =>
+  ({
+    label: "+ comment",
+    title: `add a comment on this ${beside}${beside === "message" ? " (c)" : ""}`,
+  }) as const

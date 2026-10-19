@@ -41,6 +41,9 @@
     full one or more. A kind fills compact as a value, drawn by one component.
     A folded strip and a shut margin's count are no level. The inventory draws
     compact slots and its selected card on a bench.
+  - ADR-0182: a margin is an entry's or an image's surface, one place that
+    names its owner by address, and a comment's place says which version of an
+    image it was written on; every stored margin row is rewritten to it.
 
 **Context.**
 

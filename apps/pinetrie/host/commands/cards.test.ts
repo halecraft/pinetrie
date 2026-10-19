@@ -17,6 +17,7 @@ import {
   rootIdFor,
   runId,
   type Sha256,
+  storedText,
   type TextCard,
   type ThreadId,
   threadIdFor,
@@ -29,6 +30,7 @@ import { PLACES_DOC_ID } from "@pinetrie/protocol/messages"
 import {
   readCanvases,
   readCardHistories,
+  readCardTitles,
   readPlaces,
   readPlacesRev,
   readQueueHolds,
@@ -56,6 +58,7 @@ import {
   writeLaneTip,
 } from "@pinetrie/schema/fixtures"
 import { describe, expect, test } from "vitest"
+import { memoryBlobs } from "../blobs.ts"
 import { canvasesNow } from "../canvases.ts"
 import {
   applyWrites,
@@ -165,8 +168,10 @@ function setUp() {
     for (const lane of threads)
       if (readRunning(b.live, lane)) stops.push([lane, by])
   })
+  const blobs = memoryBlobs()
   const raw = createCardCommands({
     basics: b,
+    blobs,
     cards: cards.port,
     drain: lane => void drains.push(lane),
     histories: histories.port,
@@ -201,6 +206,10 @@ function setUp() {
       raw.copyThread(w, c, canvasesNow(b)),
     paste: (w: WriterId, p: Parameters<Raw["paste"]>[1]) =>
       raw.paste(w, p, canvasesNow(b)),
+    putImages: (w: WriterId, p: Parameters<Raw["putImages"]>[1]) =>
+      raw.putImages(w, p, canvasesNow(b)),
+    version: (w: WriterId, v: Parameters<Raw["version"]>[1]) =>
+      raw.version(w, v, canvasesNow(b)),
   }
   const undoes = (result: UndoResult, revert: () => void = () => {}) => {
     undoing = result
@@ -223,6 +232,7 @@ function setUp() {
     ])
   return {
     b,
+    blobs,
     cards,
     texts,
     drains,
@@ -1424,5 +1434,83 @@ describe("a press on a proposal", () => {
       kind: "refused",
       message: "someone has already opened these branches",
     })
+  })
+})
+
+describe("images in a media column", () => {
+  const png = (shade: number) => ({
+    bytes: new Uint8Array([shade]),
+    mimeType: "image/png" as const,
+    width: 40,
+    height: 30,
+  })
+  const image = (n: number) =>
+    cardIdOfKind("image", `01a0ffd2-0000-7000-8000-0000000000b${n}`)
+
+  test("a put at a spot on the canvas makes a media column there, its images in it, each titled by its file's name", async () => {
+    const { b, blobs, commands, recorded } = setUp()
+    const [a, c] = [blobs.put(png(1)), blobs.put(png(2))]
+    const out = await commands.putImages(ADA, {
+      kind: "put-images",
+      images: [
+        { card: image(1), sha256: a.sha256, name: "home.png" },
+        { card: image(2), sha256: c.sha256, name: "login.png" },
+      ],
+      to: { kind: "canvas-at", canvas: TEST_CANVAS, after: LANE },
+      made: null,
+    })
+    expect(out.outcome).toEqual({ kind: "moved" })
+    const cards = readPlaces(b.places)
+    const column = cards.find(x => x.kind === "media")
+    expect(column?.place).toMatchObject({ kind: "canvas", canvas: TEST_CANVAS })
+    expect(
+      cards.flatMap(x =>
+        x.kind === "image" && x.place.kind === "image"
+          ? [[x.id, x.place.column, x.content.versions[0]?.sha256]]
+          : [],
+      ),
+    ).toEqual([
+      [image(1), column?.id, a.sha256],
+      [image(2), column?.id, c.sha256],
+    ])
+    expect(readCardTitles(b.session).get(image(1))?.title).toBe("home.png")
+    expect(recorded).toEqual([[ADA, TEST_CANVAS]])
+  })
+
+  test("a blob that is no image, or none, is refused, and nothing is put", async () => {
+    const { b, blobs, commands } = setUp()
+    const text = blobs.put(storedText("notes"))
+    for (const sha256 of [text.sha256, "f".repeat(64) as Sha256])
+      expect(
+        (
+          await commands.putImages(ADA, {
+            kind: "put-images",
+            images: [{ card: image(1), sha256, name: "x" }],
+            to: { kind: "canvas-at", canvas: TEST_CANVAS, after: null },
+            made: null,
+          })
+        ).outcome,
+      ).toMatchObject({ kind: "refused" })
+    expect(readPlaces(b.places).some(x => x.kind === "image")).toBe(false)
+  })
+
+  test("a version is added to an image, after its first", async () => {
+    const { b, blobs, commands } = setUp()
+    const [a, c] = [blobs.put(png(1)), blobs.put(png(2))]
+    await commands.putImages(ADA, {
+      kind: "put-images",
+      images: [{ card: image(1), sha256: a.sha256, name: "home.png" }],
+      to: { kind: "canvas-at", canvas: TEST_CANVAS, after: null },
+      made: null,
+    })
+    await commands.version(ADA, {
+      kind: "version",
+      image: image(1),
+      sha256: c.sha256,
+    })
+    const held = readPlaces(b.places).find(x => x.id === image(1))
+    expect(
+      held?.kind === "image" ? held.content.versions.map(v => v.sha256) : [],
+    ).toEqual([a.sha256, c.sha256])
   })
 })

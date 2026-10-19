@@ -11,6 +11,8 @@ import type {
   CanvasId,
   CardId,
   EntryId,
+  ImageId,
+  MediaId,
   RootId,
   ThreadId,
   WorkflowStateId,
@@ -22,6 +24,7 @@ import type { Paste, Replacing } from "./paste.ts"
 import type {
   CanvasKey,
   CardWidth,
+  ImagesTarget,
   Move,
   MoveDirection,
   MoveOf,
@@ -103,6 +106,8 @@ export const ERR = {
   INVALID_IDENTITY: "invalid_identity",
   /** A message shares, or a picture names, a `/blob/` the host does not store. */
   IMAGE_MISSING: "image_missing",
+  /** A blob put in a media column that the store sorted as text or opaque. */
+  NOT_AN_IMAGE: "not_an_image",
   /** A picture pi cannot decode or fit within `PICTURE_MOST`. */
   PICTURE_UNREADABLE: "picture_unreadable",
   /** A title with a line break, or longer than `MAX_TITLE`. */
@@ -288,6 +293,13 @@ export type ThreadStart =
  * malformed command. What it then does is decided by `planMessage` and the
  * other planners in `@pinetrie/rules`, over what the host gathers.
  */
+/** One image a put makes: its id, the blob it was uploaded as, and its file's name. */
+export interface PutImage {
+  readonly card: ImageId
+  readonly sha256: Sha256
+  readonly name: string
+}
+
 export type Intent =
   /** A human message; `mentions` are parsed from `text` once, at the codec. */
   | {
@@ -396,8 +408,8 @@ export type Intent =
   /** Change the session's workflow states. */
   | { readonly kind: "workflow"; readonly edit: WorkflowEdit }
   /**
-   * Title a canvas or a note column, or clear its title with null: one gesture,
-   * each title in its own record.
+   * Title a canvas or a titled card, or clear its title with null: one
+   * gesture, a canvas's title in its mark and a card's in its title record.
    */
   | {
       readonly kind: "mark"
@@ -490,6 +502,27 @@ export type Intent =
       readonly to: MoveTarget
       readonly replacing: Replacing | null
       readonly here: CanvasId | null
+    }
+  /**
+   * New images, from blobs already stored, put at a spot on a canvas (a
+   * media column made there) or at a media column's end: one step of the
+   * sender's history. Each is titled by its file's name.
+   */
+  | {
+      readonly kind: "put-images"
+      readonly images: readonly PutImage[]
+      readonly to: ImagesTarget
+      /**
+       * The media column a put to a spot makes, minted by the page so it
+       * draws it unfolded for its maker; null to let the host mint it.
+       */
+      readonly made: MediaId | null
+    }
+  /** A new version of an image, from a blob already stored. */
+  | {
+      readonly kind: "version"
+      readonly image: ImageId
+      readonly sha256: Sha256
     }
   /**
    * Move a queued or pinned card among its neighbours, recorded in its root's

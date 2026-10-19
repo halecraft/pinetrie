@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest"
 import {
   type CanvasId,
   type CardKind,
+  cardBlobs,
   cardIdOfKind,
   cardTextSource,
   type FactCardId,
@@ -16,6 +17,7 @@ import {
   parseCardId,
   type RelayDetails,
   type Sha256,
+  shownVersion,
   type ThreadId,
   textCardId,
   WRAPS,
@@ -73,7 +75,7 @@ describe("KINDS", () => {
         kind,
         fitsPlace(kind, "canvas") || kind in WRAPS,
       ])
-    expect(Object.keys(WRAPS).sort()).toEqual(["reference", "text"])
+    expect(Object.keys(WRAPS).sort()).toEqual(["image", "reference", "text"])
   })
 
   test("makeCard makes a card of its kind, at a place its kind is in, by its maker", () => {
@@ -149,12 +151,82 @@ test("a card's words are where its kind says (`KINDS`' text): cardTextSource agr
       { address: { kind: "thread", thread }, quote: "a".repeat(64) as Sha256 },
       ADA,
     ),
+    makeCard("media", cardIdOfKind("media", UUID), place, NO_CONTENT, ADA),
+    makeCard(
+      "image",
+      cardIdOfKind("image", UUID),
+      { kind: "image", column: cardIdOfKind("media", UUID), order: "a" },
+      {
+        versions: [
+          {
+            sha256: "b".repeat(64) as Sha256,
+            original: "b".repeat(64) as Sha256,
+            mimeType: "image/png",
+            width: 4,
+            height: 3,
+            by: ADA,
+            at: 1,
+          },
+        ],
+      },
+      ADA,
+    ),
   ]
   expect(cards.map(c => c.kind).sort()).toEqual(
-    (Object.keys(KINDS) as CardKind[])
-      .filter(k => k !== "media" && k !== "file")
-      .sort(),
+    (Object.keys(KINDS) as CardKind[]).filter(k => k !== "file").sort(),
   )
   for (const card of cards)
     expect(cardTextSource(card).kind).toBe(KINDS[card.kind].text)
+})
+
+test("a card's blobs are a reference's quote and every version of an image, none for the rest", () => {
+  const quote = "a".repeat(64) as Sha256
+  const [v1, v2] = ["b".repeat(64), "c".repeat(64)] as Sha256[]
+  const place = { kind: "inventory", holder: ADA } as const
+  expect(
+    cardBlobs(
+      makeCard(
+        "reference",
+        cardIdOfKind("reference", UUID),
+        place,
+        { address: { kind: "thread", thread: "t-1" as ThreadId }, quote },
+        ADA,
+      ),
+    ),
+  ).toEqual([quote])
+  const image = makeCard(
+    "image",
+    cardIdOfKind("image", UUID),
+    { kind: "image", column: cardIdOfKind("media", UUID), order: "a" },
+    {
+      versions: [
+        {
+          sha256: v1 as Sha256,
+          original: v1 as Sha256,
+          mimeType: "image/png",
+          width: 4,
+          height: 3,
+          by: ADA,
+          at: 1,
+        },
+        {
+          sha256: v2 as Sha256,
+          original: v2 as Sha256,
+          mimeType: "image/png",
+          width: 4,
+          height: 3,
+          by: ADA,
+          at: 2,
+        },
+      ],
+    },
+    ADA,
+  )
+  expect(cardBlobs(image)).toEqual([v1, v2])
+  expect(shownVersion(image)?.sha256).toBe(v2)
+  expect(
+    cardBlobs(
+      makeCard("media", cardIdOfKind("media", UUID), place, NO_CONTENT, ADA),
+    ),
+  ).toEqual([])
 })

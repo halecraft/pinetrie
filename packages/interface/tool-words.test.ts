@@ -18,6 +18,7 @@ describe("toolWord", () => {
     leave: "left",
     resolve_conflict: "resolve",
     save_blob: "save",
+    put_image: "image",
     propose_branches: "propose",
   }
   test.each(TOOL_IDS)("%s reads as its word", id => {

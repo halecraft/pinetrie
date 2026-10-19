@@ -11,6 +11,8 @@ import {
   type ContentOf,
   type EntryId,
   type IdOf,
+  type ImageVersion,
+  isImageMime,
   isSha256,
   isTextCard,
   kindedId,
@@ -67,6 +69,8 @@ const StoredCard = Type.Object({
   quote: Type.Optional(Type.String()),
   /** A text card's origin, a printed address, "" for none; absent before origins. */
   origin: Type.Optional(Type.String()),
+  /** An image's versions, as JSON; absent before images. */
+  versions: Type.Optional(Type.String()),
 })
 
 /** The flat value the places document stores under a card's id. */
@@ -91,6 +95,7 @@ interface StoredCardFields {
   readonly address: string
   readonly quote: string
   readonly origin: string
+  readonly versions: string
 }
 
 const isCommand = (s: string): s is CardCommand =>
@@ -99,7 +104,14 @@ const isCommand = (s: string): s is CardCommand =>
 /** The columns a card's content is stored in: "" for none. */
 type ContentFields = Pick<
   StoredCardFields,
-  "command" | "fact" | "relay" | "unsent" | "address" | "quote" | "origin"
+  | "command"
+  | "fact"
+  | "relay"
+  | "unsent"
+  | "address"
+  | "quote"
+  | "origin"
+  | "versions"
 >
 
 type ContentColumn = keyof ContentFields
@@ -112,6 +124,7 @@ const NO_CONTENT_FIELDS: ContentFields = {
   address: "",
   quote: "",
   origin: "",
+  versions: "",
 }
 
 /** How one kind's content is stored: the columns it holds, and their codec. */
@@ -176,6 +189,48 @@ export const CARD_CODEC: { readonly [K in PlacedKind]: ContentCodec<K> } = {
       return relay === undefined ? undefined : { relay }
     },
   },
+  media: { columns: [], encode: () => ({}), decode: () => NO_CONTENT },
+  image: {
+    columns: ["versions"],
+    encode: c => ({ versions: JSON.stringify(c.versions) }),
+    decode: f => {
+      const versions = decodeVersions(f.versions)
+      return versions === undefined ? undefined : { versions }
+    },
+  },
+}
+
+const StoredVersions = Type.Array(
+  Type.Object({
+    sha256: Type.String(),
+    original: Type.String(),
+    mimeType: Type.String(),
+    width: Type.Number(),
+    height: Type.Number(),
+    by: Type.String({ minLength: 1 }),
+    at: Type.Number(),
+  }),
+  { minItems: 1 },
+)
+
+/** An image's stored versions; undefined for none, or any not a blob's. */
+function decodeVersions(json: string): readonly ImageVersion[] | undefined {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(json)
+  } catch {
+    return undefined
+  }
+  return decodeWith(StoredVersions, parsed, vs => {
+    const out: ImageVersion[] = []
+    for (const v of vs) {
+      const { sha256, original, mimeType } = v
+      if (!isSha256(sha256) || !isSha256(original) || !isImageMime(mimeType))
+        return undefined
+      out.push({ ...v, sha256, original, mimeType, by: v.by as WriterId })
+    }
+    return out
+  })
 }
 
 /** A card's content as its columns (`CARD_CODEC`), every other one "". */
@@ -257,6 +312,7 @@ export const decodeCard = (
       address: c.address ?? "",
       quote: c.quote ?? "",
       origin: c.origin ?? "",
+      versions: c.versions ?? "",
     }
     const of = kindedId(card)
     switch (of.kind) {
@@ -275,6 +331,9 @@ export const decodeCard = (
       case "ask":
         return decodeOfKind(of.kind, of.id, row, place, fields)
       case "media":
+        return decodeOfKind(of.kind, of.id, row, place, fields)
+      case "image":
+        return decodeOfKind(of.kind, of.id, row, place, fields)
       case "file":
         return undefined
       default:

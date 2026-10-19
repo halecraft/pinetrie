@@ -13,9 +13,9 @@
 import type { ThreadId, WriterId } from "@pinetrie/core"
 import type { Agent } from "@pinetrie/pi"
 import {
+  readCardTitles,
   readMarks,
   readNames,
-  readNoteColumns,
   readParticipantNames,
   readRoots,
   readRunningLanes,
@@ -25,13 +25,25 @@ import {
   type CardOnCanvas,
   displayName,
   encodeCanvasFact,
+  type ImageInColumn,
   indexCanvases,
+  NEW_MEDIA_TITLE,
   NEW_NOTES_TITLE,
   planCanvasFacts,
+  UNTITLED_IMAGE,
 } from "@pinetrie/rules"
 import { type Basics, failed, type HostKeeper } from "./basics.ts"
 import { canvasTitle } from "./canvas.ts"
 import type { PlacesChange } from "./provenance.ts"
+
+/** An image's title as a fact names it, with its column's. */
+const imageTitleOf =
+  (basics: Pick<Basics, "session">) =>
+  (image: ImageInColumn): string => {
+    const titles = readCardTitles(basics.session)
+    const column = titles.get(image.place.column)?.title ?? NEW_MEDIA_TITLE
+    return `image "${titles.get(image.id)?.title ?? UNTITLED_IMAGE}" in media column "${column}"`
+  }
 
 /** A card's title as the canvas list names it. */
 const titleOf =
@@ -41,7 +53,9 @@ const titleOf =
       case "thread":
         return readNames(basics.session).get(card.id) ?? "a thread"
       case "note-column":
-        return `note column "${readNoteColumns(basics.session).get(card.id)?.title ?? NEW_NOTES_TITLE}"`
+        return `note column "${readCardTitles(basics.session).get(card.id)?.title ?? NEW_NOTES_TITLE}"`
+      case "media":
+        return `media column "${readCardTitles(basics.session).get(card.id)?.title ?? NEW_MEDIA_TITLE}"`
       // A new kind of canvas card does not compile until it has a title.
       default:
         return card satisfies never
@@ -69,6 +83,7 @@ export function createCanvasNews(deps: {
         threadsOf: canvases.threadsOf,
         running,
         titleOf: titleOf(basics),
+        imageTitleOf: imageTitleOf(basics),
         canvasTitleOf: canvas =>
           canvasTitle(
             canvas,

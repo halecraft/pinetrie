@@ -1,16 +1,17 @@
-// web/margin — an entry's margin, open under it: its comments, each a note
+// web/margin — an entry's or an image's margin, open under it: its comments, each a note
 // anyone on the canvas may edit, and a control to add one. Shut, the margin is
 // the count beside the entry (`MarginCount`). What it says is
 // `@pinetrie/interface`'s (`margin.ts`).
 
 import type { CardId } from "@pinetrie/core"
 import {
-  ADD_COMMENT,
+  addCommentWords,
   type ColumnAct,
+  type MarginBeside,
   marginCountWords,
   type Reader,
   type ReadOnly,
-  SHUT_MARGIN,
+  shutMarginWords,
 } from "@pinetrie/interface"
 import type { MarginCard, SeatRecord } from "@pinetrie/rules"
 import type { SessionClient } from "@pinetrie/session"
@@ -18,8 +19,12 @@ import { NoteCardEditor } from "./card-editor.tsx"
 import { RENDERINGS } from "./renderings.tsx"
 
 /** A shut margin: how many comments it holds; a press opens it. */
-export function MarginCount(p: { count: number; onOpen: () => void }) {
-  const words = marginCountWords(p.count)
+export function MarginCount(p: {
+  count: number
+  beside: MarginBeside
+  onOpen: () => void
+}) {
+  const words = marginCountWords(p.count, p.beside)
   return (
     <button
       aria-label={words.title}
@@ -44,11 +49,19 @@ export function Margin(p: {
   onTyping: (card: CardId) => void
   onComment: () => void
   onShut: () => void
+  beside: MarginBeside
+  /** A comment's note of the version it was written on; null for none. */
+  versionOf?: (seen: string) => string | null
 }) {
+  const add = addCommentWords(p.beside)
+  const shut = shutMarginWords(p.beside)
   return (
     <div className="margin">
       {p.comments.map(c => (
         <div className="margin-card" key={c.id}>
+          {p.versionOf?.(c.place.seen) != null && (
+            <div className="margin-version">{p.versionOf(c.place.seen)}</div>
+          )}
           {c.kind === "text" ? (
             <NoteCardEditor
               among={p.comments}
@@ -71,19 +84,19 @@ export function Margin(p: {
           <button
             className="add-comment"
             onClick={p.onComment}
-            title={ADD_COMMENT.title}
+            title={add.title}
             type="button"
           >
-            {ADD_COMMENT.label}
+            {add.label}
           </button>
         )}
         <button
           className="shut-margin"
           onClick={p.onShut}
-          title={SHUT_MARGIN.title}
+          title={shut.title}
           type="button"
         >
-          {SHUT_MARGIN.label}
+          {shut.label}
         </button>
       </div>
     </div>

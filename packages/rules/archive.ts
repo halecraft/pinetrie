@@ -245,17 +245,22 @@ export function writesIn(
           ? null
           : canvasLookup.card(intent.replacing.card),
       )
+    // New images write where they land; a version, in its image's canvas.
+    case "put-images":
+      return only(canvasLookup.place(intent.to))
+    case "version":
+      return only(canvasLookup.card(intent.image))
     // A reorder stays in the place it names.
     case "reorder":
       return only(canvasLookup.place(intent.reorder.at))
     // A width is drawn on the canvas it names.
     case "card-width":
       return only(intent.at.canvas)
-    // A note column's title writes in its column's canvas.
+    // A card's title writes in its card's canvas.
     case "mark":
       return intent.of.kind === "canvas"
         ? [intent.of.canvas]
-        : only(canvasLookup.card(intent.of.column))
+        : only(canvasLookup.card(intent.of.card))
     case "retitle":
       return [intent.canvas]
     case "undo-move":

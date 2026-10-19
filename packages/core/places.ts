@@ -2,9 +2,12 @@
 // (`PLACES_OF`), the targets and moves between them, reorders, and the places
 // row's fields. What a card is, is `cards.ts`'.
 
+import { type Address, parseAddress, printAddress } from "./address.ts"
 import type {
   Card,
   CardRecord,
+  ImageCard,
+  MediaCard,
   NoteColumnCard,
   PlacedKind,
   ReferenceCard,
@@ -17,10 +20,12 @@ import {
   type CardId,
   type CardKind,
   type EntryId,
-  entryId,
   type FactCardId,
   type FileCardId,
+  type ImageId,
   isCanvasId,
+  isImageId,
+  isMediaId,
   isNoteColumnId,
   isThreadId,
   isWorkflowStateId,
@@ -41,15 +46,17 @@ import { KINDS } from "./kinds.ts"
  * composer at a thread's end, which only you see; kept as its thread, and
  * resolved to the thread's end (`placeEnd`) whenever it is needed, so it
  * follows its thread as the thread grows. Note: in a note column, at its
- * rank there, shared by everyone in the canvas. Pinned: at the top of a
+ * rank there, shared by everyone in the canvas. Image: an image in a media
+ * column, at its rank there. Pinned: at the top of a
  * thread's column, kept and resolved the same way; the agent reads it on
  * every run. Queued: above the line, waiting for its thread's lane, until
- * the host pops it or someone unqueues it. Margin: beside an entry, a
- * comment on it, shared by everyone in the canvas and never read by the
- * agent; it names the entry's thread too, so its canvas is found without
- * reading a tree. Canvas: a thread card or a note column in a canvas, at its
- * rank there: the only record of where it is, so a card has one place by
- * construction; a thread not yet started is a thread card there too.
+ * the host pops it or someone unqueues it. Margin: beside an entry or an
+ * image, a comment on it, shared by everyone in the canvas and never read by
+ * the agent; an entry's address names its thread, so its canvas is found
+ * without reading a tree. Canvas: a thread card, a note column or a media
+ * column in a canvas, at its rank there: the only record of where it is, so
+ * a card has one place by construction; a thread not yet started is a
+ * thread card there too.
  * Inventory: in its holder's inventory; which slot holds it is the
  * holder's own document (`InventoryDoc`), not the host's. Board: a canvas's
  * card, in a workflow state of the team's board, at its rank there.
@@ -67,6 +74,13 @@ export type LivePlace =
       readonly kind: "note"
       /** The note column it is in. */
       readonly column: NoteColumnId
+      /** Its rank in the column: an order key, the host's to give. */
+      readonly order: string
+    }
+  | {
+      readonly kind: "image"
+      /** The media column it is in. */
+      readonly column: MediaId
       /** Its rank in the column: an order key, the host's to give. */
       readonly order: string
     }
@@ -99,12 +113,16 @@ export type LivePlace =
     }
   | {
       readonly kind: "margin"
-      /** The entry it comments on. */
-      readonly entry: EntryId
-      /** The entry's thread: its canvas's, read without a tree. */
-      readonly thread: ThreadId
-      /** Its rank among the entry's comments: an order key, the host's to give. */
+      /** What it comments on: an entry, which names its thread, or an image. */
+      readonly on: MarginOn
+      /** Its rank among the comments there: an order key, the host's to give. */
       readonly order: string
+      /**
+       * The version of the image it was written on, as its writer saw it,
+       * "" on an entry: a field its key compares by no rule (`sameKey`),
+       * as a queued card's `seen`.
+       */
+      readonly seen: string
     }
   | {
       readonly kind: "canvas"
@@ -134,18 +152,52 @@ export type CardPlace =
   | LivePlace
   | { readonly kind: "trash"; readonly left: LivePlace }
 
+/**
+ * What a margin is on: an entry, by its address, which names its thread;
+ * or an image, by its card's. Stored printed (`printAddress`).
+ */
+export type MarginOn =
+  | Extract<Address, { readonly kind: "entry" }>
+  | { readonly kind: "card"; readonly card: ImageId }
+
+/** An entry's margin's owner. */
+export const entryMargin = (thread: ThreadId, entry: EntryId): MarginOn => ({
+  kind: "entry",
+  thread,
+  entry,
+})
+
+/** An image's margin's owner. */
+export const imageMargin = (card: ImageId): MarginOn => ({ kind: "card", card })
+
+/** Text -> the margin owner it prints; undefined for an address no margin is on. */
+export function parseMarginOn(text: string): MarginOn | undefined {
+  const a = parseAddress(text)
+  if (a?.kind === "entry") return a
+  return a?.kind === "card" && isImageId(a.card)
+    ? { kind: "card", card: a.card }
+    : undefined
+}
+
+/** Whether two margins are one. */
+export const sameMarginOn = (a: MarginOn, b: MarginOn): boolean =>
+  printAddress(a) === printAddress(b)
+
 /** The live place a card's surface is on: its place, or for a trashed card the place it left. */
 export const livePlace = (place: CardPlace): LivePlace =>
   place.kind === "trash" ? place.left : place
 
 /**
  * Who a surface belongs to: a canvas (its canvas, its pinned cards), a note
- * column (its notes), a thread (its dock and its entries' margins), a
- * person (their inventory) or the team (its board).
+ * column (its notes), a media column (its images), an image (its margin), a
+ * thread (its dock and its entries' margins), a person (their inventory) or
+ * the team (its board).
  */
 export type SurfaceOwner =
   | { readonly kind: "canvas"; readonly canvas: CanvasId }
   | { readonly kind: "note-column"; readonly column: NoteColumnId }
+  | { readonly kind: "media"; readonly column: MediaId }
+  | { readonly kind: "image"; readonly image: ImageId }
   | { readonly kind: "thread"; readonly thread: ThreadId }
   | { readonly kind: "person"; readonly holder: WriterId }
   | { readonly kind: "team" }
@@ -163,10 +215,15 @@ export function surfaceOwner(
       return { kind: "canvas", canvas: place.canvas }
     case "note":
       return { kind: "note-column", column: place.column }
+    case "image":
+      return { kind: "media", column: place.column }
+    case "margin":
+      return place.on.kind === "entry"
+        ? { kind: "thread", thread: place.on.thread }
+        : { kind: "image", image: place.on.card }
     case "composing":
     case "pinned":
     case "queued":
-    case "margin":
       return { kind: "thread", thread: place.thread }
     case "inventory":
       return { kind: "person", holder: place.holder }
@@ -175,15 +232,23 @@ export function surfaceOwner(
   }
 }
 
-/** The card a surface owner is, if it is one: a canvas's, a note column's or a thread's id. */
-export const ownerCard = (owner: SurfaceOwner): CardId | null =>
-  owner.kind === "canvas"
-    ? owner.canvas
-    : owner.kind === "note-column"
-      ? owner.column
-      : owner.kind === "thread"
-        ? owner.thread
-        : null
+/** The card a surface owner is, if it is one: a canvas's, a column's, an image's or a thread's id. */
+export function ownerCard(owner: SurfaceOwner): CardId | null {
+  switch (owner.kind) {
+    case "canvas":
+      return owner.canvas
+    case "note-column":
+    case "media":
+      return owner.column
+    case "image":
+      return owner.image
+    case "thread":
+      return owner.thread
+    case "person":
+    case "team":
+      return null
+  }
+}
 
 /** How many columns a card on a canvas is drawn across. */
 export type CardWidth = 1 | 2
@@ -254,6 +319,11 @@ export interface CanvasTarget {
   readonly after: CardId | null
 }
 
+/** Where a put sends new images: a spot on a canvas, or a media column's end. */
+export type ImagesTarget =
+  | CanvasTarget
+  | Extract<PlaceKey, { readonly kind: "image" }>
+
 /** Where a move sends a card: a place's key, a thread's nearest notes, or a spot on a canvas. */
 export type MoveTarget =
   | PlaceKey
@@ -301,6 +371,8 @@ export function placeKey(place: CardPlace): PlaceKey {
       return place
     case "note":
       return { kind: "note", column: place.column }
+    case "image":
+      return { kind: "image", column: place.column }
     case "pinned":
       return { kind: "pinned", thread: place.thread }
     case "canvas-pinned":
@@ -308,7 +380,7 @@ export function placeKey(place: CardPlace): PlaceKey {
     case "queued":
       return { kind: "queued", thread: place.thread, seen: place.seen }
     case "margin":
-      return { kind: "margin", entry: place.entry, thread: place.thread }
+      return { kind: "margin", on: place.on, seen: place.seen }
     case "canvas":
       return { kind: "canvas", canvas: place.canvas }
     case "inventory":
@@ -332,15 +404,17 @@ export function sameKey(a: PlaceKey, b: PlaceKey): boolean {
     // A note's rank is not part of where it is, as a queued card's is not.
     case "note":
       return b.kind === "note" && a.column === b.column
+    case "image":
+      return b.kind === "image" && a.column === b.column
     case "pinned":
       return b.kind === "pinned" && a.thread === b.thread
     case "canvas-pinned":
       return b.kind === "canvas-pinned" && a.canvas === b.canvas
     case "queued":
       return b.kind === "queued" && a.thread === b.thread
-    // An entry names its thread, so the entry alone says which margin.
+    // The version a comment was written on is not part of where it is.
     case "margin":
-      return b.kind === "margin" && a.entry === b.entry
+      return b.kind === "margin" && sameMarginOn(a.on, b.on)
     case "canvas":
       return b.kind === "canvas" && a.canvas === b.canvas
     case "inventory":
@@ -416,7 +490,7 @@ export type QueueMove = Move<QueuedKey>
 
 /**
  * The places a reorder moves a card among: a queue, a thread's pinned cards, a
- * canvas's pinned cards, a note column, an entry's margin, or a canvas.
+ * canvas's pinned cards, a note column, a media column, a margin, or a canvas.
  * Each has its rule in `@pinetrie/rules`' `REORDERS`. A canvas's card is
  * reordered on the board by the board's own move (`planBoardMove`), which may
  * cross the archive's edge.
@@ -426,6 +500,7 @@ export const REORDER_PLACES = [
   "pinned",
   "canvas-pinned",
   "note",
+  "image",
   "margin",
   "canvas",
 ] as const
@@ -482,16 +557,24 @@ export function cardMove<To extends TargetOf<"note-column">>(
   card: NoteColumnCard,
   to: To,
 ): MoveOf<"note-column"> & { readonly to: To }
+export function cardMove<To extends TargetOf<"media">>(
+  card: MediaCard,
+  to: To,
+): MoveOf<"media"> & { readonly to: To }
+export function cardMove<To extends TargetOf<"image">>(
+  card: ImageCard,
+  to: To,
+): MoveOf<"image"> & { readonly to: To }
 export function cardMove(
-  card: TextCard | ThreadCard | ReferenceCard,
+  card: TextCard | ThreadCard | ReferenceCard | MediaCard,
   to: Extract<PlaceKey, { readonly kind: "inventory" }>,
 ): TypedMove
 export function cardMove(
-  card: ThreadCard | NoteColumnCard | TextCard | ReferenceCard,
+  card: ThreadCard | NoteColumnCard | MediaCard | TextCard | ReferenceCard,
   to: CanvasTarget,
 ): TypedMove
 export function cardMove(
-  card: ThreadCard | NoteColumnCard,
+  card: ThreadCard | NoteColumnCard | MediaCard,
   to: NewCanvasTarget,
 ): TypedMove
 export function cardMove(
@@ -499,7 +582,13 @@ export function cardMove(
   to: NotesTarget,
 ): TypedMove
 export function cardMove(
-  card: TextCard | ReferenceCard | ThreadCard | NoteColumnCard,
+  card:
+    | TextCard
+    | ReferenceCard
+    | ThreadCard
+    | NoteColumnCard
+    | MediaCard
+    | ImageCard,
   to: Extract<PlaceKey, { readonly kind: "trash" }> | BackTarget,
 ): TypedMove
 export function cardMove(card: CardRecord, to: MoveTarget): Move {
@@ -699,7 +788,9 @@ export const keyFieldsFrom = (
  *   named by its thread), its root the thread's;
  * - a thread's nearest notes, its id in `lane`; a canvas's, its id in `canvas`;
  * - a spot on a canvas, the card it goes after in `column` ("" for first);
- * - a comment, its entry in `at` and the entry's thread in `lane`;
+ * - an image, its media column in `column`;
+ * - a comment, what it is on in `at`, printed (`printAddress`), and the
+ *   version of the image it was written on in `seen`;
  * - a trash's key as `discarded`, every field "" (a card in a trash is
  *   stored as the place it left, its kind `discarded-` and that place's
  *   stored kind: `trashedFields`);
@@ -708,6 +799,7 @@ export const keyFieldsFrom = (
 const ROWS = {
   drafting: ["lane"],
   note: ["column", "order"],
+  image: ["column", "order"],
   notes: ["lane", "canvas"],
   "canvas-pinned": ["canvas", "order"],
   "canvas-at": ["canvas", "column"],
@@ -715,7 +807,7 @@ const ROWS = {
   "new-canvas": ["canvas"],
   pinned: ["lane", "order"],
   queued: ["lane", "order", "by", "seen"],
-  margin: ["at", "lane", "order"],
+  margin: ["at", "order", "seen"],
   canvas: ["canvas", "order", "width"],
   inventory: ["holder"],
   discarded: [],
@@ -769,6 +861,11 @@ export function placeFields(place: CardPlace | MoveTarget): PlaceFields {
         column: place.column,
         order: "order" in place ? place.order : "",
       })
+    case "image":
+      return row("image", {
+        column: place.column,
+        order: "order" in place ? place.order : "",
+      })
     case "notes":
       return place.near === "thread"
         ? row("notes", { lane: place.thread, canvas: "" })
@@ -801,9 +898,9 @@ export function placeFields(place: CardPlace | MoveTarget): PlaceFields {
       })
     case "margin":
       return row("margin", {
-        at: place.entry,
-        lane: place.thread,
+        at: printAddress(place.on),
         order: "order" in place ? place.order : "",
+        seen: place.seen,
       })
     case "canvas":
       return row("canvas", {
@@ -879,6 +976,10 @@ function livePlaceOfFields(f: PlaceFields): LivePlace | undefined {
       return !isNoteColumnId(r.column) || r.order === ""
         ? undefined
         : { kind: "note", column: r.column, order: r.order }
+    case "image":
+      return !isMediaId(r.column) || r.order === ""
+        ? undefined
+        : { kind: "image", column: r.column, order: r.order }
     case "canvas-pinned":
       return !isCanvasId(r.canvas) || r.order === ""
         ? undefined
@@ -916,10 +1017,10 @@ function livePlaceOfFields(f: PlaceFields): LivePlace | undefined {
           }
     }
     case "margin": {
-      const at = atThread(r)
-      return at === undefined || r.at === "" || r.order === ""
+      const on = parseMarginOn(r.at)
+      return on === undefined || r.order === ""
         ? undefined
-        : { kind: "margin", entry: entryId(r.at), ...at, order: r.order }
+        : { kind: "margin", on, order: r.order, seen: r.seen }
     }
   }
 }
@@ -947,6 +1048,10 @@ export function keyOfFields(f: PlaceFields): PlaceKey | undefined {
       return isNoteColumnId(r.column)
         ? { kind: "note", column: r.column }
         : undefined
+    case "image":
+      return isMediaId(r.column)
+        ? { kind: "image", column: r.column }
+        : undefined
     case "canvas-pinned":
       return isCanvasId(r.canvas)
         ? { kind: "canvas-pinned", canvas: r.canvas }
@@ -964,10 +1069,8 @@ export function keyOfFields(f: PlaceFields): PlaceKey | undefined {
         : { kind: "queued", ...at, seen: r.seen }
     }
     case "margin": {
-      const at = atThread(r)
-      return at === undefined || r.at === ""
-        ? undefined
-        : { kind: "margin", entry: entryId(r.at), ...at }
+      const on = parseMarginOn(r.at)
+      return on === undefined ? undefined : { kind: "margin", on, seen: r.seen }
     }
     default:
       return placeOfFields(f)
@@ -1022,6 +1125,7 @@ export const PLACES_OF: {
   reference: KINDS.reference.places,
   ask: KINDS.ask.places,
   media: KINDS.media.places,
+  image: KINDS.image.places,
   file: KINDS.file.places,
 }
 
@@ -1113,6 +1217,7 @@ export type IdOf<K extends CardKind> = {
   readonly reference: ReferenceCardId
   readonly ask: AskCardId
   readonly media: MediaId
+  readonly image: ImageId
   readonly file: FileCardId
 }[K]
 
@@ -1142,13 +1247,14 @@ type TargetKind = keyof typeof TARGET_PLACES
 /**
  * The container a card of a kind no canvas takes is made in when it is dropped
  * on one: a text card or a reference lands as the first note of a new note
- * column at that spot. The host resolves it (`planMoveTargets`); a kind not
+ * column at that spot, and an image as the first of a new media column. The host resolves it (`planMoveTargets`); a kind not
  * here, sent to a spot on a canvas, is refused at the edge as any target its
  * kind is never sent to is.
  */
 export const WRAPS = {
   text: "note-column",
   reference: "note-column",
+  image: "media",
 } as const satisfies Partial<Record<CardKind, CardKind>>
 
 /** The kinds a drop on a canvas makes a container for (`WRAPS`). */
@@ -1257,5 +1363,9 @@ export function placed(
       return fits("reference", place) ? { ...card, place } : undefined
     case "ask":
       return fits("ask", place) ? { ...card, place } : undefined
+    case "media":
+      return fits("media", place) ? { ...card, place } : undefined
+    case "image":
+      return fits("image", place) ? { ...card, place } : undefined
   }
 }

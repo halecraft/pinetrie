@@ -1,5 +1,5 @@
 import { cardIdOfKind, threadIdFor, writerId } from "@pinetrie/core"
-import { deleteRecord, MARK, NOTE_COLUMN, setRecord } from "@pinetrie/rules"
+import { CARD_TITLE, deleteRecord, MARK, setRecord } from "@pinetrie/rules"
 import { expect, test } from "vitest"
 import {
   basics,
@@ -42,7 +42,7 @@ test("a canvas the session does not hold takes no title", async () => {
   expect(scribe.calls).toEqual([])
 })
 
-test("a note column on a canvas takes its title in its own record", async () => {
+test("a note column on a canvas takes its title in its card's title record", async () => {
   const b = basics()
   const ada = writerId("ada@example.com")
   putCanvas(b, threadIdFor("t"))
@@ -54,11 +54,11 @@ test("a note column on a canvas takes its title in its own record", async () => 
   const scribe = record<MarkDeps["records"]>({ writeValues: async () => {} })
   const out = await handleMark({ basics: b, records: scribe.port }, ada, {
     kind: "mark",
-    of: { kind: "note-column", column },
+    of: { kind: "card", card: column },
     title: "Ideas",
   })
   expect(out).toEqual({ kind: "marked" })
   expect(writtenValues(scribe.calls)).toEqual([
-    setRecord(NOTE_COLUMN, { column, title: "Ideas", by: ada, at: 1_000 }),
+    setRecord(CARD_TITLE, { card: column, title: "Ideas", by: ada, at: 1_000 }),
   ])
 })

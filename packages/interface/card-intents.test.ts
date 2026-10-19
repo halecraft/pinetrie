@@ -5,6 +5,7 @@ import {
   cardIdOfKind,
   DISCARDED,
   entryId,
+  entryMargin,
   fitsPlace,
   INVENTORY_SLOTS,
   indexAsks,
@@ -33,11 +34,13 @@ import type { CardFacts, Effect, IntentState } from "./effects.ts"
 import {
   canvasesFor,
   NEW_CANVAS,
+  NEW_MEDIA,
   NEW_NOTE_COLUMN,
   NEW_ROOT,
   NEW_TEXT,
   NEW_THREAD,
   NO_CLIPS,
+  newImage,
   TEST_CANVAS,
   threadOfEntry,
   tree,
@@ -151,6 +154,9 @@ const MINTED = {
   canvas: NEW_CANVAS,
   thread: NEW_THREAD,
   noteColumn: NEW_NOTE_COLUMN,
+  media: NEW_MEDIA,
+  images: (count: number) =>
+    Array.from({ length: count }, (_, i) => newImage(i)),
   reference: cardIdOfKind("reference", "01a0ffd2-0000-7000-8000-0000000000e1"),
   text: NEW_TEXT,
   branches: () => [],
@@ -214,6 +220,7 @@ const ofEveryKind = (): readonly CardRecord[] => {
     composing: atEnd,
     note,
     canvas: { kind: "canvas", canvas: TEST_CANVAS, order: "a", width: 1 },
+    image: { kind: "image", column: NEW_MEDIA, order: "a" },
     board: { kind: "board", state: workflowStateIdFor("open"), order: "a" },
     queued: {
       kind: "queued",
@@ -1092,9 +1099,14 @@ describe("a new card", () => {
     ],
     [
       "a comment",
-      { kind: "margin", entry: A, thread: TEST_THREAD },
+      { kind: "margin", on: entryMargin(TEST_THREAD, A), seen: "" },
       { kind: "card", card: TEST_THREAD },
-      { kind: "margin", entry: A, thread: TEST_THREAD, order: LAST_ORDER },
+      {
+        kind: "margin",
+        on: entryMargin(TEST_THREAD, A),
+        order: LAST_ORDER,
+        seen: "",
+      },
     ],
   ] as const)(
     "%s is made at its list's end with its text, said in its column",
@@ -1119,7 +1131,12 @@ describe("a new card", () => {
       ),
     ).toEqual([
       made(
-        { kind: "margin", entry: A, thread: TEST_THREAD, order: LAST_ORDER },
+        {
+          kind: "margin",
+          on: entryMargin(TEST_THREAD, A),
+          order: LAST_ORDER,
+          seen: "",
+        },
         "",
         TEST_THREAD,
       ),

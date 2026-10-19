@@ -1,6 +1,7 @@
 # S250 — Can a canvas take an image dragged in from the desktop or out of a thread?
 
 - **Status:** Answered
+- **Led to:** ADR-0182
 
 **Question.** A media column (ADR-0116's media card, images only) is made
 four ways: a file dropped on the canvas, an image dragged out of a thread,

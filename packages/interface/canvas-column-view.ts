@@ -10,19 +10,22 @@ import type {
   CanvasId,
   CardId,
   CardRecord,
+  MediaId,
   NoteColumnId,
   ThreadId,
   ThreadName,
+  TitledCardId,
   WorkflowStateId,
   WriterId,
 } from "@pinetrie/core"
 import {
   type CanvasRole,
   type CardHistoryRecord,
+  type CardTitleRecord,
   canvasRole,
   type MarkRecord,
+  NEW_MEDIA_TITLE,
   NEW_NOTES_TITLE,
-  type NoteColumnRecord,
   trashDeadline,
   trashedTime,
   type Workflow,
@@ -87,7 +90,7 @@ export interface CanvasTrash {
 
 /** A column in the trash of a canvas, as its list draws it. */
 export interface TrashRow {
-  readonly card: ThreadId | NoteColumnId
+  readonly card: ThreadId | NoteColumnId | MediaId
   /** The thread's name, or the note column's title. */
   readonly title: string
   /** Who trashed it: its placer. */
@@ -123,7 +126,7 @@ export function canvasTrash(input: {
   /** How long a trashed card is kept (`TRASH_KEEP_MS`). */
   readonly keepMs: number
   readonly names: ReadonlyMap<ThreadId, ThreadName>
-  readonly noteTitles: ReadonlyMap<NoteColumnId, NoteColumnRecord>
+  readonly cardTitles: ReadonlyMap<TitledCardId, CardTitleRecord>
 }): CanvasTrash {
   const rows = input.cards.flatMap(c => {
     if (
@@ -135,7 +138,7 @@ export function canvasTrash(input: {
     const { now, keepMs } = input
     const deadline = trashDeadline(c.id, input.histories, now, keepMs)
     const left = Math.max(0, deadline - now)
-    const row = (card: ThreadId | NoteColumnId, title: string) => [
+    const row = (card: ThreadId | NoteColumnId | MediaId, title: string) => [
       {
         deadline,
         row: {
@@ -151,7 +154,9 @@ export function canvasTrash(input: {
       case "thread":
         return row(c.id, input.names.get(c.id) ?? UNNAMED_THREAD)
       case "note-column":
-        return row(c.id, input.noteTitles.get(c.id)?.title ?? NEW_NOTES_TITLE)
+        return row(c.id, input.cardTitles.get(c.id)?.title ?? NEW_NOTES_TITLE)
+      case "media":
+        return row(c.id, input.cardTitles.get(c.id)?.title ?? NEW_MEDIA_TITLE)
       default:
         return []
     }

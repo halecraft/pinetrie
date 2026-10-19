@@ -1891,7 +1891,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a comment is made pinned",
     file: "packages/interface/card-intents.ts",
-    from: '    { kind: "margin", entry: act.entry, thread: act.thread },',
+    from: '    { kind: "margin", on: entryMargin(act.thread, act.entry), seen: "" },',
     to: '    { kind: "pinned", thread: act.thread },',
     command: unit,
     expect:
@@ -2215,8 +2215,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "＋ past the last column offers no note column",
     file: "packages/interface/start-button.ts",
-    from: '  "note-column": [{ kind: "note-column" }],\n} as const satisfies NewColumnTable\n',
-    to: "} as const satisfies NewColumnTable\n",
+    from: '  "note-column": [{ kind: "note-column" }],\n  media:',
+    to: "  media:",
     command: unit,
     expect: "＋ past the last column makes an agent thread",
   },
@@ -2487,8 +2487,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a compact's note column draws no count",
     file: "packages/interface/compact.ts",
-    from: "        second: glance.notes === null ? null : noteCountWords(glance.notes),",
-    to: "        second: null,",
+    from: '            : countWords("note-column", glance.count),',
+    to: "            : null,",
     command: unit,
     expect:
       "a note column: its title and how many notes it holds; unread, none",
@@ -3992,8 +3992,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a note column made is left folded",
     file: "packages/interface/intent.ts",
-    from: "          unfolded: true,\n",
-    to: "          unfolded: false,\n",
+    from: "          card: column,\n          unfolded: true,\n",
+    to: "          card: column,\n          unfolded: false,\n",
     command: unit,
     expect: "a note column is made at its spot on the canvas, and unfolded",
   },
@@ -4279,8 +4279,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a comment queues no reference",
     file: "packages/interface/card-frame.ts",
-    from: '    case "margin":\n      return [\n        {\n          to: "reference",',
-    to: '    case "margin":\n      return [take]\n    case "fresh-x" as never:\n      return [\n        {\n          to: "reference",',
+    from: '      return place.on.kind === "entry"\n',
+    to: '      return place.on.kind === ("never" as string)\n',
     command: unit,
     expect:
       "a comment: a reference queued on its thread, which leaves it where it is; your inventory",
@@ -4841,5 +4841,14 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "promptParent: an edit sends again from above the lane's prompt its run wrote",
+  },
+  {
+    name: "a put's new media column is left to the host, folded",
+    file: "packages/interface/intent.ts",
+    from: '      const made = to.kind === "canvas-at" ? minted.media : null\n',
+    to: "      const made = null\n",
+    command: unit,
+    expect:
+      "images put at a spot make a media column the page mints, unfolded for their putter; put in a column, none",
   },
 ]

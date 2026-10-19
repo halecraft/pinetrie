@@ -4,7 +4,9 @@ import {
   type CanvasId,
   type CardId,
   type EntryId,
+  type ImageId,
   type LaneView,
+  type MediaId,
   type NoteColumnId,
   type ReferenceCardId,
   type RootId,
@@ -47,6 +49,9 @@ export interface Minted {
   readonly canvas: CanvasId
   readonly thread: ThreadId
   readonly noteColumn: NoteColumnId
+  readonly media: MediaId
+  /** `count` new images, one for each file a drop puts. */
+  readonly images: (count: number) => readonly ImageId[]
   /** A reference a paste makes where it lands. */
   readonly reference: ReferenceCardId
   /** A text card a paste makes where it lands. */

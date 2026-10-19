@@ -89,6 +89,41 @@ const EACH: { readonly [K in PlacedKind]: CardRecord } = {
     ada,
   ),
   ask: makeCard("ask", cardIdOfKind("ask", uuid("a5")), queued, { relay }, ada),
+  media: makeCard(
+    "media",
+    cardIdOfKind("media", uuid("a6")),
+    { kind: "inventory", holder: ada },
+    NO_CONTENT,
+    ada,
+  ),
+  image: makeCard(
+    "image",
+    cardIdOfKind("image", uuid("a7")),
+    { kind: "image", column: cardIdOfKind("media", uuid("a6")), order: "m" },
+    {
+      versions: [
+        {
+          sha256: "1".repeat(64) as Sha256,
+          original: "1".repeat(64) as Sha256,
+          mimeType: "image/png",
+          width: 4,
+          height: 3,
+          by: ada,
+          at: 1,
+        },
+        {
+          sha256: "2".repeat(64) as Sha256,
+          original: "2".repeat(64) as Sha256,
+          mimeType: "image/png",
+          width: 4,
+          height: 3,
+          by: ada,
+          at: 2,
+        },
+      ],
+    },
+    ada,
+  ),
 }
 
 const kinds = Object.keys(EACH) as PlacedKind[]
@@ -98,6 +133,32 @@ describe("a card's content as stored (CARD_CODEC)", () => {
     const card = EACH[kind]
     const stored = JSON.parse(JSON.stringify(encodeCard(card)))
     expect(decodeCard(card.id, stored)).toEqual(card)
+  })
+
+  test("an image with no versions, or one that is no blob's, is refused", () => {
+    const stored = encodeCard(EACH.image)
+    expect(
+      decodeCard(EACH.image.id, { ...stored, versions: "[]" }),
+    ).toBeUndefined()
+    expect(
+      decodeCard(EACH.image.id, {
+        ...stored,
+        versions: JSON.stringify([
+          {
+            sha256: "x",
+            original: "x",
+            mimeType: "image/png",
+            width: 4,
+            height: 3,
+            by: ada,
+            at: 1,
+          },
+        ]),
+      }),
+    ).toBeUndefined()
+    expect(
+      decodeCard(EACH.image.id, { ...stored, versions: "{" }),
+    ).toBeUndefined()
   })
 
   test("a row holding a column of another kind's content is refused", () => {

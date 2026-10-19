@@ -210,7 +210,7 @@ test("canvasTrash: the columns trashed from this canvas, newest first, with who 
     now: 4 * DAY,
     keepMs: WEEK,
     names: new Map([[T2, "amber-fox" as never]]),
-    noteTitles: new Map(),
+    cardTitles: new Map(),
   })
   expect(rows).toEqual([
     { card: T2, title: "amber-fox", by: BEA, ageMs: DAY, deletesInMs: null },
@@ -263,7 +263,7 @@ test("canvasTrash: a column whose deletion is close says when, by the keep it is
       now,
       keepMs,
       names: new Map(),
-      noteTitles: new Map(),
+      cardTitles: new Map(),
     }).rows[0]
   const reader = { me: ADA, nameOf: new Map() }
   // A week's keep warns in its last day, and not before.

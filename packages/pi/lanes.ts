@@ -20,7 +20,12 @@ import {
   type RuntimeProgram,
   type ThreadId,
 } from "@pinetrie/core"
-import { AGENTS_RULE, CONTEXT_RULES, type ToolAnswer } from "@pinetrie/rules"
+import {
+  AGENTS_RULE,
+  CONTEXT_RULES,
+  type PutImageAsk,
+  type ToolAnswer,
+} from "@pinetrie/rules"
 import { Type } from "typebox"
 import type { ModelSetup } from "./config.ts"
 import { buildSystemPromptSections } from "./deep.ts"
@@ -206,6 +211,8 @@ export interface LaneHooks {
   leave(lane: ThreadId, thread: string): Promise<ToolAnswer>
   /** `save_blob` was called: the bytes of the blob it names, or why not. */
   readBlob(lane: ThreadId, blob: string): Promise<BlobAnswer>
+  /** `put_image` was called, its image stored: the host's answer. */
+  putImage(lane: ThreadId, ask: PutImageAsk): Promise<ToolAnswer>
 }
 
 /**

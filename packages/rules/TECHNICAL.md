@@ -695,33 +695,40 @@ which are swept.
   column, one to make (its canvas, rank and the canvas cards renumbered
   around it), or, for a thread whose card is in an inventory, that
   inventory (ADR-0117). `toNotes` turns that into a place and the steps to
-  write first, minting a column's id (`newColumn`, `n-` and a uuidv7 on
-  the host) only when one is made; moves and unsent cards go through it. The page names the target `notes`
+  write first, minting a column's id (`newContainer`, `mintContainer`
+  over the host's uuidv7s) only when one is made; moves and unsent cards go through it. The page names the target `notes`
   (`notesTarget`), and the host resolves it (`planMoveTargets`, inside
   `planMoveRequest`, which ranks a spot on a canvas, `canvas-at`, too), each move against the cards the ones before it
   left, so a column made for the first takes the rest, and writes the
   column in the same step as the moves. The page draws a pending one in
   the column the host would choose (`drawnPlace`), or where it was while
   the host would make one.
-- **A margin is an entry's place for comments** (ADR-0126): `{ kind:
-  "margin", entry, thread, order }`, stored as a `margin` row, the entry in
-  `at` and its thread in `lane`. It is a text card's and a reference's
-  place, and a reorder place (`REORDERS`: the entry's comments,
-  `marginCards`, the neighbours next to each other); a move or a make puts
-  a card at its end (`marginEnd`). Its canvas is its thread's
-  (`canvasOfPlace`), so it is found without a tree; the host checks that
-  thread against the entry's own before it plans (`planMoveTargets`'
-  `entryThreads`, read from the entry's root by `marginEntryThreads` in
-  `commands/cards.ts`), and refuses one naming another, `no-place`.
+- **A margin is an entry's or an image's place for comments** (ADR-0126,
+  ADR-0182): `{ kind: "margin", on, order, seen }`, `on` an entry's address
+  (which names its thread) or an image's card address, stored printed in
+  `at`; `seen` is the version of the image a comment was written on, which
+  its key compares by no rule. It is a text card's and a reference's place,
+  and a reorder place (`REORDERS`: the comments on one owner, `marginCards`,
+  the neighbours next to each other); a move or a make puts a card at its
+  end (`marginEnd`). An entry's margin's canvas is its thread's, an image's
+  its column's (`canvasOfPlace`), so neither needs a tree; the host checks an
+  entry's thread against the entry's own before it plans
+  (`planMoveTargets`' `entryThreads`, read from the entry's root by
+  `marginEntryThreads` in `commands/cards.ts`), refusing one naming another,
+  and an image's margin only while the image is in a column, `no-place`.
+  Every stored margin row was rewritten to this shape once
+  (`0003-one-margin`, `apps/pinetrie/host/TECHNICAL.md`); an undo of a
+  comment's move stored before it writes the old row back, which no longer
+  decodes.
 - **A drop resolves to a place** (ADR-0126). A card of a kind no canvas
   takes, sent to a spot on one (`canvas-at`), lands in the container its
   kind is made in there: `WRAPS` (core's `places.ts`) says which, a note
-  column for a text card or a reference, so a later kind is a row. It is
-  part of `TargetOf` (`isTargetForKind`, the wire's check), and
-  `planMoveTargets` resolves it: the spot ranked as any card's there
-  (`rankOnCanvas`), a note column made at that rank by the mover
-  (`makeNoteColumn`, through `planMake`, as `toNotes` makes one), and the
-  card moved in as its first note. Both are one `planMoveRequest` write, so
+  column for a text card or a reference, a media column for an image
+  (ADR-0182), so a later kind is a row. It is part of `TargetOf`
+  (`isTargetForKind`, the wire's check), and `planMoveTargets` resolves it:
+  the spot ranked as any card's there (`rankOnCanvas`), the container made
+  at that rank by the mover (`makeContainer`, `containers.ts`, through
+  `planMake`, as `toNotes` makes one), and the card moved in as its first. Both are one `planMoveRequest` write, so
   one gesture: the mover's history in that canvas (`movesHistory`) undoes both.
   The page draws the card where it was until the host writes the column,
   as it does for a column `toNotes` would make. A reference or a text card
@@ -732,12 +739,26 @@ which are swept.
   (its thread's holder's inventory full, or a thread with no card) it stays
   queued, saying why, and the host holds its queue, so the drain passes it
   by until someone moves it.
-- **A note column's title** is its own record (`NOTE_COLUMN`, keyed by its
-  id: title, who set it, when), absent while untitled. `mark` sets it as it
-  sets a canvas's (`planMark` over a `MarkTarget`): last write wins, null
-  clears it, the agent never sets one, and a column on no canvas is refused
-  `UNKNOWN_TARGET`. The archive gate reads a note column's canvas from its
-  card (`writesIn`).
+- **A card's title** (a note column's, a media column's, an image's,
+  ADR-0182) is one record (`CARD_TITLE`, `card-title.ts`, keyed by the
+  card's id: title, who set it, when), absent while untitled. `mark` sets it
+  as it sets a canvas's (`planMark` over a `MarkTarget`): last write wins,
+  null clears it, a card in a trash is refused `UNKNOWN_TARGET` (`titledCards`),
+  and so is the agent where its kind is a person's alone to title (`KINDS`'
+  `titled`: a note column). The archive gate reads a card's canvas from the
+  card (`writesIn`). The note columns' own records were moved to it once
+  (`0004-card-titles`).
+- **A media column holds images** (ADR-0182, `media.ts`, `put-images.ts`):
+  each an image card at a rank in its column (`imagesIn`,
+  `mediaColumnEnd`), with its versions as its content, oldest first, each
+  the fitted copy drawn (an `ImageRef`, so its box is held before it loads)
+  and its `original`. A put of new images (`planPutImages`) makes each
+  through `planMake`; to a spot on a canvas, the first resolves as any drop
+  there does, which makes its media column, and the rest follow it into
+  that column. A version is appended (`planVersion`), never rewritten, so
+  two added at once both land. `planImageAsk` turns an agent's
+  `put_image` ask into one of the two, for the thread's person: a column of
+  its canvas named by id or title, else a new one at its end, titled so.
 - **A pinned card** (ADR-0048 step 5) is at a thread's end with an `order`.
   Pinning moves your message or a queued card to pinned at the same
   thread (`pinTargetKey`); a note has no thread to pin it to; unpinning
@@ -1998,10 +2019,14 @@ and the total `decodePinned` are the only code that builds or reads it, and
 - **The canvas list** (`canvasList`): a line per card on the canvas, in
   its order, at most `CANVAS_CAP` (50), the rest counted: its kind, its
   title and who put it there, never its contents, which only pinned cards
-  give. `planCanvasRead`
+  give. A column's line reads its glance (`columnGlances`): a note column's
+  count, a media column's images, each its title, id and how many versions,
+  at most `MEDIA_LINE_CAP` and the rest counted, so a column of many images
+  is still one line (ADR-0182). `planCanvasRead`
   writes it only when it differs from the newest on the path
   (`canvasInView`), so an unchanged canvas keeps the prompt's cache.
-- **A card added or taken while a run goes on** is a fact line steered
+- **A card added or taken while a run goes on**, or an image added to a
+  media column of the canvas or given a version, is a fact line steered
   into the lane after the turn in flight, as base news is (S103) (`planCanvasFacts`, `encodeCanvasFact`), never a queued fact
   card, which the drain would pop only after the run. Reorders and widths
   wait for the next run's list.

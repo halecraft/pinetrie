@@ -10,15 +10,16 @@ import {
   type EntryId,
   entryId,
   isCanvasId,
-  isNoteColumnId,
   isRootId,
   isThreadId,
-  type NoteColumnId,
+  isTitledCardId,
   type PointId,
+  parseCardId,
   type RootId,
   THREAD_PATTERN,
   type ThreadId,
   type ThreadName,
+  type TitledCardId,
   type WriterId,
 } from "@pinetrie/core"
 import { type Static, type TSchema, Type } from "typebox"
@@ -98,8 +99,10 @@ export const rootKey = (key: string): RootId | undefined =>
 export const parseCanvasKey = (key: string): CanvasId | undefined =>
   isCanvasId(key) ? key : undefined
 
-export const noteColumnKey = (key: string): NoteColumnId | undefined =>
-  isNoteColumnId(key) ? key : undefined
+export const titledCardKey = (key: string): TitledCardId | undefined => {
+  const card = parseCardId(key)
+  return card !== undefined && isTitledCardId(card) ? card : undefined
+}
 
 /** A singleton's address: only `expected` names it. */
 export const fixedKey = <K extends string>(

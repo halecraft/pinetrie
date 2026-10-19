@@ -125,7 +125,7 @@ const columnsOf = (l: Layout, root = "1-r1", i = index) =>
     holders: new Map(),
     index: i,
     lanes: [],
-  }).map(c => [c.kind === "notes" ? c.card : c.column.key, c.folded])
+  }).map(c => [c.kind !== "thread" ? c.card : c.column.key, c.folded])
 describe("layoutReducer", () => {
   test("a view change changes only its canvas's view, which starts from the default", () => {
     const l = layoutReducer(at(initialLayout()), unfold(C))

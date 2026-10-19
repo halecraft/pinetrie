@@ -483,9 +483,11 @@ canvas's threads (`canvasRail`). A canvas's signals are its threads', whatever r
   kind a canvas holds at least once, each entry under its own kind. A new
   kind of canvas card does not compile until ＋ makes it.
 - **Folded, a column is its strip** (`foldedView`, ADR-0126, ADR-0171):
-  its card's glance (a thread's `ThreadGlance`, a note column's
-  `NoteColumnGlance`; no size of detail), worded for a strip by `foldedWords` (its title, and a note column's count), headed by
-  `foldedMark` (a thread's icon or ✦, a note column's nothing), in its
+  its card's glance (a thread's `ThreadGlance`, a note column's or a media
+  column's `ListGlance`; no size of detail), worded for a strip by
+  `foldedWords` (its title, and how many it holds, `countWords`, the one
+  wording a list column's header, strip and compact share, ADR-0182),
+  headed by `foldedMark` (a thread's icon or ✦, a list column's nothing), in its
   thread's colour (`threadTrack`, the track its column takes at the same
   end), in its place; `projectColumns` lays the paths out over the unfolded thread
   columns alone (`openColumns`), so folding the trunk shows it in the next
@@ -2084,7 +2086,7 @@ notes in one order; the notes board, its grid and the dock's notes line are
 gone.
 
 - **`canvasNoteColumns`** is the canvas's note columns in the canvas's order,
-  each with its title (its `NOTE_COLUMN` record, else `NEW_NOTES_TITLE`)
+  each with its title (its `CARD_TITLE` record, else `NEW_NOTES_TITLE`)
   and its notes in order (`notesIn`).
 - **Where one is drawn is its card's rank on the canvas** (`canvasColumns`).
   ＋ past the last column makes one there, and nothing else makes an empty

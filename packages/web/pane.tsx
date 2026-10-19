@@ -2,7 +2,13 @@
 // modal dialog. It draws a `PaneView`, which `paneView` decided, and owns what
 // every view needs: Escape, focus, and coming into view.
 
-import type { ConflictChoice, ThreadId } from "@pinetrie/core"
+import {
+  blobOfUrl,
+  type ConflictChoice,
+  type Sha256,
+  type ThreadId,
+} from "@pinetrie/core"
+import { PUT_ON_CANVAS } from "@pinetrie/interface"
 import type { Element } from "hast"
 import {
   memo,
@@ -36,6 +42,7 @@ export function Pane({
   close,
   choose,
   said,
+  putOnCanvas,
 }: {
   /** What the strip's review line controls. */
   id: string
@@ -48,6 +55,11 @@ export function Pane({
   choose: (lane: ThreadId, path: string, choose: ConflictChoice) => void
   /** Your last choice of a version here, refused or failed, worded; null for none. */
   said: string | null
+  /**
+   * Puts the image shown in a media column made just after this column's
+   * thread, by its blob and its name; null where nothing may be put.
+   */
+  putOnCanvas: ((sha: Sha256, name: string) => void) | null
 }) {
   const narrow = useNarrow()
   const shown =
@@ -86,6 +98,7 @@ export function Pane({
         alt={view.alt}
         close={close}
         narrow={narrow}
+        putOnCanvas={putOnCanvas}
         src={view.src}
         title={view.title}
       />
@@ -280,22 +293,37 @@ function ImagePane({
   title,
   narrow,
   close,
+  putOnCanvas,
 }: {
   src: string
   alt: string
   title: string
   narrow: boolean
   close: () => void
+  putOnCanvas: ((sha: Sha256, name: string) => void) | null
 }) {
   const [zoom, setZoom] = useState(false)
+  const sha = blobOfUrl(src)
   return (
     <>
       <PaneHead
         close={close}
         extra={
-          <a className="pane-link" href={src} rel="noopener" target="_blank">
-            {OPEN_IN_TAB}
-          </a>
+          <>
+            {putOnCanvas !== null && sha !== null && (
+              <button
+                className="pane-put"
+                onClick={() => putOnCanvas(sha, alt === "" ? title : alt)}
+                title={PUT_ON_CANVAS.title}
+                type="button"
+              >
+                {PUT_ON_CANVAS.label}
+              </button>
+            )}
+            <a className="pane-link" href={src} rel="noopener" target="_blank">
+              {OPEN_IN_TAB}
+            </a>
+          </>
         }
         narrow={narrow}
         title={title}

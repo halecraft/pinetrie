@@ -79,13 +79,16 @@ it re-exports every module but `fixtures.ts`, which tests import as
   checked strictly (`parseNewThread`). A canvas's id is its card's (ADR-0116,
   ADR-0126); a root's names its document, not its root entry (ADR-0063); a
   workflow state's survives a rename (ADR-0122). A file card's is reserved
-  (ADR-0118); a fact's, a reference's (ADR-0126) and an ask's (ADR-0128) are
-  minted where the card is made.
+  (ADR-0118); a fact's, a reference's (ADR-0126), an ask's (ADR-0128), a
+  media column's and an image's (ADR-0182) are minted where the card is
+  made.
 - A history of moves is per person and canvas, or the person's outside any
   canvas (ADR-0066, ADR-0116, ADR-0126).
 - `KINDS` holds one row per kind of card: its id's prefix, the places it is
-  ever in (ADR-0116, ADR-0117, ADR-0126, ADR-0128), whether it is reordered
-  there, and where its words are read.
+  ever in (ADR-0116, ADR-0117, ADR-0126, ADR-0128, ADR-0182), whether it is
+  reordered there, where its words are read, and who may title it
+  (`titled`, `TitledKind`: a note column a person alone; a media column and
+  an image a person or the agent).
 
 ## Cards and places (`cards.ts`, `places.ts`, `paste.ts`, `grid.ts`)
 
@@ -106,6 +109,13 @@ it re-exports every module but `fixtures.ts`, which tests import as
   (ADR-0133).
 - Your inventory is one grid, its cells addressed in reading order
   (ADR-0048).
+- A margin names what it is on by address (`MarginOn`: an entry's, or an
+  image's card), printed in its row, and the version of the image a comment
+  was written on (`seen`), which no key compares (ADR-0182). Its owner is the
+  entry's thread, or the image (`surfaceOwner`).
+- An image's versions carry each fitted copy as an `ImageRef` and its
+  `original`; `cardBlobs` is every blob a card holds, a reference's quote
+  and each version's two, which the sweep keeps (ADR-0182).
 
 ## The tree (`tree.ts`, `asks.ts`, `agents.ts`, `roots.ts`, `address.ts`, `ordering.ts`)
 

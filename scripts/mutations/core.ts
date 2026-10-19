@@ -1081,7 +1081,7 @@ export const mutations: readonly Mutation[] = [
     to: '    prefix: "n-",\n    places: ["canvas", "trash", "inventory"],',
     command: unit,
     expect:
-      "fitsPlace: a text card anywhere but a canvas, a thread's card on a canvas or in an inventory, a note column on a canvas, and each of them in a trash",
+      "fitsPlace: a text card anywhere but a canvas, a thread's card or a media column on a canvas or in an inventory, a note column on a canvas, and each of them in a trash",
   },
   {
     name: "a note column is placed anywhere",
@@ -1092,10 +1092,10 @@ export const mutations: readonly Mutation[] = [
     expect: "placed: a card at a place its kind is ever in",
   },
   {
-    name: "a mark may name a canvas and a note column",
+    name: "a mark may name a canvas and a card",
     file: "packages/protocol/codec.ts",
-    from: '        : isNoteColumnId(column) && canvas === ""',
-    to: "        : isNoteColumnId(column)",
+    from: '        : card !== undefined && isTitledCardId(card) && canvas === ""',
+    to: "        : card !== undefined && isTitledCardId(card)",
     command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
     expect:
       "decode: a mark names a canvas or a note column, never both or neither",
@@ -1236,11 +1236,11 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a comment's row loses its entry",
     file: "packages/core/places.ts",
-    from: "        at: place.entry,\n",
+    from: "        at: printAddress(place.on),\n",
     to: '        at: "",\n',
     command: ["pnpm", "exec", "vitest", "run", "packages/core/core.test.ts"],
     expect:
-      "a margin place round-trips, and needs its entry, its thread and its order",
+      "an entry's margin round-trips, printed as the entry's address, and needs it and its order",
   },
   {
     name: "a canvas's id parses as no card",
@@ -1375,5 +1375,24 @@ export const mutations: readonly Mutation[] = [
     from: "export type RunnableLane = ThreadId & { readonly [runnableBrand]: true }",
     to: "export type RunnableLane = ThreadId",
     command: ["pnpm", "exec", "tsc", "--noEmit"],
+  },
+  // ── media columns ──
+  {
+    name: "the sweep keeps no image's versions",
+    file: "packages/core/cards.ts",
+    from: '    case "image":\n      return card.content.versions.flatMap(',
+    to: '    case "fresh-y" as never:\n      return card.content.versions.flatMap(',
+    command: ["pnpm", "exec", "vitest", "run", "packages/core"],
+    expect:
+      "a card's blobs are a reference's quote and every version of an image, none for the rest",
+  },
+  {
+    name: "an image's margin is any card's",
+    file: "packages/core/places.ts",
+    from: '  return a?.kind === "card" && isImageId(a.card)\n',
+    to: '  return a?.kind === "card"\n',
+    command: ["pnpm", "exec", "vitest", "run", "packages/core"],
+    expect:
+      "an image's margin keeps the version a comment was written on, which its key compares by no rule",
   },
 ]

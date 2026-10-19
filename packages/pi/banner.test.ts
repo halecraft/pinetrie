@@ -155,6 +155,9 @@ describe("banners in a harness", () => {
                 leave: async () => {
                   throw new Error("unused")
                 },
+                putImage: async () => {
+                  throw new Error("put_image was not called")
+                },
                 readBlob: async () => {
                   throw new Error("unused")
                 },

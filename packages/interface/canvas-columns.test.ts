@@ -94,8 +94,8 @@ const draw = (
 
 const shape = (columns: readonly CardColumn[]) =>
   columns.map(c =>
-    c.kind === "notes"
-      ? ["notes", c.card, c.folded]
+    c.kind !== "thread"
+      ? [c.kind, c.card, c.folded]
       : [c.column.mode.kind, c.column.key, c.folded],
   )
 

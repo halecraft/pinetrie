@@ -22,6 +22,7 @@ import {
   LEAVE_TOOL,
   PROJECT_CONFIG_FILE,
   PROPOSE_TOOL,
+  PUT_IMAGE_TOOL,
   READ_TOOL,
   RESOLVE_TOOL,
   SAVE_BLOB_TOOL,
@@ -36,6 +37,7 @@ import { bannerTool } from "./banner.ts"
 import { readImageProcessor } from "./images.ts"
 import { type PiTool, requireIntent, TAKES_INTENT } from "./intent.ts"
 import { conflictTool, type LaneHooks } from "./lanes.ts"
+import { putImageTool } from "./put-image.ts"
 import { saveBlobTool } from "./save-blob.ts"
 import { findTool, grepTool } from "./search.ts"
 import { threadOfContext } from "./thread-context.ts"
@@ -95,6 +97,8 @@ export const TOOLS: Readonly<Record<ToolId, (input: ToolsInput) => PiTool>> = {
     ),
   [SAVE_BLOB_TOOL]: input =>
     saveBlobTool((lane, blob) => input.hooks.readBlob(lane, blob)),
+  [PUT_IMAGE_TOOL]: input =>
+    putImageTool(input.blobs, (lane, ask) => input.hooks.putImage(lane, ask)),
   [PROPOSE_TOOL]: () => proposeTool(),
 }
 

@@ -1,24 +1,22 @@
 // notes — note columns and the notes in them: where a card leaving a thread
 // goes, and a note's place at its column's end.
 
-import {
-  type CanvasId,
-  type CanvasPlace,
-  type CardPlace,
-  type CardRecord,
-  makeCard,
-  NO_CONTENT,
-  type NoteColumnId,
-  type NotesTarget,
-  type TextCard,
-  type TextPlace,
-  type ThreadId,
-  type WriterId,
+import type {
+  CanvasId,
+  CardPlace,
+  CardRecord,
+  NoteColumnId,
+  NotesTarget,
+  TextCard,
+  TextPlace,
+  ThreadId,
+  WriterId,
 } from "@pinetrie/core"
 import { type CardOnCanvas, cardsOnCanvas } from "./canvas-index.ts"
 import { byOrder } from "./card.ts"
+import { type MintContainer, makeContainer } from "./containers.ts"
 import { orderAfter } from "./order.ts"
-import { afterSteps, type PlaceStep, planMake } from "./place-steps.ts"
+import { afterSteps, type PlaceStep } from "./place-steps.ts"
 import { rankAfter } from "./rank.ts"
 
 // ── note columns ────────────────────────────────────────────────
@@ -136,7 +134,7 @@ export function notesNear(
 /**
  * A card sent to the notes nearest `to` (a thread's, or a canvas's own), as a
  * place, and the writes that go first: a note column made for it (its id
- * `newColumn`'s, owned and placed by `by`), and the canvas cards renumbered
+ * `newContainer`'s, owned and placed by `by`), and the canvas cards renumbered
  * to fit it. The one step every write to notes takes: a move's, an unsent
  * card's, a migrated fresh column's cards'. The column is made through
  * `planMake`, as every card is. Null for a thread with no card, or a column
@@ -145,7 +143,7 @@ export function notesNear(
 export function toNotes(input: {
   readonly cards: readonly CardRecord[]
   readonly to: NotesTarget
-  readonly newColumn: () => NoteColumnId
+  readonly newContainer: MintContainer
   readonly by: WriterId
 }): {
   readonly place: Extract<TextPlace, { kind: "note" | "inventory" }>
@@ -162,9 +160,9 @@ export function toNotes(input: {
       const renumbered = near.renumbered.map(
         (record): PlaceStep => ({ kind: "write", record }),
       )
-      const made = makeNoteColumn(
+      const made = makeContainer(
         afterSteps(input.cards, renumbered),
-        input.newColumn(),
+        input.newContainer("note-column"),
         { kind: "canvas", canvas: near.canvas, order: near.order, width: 1 },
         input.by,
       )
@@ -172,30 +170,6 @@ export function toNotes(input: {
       return { place: made.place, first: [...renumbered, made.step] }
     }
   }
-}
-
-/**
- * A new note column, `column`, at `at` on a canvas, made by `by` through
- * `planMake` as every card is, and the place of its first note. Null when
- * the make is refused, which none is.
- */
-export function makeNoteColumn(
-  cards: readonly CardRecord[],
-  column: NoteColumnId,
-  at: CanvasPlace,
-  by: WriterId,
-): {
-  readonly step: PlaceStep
-  readonly place: Extract<CardPlace, { kind: "note" }>
-} | null {
-  const made = planMake(
-    cards,
-    makeCard("note-column", column, at, NO_CONTENT, by),
-    by,
-  )
-  return made.kind !== "write"
-    ? null
-    : { step: made, place: { kind: "note", column, order: orderAfter([]) } }
 }
 
 /** A note at the end of `column`. */

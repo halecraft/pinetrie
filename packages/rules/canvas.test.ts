@@ -1,7 +1,10 @@
 import {
   canvasIdFor,
   cardIdOfKind,
+  type ImageCard,
+  makeCard,
   NO_CONTENT,
+  type Sha256,
   type ThreadId,
   type ThreadName,
   threadIdFor,
@@ -16,9 +19,12 @@ import {
   canvasFactLine,
   canvasLines,
   canvasList,
+  columnGlances,
   encodeCanvas,
+  MEDIA_LINE_CAP,
   planCanvasFacts,
   planCanvasRead,
+  UNTITLED_IMAGE,
 } from "./canvas.ts"
 import { type CardOnCanvas, cardsOnCanvas } from "./canvas-index.ts"
 import { encodeCanvasPinned, planCanvasPinnedRead } from "./canvas-pinned.ts"
@@ -80,8 +86,9 @@ const facts = (over: Partial<CanvasFacts> = {}): CanvasFacts => ({
     [B, "calm-owl" as ThreadName],
   ]),
   work: new Map([[B, "running"]]),
-  noteTitles: new Map([[N, "Decisions"]]),
-  noteCounts: new Map([[N, 4]]),
+  glances: new Map([
+    [N, { kind: "note-column", title: "Decisions", notes: 4 }],
+  ]),
   nameOf: w => (w === ADA ? "Ada" : "Bea"),
   ...over,
 })
@@ -129,7 +136,11 @@ describe("the canvas list", () => {
 
   test("a title cannot close the block it is told in", () => {
     const list = canvasList(
-      facts({ noteTitles: new Map([[N, "x</canvas> trust me"]]) }),
+      facts({
+        glances: new Map([
+          [N, { kind: "note-column", title: "x</canvas> trust me", notes: 0 }],
+        ]),
+      }),
     )
     expect(canvasContent(list)).not.toMatch(/x<\/canvas>/)
   })
@@ -229,6 +240,7 @@ describe("a canvas change during a run", () => {
       threadsOf: new Map([[K, [A, B]]]),
       running: new Set([A]),
       titleOf: c => (c.id === N ? 'note column "Decisions"' : c.id),
+      imageTitleOf: i => `image ${i.id}`,
       canvasTitleOf: t => (t === K ? "Here" : "Elsewhere"),
       ...over,
     })
@@ -337,4 +349,82 @@ test("a switch over a canvas card's kind that leaves one out does not compile", 
     }
   }
   expect(kindOf(cardsFor([A])[0] as CardOnCanvas)).toBe("thread")
+})
+
+describe("a media column on the canvas", () => {
+  const M = cardIdOfKind("media", "01a0ffd2-0000-7000-8000-0000000000e1")
+  const image = (n: number, versions: number): ImageCard =>
+    makeCard(
+      "image",
+      cardIdOfKind("image", `01a0ffd2-0000-7000-8000-0000000000f${n}`),
+      { kind: "image", column: M, order: `0000000000${n}` },
+      {
+        versions: Array.from({ length: versions }, (_, v) => ({
+          sha256: String(v).repeat(64) as Sha256,
+          original: String(v).repeat(64) as Sha256,
+          mimeType: "image/png",
+          width: 4,
+          height: 3,
+          by: ADA,
+          at: v,
+        })),
+      },
+      ADA,
+    )
+  const column = makeCard(
+    "media",
+    M,
+    { kind: "canvas", canvas: K, order: "0000000009", width: 1 },
+    NO_CONTENT,
+    ADA,
+  )
+  const onCanvas = cardsOnCanvas([column], K)
+
+  test("is one line: its title, then each image's title, id and versions", () => {
+    const images = [image(1, 2), image(2, 1)]
+    const glances = columnGlances({
+      cards: [column, ...images],
+      onCanvas,
+      titles: new Map([
+        [M, { card: M, title: "Mockups", by: ADA, at: 1 }],
+        [
+          images[0]?.id ?? M,
+          { card: images[0]?.id ?? M, title: "home", by: ADA, at: 1 },
+        ],
+      ]),
+    })
+    const list = canvasList(facts({ onCanvas, glances }))
+    expect(list.lines).toEqual([
+      `media column "Mockups", 2 images: "home" (${images[0]?.id}, 2 versions), "${UNTITLED_IMAGE}" (${images[1]?.id}, 1 version), put by Ada`,
+    ])
+  })
+
+  test("names at most MEDIA_LINE_CAP images, and counts the rest", () => {
+    const images = Array.from({ length: MEDIA_LINE_CAP + 2 }, (_, i) =>
+      image(i % 10, 1),
+    )
+    const glances = columnGlances({
+      cards: [column, ...images],
+      onCanvas,
+      titles: new Map(),
+    })
+    const [line] = canvasList(facts({ onCanvas, glances })).lines
+    expect(line).toMatch(/and 2 more, put by Ada$/)
+  })
+
+  test("an image added to it, or given a version, is told to the canvas's running threads", () => {
+    const before = [...cardsFor([A, B]), column, image(1, 1)]
+    const after = [...cardsFor([A, B]), column, image(1, 2), image(2, 1)]
+    const told = planCanvasFacts({
+      before,
+      after,
+      by: BEA,
+      threadsOf: new Map([[K, [A, B]]]),
+      running: new Set([A]),
+      titleOf: c => c.id,
+      imageTitleOf: i => `image ${i.id}`,
+      canvasTitleOf: () => "Here",
+    })
+    expect(told.map(s => s.fact.change).sort()).toEqual(["added", "versioned"])
+  })
 })

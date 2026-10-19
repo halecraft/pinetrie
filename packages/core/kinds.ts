@@ -25,6 +25,12 @@ export interface KindSpec {
    * nothing a reader takes as text).
    */
   readonly text: "doc" | "blob" | "fact" | "ask" | "none"
+  /**
+   * Who may set its title (`CARD_TITLE`): a person alone, a person or the
+   * agent, or nobody, for a kind with no title of its own. A canvas's title
+   * is a mark, not this record.
+   */
+  readonly titled: "person" | "anyone" | null
 }
 
 /**
@@ -49,8 +55,9 @@ export interface KindSpec {
  *   until its thread's end consumes it: the host places it, no person moves it
  *   (it never becomes a note), and a person may reorder it, or hold the queue
  *   it waits in;
- * - a media card and a file card, reserved: their ids are taken, and no
- *   place takes them yet.
+ * - a media column, on a canvas, in an inventory or in a trash;
+ * - an image, in a media column or in a trash;
+ * - a file card, reserved: its id is taken, and no place takes it yet.
  *
  * A uuidv7's second character is a hex digit, never `-`, so no prefix
  * matches a text card's bare id.
@@ -71,6 +78,7 @@ export const KINDS = {
     moves: true,
     reordered: true,
     text: "doc",
+    titled: null,
   },
   thread: {
     prefix: "t-",
@@ -78,6 +86,7 @@ export const KINDS = {
     moves: true,
     reordered: true,
     text: "none",
+    titled: null,
   },
   canvas: {
     prefix: "k-",
@@ -85,6 +94,7 @@ export const KINDS = {
     moves: false,
     reordered: false,
     text: "none",
+    titled: null,
   },
   "note-column": {
     prefix: "n-",
@@ -92,6 +102,7 @@ export const KINDS = {
     moves: true,
     reordered: true,
     text: "none",
+    titled: "person",
   },
   fact: {
     prefix: "x-",
@@ -99,6 +110,7 @@ export const KINDS = {
     moves: false,
     reordered: false,
     text: "fact",
+    titled: null,
   },
   reference: {
     prefix: "q-",
@@ -106,6 +118,7 @@ export const KINDS = {
     moves: true,
     reordered: true,
     text: "blob",
+    titled: null,
   },
   ask: {
     prefix: "a-",
@@ -113,13 +126,23 @@ export const KINDS = {
     moves: false,
     reordered: true,
     text: "ask",
+    titled: null,
   },
   media: {
     prefix: "m-",
-    places: [],
-    moves: false,
-    reordered: false,
+    places: ["canvas", "inventory", "trash"],
+    moves: true,
+    reordered: true,
     text: "none",
+    titled: "anyone",
+  },
+  image: {
+    prefix: "i-",
+    places: ["image", "trash"],
+    moves: true,
+    reordered: true,
+    text: "none",
+    titled: "anyone",
   },
   file: {
     prefix: "f-",
@@ -127,5 +150,15 @@ export const KINDS = {
     moves: false,
     reordered: false,
     text: "none",
+    titled: null,
   },
 } as const satisfies Record<CardKind, KindSpec>
+
+/** The kinds with a title of their own (`KindSpec`'s `titled`). */
+export type TitledKind = {
+  [K in CardKind]: (typeof KINDS)[K]["titled"] extends null ? never : K
+}[CardKind]
+
+/** Whether a card of `kind` has a title of its own. */
+export const isTitledKind = (kind: CardKind): kind is TitledKind =>
+  KINDS[kind].titled !== null

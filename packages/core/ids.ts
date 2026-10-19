@@ -284,8 +284,20 @@ export const isNoteColumnId = (s: string): s is NoteColumnId =>
   s.startsWith(KINDS["note-column"].prefix) &&
   s.length > KINDS["note-column"].prefix.length
 declare const mediaIdBrand: unique symbol
-/** A media card's id: `m-` and a uuidv7. */
+/** A media column's id: `m-` and a uuidv7. */
 export type MediaId = string & { readonly [mediaIdBrand]: true }
+
+/** Whether text names a media column. */
+export const isMediaId = (s: string): s is MediaId =>
+  s.startsWith(KINDS.media.prefix) && s.length > KINDS.media.prefix.length
+
+declare const imageIdBrand: unique symbol
+/** An image's id: `i-` and a uuidv7, minted by the page or the host that puts it. */
+export type ImageId = string & { readonly [imageIdBrand]: true }
+
+/** Whether text names an image. */
+export const isImageId = (s: string): s is ImageId =>
+  s.startsWith(KINDS.image.prefix) && s.length > KINDS.image.prefix.length
 declare const fileCardIdBrand: unique symbol
 /** A file card's id: `f-` and a uuidv7. */
 export type FileCardId = string & { readonly [fileCardIdBrand]: true }
@@ -326,6 +338,7 @@ export type CardId =
   | ReferenceCardId
   | AskCardId
   | MediaId
+  | ImageId
   | FileCardId
 
 /** What a card is, from its id (`KINDS`). */
@@ -338,6 +351,7 @@ export type CardKind =
   | "reference"
   | "ask"
   | "media"
+  | "image"
   | "file"
 
 /** Each prefixed kind's prefix, from `KINDS`. */
@@ -386,8 +400,8 @@ const PREFIXED_CARD_RE = new RegExp(
 /**
  * A card's id as it comes in from the wire or the store; undefined for text
  * that is none. A text card's is a bare lowercase uuidv7; a note column's, a
- * fact's, a reference's, an ask's, a media card's and a file card's are their
- * prefix and one. A thread's is any id `isThreadId` takes, as everywhere a
+ * fact's, a reference's, an ask's, a media column's, an image's and a file
+ * card's are their prefix and one. A thread's is any id `isThreadId` takes, as everywhere a
  * thread is read, so a thread the store names is never dropped for its id's
  * shape; a canvas's, any `isCanvasId` takes, the same way. The one way text becomes
  * a `CardId` outside a minter.

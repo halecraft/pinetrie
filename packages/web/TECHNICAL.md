@@ -603,8 +603,11 @@ set `data-card-drag`.
   from the desktop, which only the browser's drag can bring: `file-drop.ts`
   is its one door (`boundaries.test.ts` keeps it so, as it keeps the
   clipboard in `clipboard.ts`). `fileDropProps` makes an element take
-  dropped files: a card's frame, and the picture field. A drag's files are
-  hidden until the drop, so `dragover` accepts by `dataTransfer.types`.
+  dropped files: a card's frame, the picture field, a media column (new
+  images at its end) and an image in one (a version, ADR-0182). The
+  innermost element that takes files takes the drop alone: its handlers
+  stop the event. A drag's files are hidden until the drop, so `dragover`
+  accepts by `dataTransfer.types`.
   `useFileDropGuard`, mounted once by the page, cancels a file drop nothing
   took, which the browser would otherwise open in the tab.
 - **The order is never realigned.** A column moved right keeps its scroll,
@@ -1154,6 +1157,20 @@ the session sends moves and draws them until its copy holds them
   written in (`NewCardBox`, `.new-card`). The whole column is a drop target
   (`data-put-notes`). A note's acts are sent as a `column` intent keyed by
   the note column's card, so its refusals are said there.
+- **A list column's header is one component** (`list-column-head.tsx`,
+  `ListColumnHead`): a note column's and a media column's, its kind's icon,
+  its title (renamed through `TitleField` with a `card` `MarkTarget`), its
+  count (`countWords`), its ⋯ and its fold, and the drag handle.
+- **A media column** (`media-column.tsx`, `MediaColumn`, ADR-0182) draws
+  its images at its width, two to a row when two wide, each its newest
+  version's fitted copy at its stored size, linking to its original. Each
+  image has its title, a stepper through its versions (local to the tab), ◀
+  and ▶ (a `reorder` act among the column's images), a bin, and its margin
+  (`Margin` with `beside="image"`; a comment records the version it was
+  written on, and says so under a newer one, `commentVersionWords`). Files
+  dropped on the column are uploaded (`image-upload.ts` over `uploadBlob`),
+  the images kept, and put at its end (`putImages`); one dropped on an image
+  is a version (`addVersion`). It says how many files a drop left out.
 - **A new note or pinned card is written in one box, as your message is**
   (`NewCardBox`, `card-editor.tsx`, over `useCardBox`): local until it holds
   something worth keeping, then the same element bound to the card it

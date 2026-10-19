@@ -1,20 +1,22 @@
-// mark — a canvas's title, and the one plan for titling a canvas or a note column.
+// mark — a canvas's title, and the one plan for titling a canvas or a titled card.
 
 import {
   type AgentId,
   type CanvasId,
   ERR,
+  KINDS,
+  kindOfCard,
   type MarkTarget,
-  type NoteColumnId,
   type Refusal,
   refused,
   THE_AGENT,
+  type TitledCardId,
   type ValueWrite,
   type WriterId,
 } from "@pinetrie/core"
 import { Type } from "typebox"
+import { CARD_TITLE, type CardTitleRecord } from "./card-title.ts"
 import { decodeRecord, parseCanvasKey } from "./decode.ts"
-import { NOTE_COLUMN, type NoteColumnRecord } from "./note-column.ts"
 import { deleteRecord, type RecordSpec, setRecord } from "./records.ts"
 
 // The shape only: the host is the session's one writer, and stores only
@@ -67,9 +69,10 @@ type MarkPlan =
     }
 
 /**
- * Decide a mark: set a canvas's or a note column's
- * title, or clear it with null. Each title is in its own record: a canvas's in
- * `MARK`, a note column's in `NOTE_COLUMN`, which only a person sets.
+ * Decide a mark: set a canvas's or a titled card's title, or clear it with
+ * null. A canvas's title is in `MARK`, a card's in `CARD_TITLE`. A card's is
+ * refused for a card in no place it is titled in (`titled`), and for the
+ * agent where its kind is a person's alone to title (`KINDS`' `titled`).
  */
 export function planMark(input: {
   readonly of: MarkTarget
@@ -79,9 +82,9 @@ export function planMark(input: {
   /** Every canvas the session holds. */
   readonly canvases: ReadonlySet<CanvasId>
   readonly marks: ReadonlyMap<CanvasId, MarkRecord>
-  /** Every note column on a canvas. */
-  readonly columns: ReadonlySet<NoteColumnId>
-  readonly columnTitles: ReadonlyMap<NoteColumnId, NoteColumnRecord>
+  /** Every titled card that is on a canvas, in an inventory or in a column, and not trashed. */
+  readonly titled: ReadonlySet<TitledCardId>
+  readonly cardTitles: ReadonlyMap<TitledCardId, CardTitleRecord>
 }): MarkPlan {
   const { of, title, by, now } = input
   switch (of.kind) {
@@ -100,18 +103,19 @@ export function planMark(input: {
         ],
       }
     }
-    case "note-column": {
-      const { column } = of
-      if (!input.columns.has(column) || isAgent(by))
-        return refused(ERR.UNKNOWN_TARGET, "no such note column to title")
-      const stored = input.columnTitles.get(column)?.title ?? null
+    case "card": {
+      const { card } = of
+      const only = KINDS[kindOfCard(card)].titled
+      if (!input.titled.has(card) || (isAgent(by) && only === "person"))
+        return refused(ERR.UNKNOWN_TARGET, "no such card to title")
+      const stored = input.cardTitles.get(card)?.title ?? null
       if (stored === title) return { kind: "unchanged" }
       return {
         kind: "writes",
         writes: [
           title === null
-            ? deleteRecord(NOTE_COLUMN, column)
-            : setRecord(NOTE_COLUMN, { column, title, by, at: now }),
+            ? deleteRecord(CARD_TITLE, card)
+            : setRecord(CARD_TITLE, { card, title, by, at: now }),
         ],
       }
     }

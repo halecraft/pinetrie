@@ -16,13 +16,13 @@ import { BASE, type BaseRecord } from "./base.ts"
 import { WORKFLOW } from "./board.ts"
 import { BUDGET } from "./budget.ts"
 import { CARD_HISTORY, TRACE } from "./card-history.ts"
+import { CARD_TITLE } from "./card-title.ts"
 import { COMMANDS } from "./commands.ts"
 import { DIGEST } from "./digest.ts"
 import { FOCUS } from "./focus.ts"
 import { CONFLICT, FOLDER_WRITE_JOURNAL, STATE } from "./folder-records.ts"
 import { MARK } from "./mark.ts"
 import { NAME } from "./names.ts"
-import { NOTE_COLUMN } from "./note-column.ts"
 import { PARTICIPANT, PICTURE } from "./participant.ts"
 import { PROPOSED_CHANGES } from "./proposed.ts"
 import { QUEUE_HOLD } from "./queue-hold.ts"
@@ -49,6 +49,7 @@ export const RECORD_SPECS: readonly AnyRecordSpec[] = [
   BASE,
   BUDGET,
   CARD_HISTORY,
+  CARD_TITLE,
   COMMANDS,
   CONFLICT,
   ICONS,
@@ -58,7 +59,6 @@ export const RECORD_SPECS: readonly AnyRecordSpec[] = [
   ACCEPTED,
   MARK,
   NAME,
-  NOTE_COLUMN,
   PROPOSED_CHANGES,
   PARTICIPANT,
   PICTURE,

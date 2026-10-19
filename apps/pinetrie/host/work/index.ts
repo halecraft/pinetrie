@@ -67,7 +67,10 @@ export type LaneWork = Pick<
     /** What the host found where it runs; null when it has no tools. */
     readonly project: ProjectRecord | null
     /** pi's hooks lane work answers; `askSplit` is the documents' (`host/split-call.ts`). */
-    readonly hooks: Omit<LaneHooks, "askSplit" | "ask" | "leave" | "readBlob">
+    readonly hooks: Omit<
+      LaneHooks,
+      "askSplit" | "ask" | "leave" | "readBlob" | "putImage"
+    >
     /** Accepted work and proposed changes, as the project keeps them; null for a host without tools. */
     readonly destination: Destination | null
     /**

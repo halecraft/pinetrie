@@ -12,6 +12,7 @@ import {
   type EntryId,
   entryThread,
   type LaneView,
+  type MediaId,
   type NoteColumnId,
   type ThreadId,
   type TreeIndex,
@@ -85,6 +86,12 @@ export type CardColumn =
   | {
       readonly kind: "notes"
       readonly card: NoteColumnId
+      readonly folded: boolean
+      readonly width: CardWidth
+    }
+  | {
+      readonly kind: "media"
+      readonly card: MediaId
       readonly folded: boolean
       readonly width: CardWidth
     }
@@ -203,6 +210,8 @@ function cardColumn(
     }
     case "note-column":
       return { kind: "notes", card: c.id, folded, width }
+    case "media":
+      return { kind: "media", card: c.id, folded, width }
     // A new kind of canvas card does not compile until it has its column.
     default:
       return c satisfies never

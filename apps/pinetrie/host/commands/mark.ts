@@ -1,15 +1,15 @@
-// host/commands/mark — a canvas's or a note column's title: gather, `planMark`,
-// execute.
+// host/commands/mark — a canvas's or a titled card's title: gather,
+// `planMark`, execute.
 
-import { type Intent, isNoteColumnId, type WriterId } from "@pinetrie/core"
+import type { Intent, WriterId } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import {
   readCanvases,
+  readCardTitles,
   readMarks,
-  readNoteColumns,
   readPlaces,
 } from "@pinetrie/reads"
-import { planMark } from "@pinetrie/rules"
+import { planMark, titledCards } from "@pinetrie/rules"
 import type { Basics } from "../basics.ts"
 import type { Records } from "../records.ts"
 
@@ -25,8 +25,8 @@ export async function handleMark(
 ): Promise<Outcome> {
   const { records } = deps
   const { session, places, now } = deps.basics
-  // plan (pure), over the session's canvases and titles, and the note columns
-  // on a canvas
+  // plan (pure), over the session's canvases and titles, and the titled cards
+  // not in a trash
   const planned = planMark({
     of: intent.of,
     title: intent.title,
@@ -34,12 +34,8 @@ export async function handleMark(
     now: now(),
     canvases: readCanvases(places),
     marks: readMarks(session),
-    columns: new Set(
-      readPlaces(places).flatMap(c =>
-        c.place.kind === "canvas" && isNoteColumnId(c.id) ? [c.id] : [],
-      ),
-    ),
-    columnTitles: readNoteColumns(session),
+    titled: titledCards(readPlaces(places)),
+    cardTitles: readCardTitles(session),
   })
   // execute
   switch (planned.kind) {

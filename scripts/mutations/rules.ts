@@ -3450,19 +3450,18 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the agent titles a note column",
     file: "packages/rules/mark.ts",
-    from: "      if (!input.columns.has(column) || isAgent(by))",
-    to: "      if (!input.columns.has(column))",
+    from: '      if (!input.titled.has(card) || (isAgent(by) && only === "person"))',
+    to: "      if (!input.titled.has(card))",
     command: ["pnpm", "exec", "vitest", "run", "packages/rules"],
-    expect:
-      "a note column on no canvas, or one the agent would title, is refused",
+    expect: "the agent titles an image, never a note column",
   },
   {
-    name: "a note column's title is cleared in the canvases' titles",
+    name: "a card's title is cleared in the canvases' titles",
     file: "packages/rules/mark.ts",
-    from: "            ? deleteRecord(NOTE_COLUMN, column)",
-    to: "            ? deleteRecord(MARK, column as never)",
+    from: "            ? deleteRecord(CARD_TITLE, card)",
+    to: "            ? deleteRecord(MARK, card as never)",
     command: ["pnpm", "exec", "vitest", "run", "packages/rules"],
-    expect: "titles a note column in its own record",
+    expect: "titles a card in the card's title record, and clears it there",
   },
   {
     name: "a note is in no canvas",
@@ -3703,8 +3702,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a canvas change is told to idle threads",
     file: "packages/rules/canvas.ts",
-    from: "      .filter(lane => lane !== card.id && input.running.has(lane))",
-    to: "      .filter(lane => lane !== card.id)",
+    from: "      .filter(lane => lane !== card && input.running.has(lane))",
+    to: "      .filter(lane => lane !== card)",
     command: unit,
     expect: "nothing for a thread not running, a reorder",
   },
@@ -4059,7 +4058,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a margin holds every entry's comments",
     file: "packages/rules/margin.ts",
-    from: '        hasPlaceKind(c, "margin") && c.place.entry === entry,\n',
+    from: '        hasPlaceKind(c, "margin") && sameMarginOn(c.place.on, on),\n',
     to: '        hasPlaceKind(c, "margin"),\n',
     command: unit,
     expect:
@@ -4068,8 +4067,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a margin may name any thread",
     file: "packages/rules/moves.ts",
-    from: "        if (input.entryThreads.get(to.entry) !== to.thread)\n",
-    to: "        if (false)\n",
+    from: "            ? input.entryThreads.get(on.entry) === on.thread\n",
+    to: "            ? true\n",
     command: unit,
     expect:
       "a comment goes to its margin's end, and reorders among that entry's comments alone",
@@ -4077,8 +4076,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a comment reorders past its neighbours",
     file: "packages/rules/in-place.ts",
-    from: "    siblings: (cards, at) => marginCards(cards, at.entry),\n    adjacent: true,\n",
-    to: "    siblings: (cards, at) => marginCards(cards, at.entry),\n    adjacent: false,\n",
+    from: "    siblings: (cards, at) => marginCards(cards, at.on),\n    adjacent: true,\n",
+    to: "    siblings: (cards, at) => marginCards(cards, at.on),\n    adjacent: false,\n",
     command: unit,
     expect:
       "a comment goes to its margin's end, and reorders among that entry's comments alone",
@@ -4466,5 +4465,74 @@ export const mutations: readonly Mutation[] = [
     to: "  true\n",
     command: unit,
     expect: "a carry-on says why it resumed",
+  },
+  // ── media columns ──
+  {
+    name: "a version replaces the image's others",
+    file: "packages/rules/put-images.ts",
+    from: "          ...card.content.versions,\n",
+    to: "",
+    command: unit,
+    expect: "a version is added after the others, by its adder, at now",
+  },
+  {
+    name: "a trashed media column takes images",
+    file: "packages/rules/put-images.ts",
+    from: '    if (held === undefined || held.place.kind === "trash")\n',
+    to: "    if (held === undefined)\n",
+    command: unit,
+    expect: "a trashed media column, or none, takes none",
+  },
+  {
+    name: "a put's images after the first make columns of their own",
+    file: "packages/rules/put-images.ts",
+    from: "        mediaColumnEnd(now, column),\n",
+    to: '        { kind: "image", column: cardIdOfKind("media", image.card.slice(2)), order: "m" },\n',
+    command: unit,
+    expect:
+      "a spot on a canvas makes a media column there, the images in it in order, one version each",
+  },
+  {
+    name: "an image with no versions decodes",
+    file: "packages/rules/card.ts",
+    from: "  { minItems: 1 },\n",
+    to: "  {},\n",
+    command: unit,
+    expect: "an image with no versions, or one that is no blob's, is refused",
+  },
+  {
+    name: "a comment goes in a trashed image's margin",
+    file: "packages/rules/moves.ts",
+    from: '            : now.find(c => c.id === on.card)?.place.kind === "image"\n',
+    to: "            : true\n",
+    command: unit,
+    expect:
+      "a comment goes in the margin of an image in a column, never of one in a trash",
+  },
+  {
+    name: "a media column's line names every image",
+    file: "packages/rules/canvas.ts",
+    from: "    .slice(0, MEDIA_LINE_CAP)\n",
+    to: "",
+    command: unit,
+    expect: "names at most MEDIA_LINE_CAP images, and counts the rest",
+  },
+  {
+    name: "a version is told as nothing",
+    file: "packages/rules/canvas.ts",
+    from: "      after.content.versions.length > before.content.versions.length\n",
+    to: "      false\n",
+    command: unit,
+    expect:
+      "an image added to it, or given a version, is told to the canvas's running threads",
+  },
+  {
+    name: "an agent's ask finds no column by its title",
+    file: "packages/rules/put-images.ts",
+    from: "  const found = byId ?? byTitle\n",
+    to: "  const found = byId\n",
+    command: unit,
+    expect:
+      "a column named by its title, case aside, takes the image at its end, titled by its file",
   },
 ]

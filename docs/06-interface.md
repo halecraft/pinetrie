@@ -1534,7 +1534,11 @@ board's records (ADR-0122); a card's text is its own document (ADR-0048).
 
 - **What else a canvas holds** (ADR-0116): file cards showing a source's
   file, and media. Threads from any root and note columns are built
-  (above).
+  (above). Media is decided as media columns, not yet built (ADR-0182): images,
+  each a card with its versions and its comments, made by a file dropped
+  on the strip, an image dragged out of a thread, the pane or the agent;
+  one margin shape for an entry's comments and an image's, and one title
+  record for a note column, a media column and an image.
 - **What is left of cards and the dock** (ADR-0111, ADR-0113): a thread
   card's body on the board drawn from its pinned cards' first lines (today
   its first line, under a title); and who is in a note column now, which

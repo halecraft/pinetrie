@@ -139,6 +139,8 @@ export const COMMAND_KINDS = [
   "branch-out",
   "copy-thread",
   "paste",
+  "put-images",
+  "version",
   "set-command",
   "setup",
   "publish",

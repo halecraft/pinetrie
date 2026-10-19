@@ -8,6 +8,7 @@ import {
   DISCARDED,
   type EntryId,
   fitsPlace,
+  isMediaId,
   isNoteColumnId,
   isTextCardId,
   isWhereSenderSaw,
@@ -17,7 +18,6 @@ import {
   type MoveRefusal,
   makeCard,
   NO_CONTENT,
-  type NoteColumnId,
   ownerCard,
   type Paste,
   type PlaceKey,
@@ -35,8 +35,10 @@ import {
 } from "@pinetrie/core"
 import type { Workflow } from "./board.ts"
 import { planCanvasOpening, rankOnCanvas } from "./canvas-index.ts"
+import { type MintContainer, makeContainer } from "./containers.ts"
 import { marginEnd } from "./margin.ts"
-import { makeNoteColumn, noteColumnEnd, toNotes } from "./notes.ts"
+import { mediaColumnEnd } from "./media.ts"
+import { noteColumnEnd, toNotes } from "./notes.ts"
 import { orderAfter } from "./order.ts"
 import {
   afterSteps,
@@ -91,11 +93,16 @@ function placeAt(
         cards.filter(c => c.id !== now?.id),
         key.column,
       )
+    case "image":
+      return mediaColumnEnd(
+        cards.filter(c => c.id !== now?.id),
+        key.column,
+      )
     case "margin":
       return marginEnd(
         cards.filter(c => c.id !== now?.id),
-        key.entry,
-        key.thread,
+        key.on,
+        key.seen,
       )
     // The place it leaves: a card is made in no trash, nor trashed twice.
     case "trash":
@@ -109,24 +116,28 @@ function placeAt(
 
 /**
  * A card a person's move makes at `place`, of the kind its id says: a text
- * card with no command, or a note column on a canvas; undefined for any
- * other kind, or a place its kind is never in.
+ * card with no command, or a note column or a media column on a canvas;
+ * undefined for any other kind, or a place its kind is never in. An image
+ * holds its blob, so it is made by a paste.
  */
 function madeAt(
   card: CardId,
   place: CardPlace,
   sender: WriterId,
 ): CardRecord | undefined {
-  if (isTextCardId(card) && place.kind !== "canvas" && place.kind !== "board")
+  const text = isTextCardId(card) ? placeOfKind("text", place) : undefined
+  if (isTextCardId(card) && text !== undefined)
     return makeCard(
       "text",
       card,
-      place,
+      text,
       { command: null, unsent: null, origin: null },
       sender,
     )
   if (isNoteColumnId(card) && place.kind === "canvas")
     return makeCard("note-column", card, place, NO_CONTENT, sender)
+  if (isMediaId(card) && place.kind === "canvas")
+    return makeCard("media", card, place, NO_CONTENT, sender)
   return undefined
 }
 
@@ -160,7 +171,7 @@ export function planMove(
 ): MoveStep {
   const now = cards.find(c => c.id === move.card)
   if (move.from === null) {
-    // A move makes a text card, or a note column on a canvas: a thread's
+    // A move makes a text card, or a column on a canvas: a thread's
     // card is the host's to make, with its thread's first message or a
     // copy (`planCopy`), and a fact's with its fact (`planFactCard`).
     const place = placeAt(move.to, cards, sender, undefined)
@@ -408,20 +419,22 @@ export function pastedCard(
  *   the cards given new ranks to make room written first. A card of a kind
  *   no canvas takes lands in the container its kind is made in there
  *   (`WRAPS`): a text card or a reference as the first note of a note
- *   column made at that rank, written first.
+ *   column made at that rank, an image as the first of a media column,
+ *   written first.
  *
  * A move into an entry's margin is refused `no-place` unless the
  * margin names the thread its entry is in (`entryThreads`): a margin's canvas
  * is read from its thread, so one naming another would put a comment in
- * the wrong canvas. A move onto the board is refused `no-place`: only the
+ * the wrong canvas. One into an image's margin is refused `no-place` unless
+ * the image is in a media column. A move onto the board is refused `no-place`: only the
  * board's own move places a canvas's card.
  */
 export function planMoveTargets(input: {
   readonly cards: readonly CardRecord[]
   readonly moves: readonly Move[]
   readonly sender: WriterId
-  /** Mints the id of a note column made for them. */
-  readonly newColumn: () => NoteColumnId
+  /** Mints the id of a column made for them. */
+  readonly newContainer: MintContainer
   /** The thread of each entry a move's margin names, as its root's index says; absent for one not found. */
   readonly entryThreads: ReadonlyMap<EntryId, ThreadId>
   /** The board's states, for a new canvas a move makes; null refuses one. */
@@ -444,7 +457,7 @@ export function planMoveTargets(input: {
         const notes = toNotes({
           cards: now,
           to,
-          newColumn: input.newColumn,
+          newContainer: input.newContainer,
           by: input.sender,
         })
         if (notes === null)
@@ -478,17 +491,12 @@ export function planMoveTargets(input: {
           moves.push({ ...move, to: ranked.to })
           break
         }
-        // Each container a kind is made in (`WRAPS`) is made here: a new
-        // one does not compile until it is.
-        const made =
-          wrap === "note-column"
-            ? makeNoteColumn(
-                now,
-                input.newColumn(),
-                { ...ranked.to, width: 1 },
-                input.sender,
-              )
-            : (wrap satisfies never)
+        const made = makeContainer(
+          now,
+          input.newContainer(wrap),
+          { ...ranked.to, width: 1 },
+          input.sender,
+        )
         if (made === null)
           return {
             kind: "refused",
@@ -497,11 +505,16 @@ export function planMoveTargets(input: {
           }
         first.push(made.step)
         now = afterSteps(now, [made.step])
-        moves.push({ ...move, to: { kind: "note", column: made.place.column } })
+        moves.push({ ...move, to: placeKey(made.place) })
         break
       }
-      case "margin":
-        if (input.entryThreads.get(to.entry) !== to.thread)
+      case "margin": {
+        const { on } = to
+        const held =
+          on.kind === "entry"
+            ? input.entryThreads.get(on.entry) === on.thread
+            : now.find(c => c.id === on.card)?.place.kind === "image"
+        if (!held)
           return {
             kind: "refused",
             code: "no-place",
@@ -509,6 +522,7 @@ export function planMoveTargets(input: {
           }
         moves.push({ ...move, to })
         break
+      }
       // Back to the place the card left: a restore, which `planMove` tells
       // by its target.
       case "back": {
@@ -567,7 +581,7 @@ export function planMoveRequest(
   moves: readonly Move[],
   sender: WriterId,
   running: (lane: ThreadId) => boolean,
-  newColumn: () => NoteColumnId,
+  newContainer: MintContainer,
   entryThreads: ReadonlyMap<EntryId, ThreadId>,
   workflow: Workflow | null = null,
 ): MoveCommand {
@@ -575,7 +589,7 @@ export function planMoveRequest(
     cards,
     moves,
     sender,
-    newColumn,
+    newContainer,
     entryThreads,
     workflow,
   })

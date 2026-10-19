@@ -14,6 +14,7 @@ import {
   type CardWidth,
   type ConflictChoice,
   type EntryId,
+  entryMargin,
   type LaneView,
   nearestRevision,
   type Position,
@@ -23,6 +24,7 @@ import {
   pointConflicts,
   ROOT,
   runPrompt,
+  type Sha256,
   type StreamRecord,
   type TextCardId,
   type ThreadId,
@@ -111,8 +113,8 @@ import {
 import {
   type DigestRecord,
   effectiveBase,
+  entryMarginCounts,
   marginCards,
-  marginCounts,
   pinnedCardsAtEnd,
   queuedOn,
   type SeatRecord,
@@ -124,7 +126,7 @@ import {
 } from "@pinetrie/rules"
 import { type LiveDocHandle, readStreamText } from "@pinetrie/schema"
 import type { AccessActing, AttentionStore } from "@pinetrie/session"
-import { newCardId, type SessionClient } from "@pinetrie/session"
+import { newCardId, newImageId, type SessionClient } from "@pinetrie/session"
 import {
   type KeyboardEvent as ReactKeyboardEvent,
   useCallback,
@@ -342,7 +344,7 @@ export function Column(p: ColumnProps) {
   // and the entry the keys select.
   const [openMargin, setOpenMargin] = useState<EntryId | null>(null)
   const [selected, setSelected] = useState<EntryId | null>(null)
-  const margins = useMemo(() => marginCounts(p.cards), [p.cards])
+  const margins = useMemo(() => entryMarginCounts(p.cards), [p.cards])
   // The proposals this column draws, and where each stands.
   const proposals = useMemo(
     () =>
@@ -356,10 +358,13 @@ export function Column(p: ColumnProps) {
       }),
     [view.nodes, index, p.asks, p.proposalBranches, p.lanes, p.session.writer],
   )
-  const openComments = useMemo(
-    () => (openMargin === null ? [] : marginCards(p.cards, openMargin)),
-    [p.cards, openMargin],
-  )
+  const openComments = useMemo(() => {
+    const thread =
+      openMargin === null ? undefined : index.entries[openMargin]?.thread
+    return openMargin === null || thread === undefined
+      ? []
+      : marginCards(p.cards, entryMargin(thread, openMargin))
+  }, [p.cards, openMargin, index])
   const comment = useStable((entry: EntryId) => {
     const thread = index.entries[entry]?.thread
     if (thread !== undefined)
@@ -375,6 +380,7 @@ export function Column(p: ColumnProps) {
     () =>
       openMargin === null ? null : (
         <Margin
+          beside="message"
           comments={openComments}
           onAct={act}
           onComment={() => comment(openMargin)}
@@ -767,6 +773,16 @@ export function Column(p: ColumnProps) {
     setPane(shown => togglePane(shown, subject)),
   )
   const closePane = useStable(() => setPane(null))
+  // The pane's image, put in a media column made just after this thread.
+  const canvasHere = p.canvas
+  const putOnCanvas = useStable((sha: Sha256, name: string) => {
+    if (canvasHere === null) return
+    p.onIntent({
+      kind: "putImages",
+      images: [{ card: newImageId(), sha256: sha, name }],
+      to: { kind: "canvas-at", canvas: canvasHere, after: thread },
+    })
+  })
   const reach = useMemo(
     () => ({ shown: pane, open: openPane }),
     [pane, openPane],
@@ -1328,6 +1344,9 @@ export function Column(p: ColumnProps) {
           <Pane
             choose={chooseVersion}
             close={closePane}
+            putOnCanvas={
+              p.readOnly === null && p.canvas !== null ? putOnCanvas : null
+            }
             id={paneId}
             said={resolveSaid}
             key={paneKey(pane)}

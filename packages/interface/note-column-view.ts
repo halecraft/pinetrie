@@ -3,12 +3,12 @@
 // there (`canvasColumns`). `NoteColumn` (`packages/web/note-column.tsx`) draws
 // one.
 
-import type { CardRecord, NoteColumnId } from "@pinetrie/core"
+import type { CardRecord, NoteColumnId, TitledCardId } from "@pinetrie/core"
 import {
   type CardOnCanvas,
+  type CardTitleRecord,
   NEW_NOTES_TITLE,
   type NoteCard,
-  type NoteColumnRecord,
   notesIn,
 } from "@pinetrie/rules"
 
@@ -27,7 +27,7 @@ export interface NoteColumnView {
 export function canvasNoteColumns(input: {
   readonly onCanvas: readonly CardOnCanvas[]
   readonly cards: readonly CardRecord[]
-  readonly titles: ReadonlyMap<NoteColumnId, NoteColumnRecord>
+  readonly titles: ReadonlyMap<TitledCardId, CardTitleRecord>
 }): readonly NoteColumnView[] {
   return input.onCanvas.flatMap(c => {
     if (c.kind !== "note-column") return []
@@ -42,10 +42,6 @@ export function canvasNoteColumns(input: {
     ]
   })
 }
-
-/** A note column's notes: how many there are. */
-export const noteCountWords = (n: number): string =>
-  n === 0 ? "no notes" : n === 1 ? "1 note" : `${n} notes`
 
 /** A note column with none: where a drop makes one. */
 export const NOTES_EMPTY = "drop a card here to make it a note"

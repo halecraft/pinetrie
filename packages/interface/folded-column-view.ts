@@ -2,38 +2,54 @@
 // with its card's mark and title, in its place on the canvas, so the
 // arrangement reads the same for everyone whatever you have folded.
 
-import type { CardId, NoteColumnId, ThreadId } from "@pinetrie/core"
+import type { CardId, MediaId, NoteColumnId, ThreadId } from "@pinetrie/core"
 import type { CardColumn } from "./canvas-columns.ts"
 import type { ControlWords } from "./card-words.ts"
 import type { HeadIcon } from "./column-view.ts"
-import { type NoteColumnView, noteCountWords } from "./note-column-view.ts"
+import { countWords, type ListKind } from "./count-words.ts"
+import type { MediaColumnView } from "./media-column-view.ts"
+import type { NoteColumnView } from "./note-column-view.ts"
 import type { ThreadGlance } from "./thread-glance.ts"
 
-/** A note column at a glance: its title, and how many notes it holds. */
-export interface NoteColumnGlance {
-  readonly kind: "note-column"
-  readonly card: NoteColumnId
+/** A list column at a glance: a note column or a media column, its title, and how many it holds. */
+export interface ListGlance {
+  readonly kind: ListKind
+  readonly card: NoteColumnId | MediaId
   readonly title: string
-  /** How many notes it holds; null before the tab has read them. */
-  readonly notes: number | null
+  /** How many it holds; null before the tab has read them. */
+  readonly count: number | null
 }
 
 /** A note column's glance, from its column as drawn. */
 export function noteColumnGlance(
   card: NoteColumnId,
   notes: ReadonlyMap<NoteColumnId, NoteColumnView>,
-): NoteColumnGlance {
+): ListGlance {
   const view = notes.get(card)
   return {
     kind: "note-column",
     card,
     title: view?.title ?? "",
-    notes: view?.notes.length ?? null,
+    count: view?.notes.length ?? null,
   }
 }
 
-/** What a folded column draws: a thread's glance, or a note column's. */
-export type FoldedGlance = ThreadGlance | NoteColumnGlance
+/** A media column's glance, from its column as drawn. */
+export function mediaColumnGlance(
+  card: MediaId,
+  media: ReadonlyMap<MediaId, MediaColumnView>,
+): ListGlance {
+  const view = media.get(card)
+  return {
+    kind: "media",
+    card,
+    title: view?.title ?? "",
+    count: view?.images.length ?? null,
+  }
+}
+
+/** What a folded column draws: a thread's glance, or a list column's. */
+export type FoldedGlance = ThreadGlance | ListGlance
 
 /** The card a folded column's glance is of. */
 export const glanceCardId = (glance: FoldedGlance): CardId =>
@@ -51,6 +67,7 @@ export function foldedView(
   facts: {
     readonly threadGlanceOf: (thread: ThreadId) => ThreadGlance
     readonly notes: ReadonlyMap<NoteColumnId, NoteColumnView>
+    readonly media: ReadonlyMap<MediaId, MediaColumnView>
   },
 ): FoldedGlance | null {
   switch (column.kind) {
@@ -58,6 +75,8 @@ export function foldedView(
       return column.card === null ? null : facts.threadGlanceOf(column.card)
     case "notes":
       return noteColumnGlance(column.card, facts.notes)
+    case "media":
+      return mediaColumnGlance(column.card, facts.media)
   }
 }
 
@@ -80,7 +99,8 @@ export const foldedWords = (glance: FoldedGlance): FoldedWords =>
       }
     : {
         title: glance.title,
-        detail: glance.notes === null ? null : noteCountWords(glance.notes),
+        detail:
+          glance.count === null ? null : countWords(glance.kind, glance.count),
         hint: null,
       }
 

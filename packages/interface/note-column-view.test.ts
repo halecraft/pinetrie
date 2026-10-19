@@ -67,7 +67,7 @@ test("canvasNoteColumns: each note column in the canvas's order, its title or No
   const views = canvasNoteColumns({
     onCanvas: cardsFor(A, N2, N1),
     cards: [n1, n2],
-    titles: new Map([[N1, { column: N1, title: "Ideas", by: ADA, at: 1 }]]),
+    titles: new Map([[N1, { card: N1, title: "Ideas", by: ADA, at: 1 }]]),
   })
   expect(
     views.map(v => [v.column, v.title, v.titled, v.notes.map(n => n.id)]),

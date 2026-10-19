@@ -11,13 +11,10 @@
 import type { CardId, CardWidth, TextCardId, WriterId } from "@pinetrie/core"
 import {
   type ColumnAct,
-  dragProps,
   dropProps,
   type Intent,
-  KIND_ICON,
   NOTES_EMPTY,
   type NoteColumnView,
-  noteCountWords,
   type Reader,
   type ReadOnly,
 } from "@pinetrie/interface"
@@ -25,8 +22,7 @@ import type { SeatRecord } from "@pinetrie/rules"
 import type { SessionClient } from "@pinetrie/session"
 import { useState } from "react"
 import { NewCardBox, NoteCardEditor } from "./card-editor.tsx"
-import { ColumnHeadEnd } from "./column-menu.tsx"
-import { TitleField } from "./title-field.tsx"
+import { ListColumnHead } from "./list-column-head.tsx"
 
 export function NoteColumn(p: {
   session: SessionClient
@@ -50,7 +46,6 @@ export function NoteColumn(p: {
       column: { kind: "card", card: column },
       act: a,
     })
-  const [renaming, setRenaming] = useState(false)
   // The note the new note's box holds, which the list leaves out.
   const [writing, setWriting] = useState<TextCardId | null>(null)
   return (
@@ -62,52 +57,16 @@ export function NoteColumn(p: {
       data-width={p.width}
       {...(p.readOnly === null ? dropProps({ kind: "notes", column }) : {})}
     >
-      <header
-        className="column-head"
-        data-column-head=""
-        {...dragProps({ kind: "card", card: column })}
-      >
-        <div className="head-row">
-          <span aria-hidden="true" className="note-column-mark">
-            {KIND_ICON["note-column"]}
-          </span>
-          {renaming && p.readOnly === null ? (
-            <TitleField
-              label="title for this note column"
-              onEnd={() => setRenaming(false)}
-              onSend={title =>
-                p.onIntent({
-                  kind: "rename",
-                  of: { kind: "note-column", column },
-                  title,
-                })
-              }
-              placeholder={view.title}
-              stored={view.titled}
-            />
-          ) : (
-            <button
-              className="note-column-title"
-              disabled={p.readOnly !== null}
-              onClick={() => setRenaming(true)}
-              title="rename this note column"
-              type="button"
-            >
-              <span data-fold-name="">{view.title}</span>
-            </button>
-          )}
-          <span className="note-count">
-            {noteCountWords(view.notes.length)}
-          </span>
-          <ColumnHeadEnd
-            card={column}
-            onIntent={p.onIntent}
-            unstarted={false}
-            width={p.width}
-            writable={p.readOnly === null}
-          />
-        </div>
-      </header>
+      <ListColumnHead
+        card={column}
+        count={view.notes.length}
+        kind="note-column"
+        onIntent={p.onIntent}
+        readOnly={p.readOnly}
+        title={view.title}
+        titled={view.titled}
+        width={p.width}
+      />
       <div className="note-column-notes">
         {view.notes.length === 0 && (
           <p className="notes-empty">{NOTES_EMPTY}</p>

@@ -13,12 +13,12 @@
 // `rev`: a client draws its move until its copy reaches it.
 
 import {
+  type BlobStore,
   type BranchOut,
   branchesByProposal,
   type CanvasId,
   type CardCommand,
   type CardId,
-  cardIdOfKind,
   cardMove,
   DISCARDED,
   type EntryId,
@@ -28,20 +28,23 @@ import {
   type Intent,
   indexAsks,
   isTextCardId,
+  MAX_TITLE,
   type Move,
   type MoveDirection,
   type MoveHistoryScope,
-  type NoteColumnId,
   PERSON_HISTORY,
+  parseTitle,
   placeKey,
   type QueuedFact,
   type QueueHoldChange,
   type QueueMove,
   type Reorder,
   type RootId,
+  refused,
   runPrompt,
   type Send,
   type SentCard,
+  type Sha256,
   type TextCardId,
   type ThreadId,
   type TreeIndex,
@@ -69,10 +72,12 @@ import {
   afterSteps,
   type BoardMove,
   type BranchOutRefusal,
+  CARD_TITLE,
   type CanvasIndex,
   type CopyPlan,
   type CopyThread,
   canvasOfPlace,
+  canvasOfTarget,
   cardsOfParts,
   crossesArchive,
   emptiedCanvases,
@@ -81,7 +86,10 @@ import {
   lanesToDrain,
   type MoveStep,
   type MovesStep,
+  mintContainer,
+  mintWith,
   movesHistory,
+  type NewImage,
   type Opening,
   type OpenPlan,
   type OpenThread,
@@ -94,17 +102,21 @@ import {
   planMoveTargets,
   planOpenThread,
   planPaste,
+  planPutImages,
   planQueueCard,
   planReorder,
   planRootDelete,
   planSetCommand,
   planSpinOff,
   planUnqueueAll,
+  planVersion,
   planWidth,
   type ReorderStep,
   type SpinOff,
   type SpunThread,
+  setRecord,
   undoAnswer,
+  type VersionBlobs,
 } from "@pinetrie/rules"
 import type { StepBasics } from "../basics.ts"
 import { canvasesNow } from "../canvases.ts"
@@ -152,6 +164,8 @@ export interface CardCommandDeps {
   readonly records: Pick<StepRecords, "writeValues">
   /** Name every recorded thread that has none: a copy is named as it is made. */
   readonly ensureNames: () => Promise<void>
+  /** A put image's blob, and its fitted copy, read without the bytes. */
+  readonly blobs: Pick<BlobStore, "ref" | "fitted">
 }
 
 /** A lift that deletes no thread: a redo, or an undo of no spin-off. */
@@ -174,9 +188,28 @@ export function createCardCommands(deps: CardCommandDeps) {
   const { roots, live, places, session } = deps.basics
   const docs = roots
   const running = (lane: ThreadId) => readRunning(deps.basics.live, lane)
-  /** A note column's id, for one made for a note with nowhere else to go. */
-  const newColumn = (): NoteColumnId =>
-    cardIdOfKind("note-column", deps.basics.newId())
+  /** A column's id, for one made for a card dropped where its kind is not taken. */
+  const newContainer = mintContainer(deps.basics.newId)
+
+  /**
+   * A version's blobs from the store: the fitted copy drawn and the original
+   * kept, or why there are none.
+   */
+  function versionBlobs(
+    sha: Sha256,
+  ):
+    | { readonly kind: "blobs"; readonly blobs: VersionBlobs }
+    | ReturnType<typeof refused> {
+    const ref = deps.blobs.ref(sha)
+    if (ref === undefined)
+      return refused(ERR.IMAGE_MISSING, `no blob is stored as ${sha}`)
+    if (ref.width === null)
+      return refused(ERR.NOT_AN_IMAGE, "only images go in a media column")
+    return {
+      kind: "blobs",
+      blobs: { ...(deps.blobs.fitted(sha) ?? ref), original: sha },
+    }
+  }
 
   /** A refused move: where the card is now and who put it there. */
   const unmoved = (
@@ -243,11 +276,12 @@ export function createCardCommands(deps: CardCommandDeps) {
     const threads = readThreads(session)
     const found = new Map<EntryId, ThreadId>()
     for (const { to } of moves) {
-      if (to.kind !== "margin") continue
-      const root = threads.get(to.thread)?.root
+      if (to.kind !== "margin" || to.on.kind !== "entry") continue
+      const { on } = to
+      const root = threads.get(on.thread)?.root
       if (root === undefined) continue
-      const entry = readTreeIndex(await docs.root(root)).entries[to.entry]
-      if (entry !== undefined) found.set(to.entry, entry.thread)
+      const entry = readTreeIndex(await docs.root(root)).entries[on.entry]
+      if (entry !== undefined) found.set(on.entry, entry.thread)
     }
     return found
   }
@@ -351,7 +385,7 @@ export function createCardCommands(deps: CardCommandDeps) {
       moves,
       writer,
       running,
-      newColumn,
+      newContainer,
       entryThreads,
       readWorkflow(session),
     )
@@ -451,6 +485,89 @@ export function createCardCommands(deps: CardCommandDeps) {
           : await deps.histories.gestureOf(writer, historyScope(canvas))
       // plan
       const step = planReorder(readPlaces(places), reorder)
+      // execute
+      return carry(step, [], { kind: "move", by: writer }, gesture)
+    },
+
+    /**
+     * New images in a media column, as one step of the sender's history in
+     * the canvas they land in: each blob read from the store first (its
+     * fitted copy drawn, its original kept), then `planPutImages`, then each
+     * image titled by its file's name. Refused for a blob the store does not
+     * hold, or one it sorted as text or opaque.
+     */
+    async putImages(
+      writer: WriterId,
+      put: Extract<Intent, { kind: "put-images" }>,
+      canvases: CanvasIndex,
+    ): Promise<Settled> {
+      // gather: each blob as stored, then the history's stack, loaded
+      // before the places are read
+      const images: NewImage[] = []
+      for (const image of put.images) {
+        const version = versionBlobs(image.sha256)
+        if (version.kind === "refused") return settled(version)
+        images.push({ card: image.card, image: version.blobs })
+      }
+      const canvas = canvasOfTarget(canvases, put.to)
+      const gesture =
+        canvas === null
+          ? undefined
+          : await deps.histories.gestureOf(writer, historyScope(canvas))
+      // plan
+      const now = deps.basics.now()
+      const step = planPutImages({
+        cards: readPlaces(places),
+        images,
+        to: put.to,
+        sender: writer,
+        now,
+        newContainer: mintWith(newContainer, put.made),
+      })
+      const titles = put.images.flatMap(i => {
+        const title = parseTitle(i.name.slice(0, MAX_TITLE))
+        return title.kind === "set"
+          ? [
+              setRecord(CARD_TITLE, {
+                card: i.card,
+                title: title.title,
+                by: writer,
+                at: now,
+              }),
+            ]
+          : []
+      })
+      // execute: the images, then their titles
+      const done = await carry(step, [], { kind: "move", by: writer }, gesture)
+      if (done.outcome.kind === "moved") await deps.records.writeValues(titles)
+      return done
+    },
+
+    /**
+     * A new version of an image, from a blob the store holds, as one step of
+     * the sender's history in the image's canvas (`planVersion`).
+     */
+    async version(
+      writer: WriterId,
+      change: Extract<Intent, { kind: "version" }>,
+      canvases: CanvasIndex,
+    ): Promise<Settled> {
+      // gather
+      const version = versionBlobs(change.sha256)
+      if (version.kind === "refused") return settled(version)
+      const canvas = canvases.canvasOfCard.get(change.image)
+      const gesture =
+        canvas === undefined
+          ? undefined
+          : await deps.histories.gestureOf(writer, historyScope(canvas))
+      // plan
+      const step = planVersion({
+        cards: readPlaces(places),
+        image: change.image,
+        version: version.blobs,
+        sender: writer,
+        now: deps.basics.now(),
+      })
       // execute
       return carry(step, [], { kind: "move", by: writer }, gesture)
     },
@@ -800,7 +917,7 @@ export function createCardCommands(deps: CardCommandDeps) {
         cards,
         moves: [main],
         sender: writer,
-        newColumn,
+        newContainer,
         entryThreads,
       })
       if (resolved.kind === "refused") return unmoved(resolved)

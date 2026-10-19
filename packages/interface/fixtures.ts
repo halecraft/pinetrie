@@ -79,6 +79,19 @@ export const NEW_NOTE_COLUMN = cardIdOfKind(
   "01a0ffd2-0000-7000-8000-0000000000cc",
 )
 
+/** The media column a test's `addColumn` mints. */
+export const NEW_MEDIA = cardIdOfKind(
+  "media",
+  "01a0ffd2-0000-7000-8000-0000000000cd",
+)
+
+/** The `n`th image a test's put mints. */
+export const newImage = (n: number) =>
+  cardIdOfKind(
+    "image",
+    `01a0ffd2-0000-7000-8000-${String(n).padStart(12, "0")}`,
+  )
+
 /** A text card a paste made, a bare uuidv7. */
 export const NEW_TEXT = textCardId("01a0ffd2-0000-7000-8000-0000000000dd")
 

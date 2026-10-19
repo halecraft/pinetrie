@@ -32,6 +32,11 @@
     column, and its pinned cards are pinned to the canvas.
   - ADR-0168: a file card names a file of the project, the one source a host
     has, as accepted work holds it.
+  - ADR-0182: the media card is a media column, of images only: each image a
+    card of its own in it, ordered as notes are, with its versions and
+    comments. A run is told each media column and its images' titles, never
+    the images. A note column's title is one record with a media column's and
+    an image's, a card's title, and every stored one is moved to it.
 
 **Context.**
 

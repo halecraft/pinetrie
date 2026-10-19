@@ -14,6 +14,7 @@ import {
   indexTree,
   NO_CONTENT,
   rootIdFor,
+  type Sha256,
   type TextCard,
   type TextPlace,
   type ThreadCard,
@@ -30,11 +31,13 @@ import type { CardFacts, Effect, IntentState } from "./effects.ts"
 import {
   canvasesFor,
   NEW_CANVAS,
+  NEW_MEDIA,
   NEW_NOTE_COLUMN,
   NEW_ROOT,
   NEW_TEXT,
   NEW_THREAD,
   NO_CLIPS,
+  newImage,
   threadOfEntry,
   tree,
 } from "./fixtures.ts"
@@ -176,6 +179,8 @@ const plan = (intent: Intent, state: IntentState = R1) =>
     canvas: NEW_CANVAS,
     thread: NEW_THREAD,
     noteColumn: NEW_NOTE_COLUMN,
+    media: NEW_MEDIA,
+    images: count => Array.from({ length: count }, (_, i) => newImage(i)),
     reference: cardIdOfKind(
       "reference",
       "01a0ffd2-0000-7000-8000-0000000000e1",
@@ -515,6 +520,27 @@ describe("planIntent", () => {
     expect(plan({ kind: "foldCanvas", unfolded: true }, at(onNothing))).toEqual(
       [],
     )
+  })
+
+  test("images put at a spot make a media column the page mints, unfolded for their putter; put in a column, none", () => {
+    const images = [
+      { card: newImage(1), sha256: "a".repeat(64) as Sha256, name: "home.png" },
+    ]
+    const to = { kind: "canvas-at", canvas: R1_ID, after: C } as const
+    expect(plan({ kind: "putImages", images, to })).toEqual([
+      {
+        kind: "request",
+        intent: { kind: "put-images", images, to, made: NEW_MEDIA },
+      },
+      onR1({ kind: "fold", card: NEW_MEDIA, unfolded: true }),
+    ])
+    const into = { kind: "image", column: NEW_MEDIA } as const
+    expect(plan({ kind: "putImages", images, to: into })).toEqual([
+      {
+        kind: "request",
+        intent: { kind: "put-images", images, to: into, made: null },
+      },
+    ])
   })
 
   test("a note column is made at its spot on the canvas, and unfolded", () => {

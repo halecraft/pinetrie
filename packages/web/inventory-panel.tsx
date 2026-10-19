@@ -12,9 +12,11 @@
 import {
   type CardRecord,
   isTextCard,
+  type MediaId,
   type NoteColumnId,
   type ThreadId,
   type ThreadName,
+  type TitledCardId,
   type WriterId,
 } from "@pinetrie/core"
 import {
@@ -32,6 +34,7 @@ import {
   isInventoryShown,
   KEEP,
   KEEP_TITLE,
+  type MediaColumnView,
   type NoteColumnView,
   noticeWords,
   type Reader,
@@ -40,6 +43,7 @@ import {
   type ThreadPreview,
   TRASH_SELECTED,
 } from "@pinetrie/interface"
+import type { CardTitleRecord } from "@pinetrie/rules"
 import {
   AT_INVENTORY,
   type CardNotice,
@@ -93,6 +97,10 @@ export function InventoryPanel(p: {
   previewOf: (thread: ThreadId) => ThreadPreview
   /** Each note column, as its column draws it. */
   notes: ReadonlyMap<NoteColumnId, NoteColumnView>
+  /** Each media column, as its column draws it. */
+  media: ReadonlyMap<MediaId, MediaColumnView>
+  /** Each titled card's title. */
+  titles: ReadonlyMap<TitledCardId, CardTitleRecord>
   /** Each thread's name, which a reference names. */
   threadNames: ReadonlyMap<ThreadId, ThreadName>
   /** The clipboard chip: the last copy this tab made, or none yet. */
@@ -112,10 +120,12 @@ export function InventoryPanel(p: {
     texts,
     threads: p.threads,
     threadNames: p.threadNames,
+    media: p.media,
+    titles: p.titles,
     open: p.state.bench === "open",
   })
   const { session, reader, colorOf, previewOf, notes, column, onIntent } = p
-  const { threadNames } = p
+  const { threadNames, media, titles } = p
   const frame = useRef<HTMLElement>(null)
   const bench = useRef<HTMLDivElement>(null)
   // Folded by Escape or the open card's ×, focus goes back to its slot.
@@ -127,6 +137,8 @@ export function InventoryPanel(p: {
       colorOf,
       previewOf,
       notes,
+      media,
+      titles,
       threadNames,
       column,
       onIntent,
@@ -135,7 +147,18 @@ export function InventoryPanel(p: {
         onIntent({ kind: "inventory", act: { kind: "fold" } })
       },
     }),
-    [session, reader, colorOf, previewOf, notes, threadNames, column, onIntent],
+    [
+      session,
+      reader,
+      colorOf,
+      previewOf,
+      notes,
+      media,
+      titles,
+      threadNames,
+      column,
+      onIntent,
+    ],
   )
   const act = (a: InventoryAct) => onIntent({ kind: "inventory", act: a })
   const trash = (card: CardRecord) =>

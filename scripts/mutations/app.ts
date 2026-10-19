@@ -2941,9 +2941,9 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a note column's rename sends nothing",
-    file: "packages/web/note-column.tsx",
-    from: '                p.onIntent({\n                  kind: "rename",',
-    to: '                void ({\n                  kind: "rename",',
+    file: "packages/web/list-column-head.tsx",
+    from: '              p.onIntent({\n                kind: "rename",',
+    to: '              void ({\n                kind: "rename",',
     suite: "browser",
     scenario: "page",
     expect: "a note column is renamed from its header, for everyone",

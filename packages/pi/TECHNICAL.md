@@ -823,6 +823,12 @@ item 18, and in `lanes.test.ts` against the harness.
   which the helper never counts as the agent's, so the disk model and a
   shared directory's lineage would miss the file. `writeFile` carries raw
   bytes through the channel as base64, 64 MiB in a quarter second (S206).
+- **`put_image`** (`put-image.ts`, ADR-0182) puts an image in a media
+  column of the thread's canvas, or adds a version of one. A path in the
+  lane is read with `env.readBinaryFile`, fitted and stored here as
+  `read`'s images are (`prepareImage`, the original beside its fitted
+  copy); a `/blob/` link names one already stored. The host decides where
+  it goes and writes it as the thread's person (`LaneHooks.putImage`).
 - **pine·trie's own skills** are in `skills/`, loaded after yours and the repo's
   (`additionalSkillPaths`; pi's loader keeps the first of a name):
   `resolve-conflicts` (ADR-0033), `commit-message` and `proposed-changes-stack`

@@ -159,6 +159,7 @@ export function unsentSignals(input: {
       // board holds no text card.
       case "queued":
       case "margin":
+      case "image":
       case "pinned":
       case "canvas-pinned":
       case "inventory":

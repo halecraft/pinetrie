@@ -2498,9 +2498,9 @@ export const mutations: readonly Mutation[] = [
       "an undo that puts a running thread back in an inventory stops it too: the stop follows the places change, whatever wrote it",
   },
   {
-    name: "the blob sweep forgets references' quotes",
+    name: "the blob sweep forgets the blobs cards hold",
     file: "apps/pinetrie/host/housekeeping.ts",
-    from: "  const shown = new Set([...readReferencedBlobs(doc, texts), ...quotes])",
+    from: "  const shown = new Set([...readReferencedBlobs(doc, texts), ...held])",
     to: "  const shown = new Set([...readReferencedBlobs(doc, texts)])",
     command: unit,
     expect:
@@ -3214,5 +3214,32 @@ export const mutations: readonly Mutation[] = [
     ],
     expect:
       "a refresh that builds reports its gather, its base record, its steps and its record as parts",
+  },
+  // ── media columns ──
+  {
+    name: "a margin's old row is left as it was",
+    file: "apps/pinetrie/host/migrations/0003-one-margin.ts",
+    from: '  return { ...fields, at: `e/${lane}/${at}`, lane: "", seen: "" }\n',
+    to: "  return null\n",
+    command: unit,
+    expect:
+      "an entry's margin stored by its entry and thread becomes the entry's address, which reads as its place",
+  },
+  {
+    name: "a note column's title is copied and kept where it was",
+    file: "apps/pinetrie/host/migrations/0004-card-titles.ts",
+    from: '          } as const,\n          {\n            kind: "delete",\n            target: SESSION_TARGET,\n            namespace: OLD,\n            key,\n          } as const,\n        ]\n      : [',
+    to: "          } as const,\n        ]\n      : [",
+    command: unit,
+    expect:
+      "a note column's title is written as its card's title, and deleted where it was",
+  },
+  {
+    name: "a blob that is no image is put",
+    file: "apps/pinetrie/host/commands/cards.ts",
+    from: "    if (ref.width === null)\n",
+    to: "    if (false)\n",
+    command: unit,
+    expect: "a blob that is no image, or none, is refused, and nothing is put",
   },
 ]

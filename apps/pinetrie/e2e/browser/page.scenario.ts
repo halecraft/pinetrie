@@ -24,9 +24,9 @@ import {
 import { SCRIPTED_DESCRIPTION } from "@pinetrie/pi"
 import {
   readCanvases,
+  readCardTitles,
   readMarks,
   readNames,
-  readNoteColumns,
   readParticipantNames,
   readPlaces,
   readQueueHolds,
@@ -4321,7 +4321,7 @@ async function run(check: Checks["check"]): Promise<void> {
       await page.press(titleBox, "Enter")
       const columnRenamed = await waitFor(
         () =>
-          [...readNoteColumns(host.session).values()].some(
+          [...readCardTitles(host.session).values()].some(
             r => r.title === "Ideas",
           ),
         10_000,
@@ -4340,7 +4340,7 @@ async function run(check: Checks["check"]): Promise<void> {
       check(
         "a note column is renamed from its header, for everyone",
         columnRenamed >= 0 && shownTitle === "Ideas",
-        `${columnRenamed} ms; ${[...readNoteColumns(host.session).values()].map(r => r.title).join()}; shown ${shownTitle}`,
+        `${columnRenamed} ms; ${[...readCardTitles(host.session).values()].map(r => r.title).join()}; shown ${shownTitle}`,
       )
 
       // "+ pin", in the conversation below, which has no pinned

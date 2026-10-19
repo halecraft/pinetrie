@@ -540,6 +540,7 @@ async function run(check: Checks["check"]): Promise<void> {
         address: "",
         quote: "",
         origin: "",
+        versions: "",
       }),
     )
     check(

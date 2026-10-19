@@ -1,5 +1,7 @@
+import { threadIdFor } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
+  cardBeforeGap,
   EDGE_SPEED,
   EDGE_ZONE,
   edgeScroll,
@@ -77,4 +79,16 @@ describe("edgeScroll", () => {
     expect(far).toBeGreaterThan(0)
     expect(near).toBeGreaterThan(far)
   })
+})
+
+test("a drop on the strip lands after the column before the gap it is in; before them all, after none", () => {
+  const [a, b] = [threadIdFor("a"), threadIdFor("b")]
+  const columns = [
+    { card: a, mid: 100 },
+    { card: b, mid: 300 },
+  ]
+  expect(cardBeforeGap(columns, 50)).toBeNull()
+  expect(cardBeforeGap(columns, 150)).toBe(a)
+  expect(cardBeforeGap(columns, 299)).toBe(a)
+  expect(cardBeforeGap(columns, 900)).toBe(b)
 })

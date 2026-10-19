@@ -27,13 +27,15 @@ import {
   type Intent,
   isCanvasId,
   isFolderStateId,
-  isNoteColumnId,
+  isImageId,
+  isMediaId,
   isReferenceCardId,
   isReorderPlace,
   isRootId,
   isSha256,
   isTextCardId,
   isThreadId,
+  isTitledCardId,
   isWorkflowStateId,
   keyFieldsFrom,
   keyOfFields,
@@ -56,6 +58,7 @@ import {
   PROPOSED_CHANGES_ACTIONS,
   type ProposedChangesAction,
   type ProposedChangesSeen,
+  type PutImage,
   parseAddress,
   parseCardId,
   parseMentions,
@@ -485,6 +488,60 @@ export function decodeCommand(
     if (typeof paste === "string") return refused(ERR.UNKNOWN_TARGET, paste)
     return { kind, paste, to: main.to, replacing, here }
   }
+  if (kind === "put-images") {
+    const moves = decodeMoves(text(wire?.moves))
+    if (typeof moves === "string") return refused(ERR.UNKNOWN_TARGET, moves)
+    const blobs = parsed(text(wire?.text))
+    const [first] = moves
+    const to = first?.to
+    if (
+      first === undefined ||
+      to === undefined ||
+      (to.kind !== "canvas-at" && to.kind !== "image") ||
+      !Array.isArray(blobs) ||
+      blobs.length !== moves.length
+    )
+      return refused(
+        ERR.UNKNOWN_TARGET,
+        "a put of images names each new image, its blob and its name, and one place for them all",
+      )
+    const images: PutImage[] = []
+    for (const [i, move] of moves.entries()) {
+      const blob: unknown = blobs[i]
+      const sha256 =
+        typeof blob === "object" && blob !== null && "sha256" in blob
+          ? blob.sha256
+          : undefined
+      const name =
+        typeof blob === "object" && blob !== null && "name" in blob
+          ? blob.name
+          : undefined
+      if (
+        !isImageId(move.card) ||
+        move.from !== null ||
+        JSON.stringify(move.to) !== JSON.stringify(to) ||
+        typeof sha256 !== "string" ||
+        !isSha256(sha256) ||
+        typeof name !== "string"
+      )
+        return refused(
+          ERR.UNKNOWN_TARGET,
+          "each image put is new, names its blob and its name, and goes where the others go",
+        )
+      images.push({ card: move.card, sha256, name })
+    }
+    const made = text(wire?.cardId)
+    if (made !== "" && !isMediaId(made))
+      return refused(ERR.UNKNOWN_TARGET, `not a media column: ${made}`)
+    return { kind, images, to, made: made === "" ? null : made }
+  }
+  if (kind === "version") {
+    const image = text(wire?.cardId)
+    const sha256 = text(wire?.seen)
+    return isImageId(image) && isSha256(sha256)
+      ? { kind, image, sha256 }
+      : refused(ERR.UNKNOWN_TARGET, "a version names its image and its blob")
+  }
   if (kind === "undo-move") {
     // "" names the sender's history outside any canvas.
     const canvas = text(wire?.canvas)
@@ -595,19 +652,20 @@ export function decodeCommand(
   }
   if (kind === "mark") {
     const canvas = text(wire?.canvas)
-    const column = text(wire?.cardId)
+    const cardId = text(wire?.cardId)
+    const card = cardId === "" ? undefined : parseCardId(cardId)
     const of: MarkTarget | undefined =
-      column === ""
+      cardId === ""
         ? isCanvasId(canvas)
           ? { kind: "canvas", canvas }
           : undefined
-        : isNoteColumnId(column) && canvas === ""
-          ? { kind: "note-column", column }
+        : card !== undefined && isTitledCardId(card) && canvas === ""
+          ? { kind: "card", card }
           : undefined
     if (of === undefined)
       return refused(
         ERR.UNKNOWN_TARGET,
-        `not a canvas or a note column: ${canvas}${column}`,
+        `not a canvas or a titled card: ${canvas}${cardId}`,
       )
     const title = parseTitle(text(wire?.text))
     switch (title.kind) {
@@ -1156,7 +1214,7 @@ export function encodeIntent(id: string, intent: Intent): Command {
         kind: "mark",
         ...(intent.of.kind === "canvas"
           ? { canvas: intent.of.canvas }
-          : { cardId: intent.of.column }),
+          : { cardId: intent.of.card }),
         text: intent.title ?? "",
       })
     case "retitle":
@@ -1267,6 +1325,25 @@ export function encodeIntent(id: string, intent: Intent): Command {
           },
         ]),
         here: intent.here ?? "",
+      })
+    case "put-images":
+      return command({
+        id,
+        kind: "put-images",
+        cardId: intent.made ?? "",
+        text: JSON.stringify(
+          intent.images.map(i => ({ sha256: i.sha256, name: i.name })),
+        ),
+        moves: encodeMoves(
+          intent.images.map(i => ({ card: i.card, from: null, to: intent.to })),
+        ),
+      })
+    case "version":
+      return command({
+        id,
+        kind: "version",
+        cardId: intent.image,
+        seen: intent.sha256,
       })
     case "undo-move":
       return command({

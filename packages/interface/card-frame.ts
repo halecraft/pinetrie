@@ -208,23 +208,27 @@ const moveItems = (
     case "canvas-pinned":
       return [{ to: "note", act: { kind: "unpin", card: id } }, take]
     // A comment stays beside its entry: a reference to it tells the agent.
+    // One on an image is in no thread, so nothing queues it.
     case "margin":
-      return [
-        {
-          to: "reference",
-          act: {
-            kind: "queueReference",
-            card: id,
-            entry: place.entry,
-            thread: place.thread,
-          },
-        },
-        take,
-      ]
+      return place.on.kind === "entry"
+        ? [
+            {
+              to: "reference",
+              act: {
+                kind: "queueReference",
+                card: id,
+                entry: place.on.entry,
+                thread: place.on.thread,
+              },
+            },
+            take,
+          ]
+        : [take]
     // Put is an inventory card's move, × discards it, and a drag moves it
     // anywhere; a card on a canvas is no text card, nor one on the board.
     case "inventory":
     case "canvas":
+    case "image":
     case "board":
     case "trash":
       return []

@@ -11,6 +11,7 @@ import {
   DISCARDED,
   type EntryLike,
   entryId,
+  entryMargin,
   type FactCard,
   fitsPlace,
   historyScope,
@@ -20,6 +21,7 @@ import {
   type Move,
   movesDocId,
   NO_CONTENT,
+  type NoteColumnId,
   type Paste,
   PERSON_HISTORY,
   type PlacedKind,
@@ -65,6 +67,7 @@ import {
   yourCard,
 } from "./card.ts"
 import { sourceWords } from "./card-words.ts"
+import type { Container, ContainerKind, MintContainer } from "./containers.ts"
 import { factLine } from "./fact.ts"
 import { landedThreadCard } from "./fixtures.ts"
 import { planReorder, planSetCommand, planWidth, REORDERS } from "./in-place.ts"
@@ -99,6 +102,17 @@ import {
   type QueuedText,
   queuedOn,
 } from "./queue.ts"
+
+/** A minter whose note columns are `next`'s; a media column is "made". */
+const noteMint =
+  (next: () => NoteColumnId): MintContainer =>
+  <K extends ContainerKind>(kind: K) =>
+    (kind === "note-column"
+      ? { kind: "note-column", id: next() }
+      : { kind: "media", id: cardIdOfKind("media", "made") }) as Extract<
+      Container,
+      { readonly kind: K }
+    >
 
 const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 
@@ -600,7 +614,7 @@ describe("note columns", () => {
     const there = toNotes({
       cards: [thread(LANE, K(2)), column("l", K(3)), n1],
       to: { kind: "notes", near: "thread", thread: LANE },
-      newColumn,
+      newContainer: noteMint(newColumn),
       by: BEA,
     })
     expect(there?.first).toEqual([])
@@ -610,7 +624,7 @@ describe("note columns", () => {
     const made = toNotes({
       cards: [thread(LANE, K(2))],
       to: { kind: "notes", near: "thread", thread: LANE },
-      newColumn,
+      newContainer: noteMint(newColumn),
       by: BEA,
     })
     expect(made?.first).toEqual([
@@ -644,7 +658,7 @@ describe("note columns", () => {
       cards,
       moves: planUnqueueAll(cards, LANE),
       sender: ADA,
-      newColumn: () => cardIdOfKind("note-column", `made-${++n}`),
+      newContainer: noteMint(() => cardIdOfKind("note-column", `made-${++n}`)),
       entryThreads: new Map(),
     })
     if (resolved.kind !== "resolved") throw new Error(resolved.code)
@@ -661,7 +675,7 @@ describe("note columns", () => {
         cards: [lost],
         moves: planUnqueueAll([lost], LANE),
         sender: ADA,
-        newColumn: () => MADE,
+        newContainer: noteMint(() => MADE),
         entryThreads: new Map(),
       }),
     ).toEqual({ kind: "refused", code: "no-place", now: lost })
@@ -684,7 +698,7 @@ describe("note columns", () => {
           },
         ],
         sender: ADA,
-        newColumn: () => MADE,
+        newContainer: noteMint(() => MADE),
         entryThreads: new Map(),
       })
       if (resolved.kind !== "resolved") throw new Error(resolved.code)
@@ -703,7 +717,7 @@ describe("note columns", () => {
         { card: made, from: null, to: { kind: "canvas", canvas: TEST_CANVAS } },
       ],
       sender: ADA,
-      newColumn: () => MADE,
+      newContainer: noteMint(() => MADE),
       entryThreads: new Map(),
     })
     const atEnd =
@@ -728,7 +742,7 @@ describe("note columns", () => {
       ],
       ADA,
       () => false,
-      () => MADE,
+      noteMint(() => MADE),
       new Map(),
     )
     expect(step).toMatchObject({
@@ -773,7 +787,7 @@ describe("note columns", () => {
         ],
         ADA,
         () => false,
-        () => MADE,
+        noteMint(() => MADE),
         new Map(),
       )
       if (step.kind !== "steps") throw new Error(step.code)
@@ -804,7 +818,7 @@ describe("note columns", () => {
       planUnqueueAll([q], LANE),
       ADA,
       () => false,
-      () => MADE,
+      noteMint(() => MADE),
       new Map(),
     )
     expect(
@@ -873,11 +887,20 @@ describe("note columns", () => {
 
   test("a comment goes to its margin's end, and reorders among that entry's comments alone", () => {
     const entry = entryId("e2")
-    const at = { kind: "margin", entry, thread: LANE } as const
+    const at = {
+      kind: "margin",
+      on: entryMargin(LANE, entry),
+      seen: "",
+    } as const
     const c = (id: string, order: string, on = entry): TextCard =>
       card({
         id: cardIdFor(id),
-        place: { kind: "margin", entry: on, thread: LANE, order },
+        place: {
+          kind: "margin",
+          on: entryMargin(LANE, on),
+          order,
+          seen: "",
+        },
       })
     const comments = [
       c("c1", K(0)),
@@ -920,11 +943,11 @@ describe("note columns", () => {
           {
             card: C1,
             from: placeKey(card().place),
-            to: { kind: "margin", entry, thread },
+            to: { kind: "margin", on: entryMargin(thread, entry), seen: "" },
           },
         ],
         sender: ADA,
-        newColumn: () => MADE,
+        newContainer: noteMint(() => MADE),
         entryThreads: new Map([[entry, LANE]]),
       }).kind
     expect(into(LANE)).toBe("resolved")
@@ -1247,7 +1270,7 @@ describe("the queue", () => {
       cards: [onCanvas, q],
       card: q,
       reason: "no such image",
-      newColumn: () => MADE,
+      newContainer: noteMint(() => MADE),
     })
     expect(plan.hold).toBe(false)
     expect(plan.steps).toEqual([
@@ -1289,7 +1312,7 @@ describe("the queue", () => {
         cards: [held, q, ...full],
         card: q,
         reason: "r",
-        newColumn,
+        newContainer: noteMint(newColumn),
       }),
     ).toEqual({
       steps: [
@@ -1305,7 +1328,7 @@ describe("the queue", () => {
         cards: [held, q, ...full.slice(1)],
         card: q,
         reason: "r",
-        newColumn,
+        newContainer: noteMint(newColumn),
       }).steps,
     ).toEqual([
       {
@@ -2114,7 +2137,7 @@ describe("cards pinned to a canvas", () => {
       ],
       ADA,
       () => false,
-      () => made,
+      noteMint(() => made),
       new Map(),
     )
     expect(step).toMatchObject({
@@ -2686,7 +2709,7 @@ describe("out of a trash: a restore back where the card was, and a new canvas", 
       [{ card: C1, from: DISCARDED, to: BACK }],
       sender,
       () => false,
-      () => NOTES,
+      noteMint(() => NOTES),
       new Map(),
     ).step
 
@@ -2779,7 +2802,7 @@ describe("out of a trash: a restore back where the card was, and a new canvas", 
         ],
         ADA,
         () => false,
-        () => NOTES,
+        noteMint(() => NOTES),
         new Map(),
         wf,
       ).step

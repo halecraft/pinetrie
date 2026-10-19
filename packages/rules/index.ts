@@ -161,16 +161,22 @@ export {
   type CanvasFacts,
   type CanvasMessage,
   type CanvasSteer,
+  type ColumnGlance,
   canvasContent,
   canvasFactLine,
   canvasLines,
   canvasList,
+  columnGlances,
   decodeCanvas,
   decodeCanvasFact,
   encodeCanvas,
   encodeCanvasFact,
+  type ImageGlance,
+  MEDIA_LINE_CAP,
+  NEW_MEDIA_TITLE,
   planCanvasFacts,
   planCanvasRead,
+  UNTITLED_IMAGE,
 } from "./canvas.ts"
 export {
   type CanvasIndex,
@@ -237,6 +243,11 @@ export {
   trashedTime,
   type Verb,
 } from "./card-history.ts"
+export {
+  CARD_TITLE,
+  type CardTitleRecord,
+  titledCards,
+} from "./card-title.ts"
 export { sourceWords } from "./card-words.ts"
 export {
   baseMovedOn,
@@ -258,6 +269,15 @@ export {
   resolveCommand,
 } from "./commands.ts"
 export { type ModelRef, modelRef } from "./config.ts"
+export {
+  type Container,
+  type ContainerKind,
+  type FirstPlace,
+  type MintContainer,
+  makeContainer,
+  mintContainer,
+  mintWith,
+} from "./containers.ts"
 export {
   CONTEXT,
   CONTEXT_KINDS,
@@ -382,8 +402,14 @@ export {
   planEndRun,
   planStream,
 } from "./live.ts"
-export { type MarginCard, marginCards, marginCounts } from "./margin.ts"
+export {
+  entryMarginCounts,
+  type MarginCard,
+  marginCards,
+  marginCounts,
+} from "./margin.ts"
 export { MARK, type MarkRecord, planMark } from "./mark.ts"
+export { type ImageInColumn, imagesIn, mediaColumnEnd } from "./media.ts"
 export {
   addressMessage,
   agentByDefault,
@@ -434,7 +460,6 @@ export {
   type ReservePlan,
   readableThreadName,
 } from "./names.ts"
-export { NOTE_COLUMN, type NoteColumnRecord } from "./note-column.ts"
 export {
   NEW_NOTES_TITLE,
   type NoteCard,
@@ -508,6 +533,15 @@ export {
   proposedChangesSeen,
   proposedChangesStatus,
 } from "./proposed.ts"
+export {
+  type ImageAskPlan,
+  type NewImage,
+  type PutImageAsk,
+  planImageAsk,
+  planPutImages,
+  planVersion,
+  type VersionBlobs,
+} from "./put-images.ts"
 export {
   blankQueued,
   type CanvasPinnedCard,

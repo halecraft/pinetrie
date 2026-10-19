@@ -70,9 +70,10 @@ export interface CanvasIndex {
   /** Each canvas's cards, in its canvas's order: by rank, then by id. */
   readonly cardsOn: ReadonlyMap<CanvasId, readonly CardOnCanvas[]>
   /**
-   * Each canvas card's canvas, a thread's or a note column's; a trashed one's
-   * is the canvas its canvas place was in, so its own cards keep a canvas while
-   * it is in the trash.
+   * Each canvas card's canvas, a thread's, a note column's or a media
+   * column's, and each image's, its column's; a trashed one's is the canvas
+   * its place was in, so its own cards keep a canvas while it is in the
+   * trash.
    */
   readonly canvasOfCard: ReadonlyMap<CardId, CanvasId>
   /** Each thread's canvas, a trashed one's as `canvasOfCard`'s; a thread in an inventory has none. */
@@ -136,6 +137,13 @@ export function indexCanvases(
     canvasOfCard.set(c.id, c.place.left.canvas)
     if (isThreadId(c.id)) canvasOfThread.set(c.id, c.place.left.canvas)
   }
+  // An image is in its media column's canvas, in the trash too.
+  for (const c of cards) {
+    const at = c.place.kind === "trash" ? c.place.left : c.place
+    if (at.kind !== "image") continue
+    const canvas = canvasOfCard.get(at.column)
+    if (canvas !== undefined) canvasOfCard.set(c.id, canvas)
+  }
   const rootOfThread = new Map(
     [...threads].map(([thread, r]) => [thread, r.root] as const),
   )
@@ -173,7 +181,7 @@ export const NO_CANVAS_INDEX: CanvasIndex = indexCanvases([], new Map())
 
 /**
  * The canvas a place is in: its surface's owner's (`surfaceOwner`). A canvas's own;
- * a note column's or a thread's canvas; none for an inventory, or the board
+ * a column's, an image's or a thread's canvas; none for an inventory, or the board
  * (a canvas's card is in no canvas: the board is the team's). A trashed card's
  * is the place it left's; a trash key names none, since the host fills in
  * where a discard leaves.
@@ -187,7 +195,7 @@ export function canvasOfPlace(
   return canvasOfOwner(canvases, surfaceOwner(place))
 }
 
-/** The canvas a surface's owner is in: a canvas itself, a note column's or a thread's. */
+/** The canvas a surface's owner is in: a canvas itself, a column's, an image's or a thread's. */
 function canvasOfOwner(
   canvases: CanvasIndex,
   owner: SurfaceOwner,
@@ -196,7 +204,10 @@ function canvasOfOwner(
     case "canvas":
       return owner.canvas
     case "note-column":
+    case "media":
       return canvases.canvasOfCard.get(owner.column) ?? null
+    case "image":
+      return canvases.canvasOfCard.get(owner.image) ?? null
     case "thread":
       return canvases.canvasOfThread.get(owner.thread) ?? null
     case "person":

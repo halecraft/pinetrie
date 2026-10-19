@@ -28,7 +28,6 @@ import {
   messageImages,
   messageText,
   messageWriters,
-  type NoteColumnId,
   type PlanMode,
   type PointId,
   type ProposedChangesRecord,
@@ -45,6 +44,7 @@ import {
   type ThreadLane,
   type ThreadName,
   type ThreadRecord,
+  type TitledCardId,
   type TreeIndex,
   type WriterId,
 } from "@pinetrie/core"
@@ -62,7 +62,9 @@ import {
   type BudgetRecord,
   boardCanvases,
   CARD_HISTORY,
+  CARD_TITLE,
   type CardHistoryRecord,
+  type CardTitleRecord,
   COMMANDS,
   COMMANDS_KEY,
   CONFLICT,
@@ -84,8 +86,6 @@ import {
   MARK,
   type MarkRecord,
   NAME,
-  NOTE_COLUMN,
-  type NoteColumnRecord,
   PARTICIPANT,
   PICTURE,
   PROJECT,
@@ -675,10 +675,10 @@ export const readMarks = (
   doc: SessionDocHandle,
 ): ReadonlyMap<CanvasId, MarkRecord> => readRecords(doc, MARK)
 
-/** Each titled note column's title (`pinetrie.note-column`), by id. */
-export const readNoteColumns = (
+/** Each titled card's title (`pinetrie.card-title`), by id. */
+export const readCardTitles = (
   doc: SessionDocHandle,
-): ReadonlyMap<NoteColumnId, NoteColumnRecord> => readRecords(doc, NOTE_COLUMN)
+): ReadonlyMap<TitledCardId, CardTitleRecord> => readRecords(doc, CARD_TITLE)
 
 /** Each ask's digest (`pinetrie.digest`), by its prompt. */
 export const readDigests = (

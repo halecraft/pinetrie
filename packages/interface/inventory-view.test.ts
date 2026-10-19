@@ -48,6 +48,8 @@ describe("inventoryView", () => {
       texts: new Map([[B, "\n  plan: ship it\nsecond line"]]),
       threads: new Map(),
       threadNames: new Map(),
+      media: new Map(),
+      titles: new Map(),
       open: false,
     })
     const drawn = Object.fromEntries(
@@ -86,6 +88,8 @@ describe("inventoryView", () => {
       texts: new Map(),
       threads: new Map(),
       threadNames: new Map(),
+      media: new Map(),
+      titles: new Map(),
       open: false,
     })
     expect(view.grid.cells[0]?.compact?.badge).toEqual({
@@ -109,6 +113,8 @@ describe("inventoryView", () => {
         texts: new Map(),
         threads: new Map(),
         threadNames: new Map(),
+        media: new Map(),
+        titles: new Map(),
         open,
       }).bench
     expect(view(3, false)).toEqual({
@@ -132,6 +138,8 @@ describe("inventoryView", () => {
         texts: new Map(),
         threads: new Map(),
         threadNames: new Map(),
+        media: new Map(),
+        titles: new Map(),
         open: false,
       }).grid.cells
     expect(cells(ADA).map(c => c.discards)).toEqual([
@@ -191,6 +199,8 @@ test("a thread's glance: its name, its first line, where it ended, and its statu
     texts: new Map(),
     threads: new Map([[T, { ...glance, thread: T }]]),
     threadNames: new Map(),
+    media: new Map(),
+    titles: new Map(),
     open: false,
   })
   expect(view.grid.cells[0]?.compact).toMatchObject({

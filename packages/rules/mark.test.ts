@@ -6,8 +6,8 @@ import {
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
+import { CARD_TITLE, type CardTitleRecord } from "./card-title.ts"
 import { MARK, type MarkRecord, planMark } from "./mark.ts"
-import { NOTE_COLUMN, type NoteColumnRecord } from "./note-column.ts"
 import { decodeRecords, deleteRecord, setRecord } from "./records.ts"
 
 const ADA = writerId("p-ada")
@@ -15,6 +15,7 @@ const BEA = writerId("p-bea")
 const K1 = canvasIdFor("01a0ffd2-0000-7000-8000-000000000001")
 const K2 = canvasIdFor("01a0ffd2-0000-7000-8000-000000000002")
 const N1 = cardIdOfKind("note-column", "01a0ffd2-0000-7000-8000-000000000003")
+const I1 = cardIdOfKind("image", "01a0ffd2-0000-7000-8000-000000000004")
 
 const mark = (title: string): MarkRecord => ({
   canvas: K1,
@@ -22,8 +23,8 @@ const mark = (title: string): MarkRecord => ({
   by: BEA,
   at: 1,
 })
-const titled = (title: string): NoteColumnRecord => ({
-  column: N1,
+const titled = (title: string): CardTitleRecord => ({
+  card: N1,
   title,
   by: BEA,
   at: 1,
@@ -39,8 +40,8 @@ const plan = (
     now: 5,
     canvases: new Set([K1, K2]),
     marks: new Map(),
-    columns: new Set([N1]),
-    columnTitles: new Map(),
+    titled: new Set([N1, I1]),
+    cardTitles: new Map(),
     ...over,
   })
 
@@ -58,13 +59,17 @@ describe("the records", () => {
       ]).get(K1),
     ).toEqual(r)
   })
-  test("a note column's title round-trips at its column, in the session; a key that is no note column is dropped", () => {
+  test("a card's title round-trips at its card, in the session; a key that is no titled card is dropped", () => {
     const r = titled("Ideas")
-    expect(NOTE_COLUMN.home).toBe("session")
-    expect(NOTE_COLUMN.decode(NOTE_COLUMN.encode(r), r.column)).toEqual(r)
-    expect(NOTE_COLUMN.decode(NOTE_COLUMN.encode(r), K1)).toBeUndefined()
+    expect(CARD_TITLE.home).toBe("session")
+    expect(CARD_TITLE.decode(CARD_TITLE.encode(r), r.card)).toEqual(r)
+    expect(CARD_TITLE.decode(CARD_TITLE.encode(r), I1)).toEqual({
+      ...r,
+      card: I1,
+    })
+    expect(CARD_TITLE.decode(CARD_TITLE.encode(r), K1)).toBeUndefined()
     expect(
-      NOTE_COLUMN.decode({ title: "", by: BEA, at: 1 }, r.column),
+      CARD_TITLE.decode({ title: "", by: BEA, at: 1 }, r.card),
     ).toBeUndefined()
   })
 })
@@ -110,38 +115,50 @@ describe("planMark", () => {
       }),
     ).toMatchObject({ kind: "refused", code: ERR.UNKNOWN_TARGET })
   })
-  test("titles a note column in its own record, and clears it there", () => {
-    const of = { kind: "note-column", column: N1 } as const
+  test("titles a card in the card's title record, and clears it there", () => {
+    const of = { kind: "card", card: N1 } as const
     expect(plan({ of, title: "Ideas" })).toEqual({
       kind: "writes",
       writes: [
-        setRecord(NOTE_COLUMN, { column: N1, title: "Ideas", by: ADA, at: 5 }),
+        setRecord(CARD_TITLE, { card: N1, title: "Ideas", by: ADA, at: 5 }),
       ],
     })
     expect(
       plan({
         of,
         title: null,
-        columnTitles: new Map([[N1, titled("Ideas")]]),
+        cardTitles: new Map([[N1, titled("Ideas")]]),
       }),
-    ).toEqual({ kind: "writes", writes: [deleteRecord(NOTE_COLUMN, N1)] })
+    ).toEqual({ kind: "writes", writes: [deleteRecord(CARD_TITLE, N1)] })
     expect(
       plan({
         of,
         title: "Ideas",
-        columnTitles: new Map([[N1, titled("Ideas")]]),
+        cardTitles: new Map([[N1, titled("Ideas")]]),
       }),
     ).toEqual({ kind: "unchanged" })
   })
-  test("a note column on no canvas, or one the agent would title, is refused", () => {
-    const of = { kind: "note-column", column: N1 } as const
-    expect(plan({ of, columns: new Set() })).toMatchObject({
-      kind: "refused",
-      code: ERR.UNKNOWN_TARGET,
-    })
-    expect(plan({ of, by: THE_AGENT })).toMatchObject({
-      kind: "refused",
-      code: ERR.UNKNOWN_TARGET,
+  test("a card in no titled place is refused", () => {
+    expect(
+      plan({ of: { kind: "card", card: N1 }, titled: new Set() }),
+    ).toMatchObject({ kind: "refused", code: ERR.UNKNOWN_TARGET })
+  })
+  test("the agent titles an image, never a note column", () => {
+    expect(
+      plan({ of: { kind: "card", card: N1 }, by: THE_AGENT }),
+    ).toMatchObject({ kind: "refused", code: ERR.UNKNOWN_TARGET })
+    expect(
+      plan({ of: { kind: "card", card: I1 }, by: THE_AGENT, title: "Logo" }),
+    ).toEqual({
+      kind: "writes",
+      writes: [
+        setRecord(CARD_TITLE, {
+          card: I1,
+          title: "Logo",
+          by: THE_AGENT,
+          at: 5,
+        }),
+      ],
     })
   })
 })

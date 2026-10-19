@@ -73,6 +73,8 @@ const threadGlanceOfT: ThreadGlance = threadGlance({
   focuses: new Map(),
   iconFor: () => null,
 })
+const M = cardIdOfKind("media", "01a0ffd2-0000-7000-8000-0000000000e5")
+const IMAGE = cardIdOfKind("image", "01a0ffd2-0000-7000-8000-0000000000e6")
 const facts: CompactFacts = {
   tone: "inventory",
   key: "1",
@@ -81,9 +83,22 @@ const facts: CompactFacts = {
   notes: new Map([
     [N, { column: N, title: "Ideas", titled: "Ideas", notes: [note, note] }],
   ]),
+  media: new Map([
+    [M, { column: M, title: "Mockups", titled: "Mockups", images: [] }],
+  ]),
+  titles: new Map([[IMAGE, { card: IMAGE, title: "home", by: ADA, at: 1 }]]),
   threadNames: new Map([[T, "amber-fox" as never]]),
 }
 const QUOTE = "a".repeat(64) as Sha256
+const version = (at: number) => ({
+  sha256: QUOTE,
+  original: QUOTE,
+  mimeType: "image/png" as const,
+  width: 4,
+  height: 3,
+  by: ADA,
+  at,
+})
 const reference: DrawnCard = {
   kind: "reference",
   id: cardIdOfKind("reference", "01a0ffd2-0000-7000-8000-0000000000e3"),
@@ -119,6 +134,22 @@ const EVERY_KIND: Readonly<Record<DrawnKind, DrawnCard>> = {
   reference,
   thread: threadCard,
   "note-column": notes,
+  media: {
+    kind: "media",
+    id: M,
+    owner: ADA,
+    placer: ADA,
+    place: { kind: "inventory", holder: ADA },
+    content: NO_CONTENT,
+  },
+  image: {
+    kind: "image",
+    id: IMAGE,
+    owner: ADA,
+    placer: ADA,
+    place: { kind: "image", column: M, order: "a" },
+    content: { versions: [version(1), version(2)] },
+  },
   fact: {
     kind: "fact",
     id: cardIdOfKind("fact", "01a0ffd2-0000-7000-8000-0000000000f1"),
@@ -216,17 +247,25 @@ describe("a folded column", () => {
   test("draws a note column's glance and a thread's, worded for its strip", () => {
     const folded = foldedView(
       { kind: "notes", card: N, folded: true, width: 1 },
-      { threadGlanceOf: () => threadGlanceOfT, notes: facts.notes },
+      {
+        threadGlanceOf: () => threadGlanceOfT,
+        notes: facts.notes,
+        media: facts.media,
+      },
     )
     expect(folded).toEqual({
       kind: "note-column",
       card: N,
       title: "Ideas",
-      notes: 2,
+      count: 2,
     })
     const thread = foldedView(
       { kind: "thread", card: T, column: {} as Column, folded: true, width: 1 },
-      { threadGlanceOf: () => threadGlanceOfT, notes: facts.notes },
+      {
+        threadGlanceOf: () => threadGlanceOfT,
+        notes: facts.notes,
+        media: facts.media,
+      },
     )
     expect(thread).toBe(threadGlanceOfT)
     expect(thread === null ? null : foldedWords(thread)).toEqual({
@@ -264,6 +303,32 @@ test("a thread's glance carries its icon, a chat's with no lane included", () =>
   })
 })
 
+test("a media column's compact is its title and how many images it holds; an image's, its title and its version", () => {
+  const media = cardCompact(EVERY_KIND.media, facts)
+  expect([media.lead, media.second]).toEqual([
+    { kind: "text", text: "Mockups" },
+    "no images",
+  ])
+  const image = cardCompact(EVERY_KIND.image, facts)
+  expect([image.lead, image.second]).toEqual([
+    { kind: "text", text: "home" },
+    "2 of 2",
+  ])
+  const folded = foldedView(
+    { kind: "media", card: M, folded: true, width: 1 },
+    {
+      threadGlanceOf: () => threadGlanceOfT,
+      notes: facts.notes,
+      media: facts.media,
+    },
+  )
+  expect(folded === null ? null : foldedWords(folded)).toEqual({
+    title: "Mockups",
+    detail: "no images",
+    hint: null,
+  })
+})
+
 describe("foldedMark", () => {
   test("a thread's strip draws its icon, or ✦ without one; a note column's draws none", () => {
     expect(
@@ -278,7 +343,11 @@ describe("foldedMark", () => {
     expect(foldedMark(threadGlanceOfT)).toEqual({ kind: "thread", icon: null })
     const folded = foldedView(
       { kind: "notes", card: N, folded: true, width: 1 },
-      { threadGlanceOf: () => threadGlanceOfT, notes: facts.notes },
+      {
+        threadGlanceOf: () => threadGlanceOfT,
+        notes: facts.notes,
+        media: facts.media,
+      },
     )
     expect(folded === null ? null : foldedMark(folded)).toEqual({
       kind: "none",

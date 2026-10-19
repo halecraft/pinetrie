@@ -84,6 +84,7 @@ import {
   type ListWidth,
   laneRootEntries,
   layoutReducer,
+  mediaColumns,
   messageCount,
   NO_TEXT,
   nameEffects,
@@ -159,7 +160,9 @@ import {
   canvasLines,
   canvasList,
   canvasPinnedCards,
+  columnGlances,
   displayName,
+  marginCounts,
   reachableAgents,
   TRASH_KEEP_MS,
   taskBoard,
@@ -171,6 +174,8 @@ import {
   heldBy,
   newCanvasId,
   newCardId,
+  newImageId,
+  newMediaId,
   newNoteColumnId,
   newReferenceCardId,
   newRootId,
@@ -430,7 +435,7 @@ export function App({
     seats,
     workflow,
     marks,
-    noteColumns: noteTitles,
+    cardTitles,
     threads,
     runEndReports,
     workFacts,
@@ -789,10 +794,17 @@ export function App({
         canvasNoteColumns({
           onCanvas: onCanvas,
           cards,
-          titles: noteTitles,
+          titles: cardTitles,
         }).map(v => [v.column, v] as const),
       ),
-    [onCanvas, cards, noteTitles],
+    [onCanvas, cards, cardTitles],
+  )
+  // Every media column this tab holds, a canvas's, an inventory's or a
+  // trash's, as its column, its compact and its card draw it.
+  const mediaViews = useMemo(
+    () =>
+      mediaColumns({ cards, titles: cardTitles, margins: marginCounts(cards) }),
+    [cards, cardTitles],
   )
   // The canvas you are on, which the sidebar's repair keeps while it is
   // archived, and its threads' roots with their root entries, whose trees
@@ -1160,7 +1172,7 @@ export function App({
               now: Date.now(),
               keepMs: TRASH_KEEP_MS,
               names: workFacts.names,
-              noteTitles,
+              cardTitles,
             }),
           }),
     [
@@ -1173,7 +1185,7 @@ export function App({
       cards,
       histories,
       workFacts.names,
-      noteTitles,
+      cardTitles,
     ],
   )
   // The canvas list the canvas's agents are told, read from no thread, and
@@ -1190,16 +1202,15 @@ export function App({
               reading: null,
               names: workFacts.names,
               work,
-              noteTitles: new Map(
-                [...noteViews].map(([id, v]) => [id, v.title] as const),
-              ),
-              noteCounts: new Map(
-                [...noteViews].map(([id, v]) => [id, v.notes.length] as const),
-              ),
+              glances: columnGlances({
+                cards,
+                onCanvas,
+                titles: cardTitles,
+              }),
               nameOf: w => nameFor(nameOf, w),
             }),
           ),
-    [strip, labels, onCanvas, workFacts.names, work, noteViews, nameOf],
+    [strip, labels, onCanvas, workFacts.names, work, cards, cardTitles, nameOf],
   )
   const canvasPinsInView = useMemo(
     () => canvasPinnedInView(index, views[0]?.tipId ?? null),
@@ -1535,6 +1546,8 @@ export function App({
         canvas: newCanvasId(),
         thread: newThreadId(),
         noteColumn: newNoteColumnId(),
+        media: newMediaId(),
+        images: count => Array.from({ length: count }, () => newImageId()),
         reference: newReferenceCardId(),
         text: newCardId(),
         branches: count => Array.from({ length: count }, () => newThreadId()),
@@ -1723,6 +1736,8 @@ export function App({
               threadPreview(thread, index, forkOf.get(thread)?.at ?? null)
             }
             notes={noteViews}
+            media={mediaViews}
+            titles={cardTitles}
             threadNames={workFacts.names}
             threads={threadGlances}
             cell={clipboardCellView(cell, slots, held.length)}
@@ -1811,6 +1826,8 @@ export function App({
                           <Strip
                             onCanvas={onCanvas}
                             noteViews={noteViews}
+                            mediaViews={mediaViews}
+                            cards={cards}
                             threadGlanceOf={threadGlanceOf}
                             threadTrackOf={threadTrackOf}
                             onIntent={onIntent}

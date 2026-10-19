@@ -21,10 +21,10 @@ import {
   type EntryId,
   indexAsks,
   type LaneView,
-  type NoteColumnId,
   type RootId,
   type ThreadId,
   type ThreadRecord,
+  type TitledCardId,
   type TreeIndex,
 } from "@pinetrie/core"
 import {
@@ -35,6 +35,7 @@ import {
   readBases,
   readBudgets,
   readCardHistories,
+  readCardTitles,
   readCommands,
   readConflicts,
   readDigests,
@@ -47,7 +48,6 @@ import {
   readLanes,
   readMarks,
   readNames,
-  readNoteColumns,
   readProject,
   readProposedByLane,
   readQueueHolds,
@@ -63,9 +63,9 @@ import {
 } from "@pinetrie/reads"
 import type {
   CardHistoryRecord,
+  CardTitleRecord,
   DigestRecord,
   MarkRecord,
-  NoteColumnRecord,
   RunEndReportRecord,
   SeatRecord,
   TraceRecord,
@@ -108,8 +108,8 @@ export interface SessionFacts {
   readonly workflow: Workflow | null
   /** Each canvas's title: its label. */
   readonly marks: ReadonlyMap<CanvasId, MarkRecord>
-  /** Each titled note column's title. */
-  readonly noteColumns: ReadonlyMap<NoteColumnId, NoteColumnRecord>
+  /** Each titled card's title: a note column's, a media column's, an image's. */
+  readonly cardTitles: ReadonlyMap<TitledCardId, CardTitleRecord>
   /** Every thread, by id: each one's root. */
   readonly threads: ReadonlyMap<ThreadId, ThreadRecord>
   /** Each thread's last run's end report, in any root, by lane. */
@@ -183,7 +183,7 @@ function readFacts(view: HeldView): SessionFacts {
     seats: readSeats(doc),
     workflow: readWorkflow(doc),
     marks: readMarks(doc),
-    noteColumns: readNoteColumns(doc),
+    cardTitles: readCardTitles(doc),
     threads: readThreads(doc),
     runEndReports: readRunEndReports(doc),
     histories: readCardHistories(doc),

@@ -16,6 +16,8 @@ import {
   type EntryId,
   entryThread,
   hasPlaceKind,
+  type ImageId,
+  type ImagesTarget,
   type ListKey,
   type MarkTarget,
   type MoveDirection,
@@ -23,11 +25,14 @@ import {
   notesTarget,
   type Position,
   type ProposedChangesAction,
+  type PutImage,
   type QueueHoldChange,
   type RootId,
+  type Sha256,
   type TextCardId,
   type ThreadId,
   type ThreadStart,
+  type TypedMove,
   type WorkflowEdit,
   type WorkflowStateId,
   type WriterId,
@@ -343,7 +348,19 @@ export type Intent =
   | { readonly kind: "page"; readonly to: PageName | null }
   /** Open, type in, clear or close the search of the canvas you are on. */
   | { readonly kind: "search"; readonly act: SearchAsk }
-  /** Title a canvas or a note column, or clear its title with null. */
+  /** Images uploaded, put at a spot on a canvas or at a media column's end. */
+  | {
+      readonly kind: "putImages"
+      readonly images: readonly PutImage[]
+      readonly to: ImagesTarget
+    }
+  /** An image uploaded, added as a version of `image`. */
+  | {
+      readonly kind: "addVersion"
+      readonly image: ImageId
+      readonly sha256: Sha256
+    }
+  /** Title a canvas or a titled card, or clear its title with null. */
   | {
       readonly kind: "rename"
       readonly of: MarkTarget
@@ -604,6 +621,39 @@ function planOf(
     case "retitle":
       return [
         { kind: "request", intent: { kind: "retitle", canvas: intent.canvas } },
+      ]
+    // A put to a spot makes a media column, minted here so its maker sees
+    // it unfolded.
+    case "putImages": {
+      if (intent.images.length === 0) return []
+      const { to } = intent
+      const made = to.kind === "canvas-at" ? minted.media : null
+      return [
+        {
+          kind: "request",
+          intent: { kind: "put-images", images: intent.images, to, made },
+        },
+        ...(made === null || to.kind !== "canvas-at"
+          ? []
+          : [
+              viewChangeEffect(state, to.canvas, {
+                kind: "fold",
+                card: made,
+                unfolded: true,
+              }),
+            ]),
+      ]
+    }
+    case "addVersion":
+      return [
+        {
+          kind: "request",
+          intent: {
+            kind: "version",
+            image: intent.image,
+            sha256: intent.sha256,
+          },
+        },
       ]
     case "notNeeded":
       return [{ kind: "notNeeded", lane: intent.lane, raised: intent.raised }]
@@ -933,14 +983,15 @@ function planAddColumn(
 ): readonly Effect[] {
   const { canvas, after } = at
   switch (make.kind) {
-    case "note-column": {
-      const column = minted.noteColumn
+    case "note-column":
+    case "media": {
+      const move: TypedMove =
+        make.kind === "note-column"
+          ? { card: minted.noteColumn, from: null, to: canvasSpot(at) }
+          : { card: minted.media, from: null, to: canvasSpot(at) }
+      const column = move.card
       return [
-        moveCard(
-          { card: column, from: null, to: canvasSpot(at) },
-          IN_COLUMN(column),
-          false,
-        ),
+        moveCard(move, IN_COLUMN(column), false),
         viewChangeEffect(state, canvas, {
           kind: "fold",
           card: column,

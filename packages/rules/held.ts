@@ -136,6 +136,8 @@ export function runsIn(command: Gated): readonly RunAt[] {
     case "workflow":
     case "mark":
     case "retitle":
+    case "put-images":
+    case "version":
     case "setup":
     case "publish":
     case "restore":

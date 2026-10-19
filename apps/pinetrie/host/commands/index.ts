@@ -124,6 +124,8 @@ const COMMAND_PLACE = {
   "open-thread": "documents",
   "branch-out": "documents",
   paste: "documents",
+  "put-images": "documents",
+  version: "documents",
   "spin-off": "documents",
   reorder: "documents",
   "card-width": "documents",
@@ -157,6 +159,12 @@ export interface Commands {
     writer: WriterId | undefined,
     wire: WireCommand,
   ): Promise<void>
+  /**
+   * A command the host makes for `writer`, already well formed (an agent's
+   * `put_image`): cleared through the gate and carried out as one off the
+   * socket is, with no reply to send.
+   */
+  perform(writer: WriterId, intent: Intent): Promise<Outcome>
   /**
    * A queued card the host popped, sent as its queuer's message: cleared
    * through the gate, then `sendMessage`, as a `chat` command goes.
@@ -229,6 +237,15 @@ export function createCommands(deps: CommandDeps): Commands {
 
     const intent = decodeCommand(wire)
     if (intent.kind === "refused") return settled(intent)
+    return carryOut(writer, intent, id)
+  }
+
+  /** One well-formed command, in the place its kind runs (`placeOfCommand`). */
+  function carryOut(
+    writer: WriterId,
+    intent: Intent,
+    id: string,
+  ): Promise<Settled> {
     switch (placeOfCommand(intent)) {
       case "documents":
         return deps.keeper.run(roots =>
@@ -334,6 +351,10 @@ export function createCommands(deps: CommandDeps): Commands {
         )
       case "paste":
         return cardCommands.paste(writer, intent, canvases)
+      case "put-images":
+        return cardCommands.putImages(writer, intent, canvases)
+      case "version":
+        return cardCommands.version(writer, intent, canvases)
       case "spin-off":
         return cardCommands.spinOff(
           writer,
@@ -431,6 +452,8 @@ export function createCommands(deps: CommandDeps): Commands {
 
   return {
     handle,
+    perform: async (writer, intent) =>
+      (await carryOut(writer, intent, newId())).outcome,
     sendPoppedQueuedCard: (roots, writer, sendId, chat) =>
       send(stepDeps(roots), writer, sendId, chat),
   }

@@ -903,6 +903,29 @@
       .column-content:focus { outline: none; }
       .msg[data-selected] { box-shadow: inset 2px 0 0 #8ab4f8; }
       .notes-empty { font-size: .75rem; color: #6f7784; }
+      /* A media column (ADR-0182): its images at the column's width, each
+         at its stored size so its box is held before its bytes load; two
+         wide, two to a row, so alternatives sit side by side. */
+      .media-column { flex: 0 0 28rem; width: 28rem; min-width: 0; display: flex;
+        flex-direction: column; min-height: 0; border-right: 1px solid #23272e; }
+      .media-column[data-width="2"] { flex-basis: 56rem; width: 56rem; }
+      .media-images { flex: 0 1 auto; min-height: 0; overflow-y: auto; padding: .4rem .75rem;
+        display: grid; grid-template-columns: 1fr; gap: .75rem; align-content: start; }
+      .media-images[data-width="2"] { grid-template-columns: 1fr 1fr; }
+      .media-image { margin: 0; min-width: 0; }
+      .media-image img { display: block; width: 100%; height: auto; border-radius: 4px; }
+      .media-image-bar { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem;
+        padding-top: .25rem; font-size: .8rem; color: #999; }
+      .media-image-bar button { background: none; border: 0; padding: 0 .15rem; color: #999; cursor: pointer; }
+      .media-image-bar button:hover:not(:disabled) { color: #ddd; }
+      .media-image-bar button:disabled { opacity: .4; cursor: default; }
+      .media-image-bar .media-image-title { flex: 1; min-width: 0; text-align: left; color: #ddd;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .media-left { font-size: .75rem; color: #c9a26b; padding: 0 .75rem .5rem; }
+      .margin-version { font-size: .72rem; color: #8b93a1; }
+      .card-images { display: grid; grid-template-columns: 1fr 1fr; gap: .3rem; }
+      .card-image { display: block; width: 100%; height: auto; }
+      body[data-card-drag] .media-column { outline: 1px dashed #6f7784; outline-offset: -2px; }
       body[data-card-drag] .note-column { outline: 1px dashed #6f7784; outline-offset: -2px; }
       /* While a card is dragged, the places it can become a thread (ADR-0111):
          a workflow state, on the board or the footer's strip, and the sidebar. */

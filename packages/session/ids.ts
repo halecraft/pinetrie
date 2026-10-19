@@ -5,6 +5,8 @@ import {
   type CanvasId,
   canvasIdFor,
   cardIdOfKind,
+  type ImageId,
+  type MediaId,
   type NoteColumnId,
   type ReferenceCardId,
   type RootId,
@@ -34,6 +36,12 @@ export const newCardId = (): TextCardId => textCardId(newUuidv7())
  */
 export const newNoteColumnId = (): NoteColumnId =>
   cardIdOfKind("note-column", newUuidv7())
+
+/** A new media column's id: `m-` and a uuidv7. */
+export const newMediaId = (): MediaId => cardIdOfKind("media", newUuidv7())
+
+/** A new image's id: `i-` and a uuidv7. */
+export const newImageId = (): ImageId => cardIdOfKind("image", newUuidv7())
 
 /** A new reference card's id: minted by the page that takes or puts it. */
 export const newReferenceCardId = (): ReferenceCardId =>

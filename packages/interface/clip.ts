@@ -178,8 +178,12 @@ export function cardClip(card: CardRecord, facts: ClipFacts): CardClip | null {
         card: card.id,
         text: linkTo({ kind: "card", card: card.id }),
       }
+    // Nobody copies a fact or an ask; a media column and an image are not
+    // copied yet.
     case "fact":
     case "ask":
+    case "media":
+    case "image":
       return null
   }
 }

@@ -33,6 +33,7 @@ interface Makes {
   /** What its composer opens with: `@agent ` typed, or nothing (a chat). */
   readonly thread: { readonly opens: "agent" | "chat" }
   readonly "note-column": Record<never, never>
+  readonly media: Record<never, never>
 }
 
 /** A column ＋ makes, one of a kind a canvas holds. */
@@ -57,6 +58,7 @@ const NEW_COLUMNS = {
     { kind: "thread", opens: "chat" },
   ],
   "note-column": [{ kind: "note-column" }],
+  media: [{ kind: "media" }],
 } as const satisfies NewColumnTable
 
 /** An agent thread: the main action of ＋ past a canvas's last column, the first thread the table offers. */
@@ -87,6 +89,14 @@ function startWords(make: NewColumn): Omit<StartItem, "intent"> {
         label: "note column",
         name: "new note column",
         title: "a new note column at the end of the canvas, for everyone",
+      }
+    case "media":
+      return {
+        key: "media",
+        label: "media column",
+        name: "new media column",
+        title:
+          "a new media column at the end of the canvas, for images to compare, for everyone",
       }
   }
 }

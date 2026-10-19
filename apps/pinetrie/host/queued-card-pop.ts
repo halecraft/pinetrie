@@ -14,7 +14,6 @@ import {
   type BlobStore,
   type CardId,
   type CardRecord,
-  cardIdOfKind,
   cardTextSource,
   errorText,
   parseMentions,
@@ -43,6 +42,7 @@ import {
   encodeFact,
   foreignLaneWords,
   isQueuedText,
+  mintContainer,
   planCarry,
   planNextQueuedCardPop,
   planQueueHold,
@@ -502,7 +502,7 @@ async function unsent(
     cards: readPlaces(places),
     card,
     reason,
-    newColumn: () => cardIdOfKind("note-column", newId()),
+    newContainer: mintContainer(newId),
   })
   // The hold first, so the drain this card ends finds the queue held.
   if (plan.hold)

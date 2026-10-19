@@ -10,17 +10,31 @@ import {
   type CardRecord,
   cardCommand,
   firstLine,
+  type MediaId,
   type NoteColumnId,
   type Sha256,
   type ThreadId,
   type ThreadName,
+  type TitledCardId,
   type WriterId,
 } from "@pinetrie/core"
-import { askLine, displayName, factLine } from "@pinetrie/rules"
+import {
+  askLine,
+  type CardTitleRecord,
+  displayName,
+  factLine,
+  UNTITLED_IMAGE,
+} from "@pinetrie/rules"
 import { addressWords } from "./address-words.ts"
 import type { CardTone } from "./card-frame.ts"
-import { noteColumnGlance, UNNAMED_THREAD } from "./folded-column-view.ts"
-import { type NoteColumnView, noteCountWords } from "./note-column-view.ts"
+import { countWords } from "./count-words.ts"
+import {
+  mediaColumnGlance,
+  noteColumnGlance,
+  UNNAMED_THREAD,
+} from "./folded-column-view.ts"
+import { type MediaColumnView, versionWords } from "./media-column-view.ts"
+import type { NoteColumnView } from "./note-column-view.ts"
 import type { Reader } from "./send.ts"
 import {
   bareThreadGlance,
@@ -82,6 +96,10 @@ export interface CompactFacts {
   readonly threads: ReadonlyMap<ThreadId, ThreadGlance>
   /** Each note column, as its column draws it. */
   readonly notes: ReadonlyMap<NoteColumnId, NoteColumnView>
+  /** Each media column, as its column draws it. */
+  readonly media: ReadonlyMap<MediaId, MediaColumnView>
+  /** Each titled card's title. */
+  readonly titles: ReadonlyMap<TitledCardId, CardTitleRecord>
   /** Each thread's name, which a reference names as where it is from. */
   readonly threadNames: ReadonlyMap<ThreadId, ThreadName>
 }
@@ -161,7 +179,33 @@ export function cardCompact(card: DrawnCard, facts: CompactFacts): Compact {
         mark: { kind: "none" },
         command: null,
         lead: text(glance.title),
-        second: glance.notes === null ? null : noteCountWords(glance.notes),
+        second:
+          glance.count === null
+            ? null
+            : countWords("note-column", glance.count),
+        badge: key,
+      }
+    }
+    case "media": {
+      const glance = mediaColumnGlance(card.id, facts.media)
+      return {
+        ...base,
+        mark: { kind: "none" },
+        command: null,
+        lead: text(glance.title),
+        second:
+          glance.count === null ? null : countWords("media", glance.count),
+        badge: key,
+      }
+    }
+    case "image": {
+      const n = card.content.versions.length
+      return {
+        ...base,
+        mark: { kind: "writer", writer: card.owner },
+        command: null,
+        lead: text(facts.titles.get(card.id)?.title ?? UNTITLED_IMAGE),
+        second: versionWords(n - 1, n),
         badge: key,
       }
     }
@@ -197,6 +241,8 @@ export const KIND_ICON: Readonly<Record<DrawnKind, string>> = {
   fact: "※",
   reference: "❝",
   ask: "⇢",
+  media: "▦",
+  image: "◩",
 }
 
 /** A compact in words: whose it is, its command's chip, and its badge. */
@@ -260,6 +306,7 @@ export const DETAIL_ON: Readonly<Record<CardPlace["kind"], Detail>> = {
   pinned: "normal",
   queued: "normal",
   note: "normal",
+  image: "full",
   margin: "normal",
   "canvas-pinned": "normal",
   canvas: "full",

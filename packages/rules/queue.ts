@@ -16,7 +16,6 @@ import {
   isTextCard,
   type Move,
   makeCard,
-  type NoteColumnId,
   notesTarget,
   type QueuedFact,
   type RelayDetails,
@@ -25,6 +24,7 @@ import {
   type ThreadId,
 } from "@pinetrie/core"
 import { byOrder } from "./card.ts"
+import type { MintContainer } from "./containers.ts"
 import { toNotes } from "./notes.ts"
 import { orderAfter, orderBetween, respace } from "./order.ts"
 import { inventoryFull, type PlaceStep, planMake } from "./place-steps.ts"
@@ -241,13 +241,13 @@ export function planUnsent(input: {
   readonly card: QueuedMessage
   readonly reason: string
   /** Mints the id of a note column made for it. */
-  readonly newColumn: () => NoteColumnId
+  readonly newContainer: MintContainer
 }): { readonly steps: readonly PlaceStep[]; readonly hold: boolean } {
   const { cards, card, reason } = input
   const notes = toNotes({
     cards,
     to: { kind: "notes", near: "thread", thread: card.place.thread },
-    newColumn: input.newColumn,
+    newContainer: input.newContainer,
     by: card.placer,
   })
   // Only a text card keeps why: a reference's content is its address and quote.

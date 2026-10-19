@@ -415,6 +415,19 @@ reading the store once, planning once, then acting:
   It reads every root's entries raw and writes only the rows that change,
   never an entry's `content`, id or parent; over its own output it plans
   nothing (`planCountedDiagnostics`). None is retired.
+- **`0002-image-versions`** registers the places document's new hash: its
+  card record gains `versions`, which a stored record without it reads as
+  "" (ADR-0182). It moves no data.
+- **`0003-one-margin`** (ADR-0182) rewrites each comment's place from its
+  entry's id and thread to the entry's printed address, in every places row,
+  live or trashed, and every place a card's history or a trace stores
+  (`marginFieldsNow`, `planMarginRows`, `planMarginEvents`). An address
+  holds `/`, an entry's id never does, so over its own output it plans
+  nothing. A Kyneta undo of a comment's move made before it still writes the
+  old row back.
+- **`0004-card-titles`** (ADR-0182) moves each `pinetrie.note-column`
+  record to `pinetrie.card-title` under the same id, deleting the old
+  (`planCardTitles`).
 - **A migration that only reshapes one namespace's records,** record by
   record, is a pure rewrite over `rewriteRecords` (`migrations/rewrite.ts`,
   over `recordDocs`, which any record migration reads a home's documents

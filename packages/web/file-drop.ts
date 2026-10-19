@@ -14,9 +14,27 @@ const bringsFiles = (data: DataTransfer | null): boolean =>
 /**
  * The props that make an element take dropped files: a file drag over it is
  * accepted as a copy, and a drop hands `onFiles` its files. Other drags pass
- * through, as text dragged within the page still does.
+ * through, as text dragged within the page still does. The innermost element
+ * that takes files takes the drop alone: an image in a media column takes it
+ * as a version, not the column as a new image.
  */
 export function fileDropProps(onFiles: (files: File[]) => void): {
+  readonly onDragOver: (e: DragEvent) => void
+  readonly onDrop: (e: DragEvent) => void
+} {
+  return fileDropAtProps(onFiles)
+}
+
+/**
+ * `fileDropProps`, its drop also handing `onFiles` the point it was dropped
+ * at, in the window: where on the strip a drop lands depends on it.
+ */
+export function fileDropAtProps(
+  onFiles: (
+    files: File[],
+    at: { readonly x: number; readonly y: number },
+  ) => void,
+): {
   readonly onDragOver: (e: DragEvent) => void
   readonly onDrop: (e: DragEvent) => void
 } {
@@ -24,13 +42,15 @@ export function fileDropProps(onFiles: (files: File[]) => void): {
     onDragOver: e => {
       if (!bringsFiles(e.dataTransfer)) return
       e.preventDefault()
+      e.stopPropagation()
       e.dataTransfer.dropEffect = "copy"
     },
     onDrop: e => {
       if (!bringsFiles(e.dataTransfer)) return
       e.preventDefault()
+      e.stopPropagation()
       const files = pastedFiles(e.dataTransfer)
-      if (files.length > 0) onFiles(files)
+      if (files.length > 0) onFiles(files, { x: e.clientX, y: e.clientY })
     },
   }
 }

@@ -4,7 +4,7 @@
 // The host answers an undo with each card it moved and where it is now, so
 // the place is shown as the undo acts.
 
-import type { CardId, PlaceKey } from "@pinetrie/core"
+import type { CardId, EntryId, PlaceKey, ThreadId } from "@pinetrie/core"
 import { placeEnd } from "@pinetrie/rules"
 import { type ActedAt, AT_INVENTORY } from "@pinetrie/session"
 import { heldByOthers } from "./canvas-columns.ts"
@@ -54,24 +54,10 @@ export function revealEffects(
               ],
         actedAt: AT_INVENTORY,
       }
-    // A note: its note column, unfolded in its canvas.
-    case "note": {
-      const canvas = state.canvases.index.canvasOfCard.get(place.column)
-      return {
-        effects:
-          canvas === undefined
-            ? []
-            : [
-                ...showCanvas(canvas),
-                viewChangeEffect(state, canvas, {
-                  kind: "fold",
-                  card: place.column,
-                  unfolded: true,
-                }),
-              ],
-        actedAt: at(place.column),
-      }
-    }
+    // A note or an image: its column, unfolded in its canvas.
+    case "note":
+    case "image":
+      return showColumn(place.column, state)
     // Pinned to a canvas: its canvas column, unfolded.
     case "canvas-pinned":
       return {
@@ -93,57 +79,86 @@ export function revealEffects(
     // Discarded: drawn nowhere, so nothing comes into view.
     case "trash":
       return { effects: [], actedAt: AT_INVENTORY }
+    // A comment on an image: the image's column.
+    case "margin": {
+      const { on } = place
+      if (on.kind === "card") {
+        const image = state.cards.cards.find(c => c.id === on.card)
+        return image?.place.kind === "image"
+          ? showColumn(image.place.column, state)
+          : { effects: [], actedAt: AT_INVENTORY }
+      }
+      // A comment's entry, as a thread end is opened.
+      return showThread(
+        on.thread,
+        on.entry in state.index.entries ? on.entry : null,
+        null,
+        state,
+      )
+    }
     case "composing":
     case "pinned":
     case "queued":
-    case "margin": {
-      // A comment's entry, as a thread end is opened.
-      const end =
-        place.kind === "margin"
-          ? place.entry in state.index.entries
-            ? place.entry
-            : null
-          : placeEnd(place, state.index)
-      // A thread this tab holds no entry of: its card, unfolded in its canvas.
-      if (end === null) {
-        const canvas = state.canvases.index.canvasOfCard.get(place.thread)
-        return {
-          effects:
-            canvas === undefined
-              ? []
-              : [
-                  ...showCanvas(canvas),
-                  viewChangeEffect(state, canvas, {
-                    kind: "fold",
-                    card: place.thread,
-                    unfolded: true,
-                  }),
-                ],
-          actedAt: at(place.thread),
-        }
-      }
-      const plan = planOpen(
-        state.layout,
-        state.index,
-        end,
-        state.canvases.index,
-        state.cards.lanes,
-        heldByOthers(state.cards.cards, state.cards.me),
+      return showThread(
+        place.thread,
+        placeEnd(place, state.index),
+        place.kind === "queued" ? card : null,
+        state,
       )
-      return {
-        effects: [
-          ...planOpenEntry(end, state),
-          ...(place.kind === "queued" && card !== null
-            ? [{ kind: "revealCard", card } as const]
-            : []),
-        ],
-        actedAt:
-          plan?.kind === "scroll"
-            ? at(plan.key)
-            : plan?.kind === "unfold"
-              ? at(plan.card)
-              : AT_INVENTORY,
-      }
-    }
+  }
+}
+
+/** A column of a canvas, unfolded there: a note column, a media column. */
+function showColumn(
+  column: CardId,
+  state: IntentState,
+): { readonly effects: readonly Effect[]; readonly actedAt: ActedAt } {
+  const canvas = state.canvases.index.canvasOfCard.get(column)
+  return {
+    effects:
+      canvas === undefined
+        ? []
+        : [
+            ...showCanvas(canvas),
+            viewChangeEffect(state, canvas, {
+              kind: "fold",
+              card: column,
+              unfolded: true,
+            }),
+          ],
+    actedAt: at(column),
+  }
+}
+
+/**
+ * `thread` opened at `end`, a queued `card` scrolled to in its dock; with no
+ * end this tab holds, its card, unfolded in its canvas.
+ */
+function showThread(
+  thread: ThreadId,
+  end: EntryId | null,
+  card: CardId | null,
+  state: IntentState,
+): { readonly effects: readonly Effect[]; readonly actedAt: ActedAt } {
+  if (end === null) return showColumn(thread, state)
+  const plan = planOpen(
+    state.layout,
+    state.index,
+    end,
+    state.canvases.index,
+    state.cards.lanes,
+    heldByOthers(state.cards.cards, state.cards.me),
+  )
+  return {
+    effects: [
+      ...planOpenEntry(end, state),
+      ...(card !== null ? [{ kind: "revealCard", card } as const] : []),
+    ],
+    actedAt:
+      plan?.kind === "scroll"
+        ? at(plan.key)
+        : plan?.kind === "unfold"
+          ? at(plan.card)
+          : AT_INVENTORY,
   }
 }

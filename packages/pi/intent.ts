@@ -13,6 +13,7 @@ import {
   INTENT_FIELD,
   LEAVE_TOOL,
   PROPOSE_TOOL,
+  PUT_IMAGE_TOOL,
   READ_TOOL,
   RESOLVE_TOOL,
   SAVE_BLOB_TOOL,
@@ -42,6 +43,7 @@ export const TAKES_INTENT: Readonly<Record<ToolId, boolean>> = {
   [LEAVE_TOOL]: false,
   [RESOLVE_TOOL]: false,
   [SAVE_BLOB_TOOL]: false,
+  [PUT_IMAGE_TOOL]: false,
   [PROPOSE_TOOL]: false,
 }
 

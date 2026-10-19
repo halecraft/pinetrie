@@ -16,6 +16,7 @@ import {
   cardMove,
   DISCARDED,
   type EntryId,
+  entryMargin,
   isMovable,
   isReorderPlace,
   isTargetForKind,
@@ -885,7 +886,7 @@ export const planComment = (
 ): readonly Effect[] => [
   ...newCardEffects(
     act.card,
-    { kind: "margin", entry: act.entry, thread: act.thread },
+    { kind: "margin", on: entryMargin(act.thread, act.entry), seen: "" },
     "",
     IN_COLUMN(act.thread),
     state,

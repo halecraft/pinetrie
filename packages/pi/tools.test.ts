@@ -35,6 +35,7 @@ const input = {
     ask: unused,
     leave: unused,
     readBlob: unused,
+    putImage: unused,
   },
   blobs: undefined,
   bannerAsks: unused,
@@ -112,6 +113,7 @@ describe("TOOL_IDS", () => {
       "leave",
       "resolve_conflict",
       "save_blob",
+      "put_image",
       "propose_branches",
     ])
   })

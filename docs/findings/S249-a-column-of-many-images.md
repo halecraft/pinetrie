@@ -1,6 +1,7 @@
 # S249 — Can a column draw thirty fitted images, or does a media column need thumbnails?
 
 - **Status:** Answered
+- **Led to:** ADR-0182
 
 **Question.** A media column holds images to compare: a teammate's
 uploads, an agent's screenshots, generated alternatives, each with its

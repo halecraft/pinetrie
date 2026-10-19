@@ -15,8 +15,10 @@ import {
   DISCARDED,
   emailLocalPart,
   entryId,
+  entryMargin,
   fitsPlace,
   historyScope,
+  imageMargin,
   indexTree,
   isWhereSenderSaw,
   keyFieldsFrom,
@@ -456,26 +458,65 @@ describe("a card's place as flat fields", () => {
     }
   })
 
-  test("a margin place round-trips, and needs its entry, its thread and its order", () => {
+  test("an entry's margin round-trips, printed as the entry's address, and needs it and its order", () => {
     const margin = {
       kind: "margin",
-      entry: entryId("e-1"),
-      thread: threadIdFor("x"),
+      on: entryMargin(threadIdFor("x"), entryId("e-1")),
       order: "c",
+      seen: "",
     } as const
     const f = placeFields(margin)
-    expect(f).toMatchObject({ kind: "margin", at: "e-1", order: "c" })
+    expect(f).toMatchObject({
+      kind: "margin",
+      at: `e/${threadIdFor("x")}/e-1`,
+      lane: "",
+      order: "c",
+    })
     expect(placeOfFields(f)).toEqual(margin)
     expect(placeOfFields({ ...f, at: "" })).toBeUndefined()
-    expect(placeOfFields({ ...f, lane: "" })).toBeUndefined()
+    expect(placeOfFields({ ...f, at: "e-1" })).toBeUndefined()
     expect(placeOfFields({ ...f, order: "" })).toBeUndefined()
     expect(placeKey(margin)).toEqual({
       kind: "margin",
-      entry: entryId("e-1"),
-      thread: threadIdFor("x"),
+      on: margin.on,
+      seen: "",
     })
     expect(keyOfFields(keyFieldsFrom(k => f[k]))).toEqual(placeKey(margin))
-    expect(storedRowFields("margin")).toEqual(["at", "lane", "order"])
+    expect(storedRowFields("margin")).toEqual(["at", "order", "seen"])
+  })
+
+  test("an image's margin keeps the version a comment was written on, which its key compares by no rule", () => {
+    const image = cardIdOfKind("image", "0190a000-0000-7000-8000-000000000001")
+    const margin = {
+      kind: "margin",
+      on: imageMargin(image),
+      order: "c",
+      seen: "a".repeat(64),
+    } as const
+    const f = placeFields(margin)
+    expect(f.at).toBe(`c/${image}`)
+    expect(placeOfFields(f)).toEqual(margin)
+    expect(
+      sameKey(placeKey(margin), {
+        kind: "margin",
+        on: imageMargin(image),
+        seen: "",
+      }),
+    ).toBe(true)
+    // A margin is on an entry or an image, never another card.
+    expect(placeOfFields({ ...f, at: `c/${TEST_CANVAS}` })).toBeUndefined()
+    expect(surfaceOwner(margin)).toEqual({ kind: "image", image })
+  })
+
+  test("an image in a media column round-trips, and needs its column and its order", () => {
+    const column = cardIdOfKind("media", "0190a000-0000-7000-8000-000000000002")
+    const place = { kind: "image", column, order: "d" } as const
+    const f = placeFields(place)
+    expect(placeOfFields(f)).toEqual(place)
+    expect(placeOfFields({ ...f, column: "n-x" })).toBeUndefined()
+    expect(placeOfFields({ ...f, order: "" })).toBeUndefined()
+    expect(placeKey(place)).toEqual({ kind: "image", column })
+    expect(surfaceOwner(place)).toEqual({ kind: "media", column })
   })
 
   test("a pinned card needs its order and its thread; its key has no order, and keeps its thread", () => {
@@ -543,7 +584,7 @@ describe("a card's place as flat fields", () => {
     expect(at(`f-${UUID}`)).toBe("file")
   })
 
-  test("fitsPlace: a text card anywhere but a canvas, a thread's card on a canvas or in an inventory, a note column on a canvas, and each of them in a trash", () => {
+  test("fitsPlace: a text card anywhere but a canvas, a thread's card or a media column on a canvas or in an inventory, a note column on a canvas, and each of them in a trash", () => {
     const fits = (kind: Parameters<typeof fitsPlace>[0]) =>
       (["note", "canvas", "inventory", "trash"] as const).filter(p =>
         fitsPlace(kind, p),
@@ -551,7 +592,8 @@ describe("a card's place as flat fields", () => {
     expect(fits("text")).toEqual(["note", "inventory", "trash"])
     expect(fits("thread")).toEqual(["canvas", "inventory", "trash"])
     expect(fits("note-column")).toEqual(["canvas", "trash"])
-    expect(fits("media")).toEqual([])
+    expect(fits("media")).toEqual(["canvas", "inventory", "trash"])
+    expect(fits("image")).toEqual(["trash"])
   })
 
   test("placed: a card at a place its kind is ever in, and no record where it is never", () => {

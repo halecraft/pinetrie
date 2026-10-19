@@ -382,10 +382,10 @@ describe("writesIn: the canvases a command writes in", () => {
       [CANVAS],
     ],
     [
-      "a note column's title: its column's canvas",
+      "a card's title: its card's canvas",
       {
         kind: "mark",
-        of: { kind: "note-column", column: NOTES_X },
+        of: { kind: "card", card: NOTES_X },
         title: "Ideas",
       },
       [OTHER_CANVAS],

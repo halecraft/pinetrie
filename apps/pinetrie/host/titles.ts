@@ -130,8 +130,8 @@ export function createTitles(deps: {
           now: basics.now(),
           canvases: readCanvases(places),
           marks,
-          columns: new Set(),
-          columnTitles: new Map(),
+          titled: new Set(),
+          cardTitles: new Map(),
         })
         return planned.kind === "writes" ? { records: planned.writes } : null
       },

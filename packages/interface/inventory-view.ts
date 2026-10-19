@@ -8,13 +8,17 @@ import {
   type CardId,
   INVENTORY_SLOTS,
   inventoryGrid,
+  type MediaId,
   type ThreadId,
   type ThreadName,
+  type TitledCardId,
   type WriterId,
 } from "@pinetrie/core"
+import type { CardTitleRecord } from "@pinetrie/rules"
 import { type Intents, type Slots, settleSlots } from "@pinetrie/session"
 import type { DrawnCard } from "./compact.ts"
 import { type GridView, gridView } from "./grid-view.ts"
+import type { MediaColumnView } from "./media-column-view.ts"
 import type { ThreadGlance } from "./thread-glance.ts"
 
 /**
@@ -54,6 +58,10 @@ export function inventoryView(input: {
   readonly threads: ReadonlyMap<ThreadId, ThreadGlance>
   /** Each thread's name, which a reference names as where it is from. */
   readonly threadNames: ReadonlyMap<ThreadId, ThreadName>
+  /** Each media column, as its column draws it. */
+  readonly media: ReadonlyMap<MediaId, MediaColumnView>
+  /** Each titled card's title. */
+  readonly titles: ReadonlyMap<TitledCardId, CardTitleRecord>
   /** The bench has the selected card open, drawn full. */
   readonly open: boolean
 }): InventoryView {
@@ -79,6 +87,8 @@ export function inventoryView(input: {
     texts: input.texts,
     threads: input.threads,
     threadNames: input.threadNames,
+    media: input.media,
+    titles: input.titles,
     keyOf: slotKey,
   })
   return {

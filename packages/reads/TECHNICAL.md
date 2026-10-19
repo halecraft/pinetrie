@@ -101,7 +101,7 @@ The records it reads, and the decisions that made them:
 | `readThreads` | `pinetrie.thread` | ADR-0117 |
 | `readNames` | `pinetrie.name` | ADR-0039 |
 | `readMarks` | `pinetrie.mark` | ADR-0045, ADR-0116 |
-| `readNoteColumns` | `pinetrie.note-column` | ADR-0116 |
+| `readCardTitles` | `pinetrie.card-title` | ADR-0116, ADR-0182 |
 | `readWorkflow`, `readArchived` | `pinetrie.workflow` | ADR-0122; the archive, ADR-0029 |
 | `readRunEndReports` | `pinetrie.runEndReport` | ADR-0077 |
 | `readDigests` | `pinetrie.digest` | ADR-0106 |

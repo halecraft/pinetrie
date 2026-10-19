@@ -279,15 +279,60 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
     {
       kind: "mark",
       of: {
-        kind: "note-column",
-        column: cardIdOfKind(
+        kind: "card",
+        card: cardIdOfKind(
           "note-column",
           "01a0ffd2-0000-7000-8000-0000000000a1",
         ),
       },
       title: "Ideas",
     },
+    {
+      kind: "mark",
+      of: {
+        kind: "card",
+        card: cardIdOfKind("image", "01a0ffd2-0000-7000-8000-0000000000a2"),
+      },
+      title: "Logo",
+    },
     { kind: "retitle", canvas: TEST_CANVAS },
+    {
+      kind: "put-images",
+      images: [
+        {
+          card: cardIdOfKind("image", "01a0ffd2-0000-7000-8000-0000000000a3"),
+          sha256: "a".repeat(64) as Sha256,
+          name: "home.png",
+        },
+        {
+          card: cardIdOfKind("image", "01a0ffd2-0000-7000-8000-0000000000a4"),
+          sha256: "b".repeat(64) as Sha256,
+          name: "login.png",
+        },
+      ],
+      to: { kind: "canvas-at", canvas: TEST_CANVAS, after: null },
+      made: cardIdOfKind("media", "01a0ffd2-0000-7000-8000-0000000000a6"),
+    },
+    {
+      kind: "put-images",
+      images: [
+        {
+          card: cardIdOfKind("image", "01a0ffd2-0000-7000-8000-0000000000a3"),
+          sha256: "a".repeat(64) as Sha256,
+          name: "home.png",
+        },
+      ],
+      to: {
+        kind: "image",
+        column: cardIdOfKind("media", "01a0ffd2-0000-7000-8000-0000000000a5"),
+      },
+      made: null,
+    },
+    {
+      kind: "version",
+      image: cardIdOfKind("image", "01a0ffd2-0000-7000-8000-0000000000a3"),
+      sha256: "c".repeat(64) as Sha256,
+    },
     {
       kind: "proposed",
       lane: threadIdFor("abc"),

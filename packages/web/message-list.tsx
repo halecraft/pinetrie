@@ -44,7 +44,11 @@ function MessageListView(p: MessageListProps) {
       p.openMargin === node.id ? (
         p.marginSlot
       ) : comments > 0 ? (
-        <MarginCount count={comments} onOpen={() => p.onMargin(node.id)} />
+        <MarginCount
+          beside="message"
+          count={comments}
+          onOpen={() => p.onMargin(node.id)}
+        />
       ) : null
     return (
       <Fragment key={node.id}>

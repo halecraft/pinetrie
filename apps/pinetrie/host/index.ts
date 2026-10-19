@@ -134,6 +134,7 @@ import { createPlaces } from "./places.ts"
 import { hostPolicy, resolveDoc, SCHEMA_OF } from "./policy.ts"
 import { projectAdapter } from "./project.ts"
 import { createProvenance } from "./provenance.ts"
+import { createPutImage } from "./put-image.ts"
 import {
   createWaits,
   drain as drainQueue,
@@ -688,6 +689,12 @@ export async function startHost({
   })
   lap("starting lane work")
 
+  // `put_image` acts through the commands, made after the agent.
+  let putImageLate: ReturnType<typeof createPutImage> | null = null
+  const putImageNow = (): ReturnType<typeof createPutImage> => {
+    if (putImageLate === null) throw new Error("the commands are not made yet")
+    return putImageLate
+  }
   let relaysLate: Relays | null = null
   const relaysNow = (): Relays => {
     if (relaysLate === null) throw new Error("the relays are not made yet")
@@ -712,6 +719,7 @@ export async function startHost({
               ask: (lane, to, text) => relaysNow().ask(lane, to, text),
               leave: (lane, thread) => relaysNow().leave(lane, thread),
               readBlob: createReadBlob({ runs: runDocs, blobs }),
+              putImage: (lane, ask) => putImageNow()(lane, ask),
               // A turn recorded, then a live digest of the ask `tip` is in,
               // when due.
               turnDone: async (lane, tip) => {
@@ -824,6 +832,10 @@ export async function startHost({
     keeper,
     later,
     relays,
+  })
+  putImageLate = createPutImage({
+    basics,
+    perform: (writer, intent) => commands.perform(writer, intent),
   })
   // The drain's waits for its top card: its text, someone's typing in it to
   // stop, or a blank card to be written in.

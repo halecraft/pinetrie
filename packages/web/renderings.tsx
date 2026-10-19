@@ -12,10 +12,13 @@ import {
   blobUrl,
   type CardRecord,
   type CardWidth,
+  type ImageVersion,
+  type MediaId,
   type NoteColumnId,
   type Sha256,
   type ThreadId,
   type ThreadName,
+  type TitledCardId,
   type WriterId,
 } from "@pinetrie/core"
 import {
@@ -29,13 +32,19 @@ import {
   EDIT_AS_TEXT,
   type Intent,
   KIND_ICON,
+  type MediaColumnView,
   type NoteColumnView,
   PUT,
   PUT_TITLE,
   type Reader,
   type ThreadPreview,
 } from "@pinetrie/interface"
-import { askLine, factLine } from "@pinetrie/rules"
+import {
+  askLine,
+  type CardTitleRecord,
+  factLine,
+  UNTITLED_IMAGE,
+} from "@pinetrie/rules"
 import { AT_INVENTORY, newCardId, type SessionClient } from "@pinetrie/session"
 import { createContext, type ReactNode, useContext } from "react"
 import { BoundCardEditor } from "./card-editor.tsx"
@@ -56,6 +65,10 @@ interface RenderingContext {
   readonly previewOf: (thread: ThreadId) => ThreadPreview
   /** Each note column, as its column draws it. */
   readonly notes: ReadonlyMap<NoteColumnId, NoteColumnView>
+  /** Each media column, as its column draws it. */
+  readonly media: ReadonlyMap<MediaId, MediaColumnView>
+  /** Each titled card's title. */
+  readonly titles: ReadonlyMap<TitledCardId, CardTitleRecord>
   /** Each thread's name, which a reference to it names. */
   readonly threadNames: ReadonlyMap<ThreadId, ThreadName>
   /** The column a put lands in: the one last focused; null for none. */
@@ -396,6 +409,66 @@ function ReferenceFull(p: { card: CardOf<"reference">; width: CardWidth }) {
 /** How many notes a note column shows, normal. */
 const NOTES_SHOWN = 3
 
+/** How many images a media column shows, normal. */
+const IMAGES_SHOWN = 4
+
+/** An image's version as a card draws it: its fitted copy, at its stored size. */
+function VersionImage(p: { version: ImageVersion; alt: string }) {
+  return (
+    <img
+      alt={p.alt}
+      className="card-image"
+      decoding="async"
+      height={p.version.height}
+      loading="lazy"
+      src={blobUrl(p.version.sha256)}
+      width={p.version.width}
+    />
+  )
+}
+
+/** A media column, normal or full: its title and its images, the first few or every one. */
+function ImageList(p: {
+  card: CardOf<"media">
+  width: CardWidth
+  limit: number | null
+}) {
+  const { media, onClose } = useRendering()
+  const view = media.get(p.card.id)
+  const shown = (view?.images ?? []).slice(0, p.limit ?? undefined)
+  return (
+    <NormalFrame
+      card={p.card}
+      kind="media"
+      onClose={p.limit === null ? onClose : null}
+      width={p.width}
+    >
+      <div className="card-normal-title">{view?.title ?? ""}</div>
+      <div className="card-images">
+        {shown.flatMap(i => {
+          const v = i.versions.at(-1)
+          return v === undefined
+            ? []
+            : [<VersionImage alt={i.title} key={i.image} version={v} />]
+        })}
+      </div>
+    </NormalFrame>
+  )
+}
+
+/** An image, normal and full alike: its title and the version drawn. */
+function ImageCardView(p: { card: CardOf<"image">; width: CardWidth }) {
+  const { titles } = useRendering()
+  const title = titles.get(p.card.id)?.title ?? UNTITLED_IMAGE
+  const v = p.card.content.versions.at(-1)
+  return (
+    <NormalFrame card={p.card} kind="image" width={p.width}>
+      <div className="card-normal-title">{title}</div>
+      {v !== undefined && <VersionImage alt={title} version={v} />}
+    </NormalFrame>
+  )
+}
+
 /**
  * A fact, normal and full alike: its one line, the host's, waiting for its
  * thread's end. Nobody edits or moves it.
@@ -452,9 +525,20 @@ export const RENDERINGS = {
     Normal: AskLine,
     Full: AskLine,
   },
+  media: {
+    icon: KIND_ICON.media,
+    Normal: p => <ImageList {...p} limit={IMAGES_SHOWN} />,
+    Full: p => <ImageList {...p} limit={null} />,
+  },
+  image: {
+    icon: KIND_ICON.image,
+    Normal: ImageCardView,
+    Full: ImageCardView,
+  },
 } as const satisfies { readonly [K in DrawnKind]: Renderings<K> }
 
 const NoteColumnRow = RENDERINGS["note-column"]
+const MediaRow = RENDERINGS.media
 
 /** `card` at `detail` above compact, `width` columns wide, by its kind's row. */
 export function DrawCard(p: {
@@ -497,5 +581,13 @@ export function DrawCard(p: {
       )
     case "ask":
       return <RENDERINGS.ask.Normal card={card} width={width} />
+    case "media":
+      return full ? (
+        <MediaRow.Full card={card} width={width} />
+      ) : (
+        <MediaRow.Normal card={card} width={width} />
+      )
+    case "image":
+      return <RENDERINGS.image.Normal card={card} width={width} />
   }
 }

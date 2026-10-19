@@ -12,6 +12,7 @@ import {
   type MoveTarget,
   type PlaceRefusal,
   placed,
+  placeOfKind,
   type QueueMove,
   type Reorder,
   type TypedMove,
@@ -354,6 +355,7 @@ export function drawnPlace(
     case "pinned":
     case "canvas-pinned":
     case "note":
+    case "image":
     case "margin":
     case "board":
       return { ...key, order: LAST_ORDER }
@@ -406,10 +408,9 @@ export const queuedDraft = (
   command: CardCommand | null,
 ): CardRecord | null => {
   if (move.from !== null || !isTextCardId(move.card)) return null
-  const place = drawnPlace(move.to, me, [])
-  return place === undefined ||
-    place.kind === "canvas" ||
-    place.kind === "board"
+  const drawnAt = drawnPlace(move.to, me, [])
+  const place = drawnAt === undefined ? undefined : placeOfKind("text", drawnAt)
+  return place === undefined
     ? null
     : {
         kind: "text",

@@ -20,17 +20,20 @@ const StoredCard = Schema.struct.json({
   owner: Schema.string(),
   /** `drafting`, `note`, `pinned`, `queued`, `margin`, `canvas`, `inventory`, `board` or `discarded`: the place's kind (`CardPlace`). */
   kind: Schema.string(),
-  /** A comment's entry. */
+  /** What a comment is on, printed (`printAddress`). */
   at: Schema.string(),
   /** A card at a thread's thread, which names its lane. */
   lane: Schema.string(),
-  /** A note's note column. */
+  /** A note's note column, or an image's media column. */
   column: Schema.string(),
   /** A queued, pinned, canvas or board card's rank, or a note's in its column. */
   order: Schema.string(),
   /** Who queued it. */
   by: Schema.string(),
-  /** A queued card's text version as its queuer had it (`textVersion`). */
+  /**
+   * A queued card's text version as its queuer had it (`textVersion`), or
+   * the version of the image a comment was written on.
+   */
   seen: Schema.string(),
   /** Its command. */
   command: Schema.string(),
@@ -59,6 +62,8 @@ const StoredCard = Schema.struct.json({
   quote: Schema.string(),
   /** A text card's origin, a printed address: "" for none. */
   origin: Schema.string(),
+  /** An image's versions, as JSON (`ImageVersion`). */
+  versions: Schema.string(),
 })
 
 const placesSchema = Schema.struct({

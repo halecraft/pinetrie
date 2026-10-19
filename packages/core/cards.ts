@@ -16,7 +16,7 @@ import type {
 } from "./facts.ts"
 import type { ConflictChoice } from "./folder.ts"
 import type { TextCardId, ThreadId, WriterId } from "./ids.ts"
-import type { Sha256 } from "./images.ts"
+import type { ImageRef, Sha256 } from "./images.ts"
 import type { RelayDetails } from "./mentions.ts"
 import type { IdOf, PlaceOf } from "./places.ts"
 
@@ -122,8 +122,11 @@ export const cardCommand = (card: CardRecord): CardCommand | null =>
  *   Its text is its own document; who wrote in it is read from that document's
  *   operations (`writersOfClients`), never stored.
  * - A thread's card: nothing; its id is its thread's.
- * - A note column: nothing here; its title is the host's record (`NOTE_COLUMN`,
- *   absent while untitled), and its notes are text cards whose place names it.
+ * - A note column or a media column: nothing here; its title is the host's
+ *   record (`CARD_TITLE`, absent while untitled), and its notes or images are
+ *   cards whose place names it.
+ * - An image: its versions, oldest first, never empty; the newest is drawn.
+ *   Its title is the host's record too.
  * - A fact: the fact, appended to its thread as the thread's end consumes it.
  * - A reference: an address, and the quote of what it names, kept as a blob:
  *   the past never changes, so the quote is exact, and the reference draws
@@ -147,9 +150,24 @@ export interface ContentOf {
   readonly "note-column": Readonly<Record<string, never>>
   readonly fact: { readonly fact: QueuedFact }
   readonly ask: { readonly relay: RelayDetails }
+  readonly media: Readonly<Record<string, never>>
+  readonly image: { readonly versions: readonly ImageVersion[] }
 }
 
-/** The kinds of card with records: the reserved `media` and `file` have none yet. */
+/**
+ * One version of an image: the copy drawn, fitted as every stored image is,
+ * with its type and size, so a column holds its box before its bytes load;
+ * the image as it came (`original`, the copy itself when nothing was
+ * fitted); who added it and when. The host appends them, so two added at
+ * once both land, in the order it took them.
+ */
+export interface ImageVersion extends ImageRef {
+  readonly original: Sha256
+  readonly by: WriterId
+  readonly at: number
+}
+
+/** The kinds of card with records: the reserved `file` has none yet. */
 export type PlacedKind = keyof ContentOf
 
 /**
@@ -193,6 +211,16 @@ export type FactCard = Card<"fact">
 /** A reference to an address. */
 export type ReferenceCard = Card<"reference">
 
+/** A media column's card: on a canvas, in an inventory or in a trash. */
+export type MediaCard = Card<"media">
+
+/** An image's card: in a media column or in a trash. */
+export type ImageCard = Card<"image">
+
+/** The version of `image` drawn: its newest. */
+export const shownVersion = (image: ImageCard): ImageVersion | undefined =>
+  image.content.versions.at(-1)
+
 /**
  * A card's record, by kind, so a text card on a canvas, a thread's card in a
  * queue or a fact anywhere but a queue does not compile.
@@ -203,7 +231,7 @@ export type CardRecord = { [K in PlacedKind]: Card<K> }[PlacedKind]
 export const isTextCard = (card: CardRecord): card is TextCard =>
   card.kind === "text"
 
-/** A thread card's content, and a note column's: nothing. */
+/** A thread card's content, a note column's and a media column's: nothing. */
 export const NO_CONTENT: Readonly<Record<string, never>> = {}
 
 /**
@@ -231,7 +259,33 @@ export function cardTextSource(card: CardRecord): TextSource {
     case "thread":
     case "canvas":
     case "note-column":
+    case "media":
+    case "image":
       return { kind: "none" }
+  }
+}
+
+/**
+ * The blobs a card holds, which the sweep keeps while the card is: a
+ * reference's quote, an image's versions. A text card's text names blobs of
+ * its own, which the sweep reads from the text.
+ */
+export function cardBlobs(card: CardRecord): readonly Sha256[] {
+  switch (card.kind) {
+    case "reference":
+      return [card.content.quote]
+    case "image":
+      return card.content.versions.flatMap(v =>
+        v.original === v.sha256 ? [v.sha256] : [v.sha256, v.original],
+      )
+    case "text":
+    case "thread":
+    case "canvas":
+    case "note-column":
+    case "fact":
+    case "ask":
+    case "media":
+      return []
   }
 }
 

@@ -19,6 +19,9 @@ import { lineDocPrefix } from "../lines.ts"
 import { SCHEMA_OF, type StoredKind, storedKind } from "../policy.ts"
 import type { OpenedStore } from "../store.ts"
 import { REPLY_DIAGNOSTICS } from "./0001-reply-diagnostics.ts"
+import { IMAGE_VERSIONS } from "./0002-image-versions.ts"
+import { ONE_MARGIN } from "./0003-one-margin.ts"
+import { CARD_TITLES } from "./0004-card-titles.ts"
 import type { MigrationLedger } from "./ledger.ts"
 
 /** What a migration reads with, and writes with once every read loaded. */
@@ -48,12 +51,12 @@ export interface Migration {
 }
 
 /**
- * Every migration this build carries, oldest first: none. A store opens
- * through the one migration from its stored hash. Each one Duane's store ran
- * was deleted; restore one from the revision that deleted it for a store still
+ * Every migration this build carries, oldest first. A store opens through
+ * the one migration from its stored hash. Each one Duane's store ran was
+ * deleted; restore one from the revision that deleted it for a store still
  * on its hash.
  */
-export const MIGRATIONS: readonly Migration[] = []
+export const MIGRATIONS: readonly Migration[] = [IMAGE_VERSIONS]
 
 /**
  * A one-time change to stored contents that keeps every schema's hash: a
@@ -73,7 +76,11 @@ export interface RecordMigration {
 }
 
 /** Every one-time record migration this build carries, oldest first. */
-export const RECORD_MIGRATIONS: readonly RecordMigration[] = [REPLY_DIAGNOSTICS]
+export const RECORD_MIGRATIONS: readonly RecordMigration[] = [
+  REPLY_DIAGNOSTICS,
+  ONE_MARGIN,
+  CARD_TITLES,
+]
 
 /**
  * A one-time deletion of stored documents no schema of ours opens, planned

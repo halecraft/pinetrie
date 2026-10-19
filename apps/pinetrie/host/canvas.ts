@@ -10,14 +10,13 @@ import {
   type CanvasId,
   canvasInView,
   canvasPinnedInView,
-  type NoteColumnId,
   type ThreadId,
   type WriterId,
 } from "@pinetrie/core"
 import {
+  readCardTitles,
   readMarks,
   readNames,
-  readNoteColumns,
   readParticipantNames,
   readPlaces,
   readRoots,
@@ -30,11 +29,10 @@ import {
   type CanvasPinnedMessage,
   canvasList,
   canvasPinnedCards,
+  columnGlances,
   displayName,
   encodeCanvas,
   encodeCanvasPinned,
-  NEW_NOTES_TITLE,
-  notesIn,
   pinnedReads,
   planCanvasPinnedRead,
   planCanvasRead,
@@ -96,8 +94,6 @@ export function createCanvasContext(deps: {
     const work = new Map<ThreadId, AgentWork>(
       readRunningLanes(session, live).map(r => [r.lane, "running"] as const),
     )
-    const noteColumns = readNoteColumns(session)
-    const noteIds = here.flatMap(c => (c.kind === "note-column" ? [c.id] : []))
     // plan
     const listed = planCanvasRead({
       inView: canvasInView(index, tip),
@@ -113,15 +109,11 @@ export function createCanvasContext(deps: {
         reading: lane,
         names: readNames(session),
         work,
-        noteTitles: new Map<NoteColumnId, string>(
-          noteIds.map(id => [
-            id,
-            noteColumns.get(id)?.title ?? NEW_NOTES_TITLE,
-          ]),
-        ),
-        noteCounts: new Map(
-          noteIds.map(id => [id, notesIn(cards, id).length] as const),
-        ),
+        glances: columnGlances({
+          cards,
+          onCanvas: here,
+          titles: readCardTitles(session),
+        }),
         nameOf,
       }),
     })

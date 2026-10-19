@@ -127,6 +127,51 @@ test("the blob sweep keeps a reference's quote, and deletes one no card holds", 
   expect(left).not.toContain(dropped.sha256)
 })
 
+test("the blob sweep keeps every version of an image, in a trash too", async () => {
+  const b = basics()
+  const blobs = memoryBlobs(() => 0)
+  const [v1, v2] = [blobs.put(storedText("v1")), blobs.put(storedText("v2"))]
+  const dropped = blobs.put(storedText("no image holds this"))
+  const column = cardIdOfKind("media", "01a0ffd2-0000-7000-8000-0000000000e2")
+  seedPlaces(b.places, [
+    {
+      kind: "write",
+      record: makeCard(
+        "image",
+        cardIdOfKind("image", "01a0ffd2-0000-7000-8000-0000000000e3"),
+        { kind: "trash", left: { kind: "image", column, order: "m" } },
+        {
+          versions: [
+            {
+              sha256: v1.sha256,
+              original: v1.sha256,
+              mimeType: "image/png",
+              width: 4,
+              height: 3,
+              by: ADA,
+              at: 1,
+            },
+            {
+              sha256: v2.sha256,
+              original: v2.sha256,
+              mimeType: "image/png",
+              width: 4,
+              height: 3,
+              by: ADA,
+              at: 2,
+            },
+          ],
+        },
+        ADA,
+      ),
+    },
+  ])
+  await sweepBlobs({ basics: b, blobs, grace: 0, texts: async () => [] })
+  const left = blobs.list().map(x => x.sha256)
+  expect(left).toEqual(expect.arrayContaining([v1.sha256, v2.sha256]))
+  expect(left).not.toContain(dropped.sha256)
+})
+
 test("a thread deleted from the trash leaves the shared files' lineages it read", async () => {
   const b = basics()
   const thread = threadIdFor("0123456789abcdef")

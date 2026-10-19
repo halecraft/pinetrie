@@ -33,6 +33,8 @@ export {
 export {
   newCanvasId,
   newCardId,
+  newImageId,
+  newMediaId,
   newNoteColumnId,
   newReferenceCardId,
   newRootId,

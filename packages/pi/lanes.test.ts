@@ -119,6 +119,9 @@ test("the prompt no longer tells the model to search with bash", () => {
       leave: async () => {
         throw new Error("unused")
       },
+      putImage: async () => {
+        throw new Error("put_image was not called")
+      },
       readBlob: async () => {
         throw new Error("unused")
       },
@@ -404,6 +407,9 @@ describe("lanes in a harness", () => {
           leave: async () => {
             throw new Error("unused")
           },
+          putImage: async () => {
+            throw new Error("put_image was not called")
+          },
           readBlob: async () => {
             throw new Error("unused")
           },
@@ -664,6 +670,9 @@ describe("lanes in a harness", () => {
           },
           leave: async () => {
             throw new Error("unused")
+          },
+          putImage: async () => {
+            throw new Error("put_image was not called")
           },
           readBlob: async () => {
             throw new Error("unused")
