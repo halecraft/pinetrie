@@ -1108,4 +1108,13 @@ export const mutations: readonly Mutation[] = [
     expect:
       "a host started after AGENTS.md changed leads with the lane's prompt as it was, and its next run writes the change alone",
   },
+  {
+    name: "read_card's image is dropped",
+    file: "packages/pi/read-card.ts",
+    from: "          ...(answer.image === null\n",
+    to: "          ...(true\n",
+    command: ["pnpm", "exec", "vitest", "run", "packages/pi/read-card.test.ts"],
+    expect:
+      "read_card's result is the host's words, then its image, which the model sees",
+  },
 ]

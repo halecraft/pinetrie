@@ -8,7 +8,7 @@ import path from "node:path"
 import { writerId } from "@pinetrie/core"
 import { UPLOADING } from "@pinetrie/interface"
 import { blobSha256, scriptedModel } from "@pinetrie/pi"
-import type { Page } from "@playwright/test"
+import type { CDPSession, Page } from "@playwright/test"
 import type { Checks } from "../checks.ts"
 import { idleNow, startSuiteHost, suiteModel, waitFor } from "../harness.ts"
 import { greyPng, RED_PNG } from "../images.ts"
@@ -452,6 +452,36 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           refused,
           `refused ${refused}`,
         )
+        // Media columns: files dropped between columns make one there, an
+        // image dragged out of a message is put in it, a file dropped on an
+        // image is a version, an image dragged before another moves there,
+        // and the pane's put makes another after the thread.
+        const media = await mediaColumns(pp, cdp, notesFile, drawn)
+        check(
+          "files dropped past the last column make a media column there, each image titled by its file, and say what was left out",
+          media.made,
+          media.madeDetail,
+        )
+        check(
+          "an image dragged out of a message onto a media column is put at its end",
+          media.dragged,
+          media.draggedDetail,
+        )
+        check(
+          "a file dropped on an image is a version of it",
+          media.versioned,
+          media.versionedDetail,
+        )
+        check(
+          "an image dragged onto another in its column moves before it",
+          media.reordered,
+          media.reorderedDetail,
+        )
+        check(
+          "the pane's put on canvas makes a media column after its thread",
+          media.paned,
+          media.panedDetail,
+        )
         // Pia's picture: chosen on her profile page, cropped to a
         // square in the browser and sent at 256, then drawn in her circle in
         // Quinn's window, where she reads the thread he has open.
@@ -633,5 +663,131 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     }
   } finally {
     await browser.close().catch(() => {})
+  }
+}
+
+/** Media columns on Pia's canvas, from a drop, a drag, a version, a reorder and the pane's put. */
+async function mediaColumns(
+  pp: Page,
+  cdp: CDPSession,
+  textFile: string,
+  messageImage: string,
+) {
+  const dir = mkdtempSync(path.join(tmpdir(), "pinetrie-media-"))
+  const wide = path.join(dir, "wide.png")
+  const tall = path.join(dir, "tall.png")
+  writeFileSync(wide, greyPng(60, 30))
+  writeFileSync(tall, greyPng(30, 60))
+  const fileDrop = async (x: number, y: number, files: string[]) => {
+    const data = { items: [], files, dragOperationsMask: 1 }
+    for (const type of ["dragEnter", "dragOver", "drop"] as const)
+      await cdp.send("Input.dispatchDragEvent", { type, x, y, data })
+  }
+  /** The middle of the part of `sel` the window shows; null when it shows none. */
+  const visible = async (sel: string) => {
+    const b = await pp
+      .locator(sel)
+      .first()
+      .boundingBox({ timeout: 5_000 })
+      .catch(() => null)
+    const view = pp.viewportSize()
+    if (b === null || view === null) return null
+    const top = Math.max(b.y, 0)
+    const bottom = Math.min(b.y + b.height, view.height)
+    const left = Math.max(b.x, 0)
+    const right = Math.min(b.x + b.width, view.width)
+    return bottom <= top || right <= left
+      ? null
+      : { x: (left + right) / 2, y: (top + bottom) / 2 }
+  }
+  /** A drag by the pointer from `from` onto `to`, `from` scrolled into view first. */
+  const pointerDrag = async (from: string, to: string) => {
+    await pp
+      .locator(from)
+      .first()
+      .scrollIntoViewIfNeeded({ timeout: 5_000 })
+      .catch(() => {})
+    const a = await visible(from)
+    const b = await visible(to)
+    if (a === null || b === null) return
+    await pp.mouse.move(a.x, a.y)
+    await pp.mouse.down()
+    await pp.mouse.move(b.x, b.y, { steps: 12 })
+    await pp.mouse.up()
+  }
+  const centre = async (sel: string) => (await visible(sel)) ?? { x: 0, y: 0 }
+  const images = (column = ".media-column") =>
+    pp.locator(`${column} .media-image`).count()
+  /** Whether `test` holds within ten seconds. */
+  const until = async (test: () => Promise<boolean>) =>
+    (await waitFor(test, 10_000)) >= 0
+  // Past the last column: a media column, the text file left out.
+  const thread = await pp.locator(col(0)).boundingBox()
+  await fileDrop(
+    (thread?.x ?? 0) + (thread?.width ?? 0) + 30,
+    (thread?.y ?? 0) + 200,
+    [wide, textFile],
+  )
+  const made = await until(async () => (await images()) === 1)
+  const title = await pp
+    .locator(".media-column .media-image-title")
+    .first()
+    .textContent({ timeout: 5_000 })
+    .catch(() => null)
+  const left = await pp
+    .locator(".canvas-end .media-left")
+    .textContent({ timeout: 5_000 })
+    .catch(() => null)
+  // The message's image dragged onto the column's header.
+  await pointerDrag(messageImage, ".media-column .column-head")
+  const dragged = await until(async () => (await images()) === 2)
+  // A file dropped on the first image: its second version.
+  const first = await centre(".media-column .media-image img")
+  await fileDrop(first.x, first.y, [tall])
+  const versioned = await until(
+    async () =>
+      (await pp
+        .locator(".media-column .media-versions")
+        .first()
+        .textContent({ timeout: 1_000 })
+        .catch(() => null)) === "‹2 of 2›",
+  )
+  // The second image dragged onto the first: it moves before it.
+  const order = () =>
+    pp
+      .locator(".media-column .media-image")
+      .evaluateAll(els => els.map(e => e.getAttribute("data-card")))
+  const before = await order()
+  await pointerDrag(
+    ".media-column .media-image:nth-child(2) .media-image-grip",
+    ".media-column .media-image:nth-child(1) img",
+  )
+  const reordered = await until(async () => {
+    const now = await order()
+    return now.length === 2 && now[0] === before[1] && now[1] === before[0]
+  })
+  // The pane's put: a second media column, just after the thread.
+  await pp.click(messageImage)
+  await pp
+    .click(".pane .add-put-on-canvas", { timeout: 10_000 })
+    .catch(() => {})
+  const paned = await until(
+    async () => (await pp.locator(".media-column").count()) === 2,
+  )
+  const strip = await pp
+    .locator("#strip > [data-card]")
+    .evaluateAll(els => els.map(e => e.getAttribute("data-kind")))
+  await pp.keyboard.press("Escape")
+  return {
+    made: made && title === "wide.png" && left?.includes("1 file") === true,
+    madeDetail: `made ${made}, title ${JSON.stringify(title)}, left ${JSON.stringify(left)}`,
+    dragged,
+    draggedDetail: `images ${await images()}`,
+    versioned,
+    versionedDetail: `versioned ${versioned}`,
+    reordered,
+    reorderedDetail: `before ${JSON.stringify(before)}, after ${JSON.stringify(await order())}`,
+    paned: paned && strip[1] === "media",
+    panedDetail: `strip ${JSON.stringify(strip)}`,
   }
 }

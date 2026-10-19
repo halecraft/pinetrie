@@ -243,6 +243,7 @@ export {
   trashedTime,
   type Verb,
 } from "./card-history.ts"
+export { type CardRead, planCardRead } from "./card-read.ts"
 export {
   CARD_TITLE,
   type CardTitleRecord,

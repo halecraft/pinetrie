@@ -1644,6 +1644,7 @@ export function App({
 
   /** The props every column shares, whichever tab draws it. */
   const shared = {
+    media: mediaViews,
     labelOf,
     activity,
     asks,

@@ -37,6 +37,9 @@
     comments. A run is told each media column and its images' titles, never
     the images. A note column's title is one record with a media column's and
     an image's, a card's title, and every stored one is moved to it.
+  - ADR-0183: "reading any card on demand waits for a tool of its own":
+    `read_card` reads an image, a media column or a note column of the
+    thread's canvas.
 
 **Context.**
 

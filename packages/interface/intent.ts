@@ -354,6 +354,17 @@ export type Intent =
       readonly images: readonly PutImage[]
       readonly to: ImagesTarget
     }
+  /**
+   * A stored image, dragged out of a thread or the pane, put as a new image
+   * at a spot on a canvas or at a media column's end: one image, its id
+   * minted as it is planned.
+   */
+  | {
+      readonly kind: "putStored"
+      readonly sha256: Sha256
+      readonly name: string
+      readonly to: ImagesTarget
+    }
   /** An image uploaded, added as a version of `image`. */
   | {
       readonly kind: "addVersion"
@@ -624,6 +635,20 @@ function planOf(
       ]
     // A put to a spot makes a media column, minted here so its maker sees
     // it unfolded.
+    case "putStored": {
+      const [card] = minted.images(1)
+      return card === undefined
+        ? []
+        : planOf(
+            {
+              kind: "putImages",
+              images: [{ card, sha256: intent.sha256, name: intent.name }],
+              to: intent.to,
+            },
+            state,
+            minted,
+          )
+    }
     case "putImages": {
       if (intent.images.length === 0) return []
       const { to } = intent

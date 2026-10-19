@@ -4,12 +4,15 @@
 // (`packages/web/media-column.tsx`) draws one on a canvas.
 
 import {
+  type CanvasId,
   type CardRecord,
   type ImageId,
   type ImageVersion,
   imageMargin,
   type MediaId,
   printAddress,
+  type Sha256,
+  type ThreadId,
   type TitledCardId,
 } from "@pinetrie/core"
 import {
@@ -18,6 +21,7 @@ import {
   NEW_MEDIA_TITLE,
   UNTITLED_IMAGE,
 } from "@pinetrie/rules"
+import type { StartButton } from "./start-button.ts"
 
 /** One image, as drawn. */
 export interface ImageView {
@@ -95,9 +99,51 @@ export function commentVersionWords(
   return at < 0 || at === versions.length - 1 ? null : `on version ${at + 1}`
 }
 
-/** The pane's control that puts the image it shows on the canvas. */
-export const PUT_ON_CANVAS = {
-  label: "put on canvas",
-  title:
-    "put this image in a new media column just after this thread, for everyone",
-} as const
+/**
+ * The pane's put: the image it shows in a new media column just after the
+ * thread, and in its ▾, each media column of the canvas, at its end.
+ */
+export function putOnCanvasButton(input: {
+  readonly sha256: Sha256
+  readonly name: string
+  readonly canvas: CanvasId
+  readonly thread: ThreadId
+  readonly columns: readonly { readonly id: MediaId; readonly title: string }[]
+}): StartButton {
+  const { sha256, name } = input
+  const [first, ...rest] = input.columns.map(c => ({
+    key: `into-${c.id}`,
+    label: `into ${c.title}`,
+    name: `put into ${c.title}`,
+    title: `put this image at the end of the media column ${c.title}, for everyone`,
+    intent: {
+      kind: "putStored",
+      sha256,
+      name,
+      to: { kind: "image", column: c.id },
+    } as const,
+  }))
+  return {
+    main: {
+      key: "put-on-canvas",
+      label: "put on canvas",
+      name: "put on canvas",
+      title:
+        "put this image in a new media column just after this thread, for everyone",
+      intent: {
+        kind: "putStored",
+        sha256,
+        name,
+        to: { kind: "canvas-at", canvas: input.canvas, after: input.thread },
+      },
+    },
+    more:
+      first === undefined
+        ? null
+        : { items: [first, ...rest], label: "put into a media column" },
+  }
+}
+
+/** How many files a drop left out, and why. */
+export const leftOutWords = (n: number): string =>
+  `${n === 1 ? "1 file" : `${n} files`} left out: only images go in a media column`

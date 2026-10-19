@@ -4538,4 +4538,31 @@ export const mutations: readonly Mutation[] = [
     expect:
       "a column named by its title, case aside, takes the image at its end, titled by its file",
   },
+  // ── read_card ──
+  {
+    name: "read_card reads an image's first version",
+    file: "packages/rules/card-read.ts",
+    from: "    const n = input.version ?? versions.length\n",
+    to: "    const n = input.version ?? 1\n",
+    command: unit,
+    expect: "an image is its newest version's copy, or the version asked for",
+  },
+  {
+    name: "read_card reads another canvas's card",
+    file: "packages/rules/card-read.ts",
+    from: "  if (canvasOf(cards, id) !== here)\n",
+    to: "  if (false)\n",
+    command: unit,
+    expect:
+      "a card on another canvas, a kind it does not read, or a thread on no canvas is refused",
+  },
+  {
+    name: "read_card reads a note column as its title alone",
+    file: "packages/rules/card-read.ts",
+    from: '      ...notes.map(n => input.noteTexts.get(n.id) ?? ""),\n',
+    to: "",
+    command: unit,
+    expect:
+      "a media column lists its images; a note column gives its notes' texts",
+  },
 ]

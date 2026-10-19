@@ -829,6 +829,11 @@ item 18, and in `lanes.test.ts` against the harness.
   `read`'s images are (`prepareImage`, the original beside its fitted
   copy); a `/blob/` link names one already stored. The host decides where
   it goes and writes it as the thread's person (`LaneHooks.putImage`).
+- **`read_card`** (`read-card.ts`, ADR-0183) reads a card of the thread's
+  canvas by id. The host answers its words and, for an image, the blob
+  store's bytes of the version read (`LaneHooks.readCard`); the result's
+  image part is those bytes, so the session keeps it as a reference
+  (`stored-images.ts`), as `read`'s images are kept.
 - **pine·trie's own skills** are in `skills/`, loaded after yours and the repo's
   (`additionalSkillPaths`; pi's loader keeps the first of a name):
   `resolve-conflicts` (ADR-0033), `commit-message` and `proposed-changes-stack`

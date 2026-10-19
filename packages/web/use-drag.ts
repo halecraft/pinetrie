@@ -11,11 +11,19 @@
 // threshold, so the one long frame of a drag falls before anything is seen
 // to move. Touch does not drag: a touch scrolls and taps.
 
-import { type CanvasId, isCanvasId, type WorkflowStateId } from "@pinetrie/core"
+import {
+  type CanvasId,
+  type CardId,
+  isCanvasId,
+  kindOfCard,
+  parseCardId,
+  type WorkflowStateId,
+} from "@pinetrie/core"
 import {
   type Armed,
   type CanvasOver,
   type CardOver,
+  cardBeforeGap,
   DRAG_HANDLE,
   DRAG_START,
   DROP_ZONE,
@@ -55,8 +63,8 @@ const settleMs = (): number => (reducedMotion() ? 0 : 160)
 /** What a canvas is dragged from: a board card or a row of the sidebar. */
 const ROOT_ITEM = ".thread-card, .sidebar-item"
 
-/** What moves with a card's handle: its frame, its slot. */
-const CARD_ITEM = ".card-frame, .card-grid-cell"
+/** What moves with a card's handle: its frame, its slot, an image in its media column. */
+const CARD_ITEM = ".card-frame, .card-grid-cell, .media-image"
 
 /** A group's places for a canvas's drop: its items, in order, and its end. */
 function placesOf(group: Element | null): {
@@ -137,6 +145,17 @@ interface Press {
   readonly strip: HTMLElement | null
   /** The ghost drawn off the strip, a copy of the handle; null for no column. */
   readonly ghost: HTMLElement | null
+  /**
+   * For an image's drag, a stored one or an image card: the strip's box, its
+   * canvas and each column's card and centre, where a drop between columns
+   * lands; null for any other drag.
+   */
+  readonly spots: {
+    readonly strip: HTMLElement
+    readonly box: { left: number; right: number; top: number; bottom: number }
+    readonly canvas: CanvasId
+    readonly columns: readonly { readonly card: CardId; readonly mid: number }[]
+  } | null
 }
 
 export function useDrag(input: {
@@ -245,6 +264,31 @@ export function useDrag(input: {
       if (board !== null) return { over: { kind: "board" }, el: board }
       const zone = under?.closest<HTMLElement>(DROP_ZONE) ?? null
       const target = zone === null ? null : targetOfElement(zone)
+      // An image between columns lands at that gap, as a file dropped there
+      // does, unless a media column takes it.
+      const { spots } = p
+      if (
+        spots !== null &&
+        target?.kind !== "images" &&
+        x >= spots.box.left &&
+        x <= spots.box.right &&
+        y >= spots.box.top &&
+        y <= spots.box.bottom
+      )
+        return {
+          over: {
+            kind: "put",
+            target: {
+              kind: "canvas",
+              canvas: spots.canvas,
+              after: cardBeforeGap(
+                spots.columns,
+                x - spots.box.left + spots.strip.scrollLeft,
+              ),
+            },
+          },
+          el: spots.strip,
+        }
       if (zone === null || target === null)
         return { over: { kind: "none" }, el: null }
       // A row of the sidebar: onto its canvas, or between it and a neighbour.
@@ -322,7 +366,7 @@ export function useDrag(input: {
       p.handle.setPointerCapture(p.pointer)
       p.moving.dataset.dragging = ""
       p.moving.style.pointerEvents = "none"
-      if (p.source.kind === "card") document.body.dataset.cardDrag = ""
+      if (p.source.kind !== "canvas") document.body.dataset.cardDrag = ""
       if (p.armed.column && p.strip !== null) p.strip.dataset.reordering = ""
       getSelection()?.removeAllRanges()
       swallowClick = true
@@ -446,9 +490,11 @@ export function useDrag(input: {
       // they end, not on their way there.
       settleFolds()
       const strip = stripRef.current
+      // A column's own handle drags it; a card inside it moves alone.
+      const holder = handle.closest<HTMLElement>("#strip > [data-card]")
       const column =
-        source.kind === "card"
-          ? (handle.closest<HTMLElement>("#strip > [data-card]") ?? null)
+        source.kind === "card" && holder?.dataset.card === source.card
+          ? holder
           : null
       const columns =
         column !== null && strip !== null
@@ -487,7 +533,46 @@ export function useDrag(input: {
       const item =
         source.kind === "canvas" ? handle.closest<HTMLElement>(ROOT_ITEM) : null
       const places = placesOf(item?.closest(ROOT_GROUP_ZONE) ?? null)
+      const imageDrag =
+        source.kind === "image" ||
+        (source.kind === "card" && kindOfCard(source.card) === "image")
+      const spotTarget = strip === null ? null : targetOfElement(strip)
+      const spots =
+        !imageDrag ||
+        strip === null ||
+        stripBox === null ||
+        spotTarget?.kind !== "canvas"
+          ? null
+          : {
+              strip,
+              box: {
+                left: stripBox.left,
+                right: stripBox.right,
+                top: stripBox.top,
+                bottom: stripBox.bottom,
+              },
+              canvas: spotTarget.canvas,
+              columns: [
+                ...strip.querySelectorAll<HTMLElement>(":scope > [data-card]"),
+              ].flatMap(el => {
+                const card = parseCardId(el.dataset.card ?? "")
+                const b = el.getBoundingClientRect()
+                return card === undefined
+                  ? []
+                  : [
+                      {
+                        card,
+                        mid:
+                          b.left -
+                          stripBox.left +
+                          strip.scrollLeft +
+                          b.width / 2,
+                      },
+                    ]
+              }),
+            }
       return {
+        spots,
         source,
         handle,
         moving,

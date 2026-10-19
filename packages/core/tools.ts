@@ -32,6 +32,8 @@ export const LEAVE_TOOL = "leave"
 export const SAVE_BLOB_TOOL = "save_blob"
 /** Put an image in a media column of the thread's canvas, or add a version of one. */
 export const PUT_IMAGE_TOOL = "put_image"
+/** Read a card of the thread's canvas: an image, a media column, a note column. */
+export const READ_CARD_TOOL = "read_card"
 /** Propose new threads branching from this run's end, which a person opens or starts. */
 export const PROPOSE_TOOL = "propose_branches"
 
@@ -61,6 +63,7 @@ export const TOOL_IDS = [
   RESOLVE_TOOL,
   SAVE_BLOB_TOOL,
   PUT_IMAGE_TOOL,
+  READ_CARD_TOOL,
   PROPOSE_TOOL,
 ] as const
 
@@ -111,6 +114,7 @@ const SUBJECTS: Readonly<
   [RESOLVE_TOOL]: path,
   [SAVE_BLOB_TOOL]: path,
   [PUT_IMAGE_TOOL]: args => field(args, "image"),
+  [READ_CARD_TOOL]: args => field(args, "card"),
   [PROPOSE_TOOL]: undefined,
 }
 

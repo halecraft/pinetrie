@@ -1,8 +1,9 @@
 // web/blob-image — an image the host keeps, as a message's markdown or a tool's
 // result draws it. A click opens it in the column's pane; a Cmd- or Ctrl-click
-// opens it in a new tab.
+// opens it in a new tab; a drag puts it in a media column (`use-drag.ts`).
 
 import { blobOfUrl, blobUrl, type ImageRef } from "@pinetrie/core"
+import { dragProps } from "@pinetrie/interface"
 import { type ComponentProps, type CSSProperties, useContext } from "react"
 import { imageClick } from "./image-click.ts"
 import { blockOfProperty } from "./markdown.ts"
@@ -47,6 +48,11 @@ export function BlobImage(
     // biome-ignore lint/a11y/useKeyWithClickEvents: a shortcut for the mouse; the image is not a control
     <img
       {...props}
+      {...dragProps({
+        kind: "image",
+        sha256: sha,
+        name: alt === undefined || alt === "" ? (title ?? "image") : alt,
+      })}
       alt={alt ?? ""}
       className="blob-image"
       data-shown={shown || undefined}

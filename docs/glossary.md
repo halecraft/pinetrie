@@ -90,6 +90,10 @@ words they were written with.
 | **trash** | Not a place of its own: a discarded card records where it was, and is in the trash of what it left, a canvas's for a column, a note column's for a note, a thread's for your message, your own for your inventory; seen by whoever saw it there, until restored, undone or deleted a week on (ADR-0134). | `trash` (`{ kind: "trash", left }`, stored as `discarded-<kind>`), `DISCARDED`, `surfaceOwner`, `planTrashSweep`, `trashDeadline` | the `gone` place; a person's trash |
 | **restore** (a trashed card) | Bring a trashed card back where it was, at its rank: from a canvas column's trash, or by following a link to a trashed thread; anyone who could see it there may (ADR-0134). Refused when that place is gone or taken. Not a canvas's restore from the archive. | `planFromTrash`'s `restore`, `BACK`, `planRestore` | undo |
 | **note** | A text card in a note column, which everyone on the canvas sees and no agent reads (ADR-0116). | `note`, `notesTarget`, `notesIn`, `NoteCardEditor` | drafting card, draft; a note below the line on its thread's notes board |
+| **media column** | A card on a canvas, in an inventory or in a trash: a title and its images in one order. Images only; video waits for a decision of its own (ADR-0116, ADR-0182). | `MediaId`, `MediaCard`, `MediaColumn`, `MediaColumnView` | media card |
+| **image** (a card) | A card in a media column, or in a trash: its versions, its title, and its margin of comments (ADR-0182). | `ImageId`, `ImageCard`, `ImageView`, `put_image` | |
+| **version** (of an image) | One of an image's blobs, oldest first, with who added it and when; the newest is drawn, and none is removed (ADR-0182). | `ImageVersion`, `planVersion` | |
+| **card's title** | One record for every titled card on a canvas (a note column, a media column, an image), keyed by its id; a canvas's title stays a mark (ADR-0182). | `CARD_TITLE`, `TitledKind` | a note column's title record |
 | **note column** | A card on a canvas whose content is a list of notes, titled or "Notes" (ADR-0116). Named by how it is drawn (ADR-0126). | `NoteColumnId`, `NoteColumnCard`, `CARD_TITLE`, `nearestNoteColumn`, `NoteColumn` | notes board |
 | **queued card** | A text card above the line, which the agent reads once, when the host pops it. | `queued`, `queuedOn`, `QueuedCardEditor` | |
 | **pinned card** | A text card the agent reads on every run, at the top of its thread's column. | `pinned`, `pinTargetKey`, `PinnedCardEditor` | |
@@ -137,8 +141,8 @@ a value is stored.
 | **run** | The agent's work in answer to an ask: the entries it wrote, and any fact steered into it. A run has an ask (ADR-0106). | `AskIndex.work`, `entryAsk` | |
 | **ask** | The message that started a run (ADR-0106). | `askOf`, `indexAsks` (by prompt) | |
 | **fork** | The point, at an entry, where threads diverge; not an entry. Forking before an entry edits it (ADR-0043); after it, branches. | `ThreadOrigin.fork` | |
-| **margin** | An entry's surface, for comments on it; shut, a count beside the entry; open, the comments under it (ADR-0126). | place `margin`, `marginCards`, `marginCounts`, `Margin`, `MarginCount` | |
-| **comment** | A note on an entry, in its margin: people read it; the agent does once a reference to it is queued (ADR-0126). | `comment`, `planComment`, `queueReference`, `commentMarkdown` | annotation |
+| **margin** | An entry's or an image's surface, for comments on it; shut, a count beside it; open, the comments under it (ADR-0126, ADR-0182). | place `margin`, `marginCards`, `marginCounts`, `Margin`, `MarginCount` | |
+| **comment** | A note on an entry or an image, in its margin: people read it; the agent does once a reference to a comment on an entry is queued (ADR-0126, ADR-0182). | `comment`, `planComment`, `queueReference`, `commentMarkdown` | annotation |
 | **derivation** | What the host computes from a thread's entries and replaces as they grow: a digest, a run-end report. Never an entry, never a card, never read by the agent; one a model made says so. | `DigestRecord`, `RunEndReportRecord` | host record (for these), annotation |
 
 ## The board
@@ -162,21 +166,17 @@ a value is stored.
 | **fold** (a column) | Hide a column for yourself; it keeps its place as a narrow strip with its title. Every column is folded until you open it. | `CardView.unfolded`, `FoldedColumn` | close (a column) |
 | **pinned to the canvas** | A text card every thread's agent on the canvas reads on every run, in the canvas column. | `canvas-pinned`, `canvasPinnedCards` | pinned to the task |
 
-## Accepted, not yet built: file cards, media columns, sources and runners
+## Accepted, not yet built: file cards, sources and runners
 
-Words of ADR-0116 to ADR-0119, ADR-0126 and ADR-0182, accepted and not yet built.
-Nothing in the code uses them yet, beyond a reserved id (`MediaId`,
-`FileCardId`); each becomes current as its part is built. ADR-0168,
+Words of ADR-0116 to ADR-0119 and ADR-0126, accepted and not yet built.
+Nothing in the code uses them yet, beyond a reserved id (`FileCardId`);
+each becomes current as its part is built. ADR-0168,
 proposed, would shelve sources and runners, and have a file card name a
 file of the project.
 
 | word | what it is | ADR | replaces |
 |---|---|---|---|
 | **file card** | A card showing one file of a source: as it is on disk for a live or read-only source, as accepted work has it for a branched one. | ADR-0116 | |
-| **media column** | A card on a canvas, in an inventory or in a trash: a title and its images in one order. Images only; video waits for a decision of its own. | ADR-0116, ADR-0182 | media card |
-| **image** (a card) | A card in a media column, or in a trash: its versions, its title, and its margin of comments. | ADR-0182 | |
-| **version** (of an image) | One of an image's blobs, oldest first, with who added it and when; the newest is drawn, and none is removed. | ADR-0182 | |
-| **card's title** | One record for every titled card on a canvas (a note column, a media column, an image), keyed by its id; a canvas's title stays a mark. | ADR-0182 | a note column's title record |
 | **source** | A folder the host's owner registers, which a thread's lane gets in one of three modes. | ADR-0118 | the host's one project |
 | **branched**, **live**, **read-only** | A source's modes: its own copy in the lane, whose work comes back as proposed changes; a read-write mount, never branched; a read-only mount. | ADR-0118 | |
 | **runner** | Where a lane runs: the host that holds it, that host's machine, and the model of each run. | ADR-0119 | |

@@ -29,7 +29,7 @@ export const CANVAS_TYPE = "pinetrie.canvas"
  * Constant, so the system prompt stays the same between runs.
  */
 export const CANVAS_RULE =
-  "The canvas's cards are listed in a `<canvas>` block, in the order everyone sees them, and the latest block is what holds. Only pinned cards' contents are given."
+  "The canvas's cards are listed in a `<canvas>` block, in the order everyone sees them, and the latest block is what holds. Only pinned cards' contents are given; `read_card` reads an image, a media column or a note column by the id the list gives."
 
 /** How many cards the list names; the rest are counted. */
 export const CANVAS_CAP = 50
@@ -159,15 +159,15 @@ function cardLine(c: CardOnCanvas, f: CanvasFacts): string {
       const g = f.glances.get(c.id)
       const title = g?.title ?? NEW_NOTES_TITLE
       const notes = g?.kind === "note-column" ? g.notes : 0
-      return `note column "${title}", ${noteCountWords(notes)}, ${by}`
+      return `note column "${title}" (${c.id}), ${noteCountWords(notes)}, ${by}`
     }
     case "media": {
       const g = f.glances.get(c.id)
       const title = g?.title ?? NEW_MEDIA_TITLE
       const images = g?.kind === "media" ? g.images : []
       return images.length === 0
-        ? `media column "${title}", no images, ${by}`
-        : `media column "${title}", ${count(images.length, "image", "images")}: ${imagesLine(images)}, ${by}`
+        ? `media column "${title}" (${c.id}), no images, ${by}`
+        : `media column "${title}" (${c.id}), ${count(images.length, "image", "images")}: ${imagesLine(images)}, ${by}`
     }
     // A new kind of canvas card does not compile until it has its line.
     default:

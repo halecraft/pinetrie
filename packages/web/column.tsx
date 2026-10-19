@@ -16,6 +16,7 @@ import {
   type EntryId,
   entryMargin,
   type LaneView,
+  type MediaId,
   nearestRevision,
   type Position,
   type ProposedThread,
@@ -79,6 +80,7 @@ import {
   keptTraces,
   type LiveWork,
   leftLine,
+  type MediaColumnView,
   NEW_PIN,
   NEW_PIN_TITLE,
   newPinPlace,
@@ -88,6 +90,7 @@ import {
   opens,
   type Pending,
   type ProposalMemory,
+  putOnCanvasButton,
   type ReadOnly,
   type ReserveStep,
   type RowMemory,
@@ -127,7 +130,7 @@ import {
 } from "@pinetrie/rules"
 import { type LiveDocHandle, readStreamText } from "@pinetrie/schema"
 import type { AccessActing, AttentionStore } from "@pinetrie/session"
-import { newCardId, newImageId, type SessionClient } from "@pinetrie/session"
+import { newCardId, type SessionClient } from "@pinetrie/session"
 import {
   type KeyboardEvent as ReactKeyboardEvent,
   useCallback,
@@ -210,6 +213,8 @@ export interface ColumnProps {
   /** This window is typing in this column, in the card its box shows. */
   onTyping: (card: CardId | null) => void
   cards: readonly CardRecord[]
+  /** Each media column, as its column draws it: the pane's put names them. */
+  media: ReadonlyMap<MediaId, MediaColumnView>
   /** The queued cards that are blank messages (`useBlankQueued`): they do not wait. */
   blank: ReadonlySet<CardId>
   /** Every seat the host has seen: who wrote in a card. */
@@ -774,16 +779,24 @@ export function Column(p: ColumnProps) {
     setPane(shown => togglePane(shown, subject)),
   )
   const closePane = useStable(() => setPane(null))
-  // The pane's image, put in a media column made just after this thread.
+  // The pane's image, put in a media column made just after this thread, or
+  // into one of the canvas's.
   const canvasHere = p.canvas
-  const putOnCanvas = useStable((sha: Sha256, name: string) => {
-    if (canvasHere === null) return
-    p.onIntent({
-      kind: "putImages",
-      images: [{ card: newImageId(), sha256: sha, name }],
-      to: { kind: "canvas-at", canvas: canvasHere, after: thread },
-    })
-  })
+  const putOnCanvas = useStable((sha256: Sha256, name: string) =>
+    putOnCanvasButton({
+      sha256,
+      name,
+      canvas: canvasHere ?? ("" as CanvasId),
+      thread,
+      columns: p.cards.flatMap(c =>
+        c.kind === "media" &&
+        c.place.kind === "canvas" &&
+        c.place.canvas === canvasHere
+          ? [{ id: c.id, title: p.media.get(c.id)?.title ?? "" }]
+          : [],
+      ),
+    }),
+  )
   const reach = useMemo(
     () => ({ shown: pane, open: openPane }),
     [pane, openPane],
@@ -1345,6 +1358,7 @@ export function Column(p: ColumnProps) {
           <Pane
             choose={chooseVersion}
             close={closePane}
+            onIntent={p.onIntent}
             putOnCanvas={
               p.readOnly === null && p.canvas !== null ? putOnCanvas : null
             }

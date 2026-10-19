@@ -19,6 +19,9 @@ Numbered 0181 until 2026-10-19, when two files held that number.
   - ADR-0134: a file dropped on the strip, between or onto columns, lands as
     images; an image in a message is a drag handle of its own.
   - ADR-0078: the pane puts the image it shows on the canvas.
+- **Amended by:**
+  - ADR-0183: the canvas list names each note column and media column by its
+    id too, so the agent can read it; an image is read through `read_card`.
 
 **Context.**
 

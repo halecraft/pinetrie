@@ -19,6 +19,8 @@ import {
 import {
   type ColumnAct,
   commentVersionWords,
+  dragProps,
+  dropProps,
   type ImageView,
   type Intent,
   MEDIA_EMPTY,
@@ -79,9 +81,12 @@ export function MediaColumn(p: {
       data-column={column}
       data-width={p.width}
       {...(writable
-        ? fileDropProps(files => {
-            void put(files, { kind: "image", column })
-          })
+        ? {
+            ...fileDropProps(files => {
+              void put(files, { kind: "image", column })
+            }),
+            ...dropProps({ kind: "images", column, before: null }),
+          }
         : {})}
     >
       <ListColumnHead
@@ -166,117 +171,129 @@ function MediaImage(p: {
       className="media-image"
       data-card={image.image}
       {...(writable
-        ? fileDropProps(files => {
-            void version(files)
-          })
+        ? {
+            ...fileDropProps(files => {
+              void version(files)
+            }),
+            ...dropProps({
+              kind: "images",
+              column: p.column,
+              before: image.image,
+            }),
+          }
         : {})}
     >
-      <a href={blobUrl(shown.original)} rel="noopener" target="_blank">
-        <img
-          alt={image.title}
-          decoding="async"
-          height={shown.height}
-          loading="lazy"
-          src={blobUrl(shown.sha256)}
-          width={shown.width}
-        />
-      </a>
-      <figcaption className="media-image-bar">
-        {renaming && writable ? (
-          <TitleField
-            label="title for this image"
-            onEnd={() => setRenaming(false)}
-            onSend={title =>
-              p.onIntent({
-                kind: "rename",
-                of: { kind: "card", card: image.image },
-                title,
-              })
-            }
-            placeholder={image.title}
-            stored={image.titled}
+      <div
+        className="media-image-grip"
+        {...(writable ? dragProps({ kind: "card", card: image.image }) : {})}
+      >
+        <a href={blobUrl(shown.original)} rel="noopener" target="_blank">
+          <img
+            alt={image.title}
+            decoding="async"
+            height={shown.height}
+            loading="lazy"
+            src={blobUrl(shown.sha256)}
+            width={shown.width}
           />
-        ) : (
-          <button
-            className="media-image-title"
-            disabled={!writable}
-            onClick={() => setRenaming(true)}
-            title="rename this image"
-            type="button"
-          >
-            {image.title}
-          </button>
-        )}
-        {image.versions.length > 1 && (
-          <span className="media-versions">
-            <button
-              aria-label="an older version"
-              disabled={at === 0}
-              onClick={() => setStep(at - 1)}
-              type="button"
-            >
-              ‹
-            </button>
-            {versionWords(at, image.versions.length)}
-            <button
-              aria-label="a newer version"
-              disabled={at === newest}
-              onClick={() => setStep(at + 1 === newest ? null : at + 1)}
-              type="button"
-            >
-              ›
-            </button>
-          </span>
-        )}
-        {writable && (
-          <span className="media-moves">
-            <button
-              aria-label="move it before the one before it"
-              onClick={() =>
-                p.act({
-                  kind: "reorder",
-                  card: image.image,
-                  among: p.among,
-                  step: -1,
+        </a>
+        <figcaption className="media-image-bar">
+          {renaming && writable ? (
+            <TitleField
+              label="title for this image"
+              onEnd={() => setRenaming(false)}
+              onSend={title =>
+                p.onIntent({
+                  kind: "rename",
+                  of: { kind: "card", card: image.image },
+                  title,
                 })
               }
-              type="button"
-            >
-              ◀
-            </button>
+              placeholder={image.title}
+              stored={image.titled}
+            />
+          ) : (
             <button
-              aria-label="move it after the one after it"
-              onClick={() =>
-                p.act({
-                  kind: "reorder",
-                  card: image.image,
-                  among: p.among,
-                  step: 1,
-                })
-              }
+              className="media-image-title"
+              disabled={!writable}
+              onClick={() => setRenaming(true)}
+              title="rename this image"
               type="button"
             >
-              ▶
+              {image.title}
             </button>
-            <button
-              aria-label="trash this image"
-              className="trash-card"
-              onClick={() => p.act({ kind: "discard", card: image.image })}
-              title="trash this image · ⌘Z brings it back"
-              type="button"
-            >
-              <TrashIcon />
-            </button>
-          </span>
-        )}
-        {open ? null : (
-          <MarginCount
-            beside="image"
-            count={image.comments}
-            onOpen={() => setOpen(true)}
-          />
-        )}
-      </figcaption>
+          )}
+          {image.versions.length > 1 && (
+            <span className="media-versions">
+              <button
+                aria-label="an older version"
+                disabled={at === 0}
+                onClick={() => setStep(at - 1)}
+                type="button"
+              >
+                ‹
+              </button>
+              {versionWords(at, image.versions.length)}
+              <button
+                aria-label="a newer version"
+                disabled={at === newest}
+                onClick={() => setStep(at + 1 === newest ? null : at + 1)}
+                type="button"
+              >
+                ›
+              </button>
+            </span>
+          )}
+          {writable && (
+            <span className="media-moves">
+              <button
+                aria-label="move it before the one before it"
+                onClick={() =>
+                  p.act({
+                    kind: "reorder",
+                    card: image.image,
+                    among: p.among,
+                    step: -1,
+                  })
+                }
+                type="button"
+              >
+                ◀
+              </button>
+              <button
+                aria-label="move it after the one after it"
+                onClick={() =>
+                  p.act({
+                    kind: "reorder",
+                    card: image.image,
+                    among: p.among,
+                    step: 1,
+                  })
+                }
+                type="button"
+              >
+                ▶
+              </button>
+              <button
+                aria-label="trash this image"
+                className="trash-card"
+                onClick={() => p.act({ kind: "discard", card: image.image })}
+                title="trash this image · ⌘Z brings it back"
+                type="button"
+              >
+                <TrashIcon />
+              </button>
+            </span>
+          )}
+          {open ? null : (
+            <MarginCount
+              beside="image"
+              count={image.comments}
+              onOpen={() => setOpen(true)}
+            />
+          )}
+        </figcaption>
+      </div>
       {open && (
         <Margin
           beside="image"

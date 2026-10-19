@@ -556,6 +556,15 @@ rings and opens what the plan's `opens` names, on the element the target
 was read from. It reads the source itself only to arm what moves and to
 set `data-card-drag`.
 
+- **An image drags as a card or as a stored image** (ADR-0182). An image in
+  a media column is a card (its `.media-image-grip`); a stored image a
+  message, a tool's row or the pane draws (`BlobImage`, the pane's `<img>`)
+  is an `image` source, by its blob. Either lands on a media column's
+  images (`data-put-images`, and `data-put-before` on an image), and
+  between columns at the strip's gap the pointer is in (`spots`, measured
+  at the press, `cardBeforeGap`), as a file dropped there lands, unless a
+  media column takes it. Only a column's own handle drags its column: a
+  card inside it (a dock's card, an image) moves alone.
 - **What the first frame needs is armed at the press**, before the 5 px
   threshold (`DRAG_START`): the strip's box, the columns' widths and
   centres, the neighbours' transitions, the ghost (a copy of the column's
@@ -1165,12 +1174,17 @@ the session sends moves and draws them until its copy holds them
   its images at its width, two to a row when two wide, each its newest
   version's fitted copy at its stored size, linking to its original. Each
   image has its title, a stepper through its versions (local to the tab), ◀
-  and ▶ (a `reorder` act among the column's images), a bin, and its margin
+  and ▶ (a `reorder` act among the column's images) and its grip, a drag
+  handle (onto another image of its column it moves before it, onto another
+  media column to its end), a bin, and its margin
   (`Margin` with `beside="image"`; a comment records the version it was
   written on, and says so under a newer one, `commentVersionWords`). Files
   dropped on the column are uploaded (`image-upload.ts` over `uploadBlob`),
   the images kept, and put at its end (`putImages`); one dropped on an image
-  is a version (`addVersion`). It says how many files a drop left out.
+  is a version (`addVersion`). It, and the strip, say how many files a drop
+  left out (`leftOutWords`). The pane's put is a split button
+  (`putOnCanvasButton`): a new column after the thread, or one of the
+  canvas's media columns from its ▾.
 - **A new note or pinned card is written in one box, as your message is**
   (`NewCardBox`, `card-editor.tsx`, over `useCardBox`): local until it holds
   something worth keeping, then the same element bound to the card it

@@ -31,6 +31,7 @@ import {
   foldedView,
   glanceCardId,
   type Intent,
+  leftOutWords,
   type MediaColumnView,
   type NoteColumnView,
   newColumnButton,
@@ -44,7 +45,7 @@ import {
 import type { CardOnCanvas } from "@pinetrie/rules"
 import { newImageId } from "@pinetrie/session"
 import type { ReactElement, RefObject } from "react"
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { AddButton } from "./add-button.tsx"
 import { CanvasColumn } from "./canvas-column.tsx"
 import { Column, type ColumnProps } from "./column.tsx"
@@ -240,6 +241,8 @@ export function Strip(p: {
   // at the gap the drop is in, as a column dropped there would land.
   const canvasAt =
     stage.kind === "canvas" && readOnly === null ? stage.canvas : null
+  // How many files the last drop on the strip left out: only an image goes in.
+  const [left, setLeft] = useState(0)
   const filesAt = async (files: readonly File[], x: number) => {
     const strip = p.stripRef.current
     if (canvasAt === null || strip === null) return
@@ -257,6 +260,7 @@ export function Strip(p: {
     // that moves meanwhile does not move it.
     const after = cardBeforeGap(columns, x - box.left + strip.scrollLeft)
     const up = await uploadImages(files)
+    setLeft(up.left)
     p.onIntent({
       kind: "putImages",
       images: up.images.map(i => ({ ...i, card: newImageId() })),
@@ -292,6 +296,7 @@ export function Strip(p: {
       {p.strip !== null && stripCards(p.strip).map(cardColumn)}
       {endDrop !== null && (
         <div className="canvas-end">
+          {left > 0 && <p className="media-left">{leftOutWords(left)}</p>}
           <AddButton
             add={newColumnButton(endDrop)}
             folded

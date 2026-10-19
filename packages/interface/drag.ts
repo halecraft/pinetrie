@@ -9,8 +9,10 @@ import {
   type CanvasId,
   type CardId,
   isCanvasId,
+  isSha256,
   isWorkflowStateId,
   parseCardId,
+  type Sha256,
   type WorkflowStateId,
 } from "@pinetrie/core"
 import { type Landing, type PutHow, putLanding } from "./card-intents.ts"
@@ -26,26 +28,43 @@ export type CardSource = { readonly kind: "card"; readonly card: CardId }
 /** A canvas dragged: a board card, a sidebar row. */
 export type CanvasSource = { readonly kind: "canvas"; readonly drag: RootDrag }
 
+/**
+ * A stored image dragged: one a message, a tool's row or the pane draws, by
+ * its blob, with the name it is put under.
+ */
+export type ImageSource = {
+  readonly kind: "image"
+  readonly sha256: Sha256
+  readonly name: string
+}
+
 /** What a drag carries. */
-export type DragSource = CardSource | CanvasSource
+export type DragSource = CardSource | CanvasSource | ImageSource
 
 const DRAG_CARD = "data-drag-card"
 const DRAG_CANVAS = "data-drag-canvas"
 const DRAG_STATE = "data-drag-state"
+const DRAG_IMAGE = "data-drag-image"
+const DRAG_NAME = "data-drag-name"
 
 /** What a handle a drag starts from matches. */
-export const DRAG_HANDLE = `[${DRAG_CARD}],[${DRAG_CANVAS}]`
+export const DRAG_HANDLE = `[${DRAG_CARD}],[${DRAG_CANVAS}],[${DRAG_IMAGE}]`
 
 /** The attributes that mark an element as a handle for `source`, spread on it by the page. */
 export function dragProps(
   source: DragSource,
 ): Readonly<Record<string, string>> {
-  return source.kind === "card"
-    ? { [DRAG_CARD]: source.card }
-    : {
+  switch (source.kind) {
+    case "card":
+      return { [DRAG_CARD]: source.card }
+    case "canvas":
+      return {
         [DRAG_CANVAS]: source.drag.canvas,
         [DRAG_STATE]: source.drag.state ?? "",
       }
+    case "image":
+      return { [DRAG_IMAGE]: source.sha256, [DRAG_NAME]: source.name }
+  }
 }
 
 /** The source a handle marks (`dragProps`); null for none. */
@@ -54,6 +73,13 @@ export function sourceOfElement(el: {
 }): DragSource | null {
   const card = parseCardId(el.getAttribute(DRAG_CARD) ?? "")
   if (card !== undefined) return { kind: "card", card }
+  const image = el.getAttribute(DRAG_IMAGE) ?? ""
+  if (isSha256(image))
+    return {
+      kind: "image",
+      sha256: image,
+      name: el.getAttribute(DRAG_NAME) ?? "",
+    }
   const canvas = el.getAttribute(DRAG_CANVAS)
   if (canvas === null || !isCanvasId(canvas)) return null
   const state = el.getAttribute(DRAG_STATE) ?? ""
@@ -95,6 +121,7 @@ export type CanvasOver =
  */
 export type DragAt =
   | (CardSource & { readonly over: CardOver })
+  | (ImageSource & { readonly over: CardOver })
   | (CanvasSource & { readonly over: CanvasOver })
 
 /** What a drop there would do. */
@@ -108,6 +135,8 @@ export type PlannedDrop =
       readonly landing: Landing
     }
   | { readonly kind: "root"; readonly intent: Intent }
+  /** A stored image put, as a new image or a version of one. */
+  | { readonly kind: "image"; readonly intent: Intent }
   | { readonly kind: "nothing" }
 
 /** What the press found, besides its source: the column's index, a canvas's place just after it. */
@@ -135,6 +164,7 @@ export function planDrop(
     const intent = planRootDrop(at.drag, over.target, from.archive, from.home)
     return intent === null ? NOTHING : { kind: "root", intent }
   }
+  if (at.kind === "image") return imageDrop(at, at.over)
   const { over } = at
   switch (over.kind) {
     case "strip":
@@ -154,6 +184,44 @@ export function planDrop(
     }
     case "board":
     case "none":
+      return NOTHING
+  }
+}
+
+/**
+ * What dropping a stored image `over` does: onto an image of a media column,
+ * a version of it; elsewhere on one, a new image at its end; at a spot on a
+ * canvas, a new image in a media column made there. Nothing anywhere else.
+ */
+function imageDrop(image: ImageSource, over: CardOver): PlannedDrop {
+  if (over.kind !== "put") return NOTHING
+  const { target } = over
+  const { sha256, name } = image
+  switch (target.kind) {
+    case "images":
+      return {
+        kind: "image",
+        intent:
+          target.before === null
+            ? {
+                kind: "putStored",
+                sha256,
+                name,
+                to: { kind: "image", column: target.column },
+              }
+            : { kind: "addVersion", image: target.before, sha256 },
+      }
+    case "canvas":
+      return {
+        kind: "image",
+        intent: {
+          kind: "putStored",
+          sha256,
+          name,
+          to: { kind: "canvas-at", canvas: target.canvas, after: target.after },
+        },
+      }
+    default:
       return NOTHING
   }
 }
@@ -192,6 +260,7 @@ export function dropIntents(
           ]
         : []
     case "root":
+    case "image":
       return [drop.intent]
     case "nothing":
       return []
@@ -318,6 +387,8 @@ export function dropMark(drop: PlannedDrop, how: PutHow): DropMark | null {
       return null
     case "root":
       return "root"
+    case "image":
+      return "copy"
     case "nothing":
       return null
     case "land":

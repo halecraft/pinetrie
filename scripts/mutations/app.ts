@@ -866,8 +866,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a root's drag lands nowhere",
     file: "packages/interface/drag.ts",
-    from: '    case "root":\n      return [drop.intent]',
-    to: '    case "root":\n      return []',
+    from: '    case "root":\n    case "image":\n      return [drop.intent]',
+    to: '    case "image":\n      return [drop.intent]\n    case "root":\n      return []',
     suite: "browser",
     scenario: "page",
     expect:
@@ -1271,10 +1271,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "live work is drawn a render behind the document",
     file: "packages/web/app.tsx",
-    from: "  const shared = {\n    labelOf,\n    activity,\n    asks,\n    folds,\n    live,\n",
+    from: "  const shared = {\n    media: mediaViews,\n    labelOf,\n    activity,\n    asks,\n    folds,\n    live,\n",
     // A frame behind, not a render: a render's passive effect can be
     // flushed before paint by a later update in the same frame.
-    to: "  const [lagged, setLagged] = useState(live)\n  useEffect(() => {\n    const f = requestAnimationFrame(() => setLagged(live))\n    return () => cancelAnimationFrame(f)\n  }, [live])\n  const shared = {\n    labelOf,\n    activity,\n    asks,\n    folds,\n    live: lagged,\n",
+    to: "  const [lagged, setLagged] = useState(live)\n  useEffect(() => {\n    const f = requestAnimationFrame(() => setLagged(live))\n    return () => cancelAnimationFrame(f)\n  }, [live])\n  const shared = {\n    media: mediaViews,\n    labelOf,\n    activity,\n    asks,\n    folds,\n    live: lagged,\n",
     suite: "browser",
     scenario: "tools",
     expect:
@@ -3266,5 +3266,53 @@ export const mutations: readonly Mutation[] = [
     suite: "host",
     scenario: "agents",
     expect: "an ask of a member whose canvas was archived says why",
+  },
+  // ── media columns ──
+  {
+    name: "the strip takes no dropped file",
+    file: "packages/web/strip.tsx",
+    from: "      {...(canvasAt === null\n",
+    to: "      {...(true\n",
+    suite: "browser",
+    scenario: "images",
+    expect:
+      "files dropped past the last column make a media column there, each image titled by its file, and say what was left out",
+  },
+  {
+    name: "a message's image is no drag handle",
+    file: "packages/web/blob-image.tsx",
+    from: "      {...dragProps({\n",
+    to: "      {...({\n",
+    suite: "browser",
+    scenario: "images",
+    expect:
+      "an image dragged out of a message onto a media column is put at its end",
+  },
+  {
+    name: "a file dropped on an image is put nowhere",
+    file: "packages/web/media-column.tsx",
+    from: "              void version(files)\n",
+    to: "              void files\n",
+    suite: "browser",
+    scenario: "images",
+    expect: "a file dropped on an image is a version of it",
+  },
+  {
+    name: "an image in a media column is no drag handle",
+    file: "packages/web/media-column.tsx",
+    from: '        {...(writable ? dragProps({ kind: "card", card: image.image }) : {})}\n',
+    to: "        {...{}}\n",
+    suite: "browser",
+    scenario: "images",
+    expect: "an image dragged onto another in its column moves before it",
+  },
+  {
+    name: "the pane has no put",
+    file: "packages/web/pane.tsx",
+    from: "            {putOnCanvas !== null && sha !== null && (\n",
+    to: "            {false && sha !== null && (\n",
+    suite: "browser",
+    scenario: "images",
+    expect: "the pane's put on canvas makes a media column after its thread",
   },
 ]

@@ -92,7 +92,9 @@ test("a run is told its canvas, its thread marked, and the canvas's pinned cards
   expect(list?.lines).toHaveLength(3)
   expect(list?.lines[0]).toMatch(/^thread .* \(this thread\), put by /)
   expect(list?.lines[1]).toMatch(/^thread .*, idle, put by /)
-  expect(list?.lines[2]).toBe('note column "Notes", no notes, put by Ada')
+  expect(list?.lines[2]).toBe(
+    `note column "Notes" (${NOTES}), no notes, put by Ada`,
+  )
   expect(list?.more).toBe(0)
   expect(CANVAS_CAP).toBe(50)
   expect(decodeCanvasPinned(pinned)).toEqual({

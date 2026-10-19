@@ -30,6 +30,7 @@ import { Type } from "typebox"
 import type { ModelSetup } from "./config.ts"
 import { buildSystemPromptSections } from "./deep.ts"
 import { type LaneChannel, laneEnv, refusingEnv } from "./lane-env.ts"
+import type { CardReadAnswer } from "./read-card.ts"
 import type { BlobAnswer } from "./save-blob.ts"
 import { threadOfContext } from "./thread-context.ts"
 import type { PromptSections } from "./transcript-prompt.ts"
@@ -213,6 +214,12 @@ export interface LaneHooks {
   readBlob(lane: ThreadId, blob: string): Promise<BlobAnswer>
   /** `put_image` was called, its image stored: the host's answer. */
   putImage(lane: ThreadId, ask: PutImageAsk): Promise<ToolAnswer>
+  /** `read_card` was called: what the card says, and an image to show. */
+  readCard(
+    lane: ThreadId,
+    card: string,
+    version: number | null,
+  ): Promise<CardReadAnswer>
 }
 
 /**

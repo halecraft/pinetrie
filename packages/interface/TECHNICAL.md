@@ -1953,6 +1953,14 @@ values; the engine gathers and applies.
   slot is a take, onto a sidebar canvas a move to that canvas's end, between
   canvases a `new-canvas`. A canvas's drag lands only on a root zone
   (`planRootDrop`).
+- **A stored image is a source too** (`ImageSource`, ADR-0182): a blob a
+  message, a tool's row or the pane draws, with the name it is put under.
+  It is over what a card is (`CardOver`), and lands only on a media column
+  (`images` target: a new image at its end, or onto an image a version of
+  it, `addVersion`) or at a spot on a canvas (`putStored`, a media column
+  made there), marked `copy`. An image card put on an image of its own
+  column is a reorder before it; on another media column, a move to its
+  end (`putImage`, `card-intents.ts`).
 - **A drag is its source paired with what that kind can be over**
   (`DragAt`): a card over the strip, a drop zone or ▦ (`CardOver`), a canvas
   over a place among canvases (`CanvasOver`). A canvas's drag cannot be over a

@@ -1,4 +1,10 @@
-import { canvasIdFor, threadIdFor, workflowStateIdFor } from "@pinetrie/core"
+import {
+  canvasIdFor,
+  cardIdOfKind,
+  type Sha256,
+  threadIdFor,
+  workflowStateIdFor,
+} from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
 import { expect, test } from "vitest"
 import {
@@ -15,11 +21,13 @@ import {
   dropIntents,
   dropMark,
   hoverOpens,
+  type ImageSource,
   planDrop,
   sidebarSpot,
   sourceOfElement,
 } from "./drag.ts"
 import type { IntentState } from "./effects.ts"
+import type { PutTarget } from "./put-target.ts"
 import { neighbourShifts } from "./reorder.ts"
 
 const T = threadIdFor("t")
@@ -268,4 +276,39 @@ test("a card held over the closed inventory toggle opens the inventory; over a s
     kind: "inventory",
     act: { kind: "show", how: "held" },
   })
+})
+
+test("a stored image dropped onto an image is a version, elsewhere on a media column or at a spot a new image, anywhere else nothing", () => {
+  const sha256 = "a".repeat(64) as Sha256
+  const image: ImageSource = { kind: "image", sha256, name: "shot.png" }
+  expect(sourceOfElement(element(dragProps(image)))).toEqual(image)
+  const column = cardIdOfKind("media", "01a0ffd2-0000-7000-8000-0000000000e1")
+  const onto = cardIdOfKind("image", "01a0ffd2-0000-7000-8000-0000000000e2")
+  const drop = (target: PutTarget) =>
+    planDrop(
+      { ...image, over: { kind: "put", target } },
+      { column: null, home: null, archive: ARCHIVE },
+      "move",
+      NO_STATE,
+    )
+  expect(drop({ kind: "images", column, before: onto })).toEqual({
+    kind: "image",
+    intent: { kind: "addVersion", image: onto, sha256 },
+  })
+  expect(drop({ kind: "images", column, before: null })).toEqual({
+    kind: "image",
+    intent: {
+      kind: "putStored",
+      sha256,
+      name: "shot.png",
+      to: { kind: "image", column },
+    },
+  })
+  const spot = drop({ kind: "canvas", canvas: K, after: T })
+  expect(spot).toMatchObject({
+    intent: { to: { kind: "canvas-at", canvas: K, after: T } },
+  })
+  expect(dropMark(spot, "move")).toBe("copy")
+  expect(dropIntents(image, spot, "move")).toHaveLength(1)
+  expect(drop({ kind: "column", key: T })).toEqual({ kind: "nothing" })
 })

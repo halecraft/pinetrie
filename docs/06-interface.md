@@ -1210,6 +1210,20 @@ The rail is E; the column is T. Seeing both at once is the product.
   move the undo key outside a box undoes; an empty one is discarded. In a
   new branch, a message with text takes a card only from your inventory
   ("not moved: your message here holds text").
+- **A media column holds images** (ADR-0182), for the team to see and
+  compare: a column of the canvas's, titled "Images" until someone renames
+  it, its images at its width, two to a row when it is two wide. Each image
+  has a title (its file's name until renamed), its versions with ‹ › to step
+  back through them, ◀ and ▶ and a drag to move it, a bin, and its
+  comments, which say "on version 2" under a newer one. Files dropped
+  between columns make one there, on a column put new images at its end,
+  and on an image add a version; a file that is no image is left out, and
+  said so. An image dragged out of a message, a tool's row or the pane
+  lands the same way, without uploading it again, and the pane's **put on
+  canvas** makes a column after the thread, or, from its ▾, adds to one of
+  the canvas's. ＋ past the last column makes an empty one. The agent's
+  `put_image` puts an image from its lane, or adds a version. The agent is
+  told each media column and its images' titles, never the images.
 - **Marks say where you left something unsent** (ADR-0048): a small dot in
   your colour on its canvas's item in the sidebar, and on the rail at its
   thread's end, whether or not that thread's column is open. A canvas you
@@ -1539,12 +1553,9 @@ board's records (ADR-0122); a card's text is its own document (ADR-0048).
 ## Deferred, but designed for
 
 - **What else a canvas holds** (ADR-0116): file cards showing a source's
-  file, and media. Threads from any root and note columns are built
-  (above). Media is decided as media columns, not yet built (ADR-0182): images,
-  each a card with its versions and its comments, made by a file dropped
-  on the strip, an image dragged out of a thread, the pane or the agent;
-  one margin shape for an entry's comments and an image's, and one title
-  record for a note column, a media column and an image.
+  file. Threads from any root, note columns and media columns (ADR-0182)
+  are built (above). An image is put at a column's end: a drop places it
+  among the others only by dragging it there after.
 - **What is left of cards and the dock** (ADR-0111, ADR-0113): a thread
   card's body on the board drawn from its pinned cards' first lines (today
   its first line, under a title); and who is in a note column now, which

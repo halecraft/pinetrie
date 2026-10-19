@@ -8,7 +8,7 @@ import {
   type Sha256,
   type ThreadId,
 } from "@pinetrie/core"
-import { PUT_ON_CANVAS } from "@pinetrie/interface"
+import { dragProps, type Intent, type StartButton } from "@pinetrie/interface"
 import type { Element } from "hast"
 import {
   memo,
@@ -20,6 +20,7 @@ import {
   useState,
 } from "react"
 import { createPortal } from "react-dom"
+import { AddButton } from "./add-button.tsx"
 import { BlobImage } from "./blob-image.tsx"
 import { ConflictsPane } from "./conflicts-pane.tsx"
 import { drawTree } from "./message-text.tsx"
@@ -43,6 +44,7 @@ export function Pane({
   choose,
   said,
   putOnCanvas,
+  onIntent,
 }: {
   /** What the strip's review line controls. */
   id: string
@@ -56,10 +58,11 @@ export function Pane({
   /** Your last choice of a version here, refused or failed, worded; null for none. */
   said: string | null
   /**
-   * Puts the image shown in a media column made just after this column's
-   * thread, by its blob and its name; null where nothing may be put.
+   * The put of the image shown, by its blob and its name: ＋ and its ▾
+   * (`putOnCanvasButton`); null where nothing may be put.
    */
-  putOnCanvas: ((sha: Sha256, name: string) => void) | null
+  putOnCanvas: ((sha: Sha256, name: string) => StartButton) | null
+  onIntent: (intent: Intent) => void
 }) {
   const narrow = useNarrow()
   const shown =
@@ -98,6 +101,7 @@ export function Pane({
         alt={view.alt}
         close={close}
         narrow={narrow}
+        onIntent={onIntent}
         putOnCanvas={putOnCanvas}
         src={view.src}
         title={view.title}
@@ -294,13 +298,15 @@ function ImagePane({
   narrow,
   close,
   putOnCanvas,
+  onIntent,
 }: {
   src: string
   alt: string
   title: string
   narrow: boolean
   close: () => void
-  putOnCanvas: ((sha: Sha256, name: string) => void) | null
+  putOnCanvas: ((sha: Sha256, name: string) => StartButton) | null
+  onIntent: (intent: Intent) => void
 }) {
   const [zoom, setZoom] = useState(false)
   const sha = blobOfUrl(src)
@@ -311,14 +317,12 @@ function ImagePane({
         extra={
           <>
             {putOnCanvas !== null && sha !== null && (
-              <button
-                className="pane-put"
-                onClick={() => putOnCanvas(sha, alt === "" ? title : alt)}
-                title={PUT_ON_CANVAS.title}
-                type="button"
-              >
-                {PUT_ON_CANVAS.label}
-              </button>
+              <span className="pane-put">
+                <AddButton
+                  add={putOnCanvas(sha, alt === "" ? title : alt)}
+                  onIntent={onIntent}
+                />
+              </span>
             )}
             <a className="pane-link" href={src} rel="noopener" target="_blank">
               {OPEN_IN_TAB}
@@ -331,6 +335,13 @@ function ImagePane({
       <div className="pane-body pane-image">
         {/* biome-ignore lint/a11y/useKeyWithClickEvents: a shortcut for the mouse; the link opens it whole */}
         <img
+          {...(sha === null
+            ? {}
+            : dragProps({
+                kind: "image",
+                sha256: sha,
+                name: alt === "" ? title : alt,
+              }))}
           alt={alt}
           data-zoom={zoom || undefined}
           onClick={() => setZoom(z => !z)}

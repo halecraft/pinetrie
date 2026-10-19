@@ -98,13 +98,13 @@ describe("the canvas list", () => {
     const list = canvasList(facts())
     expect(list.lines).toEqual([
       "thread amber-fox (this thread), put by Ada",
-      'note column "Decisions", 4 notes, put by Bea',
+      `note column "Decisions" (${N}), 4 notes, put by Bea`,
       "thread calm-owl, running, put by Bea",
     ])
     expect(canvasContent(list)).toBe(
       '<canvas title="Fix the sync bug">\n' +
         "thread amber-fox (this thread), put by Ada\n" +
-        'note column "Decisions", 4 notes, put by Bea\n' +
+        `note column "Decisions" (${N}), 4 notes, put by Bea\n` +
         "thread calm-owl, running, put by Bea\n" +
         "</canvas>",
     )
@@ -395,7 +395,7 @@ describe("a media column on the canvas", () => {
     })
     const list = canvasList(facts({ onCanvas, glances }))
     expect(list.lines).toEqual([
-      `media column "Mockups", 2 images: "home" (${images[0]?.id}, 2 versions), "${UNTITLED_IMAGE}" (${images[1]?.id}, 1 version), put by Ada`,
+      `media column "Mockups" (${M}), 2 images: "home" (${images[0]?.id}, 2 versions), "${UNTITLED_IMAGE}" (${images[1]?.id}, 1 version), put by Ada`,
     ])
   })
 

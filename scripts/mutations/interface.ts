@@ -4088,8 +4088,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a thread put from the inventory goes in a note column",
     file: "packages/interface/card-intents.ts",
-    from: '  if (now.kind === "thread" || now.kind === "note-column")\n    return putOnCanvas(now, target, state)\n',
-    to: "",
+    from: '    now.kind === "media"\n  )\n    return putOnCanvas(now, target, state)\n',
+    to: '    now.kind === "media"\n  )\n    return []\n',
     command: unit,
     expect:
       "put: a thread's card from your inventory lands unfolded just after the column it was put on",
@@ -4271,8 +4271,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a text card put on a canvas is put nowhere",
     file: "packages/interface/card-intents.ts",
-    from: '  if (target.kind === "canvas" || target.kind === "item") {',
-    to: "  if (false) {",
+    from: '  // lands in a note column made for it (`WRAPS`).\n  if (target.kind === "canvas" || target.kind === "item") {',
+    to: "  // lands in a note column made for it (`WRAPS`).\n  if (false) {",
     command: unit,
     expect:
       "to a spot on a canvas: a text card goes there for the host to make it a note column (WRAPS)",
@@ -4640,8 +4640,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a drop's kind of target is never round-tripped",
     file: "packages/interface/put-target.test.ts",
-    from: '    { kind: "item", canvas: TEST_CANVAS },\n    { kind: "inventory", slot: null },\n  ] satisfies PutTarget[]',
-    to: '    { kind: "inventory", slot: null },\n  ] satisfies PutTarget[]',
+    from: '    { kind: "item", canvas: TEST_CANVAS },\n    { kind: "inventory", slot: null },\n',
+    to: '    { kind: "inventory", slot: null },\n',
     // tsc names no failing check (`failingChecks`): with the interface's
     // typecheck clean, any error is the mutant's.
     command: ["pnpm", "exec", "tsc", "--noEmit", "-p", "packages/interface"],
@@ -4859,5 +4859,49 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "images put at a spot make a media column the page mints, unfolded for their putter; put in a column, none",
+  },
+  {
+    name: "a stored image dropped onto an image is a new one",
+    file: "packages/interface/drag.ts",
+    from: "          target.before === null\n",
+    to: "          true\n",
+    command: unit,
+    expect:
+      "a stored image dropped onto an image is a version, elsewhere on a media column or at a spot a new image, anywhere else nothing",
+  },
+  {
+    name: "a text card is put in a media column",
+    file: "packages/interface/card-intents.ts",
+    from: '    if (target.kind === "images" && now.kind !== "image")\n',
+    to: "    if (false)\n",
+    command: unit,
+    expect:
+      "an image dropped on another media column moves to its end; a text card is refused there",
+  },
+  {
+    name: "an image dropped onto another moves after it",
+    file: "packages/interface/card-intents.ts",
+    from: "  const after = others[to - 1]?.id ?? null\n  const before = others[to]?.id ?? null\n",
+    to: "  const after = others[to]?.id ?? null\n  const before = others[to + 1]?.id ?? null\n",
+    command: unit,
+    expect:
+      "an image dropped onto another of its column moves before it; onto the column, to its end",
+  },
+  {
+    name: "an image dropped where it is moves again",
+    file: "packages/interface/card-intents.ts",
+    from: "    (among[was - 1]?.id ?? null) === after &&\n",
+    to: "    false &&\n",
+    command: unit,
+    expect: "an image dropped where it already is moves nothing",
+  },
+  {
+    name: "the pane's put lists no media column",
+    file: "packages/interface/media-column-view.ts",
+    from: "      first === undefined\n",
+    to: "      true\n",
+    command: unit,
+    expect:
+      "the pane's put makes a media column after its thread, and its ▾ lists the canvas's media columns",
   },
 ]

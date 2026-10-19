@@ -1,4 +1,5 @@
 import {
+  type CardId,
   type CardPlace,
   type CardRecord,
   canvasIdFor,
@@ -11,6 +12,7 @@ import {
   indexAsks,
   KINDS,
   livePlace,
+  makeCard,
   NO_CONTENT,
   type PlacedKind,
   rootIdFor,
@@ -1461,6 +1463,98 @@ describe("landing a copy", () => {
         replacing: { card: ref, from: inventory },
         how: { actedAt: { kind: "inventory" }, slot: 6 },
         here: TEST_CANVAS,
+      },
+    ])
+  })
+})
+
+describe("images in media columns", () => {
+  const M1 = cardIdOfKind("media", "01a0ffd2-0000-7000-8000-0000000000d1")
+  const M2 = cardIdOfKind("media", "01a0ffd2-0000-7000-8000-0000000000d2")
+  const image = (n: number, column: typeof M1, order: string): CardRecord =>
+    makeCard(
+      "image",
+      newImage(n),
+      { kind: "image", column, order },
+      {
+        versions: [
+          {
+            sha256: "a".repeat(64) as Sha256,
+            original: "a".repeat(64) as Sha256,
+            mimeType: "image/png",
+            width: 4,
+            height: 3,
+            by: ADA,
+            at: 1,
+          },
+        ],
+      },
+      ADA,
+    )
+  const cards = [image(1, M1, "a"), image(2, M1, "b"), image(3, M1, "c")]
+  const put = (card: CardId, target: PutTarget) =>
+    plan(
+      { kind: "put", source: { kind: "card", card }, target, how: "move" },
+      state({ cards }),
+    )
+
+  test("an image dropped onto another of its column moves before it; onto the column, to its end", () => {
+    expect(
+      put(newImage(3), { kind: "images", column: M1, before: newImage(1) }),
+    ).toMatchObject([
+      {
+        kind: "reorderCard",
+        reorder: {
+          card: newImage(3),
+          at: { kind: "image", column: M1 },
+          after: null,
+          before: newImage(1),
+        },
+      },
+    ])
+    expect(
+      put(newImage(1), { kind: "images", column: M1, before: null }),
+    ).toMatchObject([
+      { kind: "reorderCard", reorder: { after: newImage(3), before: null } },
+    ])
+  })
+
+  test("an image dropped where it already is moves nothing", () => {
+    expect(
+      put(newImage(2), { kind: "images", column: M1, before: newImage(3) }),
+    ).toEqual([])
+    expect(
+      put(newImage(3), { kind: "images", column: M1, before: null }),
+    ).toEqual([])
+  })
+
+  test("an image dropped on another media column moves to its end; a text card is refused there", () => {
+    expect(
+      put(newImage(1), { kind: "images", column: M2, before: null }),
+    ).toMatchObject([
+      {
+        kind: "moveCard",
+        move: { card: newImage(1), to: { kind: "image", column: M2 } },
+      },
+    ])
+    const s = state({ cards: [card(C1, atEnd)] })
+    expect(
+      putLanding(
+        { kind: "card", card: C1 },
+        { kind: "images", column: M2, before: null },
+        "move",
+        s,
+      ),
+    ).toEqual({ kind: "refused", code: "no-place", card: C1 })
+  })
+
+  test("an image dropped at a spot on a canvas goes there, in a media column made for it", () => {
+    expect(
+      put(newImage(1), { kind: "canvas", canvas: TEST_CANVAS, after: null }),
+    ).toMatchObject([
+      {
+        kind: "moveCard",
+        move: { to: { kind: "canvas-at", canvas: TEST_CANVAS, after: null } },
       },
     ])
   })

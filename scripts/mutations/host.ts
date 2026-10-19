@@ -3358,4 +3358,13 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "a blob that is no image, or none, is refused, and nothing is put",
   },
+  {
+    name: "read_card shows no image",
+    file: "apps/pinetrie/host/read-card.ts",
+    from: '    if (read.kind !== "image") return { text: read.text, image: null }\n',
+    to: "    return { text: read.text, image: null }\n",
+    command: unit,
+    expect:
+      "read_card hands the model an image's stored bytes, its words beside them",
+  },
 ]

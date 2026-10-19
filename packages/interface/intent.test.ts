@@ -54,6 +54,7 @@ import {
   layoutReducer,
   resolveLayout,
 } from "./layout.ts"
+import { putOnCanvasButton } from "./media-column-view.ts"
 import { AGENT_PREFILL } from "./message-tools.ts"
 import { threadLink } from "./thread-link.ts"
 
@@ -1382,4 +1383,57 @@ describe("a press on a proposal", () => {
       },
     ])
   })
+})
+
+test("a stored image put mints one image, put as an uploaded one is", () => {
+  const sha256 = "b".repeat(64) as Sha256
+  const to = { kind: "canvas-at", canvas: R1_ID, after: C } as const
+  expect(plan({ kind: "putStored", sha256, name: "shot.png", to })).toEqual(
+    plan(
+      {
+        kind: "putImages",
+        images: [{ card: newImage(0), sha256, name: "shot.png" }],
+        to,
+      },
+      R1,
+    ),
+  )
+})
+
+test("the pane's put makes a media column after its thread, and its ▾ lists the canvas's media columns", () => {
+  const sha256 = "b".repeat(64) as Sha256
+  const column = cardIdOfKind("media", "01a0ffd2-0000-7000-8000-0000000000d1")
+  const button = putOnCanvasButton({
+    sha256,
+    name: "shot.png",
+    canvas: R1_ID,
+    thread: C,
+    columns: [{ id: column, title: "Mockups" }],
+  })
+  expect(button.main.intent).toEqual({
+    kind: "putStored",
+    sha256,
+    name: "shot.png",
+    to: { kind: "canvas-at", canvas: R1_ID, after: C },
+  })
+  expect(button.more?.items.map(i => [i.label, i.intent])).toEqual([
+    [
+      "into Mockups",
+      {
+        kind: "putStored",
+        sha256,
+        name: "shot.png",
+        to: { kind: "image", column },
+      },
+    ],
+  ])
+  expect(
+    putOnCanvasButton({
+      sha256,
+      name: "x",
+      canvas: R1_ID,
+      thread: C,
+      columns: [],
+    }).more,
+  ).toBeNull()
 })

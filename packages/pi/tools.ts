@@ -23,6 +23,7 @@ import {
   PROJECT_CONFIG_FILE,
   PROPOSE_TOOL,
   PUT_IMAGE_TOOL,
+  READ_CARD_TOOL,
   READ_TOOL,
   RESOLVE_TOOL,
   SAVE_BLOB_TOOL,
@@ -38,6 +39,7 @@ import { readImageProcessor } from "./images.ts"
 import { type PiTool, requireIntent, TAKES_INTENT } from "./intent.ts"
 import { conflictTool, type LaneHooks } from "./lanes.ts"
 import { putImageTool } from "./put-image.ts"
+import { readCardTool } from "./read-card.ts"
 import { saveBlobTool } from "./save-blob.ts"
 import { findTool, grepTool } from "./search.ts"
 import { threadOfContext } from "./thread-context.ts"
@@ -99,6 +101,10 @@ export const TOOLS: Readonly<Record<ToolId, (input: ToolsInput) => PiTool>> = {
     saveBlobTool((lane, blob) => input.hooks.readBlob(lane, blob)),
   [PUT_IMAGE_TOOL]: input =>
     putImageTool(input.blobs, (lane, ask) => input.hooks.putImage(lane, ask)),
+  [READ_CARD_TOOL]: input =>
+    readCardTool((lane, card, version) =>
+      input.hooks.readCard(lane, card, version),
+    ),
   [PROPOSE_TOOL]: () => proposeTool(),
 }
 

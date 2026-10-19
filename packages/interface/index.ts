@@ -484,10 +484,11 @@ export { addressMarkdown } from "./markdown-of.ts"
 export {
   commentVersionWords,
   type ImageView,
+  leftOutWords,
   MEDIA_EMPTY,
   type MediaColumnView,
   mediaColumns,
-  PUT_ON_CANVAS,
+  putOnCanvasButton,
   versionWords,
 } from "./media-column-view.ts"
 export {

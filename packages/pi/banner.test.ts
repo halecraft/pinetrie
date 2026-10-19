@@ -155,6 +155,9 @@ describe("banners in a harness", () => {
                 leave: async () => {
                   throw new Error("unused")
                 },
+                readCard: async () => {
+                  throw new Error("read_card was not called")
+                },
                 putImage: async () => {
                   throw new Error("put_image was not called")
                 },

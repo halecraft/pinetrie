@@ -43,6 +43,7 @@ export { drainLaneRuns } from "./lane-runs.ts"
 export type { LaneAccess, LaneFacts, LaneHooks } from "./lanes.ts"
 export { RUN_ENV, relayObserver, serveRelay } from "./observer.ts"
 export { loadPiSetup, type PiSetup } from "./pi-setup.ts"
+export type { CardReadAnswer } from "./read-card.ts"
 export type { BlobAnswer } from "./save-blob.ts"
 export { createScribe, type Scribe } from "./scribe.ts"
 export {

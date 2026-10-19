@@ -132,6 +132,7 @@ import {
   sendOfPoppedQueuedCard,
   untilNotTyped,
 } from "./queued-card-pop.ts"
+import { createReadCard } from "./read-card.ts"
 import { createRecords, type Records } from "./records.ts"
 import { createRelays, type Relays } from "./relays.ts"
 import { fileTrace } from "./root-trace.ts"
@@ -714,6 +715,7 @@ export async function startHost({
               leave: leaveThread.call,
               readBlob: createReadBlob({ runs: runDocs, blobs }),
               putImage: putImage.call,
+              readCard: createReadCard({ basics, cards: cardPort, blobs }),
               // A turn recorded, then a live digest of the ask `tip` is in,
               // when due.
               turnDone: async (lane, tip) => {

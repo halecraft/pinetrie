@@ -2022,7 +2022,14 @@ and the total `decodePinned` are the only code that builds or reads it, and
   give. A column's line reads its glance (`columnGlances`): a note column's
   count, a media column's images, each its title, id and how many versions,
   at most `MEDIA_LINE_CAP` and the rest counted, so a column of many images
-  is still one line (ADR-0182). `planCanvasRead`
+  is still one line (ADR-0182). A note column's and a media column's line
+  names its id, which `read_card` takes (ADR-0183).
+- **`read_card` reads a card of the thread's canvas** (`planCardRead`,
+  `card-read.ts`, ADR-0183): an image, as its version's fitted copy (the
+  newest, or the one named, from 1), a media column as its images' titles,
+  ids and versions, a note column as its notes' texts. A card on no canvas
+  or another, another kind, or a version the image lacks, is refused with
+  words the agent reads. `planCanvasRead`
   writes it only when it differs from the newest on the path
   (`canvasInView`), so an unchanged canvas keeps the prompt's cache.
 - **A card added or taken while a run goes on**, or an image added to a

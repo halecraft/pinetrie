@@ -12,9 +12,13 @@ import {
   type CanvasId,
   type CanvasTarget,
   type CardId,
+  type ImageId,
   isCanvasId,
+  isImageId,
+  isMediaId,
   isNoteColumnId,
   isWorkflowStateId,
+  type MediaId,
   type NoteColumnId,
   notesTarget,
   parseCardId,
@@ -37,6 +41,16 @@ export type PutTarget =
   | { readonly kind: "composer"; readonly key: string }
   /** A note column: a note at its end. */
   | { readonly kind: "notes"; readonly column: NoteColumnId }
+  /**
+   * A media column: its end, or, onto an image of it, `before` that image.
+   * An image moved there takes that spot; a stored image dropped onto an
+   * image is a version of it, and anywhere else on the column a new image.
+   */
+  | {
+      readonly kind: "images"
+      readonly column: MediaId
+      readonly before: ImageId | null
+    }
   /**
    * A spot on a canvas, just after `after` (first for null), where
    * no column takes a drop: a folded column, or the canvas past its last.
@@ -89,6 +103,10 @@ const PUT_SLOT = "data-put-slot"
 const ANY_SLOT = "any"
 /** The attribute a note column carries: its id. */
 const PUT_NOTES = "data-put-notes"
+/** The attribute a media column and each of its images carry: the column's id. */
+const PUT_IMAGES = "data-put-images"
+/** Beside `PUT_IMAGES` on an image: the image's id. */
+const PUT_BEFORE = "data-put-before"
 /** The attribute a spot on a canvas carries: its canvas. */
 const PUT_CANVAS = "data-put-canvas"
 /** Beside `PUT_CANVAS`: the card the spot is after, absent for first. */
@@ -102,7 +120,7 @@ const END = "end"
 const PUT_ITEM = "data-put-item"
 
 /** What an element a drop may land on matches: any mark. */
-export const DROP_ZONE = `[${PUT_COLUMN}],[${PUT_COMPOSER}],[${PUT_PINNED}],[${PUT_CANVAS_PINNED}],[${PUT_SLOT}],[${PUT_NOTES}],[${PUT_CANVAS}],[${PUT_STATE}],[${PUT_SIDEBAR}],[${PUT_ITEM}]`
+export const DROP_ZONE = `[${PUT_COLUMN}],[${PUT_COMPOSER}],[${PUT_PINNED}],[${PUT_CANVAS_PINNED}],[${PUT_SLOT}],[${PUT_NOTES}],[${PUT_IMAGES}],[${PUT_CANVAS}],[${PUT_STATE}],[${PUT_SIDEBAR}],[${PUT_ITEM}]`
 
 /** The attributes that mark an element as `target`, spread onto it by the page. */
 export function dropProps(target: PutTarget): Readonly<Record<string, string>> {
@@ -121,6 +139,10 @@ export function dropProps(target: PutTarget): Readonly<Record<string, string>> {
       }
     case "notes":
       return { [PUT_NOTES]: target.column }
+    case "images":
+      return target.before === null
+        ? { [PUT_IMAGES]: target.column }
+        : { [PUT_IMAGES]: target.column, [PUT_BEFORE]: target.before }
     case "canvas":
       return target.after === null
         ? { [PUT_CANVAS]: target.canvas }
@@ -162,6 +184,12 @@ export function targetOfElement(el: {
   const notes = el.getAttribute(PUT_NOTES)
   if (notes !== null && isNoteColumnId(notes))
     return { kind: "notes", column: notes }
+  const images = el.getAttribute(PUT_IMAGES)
+  if (images !== null && isMediaId(images)) {
+    const before = el.getAttribute(PUT_BEFORE)
+    if (before === null) return { kind: "images", column: images, before: null }
+    return isImageId(before) ? { kind: "images", column: images, before } : null
+  }
   const id = el.getAttribute(PUT_CANVAS)
   if (id !== null && isCanvasId(id)) {
     const after = el.getAttribute(PUT_AFTER)
@@ -225,6 +253,7 @@ export function placeOfTarget(
     target.kind === "state" ||
     target.kind === "sidebar" ||
     target.kind === "canvas" ||
+    target.kind === "images" ||
     target.kind === "text-box" ||
     target.kind === "item"
   )

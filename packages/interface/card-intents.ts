@@ -17,11 +17,13 @@ import {
   DISCARDED,
   type EntryId,
   entryMargin,
+  type ImageCard,
   isMovable,
   isReorderPlace,
   isTargetForKind,
   KINDS,
   type ListKey,
+  type MediaCard,
   type MoveDirection,
   type MoveTarget,
   type NoteColumnCard,
@@ -50,6 +52,7 @@ import type { Outcome } from "@pinetrie/protocol/codec"
 import {
   addressLink,
   canvasOfPlace,
+  imagesIn,
   inventoryFull,
   type TraceRecord,
 } from "@pinetrie/rules"
@@ -298,6 +301,9 @@ export function putLanding(
         : putLanding({ kind: "clip", clip }, target, "copy", state)
     }
     if (target.kind === "text-box") return { kind: "none" }
+    // Only an image goes in a media column.
+    if (target.kind === "images" && now.kind !== "image")
+      return { kind: "refused", code: "no-place", card: now.id }
     if (target.kind !== "inventory")
       return { kind: "move", card: now.id, to: target }
     if (!cardFitsPlace(now, "inventory"))
@@ -635,7 +641,12 @@ function putCard(
   // Between canvases in the sidebar: a text card spins a new canvas off; a
   // column makes one holding it, placed there, and you stay where you are.
   if (target.kind === "sidebar") {
-    if (now.kind !== "thread" && now.kind !== "note-column")
+    if (now.kind === "image") return []
+    if (
+      now.kind !== "thread" &&
+      now.kind !== "note-column" &&
+      now.kind !== "media"
+    )
       return planSpinOff(now.id, target, minted, state)
     return [
       {
@@ -655,8 +666,13 @@ function putCard(
   // A thread's card or a note column goes on a canvas; a kind
   // the host alone places is put nowhere.
   if (!isMovable(now)) return []
-  if (now.kind === "thread" || now.kind === "note-column")
+  if (
+    now.kind === "thread" ||
+    now.kind === "note-column" ||
+    now.kind === "media"
+  )
     return putOnCanvas(now, target, state)
+  if (now.kind === "image") return putImage(now, target, state)
   if (now.kind !== "text" && now.kind !== "reference") return []
   // A text card or a reference on a canvas, or onto a canvas in the sidebar,
   // lands in a note column made for it (`WRAPS`).
@@ -697,6 +713,7 @@ function putCard(
 const actedAtOf = (target: PutTarget): ActedAt => {
   switch (target.kind) {
     case "notes":
+    case "images":
       return atColumn(target.column)
     case "canvasPinned":
       return atColumn(target.canvas)
@@ -729,8 +746,60 @@ export const canvasSpot = (target: CanvasPut): CanvasTarget => ({
  * Nothing on the canvas it is on already, where a reorder moves it, nor on
  * a state or the sidebar, which make a thread from a text card alone.
  */
+/**
+ * An image put: on a canvas, in a media column made for it there
+ * (`WRAPS`); in its own column, moved before the image it is dropped onto,
+ * or to the end; in another media column, at that column's end.
+ */
+function putImage(
+  now: ImageCard,
+  target: PutTarget,
+  state: IntentState,
+): readonly Effect[] {
+  if (target.kind === "canvas" || target.kind === "item") {
+    const spot = spotOnCanvas(target, state)
+    return spot === null
+      ? []
+      : [
+          moveCard(
+            cardMove(now, { kind: "canvas-at", ...spot }),
+            { actedAt: actedAtOf(target), slot: null },
+            true,
+          ),
+        ]
+  }
+  if (target.kind !== "images") return []
+  const how = { actedAt: atColumn(target.column), slot: null }
+  const at = { kind: "image", column: target.column } as const
+  if (now.place.kind !== "image" || now.place.column !== target.column)
+    return [moveCard(cardMove(now, at), how, true)]
+  const among = imagesIn(state.cards.cards, target.column)
+  const others = among.filter(c => c.id !== now.id)
+  const to =
+    target.before === null
+      ? others.length
+      : others.findIndex(c => c.id === target.before)
+  if (to < 0 || target.before === now.id) return []
+  const after = others[to - 1]?.id ?? null
+  const before = others[to]?.id ?? null
+  const was = among.findIndex(c => c.id === now.id)
+  // Where it already is: between the same two images.
+  if (
+    (among[was - 1]?.id ?? null) === after &&
+    (among[was + 1]?.id ?? null) === before
+  )
+    return []
+  return [
+    {
+      kind: "reorderCard",
+      reorder: { card: now.id, at, after, before },
+      how,
+    },
+  ]
+}
+
 function putOnCanvas(
-  now: ThreadCard | NoteColumnCard,
+  now: ThreadCard | NoteColumnCard | MediaCard,
   target: PutTarget,
   state: IntentState,
 ): readonly Effect[] {

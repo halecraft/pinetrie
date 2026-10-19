@@ -16,6 +16,7 @@ import {
   LEAVE_TOOL,
   PROPOSE_TOOL,
   PUT_IMAGE_TOOL,
+  READ_CARD_TOOL,
   READ_TOOL,
   RESOLVE_TOOL,
   SAVE_BLOB_TOOL,
@@ -42,6 +43,7 @@ const TOOL_WORDS: Readonly<Record<ToolId, string>> = {
   [RESOLVE_TOOL]: "resolve",
   [SAVE_BLOB_TOOL]: "save",
   [PUT_IMAGE_TOOL]: "image",
+  [READ_CARD_TOOL]: "read",
   [PROPOSE_TOOL]: "propose",
 }
 
