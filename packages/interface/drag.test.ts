@@ -300,9 +300,8 @@ test("a stored image dropped onto an image is a version, elsewhere on a media co
   expect(drop({ kind: "images", column, on: null })).toEqual({
     kind: "image",
     intent: {
-      kind: "putStored",
-      sha256,
-      name: "shot.png",
+      kind: "putImages",
+      images: [{ sha256, name: "shot.png" }],
       to: { kind: "image-at", column, before: null },
     },
   })
@@ -310,7 +309,7 @@ test("a stored image dropped onto an image is a version, elsewhere on a media co
     drop({ kind: "images", column, on: { image: onto, edge: "before" } }),
   ).toMatchObject({
     intent: {
-      kind: "putStored",
+      kind: "putImages",
       to: { kind: "image-at", column, before: onto },
     },
   })

@@ -348,21 +348,14 @@ export type Intent =
   | { readonly kind: "page"; readonly to: PageName | null }
   /** Open, type in, clear or close the search of the canvas you are on. */
   | { readonly kind: "search"; readonly act: SearchAsk }
-  /** Images uploaded, put at a spot on a canvas or at a media column's end. */
-  | {
-      readonly kind: "putImages"
-      readonly images: readonly PutImage[]
-      readonly to: ImagesTarget
-    }
   /**
-   * A stored image, dragged out of a thread or the pane, put as a new image
-   * at a spot on a canvas or at a media column's end: one image, its id
-   * minted as it is planned.
+   * Stored images, uploaded or dragged out of a thread or the pane, put at a
+   * spot on a canvas or among a media column's images, by their blobs and
+   * names: each one's id is minted as it is planned.
    */
   | {
-      readonly kind: "putStored"
-      readonly sha256: Sha256
-      readonly name: string
+      readonly kind: "putImages"
+      readonly images: readonly Omit<PutImage, "card">[]
       readonly to: ImagesTarget
     }
   /** An image uploaded, added as a version of `image`. */
@@ -635,28 +628,19 @@ function planOf(
       ]
     // A put to a spot makes a media column, minted here so its maker sees
     // it unfolded.
-    case "putStored": {
-      const [card] = minted.images(1)
-      return card === undefined
-        ? []
-        : planOf(
-            {
-              kind: "putImages",
-              images: [{ card, sha256: intent.sha256, name: intent.name }],
-              to: intent.to,
-            },
-            state,
-            minted,
-          )
-    }
     case "putImages": {
-      if (intent.images.length === 0) return []
+      const ids = minted.images(intent.images.length)
+      const images = intent.images.flatMap((image, i) => {
+        const card = ids[i]
+        return card === undefined ? [] : [{ ...image, card }]
+      })
+      if (images.length === 0) return []
       const { to } = intent
       const made = to.kind === "canvas-at" ? minted.media : null
       return [
         {
           kind: "request",
-          intent: { kind: "put-images", images: intent.images, to, made },
+          intent: { kind: "put-images", images, to, made },
         },
         ...(made === null || to.kind !== "canvas-at"
           ? []

@@ -523,12 +523,14 @@ describe("planIntent", () => {
     )
   })
 
-  test("images put at a spot make a media column the page mints, unfolded for their putter; put in a column, none", () => {
-    const images = [
-      { card: newImage(1), sha256: "a".repeat(64) as Sha256, name: "home.png" },
+  test("images put at a spot make a media column the page mints, unfolded for their putter; put in a column, none; each image's id minted", () => {
+    const blobs = [
+      { sha256: "a".repeat(64) as Sha256, name: "home.png" },
+      { sha256: "b".repeat(64) as Sha256, name: "login.png" },
     ]
+    const images = blobs.map((b, i) => ({ ...b, card: newImage(i) }))
     const to = { kind: "canvas-at", canvas: R1_ID, after: C } as const
-    expect(plan({ kind: "putImages", images, to })).toEqual([
+    expect(plan({ kind: "putImages", images: blobs, to })).toEqual([
       {
         kind: "request",
         intent: { kind: "put-images", images, to, made: NEW_MEDIA },
@@ -536,7 +538,7 @@ describe("planIntent", () => {
       onR1({ kind: "fold", card: NEW_MEDIA, unfolded: true }),
     ])
     const into = { kind: "image-at", column: NEW_MEDIA, before: null } as const
-    expect(plan({ kind: "putImages", images, to: into })).toEqual([
+    expect(plan({ kind: "putImages", images: blobs, to: into })).toEqual([
       {
         kind: "request",
         intent: { kind: "put-images", images, to: into, made: null },
@@ -1385,21 +1387,6 @@ describe("a press on a proposal", () => {
   })
 })
 
-test("a stored image put mints one image, put as an uploaded one is", () => {
-  const sha256 = "b".repeat(64) as Sha256
-  const to = { kind: "canvas-at", canvas: R1_ID, after: C } as const
-  expect(plan({ kind: "putStored", sha256, name: "shot.png", to })).toEqual(
-    plan(
-      {
-        kind: "putImages",
-        images: [{ card: newImage(0), sha256, name: "shot.png" }],
-        to,
-      },
-      R1,
-    ),
-  )
-})
-
 test("the pane's put makes a media column after its thread, and its ▾ lists the canvas's media columns", () => {
   const sha256 = "b".repeat(64) as Sha256
   const column = cardIdOfKind("media", "01a0ffd2-0000-7000-8000-0000000000d1")
@@ -1411,18 +1398,16 @@ test("the pane's put makes a media column after its thread, and its ▾ lists th
     columns: [{ id: column, title: "Mockups" }],
   })
   expect(button.main.intent).toEqual({
-    kind: "putStored",
-    sha256,
-    name: "shot.png",
+    kind: "putImages",
+    images: [{ sha256, name: "shot.png" }],
     to: { kind: "canvas-at", canvas: R1_ID, after: C },
   })
   expect(button.more?.items.map(i => [i.label, i.intent])).toEqual([
     [
       "into Mockups",
       {
-        kind: "putStored",
-        sha256,
-        name: "shot.png",
+        kind: "putImages",
+        images: [{ sha256, name: "shot.png" }],
         to: { kind: "image-at", column, before: null },
       },
     ],

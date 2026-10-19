@@ -16,6 +16,7 @@ import {
 } from "@pinetrie/core"
 import { NEW_MEDIA_TITLE, UNTITLED_IMAGE } from "./canvas.ts"
 import type { CardTitleRecord } from "./card-title.ts"
+import { count } from "./counts.ts"
 import { imagesIn } from "./media.ts"
 import { NEW_NOTES_TITLE, notesIn } from "./notes.ts"
 
@@ -26,9 +27,6 @@ export type CardRead =
   | { readonly kind: "refused"; readonly text: string }
 
 const refused = (text: string): CardRead => ({ kind: "refused", text })
-
-const versionsWords = (n: number): string =>
-  n === 1 ? "1 version" : `${n} versions`
 
 /** The canvas a card of a column is on; null for none. */
 function canvasOf(cards: readonly CardRecord[], id: CardId): CanvasId | null {
@@ -72,7 +70,9 @@ export function planCardRead(input: {
     const n = input.version ?? versions.length
     const shown = versions[n - 1]
     if (shown === undefined)
-      return refused(`${id} has ${versionsWords(versions.length)}.`)
+      return refused(
+        `${id} has ${count(versions.length, "version", "versions")}.`,
+      )
     return {
       kind: "image",
       sha256: shown.sha256,
@@ -83,12 +83,12 @@ export function planCardRead(input: {
     const images = imagesIn(cards, id)
     const lines = images.map(
       i =>
-        `- "${title(i.id, UNTITLED_IMAGE)}" (${i.id}, ${versionsWords(i.content.versions.length)})`,
+        `- "${title(i.id, UNTITLED_IMAGE)}" (${i.id}, ${count(i.content.versions.length, "version", "versions")})`,
     )
     return {
       kind: "text",
       text: [
-        `Media column "${title(id, NEW_MEDIA_TITLE)}" (${id}), ${images.length === 1 ? "1 image" : `${images.length} images`}${lines.length === 0 ? "." : ":"}`,
+        `Media column "${title(id, NEW_MEDIA_TITLE)}" (${id}), ${count(images.length, "image", "images")}${lines.length === 0 ? "." : ":"}`,
         ...lines,
       ].join("\n"),
     }
@@ -97,7 +97,7 @@ export function planCardRead(input: {
   return {
     kind: "text",
     text: [
-      `Note column "${title(id, NEW_NOTES_TITLE)}" (${id}), ${notes.length === 1 ? "1 note" : `${notes.length} notes`}${notes.length === 0 ? "." : ":"}`,
+      `Note column "${title(id, NEW_NOTES_TITLE)}" (${id}), ${count(notes.length, "note", "notes")}${notes.length === 0 ? "." : ":"}`,
       ...notes.map(n => input.noteTexts.get(n.id) ?? ""),
     ].join("\n\n"),
   }

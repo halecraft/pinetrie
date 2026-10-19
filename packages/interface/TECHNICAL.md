@@ -1956,7 +1956,7 @@ values; the engine gathers and applies.
 - **A stored image is a source too** (`ImageSource`, ADR-0182): a blob a
   message, a tool's row or the pane draws, with the name it is put under.
   It is over what a card is (`CardOver`), and lands only on a media column
-  or at a spot on a canvas (`putStored`, a media column made there),
+  or at a spot on a canvas (`putImages`, a media column made there),
   marked `copy`. On a media column (`images` target) it lands by the image
   under it and that image's edge (`image-edge.ts`: `imageEdge`, a fixed
   band at each edge, `EDGE_BAND_PX` or a quarter of a small image, along

@@ -43,7 +43,6 @@ import {
   type ThreadGlance,
 } from "@pinetrie/interface"
 import type { CardOnCanvas } from "@pinetrie/rules"
-import { newImageId } from "@pinetrie/session"
 import type { ReactElement, RefObject } from "react"
 import { useMemo, useState } from "react"
 import { AddButton } from "./add-button.tsx"
@@ -263,7 +262,7 @@ export function Strip(p: {
     setLeft(up.left)
     p.onIntent({
       kind: "putImages",
-      images: up.images.map(i => ({ ...i, card: newImageId() })),
+      images: up.images,
       to: { kind: "canvas-at", canvas: canvasAt, after },
     })
   }

@@ -219,9 +219,8 @@ function imageDrop(
           spot.kind === "version"
             ? { kind: "addVersion", image: spot.image, sha256 }
             : {
-                kind: "putStored",
-                sha256,
-                name,
+                kind: "putImages",
+                images: [{ sha256, name }],
                 to: {
                   kind: "image-at",
                   column: target.column,
@@ -234,9 +233,8 @@ function imageDrop(
       return {
         kind: "image",
         intent: {
-          kind: "putStored",
-          sha256,
-          name,
+          kind: "putImages",
+          images: [{ sha256, name }],
           to: { kind: "canvas-at", canvas: target.canvas, after: target.after },
         },
       }

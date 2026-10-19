@@ -33,7 +33,7 @@ import {
   versionWords,
 } from "@pinetrie/interface"
 import { marginCards, type SeatRecord } from "@pinetrie/rules"
-import { newCardId, newImageId, type SessionClient } from "@pinetrie/session"
+import { newCardId, type SessionClient } from "@pinetrie/session"
 import { useRef, useState } from "react"
 import { fileDropAtProps, fileDropProps } from "./file-drop.ts"
 import { TrashIcon } from "./icons.tsx"
@@ -71,7 +71,7 @@ export function MediaColumn(p: {
     setLeft(up.left)
     p.onIntent({
       kind: "putImages",
-      images: up.images.map(i => ({ ...i, card: newImageId() })),
+      images: up.images,
       to,
     })
   }

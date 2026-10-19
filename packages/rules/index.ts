@@ -284,6 +284,7 @@ export { type CopyPlan, type CopyThread, planCopy } from "./copy.ts"
 export {
   byteWords,
   count,
+  countOrNone,
   noteCountWords,
   plural,
   shortId,
@@ -417,7 +418,7 @@ export {
   marginCounts,
 } from "./margin.ts"
 export { MARK, type MarkRecord, planMark } from "./mark.ts"
-export { type ImageInColumn, imagesIn, mediaColumnEnd } from "./media.ts"
+export { type ImageInColumn, imagesIn } from "./media.ts"
 export {
   addressMessage,
   agentByDefault,

@@ -21,9 +21,13 @@ export function byteWords(bytes: number): string {
   return `${n >= 100 ? Math.round(n) : Number(n.toFixed(1))} ${units[unit]}`
 }
 
+/** A count that says "no" for none: "no images", "1 image", "3 images". */
+export const countOrNone = (n: number, one: string, many: string): string =>
+  n === 0 ? `no ${many}` : count(n, one, many)
+
 /** A note column's count: "no notes", "1 note", "3 notes". */
 export const noteCountWords = (n: number): string =>
-  n === 0 ? "no notes" : plural(n, "note")
+  countOrNone(n, "note", "notes")
 
 /** A commit's or a change id's first eight characters, as a person reads one. */
 export const shortId = (id: string): string => id.slice(0, 8)
