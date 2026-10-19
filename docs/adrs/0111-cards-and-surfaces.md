@@ -27,6 +27,8 @@
     text card on a board state starts a task.
   - ADR-0171: in your inventory, × discards on the bench as everywhere;
     leaving the open card is Escape or selecting another slot.
+  - ADR-0177: a card is trashed by a bin, drawn, never by ×; × on a card open
+    on your inventory's bench closes it, as Escape does.
 
 **Context.**
 

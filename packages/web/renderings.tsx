@@ -20,6 +20,7 @@ import {
 } from "@pinetrie/core"
 import {
   addressWords,
+  CLOSE_CARD,
   type Compact,
   cardFrame,
   compactWords,
@@ -60,6 +61,8 @@ interface RenderingContext {
   /** The column a put lands in: the one last focused; null for none. */
   readonly column: string | null
   readonly onIntent: (intent: Intent) => void
+  /** Folds the card open on the bench back to read only; null where none is open. */
+  readonly onClose: (() => void) | null
 }
 
 const Rendering = createContext<RenderingContext | null>(null)
@@ -88,23 +91,27 @@ export interface Renderings<K extends DrawnKind> {
   readonly Full: (p: { card: CardOf<K>; width: CardWidth }) => ReactNode
 }
 
-/** A card's put, onto the column last focused, as its open frame's foot. */
-function PutButton(p: { card: CardRecord; title: string }) {
+/**
+ * The bench's put: its card onto the column last focused, a thread's after
+ * that column on the canvas you are on. Disabled with no card, or no column.
+ */
+export function PutButton(p: { card: CardRecord | null }) {
   const { column, onIntent } = useRendering()
+  const { card } = p
   return (
     <button
       className="put primary"
-      disabled={column === null}
+      disabled={column === null || card === null}
       onClick={() => {
-        if (column !== null)
+        if (column !== null && card !== null)
           onIntent({
             kind: "put",
-            source: { kind: "card", card: p.card.id },
+            source: { kind: "card", card: card.id },
             target: { kind: "column", key: column },
             how: "move",
           })
       }}
-      title={p.title}
+      title={card?.kind === "thread" ? PUT_THREAD_TITLE : PUT_TITLE}
       type="button"
     >
       <InventoryIcon way="put" /> {PUT}
@@ -187,6 +194,8 @@ function NormalFrame(p: {
   card: CardRecord
   width: CardWidth
   children: ReactNode
+  /** Given, the card is open on the bench, and its header ends in ×, which closes it. */
+  onClose?: (() => void) | null
 }) {
   return (
     <section
@@ -200,6 +209,17 @@ function NormalFrame(p: {
         <span aria-hidden className="card-icon">
           {KIND_ICON[p.kind]}
         </span>
+        {p.onClose != null && (
+          <button
+            aria-label={CLOSE_CARD.title}
+            className="close-card"
+            onClick={p.onClose}
+            title={CLOSE_CARD.title}
+            type="button"
+          >
+            {CLOSE_CARD.label}
+          </button>
+        )}
       </header>
       <div className="card-normal-body">{p.children}</div>
     </section>
@@ -216,16 +236,17 @@ function TextNormal(p: { card: CardOf<"text">; width: CardWidth }) {
   )
 }
 
-/** A text card opened on the bench: its editor in its frame, with its put; its × discards it. */
+/** A text card opened on the bench: its editor in its frame, whose × closes it; its put and its trash are the bench's. */
 function TextFull(p: { card: CardOf<"text">; width: CardWidth }) {
-  const { session, reader, onIntent } = useRendering()
+  const { session, reader, onIntent, onClose } = useRendering()
   return (
     <BoundCardEditor
       among={null}
       card={p.card}
       catchUps={null}
-      foot={<PutButton card={p.card} title={PUT_TITLE} />}
+      foot={null}
       key={p.card.id}
+      onClose={onClose ?? undefined}
       onDiscard={() =>
         onIntent({ kind: "discard", card: p.card.id, at: AT_INVENTORY })
       }
@@ -260,15 +281,10 @@ function ThreadNormal(p: { card: CardOf<"thread">; width: CardWidth }) {
   )
 }
 
-/** A thread's card opened: its path, read only, with its put. */
+/** A thread's card opened: its path, read only; its put is the bench's. */
 function ThreadFull(p: { card: CardOf<"thread">; width: CardWidth }) {
   const { previewOf } = useRendering()
-  return (
-    <ThreadPreviewView
-      foot={<PutButton card={p.card} title={PUT_THREAD_TITLE} />}
-      preview={previewOf(p.card.id)}
-    />
-  )
+  return <ThreadPreviewView preview={previewOf(p.card.id)} />
 }
 
 /** A note column's notes, the first `limit` of them (all for null), read only. */
@@ -337,13 +353,18 @@ function ReferenceNormal(p: { card: CardOf<"reference">; width: CardWidth }) {
  * *Edit as text*, which makes it a text card you can change.
  */
 function ReferenceFull(p: { card: CardOf<"reference">; width: CardWidth }) {
-  const { onIntent, threadNames } = useRendering()
+  const { onIntent, threadNames, onClose } = useRendering()
   const quote = useQuote(p.card.content.quote)
   const { address } = p.card.content
   const from =
     address.kind === "card" ? null : (threadNames.get(address.thread) ?? null)
   return (
-    <NormalFrame card={p.card} kind="reference" width={p.width}>
+    <NormalFrame
+      card={p.card}
+      kind="reference"
+      onClose={onClose}
+      width={p.width}
+    >
       <div className="card-normal-title">
         {addressWords(address)}
         {from !== null && <span className="reference-from"> · {from}</span>}

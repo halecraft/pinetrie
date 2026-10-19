@@ -128,7 +128,7 @@ describe("card words", () => {
         { card: null, actedAt: { kind: "inventory" }, code: "discarded" },
         READER,
       ),
-      "discarded · the undo key (⌘Z outside a box) brings it back",
+      "trashed · ⌘Z brings it back",
     ],
     [
       "noticeWords, a full inventory",

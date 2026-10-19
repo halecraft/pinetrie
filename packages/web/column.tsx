@@ -443,6 +443,7 @@ export function Column(p: ColumnProps) {
       open: openMargin !== null && openMargin === entry,
       inText: false,
       comments: writable,
+      trashes: false,
     })
     if (step === null) return
     e.preventDefault()
@@ -459,8 +460,9 @@ export function Column(p: ColumnProps) {
       case "comment":
         comment(entry)
         return
-      // A message is not moved.
+      // A message is neither moved nor trashed.
       case "move":
+      case "trash":
         return
     }
   }

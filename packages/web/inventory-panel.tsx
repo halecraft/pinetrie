@@ -2,14 +2,15 @@
 // docked left, centre or right by this device's choice, in a frame that never
 // changes size. Its header holds its count, the clipboard chip and
 // ×; under it the bag, a grid two compact slots wide (`CardGrid`), and the
-// bench, the selected slot drawn normal and read only, or full and editable
-// once opened, on the side away from the dock's edge; under them one status
-// line. It is always drawn, hidden while closed, so it can grow from its toggle
+// bench, on the side away from the dock's edge: a bar of put and trash for the
+// selected slot, then its card, normal and read only, or full and editable
+// once opened, closed by its ×; under them one status line. It is always drawn, hidden while closed, so it can grow from its toggle
 // and shrink back into it. What it draws is `inventoryView`; whether it is
 // shown, the selection and the bench are `InventoryState`; every click and
 // drop here is an intent, planned like any other.
 
 import {
+  type CardRecord,
   isTextCard,
   type NoteColumnId,
   type ThreadId,
@@ -37,6 +38,7 @@ import {
   snappedDock,
   type ThreadGlance,
   type ThreadPreview,
+  TRASH_SELECTED,
 } from "@pinetrie/interface"
 import {
   AT_INVENTORY,
@@ -53,8 +55,8 @@ import {
   useState,
 } from "react"
 import { CardGrid } from "./card-grid.tsx"
-import { CopyIcon, InventoryIcon } from "./icons.tsx"
-import { DrawCard, RenderingProvider } from "./renderings.tsx"
+import { CopyIcon, InventoryIcon, TrashIcon } from "./icons.tsx"
+import { DrawCard, PutButton, RenderingProvider } from "./renderings.tsx"
 import { useCardTexts } from "./use-card-texts.ts"
 
 /** The side of the bag the bench is drawn on: away from the dock's edge. */
@@ -114,6 +116,10 @@ export function InventoryPanel(p: {
   })
   const { session, reader, colorOf, previewOf, notes, column, onIntent } = p
   const { threadNames } = p
+  const frame = useRef<HTMLElement>(null)
+  const bench = useRef<HTMLDivElement>(null)
+  // Folded by Escape or the open card's ×, focus goes back to its slot.
+  const escaped = useRef(false)
   const context = useMemo(
     () => ({
       session,
@@ -124,12 +130,16 @@ export function InventoryPanel(p: {
       threadNames,
       column,
       onIntent,
+      onClose: () => {
+        escaped.current = true
+        onIntent({ kind: "inventory", act: { kind: "fold" } })
+      },
     }),
     [session, reader, colorOf, previewOf, notes, threadNames, column, onIntent],
   )
   const act = (a: InventoryAct) => onIntent({ kind: "inventory", act: a })
-  const frame = useRef<HTMLElement>(null)
-  const bench = useRef<HTMLDivElement>(null)
+  const trash = (card: CardRecord) =>
+    onIntent({ kind: "discard", card: card.id, at: AT_INVENTORY })
   // Shown, it grows from the toggle: its origin is the toggle's centre in
   // the panel's laid-out box, which no transform moves (`offsetLeft`). Read
   // before the first frame is painted, so that frame grows from there.
@@ -158,7 +168,9 @@ export function InventoryPanel(p: {
   // dropped, discarded) moves no focus, or it would take focus from where
   // the person went.
   const benchOpen = view.bench.kind === "card" && view.bench.detail === "full"
-  const escaped = useRef(false)
+  const benchCard = view.bench.kind === "card" ? view.bench.card : null
+  const trashable =
+    view.grid.cells[view.grid.selected]?.discards === true && benchCard !== null
   const selected = p.state.selected
   useLayoutEffect(() => {
     const at = bench.current
@@ -260,9 +272,7 @@ export function InventoryPanel(p: {
         <div className="inventory-body">
           <div className="inventory-bag">
             <CardGrid
-              onDiscard={card =>
-                onIntent({ kind: "discard", card: card.id, at: AT_INVENTORY })
-              }
+              onDiscard={trash}
               onMove={(card, slot) =>
                 onIntent({
                   kind: "put",
@@ -277,35 +287,53 @@ export function InventoryPanel(p: {
               view={view.grid}
             />
           </div>
-          {/* biome-ignore lint/a11y/useKeyWithClickEvents: Enter opens it from its slot */}
-          {/* biome-ignore lint/a11y/noStaticElementInteractions: a click on it opens its card, as Enter does */}
-          <div
-            className="bench"
-            data-side={BENCH_SIDE[p.dock]}
-            onClick={() => {
-              // A click that ends a text selection selects; it opens nothing.
-              if (
-                view.bench.kind === "card" &&
-                !benchOpen &&
-                (getSelection()?.isCollapsed ?? true)
-              )
-                act({ kind: "open" })
-            }}
-            ref={bench}
-            tabIndex={-1}
-          >
-            {view.bench.kind === "empty" ? (
-              <div className="bench-empty">
-                {emptyBenchWords(view.bench.slot)}
-              </div>
-            ) : (
-              <DrawCard
-                card={view.bench.card}
-                detail={view.bench.detail}
-                key={view.bench.card.id}
-                width={1}
-              />
-            )}
+          <div className="bench" data-side={BENCH_SIDE[p.dock]}>
+            {/* Always drawn, its buttons disabled for an empty slot, so the
+            bench keeps its height. */}
+            <div className="bench-bar">
+              <PutButton card={benchCard} />
+              <button
+                aria-label={TRASH_SELECTED.title}
+                className="trash-selected"
+                disabled={!trashable}
+                onClick={() => {
+                  if (benchCard !== null && trashable) trash(benchCard)
+                }}
+                title={TRASH_SELECTED.title}
+                type="button"
+              >
+                <TrashIcon /> {TRASH_SELECTED.label}
+              </button>
+            </div>
+            {/* biome-ignore lint/a11y/useKeyWithClickEvents: Enter opens it from its slot */}
+            {/* biome-ignore lint/a11y/noStaticElementInteractions: a click on it opens its card, as Enter does */}
+            <div
+              className="bench-card"
+              onClick={() => {
+                // A click that ends a text selection selects; it opens nothing.
+                if (
+                  view.bench.kind === "card" &&
+                  !benchOpen &&
+                  (getSelection()?.isCollapsed ?? true)
+                )
+                  act({ kind: "open" })
+              }}
+              ref={bench}
+              tabIndex={-1}
+            >
+              {view.bench.kind === "empty" ? (
+                <div className="bench-empty">
+                  {emptyBenchWords(view.bench.slot)}
+                </div>
+              ) : (
+                <DrawCard
+                  card={view.bench.card}
+                  detail={view.bench.detail}
+                  key={view.bench.card.id}
+                  width={1}
+                />
+              )}
+            </div>
           </div>
         </div>
       </RenderingProvider>

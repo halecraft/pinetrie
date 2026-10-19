@@ -497,10 +497,10 @@ canvas's threads (`canvasRail`). A canvas's signals are its threads', whatever r
   key; its width is the card's too (`cardWidth`, `columnHeadEnd`).
 - **A card column's head ends in ⋯ and one button** (`columnHeadEnd`,
   `column-menu.ts`, ADR-0161): ⇤, the `fold` intent, on a started thread
-  or a note column; × on a thread not yet started for a reader who may
-  write, and nothing for one who may not. The ⋯ ends in a `trash`
-  section, Move to trash, on every column for a reader who may write; ×
-  and it ask one `discard` intent, built once.
+  or a note column; a bin (ADR-0177) on a thread not yet started for a
+  reader who may write, and nothing for one who may not. The ⋯ ends in a
+  `trash` section, Move to trash, on every column for a reader who may
+  write; the bin and it ask one `discard` intent, built once.
 - **A thread column's ⋯ copies and takes it** (`columnHeadEnd`'s `thread`
   section, ADR-0127): `copyThread` (a `copy-thread` request at the
   source's end, `threadAnchor`, its id `Minted.thread`), `here` just after
@@ -513,7 +513,7 @@ canvas's threads (`canvasRail`). A canvas's signals are its threads', whatever r
   first send) is a column of mode `unstarted` (`UnstartedMode`), from
   `unstartedThreads` (`@pinetrie/rules`): ending at its fork, or, a new
   tab's, at its root (anchor null), its next send a branch there
-  (`isNextSendBranch`). Shared as any card, and trashed by its × or its ⋯'s
+  (`isNextSendBranch`). Shared as any card, and trashed by its bin or its ⋯'s
   Move to trash as any column is (`planDiscard`), your message staying on
   it; a new canvas's only thread, so trashed, takes its canvas out of the
   sidebar in the same move, and the host trashes the canvas's card. Its
@@ -1540,7 +1540,7 @@ composer*).
   an idle lane whose queue is held, `release`, and the queue place is
   `releases`, which `queueWords` words "send all (n)"; else `keep`.
 - **A discard is a move to your trash** (ADR-0111, ADR-0126): the
-  `discard` act (a card's ×, or Ctrl+Shift+Backspace in its box,
+  `discard` act (a card's bin, or Ctrl+Shift+Backspace in its box,
   `cardKeyAct`) and the inventory's `discard` intent plan `planDiscard`:
   `DISCARDED`, which names no canvas. The host names its history (ADR-0066,
   ADR-0116): the canvas the card leaves, or for a card in your inventory the
@@ -1804,6 +1804,11 @@ one status line (the newest notice).
   (`packages/web/TECHNICAL.md`, *Renderings*). Enter, a click on the
   selected slot, or a click on the bench opens it; selecting another slot
   folds it.
+- **The bench's bar trashes, a slot does not** (ADR-0177): a cell's
+  `discards` says whether its card may be trashed, by the bar's trash or
+  by Delete or Backspace on the selected slot (`gridKeyAct`'s `trash`,
+  which a column's messages never take: `trashes: false`). The open card's
+  × asks `fold`, as Escape does with it open.
 - **Escape with focus in the panel is the panel's** (`keyAct`, before the
   text box's guard, as the search's Escape): the bench's open card folds,
   else the panel closes (`inventoryReducer`'s `escape`). An Escape a box
@@ -1924,8 +1929,8 @@ one status line (the newest notice).
   or `refusal`), `.inventory .slot[data-slot][data-card]` and its
   `.compact-text`, the bench's `.inventory .bench` with its
   `.card-normal[data-card]`, its open card's `textarea`, an empty slot's
-  `.bench-empty`, `.inventory .put`, a slot's ×
-  `.inventory .slot-discard[data-card]`, the panel's ×
+  `.bench-empty`, its bar's `.inventory .bench .put` and
+  `.trash-selected`, its open card's × `.close-card`, the panel's ×
   `.inventory .inventory-close`, `#bottom .inventory-toggle`
   (`.account-inventory` in the account menu while the sidebar is folded),
   the clipboard chip's `.inventory .clipboard-cell` and its `.keep`, the

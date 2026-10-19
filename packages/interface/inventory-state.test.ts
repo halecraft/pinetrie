@@ -80,6 +80,14 @@ describe("inventoryReducer", () => {
     expect(isInventoryShown(after(folded, { kind: "escape" }))).toBe(false)
   })
 
+  test("the open card's × folds it and leaves the panel open", () => {
+    const opened = after(INVENTORY_CLOSED, { kind: "toggle" }, { kind: "open" })
+    expect(after(opened, { kind: "fold" })).toMatchObject({
+      bench: "normal",
+      shown: { kind: "held" },
+    })
+  })
+
   test("selecting a slot folds the bench", () => {
     const opened = after(INVENTORY_CLOSED, { kind: "toggle" }, { kind: "open" })
     expect(after(opened, { kind: "select", slot: 3 })).toMatchObject({

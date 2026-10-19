@@ -9,8 +9,8 @@ import { MessageText } from "./message-text.tsx"
 
 export function ThreadPreviewView(p: {
   preview: ThreadPreview
-  /** Below the path: its put. */
-  foot: ReactNode
+  /** Below the path, if anything. */
+  foot?: ReactNode
 }) {
   return (
     <section
@@ -26,7 +26,9 @@ export function ThreadPreviewView(p: {
           </li>
         ))}
       </ol>
-      <div className="thread-preview-foot">{p.foot}</div>
+      {p.foot !== undefined && (
+        <div className="thread-preview-foot">{p.foot}</div>
+      )}
     </section>
   )
 }

@@ -1,8 +1,9 @@
 // web/icons — the page's drawn icons, in the text's colour, so a control's
 // rest, hover and pressed colours are its CSS alone: the footer corner's inbox
-// and inventory, copy (two sheets) wherever a copy is offered, and the
+// and inventory, copy (two sheets) wherever a copy is offered, the
 // inventory's box with an arrow into it (take) or out of it (put), the same
-// wherever take and put are offered.
+// wherever take and put are offered, and a bin wherever a card is trashed.
+// Drawn, not a character: U+1F5D1 is missing from common fonts.
 
 const ICON = {
   fill: "none",
@@ -38,6 +39,15 @@ export const InventoryIcon = ({ way }: { way?: "take" | "put" }) => (
     ) : (
       <path d="M8 11.5v-4M6.5 9 8 7.5 9.5 9" />
     )}
+  </svg>
+)
+
+/** A bin with its lid: trash, wherever a card is trashed; × only closes. */
+export const TrashIcon = () => (
+  <svg {...ICON} aria-hidden="true" className="icon">
+    <path d="M2.5 4.5h11M6 4.5V3a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5v1.5" />
+    <path d="M3.8 4.5 4.5 13a1 1 0 0 0 1 .9h5a1 1 0 0 0 1-.9l.7-8.5" />
+    <path d="M6.5 7v4.5M9.5 7v4.5" />
   </svg>
 )
 

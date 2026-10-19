@@ -413,14 +413,16 @@ export const boardSel = (canvas: string) =>
  */
 export async function stepAway(p: Page): Promise<void> {
   await p.click("#sidebar .add-canvas")
-  await p.waitForSelector(".column[data-card] .close", { timeout: 15_000 })
+  await p.waitForSelector(".column[data-card] .trash-column", {
+    timeout: 15_000,
+  })
 }
 /**
  * Back on `canvas` from `stepAway`: the new tab's column closed, discarding
  * its thread and its canvas, then `canvas` shown.
  */
 export async function stepBack(p: Page, canvas: string): Promise<void> {
-  await p.click(".column[data-card] .close")
+  await p.click(".column[data-card] .trash-column")
   await p.click(itemSel(canvas))
 }
 /**

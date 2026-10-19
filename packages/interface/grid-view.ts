@@ -21,7 +21,7 @@ export interface GridCell {
   readonly card: DrawnCard | null
   readonly compact: Compact | null
   readonly selected: boolean
-  /** Whether its × is drawn: a card you may discard (`isDiscardable`). */
+  /** Whether its card may be trashed from here (`isDiscardable`): the bench's trash and Delete. */
   readonly discards: boolean
 }
 
@@ -45,7 +45,7 @@ export function gridView(input: {
   readonly tone: CardTone
   readonly placed: ReadonlyMap<number, DrawnCard>
   readonly selected: number
-  /** Who draws it: whose discards a cell's × offers. */
+  /** Who draws it: whose cards the bench's trash and Delete may trash. */
   readonly me: WriterId
   /** Each card's text, by id; one not yet read is "". */
   readonly texts: ReadonlyMap<CardId, string>

@@ -111,8 +111,7 @@ export const reorderWords = (step: -1 | 1): ControlWords =>
 export const unsentWords = (reason: string): string => `not sent: ${reason}`
 
 /** What a discard of yours says where you made it, until your next move there. */
-const DISCARDED_NOTICE =
-  "discarded · the undo key (⌘Z outside a box) brings it back"
+const DISCARDED_NOTICE = "trashed · ⌘Z brings it back"
 
 /**
  * Something of yours to say where you acted: a discard, or a
@@ -189,12 +188,19 @@ export const CLIPBOARD_CELL_TITLE =
 export const PUT = "put"
 export const PUT_TITLE =
   "put below the line in the column you were in (Ctrl+Shift+O)"
-/** A card's button that discards it; the undo key brings it back. */
-export const DISCARD_CARD = "×"
+/** A card's trash button, drawn as a bin; the undo key brings it back. */
 export const DISCARD_CARD_TITLE =
-  "discard (Ctrl+Shift+Backspace) · the undo key brings it back"
-/** A slot's ×, which discards its card from your inventory. */
-export const DISCARD_SLOT_TITLE = "discard · the undo key brings it back"
+  "trash (Ctrl+Shift+Backspace) · ⌘Z brings it back"
+/** The bench's trash button, and Delete on a selected slot: its card to your trash. */
+export const TRASH_SELECTED = {
+  label: "trash",
+  title: "trash this card (Delete) · ⌘Z brings it back",
+} as const
+/** The × of a card open on the bench: back to read only, the card kept. */
+export const CLOSE_CARD = {
+  label: "×",
+  title: "close (Esc): back to read only, the card kept",
+} as const
 
 /** A notice's React key: what it is about, and why. */
 export const noticeKey = (notice: CardNotice): string =>

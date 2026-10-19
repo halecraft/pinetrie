@@ -471,10 +471,11 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   starts another thread, however new, never pulls it away.
 - **Every unfolded column's header ends in ⋯ and one button** (ADR-0161,
   ADR-0134): **⇤** on a started thread or a note column, which folds it
-  for you, and **×** on a thread not yet started, which does not fold.
+  for you, and a **bin** on a thread not yet started, which trashes it
+  (ADR-0177).
   Its ⋯ holds what changes the canvas for everyone: its width, one or two
   columns wide; a thread's copies and its take; and last **Move to
-  trash**, on every column, even where × repeats it. ⋯ is everyone's, and
+  trash**, on every column, even where the bin repeats it. ⋯ is everyone's, and
   the head's button is yours or loses nothing. A folded strip has
   neither: unfold it first.
 - **Columns are reordered by dragging their headers, for everyone**: the
@@ -519,7 +520,7 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   above its own first message folded behind "↑ N earlier messages" when
   the thread it forks from is on no column of the canvas. A canvas with
   threads of several roots draws each root's tree on the rail.
-- **Move to trash, or × on a thread not yet started, trashes a column,
+- **Move to trash, or the bin on a thread not yet started, trashes a column,
   for everyone, asking nothing** (ADR-0134, ADR-0161): a
   thread, running or not, sent or not, and a note column with its notes.
   A running thread's run stops, as a take's does ("Ada stopped it"). The
@@ -984,7 +985,7 @@ The rail is E; the column is T. Seeing both at once is the product.
   at once, placed at the end of the first open state from your list's ＋,
   of its own state from a board column's (ADR-0122). Its first send makes
   the root, and the board shows it from then: others find it there.
-  Closing it unsent with × sends the canvas to your trash with its thread,
+  Trashing it unsent with its bin sends the canvas to your trash with its thread,
   and the undo key, on no canvas, brings both back.
 - **An empty session** shows the board, with nothing in it, and ＋.
 - **A page with nothing in the sidebar** (a first visit, or a list you
@@ -1144,7 +1145,7 @@ The rail is E; the column is T. Seeing both at once is the product.
   note, queued, pinned, inventory), how it
   stands ("next", "held · 2nd in line", "not sent: …", "changed since the
   agent last read it"), who put it there, and its command's chip; then ⋯
-  and ×. The footer holds ↑ and ↓ in a list, and at most one primary
+  and its bin, which trashes it. The footer holds ↑ and ↓ in a list, and at most one primary
   action, filled in the card's colour: send on your message, put in your
   inventory. A note has none, and a queued card none: the queue's controls
   send it.
@@ -1156,7 +1157,7 @@ The rail is E; the column is T. Seeing both at once is the product.
   inventory; a pinned card to the notes, the queue or your inventory; a
   card in a new branch to your inventory. Each is the move a drag makes there, and the
   undo key outside a box undoes it. A card in your inventory has none
-  there: put, × and a drag move it.
+  there: the bench's put and trash, and a drag, move it.
 - **Before your composer's first keystroke**, and in the box a new note or
   pinned card is written in, the frame says only where the card will be.
   That box offers no ⋯ even once its card exists: the card's moves are
@@ -1231,12 +1232,12 @@ The rail is E; the column is T. Seeing both at once is the product.
   running thread a send waits in the held queue. Unqueue all puts every
   queued card below the line at once, and the undo key outside a box puts
   them back.
-- **× on a card discards it** (ADR-0111), wherever it is: your message, a
-  note, a queued or pinned card, or a card in a slot of your inventory,
-  whose × is on its corner, shown on the selected card and on hover, and
-  one open on its bench; so does Ctrl+Shift+Backspace in its box. Where you did it,
-  the column says "discarded · the undo key (⌘Z outside a box) brings it
-  back", and the undo key does, for a week; then the host deletes it.
+- **A bin on a card trashes it** (ADR-0111, ADR-0177), wherever it is:
+  your message, a note, a queued or pinned card, a comment; so does
+  Ctrl+Shift+Backspace in its box. In your inventory, the bench's **trash**
+  and Delete on a selected slot do. × never trashes: it closes. Where you
+  did it, the column says "trashed · ⌘Z brings it back", and the undo key
+  does, for a week; then the host deletes it.
   Discarding someone else's card leaves them a trace, as a move does.
 - **↑ and ↓ on a queued card, or Alt+↑ and Alt+↓ in its box, move it one
   place in line**; the box keeps its caret. A card never passes a note the
@@ -1330,8 +1331,7 @@ The rail is E; the column is T. Seeing both at once is the product.
 - **The header** says "inventory · 8/12", holds the clipboard chip and its
   **keep** (below), and **×**, which closes the panel.
 - **The status line** under the bag and the bench says the newest notice
-  ("discarded · the undo key (⌘Z outside a box) brings it back", "inventory
-  full"), and keeps its height when it says nothing.
+  ("trashed · ⌘Z brings it back", "inventory full"), and keeps its height when it says nothing.
 - **A fixed grid of 12 slots, two wide and six high**, the first nine
   numbered 1–9. Each slot shows its card compact, as every card is drawn in
   a slot whatever its kind: a strip in your colour, its kind's icon and its
@@ -1347,14 +1347,18 @@ The rail is E; the column is T. Seeing both at once is the product.
   the panel has focus, to select it, and the bench beside the grid, on the
   side away from where the panel is docked, shows its card one column wide,
   read only; an empty slot says so ("slot 4 · empty: drop or paste a card
-  here"). **Enter, a click on the bench or on the card already selected,
-  opens it there**, editable, the caret in its box; a reference opened
-  shows **Edit as text**, and a thread its path read only, with no
-  composer, queue or run, and **put**, which puts it on the canvas you are
-  on, after the column you were last in. Only its holder opens it: a link
-  to it anywhere else says "Bea has it". **Escape** folds the open card
-  back to its slot; with none open, it closes the panel. A click that ends
-  a selection of the card's text opens nothing.
+  here"). Above it, always, a bar (ADR-0177): **put**, which puts the
+  card in the column you were last in (a thread on the canvas you are on,
+  after that column), and **trash**, both greyed on an empty slot.
+  **Enter, a click on the bench or on the card already selected, opens it
+  there**, editable, the caret in its box; a reference opened shows **Edit
+  as text**, and a thread its path read only, with no composer, queue or
+  run. Only its holder opens it: a link to it anywhere else says "Bea has
+  it". **×** on the open card, or **Escape**, closes it back to read only,
+  the card kept in its slot; Escape with none open closes the panel. A
+  click that ends a selection of the card's text opens nothing. A slot has
+  no × of its own: **Delete** or Backspace on a selected slot trashes its
+  card.
 - **Who opened it closes it.** Opened by you (its toggle, a link to a
   thread you hold, an undo that shows it), it stays until you close it:
   **×**, Escape, or the toggle; a click elsewhere leaves it open, since you
@@ -1420,7 +1424,7 @@ The rail is E; the column is T. Seeing both at once is the product.
   has **Queue a reference**, which queues the comment on its thread, under
   a link to the message, so the agent reads it once with what it is about;
   the comment stays. Queued, the reference shows in the dock as a queued
-  message does, with ↑ ↓, × and a ⋯ that moves it back to the notes or into
+  message does, with ↑ ↓, a bin and a ⋯ that moves it back to the notes or into
   your inventory. With a column's messages focused (a click on one), `j`
   and `k` select a message, Enter opens its comments, `c` comments on it,
   Escape shuts them, and Cmd+C copies it.
@@ -1429,9 +1433,9 @@ The rail is E; the column is T. Seeing both at once is the product.
   of the panel onto a column: a note in the note column nearest its thread,
   or, onto a note column, at its end. Dropped on a
   composer, it becomes your message there. Held over a canvas in the sidebar,
-  or over ▦, a drag opens it while a ring around it fills. A slot's **×**
-  discards its card, and so does the **×** of the card open on the bench;
-  the undo key brings it back.
+  or over ▦, a drag opens it while a ring around it fills. The bench's
+  **trash**, or Delete on a selected slot, trashes its card; the undo key
+  brings it back.
 - **Undo a move** with Cmd+Z (Ctrl+Z elsewhere) while no box has focus;
   Cmd+Shift+Z, Ctrl+Shift+Z or Ctrl+Y redo it (ADR-0066). It undoes your
   newest move in the canvas you are on, from any of your tabs, after a reload
@@ -1476,6 +1480,7 @@ The rail is E; the column is T. Seeing both at once is the product.
 | a preview beside the grid, and a card opened over its neighbours | the bench: the selected card read only, opened in place there (ADR-0171) |
 | an inventory as wide as what it showed, closed only by its toggle | a fixed frame, closed by ×, Escape or its toggle, opening in motion (ADR-0171) |
 | a card's face and whole | compact and full, each a box of its own size (ADR-0171) |
+| × that discarded a card, and a slot's × on hover | a bin that trashes; × only closes; the bench's trash, and Delete on a slot (ADR-0177) |
 
 With no control moving a lane, the `navigate` command had no caller and was
 deleted with `prompt` and `branch`. Lanes now never move at all (ADR-0120).

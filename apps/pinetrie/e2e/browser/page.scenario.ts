@@ -1438,7 +1438,7 @@ async function run(check: Checks["check"]): Promise<void> {
       const asideCol = col(before + 2)
       await page.waitForSelector(`${asideCol} .composer`, { timeout: 15_000 })
       await page.inputValue(`${asideCol} .composer .input`)
-      await page.click(`${asideCol} .close`)
+      await page.click(`${asideCol} .trash-column`)
       const asideClosed = await page
         .waitForFunction(
           () => document.querySelectorAll(".column").length === 2,
@@ -1449,7 +1449,7 @@ async function run(check: Checks["check"]): Promise<void> {
           () => true,
           () => false,
         )
-      check("× on a branch's column takes it off the canvas", asideClosed)
+      check("the bin on a branch's column takes it off the canvas", asideClosed)
       // ＋ past the last column: its ▾'s chat makes a column at the canvas's
       // end, a new root's thread in this canvas, ready to type in.
       await page.focus("#strip > .canvas-end .add-menu")
@@ -1494,7 +1494,7 @@ async function run(check: Checks["check"]): Promise<void> {
         `last ${madeLast}; ${JSON.stringify(madeRecord?.origin)}; "${madeLabel}", caret ${madeCaret}`,
       )
       // Taken off again: what follows counts the two columns it made.
-      await page.click(`${madeCol} .close`)
+      await page.click(`${madeCol} .trash-column`)
       await page
         .waitForFunction(
           () => document.querySelectorAll(".column").length === 2,
@@ -1842,7 +1842,7 @@ async function run(check: Checks["check"]): Promise<void> {
       await page.waitForSelector(`${col(0)}[data-card] .composer`, {
         timeout: 15_000,
       })
-      await page.click(`${col(0)} .close`)
+      await page.click(`${col(0)} .trash-column`)
       const agentRoot = heldTree(host).roots.at(-1) ?? ""
       await page.click(itemSel(rootCanvas(agentRoot)))
       await page.waitForFunction(
@@ -2361,13 +2361,13 @@ async function run(check: Checks["check"]): Promise<void> {
         )
         // Closed unsent, by ×, asking nothing: its canvas goes too.
         await page.fill(`${col(0)} .composer .input`, "never sent")
-        await page.click(`${col(0)} .close`)
+        await page.click(`${col(0)} .trash-column`)
         const gone = await waitFor(
           () => readCanvases(host.places).size === canvasesBefore,
           10_000,
         )
         check(
-          "an unsent new canvas closed with × takes its canvas away, and its thread's card to the trash, asking nothing",
+          "an unsent new canvas trashed with its bin takes its canvas away, and its thread's card to the trash, asking nothing",
           gone >= 0 &&
             readPlaces(host.places).find(c => c.id === tab)?.place.kind ===
               "trash",
@@ -3535,7 +3535,7 @@ async function run(check: Checks["check"]): Promise<void> {
         const cardsBefore = readPlaces(host.places).filter(
           c => c.place.kind !== "trash",
         ).length
-        await page.click(`${col(1)} .close`)
+        await page.click(`${col(1)} .trash-column`)
         await page
           .waitForFunction(
             () => document.querySelectorAll(".column").length === 1,
@@ -3682,8 +3682,11 @@ async function run(check: Checks["check"]): Promise<void> {
       const placeOf = (id: string) =>
         readPlaces(host.places).find(c => c.id === id)?.place
       const slotOf = (id: string) => `.inventory .slot[data-card="${id}"]`
-      const slotDiscardOf = (id: string) =>
-        `.inventory .slot-discard[data-card="${id}"]`
+      // A slot's card to the trash: selected, then the bench's trash.
+      const trashFromSlot = async (id: string) => {
+        await page.click(slotOf(id))
+        await page.click(".inventory .bench .trash-selected")
+      }
       const valueIs = (sel: string, want: string) =>
         page
           .waitForFunction(
@@ -3850,9 +3853,9 @@ async function run(check: Checks["check"]): Promise<void> {
         wrapped && unwrapped >= 0,
         `${wrapped}, ${wrapPlace?.kind}; undone ${unwrapped} ms, ${placeOf(parked)?.kind}`,
       )
-      // Discarded with its slot's ×, and back in its slot with the undo
-      // key: a discard is a move the host's history holds.
-      await page.click(slotDiscardOf(parked))
+      // Trashed with the bench's trash, and back in its slot with the undo
+      // key: a trash is a move the host's history holds.
+      await trashFromSlot(parked)
       await waitFor(() => placeOf(parked)?.kind === "trash", 5_000)
       await page.evaluate(() =>
         (document.activeElement as HTMLElement | null)?.blur(),
@@ -3863,7 +3866,7 @@ async function run(check: Checks["check"]): Promise<void> {
         5_000,
       )
       check(
-        "a slot's × discards its card, and the undo key outside a box brings it back",
+        "the bench's trash trashes the selected card, and the undo key outside a box brings it back",
         discardUndone >= 0,
         `${discardUndone} ms; ${placeOf(parked)?.kind}`,
       )
@@ -3982,6 +3985,27 @@ async function run(check: Checks["check"]): Promise<void> {
           placeOf(parked)?.kind === "inventory",
         `caret ${caretInBox}, folded ${foldedBack}, ${sizeOpen}`,
       )
+      // The open card's × closes it, as Escape does: × never trashes.
+      await page.keyboard.press("Enter")
+      await appears(".inventory .bench .close-card")
+      await page.click(".inventory .bench .close-card")
+      const closedKept = await page
+        .waitForFunction(
+          () =>
+            document.querySelector(".inventory .bench textarea") === null &&
+            document.querySelector(".inventory[data-shown]") !== null,
+          undefined,
+          { timeout: 5_000 },
+        )
+        .then(
+          () => true,
+          () => false,
+        )
+      check(
+        "the × of a card open on the bench closes it, and the card stays in its slot",
+        closedKept && placeOf(parked)?.kind === "inventory",
+        `closed ${closedKept}, ${placeOf(parked)?.kind}`,
+      )
       // A take while the panel is closed peeks: the panel opens for the
       // card's landing, and a pointer over it keeps it open, as if you had
       // opened it. The card is discarded after.
@@ -4015,9 +4039,19 @@ async function run(check: Checks["check"]): Promise<void> {
         peeks && keptOpen,
         `peeked ${peeks}, kept open ${keptOpen}`,
       )
-      await page.click(slotDiscardOf(peeked))
-      await waitFor(() => placeOf(peeked)?.kind === "trash", 5_000)
-      await page.click(slotDiscardOf(parked))
+      // Delete on a selected slot trashes its card.
+      await page.click(slotOf(peeked))
+      await page.keyboard.press("Delete")
+      const deleted = await waitFor(
+        () => placeOf(peeked)?.kind === "trash",
+        5_000,
+      )
+      check(
+        "Delete on a selected slot trashes its card",
+        deleted >= 0,
+        `${deleted} ms; ${placeOf(peeked)?.kind}`,
+      )
+      await trashFromSlot(parked)
       await waitFor(() => placeOf(parked)?.kind === "trash", 5_000)
       const columnsBefore = await page.locator(".column").count()
       // Move to trash, from its ⋯, on an unstarted branch with text trashes
@@ -4088,7 +4122,7 @@ async function run(check: Checks["check"]): Promise<void> {
       await page.focus(unstartedBox)
       await page.keyboard.press("Control+Shift+I")
       await appears(`.inventory .slot[data-slot="5"][data-card="${thought}"]`)
-      await page.click(`${branch} .close`)
+      await page.click(`${branch} .trash-column`)
       await columnsAre(columnsBefore)
 
       // Pinned cards, in the DOWN thread's agent column:
@@ -4497,7 +4531,8 @@ async function run(check: Checks["check"]): Promise<void> {
         `.inventory .slot[data-slot="5"][data-card="${thought}"]`,
       )
       check("a reload keeps your inventory's cards in their slots", stillInSlot)
-      await page.click(`.inventory .slot-discard[data-card="${thought}"]`)
+      await page.click(`.inventory .slot[data-card="${thought}"]`)
+      await page.click(".inventory .bench .trash-selected")
       await page.click("#bottom .inventory-toggle")
       await page.fill(`${col(0)} .composer .input`, "")
       // A new tab shares the device's storage (same context; every

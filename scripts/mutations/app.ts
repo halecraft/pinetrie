@@ -214,13 +214,13 @@ export const mutations: readonly Mutation[] = [
   // ⇤ and × are one button, its words and intent from `columnHeadEnd`:
   // each mutant skips its own intent.
   {
-    name: "a column's × does nothing",
+    name: "a column's bin does nothing",
     file: "packages/web/column-menu.tsx",
     from: "          onClick={() => p.onIntent(button.intent)}\n",
     to: '          onClick={() => button.intent.kind === "discard" || p.onIntent(button.intent)}\n',
     suite: "browser",
     scenario: "page",
-    expect: "× on a branch's column takes it off the canvas",
+    expect: "the bin on a branch's column takes it off the canvas",
   },
   {
     name: "a column's ⇤ does nothing",
@@ -232,14 +232,33 @@ export const mutations: readonly Mutation[] = [
     expect: "a fold turns the column's name onto its strip's, in its colour",
   },
   {
-    name: "a slot's × does nothing",
-    file: "packages/web/card-grid.tsx",
-    from: "                if (cell.card !== null) p.onDiscard(cell.card)",
+    name: "the bench's trash does nothing",
+    file: "packages/web/inventory-panel.tsx",
+    from: "                  if (benchCard !== null && trashable) trash(benchCard)",
     to: "",
     suite: "browser",
     scenario: "page",
     expect:
-      "a slot's × discards its card, and the undo key outside a box brings it back",
+      "the bench's trash trashes the selected card, and the undo key outside a box brings it back",
+  },
+  {
+    name: "the open card's × trashes it",
+    file: "packages/web/card-frame.tsx",
+    from: "              onClick={p.onClose}",
+    to: "              onClick={p.onDiscard}",
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "the × of a card open on the bench closes it, and the card stays in its slot",
+  },
+  {
+    name: "Delete on a slot trashes nothing",
+    file: "packages/web/card-grid.tsx",
+    from: "            if (selectedCard !== null) p.onDiscard(selectedCard)",
+    to: "",
+    suite: "browser",
+    scenario: "page",
+    expect: "Delete on a selected slot trashes its card",
   },
   {
     name: "a catch-up's turn names no commit",
@@ -3189,7 +3208,7 @@ export const mutations: readonly Mutation[] = [
     suite: "browser",
     scenario: "page",
     expect:
-      "an unsent new canvas closed with × takes its canvas away, and its thread's card to the trash, asking nothing",
+      "an unsent new canvas trashed with its bin takes its canvas away, and its thread's card to the trash, asking nothing",
   },
   {
     name: "a strip's mark row is taller than the geometry a fold reads",

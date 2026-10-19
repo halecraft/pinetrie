@@ -46,6 +46,8 @@ export type InventoryAct =
   | { readonly kind: "open" }
   /** Escape with focus in the panel: the bench's card folds, else the panel closes. */
   | { readonly kind: "escape" }
+  /** The open card's ×: it folds, the panel stays. */
+  | { readonly kind: "fold" }
 
 export const INVENTORY_CLOSED: InventoryState = {
   shown: { kind: "closed" },
@@ -107,6 +109,8 @@ export function inventoryReducer(
       return { ...state, selected: act.slot, bench: "normal" }
     case "open":
       return { ...state, bench: "open" }
+    case "fold":
+      return { ...state, bench: "normal" }
     case "escape":
       return state.bench === "open"
         ? { ...state, bench: "normal" }

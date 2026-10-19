@@ -2510,6 +2510,32 @@ export const mutations: readonly Mutation[] = [
     expect: "a thread: its name, then where it ended, its status as the badge",
   },
   {
+    name: "Delete trashes in a column's messages too",
+    file: "packages/interface/grid-keys.ts",
+    from: '    return at.trashes && at.hasCard && !event.altKey ? { kind: "trash" } : null',
+    to: '    return at.hasCard && !event.altKey ? { kind: "trash" } : null',
+    command: unit,
+    expect:
+      "Delete or Backspace trashes the selected card; not on an empty cell, nor in a column",
+  },
+  {
+    name: "the open card's × closes the panel",
+    file: "packages/interface/inventory-state.ts",
+    from: '    case "fold":\n      return { ...state, bench: "normal" }',
+    to: '    case "fold":\n      return { ...state, shown: CLOSED, bench: "normal" }',
+    command: unit,
+    expect: "the open card's × folds it and leaves the panel open",
+  },
+  {
+    name: "a thread not yet started shows × to trash it",
+    file: "packages/interface/column-menu.ts",
+    from: '  label: "trash",\n  title: TRASH_COLUMN,',
+    to: '  label: "×",\n  title: TRASH_COLUMN,',
+    command: unit,
+    expect:
+      "a column's head folds a started thread or a note column, and trashes a thread not yet started with its bin",
+  },
+  {
     name: "a fact's compact has no lead",
     file: "packages/interface/compact.ts",
     from: "        lead: text(factLine(card.content.fact)),",
@@ -2627,13 +2653,13 @@ export const mutations: readonly Mutation[] = [
       "a card held over the closed inventory toggle opens the inventory; over a slot, nothing",
   },
   {
-    name: "a slot's × is offered on someone else's card",
+    name: "a slot offers to trash someone else's card",
     file: "packages/interface/grid-view.ts",
     from: "      discards: card !== null && isDiscardable(card, input.me),",
     to: "      discards: card !== null,",
     command: unit,
     expect:
-      "a slot's × is drawn on a card you may discard, never on an empty slot",
+      "a slot's card may be trashed from it only if you may discard it, never an empty slot",
   },
   {
     name: "a queued card cannot be pinned from its ⋯",
@@ -4600,7 +4626,7 @@ export const mutations: readonly Mutation[] = [
     to: "    button: true\n",
     command: unit,
     expect:
-      "a column's head folds a started thread or a note column, and closes a thread not yet started",
+      "a column's head folds a started thread or a note column, and trashes a thread not yet started with its bin",
   },
   {
     name: "a drop's kind of target is never round-tripped",

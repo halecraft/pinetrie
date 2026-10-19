@@ -433,7 +433,8 @@ type (`Strip = [CanvasColumn, ...CardColumn[]]`), so no strip lacks one.
   holder sees it there read only (ADR-0124): a mention of it opens nowhere
   while someone else holds it (`inbox-menu.tsx`).
 - **Every unfolded column's header ends in ⋯ and one button**
-  (`.column-menu`, then `.fold` or `.close`, ADR-0161), a note column's
+  (`.column-menu`, then `.fold` or `.trash-column`, a bin, ADR-0161,
+  ADR-0177), a note column's
   too, drawn by one component (`column-menu.tsx`) from one
   `columnHeadEnd` value: ⇤ is the `fold` intent of its card, on a started
   thread or a note column, and × the same `discard` intent as the ⋯'s
@@ -1169,12 +1170,11 @@ the session sends moves and draws them until its copy holds them
   in view once they scroll.
 - **`CardGrid`** (`card-grid.tsx`) draws your inventory's `GridView` as
   compact cards, each cell a button (the drop target, `dropProps`, and the
-  card's drag) holding its `CompactCard`, and beside that button, never in
-  it, the card's × (`.slot-discard`) when the cell `discards`: hidden by
-  opacity, not `visibility`, so it is shown on the selected cell and on
-  hover and stays clickable. Its keys are `gridKeyAct`'s, on the grid,
-  Escape aside (the page's); Enter and a click on the selected cell ask
-  the caller to open the card on the bench. A compact's owner is an
+  card's drag) holding its `CompactCard`, and no × (ADR-0177): × only
+  closes. Its keys are `gridKeyAct`'s, on the grid, Escape aside (the
+  page's); Enter and a click on the selected cell ask the caller to open
+  the card on the bench, and Delete or Backspace to trash it, when the
+  cell `discards`. A compact's owner is an
   `Initial`, not an `Avatar`: the suites count people by `.avatar`. A
   cell's text comes from `useCardTexts`.
 - **One editor for every card: `card-editor.tsx`, in one frame:
@@ -1260,8 +1260,8 @@ the session sends moves and draws them until its copy holds them
   someone who undid everything they wrote is still named. It stays until
   Kyneta can name the writers whose text still stands
   (ADR-0048, *Who contributed*); marks do not use it.
-- **× on an unstarted thread's column trashes it, asking nothing**
-  (ADR-0134): one move (`planDiscard`), its thread's card to the trash with
+- **The bin on an unstarted thread's column trashes it, asking nothing**
+  (ADR-0134, ADR-0177): one move (`planDiscard`), its thread's card to the trash with
   your message on it, undone by the undo key.
 
 ## Pinned cards (ADR-0048 step 5)
@@ -1323,7 +1323,8 @@ stays in view; the strip scrolls past 30vh.
   prompt's `.msg`. A card's frame is `.card-frame` (with `data-tone`), its
   header `.card-head` (`.card-state[data-state]`, `.card-by`), its ⋯
   `.card-menu-trigger` and its items `.move-to[data-to]` and
-  `.card-history-item`; its × `.discard-card`. A note column is
+  `.card-history-item`; its bin `.discard-card`, and on the bench its ×
+  `.close-card`. A note column is
   `.note-column`, its notes `.card-editor.note` with their
   `textarea[data-card]`. `openNote` (`apps/pinetrie/e2e/browser/page.ts`)
   focuses a note's box, which unfolds it.
@@ -1479,6 +1480,13 @@ inventory's grid columns are `--compact-w`, its frame two `--column`s.
 - **A click on the bench opens its card only when it ends no text
   selection** (S242): a drag across the normal card's text fires `click`
   too, and opening would lose the selection.
+- **A bin trashes, × closes** (ADR-0177). The bin is drawn
+  (`TrashIcon`, `icons.tsx`): U+1F5D1 is missing from common fonts. A card
+  open on the bench gets `RenderingContext.onClose`, which its frame draws
+  as × (`CardFrame`'s `onClose`, a reference's `NormalFrame` too) in place
+  of its bin: the bench's bar (`.bench-bar`: `PutButton`, then
+  `.trash-selected`) holds its put and its trash, always drawn, disabled
+  on an empty slot, so the bench keeps its height.
 - **Opened on the bench, its card takes focus**: its text box, else its
   first enabled button (a reference's Edit as text, a thread's put), else
   the bench. Folded by Escape, focus goes back to the selected slot, where

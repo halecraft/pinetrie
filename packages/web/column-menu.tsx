@@ -1,6 +1,7 @@
 // web/column-menu — how a card column's head ends, a thread's and a note
 // column's alike, as `columnHeadEnd` decides: its ⋯, then one button, ⇤,
-// which folds it for you, or × on a thread not yet started.
+// which folds it for you, or a bin on a thread not yet started, which trashes
+// it.
 
 import type { CardId, CardWidth } from "@pinetrie/core"
 import {
@@ -9,15 +10,15 @@ import {
   columnHeadEnd,
   type Intent,
 } from "@pinetrie/interface"
-import { InventoryIcon } from "./icons.tsx"
+import { InventoryIcon, TrashIcon } from "./icons.tsx"
 import { Menu } from "./menu.tsx"
 
 export function ColumnHeadEnd(p: {
   card: CardId
   width: CardWidth
-  /** Whether the reader may trash it: no trash in ⋯, and no ×, otherwise. */
+  /** Whether the reader may trash it: no trash in ⋯, and no bin, otherwise. */
   writable: boolean
-  /** A thread not yet started: × in place of ⇤. */
+  /** A thread not yet started: a bin in place of ⇤. */
   unstarted: boolean
   onIntent: (intent: Intent) => void
 }) {
@@ -34,7 +35,11 @@ export function ColumnHeadEnd(p: {
           title={button.words.title}
           type="button"
         >
-          {button.words.label}
+          {button.intent.kind === "discard" ? (
+            <TrashIcon />
+          ) : (
+            button.words.label
+          )}
         </button>
       )}
     </>

@@ -19,6 +19,9 @@
     keep.
   - ADR-0111: in your inventory, × discards on the bench as everywhere;
     leaving the open card is Escape or selecting another slot.
+- **Amended by:**
+  - ADR-0177: the bench has a bar of put and trash, always drawn; a slot has
+    no ×, and Delete on a selected slot trashes its card.
 
 **Context.**
 

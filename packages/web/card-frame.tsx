@@ -15,9 +15,9 @@ import {
   type CardFrameView,
   type CatchUps,
   CLEAR_COMMAND,
+  CLOSE_CARD,
   type ColumnAct,
   cardFrameWords,
-  DISCARD_CARD,
   DISCARD_CARD_TITLE,
   type DrawnCard,
   dragProps,
@@ -32,7 +32,7 @@ import {
 import { type ReactNode, useRef, useState } from "react"
 import { CardHistory, MovedBack } from "./card-history.tsx"
 import { fileDropProps } from "./file-drop.ts"
-import { InventoryIcon } from "./icons.tsx"
+import { InventoryIcon, TrashIcon } from "./icons.tsx"
 import { Menu } from "./menu.tsx"
 
 /** A tone's class; the inventory's is `held`, since `.inventory` is the panel's. */
@@ -56,6 +56,11 @@ export function CardFrame(p: {
   /** A move chosen in its ⋯, or a ↑ or ↓. */
   onAct: (act: ColumnAct) => void
   onDiscard: () => void
+  /**
+   * Given, the card is open on your inventory's bench: its × closes it, back
+   * to read only, and its trash is the bench's, not the frame's.
+   */
+  onClose?: () => void
   /** The × beside a command's chip, which sends the card as a plain message; null for none. */
   onClearCommand: (() => void) | null
   /** The footer, after the tools: its primary action and quiet words. */
@@ -175,7 +180,19 @@ export function CardFrame(p: {
               triggerClassName="card-menu-trigger"
             />
           )}
-          {view.discards && <DiscardButton onDiscard={p.onDiscard} />}
+          {p.onClose !== undefined ? (
+            <button
+              aria-label={CLOSE_CARD.title}
+              className="close-card"
+              onClick={p.onClose}
+              title={CLOSE_CARD.title}
+              type="button"
+            >
+              {CLOSE_CARD.label}
+            </button>
+          ) : (
+            view.discards && <DiscardButton onDiscard={p.onDiscard} />
+          )}
         </span>
       </div>
       <div className="card-body">
@@ -249,7 +266,7 @@ function ShareFileButton(p: {
   )
 }
 
-/** A card's ×: discards it, and the undo key outside a box brings it back. */
+/** A card's bin: trashes it, and the undo key outside a box brings it back. */
 function DiscardButton(p: { onDiscard: () => void }) {
   return (
     <button
@@ -259,7 +276,7 @@ function DiscardButton(p: { onDiscard: () => void }) {
       title={DISCARD_CARD_TITLE}
       type="button"
     >
-      {DISCARD_CARD}
+      <TrashIcon />
     </button>
   )
 }

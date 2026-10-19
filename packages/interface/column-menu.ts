@@ -1,6 +1,6 @@
 // interface/column-menu — what a card column's head ends in, as values: its
 // ⋯, what changes the canvas everyone shares, ending in its trash; then one
-// button that is yours or loses nothing: ⇤, or × on a thread not yet
+// button that is yours or loses nothing: ⇤, or the bin on a thread not yet
 // started.
 
 import { type CardId, type CardWidth, isThreadId } from "@pinetrie/core"
@@ -34,18 +34,21 @@ interface HeadEnd {
   readonly button: HeadButton | null
 }
 
-/** The title of × and of Move to trash: the card goes to the canvas's trash, for everyone. */
+/** The title of the bin and of Move to trash: the card goes to the canvas's trash, for everyone. */
 const TRASH_COLUMN =
   "trash this column, for everyone: anyone on the canvas restores it from the canvas's trash"
 
-/** × on a thread not yet started: the ⋯'s Move to trash, in one click. */
-const CLOSE: ControlWords = {
-  label: "×",
+/**
+ * The bin on a thread not yet started: the ⋯'s Move to trash, in one click.
+ * Drawn as a bin, never ×, which only ever closes.
+ */
+const TRASH: ControlWords = {
+  label: "trash",
   title: TRASH_COLUMN,
-  className: "close",
+  className: "trash-column",
 }
 
-/** What the ⋯'s Move to trash and × both ask, built once so the two cannot differ. */
+/** What the ⋯'s Move to trash and the bin both ask, built once so the two cannot differ. */
 const trashIntent = (card: CardId): Intent => ({
   kind: "discard",
   card,
@@ -61,7 +64,7 @@ const trashIntent = (card: CardId): Intent => ({
 export function columnHeadEnd(input: {
   readonly card: CardId
   readonly width: CardWidth
-  /** Whether the reader may trash it: no trash in ⋯, and no ×, otherwise. */
+  /** Whether the reader may trash it: no trash in ⋯, and no bin, otherwise. */
   readonly writable: boolean
   /** A thread not yet started (`isNextSendBranch`); false for a note column. */
   readonly unstarted: boolean
@@ -72,7 +75,7 @@ export function columnHeadEnd(input: {
     button: !input.unstarted
       ? { words: FOLD, intent: { kind: "fold", card, unfolded: false } }
       : input.writable
-        ? { words: CLOSE, intent: trashIntent(card) }
+        ? { words: TRASH, intent: trashIntent(card) }
         : null,
   }
 }
@@ -80,7 +83,7 @@ export function columnHeadEnd(input: {
 /**
  * What a column's ⋯ offers, all of it everyone's. It lists no canvas: a
  * thread reaches another canvas through your inventory. It ends in Move to
- * trash on every column, even where × repeats it, so it reads the same on
+ * trash on every column, even where the bin repeats it, so it reads the same on
  * each.
  */
 function columnMenu(input: {

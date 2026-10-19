@@ -346,8 +346,8 @@
       .column-head .origin-dot { display: inline-block; width: 8px; height: 8px; margin-right: .35rem;
         border-radius: 50%; vertical-align: middle; background: var(--track, #777); }
       /* A head's one button: ⇤, which folds it for you, or × on a thread not yet started. */
-      .column-head :is(.close, .fold) { padding: 0 .2rem; font-size: 1rem; line-height: 1; color: #8b93a1; }
-      .column-head :is(.close, .fold):hover, .column-head :is(.close, .fold):focus-visible { color: #e6e6e6; }
+      .column-head :is(.trash-column, .fold) { padding: 0 .2rem; font-size: 1rem; line-height: 1; color: #8b93a1; }
+      .column-head :is(.trash-column, .fold):hover, .column-head :is(.trash-column, .fold):focus-visible { color: #e6e6e6; }
       /* Every handle a drag starts from (use-drag.ts): a column's header, a
          card's, a slot's, a canvas's. */
       .column-head { user-select: none; }
@@ -1048,15 +1048,30 @@
       .inventory-close:hover { color: #ddd; }
       .inventory-body { display: flex; height: var(--body-h); min-height: 0; }
       .inventory-bag { flex: 0 0 var(--column); width: var(--column); padding: var(--bag-pad); }
-      /* The bench (ADR-0171): the selected slot, beside the bag, away from
-         the dock's edge; normal and read only, or opened full, scrolling in
-         its own box. */
+      /* The bench (ADR-0171, ADR-0177): the selected slot, beside the bag,
+         away from the dock's edge; a bar of put and trash, always drawn, then
+         its card, normal and read only, or opened full, scrolling in its own
+         box. */
       .bench { flex: 0 0 var(--column); width: var(--column); min-width: 0; padding: var(--bag-pad);
-        padding-left: 0; overflow-y: auto; display: flex; flex-direction: column; }
+        padding-left: 0; display: flex; flex-direction: column; gap: .5rem; }
       .bench[data-side="left"] { order: -1; padding: var(--bag-pad) 0 var(--bag-pad) var(--bag-pad); }
-      .bench > .card-normal { max-height: none; }
-      .bench > .card-frame { margin: 0; }
+      .bench-bar { flex: none; display: flex; gap: .5rem; align-items: center; }
+      .bench-bar button { display: inline-flex; align-items: center; gap: .35rem;
+        padding: .25rem .7rem; font-size: .8rem; }
+      .bench-bar .trash-selected { margin-left: auto; background: none; color: #c9d1d9;
+        border: 1px solid #3a3f48; }
+      .bench-bar .trash-selected:hover:not(:disabled) { color: #ff7b72; border-color: #ff7b72; }
+      .bench-bar button:disabled { opacity: .4; cursor: default; }
+      .bench-card { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
+      .bench-card > .card-normal { max-height: none; }
+      .bench-card > .card-frame { margin: 0; }
       .bench-empty { margin: auto; color: #6f7784; font-size: .8rem; text-align: center; }
+      /* A card's × on the bench closes it; its bin, elsewhere, trashes it. */
+      .card-normal-head { display: flex; align-items: center; }
+      .card-normal-head .close-card, .card-head .close-card { margin-left: auto; padding: 0 .35rem;
+        background: none; border: 0; color: #8b93a1; font-size: .9rem; line-height: 1.2; }
+      .card-normal-head .close-card:hover, .card-head .close-card:hover { color: #e6e6e6; }
+      .discard-card .icon, .trash-column .icon { display: block; }
       /* One line, always, so a notice changes no height. */
       .inventory-status { height: 1.75rem; padding: 0 .75rem; overflow: hidden; white-space: nowrap;
         text-overflow: ellipsis; font-size: .75rem; line-height: 1.75rem; color: #d0a15f;
@@ -1109,17 +1124,6 @@
         overflow: hidden; background: #1b1e24; border: 1px solid #2c313a; border-radius: 4px; }
       .card-grid-cell > button.empty { border-style: dashed; background: none; }
       .card-grid-cell > button[aria-pressed="true"] { outline: 2px solid #9ecbff; }
-      /* A slot's ×, on its card's corner: shown on the selected card and on
-         hover; hidden by opacity, so it stays clickable for the keyboard. */
-      .card-grid-cell > button.slot-discard { position: absolute; top: .1rem; right: .1rem;
-        width: auto; height: auto; padding: 0 .3rem; line-height: 1.2; font-size: .8rem;
-        color: #8b93a1; background: #1b1e24; border: 0; border-radius: 3px; opacity: 0; }
-      .card-grid-cell:hover > button.slot-discard,
-      .card-grid-cell > button[aria-pressed="true"] ~ button.slot-discard,
-      .card-grid-cell > button.slot-discard:focus-visible { opacity: 1; }
-      .card-grid-cell > button.slot-discard:hover { color: #ddd; }
-      /* Room for the × beside a compact's badge. */
-      .card-grid-cell:has(> .slot-discard) .compact-head { padding-right: 1.1rem; }
       .thread-preview { flex: 1; display: flex; flex-direction: column; max-height: 24rem;
         background: #1b1e24; border-radius: 6px; font-size: .8rem; }
       .thread-preview-path { margin: 0; padding: .5rem .75rem; overflow-y: auto; list-style: none; }

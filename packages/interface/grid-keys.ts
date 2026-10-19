@@ -13,6 +13,8 @@ type GridAct =
   | { readonly kind: "fold" }
   /** Comment on the selected entry: a note in its margin. */
   | { readonly kind: "comment" }
+  /** The selected card to your trash: Delete or Backspace. */
+  | { readonly kind: "trash" }
 
 const STEPS: Readonly<Record<string, GridStep>> = {
   ArrowLeft: "left",
@@ -39,6 +41,8 @@ export interface GridKeyState {
   readonly inText: boolean
   /** Its cells are entries that take comments: a column's messages. */
   readonly comments: boolean
+  /** The selected cell's card is one you may trash: your inventory's. */
+  readonly trashes: boolean
 }
 
 /** The act a key asks of a grid, or null for none of its keys. */
@@ -50,6 +54,8 @@ export function gridKeyAct(event: KeyLike, at: GridKeyState): GridAct | null {
   if (at.inText || event.ctrlKey || event.metaKey || event.shiftKey) return null
   if (event.key === "Enter")
     return event.altKey || !at.hasCard ? null : { kind: "open" }
+  if (event.key === "Delete" || event.key === "Backspace")
+    return at.trashes && at.hasCard && !event.altKey ? { kind: "trash" } : null
   if (event.key === "c")
     return at.comments && at.hasCard && !event.altKey
       ? { kind: "comment" }

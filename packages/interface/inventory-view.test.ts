@@ -121,7 +121,7 @@ describe("inventoryView", () => {
     expect(view(3, true)).toMatchObject({ detail: "full" })
   })
 
-  test("a slot's × is drawn on a card you may discard, never on an empty slot", () => {
+  test("a slot's card may be trashed from it only if you may discard it, never an empty slot", () => {
     const cells = (me: typeof ADA) =>
       inventoryView({
         held: [record(A)],

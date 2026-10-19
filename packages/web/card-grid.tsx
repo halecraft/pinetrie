@@ -2,15 +2,14 @@
 // cards, empty cells dashed. Every cell is a drop target; a card's cell starts
 // its drag. Its keys are `gridKeyAct`'s: arrows and `hjkl` move the selection,
 // Alt+arrows move the selected card, Enter opens it on the bench, as a click on
-// the selected card does. Each cell draws its card's compact (`CompactCard`),
-// and a card you may discard its ×. Escape is the page's (`keyAct`), not the
-// grid's: it folds the bench or closes the panel. What a selection, a move or
-// a drop does is the caller's: an intent, planned like any other.
+// the selected card does, and Delete or Backspace trashes it, if you may. Each
+// cell draws its card's compact (`CompactCard`), with no × of its own: × only
+// closes, and the bench's bar holds the trash. Escape is the page's (`keyAct`),
+// not the grid's: it folds the bench or closes the panel. What a selection, a
+// move or a drop does is the caller's: an intent, planned like any other.
 
 import type { CardRecord } from "@pinetrie/core"
 import {
-  DISCARD_CARD,
-  DISCARD_SLOT_TITLE,
   dragProps,
   dropProps,
   type GridView,
@@ -31,7 +30,7 @@ export function CardGrid(p: {
   onSelect: (n: number) => void
   /** The selected card to cell `to`, a card there swapping with it. */
   onMove: (card: CardRecord, to: number) => void
-  /** A cell's ×: its card to your trash. */
+  /** Delete on a cell: its card to your trash. */
   onDiscard: (card: CardRecord) => void
   /** Open the selected card on the bench. */
   onOpen: () => void
@@ -39,6 +38,7 @@ export function CardGrid(p: {
   const { view } = p
   const grid = useRef<HTMLDivElement>(null)
   const selectedCard = view.card
+  const trashes = view.cells[view.selected]?.discards === true
   /** Select cell `n` and give it focus. */
   const select = (n: number) => {
     p.onSelect(n)
@@ -57,6 +57,7 @@ export function CardGrid(p: {
           open: false,
           inText: isTextBox(document.activeElement),
           comments: false,
+          trashes,
         })
         if (act === null) return
         e.preventDefault()
@@ -69,6 +70,9 @@ export function CardGrid(p: {
             return
           case "open":
             p.onOpen()
+            return
+          case "trash":
+            if (selectedCard !== null) p.onDiscard(selectedCard)
             return
           // The bench's open card folds by the page's Escape; an inventory's
           // cells take no comments.
@@ -104,21 +108,6 @@ export function CardGrid(p: {
           >
             {cell.compact !== null && <CompactCard compact={cell.compact} />}
           </button>
-          {/* Beside the cell's button, not in it: a button holds no button. */}
-          {cell.discards && cell.card !== null && (
-            <button
-              aria-label={DISCARD_SLOT_TITLE}
-              className="slot-discard"
-              data-card={cell.card.id}
-              onClick={() => {
-                if (cell.card !== null) p.onDiscard(cell.card)
-              }}
-              title={DISCARD_SLOT_TITLE}
-              type="button"
-            >
-              {DISCARD_CARD}
-            </button>
-          )}
         </div>
       ))}
     </div>

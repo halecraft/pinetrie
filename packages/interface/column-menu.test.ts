@@ -53,7 +53,7 @@ test("a column's ⋯ ends in Move to trash for a reader who may write, and offer
   }
 })
 
-test("a column's head folds a started thread or a note column, and closes a thread not yet started", () => {
+test("a column's head folds a started thread or a note column, and trashes a thread not yet started with its bin", () => {
   const thread = threadIdFor("a")
   const head = (card: CardId, unstarted: boolean, writable: boolean) =>
     columnHeadEnd({ card, width: 1, writable, unstarted })
@@ -68,7 +68,10 @@ test("a column's head folds a started thread or a note column, and closes a thre
       intent: { kind: "fold", card, unfolded: false },
     })
   const unstarted = head(thread, true, true)
-  expect(unstarted.button?.words.label).toBe("×")
+  expect(unstarted.button?.words).toMatchObject({
+    label: "trash",
+    className: "trash-column",
+  })
   expect(unstarted.button?.intent).toEqual(
     unstarted.menu.at(-1)?.items[0]?.intent,
   )

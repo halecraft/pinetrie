@@ -19,6 +19,7 @@ const at = (over: Partial<GridKeyState> = {}): GridKeyState => ({
   open: false,
   inText: false,
   comments: false,
+  trashes: true,
   ...over,
 })
 
@@ -48,6 +49,14 @@ describe("gridKeyAct", () => {
     expect(
       gridKeyAct(key("ArrowUp", { altKey: true }), at({ selected: 1 })),
     ).toBeNull()
+  })
+
+  test("Delete or Backspace trashes the selected card; not on an empty cell, nor in a column", () => {
+    expect(gridKeyAct(key("Delete"), at())).toEqual({ kind: "trash" })
+    expect(gridKeyAct(key("Backspace"), at())).toEqual({ kind: "trash" })
+    expect(gridKeyAct(key("Delete"), at({ hasCard: false }))).toBeNull()
+    expect(gridKeyAct(key("Delete"), at({ trashes: false }))).toBeNull()
+    expect(gridKeyAct(key("Delete"), at({ inText: true }))).toBeNull()
   })
 
   test("Enter on an empty cell does nothing", () => {

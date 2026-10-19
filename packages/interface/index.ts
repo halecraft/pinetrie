@@ -172,13 +172,12 @@ export {
 export {
   type CatchUps,
   CLEAR_COMMAND,
+  CLOSE_CARD,
   CLOSE_INVENTORY,
   type ControlWords,
   canvasMarkerWords,
   canvasPinnedMarkerWords,
-  DISCARD_CARD,
   DISCARD_CARD_TITLE,
-  DISCARD_SLOT_TITLE,
   HISTORY_TITLE,
   historyItemWords,
   historyWords,
@@ -198,6 +197,7 @@ export {
   pinnedMarkerWords,
   retiredWords,
   sizeWords,
+  TRASH_SELECTED,
   traceWords,
   writtenWords,
 } from "./card-words.ts"
