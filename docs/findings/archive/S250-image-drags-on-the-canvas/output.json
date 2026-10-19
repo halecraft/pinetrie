@@ -1,0 +1,916 @@
+{
+ "strip": [
+  {
+   "cls": "canvas-column folded-column",
+   "kind": null,
+   "left": 289,
+   "right": 324
+  },
+  {
+   "cls": "column",
+   "kind": "thread",
+   "left": 324,
+   "right": 773
+  },
+  {
+   "cls": "canvas-end",
+   "kind": null,
+   "left": 773,
+   "right": 837
+  }
+ ],
+ "points": {
+  "canvas column": {
+   "x": 307,
+   "y": 339
+  },
+  "between canvas column and thread": {
+   "x": 324,
+   "y": 200
+  },
+  "thread header": {
+   "x": 459,
+   "y": 32
+  },
+  "thread message text": {
+   "x": 356,
+   "y": 67
+  },
+  "image in message": {
+   "x": 372,
+   "y": 234
+  },
+  "composer": {
+   "x": 549,
+   "y": 598
+  },
+  "canvas end (+)": {
+   "x": 805,
+   "y": 339
+  },
+  "past the last column": {
+   "x": 923,
+   "y": 200
+  }
+ },
+ "file drag over each place": {
+  "canvas column": {
+   "at": "button.folded-title in section.canvas-column.folded-column",
+   "point": [
+    [
+     307,
+     339
+    ],
+    [
+     307,
+     339
+    ]
+   ],
+   "takenByAnElement": [
+    false,
+    false
+   ],
+   "dropEffectAfterElements": [
+    "copy",
+    "copy"
+   ],
+   "pointerEvents": 0,
+   "marks": []
+  },
+  "between canvas column and thread": {
+   "at": "div.column-body in section.column",
+   "point": [
+    [
+     324,
+     200
+    ],
+    [
+     324,
+     200
+    ]
+   ],
+   "takenByAnElement": [
+    false,
+    false
+   ],
+   "dropEffectAfterElements": [
+    "copy",
+    "copy"
+   ],
+   "pointerEvents": 0,
+   "marks": []
+  },
+  "thread header": {
+   "at": "div.head-row in header.column-head",
+   "point": [
+    [
+     459,
+     32
+    ],
+    [
+     459,
+     32
+    ]
+   ],
+   "takenByAnElement": [
+    false,
+    false
+   ],
+   "dropEffectAfterElements": [
+    "copy",
+    "copy"
+   ],
+   "pointerEvents": 0,
+   "marks": []
+  },
+  "thread message text": {
+   "at": "span.role in div.msg.person",
+   "point": [
+    [
+     356,
+     67
+    ],
+    [
+     356,
+     67
+    ]
+   ],
+   "takenByAnElement": [
+    false,
+    false
+   ],
+   "dropEffectAfterElements": [
+    "copy",
+    "copy"
+   ],
+   "pointerEvents": 0,
+   "marks": []
+  },
+  "image in message": {
+   "at": "img.blob-image in div.msg.person",
+   "point": [
+    [
+     372,
+     234
+    ],
+    [
+     372,
+     234
+    ]
+   ],
+   "takenByAnElement": [
+    false,
+    false
+   ],
+   "dropEffectAfterElements": [
+    "copy",
+    "copy"
+   ],
+   "pointerEvents": 0,
+   "marks": []
+  },
+  "composer": {
+   "at": "textarea.input in form.composer",
+   "point": [
+    [
+     549,
+     598
+    ],
+    [
+     549,
+     598
+    ]
+   ],
+   "takenByAnElement": [
+    true,
+    true
+   ],
+   "dropEffectAfterElements": [
+    "copy",
+    "copy"
+   ],
+   "pointerEvents": 0,
+   "marks": []
+  },
+  "canvas end (+)": {
+   "at": "div.canvas-end in div.canvas-end",
+   "point": [
+    [
+     805,
+     339
+    ],
+    [
+     805,
+     339
+    ]
+   ],
+   "takenByAnElement": [
+    false,
+    false
+   ],
+   "dropEffectAfterElements": [
+    "copy",
+    "copy"
+   ],
+   "pointerEvents": 0,
+   "marks": []
+  },
+  "past the last column": {
+   "at": "div under #strip in div.",
+   "point": [
+    [
+     923,
+     200
+    ],
+    [
+     923,
+     200
+    ]
+   ],
+   "takenByAnElement": [
+    false,
+    false
+   ],
+   "dropEffectAfterElements": [
+    "copy",
+    "copy"
+   ],
+   "pointerEvents": 0,
+   "marks": []
+  }
+ },
+ "file drop between canvas column and thread": {
+  "ev": [
+   {
+    "phase": "capture",
+    "type": "dragenter",
+    "at": "div.column-body in section.column",
+    "x": 324,
+    "y": 200,
+    "types": [
+     "Files"
+    ],
+    "effectAllowed": "copy"
+   },
+   {
+    "phase": "element-took",
+    "type": "dragenter",
+    "taken": false,
+    "dropEffect": "copy"
+   },
+   {
+    "phase": "capture",
+    "type": "dragleave",
+    "at": "div under #strip in div.",
+    "x": 324,
+    "y": 200,
+    "types": [
+     "Files"
+    ],
+    "effectAllowed": "copy"
+   },
+   {
+    "phase": "element-took",
+    "type": "dragleave",
+    "taken": false,
+    "dropEffect": "none"
+   },
+   {
+    "phase": "capture",
+    "type": "dragover",
+    "at": "div.column-body in section.column",
+    "x": 324,
+    "y": 200,
+    "types": [
+     "Files"
+    ],
+    "effectAllowed": "copy"
+   },
+   {
+    "phase": "element-took",
+    "type": "dragover",
+    "taken": false,
+    "dropEffect": "copy"
+   },
+   {
+    "phase": "capture",
+    "type": "dragover",
+    "at": "div.column-body in section.column",
+    "x": 324,
+    "y": 200,
+    "types": [
+     "Files"
+    ],
+    "effectAllowed": "copy"
+   },
+   {
+    "phase": "element-took",
+    "type": "dragover",
+    "taken": false,
+    "dropEffect": "copy"
+   },
+   {
+    "phase": "capture",
+    "type": "dragleave",
+    "at": "div.column-body in section.column",
+    "x": 324,
+    "y": 200,
+    "types": [
+     "Files"
+    ],
+    "effectAllowed": "copy"
+   },
+   {
+    "phase": "element-took",
+    "type": "dragleave",
+    "taken": false,
+    "dropEffect": "none"
+   }
+  ],
+  "marks": [],
+  "sameUrl": true,
+  "blobPosts": 0
+ },
+ "file drop past the last column": {
+  "ev": [
+   {
+    "phase": "capture",
+    "type": "dragenter",
+    "at": "div under #strip in div.",
+    "x": 923,
+    "y": 200,
+    "types": [
+     "Files"
+    ],
+    "effectAllowed": "copy"
+   },
+   {
+    "phase": "element-took",
+    "type": "dragenter",
+    "taken": false,
+    "dropEffect": "copy"
+   },
+   {
+    "phase": "capture",
+    "type": "dragover",
+    "at": "div under #strip in div.",
+    "x": 923,
+    "y": 200,
+    "types": [
+     "Files"
+    ],
+    "effectAllowed": "copy"
+   },
+   {
+    "phase": "element-took",
+    "type": "dragover",
+    "taken": false,
+    "dropEffect": "copy"
+   },
+   {
+    "phase": "capture",
+    "type": "dragover",
+    "at": "div under #strip in div.",
+    "x": 923,
+    "y": 200,
+    "types": [
+     "Files"
+    ],
+    "effectAllowed": "copy"
+   },
+   {
+    "phase": "element-took",
+    "type": "dragover",
+    "taken": false,
+    "dropEffect": "copy"
+   },
+   {
+    "phase": "capture",
+    "type": "dragleave",
+    "at": "div under #strip in div.",
+    "x": 923,
+    "y": 200,
+    "types": [
+     "Files"
+    ],
+    "effectAllowed": "copy"
+   },
+   {
+    "phase": "element-took",
+    "type": "dragleave",
+    "taken": false,
+    "dropEffect": "none"
+   }
+  ],
+  "marks": [],
+  "sameUrl": true,
+  "blobPosts": 0
+ },
+ "image in a message dragged onto the composer": {
+  "ev": [
+   {
+    "phase": "capture",
+    "type": "pointerdown",
+    "at": "img.blob-image in div.msg.person",
+    "x": 371.6875,
+    "y": 233.859375,
+    "types": null,
+    "effectAllowed": null
+   },
+   {
+    "phase": "capture",
+    "type": "dragstart",
+    "at": "img.blob-image in div.msg.person",
+    "x": 371,
+    "y": 233,
+    "types": [
+     "text/uri-list",
+     "text/html",
+     "Files"
+    ],
+    "effectAllowed": "uninitialized"
+   },
+   {
+    "phase": "element-took",
+    "type": "dragstart",
+    "taken": false,
+    "dropEffect": "none"
+   },
+   {
+    "phase": "capture",
+    "type": "pointercancel",
+    "at": "img.blob-image in div.msg.person",
+    "x": 0,
+    "y": 0,
+    "types": null,
+    "effectAllowed": null
+   },
+   {
+    "phase": "capture",
+    "type": "dragenter",
+    "at": "img.blob-image in div.msg.person",
+    "x": 375,
+    "y": 235,
+    "types": [
+     "text/uri-list",
+     "text/html"
+    ],
+    "effectAllowed": "all"
+   },
+   {
+    "phase": "element-took",
+    "type": "dragenter",
+    "taken": false,
+    "dropEffect": "copy"
+   },
+   {
+    "phase": "capture",
+    "type": "dragover",
+    "at": "img.blob-image in div.msg.person",
+    "x": 379,
+    "y": 237,
+    "types": [
+     "text/uri-list",
+     "text/html"
+    ],
+    "effectAllowed": "all"
+   },
+   {
+    "phase": "element-took",
+    "type": "dragover",
+    "taken": false,
+    "dropEffect": "copy"
+   },
+   {
+    "phase": "capture",
+    "type": "dragover",
+    "at": "img.blob-image in div.msg.person",
+    "x": 383,
+    "y": 239,
+    "types": [
+     "text/uri-list",
+     "text/html"
+    ],
+    "effectAllowed": "all"
+   },
+   {
+    "phase": "element-took",
+    "type": "dragover",
+    "taken": false,
+    "dropEffect": "copy"
+   },
+   {
+    "phase": "capture",
+    "type": "dragover",
+    "at": "img.blob-image in div.msg.person",
+    "x": 387,
+    "y": 241,
+    "types": [
+     "text/uri-list",
+     "text/html"
+    ],
+    "effectAllowed": "all"
+   },
+   {
+    "phase": "element-took",
+    "type": "dragover",
+    "taken": false,
+    "dropEffect": "copy"
+   },
+   {
+    "phase": "capture",
+    "type": "dragover",
+    "at": "img.blob-image in div.msg.person",
+    "x": 391,
+    "y": 243,
+    "types": [
+     "text/uri-list",
+     "text/html"
+    ],
+    "effectAllowed": "all"
+   },
+   {
+    "phase": "element-took",
+    "type": "dragover",
+    "taken": false,
+    "dropEffect": "copy"
+   },
+   {
+    "phase": "capture",
+    "type": "dragenter",
+    "at": "p under .text in div.msg.person",
+    "x": 395,
+    "y": 245,
+    "types": [
+     "text/uri-list",
+     "text/html"
+    ],
+    "effectAllowed": "all"
+   },
+   {
+    "phase": "element-took",
+    "type": "dragenter",
+    "taken": false,
+    "dropEffect": "copy"
+   },
+   {
+    "phase": "capture",
+    "type": "dragleave",
+    "at": "img.blob-image in div.msg.person",
+    "x": 395,
+    "y": 245,
+    "types": [
+     "text/uri-list",
+     "text/html"
+    ],
+    "effectAllowed": "all"
+   },
+   {
+    "phase": "element-took",
+    "type": "dragleave",
+    "taken": false,
+    "dropEffect": "none"
+   },
+   {
+    "phase": "capture",
+    "type": "dragover",
+    "at": "p under .text in div.msg.person",
+    "x": 399,
+    "y": 247,
+    "types": [
+     "text/uri-list",
+     "text/html"
+    ],
+    "effectAllowed": "all"
+   },
+   {
+    "phase": "element-took",
+    "type": "dragover",
+    "taken": false,
+    "dropEffect": "copy"
+   },
+   {
+    "phase": "capture",
+    "type": "dragover",
+    "at": "p under .text in div.msg.person",
+    "x": 403,
+    "y": 249,
+    "types": [
+     "text/uri-list",
+     "text/html"
+    ],
+    "effectAllowed": "all"
+   },
+   {
+    "phase": "element-took",
+    "type": "dragover",
+    "taken": false,
+    "dropEffect": "copy"
+   },
+   {
+    "phase": "capture",
+    "type": "dragover",
+    "at": "p under .text in div.msg.person",
+    "x": 399,
+    "y": 304,
+    "types": [
+     "text/uri-list",
+     "text/html"
+    ],
+    "effectAllowed": "all"
+   },
+   {
+    "phase": "element-took",
+    "type": "dragover",
+    "taken": false,
+    "dropEffect": "copy"
+   },
+   {
+    "phase": "capture",
+    "type": "dragover",
+    "at": "p under .text in div.msg.person",
+    "x": 394,
+    "y": 358,
+    "types": [
+     "text/uri-list",
+     "text/html"
+    ],
+    "effectAllowed": "all"
+   },
+   {
+    "phase": "element-took",
+    "type": "dragover",
+    "taken": false,
+    "dropEffect": "copy"
+   },
+   {
+    "phase": "capture",
+    "type": "dragenter",
+    "at": "p under .text in div.msg.assistant",
+    "x": 390,
+    "y": 412,
+    "types": [
+     "text/uri-list",
+     "text/html"
+    ],
+    "effectAllowed": "all"
+   },
+   {
+    "phase": "element-took",
+    "type": "dragenter",
+    "taken": false,
+    "dropEffect": "copy"
+   },
+   {
+    "phase": "capture",
+    "type": "dragleave",
+    "at": "p under .text in div.msg.person",
+    "x": 390,
+    "y": 412,
+    "types": [
+     "text/uri-list",
+     "text/html"
+    ],
+    "effectAllowed": "all"
+   },
+   {
+    "phase": "element-took",
+    "type": "dragleave",
+    "taken": false,
+    "dropEffect": "none"
+   },
+   {
+    "phase": "capture",
+    "type": "dragenter",
+    "at": "div.column-body in section.column",
+    "x": 386,
+    "y": 467,
+    "types": [
+     "text/uri-list",
+     "text/html"
+    ],
+    "effectAllowed": "all"
+   },
+   {
+    "phase": "element-took",
+    "type": "dragenter",
+    "taken": false,
+    "dropEffect": "copy"
+   },
+   {
+    "phase": "capture",
+    "type": "dragleave",
+    "at": "p under .text in div.msg.assistant",
+    "x": 386,
+    "y": 467,
+    "types": [
+     "text/uri-list",
+     "text/html"
+    ],
+    "effectAllowed": "all"
+   },
+   {
+    "phase": "element-took",
+    "type": "dragleave",
+    "taken": false,
+    "dropEffect": "none"
+   },
+   {
+    "phase": "capture",
+    "type": "dragenter",
+    "at": "button.add-to-queue in section.column",
+    "x": 381,
+    "y": 521,
+    "types": [
+     "text/uri-list",
+     "text/html"
+    ],
+    "effectAllowed": "all"
+   },
+   {
+    "phase": "element-took",
+    "type": "dragenter",
+    "taken": false,
+    "dropEffect": "copy"
+   },
+   {
+    "phase": "capture",
+    "type": "dragleave",
+    "at": "div.column-body in section.column",
+    "x": 381,
+    "y": 521,
+    "types": [
+     "text/uri-list",
+     "text/html"
+    ],
+    "effectAllowed": "all"
+   },
+   {
+    "phase": "element-took",
+    "type": "dragleave",
+    "taken": false,
+    "dropEffect": "none"
+   },
+   {
+    "phase": "capture",
+    "type": "dragenter",
+    "at": "textarea.input in form.composer",
+    "x": 377,
+    "y": 576,
+    "types": [
+     "text/uri-list",
+     "text/html"
+    ],
+    "effectAllowed": "all"
+   },
+   {
+    "phase": "element-took",
+    "type": "dragenter",
+    "taken": false,
+    "dropEffect": "copy"
+   },
+   {
+    "phase": "capture",
+    "type": "dragleave",
+    "at": "button.add-to-queue in section.column",
+    "x": 377,
+    "y": 576,
+    "types": [
+     "text/uri-list",
+     "text/html"
+    ],
+    "effectAllowed": "all"
+   },
+   {
+    "phase": "element-took",
+    "type": "dragleave",
+    "taken": false,
+    "dropEffect": "none"
+   },
+   {
+    "phase": "capture",
+    "type": "dragover",
+    "at": "textarea.input in form.composer",
+    "x": 377,
+    "y": 576,
+    "types": [
+     "text/uri-list",
+     "text/html"
+    ],
+    "effectAllowed": "all"
+   },
+   {
+    "phase": "element-took",
+    "type": "dragover",
+    "taken": false,
+    "dropEffect": "copy"
+   },
+   {
+    "phase": "capture",
+    "type": "drop",
+    "at": "textarea.input in form.composer",
+    "x": 377,
+    "y": 576,
+    "types": [
+     "text/uri-list",
+     "text/html"
+    ],
+    "effectAllowed": "all"
+   },
+   {
+    "phase": "element-took",
+    "type": "drop",
+    "taken": false,
+    "dropEffect": "copy"
+   },
+   {
+    "phase": "capture",
+    "type": "dragend",
+    "at": "img.blob-image in div.msg.person",
+    "x": 377,
+    "y": 576,
+    "types": [
+     "text/uri-list",
+     "text/html",
+     "Files"
+    ],
+    "effectAllowed": "uninitialized"
+   },
+   {
+    "phase": "element-took",
+    "type": "dragend",
+    "taken": false,
+    "dropEffect": "copy"
+   }
+  ],
+  "marks": [],
+  "pointermoves": 2,
+  "composerBefore": "",
+  "composerAfter": "",
+  "blobPosts": 0,
+  "pane": 0
+ },
+ "image in a message, its dragstart prevented": {
+  "types": [
+   "pointermove",
+   "pointerdown",
+   "pointermove",
+   "dragstart",
+   "pointermove",
+   "pointerup"
+  ],
+  "pointermoves": 15,
+  "lastPointerAt": {
+   "phase": "capture",
+   "type": "pointerup",
+   "at": "textarea.input in form.composer",
+   "x": 377.1875,
+   "y": 576,
+   "types": null,
+   "effectAllowed": null
+  },
+  "pane": 0,
+  "marks": []
+ },
+ "icon in header": {
+  "x": 348.1875,
+  "y": 22.390625,
+  "src": "/noun-icons/clam.png",
+  "handle": true
+ },
+ "image inside a handle, dragged": {
+  "during": [
+   {
+    "phase": "capture",
+    "type": "pointerdown",
+    "at": "span.thread-star in header.column-head",
+    "x": 348.1875,
+    "y": 22.390625,
+    "types": null,
+    "effectAllowed": null
+   }
+  ],
+  "pointermoves": 11,
+  "marksDuring": [
+   "section.column data-dragging=",
+   "body. data-card-drag=",
+   "div. data-reordering="
+  ],
+  "after": [
+   {
+    "phase": "capture",
+    "type": "pointerup",
+    "at": "header.column-head in header.column-head",
+    "x": 288.1875,
+    "y": 32.390625,
+    "types": null,
+    "effectAllowed": null
+   }
+  ],
+  "marksAfter": [
+   "body. data-card-drag=null",
+   "div. data-reordering=null",
+   "section.column data-dragging=null"
+  ]
+ }
+}

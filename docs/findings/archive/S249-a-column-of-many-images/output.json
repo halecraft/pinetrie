@@ -1,0 +1,113 @@
+{
+ "images": {
+  "count": 30,
+  "fittedMB": 14.5,
+  "w512MB": 1.7,
+  "sizes": [
+   "screen-0.png 2000x1500 502KB",
+   "screen-1.png 2000x1500 464KB",
+   "screen-2.png 2000x1500 514KB",
+   "screen-3.png 2000x1500 465KB",
+   "screen-4.png 2000x1500 511KB",
+   "screen-5.png 2000x1500 464KB",
+   "screen-6.png 2000x1500 515KB",
+   "screen-7.png 2000x1500 464KB",
+   "screen-8.png 2000x1500 505KB",
+   "screen-9.png 2000x1500 464KB",
+   "photo-0.jpg 2000x1500 910KB",
+   "photo-1.jpg 2000x1500 911KB",
+   "photo-2.jpg 2000x1500 910KB",
+   "photo-3.jpg 2000x1500 911KB",
+   "photo-4.jpg 2000x1500 909KB",
+   "photo-5.jpg 2000x1500 910KB",
+   "photo-6.jpg 2000x1500 911KB",
+   "photo-7.jpg 2000x1500 911KB",
+   "photo-8.jpg 2000x1500 913KB",
+   "photo-9.jpg 2000x1500 910KB",
+   "art-0.png 2000x2000 18KB",
+   "art-1.png 2000x2000 18KB",
+   "art-2.png 2000x2000 18KB",
+   "art-3.png 2000x2000 18KB",
+   "art-4.png 2000x2000 18KB",
+   "art-5.png 2000x2000 18KB",
+   "art-6.png 2000x2000 18KB",
+   "art-7.png 2000x2000 17KB",
+   "art-8.png 2000x2000 17KB",
+   "art-9.png 2000x2000 17KB"
+  ]
+ },
+ "full fitted": {
+  "blankMB": 167,
+  "loadedMB": 651,
+  "afterScrollMB": 652,
+  "addedMB": 484,
+  "decodeAllMs": 2,
+  "firstScrollAt4x": {
+   "frames": 160,
+   "p50": 16.7,
+   "p95": 16.8,
+   "max": 16.8,
+   "over50": 0
+  },
+  "scrollAt4x": {
+   "frames": 239,
+   "p50": 16.7,
+   "p95": 16.7,
+   "max": 16.8,
+   "over50": 0,
+   "scrollTopMax": 10820,
+   "scrollTopDistinct": 88,
+   "columnHeight": 11680
+  }
+ },
+ "full 512": {
+  "blankMB": 171,
+  "loadedMB": 228,
+  "afterScrollMB": 230,
+  "addedMB": 57,
+  "decodeAllMs": 2,
+  "firstScrollAt4x": {
+   "frames": 160,
+   "p50": 16.7,
+   "p95": 16.7,
+   "max": 16.8,
+   "over50": 0
+  },
+  "scrollAt4x": {
+   "frames": 240,
+   "p50": 16.7,
+   "p95": 16.8,
+   "max": 33.3,
+   "over50": 0,
+   "scrollTopMax": 10820,
+   "scrollTopDistinct": 88,
+   "columnHeight": 11680
+  }
+ },
+ "compact fitted": {
+  "blankMB": 167,
+  "loadedMB": 732,
+  "afterScrollMB": 732,
+  "addedMB": 565,
+  "decodeAllMs": 364,
+  "firstScrollAt4x": null,
+  "scrollAt4x": null
+ },
+ "compact 512": {
+  "blankMB": 167,
+  "loadedMB": 227,
+  "afterScrollMB": 227,
+  "addedMB": 60,
+  "decodeAllMs": 33,
+  "firstScrollAt4x": null,
+  "scrollAt4x": null
+ },
+ "decode ms per image (createImageBitmap, unthrottled)": {
+  "fitted screen": 12.9,
+  "fitted photo": 21.3,
+  "fitted art": 12.1,
+  "512-screen": 2.6,
+  "512-photo": 2.6,
+  "512-art": 2.8
+ }
+}
