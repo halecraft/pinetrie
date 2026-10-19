@@ -1189,6 +1189,16 @@ the session sends moves and draws them until its copy holds them
   closes.
   Its footer holds ↑ and ↓ and the editor's own primary button. What it
   shows is `cardFrame` (`packages/interface/TECHNICAL.md`, *Card frames*).
+- **Nothing in the header wraps** (ADR-0179). Every item is `nowrap`;
+  `.card-by` takes only the room left (`flex: 1 1 0`), so a narrow column
+  cuts who first, then `.card-state`, each to "…", with its words in its
+  title. The "·" between them is CSS (`::before`), so a header's
+  `textContent` holds none.
+- **A command's chip is the body's first child**, before the box. It is
+  drawn or not in its own slot, so the box keeps its place among the body's
+  children and is never mounted again. The frame carries `data-command`
+  and a bound card's box `data-empty`; a queued card in the dock with both
+  hides its box until the frame holds the focus.
 - **The frame's wrappers are the same with a card and without one.** The
   composer's box must stay one element (below): only what is inside the
   header changes when the card is created, and the room for ⋯ and × is kept

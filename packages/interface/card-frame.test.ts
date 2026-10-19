@@ -300,7 +300,7 @@ describe("cardFrameWords", () => {
     expect(words(card(queued), "queued", { among, held })).toMatchObject({
       state,
       place: "queued",
-      who: "queued by Bea",
+      who: "by Bea",
     })
   })
 
@@ -308,7 +308,7 @@ describe("cardFrameWords", () => {
     expect(
       words(card(pinned, { placer: BEA }), "pinned", { pinned: "changed" }),
     ).toMatchObject({
-      who: "pinned by Bea",
+      who: "by Bea",
       state: "changed since the agent last read it",
     })
   })

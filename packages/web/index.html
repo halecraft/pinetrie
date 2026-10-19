@@ -921,15 +921,30 @@
         padding: .15rem .5rem; font-size: .72rem; color: #8b93a1; }
       .card-icon, .card-place { color: var(--tone); }
       .card-icon { font-weight: 600; }
+      /* Each signal one line: a narrow column cuts who, then the state, short
+         (their titles keep the words) rather than breaking any across two.
+         Who takes only the room left, so it is cut first. */
+      .card-head > * { flex: none; white-space: nowrap; }
+      .card-head > .card-state, .card-head > .card-by { overflow: hidden; text-overflow: ellipsis; }
+      .card-head > .card-state { flex: 0 1 auto; min-width: 2rem; }
+      .card-head > .card-by { flex: 1 1 0; min-width: 0; }
+      .card-head > .card-state::before, .card-head > .card-by::before,
+      .card-head > .moved-back::before { content: "·"; margin-right: .4rem; color: #5c636e; }
       .card-state { color: #c3c8d0; }
       .card-state[data-state="unsent"], .card-state[data-status="changed"],
       .card-state[data-status="unread"] { color: #e8c07a; }
       .card-chip { padding: 0 .45rem; border-radius: .6rem; background: #2a2140; color: #d2a8ff; }
       .card-chip button { background: none; border: 0; padding: 0 0 0 .3rem; color: inherit; cursor: pointer; }
+      /* A command's chip, on its own line above the box. */
+      .card-body > .card-chip { display: inline-flex; align-items: center; max-width: 100%;
+        margin: 0 0 .3rem; padding: .05rem .5rem; font-size: .72rem; line-height: 1.4; }
       /* Room for ⋯ and × before the card exists: the header does not shift. */
-      .card-head-acts { display: flex; gap: .15rem; justify-content: flex-end; min-width: 3rem; margin-left: auto; }
-      .card-head-acts button { padding: 0 .35rem; font-size: .8rem; background: none; border: 0;
+      .card-head-acts { display: flex; align-items: center; gap: .15rem; justify-content: flex-end;
+        min-width: 3rem; margin-left: auto; }
+      .card-head-acts button { display: flex; align-items: center; justify-content: center;
+        height: 1.3rem; padding: 0 .35rem; font-size: .9rem; line-height: 1; background: none; border: 0;
         color: #8b93a1; cursor: pointer; }
+      .card-head-acts .icon { width: .85rem; height: .85rem; }
       .card-head-acts button:hover { color: #ddd; }
       .card-body { padding: 0 .5rem; }
       .card-foot { display: flex; align-items: center; gap: .4rem; padding: .3rem .5rem .4rem; }
@@ -952,6 +967,9 @@
       .dock .card-editor.queued:not(:focus-within) .input { height: 1.9rem;
         padding: .2rem .7rem; line-height: 1.4rem; overflow: hidden; resize: none;
         white-space: nowrap; text-overflow: ellipsis; }
+      /* A queued command with no words, at rest: its header and its chip. */
+      .dock .card-editor.queued[data-command]:not(:focus-within) .input[data-empty] { display: none; }
+      .dock .card-editor.queued[data-command]:not(:focus-within) .card-body > .card-chip { margin-bottom: .4rem; }
       /* A note in its note column, at rest: its header and one line (ADR-0116). */
       .note-column .card-editor.note:not(:focus-within) .card-foot { display: none; }
       .note-column .card-editor.note:not(:focus-within) .input { height: 1.9rem;

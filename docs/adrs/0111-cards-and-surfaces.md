@@ -29,6 +29,9 @@
     leaving the open card is Escape or selecting another slot.
   - ADR-0177: a card is trashed by a bin, drawn, never by ×; × on a card open
     on your inventory's bench closes it, as Escape does.
+  - ADR-0179: a command's chip heads the card's body, above its box, not its
+    header; the header names who put a queued or pinned card there without its
+    place again ("queued · next · by Bea").
 
 **Context.**
 

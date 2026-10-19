@@ -670,7 +670,7 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   the host pops when the lane is free, and your composer is left as it
   was. The queued card says "↓ catches up with accepted work first", and
   the strip "catching up with accepted work…". A card that already carries a
-  command (one unqueued, say) says so in a chip in its header, with a × that
+  command (one unqueued, say) says so in a chip above its box, with a × that
   sends it as a plain message instead, and its button reads "catch up", or "catch up
   and send"; what you write is what the agent should do with the new work
   (ADR-0108).
@@ -1148,8 +1148,11 @@ The rail is E; the column is T. Seeing both at once is the product.
   card it is (✎ a text card), and it says where the card is (your message,
   note, queued, pinned, inventory), how it
   stands ("next", "held · 2nd in line", "not sent: …", "changed since the
-  agent last read it"), who put it there, and its command's chip; then ⋯
-  and its bin, which trashes it. The footer holds ↑ and ↓ in a list, and at most one primary
+  agent last read it") and who put it there ("by Bea"), each on one line,
+  set apart by "·", what a narrow column cuts short ending in "…"
+  (ADR-0179); then ⋯
+  and its bin, which trashes it. A command's chip heads the body, above
+  its box. The footer holds ↑ and ↓ in a list, and at most one primary
   action, filled in the card's colour: send on your message, put in your
   inventory. A note has none, and a queued card none: the queue's controls
   send it.
@@ -1216,8 +1219,10 @@ The rail is E; the column is T. Seeing both at once is the product.
   does a card with a command, even on an idle thread. Every move shows at
   once and is the host's to make (ADR-0059). A queued card is drawn
   in the column's dock, headed by its place in line ("next",
-  "2nd in line", "held · next" while the queue is held) and "queued by Bea",
-  with its command's chip when it has one; its ⋯'s **Move to notes**
+  "2nd in line", "held · next" while the queue is held) and who queued it,
+  "queued · next · by Bea", with its command's chip when it has one. A
+  command with nothing written folds its empty box away until the card
+  holds the focus. Its ⋯'s **Move to notes**
   unqueues it. Anyone here
   can edit it until the host pops it to send it, when the lane is free, in
   order. An unqueued card goes back below the line, a note. Unqueue a card the host
@@ -1287,7 +1292,7 @@ The rail is E; the column is T. Seeing both at once is the product.
 - **↑ and ↓ on a pinned card, or Alt+↑ and Alt+↓ in its box, move it among
   the thread's pinned cards**: the agent reads them in that order.
 - **Anyone here can edit a pinned card**, as a queued one. Each is headed
-  "pinned by Bea", and shows its size, "~120 tokens", since a long one costs
+  "pinned · by Bea", and shows its size, "~120 tokens", since a long one costs
   that on every run, and how it stands: "read by the agent", "changed since
   the agent last read it", or "not read by the agent yet".
 - **Where a run read them**, a small "the agent read 2 pinned cards" sits

@@ -1,7 +1,7 @@
 // web/card-frame — the frame every text card is drawn in: a header that is its
 // drag handle and its signals (its kind's icon, its place, state, who put it
-// there, a command's chip, ⋯ and ×), its body, and a footer of ↑ ↓ and its one
-// primary action. What it shows is `cardFrame`'s value, in `cardFrameWords`'s
+// there, ⋯ and ×), its body (a command's chip, then its box), and a footer of
+// ↑ ↓ and its one primary action. What it shows is `cardFrame`'s value, in `cardFrameWords`'s
 // words; the frame's colour is the place's, the icon the kind's. A card
 // compact is `CompactCard`'s (`renderings.tsx`).
 //
@@ -119,6 +119,7 @@ export function CardFrame(p: {
       // The browser suite reads `.card-editor.queued`, `.pinned` and a queued
       // card's `data-queued`.
       className={`card-frame card-editor ${TONE_CLASS[view.tone]}`}
+      data-command={words.command === null ? undefined : true}
       data-queued={view.tone === "queued" ? card?.id : undefined}
       data-tone={view.tone}
       {...(p.share === undefined ? {} : fileDropProps(p.share.onFiles))}
@@ -139,6 +140,7 @@ export function CardFrame(p: {
           {KIND_ICON[card?.kind ?? "text"]}
         </span>
         <span className="card-place">{words.place}</span>
+        {/* A narrow column cuts these short: the title keeps their words. */}
         {words.state !== null && (
           <span
             className="card-state"
@@ -146,28 +148,17 @@ export function CardFrame(p: {
             data-status={
               view.state.kind === "pinned" ? view.state.status : undefined
             }
+            title={words.state}
           >
             {words.state}
           </span>
         )}
-        {words.who !== null && <span className="card-by">{words.who}</span>}
-        {card !== null && <MovedBack card={card.id} owner={card.owner} />}
-        {words.command !== null && (
-          <span className="card-chip" title={words.command.title}>
-            {words.command.label}
-            {p.onClearCommand !== null && (
-              <button
-                aria-label={CLEAR_COMMAND}
-                className="card-command-clear"
-                onClick={p.onClearCommand}
-                title={CLEAR_COMMAND}
-                type="button"
-              >
-                ×
-              </button>
-            )}
+        {words.who !== null && (
+          <span className="card-by" title={words.who}>
+            {words.who}
           </span>
         )}
+        {card !== null && <MovedBack card={card.id} owner={card.owner} />}
         {/* Room kept for ⋯ and × before the card exists, so the header
             does not shift when it is created. */}
         <span className="card-head-acts">
@@ -196,6 +187,24 @@ export function CardFrame(p: {
         </span>
       </div>
       <div className="card-body">
+        {/* Before the box, which must keep its place among the body's
+            children while a command comes and goes. */}
+        {words.command !== null && (
+          <span className="card-chip" title={words.command.title}>
+            {words.command.label}
+            {p.onClearCommand !== null && (
+              <button
+                aria-label={CLEAR_COMMAND}
+                className="card-command-clear"
+                onClick={p.onClearCommand}
+                title={CLEAR_COMMAND}
+                type="button"
+              >
+                ×
+              </button>
+            )}
+          </span>
+        )}
         {p.children}
         {history && card !== null && isTextCard(card) && (
           <CardHistory card={card.id} />

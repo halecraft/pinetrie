@@ -633,6 +633,8 @@ export function BoundCardEditor(p: {
         autoComplete="off"
         className="input"
         data-card={card.id}
+        // A queued command with no words folds its box away at rest.
+        data-empty={text === "" ? true : undefined}
         onInput={() => p.onTyping(card.id)}
         onPaste={e => sharePasted(e, shares.share)}
         onKeyDown={e => {

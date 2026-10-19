@@ -416,10 +416,10 @@ const whoWords = (
   if (by === null) return null
   const name = by === reader.me ? "you" : displayName(by, reader.nameOf.get(by))
   switch (view.tone) {
+    // The place is said beside it: "queued · next · by Bea".
     case "queued":
-      return `queued by ${name}`
     case "pinned":
-      return `pinned by ${name}`
+      return `by ${name}`
     case "note": {
       const others = writers.filter(w => w !== by)
       return others.length === 0
