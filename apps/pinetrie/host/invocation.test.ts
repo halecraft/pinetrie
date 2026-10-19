@@ -51,7 +51,7 @@ test("the store is PINETRIE_STORE when set, else the session's own", () => {
   })
 })
 
-test("pnpm tidy's arguments: a folder as the host reads one, a window, a dry run; anything else refused", () => {
+test("tidy's arguments: a folder as the host reads one, a window, a dry run; anything else refused", () => {
   expect(planTidyInvocation([], "/elsewhere")).toEqual({
     kind: "tidy",
     folder: "/elsewhere",

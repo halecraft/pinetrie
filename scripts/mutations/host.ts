@@ -200,7 +200,7 @@ export const mutations: readonly Mutation[] = [
     from: "      if (!Number.isInteger(n) || n < 1)",
     to: "      if (!Number.isInteger(n))",
     command: unit,
-    expect: "pnpm tidy's arguments",
+    expect: "tidy's arguments",
   },
   {
     name: "the sweep deletes a lane's tip",

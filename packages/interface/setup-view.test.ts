@@ -56,7 +56,7 @@ describe("setupView", () => {
       [],
     )
     expect(view?.model).toEqual({
-      line: "No model: anthropic/x has no credential: pnpm sign-in anthropic",
+      line: "No model: anthropic/x has no credential: pinetrie sign-in anthropic",
       none: true,
     })
   })

@@ -233,7 +233,7 @@ export async function startHttp(input: {
             `port ${port} is already in use — most likely a host left running.\n` +
               `  find it : lsof -ti :${port}\n` +
               `  stop it : lsof -ti :${port} | xargs kill\n` +
-              `  or pick another port: PINETRIE_PORT=7392 pnpm dev  (PINETRIE_PORT=0 = any free port)`,
+              `  or pick another port: PINETRIE_PORT=7392 pinetrie serve  (PINETRIE_PORT=0 = any free port)`,
           ),
         )
         return

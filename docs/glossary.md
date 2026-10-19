@@ -18,7 +18,7 @@ words they were written with.
 | **publish** | Move `main` (config `publish.bookmark`) forward to accepted work; with `publish.catchUp` on, bring the working copy the latest and accept your commits below `@` first (ADR-0099). | `publish`, `publishCatchesUp` | |
 | **working copy** | `@` in your repo, with your commits below it that accepted work lacks (ADR-0172). A lane's is always "the lane's working copy"; to people, a thread's copy. | `workingCopy`, `ERR.WORKING_COPY_CONFLICT`, `workingCopyEdits` | yours, your files, the host's working copy |
 | **set up** | Create accepted work's bookmark at your `@-` and write its `immutable_heads()` and `revsets.log` to your repo's config. | `setup`, `planSetup`, `setupProposal` | |
-| **tidy** | Cut your repo's op log to a window (seven days by default) with `pnpm tidy`, while no host serves the repo; a starting host logs when one is due (ADR-0155). | `pnpm tidy`, `planTidy` | trim, prune |
+| **tidy** | Cut your repo's op log to a window (seven days by default) with `pinetrie tidy`, while no host serves the repo; a starting host logs when one is due (ADR-0155). | `pinetrie tidy`, `planTidy` | trim, prune |
 
 ## A thread's work
 

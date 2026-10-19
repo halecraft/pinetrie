@@ -73,7 +73,7 @@ export function noModelWords(why: NoModel, named: string | null): string {
       return `${named ?? "the model named"} is not a model pi knows, nor one in models.json`
     case "no-credential": {
       const provider = named?.split("/")[0] ?? "its provider"
-      return `${named ?? "the model named"} has no credential: pnpm sign-in ${provider}`
+      return `${named ?? "the model named"} has no credential: pinetrie sign-in ${provider}`
     }
   }
 }
@@ -98,7 +98,7 @@ export const setupPageWords = {
   model: "Model",
   signIn: "Sign in",
   signInHint:
-    "pnpm sign-in <provider> on this host's machine: a subscription in a browser, or an API key",
+    "pinetrie sign-in <provider> on this host's machine: a subscription in a browser, or an API key",
   noCredential: "No provider has a credential yet.",
   files: "Config files",
   refusals: "Not taken",

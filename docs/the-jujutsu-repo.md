@@ -130,11 +130,11 @@ with pine·trie's terms joined on.
 Every jj command the host runs on your repo is an operation, and jj never
 removes one: in a month a busy repo gathers tens of thousands, and its
 `.jj/repo` grows past a gigabyte. Nothing the host reads depends on them
-(ADR-0154), so they can be cut. `pnpm tidy` does it, when you run it
+(ADR-0154), so they can be cut. `pinetrie tidy` does it, when you run it
 (ADR-0155):
 
 ```
-pnpm tidy [folder] [--days N] [--dry-run]
+pinetrie tidy [folder] [--days N] [--dry-run]
 ```
 
 - **It keeps the last `N` days, seven by default,** and cuts the rest:
@@ -159,7 +159,7 @@ pnpm tidy [folder] [--days N] [--dry-run]
   took minutes (S215 item 12).
 - **A starting host says when one is due:** once your oldest operation is
   more than fourteen days old, it logs "your repo's op log goes back 26 days
-  (63,162 operations); `pnpm tidy` would keep the last 7".
+  (63,162 operations); `pinetrie tidy` would keep the last 7".
 
 ## jjui
 

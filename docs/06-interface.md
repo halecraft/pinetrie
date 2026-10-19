@@ -266,10 +266,10 @@ nothing; Ctrl+Shift+L still folds the sidebar.
   - **Model**: the model and where it came from ("from
     ~/.config/pinetrie/pinetrie.json", "from $PINETRIE_MODEL"), or, in
     amber, why there is none and what to do ("no config names one: set
-    model, as provider/id"; "… has no credential: pnpm sign-in anthropic").
+    model, as provider/id"; "… has no credential: pinetrie sign-in anthropic").
   - **Sign in**: each provider with a credential and where it is
     ("signed in (auth.json)", "from an environment variable"), never the
-    credential, and the `pnpm sign-in <provider>` line.
+    credential, and the `pinetrie sign-in <provider>` line.
   - **Config files**: each layer's file, "(none)" when it is missing, the
     local one named with its session and that session's folder, and
     what it refused, in amber: a key no setting has, a key that layer may

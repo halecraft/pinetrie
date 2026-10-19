@@ -74,7 +74,7 @@ export const readRepoSizes = async (
   operations,
 })
 
-/** What `pnpm tidy` says, from values (`tidyWords`). */
+/** What `tidy` says, from values (`tidyWords`). */
 type TidySaying =
   | {
       readonly kind: "refused"
@@ -118,7 +118,7 @@ const stepWords = (step: RepoStep) =>
     .map(a => a.replace(/[0-9a-f]{12}[0-9a-f]{20,}/, id => id.slice(0, 12)))
     .join(" ")}`
 
-/** Every line `pnpm tidy` prints, and the one a starting host logs. */
+/** Every line `tidy` prints, and the one a starting host logs. */
 export function tidyWords(saying: TidySaying): string {
   switch (saying.kind) {
     case "refused":
@@ -158,6 +158,6 @@ export function tidyWords(saying: TidySaying): string {
       ].join("\n")
     }
     case "hint":
-      return `your repo's op log goes back ${saying.days} days (${count(saying.count)} operations); \`pnpm tidy\` would keep the last ${saying.keep}`
+      return `your repo's op log goes back ${saying.days} days (${count(saying.count)} operations); \`pinetrie tidy\` would keep the last ${saying.keep}`
   }
 }

@@ -59,7 +59,7 @@ export function openDatabase(
     db.close()
     if (!isBusyError(error)) throw error
     throw new Error(
-      `another process holds ${file}: a ${PRODUCT_NAME} store has one owner at a time (a host, or \`pnpm tidy\`)`,
+      `another process holds ${file}: a ${PRODUCT_NAME} store has one owner at a time (a host, or \`pinetrie tidy\`)`,
       { cause: error },
     )
   }

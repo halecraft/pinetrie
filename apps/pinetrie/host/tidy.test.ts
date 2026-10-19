@@ -49,7 +49,7 @@ test("the tidy holds the store: a host opening it is refused until it lets go", 
   openStore(store).store.close()
   const lock = await takeTidyLock({ dirs, folder: root, env: {} })
   if ("refused" in lock || lock.kind !== "held") throw new Error("not held")
-  expect(() => openStore(store, { busyTimeoutMs: 50 })).toThrow(/pnpm tidy/)
+  expect(() => openStore(store, { busyTimeoutMs: 50 })).toThrow(/pinetrie tidy/)
   lock.release()
   await openStore(store, { busyTimeoutMs: 50 }).store.close()
 })
@@ -67,8 +67,8 @@ test("a folder no host has served: nothing to hold, and no store is made", async
   expect(existsSync(store)).toBe(false)
 })
 
-test("the startup line names how far back the log goes, and what pnpm tidy keeps", () => {
+test("the startup line names how far back the log goes, and what a tidy keeps", () => {
   expect(tidyWords({ kind: "hint", days: 26, count: 63162, keep: 7 })).toBe(
-    "your repo's op log goes back 26 days (63,162 operations); `pnpm tidy` would keep the last 7",
+    "your repo's op log goes back 26 days (63,162 operations); `pinetrie tidy` would keep the last 7",
   )
 })

@@ -40,7 +40,7 @@ export function planInvocation(
 const invokedFolder = (arg: string | undefined, base: string): string =>
   arg === undefined ? base : path.resolve(base, arg)
 
-/** `pnpm tidy [folder] [--days N] [--dry-run]`: what to tidy, and how. */
+/** `tidy [folder] [--days N] [--dry-run]`: what to tidy, and how. */
 type TidyInvocation =
   | {
       readonly kind: "tidy"
@@ -52,7 +52,7 @@ type TidyInvocation =
     }
   | { readonly kind: "refused"; readonly why: string }
 
-/** `pnpm tidy`'s arguments, its folder read as `planInvocation` reads one. */
+/** `tidy`'s arguments, its folder read as `planInvocation` reads one. */
 export function planTidyInvocation(
   args: readonly string[],
   base: string,

@@ -329,12 +329,11 @@ context file.
 }
 ```
 
-- **Sign in** on the host's machine (`pinetrie sign-in` installed, `pnpm
-  sign-in` from a clone): `pnpm sign-in anthropic` (a
+- **Sign in** on the host's machine: `pinetrie sign-in anthropic` (a
   subscription, in a browser: paste the code, or the URL you land on, when
-  the redirect cannot reach this machine), `pnpm sign-in openai` (an API
-  key, hidden as you type), `pnpm sign-in` to list providers, `pnpm
-  sign-out <provider>`. Credentials go in
+  the redirect cannot reach this machine), `pinetrie sign-in openai` (an API
+  key, hidden as you type), `pinetrie sign-in` to list providers, `pinetrie
+  sign-out <provider>`. From a clone, `pnpm sign-in` is the same. Credentials go in
   `$XDG_DATA_HOME/pinetrie/auth.json`, written only by sign-in. A key in a
   provider's environment variable works too.
 - **`packages`** lists pi packages by folder: their skills and prompts are
@@ -360,7 +359,7 @@ Coming from pi, one line of `~/.pi/agent/settings.json` at a time:
   providers;
 - skills or prompts in `~/.pi/agent/skills`, `~/.pi/agent/prompts` or
   `~/.agents/skills`: list the folder, or move them beside `pinetrie.json`;
-- `pnpm sign-in <provider>` for each provider you use.
+- `pinetrie sign-in <provider>` for each provider you use.
 
 **A lane can ssh where its host can** (ADR-0140). Your own identity is
 your agent's keys; lanes use it once you allow each lane, in its
@@ -393,7 +392,7 @@ list. Where it comes from is `icons.source` in your `pinetrie.json`:
   sprite of the thread's name's noun, one of 256 shipped with the page
   (`packages/web/public/noun-icons/`, made in S188 and S190). No key, no
   request.
-- **`drawn`** (ADR-0050, ADR-0053): your OpenRouter key (`pnpm sign-in
+- **`drawn`** (ADR-0050, ADR-0053): your OpenRouter key (`pinetrie sign-in
   openrouter`, or `OPENROUTER_API_KEY`) draws one from the
   name. A thread is named as its column first wants an agent, before its
   first message (ADR-0057), and its name then fills the `column-banner`
@@ -530,7 +529,7 @@ Decided, and waiting for their turn:
   `~/.local/share/pinetrie/sessions/<name>/`. `pnpm build` then `pnpm serve` runs one that
   serves the built page, with no Vite (ADR-0148); `serve` rebuilds a page
   whose code changed since its build, and says so.
-  `pnpm tidy [folder]` cuts a jj repo's op log to its last seven days
+  `pinetrie tidy [folder]` (`pnpm tidy` from a clone) cuts a jj repo's op log to its last seven days
   (`--days N`, `--dry-run`), while no host serves it (ADR-0155); a starting
   host logs when one is due.
   `pnpm dev <folder>` (or `pnpm serve <folder>`) serves another project instead, at that folder's
