@@ -3,6 +3,10 @@
 - **Status:** Accepted
 - **Area:** `packages/pi/TECHNICAL.md`, `AGENTS.md`
 - **Evidence:** S2
+- **Amended by:**
+  - ADR-0188: `KynetaStorage` writes pi's `pi.pending.assistant_frame` and
+    `pi.pending.tool_output` to a scratch document of the lane, every other
+    namespace to the root, splitting a commit in one fixed order.
 
 **Context.** `pi-agent-core` exposes `interface Storage` (10 methods) at
 `harness/session/types.d.ts:386`, ships a conformance test suite, and already

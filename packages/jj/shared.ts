@@ -13,7 +13,7 @@ import {
 } from "@pinetrie/core"
 import { describeFailure, lines, type Runner } from "@pinetrie/lanes"
 import { revsetName } from "./lane/names.ts"
-import { ACCEPTED_THREAD_COMMITS } from "./plan.ts"
+import { threadCommitsOnAcceptedWork } from "./plan.ts"
 
 /** A commit on accepted work carrying accepted proposed changes' `Pinetrie-Source` trailers. */
 export interface AcceptedThreadCommit {
@@ -37,19 +37,27 @@ export interface SharedFacts {
   readonly acceptedThreadCommits: readonly AcceptedThreadCommit[]
   /** Every accepted thread commit on accepted work that names none (`untracedLanes`). */
   readonly untraced: readonly Untraced[]
+  /**
+   * The revset `acceptedThreadCommits` and `untraced` were read by. A read at
+   * the same operation names them by it, so the two cannot name different
+   * sets, and no read writes them out one by one.
+   */
+  readonly acceptedThreadCommitsRevset: string
   /** Files `@` changes: proposed changes' `workingCopyEdits` is its files that are here. */
   readonly editing: ReadonlySet<string>
 }
 
 /**
  * The one read of the shared facts: accepted work's commit, the accepted
- * thread commits under it, and `@`, each row flagged by which it is (one
- * commit may be more than one), `@`'s files read from its diff, as `jj diff
- * --name-only` lists them.
+ * thread commits `threadCommits` names, and `@`, each row flagged by which it
+ * is (one commit may be more than one), `@`'s files read from its diff, as
+ * `jj diff --name-only` lists them.
  */
-function sharedRead(repoConfig: RepoConfig): readonly string[] {
+function sharedRead(
+  repoConfig: RepoConfig,
+  threadCommits: string,
+): readonly string[] {
   const accepted = `present(${revsetName(repoConfig.acceptedBookmark)})`
-  const threadCommits = `::${accepted} & ${ACCEPTED_THREAD_COMMITS}`
   const flag = (letter: string, revset: string) =>
     `if(self.contained_in(${JSON.stringify(revset)}), "${letter}")`
   return [
@@ -70,8 +78,12 @@ function sharedRead(repoConfig: RepoConfig): readonly string[] {
   ]
 }
 
-/** `sharedRead`'s output → the facts at `op`. */
-export function parseShared(op: string, stdout: string): SharedFacts {
+/** `sharedRead`'s output → the facts at `op`, with the revset it read the thread commits by. */
+export function parseShared(
+  op: string,
+  stdout: string,
+  acceptedThreadCommitsRevset: string,
+): SharedFacts {
   let acceptedCommit: CommitId | null = null
   let editing: ReadonlySet<string> = new Set()
   const threadCommits: {
@@ -103,6 +115,7 @@ export function parseShared(op: string, stdout: string): SharedFacts {
     untraced: threadCommits
       .filter(t => t.lanes.length > 0)
       .map(({ commit, lanes }) => ({ commit, lanes })),
+    acceptedThreadCommitsRevset,
     editing,
   }
 }
@@ -113,7 +126,8 @@ export async function readShared(
   jj: Runner,
   repoConfig: RepoConfig,
 ): Promise<SharedFacts> {
-  const ran = await jj(sharedRead(repoConfig))
+  const threadCommits = threadCommitsOnAcceptedWork(repoConfig)
+  const ran = await jj(sharedRead(repoConfig, threadCommits))
   if (!ran.ok) throw new Error(describeFailure("jj log", ran))
-  return parseShared(op, ran.stdout)
+  return parseShared(op, ran.stdout, threadCommits)
 }

@@ -171,7 +171,7 @@ root's record is written only through a step's documents (ADR-0162).
   stopped, unclassified), never a level,
   which each client decides for its person. Its namespace and tags are
   kebab-case (`pinetrie.run-end-report`, `model-said`, `needs-you`,
-  ADR-0184); `0025-run-end-report` moved the records stored before.
+  ADR-0186); `0025-run-end-report` moved the records stored before.
 - **`LANE`** is written for every lane as it is created, naming its root;
   `history` is null for a lane with no copy of its own. `planLaneRecords`
   is its one maker, and writes a lane of its own's fork owed beside it

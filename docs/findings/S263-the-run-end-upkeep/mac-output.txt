@@ -1,0 +1,35 @@
+quick_check: ok
+documents: 268, records' bytes 545.67 MB
+largest 15 (doc, records, entries, text MB, blob MB):
+  pinetrie:session  22  21  17.36  0.00
+  root:r-01a14774-a24f-74b1-97b8-17a3b485e84a  2  1  12.75  0.00
+  attention:w-duane@johnsoneight.com  2832  2831  5.93  6.64
+  root:r-01a147c1-ae9b-7779-9422-1cf1d8931b50  1512  1511  11.38  0.00
+  root:r-01a10743-03cc-7685-9f53-4c3d93b8e06b  2  1  9.60  0.00
+  root:r-01a13634-1a0c-78a0-9a04-91752378d93f  2  1  9.33  0.00
+  root:r-01a12e65-e893-76d9-8458-7bc3f86ad704  2  1  9.21  0.00
+  root:r-01a151ad-53c8-7119-a387-49fb3993c785  5637  5636  8.61  0.00
+  root:r-01a0ef39-26db-76d9-8f47-e754169f86b1  2  1  8.42  0.00
+  root:r-01a14950-aecc-7dbe-9d96-125a09f6d25f  2  1  7.70  0.00
+  root:r-01a126a1-6aad-7474-98ca-164378ce0467  2  1  7.62  0.00
+  root:r-01a12dbe-aef3-77a6-b580-6358d0443103  2  1  7.44  0.00
+  root:r-01a146c8-2fd4-73cd-82d3-d72a89cf9e87  2  1  6.87  0.00
+  root:r-01a1083d-3051-7d7c-b9ff-3555d0b7cb6f  2  1  6.84  0.00
+  root:r-01a11e13-92ea-7d74-b3b7-5854d8f6683e  2  1  6.80  0.00
+
+per document: read all, JSON parse, JSON serialize, delete+insert transaction (ms, median of 3)
+  pinetrie:session: 22 records, largest 17.34 MB: read 23, parse 18, serialize 23, write 186, together 251
+  pinetrie:card-places: 2 records, largest 0.42 MB: read 1, parse 0, serialize 0, write 5, together 6
+  pinetrie:live: 35 records, largest 0.02 MB: read 1, parse 0, serialize 0, write 85, together 86
+  root:r-01a14774-a24f-74b1-97b8-17a3b485e84a: 2 records, largest 12.75 MB: read 24, parse 15, serialize 18, write 112, together 170
+  root:r-01a147c1-ae9b-7779-9422-1cf1d8931b50: 1512 records, largest 10.21 MB: read 18, parse 14, serialize 17, write 1360, together 1409
+  root:r-01a10743-03cc-7685-9f53-4c3d93b8e06b: 2 records, largest 9.60 MB: read 16, parse 12, serialize 16, write 63, together 107
+  root:r-01a13634-1a0c-78a0-9a04-91752378d93f: 2 records, largest 9.33 MB: read 20, parse 11, serialize 14, write 70, together 114
+  root:r-01a12e65-e893-76d9-8458-7bc3f86ad704: 2 records, largest 9.21 MB: read 15, parse 10, serialize 13, write 76, together 114
+
+the session's first whole record, by key (two levels):
+  data: 17.34 MB
+  version: 0.00 MB
+  lineage: 0.00 MB
+  kind: 0.00 MB
+  encoding: 0.00 MB

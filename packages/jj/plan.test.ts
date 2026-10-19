@@ -70,16 +70,20 @@ describe("proposed changes", () => {
   /** A rewrite of proposed changes, which may be immutable on accepted work. */
   const rw = (...args: string[]) => op("--ignore-immutable", ...args)
   test("proposedStart: the base's commit, and the history of each accepted source", () => {
-    expect(proposedStart({ tip: C1, start: C2, sources: [] })).toBe(
-      "heads(::c1 & (c2))",
-    )
+    expect(proposedStart({ tip: C1, start: C2, sources: [] })).toEqual({
+      revset: "heads(::c1 & (c2))",
+      aliases: {},
+    })
     expect(
       proposedStart({
         tip: C1,
         start: C2,
         sources: [commitId("t1"), commitId("t2")],
       }),
-    ).toBe("heads(::c1 & (c2 | ::(present(t1) | present(t2))))")
+    ).toEqual({
+      revset: "heads(::c1 & (c2 | ::pinetrie_sources))",
+      aliases: { pinetrie_sources: "(present(t1) | present(t2))" },
+    })
   })
   test("acceptedThreadCommitsRevset: accepted sources above the commit the base holds, never a WIP's copy", () => {
     const accepted =

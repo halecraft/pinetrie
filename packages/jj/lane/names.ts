@@ -12,6 +12,47 @@ export const bookmarkName = (lane: ThreadId): string => `pinetrie/${lane}`
 /** A revset string literal, so a bookmark name is never parsed as a revset. */
 export const revsetName = (name: string): string => JSON.stringify(name)
 
+/**
+ * `commits` as one revset, each `present()` so one this repo lacks names
+ * nothing; `none()` for none. A long one belongs in an alias (`revsetAliased`):
+ * jj parses a union of hundreds of commits for longer than it reads.
+ */
+export const presentUnion = (commits: readonly string[]): string =>
+  commits.length === 0
+    ? "none()"
+    : `(${commits.map(c => `present(${c})`).join(" | ")})`
+
+/** The alias a read gives the sources of accepted proposed changes it names. */
+export const SOURCES_ALIAS = "pinetrie_sources"
+
+/**
+ * A revset and the aliases it names, kept together: the revset alone fails
+ * on the names it does not define.
+ */
+export interface RevsetQuery {
+  readonly revset: string
+  readonly aliases: Readonly<Record<string, string>>
+}
+
+/**
+ * `args` with one `--config revset-aliases.<name>=<value>` per alias, after
+ * them: a long union of commits parses slowly inline and as an alias quickly,
+ * and a log line cut short still shows the command. The value is a TOML basic
+ * string, which `JSON.stringify` writes.
+ */
+export function revsetAliased(
+  args: readonly string[],
+  aliases: Readonly<Record<string, string>>,
+): string[] {
+  return [
+    ...args,
+    ...Object.entries(aliases).flatMap(([name, value]) => [
+      "--config",
+      `revset-aliases.${name}=${JSON.stringify(value)}`,
+    ]),
+  ]
+}
+
 /** The revset of one bookmark, its name quoted so it is never parsed as a revset. */
 export const bookmarkRevset = (name: string): string =>
   `bookmarks(exact:${revsetName(name)})`

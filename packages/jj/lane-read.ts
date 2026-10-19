@@ -26,6 +26,7 @@ import {
   bookmarkRevset,
   hostProposedRevset,
   laneTipName,
+  presentUnion,
   proposedBookmark,
   revsetName,
 } from "./lane/names.ts"
@@ -58,7 +59,11 @@ export interface LaneRow {
   readonly newestAccepted: boolean
   /** In the history of that `base` commit: an accepted source here is the base's already. */
   readonly underBase: boolean
-  /** One of the accepted thread commits the shared facts list. */
+  /**
+   * In the revset the shared facts read the accepted thread commits by, the
+   * untraced among them: only those the shared facts list with sources give
+   * the start any.
+   */
   readonly accepted: boolean
   /** An accepted thread commit of this lane that names no source (`SharedFacts.untraced`). */
   readonly untraced: boolean
@@ -74,7 +79,12 @@ function laneRead(input: {
   readonly lane: ThreadId
   readonly name: ThreadName | undefined
   readonly repoConfig: RepoConfig
-  readonly acceptedThreadCommits: readonly CommitId[]
+  /**
+   * The shared facts' revset of the accepted thread commits, named rather
+   * than written out: an inline union of hundreds of commits makes jj parse
+   * for longer than it reads.
+   */
+  readonly acceptedThreadCommitsRevset: string
   /** The accepted thread commits of this lane that name no source. */
   readonly untraced: readonly CommitId[]
 }): readonly string[] {
@@ -91,14 +101,8 @@ function laneRead(input: {
       ? "none()"
       : hostProposedRevset(proposedBookmark(input.name))
   const region = `(::${bookmark} ~ ::${acceptedBookmark})`
-  const accepted =
-    input.acceptedThreadCommits.length === 0
-      ? "none()"
-      : `(${input.acceptedThreadCommits.map(c => `present(${c})`).join(" | ")})`
-  const untraced =
-    input.untraced.length === 0
-      ? "none()"
-      : `(${input.untraced.map(c => `present(${c})`).join(" | ")})`
+  const accepted = `(${input.acceptedThreadCommitsRevset})`
+  const untraced = presentUnion(input.untraced)
   const flag = (letter: string, revset: string) =>
     `if(self.contained_in(${JSON.stringify(revset)}), "${letter}")`
   return [
@@ -350,9 +354,7 @@ export async function gatherLane(
       lane: input.lane,
       name: input.name,
       repoConfig: input.repoConfig,
-      acceptedThreadCommits: input.shared.acceptedThreadCommits.map(
-        t => t.commit,
-      ),
+      acceptedThreadCommitsRevset: input.shared.acceptedThreadCommitsRevset,
       untraced: input.shared.untraced
         .filter(u => u.lanes.includes(input.lane))
         .map(u => u.commit),

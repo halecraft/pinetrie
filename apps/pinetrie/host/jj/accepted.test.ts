@@ -43,6 +43,7 @@ function rig(
       acceptedCommit: now.commit,
       acceptedThreadCommits: [],
       untraced: [],
+      acceptedThreadCommitsRevset: "none()",
       editing: new Set(),
     }),
     acceptedFacts: async () => now,

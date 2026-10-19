@@ -45,7 +45,7 @@ import {
   run,
   type TouchedRevision,
 } from "@pinetrie/lanes"
-import { afterAll, beforeAll, describe, expect, test } from "vitest"
+import { afterAll, afterEach, beforeAll, describe, expect, test } from "vitest"
 import { acceptedFacts } from "./accepted.ts"
 import {
   acceptedIn,
@@ -134,9 +134,35 @@ import {
 } from "./proposed-gather.ts"
 import { repairProposedChanges } from "./proposed-repair.ts"
 import { jjFileBytes } from "./review-content.ts"
-import { bytesFor, executeRepo, hostJj, hostOps } from "./run.ts"
+import {
+  bytesFor,
+  executeRepo,
+  hostOps as runAsHost,
+  hostJj as runAsYou,
+} from "./run.ts"
 import { readShared } from "./shared.ts"
 import { git, host } from "./step.ts"
+
+/**
+ * The longest argument a jj command on your repo may have. A set of commits
+ * written out one by one grows with the repo, and jj parses it for longer than
+ * it reads; such a set is a revset or an alias.
+ */
+const MAX_JJ_ARGUMENT = 4096
+/** Every argument over the limit a history ran, checked after each test: a caller may catch the command's failure. */
+const tooLong: string[] = []
+const guarded =
+  (runner: Runner): Runner =>
+  args => {
+    for (const a of args)
+      if (a.length > MAX_JJ_ARGUMENT) tooLong.push(`${a.slice(0, 120)}…`)
+    return runner(args)
+  }
+const hostJj = (root: string): Runner => guarded(runAsYou(root))
+const hostOps = (root: string): Runner => guarded(runAsHost(root))
+afterEach(() => {
+  expect(tooLong.splice(0)).toEqual([])
+})
 
 const LANE = threadIdFor("1")
 const NAME = "amber-fox" as ThreadName

@@ -12,6 +12,8 @@ import { commitId, NO_EDITOR } from "@pinetrie/core"
 import { lines, run } from "@pinetrie/lanes"
 import { afterAll, expect, test } from "vitest"
 import { DEFAULT_REPO } from "./lane/names.ts"
+import { readCommits } from "./lane/revisions.ts"
+import { threadCommitsOnAcceptedWork } from "./plan.ts"
 import { hostOps } from "./run.ts"
 import { readShared } from "./shared.ts"
 
@@ -59,7 +61,12 @@ test("the shared facts' one read gives accepted work's commit, its accepted thre
     acceptedCommit: accepted,
     acceptedThreadCommits: [{ commit: threadCommit, sources: [base] }],
     untraced: [],
+    acceptedThreadCommitsRevset: threadCommitsOnAcceptedWork(DEFAULT_REPO),
     editing: new Set(listed),
   })
   expect([...shared.editing].sort()).toEqual(["moved.txt", "sp ace.txt"])
+  // A read naming the thread commits by the facts' revset reads the ones listed.
+  expect(await readCommits(ops, shared.acceptedThreadCommitsRevset)).toEqual([
+    threadCommit,
+  ])
 }, 60_000)

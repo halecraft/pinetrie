@@ -1,0 +1,24 @@
+
+## root:r-01a151ad-53c8-7119-a387-49fb3993c785: 12292 entries, 1 whole, 12291 batches, 13717 ops; record KB p50 0.6, p90 0.6, p99 5.3, max 4179.2
+  op shapes (keys): {change,path} ×13717
+  by path (ops, KB, largest op KB):
+    [object Object].<id> (sequence): 11539, 4813.2, 19.7
+    [object Object] (map): 2023, 1886.8, 20.8
+    [object Object].<id> (map): 101, 194.5, 38.8
+    [object Object].<id> (text): 54, 30.3, 2.3
+
+## root:r-01a15223-45d0-7cf7-854e-097358d17f0a: 9318 entries, 1 whole, 9317 batches, 10594 ops; record KB p50 0.6, p90 0.7, p99 5.7, max 1740.7
+  op shapes (keys): {change,path} ×10594
+  by path (ops, KB, largest op KB):
+    [object Object].<id> (sequence): 8630, 3616.6, 24.5
+    [object Object] (map): 1863, 1780.1, 28.1
+    [object Object].<id> (map): 98, 45.9, 1.1
+    [object Object].<id> (text): 3, 8.9, 6.6
+
+## root:r-01a147c1-ae9b-7779-9422-1cf1d8931b50: 3197 entries, 1 whole, 3196 batches, 3528 ops; record KB p50 0.6, p90 0.6, p99 6.2, max 10207.0
+  op shapes (keys): {change,path} ×3528
+  by path (ops, KB, largest op KB):
+    [object Object].<id> (sequence): 3018, 1258.1, 9.7
+    [object Object] (map): 476, 467.3, 10.4
+    [object Object].<id> (map): 25, 62.8, 42.5
+    [object Object].<id> (text): 9, 6.9, 4.6

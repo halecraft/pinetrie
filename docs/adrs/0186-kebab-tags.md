@@ -1,4 +1,6 @@
-# ADR-0184 — Every tag is kebab-case: a union's kind, a literal union's member, an error code, a stored literal and a namespace; the run-end report is migrated to it
+# ADR-0186 — Every tag is kebab-case: a union's kind, a literal union's member, an error code, a stored literal and a namespace; the run-end report is migrated to it
+
+Numbered ADR-0184 until 2026-10-19, when two files held that number.
 
 - **Status:** Accepted (Duane, 2026-10-19)
 - **Area:** `AGENTS.md`, `apps/pinetrie/host/TECHNICAL.md`,

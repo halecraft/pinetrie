@@ -27,7 +27,12 @@ import {
   type Runner,
   type TouchedRevision,
 } from "@pinetrie/lanes"
-import { bookmarkName, bookmarkRevset } from "./names.ts"
+import {
+  bookmarkName,
+  bookmarkRevset,
+  presentUnion,
+  SOURCES_ALIAS,
+} from "./names.ts"
 import {
   type AcceptedThreadCommitAbove,
   type Join,
@@ -109,10 +114,10 @@ async function acceptedThreadCommitsAbove(
   }))
   const named = [...new Set(accepted.flatMap(t => t.sources))]
   if (named.length === 0) return { accepted, held: new Set() }
-  const held = await readCommits(
-    jj,
-    `(${named.map(s => `present(${s})`).join(" | ")}) & ::${ours}`,
-  )
+  const held = await readCommits(jj, {
+    revset: `${SOURCES_ALIAS} & ::${ours}`,
+    aliases: { [SOURCES_ALIAS]: presentUnion(named) },
+  })
   return { accepted, held: new Set(held) }
 }
 

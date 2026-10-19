@@ -7,7 +7,6 @@ import {
   address,
   type CanvasId,
   ERR,
-  GET_LATEST_TOOL,
   IMAGE_MIMES,
   type ImageMime,
   type ImageRef,

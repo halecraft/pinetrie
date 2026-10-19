@@ -1,0 +1,5 @@
+roots with deltas: 13 (r-01a147c1-ae 1238, r-01a15489-0a 200, r-01a10dd2-4f 3, r-01a11e6a-af 3, r-01a10ddf-83 2, r-01a11768-38 2, r-01a11c93-50 2, r-01a1223b-f4 2, r-01a1380c-28 2, r-01a1380d-28 2, r-01a13ce8-eb 2, r-01a140d1-5e 2, r-01a1518b-59 2)
+their ops: lists.* sequence 1323, values map 228, entries map 32, lists map 30, records.* map 18, usageRows map 14, checkpointText map 6, checkpointText.* text 4
+replies: 16, frames: 1323
+frames per stored record: 1: 1323
+by type: start 16, toolcall_start 14, toolcall_end 14, thinking_start 8, thinking_delta 526, thinking_end 6, toolcall_checkpoint 5, toolcall_delta 710, text_start 3, text_delta 18, text_end 3

@@ -1,0 +1,19 @@
+
+## root:r-01a151ad-53c8-7119-a387-49fb3993c785: 7771 entries, 1 whole, 7770 batches, 8596 ops; record KB p50 0.6, p90 0.6, p99 5.6, max 4179.2
+  op shapes (keys): {change,path} ×8596
+  by path (ops, KB, largest op KB):
+    [object Object].<id> (sequence): 7337, 3076.5, 19.7
+    [object Object] (map): 1176, 1192.2, 20.8
+    [object Object].<id> (map): 60, 111.1, 29.2
+    [object Object].<id> (text): 23, 17.0, 2.3
+
+## attention:w-duane@johnsoneight.com: 2858 entries, 2858 whole, 0 batches, 0 ops; record KB p50 2.2, p90 2.3, p99 2.4, max 2.4
+  op shapes (keys): 
+  by path (ops, KB, largest op KB):
+
+## root:r-01a15223-45d0-7cf7-854e-097358d17f0a: 2574 entries, 1 whole, 2573 batches, 2982 ops; record KB p50 0.6, p90 0.9, p99 7.8, max 774.9
+  op shapes (keys): {change,path} ×2982
+  by path (ops, KB, largest op KB):
+    [object Object].<id> (sequence): 2354, 998.2, 20.1
+    [object Object] (map): 598, 719.1, 21.0
+    [object Object].<id> (map): 30, 13.0, 0.5

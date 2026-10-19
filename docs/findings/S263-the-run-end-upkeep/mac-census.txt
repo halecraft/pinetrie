@@ -1,0 +1,62 @@
+whole records read: 12 of pinetrie:session, root:r-01a151ad-53c8-7119-a387-49fb3993c785, root:r-01a14774-a24f-74b1-97b8-17a3b485e84a, root:r-01a147c1-ae9b-7779-9422-1cf1d8931b50, root:r-01a10743-03cc-7685-9f53-4c3d93b8e06b, root:r-01a13634-1a0c-78a0-9a04-91752378d93f, root:r-01a15223-45d0-7cf7-854e-097358d17f0a, root:r-01a12e65-e893-76d9-8458-7bc3f86ad704, root:r-01a0ef39-26db-76d9-8f47-e754169f86b1, root:r-01a14950-aecc-7dbe-9d96-125a09f6d25f, root:r-01a126a1-6aad-7474-98ca-164378ce0467, root:r-01a12dbe-aef3-77a6-b580-6358d0443103
+by what they hold (count, MB), largest first:
+  entries: 11, 71.24
+  entries.message.assistant: 10796, 39.64
+  entries.message.toolResult: 10761, 24.37
+  records: 12, 23.64
+  entries.message.assistant · content.thinking: 6658, 19.79
+  entries.message.toolResult · content.text: 10767, 19.34
+  entries.message.toolResult · content.text.text: 10767, 19.09
+  entries.message.assistant · content.thinking.thinkingSignature: 6658, 15.38
+  records.pinetrie.shared: 1, 12.78
+  entries.message.assistant · content.toolCall: 10772, 9.59
+  entries.message.assistant · content.toolCall.arguments: 10772, 8.69
+  records.pinetrie.revision: 11, 7.60
+  entries.message.custom: 995, 4.42
+  usageRows: 11, 4.29
+  entries.message.assistant · content.thinking.thinking: 6658, 4.06
+  entries.message.assistant · usage: 10796, 2.54
+  records.pinetrie.base: 1, 2.26
+  entries.compaction: 3, 1.80
+  entries.message.assistant · content.text: 1903, 1.56
+  entries.message.assistant · content.text.text: 1903, 1.51
+  entries.message.custom · details: 995, 1.26
+  entries.message.toolResult · details: 283, 1.10
+  entries.message.assistant · diagnostics: 7437, 0.71
+  records.pinetrie.root: 1, 0.38
+  entries.message.assistant · content.toolCall.id: 10772, 0.34
+  entries.message.toolResult · toolCallId: 10761, 0.34
+  entries.message.assistant · responseId: 10748, 0.32
+  values: 11, 0.28
+  entries.message.assistant · api: 10796, 0.22
+  records.pinetrie.card-history: 1, 0.20
+  values.pi.result: 522, 0.19
+  entries.message.assistant · model: 10796, 0.18
+  entries.message.assistant · timestamp: 10796, 0.14
+  entries.message.toolResult · timestamp: 10761, 0.14
+  entries.message.toolResult · role: 10761, 0.13
+  entries.message.assistant · role: 10796, 0.12
+  entries.message.assistant · provider: 10796, 0.12
+  entries.message.assistant · rawStopReason: 10727, 0.11
+  entries.message.system: 6, 0.11
+  entries.message.system · sections: 6, 0.10
+  entries.message.assistant · stopReason: 10796, 0.10
+  records.pinetrie.thread: 1, 0.07
+  entries.message.assistant · content.toolCall.name: 10772, 0.07
+  entries.message.toolResult · toolName: 10761, 0.07
+  entries.message.assistant · providerThinkingLevel: 10789, 0.06
+  records.pinetrie.runEndReport: 1, 0.06
+  records.pinetrie.lane: 1, 0.06
+  records.pinetrie.digest: 10, 0.06
+  entries.message.toolResult · isError: 10761, 0.05
+  records.pinetrie.banner: 1, 0.04
+  records.pinetrie.name: 1, 0.03
+  records.pinetrie.lane-fork: 1, 0.03
+  values.pi.lane.config: 56, 0.02
+  records.pinetrie.mark: 1, 0.02
+  records.pinetrie.commands: 1, 0.02
+  entries.message.custom · customType: 995, 0.02
+  records.pinetrie.proposed: 1, 0.02
+  values.pi.lane.state: 56, 0.01
+  entries.message.custom · timestamp: 995, 0.01
+  values.pi.branch.tip: 56, 0.01

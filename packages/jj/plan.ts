@@ -24,8 +24,11 @@ import {
   laneStackRef,
   laneTipRef,
   PROPOSED_BOOKMARKS,
+  presentUnion,
   proposedBookmark,
+  type RevsetQuery,
   revsetName,
+  SOURCES_ALIAS,
   stackBookmark,
 } from "./lane/names.ts"
 import { git, host, type RepoStep, you } from "./step.ts"
@@ -245,27 +248,35 @@ export const forgetSteps = (...bookmarks: NonEmpty<string>): RepoStep[] => [
 ]
 
 /** The commits an acceptance made: its proposed changes' trailers name a source or a thread. */
-export const ACCEPTED_THREAD_COMMITS = trailerRevset(["source", "thread"])
+const ACCEPTED_THREAD_COMMITS = trailerRevset(["source", "thread"])
+
+/** Every accepted thread commit on accepted work, as a revset: what the shared facts read. */
+export const threadCommitsOnAcceptedWork = (repoConfig: RepoConfig): string =>
+  `::present(${revsetName(repoConfig.acceptedBookmark)}) & ${ACCEPTED_THREAD_COMMITS}`
 
 /**
- * Where proposed changes start, as a revset: the newest ancestors of the
- * lane's tip you already have. That is the commit the lane's base names
- * (`start`: accepted work's commit, or the WIP's copy), and every lane commit a
- * accepted proposed changes' `Pinetrie-Source` names above what the base holds
- * (`acceptedThreadCommitsRevset`), with their history: a parent lane's work
- * accepted after this lane forked, or a branch of this lane accepted
- * whole. Each source is
- * `present()`: one not fetched here names nothing you have. Several heads
- * start the proposed changes from their merge.
+ * Where proposed changes start, as a revset and its alias: the newest
+ * ancestors of the lane's tip you already have. That is the commit the lane's
+ * base names (`start`: accepted work's commit, or the WIP's copy), and every
+ * lane commit a accepted proposed changes' `Pinetrie-Source` names above what
+ * the base holds (`acceptedThreadCommitsRevset`), with their history: a
+ * parent lane's work accepted after this lane forked, or a branch of this
+ * lane accepted whole. Each source is `present()`: one not fetched here names
+ * nothing you have. Several heads start the proposed changes from their
+ * merge. The sources, which grow with the acceptances above the base, are an
+ * alias (`SOURCES_ALIAS`), never written into the revset.
  */
 export function proposedStart(input: {
   readonly tip: CommitId
   readonly start: CommitId
   readonly sources: readonly CommitId[]
-}): string {
-  const sources = input.sources.map(c => `present(${c})`).join(" | ")
-  const had = sources === "" ? input.start : `${input.start} | ::(${sources})`
-  return `heads(::${input.tip} & (${had}))`
+}): RevsetQuery {
+  const none = input.sources.length === 0
+  const had = none ? input.start : `${input.start} | ::${SOURCES_ALIAS}`
+  return {
+    revset: `heads(::${input.tip} & (${had}))`,
+    aliases: none ? {} : { [SOURCES_ALIAS]: presentUnion(input.sources) },
+  }
 }
 
 /**

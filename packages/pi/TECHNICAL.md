@@ -957,6 +957,12 @@ the value record keeps a shell (`sealed: true`), and the text goes to
 rejoin them; a delete removes both. Any other shape is stored whole.
 `sealCheckpoint`/`unsealCheckpoint` are the pure rule. Conformance stays 21/21.
 
+Every pending namespace is stored in the root, `pi.pending.assistant_frame`
+among them: one appended element, and so one stored record, for each frame
+of a streaming reply, deleted once its entry is written (S262). ADR-0188,
+accepted and not yet built, moves it and `pi.pending.tool_output` to a scratch document named
+by the root, which exists only while a run there needs it and is destroyed at its end.
+
 `KynetaStorage` re-indexes only for **replayed** changes (hydration, or edits
 synced from another replica): its own commits index themselves. Which indexes a
 replayed change touches is `dirtyFrom`, a pure function: only pi's four fields

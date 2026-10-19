@@ -267,6 +267,15 @@ same for every run (`packages/pi/TECHNICAL.md`, S85).
   only once the store holds every write. Only the upkeep unloads a root;
   a test reads the sources and fails on any other `exchange.unload`, the
   migrations' and the stacks of moves' aside.
+- **The upkeep compacts whatever it names, however little it holds
+  beyond its whole record** (S263): a compaction reads every stored
+  record, takes them into the replica and rewrites the document, on the
+  event loop. A running root's records are mostly pi's reply frames, one
+  each, so a long run's end stalls the host for a second or more.
+  ADR-0188, accepted and not yet built, moves them to a scratch document
+  named by the root, which exists only while a run there needs it, and
+  compacts a document only once its stored changes outweigh its whole
+  record.
 - **`PINETRIE_ROOT_TRACE=<file>` logs how roots are used** (`root-trace.ts`),
   one JSON object a line: each use (through a step, a lease or a tab's
   ask), whether it loaded the root, and the host code that asked; each
@@ -450,7 +459,7 @@ reading the store once, planning once, then acting:
     relays, answers and ask cards, and facts), `0023-incoming` (each
     `pinetrie.heard` message's type) and `0024` (*trash*: a trashed card's
     place, in the places rows, its history and its trace).
-  - `0025-run-end-report` (ADR-0184) moves each run-end report from
+  - `0025-run-end-report` (ADR-0186) moves each run-end report from
     `pinetrie.runEndReport` to `pinetrie.run-end-report`, its report's
     `modelSaid` respelled `model-said` and its urgency `needs-you` or
     `worth-a-read` (`runEndReportNow`), read raw: the old shape no longer

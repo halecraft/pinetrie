@@ -228,7 +228,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "proposed changes start at its base, ignoring what you accepted",
     file: "packages/jj/plan.ts",
-    from: '  const had = sources === "" ? input.start : `${input.start} | ::(${sources})`',
+    from: "  const had = none ? input.start : `${input.start} | ::${SOURCES_ALIAS}`",
     to: "  const had = input.start",
     command: unit,
     expect:
@@ -1475,5 +1475,75 @@ export const mutations: readonly Mutation[] = [
     command: ["pnpm", "exec", "vitest", "run", "packages/jj/owner.test.ts"],
     expect:
       "a slow step's split holds its parts and its own commands, not a pinned read's beside it",
+  },
+  {
+    name: "a lane read writes the accepted thread commits out one by one",
+    file: "packages/jj/lane-read.ts",
+    from: "      acceptedThreadCommitsRevset: input.shared.acceptedThreadCommitsRevset,",
+    to: '      acceptedThreadCommitsRevset: input.shared.acceptedThreadCommits.map(t => `present(${t.commit})`).join(" | ") || "none()",',
+    command: ["pnpm", "exec", "vitest", "run", "packages/jj/lane-read.test.ts"],
+    expect:
+      "a lane read names the accepted thread commits by the shared facts' revset, never one by one",
+  },
+  {
+    name: "a command's revset aliases come before its own arguments",
+    file: "packages/jj/lane/names.ts",
+    from: '  return [\n    ...args,\n    ...Object.entries(aliases).flatMap(([name, value]) => [\n      "--config",\n      `revset-aliases.${name}=${JSON.stringify(value)}`,\n    ]),\n  ]',
+    to: '  return [\n    ...Object.entries(aliases).flatMap(([name, value]) => [\n      "--config",\n      `revset-aliases.${name}=${JSON.stringify(value)}`,\n    ]),\n    ...args,\n  ]',
+    command: [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "packages/jj/lane/names.test.ts",
+    ],
+    expect:
+      "revsetAliased puts one --config per alias after the command, its value a string jj reads back",
+  },
+  {
+    name: "every jj argument a history runs over 64 characters is refused",
+    file: "packages/jj/repo.test.ts",
+    from: "const MAX_JJ_ARGUMENT = 4096",
+    to: "const MAX_JJ_ARGUMENT = 64",
+    command: [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "packages/jj/repo.test.ts",
+      "-t",
+      "proposed changes on accepted work: built, immutable",
+    ],
+    expect:
+      "proposed changes on accepted work: built, immutable, refreshed, followed, accepted by a forward move, and the next one",
+  },
+  {
+    name: "a union of commits names one this repo lacks",
+    file: "packages/jj/lane/names.ts",
+    from: '    : `(${commits.map(c => `present(${c})`).join(" | ")})`',
+    to: '    : `(${commits.join(" | ")})`',
+    command: [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "packages/jj/lane/names.test.ts",
+    ],
+    expect:
+      "presentUnion names each commit with present(), and none() for no commit",
+  },
+  {
+    name: "a lane's merge read names its sources' alias without defining it",
+    file: "packages/jj/lane/merge.ts",
+    from: "    aliases: { [SOURCES_ALIAS]: presentUnion(named) },",
+    to: "    aliases: {},",
+    command: [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "packages/jj/lane/history.test.ts",
+    ],
+    expect: "An accept then getting the latest changes no file.",
   },
 ]

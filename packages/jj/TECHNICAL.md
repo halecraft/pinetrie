@@ -50,7 +50,8 @@ translates to.
   proposed changes' build, rebuild, refresh, repair
   and acceptance, lanes' refs (`laneRefSteps`), a bundle's import
   (`planImport`), where proposed changes start (`proposedStart`, `acceptedThreadCommitsRevset`), the
-  accepted thread commits' revset (`ACCEPTED_THREAD_COMMITS`, read with `@pinetrie/lanes`' `ACCEPTED_THREAD_COMMIT_ROW` and
+  accepted thread commits' revset (`ACCEPTED_THREAD_COMMITS`, and those on
+  accepted work, `threadCommitsOnAcceptedWork`, read with `@pinetrie/lanes`' `ACCEPTED_THREAD_COMMIT_ROW` and
   `parseAcceptedThreadCommits`), and the evolog walk
   (`walkToHost`).
 - `run.ts`: the runner factory, private to the package.
@@ -241,6 +242,27 @@ operation is read once and kept until the head moves.**
   sits above the base, since `known` keeps only getting the latest diffs; those
   two run once per move, plus one for each further head of its proposed
   changes' start. S253 counted 5 for 60 of 73 lanes.
+- **No read writes a set of commits out one by one** (ADR-0181). jj parses
+  a long inline union for longer than it reads: 304 accepted thread commits
+  made a lane read 15.8 KB and 148 ms, against 22 ms named by a revset
+  (S253), and the list grows with every acceptance.
+  - The lane read (`laneRead`) names the accepted thread commits by the
+    revset the shared facts were read by, which they carry
+    (`SharedFacts.acceptedThreadCommitsRevset`, built by
+    `threadCommitsOnAcceptedWork`). The two cannot name different sets.
+    The revset holds the untraced too: rows flagged `K` that
+    `planLaneRead` maps to no source, since sources come only from the
+    shared facts' list.
+  - A union no revset expresses goes in as a revset alias
+    (`SOURCES_ALIAS`, built by `presentUnion`): the start read's sources
+    (`proposedStart` returns a `RevsetQuery`, which `readCommits` runs
+    through `revsetAliased`), and the sources a lane's merge reads it holds
+    (`acceptedThreadCommitsAbove`, in the lane's own repo). The aliases go after the
+    command's own arguments, so a slow command's log line still shows the
+    command. A revset and its aliases travel as one value, and jj refuses a
+    revset whose alias is missing.
+  - `repo.test.ts` fails any jj command a history runs with an argument
+    over 4 KB.
 - **A whole refresh, as the host runs it, is counted** (the host's
   `refresh.test.ts`, every command the owner heard, `onCommand`): 2
   unchanged, 3 after any new operation (the shared facts' read), 13 for a

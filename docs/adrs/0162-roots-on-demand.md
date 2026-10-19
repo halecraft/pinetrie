@@ -14,6 +14,10 @@ Numbered 0156 until 2026-10-17, when two files held that number.
   - ADR-0029: a late write still lands only in a thread at a live place, but
     that rule no longer says what is loaded: the late step loads the root once
     the thread passes.
+- **Amended by:**
+  - ADR-0188: the upkeep compacts a document only once its stored changes
+    outweigh its whole record, never because a run settled or a root leaves
+    memory; it destroys a root's scratch document once no run needs it.
 
 **Context.**
 

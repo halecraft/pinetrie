@@ -23,22 +23,30 @@ import {
   type TurnCommittedOf,
 } from "@pinetrie/lanes"
 import { readLaneBookmark, setBookmark } from "./bookmarks.ts"
+import { type RevsetQuery, revsetAliased } from "./names.ts"
 import { type OldNamesOnDisk, planTurnCommit } from "./plan.ts"
 import { laneJj } from "./run.ts"
-/** The commit ids a revset names, in jj's order. */
+/** The commit ids a revset, or a revset with its aliases, names, in jj's order. */
 export async function readCommits(
   jj: Runner,
-  revset: string,
+  query: string | RevsetQuery,
 ): Promise<CommitId[]> {
-  const ran = await jj([
-    "log",
-    "--ignore-working-copy",
-    "--no-graph",
-    "-r",
-    revset,
-    "-T",
-    'commit_id ++ "\\n"',
-  ])
+  const { revset, aliases } =
+    typeof query === "string" ? { revset: query, aliases: {} } : query
+  const ran = await jj(
+    revsetAliased(
+      [
+        "log",
+        "--ignore-working-copy",
+        "--no-graph",
+        "-r",
+        revset,
+        "-T",
+        'commit_id ++ "\\n"',
+      ],
+      aliases,
+    ),
+  )
   if (!ran.ok) throw new Error(describeFailure(`jj log -r ${revset}`, ran))
   return lines(ran.stdout).map(commitId)
 }
