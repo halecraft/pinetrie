@@ -78,7 +78,7 @@ A type lives in the highest package that all its users can import
 | `thread-names.ts` | a thread's name and its words |
 | `config.ts` | config as other packages name it |
 | `product.ts`, `lane-env.ts` | the product's name and the host's operator; what every lane of its own sees: paths, home, programs, variables |
-| `lanes.ts`, `bases.ts`, `disks.ts` | a lane's record and its proof it may run; a thread's base, history states and a copy ready to merge; a lane's disk and snapshots |
+| `lanes.ts`, `bases.ts`, `disks.ts` | a lane's record and its proof it may run; a thread's base, history states and a copy ready to merge; a lane's disk, its snapshots and the operations on it (`DiskOp`) |
 | `revisions.ts`, `accepted.ts`, `proposed.ts`, `trailers.ts` | a turn's revision record, proposed changes recorded and reviewed; a jj project's accepted work and thread's base, as recorded; proposed changes' facts and decisions; the commit trailers |
 | `folder.ts`, `runs.ts`, `images.ts` | a folder project's history; what a command did to a disk; blobs |
 | `paths.ts`, `errors.ts`, `text.ts` | paths as strings, a thrown value as text, and a text as a label |
@@ -116,6 +116,10 @@ A type lives in the highest package that all its users can import
 
 ## Lanes and their records (`config.ts`, `lanes.ts`, `bases.ts`, `disks.ts`, `revisions.ts`, `thread-names.ts`)
 
+- **A disk operation is one type for both its sides** (`DiskOp`, generic
+  over the lane's name): lanes' planners ask it of the runtime over a
+  `LaneOwner`, and lanehost carries it out over a string, so neither keeps
+  a copy that could differ.
 - A host record lives in the session's document or a root's (ADR-0063), and
   its write names which (`Target`, `ValueWrite`, `writes.ts`). Each host
   record is one spec, and pi only carries its writes (ADR-0062).

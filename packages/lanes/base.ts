@@ -10,23 +10,24 @@
 // holds inside itself (`.pinetrie-lane/base.json`).
 
 import { BASE_SNAPSHOT, type SnapshotId } from "@pinetrie/core"
+import {
+  BASE_FILE,
+  isBaseCurrent,
+  isCopyableBase,
+  parseBaseFacts,
+  planBaseFacts,
+} from "./base-facts.ts"
 import { executeOrThrow, type Runners } from "./execute.ts"
 import type { AcceptedNow } from "./history-port.ts"
 import { laneHandle, type OpenLink, removeLane } from "./lane.ts"
+import type { LaneRuntime } from "./runtime-port.ts"
 import {
-  BASE_FILE,
   BASE_LANE,
-  isBaseCurrent,
-  isCopyableBase,
   type LaneOwner,
   type LaneSpec,
   laneContainer,
-  parseBaseFacts,
-  planBaseFacts,
-  planDisk,
-  planSnapshot,
-} from "./plan.ts"
-import type { LaneRuntime } from "./runtime-port.ts"
+} from "./spec.ts"
+import { planDiskThenStart, planSnapshot } from "./steps.ts"
 
 /** What building in the scratch lane takes. */
 interface Scratch<C> {
@@ -48,10 +49,12 @@ async function inScratch<C, T>(
   const handle = laneHandle(runtime, laneContainer(BASE_LANE), scratch.open)
   try {
     await executeOrThrow(
-      planDisk({
+      planDiskThenStart({
         spec: { ...scratch.spec, lane: BASE_LANE },
         env: scratch.env,
         from,
+        // No lane's data root to clone: a nested base's is its own.
+        dataRoot: { kind: "keep" },
       }),
       handle.runners,
     )

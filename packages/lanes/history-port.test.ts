@@ -7,6 +7,7 @@ import {
 import { expect, test } from "vitest"
 import { refreshBase } from "./base.ts"
 import { executeFork, type Runners } from "./execute.ts"
+import { planFork } from "./fork.ts"
 import {
   type BaseCheckout,
   baseCheckout,
@@ -14,8 +15,9 @@ import {
   forkSetup,
   type LaneHistory,
 } from "./history-port.ts"
-import { type LaneOwner, type LaneSpec, planFork, type Step } from "./plan.ts"
 import type { LaneRuntime } from "./runtime-port.ts"
+import type { LaneOwner, LaneSpec } from "./spec.ts"
+import type { Step } from "./steps.ts"
 
 test("a merge takes only a copy found ready, never its facts", () => {
   const merge = (h: LaneHistory, facts: CopyFacts, from: BaseMerge) =>

@@ -14,6 +14,10 @@
     past its 256 MB, stalling every lane. A drop deletes the subvolumes inside
     a disk first, deepest first, each made writable: btrfs refuses a subvolume
     that holds others, and `rm -rf` stops at a read-only one.
+- **Amended by:**
+  - ADR-0202: lanehost knows a nested lane's disk, its owner and data root
+    given as values when its server starts, and no runtime; one `disk` call
+    takes core's `DiskOp`; it exports the disks' client.
 
 **Context.** Everything the host did to lanes' disks outside a lane was
 shell kept in TypeScript strings (`planDiskCommand`), sent one at a time by

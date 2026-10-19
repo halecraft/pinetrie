@@ -18,10 +18,12 @@ import {
 import path from "node:path"
 import { runCommand } from "@pinetrie/channel"
 import type { DiskChange } from "@pinetrie/core"
+import { snapshotId } from "@pinetrie/core"
 import { afterAll, describe, expect, test } from "vitest"
 import { answer } from "./answer.ts"
-import { isSubvolume } from "./disks.ts"
-import { projectDisks } from "./layout.ts"
+import { isSubvolume } from "./btrfs.ts"
+import { TEST_NESTED, testServerArgs } from "./fixtures.ts"
+import { nestedDataRoot, projectDisks } from "./layout.ts"
 import type { LanehostCall } from "./protocol.ts"
 import { streamChanges } from "./send-stream.ts"
 import { servingFrom } from "./serving.ts"
@@ -34,7 +36,7 @@ const onBtrfs = await mkdir(HERE, { recursive: true })
   .catch(() => false)
 
 const KEY = "fedcba9876543210"
-const serving = servingFrom(["disks", HERE, "{}"])
+const serving = servingFrom(testServerArgs("disks", HERE))
 const disks = projectDisks(HERE, KEY)
 const disk = (call: LanehostCall) => answer(call, serving)
 
@@ -56,13 +58,13 @@ describe.skipIf(!onBtrfs)(
       await disk({
         kind: "disk",
         project: KEY,
-        op: { kind: "snapshot", lane: "l", snapshot: "s" },
+        op: { kind: "snapshot", lane: "l", snapshot: snapshotId("s") },
       })
       await writeFile(path.join(disks.lane("l"), "f"), "two")
       await disk({
         kind: "disk",
         project: KEY,
-        op: { kind: "snapshot", lane: "l", snapshot: "s" },
+        op: { kind: "snapshot", lane: "l", snapshot: snapshotId("s") },
       })
       expect(await readFile(path.join(disks.snapshot("s"), "f"), "utf8")).toBe(
         "two",
@@ -76,7 +78,7 @@ describe.skipIf(!onBtrfs)(
       await disk({
         kind: "disk",
         project: KEY,
-        op: { kind: "restore", lane: "r", from: "s" },
+        op: { kind: "restore", lane: "r", from: snapshotId("s") },
       })
       expect(await readFile(path.join(disks.lane("r"), "f"), "utf8")).toBe(
         "two",
@@ -92,7 +94,7 @@ describe.skipIf(!onBtrfs)(
       await disk({
         kind: "disk",
         project: KEY,
-        op: { kind: "snapshot", lane: "l", snapshot: "ro" },
+        op: { kind: "snapshot", lane: "l", snapshot: snapshotId("ro") },
       })
       await expect(
         writeFile(path.join(disks.snapshot("ro"), "x"), "no"),
@@ -100,13 +102,13 @@ describe.skipIf(!onBtrfs)(
       await disk({
         kind: "disk",
         project: KEY,
-        op: { kind: "restore", lane: "w", from: "ro" },
+        op: { kind: "restore", lane: "w", from: snapshotId("ro") },
       })
       await writeFile(path.join(disks.lane("w"), "x"), "yes")
       await disk({
         kind: "disk",
         project: KEY,
-        op: { kind: "delete-snapshots", ids: ["ro"] },
+        op: { kind: "delete-snapshots", ids: [snapshotId("ro")] },
       })
       expect(
         await answer(
@@ -125,12 +127,16 @@ describe.skipIf(!onBtrfs)(
       await disk({
         kind: "disk",
         project: KEY,
-        op: { kind: "snapshot", lane: "parent", snapshot: "at-turn" },
+        op: {
+          kind: "snapshot",
+          lane: "parent",
+          snapshot: snapshotId("at-turn"),
+        },
       })
       await disk({
         kind: "disk",
         project: KEY,
-        op: { kind: "restore", lane: "branch", from: "at-turn" },
+        op: { kind: "restore", lane: "branch", from: snapshotId("at-turn") },
       })
       await writeFile(path.join(disks.lane("parent"), "f"), "parent later")
       await writeFile(path.join(disks.lane("branch"), "f"), "branch")
@@ -160,7 +166,7 @@ describe.skipIf(!onBtrfs)(
       await disk({
         kind: "disk",
         project: KEY,
-        op: { kind: "snapshot", lane: "turn", snapshot: "a" },
+        op: { kind: "snapshot", lane: "turn", snapshot: snapshotId("a") },
       })
       await rm(path.join(lane, "d"), { recursive: true })
       await rename(
@@ -178,11 +184,11 @@ describe.skipIf(!onBtrfs)(
       await disk({
         kind: "disk",
         project: KEY,
-        op: { kind: "snapshot", lane: "turn", snapshot: "b" },
+        op: { kind: "snapshot", lane: "turn", snapshot: snapshotId("b") },
       })
       const walked = await answer(
         { kind: "diff", project: KEY, from: "a", to: "b" },
-        servingFrom(["disks", HERE, '{"rootless":true}']),
+        servingFrom(testServerArgs("disks", HERE, { rootless: true })),
       )
       const sent = streamChanges(
         readFileSync(path.join(import.meta.dirname, "fixtures", "turn.stream")),
@@ -197,7 +203,11 @@ describe.skipIf(!onBtrfs)(
         disk({
           kind: "disk",
           project: KEY,
-          op: { kind: "snapshot", lane: "replace", snapshot },
+          op: {
+            kind: "snapshot",
+            lane: "replace",
+            snapshot: snapshotId(snapshot),
+          },
         })
       await disk({
         kind: "disk",
@@ -225,7 +235,7 @@ describe.skipIf(!onBtrfs)(
       ] as const) {
         const walked = await answer(
           { kind: "diff", project: KEY, from, to },
-          servingFrom(["disks", HERE, '{"rootless":true}']),
+          servingFrom(testServerArgs("disks", HERE, { rootless: true })),
         )
         const sent = streamChanges(
           readFileSync(
@@ -251,10 +261,9 @@ describe.skipIf(!onBtrfs)(
         op: { kind: "create", lane: "n" },
       })
       await disk({
-        kind: "nested-disk",
+        kind: "disk",
         project: KEY,
-        lane: "n",
-        cloneFromLane: null,
+        op: { kind: "inner-docker-data-root", lane: "n", cloneFromLane: null },
       })
       // As an inner lanehost leaves them: a lane, and a read-only snapshot
       // of it, two levels down.
@@ -290,24 +299,36 @@ describe.skipIf(!onBtrfs)(
     })
     test("a nested disk's data root: made the rootless user's, then a clone of another lane's", async () => {
       const nestedDisk = (lane: string, cloneFromLane: string | null) =>
-        disk({ kind: "nested-disk", project: KEY, lane, cloneFromLane })
+        disk({
+          kind: "disk",
+          project: KEY,
+          op: { kind: "inner-docker-data-root", lane, cloneFromLane },
+        })
       // As a lane made before its data root was a subvolume left it.
-      await mkdir(path.join(disks.nested("old"), "docker", "image"), {
-        recursive: true,
-      })
+      await mkdir(
+        path.join(disks.nested("old"), TEST_NESTED.dataRoot, "image"),
+        {
+          recursive: true,
+        },
+      )
       await nestedDisk("old", null)
-      expect(await isSubvolume(disks.innerDockerDataRoot("old"))).toBe(true)
+      expect(await isSubvolume(nestedDataRoot(disks, TEST_NESTED, "old"))).toBe(
+        true,
+      )
       await nestedDisk("source", null)
-      await writeFile(path.join(disks.innerDockerDataRoot("source"), "f"), "1")
+      await writeFile(
+        path.join(nestedDataRoot(disks, TEST_NESTED, "source"), "f"),
+        "1",
+      )
       await nestedDisk("old", "source")
-      const cloned = disks.innerDockerDataRoot("old")
+      const cloned = nestedDataRoot(disks, TEST_NESTED, "old")
       expect(await isSubvolume(cloned)).toBe(true)
       expect(await readFile(path.join(cloned, "f"), "utf8")).toBe("1")
       expect((await stat(cloned)).uid).toBe(1000)
       // Writable, and its own: the source does not see what the clone writes.
       await writeFile(path.join(cloned, "g"), "2")
       await expect(
-        stat(path.join(disks.innerDockerDataRoot("source"), "g")),
+        stat(path.join(nestedDataRoot(disks, TEST_NESTED, "source"), "g")),
       ).rejects.toThrow()
       // A source whose data root has gone leaves the lane's as it is.
       await nestedDisk("old", "gone")

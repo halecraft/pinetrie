@@ -27,7 +27,7 @@ import {
   shownPoint,
 } from "@pinetrie/folder"
 import type { Keeper } from "@pinetrie/keeper"
-import type { FolderDisks, LaneQueue, LaneRuntime } from "@pinetrie/lanes"
+import type { FolderDisks, LaneDisks, LaneQueue } from "@pinetrie/lanes"
 import { readLaneRecords, readProposedByLane } from "@pinetrie/reads"
 import {
   answerDiff,
@@ -68,7 +68,7 @@ interface FolderProposedChanges extends ProposedChangesActs {
 
 /** What the folder's proposed changes read and merge on. */
 type ShownReader = StateReader & {
-  readonly runtime: Pick<LaneRuntime, "diff" | "disk" | "snapshotExists">
+  readonly runtime: Pick<LaneDisks, "diff" | "disk" | "snapshotExists">
   readonly disks: Pick<
     FolderDisks,
     | "fileDiff"

@@ -11,13 +11,13 @@ import {
   pointId,
   snapshotId,
 } from "@pinetrie/core"
-import type { FolderDisks, LaneRuntime } from "@pinetrie/lanes"
+import type { FolderDisks, LaneDisks } from "@pinetrie/lanes"
 import type { StateReader } from "./changes.ts"
 import { mergeInto } from "./merge.ts"
 import { withScratch } from "./scratch.ts"
 
 type MergeReader = StateReader & {
-  readonly runtime: Pick<LaneRuntime, "diff" | "disk" | "snapshotExists">
+  readonly runtime: Pick<LaneDisks, "diff" | "disk" | "snapshotExists">
   readonly disks: Pick<
     FolderDisks,
     "pathFacts" | "sameContent" | "applyMerge" | "filesUnder" | "read"

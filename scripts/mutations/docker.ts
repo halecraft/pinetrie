@@ -17,9 +17,9 @@ const unit = (path: string) => ["pnpm", "exec", "vitest", "run", path]
 export const mutations: readonly Mutation[] = [
   {
     name: "a jj lane mounts a states directory",
-    file: plan,
-    from: "      ...(shape.states\n",
-    to: "      ...(true\n",
+    file: "packages/lanes/shape.ts",
+    from: '  ...(shape.states ? (["states"] as const) : []),\n',
+    to: '  ...(["states"] as const),\n',
     command: unit("packages/docker"),
     expect:
       "a folder lane sees its states directory, read-only; a jj lane's spec has no such mount",
@@ -150,9 +150,9 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a snapshot is a new empty subvolume, not a snapshot of the lane",
-    file: "packages/lanehost/disks.ts",
-    from: '      case "snapshot":\n        await btrfs([\n          "subvolume",\n          "snapshot",\n          ...(step.readonly ? ["-r"] : []),\n          step.from,\n          step.to,\n        ])\n',
-    to: '      case "snapshot":\n        await btrfs(["subvolume", "create", step.to])\n',
+    file: "packages/lanehost/btrfs.ts",
+    from: '  btrfs(["subvolume", "snapshot", ...(readonly ? ["-r"] : []), from, to])\n',
+    to: '  btrfs(["subvolume", "create", to])\n',
     suite: "lanes",
     scenario: "contract",
     expect:
@@ -245,7 +245,7 @@ export const mutations: readonly Mutation[] = [
   {
     // Proven in a lane: `disks.test.ts` skips where `/workspace` is no btrfs.
     name: "a drop leaves the read-only subvolumes inside a disk",
-    file: "packages/lanehost/disks.ts",
+    file: "packages/lanehost/btrfs.ts",
     from: "  for (const inner of subvolumesDeepestFirst(await subvolumesUnder(at)))\n    await deleteSubvolume(inner)\n",
     to: "",
     command: unit("packages/lanehost"),
@@ -323,7 +323,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a nested shape is never made",
-    file: "packages/lanes/plan.ts",
+    file: "packages/lanes/shape.ts",
     from: "    nested: spec.grants.nested,\n",
     to: "    nested: false,\n",
     command: unit("packages/docker"),

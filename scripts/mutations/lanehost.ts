@@ -18,6 +18,15 @@ export const mutations: readonly Mutation[] = [
     expect:
       "connect opens the channel once, and a lane observed after it registers on that channel",
   },
+  {
+    name: "a server starts without its nested disk's values",
+    file: "packages/lanehost/serving.ts",
+    from: "  if (!isNestedDisk(parsed.nested))\n",
+    to: "  if (false)\n",
+    command: unit,
+    expect:
+      "a server's arguments without a nested disk's owner and data root are refused",
+  },
   // ── a nested lane's inner Docker data root ──
   {
     name: "a lane's data root is dropped for a source that has gone",

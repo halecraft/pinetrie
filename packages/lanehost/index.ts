@@ -11,13 +11,12 @@ export {
   type LanehostChannel,
   lanehostClient,
 } from "./client.ts"
-export { ROOTLESS_UID } from "./disks.ts"
+export { lanehostDisks, type StreamCommand } from "./disks-client.ts"
 export { type Grant, grantChain } from "./grants.ts"
 export {
   FOLDER_MOUNT,
-  INNER_DOCKER_DATA_ROOT_DIR,
   isProjectKey,
-  LANE_FILES,
+  type NestedDisk,
   type ProjectDisks,
   projectDisks,
 } from "./layout.ts"
@@ -39,7 +38,6 @@ export {
   type ReleaseInodes,
 } from "./observer.ts"
 export type {
-  DiskCall,
   LanehostCall,
   LanehostHello,
   LanehostResult,

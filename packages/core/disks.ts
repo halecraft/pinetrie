@@ -15,6 +15,35 @@ export const snapshotId = (id: string): SnapshotId => id as SnapshotId
 export const BASE_SNAPSHOT = snapshotId("base")
 
 /**
+ * An operation on one of a project's lane disks, named by its lane `L`: as
+ * a lane planner asks it of the runtime, and as lanehost carries it out.
+ * `delete` and `delete-snapshots` succeed when there is nothing to delete.
+ */
+export type DiskOp<L extends string = string> =
+  | { readonly kind: "create"; readonly lane: L }
+  | { readonly kind: "restore"; readonly lane: L; readonly from: SnapshotId }
+  | {
+      readonly kind: "snapshot"
+      readonly lane: L
+      readonly snapshot: SnapshotId
+    }
+  | { readonly kind: "delete"; readonly lane: L }
+  | { readonly kind: "delete-snapshots"; readonly ids: readonly SnapshotId[] }
+  /**
+   * A nested lane's inner Docker data root: a clone of `cloneFromLane`'s in
+   * place of its own when that one is there, else its own as it is; the
+   * nested disk made first, if missing. Only while the lane's container is
+   * stopped or not yet made.
+   */
+  | {
+      readonly kind: "inner-docker-data-root"
+      readonly lane: L
+      readonly cloneFromLane: L | null
+    }
+  /** A folder lane's states directory, made if missing, before its container binds it. */
+  | { readonly kind: "states-dir"; readonly lane: L }
+
+/**
  * One path that differs between two snapshots of a disk, from the disk's
  * root. A renamed directory is its old path deleted and its new one added,
  * the directory alone: what is under it moved with it.

@@ -5,7 +5,6 @@
 import { readdirSync, readFileSync } from "node:fs"
 import path from "node:path"
 import { expect, test } from "vitest"
-import * as lanes from "./index.ts"
 
 const DIR = import.meta.dirname
 
@@ -51,7 +50,7 @@ test("@pinetrie/lanes names jj as a command nowhere but its image check", () => 
   expect(naming).toEqual([])
 })
 
-test("@pinetrie/lanes exports none of jj's names", () => {
+test("@pinetrie/lanes exports none of jj's names", async () => {
   const moved = [
     "bookmarkName",
     "readLaneBookmark",
@@ -81,5 +80,13 @@ test("@pinetrie/lanes exports none of jj's names", () => {
     "repoConfig",
     "stackBookmark",
   ]
-  expect(moved.filter(name => name in lanes)).toEqual([])
+  // Every module's exports, since the index holds only what is imported
+  // through it.
+  const modules = sources().filter(f => !f.includes(path.sep))
+  const exported = new Set(
+    (await Promise.all(modules.map(f => import(path.join(DIR, f))))).flatMap(
+      m => Object.keys(m),
+    ),
+  )
+  expect(moved.filter(name => exported.has(name))).toEqual([])
 })

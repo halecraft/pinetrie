@@ -5,7 +5,7 @@
 
 import { lstat, readdir } from "node:fs/promises"
 import path from "node:path"
-import type { DiskChange } from "@pinetrie/core"
+import type { DiskChange, DiskDiff } from "@pinetrie/core"
 
 /** What a walk keeps of an entry. */
 export interface Entry {
@@ -88,4 +88,10 @@ export function compareTrees(
   for (const [p, b] of before)
     if (!after.has(p)) out.push({ path: p, change: "deleted", kind: b.kind })
   return out.sort((x, y) => (x.path < y.path ? -1 : x.path > y.path ? 1 : 0))
+}
+
+/** The diff by walking both trees, where `btrfs send` cannot run. */
+export async function diffByWalk(from: string, to: string): Promise<DiskDiff> {
+  const [before, after] = await Promise.all([walkTree(from), walkTree(to)])
+  return { changes: compareTrees(before, after) }
 }

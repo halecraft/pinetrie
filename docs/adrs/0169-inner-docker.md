@@ -29,6 +29,9 @@
   - 2026-10-18: the lane that ran last is named when its container stops, not
     when its run ends; and a lane to clone from whose data root has gone is no
     source, so a lane keeps its own.
+- **Amended by:**
+  - ADR-0202: a nested lane's data root is made by its start's plan, the
+    base's scratch lane included, never by the runtime's `run`.
 
 **Context.**
 

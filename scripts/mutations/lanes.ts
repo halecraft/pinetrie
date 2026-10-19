@@ -4,13 +4,12 @@
 import type { Mutation } from "../mutate.ts"
 
 const unit = ["pnpm", "exec", "vitest", "run", "packages/lanes"]
-const plan = "packages/lanes/plan.ts"
 
 export const mutations: readonly Mutation[] = [
   // ── host mounts ──
   {
     name: "a project's own skills are mounted from the host",
-    file: "packages/lanes/plan.ts",
+    file: "packages/lanes/mounts.ts",
     from: "    .filter(r => project === null || !isWithin(r, project))\n",
     to: "",
     command: unit,
@@ -20,17 +19,35 @@ export const mutations: readonly Mutation[] = [
   // ── a lane's start, decided whole ──
   {
     name: "a disk's start makes no container",
-    file: "packages/lanes/plan.ts",
-    from: "      return { container, start: { ...decided, steps: [planStart(spec, env)] } }\n",
-    to: "      return { container, start: { ...decided, steps: [] } }\n",
+    file: "packages/lanes/start.ts",
+    from: "          steps: planStart(spec, env, dataRoot),\n",
+    to: "          steps: [],\n",
     command: unit,
     expect:
       "decideContainerStart: a missing container's start carries the steps that make it, on its disk or from a snapshot",
   },
+  {
+    name: "a stopped container's start leaves its data root as it was",
+    file: "packages/lanes/start.ts",
+    from: "              steps: planBindSources(spec, env, dataRoot),\n",
+    to: "              steps: [],\n",
+    command: unit,
+    expect:
+      "decideContainerStart: a stopped nested container's start makes its data root; a running one's makes nothing",
+  },
+  {
+    name: "a folder lane's start makes no states directory",
+    file: "packages/lanes/shape.ts",
+    from: '  ...(shape.states ? (["states"] as const) : []),\n',
+    to: "",
+    command: unit,
+    expect:
+      "planStart: a folder lane makes its states directory, then its container",
+  },
   // ── the images ──
   {
     name: "a Containerfile copies nothing in",
-    file: plan,
+    file: "packages/lanes/image-plan.ts",
     from: '    return words.filter(w => !w.startsWith("--")).slice(0, -1)\n',
     to: "    return []\n",
     command: unit,
@@ -56,7 +73,7 @@ export const mutations: readonly Mutation[] = [
   // ── a nested lane's inner Docker data root ──
   {
     name: "a forked last run's lane clones its dropped data root",
-    file: plan,
+    file: "packages/lanes/nested-data-root.ts",
     from: "  if (last !== null && last.lane !== input.lane)\n",
     to: "  if (last !== null)\n",
     command: unit,
@@ -65,7 +82,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a lane clones again though its data root is as of the last run",
-    file: plan,
+    file: "packages/lanes/nested-data-root.ts",
     from: "    return input.clonedAtRunEnd === last.atRunEnd\n",
     to: "    return false\n",
     command: unit,
@@ -74,7 +91,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a fork never falls back to its source lane",
-    file: plan,
+    file: "packages/lanes/nested-data-root.ts",
     from: "  if (input.forkSourceLane !== null && input.forkSourceLane !== input.lane)\n",
     to: "  if (false)\n",
     command: unit,
@@ -83,17 +100,17 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a lane that is not nested makes a data root",
-    file: plan,
-    from: "  if (!spec.grants.nested) return null\n",
-    to: "",
+    file: "packages/lanes/shape.ts",
+    from: '  ...(shape.nested ? (["nested"] as const) : []),\n',
+    to: '  ...(["nested"] as const),\n',
     command: unit,
     expect: "only a nested lane's start makes its data root",
   },
   {
     name: "a fork makes its data root after its container runs",
-    file: plan,
-    from: "    ...(dataRoot === null ? [] : [dataRoot]),\n    ...planDisk({ ...input, from: input.setup.from ?? input.source.snapshot }),\n",
-    to: "    ...planDisk({ ...input, from: input.setup.from ?? input.source.snapshot }),\n    ...(dataRoot === null ? [] : [dataRoot]),\n",
+    file: "packages/lanes/steps.ts",
+    from: '    ...planBindSources(spec, env, dataRoot),\n    onRuntime({ kind: "run", start: { shape } as PlannedStart }),\n',
+    to: '    onRuntime({ kind: "run", start: { shape } as PlannedStart }),\n    ...planBindSources(spec, env, dataRoot),\n',
     command: unit,
     expect:
       "planFork: a nested lane's data root is made after the delete and before the container runs",
@@ -101,7 +118,7 @@ export const mutations: readonly Mutation[] = [
   // ── a lane's start, and its fork ──
   {
     name: "a fork owed starts on whatever disk is there",
-    file: plan,
+    file: "packages/lanes/start.ts",
     from: '  if (input.fork === "owed") return { kind: "fork" }\n',
     to: "",
     command: unit,
@@ -109,7 +126,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a lane that recorded no turn is retired, never forked again",
-    file: plan,
+    file: "packages/lanes/start.ts",
     from: '  return history.recorded ? { kind: "retired" } : { kind: "fork" }',
     to: '  return { kind: "retired" }',
     command: unit,
@@ -118,7 +135,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a start restores a snapshot that is gone",
-    file: plan,
+    file: "packages/lanes/start.ts",
     from: '    if (there) return { kind: "snapshot", from: snapshot, recreate }\n',
     to: '    return { kind: "snapshot", from: snapshot, recreate }\n',
     command: unit,
@@ -127,7 +144,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a lane's kept state's snapshot is never restored",
-    file: plan,
+    file: "packages/lanes/start.ts",
     from: "    ...(history.kept === null ? [] : [history.kept]),\n",
     to: "",
     command: unit,
@@ -136,7 +153,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a start reads its history with its disk there",
-    file: plan,
+    file: "packages/lanes/start.ts",
     from: '  if (made.disk) return { kind: "disk", recreate }\n',
     to: '  if (made.disk && made.history !== null) return { kind: "disk", recreate }\n',
     command: unit,
@@ -144,7 +161,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a start checks its oldest snapshot first",
-    file: plan,
+    file: "packages/lanes/start.ts",
     from: "    ...history.own,\n",
     to: "    ...[...history.own].reverse(),\n",
     command: unit,
@@ -153,8 +170,8 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a fork clones over whatever a stopped fork left",
-    file: plan,
-    from: '    onRuntime({ kind: "remove", container: laneContainer(lane) }),\n    onRuntime({ kind: "delete", lane }),\n',
+    file: "packages/lanes/fork.ts",
+    from: '    onRuntime({ kind: "remove", container: laneContainer(lane) }),\n    // Drops the nested disk too: the start below makes the data root again,\n    // before the run whose inner Docker starts on it.\n    onRuntime({ kind: "delete", lane }),\n',
     to: "",
     command: unit,
     expect:
@@ -182,9 +199,9 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a fork restores from its source though the adapter names a snapshot",
-    file: plan,
-    from: "  ...planDisk({ ...input, from: input.setup.from ?? input.source.snapshot }),",
-    to: "  ...planDisk({ ...input, from: input.source.snapshot }),",
+    file: "packages/lanes/fork.ts",
+    from: "      from: input.setup.from ?? input.source.snapshot,\n",
+    to: "      from: input.source.snapshot,\n",
     command: unit,
     expect: "planFork restores from the adapter's snapshot when it names one",
   },
@@ -207,7 +224,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a slot leaves out the shared directories",
-    file: "packages/lanes/plan.ts",
+    file: "packages/lanes/mounts.ts",
     from: "  ...sharedMounts(input.shared),\n  ...input.attached,\n",
     to: "  ...input.attached,\n",
     command: unit,
@@ -216,7 +233,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the lanes' ignore file leaves out a root pine·trie keeps on a disk",
-    file: plan,
+    file: "packages/lanes/shape.ts",
     from: "    ...DISK_OWN_ROOTS.map(r => `/${r}/`),\n",
     to: "    ...DISK_OWN_ROOTS.slice(1).map(r => `/${r}/`),\n",
     command: unit,
@@ -267,8 +284,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a diff is send's under rootless Docker",
     file: "packages/lanehost/roles.ts",
-    from: '    ["diff", facts.rootless ? "disks" : "privileged"],\n',
-    to: '    ["diff", "privileged"],\n',
+    from: '  facts.rootless\n    ? { role: "disks", method: "walk" }\n',
+    to: '  false\n    ? { role: "disks", method: "walk" }\n',
     command: ["pnpm", "exec", "vitest", "run", "packages/lanehost"],
     expect:
       "a diff is send's, in the privileged role, unless Docker is rootless",
@@ -393,7 +410,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a lane's own pinetrie.json widens its grants",
-    file: "packages/lanes/plan.ts",
+    file: "packages/lanes/lane-config.ts",
     from: "      env: a.env.filter(keeps(b.env, o.env, eq)),\n",
     to: "      env: [...new Set([...a.env, ...o.env])],\n",
     suite: "lanes",
@@ -482,7 +499,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a lane mounts no host path",
-    file: "packages/lanes/plan.ts",
+    file: "packages/lanes/mounts.ts",
     from: "    ...parts.hostPaths.map(p => at(p, hostPathInLane(p))),\n",
     to: "",
     suite: "lanes",
@@ -491,7 +508,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a shared directory inside .jj is shared",
-    file: "packages/lanes/plan.ts",
+    file: "packages/lanes/shared.ts",
     from: "  return NEVER_SHARED.includes(top) ? `it is inside ${top}` : null",
     to: "  return null",
     suite: "lanes",
@@ -501,7 +518,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a container made from another spec is kept",
-    file: "packages/lanes/plan.ts",
+    file: "packages/lanes/start.ts",
     from: '  if (label !== input.want) return "recreate"',
     to: '  if (false) return "recreate"',
     suite: "lanes",
@@ -511,7 +528,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "pre-rename: a fork keeps the old config folder",
-    file: plan,
+    file: "packages/lanes/fork.ts",
     from: "    laneShell(`rm -rf ${OLD_LANE_CONFIG_DIR}`),\n    ...input.setup.steps,\n",
     to: "    ...input.setup.steps,\n",
     command: unit,
@@ -520,7 +537,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a turn's snapshot is taken before sync",
-    file: plan,
+    file: "packages/lanes/steps.ts",
     from: '  inLane("sync"),\n  onRuntime({ kind: "snapshot", lane: input.lane, snapshot: input.snapshot }),\n',
     to: '  onRuntime({ kind: "snapshot", lane: input.lane, snapshot: input.snapshot }),\n  inLane("sync"),\n',
     command: unit,
@@ -528,7 +545,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a lane gets a variable no grant names",
-    file: plan,
+    file: "packages/lanes/shape.ts",
     from: "  const passed = spec.grants.env.flatMap(name => {",
     to: "  const passed = Object.keys(env).flatMap(name => {",
     command: unit,
@@ -544,7 +561,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a turn's snapshot skips sync",
-    file: plan,
+    file: "packages/lanes/steps.ts",
     from: '  inLane("sync"),\n',
     to: "",
     suite: "lanes",
@@ -554,7 +571,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "/mnt/host-working-copy is mounted writable",
-    file: plan,
+    file: "packages/lanes/mounts.ts",
     from: "    at(parts.hostWorkingCopy, HOST_WORKING_COPY),",
     to: "    { source: parts.hostWorkingCopy, target: HOST_WORKING_COPY, readonly: false },",
     suite: "lanes",
@@ -573,7 +590,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the lane's ignore file leaves out the shared directories",
-    file: plan,
+    file: "packages/lanes/shape.ts",
     from: "    ...shared.map(p => `/${p}/`),\n",
     to: "",
     command: unit,
@@ -581,7 +598,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "git's variables naming the ignore file are not set",
-    file: plan,
+    file: "packages/lanes/shape.ts",
     from: '      ["GIT_CONFIG_COUNT", "1"],\n',
     to: "",
     suite: "lanes",
@@ -591,7 +608,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "shared directories are mounted read-only",
-    file: plan,
+    file: "packages/lanes/mounts.ts",
     from: "    readonly: false,\n  }))",
     to: "    readonly: true,\n  }))",
     suite: "lanes",
@@ -600,7 +617,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a path jj tracks is shared",
-    file: plan,
+    file: "packages/lanes/shared.ts",
     from: "  const shared = candidates.filter(p => !facts.tracked.has(p))",
     to: "  const shared = candidates",
     command: unit,
@@ -608,7 +625,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a shared directory your repo does not ignore is not excluded",
-    file: plan,
+    file: "packages/lanes/shared.ts",
     from: "    exclude: shared.filter(p => !facts.ignored.has(p)),",
     to: "    exclude: [],",
     command: unit,
@@ -617,7 +634,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the image ignores pinetrie's Playwright version",
-    file: plan,
+    file: "packages/lanes/image-plan.ts",
     from: "      `PLAYWRIGHT_VERSION=${input.playwrightVersion}`,",
     to: "",
     command: unit,
@@ -625,7 +642,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the image's browser is not the one pinetrie's Playwright drives",
-    file: plan,
+    file: "packages/lanes/image-plan.ts",
     from: "      `PLAYWRIGHT_VERSION=${input.playwrightVersion}`,",
     to: '      "PLAYWRIGHT_VERSION=1.55.0",',
     suite: "lanes",
@@ -659,7 +676,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a container made from another spec is only restarted",
-    file: "packages/lanes/plan.ts",
+    file: "packages/lanes/start.ts",
     from: '  if (label !== input.want) return "recreate"\n',
     to: "",
     command: unit,
@@ -667,7 +684,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a lane with no disk and no snapshot is not told it is retired",
-    file: "packages/lanes/plan.ts",
+    file: "packages/lanes/start.ts",
     from: '  return history.recorded ? { kind: "retired" } : { kind: "fork" }',
     to: '  return { kind: "fork" }',
     command: unit,
@@ -704,7 +721,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the spec label hashes the shape's name, not the runtime's arguments",
-    file: plan,
+    file: "packages/lanes/shape.ts",
     from: "): string => specHash(runtime.runSpec(shape))",
     to: "): string => specHash([shape.name])",
     command: unit,
@@ -712,7 +729,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a lane's home is the image's",
-    file: "packages/lanes/plan.ts",
+    file: "packages/lanes/shape.ts",
     from: '      ["HOME", LANE_HOME],\n',
     to: "",
     command: unit,
@@ -720,7 +737,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "an image's tag ignores the files its build copies in",
-    file: "packages/lanes/plan.ts",
+    file: "packages/lanes/image-plan.ts",
     from: '    .update("\\0")\n    .update(containerfile.sources.join("\\0"))\n',
     to: "",
     command: unit,
@@ -738,7 +755,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a base made another way is copied",
-    file: "packages/lanes/plan.ts",
+    file: "packages/lanes/base-facts.ts",
     from: "  base !== null && base.format === BASE_FORMAT\n",
     to: "  base !== null\n",
     command: unit,
@@ -747,7 +764,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "pnpm's store may be tracked in a lane",
-    file: "packages/lanes/plan.ts",
+    file: "packages/lanes/shape.ts",
     from: '    "/.pnpm-store/",\n',
     to: "",
     command: unit,
@@ -756,7 +773,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a lane's own copy turns a grant on",
-    file: "packages/lanes/plan.ts",
+    file: "packages/lanes/lane-config.ts",
     from: "      ssh: a.ssh && (!b.ssh || o.ssh),\n",
     to: "      ssh: a.ssh || o.ssh,\n",
     command: unit,
@@ -765,7 +782,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a shared directory a lane drops stays mounted",
-    file: "packages/lanes/plan.ts",
+    file: "packages/lanes/lane-config.ts",
     from: "      keeps(lane.base.shared, lane.own.shared, eq),\n",
     to: "      () => true,\n",
     command: unit,
@@ -774,7 +791,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a grant switched on goes unnamed",
-    file: "packages/lanes/plan.ts",
+    file: "packages/lanes/lane-config.ts",
     from: '    ...(a.ssh && !b.ssh ? [{ kind: "ssh" as const }] : []),\n',
     to: "",
     command: unit,
@@ -783,7 +800,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the agent is not told what waits for acceptance",
-    file: "packages/lanes/plan.ts",
+    file: "packages/lanes/lane-config.ts",
     from: "  const waiting = configWidenings(accepted, written).map(wideningWords)\n",
     to: "  const waiting: string[] = []\n",
     command: unit,
@@ -837,7 +854,7 @@ export const mutations: readonly Mutation[] = [
   // ── a project's folder ──
   {
     name: "a home directory can be a project",
-    file: "packages/lanes/plan.ts",
+    file: "packages/lanes/project-dir.ts",
     from: "    path.resolve(root) === path.resolve(f.home) ||\n",
     to: "    false ||\n",
     command: unit,
@@ -846,7 +863,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a missing folder can be a project",
-    file: "packages/lanes/plan.ts",
+    file: "packages/lanes/project-dir.ts",
     from: "  if (!f.isDirectory)\n",
     to: "  if (false)\n",
     command: unit,
@@ -871,7 +888,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "lanes do not trust the working copy's .git, which a fetch reads",
-    file: plan,
+    file: "packages/lanes/shape.ts",
     from: "  `[safe]\\n\\tdirectory = ${HOST_WORKING_COPY}\\n\\tdirectory = ${HOST_WORKING_COPY}/.git\\n`",
     to: "  `[safe]\\n\\tdirectory = ${HOST_WORKING_COPY}\\n`",
     command: unit,
@@ -881,7 +898,7 @@ export const mutations: readonly Mutation[] = [
   // ── lanes runs no jj ──
   {
     name: "a fork's lane steps run jj",
-    file: plan,
+    file: "packages/lanes/fork.ts",
     from: "    ...input.setup.steps,\n  ]",
     to: '    ...input.setup.steps,\n    inLane("jj", "new"),\n  ]',
     command: unit,

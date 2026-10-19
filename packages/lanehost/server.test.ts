@@ -1,18 +1,19 @@
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import { isDiskName } from "@pinetrie/core"
+import { isDiskName, snapshotId } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { answer } from "./answer.ts"
+import { subvolumesDeepestFirst } from "./btrfs.ts"
 import {
   planDisk,
   planInnerDockerDataRootSteps,
   readSnapshotFile,
-  subvolumesDeepestFirst,
 } from "./disks.ts"
-import { isProjectKey, projectDisks } from "./layout.ts"
+import { TEST_NESTED, testServerArgs } from "./fixtures.ts"
+import { isProjectKey, nestedDataRoot, projectDisks } from "./layout.ts"
 import { planProjectRemoval } from "./projects.ts"
-import { planRoles } from "./roles.ts"
+import { planDiff, planRoles } from "./roles.ts"
 import { servingFrom } from "./serving.ts"
 
 const KEY = "0123456789abcdef"
@@ -35,7 +36,7 @@ describe("names: every path is built from names checked first", () => {
       expect(isDiskName(bad)).toBe(false)
   })
   test("a call naming another path is refused before anything runs", async () => {
-    const serving = servingFrom(["disks", "/var/lib/lanehost", "{}"])
+    const serving = servingFrom(testServerArgs("disks", "/var/lib/lanehost"))
     await expect(
       answer({ kind: "disk-exists", project: "../../etc", lane: "x" }, serving),
     ).rejects.toThrow("not a project's key")
@@ -43,7 +44,13 @@ describe("names: every path is built from names checked first", () => {
       answer({ kind: "disk-exists", project: KEY, lane: "../x" }, serving),
     ).rejects.toThrow("not a disk's name")
     expect(() =>
-      planDisk({ kind: "delete-snapshots", ids: ["ok", "../../x"] }, disks),
+      planDisk(
+        {
+          kind: "delete-snapshots",
+          ids: [snapshotId("ok"), snapshotId("../../x")],
+        },
+        disks,
+      ),
     ).toThrow("not a disk's name")
   })
 })
@@ -51,7 +58,10 @@ describe("names: every path is built from names checked first", () => {
 describe("planDisk: each disk operation as steps", () => {
   test("a snapshot is made aside, read-only, then moved into place over the old one", () => {
     expect(
-      planDisk({ kind: "snapshot", lane: "l", snapshot: "e1" }, disks),
+      planDisk(
+        { kind: "snapshot", lane: "l", snapshot: snapshotId("e1") },
+        disks,
+      ),
     ).toEqual([
       { kind: "parent", path: disks.snapshot("e1") },
       { kind: "drop", path: `${disks.snapshot("e1")}.tmp` },
@@ -71,7 +81,7 @@ describe("planDisk: each disk operation as steps", () => {
   })
   test("a restore is a writable snapshot of the snapshot at the lane's disk", () => {
     expect(
-      planDisk({ kind: "restore", lane: "l", from: "base" }, disks),
+      planDisk({ kind: "restore", lane: "l", from: snapshotId("base") }, disks),
     ).toEqual([
       { kind: "parent", path: disks.lane("l") },
       {
@@ -95,7 +105,10 @@ describe("planDisk: each disk operation as steps", () => {
       { kind: "drop", path: disks.states("l") },
     ])
     expect(
-      planDisk({ kind: "delete-snapshots", ids: ["a", "b"] }, disks),
+      planDisk(
+        { kind: "delete-snapshots", ids: [snapshotId("a"), snapshotId("b")] },
+        disks,
+      ),
     ).toEqual([
       { kind: "drop", path: disks.snapshot("a") },
       { kind: "drop", path: disks.snapshot("b") },
@@ -117,14 +130,15 @@ describe("planDisk: each disk operation as steps", () => {
           "m",
           facts("subvolume", "subvolume"),
           disks,
+          TEST_NESTED,
         ),
       ).toEqual([
         ...nestedDisk,
-        { kind: "drop", path: disks.innerDockerDataRoot("l") },
+        { kind: "drop", path: nestedDataRoot(disks, TEST_NESTED, "l") },
         {
           kind: "snapshot",
-          from: disks.innerDockerDataRoot("m"),
-          to: disks.innerDockerDataRoot("l"),
+          from: nestedDataRoot(disks, TEST_NESTED, "m"),
+          to: nestedDataRoot(disks, TEST_NESTED, "l"),
           readonly: false,
         },
       ])
@@ -136,6 +150,7 @@ describe("planDisk: each disk operation as steps", () => {
           "m",
           facts("subvolume", "absent"),
           disks,
+          TEST_NESTED,
         ),
       ).toEqual(nestedDisk)
     })
@@ -146,29 +161,48 @@ describe("planDisk: each disk operation as steps", () => {
           "l",
           facts("subvolume", "subvolume"),
           disks,
+          TEST_NESTED,
         ),
       ).toEqual(nestedDisk)
     })
     test("a plain directory is made a subvolume, and a missing one made, the rootless user's", () => {
       const made = {
         kind: "ensure",
-        path: disks.innerDockerDataRoot("l"),
+        path: nestedDataRoot(disks, TEST_NESTED, "l"),
         uid: 1000,
       }
       expect(
-        planInnerDockerDataRootSteps("l", null, facts("not-subvolume"), disks),
+        planInnerDockerDataRootSteps(
+          "l",
+          null,
+          facts("not-subvolume"),
+          disks,
+          TEST_NESTED,
+        ),
       ).toEqual([
         ...nestedDisk,
-        { kind: "drop", path: disks.innerDockerDataRoot("l") },
+        { kind: "drop", path: nestedDataRoot(disks, TEST_NESTED, "l") },
         made,
       ])
       expect(
-        planInnerDockerDataRootSteps("l", null, facts("absent"), disks),
+        planInnerDockerDataRootSteps(
+          "l",
+          null,
+          facts("absent"),
+          disks,
+          TEST_NESTED,
+        ),
       ).toEqual([...nestedDisk, made])
     })
     test("a name that is not a disk's is refused", () => {
       expect(() =>
-        planInnerDockerDataRootSteps("l", "../x", facts("absent"), disks),
+        planInnerDockerDataRootSteps(
+          "l",
+          "../x",
+          facts("absent"),
+          disks,
+          TEST_NESTED,
+        ),
       ).toThrow("not a disk's name")
     })
   })
@@ -214,6 +248,14 @@ describe("roles", () => {
     ]).toEqual(["disks", "disks", "privileged"])
   })
   test("a diff is send's, in the privileged role, unless Docker is rootless: then a walk, in the disks role", () => {
+    expect(planDiff({ rootless: false })).toEqual({
+      role: "privileged",
+      method: "send",
+    })
+    expect(planDiff({ rootless: true })).toEqual({
+      role: "disks",
+      method: "walk",
+    })
     expect(planRoles({ rootless: false }).get("diff")).toBe("privileged")
     expect(planRoles({ rootless: true }).get("diff")).toBe("disks")
   })
@@ -221,13 +263,30 @@ describe("roles", () => {
     await expect(
       answer(
         { kind: "projects" },
-        servingFrom(["privileged", "/var/lib/lanehost", "{}"]),
+        servingFrom(testServerArgs("privileged", "/var/lib/lanehost")),
       ),
     ).rejects.toThrow("projects is disks's, not privileged's")
   })
+  test("a server's arguments without a nested disk's owner and data root are refused", () => {
+    expect(() => servingFrom(["disks", "/l", "{}"])).toThrow(
+      "no nested disk's owner and data root",
+    )
+    expect(() =>
+      servingFrom([
+        "disks",
+        "/l",
+        JSON.stringify({ nested: { owner: 1000, dataRoot: "../x" } }),
+      ]),
+    ).toThrow("no nested disk's owner and data root")
+    expect(servingFrom(testServerArgs("disks", "/l")).nested).toEqual(
+      TEST_NESTED,
+    )
+  })
   test("a server's arguments are a role's", () => {
     expect(() => servingFrom(["root", "/l", "{}"])).toThrow("not a role")
-    expect(servingFrom(["disks", "/l", '{"rootless":true}']).facts).toEqual({
+    expect(
+      servingFrom(testServerArgs("disks", "/l", { rootless: true })).facts,
+    ).toEqual({
       rootless: true,
     })
   })

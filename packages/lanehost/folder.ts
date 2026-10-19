@@ -1,14 +1,6 @@
-// lanehost/folder — a folder project's merges on its disks, as
-// `@pinetrie/folder` plans them: what a snapshot holds at a path, whether two
-// hold alike content, a merge's steps applied to a disk, a lane's states
-// directory, and a read of the project's folder into its line. Every call is checked and planned into absolute paths first
-// (`layout.ts`), then carried out.
-
-import { constants } from "node:fs"
 import {
   chmod,
   copyFile,
-  cp,
   lstat,
   mkdir,
   open,
@@ -33,8 +25,10 @@ import {
   type PathPair,
   type ReadInAnswer,
   type ReadPath,
+  snapshotId,
   type TextMerged,
 } from "@pinetrie/core"
+import { cloneTree } from "./btrfs.ts"
 import { type DiskStep, executeDiskSteps, planDisk } from "./disks.ts"
 import {
   FOLDER_LINE,
@@ -224,15 +218,6 @@ export function planApply(
     ops: call.steps.map(step => ({ ...step, path: inside(step.path) })),
   }
 }
-
-/** Clone what is at `from` to `to`: a file by reflink, a symlink made again, a tree whole. */
-const cloneTree = (from: string, to: string) =>
-  cp(from, to, {
-    recursive: true,
-    verbatimSymlinks: true,
-    mode: constants.COPYFILE_FICLONE_FORCE,
-    errorOnExist: true,
-  })
 
 /** The executable bits set where read is, as git's mode does, or cleared. */
 const withExec = (mode: number, exec: boolean) =>
@@ -502,13 +487,13 @@ export function planReadIn(
       ...planDisk(
         call.from === null
           ? { kind: "create", lane }
-          : { kind: "restore", lane, from: named(call.from) },
+          : { kind: "restore", lane, from: snapshotId(named(call.from)) },
         disks,
       ),
     ],
     diskPath: disks.lane(lane),
     snapshot: planDisk(
-      { kind: "snapshot", lane, snapshot: named(call.state) },
+      { kind: "snapshot", lane, snapshot: snapshotId(named(call.state)) },
       disks,
     ),
     drop,

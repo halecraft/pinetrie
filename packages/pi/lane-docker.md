@@ -11,12 +11,12 @@ changes pine·trie can keep this note true. You can skip them.
 
 - Its data root is a cache, not your work: a disk of its own beside
   `/workspace`, never snapshotted, never committed, and never carried into
-  a branch. <!-- packages/lanehost/layout.ts INNER_DOCKER_DATA_ROOT_DIR -->
+  a branch. <!-- packages/docker/plan.ts INNER_DOCKER_DATA_ROOT_DIR -->
 - At the start of a run, it may be replaced by a copy of the data root of
   the project's nested lane whose run ended last, so a version of an image
   another lane built is here without a build. So `docker images` says what
   is here now, whatever you built in an earlier run.
-  <!-- packages/lanes/plan.ts planInnerDockerDataRootSource -->
+  <!-- packages/lanes/nested-data-root.ts planInnerDockerDataRootSource -->
 - Containers you start end with the run: the lane's container stops, and
   your Docker with it. A container another lane's copy brought with it is
   removed when a pine·trie host starts here.

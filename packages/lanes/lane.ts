@@ -22,10 +22,10 @@ import {
   scriptCommand,
 } from "@pinetrie/install"
 import type { Runners } from "./execute.ts"
-import { type LaneOwner, laneContainer } from "./plan.ts"
 import type { BytesRunner, Runner } from "./run.ts"
 import { RUNTIME_NODE } from "./runtime.ts"
 import type { ContainerFacts, LaneRuntime } from "./runtime-port.ts"
+import { type LaneOwner, laneContainer } from "./spec.ts"
 
 /** The note a lane's agent is pointed at, inside the lane: its history's kind's own. */
 export const laneNote = (kind: ProjectKind): string =>

@@ -67,17 +67,28 @@ export interface RoleFacts {
   readonly rootless: boolean
 }
 
+/** How a diff is made, and the role that makes it: one value, so neither is decided apart. */
+export type DiffPlan =
+  | { readonly role: "privileged"; readonly method: "send" }
+  | { readonly role: "disks"; readonly method: "walk" }
+
 /**
- * Which role serves each module. A diff is `btrfs send`'s, in the
- * privileged role, where its `SYS_ADMIN` reaches the host's user namespace;
- * under rootless Docker it cannot, and the diff is a walk of both
- * trees, which needs no capability, in the disks role.
+ * How a diff is made: by `btrfs send`, in the privileged role, where its
+ * `SYS_ADMIN` reaches the host's user namespace; under rootless Docker it
+ * cannot, and the diff is a walk of both trees, which needs no capability,
+ * in the disks role.
  */
+export const planDiff = (facts: RoleFacts): DiffPlan =>
+  facts.rootless
+    ? { role: "disks", method: "walk" }
+    : { role: "privileged", method: "send" }
+
+/** Which role serves each module; a diff's is `planDiff`'s. */
 export function planRoles(facts: RoleFacts): ReadonlyMap<Module, Role> {
   return new Map<Module, Role>([
     ["disks", "disks"],
     ["projects", "disks"],
     ["grants", "privileged"],
-    ["diff", facts.rootless ? "disks" : "privileged"],
+    ["diff", planDiff(facts).role],
   ])
 }

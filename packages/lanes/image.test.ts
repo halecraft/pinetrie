@@ -2,7 +2,11 @@ import { readFileSync } from "node:fs"
 import path from "node:path"
 import { expect, test } from "vitest"
 import { hostJjVersion, prepareImages } from "./image.ts"
-import { filesContainerfileCopies, type ImagePlan, planImages } from "./plan.ts"
+import {
+  filesContainerfileCopies,
+  type ImagePlan,
+  planImages,
+} from "./image-plan.ts"
 
 const here = (...p: string[]) => path.join(import.meta.dirname, ...p)
 const json = (file: string) =>

@@ -1,28 +1,27 @@
-// lanehost/disks — a project's disks as btrfs subvolumes, on a filesystem
-// mounted with `user_subvol_rm_allowed`, so none of it needs a capability.
-// Each operation is planned as `DiskStep`s, then carried out by
-// `executeDiskSteps`. Snapshots are read-only, as `btrfs send` needs: a
-// restore is a writable snapshot of one, and a delete makes one writable
-// first.
+// lanehost/disks — a project's disks: each operation planned as `DiskStep`s,
+// then carried out by `executeDiskSteps` on the store (`btrfs.ts`).
+// Snapshots are read-only, as `btrfs send` needs: a restore is a writable
+// snapshot of one.
 
 import {
-  lstat,
   mkdir,
   readdir,
   readFile,
   realpath,
   rename,
-  rm,
   stat,
 } from "node:fs/promises"
 import path from "node:path"
 import { runCommand } from "@pinetrie/channel"
-import { isDiskName, isPathInside } from "@pinetrie/core"
-import type { ProjectDisks } from "./layout.ts"
-import type { DiskCall } from "./protocol.ts"
-
-/** The rootless user, who owns a nested lane's inner lanes' disk. */
-export const ROOTLESS_UID = 1000
+import { type DiskOp, isDiskName, isPathInside } from "@pinetrie/core"
+import {
+  createSubvolume,
+  drop,
+  exists,
+  isSubvolume,
+  snapshotSubvolume,
+} from "./btrfs.ts"
+import { type NestedDisk, nestedDataRoot, type ProjectDisks } from "./layout.ts"
 
 /** One thing done to the disks. */
 export type DiskStep =
@@ -47,8 +46,16 @@ export type DiskStep =
   | { readonly kind: "move"; readonly from: string; readonly to: string }
   /** Make a subvolume at `path` unless one is there, owned by `uid`. */
   | { readonly kind: "ensure"; readonly path: string; readonly uid: number }
+  /** Make a directory at `path`, and its parents, unless one is there. */
+  | { readonly kind: "dir"; readonly path: string }
 
-const names = (call: DiskCall): readonly string[] => {
+/** A disk operation planned without reading the disk: every one but a data root's. */
+export type PlainDiskOp = Exclude<
+  DiskOp,
+  { readonly kind: "inner-docker-data-root" }
+>
+
+const names = (call: PlainDiskOp): readonly string[] => {
   switch (call.kind) {
     case "create":
       return [call.lane]
@@ -57,6 +64,7 @@ const names = (call: DiskCall): readonly string[] => {
     case "snapshot":
       return [call.lane, call.snapshot]
     case "delete":
+    case "states-dir":
       return [call.lane]
     case "delete-snapshots":
       return call.ids
@@ -69,7 +77,7 @@ const names = (call: DiskCall): readonly string[] => {
  * at each refresh. Throws on a name that is not a disk's.
  */
 export function planDisk(
-  call: DiskCall,
+  call: PlainDiskOp,
   disks: ProjectDisks,
 ): readonly DiskStep[] {
   const bad = names(call).find(n => !isDiskName(n))
@@ -116,6 +124,8 @@ export function planDisk(
       ]
     case "delete-snapshots":
       return call.ids.map(id => ({ kind: "drop", path: disks.snapshot(id) }))
+    case "states-dir":
+      return [{ kind: "dir", path: disks.states(call.lane) }]
   }
 }
 
@@ -130,10 +140,10 @@ export interface InnerDockerDataRootFacts {
 }
 
 /**
- * A nested lane's disk, the rootless user's, and its inner Docker data root
+ * A nested lane's disk, `given`'s owner's, and its inner Docker data root
  * in it: a writable snapshot of `cloneFromLane`'s when that one is a
  * subvolume, in place of the lane's own; else the lane's own, made a
- * subvolume owned by the rootless user unless it is one. So a lane to clone
+ * subvolume owned by `given`'s owner unless it is one. So a lane to clone
  * from whose data root has gone leaves the lane's as it is. Throws on a name
  * that is not a disk's.
  */
@@ -142,15 +152,16 @@ export function planInnerDockerDataRootSteps(
   cloneFromLane: string | null,
   facts: InnerDockerDataRootFacts,
   disks: ProjectDisks,
+  given: NestedDisk,
 ): readonly DiskStep[] {
   const bad = [lane, cloneFromLane].find(n => n !== null && !isDiskName(n))
   if (bad !== undefined)
     throw new Error(`not a disk's name: ${JSON.stringify(bad)}`)
   const nested = disks.nested(lane)
-  const dataRoot = disks.innerDockerDataRoot(lane)
+  const dataRoot = nestedDataRoot(disks, given, lane)
   const disk: DiskStep[] = [
     { kind: "parent", path: nested },
-    { kind: "ensure", path: nested, uid: ROOTLESS_UID },
+    { kind: "ensure", path: nested, uid: given.owner },
   ]
   // The lane itself is never a source: its data root would be dropped first.
   if (
@@ -163,7 +174,7 @@ export function planInnerDockerDataRootSteps(
       { kind: "drop", path: dataRoot },
       {
         kind: "snapshot",
-        from: disks.innerDockerDataRoot(cloneFromLane),
+        from: nestedDataRoot(disks, given, cloneFromLane),
         to: dataRoot,
         readonly: false,
       },
@@ -174,7 +185,7 @@ export function planInnerDockerDataRootSteps(
     ...(facts.ownDataRoot === "not-subvolume"
       ? [{ kind: "drop", path: dataRoot } as const]
       : []),
-    { kind: "ensure", path: dataRoot, uid: ROOTLESS_UID },
+    { kind: "ensure", path: dataRoot, uid: given.owner },
   ]
 }
 
@@ -183,6 +194,7 @@ export async function innerDockerDataRootFacts(
   lane: string,
   cloneFromLane: string | null,
   disks: ProjectDisks,
+  given: NestedDisk,
 ): Promise<InnerDockerDataRootFacts> {
   const state = async (at: string): Promise<DataRootState> =>
     (await isSubvolume(at))
@@ -191,20 +203,11 @@ export async function innerDockerDataRootFacts(
         ? "not-subvolume"
         : "absent"
   return {
-    ownDataRoot: await state(disks.innerDockerDataRoot(lane)),
+    ownDataRoot: await state(nestedDataRoot(disks, given, lane)),
     sourceDataRoot:
       cloneFromLane === null || !isDiskName(cloneFromLane)
         ? null
-        : await state(disks.innerDockerDataRoot(cloneFromLane)),
-  }
-}
-
-/** A subvolume's root is inode 256: `btrfs subvolume show` needs a capability. */
-export async function isSubvolume(at: string): Promise<boolean> {
-  try {
-    return (await stat(at)).ino === 256
-  } catch {
-    return false
+        : await state(nestedDataRoot(disks, given, cloneFromLane)),
   }
 }
 
@@ -228,80 +231,6 @@ export async function snapshotsIn(disks: ProjectDisks): Promise<string[]> {
   return found.sort()
 }
 
-const btrfs = async (args: readonly string[]): Promise<void> => {
-  const ran = await runCommand(["btrfs", "-q", ...args], {
-    cwd: "/",
-    bytes: false,
-    signal: new AbortController().signal,
-  })
-  if (ran.code !== 0)
-    throw new Error(
-      `btrfs ${args.join(" ")}: ${String(ran.stderr).trim().split("\n")[0] ?? ""}`,
-    )
-}
-
-const exists = (at: string) =>
-  lstat(at).then(
-    () => true,
-    () => false,
-  )
-
-/** Make a read-only subvolume writable, then delete it; false where btrfs refuses. */
-async function deleteSubvolume(at: string): Promise<boolean> {
-  // A read-only subvolume is deleted only once it is writable again.
-  await runCommand(["btrfs", "property", "set", at, "ro", "false"], {
-    cwd: "/",
-    bytes: false,
-    signal: new AbortController().signal,
-  })
-  return btrfs(["subvolume", "delete", at]).then(
-    () => true,
-    () => false,
-  )
-}
-
-/**
- * The subvolumes under `root`, not `root` itself: a directory whose inode
- * is 256. Never through a symlink, and never stopping where the device
- * changes, as each subvolume is a device of its own. Only directories are
- * kept: a nested disk holds an inner Docker's data root.
- */
-async function subvolumesUnder(root: string): Promise<string[]> {
-  const found: string[] = []
-  const pending = [root]
-  for (let dir = pending.pop(); dir !== undefined; dir = pending.pop()) {
-    const entries = await readdir(dir, { withFileTypes: true }).catch(() => [])
-    for (const e of entries) {
-      if (!e.isDirectory()) continue
-      const at = path.join(dir, e.name)
-      if (await isSubvolume(at)) found.push(at)
-      pending.push(at)
-    }
-  }
-  return found
-}
-
-/** Subvolumes in the order they can be deleted: each before every one above it. */
-export const subvolumesDeepestFirst = (
-  found: readonly string[],
-): readonly string[] =>
-  [...found].sort(
-    (a, b) => b.split("/").length - a.split("/").length || (a < b ? -1 : 1),
-  )
-
-async function drop(at: string): Promise<void> {
-  if (!(await exists(at))) return
-  const subvolume = await isSubvolume(at)
-  if (subvolume && (await deleteSubvolume(at))) return
-  // btrfs refuses a subvolume that holds others, and `rm -rf` stops at a
-  // read-only one (EROFS): an inner lanehost's snapshots, or one an agent
-  // made in its lane. So those go first, each its own delete.
-  for (const inner of subvolumesDeepestFirst(await subvolumesUnder(at)))
-    await deleteSubvolume(inner)
-  if (subvolume && (await deleteSubvolume(at))) return
-  await rm(at, { recursive: true, force: true })
-}
-
 /** Carry out `steps` in order; throws at the first that fails. */
 export async function executeDiskSteps(
   steps: readonly DiskStep[],
@@ -312,16 +241,10 @@ export async function executeDiskSteps(
         await mkdir(path.dirname(step.path), { recursive: true })
         break
       case "create":
-        await btrfs(["subvolume", "create", step.path])
+        await createSubvolume(step.path)
         break
       case "snapshot":
-        await btrfs([
-          "subvolume",
-          "snapshot",
-          ...(step.readonly ? ["-r"] : []),
-          step.from,
-          step.to,
-        ])
+        await snapshotSubvolume(step.from, step.to, step.readonly)
         break
       case "drop":
         await drop(step.path)
@@ -329,9 +252,11 @@ export async function executeDiskSteps(
       case "move":
         await rename(step.from, step.to)
         break
+      case "dir":
+        await mkdir(step.path, { recursive: true })
+        break
       case "ensure": {
-        if (!(await exists(step.path)))
-          await btrfs(["subvolume", "create", step.path])
+        if (!(await exists(step.path))) await createSubvolume(step.path)
         const ran = await runCommand(
           ["chown", `${step.uid}:${step.uid}`, step.path],
           {

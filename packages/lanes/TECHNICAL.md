@@ -39,9 +39,19 @@ the helper, S122 to S131 for Docker and the lane VM.
   not move.
 - **Planners return values; a runtime turns them into commands.** A plan is a
   list of `Step`s: a `LaneStep` (a command in the lane, through its channel)
-  or a `RuntimeOp` (a `DiskOp`, or a container made from a shape), carried
-  out by `execute` through `Runners.runtime`. A list of lane steps alone
-  needs no runtime, so `@pinetrie/jj` never has one.
+  or a `RuntimeOp` (a `DiskOp`, or a container made from a `PlannedStart`),
+  carried out by `execute` through `Runners.runtime`. A list of lane steps
+  alone needs no runtime, so `@pinetrie/jj` never has one.
+- **`LaneRuntime` is three parts** (ADR-0202): `LaneDisks` (the disks and
+  their snapshots), `LaneContainers` and `LaneImages`, and each caller types
+  the part it uses: the folder adapter takes `LaneDisks` alone. Docker's
+  disks are lanehost's client (`lanehostDisks`), which another runtime that
+  hosts lanehost's roles spreads as Docker's does.
+- **A disk is a directory on the runtime's machine:** made by lanehost, and
+  bound into the lane's container by the runtime at the shape's mount
+  points. A store that is not a directory (a volume per lane, cloud
+  volumes) would move a disk's mount into the runtime: a different port
+  (S264).
 - **What any runtime must do:**
   - a snapshot that holds what the lane wrote, after the `sync` before it
     (`planSnapshot`), and a restore from it into a new disk;
@@ -181,9 +191,26 @@ paths are its diff." would compare a function with itself.
 
 ## Where things are
 
-- `plan.ts`: every decision, pure. It covers the container's arguments,
-  grants, link mounts, fork, turn, bundle and base steps, the images and
-  their tags (`planImages`), and what the host finds at startup.
+- The planners, each pure, a module per concern:
+  - `spec.ts`: what a lane is to every planner: its owner, its container's
+    name, its grants and what is attached.
+  - `mounts.ts`: every host path a lane sees (`planMounts`), and a slot's
+    shares (`slotMounts`).
+  - `shape.ts`: the container as a value (`planShape`), its spec label,
+    and the git config and ignores pine·trie writes for it.
+  - `lane-config.ts`: a lane's config as a fact of a state
+    (`effectiveLaneConfig`, `configWidenings`), and the values a config
+    file writes.
+  - `shared.ts`: the shared directories and the links under your working
+    copy; `session-files.ts`: a session's data directory.
+  - `steps.ts`: `Step`s, a container's start (`planStart`), a disk made for
+    one (`planDiskThenStart`), a turn's snapshot; `fork.ts`: a fork's steps.
+  - `base-facts.ts`: what the base disk says it is (`base.json`).
+  - `project-dir.ts`: a project's root and kind (below).
+  - `start.ts`: a lane's start as one decision (`decideContainerStart`).
+  - `nested-data-root.ts`: where a nested lane's inner Docker data root
+    comes from.
+  - `image-plan.ts`: the images and their tags (`planImages`).
 - `execute.ts`: runs a list of `LaneStep`s in order, on the host or in the
   lane.
 - `run.ts`: commands as `Runner`s, on the host or in a lane.
@@ -192,7 +219,7 @@ paths are its diff." would compare a function with itself.
   under your working copy's `node_modules` (`gatherLinks`). Config files are
   `@pinetrie/config`'s. Your repo's startup reads
   and writes are `@pinetrie/jj`'s (`startup.ts`).
-- `planProjectDir` (`plan.ts`) decides a project's root and its kind from
+- `planProjectDir` (`project-dir.ts`) decides a project's root and its kind from
   `RootFacts`: a jj workspace is `jj`, any other folder (a git repo
   included) `folder`; or it refuses the folder (`ProjectDirRefusal`, worded
   by `projectDirWords`). The kind is that one fact, read once, where the
@@ -208,20 +235,21 @@ paths are its diff." would compare a function with itself.
   gathers what `planImages` needs and hands its plans to the runtime
   (`ensureLaneImages`), which builds them.
 - `runtime-port.ts`: `LaneRuntime`, every call the host makes to a
-  runtime, and `DiskOp`. This package implements no runtime: Docker's is
+  runtime, in its three parts, and `DiskOp` (core's, over a `LaneOwner`). This package implements no runtime: Docker's is
   `@pinetrie/docker`'s (`dockerRuntime`).
   `lane.ts`: the container, the queue, and the handle. `base.ts`: the
   base snapshot (`refreshBase`).
 
 ## Disks and snapshots
 
-- **Every disk operation is a `DiskOp`** (`runtime-port.ts`), carried out by
-  the runtime the host hands in: create, restore from a snapshot, snapshot,
-  delete, delete snapshots, and a nested lane's inner Docker data root
-  (`inner-docker-data-root`: a clone of another lane's in place of its own,
-  or its own as it is). Docker's keeps both as btrfs subvolumes,
-  and carries each operation out as a call to lanehost's `disks` role over a
-  held channel (ADR-0129, `packages/lanehost/TECHNICAL.md`).
+- **Every disk operation is a `DiskOp`** (core's, `packages/core/disks.ts`),
+  carried out by the runtime the host hands in: create, restore from a
+  snapshot, snapshot, delete, delete snapshots, a nested lane's inner Docker
+  data root (`inner-docker-data-root`: a clone of another lane's in place of
+  its own, or its own as it is) and a folder lane's states directory
+  (`states-dir`). lanehost takes the same type, so the two cannot differ:
+  its disks role keeps both as btrfs subvolumes, each operation one call
+  over a held channel (ADR-0129, `packages/lanehost/TECHNICAL.md`).
 - **A snapshot is read-only:** a restore is a writable snapshot of it, and
   `diff` compares two (`packages/lanehost/TECHNICAL.md`, Diffs).
 - **`sync` comes before every snapshot** (`planSnapshot`). Otherwise files the
@@ -279,7 +307,8 @@ paths are its diff." would compare a function with itself.
   (`startRecords`, which only an adapter makes, with `recordedStart`), so
   no record says begun for a fork whose steps did not run. A nested lane's
   fork makes its inner Docker data root after the delete, which dropped
-  it, and before the run, whose inner Docker starts on it: a clone of the
+  it, and before the run, whose inner Docker starts on it (its
+  `planStart`): a clone of the
   project's nested lane that ran last, else of the lane whose disk the
   fork clones (ADR-0169). Between the
   clone and the setup, one step
@@ -383,9 +412,19 @@ paths are its diff." would compare a function with itself.
     else it is retired: the files it recorded are gone, and a branch from
     it continues.
 - **The host decides a start whole** (`decideContainerStart`): the
-  container's plan from its facts and its shape's hash, then the start; one
-  that makes the container carries its steps (`planStart` on its disk,
-  `planDisk` from a snapshot).
+  container's plan from its facts and its shape's hash, then the start,
+  with every step it runs before the container runs: a stopped container's
+  start makes the folders it binds (`planBindSources`); one that makes the
+  container makes them and it (`planStart` on its disk, `planDiskThenStart`
+  from a snapshot); a running container's runs none.
+- **A container's start is one plan** (ADR-0202, S290). The `run` step
+  carries a `PlannedStart`, which only `planStart` makes, after the steps
+  that make each folder the shape binds on lanehost's disks (`DiskBind`:
+  a nested lane's nested disk and data root, a folder lane's states
+  directory, each from one total table, `BIND_SOURCE`). So no plan makes a
+  container without its bind sources, the base's scratch lane included
+  (`inScratch` passes `keep`), and a runtime's `run` makes only the
+  container: Docker refuses a bind whose source is missing.
 - **A start reads one fact at a time, each only when its plan asks**
   (`planLaneStart`'s `gather`, read by `decideLaneStart` through a
   `LaneFactReader`): whether its disk is there; only with it gone, its
@@ -395,10 +434,8 @@ paths are its diff." would compare a function with itself.
   stats each one, which took 9 s cold on Duane's Mac (S247), so no start
   lists them.
 - **A nested lane's inner Docker data root is made before its container
-  starts,** whenever the container is made or a stopped one started
-  (`innerDockerDataRootStep`, which takes only a
-  `LaneStartWithStoppedContainer`, so none is planned for a running one).
-  It is a clone of the project's nested lane whose container stopped last
+  starts,** whenever the container is made or a stopped one started, by the
+  start's plan (above), so none is planned for a running one. It is a clone of the project's nested lane whose container stopped last
   after a run, unless the lane's own is as of that run already
   (`planInnerDockerDataRootSource`, from the host's
   `InnerDockerDataRoots`); a kept one is still made a subvolume if it is
@@ -578,6 +615,34 @@ paths are its diff." would compare a function with itself.
   on. The owner observes the import, and the moved ref marks the lane's
   proposed changes for a refresh (`apps/pinetrie/host/jj/proposed/`).
 
+## What a lane assumes of its machine (S289)
+
+- **Built in,** each new code on a machine without it:
+  - the machine's observer is a Linux kernel's BPF program (Linux 5.17 or
+    later, BTF, kprobes; a lane is a PID namespace to it), and the disk
+    model rests on it (ADR-0135): a host that cannot observe refuses lanes;
+  - the lane runtime is Linux ELF for the machine's architecture: Node, its
+    libraries and glibc's loader, and musl builds of `RUNTIME_PROGRAMS`;
+  - disks are btrfs subvolumes (`packages/lanehost/btrfs.ts`);
+  - a lane is an OCI container under Linux's isolation: seccomp,
+    `no-new-privileges`, `--init`, and a nested lane's rootless Docker;
+  - a project's grant of host ports is iptables in the VM.
+- **Built in, and not about Linux:** the runtime's machine sees the host's
+  files. Every lane binds your working copy, pine·trie's install, the lane
+  runtime, shared directories and the host's ssh socket, each mapped to
+  where Docker's machine sees it (`DockerTarget.pathOf`). A remote machine
+  with no view of them needs the files carried, not mapped.
+- **Values:** the programs every lane carries (`RUNTIME_PROGRAMS`), where a
+  lane sees things (`WORKSPACE_ROOT`, `HOST_WORKING_COPY`, `HOST_MOUNT`,
+  `RUNTIME_MOUNT`, `STATES_MOUNT`, `LANE_HOME`), the image (a project's
+  Containerfile replaces the default; `checkImage` asks a POSIX `sh` and
+  git 2.41), the architectures (the default image's, the observer's, the
+  VM's Apple silicon), where Docker is and how host paths reach it
+  (`DockerTarget`, the lanes directory, `planRuntime`), and the machine's
+  `rootless`.
+- So a lane that is not Linux is not a swap behind these ports; another
+  container runtime or directory store on Linux is.
+
 ## Tests
 
 - **`plan.test.ts`**: the planners. jj's are `@pinetrie/jj`'s.
@@ -618,7 +683,7 @@ paths are its diff." would compare a function with itself.
   own config never applies. Each
   suite-level mutation in `scripts/mutations/lanes.ts`, `jj.ts` and
   `docker.ts`, among others, runs only the scenario its check is in, and
-  stops at that check. Each on `plan.ts` proves a fact about a real lane
+  stops at that check. Each on a planner proves a fact about a real lane
   that a unit test cannot: `sync`, a
   read-only mount, a shared mount seen both ways, the git ignore variables,
   jj's config scope, an agent's own commit, the image's browser and python3,

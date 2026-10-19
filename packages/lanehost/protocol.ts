@@ -5,6 +5,7 @@
 import type {
   DiffStat,
   DiskDiff,
+  DiskOp,
   LaneStatesOp,
   MergeStep,
   PathFact,
@@ -15,23 +16,8 @@ import type {
 } from "@pinetrie/core"
 import type { Grant } from "./grants.ts"
 
-/** A disk operation on one project's disks; the shape of lanes' `DiskOp`. */
-export type DiskCall =
-  | {
-      readonly kind: "create"
-      readonly lane: string
-    }
-  | { readonly kind: "restore"; readonly lane: string; readonly from: string }
-  | {
-      readonly kind: "snapshot"
-      readonly lane: string
-      readonly snapshot: string
-    }
-  | { readonly kind: "delete"; readonly lane: string }
-  | { readonly kind: "delete-snapshots"; readonly ids: readonly string[] }
-
 export type LanehostCall =
-  | { readonly kind: "disk"; readonly project: string; readonly op: DiskCall }
+  | { readonly kind: "disk"; readonly project: string; readonly op: DiskOp }
   | {
       readonly kind: "disk-exists"
       readonly project: string
@@ -44,24 +30,6 @@ export type LanehostCall =
     }
   /** The names of the project's snapshots, sorted: one listing for what a sweep keeps. */
   | { readonly kind: "snapshots"; readonly project: string }
-  /** A folder lane's states directory, made if missing, for its container to mount. */
-  | {
-      readonly kind: "states-dir"
-      readonly project: string
-      readonly lane: string
-    }
-  /**
-   * A nested lane's inner lanes' subvolume, made if missing, the rootless
-   * user's; and its inner Docker data root in it, a clone of
-   * `cloneFromLane`'s when that one is there, else its own, made a subvolume
-   * when it is not one.
-   */
-  | {
-      readonly kind: "nested-disk"
-      readonly project: string
-      readonly lane: string
-      readonly cloneFromLane: string | null
-    }
   /**
    * A file inside a snapshot, by its path from the snapshot's root; null
    * when absent. Refused when it leaves the snapshot or holds more than
@@ -82,7 +50,7 @@ export type LanehostCall =
   | { readonly kind: "remove-project"; readonly project: string }
   /** A project's grant of the host's ports, replacing its last (`grants.ts`). */
   | ({ readonly kind: "grant" } & Grant)
-  /** What differs between two of a project's snapshots, both read-only (`diff.ts`). */
+  /** What differs between two of a project's snapshots, both read-only (`btrfs.ts`, `walk.ts`). */
   | {
       readonly kind: "diff"
       readonly project: string
@@ -177,8 +145,6 @@ export interface LanehostResults {
   readonly "disk-exists": boolean
   readonly "snapshot-exists": boolean
   readonly snapshots: readonly string[]
-  readonly "nested-disk": null
-  readonly "states-dir": null
   readonly read: string | null
   readonly record: null
   readonly projects: readonly ProjectListed[]

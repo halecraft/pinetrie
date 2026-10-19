@@ -2,12 +2,10 @@
 // role that serves it. The server and the one-shot command (`once.ts`) both
 // answer through here.
 
-import { mkdir } from "node:fs/promises"
-import { diffBySend, diffByWalk } from "./diff.ts"
+import { diffBySend, isSubvolume } from "./btrfs.ts"
 import {
   executeDiskSteps,
   innerDockerDataRootFacts,
-  isSubvolume,
   planDisk,
   planInnerDockerDataRootSteps,
   readSnapshotFile,
@@ -29,12 +27,20 @@ import {
 import { applyGrant } from "./grants.ts"
 import {
   isProjectKey,
+  type NestedDisk,
   checkedDiskName as named,
   projectDisks,
 } from "./layout.ts"
 import { listProjects, recordProject, removeProject } from "./projects.ts"
 import type { LanehostCall, LanehostResult } from "./protocol.ts"
-import { callModule, planRoles, type Role, type RoleFacts } from "./roles.ts"
+import {
+  callModule,
+  planDiff,
+  planRoles,
+  type Role,
+  type RoleFacts,
+} from "./roles.ts"
+import { diffByWalk } from "./walk.ts"
 
 /** Where a server runs: its role, the lanes directory, and what its machine grants. */
 export interface Serving {
@@ -43,6 +49,8 @@ export interface Serving {
   readonly facts: RoleFacts
   /** Where the project's root is mounted read-only: `FOLDER_MOUNT` in a role's container. */
   readonly folder: string
+  /** What the runtime says of a nested lane's disk. */
+  readonly nested: NestedDisk
 }
 
 const disksOf = (serving: Serving, key: string) => {
@@ -70,9 +78,27 @@ async function answerAny(
   serving: Serving,
 ): Promise<unknown> {
   switch (call.kind) {
-    case "disk":
-      await executeDiskSteps(planDisk(call.op, disksOf(serving, call.project)))
+    case "disk": {
+      const disks = disksOf(serving, call.project)
+      const { op } = call
+      await executeDiskSteps(
+        op.kind === "inner-docker-data-root"
+          ? planInnerDockerDataRootSteps(
+              op.lane,
+              op.cloneFromLane,
+              await innerDockerDataRootFacts(
+                op.lane,
+                op.cloneFromLane,
+                disks,
+                serving.nested,
+              ),
+              disks,
+              serving.nested,
+            )
+          : planDisk(op, disks),
+      )
       return null
+    }
     case "disk-exists":
       return isSubvolume(disksOf(serving, call.project).lane(named(call.lane)))
     case "snapshot-exists":
@@ -81,23 +107,6 @@ async function answerAny(
       )
     case "snapshots":
       return snapshotsIn(disksOf(serving, call.project))
-    case "states-dir":
-      await mkdir(disksOf(serving, call.project).states(named(call.lane)), {
-        recursive: true,
-      })
-      return null
-    case "nested-disk": {
-      const disks = disksOf(serving, call.project)
-      await executeDiskSteps(
-        planInnerDockerDataRootSteps(
-          call.lane,
-          call.cloneFromLane,
-          await innerDockerDataRootFacts(call.lane, call.cloneFromLane, disks),
-          disks,
-        ),
-      )
-      return null
-    }
     case "read":
       return readSnapshotFile(
         disksOf(serving, call.project),
@@ -170,7 +179,7 @@ async function answerAny(
       const disks = disksOf(serving, call.project)
       const from = disks.snapshot(named(call.from))
       const to = disks.snapshot(named(call.to))
-      return serving.facts.rootless
+      return planDiff(serving.facts).method === "walk"
         ? diffByWalk(from, to)
         : diffBySend(from, to)
     }

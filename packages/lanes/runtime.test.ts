@@ -2,8 +2,8 @@
 
 import { RUNTIME_PROGRAMS } from "@pinetrie/core"
 import { expect, test } from "vitest"
-import { RUNTIME_MOUNT } from "./plan.ts"
 import { EXTRACT, RUNTIME_NODE, runtimeComplete } from "./runtime.ts"
+import { RUNTIME_MOUNT } from "./spec.ts"
 
 const NODE = ["ld.so", "lib", "node"]
 

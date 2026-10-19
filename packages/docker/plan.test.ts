@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs"
 import path from "node:path"
 import { threadIdFor } from "@pinetrie/core"
-import { INNER_DOCKER_DATA_ROOT_DIR, projectDisks } from "@pinetrie/lanehost"
+import { projectDisks } from "@pinetrie/lanehost"
 import {
   type ContainerShape,
   type LaneSpec,
@@ -15,6 +15,7 @@ import { buildError } from "./cli.ts"
 import {
   type DockerHostFacts,
   dockerWords,
+  INNER_DOCKER_DATA_ROOT_DIR,
   imageEnvPath,
   isRootless,
   type Listed,

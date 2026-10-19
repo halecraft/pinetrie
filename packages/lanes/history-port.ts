@@ -24,7 +24,7 @@ import type {
   ValueWrite,
   WriterId,
 } from "@pinetrie/core"
-import type { LaneStep } from "./plan.ts"
+import type { LaneStep } from "./steps.ts"
 
 /** Where a file is read: accepted work, or a lane's newest state or its start. */
 export type ReadSite =

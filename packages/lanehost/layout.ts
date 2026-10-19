@@ -15,12 +15,24 @@
 import { isDiskName } from "@pinetrie/core"
 
 /**
- * A nested lane's inner Docker data root, in its nested disk: a subvolume of
- * its own, so it is cloned without the inner lanehost's projects beside it.
- * The lane image's `pinetrie-inner-docker` starts the inner Docker on this
- * directory under the nested disk's mount.
+ * What the runtime says of a nested lane's disk, given in a server's
+ * arguments: who owns it (the user its inner runtime runs as), and the
+ * directory in it that runtime keeps its data in, a subvolume of its own so
+ * it is cloned without the inner lanehost's projects beside it.
  */
-export const INNER_DOCKER_DATA_ROOT_DIR = "docker"
+export interface NestedDisk {
+  readonly owner: number
+  readonly dataRoot: string
+}
+
+/** Whether `n` is a nested disk's values: an owner's uid, and a data root that is one path segment. */
+export const isNestedDisk = (n: unknown): n is NestedDisk =>
+  typeof n === "object" &&
+  n !== null &&
+  Number.isInteger((n as NestedDisk).owner) &&
+  (n as NestedDisk).owner >= 0 &&
+  typeof (n as NestedDisk).dataRoot === "string" &&
+  isDiskName((n as NestedDisk).dataRoot)
 
 /** Where one project's disks are on Docker's machine. */
 export function projectDisks(lanesDir: string, key: string) {
@@ -34,8 +46,6 @@ export function projectDisks(lanesDir: string, key: string) {
     statesDir: `${dir}/states`,
     lane: (lane: string) => `${dir}/lanes/${lane}`,
     nested: (lane: string) => `${dir}/nested/${lane}`,
-    innerDockerDataRoot: (lane: string) =>
-      `${dir}/nested/${lane}/${INNER_DOCKER_DATA_ROOT_DIR}`,
     snapshot: (id: string) => `${dir}/snapshots/${id}`,
     states: (lane: string) => `${dir}/states/${lane}`,
   }
@@ -64,3 +74,10 @@ export const FOLDER_MOUNT = "/pinetrie-folder"
 
 /** The directory on a disk that holds pine·trie's own files. */
 export const LANE_FILES = ".pinetrie-lane"
+
+/** A nested lane's inner runtime's data root, in its nested disk. */
+export const nestedDataRoot = (
+  disks: ProjectDisks,
+  nested: NestedDisk,
+  lane: string,
+): string => `${disks.nested(lane)}/${nested.dataRoot}`

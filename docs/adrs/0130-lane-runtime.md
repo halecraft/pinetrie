@@ -24,6 +24,9 @@
   - ADR-0169: a nested lane's inner Docker keeps its data root on a subvolume
     of its own, cloned from the project's nested lane that ran last, not made
     empty.
+  - ADR-0202: the runtime's port is three named parts (disks, containers,
+    images); a disk is a directory on the runtime's machine, made by lanehost
+    and bound by the runtime.
 
 Restates ADR-0103 as amended by ADR-0118 and its revisions of 2026-10-07;
 decides nothing new. ADR-0103's changes to ADR-0034, ADR-0035 and ADR-0046

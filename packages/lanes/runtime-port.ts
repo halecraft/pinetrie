@@ -2,45 +2,20 @@
 // values (`ContainerShape`, `DiskOp`); a runtime turns them into commands. The host picks the runtime and hands it in.
 
 import type {
+  DiskOp as CoreDiskOp,
   DiskDiff,
   FoldNotices,
   LaneObservation,
   SnapshotId,
 } from "@pinetrie/core"
-import type { ContainerShape, ImagePlan, LaneOwner } from "./plan.ts"
+import type { ImagePlan } from "./image-plan.ts"
 import type { Ran } from "./run.ts"
+import type { ContainerShape } from "./shape.ts"
+import type { LaneOwner } from "./spec.ts"
+import type { PlannedStart } from "./steps.ts"
 
-/**
- * A lane's disk, as the host asks of whichever runtime keeps it. `delete`
- * and `delete-snapshots` succeed when there is nothing to delete.
- */
-export type DiskOp =
-  | {
-      readonly kind: "create"
-      readonly lane: LaneOwner
-    }
-  | {
-      readonly kind: "restore"
-      readonly lane: LaneOwner
-      readonly from: SnapshotId
-    }
-  | {
-      readonly kind: "snapshot"
-      readonly lane: LaneOwner
-      readonly snapshot: SnapshotId
-    }
-  | { readonly kind: "delete"; readonly lane: LaneOwner }
-  | { readonly kind: "delete-snapshots"; readonly ids: readonly SnapshotId[] }
-  /**
-   * A nested lane's inner Docker data root: a clone of `cloneFromLane`'s in
-   * place of its own when that one is there, else its own as it is. Only
-   * while the lane's container is stopped or not yet made.
-   */
-  | {
-      readonly kind: "inner-docker-data-root"
-      readonly lane: LaneOwner
-      readonly cloneFromLane: LaneOwner | null
-    }
+/** A lane's disk, as the host asks of whichever runtime keeps it (core's `DiskOp`). */
+export type DiskOp = CoreDiskOp<LaneOwner>
 
 /**
  * What a step asks of the runtime: a disk operation, a lane's container made
@@ -48,7 +23,7 @@ export type DiskOp =
  */
 export type RuntimeOp =
   | DiskOp
-  | { readonly kind: "run"; readonly shape: ContainerShape }
+  | { readonly kind: "run"; readonly start: PlannedStart }
   | { readonly kind: "remove"; readonly container: string }
 
 /** A container's state and spec label (`SPEC_LABEL`), as its runtime reports them. */
@@ -58,8 +33,13 @@ export interface ContainerFacts {
   readonly label: string | null
 }
 
-/** Every call the host makes to a runtime. Each throws on failure, naming the command. */
-export interface LaneRuntime {
+/**
+ * A project's lane disks and their snapshots. A disk is a directory on the
+ * runtime's machine, made by whatever keeps the disks (lanehost's
+ * `lanehostDisks`) and bound into the lane's container by the runtime.
+ * Each call throws on failure, naming the command.
+ */
+export interface LaneDisks {
   disk(op: DiskOp): Promise<void>
   diskExists(lane: LaneOwner): Promise<boolean>
   snapshotExists(id: SnapshotId): Promise<boolean>
@@ -69,9 +49,17 @@ export interface LaneRuntime {
   diff(from: SnapshotId, to: SnapshotId): Promise<DiskDiff>
   /** A file of pine·trie's own (`.pinetrie-lane/<file>`) in a snapshot; null when absent. */
   readLaneFile(snapshot: SnapshotId, file: string): Promise<string | null>
+}
+
+/** A lane's container, on its disk. Each call throws on failure, naming the command. */
+export interface LaneContainers {
   /** The container's spec as the runtime makes it, without its label: pure. Its hash is its spec label. */
   runSpec(shape: ContainerShape): unknown
-  /** Make the container from `shape`, labelled with its spec hash, and start it. */
+  /**
+   * Make the container from `shape`, labelled with its spec hash, and start
+   * it. The folders it binds are there already: its start's plan made them
+   * (`planStart`).
+   */
   run(shape: ContainerShape): Promise<void>
   containerFacts(container: string): Promise<ContainerFacts>
   start(container: string): Promise<void>
@@ -81,6 +69,10 @@ export interface LaneRuntime {
   remove(container: string): Promise<void>
   /** `argv` run in a running container with stdin attached (`exec -i`). */
   execArgv(container: string, argv: readonly string[]): readonly string[]
+}
+
+/** The images lanes run. Each call throws on failure, naming the command. */
+export interface LaneImages {
   /**
    * The lane images a host needs: each built unless the runtime has it. The
    * runtime keeps them as needed, removes its other images of pine·trie's
@@ -93,6 +85,9 @@ export interface LaneRuntime {
   /** `argv` in a throwaway container of `tag`; its stdout as bytes. */
   runInImage(tag: string, argv: readonly string[]): Promise<Ran<Uint8Array>>
 }
+
+/** Every call the host makes to a runtime. */
+export interface LaneRuntime extends LaneDisks, LaneContainers, LaneImages {}
 
 /** An image the runtime builds, announced before its build. */
 export type ImageBuild = "lane" | "lanehost" | "observer"

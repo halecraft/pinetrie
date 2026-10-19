@@ -8,7 +8,9 @@ import { existsSync, mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { answer } from "./answer.ts"
+import type { NestedDisk } from "./layout.ts"
 import type { LanehostCall, LanehostResult } from "./protocol.ts"
+import type { Role } from "./roles.ts"
 import { servingFrom } from "./serving.ts"
 
 export { fileStream } from "./file-out.ts"
@@ -40,6 +42,23 @@ export async function standInRole(): Promise<{
 }
 
 /**
+ * A nested disk's values for tests: an owner, and a data root no runtime
+ * names, so a test holds lanehost to the values it is given.
+ */
+export const TEST_NESTED: NestedDisk = { owner: 1000, dataRoot: "data-root" }
+
+/** A server's arguments for a test: `role` over `lanesDir`, with `facts` and `TEST_NESTED`. */
+export const testServerArgs = (
+  role: Role,
+  lanesDir: string,
+  facts: { readonly rootless?: boolean; readonly folder?: string } = {},
+): readonly string[] => [
+  role,
+  lanesDir,
+  JSON.stringify({ ...facts, nested: TEST_NESTED }),
+]
+
+/**
  * The disks role answering in this process, over `lanesDir`, its project's
  * root at `folder` in place of its mount: for an adapter's tests on btrfs.
  */
@@ -47,10 +66,11 @@ export function disksInProcess(input: {
   readonly lanesDir: string
   readonly folder: string
 }): <C extends LanehostCall>(call: C) => Promise<LanehostResult<C>> {
-  const serving = servingFrom([
-    "disks",
-    input.lanesDir,
-    JSON.stringify({ rootless: true, folder: input.folder }),
-  ])
+  const serving = servingFrom(
+    testServerArgs("disks", input.lanesDir, {
+      rootless: true,
+      folder: input.folder,
+    }),
+  )
   return call => answer(call, serving)
 }

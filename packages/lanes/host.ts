@@ -4,7 +4,7 @@
 
 import { readdir, readlink } from "node:fs/promises"
 import path from "node:path"
-import type { Link } from "./plan.ts"
+import type { Link } from "./shared.ts"
 
 /** Every `node_modules` directory up to three levels down, never inside another. */
 async function findNodeModules(root: string): Promise<string[]> {

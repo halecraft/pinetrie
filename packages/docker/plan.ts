@@ -16,14 +16,16 @@ import {
 import {
   FOLDER_MOUNT,
   MACHINE_SOCKET,
+  type NestedDisk,
   OBSERVER_LOADER,
   type ProjectDisks,
   ROLES,
-  ROOTLESS_UID,
   type Role,
 } from "@pinetrie/lanehost"
 import {
   type ContainerShape,
+  type DiskBind,
+  diskBinds,
   type Mount,
   RUNTIME_MOUNT,
   RUNTIME_NODE,
@@ -40,6 +42,18 @@ export const SLOT_LABEL = "pinetrie.slot"
 export const LANEHOST_LABEL = "pinetrie.lanehost"
 /** Where a nested lane's inner lanes are, inside it. */
 export const NESTED_MOUNT = "/var/lib/pinetrie-lanes"
+/** The rootless user a nested lane's inner Docker runs as: the lane image's `rootless`. */
+export const ROOTLESS_UID = 1000
+/**
+ * The inner Docker's data root in a nested lane's disk, which the lane
+ * image's `pinetrie-inner-docker` starts it on (`--data-root`).
+ */
+export const INNER_DOCKER_DATA_ROOT_DIR = "docker"
+/** What lanehost is told of a nested lane's disk: its owner and its data root. */
+export const NESTED_DISK: NestedDisk = {
+  owner: ROOTLESS_UID,
+  dataRoot: INNER_DOCKER_DATA_ROOT_DIR,
+}
 /** The inner Docker's socket, which a nested lane's own host uses. */
 export const INNER_DOCKER_HOST = `unix:///run/user/${ROOTLESS_UID}/docker.sock`
 /**
@@ -124,6 +138,26 @@ const bind = (m: Mount, pathOf: (p: string) => string): BindMount => ({
   readonly: m.readonly,
 })
 
+/** Where each folder a shape binds that lanehost makes is, and where the lane sees it. */
+const DISK_BIND: {
+  readonly [B in DiskBind]: {
+    readonly source: (disks: ProjectDisks, lane: string) => string
+    readonly target: string
+    readonly readonly: boolean
+  }
+} = {
+  nested: {
+    source: (d, lane) => d.nested(lane),
+    target: NESTED_MOUNT,
+    readonly: false,
+  },
+  states: {
+    source: (d, lane) => d.states(lane),
+    target: STATES_MOUNT,
+    readonly: true,
+  },
+}
+
 /**
  * A lane's shape as a container, without its spec label. Never privileged,
  * never a capability, never a Docker socket: a lane with the VM's socket
@@ -176,24 +210,11 @@ export function renderRun(
       },
       ...shape.mounts.map(m => bind(m, target.pathOf)),
       ...(hostSocket === null ? [] : [{ ...hostSocket, readonly: false }]),
-      ...(nested
-        ? [
-            {
-              source: disks.nested(shape.lane),
-              target: NESTED_MOUNT,
-              readonly: false,
-            },
-          ]
-        : []),
-      ...(shape.states
-        ? [
-            {
-              source: disks.states(shape.lane),
-              target: STATES_MOUNT,
-              readonly: true,
-            },
-          ]
-        : []),
+      ...diskBinds(shape).map(b => ({
+        source: DISK_BIND[b].source(disks, shape.lane),
+        target: DISK_BIND[b].target,
+        readonly: DISK_BIND[b].readonly,
+      })),
     ],
     network: projectNetwork(input.project),
     memory: shape.memory,

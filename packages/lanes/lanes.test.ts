@@ -2,10 +2,10 @@ import { type RunSource, snapshotId, threadIdFor } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { execute } from "./execute.ts"
 import { helperCommand, laneHandle } from "./lane.ts"
-import type { Step } from "./plan.ts"
 import type { Ran, Runner } from "./run.ts"
 import { RUNTIME_NODE } from "./runtime.ts"
 import type { LaneRuntime } from "./runtime-port.ts"
+import type { Step } from "./steps.ts"
 
 /** A lane no observer sees: no run did anything. */
 const unobserved: RunSource = {

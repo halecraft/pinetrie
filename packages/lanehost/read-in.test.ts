@@ -19,6 +19,7 @@ import path from "node:path"
 import type { ReadPath } from "@pinetrie/core"
 import { afterAll, describe, expect, test } from "vitest"
 import { answer } from "./answer.ts"
+import { testServerArgs } from "./fixtures.ts"
 import { planReadIn } from "./folder.ts"
 import { FOLDER_LINE, projectDisks } from "./layout.ts"
 import type { LanehostCall } from "./protocol.ts"
@@ -34,11 +35,9 @@ const onBtrfs = await mkdir(LANES, { recursive: true })
   .catch(() => false)
 
 const KEY = "00112233445566ff"
-const serving = servingFrom([
-  "disks",
-  LANES,
-  JSON.stringify({ rootless: true, folder: FOLDER }),
-])
+const serving = servingFrom(
+  testServerArgs("disks", LANES, { rootless: true, folder: FOLDER }),
+)
 const disks = projectDisks(LANES, KEY)
 const call = <C extends LanehostCall>(c: C) => answer(c, serving)
 

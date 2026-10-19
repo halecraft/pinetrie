@@ -5,7 +5,7 @@
 import { createHash } from "node:crypto"
 import { readFile } from "node:fs/promises"
 import { commandStream, openChannel } from "@pinetrie/channel"
-import { OBSERVER_SOCKET, type PointId, snapshotId } from "@pinetrie/core"
+import { OBSERVER_SOCKET } from "@pinetrie/core"
 import {
   type Install,
   inMount,
@@ -15,10 +15,10 @@ import {
 } from "@pinetrie/install"
 import {
   connectObserver,
-  LANE_FILES,
   LANEHOST_CONTAINERFILE,
   type LanehostChannel,
   lanehostClient,
+  lanehostDisks,
   MACHINE_SOCKET,
   OBSERVER_CONTAINERFILE,
   type ObserverChannel,
@@ -74,6 +74,7 @@ import {
   imageEnvPath,
   labelled,
   lanehostContainer,
+  NESTED_DISK,
   observerContainer,
   observerImage,
   PROJECT_LABEL,
@@ -142,9 +143,6 @@ async function ensureContainer(
   )
     throw new Error(`docker run ${spec.name} failed: ${apiMessage(made)}`)
 }
-
-/** The most a file of pine·trie's own on a disk may hold: `base.json` is a few hundred bytes. */
-const LANE_FILE_LIMIT = 1024 * 1024
 
 export interface DockerRuntime extends LaneRuntime {
   /** The project's folder merges, on the same lanehost: the folder adapter's alone. */
@@ -324,7 +322,7 @@ export function dockerRuntime(input: {
     return openChannel(
       execArgv(name, [
         ...inContainer("lanehostServer"),
-        ...serverArgs(role, lanesDir, await facts()),
+        ...serverArgs(role, lanesDir, await facts(), NESTED_DISK),
       ]),
       `lanehost's ${role} role`,
     )
@@ -386,33 +384,19 @@ export function dockerRuntime(input: {
     return network
   }
 
-  /**
-   * A command of the disks role's own over `state`'s snapshot, its stdout as
-   * it comes: a tar of files, or one file. The call before it starts the
-   * disks role's container when it is not yet, and refuses a snapshot that
-   * is gone before the command is asked.
-   */
-  async function* snapshotOut(
-    command: ScriptName,
-    state: PointId,
-    stdin: string,
-  ): AsyncIterable<Uint8Array> {
-    if (
-      !(await lanehost.call({
-        kind: "snapshot-exists",
-        project: key,
-        snapshot: snapshotId(state),
-      }))
-    )
-      throw new Error(`the state ${state} has no snapshot`)
-    yield* commandStream(
-      execArgv(lanehostContainer("disks", key, target), [
-        ...inContainer(command),
-        disks.snapshot(snapshotId(state)),
-      ]),
-      { stdin },
-    )
-  }
+  /** The project's disks, on lanehost; a stream command is a `docker exec -i` in the disks role's container. */
+  const projectDisksCalls = lanehostDisks({
+    call: lanehost.call,
+    key,
+    out: (command, snapshot, stdin) =>
+      commandStream(
+        execArgv(lanehostContainer("disks", key, target), [
+          ...inContainer(command === "tar" ? "tarOut" : "fileOut"),
+          disks.snapshot(snapshot),
+        ]),
+        { stdin },
+      ),
+  })
 
   /** A project's grant rules, by lanehost's privileged role on the VM's own network. */
   async function firewall(
@@ -462,72 +446,10 @@ export function dockerRuntime(input: {
         },
       }
     },
-    disk: async op => {
-      if (op.kind === "inner-docker-data-root")
-        await lanehost.call({
-          kind: "nested-disk",
-          project: key,
-          lane: op.lane,
-          cloneFromLane: op.cloneFromLane,
-        })
-      else await lanehost.call({ kind: "disk", project: key, op })
-    },
-    diskExists: lane =>
-      lanehost.call({ kind: "disk-exists", project: key, lane }),
-    snapshotExists: id =>
-      lanehost.call({ kind: "snapshot-exists", project: key, snapshot: id }),
-    snapshots: async () =>
-      (await lanehost.call({ kind: "snapshots", project: key })).map(
-        snapshotId,
-      ),
-    diff: (from, to) => lanehost.call({ kind: "diff", project: key, from, to }),
-    readLaneFile: (snapshot, file) =>
-      lanehost.call({
-        kind: "read",
-        project: key,
-        snapshot,
-        path: `${LANE_FILES}/${file}`,
-        limit: LANE_FILE_LIMIT,
-      }),
-    folder: {
-      pathFacts: (snapshot, paths) =>
-        lanehost.call({ kind: "path-facts", project: key, snapshot, paths }),
-      fileDiff: (a, b, path, limit) =>
-        lanehost.call({ kind: "file-diff", project: key, a, b, path, limit }),
-      diffStats: (a, b, paths) =>
-        lanehost.call({ kind: "diff-stats", project: key, a, b, paths }),
-      filesUnder: (snapshot, paths) =>
-        lanehost.call({ kind: "files-under", project: key, snapshot, paths }),
-      sameContent: (a, b, pairs) =>
-        lanehost.call({ kind: "same-content", project: key, a, b, pairs }),
-      applyMerge: merge =>
-        lanehost.call({ kind: "apply-merge", project: key, ...merge }),
-      read: (snapshot, path, limit) =>
-        lanehost.call({ kind: "read", project: key, snapshot, path, limit }),
-      readIn: read => lanehost.call({ kind: "read-in", project: key, ...read }),
-      tarOut: (state, paths) =>
-        snapshotOut("tarOut", state, paths.map(p => `${p}\0`).join("")),
-      fileOut: (state, path) => snapshotOut("fileOut", state, path),
-      states: async (lane, op) => {
-        await lanehost.call({ kind: "states", project: key, lane, op })
-      },
-    },
+    ...projectDisksCalls,
     runSpec,
+    // The folders a shape binds are made by its start's plan, before this.
     async run(shape) {
-      if (shape.nested)
-        await lanehost.call({
-          kind: "nested-disk",
-          project: key,
-          lane: shape.lane,
-          cloneFromLane: null,
-        })
-      // A bind mount's source must be there before the container is made.
-      if (shape.states)
-        await lanehost.call({
-          kind: "states-dir",
-          project: key,
-          lane: shape.lane,
-        })
       await projectNetworkReady()
       const spec = runSpec(shape)
       const made = await runContainer(

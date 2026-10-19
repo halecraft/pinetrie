@@ -22,6 +22,7 @@ export const INDEXED: readonly string[] = [
   "rules",
   "interface",
   "web-core",
+  "lanes",
 ]
 
 /** An indexed package: its name, as imported, its directory, and its other entries. */

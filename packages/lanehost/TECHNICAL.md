@@ -3,8 +3,14 @@
 Everything the host asks of the machine its lanes' disks are on, outside a
 lane (ADR-0129): one protocol, one server, one client, and a module per
 responsibility. It declares `@pinetrie/core` and `@pinetrie/channel` only
-(`workspace.test.ts`), and knows nothing of lanes or Docker: the runtime
-(`@pinetrie/docker`) makes each role's container and opens its channel.
+(`workspace.test.ts`), and knows no runtime (ADR-0202): the runtime
+(`@pinetrie/docker`) makes each role's container, opens its channel, and
+tells its server what a nested lane's disk holds (`NestedDisk`: its owner
+and its inner runtime's data root, `serverArgs`), so lanehost holds none of
+Docker's values. It knows a nested lane's disk, which is a lane's feature.
+Its disks' client (`lanehostDisks`) is lanes' `LaneDisks` and `FolderDisks`
+in shape, typed by core alone; a runtime spreads it, and `tsc` checks the
+fit where it does.
 
 
 Its scripts run in other processes, by path: the server, its one-shot,
@@ -19,20 +25,21 @@ server loads (`scripts/shipped.test.ts`).
 | file | owns |
 |---|---|
 | `protocol.ts` | `LanehostCall` and each call's result (`LanehostResults`) |
-| `layout.ts` | where a project's disks are (`projectDisks`), and which names may stand for a project or a disk |
-| `roles.ts` | `ROLES`, each role's grant; `callModule`, a call's module; `planRoles`, which role serves each module |
+| `layout.ts` | where a project's disks are (`projectDisks`, `nestedDataRoot`), which names may stand for a project or a disk, and a nested disk's values (`NestedDisk`) |
+| `roles.ts` | `ROLES`, each role's grant; `callModule`, a call's module; `planRoles`, which role serves each module; `planDiff`, how a diff is made and by which role, one value |
 | `answer.ts` | one call answered by its module, refused when another role serves it |
 | `server.ts` | a role's process: `answer` served over `@pinetrie/channel` |
 | `once.ts` | one call answered and printed, for the suites |
-| `serving.ts` | a server's arguments (`serverArgs`) and their reading (`servingFrom`) |
+| `serving.ts` | a server's arguments (`serverArgs`) and their reading (`servingFrom`), which refuses arguments without a nested disk's values |
 | `client.ts` | the host's side: one channel per role, each call routed and logged |
-| `disks.ts` | subvolumes: each operation planned as `DiskStep`s, then executed; a file read from a snapshot |
+| `disks-client.ts` | a project's disks as a runtime gives them to the host (`lanehostDisks`): each call one lanehost call on its key |
+| `disks.ts` | each disk operation (core's `DiskOp`) planned as `DiskStep`s, then executed; a file read from a snapshot |
+| `btrfs.ts` | the one store: subvolumes made, snapshotted, found and dropped; the diff by `btrfs send`; a tree cloned by reflink |
 | `folder.ts` | a folder project's merges: path facts, alike content, a merge's steps applied, a lane's states directory; a read of the project's folder into its line (`read-in`) |
 | `projects.ts` | a project's root recorded, the listing, a project's removal |
 | `grants.ts` | a project's grant of the Mac's ports in the lane VM's firewall |
-| `diff.ts` | what differs between two snapshots: by `btrfs send`, or by a walk |
 | `send-stream.ts` | btrfs's send stream read as one change per path, pure |
-| `walk.ts` | two trees' entries compared, pure; and the walk that reads them; an entry's kind (`statKind`) |
+| `walk.ts` | two trees' entries compared, pure; the walk that reads them, and the diff by a walk; an entry's kind (`statKind`) |
 | `lanehost.Containerfile` | a role's image: Alpine, `btrfs-progs`, `git`, `iptables` |
 | `observer/` | the observer: its BPF program (`observe.bpf.c`), the kernel's structs it reads (`kernel.h`), the event both sides share (`observe.h`), the loader (`observe.c`), their Containerfile, and the suite's guest (`suite/`) |
 | `observer.ts` | the machine role: the loader's lines and commands, and every decision of the role's, pure |
@@ -221,8 +228,10 @@ host, whatever their projects.
 ## Disks (`disks.ts`)
 
 - **Each operation is planned, then executed:** `planDisk` returns
-  `DiskStep`s, pure; `executeDiskSteps` carries them out, running `btrfs`
-  with no shell (`runCommand`).
+  `DiskStep`s, pure; `executeDiskSteps` carries them out on the store
+  (`btrfs.ts`), running `btrfs` with no shell (`runCommand`). The store is
+  one module of functions: another (copies, reflinks, ZFS) would be a
+  module beside it, with its own diff and clone (S264).
 - **Snapshots are read-only,** as `btrfs send` needs (S146). A restore is a
   writable snapshot of one; a delete makes one writable first.
 - **A snapshot is made at `<id>.tmp`, then moved into place,** after the
@@ -251,16 +260,17 @@ host, whatever their projects.
 - **A subvolume is told by its root's inode, 256** (`isSubvolume`):
   `btrfs subvolume show` needs `CAP_SYS_ADMIN` (S125).
 - **A nested lane's disk holds its inner Docker's data root as a subvolume
-  of its own** (`INNER_DOCKER_DATA_ROOT_DIR`, `docker`), so it is cloned
-  without the inner lanehost's `projects/` beside it (ADR-0169). The
-  `nested-disk` call makes the nested disk the rootless user's, then the
-  data root (`planInnerDockerDataRootSteps`, from facts gathered first):
+  of its own** (`NestedDisk.dataRoot`, which the runtime gives: Docker's is
+  `docker`), so it is cloned without the inner lanehost's `projects/`
+  beside it (ADR-0169). The `inner-docker-data-root` operation makes the
+  nested disk its owner's (`NestedDisk.owner`), then the data root
+  (`planInnerDockerDataRootSteps`, from facts gathered first):
   - a lane named to clone from whose data root is a subvolume: the lane's
     own dropped, then a writable snapshot of that one, which keeps its
     owner (S233);
   - otherwise, a source gone included, the lane's own as it is, made a
-    subvolume owned by the rootless user when it is not one: a plain
-    `docker/` from before is dropped, its images with it.
+    subvolume owned by its owner when it is not one: a plain directory
+    from before is dropped, its images with it.
 
   A lane is never its own source: its data root would be dropped first.
 
@@ -329,8 +339,9 @@ out, every call checked and planned into paths first (`planApply`,
   renamed by its path alone), `file-diff` (one file's unified diff, `git diff
   --no-index` of the two snapshots, its paths from the disk's root as jj's
   `--git` prints them, cut one byte past its limit) and `diff-stats` (lines
-  added and removed per path, a binary 0 and 0). `states-dir` makes a
-  lane's states directory before its container mounts it; a project's
+  added and removed per path, a binary 0 and 0). The `states-dir`
+  operation makes a lane's states directory before its container mounts it
+  (its start's plan, `packages/lanes/TECHNICAL.md`); a project's
   removal drops each states directory, whose read-only copies a plain
   removal cannot delete.
 - **git is in the image** for `git merge-file` (S181), so the image's tag,
@@ -355,7 +366,7 @@ out, every call checked and planned into paths first (`planApply`,
   aside read into a concurrent save at its own path, `source` checked
   inside the project's folder as `path` is.
 
-## Diffs (`diff.ts`)
+## Diffs (`btrfs.ts`, `walk.ts`)
 
 - **A diff is `btrfs send --no-data -p`'s where the role's `SYS_ADMIN`
   reaches the host's user namespace:** about 2 ms for a turn's change, 618
@@ -364,12 +375,19 @@ out, every call checked and planned into paths first (`planApply`,
   killed one leaves nothing behind (S148).
 - **Under rootless Docker, a walk of both trees** (`walk.ts`), in the
   disks role: `send` cannot run there (S148). About 80 ms for a lane of
-  44,566 entries, whatever changed (S146). `planRoles` decides which, from
-  `docker info`'s `name=rootless`.
+  44,566 entries, whatever changed (S146). `planDiff` decides how and in
+  which role, as one value, from the machine's `rootless` (Docker's
+  `docker info` `name=rootless`): the role check and the answer both read
+  it.
+- **The walk trusts what a btrfs snapshot keeps** (S264): an unchanged
+  entry's inode and ctime. Measured on 20,000 files, a btrfs snapshot gave
+  1 change after one write; plain and reflink copies gave 20,000, every
+  inode and ctime new, and 1 by mode, size and mtime alone. A store of
+  copies would compare those.
 - **The stream is read as bytes** (`send-stream.ts`), never as
   `receive --dump`'s text, which writes a newline in a name as `\n`: a
   lane controls its file names.
-- **The stream is folded as it arrives, never held** (`diff.ts`,
+- **The stream is folded as it arrives, never held** (`diffBySend`,
   `streamCommand`): `sendReader` keeps only the command a chunk ends
   inside, and `sendFold` takes each command as it comes. A `pnpm install`
   of 42,631 entries is a 43 MB stream of 276k commands: held whole, with

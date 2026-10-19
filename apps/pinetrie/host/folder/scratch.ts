@@ -4,7 +4,7 @@
 // share one, and one left by a stopped host is deleted before its next use.
 
 import { type PointId, snapshotId } from "@pinetrie/core"
-import type { LaneOwner, LaneRuntime } from "@pinetrie/lanes"
+import type { LaneDisks, LaneOwner } from "@pinetrie/lanes"
 
 /**
  * `body` run on the scratch disk `<name>-scratch`, restored from `from`'s
@@ -12,7 +12,7 @@ import type { LaneOwner, LaneRuntime } from "@pinetrie/lanes"
  * `finally`, so a throw leaves none.
  */
 export async function withScratch<T>(
-  runtime: Pick<LaneRuntime, "disk">,
+  runtime: Pick<LaneDisks, "disk">,
   name: PointId,
   from: PointId,
   body: (disk: LaneOwner) => Promise<T>,

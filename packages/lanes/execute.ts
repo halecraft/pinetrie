@@ -2,7 +2,7 @@
 
 import { writeFile } from "node:fs/promises"
 import type { ThreadId } from "@pinetrie/core"
-import type { ForkSteps, LaneStep, Step } from "./plan.ts"
+import type { ForkSteps } from "./fork.ts"
 import {
   type BytesRunner,
   describeFailure,
@@ -10,6 +10,7 @@ import {
   type Runner,
 } from "./run.ts"
 import type { LaneRuntime } from "./runtime-port.ts"
+import type { LaneStep, Step } from "./steps.ts"
 
 /** Where lane steps run: the lane's helper channel. */
 export interface LaneRunners {
@@ -58,7 +59,7 @@ async function runSteps(
       const { runtime } = runners
       if (runtime === undefined)
         throw new Error("a runtime step with no runtime to run it")
-      if (step.op.kind === "run") await runtime.run(step.op.shape)
+      if (step.op.kind === "run") await runtime.run(step.op.start.shape)
       else if (step.op.kind === "remove")
         await runtime.remove(step.op.container)
       else await runtime.disk(step.op)

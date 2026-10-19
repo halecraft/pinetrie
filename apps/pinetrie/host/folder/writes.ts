@@ -48,7 +48,7 @@ import {
   planWriteSteps,
   shownMergeId,
 } from "@pinetrie/folder"
-import type { FolderDisks, LaneQueue, LaneRuntime } from "@pinetrie/lanes"
+import type { FolderDisks, LaneDisks, LaneQueue } from "@pinetrie/lanes"
 import { deleteRecord, FOLDER_WRITE_JOURNAL, setRecord } from "@pinetrie/rules"
 import type { ProposedChangesFact } from "@pinetrie/threads"
 import type { ActRefusal } from "../work/destination.ts"
@@ -137,7 +137,7 @@ export function createFolderWrites(deps: {
   /** The project's one queue: a write holds it, as a read does. */
   readonly queue: LaneQueue
   readonly reader: StateReader & {
-    readonly runtime: Pick<LaneRuntime, "diff" | "disk" | "snapshotExists">
+    readonly runtime: Pick<LaneDisks, "diff" | "disk" | "snapshotExists">
     readonly disks: Pick<
       FolderDisks,
       "filesUnder" | "sameContent" | "pathFacts" | "read" | "tarOut" | "readIn"

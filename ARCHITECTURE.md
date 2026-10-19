@@ -40,15 +40,15 @@ browser ──commands (Kyneta Line)──▶ host ──▶ pi agent core
 | `protocol` | the wire contract |
 | `rules` | each stored shape and the pure rules about it |
 | `reads` | document reads shared by host and client |
-| `lanes` | what a lane is and what runs in it: its container's shape, mounts, grants, disks, forks and snapshots; it defines the `LaneRuntime` port and a kind of project's ports (`LaneHistory`), implements neither, and runs no jj |
-| `lanehost` | what the host asks of the machine its lanes' disks are on, outside any lane (ADR-0129): one protocol, server and client, a module per role; it declares only `core` and `channel`, and knows nothing of lanes or Docker |
+| `lanes` | what a lane is and what runs in it: its container's shape, mounts, grants, disks, forks and snapshots; a container's start as one plan, the folders it binds made first; it defines the `LaneRuntime` port in three parts (disks, containers, images) and a kind of project's ports (`LaneHistory`), implements neither, and runs no jj. Nested lanes run rootless Docker inside, and images are Containerfiles |
+| `lanehost` | what the host asks of the machine its lanes' disks are on, outside any lane (ADR-0129): one protocol, server and client, a module per role, the disks on btrfs (`btrfs.ts`), and their client for any runtime (`lanehostDisks`); it declares only `core` and `channel`, and knows no runtime: a nested lane's disk's owner and data root are given it (ADR-0202) |
 | `channel` | a held channel to a server process, one JSON line per message: lanehost's server and a lane's helper speak it; it declares nothing, since both run it from pine·trie's install |
 | `ssh` | a lane's ssh through its host (ADR-0140): settings, the files every lane is given, the agent protocol and the relay's decisions; it declares nothing, and only the app declares it |
 | `install` | pine·trie's own install (ADR-0189): its root, whether it runs as the repo's `.ts` or the package's `.js`, the mount lanes see it at, and the registry of scripts it runs in other processes, handed out only as whole commands; it declares nothing |
 | `keeper` | one step at a time on a resource that needs exclusive access, in an order the caller can reason about; it declares nothing |
 | `jj` | jj's adapter: your repo as the host reads and writes it (its one owner, proposed changes, accepted work and lanes' refs in it), each lane's own repo as a `LaneHistory`, your repo at startup, and every jj name |
 | `folder` | a folder project's history as values (ADR-0142): its graph of states and their merge bases, the path merge's plan, and the snapshots kept; it declares only `core`, does no I/O, and lanehost carries out what it decides |
-| `docker` | running lanes on Docker: the `LaneRuntime` over the docker CLI, btrfs disks in a helper container, Docker's startup refusals, lanes inside a lane; beside it a folder project's `FolderDisks` |
+| `docker` | running lanes on Docker: containers and images over Docker's API, lanehost's roles in containers, its disks as lanehost's client, Docker's startup refusals, lanes inside a lane; beside it a folder project's `FolderDisks` |
 | `vm` | a Linux machine on the Mac: the image's build, the launcher, a host's lease on a slot; it declares nothing, and knows nothing of lanes |
 | `session` | one client's connection to a host, its own documents and what it has in flight |
 | `shell` | shell source as structure: a command's words by role, and a one-line command laid out to a width; it declares only `unbash` (ADR-0114) |

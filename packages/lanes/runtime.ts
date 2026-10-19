@@ -18,9 +18,9 @@
 import { mkdir, readdir, rename, rm, writeFile } from "node:fs/promises"
 import path from "node:path"
 import { RUNTIME_PROGRAMS } from "@pinetrie/core"
-import { RUNTIME_MOUNT } from "./plan.ts"
 import { describeFailure, run } from "./run.ts"
 import type { LaneRuntime } from "./runtime-port.ts"
+import { RUNTIME_MOUNT } from "./spec.ts"
 
 /** How the runtime's Node starts, in a lane: a script's path follows it (`scriptCommand`). */
 export const RUNTIME_NODE: readonly string[] = [

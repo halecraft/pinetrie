@@ -9,7 +9,11 @@
 
 import { readFile } from "node:fs/promises"
 import path from "node:path"
-import { filesContainerfileCopies, imageRefusal, planImages } from "./plan.ts"
+import {
+  filesContainerfileCopies,
+  imageRefusal,
+  planImages,
+} from "./image-plan.ts"
 import { describeFailure, run } from "./run.ts"
 import type { LaneRuntime } from "./runtime-port.ts"
 

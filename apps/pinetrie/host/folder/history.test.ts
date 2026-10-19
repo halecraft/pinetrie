@@ -39,7 +39,7 @@ import {
   type StateGraph,
   shownMergeId,
 } from "@pinetrie/folder"
-import { projectDisks } from "@pinetrie/lanehost"
+import { lanehostDisks, projectDisks } from "@pinetrie/lanehost"
 import {
   disksInProcess,
   fileStream,
@@ -136,19 +136,20 @@ async function makeRig(): Promise<FolderRig> {
   const unused = (what: string) => () => {
     throw new Error(`the rig's runtime has no ${what}`)
   }
+  // The disks as a runtime gives them, its stream commands run in process.
+  const { folder: folderDisks, ...diskCalls } = lanehostDisks({
+    call,
+    key,
+    out: (command, snapshot, stdin) =>
+      command === "tar"
+        ? tarStream(
+            disks.snapshot(snapshot),
+            stdin.split("\0").filter(p => p !== ""),
+          )
+        : fileStream(disks.snapshot(snapshot), stdin),
+  })
   const runtime: LaneRuntime = {
-    disk: async op => {
-      if (op.kind === "inner-docker-data-root")
-        throw new Error("the rig's lanes are not nested")
-      await call({ kind: "disk", project: key, op })
-    },
-    diskExists: lane => call({ kind: "disk-exists", project: key, lane }),
-    snapshotExists: id =>
-      call({ kind: "snapshot-exists", project: key, snapshot: id }),
-    snapshots: async () =>
-      (await call({ kind: "snapshots", project: key })).map(snapshotId),
-    diff: (from, to) => call({ kind: "diff", project: key, from, to }),
-    readLaneFile: unused("readLaneFile"),
+    ...diskCalls,
     runSpec: unused("runSpec"),
     run: unused("run"),
     containerFacts: unused("containerFacts"),
@@ -159,28 +160,6 @@ async function makeRig(): Promise<FolderRig> {
     ensureLaneImages: unused("ensureLaneImages"),
     imagePath: unused("imagePath"),
     runInImage: unused("runInImage"),
-  }
-  const folderDisks: FolderDisks = {
-    pathFacts: (snapshot, paths) =>
-      call({ kind: "path-facts", project: key, snapshot, paths }),
-    fileDiff: (a, b, p, limit) =>
-      call({ kind: "file-diff", project: key, a, b, path: p, limit }),
-    diffStats: (a, b, paths) =>
-      call({ kind: "diff-stats", project: key, a, b, paths }),
-    filesUnder: (snapshot, paths) =>
-      call({ kind: "files-under", project: key, snapshot, paths }),
-    sameContent: (a, b, pairs) =>
-      call({ kind: "same-content", project: key, a, b, pairs }),
-    applyMerge: m => call({ kind: "apply-merge", project: key, ...m }),
-    read: (snapshot, p, limit) =>
-      call({ kind: "read", project: key, snapshot, path: p, limit }),
-    readIn: r => call({ kind: "read-in", project: key, ...r }),
-    tarOut: (state, paths) =>
-      tarStream(disks.snapshot(snapshotId(state)), paths),
-    fileOut: (state, p) => fileStream(disks.snapshot(snapshotId(state)), p),
-    states: async (lane, op) => {
-      await call({ kind: "states", project: key, lane, op })
-    },
   }
   let stopAfter: number | null = null
   let journalWrites = 0

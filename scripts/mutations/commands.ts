@@ -47,7 +47,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "your home directory is mounted into lanes",
-    file: "packages/lanes/plan.ts",
+    file: "packages/lanes/mounts.ts",
     from: "        : isWithin(input.home, root)",
     to: "        : false",
     command: vitest("packages/lanes"),

@@ -11,7 +11,7 @@ import {
   type PointId,
   snapshotId,
 } from "@pinetrie/core"
-import type { FolderDisks, LaneRuntime } from "@pinetrie/lanes"
+import type { FolderDisks, LaneDisks } from "@pinetrie/lanes"
 import {
   type IgnoreFile,
   ignoreDirs,
@@ -23,7 +23,7 @@ const IGNORE_FILE_LIMIT = 1024 * 1024
 
 /** What reading two states' changes takes. */
 export interface StateReader {
-  readonly runtime: Pick<LaneRuntime, "diff">
+  readonly runtime: Pick<LaneDisks, "diff">
   readonly disks: Pick<
     FolderDisks,
     "filesUnder" | "sameContent" | "pathFacts" | "read"

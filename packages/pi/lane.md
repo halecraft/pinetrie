@@ -19,19 +19,19 @@ changes pine·trie can keep this note true. You can skip them.
 - A shared directory, such as `/workspace/.plans` when the person shares
   it, is their own directory mounted read-write. Your edits there are
   visible to them and to every other thread at once, are never committed,
-  and cannot be undone through jj. <!-- packages/lanes/plan.ts planMounts -->
+  and cannot be undone through jj. <!-- packages/lanes/mounts.ts planMounts -->
 - `/pinetrie` is the install of pine·trie that runs this lane, read-only. It
   looks like a pine·trie checkout, and it is not your project, even when your
   project is pine·trie: its code can differ from yours.
   <!-- packages/install/index.ts PINETRIE_MOUNT -->
 - A dependency the project links from outside itself (`link:`) is mounted
-  read-only at its own path. <!-- packages/lanes/plan.ts planLinks -->
+  read-only at its own path. <!-- packages/lanes/shared.ts planLinks -->
 - A skill's files are at `/mnt/host` followed by their path on the
   person's machine, read-only. <!-- packages/core/lane-env.ts hostPathInLane -->
 - `/pinetrie-runtime`, `/pinetrie-git` and `/workspace/.pinetrie-lane/` are
-  pine·trie's own. Leave them alone. <!-- packages/lanes/plan.ts RUNTIME_MOUNT -->
-  <!-- packages/lanes/plan.ts IGNORE_MOUNT -->
-  <!-- packages/lanes/plan.ts LANE_CONFIG_DIR -->
+  pine·trie's own. Leave them alone. <!-- packages/lanes/spec.ts RUNTIME_MOUNT -->
+  <!-- packages/lanes/shape.ts IGNORE_MOUNT -->
+  <!-- packages/lanes/spec.ts LANE_CONFIG_DIR -->
 
 ## How your work is recorded
 
@@ -106,11 +106,11 @@ changes pine·trie can keep this note true. You can skip them.
   with it. <!-- apps/pinetrie/host/work/containers.ts runEnded -->
 - `/workspace` is snapshotted after each turn. A branch from any of your
   messages starts from the disk as it was at that message.
-  <!-- packages/lanes/plan.ts planSnapshot -->
+  <!-- packages/lanes/steps.ts planSnapshot -->
 - Everything outside `/workspace`, such as `/tmp`, packages from `apt`, or a
   global `npm` install, is on the container's own file system. A branch
   never gets it, and pine·trie recreates the container when the image, mounts
-  or grants change. <!-- packages/lanes/plan.ts planContainer -->
+  or grants change. <!-- packages/lanes/start.ts planContainer -->
 
 ## The environment
 
@@ -123,7 +123,7 @@ changes pine·trie can keep this note true. You can skip them.
 - Whatever the image, `jj`, `rg`, `fd` and `sd` are in `/pinetrie-runtime/bin`,
   last on your `PATH`: static builds pine·trie brings, so an image's own
   version of one comes first. <!-- packages/core/lane-env.ts RUNTIME_PROGRAMS -->
-  <!-- packages/lanes/plan.ts RUNTIME_BIN -->
+  <!-- packages/lanes/spec.ts RUNTIME_BIN -->
 - Besides `read`, `write`, `edit` and `bash`, you have `grep` and `find`
   tools, which run that `rg` and `fd` in the lane. They skip what
   `.gitignore` ignores, such as `node_modules` or a shared `.plans`, unless
@@ -136,7 +136,7 @@ changes pine·trie can keep this note true. You can skip them.
   `/var/run/docker.sock`: point a tool that assumes it at `$DOCKER_HOST`.
   Before building or running images there, read
   `/pinetrie/packages/pi/lane-docker.md`.
-  <!-- packages/lanes/plan.ts LaneGrants -->
+  <!-- packages/lanes/spec.ts LaneGrants -->
   <!-- packages/docker/plan.ts INNER_DOCKER_HOST -->
   <!-- packages/lanes/lane.ts nestedLaneDockerNote -->
 - The person's machine's own services (bound to its loopback) are out of
@@ -147,7 +147,7 @@ changes pine·trie can keep this note true. You can skip them.
 - There are no credentials: the person's home directory is not mounted. A
   project grants its lanes an ssh agent, named environment variables, or
   read-only mounts in `pinetrie.json`'s `lanes` key.
-  <!-- packages/lanes/plan.ts LaneGrants -->
+  <!-- packages/lanes/spec.ts LaneGrants -->
 
 ## The network
 

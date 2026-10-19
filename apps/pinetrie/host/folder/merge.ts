@@ -18,7 +18,7 @@ import {
   pathsToGather,
   planPathMerge,
 } from "@pinetrie/folder"
-import type { FolderDisks, LaneRuntime } from "@pinetrie/lanes"
+import type { FolderDisks, LaneDisks } from "@pinetrie/lanes"
 import { type StateReader, samePaths, sourceDiff } from "./changes.ts"
 import { baseState } from "./virtual-base.ts"
 
@@ -113,7 +113,7 @@ export async function mergeInto(
  */
 export async function mergeToState(
   r: StateReader & {
-    readonly runtime: Pick<LaneRuntime, "diff" | "disk" | "snapshotExists">
+    readonly runtime: Pick<LaneDisks, "diff" | "disk" | "snapshotExists">
     readonly disks: Pick<
       FolderDisks,
       "pathFacts" | "sameContent" | "applyMerge" | "filesUnder" | "read"
@@ -145,7 +145,7 @@ export async function mergeToState(
  * sweep's; else it goes now, left behind by an earlier merge or not.
  */
 export async function dropUnrecordedBase(
-  runtime: Pick<LaneRuntime, "disk">,
+  runtime: Pick<LaneDisks, "disk">,
   plan: BasePlan,
   recorded: (state: PointId) => boolean,
 ): Promise<void> {

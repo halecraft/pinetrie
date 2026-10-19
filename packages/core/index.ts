@@ -49,6 +49,7 @@ export {
   DISK_OWN_ROOTS,
   type DiskChange,
   type DiskDiff,
+  type DiskOp,
   type DiskPath,
   diskPath,
   isPathInside,

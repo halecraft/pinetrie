@@ -13,8 +13,11 @@ they differ only in the `DockerTarget` the app hands it
 | `hostSocket` | the slot's socket in the VM, bridged to the one the lease names (ADR-0140) | the host's ssh socket itself |
 | lanes directory | `/var/lib/lanehost`, the VM's data disk | `$XDG_STATE_HOME/pinetrie/lanes`, or `/var/lib/pinetrie-lanes` in a nested lane |
 
-It declares `@pinetrie/core` and `@pinetrie/lanes`, and only the app
-declares it (`workspace.test.ts`).
+It declares `@pinetrie/core`, `@pinetrie/lanes`, `@pinetrie/lanehost`,
+`@pinetrie/channel` and `@pinetrie/install`, and only the app declares it
+(`workspace.test.ts`). It implements `LaneContainers` and `LaneImages`, and
+hosts lanehost's roles; its disks are lanehost's client, spread
+(`lanehostDisks`, ADR-0202).
 
 ## Where things are
 
@@ -85,13 +88,19 @@ declares it (`workspace.test.ts`).
 
 ## Disks: lanehost's (ADR-0129)
 
-- **`folder.tarOut` and `folder.fileOut` are the disk operations that are
-  no call:** a stream answers each, so each runs lanehost's `tar-out.ts`
-  or `file-out.ts` by a `docker exec -i` of its own in the disks role's
-  container (`snapshotOut`), after a `snapshot-exists` call that starts the
-  container and refuses a gone snapshot. On the Mac both cross the lane
-  VM as any exec does.
-- **Every other disk operation is a call to lanehost** (`@pinetrie/lanehost`,
+- **The disks are lanehost's client** (`lanehostDisks`), spread into the
+  runtime: every disk call and every `FolderDisks` call is one lanehost
+  call on the project's key. Docker gives it two things: each role's
+  channel (`openRole`, below), and the stream of a disks role's own command
+  (`tar-out.ts`, `file-out.ts`), a `docker exec -i` of its own in the disks
+  role's container, which the client asks only after a `snapshot-exists`
+  call that starts the container and refuses a gone snapshot. On the Mac
+  both cross the lane VM as any exec does.
+- **`run` makes only the container:** the folders a shape binds on
+  lanehost's disks (`DiskBind`) are made by its start's plan before it
+  (`packages/lanes/TECHNICAL.md`, Containers), and `renderRun` takes each
+  bind's source from one table over lanehost's layout (`DISK_BIND`).
+- **Each call goes to lanehost** (`@pinetrie/lanehost`,
   `packages/lanehost/TECHNICAL.md`), over one held `docker exec -i` per
   role: about 3 ms, against 28 ms for a `docker exec` per operation
   (S147). The runtime opens each role's channel at its first call
@@ -227,6 +236,10 @@ never reaches the VM's Docker or the launcher's ports.
   (`packages/lanes/TECHNICAL.md`, Containers), so a version one lane built
   reaches the others for the cost of a clone (S233, S236); and the host in
   the lane prunes it as any host prunes its Docker (above).
+- **Its directory and owner are docker's values** (`INNER_DOCKER_DATA_ROOT_DIR`,
+  `ROOTLESS_UID`, as `NESTED_DISK`), beside `INNER_DOCKER_HOST` and the lane
+  image's `--data-root`, which a test holds to them. lanehost is given them
+  in its server's arguments and holds none (ADR-0202).
 - **A host in a nested lane** gets `docker-host` from `planRuntime`, its
   lanes directory `/var/lib/pinetrie-lanes`. Its lanes' root is uid 1000
   outside, so a directory they write must be that user's: the suites hand

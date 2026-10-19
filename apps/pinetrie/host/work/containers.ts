@@ -13,16 +13,15 @@ import type { Keeper } from "@pinetrie/keeper"
 import {
   decideContainerStart,
   executeOrThrow,
-  innerDockerDataRootStep,
+  type InnerDockerDataRootSource,
   KILL_SSH,
   type LaneFactReader,
   type LaneGrants,
   type LaneHistory,
-  type LaneSpec,
-  type LaneStartWithStoppedContainer,
   laneNote,
   nestedLaneDockerNote,
   RUNTIME_BIN,
+  type Step,
 } from "@pinetrie/lanes"
 import type { LaneAccess, LaneFacts } from "@pinetrie/pi"
 import {
@@ -148,23 +147,6 @@ export function createContainers(deps: {
     snapshotExists: snapshot => setup.runtime.snapshotExists(snapshot),
   })
 
-  /**
-   * A nested lane's inner Docker data root, made from the last run's lane's
-   * before its container starts: `start` is one whose container is stopped
-   * or not yet made, so no inner Docker runs on it.
-   */
-  async function makeInnerDockerDataRoot(
-    spec: LaneSpec,
-    start: LaneStartWithStoppedContainer,
-    runners: Parameters<typeof executeOrThrow>[1],
-  ): Promise<void> {
-    const source = innerDockerDataRoots.sourceAtStart(spec.lane)
-    const step = innerDockerDataRootStep(spec, start, source)
-    if (step === null) return
-    await executeOrThrow([step], runners)
-    innerDockerDataRoots.made(spec.lane, source)
-  }
-
   async function startContainer(
     record: OwnLane,
     h: LaneHistory,
@@ -190,9 +172,19 @@ export function createContainers(deps: {
           runtime,
           facts: await runtime.containerFacts(container),
           fork: fork.state,
+          dataRoot: innerDockerDataRoots.sourceAtStart(lane),
         },
         factsOf(lane, h),
       )
+    /** The start's steps, then what its data root was made from. */
+    const runSteps = async (start: {
+      readonly steps: readonly Step[]
+      readonly dataRoot: InnerDockerDataRootSource | null
+    }) => {
+      await executeOrThrow(start.steps, handle.runners)
+      if (start.dataRoot !== null)
+        innerDockerDataRoots.made(lane, start.dataRoot)
+    }
     switch (decided.kind) {
       case "fork":
         // A fork stopped part way may have left its container running, its
@@ -201,12 +193,7 @@ export function createContainers(deps: {
         await deps.fork(lane, h, handle, record, fork)
         break
       case "container":
-        if (decided.plan === "start")
-          await makeInnerDockerDataRoot(
-            spec,
-            { kind: "container", plan: "start" },
-            handle.runners,
-          )
+        await runSteps(decided)
         await handle.start(decided.plan === "start" ? "stopped" : "running")
         break
       case "disk":
@@ -215,8 +202,7 @@ export function createContainers(deps: {
           await handle.stop()
           await runtime.remove(container)
         }
-        await makeInnerDockerDataRoot(spec, decided, handle.runners)
-        await executeOrThrow(decided.steps, handle.runners)
+        await runSteps(decided)
         if (decided.kind === "snapshot") await h.afterRestore()
         // Made just now: running.
         await handle.start("running")

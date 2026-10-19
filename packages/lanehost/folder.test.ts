@@ -13,9 +13,10 @@ import {
   writeFile,
 } from "node:fs/promises"
 import path from "node:path"
-import { type MergeStep, pointId } from "@pinetrie/core"
+import { type MergeStep, pointId, snapshotId } from "@pinetrie/core"
 import { afterAll, beforeAll, describe, expect, test } from "vitest"
 import { answer } from "./answer.ts"
+import { testServerArgs } from "./fixtures.ts"
 import { planApply, planStates } from "./folder.ts"
 import { projectDisks } from "./layout.ts"
 import type { LanehostCall } from "./protocol.ts"
@@ -29,7 +30,7 @@ const onBtrfs = await mkdir(HERE, { recursive: true })
   .catch(() => false)
 
 const KEY = "0123456789abcdef"
-const serving = servingFrom(["disks", HERE, '{"rootless":true}'])
+const serving = servingFrom(testServerArgs("disks", HERE, { rootless: true }))
 const disks = projectDisks(HERE, KEY)
 const call = <C extends LanehostCall>(c: C) => answer(c, serving)
 
@@ -49,7 +50,7 @@ async function state(
     op:
       from === undefined
         ? { kind: "create", lane }
-        : { kind: "restore", lane, from },
+        : { kind: "restore", lane, from: snapshotId(from) },
   })
   for (const [p, v] of Object.entries(files)) {
     const at = path.join(disks.lane(lane), p)
@@ -63,7 +64,7 @@ async function state(
   await call({
     kind: "disk",
     project: KEY,
-    op: { kind: "snapshot", lane, snapshot: name },
+    op: { kind: "snapshot", lane, snapshot: snapshotId(name) },
   })
   await call({ kind: "disk", project: KEY, op: { kind: "delete", lane } })
 }
@@ -81,7 +82,7 @@ async function mergeInto(input: {
   await call({
     kind: "disk",
     project: KEY,
-    op: { kind: "restore", lane: disk, from: input.from },
+    op: { kind: "restore", lane: disk, from: snapshotId(input.from) },
   })
   const texts = await call({
     kind: "apply-merge",
@@ -95,7 +96,7 @@ async function mergeInto(input: {
   await call({
     kind: "disk",
     project: KEY,
-    op: { kind: "snapshot", lane: disk, snapshot: input.to },
+    op: { kind: "snapshot", lane: disk, snapshot: snapshotId(input.to) },
   })
   const diff = await call({
     kind: "diff",

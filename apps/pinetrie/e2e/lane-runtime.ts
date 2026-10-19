@@ -9,13 +9,13 @@ import path from "node:path"
 import type { SnapshotId, ThreadId } from "@pinetrie/core"
 import {
   LANEHOST_LABEL,
+  NESTED_DISK,
   NESTED_MOUNT,
-  projectDisks,
   projectKey,
   ROOTLESS_UID,
 } from "@pinetrie/docker"
 import { inMount, scriptCommand, thisInstall } from "@pinetrie/install"
-import { type LanehostCall, serverArgs } from "@pinetrie/lanehost"
+import { type LanehostCall, projectDisks, serverArgs } from "@pinetrie/lanehost"
 import { RUNTIME_NODE } from "@pinetrie/lanes"
 import { vmStateDir } from "@pinetrie/vm"
 import { planRuntime } from "../host/work/runtime.ts"
@@ -101,7 +101,12 @@ async function lanehostOnce(
     "exec",
     await disksContainer(root),
     ...scriptCommand(inMount(thisInstall), "lanehostOnce", RUNTIME_NODE),
-    ...serverArgs("disks", lanesDir(), { rootless: existsSync(NESTED_MOUNT) }),
+    ...serverArgs(
+      "disks",
+      lanesDir(),
+      { rootless: existsSync(NESTED_MOUNT) },
+      NESTED_DISK,
+    ),
     JSON.stringify(call),
   ])
   return JSON.parse(out) as unknown
