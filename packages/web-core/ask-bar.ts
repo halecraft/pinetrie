@@ -1,4 +1,4 @@
-// interface/ask-bar — which ask the work at the top of a column belongs to;
+// web-core/ask-bar — which ask the work at the top of a column belongs to;
 // `use-ask-bar.ts` measures.
 
 import type { EntryId } from "@pinetrie/core"

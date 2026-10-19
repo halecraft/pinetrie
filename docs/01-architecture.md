@@ -111,6 +111,7 @@ Five contracts. Fix these and everything else proceeds in parallel.
 apps/         things you RUN; nothing imports them
   pinetrie/      @pinetrie/app          the host (server) and its e2e suites
   conformance/   @pinetrie/conformance  pi's own Storage suite vs our adapter
+  tui/           @pinetrie/tui          a terminal client: interface, session and core only (TECHNICAL.md)
 
 packages/     libraries; their boundaries are enforced by resolution
   core/          @pinetrie/core         declares NOTHING; pure decisions and types
@@ -132,8 +133,9 @@ packages/     libraries; their boundaries are enforced by resolution
   config/        @pinetrie/config       core only; settings declared with their rules, layers decoded, one settle (TECHNICAL.md)
   session/       @pinetrie/session      one client's connection to a host; no React (TECHNICAL.md)
   shell/         @pinetrie/shell        unbash only; shell source as structure (TECHNICAL.md)
-  interface/     @pinetrie/interface    what a person sees and does, for any client; no React, no DOM (ADR-0093)
-  web/           @pinetrie/web          the browser page: React and the DOM; owns its Vite build
+  interface/     @pinetrie/interface    what a person sees and does, for any client; no React, no DOM, no I/O (ADR-0093, ADR-0194)
+  web-core/      @pinetrie/web-core     core and interface only; the web client's own decisions (TECHNICAL.md)
+  web/           @pinetrie/web          the browser page: React and the DOM; owns its Vite build; no rules, no reads
 
 (root)        a bare workspace: development tooling only, no dependencies
 ```
@@ -215,6 +217,28 @@ Dependency direction is physical: `core → schema → pi → app`, and
 which is what forced `core` and `schema` to become packages — pi depends on
 them.
 
+
+### Pure code names only the globals it may
+
+Resolution fences imports, not globals: Node's types declare `fetch`, and
+the DOM library `window`. So the pure packages (interface, shell,
+web-core, the session's main entry and `apps/tui`) are type-checked in one
+program, `tsconfig.pure.json`, with `lib: ["ESNext"]`, no ambient types and
+`pure-globals.d.ts`: `TextEncoder`, `TextDecoder`, `URL`, `URLSearchParams`
+and `AbortSignal`, each with only the members used (S273, S276). There
+`fetch`, `globalThis.fetch`, `process`, `Buffer`, timers, storage and the
+DOM do not exist, and `pnpm run typecheck` runs it beside the root's
+config (ADR-0194). Saying a package is pure is a line in its `include`.
+
+- **"Cannot find name `fetch`" there means take it from the caller**, as
+  the session takes `fetch` and the `WebSocket` constructor
+  (`packages/session/TECHNICAL.md`): never add it to the list.
+- **The list stays small by a test** (`scripts/pure-globals.test.ts`):
+  each global's declaration is preceded by a line naming a file the pure
+  config reaches that names it. A dead entry fails, and growth is a
+  reviewed line in a short file.
+- **It is the type checker's**, like the branded ids: it fails `pnpm run
+  typecheck`, never a run, since Node strips types.
 ### Writers, lanes and the host
 
 The host owns one pi harness and is **not a writer**. Each connected client is

@@ -3,9 +3,8 @@
 // opens it in a new tab; a drag puts it in a media column (`use-drag.ts`).
 
 import { blobOfUrl, blobUrl, type ImageRef } from "@pinetrie/core"
-import { dragProps } from "@pinetrie/interface"
+import { dragProps, imageClick } from "@pinetrie/web-core"
 import { type ComponentProps, type CSSProperties, useContext } from "react"
-import { imageClick } from "./image-click.ts"
 import { blockOfProperty } from "./markdown.ts"
 import { type PaneSubject, samePane } from "./pane.ts"
 import { MessageSource, PaneReach } from "./pane-context.ts"

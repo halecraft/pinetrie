@@ -7,11 +7,10 @@ import type { TextCardId } from "@pinetrie/core"
 import {
   insertSnippet,
   type Selection,
+  shareMarkdown,
   shareSelection,
   shareStatus,
-  uploadBlob,
 } from "@pinetrie/interface"
-import { shareMarkdown } from "@pinetrie/rules"
 import type { SessionClient } from "@pinetrie/session"
 import { type RefObject, useState } from "react"
 
@@ -71,7 +70,7 @@ export function useShareFiles(target: ShareTarget | null): {
     })
     const anchor = anchorOf(t, at, t.boundTo())
     setUploading(n => n + 1)
-    const uploads = await Promise.all(files.map(f => uploadBlob(f)))
+    const uploads = await Promise.all(files.map(f => t.session.upload(f)))
     setUploading(n => n - 1)
     const snippets = uploads.flatMap((u, i) =>
       u.ok ? [shareMarkdown(files[i]?.name ?? "", u.ref)] : [],

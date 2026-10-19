@@ -13,6 +13,7 @@ import {
   indexTree,
   NO_CONTENT,
   rootIdFor,
+  THE_AGENT,
   type ThreadCard,
   type ThreadId,
   type ThreadRecord,
@@ -20,6 +21,7 @@ import {
   textCardId,
   threadIdFor,
   treeRoot,
+  type WriterId,
   writerId,
 } from "@pinetrie/core"
 import {
@@ -29,6 +31,9 @@ import {
   personMessage,
   withThreads,
 } from "@pinetrie/core/fixtures"
+import { DIGEST, encodeMessage, setRecord } from "@pinetrie/rules"
+import { applyRecordWrites, type RootDocHandle } from "@pinetrie/schema"
+import { writeEntry } from "@pinetrie/schema/fixtures"
 import type { ClipLookups } from "./effects.ts"
 import type { Focus } from "./focus.ts"
 
@@ -43,6 +48,12 @@ export {
   transcriptMessage,
   withThreads,
 } from "@pinetrie/core/fixtures"
+export {
+  newLiveDoc,
+  newRootDoc,
+  newSessionDoc,
+  writeLaneTip,
+} from "@pinetrie/schema/fixtures"
 
 import { type Canvases, canvasesOnBoard } from "./canvases.ts"
 
@@ -190,3 +201,51 @@ export const canvasesWith = (input: {
   })
 
 const TEST_WRITER = writerId("ada@x.io")
+
+/**
+ * A message entry in `root`, as pi's storage writes one: `id` after `parent`
+ * on `thread`. A client's test arranges a thread with it, as the host would.
+ */
+export function writeMessage(
+  root: RootDocHandle,
+  input: {
+    readonly id: string
+    readonly parent: string | null
+    readonly thread: ThreadId
+    readonly message: unknown
+  },
+): void {
+  writeEntry(root, {
+    id: input.id,
+    parentId: input.parent,
+    type: "message",
+    timestamp: 0,
+    fromId: null,
+    thread: input.thread,
+    payload: { message: input.message },
+  })
+}
+
+/** The final digest of the ask `prompt` started, in `root` (`TEST_ROOT`'s), as the host writes one after its run. */
+export function writeDigest(
+  root: RootDocHandle,
+  prompt: EntryId,
+  digest: { readonly headline: string; readonly points: readonly string[] },
+): void {
+  applyRecordWrites(root, [
+    setRecord(DIGEST, { prompt, at: 1, final: true, ...digest }, TEST_ROOT),
+  ])
+}
+
+/** A person's chat as the host stores it: `text` by `writer`, named `name`, asking the agent. */
+export const storedChat = (text: string, writer: WriterId, name: string) =>
+  encodeMessage(
+    {
+      author: writer,
+      authorName: name,
+      text,
+      compels: { kind: "agent", agent: THE_AGENT },
+      sendId: `send-${text}`,
+    },
+    1,
+  )

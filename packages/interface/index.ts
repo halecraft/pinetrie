@@ -11,7 +11,6 @@ export {
 } from "./account-view.ts"
 export { addressWords, EDIT_AS_TEXT } from "./address-words.ts"
 export { type AgentsRow, agentsRow, agentsWords } from "./agents-view.ts"
-export { placement } from "./align.ts"
 export {
   appView,
   type CanvasRail,
@@ -28,12 +27,6 @@ export {
   threadWork,
 } from "./app-view.ts"
 export {
-  type AtTop,
-  askAtTop,
-  sameAtTop,
-  type WorkBox,
-} from "./ask-bar.ts"
-export {
   type AskDraw,
   type AskRow,
   type AskSummary,
@@ -45,16 +38,14 @@ export {
   type SummaryAnchor,
   toggled,
 } from "./ask-fold.ts"
-export {
-  type Segment,
-  segmentPath,
-} from "./ask-segments.ts"
+export type { Segment } from "./ask-segments.ts"
 export {
   type AskView,
   askView,
   type ColumnRow,
-  columnRows,
   lastEndedAsk,
+  pathRows,
+  rowHolds,
 } from "./ask-view.ts"
 export {
   ASK_FILES_TITLE,
@@ -182,6 +173,7 @@ export {
   HISTORY_TITLE,
   historyItemWords,
   historyWords,
+  hostCardLine,
   INVENTORY,
   type LatestSources,
   movedBackWords,
@@ -205,14 +197,12 @@ export {
   writtenWords,
 } from "./card-words.ts"
 export {
-  CLIP_ATTRIBUTE,
-  CLIP_MIME,
   type Clip,
   type ClipFacts,
+  clipJson,
   clipOfFocus,
-  planCopy,
-  type Received,
-  readPaste,
+  clipOfJson,
+  clipText,
 } from "./clip.ts"
 export {
   type ClipboardCellView,
@@ -225,6 +215,7 @@ export {
   type ColumnMenuSection,
   columnHeadEnd,
 } from "./column-menu.ts"
+export type { ColumnMotion } from "./column-motion.ts"
 export {
   branchColors,
   type ColumnView,
@@ -306,40 +297,21 @@ export { COPY_MESSAGE, copyText } from "./copy-text.ts"
 export { countWords, type ListKind } from "./count-words.ts"
 export { byteWords, plural, whenWords } from "./counts.ts"
 export {
-  type Armed,
   type CanvasOver,
+  type CanvasSource,
   type CardOver,
-  DRAG_HANDLE,
-  DRAG_START,
+  type CardSource,
   type DragAt,
   type DragFrom,
   type DragSource,
-  type DrawPlan,
-  type DropMark,
-  dragProps,
-  drawPlan,
   dropIntents,
-  dropMark,
-  type HoverOver,
-  hoverOpens,
-  ITEM_HOVER_MS,
-  NOT_A_HANDLE,
+  type ImageSource,
   type PlannedDrop,
-  type Point,
   planDrop,
-  sidebarSpot,
-  sourceOfElement,
 } from "./drag.ts"
 export type { Effect, IntentState } from "./effects.ts"
 export type { Focus } from "./focus.ts"
 export { claimFocus, type FocusKey } from "./focus-claim.ts"
-export {
-  type ColumnMotion,
-  type FoldMotion,
-  type FoldScene,
-  planFoldMotion,
-  type Rect,
-} from "./fold-motion.ts"
 export {
   type FoldedGlance,
   type FoldedMark,
@@ -356,14 +328,6 @@ export {
   UNNAMED_THREAD,
 } from "./folded-column-view.ts"
 export { jjWordsIn, wordsIn } from "./folder-words.ts"
-export {
-  behind,
-  type FollowEvent,
-  type FollowState,
-  follow,
-  initialFollow,
-  type SeenEnd,
-} from "./follow.ts"
 export {
   columnForeign,
   columnReadOnly,
@@ -393,10 +357,12 @@ export {
   restoreStatus,
   restoreWords,
 } from "./history-view.ts"
+export * from "./host-rules.ts"
 export {
   type Identity,
   identityCodec,
   nameHint,
+  PICTURE_MOST,
   parseIdentity,
   pictureProblem,
   planRename,
@@ -404,9 +370,7 @@ export {
   renameProblem,
 } from "./identity.ts"
 export {
-  EDGE_BAND_PX,
   type ImageEdge,
-  imageEdge,
   imageSpot,
 } from "./image-edge.ts"
 export {
@@ -433,11 +397,6 @@ export {
   nameEffects,
   planIntent,
 } from "./intent.ts"
-export {
-  type Dock,
-  dockCodec,
-  snappedDock,
-} from "./inventory-dock.ts"
 export {
   cardFlight,
   type Flight,
@@ -525,12 +484,9 @@ export {
 export { actingSaid } from "./outcome-words.ts"
 export {
   BACK,
-  hashOfPage,
-  PAGE_STATE,
+  isPage,
   type PageName,
-  pageOfHash,
   pageWords,
-  planLeave,
   profileWords,
 } from "./page.ts"
 export { keyAct } from "./page-keys.ts"
@@ -558,18 +514,12 @@ export {
   perform,
 } from "./perform.ts"
 export {
-  type Crop,
-  cropSource,
-  fitCrop,
-  MOST_ZOOM,
-  moveCrop,
-  PICTURE_SIZE,
-  pictureWords,
-  zoomCrop,
-} from "./picture-crop.ts"
-export {
   othersReading,
   othersWithValue,
+  readReading,
+  readReadingCanvases,
+  readTyping,
+  readTypingIn,
   seenBy,
 } from "./presence.ts"
 export {
@@ -579,8 +529,14 @@ export {
 } from "./presence-report.ts"
 export {
   type HeldView,
+  participantsIn,
+  readHeldIndex,
   readHeldLanes,
+  readParticipantNames,
+  readParticipantPictures,
+  readRoots,
   readSessionFacts,
+  type SessionFacts,
 } from "./projection.ts"
 export {
   columnProposals,
@@ -628,10 +584,8 @@ export {
 } from "./rail-view.ts"
 export {
   cardBeforeGap,
-  edgeScroll,
   keyMove,
   landing,
-  neighbourShifts,
   pointerGap,
 } from "./reorder.ts"
 export {
@@ -672,10 +626,6 @@ export {
   rootTargetOfElement,
 } from "./root-target.ts"
 export { sameData } from "./same-data.ts"
-export {
-  type ScreenMemory,
-  screenMemory,
-} from "./screen-memory.ts"
 export {
   parseQuery,
   type SearchAct,
@@ -822,20 +772,3 @@ export {
   seenBatches,
   traceGroups,
 } from "./traces.ts"
-export { type Upload, uploadBlob } from "./upload.ts"
-export {
-  type Box,
-  columnSpot,
-  keepSpot,
-  railScroll,
-  type Span,
-  type Spot,
-  type SpotStore,
-  sameSpan,
-  spotFor,
-  spotScrollTop,
-  spotStore,
-  type ViewportStore,
-  viewportStore,
-  visibleSpan,
-} from "./viewport.ts"

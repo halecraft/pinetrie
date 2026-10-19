@@ -12,7 +12,6 @@ import type {
   ThreadId,
 } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
-import type { SnapshotStore } from "./store.ts"
 
 /**
  * A command's answer the page says (`outcomeWords`): refused, with its
@@ -159,7 +158,7 @@ function actingStep(state: ActingState, on: ActingOn): ActingState {
 }
 
 /** A command to send and track: an action on proposed changes on a lane, or a line action. */
-type ActingCommand =
+export type ActingCommand =
   | {
       readonly kind: "proposed"
       readonly lane: ThreadId
@@ -179,17 +178,17 @@ type ActingCommand =
       readonly path: string
     }
 
+/** A command sent, or its answer, by the id it was sent with. */
+export type CommandEvent =
+  | { readonly kind: "sent"; readonly id: string }
+  | {
+      readonly kind: "answered"
+      readonly id: string
+      readonly outcome: Outcome
+    }
+
 /** What `command` is on, with `event`. */
-function actingOn(
-  command: ActingCommand,
-  event:
-    | { readonly kind: "sent"; readonly id: string }
-    | {
-        readonly kind: "answered"
-        readonly id: string
-        readonly outcome: Outcome
-      },
-): ActingOn {
+function actingOn(command: ActingCommand, event: CommandEvent): ActingOn {
   switch (command.kind) {
     case "proposed":
       return {
@@ -237,23 +236,9 @@ function actingOn(
   }
 }
 
-/** Mark `command` sent in `store`, send it, and record the answer when it comes. */
-export function sendActing(
-  store: SnapshotStore<ActingState>,
+/** The state after `command` is sent or answered. */
+export const actingAfter = (
+  state: ActingState,
   command: ActingCommand,
-  send: () => Promise<Outcome>,
-  id: string = crypto.randomUUID(),
-): Promise<Outcome> {
-  store.set(
-    actingStep(store.current(), actingOn(command, { kind: "sent", id })),
-  )
-  return send().then(outcome => {
-    store.set(
-      actingStep(
-        store.current(),
-        actingOn(command, { kind: "answered", id, outcome }),
-      ),
-    )
-    return outcome
-  })
-}
+  event: CommandEvent,
+): ActingState => actingStep(state, actingOn(command, event))

@@ -18,7 +18,6 @@ import {
   type ColumnAct,
   cardFrameWords,
   type DrawnCard,
-  dragProps,
   HISTORY_TITLE,
   historyItemWords,
   KIND_ICON,
@@ -29,6 +28,7 @@ import {
   SHARE_FILE,
   TRASH_CARD_TITLE,
 } from "@pinetrie/interface"
+import { dragProps } from "@pinetrie/web-core"
 import { type ReactNode, useRef, useState } from "react"
 import { Button, IconButton } from "./button.tsx"
 import { CardHistory, MovedBack } from "./card-history.tsx"

@@ -16,6 +16,7 @@ import {
   callLabel,
   callMark,
   callStatus,
+  canvasLines,
   canvasMarkerWords,
   canvasPinnedMarkerWords,
   copyText,
@@ -35,14 +36,13 @@ import {
   rowSummary,
   rowView,
   runningFor,
-  type ScreenMemory,
   showsText,
   speakerWords,
   toolBody,
 } from "@pinetrie/interface"
-import { canvasLines } from "@pinetrie/rules"
 import { type LiveDocHandle, readStreamText } from "@pinetrie/schema"
-import { newCardId } from "@pinetrie/session"
+import { newCardId } from "@pinetrie/session/connect"
+import type { ScreenMemory } from "@pinetrie/web-core"
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { StoredImage } from "./blob-image.tsx"
 import { Button, IconButton } from "./button.tsx"

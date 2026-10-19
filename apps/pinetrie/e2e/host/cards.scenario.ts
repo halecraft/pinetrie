@@ -32,13 +32,8 @@ import {
 } from "@pinetrie/reads"
 import { cardsOnCanvas, HELD_WORDS, yourCard } from "@pinetrie/rules"
 import { cardDocId, InventoryDoc, PlacesDoc } from "@pinetrie/schema"
-import {
-  LAST_ORDER,
-  newCardId,
-  newRootId,
-  newThreadId,
-  type SessionClient,
-} from "@pinetrie/session"
+import { LAST_ORDER, type SessionClient } from "@pinetrie/session"
+import { newCardId, newRootId, newThreadId } from "@pinetrie/session/connect"
 import { openStore } from "../../host/store.ts"
 import type { Checks } from "../checks.ts"
 import {

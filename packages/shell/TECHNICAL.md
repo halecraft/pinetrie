@@ -6,7 +6,8 @@ plain), and a one-line command laid out to a width. It knows nothing of
 tool calls: `@pinetrie/interface` decides which call reads as shell, and
 `@pinetrie/web` colours the roles. It declares only `unbash`, and only
 interface declares it (`workspace.test.ts`). No DOM and no Node:
-`tsconfig.json` checks it with `lib: ["ESNext"]`.
+`tsconfig.pure.json` checks it with `lib: ["ESNext"]`, no ambient types and
+only the globals `pure-globals.d.ts` declares.
 
 ## `readShell(source, width)`
 

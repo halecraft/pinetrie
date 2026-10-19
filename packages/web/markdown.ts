@@ -11,13 +11,13 @@ import {
   type Sha256,
   type Share,
 } from "@pinetrie/core"
-import { shareChip } from "@pinetrie/interface"
 import {
   BLOCK_PROPERTY,
   type BlockNode,
   blockKey,
   markBlocks,
-} from "@pinetrie/rules"
+  shareChip,
+} from "@pinetrie/interface"
 import type { Element, ElementContent, Root, RootContent } from "hast"
 import remarkGfm from "remark-gfm"
 import remarkParse from "remark-parse"

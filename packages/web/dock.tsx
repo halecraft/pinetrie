@@ -27,15 +27,16 @@ import {
   nextButtonWords,
   nextItemWords,
   nextWords,
+  type QueuedCard,
   type QueueHead,
   queueHead,
   queueHeadPlan,
   type Reader,
   type ReadOnly,
+  readTypingIn,
 } from "@pinetrie/interface"
-import { readTypingIn } from "@pinetrie/reads"
-import type { QueuedCard } from "@pinetrie/rules"
-import { newCardId, type SessionClient } from "@pinetrie/session"
+import type { SessionClient } from "@pinetrie/session"
+import { newCardId } from "@pinetrie/session/connect"
 import type { ReactNode } from "react"
 import { Button } from "./button.tsx"
 import { QueuedCardEditor } from "./card-editor.tsx"

@@ -5,7 +5,6 @@
 // everyone's. It has no ⋯ and no ⇤ or ×: a column is unfolded to act on it.
 
 import {
-  dragProps,
   dropProps,
   type FoldedGlance,
   foldedMark,
@@ -15,6 +14,7 @@ import {
   type PutTarget,
   UNFOLD,
 } from "@pinetrie/interface"
+import { dragProps } from "@pinetrie/web-core"
 import { FoldedStrip } from "./folded-strip.tsx"
 import { useTrackColors } from "./palette-context.ts"
 

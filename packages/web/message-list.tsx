@@ -6,15 +6,14 @@
 import { ancestry, type EntryId, transcriptCalls } from "@pinetrie/core"
 import {
   askView,
-  type ColumnRow,
   callStreams,
-  columnRows,
   LEFT_WORDS,
   lastEndedAsk,
   messageTools,
+  pathRows,
   pinnedMarkers,
   promptParent,
-  segmentPath,
+  rowHolds,
 } from "@pinetrie/interface"
 import { Fragment, memo, useEffect } from "react"
 import { AskWork } from "./ask-work.tsx"
@@ -78,25 +77,18 @@ function MessageListView(p: MessageListProps) {
       </Fragment>
     )
   }
-  const segments = segmentPath(
+  const releasedPath =
+    p.releasedTip === null ? null : new Set(ancestry(index, p.releasedTip).path)
+  const nameOf = (w: Parameters<typeof nameFor>[1]) => nameFor(p.nameOf, w)
+  const rows = pathRows(
     index,
     asks,
     view.nodes.map(n => n.id),
     new Set(p.landmarks),
   )
-  const releasedPath =
-    p.releasedTip === null ? null : new Set(ancestry(index, p.releasedTip).path)
-  const nameOf = (w: Parameters<typeof nameFor>[1]) => nameFor(p.nameOf, w)
-  const holds = (row: ColumnRow, id: EntryId): boolean =>
-    row.kind === "message"
-      ? row.id === id
-      : row.parts.some(s =>
-          s.kind === "entry" ? s.id === id : s.ids.includes(id),
-        )
-  const rows = columnRows(segments, asks)
   const lastEnded = lastEndedAsk(rows, p.runningAsk)
   return rows.flatMap(row => [
-    p.leftBefore !== null && holds(row, p.leftBefore) && (
+    p.leftBefore !== null && rowHolds(row, p.leftBefore) && (
       <div
         aria-hidden
         className="left-line"

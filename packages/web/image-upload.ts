@@ -1,20 +1,17 @@
 // web/image-upload — files dropped for a media column, uploaded to `POST
-// /blob` (`uploadBlob`): the images the host kept, each with its file's
-// name, and how many were left out. The host sorts a file by its bytes, so
-// one with no width is no image.
+// /blob` (the session's `upload`); which the host kept as images is
+// `keptImages` (`@pinetrie/web-core`).
 
-import type { Sha256 } from "@pinetrie/core"
-import { uploadBlob } from "@pinetrie/interface"
+import type { SessionClient } from "@pinetrie/session"
+import { keptImages } from "@pinetrie/web-core"
 
-export async function uploadImages(files: readonly File[]): Promise<{
-  readonly images: readonly { readonly sha256: Sha256; readonly name: string }[]
-  readonly left: number
-}> {
-  const uploads = await Promise.all(files.map(f => uploadBlob(f)))
-  const images = uploads.flatMap((u, i) =>
-    u.ok && u.ref.width !== null
-      ? [{ sha256: u.ref.sha256, name: files[i]?.name ?? "image" }]
-      : [],
+export async function uploadImages(
+  upload: SessionClient["upload"],
+  files: readonly File[],
+): Promise<ReturnType<typeof keptImages>> {
+  const uploads = await Promise.all(files.map(f => upload(f)))
+  return keptImages(
+    uploads,
+    files.map(f => f.name),
   )
-  return { images, left: files.length - images.length }
 }

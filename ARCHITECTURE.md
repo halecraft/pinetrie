@@ -51,6 +51,8 @@ browser ──commands (Kyneta Line)──▶ host ──▶ pi agent core
 | `vm` | a Linux machine on the Mac: the image's build, the launcher, a host's lease on a slot; it declares nothing, and knows nothing of lanes |
 | `session` | one client's connection to a host, its own documents and what it has in flight |
 | `shell` | shell source as structure: a command's words by role, and a one-line command laid out to a width; it declares only `unbash` (ADR-0114) |
-| `interface` | what a person sees and can do, decided, for any client: no React, no DOM (ADR-0093). A tool keeps its id for the model and has a word for people (`shell`, `search`), which interface gives; core holds only what a call is (ADR-0114) |
-| `web` | the browser page: React and the DOM, drawing what `interface` decides |
+| `interface` | what a person sees and can do, decided, for any client: no React, no DOM, no I/O (ADR-0093, ADR-0194); a terminal client, `apps/tui`, proves it. A tool keeps its id for the model and has a word for people (`shell`, `search`), which interface gives; core holds only what a call is (ADR-0114) |
+| `web-core` | the web client's own decisions, from the browser's inputs (a pointer, scroll, the clipboard's formats, the URL): pure, declaring only `core` and `interface`, so no React resolves there (ADR-0194) |
+| `web` | the browser page: React and the DOM, drawing what `interface` and `web-core` decide; it declares neither `rules` nor `reads` |
+| `apps/tui` | a terminal client, declaring only `interface`, `session` and `core`: its tests draw a thread, a digest and the composer from interface alone, so a view leaving interface fails them (ADR-0194). Not shipped |
 | `apps/pinetrie` | the host; its shell is split by responsibility (`apps/pinetrie/host/TECHNICAL.md`). The one place that picks a runtime and wires `vm` to `docker` (`host/work/runtime.ts`) |

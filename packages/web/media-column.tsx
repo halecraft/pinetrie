@@ -20,20 +20,21 @@ import {
 import {
   type ColumnAct,
   commentVersionWords,
-  dragProps,
   dropProps,
   type ImageView,
   type Intent,
-  imageEdge,
   imageSpot,
   MEDIA_EMPTY,
   type MediaColumnView,
+  marginCards,
   type Reader,
   type ReadOnly,
+  type SeatRecord,
   versionWords,
 } from "@pinetrie/interface"
-import { marginCards, type SeatRecord } from "@pinetrie/rules"
-import { newCardId, type SessionClient } from "@pinetrie/session"
+import type { SessionClient } from "@pinetrie/session"
+import { newCardId } from "@pinetrie/session/connect"
+import { dragProps, imageEdge } from "@pinetrie/web-core"
 import { useRef, useState } from "react"
 import { Button, IconButton } from "./button.tsx"
 import { fileDropAtProps, fileDropProps } from "./file-drop.ts"
@@ -68,7 +69,7 @@ export function MediaColumn(p: {
   // How many files the last drop left out, which only an image may be.
   const [left, setLeft] = useState(0)
   const put = async (files: readonly File[], to: ImagesTarget) => {
-    const up = await uploadImages(files)
+    const up = await uploadImages(p.session.upload, files)
     setLeft(up.left)
     p.onIntent({
       kind: "put-images",
@@ -194,7 +195,7 @@ function MediaImage(p: {
   const writable = p.readOnly === null
   const on = imageMargin(image.image)
   const version = async (files: readonly File[]) => {
-    const up = await uploadImages(files.slice(0, 1))
+    const up = await uploadImages(p.session.upload, files.slice(0, 1))
     const [first] = up.images
     if (first !== undefined)
       p.onIntent({

@@ -7,13 +7,13 @@
 // subscribers itself. Back fires `popstate`, and a hash typed in the address
 // bar `hashchange`.
 
+import type { PageName } from "@pinetrie/interface"
 import {
   hashOfPage,
   PAGE_STATE,
-  type PageName,
   pageOfHash,
   planLeave,
-} from "@pinetrie/interface"
+} from "@pinetrie/web-core"
 import { useSyncExternalStore } from "react"
 
 const told = new Set<() => void>()

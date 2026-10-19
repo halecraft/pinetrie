@@ -19,6 +19,7 @@ import {
   askLine,
   capsulePick,
   compactRail,
+  type DigestRecord,
   matchCountWords,
   opens,
   RAIL_LABEL,
@@ -28,7 +29,6 @@ import {
   railItems,
   railKeep,
   railRings,
-  railScroll,
   railView,
   type SearchResult,
   type StretchFill,
@@ -37,11 +37,10 @@ import {
   stretchWords,
   type ThreadLink,
   type Tick,
-  type ViewportStore,
   workWords,
 } from "@pinetrie/interface"
-import type { DigestRecord } from "@pinetrie/rules"
 import type { SessionClient } from "@pinetrie/session"
+import { railScroll, type ViewportStore } from "@pinetrie/web-core"
 import {
   type ComponentProps,
   useEffect,

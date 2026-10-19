@@ -14,18 +14,20 @@
 // Shift held for Cmd+Shift+V is known by then.
 
 import {
-  CLIP_ATTRIBUTE,
-  CLIP_MIME,
   type ClipFacts,
   clipOfFocus,
   type Intent,
   imageFiles,
   pastedFiles,
-  planCopy,
-  readPaste,
   targetOfFocus,
 } from "@pinetrie/interface"
 import { AT_INVENTORY, atColumn } from "@pinetrie/session"
+import {
+  CLIP_ATTRIBUTE,
+  CLIP_MIME,
+  planCopy,
+  readPaste,
+} from "@pinetrie/web-core"
 import { useEffect } from "react"
 import { type FocusContext, focusFacts } from "./focus.ts"
 import { useStable } from "./use-stable.ts"

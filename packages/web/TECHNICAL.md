@@ -8,8 +8,13 @@ footer (`docs/06-interface.md`, ADR-0122). Its connection to the host is
 `@pinetrie/session` (`packages/session/TECHNICAL.md`), which declares no
 React. The page implements the interface's `AppPorts` (`app.tsx`) and keeps
 in the browser what the interface encodes (`tab-state.ts`,
-`storage-keys.ts`). A module named here that is not in this directory, such
-as `layout.ts` or `viewport.ts`, is the interface's.
+`storage-keys.ts`). What it decides from the browser's own inputs, a
+pointer, scroll, the clipboard's formats, the URL, is `@pinetrie/web-core`'s
+(`packages/web-core/TECHNICAL.md`), which declares no React: the page is
+its shell. The page declares neither `@pinetrie/rules` nor `@pinetrie/reads`
+(`workspace.test.ts`): what it draws by that the host decides too reaches it
+from interface. A module named here that is not in this directory is
+interface's, as `layout.ts`, or web-core's, as `viewport.ts`.
 
 ## The build (`vite.config.ts`, `stamp.ts`)
 
@@ -447,7 +452,7 @@ point in the column showing it. A shared vertical scroll was tried in design
 and dropped: forks far apart could not be seen together
 (`docs/06-interface.md`).
 
-- **`placement` (`align.ts`) is the rule, pure;** `place` in `app.tsx`
+- **`placement` (web-core's `align.ts`) is the rule, pure;** `place` in `app.tsx`
   measures, calls it, and scrolls or sets the spacer.
 - **Columns are placed left to right, the first at its end.** Every column of
   a tab shown again mounts at the top, and `useFollow` takes the first to its
@@ -543,7 +548,7 @@ type (`Strip = [CanvasColumn, ...CardColumn[]]`), so no strip lacks one.
 A fold you ask for moves (`layout` effect's `moves`, the `foldColumn`
 port): the name turns onto the strip's, the mark moves to the strip's, the
 rest fades, and one right edge closes in. What moves where is
-`planFoldMotion`'s (`packages/interface/TECHNICAL.md`, "A fold in
+`planFoldMotion`'s (`packages/web-core/TECHNICAL.md`, "A fold in
 motion"); `use-fold-motion.ts` measures and plays it.
 
 - **A fold animates the live column, then lands; it lets go only once its
@@ -576,7 +581,7 @@ motion"); `use-fold-motion.ts` measures and plays it.
 - **Reduced motion** (`reducedMotion()`) stops folds, flights and a drag's
   springs alike.
 
-## A column's view (`viewport.ts`, `use-viewport.ts`, ADR-0058)
+## A column's view (web-core's `viewport.ts`, `use-viewport.ts`, ADR-0058)
 
 Each column measures which of its messages are in view, and the same span
 serves the rail's outline and the column's spot.
@@ -632,9 +637,10 @@ Every drag that starts in the page is one engine's: a column's header (a
 folded strip's, a note column's too), a card frame's header, a slot's card,
 a board card, a sidebar row. Each handle carries `dragProps` (`data-drag-card`
 or `data-drag-canvas`), and the engine finds its source with
-`sourceOfElement`. It decides nothing: `drag.ts` in `@pinetrie/interface`
-does (`planDrop` over `putLanding` and `planRootDrop`, `drawPlan`,
-`dropIntents`, `hoverOpens`). It gathers by source (`DragAt`): a canvas's
+`sourceOfElement`. It decides nothing: interface's `drag.ts` decides what
+a drop does (`planDrop` over `putLanding` and `planRootDrop`,
+`dropIntents`), and web-core's what is read and drawn (`sourceOfElement`,
+`drawPlan`, `hoverOpens`, `sidebarSpot`). It gathers by source (`DragAt`): a canvas's
 drag reads only the root zones, a card's the strip, ▦ and the drop
 zones. It marks a target with the attribute the plan's mark names, and
 rings and opens what the plan's `opens` names, on the element the target
@@ -714,7 +720,7 @@ set `data-card-drag`.
 ## Following a column's end (S32)
 
 A column at its end stays there as it grows; once the reader scrolls up, it
-holds still. `follow.ts` is the rule, pure; `useFollow` (`use-follow.ts`) reads
+holds still. web-core's `follow.ts` is the rule, pure; `useFollow` (`use-follow.ts`) reads
 the scroller, calls it, and scrolls. A running tool's output uses the same hook.
 
 - **It follows height, not data.** A ResizeObserver watches the column's
@@ -752,7 +758,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   forget every column off the tab you are on: a closed column's key is never
   used again, except `first-<root>`, which comes back as its root's only
   column, placed at its end, and that clears ↓ new below. A reload keeps no
-  snapshots. `App` keeps them in a `screenMemory` (`screen-memory.ts`), a
+  snapshots. `App` keeps them in a `screenMemory` (web-core's `screen-memory.ts`), a
   plain object made once, which a component may read during render: a
   `useStable` handler run during render runs the previous render's function.
 - **While a lane runs on its path, a following column does not get shorter**
@@ -1267,8 +1273,9 @@ the session sends moves and draws them until its copy holds them
   media column to its end), a bin, and its margin
   (`Margin` with `beside="image"`; a comment records the version it was
   written on, and says so under a newer one, `commentVersionWords`). Files
-  dropped on the column are uploaded (`image-upload.ts` over `uploadBlob`),
-  the images kept, and put at its end (`put-images`); one dropped on an image
+  dropped on the column are uploaded (`image-upload.ts` over the session's
+  `upload`), the images the host kept (web-core's `keptImages`), and put at
+  its end (`put-images`); one dropped on an image
   is a version (`add-version`), or at its edge a new image before or after it
   (`fileDropAtProps` hands the point, and its `onOver` the point while a
   file is over, which draws the edge). It, and the strip, say how many files a drop
@@ -1692,7 +1699,7 @@ the email is the only thing pine·trie chooses.
   round preview, drawn at twice its CSS size, that a drag moves and a range
   zooms (`moveCrop`, `zoomCrop`). Nothing is uploaded until "use this
   picture", which draws the square at `PICTURE_SIZE` (256) to a canvas,
-  sends the PNG to `POST /blob` (`uploadBlob`), then asks for the
+  sends the PNG to `POST /blob` (the session's `upload`), then asks for the
   `picture` command. A drop reaches it through `fileDropProps`.
 - **A circle draws its person's picture over their initial** (`Initial`,
   `presence.tsx`): an absolutely placed `img` that covers the circle, so the
@@ -1729,8 +1736,9 @@ menu's **Setup**, and a folder project's history (`history-page.tsx`,
 ADR-0165), which draws `historyView` from the footer's **history** link.
 An entry's review opens in place (a `ReviewPane`), fetched only then; a
 restore opens its preview, which says the folder holds the version when
-its review is empty, and offers no restore then. Which page, and how leaving treats the history, are
-`page.ts`'s (`@pinetrie/interface`). The composer's "See Setup" link is a
+its review is empty, and offers no restore then. Which pages there are, and
+their words, are interface's `page.ts`; a page's hash, and how leaving
+treats the history, web-core's `page-url.ts`. The composer's "See Setup" link is a
 plain `#setup` anchor: `usePage` hears the hash change.
 
 - **The page is in the URL's hash** (`#profile`). `usePage` reads it with
@@ -1773,8 +1781,9 @@ plain `#setup` anchor: `usePage` hears the hash change.
 call, and `pastedImages`, the picture field's), and a button's copy
 (`writeTextByButton`, `useCopy`'s). Each handler gathers where focus is
 (`focusFacts`, `focus.ts`, the one gather the keys read too) and what was
-pasted, asks the planners in `@pinetrie/interface` (`clipOfFocus`,
-`planCopy`, `readPaste`, `targetOfFocus`), and carries out what they say.
+pasted, asks the planners (interface's `clipOfFocus` and
+`targetOfFocus`, web-core's `planCopy` and `readPaste`), and carries out
+what they say.
 What S151 measured, and these handlers rest on:
 
 - **`setData` counts only inside the event**, synchronously: a copy cannot
@@ -1868,7 +1877,7 @@ What S151 measured, and these handlers rest on:
   before its first send), and every other card column folds by ⇤
   (`.fold`). A browser check that folds must fold a started column.
 - **A popover opens above its trigger in the window's lower half, and from
-  its left edge in the left half** (`placeBox`, `popover-place.ts`). A
+  its left edge in the left half** (`placeBox`, web-core's `popover-place.ts`). A
   composer's `▾`, and the footer, are at the window's foot, so a list below
   would be out of sight; the sidebar's `⋯` and your avatar are at its left,
   so a box anchored by its right edge would open past it. Its `maxHeight`

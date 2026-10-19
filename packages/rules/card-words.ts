@@ -3,7 +3,7 @@
 
 import type { Sha256, TextCardId, TextSource } from "@pinetrie/core"
 import { factLine } from "./fact.ts"
-import { askLine } from "./relay.ts"
+import { relayLine } from "./relay.ts"
 
 /** Where a reader of card words reads a document's text and a blob's, each loaded first. */
 interface WordReaders {
@@ -27,7 +27,7 @@ export function sourceWords(source: TextSource, read: WordReaders): string {
     case "fact":
       return factLine(source.fact)
     case "ask":
-      return askLine(source.relay)
+      return relayLine(source.relay)
     case "none":
       return ""
   }

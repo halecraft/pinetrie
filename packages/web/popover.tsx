@@ -14,6 +14,7 @@
 // Nothing else closes it, so a trigger drawn from live data that has gone
 // (`gone`) stays while its box is open, and leaves when the person closes it.
 
+import { type BoxPlacement, placeBox } from "@pinetrie/web-core"
 import {
   type ButtonHTMLAttributes,
   type ReactNode,
@@ -24,7 +25,6 @@ import {
   useState,
 } from "react"
 import { Button } from "./button.tsx"
-import { type Placement, placeBox } from "./popover-place.ts"
 
 interface PopoverApi {
   /** Close the box, and give the trigger focus back if `refocus`. */
@@ -97,7 +97,7 @@ export function Popover({
   triggerProps?: TriggerProps
   children: (api: PopoverApi) => ReactNode
 }) {
-  const [at, setAt] = useState<Placement | null>(null)
+  const [at, setAt] = useState<BoxPlacement | null>(null)
   const open = at !== null
   const wrapper = useRef<HTMLSpanElement>(null)
   const button = useRef<HTMLButtonElement>(null)
@@ -178,7 +178,7 @@ export function Popover({
 
   if (gone && !open) return null
   const named = heading === undefined ? undefined : headingId
-  const boxProps = (at: Placement) => ({
+  const boxProps = (at: BoxPlacement) => ({
     className: boxClassName,
     id: boxId,
     popover: "manual" as const,

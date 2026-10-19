@@ -3,6 +3,7 @@
 
 import type {
   CanvasView,
+  Card,
   CardCommand,
   GetLatestCommand,
   LatestFrom,
@@ -15,8 +16,10 @@ import {
   type CardEvent,
   changeVerb,
   displayName,
+  factLine,
   latestSourceName,
   type PinnedStatus,
+  relayLine,
   type Verb,
 } from "@pinetrie/rules"
 import type { CardNotice } from "@pinetrie/session"
@@ -397,3 +400,9 @@ export const writtenWords = (
   writers.length === 0
     ? null
     : `written by ${writers.map(w => who(w, reader)).join(", ")}`
+
+/** The one line a fact's or an ask's card shows at every width: the host's, waiting for its thread's end. */
+export const hostCardLine = (card: Card<"fact"> | Card<"ask">): string =>
+  card.kind === "fact"
+    ? factLine(card.content.fact)
+    : relayLine(card.content.relay)

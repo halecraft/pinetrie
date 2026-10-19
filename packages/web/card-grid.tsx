@@ -10,12 +10,12 @@
 
 import type { CardRecord } from "@pinetrie/core"
 import {
-  dragProps,
   dropProps,
   type GridView,
   gridKeyAct,
   type PutTarget,
 } from "@pinetrie/interface"
+import { dragProps } from "@pinetrie/web-core"
 import { useRef } from "react"
 import { Button } from "./button.tsx"
 import { CompactCard } from "./renderings.tsx"

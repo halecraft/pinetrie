@@ -14,7 +14,7 @@ import {
   readPlaces,
   readWorkflow,
 } from "@pinetrie/reads"
-import { newCanvasId, newRootId, newThreadId } from "@pinetrie/session"
+import { newCanvasId, newRootId, newThreadId } from "@pinetrie/session/connect"
 import type { Checks } from "../checks.ts"
 import {
   archivedFor,

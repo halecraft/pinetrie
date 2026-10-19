@@ -8,12 +8,13 @@ import {
   addCommentWords,
   type ColumnAct,
   type MarginBeside,
+  type MarginCard,
   marginCountWords,
   type Reader,
   type ReadOnly,
+  type SeatRecord,
   shutMarginWords,
 } from "@pinetrie/interface"
-import type { MarginCard, SeatRecord } from "@pinetrie/rules"
 import type { SessionClient } from "@pinetrie/session"
 import { Button } from "./button.tsx"
 import { NoteCardEditor } from "./card-editor.tsx"

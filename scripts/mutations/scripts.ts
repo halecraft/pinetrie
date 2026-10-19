@@ -2,6 +2,21 @@
 import type { Mutation } from "../mutate.ts"
 
 const unit = ["pnpm", "exec", "vitest", "run", "scripts/mutate.test.ts"]
+const pureGlobals = [
+  "pnpm",
+  "exec",
+  "vitest",
+  "run",
+  "scripts/pure-globals.test.ts",
+]
+const pureConfig = [
+  "pnpm",
+  "exec",
+  "tsc",
+  "--noEmit",
+  "-p",
+  "tsconfig.pure.json",
+]
 const checks = [
   "pnpm",
   "exec",
@@ -762,5 +777,40 @@ export const mutations: readonly Mutation[] = [
     to: "",
     command: shipped,
     expect: "the observer's image holds every module its server loads",
+  },
+  {
+    name: "a global joins the pure list though no file it names needs it",
+    file: "pure-globals.d.ts",
+    from: "interface AbortSignal {\n",
+    to: "/** `packages/core/runs.ts`: a probe. */\ndeclare function setTimeout(handler: () => void, ms?: number): unknown\n\ninterface AbortSignal {\n",
+    command: pureGlobals,
+    expect:
+      "every global pure code may name is needed by a file the pure config reaches, which the line before it names",
+  },
+  {
+    name: "a global on the pure list loses the line naming who needs it",
+    file: "pure-globals.d.ts",
+    from: "/** `packages/rules/shares.ts`: a shared file's bytes read as UTF-8, or refused as binary. */\n",
+    to: "",
+    command: pureGlobals,
+    expect:
+      "every global pure code may name is needed by a file the pure config reaches, which the line before it names",
+  },
+  {
+    name: "interface calls fetch",
+    file: "packages/interface/counts.ts",
+    from: "export const listPhrase",
+    to: 'export const probeFetch = () => fetch("/blob")\nexport const listPhrase',
+    // tsc names no failing check: with typecheck clean, any error is the
+    // mutant's.
+    command: pureConfig,
+  },
+  {
+    name: "a session module behind its main entry starts a timer",
+    file: "packages/session/inventory.ts",
+    from: "export const NO_INTENTS",
+    to: "export const probeTimer = () => setTimeout(() => {}, 0)\nexport const NO_INTENTS",
+    // As above.
+    command: pureConfig,
   },
 ]

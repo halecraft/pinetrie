@@ -1,4 +1,4 @@
-// interface/viewport — what a column shows of its messages, and where a column
+// web-core/viewport — what a column shows of its messages, and where a column
 // left is placed when it comes back. `use-viewport.ts` measures, the rail
 // draws, `App` places.
 //

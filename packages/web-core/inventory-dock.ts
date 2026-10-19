@@ -1,8 +1,8 @@
-// interface/inventory-dock — where the inventory panel floats: left,
+// web-core/inventory-dock — where the inventory panel floats: left,
 // centre or right, the nearest third to where its frame is dropped. Kept per
 // device, not per session.
 
-import type { Codec } from "./codec.ts"
+import type { Codec } from "@pinetrie/interface"
 
 export type Dock = "left" | "centre" | "right"
 

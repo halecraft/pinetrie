@@ -20,9 +20,9 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import {
+  type CardTitleRecord,
   CLOSE_INVENTORY,
   type ClipboardCellView,
-  type Dock,
   type DrawnCard,
   emptyBenchWords,
   INVENTORY,
@@ -38,12 +38,10 @@ import {
   type Reader,
   SAVE,
   SAVE_TITLE,
-  snappedDock,
   type ThreadGlance,
   type ThreadPreview,
   TRASH_SELECTED,
 } from "@pinetrie/interface"
-import type { CardTitleRecord } from "@pinetrie/rules"
 import {
   AT_INVENTORY,
   type CardNotice,
@@ -51,6 +49,7 @@ import {
   type SessionClient,
   type Slots,
 } from "@pinetrie/session"
+import { type Dock, snappedDock } from "@pinetrie/web-core"
 import {
   type CSSProperties,
   useLayoutEffect,

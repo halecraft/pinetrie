@@ -4,16 +4,15 @@
 
 import { ExchangeProvider } from "@kyneta/react"
 import {
-  type Dock,
   decodeLayout,
-  dockCodec,
   encodeLayout,
   type Identity,
   identityCodec,
   listWidthCodec,
 } from "@pinetrie/interface"
 import { SESSION_DOC_ID } from "@pinetrie/protocol/messages"
-import { connectSession } from "@pinetrie/session"
+import { connectSession } from "@pinetrie/session/connect"
+import { type Dock, dockCodec } from "@pinetrie/web-core"
 import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
 import { App, type AppStores } from "./app.tsx"
@@ -93,6 +92,7 @@ stores.identity.subscribe(next => {
 const session = await connectSession({
   url: wsUrl,
   WebSocket,
+  fetch: (url, init) => fetch(url, init),
   principal: identity.email,
 })
 createRoot(root).render(

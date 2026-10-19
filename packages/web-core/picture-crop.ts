@@ -1,4 +1,4 @@
-// interface/picture-crop — the square of an image a person's picture shows:
+// web-core/picture-crop — the square of an image a person's picture shows:
 // chosen on the profile page by dragging and zooming, drawn by the browser at
 // `PICTURE_SIZE` before anything is uploaded. Every step goes through one
 // clamp, which keeps the square inside the image.

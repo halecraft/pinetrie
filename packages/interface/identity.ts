@@ -96,6 +96,9 @@ export function renameProblem(
   }
 }
 
+/** The largest picture the host keeps as it is: a client crops to no more. */
+export { PICTURE_MOST } from "@pinetrie/rules"
+
 /**
  * What the profile page says of the host's answer to a picture: a refusal's
  * reason or a failure, as for a rename; null when it took.

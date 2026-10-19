@@ -15,7 +15,7 @@ import {
 import { scriptedModel } from "@pinetrie/pi"
 import { readPlaces, readThreads } from "@pinetrie/reads"
 import { cardsOnCanvas } from "@pinetrie/rules"
-import { newThreadId } from "@pinetrie/session"
+import { newThreadId } from "@pinetrie/session/connect"
 import type { Checks } from "../checks.ts"
 import { canvasHolding, heldTree, START_AGENT, waitFor } from "../harness.ts"
 import { inLane, type LaneHosts } from "../lane-hosts.ts"

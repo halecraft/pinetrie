@@ -1,10 +1,7 @@
-import { canvasIdFor } from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   type FoldMotion,
   type FoldScene,
-  foldMotion,
   planFoldMotion,
   type Rect,
 } from "./fold-motion.ts"
@@ -150,37 +147,5 @@ describe("planFoldMotion", () => {
     expect(plan({ scroll }).clamp).toBeCloseTo(900 - 586.2, 5)
     expect(plan({ scroll: { ...scroll, left: 100 } }).clamp).toBe(0)
     expect(plan({ scroll, unfolding: true }).clamp).toBe(0)
-  })
-})
-
-describe("foldMotion", () => {
-  const canvas = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000c")
-  const card = cardIdFor("c1")
-  test("a card's fold or the canvas column's, with which way; nothing for another action", () => {
-    expect(
-      foldMotion({
-        kind: "view",
-        canvas,
-        first: null,
-        change: { kind: "fold", card, unfolded: false },
-      }),
-    ).toEqual({ column: { kind: "card", card }, unfolded: false })
-    expect(
-      foldMotion({
-        kind: "view",
-        canvas,
-        first: null,
-        change: { kind: "fold-canvas", unfolded: true },
-      }),
-    ).toEqual({ column: { kind: "canvas", canvas }, unfolded: true })
-    expect(
-      foldMotion({
-        kind: "view",
-        canvas,
-        first: null,
-        change: { kind: "details", card, open: true },
-      }),
-    ).toBeNull()
-    expect(foldMotion({ kind: "close-canvas", canvas })).toBeNull()
   })
 })

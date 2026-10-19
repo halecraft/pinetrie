@@ -23,6 +23,7 @@ import {
 } from "@pinetrie/core"
 import {
   addressWords,
+  type CardTitleRecord,
   CLOSE_CARD,
   type Compact,
   cardFrame,
@@ -30,6 +31,7 @@ import {
   type Detail,
   type DrawnKind,
   EDIT_AS_TEXT,
+  hostCardLine,
   type Intent,
   KIND_ICON,
   type MediaColumnView,
@@ -38,14 +40,10 @@ import {
   PUT_TITLE,
   type Reader,
   type ThreadPreview,
-} from "@pinetrie/interface"
-import {
-  askLine,
-  type CardTitleRecord,
-  factLine,
   UNTITLED_IMAGE,
-} from "@pinetrie/rules"
-import { AT_INVENTORY, newCardId, type SessionClient } from "@pinetrie/session"
+} from "@pinetrie/interface"
+import { AT_INVENTORY, type SessionClient } from "@pinetrie/session"
+import { newCardId } from "@pinetrie/session/connect"
 import { createContext, type ReactNode, useContext } from "react"
 import { Button, IconButton } from "./button.tsx"
 import { BoundCardEditor } from "./card-editor.tsx"
@@ -476,7 +474,7 @@ function ImageCardView(p: { card: CardOf<"image">; width: CardWidth }) {
 function FactLine(p: { card: CardOf<"fact">; width: CardWidth }) {
   return (
     <div className="queued-fact" data-card={p.card.id}>
-      {factLine(p.card.content.fact)}
+      {hostCardLine(p.card)}
     </div>
   )
 }
@@ -488,7 +486,7 @@ function FactLine(p: { card: CardOf<"fact">; width: CardWidth }) {
 function AskLine(p: { card: CardOf<"ask">; width: CardWidth }) {
   return (
     <div className="queued-fact queued-ask" data-card={p.card.id}>
-      {askLine(p.card.content.relay)}
+      {hostCardLine(p.card)}
     </div>
   )
 }

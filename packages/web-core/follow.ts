@@ -1,4 +1,4 @@
-// interface/follow — when a scroller follows its end.
+// web-core/follow — when a scroller follows its end.
 //
 // The scroller only ever moves down on its own, so a move up was the reader's.
 // It remembers where it last left the scroll: a scroll event above that is

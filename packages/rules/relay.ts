@@ -106,7 +106,7 @@ export const encodeAnswer = (
 ): AnswerMessage => ANSWER.encode(d, answerContent(d), timestamp)
 
 /** The one line an ask card shows: who asks, from where, what. */
-export const askLine = (d: RelayDetails): string =>
+export const relayLine = (d: RelayDetails): string =>
   `⇢ ${d.askerName} in ${d.fromName} asks: ${firstLine(d.text, 120)}`
 
 /** The one line a column shows for what came into an asked agent. */

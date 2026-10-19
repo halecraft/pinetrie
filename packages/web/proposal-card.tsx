@@ -11,8 +11,8 @@ import {
   type ProposalFacts,
   type ProposalMemory,
   proposalView,
-  type ScreenMemory,
 } from "@pinetrie/interface"
+import type { ScreenMemory } from "@pinetrie/web-core"
 import { useCallback, useRef, useState } from "react"
 import { Button, IconButton } from "./button.tsx"
 import { nameFor } from "./presence.tsx"

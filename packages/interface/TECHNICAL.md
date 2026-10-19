@@ -17,25 +17,41 @@ its thread.
 
 ## What is here, and what is the page's
 
-The rule (ADR-0093, S115): **the page holds its `.tsx` components, its
-`use-*` hooks, and the modules that touch the DOM or React, exist only for
-`React.memo`, or deal in HTML's tree (`markdown.ts`, `pane.ts`). Every other
-module is here.** A module that held both halves split: a value, its rules
-and its codec are here (`identity.ts`, `list-width.ts`, `inventory-dock.ts`,
-`codec.ts`, `same-data.ts`, `palette.ts`); where the browser keeps it is the
-page's (`storage-keys.ts`, `tab-state.ts`, `same-props.ts`, `colors.ts`).
+The rule (ADR-0093's yardstick, ADR-0194): **a module is here when a
+terminal would call it with its own inputs and keep what it returns.** One
+whose inputs or constants are the browser's (pixels, a pointer, the order
+the browser dispatches events in, animation frames, an element's
+attributes, a clipboard's MIME types, the URL's hash and history) is the
+web client's own decision, `@pinetrie/web-core`'s
+(`packages/web-core/TECHNICAL.md`); how the page draws is
+`@pinetrie/web`'s. A module that held both halves split (S269): a value,
+its rules and its codec are here (`identity.ts`, `list-width.ts`,
+`codec.ts`, `same-data.ts`, `palette.ts`, `column-motion.ts`, `clip.ts`,
+`page.ts`, `image-edge.ts`' `imageSpot`, `drag.ts`' `planDrop`); what the
+browser decides from them is web-core's. `apps/tui`, a terminal client
+declaring only this package, the session and core, proves it
+(`apps/tui/TECHNICAL.md`).
 
-- **No DOM, no React.** `packages/interface/tsconfig.json` type-checks this
-  package with `lib: ["ESNext"]`, run by `pnpm run typecheck` beside the
-  root's config, which includes the DOM. A `window`, a `document` or a DOM
-  member here fails; a mere mention of the `HTMLElement` type does not, since
-  React's types declare it. `workspace.test.ts` pins the dependencies (core,
-  protocol, reads, rules, schema, session, shell and TypeBox), and only the
-  page and the app may depend on this package. The host takes `callLabel`
-  from here for a revision titled by its first call.
+- **No DOM, no React, no I/O.** `tsconfig.pure.json` type-checks this
+  package, with what it imports, against `lib: ["ESNext"]`, no ambient
+  types and only the globals `pure-globals.d.ts` declares, run by `pnpm run
+  typecheck` beside the root's config, which includes the DOM. A `window`,
+  a `document`, `fetch` or a timer here fails; a mere mention of the
+  `HTMLElement` type does not, since React's types declare it.
+  `workspace.test.ts` pins the dependencies (core, protocol, reads, rules,
+  schema, session, shell and TypeBox), and only the page, web-core, the
+  terminal client and the app may depend on this package. The host takes
+  `callLabel` from here for a revision titled by its first call.
+- **A client declares neither rules nor reads.** What the page draws by
+  that the host decides too reaches it from here: `host-rules.ts`
+  re-exports those rules and the record types a view hands on, and
+  `projection.ts` and `presence.ts` re-export the reads a client gathers
+  beside `readSessionFacts`, each its own function so the page memoises
+  each (S54, S59). `workspace.test.ts` pins the page's dependencies.
 - **`index.ts` exports by name only what another package imports**, as
   `@pinetrie/rules`' does; a name only this package and its tests use is
-  imported from its module. The tests' fixtures are `fixtures.ts`, which the
+  imported from its module. `host-rules.ts` is the one `export *`: it only
+  re-exports by name, so its list is the one place those names are kept. The tests' fixtures are `fixtures.ts`, which the
   page's tests take as `@pinetrie/interface/fixtures`; production code never
   imports it.
 - **Where `session` ends.** `@pinetrie/session` is one client's connection,
@@ -199,8 +215,9 @@ function is proven by a unit test in a second.
   `page` intent and effect open or leave it through the `page` port, and
   `planIntent` leaves it first whenever a plan shows something in the
   stage (`showsStage`, `layout.ts`). Which hash names a page and
-  how leaving treats the browser's history (`planLeave`) are decided here;
-  `use-page.ts` carries them out (`packages/web/TECHNICAL.md`, "Pages").
+  how leaving treats the browser's history (`planLeave`) are web-core's
+  (`page-url.ts`); `use-page.ts` carries them out
+  (`packages/web/TECHNICAL.md`, "Pages").
 - **`main.tsx` boots the page:** it builds the device's stores, asks who you
   are, connects, and mounts `App({ session, stores })`. `app.tsx` touches no
   browser global as it loads.
@@ -553,38 +570,14 @@ canvas's threads (`canvasRail`). A canvas's signals are its threads', whatever r
   kind, the page refuses a send the host would allow. A known divergence
   that can do no harm, not a bug.
 
-## A fold in motion (`fold-motion.ts`, ADR-0137)
+## A fold in motion (`column-motion.ts`, ADR-0137)
 
-`planFoldMotion` decides how a column moves into its strip or out of it,
-from boxes the page measured where the column is wide (`FoldScene`) and
-the strip's geometry its CSS declares; the page plays it
-(`packages/web/TECHNICAL.md`, "Folding in motion"). A fold and an unfold
-take the same scene and differ only in which way their frames run.
-
-- **The strip is predicted, both ways**: at the wide column's left and
-  top, its name centred across `geometry.width` at `nameTop`, a line high
-  and the wide name long, its mark centred at `markTop`. An unfold's strip
-  lies where the column now starts, so it needs no measuring either. The
-  browser suite's check of the turn proves the prediction is where the CSS
-  draws the strip.
-- **The turn** (S167): the wide name turned 90° clockwise about its own
-  top-left, then moved so its right edge meets the strip name's and its
-  top its top. At the same font size every glyph lands exactly. A name
-  that wraps (its height not `line`), outgrows `nameMax` or is missing does
-  not turn: it fades with the rest.
-- **One edge, sampled** (`FoldFrame`): eased out over 8 samples, played
-  linearly between, the column's right edge and every column after it.
-  At each sample the edge stays `CLEAR` px right of the turning name and
-  the mark, where an edge eased alone would cut a long name mid-turn.
-- **The clamp**: folding can shrink the strip's scroll below where it
-  stands; the browser then clamps it and every column moves right. Every
-  column moves by it as the fold goes, so the commit's jump is part of
-  the motion.
-- **Nothing moves** under reduced motion, during a drag, for a column out
-  of the strip's view, or one already no wider than its strip.
-- **`foldMotion` reads the motion from the action**: a `view` action's `fold`
-  or `fold-canvas` names its column and which way. The effect carries only
-  `moves`, so nothing says it twice.
+`foldMotion` reads which column a layout action folds or unfolds, and which
+way, from the action itself: a `view` action's `fold` or `fold-canvas`
+names its column and which way. The effect carries only `moves`, so
+nothing says it twice. How the page moves it is web-core's
+(`planFoldMotion`, `packages/web-core/TECHNICAL.md`, "A fold in motion");
+a terminal lands it at once.
 
 ## The column model (`columns.ts`)
 
@@ -922,7 +915,9 @@ else reads those rows (tab summaries, archive search, `branchColors`).
 An ask is a message that started a run, with that run (`indexAsks`, core,
 kept per index). `readSessionFacts` reads it with the index, so the rail and
 the columns read one. `segmentPath` (`ask-segments.ts`) decides what a column folds;
-`columnRows` (`ask-view.ts`) groups each ask's segments, `planAskWork`
+`columnRows` (`ask-view.ts`) groups each ask's segments (`pathRows` is the
+two in one call, which the page's message list and `apps/tui` make, with
+`rowHolds` for whether a row holds an entry), `planAskWork`
 (`ask-fold.ts`) decides what one ask's work draws, and `AskWork`
 (`ask-work.tsx`) lays that out.
 
@@ -941,7 +936,7 @@ the columns read one. `segmentPath` (`ask-segments.ts`) decides what a column fo
   line and digest twice.
 - **Nothing is written when a run ends.** `foldOpen` reads
   `endedWhileAway`: the run's last entry is past `releasedTip`, the
-  column's tip when its reader left its end (`follow.ts`). Following, there
+  column's tip when its reader left its end (web-core's `follow.ts`). Following, there
   is none, so an ended ask folds, above the view; scrolled away, it stays
   open under the reader. An effect writing a "settled" flag when a run ends
   would be an effect dispatching from document facts (S35).
@@ -983,8 +978,9 @@ the columns read one. `segmentPath` (`ask-segments.ts`) decides what a column fo
   work. Outline gets the headline alone; story and raw its points too. One
   field cannot be drawn twice, and no fold's head holds the headline.
   `AskWork` puts it at its anchor as `.ask-digest`, the headline marked as
-  a model's (`.ask-headline`), the points one `MessageText` over
-  `pointsText`. An ask with no digest has none.
+  a model's (`.ask-headline`), the points one `MessageText` over the
+  summary's `pointsMarkdown`, its points as a markdown list (empty in
+  outline). An ask with no digest has none.
 - **Every row carries its finished words** (`AskDraw`): fold heads, the
   outcome, and the files label. `AskWork` reads only `view.ask` and
   `view.running`, and a test reads the plan as a reader would
@@ -1575,14 +1571,15 @@ composer*).
   no card someone types in. `typingDue` writes at most once a second, and
   at once in another card.
 
-## Sharing a file (`paste.ts`, `upload.ts`, ADR-0042, ADR-0151)
+## Sharing a file (`paste.ts`, ADR-0042, ADR-0151)
 
 - **A paste, a drop or a choice of files is a share.** `pastedFiles` keeps
   every file (`imageFiles`, the images alone, is the picture field's);
   with none, the paste is the browser's own. Each file is `POST`ed to
-  `/blob` as bytes (`uploadBlob`, same origin, so the key cookie goes too;
-  a reference's quote is kept the same way): the host reads what it is
-  from the bytes. When all are answered, `insertSnippet` puts every accepted
+  `/blob` as bytes (`SessionClient.upload`, with the `fetch` its caller
+  hands it; the page's is same origin, so the key cookie goes too; a
+  reference's quote is kept the same way, through the `uploadBlob` port):
+  the host reads what it is from the bytes. When all are answered, `insertSnippet` puts every accepted
   one's link (`shareMarkdown`, `@pinetrie/rules`) in place of where it
   went, on lines of their own, at once. A refused one is left out, and
   `shareStatus` words the host's reason.
@@ -1656,19 +1653,12 @@ composer*).
   folder states, the history, the conflicts, publish and base choices; the
   host's folder refusals are held to it in `commands/lane.test.ts`.
 
-## A person's picture (`picture-crop.ts`, ADR-0098)
+## A person's picture (ADR-0098)
 
-- **The crop is a value** (`Crop`: a zoom and the square's centre, in the
-  image's pixels). `fitCrop` starts with the largest centred square;
-  `moveCrop` turns a drag over the preview into image pixels, the square
-  moving against the pointer; `zoomCrop` keeps the centre; `cropSource` is
-  what `drawImage` reads. Every step goes through one clamp, which keeps the
-  zoom in [1, `MOST_ZOOM`] and the square inside the image.
-- **The browser sends `PICTURE_SIZE`** (256): the host fits anything larger
-  than `PICTURE_MOST` (512, `@pinetrie/rules`), so a picture from any client
-  is drawn from at most 512 pixels.
-- **Its words are `pictureWords`**, and the host's answer's
-  `pictureProblem`, which reads a refusal or a failure as a rename's does.
+How the page crops one is web-core's (`picture-crop.ts`,
+`packages/web-core/TECHNICAL.md`). The host's limit, `PICTURE_MOST`, is
+re-exported here (`identity.ts`), beside `pictureProblem`, which reads a
+refusal or a failure as a rename's does.
 
 ## Commands in the composer (ADR-0036)
 
@@ -1704,7 +1694,7 @@ composer*).
 
 - **Presence's verb is *reading*** (ADR-0077): a person is reading a thread
   now. A person *follows* a thread they have written on (`follows`,
-  `attention.ts`), and a column *follows its end* (`follow.ts`, whose rule
+  `attention.ts`), and a column *follows its end* (web-core's `follow.ts`, whose rule
   rests on the order S32 measured, `packages/web/TECHNICAL.md`), a column's
   verb, never a person's. Docs and comments keep to these; no word a person
   sees says that someone follows a thread they are only reading.
@@ -1788,8 +1778,8 @@ list: an archived root's work is done, so it never lights ▦ (`elsewhere`).
 ## Your inventory (ADR-0048 step 4, ADR-0059, ADR-0171)
 
 A panel floating over the columns (`inventory-panel.tsx`, drawn by `App`),
-docked left, centre or right by this device's choice (`inventory-dock.ts`,
-`snappedDock`, kept as a `deviceState`): a fixed frame two columns wide,
+docked left, centre or right by this device's choice (web-core's
+`inventory-dock.ts`, `snappedDock`, kept as a `deviceState`): a fixed frame two columns wide,
 the bag (a 2 × 6 grid of compact slots, `CardGrid`, *Card grids* below)
 and the bench, under a header (its count, the clipboard chip, ×) and over
 one status line (the newest notice).
@@ -1954,8 +1944,11 @@ one status line (the newest notice).
 
 ## Drags (`drag.ts`, ADR-0134)
 
-What the page's one drag engine (`packages/web/use-drag.ts`) decides, as
-values; the engine gathers and applies.
+What a drag carries, what it can be over, and what a drop there does, as
+values. How the web client reads a handle and the pointer, and draws each
+frame, is web-core's (`packages/web-core/TECHNICAL.md`, "A drag, read and
+drawn"); the page's engine (`packages/web/use-drag.ts`) gathers and
+applies.
 
 - **A source is a card or a canvas** (`DragSource`). A column is its card on
   a canvas, drawn whole: no source of its own. Only over the strip does a
@@ -1969,9 +1962,8 @@ values; the engine gathers and applies.
   It is over what a card is (`CardOver`), and lands only on a media column
   or at a spot on a canvas (`put-images`, a media column made there),
   marked `copy`. On a media column (`images` target) it lands by the image
-  under it and that image's edge (`image-edge.ts`: `imageEdge`, a fixed
-  band at each edge, `EDGE_BAND_PX` or a quarter of a small image, along
-  its height, or its width two to a row; `imageSpot` turns it into a spot):
+  under it and that image's edge (web-core's `imageEdge`; `imageSpot`,
+  `image-edge.ts`, turns it into a spot):
   onto the image, a version of it (`add-version`); at an edge, a new image
   just before it or before the next (`image-at`); on the column, at its end.
   An image card lands the same way, onto an image meaning just before it:
@@ -1992,33 +1984,15 @@ values; the engine gathers and applies.
   own; each runs its own planner. A refused landing sends nothing. A
   landing's planned drop carries its target, so a drop reads only the
   source and the planned drop.
-- **What a frame draws is a value** (`drawPlan`): the dragged element's
-  translate (never a scale, a rotation or a shadow, S153), the ghost's
-  position off the strip, each column's shift (`neighbourShifts`), the
-  target's mark (`dropMark`), the handle's lean, and what a hold there
-  opens (`opens`). S153's drawing conditions are its unit tests. A mark
-  names its attribute too: `root` for a canvas's landing
-  (`data-root-drop`), any other for `data-drop-mark`.
-- **A sidebar row splits in quarters** (`sidebarSpot`): its top and
-  bottom are between rows, its middle onto its canvas. Only a card's drag
-  reads it: a canvas's has no put target (`CanvasOver`), and reorders among
-  the rows (`landingIn`).
-- **What a hold opens is decided from the target** (`heldOpens`), after
-  `ITEM_HOVER_MS`: a card onto a sidebar canvas (its row's middle half)
-  opens that canvas, a card over ▦ opens the board, a card over the
-  inventory's toggle opens the panel (a drop there takes, aiming at no
-  slot), and a canvas's drag opens nothing (ADR-0134, ADR-0171). Only what a card could be dropped onto opens, so the
-  ring never fills where the drop would make a new canvas. When the shell
-  decided this from the row under the pointer, for every source, a canvas
-  dragged over another in the sidebar filled the ring and opened it, and
-  looked like a drop *into* that canvas.
-
 ## Copy, cut and paste (`clip.ts`, ADR-0132)
 
 The system clipboard is a tool, apart from the inventory: a copy moves
 nothing and opens nothing; a paste lands a copy where focus is. The page's
-`clipboard.ts` reads the events and the clipboard's data; everything it
-decides is here.
+`clipboard.ts` reads the events and the clipboard's data. What a copy takes,
+the text a clip holds (`clipText`) and a clip as JSON (`clipJson`,
+`clipOfJson`) are here; how the browser's clipboard carries a clip, and
+reads one back, is web-core's (`clip-carrier.ts`,
+`packages/web-core/TECHNICAL.md`, "The clipboard's carrier").
 
 - **A `Clip` is what was copied, holding its own text**: a selection or
   another app's text (`text`, with its origin or none), the past (`past`, a
@@ -2038,14 +2012,6 @@ decides is here.
   focus is in that column), a focused card, the clipboard cell. A cut takes
   only a focused card `isTrashable` says you may trash
   (`trashable.ts`, the one test trashing, a cut and a replacement ask).
-- **The carrier** (S151): `planCopy` writes the text as `text/plain`, the
-  selection's own HTML or the text escaped in one element carrying
-  `data-pinetrie` as `text/html`, and the same JSON as
-  `application/x-pinetrie`. `readPaste` reads the custom type, then the
-  attribute (the page parses `text/html`: WebKit writes it again in its own
-  form), then the text; a carrier counts only when it decodes, was written
-  on this host (the page's origin) and names the text pasted, `\r\n` taken
-  as `\n`. Shift held at the paste's keydown (Cmd+Shift+V) makes it text.
 - **Where a paste lands** is `targetOfFocus`: the text box with focus, else
   the drop zone around focus (`targetOfElement`), else the column last
   focused. It lands by `planPut(…, "copy")`: in a text box, text as itself
@@ -2086,7 +2052,9 @@ the first empty one (`firstEmpty`, which aims at the 12 alone) and a step
   draws a compact of another shape; that its lead says something is a unit
   test's, as a type cannot. A reference's lead is its quote, which the page
   reads from its blob (`CompactText`'s `quote`, drawn as `until` meanwhile).
-  Its words are `compactWords`. The compact is the kind's; the frame
+  Its words are `compactWords`. A fact's and an ask's lead is
+  `hostCardLine` (`card-words.ts`), the one line the page's renderings draw
+  of them at every width. The compact is the kind's; the frame
   (tone, state, actions) is the place's (`card-frame.ts`), and the two
   never share a signal: the icon is the kind's (`KIND_ICON`), the colour
   the place's.

@@ -15,6 +15,14 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 
+/** Who reads which thread end and canvas, and who types where: presence's reads, as the host reads them. */
+export {
+  readReading,
+  readReadingCanvases,
+  readTyping,
+  readTypingIn,
+} from "@pinetrie/reads"
+
 /** A presence field's entries: one per key, its writer and the thread end. */
 type Entries = readonly (readonly [WriterId, EntryId])[]
 

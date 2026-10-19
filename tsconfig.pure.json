@@ -1,0 +1,17 @@
+{
+  // The pure packages, in one program: no DOM, no Node types, and only the
+  // globals `pure-globals.d.ts` declares. Saying a package is pure is a line
+  // in `include`. Tests and fixtures are left out: the root's config checks
+  // them, with the DOM and Node. `pnpm run typecheck` runs this beside it.
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "lib": ["ESNext"], "types": [] },
+  "include": [
+    "pure-globals.d.ts",
+    "packages/interface",
+    "packages/shell",
+    "packages/web-core",
+    "apps/tui",
+    "packages/session/index.ts"
+  ],
+  "exclude": ["**/node_modules", "**/*.test.ts", "**/fixtures.ts"]
+}

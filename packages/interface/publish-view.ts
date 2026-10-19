@@ -17,7 +17,7 @@ import {
 import type { AcceptedActing } from "@pinetrie/session"
 import { count } from "./counts.ts"
 import { actingSaid } from "./outcome-words.ts"
-import { hashOfPage } from "./page.ts"
+import type { PageName } from "./page.ts"
 
 /** The publish button as the footer shows it. */
 type PublishView =
@@ -47,9 +47,9 @@ type PublishView =
 /** The footer's way to a folder project's history, in the publish button's place; null for any other project. */
 export function historyLink(
   record: AcceptedRecord | null,
-): { readonly label: string; readonly hash: string } | null {
+): { readonly label: string; readonly page: PageName } | null {
   return record?.kind === "folder"
-    ? { label: "history", hash: hashOfPage("history") }
+    ? { label: "history", page: "history" }
     : null
 }
 

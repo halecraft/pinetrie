@@ -127,6 +127,18 @@ importers:
         specifier: 8.18.2
         version: 8.18.2
 
+  apps/tui:
+    dependencies:
+      '@pinetrie/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@pinetrie/interface':
+        specifier: workspace:*
+        version: link:../../packages/interface
+      '@pinetrie/session':
+        specifier: workspace:*
+        version: link:../../packages/session
+
   packages/channel: {}
 
   packages/config:
@@ -369,18 +381,15 @@ importers:
       '@pinetrie/protocol':
         specifier: workspace:*
         version: link:../protocol
-      '@pinetrie/reads':
-        specifier: workspace:*
-        version: link:../reads
-      '@pinetrie/rules':
-        specifier: workspace:*
-        version: link:../rules
       '@pinetrie/schema':
         specifier: workspace:*
         version: link:../schema
       '@pinetrie/session':
         specifier: workspace:*
         version: link:../session
+      '@pinetrie/web-core':
+        specifier: workspace:*
+        version: link:../web-core
       hast-util-to-jsx-runtime:
         specifier: 2.3.6
         version: 2.3.6
@@ -424,6 +433,15 @@ importers:
       vite:
         specifier: 8.3.4
         version: 8.3.4(@types/node@24.10.1)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.0)
+
+  packages/web-core:
+    dependencies:
+      '@pinetrie/core':
+        specifier: workspace:*
+        version: link:../core
+      '@pinetrie/interface':
+        specifier: workspace:*
+        version: link:../interface
 
 packages:
 

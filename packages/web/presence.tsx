@@ -13,8 +13,7 @@ import {
   type TreeIndex,
   type WriterId,
 } from "@pinetrie/core"
-import { stringHash } from "@pinetrie/interface"
-import { displayName } from "@pinetrie/rules"
+import { displayName, stringHash } from "@pinetrie/interface"
 import { useContext, useState } from "react"
 import { Pictures } from "./pictures-context.ts"
 

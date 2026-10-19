@@ -11,14 +11,15 @@
 
 import type { WriterId } from "@pinetrie/core"
 import {
+  type AcceptedRecord,
   historyLink,
   type Intent,
   publishToast,
   publishView,
   publishWords,
 } from "@pinetrie/interface"
-import type { AcceptedRecord } from "@pinetrie/rules"
 import type { AcceptedActing, SessionClient } from "@pinetrie/session"
+import { hashOfPage } from "@pinetrie/web-core"
 import { type ReactNode, useState, useSyncExternalStore } from "react"
 import { AccountMenu, type Me } from "./account-menu.tsx"
 import { Button } from "./button.tsx"
@@ -98,7 +99,7 @@ export function Footer({
 function HistoryLink({ accepted }: { accepted: AcceptedRecord | null }) {
   const link = historyLink(accepted)
   return link === null ? null : (
-    <a className="publish-button history-link" href={link.hash}>
+    <a className="publish-button history-link" href={hashOfPage(link.page)}>
       {link.label}
     </a>
   )

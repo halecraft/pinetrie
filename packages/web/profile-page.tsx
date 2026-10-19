@@ -8,6 +8,7 @@
 import type { Sha256, WriterId } from "@pinetrie/core"
 import { planRename, profileWords, renameProblem } from "@pinetrie/interface"
 import type { Outcome } from "@pinetrie/protocol/codec"
+import type { SessionClient } from "@pinetrie/session"
 import { useState } from "react"
 import { Button } from "./button.tsx"
 import { NAME_PROBLEM, NameInput, type NameProblem } from "./name-input.tsx"
@@ -19,6 +20,7 @@ export function ProfilePage({
   email,
   rename,
   setPicture,
+  upload,
   nameOf,
   colorOf,
 }: {
@@ -27,6 +29,7 @@ export function ProfilePage({
   readonly email: string
   readonly rename: (name: string) => Promise<Outcome>
   readonly setPicture: (sha256: Sha256 | null) => Promise<Outcome>
+  readonly upload: SessionClient["upload"]
   readonly nameOf: ReadonlyMap<WriterId, string>
   readonly colorOf: (writer: WriterId) => string
 }) {
@@ -41,6 +44,7 @@ export function ProfilePage({
         colorOf={colorOf}
         nameOf={nameOf}
         setPicture={setPicture}
+        upload={upload}
         writer={writer}
       />
       <form

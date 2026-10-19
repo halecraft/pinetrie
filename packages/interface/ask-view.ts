@@ -16,7 +16,7 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import type { DigestBody, DigestRecord } from "@pinetrie/rules"
-import { askStats, type Segment } from "./ask-segments.ts"
+import { askStats, type Segment, segmentPath } from "./ask-segments.ts"
 import { outcomeWords, workWords } from "./ask-words.ts"
 import { callPurpose } from "./tool-words.ts"
 
@@ -55,6 +55,27 @@ export function columnRows(
   }
   return rows
 }
+
+/**
+ * A column's path, `ids`, as the rows it draws: its messages, and each
+ * ask's work folded (`segmentPath`, then `columnRows`). Every client draws
+ * these rows; `landmarks` are the entries a fold never hides.
+ */
+export const pathRows = (
+  index: TreeIndex,
+  asks: AskIndex,
+  ids: readonly EntryId[],
+  landmarks: ReadonlySet<EntryId>,
+): readonly ColumnRow[] =>
+  columnRows(segmentPath(index, asks, ids, landmarks), asks)
+
+/** Whether `row` holds the entry `id`: the message itself, or one of an ask's parts. */
+export const rowHolds = (row: ColumnRow, id: EntryId): boolean =>
+  row.kind === "message"
+    ? row.id === id
+    : row.parts.some(s =>
+        s.kind === "entry" ? s.id === id : s.ids.includes(id),
+      )
 
 /**
  * The column's last ask whose run has ended: outline keeps its last word.

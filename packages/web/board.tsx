@@ -30,11 +30,11 @@ import {
   type BoardSide,
   type BoardView,
   boardKeyAct,
+  CANVAS_BUSY_REASON,
   CLEAR_FILTER,
   type Count,
   canvasesWords,
   clickClosesBoard,
-  dragProps,
   dropProps,
   elsewhereWords,
   filterTitle,
@@ -57,8 +57,8 @@ import {
   stateWords,
   type ThreadCard,
 } from "@pinetrie/interface"
-import { CANVAS_BUSY_REASON } from "@pinetrie/rules"
 import type { CardNotice } from "@pinetrie/session"
+import { dragProps } from "@pinetrie/web-core"
 import { type RefObject, useEffect, useRef, useState } from "react"
 import { AddButton } from "./add-button.tsx"
 import { Button, IconButton } from "./button.tsx"

@@ -1,4 +1,4 @@
-// interface/screen-memory — what a component knew of the screen when it was
+// web-core/screen-memory — what a component knew of the screen when it was
 // unmounted, kept for the page's life. A root shown again mounts its
 // columns anew; this is how they come back as they were left.
 

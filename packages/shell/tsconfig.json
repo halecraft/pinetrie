@@ -1,9 +1,0 @@
-{
-  // Shell source as structure: no DOM, no Node, so a page and a host can
-  // both take it. The root's config checks it as well; this one is run beside
-  // it by `pnpm run typecheck`.
-  "extends": "../../tsconfig.json",
-  "compilerOptions": { "lib": ["ESNext"] },
-  "include": ["."],
-  "exclude": ["node_modules"]
-}

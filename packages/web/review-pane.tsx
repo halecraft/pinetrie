@@ -7,17 +7,19 @@
 import type { RevisionReview } from "@pinetrie/core"
 import {
   DIFF_LINES_SHOWN,
+  decodeRevisionReview,
   diffLines,
+  diffUrl,
   type FileRow,
   MOVED_UNCHANGED,
   type ReviewPref,
   type ReviewTarget,
   reviewPrefWords,
+  reviewUrl,
   reviewView,
   revisionReadWords,
   sectionState,
 } from "@pinetrie/interface"
-import { decodeRevisionReview, diffUrl, reviewUrl } from "@pinetrie/rules"
 import { memo, useContext, useEffect, useRef, useState } from "react"
 import { Button, IconButton } from "./button.tsx"
 import { PaneHead } from "./pane-head.tsx"

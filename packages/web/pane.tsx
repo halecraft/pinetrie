@@ -8,7 +8,8 @@ import {
   type Sha256,
   type ThreadId,
 } from "@pinetrie/core"
-import { dragProps, type Intent, type StartButton } from "@pinetrie/interface"
+import type { Intent, StartButton } from "@pinetrie/interface"
+import { dragProps } from "@pinetrie/web-core"
 import type { Element } from "hast"
 import {
   memo,

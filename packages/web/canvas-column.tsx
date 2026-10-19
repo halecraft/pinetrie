@@ -14,6 +14,7 @@ import type {
 } from "@pinetrie/core"
 import {
   boardPlaceWords,
+  CANVAS_BUSY_REASON,
   CANVAS_LIST_HEADING,
   CANVAS_PINS_EMPTY,
   CANVAS_PINS_HEADING,
@@ -36,7 +37,6 @@ import {
   trashWords,
   UNFOLD_CANVAS,
 } from "@pinetrie/interface"
-import { CANVAS_BUSY_REASON } from "@pinetrie/rules"
 import type { SessionClient } from "@pinetrie/session"
 import { useState } from "react"
 import { Button, IconButton } from "./button.tsx"

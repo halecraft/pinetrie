@@ -8,7 +8,7 @@
 // the end (`releasedTip`), and a run that ended after it ended "while away".
 
 import type { EntryId } from "@pinetrie/core"
-import type { DigestBody } from "@pinetrie/rules"
+import { type DigestBody, pointsText } from "@pinetrie/rules"
 import type { Segment } from "./ask-segments.ts"
 import type { AskView } from "./ask-view.ts"
 import { type CountsAt, type Density, foldWords } from "./ask-words.ts"
@@ -76,6 +76,8 @@ export type SummaryAnchor =
 /** An ask's digest as drawn: its headline, its points, and where it goes. */
 export interface AskSummary extends DigestBody {
   readonly after: SummaryAnchor
+  /** Its points as a markdown list, as a client draws them; empty for none. */
+  readonly pointsMarkdown: string
 }
 
 export interface AskDraw {
@@ -132,7 +134,12 @@ export function planAskWork(
   const summary: AskSummary | null =
     digest === null
       ? null
-      : { ...digest, points: outline ? [] : digest.points, after }
+      : {
+          ...digest,
+          points: outline ? [] : digest.points,
+          pointsMarkdown: outline ? "" : pointsText(digest.points),
+          after,
+        }
   const rows: AskRow[] = []
   for (const s of parts) {
     if (s.kind === "entry") {

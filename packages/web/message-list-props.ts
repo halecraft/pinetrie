@@ -15,6 +15,7 @@ import type {
   ColumnView,
   CrossCanvasLink,
   Density,
+  DigestRecord,
   FoldMemory,
   LaneJoin,
   LiveWork,
@@ -22,11 +23,10 @@ import type {
   ProposalFacts,
   ProposalMemory,
   RowMemory,
-  ScreenMemory,
   ThreadLink,
 } from "@pinetrie/interface"
-import type { DigestRecord } from "@pinetrie/rules"
 import type { LiveDocHandle } from "@pinetrie/schema"
+import type { ScreenMemory } from "@pinetrie/web-core"
 import type { ReactNode } from "react"
 import { type PropRule, sameProps } from "./same-props.ts"
 

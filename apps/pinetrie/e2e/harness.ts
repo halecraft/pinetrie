@@ -68,15 +68,17 @@ import {
   type StoredEntryRow,
 } from "@pinetrie/schema"
 import {
-  type ConnectOptions,
   columnMessageTarget,
+  type SendHow,
+  type SessionClient,
+} from "@pinetrie/session"
+import {
+  type ConnectOptions,
   connectSession,
   newCanvasId,
   newCardId,
   newThreadId,
-  type SendHow,
-  type SessionClient,
-} from "@pinetrie/session"
+} from "@pinetrie/session/connect"
 import {
   type RunningHost,
   type StartHostOptions,
@@ -256,6 +258,7 @@ export const join = async (
   const client = await connectSession({
     url: host.wsUrl,
     WebSocket,
+    fetch: (url, init) => fetch(url, init),
     principal: `${name}@${scenario}.test`,
     ...options,
   })

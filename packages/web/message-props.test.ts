@@ -3,10 +3,10 @@ import {
   messageTools,
   projectColumns,
   type RowMemory,
-  screenMemory,
 } from "@pinetrie/interface"
 import { entry, indexEntries } from "@pinetrie/interface/fixtures"
 import { newLiveDoc } from "@pinetrie/schema/fixtures"
+import { screenMemory } from "@pinetrie/web-core"
 import { expect, test } from "vitest"
 import { type MessageProps, sameMessageProps } from "./message-props.ts"
 

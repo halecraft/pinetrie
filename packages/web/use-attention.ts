@@ -24,6 +24,8 @@ import {
   type Moments,
   markLevel,
   type OpenProposedChanges,
+  type RootRecord,
+  type RunEndReportRecord,
   type SshAsk,
   type StandingRunEnd,
   type Status,
@@ -32,7 +34,6 @@ import {
   threadWriters,
   unlisted,
 } from "@pinetrie/interface"
-import type { RootRecord, RunEndReportRecord } from "@pinetrie/rules"
 import type { AttentionStore } from "@pinetrie/session"
 import {
   useEffect,

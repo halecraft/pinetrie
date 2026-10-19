@@ -2098,7 +2098,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a column placed short of its end still follows it",
-    file: "packages/interface/follow.ts",
+    file: "packages/web-core/follow.ts",
     from: "      const following = gap(at) <= FOLLOW_SLACK\n",
     to: "      const following = true\n",
     suite: "browser",

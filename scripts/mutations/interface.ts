@@ -278,22 +278,13 @@ export const mutations: readonly Mutation[] = [
     expect: "interface declares only core, protocol, reads, rules, schema",
   },
   {
-    name: "the interface reads the window",
-    file: "packages/interface/follow.ts",
-    from: "const end = (m: Metrics) => Math.max(0, m.scrollHeight - m.clientHeight)",
-    to: "const end = (m: Metrics) => Math.max(0, m.scrollHeight - window.innerHeight)",
-    // tsc names no failing check (`failingChecks`): with the interface's
-    // typecheck clean, any error is the mutant's. The root's config includes
-    // the DOM, so only the interface's own catches it.
-    command: ["pnpm", "exec", "tsc", "--noEmit", "-p", "packages/interface"],
-  },
-  {
     name: "a package below the interface depends on it",
     file: "packages/session/package.json",
     from: '    "@pinetrie/core": "workspace:*",\n',
     to: '    "@pinetrie/core": "workspace:*",\n    "@pinetrie/interface": "workspace:*",\n',
     command: workspace,
-    expect: "only the page and the app depend on interface",
+    expect:
+      "only the page, its core, the terminal client and the app depend on interface",
   },
   {
     name: "the rail splits a long ask's capsule at a base's news",
@@ -547,8 +538,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "outline's summary has its points",
     file: "packages/interface/ask-fold.ts",
-    from: "      : { ...digest, points: outline ? [] : digest.points, after }\n",
-    to: "      : { ...digest, after }\n",
+    from: "          points: outline ? [] : digest.points,\n",
+    to: "          points: digest.points,\n",
     command: unit,
     expect: "outline's summary is the headline alone",
   },
@@ -828,14 +819,6 @@ export const mutations: readonly Mutation[] = [
     expect: "not once its entry moves the tip",
   },
   {
-    name: "a following column sets no floor",
-    file: "packages/interface/follow.ts",
-    from: "  const floor = state.holding ? Math.max(0, state.held - measured.content) : 0",
-    to: "  const floor = 0",
-    command: unit,
-    expect: "sets a floor of the shrink",
-  },
-  {
     name: "resolveLayout keeps archived canvases",
     file: "packages/interface/layout.ts",
     from: "  const kept = list.filter(t => !archived.has(t) || t === here)",
@@ -868,47 +851,6 @@ export const mutations: readonly Mutation[] = [
     to: '      ...(v.prefill === undefined ? {} : { prefill: storedPrefill(v.prefill) }),\n      ...("pending" in v ? { pending: { text: String(v.pending) } } : {}),\n    })\n  }',
     command: unit,
     expect: "never stored, nor restored",
-  },
-
-  {
-    name: "the column's own follow echo is judged by position",
-    file: "packages/interface/follow.ts",
-    from: "      const movedUp = m.scrollTop < state.lastTop - JITTER && !clamped",
-    to: "      const movedUp = gap(m) > FOLLOW_SLACK",
-    command: unit,
-    expect: "its own follow's echo",
-  },
-  {
-    name: "a small scroll up does not release",
-    file: "packages/interface/follow.ts",
-    from: "state.lastTop - JITTER",
-    to: "state.lastTop - FOLLOW_SLACK",
-    command: unit,
-    expect: "any scroll up releases",
-  },
-  {
-    name: "a clamp after shrinking reads as leaving",
-    file: "packages/interface/follow.ts",
-    from: " && !clamped",
-    to: "",
-    command: unit,
-    expect: "a clamp is not leaving",
-  },
-  {
-    name: "a released column follows growth",
-    file: "packages/interface/follow.ts",
-    from: "      if (state.following) return toEnd(state, m)",
-    to: "      return toEnd(state, m)",
-    command: unit,
-    expect: "released, it holds",
-  },
-  {
-    name: "placement keeps following",
-    file: "packages/interface/follow.ts",
-    from: "      const following = gap(at) <= FOLLOW_SLACK",
-    to: "      const following = state.following",
-    command: unit,
-    expect: "placed above its end",
   },
 
   {
@@ -1098,30 +1040,6 @@ export const mutations: readonly Mutation[] = [
     to: "  return to === null || to === from ? null : to",
     command: unit,
     expect: "no move past either end",
-  },
-  {
-    name: "the strip scrolls left near its right edge",
-    file: "packages/interface/reorder.ts",
-    from: "  if (right - x < EDGE_ZONE) return pull(right - x)",
-    to: "  if (right - x < EDGE_ZONE) return 0 - pull(right - x)",
-    command: unit,
-    expect: "scrolls left near the left edge and right near the right",
-  },
-  {
-    name: "the strip scrolls as fast anywhere near an edge",
-    file: "packages/interface/reorder.ts",
-    from: "    Math.round(EDGE_SPEED * (1 - Math.max(away, 0) / EDGE_ZONE))",
-    to: "    EDGE_SPEED",
-    command: unit,
-    expect: "grows faster nearer the edge",
-  },
-  {
-    name: "a fork point below its column's view is still aligned",
-    file: "packages/interface/align.ts",
-    from: "  if (fork === null || first === null || fork.top >= fork.shownTo)",
-    to: "  if (fork === null || first === null)",
-    command: unit,
-    expect: "no spacer reaches it",
   },
   {
     name: "every asked message starts a stretch",
@@ -1730,14 +1648,6 @@ export const mutations: readonly Mutation[] = [
     expect: "a big file waits to be opened",
   },
   {
-    name: "a screen memory keeps nothing",
-    file: "packages/interface/screen-memory.ts",
-    from: "      kept.set(key, value)",
-    to: "      kept.get(key)",
-    command: unit,
-    expect: "what is remembered is got back by its key",
-  },
-  {
     name: "a row never drawn before starts revealed",
     file: "packages/interface/tool-row.ts",
     from: "export const NO_MEMORY: RowMemory = { revealed: false, open: false }",
@@ -1760,30 +1670,6 @@ export const mutations: readonly Mutation[] = [
     to: '      : "the agent is working"',
     command: unit,
     expect: "a lane running true on",
-  },
-  {
-    name: "the floor is uncapped",
-    file: "packages/interface/follow.ts",
-    from: "  Math.min(floor, FLOOR_MAX * m.clientHeight)",
-    to: "  floor",
-    command: unit,
-    expect: "a floor is at most a third of the view",
-  },
-  {
-    name: "placement forgets what was unseen",
-    file: "packages/interface/follow.ts",
-    from: "          unseen: state.unseen && gap(at) > FOLLOW_SLACK,",
-    to: "          unseen: false,",
-    command: unit,
-    expect: "what was unseen stays unseen",
-  },
-  {
-    name: "a return ignores a moved tip",
-    file: "packages/interface/follow.ts",
-    from: "(seen.unseen || seen.tip !== tip)",
-    to: "seen.unseen",
-    command: unit,
-    expect: "behind: a column mounted again",
   },
   {
     name: "a result with an image shows its caption instead",
@@ -2407,14 +2293,6 @@ export const mutations: readonly Mutation[] = [
     expect: "a mention drawn in the tab you are on is seen",
   },
   {
-    name: "a release forgets the tip it left at",
-    file: "packages/interface/follow.ts",
-    from: "  state.releasedTip ?? m.tip",
-    to: "  m.tip",
-    command: unit,
-    expect: "more of the run does not move it",
-  },
-  {
     name: "a story fold stays open after its run however the reader came back",
     file: "packages/interface/ask-fold.ts",
     from: "      return f.running || f.endedWhileAway",
@@ -2574,9 +2452,9 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a fact's compact has no lead",
-    file: "packages/interface/compact.ts",
-    from: "        lead: text(factLine(card.content.fact)),",
-    to: '        lead: text(""),',
+    file: "packages/interface/card-words.ts",
+    from: "    ? factLine(card.content.fact)\n",
+    to: '    ? ""\n',
     command: unit,
     expect: "every drawn kind's compact has a lead",
   },
@@ -2681,15 +2559,6 @@ export const mutations: readonly Mutation[] = [
     expect: "Escape in the bench's box is the panel's too",
   },
   {
-    name: "the inventory toggle opens nothing held over",
-    file: "packages/interface/drag.ts",
-    from: '        : over.target.kind === "inventory" && over.target.slot === null',
-    to: '        : over.target.kind === "inventory" && over.target.slot === -1',
-    command: unit,
-    expect:
-      "a card held over the closed inventory toggle opens the inventory; over a slot, nothing",
-  },
-  {
     name: "a slot offers to trash someone else's card",
     file: "packages/interface/grid-view.ts",
     from: "      trashes: card !== null && isTrashable(card, input.me),",
@@ -2715,38 +2584,6 @@ export const mutations: readonly Mutation[] = [
     expect: "a move flies only when its plan says so",
   },
   {
-    name: "a view's top is in the first message below it",
-    file: "packages/interface/viewport.ts",
-    from: "    if ((boxes[mid]?.top ?? 0) <= 0) lo = mid",
-    to: "    if ((boxes[mid]?.top ?? 0) < -1e9) lo = mid",
-    command: unit,
-    expect: "agrees with a scan",
-  },
-  {
-    name: "a column keeps every spot it ever left",
-    file: "packages/interface/viewport.ts",
-    from: "  for (const id of shown) next.delete(id)",
-    to: "  for (const id of []) next.delete(id)",
-    command: unit,
-    expect: "one spot per column",
-  },
-  {
-    name: "an old end comes back as the column's end",
-    file: "packages/interface/viewport.ts",
-    from: "      : spot.id === m.lastId",
-    to: "      : spot.id !== undefined",
-    command: unit,
-    expect: "an end at the bottom",
-  },
-  {
-    name: "the rail follows while the reader scrolls it",
-    file: "packages/interface/viewport.ts",
-    from: "  if (sinceReader < RAIL_HOLD_MS) return null",
-    to: "  if (sinceReader < 0) return null",
-    command: unit,
-    expect: "unless the reader just scrolled the rail",
-  },
-  {
     name: "a view's top in a capsule gets no line",
     file: "packages/interface/rail-view.ts",
     from: "    head !== undefined && head[0].ids.length > 1 && head[1].from > 0",
@@ -2769,14 +2606,6 @@ export const mutations: readonly Mutation[] = [
     to: "    true",
     command: unit,
     expect: "a tick where an edge cuts a capsule",
-  },
-  {
-    name: "a column measured again, unmoved, takes the rail",
-    file: "packages/interface/viewport.ts",
-    from: "      if (view !== null && sameViewport(now.columns.get(key), view)) return",
-    to: "      if (false) return",
-    command: unit,
-    expect: "the column that moved, not one measured again",
   },
   {
     name: "the rail follows the whole outline, not the view",
@@ -2904,14 +2733,6 @@ export const mutations: readonly Mutation[] = [
     to: "  const chord = event.ctrlKey && event.shiftKey && !event.altKey",
     command: unit,
     expect: "Ctrl+Shift+I takes the focused card, in a text box too",
-  },
-  {
-    name: "the dock snaps by halves",
-    file: "packages/interface/inventory-dock.ts",
-    from: '  return x < (2 * width) / 3 ? "centre" : "right"',
-    to: '  return x < width / 2 ? "centre" : "right"',
-    command: unit,
-    expect: "snappedDock: the nearest third",
   },
   {
     name: "a selection of only space is a range",
@@ -3537,15 +3358,6 @@ export const mutations: readonly Mutation[] = [
     expect: "showing a root",
   },
   {
-    name: "leaving a page loaded from its URL goes back out of pine·trie",
-    file: "packages/interface/page.ts",
-    from: '    ? "back"\n    : "replace"',
-    to: '    ? "back"\n    : "back"',
-    command: unit,
-    expect:
-      "leaving goes back only over an entry this tab pushed; else it replaces the page's",
-  },
-  {
     name: "the folded avatar shows the inbox's badge at zero",
     file: "packages/interface/account-view.ts",
     from: "    badge: input.badge > 0 ? input.badge : null,",
@@ -3576,23 +3388,6 @@ export const mutations: readonly Mutation[] = [
     to: "    here === null ? null : here.label",
     command: unit,
     expect: "a page over the stage names the window, not the root under it",
-  },
-  {
-    name: "a drag moves a picture's crop past the image's edge",
-    file: "packages/interface/picture-crop.ts",
-    from: "  return clamp(\n    { ...crop, x: crop.x - dx * scale, y: crop.y - dy * scale },\n    image,\n  )",
-    to: "  return { ...crop, x: crop.x - dx * scale, y: crop.y - dy * scale }",
-    command: unit,
-    expect:
-      "a drag moves the square against the pointer, and stops at the image's edge",
-  },
-  {
-    name: "the browser sends a picture the host must fit",
-    file: "packages/interface/picture-crop.ts",
-    from: "export const PICTURE_SIZE = 256",
-    to: "export const PICTURE_SIZE = 1024",
-    command: unit,
-    expect: "the browser's picture is never one the host must fit",
   },
   {
     name: "a search finds a word inside a longer one",
@@ -3869,23 +3664,6 @@ export const mutations: readonly Mutation[] = [
     expect:
       "a thread's nearest notes are drawn in the column the host would choose",
   },
-  {
-    name: "a spot between two messages comes back at the first's end",
-    file: "packages/interface/viewport.ts",
-    from: "      ? m.top + spot.at * (m.bottom - m.top) + spot.past",
-    to: "      ? m.top + spot.at * (m.bottom - m.top)",
-    command: unit,
-    expect: "spotScrollTop: as far into the message as the view's top was",
-  },
-  {
-    name: "a view's top between two messages is at the first's end",
-    file: "packages/interface/viewport.ts",
-    from: "    past: Math.max(0, -top.bottom),",
-    to: "    past: 0,",
-    command: unit,
-    expect: "visibleSpan: a top in a gap is past the message above it",
-  },
-  // ── the canvas ──────────────────────────────────────────────
   {
     name: "a thread with no entry yet ignores its lane",
     file: "packages/interface/columns.ts",
@@ -4425,32 +4203,6 @@ export const mutations: readonly Mutation[] = [
       "a move on the board runs what follows it only once the host accepts it",
   },
   {
-    name: "a carrier on other text is believed",
-    file: "packages/interface/clip.ts",
-    from: "      newlines(carrier.text) === plain",
-    to: "      true",
-    command: unit,
-    expect:
-      "text from elsewhere: no carrier, or one on other text, from another host, malformed, or Shift held",
-  },
-  {
-    name: "a carrier from another host is believed",
-    file: "packages/interface/clip.ts",
-    from: "      carrier.host === host &&",
-    to: "      true &&",
-    command: unit,
-    expect:
-      "text from elsewhere: no carrier, or one on other text, from another host, malformed, or Shift held",
-  },
-  {
-    name: "a system clipboard's \\r\\n breaks the carrier",
-    file: "packages/interface/clip.ts",
-    from: 'const newlines = (s: string): string => s.replace(/\\r\\n?/g, "\\n")',
-    to: "const newlines = (s: string): string => s",
-    command: unit,
-    expect: "a system clipboard's \\r\\n still matches the carrier's \\n",
-  },
-  {
     name: "a focused block is passed over for the selected message",
     file: "packages/interface/clip.ts",
     from: "  if (focus.block !== null) {",
@@ -4514,24 +4266,6 @@ export const mutations: readonly Mutation[] = [
   },
   // ── the drag engine's decisions ──
   {
-    name: "a dragged column follows the pointer up and down",
-    file: "packages/interface/drag.ts",
-    from: "    dragged: { x: pointer.x - armed.start.x, y: 0 },",
-    to: "    dragged: { x: pointer.x - armed.start.x, y: pointer.y - armed.start.y },",
-    command: unit,
-    expect:
-      "drawPlan: a column only translates, along the strip; off it, its ghost is drawn instead",
-  },
-  {
-    name: "a column off the strip is drawn whole",
-    file: "packages/interface/drag.ts",
-    from: "    return { dragged: null, ghost: pointer, shifts: still, mark, lean, opens }",
-    to: "    return { dragged: pointer, ghost: null, shifts: still, mark, lean, opens }",
-    command: unit,
-    expect:
-      "drawPlan: a column only translates, along the strip; off it, its ghost is drawn instead",
-  },
-  {
     name: "a refused landing is dropped anyway",
     file: "packages/interface/drag.ts",
     from: '      return source.kind === "card" && drop.landing.kind !== "refused"',
@@ -4539,42 +4273,6 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "a drop sends what a key or a menu would: move-column, put or the canvas's drop, nothing else",
-  },
-  {
-    name: "a sidebar row is all onto its canvas",
-    file: "packages/interface/drag.ts",
-    from: '  if (at < 0.25) return { kind: "sidebar", before: canvas }',
-    to: '  if (false) return { kind: "sidebar", before: canvas }',
-    command: unit,
-    expect:
-      "a sidebar row: between rows in its top and bottom quarters, onto its canvas in between",
-  },
-  {
-    name: "a canvas's drag opens the canvas it would go before",
-    file: "packages/interface/drag.ts",
-    from: '  if (at.kind === "canvas") return NO_HOVER',
-    to: '  if (at.kind === "canvas") return at.over.kind === "root" && at.over.target.before !== null ? { kind: "canvas", canvas: at.over.target.before } : NO_HOVER',
-    command: unit,
-    expect:
-      "a canvas's drag opens nothing, over a place among canvases or none",
-  },
-  {
-    name: "a card opens a sidebar canvas from between rows",
-    file: "packages/interface/drag.ts",
-    from: '          ? { kind: "inventory" }\n          : NO_HOVER',
-    to: '          ? { kind: "inventory" }\n          : over.target.kind === "sidebar" && over.target.before !== null\n            ? { kind: "canvas", canvas: over.target.before }\n            : NO_HOVER',
-    command: unit,
-    expect:
-      "a card's drag opens a sidebar canvas from its middle and ▦ the board; between canvases, nothing",
-  },
-  {
-    name: "a canvas's landing is marked as a card's move",
-    file: "packages/interface/drag.ts",
-    from: '    case "root":\n      return "root"',
-    to: '    case "root":\n      return "move"',
-    command: unit,
-    expect:
-      "a canvas's landing is marked as a root drop; a card's as its move or copy",
   },
   {
     name: "Alt+arrows move a column from a text box",
@@ -4662,48 +4360,14 @@ export const mutations: readonly Mutation[] = [
     file: "packages/interface/put-target.test.ts",
     from: '    { kind: "item", canvas: TEST_CANVAS },\n    { kind: "inventory", slot: null },\n',
     to: '    { kind: "inventory", slot: null },\n',
-    // tsc names no failing check (`failingChecks`): with the interface's
-    // typecheck clean, any error is the mutant's.
-    command: ["pnpm", "exec", "tsc", "--noEmit", "-p", "packages/interface"],
+    // tsc names no failing check (`failingChecks`): with typecheck clean, any
+    // error is the mutant's.
+    command: ["pnpm", "exec", "tsc", "--noEmit"],
   },
   // ── a fold in motion (fold-motion.ts, effects, perform) ──
   {
-    name: "a fold's turn lands the name on the strip's other edge",
-    file: "packages/interface/fold-motion.ts",
-    from: "          dx: left + (geometry.width + line) / 2 - name.left,\n",
-    to: "          dx: left + (geometry.width - line) / 2 - name.left,\n",
-    command: unit,
-    expect: "a fold turns the name onto where its strip draws it",
-  },
-  {
-    name: "a fold's edge runs through the turning name",
-    file: "packages/interface/fold-motion.ts",
-    from: "      inset: Math.max(0, Math.min(narrowing * fold, limit)),\n",
-    to: "      inset: Math.max(0, narrowing * fold),\n",
-    command: unit,
-    expect: "the edge stays clear of a long name all the way through its turn",
-  },
-  {
-    name: "a fold leaves out the scroll's clamp",
-    file: "packages/interface/fold-motion.ts",
-    from: "  const clamp = scene.unfolding\n",
-    to: "  const clamp = true\n",
-    command: unit,
-    expect:
-      "a fold that shrinks the scroll below where it stands moves every column by the clamp",
-  },
-  {
-    name: "a fold moves under reduced motion",
-    file: "packages/interface/fold-motion.ts",
-    from: "  if (scene.reducedMotion || scene.dragging) return null\n",
-    to: "  if (scene.dragging) return null\n",
-    command: unit,
-    expect:
-      "nothing moves under reduced motion, during a drag, out of view, or already narrow",
-  },
-  {
     name: "the canvas column's fold names a card",
-    file: "packages/interface/fold-motion.ts",
+    file: "packages/interface/column-motion.ts",
     from: '        column: { kind: "canvas", canvas: action.canvas },\n',
     to: '        column: { kind: "card", card: action.canvas as never },\n',
     command: unit,
@@ -4926,22 +4590,6 @@ export const mutations: readonly Mutation[] = [
   },
   // ── an image's edges ──
   {
-    name: "a tall image's edges are a quarter of it",
-    file: "packages/interface/image-edge.ts",
-    from: "  const band = Math.min(EDGE_BAND_PX, length / 4)\n",
-    to: "  const band = length / 4\n",
-    command: unit,
-    expect: "a tall image keeps all but a fixed band at each edge for versions",
-  },
-  {
-    name: "two to a row, an image's edges are its top and bottom",
-    file: "packages/interface/image-edge.ts",
-    from: "  const length = across ? box.width : box.height\n  const into = across ? at.x - box.left : at.y - box.top\n",
-    to: "  const length = box.height\n  const into = at.y - box.top\n",
-    command: unit,
-    expect: "two to a row, its edges are left and right",
-  },
-  {
     name: "after an image is before it",
     file: "packages/interface/image-edge.ts",
     from: '  return { kind: "spot", before: at < 0 ? null : (images[at + 1] ?? null) }\n',
@@ -4975,5 +4623,32 @@ export const mutations: readonly Mutation[] = [
     to: "    warning: false\n",
     command: unit,
     expect: "an unshaped subscription warns, and says what to do",
+  },
+  {
+    name: "an ask's card shows its relay's bare text",
+    file: "packages/interface/card-words.ts",
+    from: "    : relayLine(card.content.relay)\n",
+    to: "    : String(card.content.relay.text)\n",
+    command: unit,
+    expect:
+      "a fact's lead is its fact's line and an ask's its relay's, the line the page draws at every width",
+  },
+  {
+    name: "an ask's row holds only its first part's entries",
+    file: "packages/interface/ask-view.ts",
+    from: "    : row.parts.some(s =>",
+    to: "    : row.parts.slice(0, 1).some(s =>",
+    command: unit,
+    expect:
+      "rowHolds: a message row holds its entry; an ask's row holds each entry of its folds and parts",
+  },
+  {
+    name: "outline's summary keeps its points' markdown",
+    file: "packages/interface/ask-fold.ts",
+    from: '          pointsMarkdown: outline ? "" : pointsText(digest.points),\n',
+    to: "          pointsMarkdown: pointsText(digest.points),\n",
+    command: unit,
+    expect:
+      "outline's summary is the headline alone; story's and raw's have its points, as a markdown list too",
   },
 ]

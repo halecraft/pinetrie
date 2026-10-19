@@ -30,11 +30,13 @@ import {
   type TextCardId,
 } from "@pinetrie/core"
 import {
+  type AcceptedRecord,
   baseChoices,
   type CardFrameFacts,
   type CardFrameView,
   type ColumnAct,
   type ColumnHow,
+  type CommandSummary,
   type CompletionOption,
   type ComposerMode,
   cardFrame,
@@ -51,10 +53,12 @@ import {
   pinnedStatus,
   placeholderWords,
   planSend,
+  type QueuedText,
   queueWords,
   type Reader,
   type ReadOnly,
   SEE_SETUP,
+  type SeatRecord,
   sendable,
   sendButton,
   settleSend,
@@ -64,21 +68,15 @@ import {
   startWords,
   textTokens,
   tokenSizeWords,
-} from "@pinetrie/interface"
-import {
-  type AcceptedRecord,
-  type CommandSummary,
-  type QueuedText,
-  type SeatRecord,
   writersOfClients,
-} from "@pinetrie/rules"
+} from "@pinetrie/interface"
 import { textClients } from "@pinetrie/schema"
 import {
   columnMessageTarget,
   IN_COLUMN,
-  newCardId,
   type SessionClient,
 } from "@pinetrie/session"
+import { newCardId } from "@pinetrie/session/connect"
 import {
   type ClipboardEvent,
   type KeyboardEvent,

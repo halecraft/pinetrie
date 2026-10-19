@@ -9,13 +9,13 @@
 // that column is painted. Every animation carries `FOLD_ANIMATION`, so
 // `settleFolds` finds what is moving.
 
+import type { ColumnMotion } from "@pinetrie/interface"
 import {
-  type ColumnMotion,
   type FoldMotion,
   type FoldScene,
   planFoldMotion,
   type Rect,
-} from "@pinetrie/interface"
+} from "@pinetrie/web-core"
 import type { RefObject } from "react"
 import {
   FOLD_ANIMATION,

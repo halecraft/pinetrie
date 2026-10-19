@@ -10,7 +10,7 @@
 
 import type { CanvasId, ThreadId, TreeIndex, WriterId } from "@pinetrie/core"
 import {
-  dragProps,
+  CANVAS_BUSY_REASON,
   dropProps,
   dropsWords,
   type Intent,
@@ -28,8 +28,8 @@ import {
   SIDEBAR_WORDS,
   type SidebarView,
 } from "@pinetrie/interface"
-import { CANVAS_BUSY_REASON } from "@pinetrie/rules"
 import type { SessionClient } from "@pinetrie/session"
+import { dragProps } from "@pinetrie/web-core"
 import {
   type KeyboardEvent,
   type ReactNode,

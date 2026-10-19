@@ -7,7 +7,7 @@ import {
   sameSpan,
   type ViewportStore,
   visibleSpan,
-} from "@pinetrie/interface"
+} from "@pinetrie/web-core"
 import { type RefObject, useEffect, useMemo, useRef } from "react"
 
 /**

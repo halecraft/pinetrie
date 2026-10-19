@@ -6,6 +6,9 @@
 - **Amended by:**
   - ADR-0180: the placement rule the packages' notes share now says where a
     record's type lives; what the page shows is unchanged.
+  - ADR-0194: the yardstick stays and becomes the placement rule; a pure
+    module whose inputs are the browser's is `@pinetrie/web-core`'s, and
+    `inventory-dock.ts` moves with them.
 
 **Context.** `@pinetrie/core` is a dependency of every package, `lanes`,
 `repo`, `pi` and the host among them, yet it held the columns' paths, the

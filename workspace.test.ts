@@ -123,7 +123,7 @@ test("session declares only Kyneta's exchange and WebSocket transport, core, pro
 
 test("interface declares only core, protocol, reads, rules, schema, session, shell and TypeBox: no React, no DOM", () => {
   // What any client shows and does: a TTY must be able to take
-  // it without a browser. `packages/interface/tsconfig.json` checks the DOM.
+  // it without a browser. `tsconfig.pure.json` checks it has no DOM.
   assert.deepEqual(deps(read("packages/interface")).sort(), [
     "@pinetrie/core",
     "@pinetrie/protocol",
@@ -147,11 +147,42 @@ test("only interface declares shell: which call reads as shell is its decision",
   assert.deepEqual(declaring, ["packages/interface"])
 })
 
-test("only the page and the app depend on interface: nothing below it does", () => {
+test("only the page, its core, the terminal client and the app depend on interface: nothing below it does", () => {
   const declaring = WORKSPACE.filter(dir =>
     allDeps(read(dir)).includes("@pinetrie/interface"),
   ).sort()
-  assert.deepEqual(declaring, ["apps/pinetrie", "packages/web"])
+  assert.deepEqual(declaring, [
+    "apps/pinetrie",
+    "apps/tui",
+    "packages/web",
+    "packages/web-core",
+  ])
+})
+
+test("web-core declares only core and interface: the web client's decisions, no React and no page", () => {
+  // Resolution keeps React and the page's components out of it in the type
+  // check, Vitest and Vite alike; `tsconfig.pure.json` keeps out the DOM.
+  assert.deepEqual(deps(read("packages/web-core")).sort(), [
+    "@pinetrie/core",
+    "@pinetrie/interface",
+  ])
+})
+
+test("only the page depends on web-core: it is the web client's", () => {
+  const declaring = WORKSPACE.filter(dir =>
+    allDeps(read(dir)).includes("@pinetrie/web-core"),
+  ).sort()
+  assert.deepEqual(declaring, ["packages/web"])
+})
+
+test("the terminal client declares only interface, session and core: it draws from interface alone", () => {
+  // What it draws proves interface holds what any client needs: a name it
+  // took from rules or reads would prove nothing.
+  assert.deepEqual(allDeps(read("apps/tui")).sort(), [
+    "@pinetrie/core",
+    "@pinetrie/interface",
+    "@pinetrie/session",
+  ])
 })
 
 test("lanes declares only core and install: it runs jj and git in a lane, on a runtime it is handed, never pi or the document", () => {
@@ -268,6 +299,24 @@ test("the page declares no server package and no app", () => {
       `the page must not depend on ${forbidden}`,
     )
   }
+})
+
+test("the page declares neither rules nor reads: it draws what interface decides", () => {
+  // A decision the page made from either would be one a terminal client
+  // repeats; interface re-exports what a client draws by.
+  assert.deepEqual(
+    deps(read("packages/web"))
+      .filter(d => d.startsWith("@pinetrie/"))
+      .sort(),
+    [
+      "@pinetrie/core",
+      "@pinetrie/interface",
+      "@pinetrie/protocol",
+      "@pinetrie/schema",
+      "@pinetrie/session",
+      "@pinetrie/web-core",
+    ],
+  )
 })
 
 /** Every package the page bundles: the page and its `@pinetrie/*` dependencies, through each one's. */

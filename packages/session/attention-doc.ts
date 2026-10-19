@@ -7,10 +7,10 @@ import { batch } from "@kyneta/schema"
 import type { EntryId, ThreadId, WriterId } from "@pinetrie/core"
 import { personDocId } from "@pinetrie/protocol/writers"
 import type { RootRecord } from "@pinetrie/rules"
-import { type Attention, AttentionDoc, readAttention } from "@pinetrie/schema"
+import { AttentionDoc, readAttention } from "@pinetrie/schema"
+import type { AttentionStore } from "./attention-store.ts"
 import { personDoc } from "./person-doc.ts"
 import { NO_READS, type ReadMemory, readStep } from "./read-marks.ts"
-import type { Readable } from "./store.ts"
 
 /** Lower than every entry id (a uuidv7): where a person starts in an empty session. */
 export const EARLIEST = "0"
@@ -25,31 +25,6 @@ export function startingSince(roots: Iterable<RootRecord>): string {
   for (const { newest } of roots)
     if (newest !== null && newest > since) since = newest
   return since
-}
-
-/**
- * The mentions you have seen, as the page's inbox decides them
- * (`@pinetrie/interface`'s `inbox.ts`): every one at or before `since`, and
- * `seen` above it.
- */
-export interface SeenMentions {
-  readonly since: string
-  readonly seen: readonly string[]
-}
-
-export interface AttentionStore {
-  readonly attention: Readable<Attention>
-  /** A column of `lane` follows its end, at `entry`. */
-  read(lane: ThreadId, entry: EntryId): void
-  /** A column has left its thread's end, or the page is hidden: write every waiting mark. */
-  leave(): void
-  /** Mark `lane`'s run-end report, of the run `ask` started, "not needed". */
-  dismiss(lane: ThreadId, ask: EntryId): void
-  /** Mark `lane`'s proposed changes "not needed" while it holds `source`. */
-  dismissReady(lane: ThreadId, source: string): void
-  /** The mentions seen, as the inbox decided them next. */
-  setInbox(next: SeenMentions): void
-  dispose(): void
 }
 
 export function attentionStore(

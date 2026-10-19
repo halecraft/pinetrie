@@ -179,12 +179,15 @@ describe("planAskWork", () => {
   )
 
   test.each(["outline", "story", "raw"] as const)(
-    "outline's summary is the headline alone; story's and raw's have its points (%s)",
+    "outline's summary is the headline alone; story's and raw's have its points, as a markdown list too (%s)",
     density => {
-      expect(
-        planAskWork(view(), shapes["one fold"] ?? [], reader({ density }))
-          .summary?.points,
-      ).toEqual(density === "outline" ? [] : ["p1"])
+      const summary = planAskWork(
+        view(),
+        shapes["one fold"] ?? [],
+        reader({ density }),
+      ).summary
+      expect(summary?.points).toEqual(density === "outline" ? [] : ["p1"])
+      expect(summary?.pointsMarkdown).toBe(density === "outline" ? "" : "- p1")
     },
   )
 

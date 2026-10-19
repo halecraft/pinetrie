@@ -30,9 +30,9 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the answer to a command on proposed changes is never recorded",
-    file: "packages/session/acting.ts",
-    from: '        actingOn(command, { kind: "answered", id, outcome }),\n',
-    to: '        actingOn(command, { kind: "sent", id }),\n',
+    file: "packages/session/send-acting.ts",
+    from: '      actingAfter(store.current(), command, { kind: "answered", id, outcome }),\n',
+    to: '      actingAfter(store.current(), command, { kind: "sent", id }),\n',
     command: unit,
     expect:
       "sent at once, the refusal on reply, per lane; an acceptance clears it",

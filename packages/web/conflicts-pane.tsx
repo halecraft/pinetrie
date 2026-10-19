@@ -8,9 +8,9 @@ import type { ConflictChoice, ThreadId } from "@pinetrie/core"
 import {
   type ConflictShown,
   conflictsWords,
+  reviewUrl,
   reviewView,
 } from "@pinetrie/interface"
-import { reviewUrl } from "@pinetrie/rules"
 import { Button } from "./button.tsx"
 import { PaneHead } from "./pane-head.tsx"
 import { ReviewFile, readReview, SHOWN_NOW } from "./review-pane.tsx"

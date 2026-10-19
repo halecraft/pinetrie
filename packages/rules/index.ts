@@ -604,7 +604,6 @@ export {
   type AnswerMessage,
   type AnswerPlan,
   answerContent,
-  askLine,
   decodeAnswer,
   decodeIncoming,
   decodeRelay,
@@ -623,6 +622,7 @@ export {
   type RelayMessage,
   type RelayPlan,
   type RelayRefusal,
+  relayLine,
   relayRefusalText,
   unreachableRefusal,
 } from "./relay.ts"

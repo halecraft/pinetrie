@@ -17,8 +17,8 @@ import {
   type NoteColumnView,
   type Reader,
   type ReadOnly,
+  type SeatRecord,
 } from "@pinetrie/interface"
-import type { SeatRecord } from "@pinetrie/rules"
 import type { SessionClient } from "@pinetrie/session"
 import { useState } from "react"
 import { NewCardBox, NoteCardEditor } from "./card-editor.tsx"

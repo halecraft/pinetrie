@@ -1,5 +1,5 @@
 import type { ImageRef, Sha256, Share } from "@pinetrie/core"
-import { textBlocks } from "@pinetrie/rules"
+import { textBlocks } from "@pinetrie/interface"
 import type { Element, ElementContent, Root } from "hast"
 import { describe, expect, test } from "vitest"
 import {

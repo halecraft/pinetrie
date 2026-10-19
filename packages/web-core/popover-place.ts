@@ -1,7 +1,8 @@
-// web/popover-place — where a popover's box goes (`popover.tsx`).
+// web-core/popover-place — where a popover's box goes, from its trigger's box
+// and the window's size (`packages/web/popover.tsx` measures both).
 
 /** Where an open box goes, and how tall it may be. */
-export type Placement = (
+export type BoxPlacement = (
   | { readonly top: number }
   | { readonly bottom: number }
 ) &
@@ -21,9 +22,14 @@ export const EDGE = 8
  * the room on the side it opens to, so a long list scrolls inside it.
  */
 export function placeBox(
-  trigger: Pick<DOMRect, "top" | "bottom" | "left" | "right">,
+  trigger: {
+    readonly top: number
+    readonly bottom: number
+    readonly left: number
+    readonly right: number
+  },
   view: { readonly width: number; readonly height: number },
-): Placement {
+): BoxPlacement {
   const side =
     trigger.left < view.width / 2
       ? { left: trigger.left }

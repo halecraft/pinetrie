@@ -1,0 +1,60 @@
+// interface/host-rules — the host's own rules a client draws by, re-exported
+// so a client reads them from here and no client package declares
+// `@pinetrie/rules`: what a column shows of its cards, the board and the
+// canvas, a review's addresses, a message's blocks as an address numbers
+// them, and the records a view hands on. Each is the host's too, so what is
+// drawn and what the host does cannot differ.
+
+export type {
+  AcceptedRecord,
+  BlockNode,
+  CardHistoryRecord,
+  CardOnCanvas,
+  CardTitleRecord,
+  CommandSummary,
+  DigestRecord,
+  MarginCard,
+  QueuedCard,
+  QueuedText,
+  RootRecord,
+  RunEndReportRecord,
+  SeatRecord,
+  TraceRecord,
+  WorkflowState,
+  WorkStripButton,
+} from "@pinetrie/rules"
+export {
+  BLOCK_PROPERTY,
+  blankQueued,
+  blockKey,
+  CANVAS_BUSY_REASON,
+  canvasLines,
+  canvasList,
+  canvasPinnedCards,
+  columnGlances,
+  decodeRevisionReview,
+  diffUrl,
+  displayName,
+  effectiveBase,
+  entryMarginCounts,
+  marginCards,
+  marginCounts,
+  markBlocks,
+  movedBackBy,
+  pinnedCardsAtEnd,
+  queuedOn,
+  reachableAgents,
+  readableThreadName,
+  reviewUrl,
+  shareMarkdown,
+  TRASH_KEEP_MS,
+  taskBoard,
+  tasksInArchive,
+  textBlocks,
+  threadReach,
+  traceEnd,
+  UNTITLED_IMAGE,
+  unstartedThreads,
+  writersOfClients,
+  yourCard,
+} from "@pinetrie/rules"

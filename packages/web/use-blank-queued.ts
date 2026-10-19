@@ -5,7 +5,7 @@
 
 import { subscribe } from "@kyneta/schema"
 import { type CardId, type CardRecord, isTextCard } from "@pinetrie/core"
-import { blankQueued } from "@pinetrie/rules"
+import { blankQueued } from "@pinetrie/interface"
 import { textHolds } from "@pinetrie/schema"
 import type { SessionClient } from "@pinetrie/session"
 import { useEffect, useMemo, useState } from "react"

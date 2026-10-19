@@ -16,10 +16,10 @@ import type {
   MessageTools,
   PinnedMarker,
   RowMemory,
-  ScreenMemory,
   ThreadLink,
 } from "@pinetrie/interface"
 import type { LiveDocHandle } from "@pinetrie/schema"
+import type { ScreenMemory } from "@pinetrie/web-core"
 import { type PropRule, sameProps } from "./same-props.ts"
 
 export interface MessageProps {

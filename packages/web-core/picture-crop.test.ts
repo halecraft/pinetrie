@@ -1,4 +1,4 @@
-import { PICTURE_MOST } from "@pinetrie/rules"
+import { PICTURE_MOST } from "@pinetrie/interface"
 import { describe, expect, test } from "vitest"
 import {
   cropSource,

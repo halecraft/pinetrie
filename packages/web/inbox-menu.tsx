@@ -26,9 +26,9 @@ import {
   NOT_NEEDED,
   opens,
   type Reader,
+  readableThreadName,
   type ThreadLink,
 } from "@pinetrie/interface"
-import { readableThreadName } from "@pinetrie/rules"
 import { useState } from "react"
 import { InboxIcon } from "./icons.tsx"
 import { Menu, type MenuItem, type MenuSection } from "./menu.tsx"

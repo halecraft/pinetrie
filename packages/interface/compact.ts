@@ -19,15 +19,13 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import {
-  askLine,
   type CardTitleRecord,
   displayName,
-  factLine,
   UNTITLED_IMAGE,
 } from "@pinetrie/rules"
 import { addressWords } from "./address-words.ts"
 import type { CardTone } from "./card-frame.ts"
-import { COMMAND_VERB } from "./card-words.ts"
+import { COMMAND_VERB, hostCardLine } from "./card-words.ts"
 import { countWords } from "./count-words.ts"
 import {
   mediaColumnGlance,
@@ -215,7 +213,7 @@ export function cardCompact(card: DrawnCard, facts: CompactFacts): Compact {
         ...base,
         mark: { kind: "none" },
         command: null,
-        lead: text(factLine(card.content.fact)),
+        lead: text(hostCardLine(card)),
         second: null,
         badge: null,
       }
@@ -224,7 +222,7 @@ export function cardCompact(card: DrawnCard, facts: CompactFacts): Compact {
         ...base,
         mark: { kind: "none" },
         command: null,
-        lead: text(askLine(card.content.relay)),
+        lead: text(hostCardLine(card)),
         second: null,
         badge: null,
       }

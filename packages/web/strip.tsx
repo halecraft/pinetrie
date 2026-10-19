@@ -22,6 +22,7 @@ import {
   type CanvasColumnView,
   type CanvasPut,
   type CardColumn,
+  type CardOnCanvas,
   type ColumnMatches,
   type Column as ColumnSpec,
   type ColumnView,
@@ -42,7 +43,6 @@ import {
   stripCards,
   type ThreadGlance,
 } from "@pinetrie/interface"
-import type { CardOnCanvas } from "@pinetrie/rules"
 import type { ReactElement, RefObject } from "react"
 import { useMemo, useState } from "react"
 import { AddButton } from "./add-button.tsx"
@@ -258,7 +258,7 @@ export function Strip(p: {
     // Where it lands is decided at the drop, before the upload, so a strip
     // that moves meanwhile does not move it.
     const after = cardBeforeGap(columns, x - box.left + strip.scrollLeft)
-    const up = await uploadImages(files)
+    const up = await uploadImages(p.shared.session.upload, files)
     setLeft(up.left)
     p.onIntent({
       kind: "put-images",

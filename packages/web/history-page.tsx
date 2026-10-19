@@ -6,11 +6,12 @@
 
 import type { RestorePreview } from "@pinetrie/core"
 import {
+  decodeRevisionReview,
   type HistoryEntry,
   type HistoryView,
   restoreWords,
+  reviewUrl,
 } from "@pinetrie/interface"
-import { decodeRevisionReview, reviewUrl } from "@pinetrie/rules"
 import { useState } from "react"
 import { Button } from "./button.tsx"
 import { ReviewPane } from "./review-pane.tsx"

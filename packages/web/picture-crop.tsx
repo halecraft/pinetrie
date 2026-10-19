@@ -12,7 +12,7 @@ import {
   PICTURE_SIZE,
   pictureWords,
   zoomCrop,
-} from "@pinetrie/interface"
+} from "@pinetrie/web-core"
 import { useLayoutEffect, useRef, useState } from "react"
 import { Button } from "./button.tsx"
 

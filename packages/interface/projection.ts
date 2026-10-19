@@ -81,6 +81,19 @@ import type { WorkFacts } from "./column-view.ts"
 import { type LiveWork, liveWork } from "./live.ts"
 import { sameData } from "./same-data.ts"
 
+/**
+ * The reads a client gathers beside `readSessionFacts`, each in its own
+ * selector, as the page memoises each: the directory, the held roots as one
+ * tree, and who takes part. The host reads by the same functions.
+ */
+export {
+  participantsIn,
+  readHeldIndex,
+  readParticipantNames,
+  readParticipantPictures,
+  readRoots,
+} from "@pinetrie/reads"
+
 /** The documents a page reads: the session's, what streams, and the roots it holds. */
 export interface HeldView {
   readonly session: SessionDocHandle

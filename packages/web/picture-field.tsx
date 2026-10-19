@@ -4,13 +4,10 @@
 // is uploaded before "use this picture".
 
 import type { Sha256, WriterId } from "@pinetrie/core"
-import {
-  imageFiles,
-  pictureProblem,
-  pictureWords,
-  uploadBlob,
-} from "@pinetrie/interface"
+import { imageFiles, pictureProblem } from "@pinetrie/interface"
 import type { Outcome } from "@pinetrie/protocol/codec"
+import type { SessionClient } from "@pinetrie/session"
+import { pictureWords } from "@pinetrie/web-core"
 import { useContext, useRef, useState } from "react"
 import { Button } from "./button.tsx"
 import { pastedImages } from "./clipboard.ts"
@@ -24,12 +21,15 @@ export function PictureField({
   nameOf,
   colorOf,
   setPicture,
+  upload,
 }: {
   readonly writer: WriterId
   readonly nameOf: ReadonlyMap<WriterId, string>
   readonly colorOf: (writer: WriterId) => string
   /** Ask the host to set your picture to a stored blob, or with null remove it. */
   readonly setPicture: (sha256: Sha256 | null) => Promise<Outcome>
+  /** Keep the cropped picture as a blob (`SessionClient.upload`). */
+  readonly upload: SessionClient["upload"]
 }) {
   const has = useContext(Pictures).has(writer)
   const file = useRef<HTMLInputElement>(null)
@@ -111,9 +111,9 @@ export function PictureField({
           onCancel={() => setChosen(null)}
           onUse={async picture => {
             setBusy(true)
-            const upload = await uploadBlob(picture)
-            if (!upload.ok) setProblem(upload.reason)
-            const took = upload.ok && (await send(upload.ref.sha256))
+            const kept = await upload(picture)
+            if (!kept.ok) setProblem(kept.reason)
+            const took = kept.ok && (await send(kept.ref.sha256))
             setBusy(false)
             if (took) setChosen(null)
           }}

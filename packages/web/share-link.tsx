@@ -4,8 +4,8 @@
 // its name. Every other link is drawn as it is.
 
 import { blobOfUrl } from "@pinetrie/core"
+import { imageClick } from "@pinetrie/web-core"
 import { type ComponentProps, useContext } from "react"
-import { imageClick } from "./image-click.ts"
 import type { PaneSubject } from "./pane.ts"
 import { samePane } from "./pane.ts"
 import { PaneReach } from "./pane-context.ts"

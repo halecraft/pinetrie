@@ -12,8 +12,9 @@ import {
   writerId,
 } from "@pinetrie/core"
 import { cardIdFor, threadOfEntry } from "@pinetrie/core/fixtures"
-import type { NoteCard } from "@pinetrie/rules"
+import { factLine, type NoteCard, relayLine } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
+import { hostCardLine } from "./card-words.ts"
 import type { Column } from "./columns.ts"
 import {
   type CompactFacts,
@@ -169,6 +170,22 @@ const EVERY_KIND: Readonly<Record<DrawnKind, DrawnCard>> = {
 }
 
 describe("cardCompact", () => {
+  test("a fact's lead is its fact's line and an ask's its relay's, the line the page draws at every width", () => {
+    const { fact, ask } = EVERY_KIND
+    if (fact.kind !== "fact" || ask.kind !== "ask")
+      throw new Error("EVERY_KIND holds each kind under its own key")
+    expect(cardCompact(fact, facts).lead).toEqual({
+      kind: "text",
+      text: hostCardLine(fact),
+    })
+    expect(hostCardLine(fact)).toBe(factLine(fact.content.fact))
+    expect(cardCompact(ask, facts).lead).toEqual({
+      kind: "text",
+      text: hostCardLine(ask),
+    })
+    expect(hostCardLine(ask)).toBe(relayLine(ask.content.relay))
+  })
+
   test("every drawn kind's compact has a lead", () => {
     for (const card of Object.values(EVERY_KIND)) {
       const { lead } = cardCompact(card, facts)

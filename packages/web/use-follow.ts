@@ -7,7 +7,7 @@ import {
   type FollowState,
   follow,
   initialFollow,
-} from "@pinetrie/interface"
+} from "@pinetrie/web-core"
 import {
   type RefObject,
   useCallback,

@@ -15,6 +15,8 @@ import {
   type ColumnRow,
   columnRows,
   lastEndedAsk,
+  pathRows,
+  rowHolds,
 } from "./ask-view.ts"
 import {
   entry,
@@ -72,6 +74,22 @@ test("columnRows: an ask's work is one row, its prompt and what follows rows of 
       { kind: "entry", id: "5-a" },
     ],
   })
+})
+
+test("pathRows: a path's rows are its segments grouped, as columnRows groups them", () => {
+  expect(pathRows(index, asks, path, new Set())).toEqual(
+    columnRows(segmentPath(index, asks, path, new Set()), asks),
+  )
+})
+
+test("rowHolds: a message row holds its entry; an ask's row holds each entry of its folds and parts", () => {
+  const [prompt, work] = pathRows(index, asks, path, new Set())
+  if (prompt === undefined || work === undefined) throw new Error("two rows")
+  expect(rowHolds(prompt, entryId("1-p"))).toBe(true)
+  expect(rowHolds(prompt, entryId("2-a"))).toBe(false)
+  expect(rowHolds(work, entryId("3-a"))).toBe(true)
+  expect(rowHolds(work, entryId("5-a"))).toBe(true)
+  expect(rowHolds(work, entryId("6-q"))).toBe(false)
 })
 
 test("columnRows: a base's news steered into a run is drawn in its ask's row", () => {

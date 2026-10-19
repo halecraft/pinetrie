@@ -1,10 +1,8 @@
-// interface/fold-motion — how a column folds into its strip, or unfolds from
+// web-core/fold-motion — how a column folds into its strip, or unfolds from
 // it, as a value: what moves where, sampled over the motion. The shell
 // measures the wide column and plays what this returns
-// (`packages/web/use-fold-motion.ts`).
-
-import type { ColumnKey } from "./columns.ts"
-import type { LayoutAction } from "./layout.ts"
+// (`packages/web/use-fold-motion.ts`). Which column folds, and which way, is
+// interface's (`foldMotion`).
 
 /** A box on the page, as `getBoundingClientRect` gives it, in px. */
 export interface Rect {
@@ -100,32 +98,6 @@ const CLEAR = 2
 
 /** How close two lengths count as the same, in px. */
 const SAME = 0.5
-
-/** A column's fold, as its layout action names it, and which way. */
-export interface ColumnMotion {
-  readonly column: ColumnKey
-  readonly unfolded: boolean
-}
-
-/** The column a layout action folds or unfolds, and which way; null for any other action. */
-export function foldMotion(action: LayoutAction): ColumnMotion | null {
-  if (action.kind !== "view") return null
-  const { change } = action
-  switch (change.kind) {
-    case "fold":
-      return {
-        column: { kind: "card", card: change.card },
-        unfolded: change.unfolded,
-      }
-    case "fold-canvas":
-      return {
-        column: { kind: "canvas", canvas: action.canvas },
-        unfolded: change.unfolded,
-      }
-    default:
-      return null
-  }
-}
 
 const easeOut = (t: number): number => 1 - (1 - t) ** 3
 

@@ -43,12 +43,16 @@ import {
   appView,
   boardView,
   branchColors,
+  type CardOnCanvas,
   type Clip,
   type Column as ColumnSpec,
   canvasColumnView,
   canvasesOnBoard,
   canvasIcons,
+  canvasLines,
+  canvasList,
   canvasNoteColumns,
+  canvasPinnedCards,
   canvasRail,
   canvasStrip,
   canvasTrash,
@@ -57,11 +61,12 @@ import {
   clipboardCellView,
   clipFacts,
   columnForeign,
+  columnGlances,
   columnLandmarks,
   columnMatches,
   composerPlacesStore,
-  type Dock,
   directoryRootEntries,
+  displayName,
   type Effect,
   type Focus,
   type FocusKey,
@@ -84,6 +89,7 @@ import {
   type ListWidth,
   laneRootEntries,
   layoutReducer,
+  marginCounts,
   mediaColumns,
   messageCount,
   NO_TEXT,
@@ -96,8 +102,8 @@ import {
   pageTitle,
   parseQuery,
   parseSearch,
+  participantsIn,
   perform,
-  placement,
   planHeldRoots,
   planIntent,
   planReading,
@@ -107,18 +113,20 @@ import {
   type RowMemory,
   railSpots,
   railStubWords,
+  reachableAgents,
+  readHeldIndex,
   readHeldLanes,
+  readParticipantNames,
+  readParticipantPictures,
+  readRoots,
   readSessionFacts,
   reconcileName,
   resolveLayout,
   restoreStatus,
   rootSeed,
   type SearchState,
-  type SeenEnd,
   SIDEBAR_WORDS,
-  type Spot,
   type Strip as StripView,
-  screenMemory,
   searchCorpus,
   searchLine,
   searchOn,
@@ -127,15 +135,15 @@ import {
   setupView,
   shownWidth,
   sidebarView,
-  spotFor,
-  spotScrollTop,
-  spotStore,
   storedLayout,
   stripCards,
   type ThreadLink,
+  TRASH_KEEP_MS,
   type TypedLast,
+  taskBoard,
   taskLabels,
   taskSummaries,
+  tasksInArchive,
   threadAnchor,
   threadCardHeads,
   threadGlance,
@@ -148,33 +156,16 @@ import {
   typingDue,
   unsentSignals,
   unstartedMode,
-  uploadBlob,
-  viewportStore,
-} from "@pinetrie/interface"
-import {
-  participantsIn,
-  readHeldIndex,
-  readParticipantNames,
-  readParticipantPictures,
-  readRoots,
-} from "@pinetrie/reads"
-import {
-  type CardOnCanvas,
-  canvasLines,
-  canvasList,
-  canvasPinnedCards,
-  columnGlances,
-  displayName,
-  marginCounts,
-  reachableAgents,
-  TRASH_KEEP_MS,
-  taskBoard,
-  tasksInArchive,
   unstartedThreads,
   type WorkflowState,
-} from "@pinetrie/rules"
+} from "@pinetrie/interface"
 import {
   heldBy,
+  type SessionClient,
+  settleSlots,
+  slotIntents,
+} from "@pinetrie/session"
+import {
   newCanvasId,
   newCardId,
   newImageId,
@@ -183,10 +174,18 @@ import {
   newReferenceCardId,
   newRootId,
   newThreadId,
-  type SessionClient,
-  settleSlots,
-  slotIntents,
-} from "@pinetrie/session"
+} from "@pinetrie/session/connect"
+import {
+  type Dock,
+  placement,
+  type SeenEnd,
+  type Spot,
+  screenMemory,
+  spotFor,
+  spotScrollTop,
+  spotStore,
+  viewportStore,
+} from "@pinetrie/web-core"
 import {
   useCallback,
   useDeferredValue,
@@ -1507,7 +1506,7 @@ export function App({
       })
     },
     landed,
-    uploadBlob,
+    uploadBlob: markdown => session.upload(markdown),
     clipboardCell: setCell,
     // As typed: the box's own text undo and its binding see an insert.
     insertText: text => {
@@ -1907,6 +1906,7 @@ export function App({
                   setPicture={sha256 =>
                     session.request({ kind: "picture", sha256 })
                   }
+                  upload={session.upload}
                   writer={session.writer}
                 />
               )}

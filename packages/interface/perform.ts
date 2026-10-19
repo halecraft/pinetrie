@@ -6,12 +6,13 @@ import {
   AT_BOARD,
   type AttentionStore,
   type SessionClient,
+  type Upload,
 } from "@pinetrie/session"
 import { afterKeep } from "./card-intents.ts"
 import type { Clip } from "./clip.ts"
+import { type ColumnMotion, foldMotion } from "./column-motion.ts"
 import type { Effect } from "./effects.ts"
 import type { FocusKey } from "./focus-claim.ts"
-import { type ColumnMotion, foldMotion } from "./fold-motion.ts"
 import type { Identity } from "./identity.ts"
 import { afterCanvasMove, type Intent } from "./intent.ts"
 import {
@@ -25,7 +26,6 @@ import { commentMarkdown } from "./markdown-of.ts"
 import type { PageName } from "./page.ts"
 import type { SearchAct } from "./search.ts"
 import { afterSpinOff } from "./spin-off.ts"
-import type { Upload } from "./upload.ts"
 
 export interface AppPorts {
   readonly dispatch: (action: LayoutAction) => void
@@ -86,7 +86,7 @@ export interface AppPorts {
   readonly search: (act: SearchAct) => void
   /** Outline a message briefly once it is drawn (`useReveal`). */
   readonly landed: (entry: EntryId) => void
-  /** Keep markdown as a blob: a reference's quote (`uploadBlob`). */
+  /** Keep markdown as a blob: a reference's quote (`SessionClient.upload`). */
   readonly uploadBlob: (markdown: string) => Promise<Upload>
   /** Show `clip` in the clipboard cell: the copy this tab just made. */
   readonly clipboardCell: (clip: Clip) => void

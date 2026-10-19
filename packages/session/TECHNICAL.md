@@ -9,8 +9,23 @@ the same code.
 
 **It runs unchanged in a browser and in Node, and declares no React**
 (`workspace.test.ts` pins its dependencies), so it cannot draw. The only
-value specific to one of the two is the `WebSocket` constructor, which the
-caller passes.
+values specific to one of the two are the `WebSocket` constructor and the
+`fetch` a blob is posted with (`SessionClient.upload`, `upload.ts`), which
+the caller passes.
+
+**Two entries** (ADR-0194). The main entry, `index.ts`, exports the pure
+modules and their types, which `@pinetrie/interface` and `apps/tui` take:
+the moves, the inventory, a send's target, the acting state, and the
+client's shape (`client.ts`: `SessionClient`, `HostRequest`; and
+`attention-store.ts`: `AttentionStore`), declared apart from the code that
+implements them. `tsconfig.pure.json` checks what it reaches against the
+pure globals, so none of it names a timer, `crypto` or `fetch`.
+`@pinetrie/session/connect` (`connection.ts`) exports the connection
+(`connectSession`) and the id minters, which name the runtime's globals:
+only the page's `main.tsx` and the components that mint, and the suites,
+import it. A module joins the main entry only if it type-checks under the
+pure config; a shell step inside a pure module moves out, as `sendActing`
+did (`send-acting.ts`), its id taken from its caller.
 
 Where a rule lives, as `packages/rules/TECHNICAL.md` and
 `packages/jj/TECHNICAL.md` state it too:
@@ -57,7 +72,8 @@ it.
 | `openThreads` (`open-threads.ts`) | the sidebar: the canvases you have open, in your order (ADR-0122, ADR-0116) | `placeInList`, `planOpenRepair` (`open-repair.ts`) |
 | `presenceSeat` (`presence-seat.ts`) | this seat's reading and typing | none |
 | `hostLine` (`host-line.ts`) | the requests waiting for their replies | `encodeIntent`, `decodeReply` |
-| one `snapshotStore<ActingState>` | your proposed changes and setup and publish commands out | `nextActing` (`acting.ts`) |
+| one `snapshotStore<ActingState>`, set by `sendActing` (`send-acting.ts`) | your proposed changes and setup and publish commands out | `actingAfter`, `nextActing` (`acting.ts`) |
+| `upload` (`upload.ts`) | a blob posted to the host's `/blob` with the caller's `fetch` | `uploadUrl`, `postBlob` |
 | `send` | what a send asks the host, and what it draws | `planSendRequest` (`send.ts`) |
 
 - **Order matters to Kyneta.** `writersPolicy` is registered before the

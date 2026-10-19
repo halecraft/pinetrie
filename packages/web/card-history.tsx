@@ -7,18 +7,16 @@
 
 import type { CardId, TextCardId, WriterId } from "@pinetrie/core"
 import {
+  type CardHistoryRecord,
   HISTORY_TITLE,
   historyWords,
+  movedBackBy,
   movedBackWords,
   type Reader,
-  writtenWords,
-} from "@pinetrie/interface"
-import {
-  type CardHistoryRecord,
-  movedBackBy,
   type SeatRecord,
   writersOfClients,
-} from "@pinetrie/rules"
+  writtenWords,
+} from "@pinetrie/interface"
 import { textClients } from "@pinetrie/schema"
 import type { SessionClient } from "@pinetrie/session"
 import { createContext, useContext } from "react"

@@ -7,7 +7,7 @@ import {
   askAtTop,
   sameAtTop,
   type WorkBox,
-} from "@pinetrie/interface"
+} from "@pinetrie/web-core"
 import { type RefObject, useEffect, useRef, useState } from "react"
 
 /**

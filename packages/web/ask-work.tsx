@@ -15,7 +15,6 @@ import {
   type Segment,
   toggled,
 } from "@pinetrie/interface"
-import { pointsText } from "@pinetrie/rules"
 import {
   type ReactNode,
   useCallback,
@@ -43,7 +42,7 @@ const Summary = ({ summary }: { summary: AskSummary }) => (
       <Headline text={summary.headline} />
     </p>
     {summary.points.length > 0 && (
-      <MessageText mode="committed" text={pointsText(summary.points)} />
+      <MessageText mode="committed" text={summary.pointsMarkdown} />
     )}
   </div>
 )

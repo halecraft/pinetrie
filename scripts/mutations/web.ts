@@ -89,14 +89,6 @@ export const mutations: readonly Mutation[] = [
       "every noun has its built-in icon where its URL names it, and nothing else is there",
   },
   {
-    name: "a popover's box is as tall as the window",
-    file: "packages/web/popover-place.ts",
-    from: "        maxHeight: view.height - trigger.bottom - EDGE,\n",
-    to: "        maxHeight: view.height - EDGE,\n",
-    command: unit,
-    expect: "a box opens below and leftwards from the top right",
-  },
-  {
     name: "everyone present has the first colour",
     file: "packages/web/presence.tsx",
     from: "    return (i === undefined ? undefined : FIRST_COLORS[i]) ?? hashed(writer)",
@@ -244,14 +236,6 @@ export const mutations: readonly Mutation[] = [
     to: "      Object.is(a[k], b[k]),",
     command: unit,
     expect: "props rebuilt from an unchanged message draw the same",
-  },
-  {
-    name: "a modified click opens the image in the pane too",
-    file: "packages/web/image-click.ts",
-    from: '  return e.metaKey || e.ctrlKey ? "tab" : "pane"',
-    to: '  return "pane"',
-    command: unit,
-    expect: "a Cmd- or Ctrl-click opens the image in a new tab",
   },
   {
     name: "opening what the pane shows replaces it",
@@ -455,5 +439,13 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "a stamp is fresh until an input changes, goes, or the mode differs",
+  },
+  {
+    name: "the page declares rules again",
+    file: "packages/web/package.json",
+    from: '    "@pinetrie/protocol": "workspace:*",\n',
+    to: '    "@pinetrie/protocol": "workspace:*",\n    "@pinetrie/rules": "workspace:*",\n',
+    command: ["pnpm", "exec", "vitest", "run", "workspace.test.ts"],
+    expect: "the page declares neither rules nor reads",
   },
 ]

@@ -5,8 +5,14 @@
 
 import { useSelector } from "@kyneta/react"
 import type { CanvasId, EntryId, TreeIndex, WriterId } from "@pinetrie/core"
-import { othersReading, othersWithValue, seenBy } from "@pinetrie/interface"
-import { readReading, readReadingCanvases, readTyping } from "@pinetrie/reads"
+import {
+  othersReading,
+  othersWithValue,
+  readReading,
+  readReadingCanvases,
+  readTyping,
+  seenBy,
+} from "@pinetrie/interface"
 import type { PresenceDocHandle } from "@pinetrie/schema"
 import { useMemo } from "react"
 

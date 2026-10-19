@@ -6,8 +6,8 @@ import {
   type LaneJoin,
   type ProposalMemory,
   type RowMemory,
-  screenMemory,
 } from "@pinetrie/interface"
+import { screenMemory } from "@pinetrie/web-core"
 import { expect, test } from "vitest"
 import {
   type MessageListProps,

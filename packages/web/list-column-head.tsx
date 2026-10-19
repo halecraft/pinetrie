@@ -6,12 +6,12 @@
 import type { CardWidth, MediaId, NoteColumnId } from "@pinetrie/core"
 import {
   countWords,
-  dragProps,
   type Intent,
   KIND_ICON,
   type ListKind,
   type ReadOnly,
 } from "@pinetrie/interface"
+import { dragProps } from "@pinetrie/web-core"
 import { useState } from "react"
 import { Button } from "./button.tsx"
 import { ColumnHeadEnd } from "./column-menu.tsx"

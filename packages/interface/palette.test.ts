@@ -1,4 +1,4 @@
-import { newCanvasId, newRootId } from "@pinetrie/session"
+import { newCanvasId, newRootId } from "@pinetrie/session/connect"
 import { describe, expect, test } from "vitest"
 import { PENDING_TRACK } from "./column-paths.ts"
 import { canvasSlot, rootSeed, SLOTS, STRIDE, trackSlot } from "./palette.ts"
