@@ -94,7 +94,7 @@ export function planQueueCard(input: {
   readonly holds: readonly ValueWrite<"session">[]
 } {
   const { move, hold } = input
-  // A queueing discards nothing: its target is a queue.
+  // A queueing trashes nothing: its target is a queue.
   const planned = planMoveCommand(input.cards, [move], input.by, input.running)
   const { drain } = planned
   const step =

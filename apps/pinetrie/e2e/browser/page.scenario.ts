@@ -3398,8 +3398,8 @@ async function run(check: Checks["check"]): Promise<void> {
           mergedHere && /'s note · with /.test(heading ?? ""),
           `${heading}`,
         )
-        // The note discarded, and a message again, for what follows.
-        await page.click(`${ourFrame} .discard-card`)
+        // The note trashed, and a message again, for what follows.
+        await page.click(`${ourFrame} .trash-card`)
         await page.click(box)
         await page.keyboard.type("Together: from B")
         await hasValue(page, box, "Together: from B")
@@ -3511,7 +3511,7 @@ async function run(check: Checks["check"]): Promise<void> {
         await page.keyboard.press("ControlOrMeta+z")
         await hasValue(page, box, "")
         await idle()
-        // A branch's message is kept at its thread; closing it asks, and discards.
+        // A branch's message is kept at its thread; closing it asks, and trashes.
         // A message's tools show on hover.
         const branchable = page
           .locator(`${col(0)} .msg[data-entry]:has(> .tools > .branch)`)
@@ -3861,14 +3861,14 @@ async function run(check: Checks["check"]): Promise<void> {
         (document.activeElement as HTMLElement | null)?.blur(),
       )
       await page.keyboard.press("ControlOrMeta+z")
-      const discardUndone = await waitFor(
+      const trashUndone = await waitFor(
         () => placeOf(parked)?.kind === "inventory",
         5_000,
       )
       check(
         "the bench's trash trashes the selected card, and the undo key outside a box brings it back",
-        discardUndone >= 0,
-        `${discardUndone} ms; ${placeOf(parked)?.kind}`,
+        trashUndone >= 0,
+        `${trashUndone} ms; ${placeOf(parked)?.kind}`,
       )
       // Dropped on a state in the footer's strip, a card becomes a thread
       // there, its first message the card's text; the undo key lifts it back
@@ -4008,7 +4008,7 @@ async function run(check: Checks["check"]): Promise<void> {
       )
       // A take while the panel is closed peeks: the panel opens for the
       // card's landing, and a pointer over it keeps it open, as if you had
-      // opened it. The card is discarded after.
+      // opened it. The card is trashed after.
       await page.click("#bottom .inventory-toggle")
       await page.click(downBox)
       await page.keyboard.type("a peek")

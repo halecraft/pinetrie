@@ -33,6 +33,30 @@ import { baseGetLatest } from "./0012-base-get-latest.ts"
 import { acceptedGetLatestMigration } from "./0013-accepted-get-latest.ts"
 import { stateGetLatestMigration } from "./0014-state-get-latest.ts"
 import { cardCommandGetLatestMigration } from "./0015-card-command-get-latest.ts"
+import { baseUnfinishedMigration } from "./0016-base-unfinished.ts"
+import { acceptedUnfinished } from "./0017-accepted-unfinished.ts"
+import {
+  behindUnfinished,
+  factUnfinished,
+  updateUnfinished,
+} from "./0018-history-unfinished.ts"
+import { queuedFactUnfinishedMigration } from "./0019-queued-fact-unfinished.ts"
+import { allowanceRecords } from "./0020-allowance-records.ts"
+import {
+  answerAllowance,
+  askCardAllowanceMigration,
+  relayAllowance,
+} from "./0021-relay-allowance.ts"
+import {
+  factAllowanceMigration,
+  queuedFactAllowanceMigration,
+} from "./0022-fact-allowance.ts"
+import { incomingType } from "./0023-incoming.ts"
+import {
+  trashedHistories,
+  trashedRows,
+  trashedTraces,
+} from "./0024-trashed-rows.ts"
 import type { MigrationLedger } from "./ledger.ts"
 
 /** What a migration reads with, and writes with once every read loaded. */
@@ -102,6 +126,22 @@ export const RECORD_MIGRATIONS: readonly RecordMigration[] = [
   acceptedGetLatestMigration,
   stateGetLatestMigration,
   cardCommandGetLatestMigration,
+  baseUnfinishedMigration,
+  acceptedUnfinished,
+  updateUnfinished,
+  behindUnfinished,
+  factUnfinished,
+  queuedFactUnfinishedMigration,
+  allowanceRecords,
+  relayAllowance,
+  answerAllowance,
+  askCardAllowanceMigration,
+  factAllowanceMigration,
+  queuedFactAllowanceMigration,
+  incomingType,
+  trashedRows,
+  trashedHistories,
+  trashedTraces,
 ]
 
 /**

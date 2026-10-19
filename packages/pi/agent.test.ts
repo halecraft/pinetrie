@@ -25,7 +25,7 @@ import { cardIdFor } from "@pinetrie/core/fixtures"
 import {
   BEHIND_TYPE,
   encodeBehind,
-  encodeHeard,
+  encodeIncoming,
   encodeMessage,
   encodePinned,
   encodeRelayMessage,
@@ -654,7 +654,7 @@ describe("agents talking", () => {
     ])
     const { agent, lane } = await laneOver(script, {})
     const from = threadIdFor(newId())
-    const heard = encodeHeard(
+    const heard = encodeIncoming(
       { from, fromName: "sable-meadow", entries: [entryId("e-1")] },
       ["Ada: should we queue?"],
       1,
@@ -667,7 +667,7 @@ describe("agents talking", () => {
         asker: { kind: "agent", thread: from },
         askerName: "sable-meadow",
         text: "what do you think?",
-        budget: entryId("e-1"),
+        allowance: entryId("e-1"),
         by: ADA,
       },
       1,

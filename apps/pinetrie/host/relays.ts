@@ -13,7 +13,7 @@
 import {
   cardIdOfKind,
   type EntryId,
-  lastHeardEntry,
+  lastIncomingEntry,
   lastInvitation,
   messageText,
   projectTranscript,
@@ -25,7 +25,7 @@ import {
 } from "@pinetrie/core"
 import { readArchived, readNames, readPlaces } from "@pinetrie/reads"
 import {
-  encodeHeard,
+  encodeIncoming,
   encodeRelayMessage,
   planAskCard,
   planDelivery,
@@ -36,8 +36,8 @@ import {
   type ToolAnswer,
   unreachableRefusal,
 } from "@pinetrie/rules"
+import type { Allowances } from "./allowances.ts"
 import type { Basics, HostKeeper } from "./basics.ts"
-import type { Budgets } from "./budgets.ts"
 import { canvasesNow } from "./canvases.ts"
 import { queueFact as queueFactIn } from "./facts.ts"
 import type { Places } from "./places.ts"
@@ -111,13 +111,13 @@ export function createRelays(deps: {
   readonly start: Runs["start"]
   /** Whether a run may start on a lane (`LaneWork.runnable`). */
   readonly runnable: LaneWork["runnable"]
-  readonly budgets: Budgets
+  readonly allowances: Allowances
   /** Ask for a lane's drain. */
   readonly drain: (lane: ThreadId) => void
   /** The writer of the places: an ask's card and a fact are the host's changes. */
   readonly placesWriter: Places
 }): Relays {
-  const { basics, budgets } = deps
+  const { basics, allowances } = deps
   const { session, places } = basics
   const threads = threadsNow(basics)
   const { nameOf, personName } = threads
@@ -167,17 +167,17 @@ export function createRelays(deps: {
       toLane: target?.lane ?? { kind: "none" },
       toForeign: typeof runnable === "object" ? runnable : null,
       path: projectTranscript(from.index, from.end),
-      heard:
+      lastIncoming:
         target === null
           ? null
-          : lastHeardEntry(target.index, target.end, from.thread),
+          : lastIncomingEntry(target.index, target.end, from.thread),
       lastInvitation: lastInvitation(from.index, from.end, to),
       source: relay.source,
       asker: relay.asker,
       askerName: relay.askerName,
       text: relay.text,
-      budget: relay.budget,
-      spent: budgets.spent(relay.budget),
+      allowance: relay.allowance,
+      spent: allowances.spent(relay.allowance),
       by: relay.by,
     })
     if (planned.kind === "refused") return planned
@@ -200,10 +200,14 @@ export function createRelays(deps: {
         kind: "prompt",
         message: encodeRelayMessage(planned.relay, now),
         pinnedSeen: [],
-        heard:
-          planned.heard === null
+        incoming:
+          planned.incoming === null
             ? null
-            : encodeHeard(planned.heard.details, planned.heard.lines, now),
+            : encodeIncoming(
+                planned.incoming.details,
+                planned.incoming.lines,
+                now,
+              ),
       })
       return { kind: "ran" }
     }
@@ -247,7 +251,7 @@ export function createRelays(deps: {
     return deps.keeper.run(async roots => {
       const from = await threads.thread(roots, lane)
       const target = findAgent(to)
-      const budget = budgets.runBudget(lane)
+      const budget = allowances.runAllowance(lane)
       if (from === null || budget === null)
         return said("This call reached no thread.", true)
       if (target === null)
@@ -255,13 +259,13 @@ export function createRelays(deps: {
       // A person's message whose run asks sets its budget now.
       const by = budget.by
       if (by === null) return said("This call reached no thread.", true)
-      await budgets.ensure(budget.key, lane, by)
+      await allowances.ensure(budget.key, lane, by)
       const delivered = await deliverRelay(roots, lane, target.thread, {
         source: from.end ?? budget.key,
         asker: { kind: "agent", thread: lane },
         askerName: nameOf(lane),
         text,
-        budget: budget.key,
+        allowance: budget.key,
         by,
       })
       switch (delivered.kind) {
@@ -284,7 +288,7 @@ export function createRelays(deps: {
   async function leave(lane: ThreadId, name: string): Promise<ToolAnswer> {
     return deps.keeper.run(async roots => {
       const left = findAgent(name)
-      const by = budgets.runBudget(lane)?.by ?? null
+      const by = allowances.runAllowance(lane)?.by ?? null
       if (left === null || by === null)
         return said(refusal({ kind: "unknown", name }), true)
       // A thread out of reach is told nothing, and its root is not opened.
@@ -321,7 +325,7 @@ export function createRelays(deps: {
       const asks = personMessage.asks ?? []
       if (asks.length === 0 && (personMessage.invites ?? []).length === 0)
         return
-      await budgets.ensure(source, thread, author)
+      await allowances.ensure(source, thread, author)
       // What came after the chat is not heard with it: its path ends there.
       for (const to of asks) {
         const delivered = await deliverRelay(
@@ -333,7 +337,7 @@ export function createRelays(deps: {
             asker: { kind: "person", writer: author },
             askerName: personMessage.author ?? "",
             text: messageText(personMessage),
-            budget: source,
+            allowance: source,
             by: author,
           },
           source,

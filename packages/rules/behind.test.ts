@@ -32,7 +32,7 @@ const line = (commit = L2): JjAcceptedRecord => ({
   commit,
   heads: { current: null, proposed: "" },
   log: { current: null, proposed: "" },
-  wips: [],
+  unfinishedWork: [],
   workingCopy: {
     behind: 0,
     ahead: 0,

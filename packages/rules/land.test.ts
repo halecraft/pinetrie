@@ -15,7 +15,7 @@ const ADA = writerId("ada")
 const C1 = pointId("c1")
 
 /** pi's estimate of a custom message (`packages/pi/compaction.ts`): a token per four characters. */
-const budgetOf = (tokens: number): PromptBudget => ({
+const allowanceOf = (tokens: number): PromptBudget => ({
   tokens,
   estimate: content => Math.ceil(content.length / 4),
 })
@@ -26,7 +26,7 @@ const floorOf = (
   latest = "Accepted work",
 ): Floor => {
   const found = resolutionFloor({
-    budget: budgetOf(tokens),
+    budget: allowanceOf(tokens),
     skill: { path: "/s/SKILL.md", content: "SKILL TEXT", hash: "h" },
     intent,
     latest,
@@ -222,7 +222,7 @@ describe("planResolution: the land message", () => {
   test("the floor: too large only when the skill and the person's text overflow", () => {
     expect(
       resolutionFloor({
-        budget: budgetOf(100),
+        budget: allowanceOf(100),
         skill: null,
         intent: "x".repeat(1_000),
         latest: "Accepted work",

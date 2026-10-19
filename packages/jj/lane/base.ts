@@ -36,7 +36,7 @@ export async function laneBase(
         source: newest.commit,
       }
     : {
-        base: { kind: "wip", bookmark: newest.bookmark },
+        base: { kind: "unfinished", bookmark: newest.bookmark },
         start: newest.at,
         source: newest.commit,
       }

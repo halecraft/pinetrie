@@ -538,7 +538,7 @@ export async function executeSend(
           message:
             begin === ERR.NOT_SET_UP
               ? "set up accepted work first: a new thread's lane starts from it"
-              : `${context.base ?? "that"} is no WIP bookmark above accepted work`,
+              : `${context.base ?? "that"} is no bookmark of unfinished work above accepted work`,
         }
       const created = await agent.createThreadLane(
         { root, at: planned.at },

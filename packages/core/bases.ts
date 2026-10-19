@@ -11,7 +11,7 @@ import type { ThreadName } from "./thread-names.ts"
  */
 export type ThreadBase =
   | { readonly kind: "accepted" }
-  | { readonly kind: "wip"; readonly bookmark: string }
+  | { readonly kind: "unfinished"; readonly bookmark: string }
 
 /** The thread a lane's copy was cloned from, by its lane and its name. */
 export interface ParentThread {
@@ -130,7 +130,7 @@ export type ForkStart =
   | { readonly kind: "recorded"; readonly points: readonly PointId[] }
   | { readonly kind: "accepted"; readonly point: PointId }
   | {
-      readonly kind: "wip"
+      readonly kind: "unfinished"
       readonly bookmark: string
       /** The WIP's commit: whose files the copy holds. */
       readonly commit: CommitId
@@ -151,7 +151,7 @@ export type BaseMerge =
       readonly mark: boolean
     }
   | {
-      readonly kind: "wip"
+      readonly kind: "unfinished"
       readonly bookmark: string
       /** The WIP's commit: whose files the copy holds. */
       readonly commit: CommitId

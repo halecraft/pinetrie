@@ -63,7 +63,7 @@ wires them.
 | `delivery.ts` | where a host's message goes in a thread (`createDelivery`, by `planDelivery`): a run for one that wakes an idle lane, a steer into a running one, or an append; only a prompt wakes, since only a prompt starts a run. Shared by answers and ssh news |
 | `ssh-news.ts` | each change to a lane's use of its owner's ssh, told to the lane (ADR-0178): heard from lane work's `onSshNews`, planned by `planSshNews`, delivered in a late step on the lane's thread |
 | `threads-now.ts` | a thread as it is now, for the relays, the answers and the late steps: its reach, its tree, end and lane (`thread`, which opens only a live thread's root), and the names a message uses |
-| `budgets.ts` | what agents talking spend (ADR-0128): the budget a run spends, read from its prompt (`promptBudget`), counted per request, written when it goes over and at a run's end, and the gate before each request |
+| `allowances.ts` | what agents talking spend (ADR-0128): the allowance a run spends, read from its prompt (`promptAllowance`), counted per request, written when it goes over and at a run's end, and the gate before each request |
 | `later.ts` | `Later`: every write the host decides before a gap and makes after it (§ Late writes), its gate (`lateAway`), and a model request outside the keeper (`outside`) |
 | `fakes.ts` | test support: `record<T>()`, `fakeLane`, `row`, `putValue` and `applyWrites` (each write to the document its target names, through the real `applyRecordWrites`), `writtenValues`, `basics` (one root, `ROOT_ID`, in `fakeDocuments`), `putLane`, `writeDirectory` |
 
@@ -246,7 +246,7 @@ same for every run (`packages/pi/TECHNICAL.md`, S85).
 - **A run holds its root by a lease**, taken in `Runs.start`, which takes
   its step's `StepDocs` and so runs only in a step, and released after the
   run's `ended` has run. What reads a running lane's root (its stream, its
-  pinned cards, its canvas's context, its budget, its pending run-end report, base
+  pinned cards, its canvas's context, its allowance, its pending run-end report, base
   news, `save_blob`) reads `RunDocs.docOf`, whose null is "no run". The
   leases say what must stay in memory; which lanes run is
   `pinetrie:live`'s.
@@ -442,7 +442,14 @@ reading the store once, planning once, then acting:
     to `denied` with `takenBack`; `0010-ssh-fact-words` renames each ssh
     fact's news `refused` to `denied` and `revoked` to `taken-back`, and
     `0011-carry-on-ssh-allowed` each carry-on's reason `ssh-approved` to
-    `ssh-allowed`, `content` untouched in both.
+    `ssh-allowed`, `content` untouched in both; and the rest of the
+    plain-words renames: `0012`–`0015` (*get the latest*: a lane's base,
+    accepted work's preview, a folder state, a card's command), `0016`–`0019`
+    (*unfinished work*: a base, accepted work's list, history messages and
+    queued facts), `0020`–`0022` (*allowance*: its records' namespace,
+    relays, answers and ask cards, and facts), `0023-incoming` (each
+    `pinetrie.heard` message's type) and `0024` (*trash*: a trashed card's
+    place, in the places rows, its history and its trace).
 - **A migration that only reshapes one namespace's records,** record by
   record, is a pure rewrite over `rewriteRecords` (`migrations/rewrite.ts`,
   over `recordDocs`, which any record migration reads a home's documents
@@ -865,7 +872,7 @@ rejects `shutdown()`.
   take each card, and its thread end from its loaded root, the first time
   the change touches it, synchronously, before the write; the close diffs
   those cards alone. So a change whose body awaits (the drain's, across a
-  send) records nothing another change wrote meanwhile, such as a budget's
+  send) records nothing another change wrote meanwhile, such as an allowance's
   stop fact written from pi's gate, outside any keeper step. A plan's read
   and the first `apply` have no `await` between them, so the change finds
   each card as the plan did. The body is called synchronously: a pop checks
@@ -883,13 +890,13 @@ rejects `shutdown()`.
 - **A change's close runs in a `finally`**: the records already say what
   happened, so their history and texts follow even when the body throws. A
   close that fails after a failed body is logged, and the body's error is
-  rethrown. A caller that voids a change catches it (`budgets.ts`'s stop,
+  rethrown. A caller that voids a change catches it (`allowances.ts`'s stop,
   `failed`): a voided async function that rejects ends the process
   (`packages/keeper/TECHNICAL.md`).
 - **`move` and `set-command` are handoffs** (`commands/cards.ts`): gather
   the places and whether the lane runs, plan (`planMoveCommand` over
-  several moves, `planSetCommand`), then write. A discard's history is the
-  host's to name (ADR-0066, ADR-0116): `Discards` is the canvases now and the
+  several moves, `planSetCommand`), then write. Trashing's history is the
+  host's to name (ADR-0066, ADR-0116): `Trashes` is the canvases now and the
   `here` the `move` carries, the canvas its sender is on. A move's list is accepted
   whole or refused by its first refusal (`planMoves`): a keep's cards are
   one command. An accepted move answers `moved` with its `rev`; a refusal
@@ -936,7 +943,7 @@ rejects `shutdown()`.
   the canvas, its document (`HostDocuments.destroy`, which tells
   every peer), and the canvas's stacks, unloaded for the startup sweep to
   retire. A redo after a lift moves the card back to the trash, its thread
-  deleted: a discard.
+  deleted: trashing it.
 - **`spin-off` makes a text card a thread** (ADR-0111, ADR-0126,
   `spinOff`), in one keeper step: the card's text loaded whole,
   `planSpinOff` (refused for a blank card, a root or thread id in use, or
@@ -1003,7 +1010,7 @@ rejects `shutdown()`.
   shares them with no one and rejects one a client announces, and
   `writersPolicy` gives them to the host alone.
 - **Which history a move enters is the host's** (`movesHistory`): the canvas the
-  card goes to, else the one it leaves, read from its record; a discard's,
+  card goes to, else the one it leaves, read from its record; trashing's,
   the canvas it leaves, else, from an inventory, the canvas its sender is on
   (`here`), else, on none, its sender's history outside any canvas; a
   creation or a removal enters none. `move` writes inside that
@@ -1047,14 +1054,14 @@ rejects `shutdown()`.
   The record carries the text's version (`seen`); a top card the host's
   copy does not yet hold is `behind`, and stays on top, and the host drains
   the lane again once it holds it (`createWaits`, below). A
-  wait whose card leaves the queue, popped, unqueued or discarded, is given
+  wait whose card leaves the queue, popped, unqueued or trashed, is given
   up (`givenUp`), so it neither stays subscribed nor drains; the places are
   watched only while a wait is out.
 - **What a popped card comes to is decided first** (`planCarry`,
   ADR-0080), then carried out (`carryOut`): a fact is appended to the
   thread; getting the latest runs `prepareUpdate`, then sends the text; a split
   starts the split's own run, its text the brief; a message is sent; a card
-  with no text and no command is discarded. A queued reference's quote is
+  with no text and no command is trashed. A queued reference's quote is
   read from its blob before the pop (`queuedQuotes`) and sent as a
   message; one whose blob is missing is skipped, logged, and the drain goes
   on (ADR-0126). getting the latest's `prepareUpdate`:
@@ -1178,7 +1185,7 @@ rejects `shutdown()`.
 An archived canvas is read-only, and a command is refused there by the gate
 (`planGate`). The host's own writes that it decides before a gap and makes
 after it are refused by `Later`'s: a model request's answer, a step a run's
-end queues, an action on proposed changes' fact, a budget a round's request spent. A
+end queues, an action on proposed changes' fact, an allowance a round's request spent. A
 root record written through `Records` after an archive let its root go
 opened it again for good, and one written after `docs.destroy` made the
 document again (S198); a fact queued in an archived canvas left it holding
@@ -1214,9 +1221,9 @@ queued cards, which `planArchive` refuses.
   `digests.ts`, `focuses.ts`, `titles.ts`, `banners.ts` and `answers.ts` take `Later`,
   and no `Records`, places writer or keeper, so every step they take is a
   late one. `answers.ts` keeps pi's ports for an answer's delivery, which
-  it makes only in an `after`; that much is held by its tests. `budgets.ts`
+  it makes only in an `after`; that much is held by its tests. `allowances.ts`
   keeps its keeper, `Records` and places writer for what is exempt below,
-  and its `budget-spent` fact is a `Later.step`.
+  and its `allowance-spent` fact is a `Later.step`.
 - **Exempt, each with its reason** (the list is closed):
   - commands, and the sends made for one: `planGate`, through `clear`;
   - the archive's own steps (`commands/board.ts`): they write about the
@@ -1225,10 +1232,10 @@ queued cards, which `planArchive` refuses.
     (`housekeeping.ts`, the trash, holds, histories, provenance), names,
     seats, the compaction, startup;
   - what happens inside a running lane, whose canvas cannot be archived
-    (`planArchive` refuses `running`): `budgets`' `stopNow` in pi's gate,
+    (`planArchive` refuses `running`): `allowances`' `stopNow` in pi's gate,
     `split-call.ts`, `canvas-news.ts`, `base-news.ts`,
     `writePendingRunEndReport`, `runs.ts`;
-  - a budget's own record (`BUDGET`), written when it goes over whatever
+  - an allowance's own record (`ALLOWANCE`), written when it goes over whatever
     became of its thread, so a restored canvas's agents cannot spend it
     again;
   - the drain: a popped card's send is cleared by `planGate` (`writesIn`'s
@@ -1314,13 +1321,13 @@ queued cards, which `planArchive` refuses.
 - **No request is held per thread.** A run that ends while another run's
   focus is asked asks too: `focusToWrite` keeps the newer ask's, and
   skipping it would leave the focus a phase behind.
-- **Its tokens count to the ask** (`budgets.spendFor`), as a digest's do.
+- **Its tokens count to the ask** (`allowances.spendFor`), as a digest's do.
 
-## Agents talking (`relays.ts`, `answers.ts`, `budgets.ts`, ADR-0128)
+## Agents talking (`relays.ts`, `answers.ts`, `allowances.ts`, ADR-0128)
 
 - **A relay is a run in the asked thread.** `deliver` gathers both
   threads as they are now, plans with `planRelay` and `planDelivery`, and
-  starts the run with the heard entry first (`RunStart.heard`), or makes an
+  starts the run with the incoming entry first (`RunStart.incoming`), or makes an
   ask card on a busy lane and asks for its drain. Every step is one keeper
   step; the `ask` hook's too, as `split-call.ts` is.
 - **Whose agents a send may name is every open canvas's named threads**
@@ -1336,7 +1343,7 @@ queued cards, which `planArchive` refuses.
   `undelivered` fact in the answering thread.
 - **A person's chat is relayed after it is written** (`relayMessage`, queued
   by `sendMessage`, not awaited inside its step): it finds the chat by its
-  send's id, sets its budget, and relays each member it asks.
+  send's id, sets its allowance, and relays each member it asks.
 - **The run's end sends the answer** (`answers.ts`' `ended`, from
   `runs.onEnded`, before the settle), each a late step on the answering
   thread: the answer runs an idle asker it wakes, is steered into a
@@ -1352,10 +1359,10 @@ queued cards, which `planArchive` refuses.
 - **A thread with no lane** is told its facts at its end through the
   scribe (`lanelessSpot`, the drain's), since only a lane appends; a
   person's message to one is written through the scribe too (S21).
-- **The budget is read from the run's prompt** (`promptBudget`): a
+- **The allowance is read from the run's prompt** (`promptAllowance`): a
   relay's or an answer's names it, a person's message is its own, and only
   a run an agent started spends. Its count is kept in memory and written
-  when it crosses the limit (with a `budget-spent` fact in the thread that
+  when it crosses the limit (with a `allowance-spent` fact in the thread that
   set it) and at a run's end. A request spends what it adds
   (`addedTokens`), measured against the run's last request, kept in
   memory by its prompt until the run ends, so a run resumed after a
@@ -1540,7 +1547,7 @@ adapter's.
   returned facts.
 - **An update is one step on the lane's `LaneQueue`** (`updateOnQueue`):
   the copy found ready (`readyToMerge`, whose `ReadyCopy` alone `merge`
-  takes), the lane's base from its own history, accepted work and the WIP
+  takes), the lane's base from its own history, accepted work and the unfinished work
   from the destination (`baseNow`), `planUpdateFrom`, then `merge`: the
   edits committed and, for jj, `mergeUpdate`
   (which first joins each accepted thread commit the lane holds to its source, ADR-0079), so nothing
@@ -1716,7 +1723,7 @@ adapter's.
   `resolve` writes the version chosen and closes it.
   `follow` is always null: nothing is fetched.
 - **The destination** (`index.ts`): `begin` and `baseNow` read the project's
-  folder first, so getting the latest merges its newest state; a WIP is refused. Each run's
+  folder first, so getting the latest merges its newest state; unfinished work is refused. Each run's
   end builds the lane's proposed changes and base records (`folder/proposed.ts`) and describes
   the proposed changes with the host's describer (`describe.ts`, jj's too); accepted
   work moving rebuilds every folder lane's. A squash is refused
@@ -1820,7 +1827,7 @@ adapter's.
   running, however many refreshes are marked, and a lane marked many times
   before its refresh starts refreshes once.
 - **What marks a lane** (`planMarks`, `marks.ts`, pure, from the owner's `onMoved`): a
-  move of accepted work or a WIP, or the first observation (`all`), marks the
+  move of accepted work or unfinished work, or the first observation (`all`), marks the
   line's record, every named lane whose root is not archived, and every
   open record; your `@` alone
   (`workingCopy`, jjui and your editor) marks no lane: one `later("shared")` step
@@ -1861,15 +1868,15 @@ adapter's.
   board place, `readArchived`, never from the lane's tip being missing: a tip missing
   for one import, S78, must not withdraw live proposed changes), the last getting the latest
   read (`pinetrie.base`, a memo `readGetLatest` keeps at the same tip and base
-  commit, never read to decide), the lane's tip entry and the WIP line.
-  **The tip and the WIP line are read only after a decision to build or
+  commit, never read to decide), the lane's tip entry and the unfinished work line.
+  **The tip and the unfinished work line are read only after a decision to build or
   rebuild** (`isBuild`), both under one lease (`messageFacts`): reading them
   loads the lane's root, which the upkeep then compacts and lets go, and
   every lane is refreshed at a start and whenever accepted work moves,
   most deciding nothing that writes a message. `refresh.test.ts` counts
   the leases.
   Everything else is read from your repo (ADR-0104), and where proposed changes
-  sit is decided once there (`ProposedChangesPlace`): a WIP gone moves nothing and
+  sit is decided once there (`ProposedChangesPlace`): unfinished work gone moves nothing and
   writes only its base record; an untraced start builds nothing, so squash,
   refresh, describe and a split's span refuse it, while an acceptance, a
   bookmark move, can still accept proposed changes you edited there.
@@ -1924,7 +1931,7 @@ adapter's.
 - **The base snapshot follows accepted work** (`jj/index.ts`): the owner's
   `Moved.onto` refreshes it (`acceptedMoved`, then `refreshBaseSoon`), so setup, an accept, an
   accepting publish and a move made in jj outside pine·trie all reach it
-  by one path. An acceptance into a WIP does not, since the snapshot is
+  by one path. An acceptance into unfinished work does not, since the snapshot is
   accepted work's.
 - **Shutdown closes the owner** (`LaneWork.destination.close`, the `close` step): it
   refuses every step from then on and stops its watch; `quiet` waits for

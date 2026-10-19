@@ -72,7 +72,7 @@ export function useClipboard(p: {
       onIntent({ kind: "copied", clip: plan.clip })
       if (cut && plan.clip.kind === "card")
         onIntent({
-          kind: "discard",
+          kind: "trash",
           card: plan.clip.of.card,
           at:
             focus.inPanel || focus.column === null

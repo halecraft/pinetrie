@@ -135,7 +135,7 @@ history:
 - **Ancestry, merge bases and diffs are each adapter's own**, computed
   inside it, never a port method: no crossing between an adapter and the
   shared history needs more than an equality test. What a kind does on the
-  destination's side (proposed changes, WIPs, stacks) is not part of the algebra.
+  destination's side (proposed changes, bookmarks of unfinished work, stacks) is not part of the algebra.
 
 jj computes its merge bases inside one command and reports none through
 the port; a folder project's graph states its own laws in

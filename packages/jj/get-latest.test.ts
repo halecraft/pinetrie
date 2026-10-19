@@ -47,7 +47,7 @@ test.each([
     "a WIP copied: the base's start",
     {
       start: { kind: "known", start: [C2] },
-      target: { kind: "wip", commit: TO },
+      target: { kind: "unfinished", commit: TO },
     },
     [C1],
   ],

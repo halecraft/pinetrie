@@ -160,7 +160,7 @@ type LanePlan =
   /** No tip, or no accepted commit in its history: nothing moves. */
   | { readonly kind: "none" }
   /** On a WIP: the separate reads. */
-  | { readonly kind: "wip" }
+  | { readonly kind: "unfinished" }
   | {
       readonly kind: "accepted"
       readonly tip: CommitId
@@ -220,7 +220,7 @@ export function planLaneRead(
       : messageBase(based.description, input.repoConfig.wipPrefix)
   let base: CommitBase
   if (based !== undefined && parsed !== null) {
-    if (parsed.kind === "wip") return { kind: "wip" }
+    if (parsed.kind === "unfinished") return { kind: "unfinished" }
     base = {
       base: { kind: "accepted" },
       start: parsed.commit,
@@ -329,7 +329,7 @@ interface LaneGather {
  * and the top's conflicted files; whether the lane's work changes any file,
  * unless its start is untraced; and, once accepted work has moved past its
  * base, what catching up would change, unless `known` says it at the same tip
- * and line. "none" or "wip" for a lane not on accepted work: read it the
+ * and line. "none" or "unfinished" for a lane not on accepted work: read it the
  * separate way.
  */
 export async function gatherLane(
@@ -342,7 +342,7 @@ export async function gatherLane(
     /** What catching up would change, as last read: kept at the same tip and line. */
     readonly known: GetLatestRead | null
   },
-): Promise<LaneGather | "none" | "wip"> {
+): Promise<LaneGather | "none" | "unfinished"> {
   const acceptedBookmark = input.shared.acceptedCommit
   if (acceptedBookmark === null) return "none"
   const ran = await jj(

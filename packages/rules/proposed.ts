@@ -9,7 +9,7 @@ import {
   type DescribeDecision,
   ERR,
   type ErrCode,
-  isWipLine,
+  isUnfinishedLine,
   type JjProposedChangesRecord,
   type ProposedChangesGather,
   type ProposedChangesInRepo,
@@ -246,7 +246,7 @@ function acceptStack(input: {
  */
 export interface AcceptanceDestination {
   readonly bookmark: string
-  readonly kind: "accepted" | "wip"
+  readonly kind: "accepted" | "unfinished"
   /** Commits of yours that land with the proposed changes: the WIP's, onto accepted work. */
   readonly bringsAlong: number
   /** What moves is immutable after: accepted work. */
@@ -267,7 +267,7 @@ export function acceptanceDestinations(input: {
   readonly acceptedBookmark: string
   readonly conflicted: boolean
   /** The WIP's commits above accepted work, for a WIP base. */
-  readonly wipAhead: number
+  readonly unfinishedAhead: number
 }): readonly AcceptanceDestination[] {
   const line = (bringsAlong: number): AcceptanceDestination[] =>
     input.conflicted
@@ -285,11 +285,11 @@ export function acceptanceDestinations(input: {
   return [
     {
       bookmark: input.base.bookmark,
-      kind: "wip",
+      kind: "unfinished",
       bringsAlong: 0,
       final: false,
     },
-    ...line(input.wipAhead),
+    ...line(input.unfinishedAhead),
   ]
 }
 
@@ -361,7 +361,7 @@ export function proposedChangesRecord(input: {
     conflicts: proposed.conflicts,
     startConflicts: proposed.startConflicts,
     workingCopyEdits: proposed.files.filter(f => input.editing.has(f)),
-    described: !isWipLine(input.name, proposed.firstLine),
+    described: !isUnfinishedLine(input.name, proposed.firstLine),
     edited: isProposedEdited(proposed),
     bookmark: proposed.bookmark,
     acceptedAs: null,
@@ -493,7 +493,7 @@ export function planAcceptance(input: {
     state: place.state,
     acceptedBookmark: input.acceptedBookmark,
     conflicted: proposed.conflicts.length > 0,
-    wipAhead: acceptance.wipAhead,
+    unfinishedAhead: acceptance.unfinishedAhead,
   })
   const destination =
     input.to === null
@@ -580,14 +580,16 @@ export function planStackEnded(input: {
  */
 export function planRebuild(
   gathered: ProposedChangesGather | null,
-  wip: string,
+  unfinished: string,
 ): RebuildDecision<ErrCode> {
   const refused = (why: ErrCode) => ({ kind: "refused", why }) as const
   if (!isProposedNamed(gathered)) return refused(ERR.NO_PROPOSED_CHANGES)
   const { place, proposed, name } = gathered
   if (place.kind === "gone") return refused(ERR.BAD_DESTINATION)
   if (place.kind === "untraced") return refused(ERR.NO_PROPOSED_CHANGES)
-  const sources: ProposedSource[] = [{ commit: place.tip, description: wip }]
+  const sources: ProposedSource[] = [
+    { commit: place.tip, description: unfinished },
+  ]
   return {
     kind: "rebuild",
     name,
@@ -611,7 +613,7 @@ const describeWanted = (
   proposed?.kind === "present" &&
   proposed.revisions.length === 1 &&
   !isProposedEdited(proposed) &&
-  (force || isWipLine(name, proposed.firstLine))
+  (force || isUnfinishedLine(name, proposed.firstLine))
 
 /**
  * Asked to describe the proposed changes again: refused without named proposed

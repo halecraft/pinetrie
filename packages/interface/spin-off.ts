@@ -8,7 +8,7 @@ import {
   type CanvasId,
   type CardId,
   cardMove,
-  DISCARDED,
+  TRASH_PLACE,
   type WorkflowStateId,
 } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
@@ -51,7 +51,7 @@ export function planSpinOff(
   if (place.kind === "trash") return []
   const request: Extract<HostRequest, { kind: "spin-off" }> = {
     kind: "spin-off",
-    move: cardMove(now, DISCARDED),
+    move: cardMove(now, TRASH_PLACE),
     root: minted.root,
     thread: minted.thread,
     canvas: minted.canvas,

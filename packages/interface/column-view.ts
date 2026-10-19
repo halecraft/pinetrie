@@ -38,9 +38,9 @@ import {
 import {
   type AcceptedRecord,
   type AccessRecord,
+  type AllowanceRecord,
   type BannerRecord,
   type BaseRecord,
-  type BudgetRecord,
   baseMovedOn,
   type CommandSummary,
   displayName,
@@ -122,7 +122,7 @@ export interface WorkFacts {
   /** Each lane of its own's fork: a copy's fork row says when its files were not kept. */
   readonly laneForks: ReadonlyMap<ThreadId, LaneForkRecord>
   /** Each budget for agents talking, by the message that set it. */
-  readonly budgets: ReadonlyMap<EntryId, BudgetRecord>
+  readonly allowances: ReadonlyMap<EntryId, AllowanceRecord>
   /** What the host read of its config; null before a host wrote it. */
   readonly setup: SetupRecord | null
   /** A folder project's states, by id: its history. */
@@ -484,16 +484,17 @@ const shownHeadIcon = (
   icon === null ? null : { ...icon, fade: icon.url !== mounted }
 
 /**
- * A thread's base in its header: the WIP it is on, or that the
- * WIP is gone; nothing for accepted work, or a WIP that landed on it.
+ * A thread's base in its header: the unfinished work it started from, or
+ * that it is gone; nothing for accepted work, or unfinished work that landed
+ * on it.
  */
 export function baseWords(base: BaseRecord | undefined): string | null {
-  if (base?.kind !== "jj" || base.base.kind !== "wip") return null
+  if (base?.kind !== "jj" || base.base.kind !== "unfinished") return null
   switch (base.state) {
     case "ok":
-      return `on ${base.base.bookmark}`
+      return `started from your unfinished work: ${base.base.bookmark}`
     case "gone":
-      return `${base.base.bookmark} is gone`
+      return `your unfinished work ${base.base.bookmark} is gone`
     case "landed":
       return null
   }
@@ -708,9 +709,11 @@ function workStrip(f: ColumnFacts, parent: ParentNow | null): WorkStrip | null {
         : accepted === null
           ? null
           : { kind: "bookmark", bookmark: accepted.acceptedBookmark },
-    wipAhead:
-      accepted?.wips.find(
-        w => jjBase?.base.kind === "wip" && w.bookmark === jjBase.base.bookmark,
+    unfinishedAhead:
+      accepted?.unfinishedWork.find(
+        w =>
+          jjBase?.base.kind === "unfinished" &&
+          w.bookmark === jjBase.base.bookmark,
       )?.ahead ?? 0,
     getLatest: latestNow(base ?? undefined, work.accepted),
     untraced: (jjBase?.untraced.length ?? 0) > 0,
@@ -775,7 +778,7 @@ const BUTTON_LABEL: Record<
   split: "split into a stack",
   squash: "squash to one",
   describe: "rewrite description",
-  refresh: "refresh (discards your edits)",
+  refresh: "refresh (loses your edits)",
 }
 
 /** What a command on proposed changes in flight says, until the host answers. */

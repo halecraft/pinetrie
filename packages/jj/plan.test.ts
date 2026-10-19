@@ -1,6 +1,6 @@
 import { commitId, type ThreadName, threadIdFor } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
-import { wipState } from "./accepted.ts"
+import { unfinishedState } from "./accepted.ts"
 import { DEFAULT_REPO } from "./lane/names.ts"
 import { type LaneRow, planLaneRead } from "./lane-read.ts"
 import { type Fingerprint, parseFingerprint, planObserve } from "./observe.ts"
@@ -96,7 +96,7 @@ describe("proposed changes", () => {
       acceptedThreadCommitsRevset({
         repoConfig: DEFAULT_REPO,
         base: {
-          base: { kind: "wip", bookmark: "wip/a" },
+          base: { kind: "unfinished", bookmark: "wip/a" },
           start: C1,
           source: C2,
         },
@@ -562,7 +562,7 @@ describe("planLaneRead: what one lane's rows say", () => {
   test("a base on a WIP is read the separate way", () => {
     expect(
       read([tip, { ...based, description: "s\n\nPinetrie-Base: wip/x@c9\n" }]),
-    ).toEqual({ kind: "wip" })
+    ).toEqual({ kind: "unfinished" })
   })
   test("an accepted source above the base makes the start a read; one under it does not", () => {
     const above = row("t1", { accepted: true })
@@ -632,9 +632,9 @@ describe("wipState: landed, gone, or ok", () => {
       "gone",
     ],
   ] as const)("%s: %s", (_, facts, state) => {
-    expect(wipState(facts)).toBe(state)
+    expect(unfinishedState(facts)).toBe(state)
   })
   test("a line base, with no WIP facts, is ok", () => {
-    expect(wipState(null)).toBe("ok")
+    expect(unfinishedState(null)).toBe("ok")
   })
 })

@@ -127,7 +127,7 @@ describe("inventoryView", () => {
     expect(view(3, true)).toMatchObject({ detail: "full" })
   })
 
-  test("a slot's card may be trashed from it only if you may discard it, never an empty slot", () => {
+  test("a slot's card may be trashed from it only if you may trash it, never an empty slot", () => {
     const cells = (me: typeof ADA) =>
       inventoryView({
         held: [record(A)],
@@ -142,11 +142,11 @@ describe("inventoryView", () => {
         titles: new Map(),
         open: false,
       }).grid.cells
-    expect(cells(ADA).map(c => c.discards)).toEqual([
+    expect(cells(ADA).map(c => c.trashes)).toEqual([
       true,
       ...Array(11).fill(false),
     ])
-    expect(cells(writerId("bea@x.io"))[0]?.discards).toBe(false)
+    expect(cells(writerId("bea@x.io"))[0]?.trashes).toBe(false)
   })
 })
 

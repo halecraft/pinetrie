@@ -195,7 +195,7 @@ const work = (over: Partial<WorkFacts> = {}): WorkFacts => ({
   forks: new Map(),
   laneForks: new Map(),
   setup: null,
-  budgets: new Map(),
+  allowances: new Map(),
   states: new Map(),
   conflicts: [],
   ...over,
@@ -210,7 +210,7 @@ const ACCEPTED = {
   commit: commitId("bbbbbbbbbbbb"),
   heads: { current: null, proposed: "" },
   log: { current: null, proposed: "" },
-  wips: [],
+  unfinishedWork: [],
   workingCopy: {
     behind: 0,
     ahead: 0,
@@ -930,7 +930,7 @@ describe("workStripWords", () => {
         asked: null,
         base,
         into: { kind: "bookmark", bookmark: "pinetrie-accepted" },
-        wipAhead: 2,
+        unfinishedAhead: 2,
         getLatest: catching.getLatest ?? { kind: "current" },
         untraced: catching.untraced ?? false,
         queued: catching.queued ?? [],
@@ -939,9 +939,9 @@ describe("workStripWords", () => {
       }),
       acting,
     )
-  const WIP_BASE = {
+  const UNFINISHED_BASE = {
     kind: "jj",
-    base: { kind: "wip", bookmark: "wip/search" },
+    base: { kind: "unfinished", bookmark: "wip/search" },
     state: "ok",
   } as const
   test.each([
@@ -1026,7 +1026,7 @@ describe("workStripWords", () => {
     )
     expect(labels({ ...proposed, edited: true })).toEqual([
       "accept changes",
-      "refresh (discards your edits)",
+      "refresh (loses your edits)",
     ])
     expect(words(proposed).menu.map(b => b.label)).toEqual([
       "rewrite description",
@@ -1056,7 +1056,7 @@ describe("workStripWords", () => {
     expect(w.menu.find(b => b.button === "update")?.title).toBe(
       "merges accepted work into this thread's copy",
     )
-    expect(words(proposed, "idle", WIP_BASE).buttons[0]?.title).toBe(
+    expect(words(proposed, "idle", UNFINISHED_BASE).buttons[0]?.title).toBe(
       "moves wip/search forward to pinetrie-proposed/amber-fox",
     )
   })
@@ -1077,7 +1077,7 @@ describe("workStripWords", () => {
         asked: null,
         base: { kind: "folder" },
         into: { kind: "folder" },
-        wipAhead: 0,
+        unfinishedAhead: 0,
         getLatest: { kind: "unknown" },
         untraced: false,
         queued: [],
@@ -1115,7 +1115,7 @@ describe("workStripWords", () => {
     expect(words(undefined, "idle", ACCEPTED_BASE, brings).line).toBe(
       "accepted work has moved on since this thread started",
     )
-    expect(words(undefined, "idle", WIP_BASE, brings).line).toBe(
+    expect(words(undefined, "idle", UNFINISHED_BASE, brings).line).toBe(
       "wip/search has moved on since this thread started",
     )
   })
@@ -1169,10 +1169,10 @@ describe("workStripWords", () => {
       "get the latest and resolve",
     ])
     expect(
-      words(conflicted, "idle", WIP_BASE).buttons.map(b => b.label),
+      words(conflicted, "idle", UNFINISHED_BASE).buttons.map(b => b.label),
     ).toEqual(["get the latest and resolve", "accept anyway into wip/search"])
     expect(
-      words(conflicted, "idle", WIP_BASE).menu.map(b => b.label),
+      words(conflicted, "idle", UNFINISHED_BASE).menu.map(b => b.label),
     ).not.toContain("accept, with your 2 commits beneath it")
   })
   test("a conflict that came with the copy says so, and names the thread that resolved it", () => {
@@ -1216,7 +1216,7 @@ describe("workStripWords", () => {
     })
   })
   test("a WIP thread adds to its WIP, and offers the project with its commits", () => {
-    const w = words(proposed, "idle", WIP_BASE)
+    const w = words(proposed, "idle", UNFINISHED_BASE)
     expect(w.buttons[0]?.label).toBe("accept changes into wip/search")
     expect(w.menu.map(b => b.label)).toEqual([
       "rewrite description",
@@ -1238,13 +1238,13 @@ describe("workStripWords", () => {
     ],
     [
       "an acceptance into its WIP",
-      WIP_BASE,
+      UNFINISHED_BASE,
       sent("accept"),
       "accepting into wip/search…",
     ],
     [
       "an acceptance from a WIP into accepted work",
-      WIP_BASE,
+      UNFINISHED_BASE,
       sent("accept", "pinetrie-accepted"),
       "accepting…",
     ],
@@ -1277,7 +1277,7 @@ describe("workStripWords", () => {
     expect(words(proposed, "idle", base, {}, acting).note).toBe(note)
   })
   test("a WIP gone without landing offers no acceptance, and continuing from the project", () => {
-    const w = words(proposed, "idle", { ...WIP_BASE, state: "gone" })
+    const w = words(proposed, "idle", { ...UNFINISHED_BASE, state: "gone" })
     expect(w.buttons.map(b => b.label)).toEqual(["split into a stack"])
     expect(w.menu.map(b => b.label)).toEqual([
       "rewrite description",

@@ -11,10 +11,10 @@ import type {
 
 import { ACCEPTED, ACCEPTED_KEY, type AcceptedRecord } from "./accepted.ts"
 import { ACCESS } from "./access.ts"
+import { ALLOWANCE } from "./allowance.ts"
 import { BANNER, ICONS } from "./banner.ts"
 import { BASE, type BaseRecord } from "./base.ts"
 import { WORKFLOW } from "./board.ts"
-import { BUDGET } from "./budget.ts"
 import { CARD_HISTORY, TRACE } from "./card-history.ts"
 import { CARD_TITLE } from "./card-title.ts"
 import { COMMANDS } from "./commands.ts"
@@ -47,7 +47,7 @@ export const RECORD_SPECS: readonly AnyRecordSpec[] = [
   ACCESS,
   BANNER,
   BASE,
-  BUDGET,
+  ALLOWANCE,
   CARD_HISTORY,
   CARD_TITLE,
   COMMANDS,

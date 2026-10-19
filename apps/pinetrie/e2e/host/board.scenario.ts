@@ -5,7 +5,7 @@
 // command to it, a new root lands where its chat says, and the records reach
 // another client.
 
-import { type CanvasId, DISCARDED, entryId, ROOT } from "@pinetrie/core"
+import { type CanvasId, entryId, ROOT, TRASH_PLACE } from "@pinetrie/core"
 import { scriptedModel } from "@pinetrie/pi"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import {
@@ -163,7 +163,7 @@ async function run(check: Checks["check"]): Promise<void> {
         {
           card: tab,
           from: { kind: "canvas", canvas: tabCanvas },
-          to: DISCARDED,
+          to: TRASH_PLACE,
         },
         undefined,
         null,

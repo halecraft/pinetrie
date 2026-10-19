@@ -421,7 +421,7 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   amber-fox · Fix the sync bug", and a thread whose parent thread is in
   another canvas names that, "↰ from amber-fox · Fix the sync bug": clicking
   either opens that canvas at the fork. Where someone holds the source in
-  their inventory, the row says "Bea has it" and opens nothing. A thread that started from a WIP says so, "on
+  their inventory, the row says "Bea has it" and opens nothing. A thread that started from unfinished work says so, "on
   wip/search", or "wip/search is gone" once it is (ADR-0104); one on the
   line says nothing.
 - **A named agent's header says what its thread is doing now** (ADR-0173):
@@ -538,7 +538,7 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   place is gone (a note whose column was trashed after it) or taken (your
   message where you have written a newer one) is refused, saying so.
   Nothing is sent in a trashed thread ("restore it first"); a link to it
-  says "in the trash" and restores it. A week after its discard a trashed
+  says "in the trash" and restores it. A week after its trash a trashed
   card is deleted, with everything on it; a thread takes its lane, its
   bookmark and its proposed changes with it, and its messages stay in their root,
   where a link to it says "deleted".
@@ -603,7 +603,7 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   no stack and no split. Its words name accepted work as jj proposed changes' do,
   and its titles name no bookmark. **accept** writes the files into the
   project's folder, as its title says; conflicted proposed changes have
-  none, since a folder has no WIP, and getting the latest or **choose versions**
+  none, since a folder has no unfinished work, and getting the latest or **choose versions**
   resolves them: the pane shows each conflicted file's changes on both
   sides from the version both began from, and three choices ("keep this
   thread's", "take accepted work's", "take the version both began from"),
@@ -612,7 +612,7 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   first, who made each, when and how, each one's changes opened in place,
   and "restore this version", whose preview is what the folder would
   change; "restore" writes it back, refused if the folder moved since the
-  preview. The composer has no WIP to start from: a folder project's
+  preview. The composer has no unfinished work to start from: a folder project's
   accepted work is its folder.
 - **A review shows a file as a file** (ADR-0165), in either kind of
   project: an image's before and after side by side, any other binary
@@ -621,8 +621,8 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
 - **A row of the column's header, the work strip, says what became of the
   agent's files** (ADR-0040, ADR-0113): an agent on its own copy shows its proposed changes in plain words ("2
   files changed"), with **accept changes** and its bookmark, which a press copies. The
-  button names a WIP the work goes into (ADR-0104, ADR-0090): "accept changes", or
-  "accept changes into wip/search" for a thread on a WIP, whose menu also offers
+  button names unfinished work the work goes into (ADR-0104, ADR-0090): "accept changes", or
+  "accept changes into wip/search" for a thread on unfinished work, whose menu also offers
   "accept, with your 2 commits beneath it" into accepted work; its title
   names the bookmark it moves. Accepting the proposed changes (an *acceptance*,
   ADR-0083) moves that bookmark forward to the proposed changes and never touches your
@@ -644,7 +644,7 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   in 1 file", and, when the thread it branched from has since resolved
   those files, "· amber-fox has resolved it", with **get the latest from
   amber-fox** as its button (ADR-0072). Its **⋯** menu holds **catch
-  up with** the thread's base (accepted work, or its WIP), or, once its WIP
+  up with** the thread's base (accepted work, or its unfinished work), or, once its unfinished work
   is gone, **continue from accepted work**; and, while the thread it branched
   from has new commits, **get the latest from** that thread by its name, greyed
   out while that thread's agent works. When getting the latest would change files
@@ -928,13 +928,13 @@ The rail is E; the column is T. Seeing both at once is the product.
     its thread had where it forked. The column's header names them ("with
     amber-fox"), a member out of reach as away ("slate-owl (Bea has it)",
     "(archived by Bea)"), and what agents talking from the thread spent
-    ("agents spent 38k of 200k tokens"). An ask of a member out of reach is
+    ("agents used 38k of their 200k-token allowance"). An ask of a member out of reach is
     refused, saying why.
   - **The send button names them**: "invite amber-fox · send to agent",
     "send to amber-fox", "send to amber-fox +1".
   - **An agent asks another with its `ask` tool**, which never waits: its
     row reads "asked amber-fox". The asked agent works in its own thread:
-    a "heard in sable-meadow: 3 messages" line, then the ask, spoken by its
+    an "incoming from sable-meadow: 3 messages" line, then the ask, spoken by its
     asker. Its last message comes back as an answer, spoken by its thread's
     name; an answer to an agent's ask runs that agent again, and nothing
     else does. A row from a thread on another canvas names that canvas beside
@@ -942,12 +942,12 @@ The rail is E; the column is T. Seeing both at once is the product.
     canvas was archived, or which was taken, since it asked is not sent: the
     answering thread says so. An ask for a busy agent waits in its dock as an ask card,
     which a held queue holds.
-  - **A budget of tokens** (200k unless the user config's `agents.budget`
+  - **An allowance of tokens** (200k unless the user config's `agents.budget`
     says otherwise) is set by the person's message the talk began from;
     the runs agents start spend it, and a spent one stops the run, wakes
     nobody, and says so in the thread.
   - **An agent cannot read another thread yet.** A `read_thread` tool,
-    reaching as far as a mention does, is decided and not built. A budget
+    reaching as far as a mention does, is decided and not built. An allowance
     chosen in the composer, a top-up of a spent one, dismissing a member, a
     relayed run's end report in the thread that asked, and "talking in
     sable-meadow" in the asked thread's header are shelved (ADR-0160).
@@ -956,9 +956,9 @@ The rail is E; the column is T. Seeing both at once is the product.
   "queue up next", "queue after Bea" or "queue after yours", naming who
   queued the last card already waiting. It uses the host's own decision (`addressMessage`,
   over the column's thread), so it cannot promise a reply that will not come. When the
-  send starts a thread and you have WIP bookmarks, a line left of the
+  send starts a thread and you have unfinished work bookmarks, a line left of the
   button says what its copy **starts from** ("starts from accepted work ▾"),
-  and opens the choices: accepted work, or a WIP, with how far that is
+  and opens the choices: accepted work, or unfinished work, with how far that is
   behind accepted work (ADR-0104). Every thread's agent works in a lane of
   its own (ADR-0102): there is no place to choose.
 - **Who else is here** (ADR-0024) shows where there is room for it:
@@ -1207,7 +1207,7 @@ The rail is E; the column is T. Seeing both at once is the product.
   folded column or past the last column, lands in a new note column made
   for it there; the undo key takes back both. Dropped on the composer a note becomes your
   message, and a message there with text takes the note's place, in one
-  move the undo key outside a box undoes; an empty one is discarded. In a
+  move the undo key outside a box undoes; an empty one is trashed. In a
   new branch, a message with text takes a card only from your inventory
   ("not moved: your message here holds text").
 - **A media column holds images** (ADR-0182), for the team to see and
@@ -1234,7 +1234,7 @@ The rail is E; the column is T. Seeing both at once is the product.
   closed is marked on ▦ and its canvas card; an archived canvas only on its
   canvas card, since its work is done. A note you own marks its canvas, not a
   thread's end. Only your own message and the notes you own count, and only while they hold text: emptied, sent or
-  discarded, the dot goes. A bare `@agent ` is nothing typed.
+  trashed, the dot goes. A bare `@agent ` is nothing typed.
 - **Sending spends the card.** The box stays as it was until the host
   answers: written or running, the card is gone and the box empty; a
   conflict or a refusal leaves the card, so nothing is lost or put back.
@@ -1270,7 +1270,7 @@ The rail is E; the column is T. Seeing both at once is the product.
   and Delete on a selected slot do. × never trashes: it closes. Where you
   did it, the column says "trashed · ⌘Z brings it back", and the undo key
   does, for a week; then the host deletes it.
-  Discarding someone else's card leaves them a trace, as a move does.
+  Trashing someone else's card leaves them a trace, as a move does.
 - **↑ and ↓ on a queued card, or Alt+↑ and Alt+↓ in its box, move it one
   place in line**; the box keeps its caret. A card never passes a note the
   thread will read. A move the queue overtook says "not moved: the cards
@@ -1285,7 +1285,7 @@ The rail is E; the column is T. Seeing both at once is the product.
 - **Cmd+Z and Cmd+Shift+Z** undo and redo your own typing in a card, never
   someone else's. Each tab has its own history, which a reload forgets.
 - **Closing a new branch that holds text asks** "keep what you typed in your
-  inventory?": **keep in inventory** (focused, the default), **discard**,
+  inventory?": **keep in inventory** (focused, the default), **trash**,
   which the undo key reverses, or **cancel**. Keep moves every card in the branch with
   text into your inventory, and closes the branch once each is there; with
   too few empty slots it says so ("not kept: needs 2 slots, 1 free") and the
@@ -1412,9 +1412,9 @@ The rail is E; the column is T. Seeing both at once is the product.
   panel is closed peeks at it. With no empty slot it is refused with
   "inventory full". **A drop or a paste aimed at a filled slot replaces its
   card**, which goes to your trash in the same undo step (ADR-0133); a card
-  that may not be discarded there is not replaced ("not replaced: the card
-  in that slot can't be discarded"), and a thread's copy lands only in an
-  empty slot. Nothing nobody aimed at is discarded.
+  that may not be trashed there is not replaced ("not replaced: the card
+  in that slot can't be trashed"), and a thread's copy lands only in an
+  empty slot. Nothing nobody aimed at is trashed.
 - **Copy, cut and paste** are the system clipboard's (ADR-0132), and the
   inventory holds only what you take:
   - **Cmd+C** (Ctrl+C elsewhere) copies anything you can read: a selection
@@ -1423,8 +1423,8 @@ The rail is E; the column is T. Seeing both at once is the product.
     focused card the card, the clipboard cell its copy. It moves nothing,
     opens nothing, is never refused for room and is no undo step. In a
     read-only column too.
-  - **Cmd+X** on a focused card you may discard cuts it: a copy, then a
-    discard to your trash, one undo step. On the past it does nothing.
+  - **Cmd+X** on a focused card you may trash cuts it: a copy, then a
+    trash to your trash, one undo step. On the past it does nothing.
   - **Cmd+V** lands what the clipboard holds where focus is, one undo step:
     in a text box, text as itself and a copied message, block or card as a
     link to it; on a column, a note column or a slot, a selection or text
@@ -1480,7 +1480,7 @@ The rail is E; the column is T. Seeing both at once is the product.
   Sends are final; a paste, **Copy to this canvas**, **Copy to your
   inventory**, **Edit as text** and **Send to the agent, quoting this comment** are each undone
   whole, and a copy to the clipboard changes nothing to undo. On no canvas, the undo key undoes your moves
-  outside any canvas: a discard from your inventory. An archived canvas's moves cannot be
+  outside any canvas: trashing from your inventory. An archived canvas's moves cannot be
   undone, and are forgotten 7 days after it was archived.
 - **Undo a swap** with the same keys while the panel has focus: this tab's
   newest swap goes back, unless those slots have changed since.
@@ -1506,14 +1506,14 @@ The rail is E; the column is T. Seeing both at once is the product.
 | a new root by anyone appearing as a tab | the board shows its canvas, and who is in it; you open it (ADR-0122) |
 | the Archive tab, and the header's people | the board: every canvas in a workflow state, Done the archive (ADR-0122) |
 | Cmd+C taking a reference into your inventory; a message's **take**; a table's or an image's ❝ | Cmd+C copies to the clipboard alone; keep, from the clipboard cell (ADR-0132) |
-| Cmd+X taking a card into your inventory | Cmd+X cuts it: a copy, then a discard (ADR-0132) |
+| Cmd+X taking a card into your inventory | Cmd+X cuts it: a copy, then a trash (ADR-0132) |
 | a reference staying in your hand when put, and the put key in a text box | every card leaves your hand when put; Cmd+V types a link (ADR-0132) |
 | a drop on a filled slot landing in the first empty one | the drop replaces the slot's card (ADR-0133) |
 | a 3 × 6 inventory of near-square slots, a reference's slot saying only "a quote" | 12 compact slots, two wide, every kind in one shape (ADR-0171) |
 | a preview beside the grid, and a card opened over its neighbours | the bench: the selected card read only, opened in place there (ADR-0171) |
 | an inventory as wide as what it showed, closed only by its toggle | a fixed frame, closed by ×, Escape or its toggle, opening in motion (ADR-0171) |
 | a card's face and whole | compact and full, each a box of its own size (ADR-0171) |
-| × that discarded a card, and a slot's × on hover | a bin that trashes; × only closes; the bench's trash, and Delete on a slot (ADR-0177) |
+| × that trashed a card, and a slot's × on hover | a bin that trashes; × only closes; the bench's trash, and Delete on a slot (ADR-0177) |
 
 With no control moving a lane, the `navigate` command had no caller and was
 deleted with `prompt` and `branch`. Lanes now never move at all (ADR-0120).

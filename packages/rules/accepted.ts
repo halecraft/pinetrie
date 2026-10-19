@@ -40,7 +40,7 @@ const JjAcceptedSchema = Type.Object({
     current: Type.Union([Type.String(), Type.Null()]),
     proposed: Type.String({ minLength: 1 }),
   }),
-  wips: Type.Array(
+  unfinishedWork: Type.Array(
     Type.Object({
       bookmark: Type.String({ minLength: 1 }),
       commit: CommitSchema,
@@ -127,7 +127,7 @@ export const ACCEPTED: RecordSpec<
           ...r,
           heads: { ...r.heads },
           log: { ...r.log },
-          wips: r.wips.map(w => ({ ...w })),
+          unfinishedWork: r.unfinishedWork.map(w => ({ ...w })),
           published: { ...r.published },
           workingCopy: {
             ...r.workingCopy,
@@ -155,7 +155,10 @@ export const ACCEPTED: RecordSpec<
           : {
               ...r,
               commit: r.commit === null ? null : commitId(r.commit),
-              wips: r.wips.map(w => ({ ...w, commit: commitId(w.commit) })),
+              unfinishedWork: r.unfinishedWork.map(w => ({
+                ...w,
+                commit: commitId(w.commit),
+              })),
               published: {
                 ...r.published,
                 commit:
@@ -193,7 +196,7 @@ export function planAcceptedRecord(input: {
     commit: facts.commit,
     heads: { current: facts.heads, proposed: proposed.heads },
     log: { current: facts.log, proposed: proposed.log },
-    wips: facts.wips,
+    unfinishedWork: facts.unfinishedWork,
     published: facts.published,
     workingCopy: facts.workingCopy,
     publishCatchesUp: repoConfig.publishCatchesUp,

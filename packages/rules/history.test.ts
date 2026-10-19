@@ -18,7 +18,7 @@ import type { HistorySpec } from "./history.ts"
 import { LAND } from "./land.ts"
 import { renderableMessage } from "./message.ts"
 import { PINNED } from "./pinned.ts"
-import { ANSWER, HEARD, RELAY } from "./relay.ts"
+import { ANSWER, INCOMING, RELAY } from "./relay.ts"
 import { SSH_FACT } from "./ssh-news.ts"
 import { STACK } from "./stack.ts"
 import { CARRY_ON } from "./stop.ts"
@@ -37,7 +37,7 @@ const MESSAGE_SPECS = [
   CANVAS,
   CANVAS_FACT,
   SSH_FACT,
-  HEARD,
+  INCOMING,
   RELAY,
   ANSWER,
 ] as const
@@ -82,7 +82,7 @@ const SAMPLES: Record<CustomType, unknown> = {
     by: ADA,
     as: "kabcdefg",
     bookmark: "wip/a",
-    to: { kind: "wip", bookmark: "wip/a" },
+    to: { kind: "unfinished", bookmark: "wip/a" },
   },
   "pinetrie.behind": {
     from: { kind: "accepted" },
@@ -121,7 +121,7 @@ const SAMPLES: Record<CustomType, unknown> = {
     change: "added",
   },
   "pinetrie.ssh-fact": { news: "asked", host: "hql", ownerName: "Ada" },
-  "pinetrie.heard": {
+  "pinetrie.incoming": {
     from: LANE,
     fromName: "amber-fox",
     entries: [entryId("e-1"), entryId("e-2")],
@@ -133,7 +133,7 @@ const SAMPLES: Record<CustomType, unknown> = {
     asker: { kind: "agent", thread: LANE },
     askerName: "amber-fox",
     text: "what next?",
-    budget: entryId("e-1"),
+    allowance: entryId("e-1"),
     by: ADA,
   },
   "pinetrie.answer": {
@@ -143,7 +143,7 @@ const SAMPLES: Record<CustomType, unknown> = {
     source: entryId("e-2"),
     text: "this next",
     wakes: true,
-    budget: entryId("e-1"),
+    allowance: entryId("e-1"),
     by: ADA,
   },
 }
@@ -161,7 +161,7 @@ const ROLES: Record<CustomType, string> = {
   "pinetrie.canvas": "canvas",
   "pinetrie.canvas-fact": "fact",
   "pinetrie.ssh-fact": "fact",
-  "pinetrie.heard": "heard",
+  "pinetrie.incoming": "incoming",
   "pinetrie.relay": "relay",
   "pinetrie.answer": "answer",
 }

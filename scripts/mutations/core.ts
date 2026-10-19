@@ -1046,7 +1046,7 @@ export const mutations: readonly Mutation[] = [
     name: "a gone key carries a canvas on the wire",
     file: "packages/core/places.ts",
     from: '    kinds: ["canvas", "canvas-at", "canvas-pinned", "notes", "new-canvas"],',
-    to: '    kinds: ["canvas", "canvas-at", "canvas-pinned", "notes", "new-canvas", "discarded-canvas"],',
+    to: '    kinds: ["canvas", "canvas-at", "canvas-pinned", "notes", "new-canvas", "trashed-canvas"],',
     command: unit,
     expect: "no canvas but a canvas's and a spot's",
   },

@@ -12,4 +12,4 @@ A person asked two or more agents from other threads at once, and each has answe
 - `ask <name>: <what to ask>`: one agent should answer another, because they disagree, or one answer depends on the other. Name one agent from the list, and say what it should answer, in a sentence.
 - `people: <one line>`: something the people should know or decide, that the answers leave open, in at most 20 words.
 
-Do not continue the conversation yourself, and add nothing before or after the line. When in doubt, answer `nothing`: every ask costs tokens from the person's budget.
+Do not continue the conversation yourself, and add nothing before or after the line. When in doubt, answer `nothing`: every ask costs tokens from the person's allowance.

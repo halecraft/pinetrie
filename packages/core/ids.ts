@@ -199,7 +199,7 @@ export const MOVES_DOC_PREFIX = "moves:"
 
 /**
  * Which of a person's histories of moves a step is in: a canvas's, or theirs
- * outside any canvas (a discard from their inventory while on no canvas).
+ * outside any canvas (a trash from their inventory while on no canvas).
  */
 export type MoveHistoryScope =
   | { readonly kind: "canvas"; readonly canvas: CanvasId }

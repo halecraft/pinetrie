@@ -5,7 +5,7 @@ import {
   entryId,
   entryOfMessage,
   hasTrailer,
-  isWipLine,
+  isUnfinishedLine,
   messageBase,
   messageSources,
   proposedLedger,
@@ -16,8 +16,8 @@ import {
   threadIdFor,
   trailerRevset,
   trailerValues,
+  unfinishedDescription,
   untracedLanes,
-  wipDescription,
   withLedger,
   withoutTrailers,
   withTrailers,
@@ -112,14 +112,14 @@ describe("what is written reads back", () => {
   })
   test("baseMessage and messageBase round-trip a Pinetrie-Base, the newest of them; a malformed one reads as none", () => {
     const m = baseMessage("copy of wip/a@b", {
-      kind: "wip",
+      kind: "unfinished",
       bookmark: "wip/a@b",
       commit: C1,
     })
     expect(m).toBe("copy of wip/a@b\n\nPinetrie-Base: wip/a@b@c1\n")
     expect(messageBase("x\n\nPinetrie-Base: nope\n", "wip/")).toBeNull()
     expect(messageBase(m, "wip/")).toEqual({
-      kind: "wip",
+      kind: "unfinished",
       bookmark: "wip/a@b",
       commit: C1,
     })
@@ -138,7 +138,7 @@ describe("what is written reads back", () => {
         commit: C1,
       })
     expect(messageBase("b\n\nPinetrie-Base: draft/x@c1\n", "draft/")).toEqual({
-      kind: "wip",
+      kind: "unfinished",
       bookmark: "draft/x",
       commit: C1,
     })
@@ -181,21 +181,23 @@ describe("what is written reads back", () => {
       `feat: x\n\nPinetrie-Thread: amber-fox\nPinetrie-Lane: ${LANE}\nPinetrie-Entry: e9\n`,
     )
     expect(
-      wipDescription(NAME, "add the line of the proposed changes\nmore"),
+      unfinishedDescription(NAME, "add the line of the proposed changes\nmore"),
     ).toBe("WIP (amber-fox): add the line of the proposed changes")
-    expect(wipDescription(NAME, "")).toBe("WIP (amber-fox): this thread's work")
-    expect(wipDescription(NAME, "@agent fix it")).toBe(
+    expect(unfinishedDescription(NAME, "")).toBe(
+      "WIP (amber-fox): this thread's work",
+    )
+    expect(unfinishedDescription(NAME, "@agent fix it")).toBe(
       "WIP (amber-fox): fix it",
     )
-    expect(wipDescription(NAME, "ask @agent here")).toBe(
+    expect(unfinishedDescription(NAME, "ask @agent here")).toBe(
       "WIP (amber-fox): ask @agent here",
     )
   })
   test("the WIP line is this thread's; an agent's message is not", () => {
     const name = "t-1" as ThreadName
-    expect(isWipLine(name, "WIP (t-1): x")).toBe(true)
-    expect(isWipLine(name, "fix: x")).toBe(false)
-    expect(isWipLine(name, "WIP (t-2): x")).toBe(false)
+    expect(isUnfinishedLine(name, "WIP (t-1): x")).toBe(true)
+    expect(isUnfinishedLine(name, "fix: x")).toBe(false)
+    expect(isUnfinishedLine(name, "WIP (t-2): x")).toBe(false)
   })
 })
 
@@ -278,7 +280,7 @@ describe("pre-rename: what the host wrote as Pineta is read", () => {
     expect(
       messageBase("copy of wip/a\n\nPineta-Base: wip/a@c1\n", "wip/"),
     ).toEqual({
-      kind: "wip",
+      kind: "unfinished",
       bookmark: "wip/a",
       commit: C1,
     })

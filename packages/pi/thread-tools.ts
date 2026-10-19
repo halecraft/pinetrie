@@ -61,7 +61,7 @@ export function getLatestTool(
     name: GET_LATEST_TOOL,
     label: "get the latest",
     description:
-      "Merge the new work of this thread's base (accepted work, or its WIP), or with from: parent of the thread this one branched from, into this thread's own copy, now. It acts only when there is new work, and must be the only tool call in its turn. A clean merge answers what came in; a conflicted one answers the conflicts, to resolve here.",
+      "Merge the new work of this thread's base (accepted work, or its unfinished work), or with from: parent of the thread this one branched from, into this thread's own copy, now. It acts only when there is new work, and must be the only tool call in its turn. A clean merge answers what came in; a conflicted one answers the conflicts, to resolve here.",
     parameters: Type.Object({
       from: Type.Optional(
         Type.Union([Type.Literal("base"), Type.Literal("parent")], {

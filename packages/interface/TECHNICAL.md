@@ -451,7 +451,7 @@ canvas's threads (`canvasRail`). A canvas's signals are its threads', whatever r
   move, reorder or width can name it.
 - **The canvas column lists its canvas's trash** (`canvasTrash`,
   `canvas-column-view.ts`): each thread or note column in a trash whose
-  `left` is this canvas, the newest discard first, with who trashed
+  `left` is this canvas, the newest trash first, with who trashed
   it (its placer) and how long ago (`trashedTime`); a row whose deletion is
   close (`trashWarnMs`: its last day, or the last quarter of a shorter
   keep) says when it is deleted instead (`trashDeadline`, the sweep's
@@ -502,7 +502,7 @@ canvas's threads (`canvasRail`). A canvas's signals are its threads', whatever r
   or a note column; a bin (ADR-0177) on a thread not yet started for a
   reader who may write, and nothing for one who may not. The ⋯ ends in a
   `trash` section, Move to trash, on every column for a reader who may
-  write; the bin and it ask one `discard` intent, built once.
+  write; the bin and it ask one `trash` intent, built once.
 - **A thread column's ⋯ copies and takes it** (`columnHeadEnd`'s `thread`
   section, ADR-0127): `copyThread` (a `copy-thread` request at the
   source's end, `threadAnchor`, its id `Minted.thread`), `here` just after
@@ -516,7 +516,7 @@ canvas's threads (`canvasRail`). A canvas's signals are its threads', whatever r
   `unstartedThreads` (`@pinetrie/rules`): ending at its fork, or, a new
   tab's, at its root (anchor null), its next send a branch there
   (`isNextSendBranch`). Shared as any card, and trashed by its bin or its ⋯'s
-  Move to trash as any column is (`planDiscard`), your message staying on
+  Move to trash as any column is (`planTrash`), your message staying on
   it; a new canvas's only thread, so trashed, takes its canvas out of the
   sidebar in the same move, and the host trashes the canvas's card. Its
   head has no ⇤: it is about to be sent or dropped.
@@ -1200,7 +1200,7 @@ which names the entry and its thread (`packages/rules/TECHNICAL.md`,
   body, read only, and ⋯ and ×. Its ⋯ offers what its kind may do
   (`cardFrame` keeps a Move to ▸ item only where `PLACES_OF` puts the kind,
   `MOVE_PLACES`): back to the notes and into your inventory, never pinned.
-  Unqueue and discard plan for any kind that may be queued or discarded
+  Unqueue and trash plan for any kind that may be queued or trashed
   (`isQueuedMessage`, `cardFitsPlace(card, "trash")`).
 - **Entries by keys** (`onEntryKey`, `Column`): while focus is in a
   column's messages and in no text box, they are a grid one cell wide,
@@ -1260,7 +1260,7 @@ composer*).
   falls back, and the whole path reads as the column's lane.
 - **What getting the latest merges is worded by `latestSourceName` alone**
   (`@pinetrie/rules`, ADR-0061, ADR-0072, ADR-0090, ADR-0100): accepted
-  work is "accepted work", a WIP its bookmark, the thread a thread branched from its name. The words
+  work is "accepted work", unfinished work its bookmark, the thread a thread branched from its name. The words
   take core's `LatestFrom`, never a bookmark string, and accepted work's
   bookmark goes only in titles: `workStripWords`' button titles ("moves
   pinetrie-accepted forward to pinetrie-proposed/amber-fox"), `behindMark`'s,
@@ -1304,15 +1304,15 @@ composer*).
   the lane's entry as `ColumnFacts.acting`: the strip's `waiting` disables
   its buttons and menu rows while it is `sent`, and `workStripWords` words it
   as the strip's `note` (`.work-note`, `role="status"`, `data-acting`
-  `sent` or `said`). An acceptance in flight names a WIP destination
+  `sent` or `said`). An acceptance in flight names unfinished work destination
   ("accepting into wip/search…"); a refusal or failure is `outcomeWords`,
   shared with the publish toast.
 - **`workStripView` (`@pinetrie/rules`) decides proposed changes; `workStripWords`
   words it**: its line and each button's label and title, by state. Proposed changes that conflict say so even when they are `edited` (S73), and their
   accept button reads "accept anyway" whatever the state, as it does when
-  a resolution asked for you. Each accept button names a WIP the work
+  a resolution asked for you. Each accept button names unfinished work the work
   goes into (ADR-0104, ADR-0083, ADR-0090): "accept changes", "accept
-  changes into wip/search", and, from a WIP thread's menu, "accept, with your 2 commits
+  changes into wip/search", and, from unfinished work thread's menu, "accept, with your 2 commits
   beneath it". Conflicted proposed changes on the
   line offers "resolve in the thread", never an acceptance into it. The bookmark is
   a fact of its own, drawn apart (`.work-bookmark`), never in the line.
@@ -1322,17 +1322,17 @@ composer*).
   and has no review. Open proposed changes' review reads jj proposed changes' revisions,
   or folder proposed changes' `start..tip` range (`proposedReview`), as an ask's range
   is read; folder proposed changes have no bookmark, no stack and no split, and the
-  composer offers no WIP to start from (`baseChoices`) in a folder project.
+  composer offers no unfinished work to start from (`baseChoices`) in a folder project.
 - **Where an acceptance goes is a value** (`AcceptsInto`, `@pinetrie/core`):
   `columnView` hands `workStripView` a `folder` one for a folder project, a
   `bookmark` one from a jj accepted record, and null for a jj project
   whose record is not read yet: then nothing is accepted into, and accept
-  is left out, as for a gone WIP. Jj proposed changes' accept is titled with the
+  is left out, as for a gone unfinished work. Jj proposed changes' accept is titled with the
   bookmark it moves ("moves pinetrie-accepted forward to …"); folder
   proposed changes' names no bookmark anywhere: its accept is live, into
   its one destination, accepted work, and titled "writes these files into
   the project's folder"; conflicted, it has no accept, a folder having no
-  WIP. A quiet button's title always says why: it would change nothing
+  unfinished work. A quiet button's title always says why: it would change nothing
   now, or cannot yet be done.
 - **What getting the latest would do** (`latestNow`, from `pinetrie.base`'s `start`
   and `getLatest` against `pinetrie.accepted`'s commits, S97): when it `brings`
@@ -1359,8 +1359,8 @@ composer*).
   Getting the latest says its base: "get the latest from wip/search". Two known limits,
   both in words only:
   - until a lane has a base record, the page names accepted work as its base
-    (`effectiveBase(null)`), so a WIP thread that never changed a file says
-    "get the latest from accepted work". The host merges the WIP, read from the
+    (`effectiveBase(null)`), so unfinished work thread that never changed a file says
+    "get the latest from accepted work". The host merges the unfinished work, read from the
     lane's own history;
   - with no line set up, `latestNow` is `current`, so the menu says
     "already got the latest from accepted work" where it is not set up.
@@ -1543,14 +1543,14 @@ composer*).
   in a note column until the queue's move landed. `planSend` decides the hold: on
   an idle lane whose queue is held, `release`, and the queue place is
   `releases`, which `queueWords` words "send all (n)"; else `keep`.
-- **A discard is a move to your trash** (ADR-0111, ADR-0126): the
-  `discard` act (a card's bin, or Ctrl+Shift+Backspace in its box,
-  `cardKeyAct`) and the inventory's `discard` intent plan `planDiscard`:
-  `DISCARDED`, which names no canvas. The host names its history (ADR-0066,
+- **A trash is a move to your trash** (ADR-0111, ADR-0126): the
+  `trash` act (a card's bin, or Ctrl+Shift+Backspace in its box,
+  `cardKeyAct`) and the inventory's `trash` intent plan `planTrash`:
+  `TRASH_PLACE`, which names no canvas. The host names its history (ADR-0066,
   ADR-0116): the canvas the card leaves, or for a card in your inventory the
   canvas you are on, which the move carries (`here`, `canvasOfTab`), or on
   none your history outside any canvas, so the undo key there brings it
-  back. The close ask's discard is the same move, with the thread's card. The session keeps your accepted discard as a notice where you made
+  back. The close ask's trash is the same move, with the thread's card. The session keeps your accepted trash as a notice where you made
   it (`CardNotice`, `noticeWords`), as it keeps a refusal.
 - **A queued or pinned card moves one place** with its ↑ and ↓
   (its frame's `tools`, `CardTool`, `card-frame.ts`) or Alt+↑/↓ in its box
@@ -1642,7 +1642,7 @@ composer*).
   is at a path its row does not name. Neither has a diff section.
 - **No label a folder project's views produce names jj's words** (the
   words check, `folder-words.test.ts`, over `jjWordsIn`): commit,
-  bookmark, revision, repo, stack, WIP or publish, in the work strip's
+  bookmark, revision, repo, stack, unfinished work or publish, in the work strip's
   folder states, the history, the conflicts, publish and base choices; the
   host's folder refusals are held to it in `commands/lane.test.ts`.
 
@@ -1809,7 +1809,7 @@ one status line (the newest notice).
   selected slot, or a click on the bench opens it; selecting another slot
   folds it.
 - **The bench's bar trashes, a slot does not** (ADR-0177): a cell's
-  `discards` says whether its card may be trashed, by the bar's trash or
+  `trashes` says whether its card may be trashed, by the bar's trash or
   by Delete or Backspace on the selected slot (`gridKeyAct`'s `trash`,
   which a column's messages never take: `trashes: false`). The open card's
   × asks `fold`, as Escape does with it open.
@@ -1866,7 +1866,7 @@ one status line (the newest notice).
   refusal and maps each case to its effect. Your inventory's target is
   aimed (`slot: number`, a drop or a paste on a slot) or not (`null`, a
   take, keep, Copy to your inventory): aimed and filled, the slot's card is
-  replaced, discarded first (ADR-0133); unaimed, refused `full` when you
+  replaced, trashed first (ADR-0133); unaimed, refused `full` when you
   hold `INVENTORY_SLOTS` cards (`inventoryFull`, the host's own rule, so a
   slot drawn past them while you hold more is never aimed at), else the
   selected slot if empty, else `firstEmpty`, else refused `full`. A target is: a thread's column by key (a note in the note column nearest
@@ -2025,8 +2025,8 @@ decides is here.
   `selectionReference` names, else the message; then a focused block
   (`data-block`), the column's selected message (`data-selected`, only while
   focus is in that column), a focused card, the clipboard cell. A cut takes
-  only a focused card `isDiscardable` says you may discard
-  (`discardable.ts`, the one test a discard, a cut and a replacement ask).
+  only a focused card `isTrashable` says you may trash
+  (`trashable.ts`, the one test trashing, a cut and a replacement ask).
 - **The carrier** (S151): `planCopy` writes the text as `text/plain`, the
   selection's own HTML or the text escaped in one element carrying
   `data-pinetrie` as `text/html`, and the same JSON as
@@ -2047,7 +2047,7 @@ decides is here.
   a reference to it. A cut clip whose card is still in your trash is an
   `uncut`: the card itself moves out.
 - **A paste is one request** (`paste`, `@pinetrie/rules`' `planPaste`):
-  the card it replaces discarded first, then the card made or moved, one
+  the card it replaces trashed first, then the card made or moved, one
   step of history. **Send to the agent, quoting this comment** is a paste of a reference onto
   its thread's queue, its quote the comment's under a link to its entry,
   read as it is kept.
@@ -2142,10 +2142,10 @@ gone.
 - **`recipientWords`** puts the agents a send invites first ("invite
   amber-fox · send to agent") and names those it asks as people are named.
 - **`agentsRow`** is the header's row: the thread's members by name, and
-  the newest budget a message of the thread set, worded by `agentsWords`.
+  the newest allowance a message of the thread set, worded by `agentsWords`.
   A member is away exactly when it is not in `inReach`, so `threadReach`
   is read for those alone, to say why (`awayWords`).
-- **`crossCanvasLinks`** gives each ask, answer and heard row from a thread
+- **`crossCanvasLinks`** gives each ask, answer and incoming row from a thread
   on another canvas its `ThreadLink` and words ("Sync bug", "Bea has it"),
   one value-compared map per column, as `joins` is; the message draws it
   beside its speaker and opens it through the column's `onLink`, as a fork

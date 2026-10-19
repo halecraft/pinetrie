@@ -9,7 +9,7 @@ import type {
   ThreadName,
   WriterId,
 } from "@pinetrie/core"
-import { awayWords, type BudgetRecord, tokensWords } from "@pinetrie/rules"
+import { type AllowanceRecord, awayWords, tokensWords } from "@pinetrie/rules"
 
 /** What a column's header says of other threads' agents. */
 export interface AgentsRow {
@@ -28,7 +28,7 @@ export interface AgentsRow {
 
 /**
  * The header's row for `thread`, or null when it has no member and no
- * budget. `budgets` is every budget, in the order the session holds them;
+ * budget. `allowances` is every budget, in the order the session holds them;
  * the last of this thread's is shown. A member is away exactly when it is
  * not in `inReach` (`reachableAgents`), so `threadReach` is read for those alone,
  * to say why.
@@ -40,7 +40,7 @@ export function agentsRow(input: {
   readonly threadReach: (thread: ThreadId) => Reach
   readonly names: ReadonlyMap<ThreadId, ThreadName>
   readonly nameOf: (w: WriterId) => string
-  readonly budgets: ReadonlyMap<EntryId, BudgetRecord>
+  readonly allowances: ReadonlyMap<EntryId, AllowanceRecord>
 }): AgentsRow | null {
   const members = input.members.map(t => {
     const name = input.names.get(t) ?? t.slice(-8)
@@ -52,8 +52,9 @@ export function agentsRow(input: {
     }
   })
   const budget =
-    [...input.budgets.values()].filter(b => b.thread === input.thread).at(-1) ??
-    null
+    [...input.allowances.values()]
+      .filter(b => b.thread === input.thread)
+      .at(-1) ?? null
   if (members.length === 0 && budget === null) return null
   return {
     members,
@@ -75,7 +76,7 @@ export function agentsWords(row: AgentsRow): string {
     budget === null
       ? null
       : budget.over
-        ? `agents spent the budget of ${tokensWords(budget.limit)}`
-        : `agents spent ${tokensWords(budget.spent).replace(/ tokens$/, "")} of ${tokensWords(budget.limit)}`
+        ? `agents used up their ${tokensWords(budget.limit).replace(/ tokens?$/, "-token")} allowance`
+        : `agents used ${tokensWords(budget.spent).replace(/ tokens$/, "")} of their ${tokensWords(budget.limit).replace(/ tokens?$/, "-token")} allowance`
   return [with_, spent].filter(w => w !== null).join(" · ")
 }

@@ -137,7 +137,7 @@ export function conflictCause(record: ProposedChangesRecord): ConflictCause {
  * about a conflict on the thread's path (`conflictAskTime`); it asks for you
  * only when newer than the proposed changes. `base` is the lane's
  * (`pinetrie.base`), null before the host read it, as accepted work; `into` and
- * `wipAhead` come from accepted work's record. Jj proposed changes' acceptance
+ * `unfinishedAhead` come from accepted work's record. Jj proposed changes' acceptance
  * is offered only with a destination (`acceptanceDestinations`); a folder
  * project's one is accepted work, the project's folder, for clean proposed
  * changes.
@@ -149,7 +149,7 @@ export function workStripView(input: {
   readonly base: FollowedBase | null
   /** Null for a jj project whose accepted work is not read yet: nothing to accept into. */
   readonly into: AcceptsInto | null
-  readonly wipAhead: number
+  readonly unfinishedAhead: number
   /** What catching up would do (`latestNow`). */
   readonly getLatest: LatestNow
   /** Accepted thread commits of this thread that name no source (`BaseRecord.untraced`). */
@@ -210,7 +210,7 @@ export function workStripView(input: {
           // A folder has no bookmark: the wire's empty destination is the default.
           acceptedBookmark: into.kind === "bookmark" ? into.bookmark : "",
           conflicted: open.conflicts.length > 0,
-          wipAhead: input.wipAhead,
+          unfinishedAhead: input.unfinishedAhead,
         })
   const gone = jjBase?.state === "gone"
   const integrable = (

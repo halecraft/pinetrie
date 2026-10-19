@@ -32,20 +32,20 @@ test("Alt+↑ and Alt+↓ move the card one place; anything else is the box's ow
   expect(cardKeyAct(key("ArrowLeft"), C, among)).toBeNull()
 })
 
-test("Ctrl+Shift+Backspace discards any card; a card with no place in line takes no Alt+↑", () => {
-  const discard = key("Backspace", {
+test("Ctrl+Shift+Backspace trashes any card; a card with no place in line takes no Alt+↑", () => {
+  const trash = key("Backspace", {
     altKey: false,
     ctrlKey: true,
     shiftKey: true,
   })
-  expect(cardKeyAct(discard, C, null)).toEqual({ kind: "discard", card: C })
-  expect(cardKeyAct(discard, C, among)).toEqual({ kind: "discard", card: C })
-  expect(cardKeyAct({ ...discard, metaKey: true }, C, null)).toBeNull()
-  expect(cardKeyAct({ ...discard, shiftKey: false }, C, null)).toBeNull()
+  expect(cardKeyAct(trash, C, null)).toEqual({ kind: "trash", card: C })
+  expect(cardKeyAct(trash, C, among)).toEqual({ kind: "trash", card: C })
+  expect(cardKeyAct({ ...trash, metaKey: true }, C, null)).toBeNull()
+  expect(cardKeyAct({ ...trash, shiftKey: false }, C, null)).toBeNull()
   expect(cardKeyAct(key("ArrowUp"), C, null)).toBeNull()
 })
 
-test("in a new card's box, a move hands the card to its list, focused; a discard lets it go; any other key keeps it", () => {
+test("in a new card's box, a move hands the card to its list, focused; trashing lets it go; any other key keeps it", () => {
   expect(newCardKeys(key("ArrowUp"), C, among)).toEqual({
     acts: [
       { kind: "reorder", card: C, among, step: -1 },
@@ -59,7 +59,7 @@ test("in a new card's box, a move hands the card to its list, focused; a discard
       C,
       among,
     ),
-  ).toEqual({ acts: [{ kind: "discard", card: C }], release: true })
+  ).toEqual({ acts: [{ kind: "trash", card: C }], release: true })
   expect(newCardKeys(key("a", { altKey: false }), C, among)).toEqual({
     acts: [],
     release: false,

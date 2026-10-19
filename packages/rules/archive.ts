@@ -236,7 +236,7 @@ export function writesIn(
     // thread is copied, since archiving freezes its end, not its history.
     case "copy-thread":
       return only(canvasLookup.place(intent.move.to))
-    // A paste writes where it lands, and discards the card it replaces
+    // A paste writes where it lands, and trashes the card it replaces
     // where that is (an edit as text's reference, a slot's card).
     case "paste":
       return only(

@@ -41,7 +41,7 @@ describe("other threads' agents in a column's header", () => {
       thread: here,
       members: [fox, owl],
       names: new Map([...names, [owl, "slate-owl" as ThreadName]]),
-      budgets: new Map(),
+      allowances: new Map(),
     })
     expect(row === null ? "" : agentsWords(row)).toBe(
       "with amber-fox, slate-owl (Bea has it)",
@@ -53,10 +53,10 @@ describe("other threads' agents in a column's header", () => {
       thread: here,
       members: [fox],
       names,
-      budgets: budget(38_000),
+      allowances: budget(38_000),
     })
     expect(row === null ? "" : agentsWords(row)).toBe(
-      "with amber-fox · agents spent 38k of 200k tokens",
+      "with amber-fox · agents used 38k of their 200k-token allowance",
     )
   })
   test("a spent budget says so; no member and no budget is no row", () => {
@@ -65,10 +65,10 @@ describe("other threads' agents in a column's header", () => {
       thread: here,
       members: [],
       names,
-      budgets: budget(210_000, true),
+      allowances: budget(210_000, true),
     })
     expect(row === null ? "" : agentsWords(row)).toBe(
-      "agents spent the budget of 200k tokens",
+      "agents used up their 200k-token allowance",
     )
     expect(
       agentsRow({
@@ -76,7 +76,7 @@ describe("other threads' agents in a column's header", () => {
         thread: fox,
         members: [],
         names,
-        budgets: budget(1),
+        allowances: budget(1),
       }),
     ).toBeNull()
   })

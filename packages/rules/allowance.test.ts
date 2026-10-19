@@ -1,13 +1,13 @@
 import { entryId, threadIdFor, writerId } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
+  type AllowanceRecord,
   addedTokens,
-  type BudgetRecord,
   mayRequest,
   planSpend,
-} from "./budget.ts"
+} from "./allowance.ts"
 
-const budget: BudgetRecord = {
+const budget: AllowanceRecord = {
   message: entryId("m"),
   thread: threadIdFor("a"),
   by: writerId("ada@example.com"),

@@ -4,7 +4,6 @@ import {
   type CardRecord,
   canvasIdFor,
   cardIdOfKind,
-  DISCARDED,
   entryId,
   entryMargin,
   fitsPlace,
@@ -19,6 +18,7 @@ import {
   type Sha256,
   type TextCard,
   type TextPlace,
+  TRASH_PLACE,
   textCardId,
   threadIdFor,
   workflowStateIdFor,
@@ -339,10 +339,10 @@ describe("a queued reference", () => {
         here: null,
       },
     ])
-    expect(plan(inColumn({ kind: "discard", card: id }, column), s)).toEqual([
+    expect(plan(inColumn({ kind: "trash", card: id }, column), s)).toEqual([
       {
         kind: "moveCard",
-        move: { card: id, from, to: DISCARDED },
+        move: { card: id, from, to: TRASH_PLACE },
         how,
         queuedBy: null,
         fly: false,
@@ -566,7 +566,7 @@ describe("your message", () => {
     })
   })
 
-  test("an empty message is discarded as the card takes its place", () => {
+  test("an empty message is trashed as the card takes its place", () => {
     const [keep] = plan(toComposer(), withMessage(false, [card(C1, note)]))
     expect(keep).toMatchObject({
       kind: "moveCards",
@@ -809,7 +809,7 @@ describe("afterUndo: what an undo's answer brings into view", () => {
     ).toContainEqual({ kind: "reveal", entry: A })
   })
 
-  test("a discarded queued card back in its queue: its thread shown, and the card scrolled to in the dock", () => {
+  test("a trashed queued card back in its queue: its thread shown, and the card scrolled to in the dock", () => {
     const effects = answered({
       kind: "undone",
       cards: [
@@ -1370,7 +1370,7 @@ describe("landing a copy", () => {
       {
         kind: "moveCards",
         moves: [
-          { move: { card: C2, to: DISCARDED } },
+          { move: { card: C2, to: TRASH_PLACE } },
           { move: { card: C1, to: inventory }, slot: 4 },
         ],
       },
@@ -1388,7 +1388,7 @@ describe("landing a copy", () => {
     ])
   })
 
-  test("a slot is replaced only when its card is yours to discard, and never by a thread's copy", () => {
+  test("a slot is replaced only when its card is yours to trash, and never by a thread's copy", () => {
     const canvas = {
       kind: "canvas",
       id: TEST_CANVAS,

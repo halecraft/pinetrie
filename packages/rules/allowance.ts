@@ -7,7 +7,7 @@ import { decodeRecord, entryKey } from "./decode.ts"
 import { type RecordSpec, setRecord } from "./records.ts"
 
 /** A budget, at the message that set it. */
-export interface BudgetRecord {
+export interface AllowanceRecord {
   /** The person's message that set it: the key. */
   readonly message: EntryId
   /** The thread that message is in, where its facts go. */
@@ -22,7 +22,7 @@ export interface BudgetRecord {
   readonly over: boolean
 }
 
-const BudgetSchema = Type.Object({
+const AllowanceSchema = Type.Object({
   thread: Type.String({ minLength: 1 }),
   by: Type.String({ minLength: 1 }),
   limit: Type.Number({ minimum: 0 }),
@@ -31,13 +31,13 @@ const BudgetSchema = Type.Object({
 })
 
 /** Each budget, at the message that set it. */
-export const BUDGET: RecordSpec<BudgetRecord, EntryId, "session"> = {
-  namespace: "pinetrie.budget",
+export const ALLOWANCE: RecordSpec<AllowanceRecord, EntryId, "session"> = {
+  namespace: "pinetrie.allowance",
   home: "session",
   keyOf: r => r.message,
   encode: ({ message, ...contents }) => contents,
   decode: (contents, key) =>
-    decodeRecord(BudgetSchema, contents, entryKey(key), (r, message) => ({
+    decodeRecord(AllowanceSchema, contents, entryKey(key), (r, message) => ({
       message,
       thread: r.thread as ThreadId,
       by: r.by as WriterId,
@@ -48,15 +48,15 @@ export const BUDGET: RecordSpec<BudgetRecord, EntryId, "session"> = {
 }
 
 /** The budget a person's message sets when no config names one. */
-export const DEFAULT_BUDGET = 200_000
+export const DEFAULT_ALLOWANCE = 200_000
 
-export const newBudget = (input: {
+export const newAllowance = (input: {
   readonly message: EntryId
   readonly thread: ThreadId
   readonly by: WriterId
   readonly limit: number
 }): ValueWrite<"session"> =>
-  setRecord(BUDGET, { ...input, spent: 0, over: false })
+  setRecord(ALLOWANCE, { ...input, spent: 0, over: false })
 
 /** One model request's tokens, as the provider reported them. */
 export interface RequestTokens {
@@ -90,7 +90,7 @@ export function addedTokens(
 export interface Spend {
   readonly spent: number
   /** The record with `over`, the first time the count crosses `limit`; null otherwise. */
-  readonly over: BudgetRecord | null
+  readonly over: AllowanceRecord | null
 }
 
 /**
@@ -98,7 +98,7 @@ export interface Spend {
  * record is rewritten only by the spend that crosses its limit.
  */
 export function planSpend(
-  record: BudgetRecord,
+  record: AllowanceRecord,
   spent: number,
   tokens: number,
 ): Spend {
@@ -113,5 +113,5 @@ export function planSpend(
 }
 
 /** Whether a run spending `record` may make another model request. */
-export const mayRequest = (record: BudgetRecord | undefined): boolean =>
+export const mayRequest = (record: AllowanceRecord | undefined): boolean =>
   record === undefined || !record.over

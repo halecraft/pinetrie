@@ -54,12 +54,12 @@ import {
   ACCESS,
   type AcceptedRecord,
   type AccessRecord,
+  ALLOWANCE,
+  type AllowanceRecord,
   BANNER,
   BASE,
   type BannerRecord,
   type BaseRecord,
-  BUDGET,
-  type BudgetRecord,
   boardCanvases,
   CARD_HISTORY,
   CARD_TITLE,
@@ -752,9 +752,9 @@ export const readBases = (
 ): ReadonlyMap<ThreadId, BaseRecord> => readRecords(doc, BASE)
 
 /** Each budget for agents talking, by the message that set it. */
-export const readBudgets = (
+export const readAllowances = (
   doc: SessionDocHandle,
-): ReadonlyMap<EntryId, BudgetRecord> => readRecords(doc, BUDGET)
+): ReadonlyMap<EntryId, AllowanceRecord> => readRecords(doc, ALLOWANCE)
 
 /** Each lane's name (`pinetrie.name`), by lane. */
 export const readNames = (

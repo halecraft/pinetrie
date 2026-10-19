@@ -121,7 +121,7 @@ export type Effect =
   /**
    * A paste: a text card's text written first, a reference's
    * quote kept first when it is markdown or a comment's, then one request
-   * that discards the card it replaces and makes the card, or
+   * that trashes the card it replaces and makes the card, or
    * moves a cut card out of your trash, where `to` sends it.
    */
   | {
@@ -130,14 +130,14 @@ export type Effect =
       readonly to: MoveTarget
       readonly replacing: Replacing | null
       readonly how: MoveHow
-      /** The canvas you are on: a discard's history from your inventory. */
+      /** The canvas you are on: a trash's history from your inventory. */
       readonly here: CanvasId | null
     }
   /** What the clipboard cell shows: the copy this tab just made. */
   | { readonly kind: "clipboardCell"; readonly clip: Clip }
   /** Text at the caret of the text box that has focus. */
   | { readonly kind: "insertText"; readonly text: string }
-  /** A move: a take into the inventory, a put, an unqueue, a discard. */
+  /** A move: a take into the inventory, a put, an unqueue, a trash. */
   | {
       readonly kind: "moveCard"
       readonly move: TypedMove
@@ -146,7 +146,7 @@ export type Effect =
       readonly queuedBy: WriterId | null
       /** Whether the card animates to where it lands (`ports.fly`). */
       readonly fly: boolean
-      /** The canvas you are on, for a discard: its history, from your inventory. */
+      /** The canvas you are on, for a trash: its history, from your inventory. */
       readonly here: CanvasId | null
     }
   /**
@@ -310,7 +310,7 @@ export const findCard = (
 ): CardRecord | undefined => facts.cards.find(c => c.id === card)
 
 /**
- * The canvas an undo of moves acts in, and a discard's history: the canvas you
+ * The canvas an undo of moves acts in, and a trash's history: the canvas you
  * are on. None on nothing.
  */
 export function canvasOfTab(state: IntentState): CanvasId | null {

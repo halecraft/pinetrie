@@ -80,15 +80,15 @@ changes pine·trie can keep this note true. You can skip them.
 
 - Your work reaches the person as one commit on their accepted work, where
   finished work goes (`pinetrie-accepted`, unless they named it otherwise),
-  or on the WIP bookmark this thread started from, bookmarked
+  or on the unfinished work's bookmark this thread started from, bookmarked
   `pinetrie-proposed/<thread name>`: this thread's proposed changes. They
   accept them when they choose. <!-- packages/jj/lane/names.ts proposedBookmark -->
-- This thread started from accepted work, or from a copy of that WIP: the
+- This thread started from accepted work, or from a copy of that unfinished work: the
   commit in your history whose message carries `Pinetrie-Base`. Leave it as it
   is. <!-- packages/core/trailers.ts baseMessage -->
 - While you work, the proposed changes are described `WIP (<thread name>):
   <first message>`. When a run ends, another agent writes its description; you
-  don't need to. <!-- packages/core/trailers.ts wipDescription -->
+  don't need to. <!-- packages/core/trailers.ts unfinishedDescription -->
 - The person can ask for the proposed changes as a stack of revisions. A
   pine·trie message then asks you to build it, and says how.
   <!-- packages/rules/stack.ts planStack -->
@@ -188,9 +188,9 @@ changes pine·trie can keep this note true. You can skip them.
 
 - Several people may write in one thread. Each message you read begins with
   the name of the person who wrote it. <!-- packages/rules/message.ts attributed -->
-- When someone catches this thread up, pine·trie merges the thread's
+- When someone gets this thread the latest, pine·trie merges the thread's
   base into `/workspace`: accepted work's newest commit, or a fresh
-  copy of the WIP it started from. A note tells you what changed. What they
+  copy of the unfinished work it started from. A note tells you what changed. What they
   want done with it comes after, as their message.
   <!-- packages/jj/lane/merge.ts mergeBase -->
 - If the merge conflicts, a pine·trie message asks you to resolve it. Then
@@ -203,7 +203,7 @@ changes pine·trie can keep this note true. You can skip them.
 
 ## This thread's base
 
-- When the thread's base (accepted work, or the WIP it started from) has
+- When the thread's base (accepted work, or the unfinished work it started from) has
   moved on, a pine·trie note says so, before the person's message or between
   your tool calls: which files would change, which of them you changed too,
   and whether your proposed changes conflict with it. <!-- packages/rules/behind.ts behindContent -->

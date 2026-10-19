@@ -446,9 +446,9 @@ describe("planIntent", () => {
       to: { kind: "trash" },
     }
     const column = { kind: "column", key: F } as const
-    expect(plan({ kind: "discard", card: F, at: column }, state)).toMatchObject(
-      [{ kind: "moveCard", move: away, how: { actedAt: column } }],
-    )
+    expect(plan({ kind: "trash", card: F, at: column }, state)).toMatchObject([
+      { kind: "moveCard", move: away, how: { actedAt: column } },
+    ])
     // Alone on its canvas: a new canvas's, whose canvas then leaves the sidebar.
     const alone = { ...thread, place: { ...thread.place, canvas: NEW_CANVAS } }
     const onTab = {
@@ -458,7 +458,7 @@ describe("planIntent", () => {
         index: { ...CANVASES.index, cardsOn: new Map([[NEW_CANVAS, [alone]]]) },
       },
     } as IntentState
-    expect(plan({ kind: "discard", card: F, at: column }, onTab)).toEqual([
+    expect(plan({ kind: "trash", card: F, at: column }, onTab)).toEqual([
       {
         kind: "moveCards",
         moves: [

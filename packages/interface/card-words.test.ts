@@ -57,7 +57,7 @@ describe("card words", () => {
     [
       "commandWords, on a WIP",
       commandWords("get-latest", {
-        base: { kind: "wip", bookmark: "wip/a" },
+        base: { kind: "unfinished", bookmark: "wip/a" },
         parent: null,
       }),
       "get the latest",
@@ -112,7 +112,7 @@ describe("card words", () => {
     [
       "noticeWords, gone from a note",
       noticeWords(refusal({ fromQueue: false }), READER),
-      "not moved: it was sent or discarded first",
+      "not moved: it was sent or trashed first",
     ],
     [
       "noticeWords, moved by Bea first",
@@ -125,9 +125,9 @@ describe("card words", () => {
       "not moved: you moved it first",
     ],
     [
-      "noticeWords, your discard",
+      "noticeWords, your trash",
       noticeWords(
-        { card: null, actedAt: { kind: "inventory" }, code: "discarded" },
+        { card: null, actedAt: { kind: "inventory" }, code: "trashed" },
         READER,
       ),
       "trashed · ⌘Z brings it back",

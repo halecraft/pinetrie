@@ -1052,7 +1052,7 @@ Note what it does **not** do: it detects change, it does not design for it.
 Probes P1 and P2 in `sandbox/s17-typed-entries/` could each have failed while
 conformance stayed green, which is why they ran first.
 
-### Agents talking: `ask`, `leave`, and the budget's gate (ADR-0128, S144)
+### Agents talking: `ask`, `leave`, and the allowance's gate (ADR-0128, S144)
 
 - **`ask` and `leave` are the host's tools** (`thread-tools.ts`), as
   `catch_up` is: each reads its call and returns the hook's answer
@@ -1064,16 +1064,16 @@ conformance stayed green, which is why they ran first.
   after the context rules.
 - **`onUsage`** is pi's `usage` event, per request and per lane, as a
   `RequestTokens`: its context (input, cache reads and cache writes) and
-  its output. What a budget spends of it is the host's (`addedTokens`).
+  its output. What an allowance spends of it is the host's (`addedTokens`).
 - **`mayRequest`** is asked in a `before_request` hook; false aborts the
   run before the request is sent. The hook awaits the held lane, which
   resolves at once, and does not await the abort: the hook runs inside the
   lane's drive, which an awaited abort would wait on (S144).
-- **`complete` returns its tokens** (`Completed`): a budget counts a
+- **`complete` returns its tokens** (`Completed`): an allowance counts a
   relayed run's urgency and digest requests too.
 - **Gotcha: compaction keeps only what is stored.** pi summarises stored
   messages with `convertToLlm` and skips custom entries, so what an asked
-  agent hears of another thread is copied into its thread as a heard
+  agent hears of another thread is copied into its thread as an incoming
   entry's `content`, never drawn in from the other root at each request
   (S144). `run` writes it first in `before`, so the cards entry stays the
   prompt's parent.

@@ -1,6 +1,6 @@
 // interface/card-keys — the keys a card's own box takes for what the card
 // does in its place: Alt+↑ and Alt+↓ move a card in a list one place up or
-// down, and Ctrl+Shift+Backspace discards a card.
+// down, and Ctrl+Shift+Backspace trashes a card.
 //
 // Only boxes of a card in a list (queued, pinned, a note, a new card's box)
 // take Alt+↑/↓. On a Mac, Option+↑/↓ moves a textarea's caret to its
@@ -22,7 +22,7 @@ export function cardKeyAct(
 ): ColumnAct | null {
   if (event.isComposing || event.metaKey) return null
   if (event.ctrlKey && event.shiftKey && !event.altKey)
-    return event.key === "Backspace" ? { kind: "discard", card } : null
+    return event.key === "Backspace" ? { kind: "trash", card } : null
   if (!event.altKey || event.ctrlKey || event.shiftKey || among === null)
     return null
   if (event.key === "ArrowUp") return { kind: "reorder", card, among, step: -1 }

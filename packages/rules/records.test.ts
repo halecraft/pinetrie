@@ -21,8 +21,8 @@ import {
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
+import { ALLOWANCE } from "./allowance.ts"
 import type { BaseRecord } from "./base.ts"
-import { BUDGET } from "./budget.ts"
 import {
   ACCEPTED,
   ACCESS,
@@ -204,7 +204,7 @@ const SAMPLES: readonly Sample[] = [
       commit: C,
       heads: { current: null, proposed: "h" },
       log: { current: null, proposed: "l" },
-      wips: [],
+      unfinishedWork: [],
       workingCopy: {
         behind: 0,
         ahead: 0,
@@ -282,7 +282,7 @@ const SAMPLES: readonly Sample[] = [
   sample("queue hold", QUEUE_HOLD, { lane: L, by: ADA, at: 1 }, "lane"),
   sample(
     "budget",
-    BUDGET,
+    ALLOWANCE,
     { message: E, thread: L, by: ADA, limit: 200, spent: 10, over: false },
     "message",
   ),

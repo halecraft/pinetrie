@@ -285,7 +285,7 @@ export function proposedChangesRefusal(
 ): string {
   switch (code) {
     case ERR.BAD_DESTINATION:
-      return "the changes cannot be accepted there now: conflicted changes go only into a WIP, and the destination must sit below them"
+      return "the changes cannot be accepted there now: conflicted changes go only into unfinished work, and the destination must sit below them"
     case ERR.NOT_AS_SHOWN:
       return "the changes are not what you were shown: review them again"
     case ERR.FOLDER_MOVED:

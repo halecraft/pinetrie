@@ -63,7 +63,7 @@ const AT = {
   lane: LANE,
   name: NAME,
   entry: "e1",
-  wip: "WIP (amber-fox): fix it",
+  unfinished: "WIP (amber-fox): fix it",
   nonce: "pinetrie-proposed-n",
 }
 

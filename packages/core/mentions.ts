@@ -141,7 +141,7 @@ export type Asker =
 
 /**
  * An ask relayed into another thread, the asked agent's prompt: where it was
- * asked, by whom, and what. `budget` is the person's message whose budget the
+ * asked, by whom, and what. `allowance` is the person's message whose allowance the
  * chain spends (its run spends from it only when an agent asked); `by` is the
  * person behind the chain, who a stop, a card or a run's author names.
  */
@@ -153,7 +153,7 @@ export interface RelayDetails {
   readonly asker: Asker
   readonly askerName: string
   readonly text: string
-  readonly budget: EntryId
+  readonly allowance: EntryId
   readonly by: WriterId
 }
 
@@ -172,7 +172,7 @@ export interface AnswerDetails {
   readonly source: EntryId
   readonly text: string
   readonly wakes: boolean
-  readonly budget: EntryId
+  readonly allowance: EntryId
   readonly by: WriterId
 }
 
@@ -180,7 +180,7 @@ export interface AnswerDetails {
  * What an asked agent heard of the thread that asked: those entries' ids,
  * newest last. Their text is the heard entry's `content`.
  */
-export interface HeardDetails {
+export interface IncomingDetails {
   readonly from: ThreadId
   readonly fromName: string
   readonly entries: readonly EntryId[]

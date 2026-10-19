@@ -184,7 +184,7 @@ export const NO_CANVAS_INDEX: CanvasIndex = indexCanvases([], new Map())
  * a column's, an image's or a thread's canvas; none for an inventory, or the board
  * (a canvas's card is in no canvas: the board is the team's). A trashed card's
  * is the place it left's; a trash key names none, since the host fills in
- * where a discard leaves.
+ * where a trash leaves.
  */
 export function canvasOfPlace(
   canvases: CanvasIndex,

@@ -546,8 +546,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a chat's run is not told its base's news",
     file: "apps/pinetrie/host/runs.ts",
-    from: "          const before = [\n            start.heard ?? null,\n            behind,\n            ...canvas,\n            pinned,\n",
-    to: "          const before = [\n            start.heard ?? null,\n            ...canvas,\n            pinned,\n",
+    from: "          const before = [\n            start.incoming ?? null,\n            behind,\n            ...canvas,\n            pinned,\n",
+    to: "          const before = [\n            start.incoming ?? null,\n            ...canvas,\n            pinned,\n",
     command: unit,
     expect: "a chat's run is told its base's news first",
   },
@@ -949,7 +949,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a card with no text is sent",
     file: "apps/pinetrie/host/queued-card-pop.ts",
-    from: '  if (plan.after === "discard") return "next"',
+    from: '  if (plan.after === "trash") return "next"',
     to: '  if (false) return "next"',
     command: unit,
     expect: "clean with no text: the update alone, and no run",
@@ -1952,8 +1952,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a run reads no pinned cards",
     file: "apps/pinetrie/host/runs.ts",
-    from: "          const before = [\n            start.heard ?? null,\n            behind,\n            ...canvas,\n            pinned,\n",
-    to: "          const before = [\n            start.heard ?? null,\n            behind,\n            ...canvas,\n",
+    from: "          const before = [\n            start.incoming ?? null,\n            behind,\n            ...canvas,\n            pinned,\n",
+    to: "          const before = [\n            start.incoming ?? null,\n            behind,\n            ...canvas,\n",
     command: unit,
     expect: "a prompt's run reads its pinned cards",
   },
@@ -2470,12 +2470,12 @@ export const mutations: readonly Mutation[] = [
     expect: "a branch's record is written with its first, then named",
   },
   {
-    name: "the host's discard history ignores the sender's canvas",
+    name: "the host's trash history ignores the sender's canvas",
     file: "apps/pinetrie/host/commands/cards.ts",
-    from: "    const discards = { canvases, here }\n",
-    to: "    const discards = { canvases, here: null }\n",
+    from: "    const trashes = { canvases, here }\n",
+    to: "    const trashes = { canvases, here: null }\n",
     command: unit,
-    expect: "the host names a discard's history",
+    expect: "the host names trashing's history",
   },
   {
     name: "a width is recorded in no history",
@@ -2488,8 +2488,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a run is told nothing of its canvas",
     file: "apps/pinetrie/host/runs.ts",
-    from: "          const before = [\n            start.heard ?? null,\n            behind,\n            ...canvas,\n            pinned,\n",
-    to: "          const before = [\n            start.heard ?? null,\n            behind,\n            pinned,\n",
+    from: "          const before = [\n            start.incoming ?? null,\n            behind,\n            ...canvas,\n            pinned,\n",
+    to: "          const before = [\n            start.incoming ?? null,\n            behind,\n            pinned,\n",
     command: unit,
     expect: "then its canvas, before its cards entry",
   },
@@ -2819,7 +2819,7 @@ export const mutations: readonly Mutation[] = [
     to: '  if (plan.change.cause.kind !== "host")\n    await ports.provenance.write(plan.provenance)\n',
     command: unit,
     expect:
-      "a budget gone over queues its fact, with its making in its history",
+      "an allowance gone over queues its fact, with its making in its history",
   },
   {
     name: "a host's change stops runs",
@@ -2881,7 +2881,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "another module writes the places",
-    file: "apps/pinetrie/host/budgets.ts",
+    file: "apps/pinetrie/host/allowances.ts",
     from: 'import type { Later } from "./later.ts"\n',
     to: 'import { batch } from "@kyneta/schema"\nimport type { Later } from "./later.ts"\n',
     command: unit,
@@ -3308,6 +3308,86 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "a card's command in the old words is renamed, its other fields kept",
+  },
+  {
+    name: "a base on a WIP keeps the old word",
+    file: "apps/pinetrie/host/migrations/0016-base-unfinished.ts",
+    from: '    ? { ...contents, base: { ...base, kind: "unfinished" } }\n',
+    to: "    ? { ...contents, base }\n",
+    command: unit,
+    expect:
+      "a base on a WIP reads as one on unfinished work, its bookmark kept",
+  },
+  {
+    name: "a history message naming a WIP keeps the old word",
+    file: "apps/pinetrie/host/migrations/0018-history-unfinished.ts",
+    from: '      ? { ...details, [field]: { ...named, kind: "unfinished" } }\n',
+    to: "      ? { ...details }\n",
+    command: unit,
+    expect: "a message naming a WIP names unfinished work, the rest kept",
+  },
+  {
+    name: "a queued fact's row is rewritten without its fact",
+    file: "apps/pinetrie/host/migrations/0019-queued-fact-unfinished.ts",
+    from: "  return renamed === null ? null : { ...row, fact: JSON.stringify(renamed) }\n",
+    to: "  return renamed === null ? null : { ...row }\n",
+    command: unit,
+    expect:
+      "a queued fact into a WIP is rewritten in its row, the row's other fields kept",
+  },
+  {
+    name: "a moved allowance leaves its old record",
+    file: "apps/pinetrie/host/migrations/0020-allowance-records.ts",
+    from: '    { kind: "delete" as const, target: SESSION_TARGET, namespace: OLD, key },\n',
+    to: "",
+    command: unit,
+    expect:
+      "each stored budget moves to the allowance namespace under its message, the old deleted",
+  },
+  {
+    name: "an ask card's row is rewritten without its relay",
+    file: "apps/pinetrie/host/migrations/0021-relay-allowance.ts",
+    from: "  return renamed === null ? null : { ...row, relay: JSON.stringify(renamed) }\n",
+    to: "  return renamed === null ? null : { ...row }\n",
+    command: unit,
+    expect:
+      "an ask card's relay names its allowance, the row's other fields kept",
+  },
+  {
+    name: "an allowance used up keeps the old kind",
+    file: "apps/pinetrie/host/migrations/0022-fact-allowance.ts",
+    from: '  const kind = rest.kind === "budget-spent" ? "allowance-spent" : rest.kind\n',
+    to: "  const kind = rest.kind\n",
+    command: unit,
+    expect:
+      "a stop by an allowance, and an allowance used up, read in the new words",
+  },
+  {
+    name: "a renamed history message keeps its old type",
+    file: "apps/pinetrie/host/migrations/rewrite.ts",
+    from: "      ...(renamedTo === undefined ? {} : { customType: renamedTo }),\n",
+    to: "",
+    command: unit,
+    expect:
+      "a history message of one type takes another, its details and content kept",
+  },
+  {
+    name: "a trashed card's row keeps the old prefix",
+    file: "apps/pinetrie/host/migrations/0024-trashed-rows.ts",
+    from: '    return { ...fields, kind: `trashed-${kind.slice("discarded-".length)}` }\n',
+    to: "    return { ...fields }\n",
+    command: unit,
+    expect:
+      "a trashed card's row in the old words reads as the place it left, in the trash",
+  },
+  {
+    name: "a card's history keeps its trashed places in the old words",
+    file: "apps/pinetrie/host/migrations/0024-trashed-rows.ts",
+    from: "    : { ...history, events: now.map((e, i) => e ?? events[i]) }\n",
+    to: "    : null\n",
+    command: unit,
+    expect:
+      "a history's events and a trace are rewritten whole, and nothing else",
   },
   // ── a lane's prompt ──
   {

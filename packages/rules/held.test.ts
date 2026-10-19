@@ -204,7 +204,7 @@ test("takenIn: the threads a change puts in an inventory that were not in one", 
   expect(takenIn([held], [on])).toEqual([])
 })
 
-test("a trashed thread is held by nobody, but its discard stops its run and a command in it is refused", () => {
+test("a trashed thread is held by nobody, but trashing it stops its run and a command in it is refused", () => {
   const on: CardRecord = {
     kind: "thread",
     id: T,

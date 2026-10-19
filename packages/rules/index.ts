@@ -52,6 +52,17 @@ export {
   type ToolAnswer,
 } from "./agent-commands.ts"
 export {
+  ALLOWANCE,
+  type AllowanceRecord,
+  addedTokens,
+  DEFAULT_ALLOWANCE,
+  mayRequest,
+  newAllowance,
+  planSpend,
+  type RequestTokens,
+  type Spend,
+} from "./allowance.ts"
+export {
   type ArchiveTeardown,
   archivedIn,
   CANVAS_BUSY_REASON,
@@ -140,17 +151,6 @@ export {
   type WorkflowPlan,
   type WorkflowState,
 } from "./board.ts"
-export {
-  addedTokens,
-  BUDGET,
-  type BudgetRecord,
-  DEFAULT_BUDGET,
-  mayRequest,
-  newBudget,
-  planSpend,
-  type RequestTokens,
-  type Spend,
-} from "./budget.ts"
 export {
   CANVAS_CAP,
   CANVAS_FACT_TYPE,
@@ -442,9 +442,9 @@ export {
 export {
   cardsOfParts,
   crossesArchive,
-  type Discards,
   movesHistory,
   planHistorySweep,
+  type Trashes,
   type UndoResult,
   undoAnswer,
 } from "./move-history.ts"
@@ -600,22 +600,25 @@ export {
 export {
   AGENTS_RULE,
   ANSWER,
+  ANSWER_TYPE,
   type AnswerMessage,
   type AnswerPlan,
   answerContent,
   askLine,
   decodeAnswer,
-  decodeHeard,
+  decodeIncoming,
   decodeRelay,
   encodeAnswer,
-  encodeHeard,
+  encodeIncoming,
   encodeRelayMessage,
-  HEARD,
-  type HeardMessage,
-  heardLine,
+  INCOMING,
+  INCOMING_TYPE,
+  type IncomingEntriesMessage,
+  incomingLine,
   planAnswer,
   planRelay,
   RELAY,
+  RELAY_TYPE,
   type RelayEnd,
   type RelayMessage,
   type RelayPlan,

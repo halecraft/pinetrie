@@ -34,9 +34,9 @@ import {
 import { addressLink } from "@pinetrie/rules"
 import { addressWords } from "./address-words.ts"
 import { threadAnchor } from "./columns.ts"
-import { isDiscardable } from "./discardable.ts"
 import type { Focus } from "./focus.ts"
 import { messageReference, selectionReference } from "./message-tools.ts"
+import { isTrashable } from "./trashable.ts"
 
 /** What copying from the past takes: an address, and its markdown (`addressMarkdown`). */
 export interface Taken {
@@ -216,8 +216,8 @@ export type CopyPlan =
  * the message's text names, else the message, as its origin; then a focused
  * block; the column's selected message; a focused card (`cardClip`); the
  * clipboard cell's clip. Nothing else is the browser's too. `cut` says the
- * gesture was Cmd+X: only a focused card you may discard is cut, as × would
- * discard it; anything else is left to the browser, which cuts only in a
+ * gesture was Cmd+X: only a focused card you may trash is cut, as × would
+ * trash it; anything else is left to the browser, which cuts only in a
  * text box.
  */
 export function clipOfFocus(
@@ -229,7 +229,7 @@ export function clipOfFocus(
   if (cut) {
     const record = facts.cards.find(c => c.id === focus.card)
     const of =
-      record === undefined || !isDiscardable(record, facts.me)
+      record === undefined || !isTrashable(record, facts.me)
         ? null
         : cardClip(record, facts)
     return of === null

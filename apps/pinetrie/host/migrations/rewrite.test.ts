@@ -151,3 +151,46 @@ describe("planHistoryRewrites: one kind of history message's details", () => {
     ).toEqual([])
   })
 })
+
+test("a history message of one type takes another, its details and content kept", () => {
+  const row = {
+    id: "a",
+    parentId: null,
+    type: "message",
+    timestamp: 1,
+    fromId: null,
+    thread: "t-1",
+    payload: {
+      type: "message",
+      message: {
+        role: "custom",
+        customType: "pinetrie.heard",
+        content: "c",
+        details: { from: "t-2" },
+      },
+    },
+  }
+  const [written] = planHistoryRewrites(
+    { a: row },
+    "pinetrie.heard",
+    () => null,
+    "pinetrie.incoming",
+  )
+  expect(written?.payload).toEqual({
+    type: "message",
+    message: {
+      role: "custom",
+      customType: "pinetrie.incoming",
+      content: "c",
+      details: { from: "t-2" },
+    },
+  })
+  expect(
+    planHistoryRewrites(
+      { a: row },
+      "pinetrie.other",
+      () => null,
+      "pinetrie.incoming",
+    ),
+  ).toEqual([])
+})

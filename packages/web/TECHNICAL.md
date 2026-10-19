@@ -437,7 +437,7 @@ type (`Strip = [CanvasColumn, ...CardColumn[]]`), so no strip lacks one.
   ADR-0177), a note column's
   too, drawn by one component (`column-menu.tsx`) from one
   `columnHeadEnd` value: ⇤ is the `fold` intent of its card, on a started
-  thread or a note column, and × the same `discard` intent as the ⋯'s
+  thread or a note column, and × the same `trash` intent as the ⋯'s
   Move to trash, on a thread not yet started. On such a thread both are
   there on purpose: ⋯ is everyone's and reads the same on every column.
   The page draws whichever button it is given, never asking which. A note column's header is a
@@ -869,11 +869,11 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
     `.working-line` with `state: "attached"`, or read its computed
     `visibility` (S67).
 - **What a new thread starts from** (ADR-0104, ADR-0102). When a send would
-  create a lane and you have WIP bookmarks, a line left of the button
+  create a lane and you have unfinished work bookmarks, a line left of the button
   (`StartLine`, `.start-line`) says what it starts from, in `startWords`'
   words ("starts from accepted work ▾", "starts from your unfinished work:
   wip/x ▾"), and opens `baseChoices` (`send.ts`): accepted work, then each
-  WIP with how far it is behind accepted work. With no WIP there is no
+  unfinished work with how far it is behind accepted work. With no unfinished work there is no
   choice, and no line; a fork from a conflicted commit says so there
   (`forkWords`, ADR-0072). The base is each editor's state until sent, and is sent
   with the chat. Every thread's agent works in a lane of its own: there is
@@ -906,9 +906,9 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   then queued like any other (`planSend`, which carries the command), and
   the host carries the command out when it pops it.
 - **One-line messages** (`LINE_ROLES`, core) show as one line each: `land`,
-  `update`, `stack`, `carry-on`, `heard`, and the host's facts, `fact`
+  `update`, `stack`, `carry-on`, `incoming`, and the host's facts, `fact`
   (what a command on the proposed changes did, ADR-0080; a stop, a member gone, a
-  budget spent, a canvas change) and `behind` (the base's new work). The
+  allowance used up, a canvas change) and `behind` (the base's new work). The
   host wrote them all, so each one's speaker is pine·trie (`speakerWords`,
   `@pinetrie/interface`). The speaker label says who wrote a line, as it
   does for a person or the agent, and never what happened: the line's own
@@ -1210,7 +1210,7 @@ the session sends moves and draws them until its copy holds them
   closes. Its keys are `gridKeyAct`'s, on the grid, Escape aside (the
   page's); Enter and a click on the selected cell ask the caller to open
   the card on the bench, and Delete or Backspace to trash it, when the
-  cell `discards`. A compact's owner is an
+  cell `trashes`. A compact's owner is an
   `Initial`, not an `Avatar`: the suites count people by `.avatar`. A
   cell's text comes from `useCardTexts`.
 - **One editor for every card: `card-editor.tsx`, in one frame:
@@ -1220,7 +1220,7 @@ the session sends moves and draws them until its copy holds them
   its header with who else wrote in it. The frame's header is the card's drag handle (`draggable`,
   `data-card`, so Ctrl+Shift+I finds the card from it and `NOT_A_HANDLE`
   keeps a column's drag off it); a press on its ⋯ or × starts no drag. Its
-  ⋯ is a `Menu` of the card's Move to ▸ items, then History. Its × discards,
+  ⋯ is a `Menu` of the card's Move to ▸ items, then History. Its × trashes,
   except on a card given a close (the inventory's open card), where it
   closes.
   Its footer holds ↑ and ↓ and the editor's own primary button. What it
@@ -1307,7 +1307,7 @@ the session sends moves and draws them until its copy holds them
   Kyneta can name the writers whose text still stands
   (ADR-0048, *Who contributed*); marks do not use it.
 - **The bin on an unstarted thread's column trashes it, asking nothing**
-  (ADR-0134, ADR-0177): one move (`planDiscard`), its thread's card to the trash with
+  (ADR-0134, ADR-0177): one move (`planTrash`), its thread's card to the trash with
   your message on it, undone by the undo key.
 
 ## Pinned cards (ADR-0048 step 5)
@@ -1369,7 +1369,7 @@ stays in view; the strip scrolls past 30vh.
   prompt's `.msg`. A card's frame is `.card-frame` (with `data-tone`), its
   header `.card-head` (`.card-state[data-state]`, `.card-by`), its ⋯
   `.card-menu-trigger` and its items `.move-to[data-to]` and
-  `.card-history-item`; its bin `.discard-card`, and on the bench its ×
+  `.card-history-item`; its bin `.trash-card`, and on the bench its ×
   `.close-card`. A note column is
   `.note-column`, its notes `.card-editor.note` with their
   `textarea[data-card]`. `openNote` (`apps/pinetrie/e2e/browser/page.ts`)
@@ -1492,7 +1492,7 @@ inventory's grid columns are `--compact-w`, its frame two `--column`s.
 - **The rows wrap what exists.** A text card normal is its text through
   `MessageText`, read only and bounded at a column's height
   (`.card-normal`); full, its editor in its frame (`BoundCardEditor`, with
-  its put), whose × discards it, on the bench as anywhere. A thread normal
+  its put), whose × trashes it, on the bench as anywhere. A thread normal
   is its first and last messages, full `ThreadPreviewView`. A note column
   normal is its title and first notes, full all of them.
 - **A reference's quote is fetched once per page** (`useQuote`), and kept
@@ -1537,7 +1537,7 @@ inventory's grid columns are `--compact-w`, its frame two `--column`s.
   first enabled button (a reference's Edit as text, a thread's put), else
   the bench. Folded by Escape, focus goes back to the selected slot, where
   the grid's keys are; a card that leaves the bench (put, dropped,
-  discarded) moves no focus, or a key pressed after would land in the
+  trashed) moves no focus, or a key pressed after would land in the
   panel (Ctrl+Z undoing a swap, not the move), and the bench folds, so a
   card put in that slot later is not opened.
 - **Its size is the viewport's alone**: the bag and the bench are each a
@@ -1874,7 +1874,7 @@ What S151 measured, and these handlers rest on:
   that opens a second page opens its thread from there (`openFromBoard`), or
   from a reader on a thread card. To step away from a root so its columns
   unmount, a check opens a new canvas and closes its column again, which
-  discards its canvas (`stepAway`, `stepBack`).
+  trashes its canvas (`stepAway`, `stepBack`).
 - **`.column` must stay `#strip`'s direct child**: `use-drag.ts` and
   `focus.ts` query `#strip > [data-card]`. A column's `.column-body` is inside
   `.column-thread`.

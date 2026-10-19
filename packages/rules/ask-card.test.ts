@@ -19,7 +19,7 @@ const relay: RelayDetails = {
   asker: { kind: "agent", thread: threadIdFor("here") },
   askerName: "sable-meadow",
   text: "what next?",
-  budget: entryId("1"),
+  allowance: entryId("1"),
   by: ada,
 }
 const ID = cardIdOfKind("ask", "01a0ffd2-0000-7000-8000-0000000000a1")

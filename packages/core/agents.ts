@@ -53,7 +53,7 @@ export const lastInvitation = (
  * has heard none since a compaction, which summarised what it heard, so the
  * next ask copies it again, as base news is told again past one.
  */
-export const lastHeardEntry = (
+export const lastIncomingEntry = (
   index: TreeIndex,
   tip: EntryId | null,
   from: ThreadId,
@@ -62,8 +62,10 @@ export const lastHeardEntry = (
     index,
     tip,
     e => {
-      const heard = e.message?.heard
-      return heard?.from === from ? (heard.entries.at(-1) ?? null) : undefined
+      const incoming = e.message?.incoming
+      return incoming?.from === from
+        ? (incoming.entries.at(-1) ?? null)
+        : undefined
     },
     () => null,
   )

@@ -138,7 +138,7 @@ here, so a superseded ADR leads to the scenarios to revisit.
 | scenario | decisions |
 |---|---|
 | `host/admission` | the invite key, off loopback, for a request and an upgrade (ADR-0107), and Vite's HMR socket on the host's own port, behind admission (S112) |
-| `host/agents` | an agent invited into another canvas's thread, its budget (ADR-0128) |
+| `host/agents` | an agent invited into another canvas's thread, its allowance (ADR-0128) |
 | `host/banners`, `browser/banner` | a thread's banner (ADR-0050, ADR-0053), drawn before its first message (ADR-0057) |
 | `host/board` | the board (ADR-0122), the archive (ADR-0029), a root's title (ADR-0045), a canvas as a card (ADR-0116, ADR-0126) |
 | `host/cards` | cards and their queue, pinned cards, traces and a held queue (ADR-0048; what the agent reads of pinned cards, S92), undo per card (ADR-0052; a spent card's copy, S64), the places' one owner (ADR-0059, S76), moves' history per person and root (ADR-0066, S91), a thread's card in an inventory (ADR-0117, ADR-0124), paste (ADR-0132), a note column on the canvas (ADR-0126) |

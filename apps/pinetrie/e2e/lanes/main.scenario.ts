@@ -90,7 +90,7 @@ async function mainSection(
   const project = await committedProject("pinetrie-lanes-", {
     "shared.txt": "one\ntwo\nthree\n",
     ".gitignore": "node_modules/\n.vite/\n",
-    "pinetrie.json": `${JSON.stringify({ lanes: { ssh: { personal: true } }, publish: { getLatest: true } })}\n`,
+    "pinetrie.json": `${JSON.stringify({ lanes: { ssh: { personal: true } }, publish: { catchUp: true } })}\n`,
   })
   const script = scriptedModel()
   const logs: string[] = []
@@ -791,7 +791,7 @@ async function mainSection(
     // The resolution moved the lane: the proposed changes followed it in place,
     // back to a work in progress while the run went on, then described again.
     await wh.quiet()
-    const wip = `WIP (${twoName}): lane two: who are you?`
+    const unfinished = `WIP (${twoName}): lane two: who are you?`
     const history = await descriptionsOf(firstChange)
     // The update's merge reaches your repo before the resolution runs, so it
     // is followed, and described, on its own: at least two rounds.
@@ -800,7 +800,8 @@ async function mainSection(
       (await proposedChangeId()) === firstChange &&
         history.length >= 4 &&
         history.every(
-          (d, i) => d === (i % 2 === 0 ? wip : "proposed changes: scripted"),
+          (d, i) =>
+            d === (i % 2 === 0 ? unfinished : "proposed changes: scripted"),
         ) &&
         history.length % 2 === 0,
       `${JSON.stringify(history)}`,
@@ -1280,7 +1281,7 @@ async function mainSection(
           path: "pinetrie.json",
           content: JSON.stringify({
             lanes: { env: ["PINETRIE_E2E_WIDE"] },
-            publish: { getLatest: true },
+            publish: { catchUp: true },
           }),
         },
       },

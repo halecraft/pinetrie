@@ -493,9 +493,9 @@ describe("what a new lane starts from: its line", () => {
     )
     expect(forkWords(3)).toMatch(/in 3 files$/)
   })
-  /** Accepted work, set up, with `wips` above it. */
+  /** Accepted work, set up, with `unfinishedWork` above it. */
   const accepted = (
-    wips: JjAcceptedRecord["wips"] = [],
+    unfinishedWork: JjAcceptedRecord["unfinishedWork"] = [],
     commit: JjAcceptedRecord["commit"] = commitId("c1"),
   ): JjAcceptedRecord => ({
     kind: "jj",
@@ -506,7 +506,7 @@ describe("what a new lane starts from: its line", () => {
     commit,
     heads: { current: null, proposed: "" },
     log: { current: null, proposed: "" },
-    wips,
+    unfinishedWork,
     workingCopy: {
       behind: 0,
       ahead: 0,

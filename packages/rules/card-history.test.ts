@@ -443,13 +443,13 @@ test("planTraceSweep: traces too old, and histories whose card is gone", () => {
   })
 })
 
-test("planTrashSweep: a card discarded a week ago or more, or with no history to tell; never one drawn somewhere", () => {
-  const discarded = { kind: "trash", left: DRAFTING } as const
+test("planTrashSweep: a card trashed a week ago or more, or with no history to tell; never one drawn somewhere", () => {
+  const trashed = { kind: "trash", left: DRAFTING } as const
   const event = (when: number) => ({
     kind: "moved" as const,
     by: ADA,
     from: placeKey(DRAFTING),
-    to: placeKey(discarded),
+    to: placeKey(trashed),
     at: when,
   })
   const now = TRASH_KEEP_MS + 100
@@ -459,9 +459,9 @@ test("planTrashSweep: a card discarded a week ago or more, or with no history to
   expect(
     planTrashSweep({
       cards: [
-        { ...card(discarded), id: old },
-        { ...card(discarded), id: fresh },
-        { ...card(discarded), id: silent },
+        { ...card(trashed), id: old },
+        { ...card(trashed), id: fresh },
+        { ...card(trashed), id: silent },
         card(DRAFTING),
       ],
       histories: new Map([
@@ -485,12 +485,12 @@ test("planTrashSweep: a card discarded a week ago or more, or with no history to
 })
 
 test("planTrashSweep: a card is kept as long as it is told, whatever that is", () => {
-  const discarded = { kind: "trash", left: DRAFTING } as const
+  const trashed = { kind: "trash", left: DRAFTING } as const
   const at = (when: number) => ({
     kind: "moved" as const,
     by: ADA,
     from: placeKey(DRAFTING),
-    to: placeKey(discarded),
+    to: placeKey(trashed),
     at: when,
   })
   const hour = 60 * 60 * 1000
@@ -498,7 +498,7 @@ test("planTrashSweep: a card is kept as long as it is told, whatever that is", (
   const histories = new Map([[card1, { card: card1, events: [at(0)] }]])
   const sweep = (now: number) =>
     planTrashSweep({
-      cards: [{ ...card(discarded), id: card1 }],
+      cards: [{ ...card(trashed), id: card1 }],
       histories,
       now,
       keepMs: 2 * hour,

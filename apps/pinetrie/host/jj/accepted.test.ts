@@ -11,7 +11,7 @@ const facts = (
   commit: commitId("c1"),
   heads: null,
   log: null,
-  wips: [],
+  unfinishedWork: [],
   published: { commit: commitId("m0"), behind: 1, ahead: 0 },
   workingCopy: {
     behind: 1,
@@ -30,8 +30,8 @@ function rig(
   after: AcceptedFacts,
   {
     moveFails = false,
-    getLatest = true,
-  }: { moveFails?: boolean; getLatest?: boolean } = {},
+    catchesUp = true,
+  }: { moveFails?: boolean; catchesUp?: boolean } = {},
 ) {
   const b = basics()
   const ran: RepoStep[][] = []
@@ -63,7 +63,7 @@ function rig(
   const accepted = createAcceptedWork({
     owner,
     basics: b,
-    repoConfig: { ...DEFAULT_REPO, publishCatchesUp: getLatest },
+    repoConfig: { ...DEFAULT_REPO, publishCatchesUp: catchesUp },
     writeValues: async w => applyWrites(b, w),
   })
   const argv = () => ran.map(steps => steps.map(s => s.args.join(" ")))
@@ -72,7 +72,7 @@ function rig(
 
 describe("a publish with publish.catchUp off moves main alone", () => {
   test("the working copy behind and your commits below @ stay where they are", async () => {
-    const { line, argv } = rig(facts(), { getLatest: false })
+    const { line, argv } = rig(facts(), { catchesUp: false })
     expect(await line.act("publish")).toBeNull()
     expect(argv()).toEqual([['bookmark move main --to "pinetrie-accepted"']])
   })

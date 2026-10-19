@@ -74,8 +74,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a lane read in a batch takes every base for a WIP's",
     file: "packages/jj/lane-read.ts",
-    from: '    if (parsed.kind === "wip") return { kind: "wip" }\n',
-    to: '    return { kind: "wip" }\n',
+    from: '    if (parsed.kind === "unfinished") return { kind: "unfinished" }\n',
+    to: '    return { kind: "unfinished" }\n',
     command: repoTest,
     expect:
       "its Pineta-Base on pineta-onto reads as accepted work, the batched read and the separate reads alike",
@@ -870,7 +870,7 @@ export const mutations: readonly Mutation[] = [
     name: "the one read forecasts a lane on accepted work as a WIP's copy",
     file: "packages/jj/lane-read.ts",
     from: '    target: { kind: "accepted", commit: acceptedBookmark },\n',
-    to: '    target: { kind: "wip", commit: acceptedBookmark },\n',
+    to: '    target: { kind: "unfinished", commit: acceptedBookmark },\n',
     command: repoTest,
     expect:
       "the lane re-edits a file of its own accepted proposed changes, accepted work unchanged since: the forecast is none, and so is the merge",
@@ -960,7 +960,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "rebuilt proposed changes keep the agent's message",
     file: "packages/jj/proposed-steps.ts",
-    from: "          description: proposedMessage(at.wip, {",
+    from: "          description: proposedMessage(at.unfinished, {",
     to: '          description: proposedMessage("proposed changes: scripted", {',
     command: unit,
     expect: "rebuild: planRebuildProposed's steps",
@@ -1123,7 +1123,7 @@ export const mutations: readonly Mutation[] = [
     name: "a fork's copy is a child of your @ itself",
     file: "packages/jj/lane/plan.ts",
     from: '  inLane("jj", "new", on),',
-    to: '  inLane("jj", "new", wip.commit),',
+    to: '  inLane("jj", "new", unfinished.commit),',
     command: unit,
     expect: "planForkSetup: a WIP's copy on accepted commit under it",
   },
@@ -1172,8 +1172,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a WIP's copy fetches the lane's own copy too",
     file: "packages/jj/lane/plan.ts",
-    from: "    steps: [fetchById([from.commit]), ...planWipCopy(from, commit(from.on))],",
-    to: "    steps: [\n      fetchById([from.commit, commit(from.on)]),\n      ...planWipCopy(from, commit(from.on)),\n    ],",
+    from: "    steps: [\n      fetchById([from.commit]),\n      ...planUnfinishedCopy(from, commit(from.on)),\n    ],",
+    to: "    steps: [\n      fetchById([from.commit, commit(from.on)]),\n      ...planUnfinishedCopy(from, commit(from.on)),\n    ],",
     command: unit,
     expect: "a WIP's copy fetches only the WIP's commit",
   },
@@ -1400,7 +1400,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "proposed changes rebuilt while their lane runs keep the agent's message",
     file: "packages/jj/proposed-steps.ts",
-    from: "          description: proposedMessage(at.wip, {",
+    from: "          description: proposedMessage(at.unfinished, {",
     to: '          description: proposedMessage("proposed changes: scripted", {',
     suite: "lanes",
     scenario: "main",

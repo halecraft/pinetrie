@@ -136,7 +136,7 @@ export function entryOfMessage(description: string): EntryId | null {
 export type BaseTrailer =
   | { readonly kind: "accepted"; readonly commit: CommitId }
   | {
-      readonly kind: "wip"
+      readonly kind: "unfinished"
       readonly bookmark: string
       readonly commit: CommitId
     }
@@ -179,7 +179,7 @@ export function messageBase(
   if (parsed === null) return null
   const { bookmark, commit } = parsed
   return bookmark !== ACCEPTED_BASE && bookmark.startsWith(wipPrefix)
-    ? { kind: "wip", bookmark, commit }
+    ? { kind: "unfinished", bookmark, commit }
     : { kind: "accepted", commit }
 }
 
@@ -194,13 +194,16 @@ const ASKED = `@${THE_AGENT} `
  * progress, named by its thread and the thread's own first message, less the
  * `@agent ` it starts with, which says only who was asked.
  */
-export const wipDescription = (name: ThreadName, first: string): string => {
+export const unfinishedDescription = (
+  name: ThreadName,
+  first: string,
+): string => {
   const said = first.startsWith(ASKED) ? first.slice(ASKED.length) : first
   return `WIP (${name}): ${firstLine(said, 60) || "this thread's work"}`
 }
 
-/** Whether a first line is still the WIP line (`wipDescription`): no agent described it. */
-export const isWipLine = (name: ThreadName, line: string): boolean =>
+/** Whether a first line is still the WIP line (`unfinishedDescription`): no agent described it. */
+export const isUnfinishedLine = (name: ThreadName, line: string): boolean =>
   line.startsWith(`WIP (${name}): `)
 
 /** A message with the host's own trailers: the thread, the lane and the newest entry. */

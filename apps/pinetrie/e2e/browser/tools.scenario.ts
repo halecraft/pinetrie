@@ -696,7 +696,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
               trigger,
               '.start-base[data-base="wip/e2e"]',
             ))
-          const onWip = await startSaid()
+          const onUnfinished = await startSaid()
           if (offered)
             await chooseFromMenu(tp, trigger, '.start-base[data-base=""]')
           const back = await startSaid()
@@ -718,10 +718,10 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
               offered &&
               atAccepted === "starts from accepted work" &&
               chose &&
-              onWip === "starts from your unfinished work: wip/e2e" &&
+              onUnfinished === "starts from your unfinished work: wip/e2e" &&
               back === atAccepted &&
               gone,
-            `${noLine}; ${atAccepted}; ${onWip}; ${back}; gone ${gone}`,
+            `${noLine}; ${atAccepted}; ${onUnfinished}; ${back}; gone ${gone}`,
           )
         }
 

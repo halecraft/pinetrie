@@ -35,11 +35,7 @@ export function ColumnHeadEnd(p: {
           title={button.words.title}
           type="button"
         >
-          {button.intent.kind === "discard" ? (
-            <TrashIcon />
-          ) : (
-            button.words.label
-          )}
+          {button.intent.kind === "trash" ? <TrashIcon /> : button.words.label}
         </button>
       )}
     </>

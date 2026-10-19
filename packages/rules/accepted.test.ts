@@ -53,7 +53,7 @@ describe("accepted work", () => {
     commit: null,
     heads: "trunk()",
     log: null,
-    wips: [],
+    unfinishedWork: [],
     published: { commit: null, behind: 0, ahead: 0 },
     workingCopy: {
       behind: 0,
@@ -358,7 +358,7 @@ describe("accepted work", () => {
   })
   test("movedOnLine names the base as latestSourceName does", () => {
     expect(baseMovedOn({ kind: "accepted" })).toBe("accepted work has moved on")
-    expect(baseMovedOn({ kind: "wip", bookmark: "wip/search" })).toBe(
+    expect(baseMovedOn({ kind: "unfinished", bookmark: "wip/search" })).toBe(
       "wip/search has moved on",
     )
   })
@@ -366,7 +366,7 @@ describe("accepted work", () => {
 
 describe("planBegin: accepted work, or a WIP's copy", () => {
   const L = commitId("l1")
-  const wip = { commit: commitId("w1"), under: commitId("l0") }
+  const unfinished = { commit: commitId("w1"), under: commitId("l0") }
   const begin = (
     base: string | null,
     facts: Parameters<typeof planBegin>[0]["facts"],
@@ -377,24 +377,26 @@ describe("planBegin: accepted work, or a WIP's copy", () => {
       facts,
     })
   test("accepted work's commit by default", () => {
-    expect(begin(null, { acceptedCommit: L, wip: null })).toEqual({
+    expect(begin(null, { acceptedCommit: L, unfinished: null })).toEqual({
       kind: "accepted",
       point: L,
     })
   })
   test("a WIP above accepted work: its copy on accepted commit under it", () => {
-    expect(begin("wip/x", { acceptedCommit: L, wip })).toEqual({
-      kind: "wip",
+    expect(begin("wip/x", { acceptedCommit: L, unfinished })).toEqual({
+      kind: "unfinished",
       bookmark: "wip/x",
-      ...wip,
+      ...unfinished,
     })
   })
   test("no line: not_set_up; a base that is no WIP above accepted work: bad_base", () => {
-    expect(begin(null, { acceptedCommit: null, wip: null })).toBe(
+    expect(begin(null, { acceptedCommit: null, unfinished: null })).toBe(
       ERR.NOT_SET_UP,
     )
-    expect(begin("main", { acceptedCommit: L, wip })).toBe(ERR.BAD_BASE)
-    expect(begin("wip/x", { acceptedCommit: L, wip: null })).toBe(ERR.BAD_BASE)
+    expect(begin("main", { acceptedCommit: L, unfinished })).toBe(ERR.BAD_BASE)
+    expect(begin("wip/x", { acceptedCommit: L, unfinished: null })).toBe(
+      ERR.BAD_BASE,
+    )
   })
 })
 
@@ -513,8 +515,8 @@ describe("planUpdateFrom: always the base the thread follows", () => {
   const L = pointId("l1")
   const W = commitId("w1")
   const COPY = pointId("c1")
-  const wipBase: LaneBase = {
-    base: { kind: "wip", bookmark: "wip/x" },
+  const unfinishedBase: LaneBase = {
+    base: { kind: "unfinished", bookmark: "wip/x" },
     start: COPY,
     source: pointFromCommit(W),
   }
@@ -526,11 +528,11 @@ describe("planUpdateFrom: always the base the thread follows", () => {
   const now = { commit: commitId("w2"), under: commitId("l0") }
   const from = (over: Partial<Parameters<typeof planUpdateFrom>[0]> = {}) =>
     planUpdateFrom({
-      base: wipBase,
+      base: unfinishedBase,
       state: "ok",
       toAccepted: false,
       acceptedPoint: L,
-      wipNow: now,
+      unfinishedNow: now,
       ...over,
     })
   const line = (mark: boolean) => ({
@@ -539,32 +541,45 @@ describe("planUpdateFrom: always the base the thread follows", () => {
     mark,
   })
   test("a WIP thread merges a fresh copy of its WIP; nothing when it has not moved", () => {
-    expect(from()).toMatchObject({ kind: "wip", bookmark: "wip/x", ...now })
-    expect(from({ wipNow: { ...now, commit: W } })).toEqual({ kind: "nothing" })
+    expect(from()).toMatchObject({
+      kind: "unfinished",
+      bookmark: "wip/x",
+      ...now,
+    })
+    expect(from({ unfinishedNow: { ...now, commit: W } })).toEqual({
+      kind: "nothing",
+    })
   })
   test("a WIP's copy is made on the lane's last copy", () => {
-    expect(from()).toEqual({ kind: "wip", bookmark: "wip/x", ...now, on: COPY })
+    expect(from()).toEqual({
+      kind: "unfinished",
+      bookmark: "wip/x",
+      ...now,
+      on: COPY,
+    })
   })
   test("a thread on accepted work, a lane with no base, and a landed WIP merge accepted work, marking no move", () => {
-    expect(from({ base: acceptedBase, wipNow: null })).toEqual(line(false))
-    expect(from({ base: null, wipNow: null })).toEqual(line(false))
-    expect(from({ state: "landed", wipNow: null })).toEqual(line(false))
+    expect(from({ base: acceptedBase, unfinishedNow: null })).toEqual(
+      line(false),
+    )
+    expect(from({ base: null, unfinishedNow: null })).toEqual(line(false))
+    expect(from({ state: "landed", unfinishedNow: null })).toEqual(line(false))
   })
   test("continue on accepted work marks a move from a WIP, and from no other base", () => {
     expect(from({ toAccepted: true })).toEqual(line(true))
     expect(from({ toAccepted: true, state: "landed" })).toEqual(line(true))
     expect(
-      from({ toAccepted: true, base: acceptedBase, wipNow: null }),
+      from({ toAccepted: true, base: acceptedBase, unfinishedNow: null }),
     ).toEqual(line(false))
-    expect(from({ toAccepted: true, base: null, wipNow: null })).toEqual(
+    expect(from({ toAccepted: true, base: null, unfinishedNow: null })).toEqual(
       line(false),
     )
   })
   test("a gone WIP refuses until continued on accepted work; no line refuses", () => {
-    expect(from({ state: "gone", wipNow: null })).toBe(ERR.BASE_GONE)
-    expect(from({ state: "gone", wipNow: null, toAccepted: true })).toEqual(
-      line(true),
-    )
+    expect(from({ state: "gone", unfinishedNow: null })).toBe(ERR.BASE_GONE)
+    expect(
+      from({ state: "gone", unfinishedNow: null, toAccepted: true }),
+    ).toEqual(line(true))
     expect(from({ acceptedPoint: null })).toBe(ERR.NOT_SET_UP)
   })
 })

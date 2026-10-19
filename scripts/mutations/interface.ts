@@ -254,11 +254,11 @@ export const mutations: readonly Mutation[] = [
   {
     name: "Ctrl+Shift+Backspace is the box's own",
     file: "packages/interface/card-keys.ts",
-    from: '    return event.key === "Backspace" ? { kind: "discard", card } : null',
+    from: '    return event.key === "Backspace" ? { kind: "trash", card } : null',
     to: "    return null",
     command: unit,
     expect:
-      "Ctrl+Shift+Backspace discards any card; a card with no place in line takes no Alt+↑",
+      "Ctrl+Shift+Backspace trashes any card; a card with no place in line takes no Alt+↑",
   },
   {
     name: "a held queue rings its thread",
@@ -674,7 +674,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the bases are offered with no WIP to choose",
     file: "packages/interface/send.ts",
-    from: "    accepted.commit === null ||\n    accepted.wips.length === 0\n",
+    from: "    accepted.commit === null ||\n    accepted.unfinishedWork.length === 0\n",
     to: "    accepted.commit === null\n",
     command: unit,
     expect: "baseChoices: accepted work first, then each WIP",
@@ -1850,7 +1850,7 @@ export const mutations: readonly Mutation[] = [
     to: "    acts: [act],",
     command: unit,
     expect:
-      "in a new card's box, a move hands the card to its list, focused; a discard lets it go; any other key keeps it",
+      "in a new card's box, a move hands the card to its list, focused; trashing lets it go; any other key keeps it",
   },
   {
     name: "a new card's box keeps its card after a move",
@@ -1859,7 +1859,7 @@ export const mutations: readonly Mutation[] = [
     to: '    release: act.kind !== "reorder",\n  }',
     command: unit,
     expect:
-      "in a new card's box, a move hands the card to its list, focused; a discard lets it go; any other key keeps it",
+      "in a new card's box, a move hands the card to its list, focused; trashing lets it go; any other key keeps it",
   },
   {
     name: "a new card's box lets its card go on any key",
@@ -1868,7 +1868,7 @@ export const mutations: readonly Mutation[] = [
     to: "  if (act === null) return { acts: [], release: true }",
     command: unit,
     expect:
-      "in a new card's box, a move hands the card to its list, focused; a discard lets it go; any other key keeps it",
+      "in a new card's box, a move hands the card to its list, focused; trashing lets it go; any other key keeps it",
   },
   {
     name: "a pinned card's box is drawn as a note",
@@ -2664,11 +2664,11 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a slot offers to trash someone else's card",
     file: "packages/interface/grid-view.ts",
-    from: "      discards: card !== null && isDiscardable(card, input.me),",
-    to: "      discards: card !== null,",
+    from: "      trashes: card !== null && isTrashable(card, input.me),",
+    to: "      trashes: card !== null,",
     command: unit,
     expect:
-      "a slot's card may be trashed from it only if you may discard it, never an empty slot",
+      "a slot's card may be trashed from it only if you may trash it, never an empty slot",
   },
   {
     name: "a queued card cannot be pinned from its ⋯",
@@ -3791,7 +3791,7 @@ export const mutations: readonly Mutation[] = [
     expect: "a running call's time counts from its stream's start",
   },
   {
-    name: "a discard names no canvas you are on",
+    name: "trashing names no canvas you are on",
     file: "packages/interface/card-intents.ts",
     from: "    return [moveCard(move, how, false, null, canvasOfTab(state))]",
     to: "    return [moveCard(move, how, false, null, null)]",
@@ -4331,8 +4331,8 @@ export const mutations: readonly Mutation[] = [
       "goes back to its thread's notes from its ⋯, and to the trash from its ×",
   },
   {
-    name: "only a text card is discarded",
-    file: "packages/interface/discardable.ts",
+    name: "only a text card is trashed",
+    file: "packages/interface/trashable.ts",
     from: '  cardFitsPlace(card, "trash") &&\n  isMovable(card) &&',
     to: '  card.kind === "text" &&',
     command: unit,
@@ -4446,22 +4446,22 @@ export const mutations: readonly Mutation[] = [
     to: "  if (false) {",
     command: unit,
     expect:
-      "a cut takes only a card you may discard; the past is left to the browser",
+      "a cut takes only a card you may trash; the past is left to the browser",
   },
   {
-    name: "a slot's card is replaced whether or not it may be discarded",
+    name: "a slot's card is replaced whether or not it may be trashed",
     file: "packages/interface/card-intents.ts",
-    from: "  return isDiscardable(old, state.cards.me)",
+    from: "  return isTrashable(old, state.cards.me)",
     to: "  return true",
     command: unit,
     expect:
-      "a slot is replaced only when its card is yours to discard, and never by a thread's copy",
+      "a slot is replaced only when its card is yours to trash, and never by a thread's copy",
   },
   {
-    name: "a drop's replacement discards the slot's card last",
+    name: "a drop's replacement trashes the slot's card last",
     file: "packages/interface/card-intents.ts",
-    from: "            { move: cardMove(replacing, DISCARDED), slot: null },\n            { move: into, slot: landing.to.slot },",
-    to: "            { move: into, slot: landing.to.slot },\n            { move: cardMove(replacing, DISCARDED), slot: null },",
+    from: "            { move: cardMove(replacing, TRASH_PLACE), slot: null },\n            { move: into, slot: landing.to.slot },",
+    to: "            { move: into, slot: landing.to.slot },\n            { move: cardMove(replacing, TRASH_PLACE), slot: null },",
     command: unit,
     expect:
       "a replaced slot's card goes to your trash first: a drop's move set, a paste's `replacing`",

@@ -63,13 +63,13 @@ const relay = (over: Partial<Parameters<typeof planRelay>[0]> = {}) =>
     members: [fox],
     toLane: idle,
     path,
-    heard: null,
+    lastIncoming: null,
     lastInvitation: entryId("1"),
     source: entryId("5"),
     asker: { kind: "agent", thread: here },
     askerName: "sable-meadow",
     text: "what next?",
-    budget: entryId("1"),
+    allowance: entryId("1"),
     spent: false,
     by: ada,
     ...over,
@@ -80,21 +80,21 @@ describe("planRelay", () => {
     const plan = relay()
     expect(plan.kind).toBe("relay")
     if (plan.kind !== "relay") return
-    expect(plan.heard?.details.entries).toEqual([
+    expect(plan.incoming?.details.entries).toEqual([
       entryId("1"),
       entryId("2"),
       entryId("4"),
     ])
-    expect(plan.heard?.lines).toEqual([
+    expect(plan.incoming?.lines).toEqual([
       "Ada: please talk to @amber-fox",
       "agent: I will ask it",
       "agent: and now",
     ])
-    expect(plan.relay).toMatchObject({ source: "5", budget: "1", by: ada })
+    expect(plan.relay).toMatchObject({ source: "5", allowance: "1", by: ada })
   })
   test("after what it heard last; nothing new, nothing heard", () => {
-    const plan = relay({ heard: entryId("4") })
-    expect(plan.kind === "relay" && plan.heard).toBeNull()
+    const plan = relay({ lastIncoming: entryId("4") })
+    expect(plan.kind === "relay" && plan.incoming).toBeNull()
   })
   test("a thread out of reach is refused first, the asked one's or the asker's", () => {
     expect(relay({ toReach: ARCHIVED, members: [] })).toEqual({
@@ -141,7 +141,7 @@ describe("planAnswer", () => {
     asker: { kind: "agent", thread: here },
     askerName: "sable-meadow",
     text: "what next?",
-    budget: entryId("1"),
+    allowance: entryId("1"),
     by: ada,
   }
   const answer = (over: Partial<Parameters<typeof planAnswer>[0]> = {}) =>
@@ -165,7 +165,7 @@ describe("planAnswer", () => {
         source: entryId("5"),
         text: "this",
         wakes: true,
-        budget: entryId("1"),
+        allowance: entryId("1"),
         by: ada,
       },
     })

@@ -314,7 +314,7 @@ function MediaImage(p: {
               <button
                 aria-label="trash this image"
                 className="trash-card"
-                onClick={() => p.act({ kind: "discard", card: image.image })}
+                onClick={() => p.act({ kind: "trash", card: image.image })}
                 title="trash this image · ⌘Z brings it back"
                 type="button"
               >

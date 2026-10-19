@@ -18,7 +18,7 @@ work reaches the repo as proposed changes.
 
 pine·trie names these things by what they are for, one word each, in the
 page, the code and here (ADR-0100, `docs/glossary.md`): **accepted work**,
-**accept**, **proposed changes**, **WIP**, **get the latest**, and **publish**. The jj names
+**accept**, **proposed changes**, **unfinished work**, **get the latest**, and **publish**. The jj names
 are in the page's titles.
 
 ## Bookmarks
@@ -183,7 +183,7 @@ and jj's `trailers` template reads only the last.
 
 | trailer | on | says |
 |---|---|---|
-| `Pinetrie-Base: accepted@<commit>`, `Pinetrie-Base: <wip>@<commit>` | a lane's start (`base: accepted work`, `copy of <wip>`), and each time it gets the latest (`catch up: accepted work`) | the thread's base: accepted work, or a `wip/` bookmark, at that commit. A name with the WIP prefix is that WIP; any other, `pinetrie-onto` in older commits included, is accepted work |
+| `Pinetrie-Base: accepted@<commit>`, `Pinetrie-Base: <wip>@<commit>` | a lane's start (`base: accepted work`, `copy of <wip>`), and each time it gets the latest (`catch up: accepted work`) | the thread's base: accepted work, or a `wip/` bookmark, at that commit. A name with the unfinished work prefix is that unfinished work; any other, `pinetrie-onto` in older commits included, is accepted work |
 | `Pinetrie-Source: <commit>` | every revision of proposed changes | the lane tip the proposed changes hold; on accepted work, that work has been accepted |
 | `Pinetrie-Start: <commit>` | every revision of proposed changes | where the proposed changes start |
 | `Pinetrie-Thread`, `Pinetrie-Lane`, `Pinetrie-Entry` | every revision of proposed changes | the thread, its lane, and the newest entry its work came from |
@@ -219,7 +219,7 @@ believes:
   thread's proposed changes, archive the thread: the host abandons the proposed changes, and
   builds it again if the thread is restored.
 - **A `wip/` bookmark** is the owner's to rebase, amend or move. A thread
-  started from it gets the latest from a fresh copy of it. Once the WIP's
+  started from it gets the latest from a fresh copy of it. Once the unfinished work's
   commits are on accepted work, its threads move to accepted work; if the
   bookmark is deleted before then, their times it got the latest stop until "continue on
   accepted work".

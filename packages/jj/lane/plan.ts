@@ -86,20 +86,20 @@ export const planAcceptedStart = (commit: CommitId): LaneStep[] => [
  * WIP's own commits: the lane's tip, immutable in your repo, would make them
  * immutable. Fetches nothing: the lane must hold both commits.
  */
-export const planWipCopy = (
-  wip: { readonly bookmark: string; readonly commit: CommitId },
+export const planUnfinishedCopy = (
+  unfinished: { readonly bookmark: string; readonly commit: CommitId },
   on: CommitId,
 ): LaneStep[] => [
   inLane("jj", "new", on),
-  inLane("jj", "restore", "--from", wip.commit),
+  inLane("jj", "restore", "--from", unfinished.commit),
   inLane(
     "jj",
     "commit",
     "-m",
-    baseMessage(`copy of ${wip.bookmark}`, {
-      kind: "wip",
-      bookmark: wip.bookmark,
-      commit: wip.commit,
+    baseMessage(`copy of ${unfinished.bookmark}`, {
+      kind: "unfinished",
+      bookmark: unfinished.bookmark,
+      commit: unfinished.commit,
     }),
   ),
 ]
@@ -158,7 +158,10 @@ export function planMerge(lane: JjLane, from: BaseMerge): MergePlan {
     }
   }
   return {
-    steps: [fetchById([from.commit]), ...planWipCopy(from, commit(from.on))],
+    steps: [
+      fetchById([from.commit]),
+      ...planUnfinishedCopy(from, commit(from.on)),
+    ],
     source: "copy",
     message: `update: ${from.bookmark}`,
     mark: false,
@@ -230,10 +233,10 @@ export function planForkSetup(jj: JjLane, start: ForkStart): LaneStep[] {
   const base: LaneStep[] =
     start.kind === "accepted"
       ? planAcceptedStart(commitFromPoint(jj, start.point))
-      : start.kind === "wip"
+      : start.kind === "unfinished"
         ? [
             fetchById([start.commit, start.under]),
-            ...planWipCopy(start, start.under),
+            ...planUnfinishedCopy(start, start.under),
           ]
         : [
             fetchById(recorded),

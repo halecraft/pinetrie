@@ -18,7 +18,7 @@ import { type TextCardId, textCardId } from "@pinetrie/core"
  */
 const StoredCard = Schema.struct.json({
   owner: Schema.string(),
-  /** `drafting`, `note`, `pinned`, `queued`, `margin`, `canvas`, `inventory`, `board` or `discarded`: the place's kind (`CardPlace`). */
+  /** `drafting`, `note`, `pinned`, `queued`, `margin`, `canvas`, `inventory`, `board` or `trashed`: the place's kind (`CardPlace`). */
   kind: Schema.string(),
   /** What a comment is on, printed (`printAddress`). */
   at: Schema.string(),

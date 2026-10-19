@@ -74,7 +74,7 @@ export function createDelivery(deps: {
             kind: "prompt",
             message: delivered.message,
             pinnedSeen: [],
-            heard: null,
+            incoming: null,
           })
         return "delivered"
       }

@@ -30,7 +30,7 @@ import {
   readCommits,
   readOpLog,
   readRepoFile,
-  readWipState,
+  readUnfinishedState,
   revsetName,
   startRepoOwner,
   TIDY_DAYS,
@@ -191,11 +191,11 @@ export function startJjProject(dir: JjProjectDir): ProjectAdapter {
               const lane = requireJjLane(record)
               const commits = base === null ? null : baseInCommits(lane, base)
               const { state, begin } = await owner.read(async ({ jj }) => ({
-                state: await readWipState(jj, names, commits),
+                state: await readUnfinishedState(jj, names, commits),
                 begin: await beginFacts(
                   jj,
                   names,
-                  base?.base.kind === "wip" ? base.base.bookmark : null,
+                  base?.base.kind === "unfinished" ? base.base.bookmark : null,
                 ),
               }))
               return {
@@ -204,7 +204,7 @@ export function startJjProject(dir: JjProjectDir): ProjectAdapter {
                   begin.acceptedCommit === null
                     ? null
                     : pointFromCommit(begin.acceptedCommit),
-                wipNow: begin.wip,
+                unfinishedNow: begin.unfinished,
               }
             },
             // A lane jj cannot read has no ref in your repo to move: left.

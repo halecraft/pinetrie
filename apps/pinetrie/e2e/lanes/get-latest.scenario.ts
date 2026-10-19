@@ -48,7 +48,7 @@ async function getLatestSection(
     "a.txt": "a\n",
     ".gitignore": "node_modules/\n.vite/\n",
     // A publish here accepts your commit.
-    "pinetrie.json": `${JSON.stringify({ publish: { getLatest: true } })}\n`,
+    "pinetrie.json": `${JSON.stringify({ publish: { catchUp: true } })}\n`,
   })
   const script = scriptedModel()
   const wh = await lanes.startHost({

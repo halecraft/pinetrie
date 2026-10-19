@@ -35,11 +35,11 @@ decisions:
 
 | kind | decisions |
 |---|---|
-| `send` | its `MessageAt` (ADR-0117), its root (ADR-0063), its card spent once sent (ADR-0048), the text versions the run waits for (S96: a text can reach the host after its record), its WIP base (ADR-0104), its workflow state (ADR-0122) |
+| `send` | its `MessageAt` (ADR-0117), its root (ADR-0063), its card spent once sent (ADR-0048), the text versions the run waits for (S96: a text can reach the host after its record), its unfinished work base (ADR-0104), its workflow state (ADR-0122) |
 | `picture` | ADR-0098 |
 | `carry-on` | ADR-0082 |
 | `queue-hold`, `reorder` | ADR-0048 (step 7), ADR-0116 |
-| `move` | ADR-0059; its sender's canvas names a discard's history (ADR-0116) |
+| `move` | ADR-0059; its sender's canvas names a trash's history (ADR-0116) |
 | `queue-card` | the one way into a queue, which decides its hold too (ADR-0113) |
 | `move-canvas`, `workflow` | ADR-0122, ADR-0126 |
 | `mark` | ADR-0045, ADR-0116 |
@@ -52,7 +52,7 @@ decisions:
 | `open-thread` | ADR-0126 |
 | `branch-out` | ADR-0157: Open carries rows, Start rows with their briefs, in `text`; rows strictly increasing, threads new and distinct, a brief non-blank on Start and absent on Open, so a decoded press keeps its proposal's order |
 | `copy-thread` | ADR-0117 |
-| `paste` | ADR-0132; it discards the card it replaces first (ADR-0133) |
+| `paste` | ADR-0132; it trashes the card it replaces first (ADR-0133) |
 | `undo-move` | ADR-0066; `""` names your history outside any canvas (ADR-0126) |
 | `set-command` | ADR-0108 |
 | `traces-seen` | ADR-0048 |

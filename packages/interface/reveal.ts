@@ -76,7 +76,7 @@ export function revealEffects(
         effects: [layout({ kind: "board", open: true })],
         actedAt: AT_INVENTORY,
       }
-    // Discarded: drawn nowhere, so nothing comes into view.
+    // Trashed: drawn nowhere, so nothing comes into view.
     case "trash":
       return { effects: [], actedAt: AT_INVENTORY }
     // A comment on an image: the image's column.

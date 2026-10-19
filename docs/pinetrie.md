@@ -159,7 +159,7 @@ it, and the ADR says why. Every decision in force is in `docs/adrs/`, and
 | What the host cannot tell, it does not act on: an unknown answer never builds proposed changes. | ADR-0067 | `packages/jj/TECHNICAL.md` |
 | Every thread's agent works in a lane of its own; nothing works directly in a directory. | ADR-0102, ADR-0130 | `ARCHITECTURE.md`, `packages/lanes/TECHNICAL.md` |
 | What a person sees and does is decided in `@pinetrie/interface`, with no DOM and no React. | ADR-0093 | `packages/interface/TECHNICAL.md` |
-| One word per concept: accepted work, accept, proposed changes, WIP, publish, get the latest. | ADR-0100 | `docs/glossary.md` |
+| One word per concept: accepted work, accept, proposed changes, unfinished work, publish, get the latest. | ADR-0100 | `docs/glossary.md` |
 
 ---
 
@@ -498,7 +498,7 @@ Decided, and waiting for their turn:
   - **S6**: anchoring a reference to a file range, once something points
     into files (references were withdrawn, ADR-0043).
   - **S100**: one parameterized read for every lane's proposed changes,
-    a lane on a WIP's included.
+    a lane on unfinished work's included.
   - **S154**: a touch drag on iOS Safari, deferred until an iPhone is at
     hand.
   - **S197**: building the lane VM's image on Linux, in QEMU.
@@ -543,8 +543,8 @@ Decided, and waiting for their turn:
   agent has its tools, and each
   thread's agent works in its own Linux container (ADR-0034), on a disk
   cloned from the turn it branched at. A root thread's starts from its
-  base, accepted work or a copy of a WIP, which the send button's
-  "starts from" chooses when you have WIP bookmarks (ADR-0104): your
+  base, accepted work or a copy of unfinished work, which the send button's
+  "starts from" chooses when you have unfinished work bookmarks (ADR-0104): your
   working copy reaches a thread only through one of them. Nothing installs its
   dependencies: it does, as you would after a clone. It sees its own directory at `/workspace` and your working copy at
   `/mnt/host-working-copy`, read-only, and nothing else of your machine unless
@@ -606,7 +606,7 @@ Decided, and waiting for their turn:
   you are editing) and every file's diff. Or find its bookmark, which a
   press copies, in jj or jjui. **accept changes** (or **accept changes into wip/…**), in the
   work strip, a row of its column's header, moves **accepted work**
-  (`pinetrie-accepted`) or the WIP forward to it, and your `@` stays where
+  (`pinetrie-accepted`) or the unfinished work forward to it, and your `@` stays where
   it is (ADR-0104). Reword, squash or split the proposed changes like any commit of
   yours before then; the host then leaves it alone. **split into a stack**
   has the agent rewrite it as reviewable revisions, in a run of its own:
@@ -618,13 +618,13 @@ Decided, and waiting for their turn:
   `pinetrie.json` to have proposed changes land on another bookmark instead;
   `jj git push --all` would push it: push by name.
 - **Getting a thread the latest:** the work strip's `⋯` offers **get the latest from**
-  the thread's base (accepted work, or its WIP), **continue from accepted
-  work** once its WIP is gone, and **get the latest from** the thread it branched
+  the thread's base (accepted work, or its unfinished work), **continue from accepted
+  work** once its unfinished work is gone, and **get the latest from** the thread it branched
   from while that thread has new work (ADR-0072). Each queues a card
   holding the command, which the host pops when the lane is free
   (ADR-0108). When it conflicts, the agent resolves it, or asks you
   (ADR-0033). Your own work reaches a thread the same way: publish it into
-  accepted work, or put it on a WIP, then catch the thread up. A thread's
+  accepted work, or put it on unfinished work, then catch the thread up. A thread's
   own history is in your repo out of sight:
   `jj log -r '::remote_bookmarks(remote=glob:"pinetrie-*") ~ ::@'`.
 - **Summaries of asks** (ADR-0106, on by default since ADR-0071, shaped by

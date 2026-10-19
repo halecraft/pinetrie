@@ -162,7 +162,7 @@ export function InventoryPanel(p: {
   )
   const act = (a: InventoryAct) => onIntent({ kind: "inventory", act: a })
   const trash = (card: CardRecord) =>
-    onIntent({ kind: "discard", card: card.id, at: AT_INVENTORY })
+    onIntent({ kind: "trash", card: card.id, at: AT_INVENTORY })
   // Shown, it grows from the toggle: its origin is the toggle's centre in
   // the panel's laid-out box, which no transform moves (`offsetLeft`). Read
   // before the first frame is painted, so that frame grows from there.
@@ -188,12 +188,12 @@ export function InventoryPanel(p: {
   // Opened on the bench, its card takes focus: the caret in its box, or its
   // first control for a kind with none. Folded by Escape, focus goes back to
   // its slot, where the grid's keys are; a card that left the bench (put,
-  // dropped, discarded) moves no focus, or it would take focus from where
+  // dropped, trashed) moves no focus, or it would take focus from where
   // the person went.
   const benchOpen = view.bench.kind === "card" && view.bench.detail === "full"
   const benchCard = view.bench.kind === "card" ? view.bench.card : null
   const trashable =
-    view.grid.cells[view.grid.selected]?.discards === true && benchCard !== null
+    view.grid.cells[view.grid.selected]?.trashes === true && benchCard !== null
   const selected = p.state.selected
   useLayoutEffect(() => {
     const at = bench.current
@@ -295,7 +295,7 @@ export function InventoryPanel(p: {
         <div className="inventory-body">
           <div className="inventory-bag">
             <CardGrid
-              onDiscard={trash}
+              onTrash={trash}
               onMove={(card, slot) =>
                 onIntent({
                   kind: "put",

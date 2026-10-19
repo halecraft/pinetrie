@@ -8,7 +8,6 @@ import {
   canvasIdFor,
   cardIdOfKind,
   cardTextSource,
-  DISCARDED,
   type EntryLike,
   entryId,
   entryMargin,
@@ -37,6 +36,7 @@ import {
   type TextCardId,
   type TextPlace,
   type ThreadId,
+  TRASH_PLACE,
   type TreeIndex,
   textCardId,
   threadIdFor,
@@ -215,7 +215,7 @@ describe("planCarry", () => {
       {
         kind: "get-latest",
         command: "get-latest-from-parent",
-        after: "discard",
+        after: "trash",
       },
     ],
     [
@@ -260,7 +260,7 @@ describe("planCarry", () => {
     expect(
       planMove(
         [fact],
-        { card: fact.id, from: placeKey(fact.place), to: DISCARDED },
+        { card: fact.id, from: placeKey(fact.place), to: TRASH_PLACE },
         ADA,
       ),
     ).toEqual({ kind: "refused", code: "no-place", now: fact })
@@ -975,7 +975,7 @@ describe("note columns", () => {
         ADA,
       ),
     ).toEqual({ kind: "refused", code: "no-place", now: null })
-    // Moves from nowhere discard nothing: no canvas's index, and no canvas here.
+    // Moves from nowhere trash nothing: no canvas's index, and no canvas here.
     const none = { canvases: NO_CANVAS_INDEX, here: null }
     expect(
       movesHistory([{ card: id, from: null, to }], [], none, "move"),
@@ -1509,8 +1509,8 @@ describe("handoffs", () => {
     },
   )
 
-  describe("a discard", () => {
-    const gone = (_: CardRecord["place"]) => DISCARDED
+  describe("trashing", () => {
+    const gone = (_: CardRecord["place"]) => TRASH_PLACE
     test.each([
       ["your message", atEnd],
       [
@@ -1532,7 +1532,7 @@ describe("handoffs", () => {
         },
       ],
     ] as const)(
-      "of %s: in the trash, recording the place it left, its discarder its placer",
+      "of %s: in the trash, recording the place it left, who trashed it its placer",
       (_, place) => {
         const c = card({ place })
         expect(
@@ -1553,13 +1553,13 @@ describe("handoffs", () => {
     )
 
     test("a gone card is moved by no handoff, and a popped one is gone", () => {
-      const discarded = card({
+      const trashed = card({
         place: { kind: "trash", left: { kind: "inventory", holder: ADA } },
       })
       expect(
         planMove(
-          [discarded],
-          { card: C1, from: placeKey(discarded.place), to: atEnd },
+          [trashed],
+          { card: C1, from: placeKey(trashed.place), to: atEnd },
           ADA,
         ),
       ).toEqual({ kind: "refused", code: "gone", now: null })
@@ -1628,9 +1628,9 @@ describe("handoffs", () => {
       ).toBe("write")
     })
 
-    test("a discard from your own inventory records that it left it; from someone else's, refused", () => {
+    test("trashing from your own inventory records that it left it; from someone else's, refused", () => {
       const held = card({ place: mine })
-      const to = DISCARDED
+      const to = TRASH_PLACE
       expect(planMove([held], { card: C1, from: mine, to }, ADA)).toMatchObject(
         {
           kind: "write",
@@ -2333,14 +2333,14 @@ describe("movesHistory: the canvas a move enters the sender's history in", () =>
       null,
     ],
     [
-      "a discard from an inventory: the canvas its sender is on",
-      [{ card: C1, from: inv, to: DISCARDED }],
+      "trashing from an inventory: the canvas its sender is on",
+      [{ card: C1, from: inv, to: TRASH_PLACE }],
       at(inv),
       OTHER_CANVAS,
     ],
     [
-      "a discard at a thread: the canvas it leaves, not its sender's",
-      [{ card: C1, from: draftingIn(T_E), to: DISCARDED }],
+      "trashing at a thread: the canvas it leaves, not its sender's",
+      [{ card: C1, from: draftingIn(T_E), to: TRASH_PLACE }],
       at(draftingIn(T_E)),
       TEST_CANVAS,
     ],
@@ -2369,8 +2369,8 @@ describe("movesHistory: the canvas a move enters the sender's history in", () =>
     ).toEqual(want === null ? null : historyScope(want))
   })
 
-  test("a discard from an inventory on no canvas: its sender's history outside any canvas", () => {
-    const moves = [{ card: C1, from: inv, to: DISCARDED }]
+  test("trashing from an inventory on no canvas: its sender's history outside any canvas", () => {
+    const moves = [{ card: C1, from: inv, to: TRASH_PLACE }]
     expect(
       movesHistory(moves, at(inv), { canvases, here: null }, "move"),
     ).toEqual(PERSON_HISTORY)
@@ -2565,7 +2565,7 @@ describe("references", () => {
       pasted,
       {
         card: pasted.card,
-        from: pasted.kind === "uncut" ? DISCARDED : null,
+        from: pasted.kind === "uncut" ? TRASH_PLACE : null,
         to,
       },
       replacing,
@@ -2673,7 +2673,7 @@ describe("references", () => {
       code: "gone",
     })
     expect(
-      planMove([trashed(ADA)], { card: REF, from: DISCARDED, to: inv }, ADA),
+      planMove([trashed(ADA)], { card: REF, from: TRASH_PLACE, to: inv }, ADA),
     ).toMatchObject({ kind: "refused", code: "gone" })
   })
 
@@ -2710,7 +2710,7 @@ describe("out of a trash: a restore back where the card was, and a new canvas", 
   const restore = (cards: readonly CardRecord[], sender = BEA) =>
     planMoveRequest(
       cards,
-      [{ card: C1, from: DISCARDED, to: BACK }],
+      [{ card: C1, from: TRASH_PLACE, to: BACK }],
       sender,
       () => false,
       noteMint(() => NOTES),
@@ -2775,7 +2775,7 @@ describe("out of a trash: a restore back where the card was, and a new canvas", 
     expect(
       planMove(
         [inBeas],
-        { card: C1, from: DISCARDED, to: { kind: "inventory", holder: ADA } },
+        { card: C1, from: TRASH_PLACE, to: { kind: "inventory", holder: ADA } },
         ADA,
       ),
     ).toMatchObject({ kind: "refused", code: "gone" })

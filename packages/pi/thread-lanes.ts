@@ -20,7 +20,7 @@ import type {
   CanvasPinnedMessage,
   CarryOnMessage,
   FactMessage,
-  HeardMessage,
+  IncomingEntriesMessage,
   PersonMessage,
   PinnedMessage,
   PromptMessage,
@@ -122,7 +122,7 @@ type PiResult =
  * context entries.
  */
 export type BeforePrompt =
-  | HeardMessage
+  | IncomingEntriesMessage
   | BehindMessage
   | PinnedMessage
   | CanvasPinnedMessage

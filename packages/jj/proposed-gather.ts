@@ -23,7 +23,7 @@ import type {
   ThreadName,
 } from "@pinetrie/core"
 import { lines, type Runner } from "@pinetrie/lanes"
-import { readWipState } from "./accepted.ts"
+import { readUnfinishedState } from "./accepted.ts"
 import { type GetLatestTarget, readGetLatest } from "./get-latest.ts"
 import { laneBase } from "./lane/base.ts"
 import { proposedBookmark, revsetName } from "./lane/names.ts"
@@ -152,12 +152,12 @@ async function placeOf(
   if (tip === null) return null
   const base = await laneBase(jj, tip, repoConfig)
   if (base === null) return null
-  const state = await readWipState(jj, repoConfig, base)
+  const state = await readUnfinishedState(jj, repoConfig, base)
   // A WIP still above accepted work is the target, and its update a copy of
   // it; a landed WIP's update merges accepted work (`planUpdateFrom`).
   const target =
-    base.base.kind === "wip" && state === "ok"
-      ? targetOf("wip", await commitOf(jj, base.base.bookmark))
+    base.base.kind === "unfinished" && state === "ok"
+      ? targetOf("unfinished", await commitOf(jj, base.base.bookmark))
       : state === "gone"
         ? null
         : targetOf("accepted", await commitOf(jj, repoConfig.acceptedBookmark))
@@ -271,7 +271,7 @@ export async function gatherRefresh(
     known: input.known,
   })
   if (gathered === "none") return { kind: "none" }
-  if (gathered !== "wip") {
+  if (gathered !== "unfinished") {
     const { tip, base, target, start, proposed, hostLeft, work, getLatest } =
       gathered
     return {
@@ -339,8 +339,8 @@ export async function gatherAcceptance(
   const [bottom] = proposed.revisions
   if (bottom === undefined) return null
   const { base } = place.base
-  const wipAhead =
-    base.kind === "wip"
+  const unfinishedAhead =
+    base.kind === "unfinished"
       ? (
           await readCommits(
             jj,
@@ -350,7 +350,7 @@ export async function gatherAcceptance(
       : 0
   const below = new Set<string>()
   for (const bookmark of [
-    ...(base.kind === "wip" ? [base.bookmark] : []),
+    ...(base.kind === "unfinished" ? [base.bookmark] : []),
     repoConfig.acceptedBookmark,
   ])
     if (
@@ -362,7 +362,7 @@ export async function gatherAcceptance(
       ).length > 0
     )
       below.add(bookmark)
-  return { wipAhead, below }
+  return { unfinishedAhead, below }
 }
 
 /**

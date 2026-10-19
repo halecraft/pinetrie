@@ -41,7 +41,7 @@ export type EditorEvent =
   /** Your card here exists: found on opening, or made by another of your tabs. */
   | { readonly kind: "found"; readonly card: TextCardId }
   /**
-   * Your card here is gone: someone sent it, or it was discarded. An undo
+   * Your card here is gone: someone sent it, or it was trashed. An undo
    * past its creation only empties it, so it is not gone.
    */
   | { readonly kind: "gone" }

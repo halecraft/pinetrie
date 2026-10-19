@@ -272,7 +272,7 @@ export function proposedStart(input: {
  * The accepted thread commits `proposedStart` reads, by their `Pinetrie-Source`
  * or `Pinetrie-Thread` trailers: accepted proposed changes' sources, or none
  * for an proposed changes accepted before proposed changes carried them
- * (`untracedLanes`). Those in `::<accepted>`, and in `::<wip>` for a lane on a
+ * (`untracedLanes`). Those in `::<accepted>`, and in `::<unfinished>` for a lane on a
  * WIP, but not in the history of the base's `source`. The lane merged that
  * commit, so it holds what was accepted below it. Proposed changes keep the
  * diff from the merge of its start to the tip, so a source the target holds as
@@ -287,7 +287,9 @@ export function acceptedThreadCommitsRevset(input: {
   const { base } = input.base
   const heads = [
     `present(${revsetName(input.repoConfig.acceptedBookmark)})`,
-    ...(base.kind === "wip" ? [`present(${revsetName(base.bookmark)})`] : []),
+    ...(base.kind === "unfinished"
+      ? [`present(${revsetName(base.bookmark)})`]
+      : []),
   ].join(" | ")
   return `(::(${heads}) ~ ::present(${input.base.source})) & ${ACCEPTED_THREAD_COMMITS}`
 }

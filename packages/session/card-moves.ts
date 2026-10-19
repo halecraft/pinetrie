@@ -103,7 +103,7 @@ export type Pending =
 /**
  * Something of yours to say where you acted, kept until your next move
  * there: a move or an undo the host refused, an undone swap whose slots
- * changed since, or a discard the undo key can bring back.
+ * changed since, or a trash the undo key can bring back.
  */
 export type CardNotice = {
   /** The card it was about; null when no one card is named. */
@@ -123,14 +123,14 @@ export type CardNotice = {
   /** An undone swap whose slots no longer hold what it wrote. */
   | { readonly code: "slots-changed" }
   /**
-   * A drop or a paste on a filled slot whose card may not be discarded, so
+   * A drop or a paste on a filled slot whose card may not be trashed, so
    * nothing replaces it: `card` names that card.
    */
   | { readonly code: "not-replaced" }
   /** A thread's copy aimed at a filled slot: it lands only in an empty one. */
   | { readonly code: "slot-taken" }
-  /** Your discard, accepted. */
-  | { readonly code: "discarded" }
+  /** Your trash, accepted. */
+  | { readonly code: "trashed" }
 )
 
 export interface MovesState {
@@ -179,11 +179,11 @@ const answered = (p: Pending, rev: number): Pending => ({
 const drawn = (p: Pending, rev: number): boolean =>
   p.answer.state === "sent" || p.answer.rev > rev
 
-/** The discards a command sent as `id` made, each a notice where it was made. */
-const discardsIn = (pending: readonly Pending[], id: string): CardNotice[] =>
+/** The trashes a command sent as `id` made, each a notice where it was made. */
+const trashesIn = (pending: readonly Pending[], id: string): CardNotice[] =>
   pending.flatMap(p =>
     p.id === id && p.kind === "move" && p.move.to.kind === "trash"
-      ? [{ card: p.move.card, actedAt: p.actedAt, code: "discarded" as const }]
+      ? [{ card: p.move.card, actedAt: p.actedAt, code: "trashed" as const }]
       : [],
   )
 
@@ -213,7 +213,7 @@ export function movesStep(state: MovesState, event: MovesEvent): MovesState {
               ? state.notices
               : [...state.notices, answer.refusal],
         }
-      const notices = [...state.notices, ...discardsIn(state.pending, event.id)]
+      const notices = [...state.notices, ...trashesIn(state.pending, event.id)]
       // The copy already holds it: `places` arrived first.
       if (answer.rev <= state.rev) return { ...state, pending: rest, notices }
       return {
@@ -337,7 +337,7 @@ export const LAST_ORDER = "\uffff"
  * waits for the host to give it an order, so it is drawn last among its
  * kind, a queued one queued by you, a canvas card one column wide; a gone
  * one is gone by you, in no history until the host names it one
- * (`movesHistory`); a discard records where it was, and a restore goes back
+ * (`movesHistory`); a trash records where it was, and a restore goes back
  * there. A thread's nearest notes are the note column the host
  * would choose from `cards` (`nearestNoteColumn`, `@pinetrie/rules`); undefined, drawn where it was,
  * when the host would make one, or the thread has no card. A spot on a
@@ -361,7 +361,7 @@ export function drawnPlace(
       return { ...key, order: LAST_ORDER }
     case "canvas":
       return { ...key, order: LAST_ORDER, width: 1 }
-    // A discard records where the card was; a card not yet drawn is
+    // Trashing records where the card was; a card not yet drawn is
     // drawn nowhere until the host writes it.
     case "trash":
       return now === undefined || now.place.kind === "trash"

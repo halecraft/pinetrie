@@ -20,7 +20,6 @@ import {
   type CardCommand,
   type CardId,
   cardMove,
-  DISCARDED,
   type EntryId,
   ERR,
   entryThread,
@@ -47,6 +46,7 @@ import {
   type Sha256,
   type TextCardId,
   type ThreadId,
+  TRASH_PLACE,
   type TreeIndex,
   threadEnd,
   threadOfSend,
@@ -374,8 +374,8 @@ export function createCardCommands(deps: CardCommandDeps) {
     here: CanvasId | null,
     canvases: CanvasIndex,
   ): Promise<Settled> {
-    // gather. `Discards` names a discard's history (`movesHistory`).
-    const discards = { canvases, here }
+    // gather. `Trashes` names trashing's history (`movesHistory`).
+    const trashes = { canvases, here }
     const entryThreads = await marginEntryThreads(moves)
     const cards = readPlaces(places)
     // plan: each move to a thread's notes to its nearest note column, made
@@ -414,7 +414,7 @@ export function createCardCommands(deps: CardCommandDeps) {
     const scope =
       emptied.length > 0
         ? PERSON_HISTORY
-        : movesHistory(moves, cards, discards, "move")
+        : movesHistory(moves, cards, trashes, "move")
     // gather the history's stack: nothing writes the places while it loads,
     // on the keeper
     const gesture =
@@ -438,7 +438,7 @@ export function createCardCommands(deps: CardCommandDeps) {
     canvases: CanvasIndex,
   ): Promise<Settled> {
     // gather: the history's stack, loaded before the places are read
-    // A queueing discards nothing: its history is the queue's canvas.
+    // A queueing trashes nothing: its history is the queue's canvas.
     const scope = movesHistory(
       [queued],
       readPlaces(places),
@@ -694,8 +694,8 @@ export function createCardCommands(deps: CardCommandDeps) {
       // gather: the card's text, loaded whole, and the history's stack
       await deps.cards.hydrate([card])
       const text = deps.cards.textNow(card)
-      const discards = { canvases, here: request.here }
-      const scope = movesHistory([move], readPlaces(places), discards, "move")
+      const trashes = { canvases, here: request.here }
+      const scope = movesHistory([move], readPlaces(places), trashes, "move")
       const gesture =
         scope === null
           ? undefined
@@ -880,7 +880,7 @@ export function createCardCommands(deps: CardCommandDeps) {
     },
 
     /**
-     * A paste: the card it replaces discarded, then a card made from a copy
+     * A paste: the card it replaces trashed, then a card made from a copy
      * where its target resolves to (a thread's nearest notes, made where its
      * canvas has none; a margin checked against its entry's thread), or a cut
      * card out of a trash by its cutter (`planPaste`). One step of the sender's
@@ -893,19 +893,19 @@ export function createCardCommands(deps: CardCommandDeps) {
       canvases: CanvasIndex,
     ): Promise<Settled> {
       // gather: the history's stack, loaded before the places are read
-      const discards = { canvases, here: pasted.here }
+      const trashes = { canvases, here: pasted.here }
       const main = {
         card: pasted.paste.card,
-        from: pasted.paste.kind === "uncut" ? DISCARDED : null,
+        from: pasted.paste.kind === "uncut" ? TRASH_PLACE : null,
         to: pasted.to,
       }
       const moves = [
         ...(pasted.replacing === null
           ? []
-          : [{ ...pasted.replacing, to: DISCARDED }]),
+          : [{ ...pasted.replacing, to: TRASH_PLACE }]),
         main,
       ]
-      const scope = movesHistory(moves, readPlaces(places), discards, "paste")
+      const scope = movesHistory(moves, readPlaces(places), trashes, "paste")
       const gesture =
         scope === null
           ? undefined

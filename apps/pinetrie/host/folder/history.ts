@@ -232,8 +232,10 @@ export function folderHistory(
     readyToMerge: async () => folderCopyReady(),
 
     async merge(_ready, from, edits) {
-      if (from.kind === "wip")
-        throw new Error("a folder project has no WIP to get the latest from")
+      if (from.kind === "unfinished")
+        throw new Error(
+          "a folder project has no unfinished work to get the latest from",
+        )
       if (edits !== null) await turn(edits)
       const g = graph()
       const ours = newestOf(g)

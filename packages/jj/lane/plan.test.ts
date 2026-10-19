@@ -73,7 +73,7 @@ test("planForkSetup: a WIP's copy on accepted commit under it, never the WIP's o
   const W = commitId("w1")
   const steps = argvs(
     planForkSetup(JJ, {
-      kind: "wip",
+      kind: "unfinished",
       bookmark: "wip/x",
       commit: W,
       under: C1,
@@ -83,7 +83,7 @@ test("planForkSetup: a WIP's copy on accepted commit under it, never the WIP's o
   expect(steps.slice(1, 4)).toEqual([
     "lane: jj new c1",
     "lane: jj restore --from w1",
-    `lane: jj commit -m ${baseMessage("copy of wip/x", { kind: "wip", bookmark: "wip/x", commit: W })}`,
+    `lane: jj commit -m ${baseMessage("copy of wip/x", { kind: "unfinished", bookmark: "wip/x", commit: W })}`,
   ])
   expect(steps.some(s => s.includes("jj new w1"))).toBe(false)
   // No fork installs: a WIP's dependencies are a layer of its own.
@@ -153,7 +153,7 @@ describe("planMerge: an update's steps", () => {
   })
   test("a WIP's copy fetches only the WIP's commit, and is made on the lane's last copy", () => {
     const plan = planMerge(JJ, {
-      kind: "wip",
+      kind: "unfinished",
       bookmark: "wip/x",
       commit: W,
       under: C2,
@@ -163,7 +163,7 @@ describe("planMerge: an update's steps", () => {
       `lane: ${fetchById([W]).argv.join(" ")}`,
       "lane: jj new copy1",
       "lane: jj restore --from w1",
-      `lane: jj commit -m ${baseMessage("copy of wip/x", { kind: "wip", bookmark: "wip/x", commit: W })}`,
+      `lane: jj commit -m ${baseMessage("copy of wip/x", { kind: "unfinished", bookmark: "wip/x", commit: W })}`,
     ])
     expect(plan).toMatchObject({
       source: "copy",

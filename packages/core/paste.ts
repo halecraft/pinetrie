@@ -28,7 +28,7 @@ export type Paste =
 
 /**
  * The card a paste takes the place of, where its paster saw it: a slot's card,
- * or a reference edited as text. It is discarded first.
+ * or a reference edited as text. It is trashed first.
  */
 export interface Replacing {
   readonly card: CardId

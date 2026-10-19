@@ -20,7 +20,7 @@ import type { Agent } from "@pinetrie/pi"
 import { readLatestPrompt, readThreadName } from "@pinetrie/reads"
 import {
   foreignRefusal,
-  type HeardMessage,
+  type IncomingEntriesMessage,
   MESSAGE_TYPE,
   type PinnedMessage,
   type PromptMessage,
@@ -56,7 +56,7 @@ export type RunStart =
        * What an asked agent heard of the thread that asked, written first,
        * before its relayed ask; absent for every other run.
        */
-      readonly heard?: HeardMessage | null
+      readonly incoming?: IncomingEntriesMessage | null
     }
   | { readonly kind: "resume" }
 
@@ -297,7 +297,7 @@ export function createRuns(deps: {
           // The cards entry stays the prompt's parent; what an asked agent
           // heard goes first.
           const before = [
-            start.heard ?? null,
+            start.incoming ?? null,
             behind,
             ...canvas,
             pinned,

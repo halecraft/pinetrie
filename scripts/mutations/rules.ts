@@ -778,13 +778,13 @@ export const mutations: readonly Mutation[] = [
     expect: "at startup, a canvas the session does not hold is retired too",
   },
   {
-    name: "a discard on no canvas enters no history",
+    name: "trashing on no canvas enters no history",
     file: "packages/rules/move-history.ts",
-    from: "      return historyScope(discardHistory(from, discards))\n",
-    to: "      return discardHistory(from, discards) === null ? null : historyScope(discardHistory(from, discards))\n",
+    from: "      return historyScope(trashHistory(from, trashes))\n",
+    to: "      return trashHistory(from, trashes) === null ? null : historyScope(trashHistory(from, trashes))\n",
     command: unit,
     expect:
-      "a discard from an inventory on no canvas: its sender's history outside any canvas",
+      "trashing from an inventory on no canvas: its sender's history outside any canvas",
   },
   {
     name: "a trashed thread runs",
@@ -793,15 +793,15 @@ export const mutations: readonly Mutation[] = [
     to: "  return FREE",
     command: unit,
     expect:
-      "a trashed thread is held by nobody, but its discard stops its run and a command in it is refused",
+      "a trashed thread is held by nobody, but trashing it stops its run and a command in it is refused",
   },
   {
-    name: "a thread discarded keeps running",
+    name: "a thread trashed keeps running",
     file: "packages/rules/held.ts",
     from: '    (c.place.kind === "inventory" || c.place.kind === "trash") &&\n',
     to: '    c.place.kind === "inventory" &&\n',
     command: unit,
-    expect: "a trashed thread is held by nobody, but its discard stops its run",
+    expect: "a trashed thread is held by nobody, but trashing it stops its run",
   },
   {
     name: "a thread's origin this build does not know is read as a root",
@@ -857,7 +857,7 @@ export const mutations: readonly Mutation[] = [
   // ── agents talking ──
   {
     name: "a budget goes over at every spend past its limit",
-    file: "packages/rules/budget.ts",
+    file: "packages/rules/allowance.ts",
     from: "      !record.over && now >= record.limit\n",
     to: "      now >= record.limit\n",
     command: unit,
@@ -865,7 +865,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a request spends the context it re-reads",
-    file: "packages/rules/budget.ts",
+    file: "packages/rules/allowance.ts",
     from: "    now.output + Math.max(0, now.context - previous.context - previous.output)\n",
     to: "    now.output + now.context\n",
     command: unit,
@@ -873,7 +873,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a run's first request spends its whole context",
-    file: "packages/rules/budget.ts",
+    file: "packages/rules/allowance.ts",
     from: "  if (previous === null) return now.output\n",
     to: "  if (previous === null) return now.output + now.context\n",
     command: unit,
@@ -881,7 +881,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a compaction spends a negative count",
-    file: "packages/rules/budget.ts",
+    file: "packages/rules/allowance.ts",
     from: "    now.output + Math.max(0, now.context - previous.context - previous.output)\n",
     to: "    now.output + (now.context - previous.context - previous.output)\n",
     command: unit,
@@ -983,13 +983,13 @@ export const mutations: readonly Mutation[] = [
     expect: "a blank top card with a card behind: the second pops",
   },
   {
-    name: "a discarded card is kept for good",
+    name: "a trashed card is kept for good",
     file: "packages/rules/card-history.ts",
     from: "          trashDeadline(c.id, input.histories, input.now, input.keepMs) <=\n            input.now,",
     to: "          false,",
     command: unit,
     expect:
-      "planTrashSweep: a card discarded a week ago or more, or with no history to tell; never one drawn somewhere",
+      "planTrashSweep: a card trashed a week ago or more, or with no history to tell; never one drawn somewhere",
   },
   {
     name: "the sweep keeps a trashed card a week, whatever it is told",
@@ -1463,8 +1463,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a forced describe is refused once described",
     file: "packages/rules/proposed.ts",
-    from: "  (force || isWipLine(name, proposed.firstLine))",
-    to: "  isWipLine(name, proposed.firstLine)",
+    from: "  (force || isUnfinishedLine(name, proposed.firstLine))",
+    to: "  isUnfinishedLine(name, proposed.firstLine)",
     command: unit,
     expect: "describeWanted",
   },
@@ -1488,8 +1488,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "any bookmark is a base",
     file: "packages/rules/base.ts",
-    from: "  if (!base.startsWith(input.wipPrefix) || facts.wip === null)",
-    to: "  if (facts.wip === null)",
+    from: "  if (!base.startsWith(input.wipPrefix) || facts.unfinished === null)",
+    to: "  if (facts.unfinished === null)",
     command: unit,
     expect:
       "no line: not_set_up; a base that is no WIP above accepted work: bad_base",
@@ -2453,7 +2453,7 @@ export const mutations: readonly Mutation[] = [
     to: "  if (false)",
     command: unit,
     expect:
-      "a discard from your own inventory records that it left it; from someone else's, refused",
+      "trashing from your own inventory records that it left it; from someone else's, refused",
   },
   {
     name: "an inventory holds a card past its last slot",
@@ -2522,15 +2522,15 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a WIP's copy is made on the WIP's own commit",
     file: "packages/rules/base.ts",
-    from: '    : { kind: "wip", bookmark: followed.bookmark, ...wipNow, on: base.start }',
-    to: '    : { kind: "wip", bookmark: followed.bookmark, ...wipNow, on: base.source }',
+    from: "        ...unfinishedNow,\n        on: base.start,\n",
+    to: "        ...unfinishedNow,\n        on: base.source,\n",
     command: unit,
     expect: "a WIP's copy is made on the lane's last copy",
   },
   {
     name: "a move to accepted work is never marked",
     file: "packages/rules/base.ts",
-    from: '      mark: input.toAccepted && base?.base.kind === "wip",',
+    from: '      mark: input.toAccepted && base?.base.kind === "unfinished",',
     to: "      mark: false,",
     command: unit,
     expect: "continue on accepted work marks a move from a WIP",
@@ -2847,7 +2847,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "proposed changes read as described from the start",
     file: "packages/rules/proposed.ts",
-    from: "    described: !isWipLine(input.name, proposed.firstLine),",
+    from: "    described: !isUnfinishedLine(input.name, proposed.firstLine),",
     to: "    described: true,",
     command: unit,
     expect: "each revision's commit as it is now, and what the page shows",
@@ -3371,20 +3371,20 @@ export const mutations: readonly Mutation[] = [
     expect: "every decision that writes names its thread once",
   },
   {
-    name: "a discard's history is its sender's canvas, not the one it leaves",
+    name: "trashing's history is its sender's canvas, not the one it leaves",
     file: "packages/rules/move-history.ts",
-    from: "): CanvasId | null => canvasOfPlace(discards.canvases, from) ?? discards.here",
-    to: "): CanvasId | null => discards.here",
+    from: "): CanvasId | null => canvasOfPlace(trashes.canvases, from) ?? trashes.here",
+    to: "): CanvasId | null => trashes.here",
     command: unit,
-    expect: "a discard at a thread: the canvas it leaves, not its sender's",
+    expect: "trashing at a thread: the canvas it leaves, not its sender's",
   },
   {
-    name: "a discard from an inventory is in no history",
+    name: "trashing from an inventory is in no history",
     file: "packages/rules/move-history.ts",
-    from: "): CanvasId | null => canvasOfPlace(discards.canvases, from) ?? discards.here",
-    to: "): CanvasId | null => canvasOfPlace(discards.canvases, from)",
+    from: "): CanvasId | null => canvasOfPlace(trashes.canvases, from) ?? trashes.here",
+    to: "): CanvasId | null => canvasOfPlace(trashes.canvases, from)",
     command: unit,
-    expect: "a discard from an inventory: the canvas its sender is on",
+    expect: "trashing from an inventory: the canvas its sender is on",
   },
   {
     name: "a branch's start forgets its board state",
@@ -4025,9 +4025,9 @@ export const mutations: readonly Mutation[] = [
       "a put's link is found again in the text, with its label; one in code is text",
   },
   {
-    name: "a replacement makes its card before the discard",
+    name: "a replacement makes its card before trashing",
     file: "packages/rules/moves.ts",
-    from: "  const before = discard === null ? cards : afterSteps(cards, [discard])",
+    from: "  const before = trash === null ? cards : afterSteps(cards, [trash])",
     to: "  const before = cards",
     command: unit,
     expect:
@@ -4175,7 +4175,7 @@ export const mutations: readonly Mutation[] = [
     to: "        replaced.from === null)",
     command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
     expect:
-      "decode: a paste names its card's move, after at most a discard of the card it replaces",
+      "decode: a paste names its card's move, after at most trashing the card it replaces",
   },
   // ── a trash that records where the card was ──
   {
@@ -4214,13 +4214,13 @@ export const mutations: readonly Mutation[] = [
       "refused: its column trashed or gone, someone else's message, or yours where you wrote anew",
   },
   {
-    name: "a discard forgets where the card was",
+    name: "trashing forgets where the card was",
     file: "packages/rules/moves.ts",
     from: '        : { kind: "trash", left: now.place }',
     to: '        : { kind: "trash", left: { kind: "inventory", holder: sender } }',
     command: unit,
     expect:
-      "of your message: in the trash, recording the place it left, its discarder its placer",
+      "of your message: in the trash, recording the place it left, who trashed it its placer",
   },
   {
     name: "the sweep keeps what a deleted card owns",
@@ -4243,8 +4243,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a WIP's commit is compared with the lane's start, not its source",
     file: "packages/rules/base.ts",
-    from: "  return pointFromCommit(wipNow.commit) === base.source\n",
-    to: "  return pointFromCommit(wipNow.commit) === base.start\n",
+    from: "  return pointFromCommit(unfinishedNow.commit) === base.source\n",
+    to: "  return pointFromCommit(unfinishedNow.commit) === base.start\n",
     command: unit,
     expect:
       "a WIP thread merges a fresh copy of its WIP; nothing when it has not moved",

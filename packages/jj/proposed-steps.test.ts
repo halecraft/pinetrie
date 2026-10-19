@@ -61,7 +61,7 @@ const PLACE: Placed = {
   start: [START],
 }
 const TRAILERS = { lane: LANE, name: NAME, entry: "e1" }
-const AT = { ...TRAILERS, wip: "WIP (amber-fox): fix it", nonce: "n1" }
+const AT = { ...TRAILERS, unfinished: "WIP (amber-fox): fix it", nonce: "n1" }
 const LEDGER = { source: NEW_TIP, start: [START] }
 
 describe("buildEffects and proposedChangesEffects: each refresh decision's steps, and what follows", () => {
@@ -77,7 +77,10 @@ describe("buildEffects and proposedChangesEffects: each refresh decision's steps
           start: [START],
           tip: NEW_TIP,
           target: TARGET,
-          description: proposedMessage(AT.wip, { ...TRAILERS, ledger: LEDGER }),
+          description: proposedMessage(AT.unfinished, {
+            ...TRAILERS,
+            ledger: LEDGER,
+          }),
         }),
         ...markSteps(BOOKMARK),
       ],
@@ -155,7 +158,7 @@ describe("buildEffects and proposedChangesEffects: each refresh decision's steps
           sources: [
             {
               commit: NEW_TIP,
-              description: proposedMessage(AT.wip, {
+              description: proposedMessage(AT.unfinished, {
                 ...TRAILERS,
                 ledger: LEDGER,
               }),
@@ -175,7 +178,7 @@ describe("buildEffects and proposedChangesEffects: each refresh decision's steps
           name: NAME,
           place: PLACE,
           changeIds: [],
-          sources: [{ commit: NEW_TIP, description: AT.wip }],
+          sources: [{ commit: NEW_TIP, description: AT.unfinished }],
         },
         AT,
       ),

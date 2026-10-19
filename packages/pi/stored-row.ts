@@ -13,7 +13,7 @@ import {
 
 /**
  * `Omit` over a union collapses it to the keys common to every member, which
- * for pi's `Entry` discards `message`, `summary`, `fromId` and the rest. The
+ * for pi's `Entry` trashes `message`, `summary`, `fromId` and the rest. The
  * conditional distributes over the union instead, so each variant keeps its
  * own fields. Distribution needs a naked type parameter, hence the helper.
  */

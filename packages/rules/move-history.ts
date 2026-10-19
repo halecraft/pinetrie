@@ -30,10 +30,10 @@ import type { MoveStep } from "./place-steps.ts"
 // ── moves' history ─────────────────────────────────────────────
 
 /**
- * What names a discard's history, the host's to decide: the canvases, and the
+ * What names a trash's history, the host's to decide: the canvases, and the
  * canvas the sender is on, for a card that leaves no canvas.
  */
-export interface Discards {
+export interface Trashes {
   readonly canvases: CanvasIndex
   readonly here: CanvasId | null
 }
@@ -42,10 +42,10 @@ export interface Discards {
  * The history a card leaving `from` for gone is in: the canvas it leaves,
  * else, from an inventory, the canvas its sender is on.
  */
-export const discardHistory = (
+export const trashHistory = (
   from: CardPlace,
-  discards: Discards,
-): CanvasId | null => canvasOfPlace(discards.canvases, from) ?? discards.here
+  trashes: Trashes,
+): CanvasId | null => canvasOfPlace(trashes.canvases, from) ?? trashes.here
 
 /**
  * The history of the sender's moves `moves` enter, or null for none.
@@ -57,10 +57,10 @@ export const discardHistory = (
  * card goes to, when it goes to one, else the canvas it leaves, read from its
  * record, since the host accepts a move only from where the card is. So a
  * take into the inventory is recorded where it left, a put where it went, a
- * drag across canvases where it went, and a discard in the canvas it leaves
- * (`discardHistory`), which the page does not name, or, leaving
+ * drag across canvases where it went, and a trash in the canvas it leaves
+ * (`trashHistory`), which the page does not name, or, leaving
  * no canvas, in its sender's history outside any canvas. Of several, the first
- * that names a history names the step's: a paste's discard of the card it
+ * that names a history names the step's: a paste's trash of the card it
  * replaces, when there is one. A place at a thread, or a thread's nearest
  * notes, is in its thread's canvas, a spot on a canvas in its canvas's
  * (`canvasOfTarget`).
@@ -68,11 +68,11 @@ export const discardHistory = (
 export function movesHistory(
   moves: readonly Move[],
   cards: readonly CardRecord[],
-  discards: Discards,
+  trashes: Trashes,
   cause: "move" | "paste",
 ): MoveHistoryScope | null {
   const targetCanvas = (to: CardPlace | MoveTarget) =>
-    canvasOfTarget(discards.canvases, to)
+    canvasOfTarget(trashes.canvases, to)
   for (const move of moves) {
     if (move.from === null) {
       if (cause === "paste") return historyScope(targetCanvas(move.to))
@@ -82,7 +82,7 @@ export function movesHistory(
     const from = cards.find(c => c.id === move.card)?.place
     if (from === undefined) continue
     if (move.to.kind === "trash")
-      return historyScope(discardHistory(from, discards))
+      return historyScope(trashHistory(from, trashes))
     const canvas = targetCanvas(move.to) ?? targetCanvas(from)
     if (canvas !== null) return historyScope(canvas)
   }

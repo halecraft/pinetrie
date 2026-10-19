@@ -128,7 +128,7 @@ describe("what a copy takes (`clipOfFocus`)", () => {
     })
   })
 
-  test("a cut takes only a card you may discard; the past is left to the browser", () => {
+  test("a cut takes only a card you may trash; the past is left to the browser", () => {
     expect(clipOfFocus(focus({ card: TEXT }), facts(), true)).toMatchObject({
       clip: { kind: "card", cut: true },
     })

@@ -73,7 +73,7 @@ function QueuedReference(p: {
       foot={null}
       onAct={p.onAct}
       onClearCommand={null}
-      onDiscard={() => p.onAct({ kind: "discard", card: card.id })}
+      onTrash={() => p.onAct({ kind: "trash", card: card.id })}
       reader={p.reader}
       view={view}
     >

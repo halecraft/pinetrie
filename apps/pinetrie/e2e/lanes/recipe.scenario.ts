@@ -57,7 +57,7 @@ async function recipeSection(
     "build.sh":
       'mkdir -p .store && touch .store/CACHEDIR.TAG && for p in $(cat pkgs.txt); do echo "$p" > ".store/$p"; mkdir -p "out-$p" && echo built > "out-$p/marker"; done\n',
     ".gitignore": "out-*/\n.env\n.store/\n",
-    "pinetrie.json": `${JSON.stringify({ publish: { getLatest: true } })}\n`,
+    "pinetrie.json": `${JSON.stringify({ publish: { catchUp: true } })}\n`,
   })
   const script = scriptedModel()
   const wh = await lanes.startHost({

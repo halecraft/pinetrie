@@ -39,7 +39,7 @@ function behind(to = "l2") {
       commit: commitId(to),
       heads: { current: null, proposed: "x" },
       log: { current: null, proposed: "x" },
-      wips: [],
+      unfinishedWork: [],
       workingCopy: {
         behind: 0,
         ahead: 0,

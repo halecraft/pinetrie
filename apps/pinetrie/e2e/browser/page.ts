@@ -418,7 +418,7 @@ export async function stepAway(p: Page): Promise<void> {
   })
 }
 /**
- * Back on `canvas` from `stepAway`: the new tab's column closed, discarding
+ * Back on `canvas` from `stepAway`: the new tab's column closed, trashing
  * its thread and its canvas, then `canvas` shown.
  */
 export async function stepBack(p: Page, canvas: string): Promise<void> {

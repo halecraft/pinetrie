@@ -31,7 +31,7 @@ export interface JjAcceptedRecord {
    */
   readonly log: { readonly current: string | null; readonly proposed: string }
   /** The WIP bookmarks a thread may start from, newest first. */
-  readonly wips: readonly {
+  readonly unfinishedWork: readonly {
     readonly bookmark: string
     readonly commit: CommitId
     /** Line commits it lacks: how far it is behind accepted work. */

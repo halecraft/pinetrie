@@ -321,17 +321,17 @@ would refuse each whole undo of a move (S82).
   opens; delete them by hand. The startup sweep removes the texts no record
   names.
 - **A card in a trash is stored as the place it left** (ADR-0134): that
-  place's own row, its kind prefixed `discarded-` (`discarded-note`,
-  `discarded-canvas`, `discarded-drafting`, …), so no field was added and
+  place's own row, its kind prefixed `trashed-` (`trashed-note`,
+  `trashed-canvas`, `trashed-drafting`, …), so no field was added and
   the schema's hash held. Who trashed it is the row's `placer`. A row of
-  the old shape, `discarded` with `holder` and `canvas`, does not decode:
+  the old shape, `trashed` with `holder` and `canvas`, does not decode:
   a record migration, since deleted, removed them. A card spun into a
   thread is in a trash too; its thread's record names it (`origin`
   `spun`).
 - **The row has no `root`** (ADR-0126): only a fresh card's row named one,
   and a branch or a new canvas's thread is a thread card now. A migration,
   since deleted, dropped it with its data moved: each fresh
-  column became its thread opened, a spun card a discarded one, an ask's
+  column became its thread opened, a spun card a trashed one, an ask's
   relay moved from `fact` to `relay`.
 - **`holder`** is whose inventory holds a card (`CardPlace` `inventory`);
   rows written before it existed do not decode, and no stored session held

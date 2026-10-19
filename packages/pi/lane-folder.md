@@ -169,7 +169,7 @@ changes pine·trie can keep this note true. You can skip them.
 
 - Several people may write in one thread. Each message you read begins with
   the name of the person who wrote it. <!-- packages/rules/message.ts attributed -->
-- When someone catches this thread up, pine·trie merges accepted work's newest
+- When someone gets this thread the latest, pine·trie merges accepted work's newest
   state into `/workspace`, path by path, writing only what changed. A note
   tells you what changed. What they want done with it comes after, as
   their message.

@@ -7,7 +7,7 @@ import {
   type EntryId,
   type ForeignLane,
   firstLine,
-  type HeardDetails,
+  type IncomingDetails,
   type Reach,
   type RelayDetails,
   type ThreadId,
@@ -28,11 +28,11 @@ import { reachWords } from "./reach.ts"
 import { RelaySchema } from "./relay-codec.ts"
 import { transcriptLines } from "./request.ts"
 
-const HEARD_TYPE = "pinetrie.heard"
-const RELAY_TYPE = "pinetrie.relay"
-const ANSWER_TYPE = "pinetrie.answer"
+export const INCOMING_TYPE = "pinetrie.incoming"
+export const RELAY_TYPE = "pinetrie.relay"
+export const ANSWER_TYPE = "pinetrie.answer"
 
-const HeardSchema = Type.Object({
+const IncomingSchema = Type.Object({
   from: ThreadIdSchema,
   fromName: Type.String(),
   entries: List(EntryIdSchema),
@@ -45,20 +45,23 @@ const AnswerSchema = Type.Object({
   source: EntryIdSchema,
   text: Type.String(),
   wakes: Type.Boolean(),
-  budget: EntryIdSchema,
+  allowance: EntryIdSchema,
   by: WriterIdSchema,
 })
 
-/** What an asked agent heard: not shown as a message, drawn folded. */
-export const HEARD = historyMessage(HEARD_TYPE, HeardSchema, false)
+/** What came into an asked agent of the thread that asked: not shown as a message, drawn folded. */
+export const INCOMING = historyMessage(INCOMING_TYPE, IncomingSchema, false)
 export const RELAY = historyMessage(RELAY_TYPE, RelaySchema)
 export const ANSWER = historyMessage(ANSWER_TYPE, AnswerSchema)
 
-export type HeardMessage = HistoryMessage<typeof HEARD_TYPE, HeardDetails>
+export type IncomingEntriesMessage = HistoryMessage<
+  typeof INCOMING_TYPE,
+  IncomingDetails
+>
 export type RelayMessage = HistoryMessage<typeof RELAY_TYPE, RelayDetails>
 export type AnswerMessage = HistoryMessage<typeof ANSWER_TYPE, AnswerDetails>
 
-export const decodeHeard = HEARD.decode
+export const decodeIncoming = INCOMING.decode
 export const decodeRelay = RELAY.decode
 export const decodeAnswer = ANSWER.decode
 
@@ -71,7 +74,7 @@ export const AGENTS_RULE =
   "Other threads' agents can be members of this thread. Ask one with the ask tool, by its thread's name: it does not wait, and the answer arrives later as a message. An @name you write asks nobody. When another thread's agent or person asks you, your last message of that run is your answer there."
 
 /** What the asked agent reads of what it heard: one line per message. */
-const heardContent = (fromName: string, lines: readonly string[]): string =>
+const incomingContent = (fromName: string, lines: readonly string[]): string =>
   [
     `What was said in the thread ${fromName} since you last heard from it:`,
     ...lines.map(l => `- ${l}`),
@@ -85,11 +88,12 @@ const relayContent = (d: RelayDetails): string =>
 export const answerContent = (d: AnswerDetails): string =>
   `${d.fromName} answers, from its own thread: ${d.text}`
 
-export const encodeHeard = (
-  d: HeardDetails,
+export const encodeIncoming = (
+  d: IncomingDetails,
   lines: readonly string[],
   timestamp: number,
-): HeardMessage => HEARD.encode(d, heardContent(d.fromName, lines), timestamp)
+): IncomingEntriesMessage =>
+  INCOMING.encode(d, incomingContent(d.fromName, lines), timestamp)
 
 export const encodeRelayMessage = (
   d: RelayDetails,
@@ -105,9 +109,9 @@ export const encodeAnswer = (
 export const askLine = (d: RelayDetails): string =>
   `⇢ ${d.askerName} in ${d.fromName} asks: ${firstLine(d.text, 120)}`
 
-/** The one line a column shows for what an agent heard. */
-export const heardLine = (d: HeardDetails): string =>
-  `heard in ${d.fromName}: ${d.entries.length} ${d.entries.length === 1 ? "message" : "messages"}`
+/** The one line a column shows for what came into an asked agent. */
+export const incomingLine = (d: IncomingDetails): string =>
+  `incoming from ${d.fromName}: ${d.entries.length} ${d.entries.length === 1 ? "message" : "messages"}`
 
 /** Why an ask was refused, as a value; `relayRefusalText` words it. */
 export type RelayRefusal =
@@ -151,7 +155,7 @@ export function relayRefusalText(
     case "foreign":
       return `${why.name} cannot be asked: ${foreignLaneWords(why.lane)}.`
     case "spent":
-      return "The budget for agents talking is spent: a person must add more first."
+      return "The allowance for agents talking is used up: a person must add more first."
   }
 }
 
@@ -160,8 +164,8 @@ export type RelayPlan =
   | {
       readonly kind: "relay"
       readonly to: ThreadId
-      readonly heard: {
-        readonly details: HeardDetails
+      readonly incoming: {
+        readonly details: IncomingDetails
         readonly lines: readonly string[]
       } | null
       readonly relay: RelayDetails
@@ -205,7 +209,7 @@ export function unreachableRefusal(input: {
  *   ask, and a run may start on it: a lane of another kind has none; a
  *   spent budget asks nobody.
  * - What `to` has not heard is the asking thread's messages after the
- *   newest it heard (`lastHeardEntry`), or, having heard none, from the message
+ *   newest it heard (`lastIncomingEntry`), or, having heard none, from the message
  *   that invited it on; never the ask itself, which the relay carries, nor
  *   `to`'s own answers.
  */
@@ -223,15 +227,15 @@ export function planRelay(input: {
   readonly toForeign: ForeignLane | null
   /** The asking thread's path, root first (`projectTranscript`). */
   readonly path: readonly TranscriptMessage[]
-  /** The newest entry of `from` that `to` has heard (`lastHeardEntry`). */
-  readonly heard: EntryId | null
+  /** The newest entry of `from` that came into `to` (`lastIncomingEntry`). */
+  readonly lastIncoming: EntryId | null
   /** The message that invited `to`, on the path; null when none is. */
   readonly lastInvitation: EntryId | null
   readonly source: EntryId
   readonly asker: Asker
   readonly askerName: string
   readonly text: string
-  readonly budget: EntryId
+  readonly allowance: EntryId
   readonly spent: boolean
   readonly by: WriterId
 }): RelayPlan {
@@ -252,26 +256,26 @@ export function planRelay(input: {
   if (input.spent) return refuse({ kind: "spent" })
   const at = (id: EntryId) => input.path.findIndex(m => m.id === id)
   const start =
-    input.heard !== null
-      ? at(input.heard) + 1
+    input.lastIncoming !== null
+      ? at(input.lastIncoming) + 1
       : input.lastInvitation !== null
         ? Math.max(0, at(input.lastInvitation))
         : 0
-  const unheard = input.path
+  const notYetIncoming = input.path
     .slice(start)
     .filter(m => m.id !== input.source && !isAnswerFrom(m, input.to))
-  const lines = transcriptLines(unheard)
+  const lines = transcriptLines(notYetIncoming)
   return {
     kind: "relay",
     to: input.to,
-    heard:
+    incoming:
       lines.length === 0
         ? null
         : {
             details: {
               from: input.from,
               fromName: input.fromName,
-              entries: unheard.map(m => m.id),
+              entries: notYetIncoming.map(m => m.id),
             },
             lines,
           },
@@ -282,7 +286,7 @@ export function planRelay(input: {
       asker: input.asker,
       askerName: input.askerName,
       text: input.text,
-      budget: input.budget,
+      allowance: input.allowance,
       by: input.by,
     },
   }
@@ -345,7 +349,7 @@ export function planAnswer(input: {
       source: relay.source,
       text: end.text,
       wakes: relay.asker.kind === "agent" && !input.spent,
-      budget: relay.budget,
+      allowance: relay.allowance,
       by: relay.by,
     },
   }

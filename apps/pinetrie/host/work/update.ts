@@ -83,7 +83,7 @@ function updateRefusal(code: UpdateRefusal): string {
     case ERR.NOT_SET_UP:
       return "set up accepted work first"
     case ERR.BASE_GONE:
-      return "this thread's WIP bookmark is gone: continue it on accepted work"
+      return "this thread's unfinished work is gone: continue it on accepted work"
     case ERR.NO_PARENT:
       return "this thread did not branch from another thread's copy"
     case ERR.PARENT_RUNNING:
@@ -499,7 +499,7 @@ export function createUpdates(deps: {
       state: now.state,
       toAccepted,
       acceptedPoint: now.acceptedPoint,
-      wipNow: now.wipNow,
+      unfinishedNow: now.unfinishedNow,
     })
   }
 

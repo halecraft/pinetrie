@@ -1,5 +1,5 @@
 // interface/card-intents — what take into the inventory, put, a paste, keep,
-// discard and undo do, as effects.
+// trash and undo do, as effects.
 //
 // Each move says where it was made, so a refusal is said there. Which
 // history a move enters is the host's to decide (`movesHistory`); an undo names
@@ -14,7 +14,6 @@ import {
   type CardRecord,
   cardFitsPlace,
   cardMove,
-  DISCARDED,
   type EntryId,
   entryMargin,
   type ImageCard,
@@ -45,6 +44,7 @@ import {
   type TextCardId,
   type ThreadCard,
   type ThreadId,
+  TRASH_PLACE,
   type TypedMove,
   type WriterId,
 } from "@pinetrie/core"
@@ -71,7 +71,6 @@ import {
 import { addressWords } from "./address-words.ts"
 import { type Clip, type ClipFacts, cardClip } from "./clip.ts"
 import type { Minted } from "./columns.ts"
-import { type Discardable, isDiscardable } from "./discardable.ts"
 import {
   type CardFacts,
   canvasOfTab,
@@ -93,10 +92,11 @@ import {
 } from "./put-target.ts"
 import { revealEffects } from "./reveal.ts"
 import { newCanvasEffects, planSpinOff } from "./spin-off.ts"
+import { isTrashable, type Trashable } from "./trashable.ts"
 
 /**
  * A move to send; `fly`: whether its card animates to where it lands;
- * `here`, for a discard, the canvas you are on.
+ * `here`, for a trash, the canvas you are on.
  */
 export const moveCard = (
   move: TypedMove,
@@ -281,7 +281,7 @@ export const clipFacts = (state: IntentState): ClipFacts => ({
  *   A cut card still in your trash is moved out of it instead.
  * - **The past** only ever copies: a drop of it with `move` copies.
  * - **A slot**: aimed and empty, the card lands there; aimed and
- *   filled, it replaces the card there, which must be one you may discard;
+ *   filled, it replaces the card there, which must be one you may trash;
  *   unaimed, the selected slot if empty, else the first empty one, else
  *   refused `full`.
  */
@@ -327,7 +327,7 @@ export function putLanding(
     case "reference":
     case "uncut":
       return intoSlot(lands, target.slot, state)
-    // A thread's copy has no card to discard first: it needs an empty slot.
+    // A thread's copy has no card to trash first: it needs an empty slot.
     case "thread": {
       const at = slotFor(target.slot, null, state)
       if (at.kind === "refused") return at
@@ -381,7 +381,7 @@ function intoSlot(
   if (at.taken === null) return into
   const old = findCard(state.cards, at.taken)
   if (old === undefined) return into
-  return isDiscardable(old, state.cards.me)
+  return isTrashable(old, state.cards.me)
     ? { kind: "replace", old: old.id, landing: into }
     : { kind: "refused", code: "not-replaced", card: old.id }
 }
@@ -489,12 +489,12 @@ export function planPut(
   return effectsOfLanding(putLanding(source, target, how, state), state, minted)
 }
 
-/** The effects of `landing`; `replacing`, the slot's card a replacement discards first. */
+/** The effects of `landing`; `replacing`, the slot's card a replacement trashes first. */
 function effectsOfLanding(
   landing: Landing,
   state: IntentState,
   minted: Minted,
-  replacing: Discardable | null = null,
+  replacing: Trashable | null = null,
 ): readonly Effect[] {
   const show: readonly Effect[] =
     "to" in landing && landing.to.kind === "inventory"
@@ -517,7 +517,7 @@ function effectsOfLanding(
       return [{ kind: "insertText", text: landing.text }]
     case "replace": {
       const old = findCard(state.cards, landing.old)
-      return old === undefined || !isDiscardable(old, state.cards.me)
+      return old === undefined || !isTrashable(old, state.cards.me)
         ? []
         : effectsOfLanding(landing.landing, state, minted, old)
     }
@@ -537,7 +537,7 @@ function effectsOfLanding(
         {
           kind: "moveCards",
           moves: [
-            { move: cardMove(replacing, DISCARDED), slot: null },
+            { move: cardMove(replacing, TRASH_PLACE), slot: null },
             { move: into, slot: landing.to.slot },
           ],
           actedAt: AT_INVENTORY,
@@ -880,7 +880,7 @@ function spotOnCanvas(
  * `now` as your message in column `key`'s composer. A message
  * there with text takes `now`'s place, a slot of your inventory included,
  * in one move the host accepts or refuses whole, so one undo; an empty one
- * is discarded.
+ * is trashed.
  */
 function putInMessage(
   now: TextCard,
@@ -900,7 +900,7 @@ function putInMessage(
   if (message === undefined)
     return [moveCard(into.move, { actedAt, slot: null }, true)]
   if (!facts.filled.has(message.id)) {
-    const away = cardMove(message, DISCARDED)
+    const away = cardMove(message, TRASH_PLACE)
     return [
       {
         kind: "moveCards",
@@ -989,7 +989,7 @@ export const planComment = (
  * that replaces it, in its very place, keeping its
  * address as its origin; one step of history, the reference to your trash
  * first, so a full inventory takes it too. Nothing for a card that is no
- * reference, or one you may not discard.
+ * reference, or one you may not trash.
  */
 export function planEditAsText(
   edit: {
@@ -1001,7 +1001,7 @@ export function planEditAsText(
 ): readonly Effect[] {
   const facts = state.cards
   const now = findCard(facts, edit.reference)
-  if (now?.kind !== "reference" || !isDiscardable(now, facts.me)) return []
+  if (now?.kind !== "reference" || !isTrashable(now, facts.me)) return []
   const from = placeKey(now.place)
   return [
     {
@@ -1138,18 +1138,18 @@ export function planPinToCanvas(
 }
 
 /**
- * Discard `card`: a move to gone, in the history of the root it
+ * Trash `card`: a move to gone, in the history of the root it
  * is in, else of the root you are on, so the undo key there brings it back.
  * Made where `how` says; nothing for a card not drawn or not yours to move.
  */
-export function planDiscard(
+export function planTrash(
   card: CardId,
   how: MoveHow,
   state: IntentState,
 ): readonly Effect[] {
   const now = findCard(state.cards, card)
-  if (now === undefined || !isDiscardable(now, state.cards.me)) return []
-  const move = cardMove(now, DISCARDED)
+  if (now === undefined || !isTrashable(now, state.cards.me)) return []
+  const move = cardMove(now, TRASH_PLACE)
   const emptied = emptiedNewTab(now, state)
   if (emptied === null)
     return [moveCard(move, how, false, null, canvasOfTab(state))]
@@ -1167,7 +1167,7 @@ export function planDiscard(
 }
 
 /**
- * The canvas a discard of `card` empties, when it is a new canvas's: a thread
+ * The canvas a trash of `card` empties, when it is a new canvas's: a thread
  * not yet started, the only card on its canvas. Null for any other card.
  */
 function emptiedNewTab(card: CardRecord, state: IntentState): CanvasId | null {

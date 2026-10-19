@@ -23,7 +23,11 @@ import {
 } from "./ids.ts"
 import { type ImageRef, isImageMime, isSha256, type Share } from "./images.ts"
 import type { SendAt } from "./intents.ts"
-import type { AnswerDetails, HeardDetails, RelayDetails } from "./mentions.ts"
+import type {
+  AnswerDetails,
+  IncomingDetails,
+  RelayDetails,
+} from "./mentions.ts"
 import type { Proposal } from "./threads.ts"
 import { callIntent, callSubject } from "./tools.ts"
 
@@ -173,8 +177,8 @@ export interface AgentMessageLike {
   readonly stopped?: {
     readonly prompt: EntryId
     readonly by: WriterId
-    /** A spent budget's message, when the budget stopped it. */
-    readonly budget?: EntryId
+    /** A spent allowance's message, when the allowance stopped it. */
+    readonly allowance?: EntryId
   }
   /** Role `fact` only, for a member's: who left the thread's members. */
   readonly member?: { readonly gone: ThreadId }
@@ -187,8 +191,8 @@ export interface AgentMessageLike {
   readonly relay?: RelayDetails
   /** Role `answer` only: an asked agent's answer. */
   readonly answer?: AnswerDetails
-  /** Role `heard` only: what an asked agent heard of the thread that asked. */
-  readonly heard?: HeardDetails
+  /** Role `incoming` only: what an asked agent was told of the thread that asked. */
+  readonly incoming?: IncomingDetails
 }
 
 export interface EntryLike {
@@ -235,7 +239,7 @@ export interface TranscriptMessage {
   readonly toolCalls?: readonly ToolCall[]
   /** Roles `update` and `land` only: the states merged into the lane. */
   readonly merged?: readonly PointId[]
-  /** Roles `relay`, `answer` and `heard` only: the thread it came from. */
+  /** Roles `relay`, `answer` and `incoming` only: the thread it came from. */
   readonly from?: ThreadId
   /** Role `fact` only: what its line leaves out, as its title. */
   readonly detail?: string
@@ -405,9 +409,9 @@ function renderableMessage(entry: EntryLike): TranscriptMessage | null {
   const merged = entry.message?.merged
   if ((role === "update" || role === "land") && merged !== undefined)
     return { ...message, merged }
-  const heard = entry.message?.heard
-  if (role === "heard" && heard !== undefined)
-    return { ...message, from: heard.from }
+  const incoming = entry.message?.incoming
+  if (role === "incoming" && incoming !== undefined)
+    return { ...message, from: incoming.from }
   const detail = entry.message?.detail
   if (role === "fact" && detail !== undefined) return { ...message, detail }
   const calls = role === "assistant" ? messageToolCalls(entry.message) : []
@@ -420,7 +424,7 @@ function renderableMessage(entry: EntryLike): TranscriptMessage | null {
  * `stack`), a Resume's carry-on (`carry-on`), the host's facts (`fact`: what a
  * command on the proposed changes did, a stop, a member gone, a budget spent, a
  * canvas change), that the base has new work (`behind`), and what an asked
- * agent heard of the thread that asked (`heard`).
+ * agent was told of the thread that asked (`incoming`).
  */
 export const LINE_ROLES: ReadonlySet<string> = new Set([
   "land",
@@ -429,7 +433,7 @@ export const LINE_ROLES: ReadonlySet<string> = new Set([
   "carry-on",
   "fact",
   "behind",
-  "heard",
+  "incoming",
 ])
 
 /** The message a reader sees at `id`, or null (`renderableMessage`). */

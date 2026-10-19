@@ -740,7 +740,7 @@ export function Column(p: ColumnProps) {
           threadReach(t, { cards: p.cards, archived: p.archived }),
         names: p.work.names,
         nameOf: w => nameFor(p.nameOf, w),
-        budgets: p.work.budgets,
+        allowances: p.work.allowances,
       }),
     [
       thread,
@@ -750,7 +750,7 @@ export function Column(p: ColumnProps) {
       p.archived,
       p.work.names,
       p.nameOf,
-      p.work.budgets,
+      p.work.allowances,
     ],
   )
   // Where each row from another canvas's thread is.

@@ -45,7 +45,7 @@ test("a column's ⋯ ends in Move to trash for a reader who may write, and offer
           key: "trash",
           label: "Move to trash",
           title: expect.any(String),
-          intent: { kind: "discard", card, at: { kind: "column", key: card } },
+          intent: { kind: "trash", card, at: { kind: "column", key: card } },
         },
       ],
     })

@@ -57,7 +57,6 @@ import {
   type PutHow,
   type PutSource,
   planComment,
-  planDiscard,
   planEditAsText,
   planNewCard,
   planOpenTrace,
@@ -67,6 +66,7 @@ import {
   planQueueReference,
   planRestore,
   planToNote,
+  planTrash,
   planUndoMove,
   planUnpin,
   queueMove,
@@ -122,8 +122,8 @@ import { linkOpen, type ThreadLink } from "./thread-link.ts"
  */
 export type ColumnAct =
   | MessageAct
-  /** Discard a card here; the undo key brings it back. */
-  | { readonly kind: "discard"; readonly card: CardId }
+  /** Trash a card here; the undo key brings it back. */
+  | { readonly kind: "trash"; readonly card: CardId }
   /** Take a card in this column into your inventory. */
   | { readonly kind: "putAway"; readonly card: CardId }
   /** Read the column at `density`. */
@@ -405,10 +405,10 @@ export type Intent =
       readonly how: PutHow
     }
   /**
-   * Discard a card, said where `at` is: the undo key brings it back.
+   * Trash a card, said where `at` is: the undo key brings it back.
    * A cut is a copy, then this.
    */
-  | { readonly kind: "discard"; readonly card: CardId; readonly at: ActedAt }
+  | { readonly kind: "trash"; readonly card: CardId; readonly at: ActedAt }
   /** Bring a trashed card back to where it was, for anyone who may. */
   | { readonly kind: "restore"; readonly card: CardId; readonly at: ActedAt }
   /** The page copied `clip` to the clipboard: the clipboard cell shows it. */
@@ -678,8 +678,8 @@ function planOf(
       return planPut(intent.source, intent.target, intent.how, state, minted)
     case "editAsText":
       return planEditAsText(intent, state)
-    case "discard":
-      return planDiscard(intent.card, { actedAt: intent.at, slot: null }, state)
+    case "trash":
+      return planTrash(intent.card, { actedAt: intent.at, slot: null }, state)
     case "restore":
       return planRestore(intent.card, { actedAt: intent.at, slot: null }, state)
     case "copied":
@@ -768,8 +768,8 @@ function planColumn(
         { pending: act.pending },
         state,
       )
-    case "discard":
-      return planDiscard(act.card, IN_COLUMN(key), state)
+    case "trash":
+      return planTrash(act.card, IN_COLUMN(key), state)
     case "putAway":
       return planPutAway(act.card, state, minted)
     case "density":

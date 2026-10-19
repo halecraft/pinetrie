@@ -44,7 +44,7 @@ export async function acceptedFacts(
       commit: null,
       heads: heads.ok ? heads.stdout.trim() : null,
       log,
-      wips: [],
+      unfinishedWork: [],
       published: { commit: null, behind: 0, ahead: 0 },
       workingCopy: {
         behind: 0,
@@ -62,7 +62,7 @@ export async function acceptedFacts(
     "-T",
     'local_bookmarks.map(|b| b.name()).join(",") ++ "\\t" ++ commit_id ++ "\\n"',
   ])
-  const wips: {
+  const unfinishedWork: {
     bookmark: string
     commit: CommitId
     behind: number
@@ -72,7 +72,7 @@ export async function acceptedFacts(
     const [names = "", id = ""] = row.split("\t")
     for (const bookmark of names.split(","))
       if (bookmark.startsWith(repoConfig.wipPrefix))
-        wips.push({
+        unfinishedWork.push({
           bookmark,
           commit: commitId(id),
           behind: await count(jj, `::${acceptedBookmark} ~ ::${id}`),
@@ -84,7 +84,7 @@ export async function acceptedFacts(
     commit,
     heads: heads.ok ? heads.stdout.trim() : null,
     log,
-    wips,
+    unfinishedWork,
     published: await publishedFacts(
       jj,
       acceptedBookmark,
@@ -171,16 +171,19 @@ export async function beginFacts(
   base: string | null,
 ): Promise<{
   readonly acceptedCommit: CommitId | null
-  readonly wip: { readonly commit: CommitId; readonly under: CommitId } | null
+  readonly unfinished: {
+    readonly commit: CommitId
+    readonly under: CommitId
+  } | null
 }> {
   const acceptedBookmark = revsetName(repoConfig.acceptedBookmark)
   const [acceptedCommit] = await readCommits(jj, `present(${acceptedBookmark})`)
   if (acceptedCommit === undefined || base === null)
-    return { acceptedCommit: acceptedCommit ?? null, wip: null }
-  const wip = revsetName(base)
+    return { acceptedCommit: acceptedCommit ?? null, unfinished: null }
+  const unfinished = revsetName(base)
   const [commit] = await readCommits(
     jj,
-    `present(${wip}) ~ ::${acceptedBookmark}`,
+    `present(${unfinished}) ~ ::${acceptedBookmark}`,
   )
   const [under] =
     commit === undefined
@@ -191,16 +194,17 @@ export async function beginFacts(
         )
   return {
     acceptedCommit: acceptedCommit,
-    wip: commit === undefined || under === undefined ? null : { commit, under },
+    unfinished:
+      commit === undefined || under === undefined ? null : { commit, under },
   }
 }
 
 /**
- * What `wipState` decides from: where a lane's WIP bookmark is, against the
+ * What `unfinishedState` decides from: where a lane's WIP bookmark is, against the
  * line, and whether the commit its base names is there. Null for a base on
  * accepted work, or none.
  */
-async function wipFacts(
+async function unfinishedFacts(
   jj: Runner,
   repoConfig: RepoConfig,
   base: CommitBase | null,
@@ -209,7 +213,7 @@ async function wipFacts(
   readonly bookmarkInAccepted: boolean
   readonly sourceInAccepted: boolean
 } | null> {
-  if (base?.base.kind !== "wip") return null
+  if (base?.base.kind !== "unfinished") return null
   const { source } = base
   const { bookmark } = base.base
   const acceptedBookmark = `::present(${revsetName(repoConfig.acceptedBookmark)})`
@@ -236,7 +240,7 @@ async function wipFacts(
  * bookmark is gone and the WIP did not land; else ok. No facts, a base on
  * accepted work, is ok.
  */
-export function wipState(
+export function unfinishedState(
   facts: {
     /** Where the WIP bookmark points now; null when it is gone. */
     readonly bookmark: CommitId | null
@@ -251,10 +255,10 @@ export function wipState(
   return facts.sourceInAccepted ? "landed" : "gone"
 }
 
-/** What became of a lane's WIP base (`wipState` of `wipFacts`); "ok" for a base on accepted work. */
-export const readWipState = async (
+/** What became of a lane's WIP base (`unfinishedState` of `unfinishedFacts`); "ok" for a base on accepted work. */
+export const readUnfinishedState = async (
   jj: Runner,
   repoConfig: RepoConfig,
   base: CommitBase | null,
 ): Promise<JjBaseRecord["state"]> =>
-  wipState(await wipFacts(jj, repoConfig, base))
+  unfinishedState(await unfinishedFacts(jj, repoConfig, base))

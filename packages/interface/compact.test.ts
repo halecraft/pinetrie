@@ -125,7 +125,7 @@ const relay: RelayDetails = {
   asker: { kind: "agent", thread: threadIdFor("here") },
   askerName: "sable-meadow",
   text: "what next?",
-  budget: entryId("1"),
+  allowance: entryId("1"),
   by: ADA,
 }
 /** One card of every drawn kind: a kind left out does not compile. */

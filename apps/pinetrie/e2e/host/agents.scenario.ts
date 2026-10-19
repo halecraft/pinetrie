@@ -17,7 +17,7 @@ import {
   readThreads,
   readWorkflow,
 } from "@pinetrie/reads"
-import { BUDGET } from "@pinetrie/rules"
+import { ALLOWANCE } from "@pinetrie/rules"
 import type { Checks } from "../checks.ts"
 import {
   at,
@@ -44,7 +44,7 @@ const replies = (last: string): string =>
       ? "A-NOTED"
       : "ok"
 
-/** The suite's places, with a budget for agents talking. */
+/** The suite's places, with an allowance for agents talking. */
 const placesWith = (budget: number) =>
   suitePlaces({ user: { ...SUITE_CONFIG, agents: { budget } } })
 
@@ -105,8 +105,8 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         `invited ${invited}`,
       )
       check(
-        "an agent's ask runs the other thread's agent, on what it heard and then the ask",
-        inB.some(l => l.startsWith("heard: heard in")) &&
+        "an agent's ask runs the other thread's agent, on what came in and then the ask",
+        inB.some(l => l.startsWith("incoming: incoming from")) &&
           inB.some(l => l.startsWith("relay:")) &&
           inB.some(l => l.includes("B-ANSWER")),
         inB.slice(-4).join(" | "),
@@ -118,7 +118,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           inA.slice(answered + 1).some(l => l.includes("A-NOTED")),
         inA.slice(-4).join(" | "),
       )
-      const budget = [...readRecords(host.session, BUDGET).values()][0]
+      const budget = [...readRecords(host.session, ALLOWANCE).values()][0]
       check(
         "what the other thread's agent spent is counted in the budget",
         budget !== undefined && budget.spent > 0 && !budget.over,
@@ -189,7 +189,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         "a spent budget: the answer wakes nobody, and the asking thread is told it was spent",
         answered >= 0 &&
           !inA.slice(answered + 1).some(l => l.includes("A-NOTED")) &&
-          inA.some(l => l.includes("agents spent the budget")),
+          inA.some(l => l.includes("agents used up their")),
         inA.slice(-4).join(" | "),
       )
     } finally {

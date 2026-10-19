@@ -281,7 +281,7 @@ export function startFolderProject(dir: {
               return {
                 state: "ok",
                 acceptedPoint: await read(),
-                wipNow: null,
+                unfinishedNow: null,
               }
             },
             // Nothing holds a lane's history but its states: an archived

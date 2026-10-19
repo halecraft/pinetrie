@@ -474,7 +474,7 @@ which are swept.
 - **A reference is a card holding an address** (`ReferenceCard`, `q-`
   ids): its content is the address and its quote's blob, so it draws
   without loading the referent's root. It is a note, a comment, queued, in
-  an inventory, or discarded; never pinned, since the readers of pinned
+  an inventory, or trashed; never pinned, since the readers of pinned
   cards read no quote. Queued, it is a message (`QueuedMessage`,
   `isQueuedMessage`): the drain reads its quote's blob before the pop
   (`queuedQuotes`, `sourceWords`'s `blob` reader) and sends it as its queuer's;
@@ -488,11 +488,11 @@ which are swept.
   printed ("" for none).
 - **`planPaste`** (ADR-0132, ADR-0133) plans one paste as one step: the
   card it replaces (`Replacing`: a slot's card, a reference edited as text)
-  discarded first, so a replacement into a full inventory never meets
+  trashed first, so a replacement into a full inventory never meets
   `full`, then a new text card or reference made through `planMake` (in
   the replaced card's very place when the target is its place), or a cut
   card moved out of a trash by its cutter (`planFromTrash`'s `uncut`). "The replaced
-  card is discarded first" holds in two places: here, for a paste, and in
+  card is trashed first" holds in two places: here, for a paste, and in
   the client's `moveCards` set for a drop on a filled slot, which
   `planMoves` plans in order.
 - **One rule makes every card** (`planMake`, `place-steps.ts`): it takes a card
@@ -527,7 +527,7 @@ which are swept.
   since deleted, cleared the old ones); the row's `at` field is a
   comment's entry. A canvas card has its canvas, rank and width; a card in a
   trash is stored as the place it left, its row's kind that place's
-  prefixed `discarded-` (`discarded-note`, `discarded-canvas`, …), so no
+  prefixed `trashed-` (`trashed-note`, `trashed-canvas`, …), so no
   field was added; a queued card has its `order` and `by`, and `seen`, its text's version as its queuer had it (S96), which
   the queue's key carries from the client. Every field is required: the
   host writes a record whole. A
@@ -562,7 +562,7 @@ which are swept.
   history. Where each kind of card may be is one table, core's
   `PLACES_OF`, which `fitsPlace`, `placed` and each record's place type
   (`PlaceOf`) read. Nobody removes a card:
-  `Move.to` is never null. A discard is a move to a trash (`DISCARDED`,
+  `Move.to` is never null. Trashing is a move to a trash (`TRASH_PLACE`,
   ADR-0134), from any place the sender may move out of: a text card, a
   reference, a thread's card or a note column (`KINDS`). Its key names no
   place left: the host fills it in from where the card is (`placeAt`:
@@ -570,7 +570,7 @@ which are swept.
   move. Nothing else decides where it is: whose trash it is, who sees it,
   where a restore goes and which history it is in follow from `left`
   (`surfaceOwner`, `livePlace`, core). Its history (`movesHistory`, over
-  `Discards`) is the canvas it left (`canvasOfPlace`), or for a card in an
+  `Trashes`) is the canvas it left (`canvasOfPlace`), or for a card in an
   inventory the canvas its sender is on (`here`, which a `move` carries),
   or, on none, its sender's history outside any canvas. A spin-off's `here`
   is the canvas its sender will be on: the new one for a drop in the
@@ -602,7 +602,7 @@ which are swept.
   below the line, or into an inventory, it keeps both. A move to where the
   card already is is refused `moved`: it would queue the card last under its
   sender's name, and a card changes its place in line by a reorder.
-  Refusals (`MoveRefusal`): `gone` (no record, or discarded), `moved`,
+  Refusals (`MoveRefusal`): `gone` (no record, or trashed), `moved`,
   `exists`, `full`, `someone-elses`, `no-place` (a place the card's kind is
   never in, or a kind no person moves: every move of a fact is refused so,
   with no check of its own), a restore's `left-gone` and `left-taken`, and
@@ -659,7 +659,7 @@ which are swept.
   composer's new card, an empty note) and a send, which is no move, enter
   none. Otherwise the canvas the card goes to, when it goes to one,
   else the canvas it leaves, read from its record, since a move is accepted
-  only from there; a discard's is `discardHistory`'s canvas, or with none its
+  only from there; trashing's is `trashHistory`'s canvas, or with none its
   sender's history outside any canvas (ADR-0126). A place is in a canvas by
   `canvasOfPlace`, so no tree is read. An inventory is in no canvas.
 - **`undoAnswer`** reads what a whole undo did: the cards its step wrote,
@@ -867,8 +867,8 @@ not `pinetrie:live`, so it lasts until a release, across a restart.
   board place as `left`, its closer the placer), in their history outside any
   canvas, since the canvas leaves their view: the undo key on no canvas brings
   the canvas and its thread back (ADR-0126).
-- **The history's verb is `discarded`** (`changeVerb`): the spin-off's card is
-  in its sender's trash, as any discard's is.
+- **The history's verb is `trashed`** (`changeVerb`): the spin-off's card is
+  in its sender's trash, as any trashing's is.
 
 # Card history and traces (`card-history.ts`, ADR-0048 step 6)
 
@@ -1251,7 +1251,7 @@ what it was writing when stopped was not kept; its `details` hold the lane,
 who resumed and their name then, for the column's line ("↻ resumed by
 Ada"), and why (`reason`). It is a prompt, so its run is an ask of its own
 (`PROMPT_ROLES`), and its run is the resumer's (`promptAuthor`): their
-budget, and their inbox when it ends.
+allowance, and their inbox when it ends.
 - **A carry-on also wakes a lane its owner let use their ssh** (ADR-0178):
   its reason `ssh-allowed`, with the host, and its line "↻ resumed by
   Duane: allowed ssh for hql". Only `planSshNews` makes one; the Resume
@@ -1427,7 +1427,7 @@ Host-written records, each a `RecordSpec` (above) with a total decoder:
 | record | namespace | key | written |
 |---|---|---|---|
 | a lane's setting: the root it works in, and the kind of history its own copy keeps (`history`: `"jj"`, `"folder"`, or null for no copy of its own) (ADR-0102, ADR-0150) | `pinetrie.lane` | the lane | once, when the lane is created |
-| a lane of its own's fork: the WIP it starts from (`base`, null for accepted work), and `state`: `owed`, or `begun` with `lost`, the snapshot its source would have cloned when that was not kept (ADR-0167) | `pinetrie.lane-fork` | the lane | owed with `LANE` (`planLaneRecords`), and again by a fork run over a begun lane; begun at the fork's end, with its history's start records (`forkEnd`, the host's) |
+| a lane of its own's fork: the unfinished work it starts from (`base`, null for accepted work), and `state`: `owed`, or `begun` with `lost`, the snapshot its source would have cloned when that was not kept (ADR-0167) | `pinetrie.lane-fork` | the lane | owed with `LANE` (`planLaneRecords`), and again by a fork run over a begun lane; begun at the fork's end, with its history's start records (`forkEnd`, the host's) |
 | the state (`point`) and disk at an entry, and the paths its turn changed, written whole: every field present (a migration, since deleted, moved the older shapes) | `pinetrie.revision` | the entry | for every run's prompt, and every assistant message of a lane of its own that made tool calls |
 | what the host found where it runs: its root, its kind (`jj` or `folder`, what a lane's history must be to run), and its owner; a record from before the kind decodes as none until the host's start rewrites it | `pinetrie.project` | `project` | at every start |
 
@@ -1620,7 +1620,7 @@ Host-written records, each a `RecordSpec` (above) with a total decoder:
   it (`foreignIn`).
 - **`forkSource`** is where a new lane of its own starts: the nearest snapshot
   above it, else the base snapshot; and the nearest state, else the
-  thread's base (`planBegin`): accepted work's state, or a WIP's copy on accepted work
+  thread's base (`planBegin`): accepted work's state, or unfinished work's copy on accepted work
   commit under it. It answers a `ForkSource` tagged `kind: "source"`, or
   refuses a disk of another kind than the new lane's record
   (`ForeignLane`), never told apart by a missing field. The start is always named: a cloned disk carries its
@@ -1662,7 +1662,7 @@ What the host decides about it is `proposed.ts`'s, from the facts
 nothing itself. Where proposed changes start (`startOfProposed`, `proposedStart`) is
 `@pinetrie/jj`'s. What the page reads is `work-strip.ts`, the review's wire
 `review.ts`, the commit-message format `@pinetrie/core`'s `trailers.ts`
-(`withTrailers`, `withoutTrailers`, `wipDescription`, `isWipLine`), and the
+(`withTrailers`, `withoutTrailers`, `unfinishedDescription`, `isUnfinishedLine`), and the
 commit-message request `request.ts` (`describeRequest`).
 
 ## What the host decides (`proposed.ts`)
@@ -1701,31 +1701,31 @@ commit-message request `request.ts` (`describeRequest`).
   rebuilt once. The record's `stale` uses the same rule.
 - **`proposedChangesRecord`** is the record, the page's cache, from the proposed changes as
   your repo holds it: its files and conflicts, your edits (its files that
-  `@` changes), described (its first line no longer the WIP line), edited,
+  `@` changes), described (its first line no longer the unfinished work line), edited,
   stale (a stack whose lane moved past its ledger), its bookmark (as the
   gather found it) and its commits. **`planWorkingCopyEdits`**: only `@` moved, so
   each record not yet accepted has its `workingCopyEdits` rewritten from one
   shared read.
 - **`planAcceptance`** decides an acceptance from the proposed changes
-  read in its own command and what only an acceptance reads (`AcceptanceFacts`: the WIP's commits above accepted work,
+  read in its own command and what only an acceptance reads (`AcceptanceFacts`: the unfinished work's commits above accepted work,
   and which bookmarks sit below the proposed changes). Refused, in this order: no
-  proposed changes (`no_offer`), a WIP gone (`bad_destination`), nothing shown
+  proposed changes (`no_offer`), unfinished work gone (`bad_destination`), nothing shown
   (`offer_changed`), divergent proposed changes (`no_offer`), other work than was
   shown or a new conflict (`offer_changed`, ADR-0065), and a destination
   that is not one of the proposed changes' or not below it (`bad_destination`). Its
-  destinations are `acceptanceDestinations`': the thread's WIP, then accepted work,
-  with how many of the WIP's commits land along. Conflicted proposed changes never
+  destinations are `acceptanceDestinations`': the thread's unfinished work, then accepted work,
+  with how many of the unfinished work's commits land along. Conflicted proposed changes never
   lands on accepted work: accepted work is immutable, and the conflict would stay in
-  its history. A gone WIP has none. An untraced place can be accepted: an
+  its history. A gone unfinished work has none. An untraced place can be accepted: an
   acceptance moves a bookmark and needs no start.
 - **`planStackEnded`**: a split's stack replaces the proposed changes only when its
   top has exactly the tip's files (`acceptStack`, private), built at the
   proposed changes' place from the stack's own start and tip, which its ledger names;
   an untraced place accepts it. **`planRebuild`**, for squash and refresh,
-  rebuilds from the lane's tip as one revision on its WIP line, from a known
+  rebuilds from the lane's tip as one revision on its unfinished work line, from a known
   start only. Both are a `Rebuild`, as a build is, with the thread's name.
 - **`describeWanted`** says proposed changes are one to ask a message for: one
-  revision, not edited, on its WIP line unless asked again.
+  revision, not edited, on its unfinished work line unless asked again.
   **`planDescribeAsk`** names the commit to ask for; **`planDescribeSettle`**
   writes the answer only to that commit, read again in the command that
   writes it, keeping the proposed changes' ledger (or the place's tip and start
@@ -1798,7 +1798,7 @@ commit-message request `request.ts` (`describeRequest`).
   (`baseMoved`) is private to it.
 - **`latestSourceName`** (`latest-from.ts`) is the one wording of what getting the latest
   merges (`LatestFrom`): "accepted work" for accepted work (ADR-0090), the
-  bookmark for a WIP (ADR-0061), the thread's name for the thread a thread branched from
+  bookmark for unfinished work (ADR-0061), the thread's name for the thread a thread branched from
   (ADR-0072). `updateLine` uses it through the update's `from`, stored as
   it is (`LatestFromSchema`). `latestWords` names it for the model, and
   `baseMovedOn` says a base moved.
@@ -1840,8 +1840,8 @@ commit-message request `request.ts` (`describeRequest`).
 
 | record | namespace | key | written |
 |---|---|---|---|
-| accepted work: its commit, the WIP bookmarks above it, the publish bookmark and your work against it (`workingCopy.ahead`, `workingCopy.getLatest`), and `publish.catchUp` (`getLatest`) | `pinetrie.accepted` | `line` | when your repo's operation head moves |
-| a lane's base, as its newest `Pinetrie-Base` says it, whether a WIP base landed or is gone, what getting the latest would change and where that was read, and its untraced accepted thread commits (S97) | `pinetrie.base` | the lane | when a refresh reads the lane |
+| accepted work: its commit, the unfinished work bookmarks above it, the publish bookmark and your work against it (`workingCopy.ahead`, `workingCopy.getLatest`), and `publish.catchUp` (`getLatest`) | `pinetrie.accepted` | `line` | when your repo's operation head moves |
+| a lane's base, as its newest `Pinetrie-Base` says it, whether unfinished work base landed or is gone, what getting the latest would change and where that was read, and its untraced accepted thread commits (S97) | `pinetrie.base` | the lane | when a refresh reads the lane |
 
 - **`planAcceptedRecord`** is accepted work's record from what the host read
   (`AcceptedFacts`), beside what setting accepted work up would write to your
@@ -1909,18 +1909,18 @@ commit-message request `request.ts` (`describeRequest`).
   host writes it again. `getLatest` names the lane tip and base commit it was
   read at; the host keeps it while both stay, so it is read once per move.
 - **`planBegin`** refuses a lane with no line (`no_line`), and a base that
-  is not a bookmark with the WIP prefix above accepted work (`bad_base`). The
+  is not a bookmark with the unfinished work prefix above accepted work (`bad_base`). The
   host checks it before the lane is created, so a refused send creates
   nothing.
-- **What became of a WIP base** (`ok`, `landed` or `gone`, S77 item 2) is
-  read in `@pinetrie/jj` (`wipState`, `readWipState`), since the gather
+- **What became of unfinished work base** (`ok`, `landed` or `gone`, S77 item 2) is
+  read in `@pinetrie/jj` (`unfinishedState`, `readUnfinishedState`), since the gather
   needs it to know where proposed changes sit. **`planUpdateFrom`** then says what
   bringing a thread up to date merges, from the lane's `LaneBase`: the base
   the thread follows by `effectiveBase`, the rule the
   page's button words itself from, so the button names what is merged. A
-  WIP's copy is made `on` the lane's previous copy (`LaneBase.start`);
-  nothing when the lane already holds the WIP's commit. Accepted work once a WIP
-  landed; refused (`base_gone`) for a gone WIP until "continue on the
+  unfinished work's copy is made `on` the lane's previous copy (`LaneBase.start`);
+  nothing when the lane already holds the unfinished work's commit. Accepted work once unfinished work
+  landed; refused (`base_gone`) for a gone unfinished work until "continue on the
   line", which `mark`s the move even with nothing to merge; refused
   (`no_line`) with no line. Only those two codes (`UpdateRefusal`).
 
@@ -2065,12 +2065,12 @@ reads, `details` what pine·trie reads back.
   commit** (ADR-0150). `PointSchema` and `CommitSchema` store the same
   bare string, so a message stored before points decodes unchanged.
   `update`'s `merged`, `land`'s `merged`, `behind`'s `to` and a
-  `catch_up`'s `merged` are points; proposed changes, WIPs, accepted work's and a
+  `catch_up`'s `merged` are points; proposed changes, bookmarks of unfinished work, accepted work's and a
   base's jj records (`JjProposedChangesRecord`, `JjAcceptedRecord`, `JjBaseRecord`,
   `GetLatestRead`) and the stack's message are jj's, and commits; a base's
   move (`BaseMove`) is points. Where a
   jj-only fact meets the shared history, the rule converts it at that
-  site with `pointFromCommit` (`planUpdateFrom`'s WIP, `latestNow`'s
+  site with `pointFromCommit` (`planUpdateFrom`'s unfinished work, `latestNow`'s
   base move), so each crossing is visible; nothing here turns a point back
   into a commit, or tests one for more than equality (core's rule).
 - **The schema is the type.** Ids are branded schemas (`decode.ts`:
@@ -2102,7 +2102,7 @@ the tip it must match, and the bookmark to leave on it.
 - **A fact is a history message** (`pinetrie.fact`, role `fact`): `content` is what the model reads, `details` the
   `ProposedChangesFact`, which the column words as one line (`factLine`). Each proposed changes
   action has one: an acceptance (`acceptedFact`: the change, the
-  bookmark, and that bookmark as the thread knows it, accepted work or a WIP),
+  bookmark, and that bookmark as the thread knows it, accepted work or unfinished work),
   and a description asked for again, a squash, a refresh (`actionFact`).
   A person's choice of a version of a folder lane's conflicted path is a
   fact of its own (`ResolvedFact`, `resolved`): who chose which version of
@@ -2238,20 +2238,20 @@ Gotchas:
   (`conflictAskTime`, core), which the strip reads as "needs you" while it
   is newer than the proposed changes' record.
 
-# Agents talking (`relay.ts`, `budget.ts`, `round.ts`, ADR-0128)
+# Agents talking (`relay.ts`, `allowance.ts`, `round.ts`, ADR-0128)
 
 Another thread's agent, invited into a thread, is asked there and answers
 from its own thread. Who a message invites and asks is `address`
 (`@pinetrie/core`), and the chat stores both (`MessageDetails.asks`,
-`invites`, absent when none); members, what an agent has heard and whether
-a round is done are read from the path (`threadMembers`, `lastHeardEntry`,
+`invites`, absent when none); members, what came into an agent and whether
+a round is done are read from the path (`threadMembers`, `lastIncomingEntry`,
 `isRoundAnswered`, core). Nothing about them is stored beside the entries.
 
-- **Three history messages.** `pinetrie.heard` (role `heard`, a one-line
+- **Three history messages.** `pinetrie.incoming` (role `incoming`, a one-line
   message): what an asked agent was told of the thread that asked, its text
   frozen in `content` (S144), the source ids in `details`. `pinetrie.relay` (role
   `relay`): the ask, the asked agent's prompt, carrying where it came from,
-  its asker, its chain's budget and the person behind it (`by`).
+  its asker, its chain's allowance and the person behind it (`by`).
   `pinetrie.answer` (role `answer`): the asked agent's last message, in the
   asking thread, a prompt when it `wakes` its asker. Both are prompts
   (`PROMPT_ROLES`), so each is an ask; `transcriptLines` speaks them by
@@ -2261,10 +2261,10 @@ a round is done are read from the path (`threadMembers`, `lastHeardEntry`,
   answers plan with it. Only an answer that wakes `steers` into a running
   lane; one that wakes nobody waits for the run's end.
 - **`planRelay`** hears the asking thread's path after the newest entry
-  `lastHeardEntry` names, or from the message that invited it, never the ask
+  `lastIncomingEntry` names, or from the message that invited it, never the ask
   itself nor the asked agent's own answers; it refuses a non-member, a
-  thread with no lane, itself and a spent budget (`relayRefusalText`).
-- **`planAnswer`** wakes the asker only when an agent asked and the budget
+  thread with no lane, itself and a used-up allowance (`relayRefusalText`).
+- **`planAnswer`** wakes the asker only when an agent asked and the allowance
   is not spent; a stopped or failed run sends no answer, and the asking
   thread is told by an `unanswered` fact.
 - **An ask card** is a card of its own kind (`KINDS.ask`, `a-` id), only
@@ -2273,19 +2273,19 @@ a round is done are read from the path (`threadMembers`, `lastHeardEntry`,
   as a fact card's fact is, so no field was added. A held queue holds it;
   nobody moves it, but it may be reordered. The drain carries it as a relay
   (`planCarry`).
-- **A budget** (`BUDGET`, keyed by the person's message that set it) holds
+- **An allowance** (`ALLOWANCE`, keyed by the person's message that set it) holds
   its limit, its count as of the last write, and `over`. A run's request
   spends what it adds to the talk (`addedTokens`): its output, and the
   context new since the run's previous request; never the context it
   re-reads, which is the whole thread at every request (ADR-0144).
   `planSpend` counts, and returns the record to write only when a spend crosses the
   limit, or at a run's end, so a session write is not made for every model
-  request: the host counts what runs spend live (`budgets.ts`). `mayRequest`
+  request: the host counts what runs spend live (`allowances.ts`). `mayRequest`
   reads it. `agents.budget` is the host's setting, limited by a system
   file.
 - **Facts**: `dismissed` and `left` (a member gone, read by `threadMembers`),
   `unanswered`, `round` (what the round told the people) and
-  `budget-spent`; a stop the budget made names it (`StopFact.budget`) and
+  `allowance-spent`; a stop the allowance made names it (`StopFact.allowance`) and
   holds no queue (`planStop`).
 - **A late write's gate** (`reach.ts`, `lateAway`): what the host decided
   before a gap lands only in a thread at a live place (`isLivePlace`,

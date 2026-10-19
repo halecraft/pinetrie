@@ -188,14 +188,14 @@ describe("cardFrame", () => {
     expect(cardFrame(null, tone, FACTS).primary).toBe(primary)
   })
 
-  test("with no card yet: its tone and place, nothing to move or discard", () => {
+  test("with no card yet: its tone and place, nothing to move or trash", () => {
     const view = cardFrame(null, "pinned", FACTS)
     expect(view).toMatchObject({
       tone: "pinned",
       state: { kind: "none" },
       moves: [],
       tools: [],
-      discards: false,
+      trashes: false,
     })
     expect(cardFrameWords(view, READER, GET_LATESTS, [])).toMatchObject({
       place: "pinned",
@@ -225,13 +225,13 @@ describe("cardFrame", () => {
       { to: "note", act: { kind: "unqueue", card: id, lane: LANE, by: BEA } },
       { to: "inventory", act: { kind: "putAway", card: id } },
     ])
-    expect(view.discards).toBe(true)
+    expect(view.trashes).toBe(true)
     expect(view.tools.map(t => t.act?.kind ?? null)).toEqual([null, "reorder"])
   })
 
-  test("a read-only column, or a fact, moves and discards nothing", () => {
+  test("a read-only column, or a fact, moves and trashes nothing", () => {
     const read = cardFrame(card(queued), "queued", { ...FACTS, readOnly: true })
-    expect(read).toMatchObject({ moves: [], tools: [], discards: false })
+    expect(read).toMatchObject({ moves: [], tools: [], trashes: false })
     const fact: CardRecord = {
       kind: "fact",
       id: cardIdOfKind("fact", "01a0ffd2-0000-7000-8000-0000000000f1"),
@@ -251,15 +251,15 @@ describe("cardFrame", () => {
     }
     expect(cardFrame(fact, "queued", FACTS)).toMatchObject({
       moves: [],
-      discards: false,
+      trashes: false,
     })
   })
 
-  test("someone else's inventory card is not yours to discard", () => {
+  test("someone else's inventory card is not yours to trash", () => {
     const theirs = card({ kind: "inventory", holder: BEA })
-    expect(cardFrame(theirs, "inventory", FACTS).discards).toBe(false)
+    expect(cardFrame(theirs, "inventory", FACTS).trashes).toBe(false)
     const mine = card({ kind: "inventory", holder: ME }, { owner: BEA })
-    expect(cardFrame(mine, "inventory", FACTS).discards).toBe(true)
+    expect(cardFrame(mine, "inventory", FACTS).trashes).toBe(true)
   })
 
   test("↑ and ↓ in a list, each off at its edge", () => {

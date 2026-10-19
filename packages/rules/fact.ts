@@ -66,7 +66,7 @@ const QueuedFactSchema = Type.Union([
     prompt: EntryIdSchema,
     by: WriterIdSchema,
     at: Type.Number(),
-    budget: Type.Optional(EntryIdSchema),
+    allowance: Type.Optional(EntryIdSchema),
   }),
   Type.Object({
     kind: Type.Union([Type.Literal("dismissed"), Type.Literal("left")]),
@@ -117,9 +117,9 @@ const QueuedFactSchema = Type.Union([
     titles: List(Type.String()),
   }),
   Type.Object({
-    kind: Type.Literal("budget-spent"),
+    kind: Type.Literal("allowance-spent"),
     lane: ThreadIdSchema,
-    budget: EntryIdSchema,
+    allowance: EntryIdSchema,
     limit: Type.Number(),
     by: WriterIdSchema,
   }),
@@ -186,15 +186,15 @@ export function factLine(fact: QueuedFact): string {
     case "resolved":
       return `✓ ${choiceWords(fact.choose)} of ${fact.path} chosen: its conflict is closed`
     case "stopped":
-      return fact.budget === undefined
+      return fact.allowance === undefined
         ? "■ the run was stopped"
-        : "■ the run was stopped: its budget was spent"
+        : "■ the run was stopped: its allowance was used up"
     case "dismissed":
       return "− an agent was dismissed from this thread"
     case "left":
       return "− an agent left this thread"
-    case "budget-spent":
-      return `■ agents spent the budget of ${tokensWords(fact.limit)}`
+    case "allowance-spent":
+      return `■ agents used up their ${tokensWords(fact.limit).replace(/ tokens?$/, "-token")} allowance`
     case "undelivered":
       return `■ the answer was not sent: ${awayLine(fact.toName, fact.why)}`
     case "round":
@@ -239,13 +239,13 @@ export function factContent(fact: QueuedFact, name: string): string {
     case "squashed":
       return `${name} squashed this thread's proposed changes back into one revision.`
     case "refreshed":
-      return `${name} rebuilt this thread's proposed changes from your work as it is now, discarding their edits to them.`
+      return `${name} rebuilt this thread's proposed changes from your work as it is now, dropping their edits to them.`
     case "resolved":
       return `${name} chose ${choiceWords(fact.choose)} of ${fact.path}; its conflict is closed${fact.choose === "ours" ? "" : ", and your copy holds that version now"}.`
     case "stopped":
-      return fact.budget === undefined
+      return fact.allowance === undefined
         ? `${name} stopped this run.`
-        : `This run was stopped: the budget of tokens ${name}'s message set for agents talking was spent.`
+        : `This run was stopped: the allowance of tokens ${name}'s message set for agents talking was used up.`
     case "dismissed":
       return `${name} dismissed another thread's agent from this thread's members; it is no longer asked here.`
     case "left":
@@ -256,8 +256,8 @@ export function factContent(fact: QueuedFact, name: string): string {
       return `After the agents answered: ${fact.line}`
     case "unanswered":
       return `The agent you asked in another thread did not answer: its run ${fact.why === "stopped" ? "was stopped" : "failed"}.`
-    case "budget-spent":
-      return `Agents talking from ${name}'s message spent its budget of ${tokensWords(fact.limit)}. Asking another thread's agent is refused until ${name} adds more.`
+    case "allowance-spent":
+      return `Agents talking from ${name}'s message used up its allowance of ${tokensWords(fact.limit)}. Asking another thread's agent is refused until ${name} adds more.`
     case "branched":
       return fact.how === "started"
         ? `${name} started ${branchesWords(fact.titles.length)} from your proposal, each a thread of its own with its own agent: ${fact.titles.join("; ")}.`
@@ -293,7 +293,7 @@ export const acceptedFact = (input: {
     to:
       destination === input.acceptedBookmark
         ? { kind: "accepted" }
-        : { kind: "wip", bookmark: destination },
+        : { kind: "unfinished", bookmark: destination },
   }
 }
 

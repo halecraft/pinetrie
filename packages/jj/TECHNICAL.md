@@ -67,8 +67,8 @@ translates to.
   (`ProposedChangesEffects.after`).
 - `proposed-repair.ts`: `repairProposedChanges`, the one step on proposed changes that read between
   its steps.
-- `accepted.ts`: accepted work's facts, a new lane's begin, a WIP's state
-  (`wipState`, `readWipState`).
+- `accepted.ts`: accepted work's facts, a new lane's begin, unfinished work's state
+  (`unfinishedState`, `readUnfinishedState`).
 - `shared.ts`: the facts every lane and accepted work share, per operation.
 - `lane-read.ts`: one lane's refresh facts in one `jj log` (`gatherLane`).
 - `get-latest.ts`: what getting the latest would change in a lane, its rules and
@@ -147,7 +147,7 @@ everything else reads at the head it last saw.**
 - **Observation** (`later("observe")`, or inline after a write): `jj op log
   --no-graph -n 1 -T id`, which merges divergent heads and names the result
   (S87 item 4). The same id ends it. Else one `jj log`, pinned to that id,
-  reads the fingerprint: accepted work's bookmark, the WIP bookmarks, the
+  reads the fingerprint: accepted work's bookmark, the unfinished work bookmarks, the
   publish bookmark (`main`, ADR-0076), the proposed changes' bookmarks, the lanes'
   `pinetrie-*` remote bookmarks, each with its commit (a conflicted one with
   all its targets), and `@`'s commit. A bookmark of yours outside those is
@@ -203,7 +203,7 @@ operation is read once and kept until the head moves.**
   fresh set.
 - **Accepted work's record's facts are kept apart** (`RepoOps.acceptedFacts()`,
   `acceptedFacts`): nine reads and six more when your `@-` is behind (its
-  configs, the WIPs, the publish bookmark, your `@-` and `@`), once per
+  configs, the bookmarks of unfinished work, the publish bookmark, your `@-` and `@`), once per
   operation, read only when that record is written. In the shared facts,
   every refresh at a new operation paid them, twice when it wrote (S254).
 - **`workingCopyEdits` is `files ∩ editing`**, decided in `proposedChangesRecord`
@@ -253,8 +253,8 @@ operation is read once and kept until the head moves.**
 - **One rule decides both.** `repo.test.ts` holds `gatherLane` beside the
   separate reads (`laneTipIn`, `laneBase`, `startOfProposed`, `readProposedChanges`,
   `filesTouched`, `readGetLatest`) at every proposed changes it builds, accepts, follows, repairs and
-  stacks, and expects the same values. A lane on a WIP reads the separate
-  way (`wipFacts`): its target and state need more of your repo. Which way
+  stacks, and expects the same values. A lane on unfinished work reads the separate
+  way (`unfinishedFacts`): its target and state need more of your repo. Which way
   a lane is read is `gatherRefresh`'s choice; the host never makes it.
   Whether one read could serve every lane is S100.
 
@@ -270,8 +270,8 @@ update's merge will change.**
   Both gathers call `readGetLatest`: `gatherLane`, and `placeOf` for every
   other gather.
 - **The target is one value** (`GetLatestTarget`): accepted work's commit,
-  merged, or a WIP's commit, copied. `placeOf` builds it from the WIP's
-  state, a landed WIP's update merging accepted work; `gatherLane` reads
+  merged, or unfinished work's commit, copied. `placeOf` builds it from the unfinished work's
+  state, a landed unfinished work's update merging accepted work; `gatherLane` reads
   lanes on accepted work only. The stored `GetLatestRead.to` is its commit.
 - **Read once per move.** It is read only once the base has moved from the
   lane's base start, and kept (`known`: the page's `pinetrie.base`, as a
@@ -293,11 +293,11 @@ update's merge will change.**
   commit and the source). A file then counts only when `to` differs from
   both. A union would count every file of the acceptance again, and the
   intersection misses a file only when accepted work puts it back to the
-  base's exactly. A WIP's copy, and an untraced start, diff from the base's
-  start: for a WIP the target is the WIP's commit, and the copy has its
+  base's exactly. Unfinished work's copy, and an untraced start, diff from the base's
+  start: for unfinished work the target is the unfinished work's commit, and the copy has its
   files.
   `repo.test.ts` holds it against `mergeUpdate`'s files on accepted work
-  and on a WIP, your own acceptance, the lane editing it again, and the
+  and on unfinished work, your own acceptance, the lane editing it again, and the
   start with two heads.
 - **Read as the merge reads its files** (`changedPaths`, `@pinetrie/lanes`),
   from the repo's root, so the forecast and `mergeUpdate`'s `files`
@@ -333,7 +333,7 @@ update's merge will change.**
   the rest), then the steps on the owner. A decision carries the facts its
   steps need (a `Placed`, the proposed changes, its changes), so each kind has one
   translation and none that runs nothing because a case cannot occur.
-- **Only a build and a rebuild take the lane's tip and WIP line**
+- **Only a build and a rebuild take the lane's tip and unfinished work line**
   (`isBuild`, `buildEffects`, `BuildAt`): they are the refresh decisions
   that write commit messages. Every other one is translated by
   `proposedChangesEffects` from the thread's name alone, so its types give
@@ -387,8 +387,8 @@ update's merge will change.**
   The base start is the commit the lane's newest `Pinetrie-Base` names
   (`laneBase`); for a lane with none, from before accepted work, the newest line
   commit in the tip's history. The sources are the lane commits that
-  accepted proposed changes' `Pinetrie-Source` trailers name, in `::<accepted>` and in `::<wip>`
-  for a lane on a WIP, minus `::present(<base source>)` (`acceptedThreadCommitsRevset`,
+  accepted proposed changes' `Pinetrie-Source` trailers name, in `::<accepted>` and in `::<unfinished>`
+  for a lane on unfinished work, minus `::present(<base source>)` (`acceptedThreadCommitsRevset`,
   read by `acceptedThreadCommitFacts` with the lane's untraced ones), each `present()`: one never fetched here names
   nothing you have. A squash of two accepted proposed changes keep both trailer
   paragraphs, and `trailerValues` reads every one; jj's `trailers` template
@@ -397,11 +397,11 @@ update's merge will change.**
   `trailers.ts`): proposed changes accepted before the rename carry `Pineta-Source`,
   and an old lane's next proposed changes would otherwise start below them and put
   their files back over yours (`repo.test.ts`, pre-rename). A `Pineta-Base`
-  on `pineta-onto` reads as accepted work, as any base off the WIP prefix
+  on `pineta-onto` reads as accepted work, as any base off the unfinished work prefix
   does (`messageBase`, ADR-0100).
 - **A source accepted below the base's source is not part of the start**
   (S81). A base's `source` (`CommitBase`) is the commit of yours the lane merged whole:
-  the one its `Pinetrie-Base` names (the WIP's commit, never the copy, which
+  the one its `Pinetrie-Base` names (the unfinished work's commit, never the copy, which
   descends from no accepted thread commit), else `start`. Proposed changes keep the diff from
   its start's merge to the tip, so a start the target holds as another
   commit is subtracted from the target. An accepted thread commit and a
@@ -412,7 +412,7 @@ update's merge will change.**
 - **Every revision of proposed changes carry the host's trailers and its ledger**
   (`proposedMessage`, core's `trailers.ts`): `Pinetrie-Thread`, `Pinetrie-Lane`,
   `Pinetrie-Entry`, then `Pinetrie-Source: <tip>` and `Pinetrie-Start`, in one
-  paragraph, on its WIP line and kept through a description. The source is
+  paragraph, on its unfinished work line and kept through a description. The source is
   the lane tip the whole proposed changes hold, a stack's revisions included:
   accepted, it says you have that tip.
 - **`acceptedFacts` previews bringing the working copy the latest** (`workingCopy.getLatest`, S80):
@@ -515,7 +515,7 @@ update's merge will change.**
   tracked bookmark with its remote; `jj bookmark track`, which tracks it the
   first time, writes nothing after, and repairs a jj command of yours that
   imported the ref first, untracked. An untracked remote bookmark is in
-  `builtin_immutable_heads()`: the WIP under the proposed changes would become
+  `builtin_immutable_heads()`: the unfinished work under the proposed changes would become
   immutable to you. jj exports no conflicted bookmark, so a mark is planned
   only for proposed changes read whole. New proposed changes' bookmark is still made with
   `bookmark set` (`planProposedChanges`), and the mark after its describes copies it.
@@ -633,7 +633,7 @@ with the steps this package gives it (`ForkSetup`, `BaseCheckout`).
   `turnFromCommits`, `mergedFromCommits`); the host's adapter converts a
   base a port carried back with its lane's proof (`baseInCommits`), and a
   review's range with the lane `planReviewRead` named (`CommitSpan`).
-  WIPs, proposed changes and accepted work's own records are jj's alone, and stay
+  bookmarks of unfinished work, proposed changes and accepted work's own records are jj's alone, and stay
   `CommitId` throughout.
 
 - **Every method is gather, a pure planner, then execute.** The planners
@@ -654,11 +654,11 @@ with the steps this package gives it (`ForkSetup`, `BaseCheckout`).
 
 - **A fork with no revision above it starts from its thread's base**
   (`planForkSetup`, ADR-0104): on accepted work, an empty commit on accepted work's
-  commit (`planAcceptedStart`); on a WIP, a copy of the WIP made in the lane
-  (`planWipCopy`): a commit on accepted commit under the WIP, with the WIP's
-  files restored. Never the WIP's own commits: the lane's tip, a remote
+  commit (`planAcceptedStart`); on unfinished work, a copy of the unfinished work made in the lane
+  (`planUnfinishedCopy`): a commit on accepted commit under the unfinished work, with the unfinished work's
+  files restored. Never the unfinished work's own commits: the lane's tip, a remote
   bookmark and immutable in your repo, would make them immutable too (S48
-  item 11), and your WIP would freeze. Either commit carries
+  item 11), and your unfinished work would freeze. Either commit carries
   `Pinetrie-Base: <bookmark>@<commit>` (`baseMessage`), the lane's ledger of
   its base.
 - **`jj new` runs first in a fork's setup** (`planForkSetup`), after
@@ -760,7 +760,7 @@ with the steps this package gives it (`ForkSetup`, `BaseCheckout`).
   - **The readers also read `Pineta-*`** (`READ`, `pre-rename:`): commits
     made before the rename are immutable. Writers write `Pinetrie-*` only.
   - **A base is read by kind, never by accepted work's bookmark**
-    (`messageBase`, ADR-0100): a name with the WIP prefix is that WIP, any other
+    (`messageBase`, ADR-0100): a name with the unfinished work prefix is that unfinished work, any other
     is accepted work. New bases write `accepted@<commit>`; one written as
     `pinetrie-onto@` or `pineta-onto@` reads as accepted work too, with no
     special case, and so would one under any later name of the bookmark.
@@ -819,11 +819,11 @@ with the steps this package gives it (`ForkSetup`, `BaseCheckout`).
   it throws, and a caller that reads none on failure says so at the call.
   `conflictsIn` snapshots the lane first, then reads `@`.
 - **An update merges the thread's base** (`mergeBase`, ADR-0104): the
-  line's commit, or a fresh copy of the WIP (`planWipCopy`) made on the
+  line's commit, or a fresh copy of the unfinished work (`planUnfinishedCopy`) made on the
   lane's previous copy, so conflicts the lane already resolved do not come
   back. Or the newest commit of the thread it branched from (`planMerge`'s
   `parent`, ADR-0072), merged as accepted work's commit is but with no
-  `Pinetrie-Base`: ancestry says what the lane holds of it. Accepted work's merge carries `Pinetrie-Base`, a WIP's copy its own, and
+  `Pinetrie-Base`: ancestry says what the lane holds of it. Accepted work's merge carries `Pinetrie-Base`, unfinished work's copy its own, and
   `newestBase` reads the newest one in a lane's history: its base, and
   where its proposed changes start. `laneBase` reads it in the lane's own repo too
   (`bookmarkRevset`), where a lane with none is null: that repo has no
@@ -848,7 +848,7 @@ with the steps this package gives it (`ForkSetup`, `BaseCheckout`).
     found by theirs.
   - **The update's titles and a conflict's `theirs` leave the accepted thread commits out**
     (`withoutAcceptedThreadCommits`), and keep accepted work's commits under them.
-  - **A WIP's copy has no accepted thread commit in its history,** so a WIP thread joins
+  - **Unfinished work's copy has no accepted thread commit in its history,** so unfinished work thread joins
     nothing.
   - **The host's forecast starts from the same sources** (`getLatestFiles`,
     `@pinetrie/jj`): it diffs from the proposed changes' start, which holds them,
@@ -856,11 +856,11 @@ with the steps this package gives it (`ForkSetup`, `BaseCheckout`).
 - **`mergeUpdate` is an update's whole run in a lane** after its edits,
   on the lane's queue (`LaneHistory.merge` commits the edits, plans the
   merge with `planMerge`, then runs it): `planMerge`'s steps (a fetch of accepted work's commit,
-  or of the WIP's commit and its copy), the merge, a mark naming accepted work
+  or of the unfinished work's commit and its copy), the merge, a mark naming accepted work
   when a thread moves there with nothing to merge, then what the merge left:
   its files and the titles of what came in (`readTitles`, one log), or each
   conflicted file's content and the revisions on each side that touched
-  them. A WIP's copy fetches only the WIP's commit: its parent is the
+  them. Unfinished work's copy fetches only the unfinished work's commit: its parent is the
   lane's own.
 - **`revisionsIn` reads a side of a merge in one `jj log`**: the range's
   revisions that touched any of the files, each with those it touched, from
@@ -918,8 +918,8 @@ with the steps this package gives it (`ForkSetup`, `BaseCheckout`).
   edited its accepted work again, with one start and two (S102 item 11);
   and a review of proposed changes' commit (its description, a rename, names with a space and a
   quote, and one file's diff, never a directory's). The gathers are held to
-  it as well: each place kind (placed, untraced, a WIP gone), what an
-  acceptance reads on a WIP (`gatherAcceptance`), a split's stack bottom first
+  it as well: each place kind (placed, untraced, unfinished work gone), what an
+  acceptance reads on unfinished work (`gatherAcceptance`), a split's stack bottom first
   (`gatherStack`), `repairProposedChanges` on divergent proposed changes, and that
   `trailerRevset` finds exactly the commits `hasTrailer` matches. And a
   getting the latest past an accepted thread commit of the lane's own work, of its

@@ -469,7 +469,7 @@ export function baseChoices(
     accepted === null ||
     accepted.kind === "folder" ||
     accepted.commit === null ||
-    accepted.wips.length === 0
+    accepted.unfinishedWork.length === 0
   )
     return []
   const behind = (n: number) =>
@@ -485,7 +485,7 @@ export function baseChoices(
       chosen: chosen === null,
       title: `${accepted.acceptedBookmark} at ${shortId(accepted.commit)}`,
     },
-    ...accepted.wips.map(w => ({
+    ...accepted.unfinishedWork.map(w => ({
       key: `base:${w.bookmark}`,
       base: w.bookmark,
       row: w.bookmark,

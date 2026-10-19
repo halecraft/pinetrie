@@ -422,7 +422,7 @@ async function getLatestThenSend(
     })
     return "ran"
   }
-  if (plan.after === "discard") return "next"
+  if (plan.after === "trash") return "next"
   // Brought up to date: what is left is a plain message.
   return sendCard(deps, open, popped, {
     ...card,
@@ -539,7 +539,7 @@ async function unsent(
 /**
  * The waits for a queued card's text to give up (`behind`): each awaited card
  * no longer queued. The pop removed it, someone unqueued it, took it into an
- * inventory or discarded it, or its lane went: it will not be popped, so
+ * inventory or trashed it, or its lane went: it will not be popped, so
  * nothing is left to wait for.
  */
 export const givenUp = (

@@ -453,7 +453,7 @@ export type Intent =
    * Move cards, create one, or remove one: one move, or a keep's several,
    * accepted whole or refused. The host records it in a canvas's history of the
    * sender's moves (`movesHistory`); `here`, the canvas its sender is on, is a
-   * discard's from an inventory.
+   * trash's from an inventory.
    */
   | {
       readonly kind: "move"
@@ -492,9 +492,9 @@ export type Intent =
     }
   /**
    * Paste: make a card from a copy, or move a cut card out of a trash by its
-   * cutter, where `to` sends it, after discarding the card it replaces. One
+   * cutter, where `to` sends it, after trashing the card it replaces. One
    * step of the sender's history, in the canvas it lands in; `here`, the canvas its
-   * sender is on, names a discard's from an inventory.
+   * sender is on, names a trash's from an inventory.
    */
   | {
       readonly kind: "paste"
@@ -564,7 +564,7 @@ export type Intent =
 /**
  * What can be done with proposed changes: accept it into accepted work or a
  * WIP, squash a stack back to one revision, have the agent write its
- * description again, or rebuild it, discarding your edits. Splitting it is a
+ * description again, or rebuild it, trashing your edits. Splitting it is a
  * card's command, `split`, popped when the thread is free.
  */
 export type ProposedChangesAction = "accept" | "squash" | "describe" | "refresh"

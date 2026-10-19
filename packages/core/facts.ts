@@ -19,10 +19,10 @@ export interface StopFact {
   /** When Stop was pressed, in ms since the epoch. */
   readonly at: number
   /**
-   * The message whose budget was spent, when it was the budget that stopped the
-   * run, and `by` is whose message it was; absent for a Stop.
+   * The message whose allowance was spent, when it was the allowance that
+   * stopped the run, and `by` is whose message it was; absent for a Stop.
    */
-  readonly budget?: EntryId
+  readonly allowance?: EntryId
 }
 
 /**
@@ -115,13 +115,13 @@ export interface BranchedFact {
 }
 
 /**
- * Agents spent a budget: its message's tokens ran out, in the thread whose
+ * Agents spent an allowance: its message's tokens ran out, in the thread whose
  * message set it. `by` is whose message it was.
  */
-export interface BudgetSpentFact {
-  readonly kind: "budget-spent"
+export interface AllowanceSpentFact {
+  readonly kind: "allowance-spent"
   readonly lane: ThreadId
-  readonly budget: EntryId
+  readonly allowance: EntryId
   readonly limit: number
   readonly by: WriterId
 }

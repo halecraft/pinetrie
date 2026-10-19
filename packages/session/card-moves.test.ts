@@ -141,18 +141,16 @@ describe("the tab's moves", () => {
     expect(s.notices).toEqual([refusal])
   })
 
-  test("an accepted discard is a notice where you made it until your next move there, drawn gone until then", () => {
-    const gone = { kind: "trash", why: { kind: "discarded" } } as const
-    const discard = {
+  test("an accepted trashing is a notice where you made it until your next move there, drawn gone until then", () => {
+    const gone = { kind: "trash", why: { kind: "trashed" } } as const
+    const trash = {
       ...sentAs,
       id: "d-1",
       kind: "move",
       move: { card: C1, from: atEnd, to: gone },
     } as const
-    const s = run([sent(discard), accepted("d-1", 4)])
-    expect(s.notices).toEqual([
-      { card: C1, actedAt: COLUMN, code: "discarded" },
-    ])
+    const s = run([sent(trash), accepted("d-1", 4)])
+    expect(s.notices).toEqual([{ card: C1, actedAt: COLUMN, code: "trashed" }])
     // In no history until the host names one.
     expect(withPending(host, s, ME)[0]?.place).toEqual({
       kind: "trash",

@@ -65,7 +65,7 @@ export type ProposedChangesSeen =
  * Proposed changes as your repo holds it now (`readProposedChanges` in
  * `@pinetrie/jj`): all the host decides proposed changes from. Facts only; what
  * they mean is decided in `@pinetrie/rules` (`planRefresh`, `isProposedEdited`,
- * `isProposedMoved`) and `isWipLine` (`trailers.ts`). Divergent proposed
+ * `isProposedMoved`) and `isUnfinishedLine` (`trailers.ts`). Divergent proposed
  * changes are only its change ids: the repair needs nothing more, and every
  * other read would name one of two commits.
  */
@@ -160,7 +160,7 @@ export interface Placed {
   /** The lane's tip in your repo. */
   readonly tip: CommitId
   readonly base: CommitBase
-  /** A WIP base's state (`wipState`, `@pinetrie/jj`); "ok" for accepted work. */
+  /** A WIP base's state (`unfinishedState`, `@pinetrie/jj`); "ok" for accepted work. */
   readonly state: "ok" | "landed"
   /** Where the proposed changes sit: accepted work's commit, or the WIP bookmark's. */
   readonly target: CommitId
@@ -235,7 +235,7 @@ export type RefreshFacts =
 /** What only an acceptance reads; the rest is in its gather's place. */
 export interface AcceptanceFacts {
   /** The WIP's commits above accepted work; 0 for a lane on accepted work. */
-  readonly wipAhead: number
+  readonly unfinishedAhead: number
   /**
    * Of accepted work's bookmark and, on a WIP, the WIP's, those at or below the
    * proposed changes' bottom's parent: a move to one is forward.
@@ -344,7 +344,7 @@ export interface DescribeDecision {
 export interface AcceptedFacts
   extends Pick<
     JjAcceptedRecord,
-    "commit" | "wips" | "published" | "workingCopy"
+    "commit" | "unfinishedWork" | "published" | "workingCopy"
   > {
   readonly heads: string | null
   readonly log: string | null

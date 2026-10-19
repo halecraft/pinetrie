@@ -864,7 +864,7 @@ test("decode: a move is refused to or from a place its card's kind is never in",
   assert.ok(nor)
 })
 
-test("decode: a paste names its card's move, after at most a discard of the card it replaces", () => {
+test("decode: a paste names its card's move, after at most trashing the card it replaces", () => {
   const ada = { kind: "inventory", holder: writerId("ada@x.io") } as const
   const wire = (over: Record<string, string>) =>
     decodeCommand({
@@ -899,7 +899,7 @@ test("decode: a paste names its card's move, after at most a discard of the card
   expect(refusalCode(wire({ mode: "text", text: "", moves: moved }))).toBe(
     ERR.UNKNOWN_TARGET,
   )
-  // What it replaces is discarded, and comes first.
+  // What it replaces is trashed, and comes first.
   const replaced = encodeMoves([
     { card: textCardId(cardIdFor("c1")), from: ada, to: ada },
     { card: REFERENCE, from: null, to: ada },
@@ -1063,7 +1063,7 @@ test("decodeReply: an unrecognised code stays inside the ErrCode set", () => {
 })
 
 test("decode: a spin-off names its move to the trash, a new root, thread and canvas, and a state or none", () => {
-  const trash = { kind: "discarded" }
+  const trash = { kind: "trashed" }
   const from = { kind: "inventory", holder: "ada@example.com" }
   const moves = (to: unknown) =>
     JSON.stringify([{ card: cardIdFor("c1"), from, to }])

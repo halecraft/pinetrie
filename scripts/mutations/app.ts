@@ -30,12 +30,12 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a relayed run is not given what its agent heard",
     file: "apps/pinetrie/host/runs.ts",
-    from: "          const before = [\n            start.heard ?? null,\n            behind,\n            ...canvas,\n            pinned,\n",
+    from: "          const before = [\n            start.incoming ?? null,\n            behind,\n            ...canvas,\n            pinned,\n",
     to: "          const before = [\n            null,\n            behind,\n            ...canvas,\n            pinned,\n",
     suite: "host",
     scenario: "agents",
     expect:
-      "an agent's ask runs the other thread's agent, on what it heard and then the ask",
+      "an agent's ask runs the other thread's agent, on what came in and then the ask",
   },
   {
     name: "a relayed run's end sends no answer",
@@ -48,7 +48,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a budget counts nothing spent",
-    file: "apps/pinetrie/host/budgets.ts",
+    file: "apps/pinetrie/host/allowances.ts",
     from: "    if (!budget.spends) return\n",
     to: "    return\n",
     suite: "host",
@@ -57,9 +57,9 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a spent budget tells its thread nothing",
-    file: "apps/pinetrie/host/budgets.ts",
-    from: '        facts: [\n          {\n            kind: "budget-spent",',
-    to: '        facts: [] || [\n          {\n            kind: "budget-spent",',
+    file: "apps/pinetrie/host/allowances.ts",
+    from: '          facts: [\n            {\n              kind: "allowance-spent",',
+    to: '          facts: [] || [\n            {\n              kind: "allowance-spent",',
     suite: "host",
     scenario: "agents",
     expect:
@@ -217,7 +217,7 @@ export const mutations: readonly Mutation[] = [
     name: "a column's bin does nothing",
     file: "packages/web/column-menu.tsx",
     from: "          onClick={() => p.onIntent(button.intent)}\n",
-    to: '          onClick={() => button.intent.kind === "discard" || p.onIntent(button.intent)}\n',
+    to: '          onClick={() => button.intent.kind === "trash" || p.onIntent(button.intent)}\n',
     suite: "browser",
     scenario: "page",
     expect: "the bin on a branch's column takes it off the canvas",
@@ -245,7 +245,7 @@ export const mutations: readonly Mutation[] = [
     name: "the open card's × trashes it",
     file: "packages/web/card-frame.tsx",
     from: "              onClick={p.onClose}",
-    to: "              onClick={p.onDiscard}",
+    to: "              onClick={p.onTrash}",
     suite: "browser",
     scenario: "page",
     expect:
@@ -254,7 +254,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "Delete on a slot trashes nothing",
     file: "packages/web/card-grid.tsx",
-    from: "            if (selectedCard !== null) p.onDiscard(selectedCard)",
+    from: "            if (selectedCard !== null) p.onTrash(selectedCard)",
     to: "",
     suite: "browser",
     scenario: "page",
@@ -2992,7 +2992,7 @@ export const mutations: readonly Mutation[] = [
     name: "a column's Move to trash does nothing",
     file: "packages/web/column-menu.tsx",
     from: "          onChoose: () => p.onIntent(item.intent),\n",
-    to: '          onChoose: () => item.intent.kind === "discard" || p.onIntent(item.intent),\n',
+    to: '          onChoose: () => item.intent.kind === "trash" || p.onIntent(item.intent),\n',
     suite: "browser",
     scenario: "page",
     expect:
@@ -3144,8 +3144,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the host records no paste",
     file: "apps/pinetrie/host/commands/cards.ts",
-    from: '      const scope = movesHistory(moves, readPlaces(places), discards, "paste")',
-    to: '      const scope = movesHistory(moves, readPlaces(places), discards, "move")',
+    from: '      const scope = movesHistory(moves, readPlaces(places), trashes, "paste")',
+    to: '      const scope = movesHistory(moves, readPlaces(places), trashes, "move")',
     suite: "host",
     scenario: "cards",
     expect:

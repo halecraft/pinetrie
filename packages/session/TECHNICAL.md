@@ -136,7 +136,7 @@ session or someone else's inventory throws before it is made.
 
 - **Every move is a request to the host**: creating a card (its text in one
   undo step, then a `move` from nowhere, then its command), unqueueing,
-  discarding, and setting a command; and queueing, which is `queue-card`
+  trashing, and setting a command; and queueing, which is `queue-card`
   alone (`queueCard`, ADR-0113): the host refuses a `move` into a queue. A
   card made in the queue is drawn there at once as `queuedDraft` (empty,
   with its command), never in another place first. The
@@ -170,23 +170,23 @@ session or someone else's inventory throws before it is made.
   accepts or refuses whole: never none, since it takes a non-empty tuple.
   What the page closes after one (`afterKeep`, `@pinetrie/interface`)
   closes only once the host accepts it.
-- **A discard names no history** (ADR-0116): `moveCard` and `moveCards`
+- **A trash names no history** (ADR-0116): `moveCard` and `moveCards`
   take `here`, the canvas the tab is on, which the `move` carries; the host
   names the history from it for a card leaving your inventory. Until the
-  host answers, a discarded card is drawn in the trash recording the place
+  host answers, a trashed card is drawn in the trash recording the place
   it was drawn at, and a restore (`back`) back there; a move to a new canvas
   is drawn on that canvas, last (`drawnPlace`).
 - **Notices are values** (`CardNotice`, kept by `movesStep` until your
-  next move where you acted): a refusal, or a discard the host accepted
+  next move where you acted): a refusal, or trashing the host accepted
   (ADR-0111), which says the undo key brings it back. The page words them
   (`noticeWords`). Each move carries where you were looking when you made it
   (`ActedAt`: a column's key, the inventory, or the board, ADR-0126), and
   its notice is drawn there. A move on the board asks for no card's move:
   it says it acted there (`acted`), and the refusal said there before goes.
 - **A paste is a creation** (`paste`, ADR-0132): a text card's text is
-  written first, then one request discards the card on the filled slot it
+  written first, then one request trashes the card on the filled slot it
   replaces, if any, and makes the pasted card, or moves a cut card out of
-  your trash. A card that may not be discarded is not replaced, and says so
+  your trash. A card that may not be trashed is not replaced, and says so
   (`not-replaced`, ADR-0133).
 - **A send is pending as a send** (`pendingSend`): its card is drawn
   nowhere until the copy holds what the host did with it. A move always

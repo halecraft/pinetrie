@@ -126,9 +126,9 @@ export async function act(
     const name = gathered?.name
     const message =
       name === undefined
-        ? { entry: "", wip: "" }
+        ? { entry: "", unfinished: "" }
         : await docs.messageFacts(lane, name)
-    const planned = planRebuild(gathered, message.wip)
+    const planned = planRebuild(gathered, message.unfinished)
     if (planned.kind === "refused") return code(planned.why)
     await refresh.rebuild(ops, lane, planned, message.entry)
     return { code: null, describe: false, fact: actionFact(action, lane, by) }

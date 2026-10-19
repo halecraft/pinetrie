@@ -7,7 +7,6 @@ import { whenSettled } from "@kyneta/exchange"
 import {
   BACK,
   type CardId,
-  DISCARDED,
   type EntryId,
   entryId,
   entryThread,
@@ -15,6 +14,7 @@ import {
   ROOT,
   type TextCardId,
   type ThreadId,
+  TRASH_PLACE,
 } from "@pinetrie/core"
 import { scriptedModel } from "@pinetrie/pi"
 import { PLACES_DOC_ID } from "@pinetrie/protocol/messages"
@@ -763,7 +763,7 @@ async function run(check: Checks["check"]): Promise<void> {
     )
     // A paste: a text card pasted at the thread lands in its
     // notes, one step of Ada's history in this canvas, which an undo takes
-    // away. A cut is a discard, then the paste of that very card out of
+    // away. A cut is trashing, then the paste of that very card out of
     // her trash; an undo puts it back there.
     const notesNear = {
       kind: "notes",
@@ -795,7 +795,7 @@ async function run(check: Checks["check"]): Promise<void> {
     const cutCard = newCard(ada, tipOf(), "cut, then pasted")
     await waitFor(() => onHost(cutCard) !== undefined, 5_000)
     await ada.moveCard(
-      { card: cutCard, from: drafting(tipOf()), to: DISCARDED },
+      { card: cutCard, from: drafting(tipOf()), to: TRASH_PLACE },
       { actedAt: { kind: "inventory" }, slot: null },
       null,
       here,
@@ -831,7 +831,7 @@ async function run(check: Checks["check"]): Promise<void> {
         {
           card: columnThread,
           from: { kind: "canvas", canvas: wasOn.canvas },
-          to: DISCARDED,
+          to: TRASH_PLACE,
         },
         { actedAt: { kind: "inventory" }, slot: null },
         null,
@@ -841,7 +841,7 @@ async function run(check: Checks["check"]): Promise<void> {
     }
     const trashedLeft = onHost(columnThread)?.place
     const restored = await bea.moveCard(
-      { card: columnThread, from: DISCARDED, to: BACK },
+      { card: columnThread, from: TRASH_PLACE, to: BACK },
       { actedAt: { kind: "inventory" }, slot: null },
     )
     await waitFor(() => onHost(columnThread)?.place.kind === "canvas", 5_000)

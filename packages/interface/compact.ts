@@ -292,7 +292,7 @@ export type Detail = "compact" | "normal" | "full"
  * the bench, and full when opened). An entry's margin draws its comments
  * normal under the entry while it is open; shut, it draws their count, which
  * is no level. A folded column is no level either: it is drawn as its strip.
- * A discarded card is drawn nowhere; were it drawn, it would be compact.
+ * A trashed card is drawn nowhere; were it drawn, it would be compact.
  */
 export const DETAIL_ON: Readonly<Record<CardPlace["kind"], Detail>> = {
   composing: "normal",

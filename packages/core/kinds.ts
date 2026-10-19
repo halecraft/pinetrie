@@ -46,7 +46,7 @@ export interface KindSpec {
  * - a note column, on a canvas;
  * - a reference, holding an address and its quote: a note, a comment in
  *   an entry's margin, queued (its quote sent as its queuer's message), in
- *   an inventory, or discarded. The readers of pinned cards read no quote,
+ *   an inventory, or trashed. The readers of pinned cards read no quote,
  *   so it is never pinned;
  * - a fact, only ever queued, until its thread's end consumes it: the
  *   host places it, no person moves it (a move is refused `no-place`), and

@@ -119,7 +119,7 @@ const parentFrom: BaseMerge = {
   upToDateWith: OURS,
 }
 /** pi's estimate of a custom message: a token per four characters. */
-const budgetOf = (tokens: number): PromptBudget => ({
+const allowanceOf = (tokens: number): PromptBudget => ({
   tokens,
   estimate: content => Math.ceil(content.length / 4),
 })
@@ -127,7 +127,7 @@ const budgetOf = (tokens: number): PromptBudget => ({
 /** The floor `planGetLatest` settles for `from`, with room for anything. */
 function floorFor(from: BaseMerge, intent: string): Floor {
   const planned = planGetLatest(from, {
-    budget: budgetOf(100_000),
+    budget: allowanceOf(100_000),
     skill: null,
     intent,
   })
@@ -138,7 +138,7 @@ function floorFor(from: BaseMerge, intent: string): Floor {
 describe("planGetLatest: whether a catch-up may merge", () => {
   test("refused, before the merge, when even the smallest prompt would not fit; it names what can be shortened", () => {
     const planned = planGetLatest(acceptedFrom, {
-      budget: budgetOf(50),
+      budget: allowanceOf(50),
       skill: null,
       intent: "x".repeat(400),
     })
@@ -151,7 +151,7 @@ describe("planGetLatest: whether a catch-up may merge", () => {
   })
   test("with room, it merges what it was given, and the prompt names whose work comes in", () => {
     const planned = planGetLatest(parentFrom, {
-      budget: budgetOf(1_000),
+      budget: allowanceOf(1_000),
       skill: null,
       intent: "",
     })
@@ -195,18 +195,18 @@ describe("planSettle: what a merge comes to", () => {
       ),
       merge: MERGE,
     })
-    const wip: BaseMerge = {
-      kind: "wip",
+    const unfinished: BaseMerge = {
+      kind: "unfinished",
       bookmark: "wip/x",
       commit: commitId(ACCEPTED),
       under: commitId(OURS),
       on: OURS,
     }
-    expect(planSettle(facts, { ...ctx, from: wip })).toMatchObject({
+    expect(planSettle(facts, { ...ctx, from: unfinished })).toMatchObject({
       message: encodeUpdate(
         {
           lane: LANE,
-          from: { kind: "wip", bookmark: "wip/x" },
+          from: { kind: "unfinished", bookmark: "wip/x" },
           merged: ACCEPTED,
           files: ["a.txt"],
           commits: ["yours one"],
@@ -527,7 +527,7 @@ describe("getLatestInRun", () => {
         commit: commitId("l2"),
         heads: { current: null, proposed: "x" },
         log: { current: null, proposed: "x" },
-        wips: [],
+        unfinishedWork: [],
         workingCopy: {
           behind: 0,
           ahead: 0,

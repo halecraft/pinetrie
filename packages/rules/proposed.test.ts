@@ -434,7 +434,7 @@ describe("records", () => {
       commit: COPY,
       heads: { current: null, proposed: "builtin_immutable_heads() | …" },
       log: { current: null, proposed: "builtin_log() | …" },
-      wips: [{ bookmark: "wip/x", commit: TIP, behind: 1, ahead: 2 }],
+      unfinishedWork: [{ bookmark: "wip/x", commit: TIP, behind: 1, ahead: 2 }],
       workingCopy: {
         behind: 0,
         ahead: 0,
@@ -449,7 +449,7 @@ describe("records", () => {
     const base: JjBaseRecord = {
       kind: "jj",
       lane: LANE,
-      base: { kind: "wip", bookmark: "wip/x" },
+      base: { kind: "unfinished", bookmark: "wip/x" },
       start: COPY,
       state: "ok",
       getLatest: { tip: TIP, to: COPY, files: ["a.txt"] },
@@ -498,14 +498,14 @@ describe("the update and stack messages", () => {
     const { from: _f, merged: _m, ...rest } = details
     const older = { ...rest, base: "accepted", line: true, copy: COPY }
     expect(decodeUpdate({ ...m, details: older })).toBeUndefined()
-    const wip = {
+    const unfinished = {
       ...details,
-      from: { kind: "wip" as const, bookmark: "wip/a" },
+      from: { kind: "unfinished" as const, bookmark: "wip/a" },
     }
-    expect(renderableMessage(encodeUpdate(wip, 5))).toMatchObject({
+    expect(renderableMessage(encodeUpdate(unfinished, 5))).toMatchObject({
       content: "↓ got the latest from wip/a: 2 files changed",
     })
-    expect(encodeUpdate(wip, 5).content).toContain(
+    expect(encodeUpdate(unfinished, 5).content).toContain(
       "The work on wip/a was merged",
     )
   })
@@ -545,7 +545,7 @@ describe("the update and stack messages", () => {
   })
   test.each([
     [{ kind: "accepted" }, "Accepted work"],
-    [{ kind: "wip", bookmark: "wip/a" }, "The work on wip/a"],
+    [{ kind: "unfinished", bookmark: "wip/a" }, "The work on wip/a"],
     [
       {
         kind: "parent",
@@ -590,7 +590,7 @@ describe("the update and stack messages", () => {
 
 describe("acceptanceDestinations", () => {
   const line = { kind: "accepted" } as const
-  const wip = { kind: "wip", bookmark: "wip/x" } as const
+  const unfinished = { kind: "unfinished", bookmark: "wip/x" } as const
   const of = (
     over: Partial<Parameters<typeof acceptanceDestinations>[0]> = {},
   ) =>
@@ -599,27 +599,29 @@ describe("acceptanceDestinations", () => {
       state: "ok",
       acceptedBookmark: "pinetrie-accepted",
       conflicted: false,
-      wipAhead: 2,
+      unfinishedAhead: 2,
       ...over,
     }).map(d => [d.bookmark, d.bringsAlong, d.final])
   test("a thread on accepted work: accepted work, final", () => {
     expect(of()).toEqual([["pinetrie-accepted", 0, true]])
   })
   test("a WIP thread: its WIP first, then accepted work with the WIP's commits", () => {
-    expect(of({ base: wip })).toEqual([
+    expect(of({ base: unfinished })).toEqual([
       ["wip/x", 0, false],
       ["pinetrie-accepted", 2, true],
     ])
   })
   test("conflicted proposed changes never land on accepted work: only into a WIP", () => {
     expect(of({ conflicted: true })).toEqual([])
-    expect(of({ base: wip, conflicted: true })).toEqual([["wip/x", 0, false]])
+    expect(of({ base: unfinished, conflicted: true })).toEqual([
+      ["wip/x", 0, false],
+    ])
   })
   test("a landed WIP is accepted work's; a gone one has none", () => {
-    expect(of({ base: wip, state: "landed" })).toEqual([
+    expect(of({ base: unfinished, state: "landed" })).toEqual([
       ["pinetrie-accepted", 0, true],
     ])
-    expect(of({ base: wip, state: "gone" })).toEqual([])
+    expect(of({ base: unfinished, state: "gone" })).toEqual([])
   })
 })
 
@@ -780,8 +782,8 @@ describe("the proposed changes' policy over a gather", () => {
         { commit: commitId("b2"), changeId: "ktop", since: HOST_ONLY },
       ],
     })
-    const WIP_BASE = {
-      base: { kind: "wip", bookmark: "wip/x" },
+    const UNFINISHED_BASE = {
+      base: { kind: "unfinished", bookmark: "wip/x" },
       start: START,
       source: START,
     } as const
@@ -802,12 +804,12 @@ describe("the proposed changes' policy over a gather", () => {
         gathered:
           over.gathered === undefined
             ? gather({
-                place: at({ base: WIP_BASE }),
+                place: at({ base: UNFINISHED_BASE }),
                 proposed: over.proposed ?? o,
               })
             : over.gathered,
         seen: over.seen === undefined ? SHOWN : over.seen,
-        acceptance: { wipAhead: 2, below: over.below ?? BOTH },
+        acceptance: { unfinishedAhead: 2, below: over.below ?? BOTH },
         editing: new Set(),
         acceptedBookmark: "pinetrie-accepted",
         to: over.to ?? null,
@@ -845,7 +847,7 @@ describe("the proposed changes' policy over a gather", () => {
         outcome(
           accept({
             gathered: gather({
-              place: { kind: "gone", tip: TIP, base: WIP_BASE },
+              place: { kind: "gone", tip: TIP, base: UNFINISHED_BASE },
             }),
             seen: null,
           }),

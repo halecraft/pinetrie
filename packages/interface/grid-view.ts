@@ -14,10 +14,10 @@ import type {
 import type { CardTitleRecord } from "@pinetrie/rules"
 import type { CardTone } from "./card-frame.ts"
 import { type Compact, cardCompact, type DrawnCard } from "./compact.ts"
-import { isDiscardable } from "./discardable.ts"
 import type { MediaColumnView } from "./media-column-view.ts"
 import type { NoteColumnView } from "./note-column-view.ts"
 import type { ThreadGlance } from "./thread-glance.ts"
+import { isTrashable } from "./trashable.ts"
 
 export interface GridCell {
   readonly index: number
@@ -25,8 +25,8 @@ export interface GridCell {
   readonly card: DrawnCard | null
   readonly compact: Compact | null
   readonly selected: boolean
-  /** Whether its card may be trashed from here (`isDiscardable`): the bench's trash and Delete. */
-  readonly discards: boolean
+  /** Whether its card may be trashed from here (`isTrashable`): the bench's trash and Delete. */
+  readonly trashes: boolean
 }
 
 export interface GridView {
@@ -85,7 +85,7 @@ export function gridView(input: {
               threadNames: input.threadNames ?? NONE,
             }),
       selected: index === input.selected,
-      discards: card !== null && isDiscardable(card, input.me),
+      trashes: card !== null && isTrashable(card, input.me),
     }
   })
   return {

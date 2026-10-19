@@ -5,7 +5,6 @@ import {
   type CardId,
   type CardPlace,
   type CardRecord,
-  DISCARDED,
   type EntryId,
   fitsPlace,
   isMediaId,
@@ -30,6 +29,7 @@ import {
   sameKey,
   surfaceOwner,
   type ThreadId,
+  TRASH_PLACE,
   type WriterId,
   wrapperKind,
 } from "@pinetrie/core"
@@ -155,7 +155,7 @@ function madeAt(
  *   (`planMake`).
  * - A fact is the host's: no person moves its kind (`KINDS`),
  *   so every move of it is refused `no-place`.
- * - To a trash: a discard, from any place the sender may move out of; the
+ * - To a trash: a trash, from any place the sender may move out of; the
  *   card records the place it left. A card in a trash moves only by an
  *   undo, which is no handoff, or by `planFromTrash` (its cutter's paste,
  *   or a restore to `back`): any other move out of a trash is refused
@@ -225,7 +225,7 @@ export function planFromTrash(
   if (why.kind === "uncut") {
     if (now.placer !== sender)
       return { kind: "refused", code: "gone", now: null }
-    return handoff(cards, now, { card, from: DISCARDED, to: why.to }, sender)
+    return handoff(cards, now, { card, from: TRASH_PLACE, to: why.to }, sender)
   }
   const { left } = now.place
   // A canvas's card goes back by the board's own move, or by an undo.
@@ -235,7 +235,7 @@ export function planFromTrash(
   return handoff(
     cards,
     now,
-    { card, from: DISCARDED, to: backTo(left) },
+    { card, from: TRASH_PLACE, to: backTo(left) },
     sender,
   )
 }
@@ -317,12 +317,12 @@ function handoff(
 
 /**
  * A paste, as one step of its sender's history: the card it
- * replaces discarded first, so a replacement in a full inventory
+ * replaces trashed first, so a replacement in a full inventory
  * never meets `full`; then the card made where `move` sends it (a text
  * card keeping its origin, or a reference), or the cut card moved out of
  * a trash by its cutter (`planFromTrash`). A card made in the place of the one it
  * replaces takes that very place (its rank in a note column or a queue): an
- * edit as text keeps the reference's spot. Refused as the discard, the
+ * edit as text keeps the reference's spot. Refused as the trash, the
  * make or the move would be.
  */
 export function planPaste(
@@ -334,16 +334,16 @@ export function planPaste(
 ): MovesStep {
   const old =
     replacing === null ? undefined : cards.find(c => c.id === replacing.card)
-  const discard =
+  const trash =
     replacing === null
       ? null
       : planMove(
           cards,
-          { card: replacing.card, from: replacing.from, to: DISCARDED },
+          { card: replacing.card, from: replacing.from, to: TRASH_PLACE },
           sender,
         )
-  if (discard?.kind === "refused") return discard
-  const before = discard === null ? cards : afterSteps(cards, [discard])
+  if (trash?.kind === "refused") return trash
+  const before = trash === null ? cards : afterSteps(cards, [trash])
   if (paste.kind === "uncut") {
     const step = planFromTrash(before, paste.card, sender, {
       kind: "uncut",
@@ -352,7 +352,7 @@ export function planPaste(
     if (step.kind === "refused") return step
     return {
       kind: "steps",
-      steps: [...(discard === null ? [] : [discard]), step],
+      steps: [...(trash === null ? [] : [trash]), step],
     }
   }
   const place =
@@ -367,7 +367,7 @@ export function planPaste(
   if (step.kind === "refused") return step
   return {
     kind: "steps",
-    steps: [...(discard === null ? [] : [discard]), step],
+    steps: [...(trash === null ? [] : [trash]), step],
   }
 }
 

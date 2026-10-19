@@ -111,7 +111,7 @@ The records it reads, and the decisions that made them:
 | `readProposedByLane` | `pinetrie.proposed` | ADR-0105 |
 | `readAccepted`, `readBases` | `pinetrie.accepted`, `pinetrie.base` | ADR-0104 |
 | `readLaneForks` | `pinetrie.lane-fork` | ADR-0167 |
-| `readBudgets` | `pinetrie.budget` | ADR-0128 |
+| `readAllowances` | `pinetrie.allowance` | ADR-0128 |
 | `readCommands` | `pinetrie.commands` | ADR-0036 |
 | `readIcons` | `pinetrie.icons` | ADR-0143 |
 

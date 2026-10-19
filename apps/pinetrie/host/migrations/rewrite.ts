@@ -148,6 +148,7 @@ export function planHistoryRewrites(
   rows: Readonly<Record<string, StoredEntryRow>>,
   customType: string,
   rewrite: Rewrite,
+  renamedTo?: string,
 ): readonly StoredEntryRow[] {
   return Object.values(rows).flatMap(row => {
     const payload = row.payload as { readonly message?: unknown } | null
@@ -158,21 +159,28 @@ export function planHistoryRewrites(
       readonly details?: unknown
     }
     if (m.customType !== customType) return []
-    const details = rewrite(m.details)
-    return details === null
-      ? []
-      : [{ ...row, payload: { ...payload, message: { ...m, details } } }]
+    const rewritten = rewrite(m.details)
+    if (rewritten === null && renamedTo === undefined) return []
+    const written = {
+      ...m,
+      details: rewritten ?? m.details,
+      ...(renamedTo === undefined ? {} : { customType: renamedTo }),
+    }
+    return [{ ...row, payload: { ...payload, message: written } }]
   })
 }
 
 /**
  * A record migration that rewrites the stored `details` of every history
- * message of `customType`, in every root.
+ * message of `customType`, in every root; with `renamedTo`, every such message
+ * also takes that `customType`, its details unchanged where `rewrite` leaves
+ * them.
  */
 export function rewriteHistory(spec: {
   readonly name: string
   readonly customType: string
   readonly rewrite: Rewrite
+  readonly renamedTo?: string
 }): RecordMigration {
   return {
     name: spec.name,
@@ -188,6 +196,7 @@ export function rewriteHistory(spec: {
           readEntries(doc),
           spec.customType,
           spec.rewrite,
+          spec.renamedTo,
         )
         return rows.length === 0 ? [] : [{ doc, rows }]
       })

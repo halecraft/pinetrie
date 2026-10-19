@@ -41,8 +41,8 @@ interface ProposedChangesAt {
 
 /** What a build needs besides: the WIP line, and a fresh nonce its commits are named by (`nonceRevset`). */
 export interface BuildAt extends ProposedChangesAt {
-  /** The WIP line proposed changes carry until an agent describes it (`wipDescription`). */
-  readonly wip: string
+  /** The WIP line proposed changes carry until an agent describes it (`unfinishedDescription`). */
+  readonly unfinished: string
   /** `pinetrie-proposed-<uuid>`, fresh for each build: the host makes it. */
   readonly nonce: string
 }
@@ -136,7 +136,7 @@ export function buildEffects(
           name: at.name,
           place: decision.place,
           changeIds: [],
-          sources: [{ commit: decision.place.tip, description: at.wip }],
+          sources: [{ commit: decision.place.tip, description: at.unfinished }],
         },
         at,
       )
@@ -153,7 +153,7 @@ export function buildEffects(
             start: place.start,
             tip: place.tip,
             target: place.target,
-            description: proposedMessage(at.wip, {
+            description: proposedMessage(at.unfinished, {
               ...at,
               ledger: { source: place.tip, start: place.start },
             }),

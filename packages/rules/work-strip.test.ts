@@ -69,7 +69,7 @@ describe("workStripView: the work strip's states", () => {
       asked,
       base: null,
       into: { kind: "bookmark", bookmark: "pinetrie-accepted" },
-      wipAhead: 0,
+      unfinishedAhead: 0,
       getLatest: catching.getLatest ?? { kind: "current" },
       untraced: catching.untraced ?? false,
       queued: catching.queued ?? [],
@@ -218,13 +218,13 @@ describe("workStripView: the work strip's states", () => {
       asked: null,
       base: {
         kind: "jj",
-        base: { kind: "wip", bookmark: "wip/a" },
+        base: { kind: "unfinished", bookmark: "wip/a" },
         state: "gone",
       },
       parent: null,
       parentRunning: false,
       into: { kind: "bookmark", bookmark: "pinetrie-accepted" },
-      wipAhead: 0,
+      unfinishedAhead: 0,
       getLatest: { kind: "current" },
       untraced: false,
       queued: [],
@@ -274,7 +274,7 @@ describe("workStripView: the work strip's states", () => {
     const W1 = commitId("w1")
     const line = (
       commit: typeof L1 | null,
-      wips = [] as { bookmark: string; commit: typeof L1 }[],
+      unfinishedWork = [] as { bookmark: string; commit: typeof L1 }[],
     ): JjAcceptedRecord => ({
       kind: "jj",
       acceptedBookmark: "pinetrie-accepted",
@@ -284,7 +284,7 @@ describe("workStripView: the work strip's states", () => {
       commit,
       heads: { current: null, proposed: "" },
       log: { current: null, proposed: "" },
-      wips: wips.map(w => ({ ...w, behind: 0, ahead: 1 })),
+      unfinishedWork: unfinishedWork.map(w => ({ ...w, behind: 0, ahead: 1 })),
       workingCopy: {
         behind: 0,
         ahead: 0,
@@ -303,10 +303,10 @@ describe("workStripView: the work strip's states", () => {
       untraced: [],
       work: "some",
     }
-    const onWip: JjBaseRecord = {
+    const onUnfinished: JjBaseRecord = {
       kind: "jj",
       lane: LANE,
-      base: { kind: "wip" as const, bookmark: "wip/a" },
+      base: { kind: "unfinished" as const, bookmark: "wip/a" },
       start: W1,
       state: "ok" as const,
       getLatest: null,
@@ -320,20 +320,23 @@ describe("workStripView: the work strip's states", () => {
     // there is no line to catch up with.
     expect(latestNow(undefined, line(L2))).toEqual({ kind: "unknown" })
     expect(latestNow(undefined, line(null))).toEqual({ kind: "current" })
-    expect(moved(onWip, line(L2, [{ bookmark: "wip/a", commit: W1 }]))).toBe(
-      false,
-    )
     expect(
-      moved(onWip, line(L2, [{ bookmark: "wip/a", commit: commitId("w2") }])),
+      moved(onUnfinished, line(L2, [{ bookmark: "wip/a", commit: W1 }])),
+    ).toBe(false)
+    expect(
+      moved(
+        onUnfinished,
+        line(L2, [{ bookmark: "wip/a", commit: commitId("w2") }]),
+      ),
     ).toBe(true)
     // Landed: on accepted work now, and caught up with it only once merged.
-    expect(moved({ ...onWip, state: "landed" }, line(L2))).toBe(true)
-    expect(moved({ ...onWip, state: "gone" }, line(L2))).toBe(false)
+    expect(moved({ ...onUnfinished, state: "landed" }, line(L2))).toBe(true)
+    expect(moved({ ...onUnfinished, state: "gone" }, line(L2))).toBe(false)
     expect(latestNow(onAccepted, line(L2))).toEqual({ kind: "unknown" })
     expect(
       latestNow(
         {
-          ...onWip,
+          ...onUnfinished,
           getLatest: { tip: commitId("t"), to: commitId("w2"), files: ["w"] },
         },
         line(L2, [{ bookmark: "wip/a", commit: commitId("w2") }]),
@@ -419,7 +422,7 @@ describe("workStripView: the work strip's states", () => {
       parent: null,
       parentRunning: false,
       into: { kind: "folder" },
-      wipAhead: 0,
+      unfinishedAhead: 0,
       getLatest: { kind: "current" },
       untraced: false,
       queued: [],
@@ -452,7 +455,7 @@ describe("workStripView: the work strip's states", () => {
       parent: null,
       parentRunning: false,
       into: null,
-      wipAhead: 0,
+      unfinishedAhead: 0,
       getLatest: { kind: "current" },
       untraced: false,
       queued: [],
@@ -488,7 +491,7 @@ describe("a conflict that came with the copy, and the thread it branched from", 
       asked: null,
       base: null,
       into: { kind: "bookmark", bookmark: "pinetrie-accepted" },
-      wipAhead: 0,
+      unfinishedAhead: 0,
       getLatest: { kind: "current" },
       untraced: false,
       queued: [],

@@ -12,8 +12,8 @@ import { readPlaces } from "@pinetrie/reads"
 import { encodeRelayMessage, queuedOn } from "@pinetrie/rules"
 import { beginRun, writeEntry } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
+import type { Allowances } from "./allowances.ts"
 import { createAnswers } from "./answers.ts"
-import type { Budgets } from "./budgets.ts"
 import { createDelivery } from "./delivery.ts"
 import {
   archiveCanvas,
@@ -52,7 +52,7 @@ function setUp() {
     asker: { kind: "person", writer: ADA },
     askerName: "Ada",
     text: "anything?",
-    budget: entryId("a-1"),
+    allowance: entryId("a-1"),
     by: ADA,
   }
   writeEntry(
@@ -96,7 +96,7 @@ function setUp() {
       },
       runnable: RUNS_ANY.runnable,
     }),
-    budgets: record<Budgets>({
+    allowances: record<Allowances>({
       spent: () => false,
       runEnded: async () => {},
     }).port,

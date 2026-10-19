@@ -132,11 +132,11 @@ export const reorderWords = (step: -1 | 1): ControlWords =>
 /** A card the host could not send, until it is queued again. */
 export const unsentWords = (reason: string): string => `not sent: ${reason}`
 
-/** What a discard of yours says where you made it, until your next move there. */
-const DISCARDED_NOTICE = "trashed · ⌘Z brings it back"
+/** What a trash of yours says where you made it, until your next move there. */
+const TRASHED_NOTICE = "trashed · ⌘Z brings it back"
 
 /**
- * Something of yours to say where you acted: a discard, or a
+ * Something of yours to say where you acted: a trash, or a
  * refusal: a move, a reorder or an undo the host refused, or an
  * undone swap whose slots changed. Gone from the queue, the host had popped
  * the card first, so it was sent as its queuer's message; moved,
@@ -144,17 +144,17 @@ const DISCARDED_NOTICE = "trashed · ⌘Z brings it back"
  * moved first.
  */
 export function noticeWords(notice: CardNotice, reader: Reader): string {
-  if (notice.code === "discarded") return DISCARDED_NOTICE
+  if (notice.code === "trashed") return TRASHED_NOTICE
   if (notice.code === "slots-changed")
     return "not undone: those slots have changed since"
   if (notice.code === "not-replaced")
-    return "not replaced: the card in that slot can't be discarded"
+    return "not replaced: the card in that slot can't be trashed"
   if (notice.code === "slot-taken")
     return "not pasted: a thread's copy lands only in an empty slot"
   const { by } = notice
   switch (notice.code) {
     case "gone":
-      if (!notice.fromQueue) return "not moved: it was sent or discarded first"
+      if (!notice.fromQueue) return "not moved: it was sent or trashed first"
       return by === null
         ? "already sent before you unqueued it"
         : by === reader.me
@@ -211,7 +211,7 @@ export const PUT = "put"
 export const PUT_TITLE =
   "put into your message box in the column you were in (Ctrl+Shift+O)"
 /** A card's trash button, drawn as a bin; the undo key brings it back. */
-export const DISCARD_CARD_TITLE =
+export const TRASH_CARD_TITLE =
   "trash (Ctrl+Shift+Backspace) · ⌘Z brings it back"
 /** The bench's trash button, and Delete on a selected slot: its card to your trash. */
 export const TRASH_SELECTED = {
@@ -330,7 +330,7 @@ const PARTICIPLE: Readonly<Record<Verb, string>> = {
   unpinned: "unpinned",
   "put-away": "put away",
   put: "put",
-  discarded: "discarded",
+  trashed: "trashed",
   moved: "moved",
 }
 
@@ -367,7 +367,7 @@ const ACTIVE: Readonly<Record<Verb, string>> = {
   unpinned: "unpinned this",
   "put-away": "put this away",
   put: "put this",
-  discarded: "discarded this",
+  trashed: "trashed this",
   moved: "moved this",
 }
 

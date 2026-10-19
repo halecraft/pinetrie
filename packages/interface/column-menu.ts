@@ -50,7 +50,7 @@ const TRASH: ControlWords = {
 
 /** What the ⋯'s Move to trash and the bin both ask, built once so the two cannot differ. */
 const trashIntent = (card: CardId): Intent => ({
-  kind: "discard",
+  kind: "trash",
   card,
   // A card's column is keyed by its card.
   at: { kind: "column", key: card },

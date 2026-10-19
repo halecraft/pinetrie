@@ -31,14 +31,14 @@ export function CardGrid(p: {
   /** The selected card to cell `to`, a card there swapping with it. */
   onMove: (card: CardRecord, to: number) => void
   /** Delete on a cell: its card to your trash. */
-  onDiscard: (card: CardRecord) => void
+  onTrash: (card: CardRecord) => void
   /** Open the selected card on the bench. */
   onOpen: () => void
 }) {
   const { view } = p
   const grid = useRef<HTMLDivElement>(null)
   const selectedCard = view.card
-  const trashes = view.cells[view.selected]?.discards === true
+  const trashes = view.cells[view.selected]?.trashes === true
   /** Select cell `n` and give it focus. */
   const select = (n: number) => {
     p.onSelect(n)
@@ -72,7 +72,7 @@ export function CardGrid(p: {
             p.onOpen()
             return
           case "trash":
-            if (selectedCard !== null) p.onDiscard(selectedCard)
+            if (selectedCard !== null) p.onTrash(selectedCard)
             return
           // The bench's open card folds by the page's Escape; an inventory's
           // cells take no comments.

@@ -21,7 +21,29 @@ export interface Source {
 }
 
 /** Names no identifier may contain, matched without regard to case. */
-export const RETIRED_IN_NAMES: readonly string[] = ["yours", "catchup"]
+export const RETIRED_IN_NAMES: readonly string[] = [
+  "yours",
+  "catchup",
+  "wips",
+  "wipnow",
+  "wipahead",
+  "wipbase",
+  "wipstate",
+  "wipmerge",
+  "wipfacts",
+  "wipdescription",
+  "iswipline",
+  "planwipcopy",
+  "onwip",
+  "wip_base",
+  "discard",
+]
+
+/**
+ * Identifiers that hold a retired name and keep it whole: a setting's key in
+ * a person's `pinetrie.json`, which renaming would stop their file reading.
+ */
+export const KEPT_NAMES: readonly string[] = ["catchUp"]
 
 /**
  * Files whose identifiers may hold a retired name: a migration's own words
@@ -38,6 +60,7 @@ export const OLD_SHAPES: readonly string[] = [
   "apps/pinetrie/host/migrations/0012-base-get-latest.ts",
   "apps/pinetrie/host/migrations/0013-accepted-get-latest.ts",
   "apps/pinetrie/host/migrations/0013-accepted-get-latest.test.ts",
+  "apps/pinetrie/host/migrations/0017-accepted-unfinished.ts",
 ]
 
 /** Every identifier `text` names, each once, in order: bindings, references and property keys. */
@@ -70,6 +93,7 @@ export function retiredNames(
 ): readonly string[] {
   const lower = retired.map(w => w.toLowerCase())
   return identifierNames(source.file, source.text)
+    .filter(name => !KEPT_NAMES.includes(name))
     .filter(name => lower.some(w => name.toLowerCase().includes(w)))
     .map(name => `${source.file}: ${name}`)
 }

@@ -277,7 +277,7 @@ export type PlaceKey =
       "order" | "by" | "width"
     >
   /**
-   * A discard names no place left: the host fills it in from where the
+   * A trash names no place left: the host fills it in from where the
    * card is, and names its history from it (`movesHistory`).
    */
   | { readonly kind: "trash" }
@@ -471,7 +471,7 @@ export const MOVE_DIRECTIONS: readonly MoveDirection[] = ["undo", "redo"]
 
 /**
  * A handoff: move a card from where its sender saw it to another place. `from`
- * null creates the card. Nobody removes one: a discard is a move to the trash,
+ * null creates the card. Nobody removes one: a trash is a move to the trash,
  * and only the host deletes a record, for a card it sends or sweeps.
  */
 export interface Move<To extends MoveTarget = MoveTarget> {
@@ -632,10 +632,10 @@ export const threadOfPlace = (place: CardPlace | PlaceKey): ThreadId | null =>
     : null
 
 /**
- * Where a discard puts a card: a trash, the host filling in the place it
+ * Where a trash puts a card: a trash, the host filling in the place it
  * left, from which its history is named (`movesHistory`).
  */
-export const DISCARDED: Extract<PlaceKey, { readonly kind: "trash" }> = {
+export const TRASH_PLACE: Extract<PlaceKey, { readonly kind: "trash" }> = {
   kind: "trash",
 }
 
@@ -654,7 +654,7 @@ export const pinTargetKey = (
 export type MoveRefusal =
   /** The card is no longer where the sender saw it. */
   | "moved"
-  /** The card has no record: sent, or discarded. */
+  /** The card has no record: sent, or trashed. */
   | "gone"
   /** A creation whose id is in use. */
   | "exists"
@@ -751,7 +751,7 @@ const PLACE_FIELDS = {
   by: { key: "never" },
   seen: { key: "always" },
   holder: { key: "always" },
-  // A trash key names no canvas: the host names a discard's history.
+  // A trash key names no canvas: the host names trashing's history.
   canvas: {
     key: "for",
     kinds: ["canvas", "canvas-at", "canvas-pinned", "notes", "new-canvas"],
@@ -810,8 +810,8 @@ export const keyFieldsFrom = (
  * - an image, its media column in `column`;
  * - a comment, what it is on in `at`, printed (`printAddress`), and the
  *   version of the image it was written on in `seen`;
- * - a trash's key as `discarded`, every field "" (a card in a trash is
- *   stored as the place it left, its kind `discarded-` and that place's
+ * - a trash's key as `trashed`, every field "" (a card in a trash is
+ *   stored as the place it left, its kind `trashed-` and that place's
  *   stored kind: `trashedFields`);
  * - a canvas's card on the board, its workflow state in `state`.
  */
@@ -830,7 +830,7 @@ const ROWS = {
   margin: ["at", "order", "seen"],
   canvas: ["canvas", "order", "width"],
   inventory: ["holder"],
-  discarded: [],
+  trashed: [],
   board: ["state", "order"],
 } as const satisfies Record<
   string,
@@ -938,14 +938,14 @@ export function placeFields(place: CardPlace | MoveTarget): PlaceFields {
         order: "order" in place ? place.order : "",
       })
     case "trash":
-      return "left" in place ? trashedFields(place.left) : row("discarded", {})
+      return "left" in place ? trashedFields(place.left) : row("trashed", {})
   }
 }
 
 /** What a trashed card's row kind starts with, before its left place's stored kind. */
-const TRASHED = "discarded-"
+const TRASHED = "trashed-"
 
-/** A trashed card's row: the place it left, its kind prefixed `discarded-`. */
+/** A trashed card's row: the place it left, its kind prefixed `trashed-`. */
 const trashedFields = (left: LivePlace): PlaceFields => {
   const fields = placeFields(left)
   return { ...fields, kind: `${TRASHED}${fields.kind}` }
@@ -1015,7 +1015,7 @@ function livePlaceOfFields(f: PlaceFields): LivePlace | undefined {
       return !isWorkflowStateId(r.state) || r.order === ""
         ? undefined
         : { kind: "board", state: r.state, order: r.order }
-    case "discarded":
+    case "trashed":
       return undefined
     case "drafting": {
       const at = atThread(r)
@@ -1079,7 +1079,7 @@ export function keyOfFields(f: PlaceFields): PlaceKey | undefined {
       return isCanvasId(r.canvas)
         ? { kind: "canvas-pinned", canvas: r.canvas }
         : undefined
-    case "discarded":
+    case "trashed":
       return { kind: "trash" }
     case "board":
       return isWorkflowStateId(r.state)

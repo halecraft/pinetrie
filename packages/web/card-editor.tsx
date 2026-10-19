@@ -413,8 +413,8 @@ export function CardEditor(p: {
           ? null
           : () => p.onAct({ kind: "setCommand", card: card.id, command: null })
       }
-      onDiscard={() => {
-        if (card !== undefined) p.onAct({ kind: "discard", card: card.id })
+      onTrash={() => {
+        if (card !== undefined) p.onAct({ kind: "trash", card: card.id })
       }}
       reader={p.reader}
       view={frame}
@@ -579,8 +579,8 @@ export function BoundCardEditor(p: {
   among: readonly CardRecord[] | null
   /** A move from its ⋯, a ↑ or ↓, or a key in its box; absent where it has none. */
   onAct?: (act: ColumnAct) => void
-  /** Discards the card: its bin and Ctrl+Shift+Backspace. */
-  onDiscard: () => void
+  /** Trashes the card: its bin and Ctrl+Shift+Backspace. */
+  onTrash: () => void
   /** Given, the card is open on your inventory's bench: its × closes it. */
   onClose?: () => void
   /** Every seat the host has seen, to name who wrote in a note; empty for none. */
@@ -622,7 +622,7 @@ export function BoundCardEditor(p: {
       foot={p.foot}
       onAct={onAct}
       onClearCommand={null}
-      onDiscard={p.onDiscard}
+      onTrash={p.onTrash}
       onClose={p.onClose}
       reader={p.reader}
       view={view}
@@ -647,10 +647,10 @@ export function BoundCardEditor(p: {
             among === null ? null : among.map(c => c.id),
           )
           if (act === null) return
-          if (act.kind === "discard" && !view.discards) return
+          if (act.kind === "trash" && !view.trashes) return
           if (act.kind === "reorder" && among === null) return
           e.preventDefault()
-          if (act.kind === "discard") p.onDiscard()
+          if (act.kind === "trash") p.onTrash()
           else onAct(act)
         }}
         readOnly={p.readOnly}
@@ -721,7 +721,7 @@ export function NoteCardEditor(p: {
       latestSources={p.latestSources}
       foot={null}
       onAct={p.onAct}
-      onDiscard={() => p.onAct({ kind: "discard", card: card.id })}
+      onTrash={() => p.onAct({ kind: "trash", card: card.id })}
       onTyping={p.onTyping}
       readOnly={p.readOnly !== null}
       reader={p.reader}
@@ -801,7 +801,7 @@ export function NewCardBox(p: {
         foot={null}
         onAct={p.onAct}
         onClearCommand={null}
-        onDiscard={() => {}}
+        onTrash={() => {}}
         reader={p.reader}
         view={cardFrame(null, view.tone, {
           me: session.writer,
@@ -889,7 +889,7 @@ export function QueuedCardEditor(p: {
       latestSources={p.latestSources}
       foot={null}
       onAct={p.onAct}
-      onDiscard={() => p.onAct({ kind: "discard", card: card.id })}
+      onTrash={() => p.onAct({ kind: "trash", card: card.id })}
       onTyping={p.onTyping}
       readOnly={p.readOnly !== null}
       reader={p.reader}
@@ -942,7 +942,7 @@ export function PinnedCardEditor(p: {
         <span className="pinned-size">{tokenSizeWords(textTokens(text))}</span>
       }
       onAct={p.onAct}
-      onDiscard={() => p.onAct({ kind: "discard", card: card.id })}
+      onTrash={() => p.onAct({ kind: "trash", card: card.id })}
       onText={setText}
       onTyping={p.onTyping}
       readOnly={p.readOnly !== null}

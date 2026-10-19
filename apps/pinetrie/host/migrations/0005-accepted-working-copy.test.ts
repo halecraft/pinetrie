@@ -17,7 +17,7 @@ const OLD = {
   commit: null,
   heads: { current: null, proposed: "trunk()" },
   log: { current: null, proposed: "logged" },
-  wips: [],
+  unfinishedWork: [],
   published: { commit: null, behind: 0, ahead: 0 },
   yours: {
     behind: 1,

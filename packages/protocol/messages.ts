@@ -99,7 +99,7 @@ export const HOST_PRINCIPAL = "pinetrie-host"
  *   - `paste` makes a card from a copy, or moves a cut one out of a trash
  *     by its cutter: `mode` is `text`, `reference` or `uncut`;
  *     `moves` ends with the card's move (from nowhere, or from a trash),
- *     after the discard of the card it replaces, if any; `text`
+ *     after the trash of the card it replaces, if any; `text`
  *     is a reference's address, or a text card's origin (`""` for none),
  *     printed (`printAddress`); `seen` a reference's quote's blob; `here`
  *     the sender's canvas.
@@ -183,7 +183,7 @@ export interface Command {
   readonly canvas: string
   /**
    * `move` and `spin-off`: the canvas its sender is on, which names a
-   * discard's history for a card in an inventory. `""` for none.
+   * trash's history for a card in an inventory. `""` for none.
    */
   readonly here: string
   /**

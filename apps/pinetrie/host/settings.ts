@@ -50,7 +50,7 @@ import {
 } from "@pinetrie/lanes"
 import type { ListedFolder } from "@pinetrie/pi"
 import {
-  DEFAULT_BUDGET,
+  DEFAULT_ALLOWANCE,
   DEFAULT_QUOTE_BYTES,
   ICON_SOURCES,
   type IconConfig,
@@ -172,7 +172,7 @@ export const SETTINGS = defineTable({
   }),
   "agents.budget": limited(
     pick(count({ min: 1 }), {
-      fallback: DEFAULT_BUDGET,
+      fallback: DEFAULT_ALLOWANCE,
       describe: "the tokens agents may spend talking, per message",
       order: ["user", "local"],
     }),
@@ -273,7 +273,7 @@ export const SETTINGS = defineTable({
     ),
     {
       fallback: DEFAULT_REPO.wipPrefix,
-      describe: "the start of every WIP's bookmark",
+      describe: "the start of every bookmark of unfinished work",
       order: ["user", { project: "working" }, "local"],
     },
   ),

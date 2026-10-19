@@ -23,7 +23,7 @@ export const RelaySchema = Type.Object({
   asker: AskerSchema,
   askerName: Type.String(),
   text: Type.String(),
-  budget: EntryIdSchema,
+  allowance: EntryIdSchema,
   by: WriterIdSchema,
 })
 

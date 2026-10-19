@@ -43,7 +43,7 @@ export interface BaseNow {
   /** Accepted work's state; null before it is set up. */
   readonly acceptedPoint: PointId | null
   /** For a WIP base: its commit now, and accepted work's commit under it. */
-  readonly wipNow: {
+  readonly unfinishedNow: {
     readonly commit: CommitId
     readonly under: CommitId
   } | null

@@ -116,7 +116,7 @@ export const trashWarnMs = (keepMs: number): number =>
 
 /**
  * The columns trashed from `canvas`'s canvas: each thread or note column in a
- * trash whose `left` is that canvas, the newest discard first.
+ * trash whose `left` is that canvas, the newest trash first.
  */
 export function canvasTrash(input: {
   readonly cards: readonly CardRecord[]

@@ -60,7 +60,7 @@ const strip = (
       asked: null,
       base: { kind: "folder" },
       into: { kind: "folder" },
-      wipAhead: 0,
+      unfinishedAhead: 0,
       getLatest: over.getLatest ?? { kind: "current" },
       untraced: false,
       queued: [],

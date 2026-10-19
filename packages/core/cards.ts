@@ -6,8 +6,8 @@
 import type { Address } from "./address.ts"
 import type { LatestFrom } from "./bases.ts"
 import type {
+  AllowanceSpentFact,
   BranchedFact,
-  BudgetSpentFact,
   MemberFact,
   RoundFact,
   StopFact,
@@ -105,7 +105,7 @@ export type QueuedFact =
   | ResolvedFact
   | StopFact
   | MemberFact
-  | BudgetSpentFact
+  | AllowanceSpentFact
   | UnansweredFact
   | UndeliveredFact
   | RoundFact

@@ -50,7 +50,7 @@ export function inventoryView(input: {
   readonly slots: Slots
   readonly intents: Intents
   readonly selected: number
-  /** You: whose cards the grid's × discards. */
+  /** You: whose cards the grid's × trashes. */
   readonly me: WriterId
   /** Each card's text, by id; one not yet read is "". */
   readonly texts: ReadonlyMap<CardId, string>

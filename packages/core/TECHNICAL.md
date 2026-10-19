@@ -135,7 +135,7 @@ it re-exports every module but `fixtures.ts`, which tests import as
   (ADR-0075). Resume starts a new turn (ADR-0082).
 - A thread's mode is its lane, and a mention picks who a message is for
   (ADR-0021). Other threads' agents are invited, then asked, and what an
-  asked agent has heard is read from the path (ADR-0128).
+  came into an asked agent is read from the path (ADR-0128).
 - A root is a document (ADR-0063), rooted at its first message (S30). Its
   summary, written to the directory, carries its followers (ADR-0077) and
   its mentions, for your inbox (ADR-0030).
@@ -248,7 +248,7 @@ it re-exports every module but `fixtures.ts`, which tests import as
   so the readers read every paragraph (S77). A base trailer names accepted
   work by its kind, not its bookmark, which config may rename (ADR-0100).
 - A thread has a name you can say, which its proposed changes' bookmark and trailers
-  carry, and its proposed changes hold the WIP line until an agent describes it
+  carry, and its proposed changes hold the unfinished work line until an agent describes it
   (ADR-0039).
 - A lane's work, its state and its disk are read from the nearest revision
   records above an entry (ADR-0032, ADR-0034), with the lanes that recorded

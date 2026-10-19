@@ -221,7 +221,7 @@ export type Verb =
   | "unpinned"
   | "put-away"
   | "put"
-  | "discarded"
+  | "trashed"
   | "moved"
 
 /**
@@ -291,7 +291,7 @@ export function changeVerb(from: PlaceKey | null, to: PlaceKey | null): Verb {
   if (from === null) return "created"
   const back = movedBack(from, to)
   if (back !== null) return back
-  if (to.kind === "trash") return "discarded"
+  if (to.kind === "trash") return "trashed"
   if (to.kind === "queued") return "queued"
   if (to.kind === "pinned" || to.kind === "canvas-pinned") return "pinned"
   if (to.kind === "inventory") return "put-away"
@@ -482,7 +482,7 @@ export function planProvenance(input: {
 export const TRASH_KEEP_MS = 7 * 24 * 60 * 60 * 1000
 
 /**
- * When a trashed card was trashed: its newest history event (its discard, or
+ * When a trashed card was trashed: its newest history event (its trash, or
  * what came after); `now` for one with no history to tell.
  */
 export function trashedTime(

@@ -97,7 +97,7 @@ flows, merged by `git merge-file` as lanehost merges.
   of the project's folder, are the two the page showed, with no conflict
   it was not shown (`planAccept`). Any save since the review refuses,
   whatever path it touched: the page has not shown the review rebuilt. A
-  conflicted shown merge has no destination, a folder having no WIP.
+  conflicted shown merge has no destination, a folder having no unfinished work.
 - **What it writes is a value:** each source path between accepted work's
   newest and the shown merge, with the stamp the accept's own read took
   there and what the shown merge holds (`pathWrites`), never a scan of

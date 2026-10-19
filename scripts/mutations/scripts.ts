@@ -103,6 +103,15 @@ export const mutations: readonly Mutation[] = [
       "an identifier holds a retired name in any case; a string or a comment does not count",
   },
   {
+    name: "a kept setting key reads as a retired name",
+    file: "scripts/words.ts",
+    from: "    .filter(name => !KEPT_NAMES.includes(name))\n",
+    to: "",
+    command: words,
+    expect:
+      "a kept setting key passes whole, and a name that only holds it does not",
+  },
+  {
     name: "the glossary's list of phrases nothing says reads past its heading",
     file: "scripts/words.ts",
     from: "  const section = end === -1 ? rest : rest.slice(0, end)\n",

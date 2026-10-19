@@ -76,6 +76,7 @@ import {
 } from "@pinetrie/schema"
 import { hostSocketIn } from "@pinetrie/ssh"
 import { DEFAULT_BIND, isLoopback, newKey } from "./admission.ts"
+import { createAllowances } from "./allowances.ts"
 import { createAnswers } from "./answers.ts"
 import { createBanners } from "./banners.ts"
 import { createBaseNews } from "./base-news.ts"
@@ -89,7 +90,6 @@ import {
   slow,
 } from "./basics.ts"
 import { memoryBlobs } from "./blobs.ts"
-import { createBudgets } from "./budgets.ts"
 import { createCanvasContext } from "./canvas.ts"
 import { createCanvasNews } from "./canvas-news.ts"
 import { startCards } from "./cards.ts"
@@ -618,7 +618,7 @@ export async function startHost({
   // Each run's end report, and each ask's digest unless the config turns
   // digests off. What agents talking spend. Its drain and the relays are made
   // after the agent, whose hooks call them: bound late.
-  const budgets = createBudgets({
+  const allowances = createAllowances({
     basics,
     runs: runDocs,
     keeper,
@@ -633,7 +633,7 @@ export async function startHost({
     presence,
     piSetup,
     enabled: settled["digests.enabled"].value,
-    spent: (ask, tokens) => budgets.spendFor(ask, tokens),
+    spent: (ask, tokens) => allowances.spendFor(ask, tokens),
   })
   const digestFailed = (lane: ThreadId) =>
     failed(basics, "summarizing its ask", lane)
@@ -643,7 +643,7 @@ export async function startHost({
     later,
     piSetup,
     enabled: settled["digests.enabled"].value,
-    spent: (ask, tokens) => budgets.spendFor(ask, tokens),
+    spent: (ask, tokens) => allowances.spendFor(ask, tokens),
   })
   // Each root's title, unasked as its first lane starts unless the config
   // turns that off, or when a person asks.
@@ -725,8 +725,8 @@ export async function startHost({
             },
           },
     onStream: streamInto(basics, runDocs),
-    onUsage: (lane, tokens) => budgets.onUsage(lane, tokens),
-    mayRequest: lane => budgets.mayRequest(lane),
+    onUsage: (lane, tokens) => allowances.onUsage(lane, tokens),
+    mayRequest: lane => allowances.mayRequest(lane),
   })
   log(
     agentReadyLine({
@@ -771,7 +771,7 @@ export async function startHost({
     keeper,
     start: runs.start,
     runnable: lane => work.runnable(lane),
-    budgets,
+    allowances,
     drain: lane => queueDrain(lane),
     placesWriter,
   })
@@ -793,7 +793,7 @@ export async function startHost({
     relays,
     agent,
     deliver,
-    budgets,
+    allowances,
     piSetup,
   })
   // A lane is told each change to its use of its owner's ssh; an approval

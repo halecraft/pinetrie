@@ -7,7 +7,7 @@
 // once, and gains one only through acceptance. Each copy is decoded by the
 // host's table (`settings.ts`), and every setting is settled with the layers
 // read at startup.
-// Your repo's names (`accepted`, `wip`, `publish`) are read from the working
+// Your repo's names (`accepted`, `unfinished`, `publish`) are read from the working
 // copy's file, at startup: they find accepted work, so they cannot come from
 // it (`openProject`).
 

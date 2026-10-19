@@ -4,7 +4,6 @@ import {
   type CardId,
   canvasIdFor,
   cardIdOfKind,
-  DISCARDED,
   ERR,
   entryId,
   historyScope,
@@ -20,6 +19,7 @@ import {
   storedText,
   type TextCard,
   type ThreadId,
+  TRASH_PLACE,
   threadIdFor,
   type WriterId,
   workflowStateIdFor,
@@ -331,7 +331,7 @@ describe("moves on the documents' keeper: the next queued card's pop and an unqu
     })
   })
 
-  test("the host names a discard's history: the canvas you are on, or the canvas of the thread it leaves", async () => {
+  test("the host names trashing's history: the canvas you are on, or the canvas of the thread it leaves", async () => {
     const elsewhere = canvasIdFor("01a0ffd2-0000-7000-8000-0000000000ee")
     const gone = { kind: "trash" } as const
     const mine = { kind: "inventory", holder: ADA } as const
@@ -470,7 +470,7 @@ describe("moves on the documents' keeper: the next queued card's pop and an unqu
     expect(reverted).toBe(false)
   })
 
-  test("a discard from your inventory on no canvas is in your history outside any canvas, and undone there", async () => {
+  test("trashing from your inventory on no canvas is in your history outside any canvas, and undone there", async () => {
     const gone = { kind: "trash" } as const
     const mine = { kind: "inventory", holder: ADA } as const
     const { b, commands, put, recorded, histories } = setUp()
@@ -482,7 +482,7 @@ describe("moves on the documents' keeper: the next queued card's pop and an unqu
     expect(histories.calls.at(-1)?.args).toEqual([ADA, PERSON_HISTORY, "undo"])
   })
 
-  test("a discard keeps the card, gone, in the discarder's history of its canvas: no text is destroyed, and its placer gets a trace", async () => {
+  test("trashing keeps the card, gone, in the trasher's history of its canvas: no text is destroyed, and its placer gets a trace", async () => {
     const { b, cards, commands, put, recorded } = setUp()
     put({ placer: BEA, place: pinnedPlace })
     const gone = { kind: "trash" } as const
@@ -610,10 +610,14 @@ describe("a paste", () => {
     expect(recorded).toEqual([[BEA, TEST_CANVAS]])
   })
 
-  test("a cut card, discarded, is pasted out of its cutter's trash into another place", async () => {
+  test("a cut card, trashed, is pasted out of its cutter's trash into another place", async () => {
     const { b, commands, put } = setUp()
     put({ owner: BEA })
-    await commands.move(BEA, [{ card: C1, from: noteKey, to: DISCARDED }], null)
+    await commands.move(
+      BEA,
+      [{ card: C1, from: noteKey, to: TRASH_PLACE }],
+      null,
+    )
     const done = await commands.paste(BEA, {
       kind: "paste",
       paste: { kind: "uncut", card: C1 },

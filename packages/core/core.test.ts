@@ -12,7 +12,6 @@ import {
   canvasIdFor,
   cardIdOfKind,
   cardMove,
-  DISCARDED,
   emailLocalPart,
   entryId,
   entryMargin,
@@ -60,6 +59,7 @@ import {
   THE_AGENT,
   type ThreadId,
   type ThreadName,
+  TRASH_PLACE,
   targetOfFields,
   threadIdFor,
   wireKeyFields,
@@ -735,8 +735,8 @@ describe("moves, built once", () => {
     content: { command: null, unsent: null, origin: null },
   })
   const atEnd = card({ kind: "note", column: NOTES, order: "a" })
-  test("a move goes from where the card is; a discard names no history: the host's to name", () => {
-    expect(cardMove(atEnd, DISCARDED)).toEqual({
+  test("a move goes from where the card is; trashing names no history: the host's to name", () => {
+    expect(cardMove(atEnd, TRASH_PLACE)).toEqual({
       card: cardIdFor("c1"),
       from: { kind: "note", column: NOTES },
       to: { kind: "trash" },
@@ -747,14 +747,14 @@ describe("moves, built once", () => {
     const left = { kind: "note", column: NOTES, order: "c" } as const
     const place = { kind: "trash", left } as const
     const fields = placeFields(place)
-    expect(fields).toMatchObject({ kind: "discarded-note", column: NOTES })
+    expect(fields).toMatchObject({ kind: "trashed-note", column: NOTES })
     expect(placeOfFields(fields)).toEqual(place)
     expect(keyOfFields(fields)).toEqual({ kind: "trash" })
     expect(placeOfFields({ ...fields, column: "" })).toBeUndefined()
     expect(
-      placeOfFields(asPlaceFields({ kind: "discarded", holder: ADA })),
+      placeOfFields(asPlaceFields({ kind: "trashed", holder: ADA })),
     ).toBeUndefined()
-    expect(keyOfFields(placeFields(DISCARDED))).toEqual(DISCARDED)
+    expect(keyOfFields(placeFields(TRASH_PLACE))).toEqual(TRASH_PLACE)
   })
 
   test("a surface's owner, and the live place of a trashed card", () => {

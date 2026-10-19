@@ -17,7 +17,6 @@ import {
   CLOSE_CARD,
   type ColumnAct,
   cardFrameWords,
-  DISCARD_CARD_TITLE,
   type DrawnCard,
   dragProps,
   HISTORY_TITLE,
@@ -28,6 +27,7 @@ import {
   moveWords,
   type Reader,
   SHARE_FILE,
+  TRASH_CARD_TITLE,
 } from "@pinetrie/interface"
 import { type ReactNode, useRef, useState } from "react"
 import { CardHistory, MovedBack } from "./card-history.tsx"
@@ -55,7 +55,7 @@ export function CardFrame(p: {
   writers?: readonly WriterId[]
   /** A move chosen in its ⋯, or a ↑ or ↓. */
   onAct: (act: ColumnAct) => void
-  onDiscard: () => void
+  onTrash: () => void
   /**
    * Given, the card is open on your inventory's bench: its × closes it, back
    * to read only, and its trash is the bench's, not the frame's.
@@ -129,10 +129,10 @@ export function CardFrame(p: {
         data-card={card?.id}
         // The card itself takes focus here, outside its text box, so Cmd+C
         // and Cmd+X copy and cut the card; a click focuses it. It is the
-        // card's drag handle too, a card you may discard being one you may
+        // card's drag handle too, a card you may trash being one you may
         // move (`use-drag.ts`).
         tabIndex={card === null ? undefined : 0}
-        {...(card !== null && view.discards
+        {...(card !== null && view.trashes
           ? dragProps({ kind: "card", card: card.id })
           : {})}
       >
@@ -182,7 +182,7 @@ export function CardFrame(p: {
               {CLOSE_CARD.label}
             </button>
           ) : (
-            view.discards && <DiscardButton onDiscard={p.onDiscard} />
+            view.trashes && <TrashButton onTrash={p.onTrash} />
           )}
         </span>
       </div>
@@ -276,13 +276,13 @@ function ShareFileButton(p: {
 }
 
 /** A card's bin: trashes it, and the undo key outside a box brings it back. */
-function DiscardButton(p: { onDiscard: () => void }) {
+function TrashButton(p: { onTrash: () => void }) {
   return (
     <button
-      aria-label={DISCARD_CARD_TITLE}
-      className="discard-card"
-      onClick={p.onDiscard}
-      title={DISCARD_CARD_TITLE}
+      aria-label={TRASH_CARD_TITLE}
+      className="trash-card"
+      onClick={p.onTrash}
+      title={TRASH_CARD_TITLE}
       type="button"
     >
       <TrashIcon />

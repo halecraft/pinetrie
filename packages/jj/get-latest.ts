@@ -14,11 +14,11 @@ import { changedPaths } from "./lane/revisions.ts"
 
 /**
  * What an update brings in: accepted work's commit, merged, or a WIP's
- * commit, copied onto the lane's previous copy (`planWipCopy`).
+ * commit, copied onto the lane's previous copy (`planUnfinishedCopy`).
  */
 export type GetLatestTarget =
   | { readonly kind: "accepted"; readonly commit: CommitId }
-  | { readonly kind: "wip"; readonly commit: CommitId }
+  | { readonly kind: "unfinished"; readonly commit: CommitId }
 
 /**
  * Whether a lane's forecast is read: `none` while the base is at the lane's

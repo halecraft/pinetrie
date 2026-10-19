@@ -24,14 +24,14 @@ import {
   readTreeIndex,
 } from "@pinetrie/reads"
 import {
+  ALLOWANCE,
+  type AllowanceRecord,
   addedTokens,
-  BUDGET,
-  type BudgetRecord,
   decodeAnswer,
   decodeRelay,
   mayRequest,
   NONE_BLANK,
-  newBudget,
+  newAllowance,
   planSpend,
   planStop,
   promptAuthor,
@@ -45,7 +45,7 @@ import type { Records } from "./records.ts"
 import type { RunDocs } from "./runs.ts"
 
 /** The budget a run's prompt names, and whether the run spends from it. */
-export interface RunBudget {
+export interface RunAllowance {
   readonly key: EntryId
   /** An agent started the run: an agent's ask, or an answer that woke it. */
   readonly spends: boolean
@@ -57,30 +57,33 @@ export interface RunBudget {
  * The budget a prompt names, read from it: a relay's or an answer's, else the
  * prompt's own (a person's message, or a carry-on).
  */
-export function promptBudget(prompt: EntryId, message: unknown): RunBudget {
+export function promptAllowance(
+  prompt: EntryId,
+  message: unknown,
+): RunAllowance {
   const relay = decodeRelay(message)
   if (relay !== undefined)
     return {
-      key: relay.budget,
+      key: relay.allowance,
       spends: relay.asker.kind === "agent",
       by: relay.by,
     }
   const answer = decodeAnswer(message)
   if (answer !== undefined)
-    return { key: answer.budget, spends: answer.wakes, by: answer.by }
+    return { key: answer.allowance, spends: answer.wakes, by: answer.by }
   return { key: prompt, spends: false, by: promptAuthor(message) }
 }
 
-export interface Budgets {
+export interface Allowances {
   /** The budget `lane`'s run spends, from its prompt; null for a lane with none. */
-  runBudget(lane: ThreadId): RunBudget | null
+  runAllowance(lane: ThreadId): RunAllowance | null
   /** `lane`'s budget, made when its chain has none yet, in `thread`, for `by`. */
   ensure(
     key: EntryId,
     thread: ThreadId,
     by: WriterId,
     limit?: number,
-  ): Promise<BudgetRecord>
+  ): Promise<AllowanceRecord>
   /** Whether `key`'s budget is spent. */
   spent(key: EntryId): boolean
   /** A model request of `lane`'s run was answered, with `tokens`. */
@@ -95,7 +98,7 @@ export interface Budgets {
   runEnded(prompt: EntryId | null): Promise<void>
 }
 
-export function createBudgets(deps: {
+export function createAllowances(deps: {
   readonly basics: Pick<
     Basics,
     "session" | "places" | "live" | "now" | "newId" | "log"
@@ -110,36 +113,37 @@ export function createBudgets(deps: {
   readonly later: Pick<Later, "step">
   /** The settled `agents.budget`. */
   readonly limit: number
-}): Budgets {
+}): Allowances {
   const { session, places } = deps.basics
   const docs = deps.runs
   // The live count of each budget spent from since the host started.
   const counts = new Map<EntryId, number>()
   // Each run's budget, by its prompt, once seen: its end and its requests
   // outside the thread find it here.
-  const byPrompt = new Map<EntryId, RunBudget>()
+  const byPrompt = new Map<EntryId, RunAllowance>()
   // Each spending run's last request, by its prompt; dropped at its end.
   const lastRequest = new Map<EntryId, RequestTokens>()
 
-  const record = (key: EntryId): BudgetRecord | undefined =>
-    readRecords(session, BUDGET).get(key)
-  const countOf = (r: BudgetRecord): number => counts.get(r.message) ?? r.spent
+  const record = (key: EntryId): AllowanceRecord | undefined =>
+    readRecords(session, ALLOWANCE).get(key)
+  const countOf = (r: AllowanceRecord): number =>
+    counts.get(r.message) ?? r.spent
 
   /** `lane`'s run: its prompt, and the budget it names. */
   function runOf(
     lane: ThreadId,
-  ): { readonly prompt: EntryId; readonly budget: RunBudget } | null {
+  ): { readonly prompt: EntryId; readonly budget: RunAllowance } | null {
     const doc = docs.docOf(lane)
     const prompt = doc === null ? null : readPromptMessage(doc, lane)
     if (prompt === null) return null
     const known = byPrompt.get(prompt.id)
     if (known !== undefined) return { prompt: prompt.id, budget: known }
-    const budget = promptBudget(prompt.id, prompt.message)
+    const budget = promptAllowance(prompt.id, prompt.message)
     byPrompt.set(prompt.id, budget)
     return { prompt: prompt.id, budget }
   }
 
-  const runBudget = (lane: ThreadId): RunBudget | null =>
+  const runAllowance = (lane: ThreadId): RunAllowance | null =>
     runOf(lane)?.budget ?? null
 
   /**
@@ -148,24 +152,28 @@ export function createBudgets(deps: {
    * restored canvas's agents cannot spend it again; telling the thread is a
    * late write, since a round's request can cross it after its run ended.
    */
-  function wentOver(over: BudgetRecord): void {
+  function wentOver(over: AllowanceRecord): void {
     const failed = (error: unknown) =>
-      deps.basics.log(`[host] a spent budget was not recorded: ${error}`)
+      deps.basics.log(`[host] a spent allowance was not recorded: ${error}`)
     void deps.keeper
-      .run(() => deps.records.writeValues([setRecord(BUDGET, over)]))
+      .run(() => deps.records.writeValues([setRecord(ALLOWANCE, over)]))
       .catch(failed)
     void deps.later
-      .step({ kind: "thread", thread: over.thread }, "a spent budget", () => ({
-        facts: [
-          {
-            kind: "budget-spent",
-            lane: over.thread,
-            budget: over.message,
-            limit: over.limit,
-            by: over.by,
-          },
-        ],
-      }))
+      .step(
+        { kind: "thread", thread: over.thread },
+        "a spent allowance",
+        () => ({
+          facts: [
+            {
+              kind: "allowance-spent",
+              lane: over.thread,
+              allowance: over.message,
+              limit: over.limit,
+              by: over.by,
+            },
+          ],
+        }),
+      )
       .catch(failed)
   }
 
@@ -174,7 +182,7 @@ export function createBudgets(deps: {
    * budget's person, and no queue held. pi aborts the run itself, before its
    * next request (`mayRequest`).
    */
-  function stopNow(lane: ThreadId, over: BudgetRecord): void {
+  function stopNow(lane: ThreadId, over: AllowanceRecord): void {
     const doc = docs.docOf(lane)
     if (doc === null) return
     const index = readTreeIndex(doc)
@@ -202,10 +210,10 @@ export function createBudgets(deps: {
     if (planned.kind === "abort" && planned.fact.length > 0)
       deps.placesWriter
         .change({ kind: "host" }, open => open.apply(planned.fact))
-        .catch(failed(deps.basics, "a spent budget's stop", lane))
+        .catch(failed(deps.basics, "a spent allowance's stop", lane))
   }
 
-  function spend(budget: RunBudget, tokens: number) {
+  function spend(budget: RunAllowance, tokens: number) {
     if (!budget.spends) return
     const r = record(budget.key)
     if (r === undefined) return
@@ -215,12 +223,12 @@ export function createBudgets(deps: {
   }
 
   return {
-    runBudget,
+    runAllowance,
     async ensure(key, thread, by, limit) {
       const known = record(key)
       if (known !== undefined) return known
       await deps.records.writeValues([
-        newBudget({ message: key, thread, by, limit: limit ?? deps.limit }),
+        newAllowance({ message: key, thread, by, limit: limit ?? deps.limit }),
       ])
       return (
         record(key) ?? {
@@ -249,7 +257,7 @@ export function createBudgets(deps: {
       spend({ key, spends: true, by: null }, tokens)
     },
     mayRequest(lane) {
-      const budget = runBudget(lane)
+      const budget = runAllowance(lane)
       if (budget === null || !budget.spends) return true
       const r = record(budget.key)
       if (mayRequest(r) || r === undefined) return true
@@ -266,7 +274,7 @@ export function createBudgets(deps: {
       const count = counts.get(budget.key)
       if (r === undefined || count === undefined || count === r.spent) return
       await deps.records.writeValues([
-        setRecord(BUDGET, { ...r, spent: count }),
+        setRecord(ALLOWANCE, { ...r, spent: count }),
       ])
     },
   }

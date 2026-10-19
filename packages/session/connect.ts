@@ -21,7 +21,6 @@ import {
   type CardPlace,
   type CardRecord,
   type ConflictChoice,
-  DISCARDED,
   type EntryId,
   type Intent,
   isTextCard,
@@ -41,6 +40,7 @@ import {
   type TextCard,
   type TextCardId,
   type ThreadId,
+  TRASH_PLACE,
   type TypedMove,
   type WriterId,
   writerOfPrincipal,
@@ -238,7 +238,7 @@ export interface SessionClient {
   createCard(card: NewCard, text: string, how?: MoveHow): Promise<MoveAnswer>
   /**
    * Paste: a text card's `text` written first, as a creation's
-   * is, then one request that discards the card it replaces and
+   * is, then one request that trashes the card it replaces and
    * makes the pasted card where `to` is, or moves a cut card out of your
    * trash there. Drawn there, and the replaced card gone, until the host
    * answers. Into your inventory, `how.slot` is the slot it takes.
@@ -256,13 +256,13 @@ export interface SessionClient {
   ): Promise<MoveAnswer>
   /**
    * Ask the host to move a card, as the page planned it: a take
-   * into the inventory, a put, an unqueue, or a discard (to gone); a queue is
+   * into the inventory, a put, an unqueue, or a trash (to gone); a queue is
    * `queueCard`. Into your inventory with `how.slot`, the slot is written once the host
    * accepts, before the answer is recorded, so the repair never sees the
    * card held without its slot. `queuedBy`, for an unqueue, is who queued
    * the card: if the host popped it first, the refusal says it was sent, as
    * theirs. `here`, the canvas this tab is on, names the history of a
-   * discard from your inventory. Resolves with the host's answer.
+   * trash from your inventory. Resolves with the host's answer.
    */
   moveCard(
     move: TypedMove,
@@ -677,7 +677,7 @@ export async function connectSession(
         paste.kind === "uncut"
           ? pendingMove(
               id,
-              { card: paste.card, from: DISCARDED, to },
+              { card: paste.card, from: TRASH_PLACE, to },
               how,
               null,
             )
@@ -687,20 +687,20 @@ export async function connectSession(
               how,
               pastedDraft(paste, drawnPlace(to, me, readPlaces(places)), me),
             )
-      const discard =
+      const trash =
         replacing === null
           ? []
           : [
               pendingMove(
                 id,
-                { ...replacing, to: DISCARDED },
+                { ...replacing, to: TRASH_PLACE },
                 { actedAt: how.actedAt, slot: null },
                 null,
               ),
             ]
       return tracked(
         { kind: "paste", paste, to, replacing, here },
-        [main, ...discard],
+        [main, ...trash],
         null,
       ).then(r => r.answer)
     },

@@ -43,7 +43,7 @@ const JjBaseSchema = Type.Object({
   base: Type.Union([
     Type.Object({ kind: Type.Literal("accepted") }),
     Type.Object({
-      kind: Type.Literal("wip"),
+      kind: Type.Literal("unfinished"),
       bookmark: Type.String({ minLength: 1 }),
     }),
   ]),
@@ -172,7 +172,7 @@ export type FollowedBase =
  * lane's base not yet read, is accepted work.
  */
 export const effectiveBase = (base: FollowedBase | null): ThreadBase =>
-  base?.kind === "jj" && base.base.kind === "wip" && base.state === "ok"
+  base?.kind === "jj" && base.base.kind === "unfinished" && base.state === "ok"
     ? base.base
     : { kind: "accepted" }
 
@@ -204,7 +204,7 @@ function baseMoved(
   const now =
     thread.kind === "accepted"
       ? { bookmark: accepted.acceptedBookmark, commit }
-      : accepted.wips.find(w => w.bookmark === thread.bookmark)
+      : accepted.unfinishedWork.find(w => w.bookmark === thread.bookmark)
   return now === undefined || now.commit === base.start
     ? null
     : {
@@ -289,7 +289,7 @@ const getLatestRead = (
 /** Where agent work begins when nothing is above: accepted work, or a WIP's copy. */
 export type ForkBegin = Extract<
   ForkStart,
-  { readonly kind: "accepted" | "wip" }
+  { readonly kind: "accepted" | "unfinished" }
 >
 
 /**
@@ -307,16 +307,19 @@ export function planBegin(input: {
     /** Accepted work's commit; null before it is set up. */
     readonly acceptedCommit: CommitId | null
     /** The WIP's commit and accepted commit under it; null when it is no WIP above accepted work. */
-    readonly wip: { readonly commit: CommitId; readonly under: CommitId } | null
+    readonly unfinished: {
+      readonly commit: CommitId
+      readonly under: CommitId
+    } | null
   }
 }): ForkBegin | ErrCode {
   const { base, facts } = input
   if (facts.acceptedCommit === null) return ERR.NOT_SET_UP
   if (base === null)
     return { kind: "accepted", point: pointFromCommit(facts.acceptedCommit) }
-  if (!base.startsWith(input.wipPrefix) || facts.wip === null)
+  if (!base.startsWith(input.wipPrefix) || facts.unfinished === null)
     return ERR.BAD_BASE
-  return { kind: "wip", bookmark: base, ...facts.wip }
+  return { kind: "unfinished", bookmark: base, ...facts.unfinished }
 }
 
 /** What an update merges into a lane, or nothing. */
@@ -348,19 +351,19 @@ export type UpdateRefusal =
 export function planUpdateFrom(input: {
   /** The lane's base, from its own history; null for a lane with none, on accepted work. */
   readonly base: LaneBase | null
-  /** `wipState` of a WIP base (`@pinetrie/jj`); "ok" for accepted work. */
+  /** `unfinishedState` of a WIP base (`@pinetrie/jj`); "ok" for accepted work. */
   readonly state: JjBaseRecord["state"]
   /** "continue on accepted work": the thread moves to accepted work, whatever its base. */
   readonly toAccepted: boolean
   /** Accepted work's state; null before it is set up. */
   readonly acceptedPoint: PointId | null
   /** For a WIP base: its commit now and accepted commit under it (`beginFacts`). */
-  readonly wipNow: {
+  readonly unfinishedNow: {
     readonly commit: CommitId
     readonly under: CommitId
   } | null
 }): UpdateFrom | UpdateRefusal {
-  const { base, state, wipNow } = input
+  const { base, state, unfinishedNow } = input
   if (input.acceptedPoint === null) return ERR.NOT_SET_UP
   if (!input.toAccepted && state === "gone") return ERR.BASE_GONE
   const followed: ThreadBase = input.toAccepted
@@ -374,14 +377,19 @@ export function planUpdateFrom(input: {
     return {
       kind: "accepted",
       point: input.acceptedPoint,
-      mark: input.toAccepted && base?.base.kind === "wip",
+      mark: input.toAccepted && base?.base.kind === "unfinished",
     }
-  if (base === null || wipNow === null) return ERR.BASE_GONE
+  if (base === null || unfinishedNow === null) return ERR.BASE_GONE
   // The WIP's commit is jj's alone; the lane's source is a state of the
   // shared history, so the commit crosses as the point it is.
-  return pointFromCommit(wipNow.commit) === base.source
+  return pointFromCommit(unfinishedNow.commit) === base.source
     ? { kind: "nothing" }
-    : { kind: "wip", bookmark: followed.bookmark, ...wipNow, on: base.start }
+    : {
+        kind: "unfinished",
+        bookmark: followed.bookmark,
+        ...unfinishedNow,
+        on: base.start,
+      }
 }
 
 /** The thread a lane branched from, as the document says it now (`parentNow`). */

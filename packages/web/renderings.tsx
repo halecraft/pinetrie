@@ -260,8 +260,8 @@ function TextFull(p: { card: CardOf<"text">; width: CardWidth }) {
       foot={null}
       key={p.card.id}
       onClose={onClose ?? undefined}
-      onDiscard={() =>
-        onIntent({ kind: "discard", card: p.card.id, at: AT_INVENTORY })
+      onTrash={() =>
+        onIntent({ kind: "trash", card: p.card.id, at: AT_INVENTORY })
       }
       onTyping={() => {}}
       readOnly={false}

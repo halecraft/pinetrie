@@ -12,7 +12,7 @@ import {
 } from "@pinetrie/core"
 import { NAME, PARTICIPANT, setRecord, WORKFLOW } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
-import type { Budgets } from "./budgets.ts"
+import type { Allowances } from "./allowances.ts"
 import {
   basics,
   CANVAS_ID,
@@ -72,8 +72,8 @@ function setUp() {
     opened.push(id)
     return root(id)
   }
-  const budgets = record<Budgets>({
-    runBudget: () => ({ key: entryId("m"), spends: true, by: ADA }),
+  const allowances = record<Allowances>({
+    runAllowance: () => ({ key: entryId("m"), spends: true, by: ADA }),
     ensure: async () => ({
       message: entryId("m"),
       thread: HERE,
@@ -91,7 +91,7 @@ function setUp() {
       throw new Error("no run starts")
     },
     runnable: RUNS_ANY.runnable,
-    budgets,
+    allowances,
     drain: () => {},
     placesWriter: placesFor(b).placesWriter,
   })
@@ -126,7 +126,7 @@ describe("other threads' agents in reach", () => {
       asker: { kind: "agent", thread: OWL },
       askerName: "slate-owl",
       text: "anything?",
-      budget: entryId("m"),
+      allowance: entryId("m"),
       by: ADA,
     })
     expect(ran).toBe("next")

@@ -28,7 +28,7 @@ const record = (over: Partial<JjAcceptedRecord> = {}): JjAcceptedRecord => ({
   commit: commitId("c1"),
   heads: { current: null, proposed: "builtin_immutable_heads() | …" },
   log: { current: null, proposed: "builtin_log() | …" },
-  wips: [],
+  unfinishedWork: [],
   workingCopy: workingCopyFacts(),
   publishCatchesUp: true,
   ...over,
@@ -197,16 +197,20 @@ describe("the thread's base in its header, and the bases a new lane may start fr
     ({
       kind: "jj",
       lane,
-      base: { kind: "wip", bookmark: "wip/search" },
+      base: { kind: "unfinished", bookmark: "wip/search" },
       start: commitId("c"),
       state,
       getLatest: null,
       untraced: [],
       work: "some",
     }) as const
-  test("baseWords: a WIP while it is one, gone when gone, nothing on accepted work", () => {
-    expect(baseWords(base("ok"))).toBe("on wip/search")
-    expect(baseWords(base("gone"))).toBe("wip/search is gone")
+  test("baseWords: unfinished work while it is so, gone when gone, nothing on accepted work", () => {
+    expect(baseWords(base("ok"))).toBe(
+      "started from your unfinished work: wip/search",
+    )
+    expect(baseWords(base("gone"))).toBe(
+      "your unfinished work wip/search is gone",
+    )
     expect(baseWords(base("landed"))).toBeNull()
     expect(baseWords({ ...base("ok"), base: { kind: "accepted" } })).toBeNull()
     expect(baseWords(undefined)).toBeNull()

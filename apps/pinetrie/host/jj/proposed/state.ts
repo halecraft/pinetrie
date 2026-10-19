@@ -16,8 +16,8 @@ import {
   type RepoConfig,
   type ThreadId,
   type ThreadName,
+  unfinishedDescription,
   type ValueWrite,
-  wipDescription,
 } from "@pinetrie/core"
 import type { ProposedChangesInput, RepoOwner } from "@pinetrie/jj"
 import type { PiSetup } from "@pinetrie/pi"
@@ -66,7 +66,7 @@ export interface ProposedChangesDocs {
 /** What a build's messages take from the lane's root. */
 export interface MessageFacts {
   readonly entry: string
-  readonly wip: string
+  readonly unfinished: string
 }
 
 /** The records the host writes from your repo, the page's cache. */
@@ -140,12 +140,16 @@ export function createProposedChangesDeps(input: {
     async messageFacts(lane, name) {
       await using held = basics.leases.lane(lane)
       const root = held === null ? null : await held.ready
-      if (root === null) return { entry: "", wip: wipDescription(name, "") }
+      if (root === null)
+        return { entry: "", unfinished: unfinishedDescription(name, "") }
       const index = readTreeIndex(root)
       const tip = readLaneTip(root, lane)
       const first = laneFirstPrompt(index, readRevisions(root), lane, tip)
       const text = projectTranscript(index, tip).find(m => m.id === first)?.text
-      return { entry: tip ?? "", wip: wipDescription(name, text ?? "") }
+      return {
+        entry: tip ?? "",
+        unfinished: unfinishedDescription(name, text ?? ""),
+      }
     },
   }
   const records: ProposedChangesRecords = {

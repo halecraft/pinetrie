@@ -110,8 +110,8 @@ export interface CardFrameView {
   readonly tools: readonly CardTool[]
   /** Its ⋯'s Move to ▸, in a fixed order. */
   readonly moves: readonly CardMoveItem[]
-  /** Whether × discards it: a card that exists, that you may move. */
-  readonly discards: boolean
+  /** Whether × trashes it: a card that exists, that you may move. */
+  readonly trashes: boolean
 }
 
 /** Where a queue from a column puts a card: as the composer's queue does. */
@@ -224,7 +224,7 @@ const moveItems = (
             take,
           ]
         : [take]
-    // Put is an inventory card's move, × discards it, and a drag moves it
+    // Put is an inventory card's move, × trashes it, and a drag moves it
     // anywhere; a card on a canvas is no text card, nor one on the board.
     case "inventory":
     case "canvas":
@@ -268,8 +268,8 @@ const byOf = (card: CardRecord, me: WriterId): WriterId | null => {
 /**
  * The frame of `card`, drawn as `tone`; with no card, the composer before
  * its first keystroke or the "+ pin" box: its tone and place alone, nothing
- * to move or discard yet. A kind no person moves (`KINDS`: a fact, the
- * host's) neither moves nor is discarded, and a read-only column
+ * to move or trash yet. A kind no person moves (`KINDS`: a fact, the
+ * host's) neither moves nor is trashed, and a read-only column
  * moves nothing.
  */
 export function cardFrame(
@@ -288,7 +288,7 @@ export function cardFrame(
       primary,
       tools: [],
       moves: [],
-      discards: false,
+      trashes: false,
     }
   const movable = !facts.readOnly && KINDS[card.kind].moves
   const among = facts.among ?? null
@@ -316,7 +316,7 @@ export function cardFrame(
     moves: movable
       ? moveItems(card, facts).filter(m => offers(card.kind, m.to))
       : [],
-    discards:
+    trashes:
       movable &&
       card.place.kind !== "trash" &&
       (card.place.kind !== "inventory" || card.place.holder === facts.me),

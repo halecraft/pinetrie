@@ -5,7 +5,7 @@ import {
   entryId,
   indexTree,
   isRoundAnswered,
-  lastHeardEntry,
+  lastIncomingEntry,
   lastInvitation,
   type TreeIndex,
   threadIdFor,
@@ -39,7 +39,7 @@ const answer = (from: typeof fox, source: string): Message => ({
     source: entryId(source),
     text: "answered",
     wakes: false,
-    budget: entryId("m"),
+    allowance: entryId("m"),
     by: ada,
   },
 })
@@ -68,7 +68,7 @@ describe("lastHeardEntry", () => {
   const heard = (from: typeof fox, entries: string[]): Message => ({
     role: "heard",
     content: "",
-    heard: { from, fromName: "x", entries: entries.map(entryId) },
+    incoming: { from, fromName: "x", entries: entries.map(entryId) },
   })
   const index = build([
     entry("1", null, heard(here, ["a", "b"])),
@@ -83,12 +83,12 @@ describe("lastHeardEntry", () => {
     entry("4", "c", said("after")),
   ])
   test("the newest heard entry from that thread, its last source entry", () => {
-    expect(lastHeardEntry(index, entryId("3"), here)).toBe("b")
-    expect(lastHeardEntry(index, entryId("3"), owl)).toBe("z")
-    expect(lastHeardEntry(index, entryId("3"), fox)).toBeNull()
+    expect(lastIncomingEntry(index, entryId("3"), here)).toBe("b")
+    expect(lastIncomingEntry(index, entryId("3"), owl)).toBe("z")
+    expect(lastIncomingEntry(index, entryId("3"), fox)).toBeNull()
   })
   test("past a compaction, nothing heard: the next ask copies it again", () => {
-    expect(lastHeardEntry(index, entryId("4"), here)).toBeNull()
+    expect(lastIncomingEntry(index, entryId("4"), here)).toBeNull()
   })
 })
 

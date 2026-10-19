@@ -33,8 +33,8 @@ import {
   transcriptLines,
 } from "@pinetrie/rules"
 import { readEntryMessage } from "@pinetrie/schema"
+import type { Allowances } from "./allowances.ts"
 import type { Basics, HostKeeper } from "./basics.ts"
-import type { Budgets } from "./budgets.ts"
 import type { Deliver } from "./delivery.ts"
 import type { Later, LateWrite } from "./later.ts"
 import type { Relays } from "./relays.ts"
@@ -75,10 +75,10 @@ export function createAnswers(deps: {
   readonly agent: Pick<Agent, "lane">
   /** Where an answer goes in its asker's thread (`delivery.ts`). */
   readonly deliver: Deliver
-  readonly budgets: Budgets
+  readonly allowances: Allowances
   readonly piSetup: Pick<PiSetup, "complete" | "skill">
 }): Answers {
-  const { basics, budgets, later } = deps
+  const { basics, allowances, later } = deps
   const threads = threadsNow(basics)
   // Answers that wake nobody, for a lane that was running when they came:
   // appended when its run ends, never steered into it, so its agent does
@@ -202,7 +202,7 @@ export function createAnswers(deps: {
               : outcome.kind === "failed" || text === ""
                 ? { kind: "failed" }
                 : { kind: "answered", text },
-          spent: budgets.spent(relay.budget),
+          spent: allowances.spent(relay.allowance),
           fromReach: threads.reach(relay.from),
         }),
       )
@@ -225,7 +225,7 @@ export function createAnswers(deps: {
       !isRoundAnswered(from.index, from.end, relay.source)
     )
       return
-    if (budgets.spent(relay.budget)) return
+    if (allowances.spent(relay.allowance)) return
     const skill = await deps.piSetup.skill("pinetrie:skill:agents-round")
     if (skill === null) {
       basics.log("[host] no agents-round skill")
@@ -248,7 +248,7 @@ export function createAnswers(deps: {
         basics.log(`[host] the round's request failed: ${error}`),
       request: async () => {
         const { text, tokens } = await deps.piSetup.complete(request)
-        budgets.spendFrom(relay.budget, tokens)
+        allowances.spendFrom(relay.allowance, tokens)
         return text
       },
       plan: reply => {
@@ -275,7 +275,7 @@ export function createAnswers(deps: {
                   asker: { kind: "person", writer: relay.by },
                   askerName: threads.personName(relay.by),
                   text: next.text,
-                  budget: relay.budget,
+                  allowance: relay.allowance,
                   by: relay.by,
                 })
               },
@@ -299,7 +299,7 @@ export function createAnswers(deps: {
       const held = heldAnswers(lane)
       await Promise.all(held)
       if (prompt === null) return
-      await budgets.runEnded(prompt)
+      await allowances.runEnded(prompt)
       const relay =
         stored?.present === true ? decodeRelay(stored.message) : undefined
       if (relay === undefined) return

@@ -50,9 +50,9 @@ import { decodeProposal } from "./proposal.ts"
 import {
   type AnswerMessage,
   decodeAnswer,
-  decodeHeard,
+  decodeIncoming,
   decodeRelay,
-  heardLine,
+  incomingLine,
   type RelayMessage,
 } from "./relay.ts"
 import { fittedLine } from "./shares.ts"
@@ -369,8 +369,8 @@ function toolResultFacts(
  * role `fact` and a base's news role `behind`; a cards entry becomes role
  * `pinned` with the cards it read, a canvas's cards entry role `canvas-pinned`, and
  * a canvas entry role `canvas` with the list it told; an ask relayed from
- * another thread, an answer and what an asked agent heard become roles `relay`,
- * `answer` and `heard` with their details; a host tool's result keeps its role
+ * another thread, an answer and what an asked agent was told become roles
+ * `relay`, `answer` and `incoming` with their details; a host tool's result keeps its role
  * and gains what it says as a fact (`asked`, `merged`, `proposal`); anything else passes
  * through unchanged for `core` to judge.
  */
@@ -401,7 +401,7 @@ export function renderableMessage(message: unknown): AgentMessageLike {
           stopped: {
             prompt: fact.prompt,
             by: fact.by,
-            ...(fact.budget === undefined ? {} : { budget: fact.budget }),
+            ...(fact.allowance === undefined ? {} : { budget: fact.allowance }),
           },
         }
       : fact.kind === "dismissed" || fact.kind === "left"
@@ -413,9 +413,9 @@ export function renderableMessage(message: unknown): AgentMessageLike {
   const answer = decodeAnswer(message)
   if (answer !== undefined)
     return { role: "answer", content: answer.text, answer }
-  const heard = decodeHeard(message)
-  if (heard !== undefined)
-    return { role: "heard", content: heardLine(heard), heard }
+  const incoming = decodeIncoming(message)
+  if (incoming !== undefined)
+    return { role: "incoming", content: incomingLine(incoming), incoming }
   const behind = decodeBehind(message)
   if (behind !== undefined)
     return { role: "behind", content: behindLine(behind), behind }

@@ -36,7 +36,7 @@ const FACTS: readonly ProposedChangesFact[] = [
   {
     ...ACCEPTED,
     bookmark: "wip/search",
-    to: { kind: "wip", bookmark: "wip/search" },
+    to: { kind: "unfinished", bookmark: "wip/search" },
   },
   { kind: "described", lane: LANE, by: ADA },
   { kind: "squashed", lane: LANE, by: ADA },
@@ -161,7 +161,7 @@ describe("a fact", () => {
         decision: { ...decision, destination: "wip/search" },
         acceptedBookmark: "pinetrie-accepted",
       }),
-    ).toMatchObject({ to: { kind: "wip", bookmark: "wip/search" } })
+    ).toMatchObject({ to: { kind: "unfinished", bookmark: "wip/search" } })
     expect(actionFact("squash", LANE, ADA)).toEqual(FACTS[3])
   })
 })

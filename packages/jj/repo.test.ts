@@ -83,7 +83,7 @@ import {
   planForkSetup,
   planMerge,
   planOldNamesOnDisk,
-  planWipCopy,
+  planUnfinishedCopy,
 } from "./lane/plan.ts"
 import {
   ACCEPTED_THREAD_COMMIT_ROW,
@@ -367,7 +367,7 @@ describe("a lane's repo, with jj", () => {
     await writeFile(path.join(repoDir, "shared.txt"), "one\ntwo (you)\nthree\n")
     await repoJj(["commit", "-m", "you edit line two"])
     await repoJj(["bookmark", "create", "wip/x", "-r", "@-"])
-    const wipNow = async () => {
+    const unfinishedNow = async () => {
       const [commit] = await readCommits(repoJj, "wip/x")
       if (commit === undefined) throw new Error("no wip")
       return { bookmark: "wip/x", commit, under: base[0] ?? commit }
@@ -375,10 +375,10 @@ describe("a lane's repo, with jj", () => {
 
     // An update: a copy of the WIP made in the lane, on accepted commit
     // under it, merged; accepted work conflicts.
-    const wip1 = await wipNow()
+    const unfinished1 = await unfinishedNow()
     await inLane(laneDir, [
-      fetchById([wip1.commit, wip1.under]),
-      ...planWipCopy(wip1, wip1.under),
+      fetchById([unfinished1.commit, unfinished1.under]),
+      ...planUnfinishedCopy(unfinished1, unfinished1.under),
     ])
     const [copy] = await readCommits(laneJj, "@-")
     if (copy === undefined) throw new Error("no copy")
@@ -386,12 +386,14 @@ describe("a lane's repo, with jj", () => {
       (await laneJj(["file", "show", "-r", copy, 'root:"shared.txt"'])).stdout,
     ).toContain("two (you)")
     // The copy is no commit of yours: your WIP stays yours.
-    expect(await readCommits(laneJj, `${copy} & ${wip1.commit}`)).toEqual([])
+    expect(
+      await readCommits(laneJj, `${copy} & ${unfinished1.commit}`),
+    ).toEqual([])
     expect(await newestBase(laneJj, copy, "wip/")).toEqual({
       at: copy,
-      kind: "wip",
+      kind: "unfinished",
       bookmark: "wip/x",
-      commit: wip1.commit,
+      commit: unfinished1.commit,
     })
     const { ours, merge } = await mergeBase(laneJj, LANE, copy, "update: wip/x")
     expect(merge).not.toBeNull()
@@ -434,10 +436,10 @@ describe("a lane's repo, with jj", () => {
     await repoJj(["bookmark", "move", "wip/x", "--to", "@-"])
     // The next copy sits on the last one: the merge brings in only what
     // the WIP changed since, not accepted work two the lane already resolved.
-    const wip2 = await wipNow()
+    const unfinished2 = await unfinishedNow()
     await inLane(laneDir, [
-      fetchById([wip2.commit]),
-      ...planWipCopy(wip2, copy),
+      fetchById([unfinished2.commit]),
+      ...planUnfinishedCopy(unfinished2, copy),
     ])
     const [cleanCopy] = await readCommits(laneJj, "@-")
     if (cleanCopy === undefined) throw new Error("no copy")
@@ -504,7 +506,10 @@ describe("a lane's repo, with jj", () => {
     await cp(laneDir, rootDir, { recursive: true, verbatimSymlinks: true })
     await inLane(
       rootDir,
-      planForkSetup(jjLaneFor(ROOT), { kind: "wip", ...(await wipNow()) }),
+      planForkSetup(jjLaneFor(ROOT), {
+        kind: "unfinished",
+        ...(await unfinishedNow()),
+      }),
     )
     const rootJj = laneJjAt(rootDir)
     expect(await readFile(path.join(rootDir, "yours-only.txt"), "utf8")).toBe(
@@ -768,16 +773,21 @@ describe("a lane's repo, with jj", () => {
     await repoJj(["bookmark", "create", "wip/x", "-r", "@-"])
     const [w1] = await readCommits(repoJj, "@-")
     if (w1 === undefined) throw new Error("no wip")
-    const wipMerge = (commit: CommitId, on: CommitId) =>
+    const unfinishedMerge = (commit: CommitId, on: CommitId) =>
       planMerge(jjLaneFor(LANE), {
-        kind: "wip",
+        kind: "unfinished",
         bookmark: "wip/x",
         commit,
         under: line2,
         on: pointFromCommit(on),
       })
     const beforeFirst = await head()
-    const first = await mergeUpdate(laneJj, runners, LANE, wipMerge(w1, line2))
+    const first = await mergeUpdate(
+      laneJj,
+      runners,
+      LANE,
+      unfinishedMerge(w1, line2),
+    )
     expect(first).toMatchObject({
       kind: "clean",
       files: ["w.txt"],
@@ -801,7 +811,7 @@ describe("a lane's repo, with jj", () => {
       laneJj,
       runners,
       LANE,
-      wipMerge(w2, first.from),
+      unfinishedMerge(w2, first.from),
     )
     expect(next).toMatchObject({
       kind: "clean",
@@ -1147,8 +1157,8 @@ describe("a lane's repo, with jj", () => {
         expect(gathered).toBe("none")
         return gathered
       }
-      if (base.base.kind === "wip") {
-        expect(gathered).toBe("wip")
+      if (base.base.kind === "unfinished") {
+        expect(gathered).toBe("unfinished")
         return gathered
       }
       const target = await acceptedNow()
@@ -2344,7 +2354,7 @@ describe("a lane's repo, with jj", () => {
         shared: facts,
         known,
       })
-      if (read === "none" || read === "wip")
+      if (read === "none" || read === "unfinished")
         throw new Error("not on accepted work")
       return { read, ran }
     }
@@ -2576,7 +2586,7 @@ describe("a lane's repo, with jj", () => {
     const forecast = async (rig: Awaited<ReturnType<typeof turnRig>>) => {
       await rig.fetch(rig.base)
       const gathered = await rig.agrees()
-      if (gathered === "none" || gathered === "wip")
+      if (gathered === "none" || gathered === "unfinished")
         throw new Error("not on accepted work")
       return { files: gathered.getLatest?.files, start: gathered.start }
     }
@@ -2822,14 +2832,14 @@ describe("a lane's repo, with jj", () => {
     await rig.edit(rig.repoDir, "wip.txt", "half done\n")
     await rig.repoJj(["commit", "-m", "wip: half done"])
     await rig.repoJj(["bookmark", "create", "wip/search", "-r", "@-"])
-    const [wip] = await readCommits(rig.repoJj, "wip/search")
-    if (wip === undefined) throw new Error("no wip")
+    const [unfinished] = await readCommits(rig.repoJj, "wip/search")
+    if (unfinished === undefined) throw new Error("no wip")
     await rig.inLane(planBaseCheckout({ accepted: base, fresh: true }))
     await rig.inLane(
       planForkSetup(jjLaneFor(LANE), {
-        kind: "wip",
+        kind: "unfinished",
         bookmark: "wip/search",
-        commit: wip,
+        commit: unfinished,
         under: line,
       }),
     )
@@ -2840,12 +2850,14 @@ describe("a lane's repo, with jj", () => {
     await rig.turn()
     await rig.fetch(base)
     // The lane's tip is immutable in your repo; your WIP is not.
-    expect((await readCommits(rig.repoJj, `${wip} & mutable()`)).length).toBe(1)
+    expect(
+      (await readCommits(rig.repoJj, `${unfinished} & mutable()`)).length,
+    ).toBe(1)
     const tip = await laneTipIn(rig.ops, LANE)
     if (tip === null) throw new Error("no tip")
     expect(await laneBase(rig.ops, tip, rig.line)).toMatchObject({
-      base: { kind: "wip", bookmark: "wip/search" },
-      source: wip,
+      base: { kind: "unfinished", bookmark: "wip/search" },
+      source: unfinished,
     })
     // You amend the WIP: the proposed changes, from the copy, placed on the WIP
     // now, holds only the lane's file.
@@ -2883,7 +2895,7 @@ describe("a lane's repo, with jj", () => {
     if (gathered === null) throw new Error("no gather")
     expect(await gatherAcceptance({ jj: rig.ops }, gathered, rig.line)).toEqual(
       {
-        wipAhead: 1,
+        unfinishedAhead: 1,
         below: new Set(["wip/search", rig.line.acceptedBookmark]),
       },
     )

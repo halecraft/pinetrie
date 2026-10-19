@@ -8,7 +8,7 @@ import { ThreadIdSchema, ThreadNameSchema } from "./decode.ts"
 /** `LatestFrom` as a thread's history stores it: as it is. */
 export const LatestFromSchema = Type.Union([
   Type.Object({ kind: Type.Literal("accepted") }),
-  Type.Object({ kind: Type.Literal("wip"), bookmark: Type.String() }),
+  Type.Object({ kind: Type.Literal("unfinished"), bookmark: Type.String() }),
   Type.Object({
     kind: Type.Literal("parent"),
     lane: ThreadIdSchema,
@@ -20,8 +20,8 @@ export const LatestFromSchema = Type.Union([
 export const mergedFrom = (merge: BaseMerge): LatestFrom =>
   merge.kind === "accepted"
     ? { kind: "accepted" }
-    : merge.kind === "wip"
-      ? { kind: "wip", bookmark: merge.bookmark }
+    : merge.kind === "unfinished"
+      ? { kind: "unfinished", bookmark: merge.bookmark }
       : { kind: "parent", lane: merge.lane, name: merge.name }
 
 /**
@@ -33,7 +33,7 @@ export const mergedFrom = (merge: BaseMerge): LatestFrom =>
 export const latestSourceName = (from: LatestFrom): string =>
   from.kind === "accepted"
     ? "accepted work"
-    : from.kind === "wip"
+    : from.kind === "unfinished"
       ? from.bookmark
       : from.name
 
@@ -46,7 +46,7 @@ export function latestWords(from: LatestFrom): string {
   switch (from.kind) {
     case "accepted":
       return "Accepted work"
-    case "wip":
+    case "unfinished":
       return `The work on ${from.bookmark}`
     case "parent":
       return `The work of the thread this one branched from (${from.name})`

@@ -38,6 +38,14 @@ describe("the rules", () => {
     ])
   })
 
+  test("a kept setting key passes whole, and a name that only holds it does not", () => {
+    const source = {
+      file: "a.ts",
+      text: "const o = { catchUp: true, catchUpNow: 1 }",
+    }
+    expect(retiredNames(source, ["catchup"])).toEqual(["a.ts: catchUpNow"])
+  })
+
   test("identifierNames reads bindings, references, property keys and JSX", () => {
     expect(
       identifierNames(

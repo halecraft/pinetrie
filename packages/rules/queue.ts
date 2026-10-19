@@ -381,7 +381,7 @@ export type CarryPlan =
       readonly card: QueuedText
       readonly command: GetLatestCommand
       /** After a clean update or nothing new: the card's text, or nothing to send. */
-      readonly after: "send" | "discard"
+      readonly after: "send" | "trash"
     }
   /** Split the proposed changes in a run of its own, the card's text its intent. */
   | {
@@ -417,7 +417,7 @@ export function planCarry(card: QueuedCard, text: string): CarryPlan {
       kind: "get-latest",
       card,
       command,
-      after: blank ? "discard" : "send",
+      after: blank ? "trash" : "send",
     }
   return { kind: "send", card }
 }

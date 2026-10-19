@@ -630,7 +630,7 @@ describe("sendMessage", () => {
           commit: commitId("l2"),
           heads: { current: null, proposed: "x" },
           log: { current: null, proposed: "x" },
-          wips: [],
+          unfinishedWork: [],
           workingCopy: {
             behind: 0,
             ahead: 0,

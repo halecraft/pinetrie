@@ -161,7 +161,7 @@ async function withLock<T>(lock: string, body: () => Promise<T>): Promise<T> {
 
 /**
  * Put the checked outputs in `from` at `image`. A whole image already there
- * is kept and ours discarded, unless `force`: a launcher may be starting
+ * is kept and ours trashed, unless `force`: a launcher may be starting
  * from it. One that is not whole is replaced.
  */
 export async function installImage(

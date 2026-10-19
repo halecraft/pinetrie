@@ -19,7 +19,6 @@ import {
   type CommitId,
   chatMode,
   commitId,
-  DISCARDED,
   type EntryId,
   ERR,
   type ErrCode,
@@ -83,6 +82,7 @@ import {
   type StartedRow,
   type ThreadId,
   type ThreadStart,
+  TRASH_PLACE,
   type TypedMove,
   targetOfFields,
   typedMove,
@@ -464,7 +464,7 @@ export function decodeCommand(
   if (kind === "paste") {
     const moves = decodeMoves(text(wire?.moves))
     if (typeof moves === "string") return refused(ERR.UNKNOWN_TARGET, moves)
-    // Its card's move last, after the discard of the card it replaces.
+    // Its card's move last, after trashing the card it replaces.
     const main = moves.at(-1)
     const replaced = moves.length === 2 ? moves[0] : undefined
     if (
@@ -475,7 +475,7 @@ export function decodeCommand(
     )
       return refused(
         ERR.UNKNOWN_TARGET,
-        "a paste names its card's move, after a discard of the card it replaces",
+        "a paste names its card's move, after trashing the card it replaces",
       )
     const here = hereOf(wire)
     if (here === undefined)
@@ -1317,10 +1317,10 @@ export function encodeIntent(id: string, intent: Intent): Command {
         moves: encodeMoves([
           ...(intent.replacing === null
             ? []
-            : [{ ...intent.replacing, to: DISCARDED }]),
+            : [{ ...intent.replacing, to: TRASH_PLACE }]),
           {
             card: intent.paste.card,
-            from: intent.paste.kind === "uncut" ? DISCARDED : null,
+            from: intent.paste.kind === "uncut" ? TRASH_PLACE : null,
             to: intent.to,
           },
         ]),
