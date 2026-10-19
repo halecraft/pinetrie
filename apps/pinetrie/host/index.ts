@@ -1,6 +1,6 @@
 // host — the composition root. It builds the store, the Exchange, the
-// documents, pi's scribe and setup, lane work and the agent, in that order,
-// and wires the shell's modules; each module takes what it needs as a
+// documents, pi's scribe and setup, lane work with its lanes ready, and the
+// agent, in that order, then listens, and wires the shell's modules; each module takes what it needs as a
 // parameter, and only this file wires them (TECHNICAL.md).
 //
 // Imports NO pi. Everything pi-shaped arrives through pi/.
@@ -110,6 +110,7 @@ import {
 } from "./docs.ts"
 import { createFocuses } from "./focuses.ts"
 import { forward } from "./forward.ts"
+import { HostRefused } from "./host-refused.ts"
 import { type SweepDeps, sweepUnused } from "./housekeeping.ts"
 import { startHttp } from "./http.ts"
 import { createLater } from "./later.ts"
@@ -159,8 +160,14 @@ import { planShutdown, type ShutdownStep } from "./shutdown.ts"
 import { createSplitCall } from "./split-call.ts"
 import { createSshNews } from "./ssh-news.ts"
 import { watchStalls } from "./stalls.ts"
+import {
+  laneMachine,
+  planStartSteps,
+  type StartProgress,
+} from "./start-checklist.ts"
+import { lineProgress } from "./start-terminal.ts"
 import { recover, recoverRoot } from "./startup.ts"
-import { agentReadyLine, reportLines, startupLaps } from "./startup-lines.ts"
+import { agentReadyLine, reportLines } from "./startup-lines.ts"
 import { type OpenedStore, openStore } from "./store.ts"
 import { createTitles } from "./titles.ts"
 import { startLaneWork } from "./work/index.ts"
@@ -254,6 +261,11 @@ export interface StartHostOptions {
    */
   readonly keepRootsRead?: boolean
   readonly log?: (message: string) => void
+  /**
+   * Where the start's steps are reported (`start-terminal.ts`); by default a
+   * line of `log` for each step's end.
+   */
+  readonly progress?: StartProgress
 }
 
 export interface RunningHost {
@@ -307,54 +319,79 @@ export interface RunningHost {
 }
 
 /**
- * Thrown by `startHost` when a host with tools cannot run its lanes here:
- * `findProject`'s refusal, worded with its fix. Nothing was opened.
+ * Start a host: every step of its start reported to `progress` (by default
+ * a line of `log` per step), and listening last. A start that throws, a
+ * `HostRefused` among them, first closes what it opened.
  */
-export class HostRefused extends Error {}
+export async function startHost(
+  options: StartHostOptions,
+): Promise<RunningHost> {
+  const progress =
+    options.progress ??
+    lineProgress(options.log ?? console.log, {
+      steps: planStartSteps({ tools: options.project?.tools === true }),
+      machine: laneMachine(process.platform),
+      times: {},
+    })
+  // Disposed only when the start throws: once returned, `shutdown()` closes
+  // the host in `planShutdown`'s order.
+  const closers = new AsyncDisposableStack()
+  try {
+    const host = await openHost(options, progress, closers)
+    progress.end()
+    return host
+  } catch (error) {
+    progress.fail(error)
+    await closers.disposeAsync().catch(() => {})
+    throw error
+  }
+}
 
-export async function startHost({
-  install = thisInstall,
-  port = 0,
-  bind = DEFAULT_BIND,
-  key: givenKey,
-  model,
-  project = null,
-  env = process.env,
-  places: where = configPlaces(env, homedir(), null),
-  served = null,
-  binding,
-  ssh = {
-    dir: path.join(homedir(), ".ssh"),
-    agent: process.env.SSH_AUTH_SOCK ?? null,
-  },
-  store: storeFile = null,
-  page = NO_PAGE,
-  now = Date.now,
-  presenceDecay = PRESENCE_DECAY,
-  keepRootsRead = false,
-  log = console.log,
-}: StartHostOptions): Promise<RunningHost> {
+async function openHost(
+  {
+    install = thisInstall,
+    port = 0,
+    bind = DEFAULT_BIND,
+    key: givenKey,
+    model,
+    project = null,
+    env = process.env,
+    places: where = configPlaces(env, homedir(), null),
+    served = null,
+    binding,
+    ssh = {
+      dir: path.join(homedir(), ".ssh"),
+      agent: process.env.SSH_AUTH_SOCK ?? null,
+    },
+    store: storeFile = null,
+    page = NO_PAGE,
+    now = Date.now,
+    presenceDecay = PRESENCE_DECAY,
+    keepRootsRead = false,
+    log = console.log,
+  }: StartHostOptions,
+  progress: StartProgress,
+  closers: AsyncDisposableStack,
+): Promise<RunningHost> {
   const key = isLoopback(bind) ? null : (givenKey ?? newKey())
   const toolsIn = project?.tools === true ? project.dir : null
 
-  // Each phase of the start that takes a second or more is logged.
-  const lap = startupLaps(log)
   // The config layers that do not change while the host runs, read once.
   // The project's copies are read once the project is open (`openProject`).
   const start = await readStartLayers(SETTINGS, where, env)
-  // The project, before anything opens, so a refusal leaves nothing to close,
+  // The project, before the store opens, so a refusal has little to close,
   // and before pi's setup, which loads from its root.
   // The host's ssh socket's directory, named before the runtime is found:
   // the Mac's lease names the socket, which listens once lane work starts.
+  if (toolsIn !== null) progress.begin("lane-machine")
   const sshDir = await prepareSshDir()
+  closers.defer(() => rm(sshDir, { recursive: true, force: true }))
   const projectDir = toolsIn === null ? null : await prepareProjectDir(toolsIn)
   // Chosen once, by the project's kind: a folder lanes cannot serve is
   // refused before any runtime is asked.
   const chosen = projectDir === null ? null : projectAdapter(projectDir)
-  if (chosen !== null && "refused" in chosen) {
-    await rm(sshDir, { recursive: true, force: true })
+  if (chosen !== null && "refused" in chosen)
     throw new HostRefused(chosen.refused)
-  }
   const found = await findProject({
     install,
     hostSocket: hostSocketIn(sshDir),
@@ -364,14 +401,13 @@ export async function startHost({
     // Only the machine's and your own file may set it: no project's copy.
     slots: settleHost(start, {}).settled["lanes.vm.slots"].value,
     log,
+    building: build => progress.building(build),
   })
-  if (found?.kind === "refused") {
-    await rm(sshDir, { recursive: true, force: true })
-    throw new HostRefused(found.words)
-  }
-  lap("the project and the lane VM")
+  if (found?.kind === "refused") throw new HostRefused(found.words)
+  if (found !== null) closers.defer(() => found.close())
 
   // --- transport + exchange ------------------------------------------------
+  progress.begin("store")
   const serverTransport = new WebsocketServerTransport()
   const opened: OpenedStore =
     typeof storeFile === "string"
@@ -384,6 +420,11 @@ export async function startHost({
           sizes: null,
         })
   const { store, blobs } = opened
+  // The exchange closes the store once it is made (`shutdown`).
+  let storeClosedBy: "start" | "exchange" = "start"
+  closers.defer(async () => {
+    if (storeClosedBy === "start") await store.close()
+  })
   // Each stored document's schema, checked before anything opens one: opened
   // under a changed schema, a dropped field's data goes at the next
   // compaction. Read before anything is deleted, so one plan decides it all.
@@ -391,12 +432,9 @@ export async function startHost({
     await readStored(store),
     opened.ledger.ran(),
   )
-  if (startPlan.kind === "refuse") {
-    await store.close()
+  if (startPlan.kind === "refuse")
     throw new Error(refusalLine(startPlan.refusal))
-  }
   await prepareStore(opened, startPlan, { now, log })
-  lap("opening the store")
   // Clients find the host by its principal and address their Lines to the seat
   // Kyneta issues it. The host has no WRITER identity: writers are the
   // connected clients, named by their principals, and they own no lanes; lanes
@@ -418,6 +456,7 @@ export async function startHost({
       return kind === undefined ? undefined : Interpret(SCHEMA_OF[kind])
     },
   })
+  storeClosedBy = "exchange"
 
   await migrate({
     plan: startPlan.open,
@@ -428,7 +467,6 @@ export async function startHost({
     now,
     log,
   })
-  lap("the store's migrations")
   // The session's records, the directory of roots among them. Each root's
   // document is opened through `docs`, below.
   const session = exchange.get(SESSION_DOC_ID, SessionDoc)
@@ -451,7 +489,6 @@ export async function startHost({
   await whenHydrated(session)
   await whenHydrated(places)
   await whenHydrated(live)
-  lap("loading the session, the places and what is live")
   // Each person's history of moves, per root.
   const histories = createMoveHistories(exchange)
   const docs = hostDocuments({ session, live, places })
@@ -487,6 +524,13 @@ export async function startHost({
     },
     keepLastRead: keepRootsRead,
     ...(rootTrace === null ? {} : { trace: rootTrace.trace }),
+  })
+  closers.defer(async () => {
+    roots.close()
+    histories.dispose()
+    await exchange.flush()
+    await exchange.shutdown()
+    await rootTrace?.close()
   })
   // Each root's first load is recovered (`recoverRoot`) in a step of its own,
   // once the agent and the runs exist: the roots that load before are held
@@ -532,10 +576,12 @@ export async function startHost({
   // Before a root's document goes, what holds it lets go: the scribe closes the
   // agent's harness over it, then its session.
   roots.onReleasing(async root => scribe.release(root))
+  closers.defer(() => scribe.close())
   const projectRoot = found?.project.root ?? project?.dir ?? null
   // The project, opened, and the config settled with accepted work's copy:
   // before pi's setup, which reads `model`, `skills` and `prompts` from it.
   // A host without lane work reads its folder's file as every copy.
+  progress.begin("project")
   const openedProject = await openProject({
     basics: leaseBasics,
     found,
@@ -544,7 +590,6 @@ export async function startHost({
     records,
     start,
   })
-  lap("opening the project and its config")
   const report: HostReport =
     openedProject === null
       ? await folderReport(start, project?.dir ?? null)
@@ -557,6 +602,7 @@ export async function startHost({
   const accepted =
     openedProject === null ? null : openedProject.configs.accepted().copy.values
   const listRoot = projectRoot ?? process.cwd()
+  progress.begin("model")
   const piSetup = await loadPiSetup({
     model:
       model.kind === "configured"
@@ -578,7 +624,6 @@ export async function startHost({
     ...(iconConfig.source === "drawn" ? { banner: iconConfig.model } : {}),
     ...(projectRoot === null ? {} : { project: projectRoot }),
   })
-  lap("pi's setup")
   for (const p of piSetup.refusedPackages)
     log(`[host] ${p} is not a folder: the package is not loaded`)
   const setupRecordNow = (r: HostReport) =>
@@ -603,9 +648,11 @@ export async function startHost({
     onError: failed(basics, "step"),
     onSlow: slow(basics),
   })
+  closers.defer(() => keeper.close("drop"))
   // The roots of the lanes a crash interrupted a run in, read before
   // `recover` clears what was running, opened in one step. Every other root
   // is loaded by the step that needs it (`planLoads`).
+  progress.begin("roots")
   const opening = planLoads(
     readActiveLanes(live),
     lane => readLaneRecords(session).get(lane)?.root,
@@ -613,7 +660,6 @@ export async function startHost({
   await keeper.run(async step => {
     for (const root of opening) await step.root(root)
   })
-  lap("opening the roots")
   const total = new Set([...readThreads(session).values()].map(t => t.root))
     .size
   log(`[host] ${rootsOpenedWords({ opened: opening.length, total })}`)
@@ -702,8 +748,9 @@ export async function startHost({
     records,
     piSetup,
     ensureNames: names.ensure,
+    progress,
   })
-  lap("starting lane work")
+  progress.begin("agent")
 
   // `put_image` acts through the commands, and the agent's tools ask the
   // relays, which start runs over the agent: each bound once what carries it
@@ -752,6 +799,12 @@ export async function startHost({
     onStream: streamInto(basics, runDocs),
     onUsage: (lane, tokens) => allowances.onUsage(lane, tokens),
     mayRequest: lane => allowances.mayRequest(lane),
+  })
+  // As `planShutdown`: the queues close before the agent, so the steps the
+  // ends of its closed runs queue are refused.
+  closers.defer(async () => {
+    keeper.close("drop")
+    await agent.close()
   })
   log(
     agentReadyLine({
@@ -1024,6 +1077,7 @@ export async function startHost({
     handle: commands.handle,
   })
 
+  progress.begin("listening")
   const server = await startHttp({
     port,
     bind,
@@ -1036,7 +1090,7 @@ export async function startHost({
     log,
   })
 
-  // From here, not the start: a slow phase of the start is its lap's line.
+  // From here, not the start: the start's checklist times its own steps.
   const stalls = watchStalls(log)
 
   const stop = async (): Promise<void> => {

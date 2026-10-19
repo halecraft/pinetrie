@@ -166,11 +166,6 @@ export function startFolderProject(dir: {
 
         start(parts) {
           const reader = { runtime, disks, own }
-          /** The project's folder read, once lanehost runs. */
-          const read = async () => {
-            await parts.ready()
-            return line.read()
-          }
           const proposed = startFolderProposedChanges({
             basics,
             records: parts.records,
@@ -194,9 +189,6 @@ export function startFolderProject(dir: {
                 .catch(failed(basics, "following the project's folder")),
             )
           })
-          // The project's folder is read once lanehost runs: as accepted work moving
-          // is, which waits for setup (`acceptedNow`); so is each change the
-          // watcher saw.
           parts.acceptedMoved()
           /**
            * What is kept, said once: accepted work's record written with
@@ -205,7 +197,6 @@ export function startFolderProject(dir: {
            * written over a later one.
            */
           const refreshKept = async () => {
-            await parts.ready()
             // gather
             const exists = new Set((await runtime.snapshots()).map(pointId))
             const planned = planKeep({
@@ -275,12 +266,12 @@ export function startFolderProject(dir: {
             async begin(base) {
               // A folder project has no WIP to begin from.
               if (base !== null) return ERR.BAD_BASE
-              return { kind: "accepted", point: await read() }
+              return { kind: "accepted", point: await line.read() }
             },
             async baseNow() {
               return {
                 state: "ok",
-                acceptedPoint: await read(),
+                acceptedPoint: await line.read(),
                 unfinishedNow: null,
               }
             },

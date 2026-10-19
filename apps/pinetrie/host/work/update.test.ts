@@ -508,7 +508,7 @@ describe("askedAboutConflict", () => {
     }).port
     const updates = createUpdates({
       basics: b,
-      setup: { ready: Promise.resolve({ image: "img" } as Ready) },
+      setup: { ready: { image: "img" } as Ready },
       destination:
         record<Parameters<typeof createUpdates>[0]["destination"]>().port,
       registry: registryWith(history, own),
@@ -617,7 +617,7 @@ describe("getLatestInRun", () => {
     }).port
     const updates = createUpdates({
       basics: b,
-      setup: { ready: Promise.resolve({ image: "img" } as Ready) },
+      setup: { ready: { image: "img" } as Ready },
       destination:
         record<Parameters<typeof createUpdates>[0]["destination"]>().port,
       registry: registryWith(history),

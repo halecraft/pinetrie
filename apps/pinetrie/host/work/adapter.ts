@@ -95,12 +95,6 @@ export interface ProjectParts {
   readonly beforeRun: (lane: ThreadId) => void
   /** Accepted work moved: the base snapshot follows. */
   readonly acceptedMoved: () => void
-  /**
-   * Settles once lanes can run: lanehost, and so a disk, answers only then.
-   * Asked, never held: a setup that fails rejects it, and only an asker
-   * handles that.
-   */
-  readonly ready: () => Promise<void>
   /** How many states of accepted work a folder project keeps (`folder.history.states`). */
   readonly keepStates: () => number
   /** A lane's base record changed. */

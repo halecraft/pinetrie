@@ -24,6 +24,7 @@ import {
   laneGitConfig,
   laneIgnores,
   type Mount,
+  type Observer,
   planHostMounts,
   planLinks,
   planMounts,
@@ -36,6 +37,7 @@ import {
 import type { PiSetup } from "@pinetrie/pi"
 import { type ProjectRecord, shortId } from "@pinetrie/rules"
 import { failed, type LeaseBasics } from "../basics.ts"
+import { HostRefused } from "../host-refused.ts"
 import type { Records } from "../records.ts"
 import {
   folderCopy,
@@ -45,6 +47,7 @@ import {
   settleHost,
   sshChoice,
 } from "../settings.ts"
+import type { StartProgress } from "../start-checklist.ts"
 import type { OpenProject, ProjectAdapter } from "./adapter.ts"
 import {
   type AcceptedLanes,
@@ -66,7 +69,7 @@ const LANE_MEMORY = "4G"
  */
 export const PLAYWRIGHT_VERSION = "1.64.1"
 
-/** What lanes of their own need, once the images, runtime and grants are ready. */
+/** What lanes of their own need, once the images, runtime, slot and observer are ready. */
 export interface Ready {
   readonly image: string
   readonly imagePath: string
@@ -74,12 +77,15 @@ export interface Ready {
   readonly runtime: string
   readonly links: readonly Mount[]
   readonly identity: { readonly name: string; readonly email: string }
+  /** The machine's observer, connected: every lane's link registers with it. */
+  readonly observer: Observer
 }
 
 /**
  * What a host with tools found for its lanes, all of it or none
  * (`startSetup` returns null without tools): a host with tools has a
- * project, a runtime, your repo's owner and the lanes' configs.
+ * project, a runtime, your repo's owner, the lanes' configs, and lanes
+ * ready.
  */
 export interface Setup {
   /** What the host found where it runs, and whom its config names its owner. */
@@ -101,8 +107,7 @@ export interface Setup {
    * the project has no `pinetrie.Containerfile`.
    */
   readonly defaultImage: boolean
-  /** The images, runtime and grants, made in the background. */
-  readonly ready: Promise<Ready>
+  readonly ready: Ready
   /**
    * The host paths every lane is granted, read-only: the roots of the commands
    * pi loaded.
@@ -112,11 +117,7 @@ export interface Setup {
    * A lane's spec, from the config it runs with (`configs`). The base lane
    * gets accepted work's grants, and no shared directories or host paths.
    */
-  specOf<L extends LaneOwner>(
-    lane: L,
-    ready: Ready,
-    base?: boolean,
-  ): LaneSpec<L>
+  specOf<L extends LaneOwner>(lane: L, base?: boolean): LaneSpec<L>
   /** Refresh the base snapshot after the refreshes queued before, in the background. */
   refreshBaseSoon(): void
   /**
@@ -208,6 +209,12 @@ async function writeLaneGit(
   await writeFile(path.join(dir, LANE_GITCONFIG), laneGitConfig())
 }
 
+/**
+ * Lane work's setup, all of it or none: its configs, shared directories and
+ * ssh (the start's `lane-work` step), then its lanes made ready, each step
+ * reported (`prepare`). Null without tools. A preparation that fails is a
+ * `HostRefused`: the start stops there.
+ */
 export async function startSetup(input: {
   readonly basics: LeaseBasics
   /** The project, opened (`openProject`); null with no tools. */
@@ -225,12 +232,55 @@ export async function startSetup(input: {
   /** The directory of the host's ssh socket, which the runtime mounts. */
   readonly sshDir: string
   readonly personalSsh: PersonalSshPlaces
+  readonly progress: StartProgress
 }): Promise<Setup | null> {
-  const { basics, keeper } = input
+  const { progress } = input
+  progress.begin("lane-work")
+  const laid = await laySetup(input)
+  if (laid === null) return null
+  const refreshBaseNow = baseRefresher(laid)
+  const ready = await prepare(laid, refreshBaseNow, progress).catch(
+    (error: unknown) => {
+      throw new HostRefused(errorText(error))
+    },
+  )
+  return setupWith(laid, ready, refreshBaseNow, input.keeper, input.basics)
+}
+
+/** What setup knows before its lanes are ready, and how it works out what each lane gets. */
+interface Laid {
+  readonly project: ProjectRecord
+  readonly ssh: LaneSsh
+  readonly root: string
+  readonly opened: OpenProject
+  readonly found: Found
+  readonly files: LaneFiles
+  readonly configs: LaneConfigs
+  readonly defaultImage: boolean
+  readonly hostPaths: readonly string[]
+  readonly log: (m: string) => void
+  /** What lanes of this host may mount and reach under `accepted`. */
+  wantedFor(r: LaidOut, accepted: AcceptedLanes): Wanted
+  specOf<L extends LaneOwner>(lane: L, r: Ready, base: boolean): LaneSpec<L>
+}
+
+/** What a lane's mounts are made from, known before the slot is served. */
+type LaidOut = Pick<Ready, "runtime" | "links">
+
+async function laySetup(input: {
+  readonly basics: LeaseBasics
+  readonly project: OpenedProject | null
+  readonly report: HostReport | null
+  readonly places: ConfigPlaces
+  readonly setup: Pick<PiSetup, "commands">
+  readonly records: Pick<Records, "writeValues">
+  readonly sshDir: string
+  readonly personalSsh: PersonalSshPlaces
+}): Promise<Laid | null> {
+  const { basics } = input
   const { log } = basics
   if (input.project === null || input.report === null) return null
   const { found, root, files, opened, configs } = input.project
-  const { runtime, shareAndGrant } = found
   const project: ProjectRecord = {
     root,
     kind: opened.kind,
@@ -275,7 +325,7 @@ export async function startSetup(input: {
   const hostPaths = hostMounts.mounts
 
   const mountsFor = (
-    r: Ready,
+    r: LaidOut,
     grants: readonly Mount[],
     shared: readonly SharedDir[],
     withHostPaths: boolean,
@@ -291,60 +341,75 @@ export async function startSetup(input: {
       hostPaths: withHostPaths ? hostPaths : [],
     })
 
-  /**
-   * What lanes of this host may mount and reach under `accepted`: on the Mac
-   * every directory is shared into a slot before any lane names it.
-   */
-  const wantedFor = (r: Ready, accepted: AcceptedLanes): Wanted => ({
-    mounts: slotMounts({
-      base: mountsFor(r, accepted.authority.grants.mounts, [], true),
-      shared: accepted.shared,
-      attached: ssh.mounts,
+  return {
+    project,
+    ssh,
+    root,
+    opened,
+    found,
+    files,
+    configs,
+    defaultImage,
+    hostPaths,
+    log,
+    // On the Mac every directory is shared into a slot before any lane names it.
+    wantedFor: (r, accepted) => ({
+      mounts: slotMounts({
+        base: mountsFor(r, accepted.authority.grants.mounts, [], true),
+        shared: accepted.shared,
+        attached: ssh.mounts,
+      }),
+      hostPorts: accepted.authority.grants.hostPorts,
     }),
-    hostPorts: accepted.authority.grants.hostPorts,
-  })
-
-  const specOf = <L extends LaneOwner>(
-    lane: L,
-    r: Ready,
-    base = false,
-  ): LaneSpec<L> => {
-    const own = !base && isThreadId(lane) ? lane : null
-    const { grants } =
-      own === null ? configs.accepted().authority : configs.laneConfig(own)
-    return {
-      lane,
-      image: r.image,
-      imagePath: r.imagePath,
-      mounts: mountsFor(
-        r,
-        grants.mounts,
-        own === null ? [] : configs.laneShared(own),
-        !base,
-      ),
-      grants: {
-        nested: grants.nested,
-        hostPorts: grants.hostPorts,
-        env: grants.env,
-      },
-      attached: ssh.attachedFor(lane),
-      identity: r.identity,
-      memory: LANE_MEMORY,
-      // A lane runs only on its project's kind of history.
-      states: own !== null && opened.kind === "folder",
-    }
+    specOf(lane, r, base) {
+      const own = !base && isThreadId(lane) ? lane : null
+      const { grants } =
+        own === null ? configs.accepted().authority : configs.laneConfig(own)
+      return {
+        lane,
+        image: r.image,
+        imagePath: r.imagePath,
+        mounts: mountsFor(
+          r,
+          grants.mounts,
+          own === null ? [] : configs.laneShared(own),
+          !base,
+        ),
+        grants: {
+          nested: grants.nested,
+          hostPorts: grants.hostPorts,
+          env: grants.env,
+        },
+        attached: ssh.attachedFor(lane),
+        identity: r.identity,
+        memory: LANE_MEMORY,
+        // A lane runs only on its project's kind of history.
+        states: own !== null && opened.kind === "folder",
+      }
+    },
   }
+}
 
-  /** Accepted work's states when its config was last read, for a kind with no base snapshot. */
+/**
+ * The base snapshot at accepted work's commit: every lane starts from
+ * accepted work, or from a WIP's copy on it. Nothing to do before accepted
+ * work is set up. A kind with no base snapshot (a folder's) reads its
+ * config again each time accepted work's states move. `configsAt` is
+ * accepted work's states when its config was last read, for such a kind.
+ */
+type RefreshBase = (r: Ready, making?: () => void) => Promise<void>
+
+function baseRefresher(laid: Laid): RefreshBase {
+  const { opened, configs, found, log } = laid
   let configsAt: string | null = null
-
-  /**
-   * The base snapshot at accepted work's commit: every lane starts from
-   * accepted work, or from a WIP's copy on it. Nothing to do before accepted
-   * work is set up. A kind with no base snapshot (a folder's) reads its
-   * config again each time accepted work's states move.
-   */
-  async function refreshBaseNow(r: Ready) {
+  /** What the scratch lane builds with. Nothing in it should see a shared directory. */
+  const scratchOf = (r: Ready) => ({
+    runtime: found.runtime,
+    spec: laid.specOf(BASE_LANE, r, true),
+    env: process.env,
+    open: laneLinkOpener(found.runtime, r.observer, found.install),
+  })
+  return async (r, making) => {
     const accepted = await opened.acceptedNow()
     const [point] = accepted.points
     if (point === undefined) return
@@ -352,7 +417,11 @@ export async function startSetup(input: {
     const made =
       accepted.checkout === null
         ? configsAt !== at
-        : await refreshBase({ ...scratchOf(r), accepted })
+        : await refreshBase({
+            ...scratchOf(r),
+            accepted,
+            ...(making === undefined ? {} : { making }),
+          })
     configsAt = at
     if (made) {
       if (accepted.checkout !== null)
@@ -361,106 +430,96 @@ export async function startSetup(input: {
       // force, so no lane names a directory no slot holds; a failed share is
       // said, and lanes naming what it lacks say why they cannot start.
       const next = await configs.readAccepted()
-      await shareAndGrant(wantedFor(r, next)).catch(error =>
-        log(`[host] ${errorText(error)}`),
-      )
+      await found
+        .shareAndGrant(laid.wantedFor(r, next))
+        .catch(error => log(`[host] ${errorText(error)}`))
       configs.takeAccepted(next)
     }
-  }
-
-  /** What the scratch lane builds with. Nothing in it should see a shared directory. */
-  const scratchOf = (r: Ready) => ({
-    runtime,
-    spec: specOf(BASE_LANE, r, true),
-    env: process.env,
-    open: laneLinkOpener(runtime, found.install),
-  })
-
-  // --- the images, runtime and base snapshot, in the background ----------
-  const ready: Promise<Ready> = keeper.track(
-    prepare({
-      at: root,
-      runtimeDir: files.runtime,
-      runtime,
-      runtimeReady: found.ready,
-      wanted: r => wantedFor(r, configs.accepted()),
-      identity: () => opened.identity(),
-      refreshBaseNow,
-      log,
-    }),
-  )
-  ready.catch(error =>
-    log(`[host] lanes of their own cannot start: ${errorText(error)}`),
-  )
-
-  /** The base snapshot's refreshes, one at a time. */
-  const base = createKeeper()
-  async function baseAtAccepted(): Promise<void> {
-    await base.run(async () => refreshBaseNow(await ready))
-  }
-  function refreshBaseSoon(): void {
-    void keeper.track(
-      baseAtAccepted().catch(failed(basics, "refreshing the base snapshot")),
-    )
-  }
-
-  return {
-    project,
-    ssh,
-    root,
-    opened,
-    runtime,
-    install: found.install,
-    configs,
-    defaultImage,
-    ready,
-    hostPaths,
-    specOf,
-    refreshBaseSoon,
-    baseAtAccepted,
   }
 }
 
 /**
- * The images, the lane runtime, links and identity; then the runtime told
- * the default image and every mount, before the base snapshot, the first
- * lane to start.
+ * The lanes made ready, one step of the start each: the images, the lane
+ * runtime with links and identity, the slot served, the observer
+ * connected, then the base snapshot, the first thing a lane's start reads.
  */
-async function prepare(input: {
-  readonly at: string
-  /** Where the lane runtime is extracted, one directory per image tag. */
-  readonly runtimeDir: string
-  readonly runtime: LaneRuntime
-  readonly runtimeReady: Found["ready"]
-  /** Every host path a lane of this host mounts, and the ports it reaches. */
-  readonly wanted: (r: Ready) => Wanted
-  /** The identity lanes commit as (`OpenProject.identity`). */
-  readonly identity: () => Promise<Ready["identity"]>
-  readonly refreshBaseNow: (r: Ready) => Promise<void>
-  readonly log: (m: string) => void
-}): Promise<Ready> {
-  const { at, runtime, log } = input
+async function prepare(
+  laid: Laid,
+  refreshBaseNow: RefreshBase,
+  progress: StartProgress,
+): Promise<Ready> {
+  const { root, found, files, configs, opened } = laid
+  const { runtime } = found
+  progress.begin("lane-images")
   const { lane, runtimeFrom } = await prepareImages(
     runtime,
-    at,
+    root,
     PLAYWRIGHT_VERSION,
-    log,
   )
   const refused = await checkImage(runtime, lane)
   if (refused !== null) throw new Error(refused)
-  const programs = await ensureRuntime(runtime, input.runtimeDir, runtimeFrom)
-  const result: Ready = {
-    image: lane,
-    imagePath: await runtime.imagePath(lane),
-    runtime: programs,
-    links: planLinks(at, await gatherLinks(at)),
-    identity: await input.identity(),
+
+  progress.begin("lane-runtime")
+  const laidOut: LaidOut = {
+    runtime: await ensureRuntime(runtime, files.runtime, runtimeFrom, () =>
+      progress.building({ kind: "runtime" }),
+    ),
+    links: planLinks(root, await gatherLinks(root)),
   }
-  await input.runtimeReady({
+  const imagePath = await runtime.imagePath(lane)
+  const identity = await opened.identity()
+
+  progress.begin("lanehost")
+  const served = await found.ready({
     defaultImage: runtimeFrom,
-    ...input.wanted(result),
+    ...laid.wantedFor(laidOut, configs.accepted()),
   })
-  await input.refreshBaseNow(result)
-  log("[host] lanes of their own are ready")
-  return result
+
+  progress.begin("observer")
+  const ready: Ready = {
+    ...laidOut,
+    image: lane,
+    imagePath,
+    identity,
+    observer: await served.observer(),
+  }
+
+  progress.begin("base-snapshot")
+  await refreshBaseNow(ready, () =>
+    progress.building({ kind: "base-snapshot" }),
+  )
+  return ready
+}
+
+function setupWith(
+  laid: Laid,
+  ready: Ready,
+  refreshBaseNow: RefreshBase,
+  keeper: Keeper,
+  basics: LeaseBasics,
+): Setup {
+  /** The base snapshot's refreshes, one at a time. */
+  const base = createKeeper()
+  async function baseAtAccepted(): Promise<void> {
+    await base.run(async () => refreshBaseNow(ready))
+  }
+  return {
+    project: laid.project,
+    ssh: laid.ssh,
+    root: laid.root,
+    opened: laid.opened,
+    runtime: laid.found.runtime,
+    install: laid.found.install,
+    configs: laid.configs,
+    defaultImage: laid.defaultImage,
+    ready,
+    hostPaths: laid.hostPaths,
+    specOf: (lane, base = false) => laid.specOf(lane, ready, base),
+    refreshBaseSoon() {
+      void keeper.track(
+        baseAtAccepted().catch(failed(basics, "refreshing the base snapshot")),
+      )
+    },
+    baseAtAccepted,
+  }
 }

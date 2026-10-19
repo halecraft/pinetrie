@@ -2,11 +2,20 @@ import { sessionNameFor } from "@pinetrie/config/testing"
 import type { SshName } from "@pinetrie/ssh"
 import { describe, expect, test } from "vitest"
 import {
+  checklistAfter,
+  type StartEvent,
+  startChecklist,
+} from "./start-checklist.ts"
+import {
   agentReadyLine,
+  buildingLine,
+  buildWords,
+  checklistLines,
+  endedLine,
   reportLines,
   sessionLines,
   sshLines,
-  startupLaps,
+  startStepWords,
   storeLine,
 } from "./startup-lines.ts"
 
@@ -134,19 +143,6 @@ describe("agentReadyLine", () => {
   })
 })
 
-test("startupLaps: a phase of a second or more is said with its time since the last lap; a quicker one is not", () => {
-  const lines: string[] = []
-  const times = [0, 400, 1900, 2899]
-  const lap = startupLaps(
-    line => lines.push(line),
-    () => times.shift() ?? 0,
-  )
-  lap("quick")
-  lap("slow")
-  lap("just under")
-  expect(lines).toEqual(["[host] starting: slow took 1500 ms"])
-})
-
 test("an allowed host with no known key is said at start", () => {
   const lines = sshLines({
     personal: { kind: "on", hosts: ["hql", "*.lan"], own: true },
@@ -167,4 +163,70 @@ test("an allowed host with no known key is said at start", () => {
   expect(lines).toContain(
     "[host] lanes.ssh.hosts: *.lan matches no line of your known_hosts, so your identity signs for it nowhere",
   )
+})
+
+describe("the start's checklist", () => {
+  const list = [
+    { kind: "begin", step: "lane-machine", at: 0 },
+    { kind: "begin", step: "store", at: 400 },
+    { kind: "begin", step: "lane-images", at: 1000 },
+    { kind: "building", build: { kind: "image", image: "lane" } },
+  ].reduce(
+    (l, e) => checklistAfter(l, e as StartEvent),
+    startChecklist(
+      ["lane-machine", "store", "project", "lane-images", "observer"],
+      { "lane-images": { built: 120_000 } },
+    ),
+  )
+
+  test("every state of a step has its line", () => {
+    expect(checklistLines(list, "lane-vm", 43_000)).toEqual([
+      "  ✓ the lane VM, up to date (0.4 s)",
+      "  ✓ the store and the session (0.6 s)",
+      "  ✗ the project and its config: never ran",
+      "  ▸ the lane images: building the lane image · 42.0 s of about 2:00",
+      "  · the observer",
+    ])
+  })
+
+  test("a failed step says why", () => {
+    const failed = checklistAfter(list, { kind: "fail", why: "no git" })
+    expect(checklistLines(failed, "docker", 0).at(-2)).toBe(
+      "  ✗ the lane images: no git",
+    )
+  })
+
+  test("the line form says a step that built, and a build with its estimate", () => {
+    expect(
+      endedLine(
+        {
+          kind: "done",
+          step: "observer",
+          took: 61_000,
+          built: { kind: "image", image: "observer" },
+        },
+        "lane-vm",
+      ),
+    ).toBe("[host] ✓ the observer, built (1:01)")
+    expect(
+      buildingLine({ kind: "image", image: "observer" }, "observer", {}),
+    ).toBe("[host] building the observer's image (about 1:00)")
+    expect(buildingLine({ kind: "image", image: "lane" }, null, {})).toBe(
+      "[host] building the lane image",
+    )
+  })
+
+  test("the lane machine is named for where lanes run", () => {
+    expect(startStepWords("lane-machine", "lane-vm")).toBe("the lane VM")
+    expect(startStepWords("lane-machine", "docker")).toBe("Docker")
+  })
+
+  test("a VM image's build says what it does first", () => {
+    expect(buildWords({ kind: "vm-image", compile: true, fetch: false })).toBe(
+      "building the lane VM's image: compiling its builder first",
+    )
+    expect(buildWords({ kind: "vm-image", compile: false, fetch: false })).toBe(
+      "building the lane VM's image",
+    )
+  })
 })

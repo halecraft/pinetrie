@@ -131,6 +131,7 @@ async function dockerContract(
     // No lane here holds an ssh identity: nothing listens there.
     hostSocket: path.join(projA, ".no-ssh.sock"),
     log,
+    building: build => log(`building ${JSON.stringify(build)}`),
   })
   if (a?.kind !== "found")
     throw new Error(`no Docker runtime: ${a === null ? "no project" : a.words}`)
@@ -210,7 +211,6 @@ async function dockerContract(
       runtime,
       projA,
       PLAYWRIGHT_VERSION,
-      log,
     )
     const serverMounts: readonly Mount[] = [
       { source: thisInstall.root, target: PINETRIE_MOUNT, readonly: true },
@@ -254,7 +254,7 @@ async function dockerContract(
       tag: contractImage("rebuilt"),
       buildArgs: [],
     }
-    await runtime.ensureLaneImages([rebuilt], () => {})
+    await runtime.ensureLaneImages([rebuilt])
     const listed = await quietCli([
       "images",
       "--format",
@@ -488,6 +488,7 @@ async function dockerContract(
       slots,
       hostSocket: path.join(projB, ".no-ssh.sock"),
       log,
+      building: build => log(`building ${JSON.stringify(build)}`),
     })
     if (b?.kind === "found") {
       await b.ready({

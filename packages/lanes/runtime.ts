@@ -61,22 +61,25 @@ export const runtimeComplete = (
 
 /**
  * The runtime for `image` under `dir` (the session's `runtime/`), copied out of it
- * unless one with every program is there. Its directory is named by the
- * image's tag, so a rebuilt image gets a new runtime, and those of earlier
- * tags are removed. Returns the directory.
+ * unless one with every program is there, `extracting` told first. Its
+ * directory is named by the image's tag, so a rebuilt image gets a new
+ * runtime, and those of earlier tags are removed. Returns the directory.
  */
 export async function ensureRuntime(
   runtime: LaneRuntime,
   dir: string,
   image: string,
+  extracting: () => void = () => {},
 ): Promise<string> {
   const name = image.replace(/[^A-Za-z0-9._-]/g, "-")
   const final = path.join(dir, name)
   const [node, bin] = await Promise.all(
     ["node", "bin"].map(d => readdir(path.join(final, d)).catch(() => [])),
   )
-  if (!runtimeComplete(node ?? [], bin ?? []))
+  if (!runtimeComplete(node ?? [], bin ?? [])) {
+    extracting()
     await extract(runtime, final, image)
+  }
   for (const old of await readdir(dir))
     if (old !== name)
       await rm(path.join(dir, old), { recursive: true, force: true })

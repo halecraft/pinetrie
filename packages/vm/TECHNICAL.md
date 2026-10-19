@@ -254,6 +254,11 @@ The Mac builds the image in a one-shot VM of its own, with no Docker
   that cannot start the current VM (no Xcode tools, `vmStartRefusal`) joins
   the old one and says what is missing; a missing image is built first. Without this, a host after an update joined
   the VM left running by the last one, for up to its 10 idle minutes.
+- **A lease says what it builds before it builds it:** the launcher, and
+  the image with what it compiles or fetches first (`VmBuild`), handed to
+  its `building` as a value; a host's start words it and times it (ADR-0191).
+  Given none (`pnpm vm:build`'s callers, a scenario's lease), it logs
+  `vmBuildWords`' line, with its fixed estimate.
 - **A launcher older than the VM's identity** sends a `slot` without it:
   read with a null identity (`VmIdentity`), joined (`old-launcher`), and
   the log says how to replace it, since it cannot take `retire`. A decoder that dropped such a

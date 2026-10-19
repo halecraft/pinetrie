@@ -25,6 +25,7 @@ export {
   launcherWords,
   leaseExtra,
   leaseVm,
+  type VmBuild,
   VmRefused,
   vmProblem,
 } from "./lease.ts"

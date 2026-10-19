@@ -150,7 +150,6 @@ async function makeRig(): Promise<FolderRig> {
     runSpec: unused("runSpec"),
     run: unused("run"),
     containerFacts: unused("containerFacts"),
-    observe: unused("observe"),
     start: unused("start"),
     stop: unused("stop"),
     remove: unused("remove"),

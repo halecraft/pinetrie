@@ -225,10 +225,9 @@ export function createNewLanes(deps: {
       ),
 
     async fork(lane, h, handle, record, fork) {
-      const { runtime, ready } = setup
+      const { runtime } = setup
       const { kind } = setup.opened
       // gather
-      const r = await ready
       await using held = basics.leases.lane(lane)
       if (held === null) throw new Error(`${lane} is in no root`)
       const doc = await held.ready
@@ -257,7 +256,7 @@ export function createNewLanes(deps: {
       )
       const steps = planFork({
         source,
-        spec: setup.specOf(lane, r),
+        spec: setup.specOf(lane),
         env: process.env,
         setup: forkSetup,
         innerDockerDataRoot: dataRoot,

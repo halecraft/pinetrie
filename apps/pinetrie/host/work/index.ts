@@ -36,6 +36,7 @@ import {
 import { failed, type LeaseBasics } from "../basics.ts"
 import type { Records } from "../records.ts"
 import type { HostReport } from "../settings.ts"
+import type { StartProgress } from "../start-checklist.ts"
 import type { Splits, StartedProject } from "./adapter.ts"
 import { type Archive, createArchive } from "./archive.ts"
 import { type Containers, createContainers } from "./containers.ts"
@@ -104,10 +105,11 @@ export type LaneWork = Pick<
   }
 
 /**
- * Return what the host needs for lanes, in the project `findProject` found.
- * The agent is made after this, with its `access` and `hooks`. Images, the
- * lane runtime and the base snapshot are made in the background; a lane's
- * first steps wait for them.
+ * Return what the host needs for lanes, in the project `findProject` found,
+ * once its lanes are ready: the images, the lane runtime, the slot, the
+ * observer and the base snapshot, each a step of the start. The agent is
+ * made after this, with its `access` and `hooks`. Throws `HostRefused` when
+ * lanes cannot be made ready.
  */
 export async function startLaneWork(input: {
   readonly basics: LeaseBasics
@@ -127,6 +129,8 @@ export async function startLaneWork(input: {
   readonly sshDir: string
   /** The person's ssh files and agent. */
   readonly personalSsh: PersonalSshPlaces
+  /** The start's steps: setup's, and each step of making lanes ready. */
+  readonly progress: StartProgress
 }): Promise<LaneWork> {
   const { basics } = input
   const { session } = basics
@@ -142,6 +146,7 @@ export async function startLaneWork(input: {
     records: input.records,
     sshDir: input.sshDir,
     personalSsh: input.personalSsh,
+    progress: input.progress,
   })
   if (setup === null)
     return {
@@ -168,6 +173,7 @@ export async function startLaneWork(input: {
   const registry = createRegistry({
     session,
     runtime,
+    observer: setup.ready.observer,
     install: setup.install,
     history: (lane, runners) => started.history(lane, runners),
   })
@@ -182,7 +188,6 @@ export async function startLaneWork(input: {
     startContainer: (record, h) => containers.startContainer(record, h),
     beforeRun: lane => containers.beforeRun(lane),
     acceptedMoved: () => setup.refreshBaseSoon(),
-    ready: () => setup.ready.then(() => {}),
     keepStates: () =>
       setup.configs.accepted().report.settled["folder.history.states"].value,
     baseChanged: lane => {

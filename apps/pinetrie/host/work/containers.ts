@@ -175,14 +175,13 @@ export function createContainers(deps: {
     h: LaneHistory,
   ): Promise<void> {
     const { lane } = record
-    const { ready, runtime } = setup
-    const r = await ready
+    const { runtime } = setup
     const handle = registry.handleOf(lane)
     const { container } = handle
     // Its own pinetrie.json may narrow what it gets: a narrowing changes the
     // spec, so the container is made anew below.
     await setup.configs.readLane(lane)
-    const spec = setup.specOf(lane, r)
+    const spec = setup.specOf(lane)
     // Read in this step, never when it was queued: a fork queued before it
     // may have ended since. `withHistory` refused a lane with none.
     const fork = readLaneForks(session).get(lane)
@@ -236,7 +235,7 @@ export function createContainers(deps: {
     }
     // Every run starts on a disk whose recipes are checked, whatever made it
     // (a fork, a restore, a merge, another image): what went stale goes.
-    await removeStaleOutputs(handle, r.image).catch(
+    await removeStaleOutputs(handle, setup.ready.image).catch(
       failed(basics, "removing stale outputs", lane),
     )
   }
@@ -290,7 +289,7 @@ export function createContainers(deps: {
             await handle.stop()
             // Stopped: from now its inner Docker data root is the one to
             // clone, and no Docker runs on it unless it starts again.
-            if (setup.specOf(lane, await setup.ready).grants.nested)
+            if (setup.specOf(lane).grants.nested)
               innerDockerDataRoots.stoppedAfterRun(lane)
           })
           .catch(failed(basics, "stopping", lane)),

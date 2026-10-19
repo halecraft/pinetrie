@@ -144,7 +144,11 @@ the one exception: it checks the manifests.
 The host's shell, `apps/pinetrie/host/`, is split by responsibility: runs, the
 popping queued cards, settling, startup, each command, HTTP. Each module takes its
 dependencies as a parameter, and `index.ts` alone wires them. Its order rules
-(a run's end, startup) are in `apps/pinetrie/host/TECHNICAL.md`.
+(a run's end, startup) are in `apps/pinetrie/host/TECHNICAL.md`. A host with
+tools listens only once its lanes work: their images, runtime, slot, observer
+and base snapshot are ready before the agent is made, and a preparation that
+fails refuses the start. The start draws its steps as a checklist, each with
+an estimate from the last start (ADR-0191).
 
 ### The pi rule is correct-by-construction, not checked
 

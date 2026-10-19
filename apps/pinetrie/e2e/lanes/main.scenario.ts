@@ -35,6 +35,8 @@ import {
   setRecord,
 } from "@pinetrie/rules"
 import { rowMessage } from "@pinetrie/schema"
+import { laneMachine, planStartSteps } from "../../host/start-checklist.ts"
+import { startStepWords } from "../../host/startup-lines.ts"
 import type { Checks } from "../checks.ts"
 import {
   at,
@@ -102,6 +104,8 @@ async function mainSection(
       if (process.env.PINETRIE_E2E_LOG === "1") console.log(m)
     },
   })
+  // What the start said by the time it returned: each step's end, in order.
+  const startLines = [...logs]
   const wu = await join(wh, "uma", "lanes")
   await wu.request({ kind: "name", name: "Uma" })
   const tree = () => heldTree(wh)
@@ -134,6 +138,15 @@ async function mainSection(
   }
 
   try {
+    const machine = laneMachine(process.platform)
+    const ends = startLines.filter(l => l.startsWith("[host] ✓ "))
+    check(
+      "a host's start reports each of its steps as it ends",
+      planStartSteps({ tools: true }).every((step, i) =>
+        ends[i]?.startsWith(`[host] ✓ ${startStepWords(step, machine)}`),
+      ),
+      ends.join(" | "),
+    )
     await waitFor(() => readProject(wh.session) !== null, 30_000)
     check(
       "the host finds Docker and gives threads lanes of their own",

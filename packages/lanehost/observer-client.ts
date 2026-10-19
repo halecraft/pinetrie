@@ -75,6 +75,12 @@ export interface ObserverClient {
     /** How its notices become its runs' traces, batch by batch. */
     readonly fold: FoldNotices
   }): Promise<LaneObservation>
+  /**
+   * Open the held channel, registering nothing: the role, which exits a
+   * minute after its last connection, stays while it is held. Rejects,
+   * saying why, where the channel cannot open or the loader refused.
+   */
+  connect(): Promise<void>
   /** Close the channel: the next call opens it again, and registers every lane again. */
   reset(): void
 }
@@ -166,6 +172,9 @@ export function observerClient(input: {
   }
 
   return {
+    async connect() {
+      await opened()
+    },
     async observe(lane) {
       const held: Held = {
         ...lane,

@@ -187,6 +187,10 @@ host, whatever their projects.
        returned. A callback that threw leaves the traces it was given.
 
     Drains run one after another, in call order.
+- **A host connects before any lane** (`ObserverClient.connect`): the held
+  channel opened with nothing registered. The role exits a minute after its
+  last connection, or after starting with none, so a host holding one keeps
+  it while the host runs, and a loader that refuses is found at the start.
 - **A connection waits up to 15 s for the role's socket** (`observer-connect.ts`):
   a role's container just made makes it once Node has started, some
   hundreds of ms after `docker run` returns.

@@ -589,6 +589,8 @@ export interface LaneFiles {
 export interface SessionFiles {
   /** The session's SQLite file, unless `PINETRIE_STORE` names another. */
   readonly store: string
+  /** What each step of its last starts took (`start-checklist.ts`). */
+  readonly startTimes: string
   readonly lanes: LaneFiles
 }
 
@@ -596,6 +598,7 @@ export interface SessionFiles {
 export function sessionFiles(sessionData: string): SessionFiles {
   return {
     store: path.join(sessionData, "pinetrie.db"),
+    startTimes: path.join(sessionData, "start-times.json"),
     lanes: {
       runtime: path.join(sessionData, "runtime"),
       laneGit: path.join(sessionData, "lane-git"),

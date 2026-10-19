@@ -344,7 +344,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "getting the latest leaves stale outputs",
     file: "apps/pinetrie/host/work/update.ts",
-    from: "          (await removeStaleOutputs(handle, (await setup.ready).image).catch(\n",
+    from: "          (await removeStaleOutputs(handle, setup.ready.image).catch(\n",
     to: "          (await Promise.resolve([]).catch(\n",
     suite: "lanes",
     scenario: "recipe",
@@ -364,7 +364,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a run starts on stale outputs",
     file: "apps/pinetrie/host/work/containers.ts",
-    from: "    await removeStaleOutputs(handle, r.image).catch(\n",
+    from: "    await removeStaleOutputs(handle, setup.ready.image).catch(\n",
     to: "    await Promise.resolve().catch(\n",
     suite: "lanes",
     scenario: "recipe",

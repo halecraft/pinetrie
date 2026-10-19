@@ -38,7 +38,6 @@ function recordingRuntime(seen: string[]): LaneRuntime {
     readLaneFile: no,
     runSpec: no,
     containerFacts: no,
-    observe: no,
     start: no,
     stop: no,
     remove: no,

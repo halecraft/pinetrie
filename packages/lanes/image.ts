@@ -45,7 +45,6 @@ export async function prepareImages(
   runtime: Pick<LaneRuntime, "ensureLaneImages">,
   root: string,
   playwrightVersion: string,
-  log: (m: string) => void,
 ): Promise<{ readonly lane: string; readonly runtimeFrom: string }> {
   const own = projectContainerfile(root)
   const [jjVersion, pinetrie, project] = await Promise.all([
@@ -73,7 +72,6 @@ export async function prepareImages(
   // given yet, and the project's own would go while the default one built.
   await runtime.ensureLaneImages(
     plans.project === null ? [plans.pinetrie] : [plans.pinetrie, plans.project],
-    plan => log(`[host] building the lane image ${plan.tag} from ${plan.file}`),
   )
   return {
     lane: (plans.project ?? plans.pinetrie).tag,

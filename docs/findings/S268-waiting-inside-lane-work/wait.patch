@@ -1,0 +1,14 @@
+diff --git a/apps/pinetrie/host/work/index.ts b/apps/pinetrie/host/work/index.ts
+index 5a5119fcef..fcdf071ebd 100644
+--- a/apps/pinetrie/host/work/index.ts
++++ b/apps/pinetrie/host/work/index.ts
+@@ -161,6 +161,9 @@
+           base,
+         ),
+     }
++  basics.log("[s268] awaiting lanes")
++  await setup.ready
++  basics.log("[s268] lanes awaited")
+   const baseListeners: ((lane: ThreadId) => void)[] = []
+   const { opened, runtime } = setup
+   // The registry asks for a lane's history only from `withHistory`, after

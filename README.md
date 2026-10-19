@@ -33,6 +33,11 @@ pinetrie tidy [folder]           # cut a repo's operation log to a window
 pinetrie session rename <old> <new>
 ```
 
+A start draws a checklist of what it does, each step with what it is
+expected to take. The first start, and any after an update that changes an
+image, builds the lanes' images for a few minutes; once it says
+`listening`, every thread's agent can work.
+
 Settings are `pinetrie.json` files: the machine's, yours
 (`~/.config/pinetrie/pinetrie.json`), the project's, and yours for one
 project, from the broadest to the most specific. `docs/pinetrie.md`

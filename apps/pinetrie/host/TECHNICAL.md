@@ -15,7 +15,11 @@ wires them.
 | `../command.ts`, `../bin.ts` | `pinetrie <command>`, the command the npm package puts on the PATH: `planCommand` decides which of `serve`, `sign-in`, `sign-out`, `tidy` and `session` an invocation asks for, and `bin.ts` loads only that command's module, each exporting `main(args)` and running nothing when loaded |
 | `sessions.ts`; and `sessionOfFolder`, a read of the registry alone, for `pnpm tidy` | the session a host serves (`openSession`, ADR-0149): the folder's real path looked up in the registry under its lock, the registry written, the session's data directory made and its `host.pid` taken; and `renameSession`, for `pnpm session rename` (`apps/pinetrie/scripts/session.ts`); and `sessionOfFolder`, a read of the registry alone, for `pnpm tidy` |
 | `tidy.ts` | `pnpm tidy`'s shell (`apps/pinetrie/scripts/tidy.ts`, ADR-0155): `takeTidyLock`, the session store's own lock taken without waiting, so a host serving the folder refuses the tidy and a host starting during it is refused; the sizes it reports (`readRepoSizes`); and every line it prints, and the startup line, from values (`tidyWords`). What a tidy does is `@pinetrie/jj`'s `planTidy`. The folder is `invocation.ts`' `planTidyInvocation`, which reads one as `pnpm dev` does (`invokedFolder`) |
-| `startup-lines.ts` | the words of what a starting host logs about its inputs: the project, the session (`sessionLines`), the store, each config file and what it refused (`reportLines`, in the setup page's words), the agent's model and where it came from or why there is none, the URL and invites, and the setup page's URL with no model |
+| `startup-lines.ts` | the words of what a starting host logs about its inputs: the project, the session (`sessionLines`), the store, each config file and what it refused (`reportLines`, in the setup page's words), the agent's model and where it came from or why there is none, the URL and invites, and the setup page's URL with no model; and the start's checklist, drawn (`checklistLines`) or a line per step (`endedLine`, `buildingLine`) |
+| `start-checklist.ts` | a start's steps as values (§ Startup): `planStartSteps`, the cursor (`checklistAfter`), estimates (`stepEstimate`, `START_DEFAULTS`), what is remembered (`timesAfter`, `decodeStartTimes`), and the port a start reports through (`StartProgress`) |
+| `start-terminal.ts` | the checklist on its way out: redrawn in place on a terminal, owning its writes while it draws (`terminalProgress`), else a line per step (`lineProgress`) |
+| `host-refused.ts` | `HostRefused`, the one error a start throws as a refusal |
+| `replace-file.ts` | a file of the host's own written whole, through a temporary file renamed over it: the session registry, a folder's stamps, the start's times |
 | `settings.ts` | every setting the host reads, declared once (`SETTINGS`, ADR-0146) with the layers that may set it and how they combine; the project's copies as values (`laneAuthority`, `decodeAuthority`, `laneCopy`), `settleHost`, `folderReport` for a host without lane work, and the settled values as the deciding packages take them (`repoNames`, `iconSettings`, `titleSettings`, `sshChoice`, `listedFolders`) |
 | `setup-record.ts` | `planSetupRecord`: the `pinetrie.setup` value, from the config's report and what the model setup loaded |
 | `index.ts` | `startHost`: the store and the check of its schemas (`migrations/`), the Exchange (with its `resolve` for the documents clients create, `resolveDoc`), the documents and the records, then pi's scribe and setup, lane work and the agent, in that order (§ Startup), then the wiring below |
@@ -565,12 +569,40 @@ reading the store once, planning once, then acting:
 
 ## Startup
 
-**A phase of the start that takes a second or more is logged**
-(`startupLaps`, `startup-lines.ts`): `[host] starting: <phase> took <n> ms`,
-the time since the last lap. The laps are the project and the lane VM, the
-store, its migrations, loading the session, places and live documents,
-opening the project and its config, pi's setup, the roots, and lane work. A
-start's quiet gap is one of these, and its line names which.
+**A host with tools listens only once its lanes work** (ADR-0191): lane
+work's setup makes them ready before it returns (`startSetup`, `setup.ts`),
+so the agent, `recover` and the runs it resumes come after, and the server
+listens last. A preparation that fails is a `HostRefused`.
+
+**A start is a checklist of steps** (`start-checklist.ts`, drawn by
+`start-terminal.ts`, worded by `startup-lines.ts`). `planStartSteps` lists
+every step of this start before any runs: the lane machine (with tools),
+the store, the project, the model, the roots, lane work's setup, then with
+tools the lane images, the lane runtime, lanehost, the observer and the
+base snapshot, then the agent, and the server.
+
+- **One step runs at a time, so the list is a cursor** (`Checklist`): the
+  steps ended, the one running or failed, those waiting. Each `begin` ends
+  the step before it; `startHost` ends the last, or fails the running one,
+  in one place. A `begin` past a waiting step marks it as never run, so a
+  planned step the code skips shows.
+- **A build lands on the step running** (`StartProgress.building`): the
+  lane VM's launcher and image (`leaseVm`'s `building`), every image
+  Docker builds (`dockerRuntime`'s `building`), the runtime's extraction
+  and the base snapshot's making. A step that built says so; one that could
+  have and did not says it is up to date. A build with no step running (a
+  tag another host removed, rebuilt later) is a line of its own.
+- **Estimates are the last start's** (`stepEstimate`): each step's
+  duration, kept apart for a start in which it built, in the session's
+  `start-times.json` (`SessionFiles.startTimes`), written once the start
+  ends or fails; a failed step keeps its old times. A step never measured
+  takes `START_DEFAULTS`, a `Record` of every step.
+- **On a terminal it is redrawn in place; piped, it is a line per step**
+  (`startProgress` picks by `isTTY` once). While it draws, the terminal
+  form owns stdout's and stderr's `write`: anything written, Vite's and
+  Kyneta's included, erases the checklist, goes through, and the checklist
+  is drawn below it. Only `redrawText` makes escape codes. A host given no
+  `progress` (every suite) gets the line form over its `log`.
 
 After `recover`, `sweepUnused` runs a start's sweeps (`planSweeps`) in one
 keeper step: `sweepHistories` retires the histories of moves no one will
@@ -698,7 +730,8 @@ as it first loads (§ Roots: steps, leases and the upkeep).
      `planLoads` names, opened in one step, the directory,
      banners, digests, titles, names and the split call, each
      with the records and the setup;
-  4. lane work, with them;
+  4. lane work, with them, which returns once its lanes are ready, the
+     observer connected (`Ready` is a value, ADR-0191);
   5. the agent, last, with lane work's `access` and `hooks`, banners'
      `request` and digests' `step`; then base news, which steers its lanes
      and joins lane work's `onBaseChanged`, the runs, the delivery, the
@@ -737,7 +770,17 @@ as it first loads (§ Roots: steps, leases and the upkeep).
   - **A host with tools that cannot run lanes does not start** (ADR-0102):
     `projectAdapter` (`project.ts`) and `findProject` return the refusal as
     a value, worded with its fix, and `startHost` throws it as
-    `HostRefused`; `server.ts` prints it and exits 1. The refusals: the
+    `HostRefused` (`host-refused.ts`); `server.ts` prints it and exits 1.
+    So does a preparation of the lanes that fails (an image that does not
+    build or has no git, the runtime's extraction, the slot, the observer,
+    the base snapshot), worded with its error.
+  - **A start that throws closes what it opened** (`startHost`): each part
+    is pushed on an `AsyncDisposableStack` as it opens (the ssh directory,
+    the lease, the store, the exchange with the roots, the scribe, the
+    keeper, the agent), disposed in reverse on a throw. The store is the
+    exchange's to close once the exchange is made; the agent's closing
+    closes the keeper first, as `planShutdown` does. Once `startHost` has
+    returned, only `shutdown()` closes anything. The refusals: the
     project's, asked first, before any runtime (`ProjectDirRefusal`, worded
     by `projectDirWords`: no such directory, your home directory or the
     file system's root, a jj repo with no git directory beside it), and
@@ -794,7 +837,8 @@ rejects `shutdown()`.
   listener is gone, the `"vite"` route leaves that socket open. A host
   serving the built page has no Vite to close.
 - **`host.pid` goes after `shutdown()`** (`server.ts`): the session's
-  `release`, also when lanes refuse to start.
+  `release`, also when lanes refuse to start, after the start closed what
+  it opened.
 - **Only the first signal shuts down** (`server.ts`). It takes the SIGINT
   and SIGTERM listeners off, so a second Ctrl-C gets Node's default action
   and ends the process, even while `shutdown()` hangs.
@@ -1513,13 +1557,13 @@ adapter's.
 
 | module | owns |
 |---|---|
-| `adapter.ts` | `ProjectAdapter`, which carries its `kind`: opened by setup where it reads your repo's names, with the runtime, a folder project's `FolderDisks`, the session's lane files and the records, before anything else reads the project (`OpenProject`: `kind`, `fileAt`, `prepareShared`, `identity`, `acceptedNow`, whose checkout is bound to its read, or none for a folder), then started once lane work has its registry, with `ready` (asked, never held: a read waits on it for lanehost) and `keepStates` (`StartedProject`: the `Destination`, each lane's `history` from its record, refused for a lane of another kind, and `Splits`). The registry and the containers it is started with are bound late: neither is asked for before startup ends |
+| `adapter.ts` | `ProjectAdapter`, which carries its `kind`: opened by setup where it reads your repo's names, with the runtime, a folder project's `FolderDisks`, the session's lane files and the records, before anything else reads the project (`OpenProject`: `kind`, `fileAt`, `prepareShared`, `identity`, `acceptedNow`, whose checkout is bound to its read, or none for a folder), then started once lane work has its registry and its lanes are ready, with `keepStates` (`StartedProject`: the `Destination`, each lane's `history` from its record, refused for a lane of another kind, and `Splits`). The registry and the containers it is started with are bound late: neither is asked for before startup ends |
 | `destination.ts` | `Destination`: accepted work and proposed changes as any kind has them: a file at a point (`fileAt`), where a new lane begins (`begin`), what the base that got the latest is now (`baseNow`), an archive's lanes moved (`lanesMoved`), the proposed changes' acts (`ProposedChangesActs`), setup and publish (`AcceptedActs`), `quiet` and `close` |
-| `setup.ts` | `openProject`: the project opened through its adapter, with your repo's names settled from your files and the working copy's `pinetrie.json`, before anything else reads it, and its lane configs, before pi's setup. `Setup`, all of it or none: the opened project, the lanes' ssh, the shared directories, the default-image check (the default image carries a browser, ADR-0041, and python3, ADR-0064), the images and runtime (`ready`), `specOf`, the granted host paths (planned at its start, from the roots of the commands pi's setup loaded, none inside the project and none holding pine·trie's own directories, ADR-0036), and the base snapshot's refreshes |
+| `setup.ts` | `openProject`: the project opened through its adapter, with your repo's names settled from your files and the working copy's `pinetrie.json`, before anything else reads it, and its lane configs, before pi's setup. `Setup`, all of it or none: the opened project, the lanes' ssh, the shared directories, the default-image check (the default image carries a browser, ADR-0041, and python3, ADR-0064), its lanes made ready before it returns, each a step of the start (`prepare`: the images, the runtime, the slot served, the observer connected, the base snapshot; `ready`, a value), `specOf`, the granted host paths (planned at its start, from the roots of the commands pi's setup loaded, none inside the project and none holding pine·trie's own directories, ADR-0036), and the base snapshot's refreshes |
 | `config.ts` | `pinetrie.json` as a fact of a state (ADR-0135, ADR-0146): accepted work's copy read at accepted work (`Destination.fileAt`) at startup and when the base moves (`readAccepted`), decoded by the host's table and settled with the start layers, its shared directories (the settled `lanes.shared`) prepared again, and put in force (`takeAccepted`, `onTaken`) once what it names is shared; a lane's own copy and the copy it started on, read at its tip and its start before its container starts (`readLane`), so `specOf` and the prompt's facts use the lane's config; the note on a write of the file (`configNote`, the `configWritten` hook): what it changes, and each key not taken. A lane with no commit in your repo yet runs with accepted work's |
 | `shared.ts` | the shared files' lineages (`pinetrie.shared`, ADR-0135), one recorder for every lane and the watcher, so none reads and writes a lineage at once: a turn's accesses of shared files (`classifyWritesOnQueue` hands them over), based on what the lane last read, numbered and flagged (`planSharedLineages`) after the turn's queued step, since the lineages are every lane's; the watcher's stamps (`seen`); a whole directory's scan (`scanned`), whose missing files' lineages go once every version is older than the host's start (`planGoneLineages`); and a thread deleted from the trash, which leaves every lineage it read (`forgetReaders`, from `sweepTrash`). An earlier turn found concurrent after its rival is learnt has its revision record rewritten; one whose record is not written yet keeps what it says |
 | `shared-watch.ts` | your writes to the shared directories as they are made (S169): each directory of accepted work's watched (`watch-dir.ts`, with no quiet window), each file an event names stat'ed into the stamp a lane would read, and handed to `shared.ts`. A scan at each start, and after a dropped-events error, finds what changed unseen, and what is gone. A listing that fails throws, so it never reads as every file gone; only a missing directory lists none. A delete event lets nothing go: the next scan does. It follows accepted work's list (`LaneConfigs.onShared`). Lanes' writes come by here too, and are claimed when their turns are recorded |
-| `registry.ts` | `LaneRegistry`: each lane's handle, its record, whether it is a lane of its own; the only module that touches the handles; `withHistory`, the one way to a lane's `LaneHistory`, which queues its function on the lane's queue with the history, the handle and the lane's record; refused, with nothing queued, for a lane with no record, no copy of its own, no fork record, or a history the adapter does not keep |
+| `registry.ts` | `LaneRegistry`: each lane's handle, its record, whether it is a lane of its own; the only module that touches the handles; `withHistory`, the one way to a lane's `LaneHistory`, which queues its function on the lane's queue with the history, the handle and the lane's record; refused, with nothing queued, for a lane with no record, no copy of its own, no fork record, or a history the adapter does not keep; each lane's link registers it with `Ready`'s observer (`laneLinkOpener`), so no lane is observed before the observer is |
 | `containers.ts` | `access` (its prompt's facts from the lane's grants, `laneFacts`, pure), a container's start (`planContainer`, then `decideLaneStart` from the lane's fork record, which reads, only when the container must be made, its disk, and with that gone its revision records' snapshots and `keptSnapshot`, then each snapshot newest first until one is there (`factsOf`); a fork owed runs `create.ts`'s fork; after a restore from a snapshot, the history's `afterRestore`, for jj `pre-rename:`, since a snapshot made before the rename holds the old names (S114); run from a queued step, which hands it the history; every start loses stale outputs, `removeStaleOutputs`), `beforeRun`, `runEnded` |
 | `inner-docker-data-roots.ts` | the host's one `InnerDockerDataRoots` (ADR-0169), in memory: which nested lane's container stopped last after a run, and which run end each lane's inner Docker data root is as of. `containers.ts` names a lane the last in the step that stops it at its run's end, after the stop, so it is stopped when others clone it; a start or a fork asks where a data root comes from, and records it once its step ran. After a host's start there is no last run's lane until a run ends |
 | `turns.ts` | pi's `turnDone`: the turn's revision (`recordTurn`), its classes and snapshot (`disk.ts`), its whole-disk diff, and what follows its commit (`follow`, for jj its fetch), fired once the snapshot step is queued (`queueTurnEnd`); the turn records still being written (`pendingRecords`). A revision is titled by its message's first line, else what its first call is for (`revisionTitle`, `callPurpose` from `@pinetrie/interface`): its intent (ADR-0173), "Run the unit tests", else its words (ADR-0114: `shell pnpm test`, not `bash …`). A lane is fetched into your repo only after a turn that commits, so a lane that never changed a file has no `tip@pinetrie-<lane>`, no refresh and no `pinetrie.base` until it gets the latest (a clean merge is fetched) |

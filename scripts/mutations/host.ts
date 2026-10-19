@@ -11,6 +11,58 @@ const command = [
 ]
 
 export const mutations: readonly Mutation[] = [
+  // ── the start's checklist ──
+  {
+    name: "an estimate forgets the build remembered",
+    file: "apps/pinetrie/host/start-checklist.ts",
+    from: "      remembered?.built ?? defaults.built ?? remembered?.usual ?? defaults.usual",
+    to: "      defaults.built ?? remembered?.usual ?? defaults.usual",
+    command: unit,
+    expect: "a remembered build's time is the estimate of a step that builds",
+  },
+  {
+    name: "a build lands on no step",
+    file: "apps/pinetrie/host/start-checklist.ts",
+    from: "        : { ...list, now: { ...now, building: event.build } }",
+    to: "        : list",
+    command: unit,
+    expect:
+      "a build lands on the step running, and is what it ended having built",
+  },
+  {
+    name: "a step the start went past is dropped unsaid",
+    file: "apps/pinetrie/host/start-checklist.ts",
+    from: "      const skipped: Ended[] = (at < 0 ? [] : list.waiting.slice(0, at)).map(",
+    to: "      const skipped: Ended[] = [].map(",
+    command: unit,
+    expect: "a begin past a waiting step marks it never run",
+  },
+  {
+    name: "a failed step's time is remembered",
+    file: "apps/pinetrie/host/start-checklist.ts",
+    from: "  for (const e of list.ended) {\n",
+    to: '  const failed = list.now?.kind === "failed" ? [{ kind: "done" as const, step: list.now.step, took: 0, built: null }] : []\n  for (const e of [...list.ended, ...failed]) {\n',
+    command: unit,
+    expect: "a failed step's times stay as they were",
+  },
+  {
+    name: "a redraw moves up one line too few",
+    file: "apps/pinetrie/host/start-terminal.ts",
+    from: '  const up = height > 0 ? `\\x1b[${height}F` : ""',
+    to: '  const up = height > 1 ? `\\x1b[${height - 1}F` : ""',
+    command: unit,
+    expect:
+      "it moves up over every line drawn last, clears below, and draws the new lines",
+  },
+  {
+    name: "a write while the checklist draws leaves it erased",
+    file: "apps/pinetrie/host/start-terminal.ts",
+    from: "      const wrote = write(...args)\n      draw()\n",
+    to: "      const wrote = write(...args)\n",
+    command: unit,
+    expect:
+      "a write while it draws goes above the checklist, which is drawn again below it",
+  },
   // ── a lane's fork ──
   {
     name: "a fork's end leaves out its history's start",
@@ -125,14 +177,6 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "Start opens every branch in one change before any send, sends each in order, then queues one fact",
-  },
-  {
-    name: "every start-up phase is said, however quick",
-    file: "apps/pinetrie/host/startup-lines.ts",
-    from: "  ms < 1000 ? null : `[host] starting: ${what} took ${Math.round(ms)} ms`",
-    to: "  `[host] starting: ${what} took ${Math.round(ms)} ms`",
-    command: unit,
-    expect: "startupLaps: a phase of a second or more is said",
   },
   {
     name: "pnpm tidy takes no lock",

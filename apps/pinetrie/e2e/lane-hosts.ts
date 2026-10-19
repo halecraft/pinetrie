@@ -68,6 +68,7 @@ export async function runtimeProblem(): Promise<string | null> {
       // Nothing listens there: this probe makes no lane.
       hostSocket: path.join(dir, ".no-ssh.sock"),
       log: () => {},
+      building: () => {},
     })
     if (found === null) return "no project"
     if (found.kind === "refused") return found.words

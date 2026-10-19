@@ -65,14 +65,15 @@ async function inScratch<C, T>(
 /**
  * Make the base snapshot at `accepted`: the base before it restored (none,
  * or one made another way, gives an empty disk), accepted work checked out
- * on it, its facts written, then snapshotted. Does nothing when the base
- * already holds them, or when accepted work has no checkout: a kind with no
- * base snapshot.
+ * on it, its facts written, then snapshotted, `making` told first. Does
+ * nothing when the base already holds them, or when accepted work has no
+ * checkout: a kind with no base snapshot.
  */
 export async function refreshBase<C>(
   input: Scratch<C> & {
     /** Accepted work as the adapter just read it, with its checkout, if any. */
     readonly accepted: AcceptedNow
+    readonly making?: () => void
   },
 ): Promise<boolean> {
   const { runtime, accepted } = input
@@ -83,6 +84,7 @@ export async function refreshBase<C>(
   )
   if (isBaseCurrent(base, accepted.points)) return false
   const from = isCopyableBase(base) ? BASE_SNAPSHOT : null
+  input.making?.()
   await inScratch(input, from, async runners => {
     await executeOrThrow(
       [

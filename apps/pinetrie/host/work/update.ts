@@ -487,7 +487,7 @@ export function createUpdates(deps: {
         // and what went is kept for the message. A failed removal tells
         // nothing.
         const removed =
-          (await removeStaleOutputs(handle, (await setup.ready).image).catch(
+          (await removeStaleOutputs(handle, setup.ready.image).catch(
             failed(basics, "removing stale outputs", lane),
           )) ?? []
         // A conflict's prompt fits the floor settled before the merge.

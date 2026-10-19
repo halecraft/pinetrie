@@ -6,7 +6,7 @@ import {
   writerId,
 } from "@pinetrie/core"
 import { thisInstall } from "@pinetrie/install"
-import type { LaneHistory, LaneRuntime } from "@pinetrie/lanes"
+import type { LaneHistory, LaneRuntime, Observer } from "@pinetrie/lanes"
 import { foreignLaneWords, LANE, planLaneRecords } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
 import { basics, putValue, record } from "../fakes.ts"
@@ -41,6 +41,7 @@ function registryWith(
   const registry = createRegistry({
     session: b.session,
     runtime: record<LaneRuntime>().port,
+    observer: record<Observer>().port,
     install: thisInstall,
     history: lane => {
       asked.push(lane)

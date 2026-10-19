@@ -51,7 +51,14 @@ the helper, S122 to S131 for Docker and the lane VM.
     and every other image of pine·trie's it keeps removed after a build
     once nothing uses it (`ensureLaneImages`, ADR-0169); and a throwaway
     container's stdout as bytes (`runInImage`), from which the lane runtime
-    is extracted.
+    is extracted (`ensureRuntime`, which says when it extracts). A runtime
+    tells the host of each build it runs as it is made, never through the
+    port's calls.
+- **A lane is observed only through `Observer`,** which the runtime gives
+  once its slot is served (`Served.observer`, ADR-0191): the observer's
+  image built, its container running and the host's connection held. The
+  port has no `observe`, so nothing observes a lane before the host made
+  the observer ready.
 - **Who implements it:** `@pinetrie/docker` (`dockerRuntime`, the Mac's lane
   VM and Linux), the one implementation.
 - **A folder project's merges are a port of their own,** `FolderDisks`

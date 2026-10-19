@@ -221,6 +221,17 @@ export async function leaseExtra(input: {
   }
 }
 
+/** A build a lease runs before the VM starts, announced first. */
+export type VmBuild =
+  | { readonly kind: "vm-launcher" }
+  | {
+      readonly kind: "vm-image"
+      /** Its builder compiled first. */
+      readonly compile: boolean
+      /** Alpine's kernel and root fetched first, once. */
+      readonly fetch: boolean
+    }
+
 interface LeaseInput {
   /** `vmStateDir`. */
   readonly stateDir: string
@@ -229,6 +240,8 @@ interface LeaseInput {
   /** The socket the slot's ssh socket is bridged to (the host's own ssh socket), or null. */
   readonly agent: string | null
   readonly log: (line: string) => void
+  /** Told before each build; without it, each is logged in `vmBuildWords`. */
+  readonly building?: (build: VmBuild) => void
 }
 
 /**
@@ -263,7 +276,9 @@ async function leaseOnce(input: LeaseInput): Promise<{
     // execute
     if (planned.buildImage) await buildImage(input)
     if (launcher.state === "buildable") {
-      input.log("[vm] building the lane VM's launcher")
+      if (input.building === undefined)
+        input.log("[vm] building the lane VM's launcher")
+      else input.building({ kind: "vm-launcher" })
       await buildBinary(launcher.binary, LAUNCHER)
     }
     // The VM's network stack: fetched and checked once, then kept.
@@ -300,9 +315,10 @@ const refusedBy = (r: VmRefusal) => new VmRefused(vmWords(r))
 /** Build the current image, saying first what that takes, then prune what it replaced. */
 async function buildImage(input: LeaseInput): Promise<void> {
   const { stateDir } = input
-  input.log(
-    `[vm] ${vmBuildWords({ kind: "build" }, await gatherBuildFirst(stateDir))}`,
-  )
+  const first = await gatherBuildFirst(stateDir)
+  if (input.building === undefined)
+    input.log(`[vm] ${vmBuildWords({ kind: "build" }, first)}`)
+  else input.building({ kind: "vm-image", ...first })
   await buildVmImageInVm({
     stateDir,
     force: false,

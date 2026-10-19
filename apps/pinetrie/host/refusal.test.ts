@@ -13,7 +13,8 @@ import { configPlaces } from "@pinetrie/config"
 import { sessionFiles } from "@pinetrie/lanes"
 import { bindAgentDir, scriptedModel } from "@pinetrie/pi"
 import { afterAll, expect, test } from "vitest"
-import { HostRefused, startHost } from "./index.ts"
+import { HostRefused } from "./host-refused.ts"
+import { startHost } from "./index.ts"
 
 const dir = realpathSync(mkdtempSync(path.join(tmpdir(), "pinetrie-plain-")))
 // No config of the person's: every place is in the throwaway folder.

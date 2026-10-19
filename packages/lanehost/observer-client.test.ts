@@ -198,3 +198,36 @@ test("drains run one after another, each given what the one before returned", as
   expect(await second).toEqual(["marker"])
   expect(order).toEqual(["first begins", "first ends", "second begins"])
 })
+
+test("connect opens the channel once, and a lane observed after it registers on that channel", async () => {
+  const role = fakeRole()
+  let opened = 0
+  const client = observerClient({
+    open: () => {
+      opened++
+      return role.open()
+    },
+  })
+  await client.connect()
+  expect(opened).toBe(1)
+  const { fold } = firstEventFold()
+  const lane = await client.observe({ pid: async () => 4, remote: [], fold })
+  role.send("1", open("/w/a", "file"))
+  const traces = await lane.drain(keep)
+  expect(opened).toBe(1)
+  expect([...(traces.get("1")?.paths.keys() ?? [])]).toEqual(["/w/a"])
+})
+
+test("connect rejects with the loader's refusal", async () => {
+  const role = fakeRole()
+  const client = observerClient({
+    open: async () => ({
+      ...(await role.open()),
+      ready: Promise.resolve({
+        version: "v1",
+        loader: { kind: "failed", why: "observe: load: Invalid" },
+      }),
+    }),
+  })
+  await expect(client.connect()).rejects.toThrow("observe: load: Invalid")
+})

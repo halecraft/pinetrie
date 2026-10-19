@@ -23,7 +23,9 @@ import { planObserver } from "@pinetrie/lanehost"
 import {
   createQueue,
   type FolderDisks,
+  type ImageBuild,
   type LaneRuntime,
+  type Served,
 } from "@pinetrie/lanes"
 import type { ProjectRecord } from "@pinetrie/rules"
 import {
@@ -34,6 +36,7 @@ import {
   slotRoot,
   vmStateDir,
 } from "@pinetrie/vm"
+import type { Build } from "../start-checklist.ts"
 import {
   createShares,
   type HostShares,
@@ -56,9 +59,9 @@ export interface Found {
   /**
    * Called once by setup, before any lane starts: pine·trie's default image,
    * and what lanes may mount and reach, shared and granted as
-   * `shareAndGrant` does.
+   * `shareAndGrant` does. Returns what is reached only once served.
    */
-  ready(input: Wanted & { readonly defaultImage: string }): Promise<void>
+  ready(input: Wanted & { readonly defaultImage: string }): Promise<Served>
   /**
    * What lanes may mount and reach now, each time accepted work moves,
    * before the new config is in force: on the Mac, a directory no slot of
@@ -128,26 +131,27 @@ export async function findProject(input: {
    */
   readonly hostSocket: string
   readonly log: (line: string) => void
+  /** Told before each build the runtime or the lane VM's lease runs, now or later. */
+  readonly building: (build: Build) => void
 }): Promise<Found | Refused | null> {
   if (input.root === null) return null
-  return runtimeFound(
-    input.root,
-    input.install,
-    input.slots,
-    input.hostSocket,
-    input.log,
-    input.ownPort ?? null,
-  )
+  return runtimeFound(input.root, input, input.ownPort ?? null)
 }
 
 const refusedWith = (words: string): Refused => ({ kind: "refused", words })
 
+/** What every runtime is made with. */
+interface RuntimeInput {
+  readonly install: Install
+  readonly slots: number
+  readonly hostSocket: string
+  readonly log: (line: string) => void
+  readonly building: (build: Build) => void
+}
+
 async function runtimeFound(
   root: string,
-  install: Install,
-  slots: number,
-  hostSocket: string,
-  log: (line: string) => void,
+  input: RuntimeInput,
   ownPort: number | null,
 ): Promise<Found | Refused> {
   const env = process.env
@@ -158,27 +162,24 @@ async function runtimeFound(
   })
   const project = { root }
   return planned.kind === "docker-vm"
-    ? vmFound(
-        project,
-        install,
-        planned.lanesDir,
-        slots,
-        hostSocket,
-        log,
-        ownPort,
-      )
-    : hostDockerFound(project, install, planned.lanesDir, hostSocket, log)
+    ? vmFound(project, input, planned.lanesDir, ownPort)
+    : hostDockerFound(project, input, planned.lanesDir)
 }
+
+/** Docker's builds, as the start's checklist names them. */
+const imageBuilding =
+  (input: RuntimeInput) =>
+  (image: ImageBuild): void =>
+    input.building({ kind: "image", image })
 
 /** Docker on this machine (Linux): its socket, paths as they are. */
 async function hostDockerFound(
   project: Found["project"],
-  install: Install,
+  input: RuntimeInput,
   lanesDir: string,
-  hostSocket: string,
-  log: (line: string) => void,
 ): Promise<Found | Refused> {
   const { root } = project
+  const { install, hostSocket, log } = input
   const host = process.env.DOCKER_HOST
   const target: DockerTarget = {
     socket: host?.startsWith("unix://")
@@ -204,6 +205,7 @@ async function hostDockerFound(
     install,
     log,
     observer: observed.kind,
+    building: imageBuilding(input),
   })
   log(`[host] lanes run on Docker, their disks in ${lanesDir}`)
   let shares = NO_SHARES
@@ -221,9 +223,10 @@ async function hostDockerFound(
     runtime,
     folder: runtime.folder,
     ready: async ({ mounts, hostPorts }) => {
-      runtime.serveFrom(mounts)
+      const served = runtime.serveFrom(mounts)
       sweptLog(await runtime.sweepProjects(), log)
       await shareAndGrant({ mounts, hostPorts })
+      return served
     },
     shareAndGrant,
     close: async () => {},
@@ -239,16 +242,21 @@ async function hostDockerFound(
  */
 async function vmFound(
   project: Found["project"],
-  install: Install,
+  input: RuntimeInput,
   lanesDir: string,
-  slots: number,
-  hostSocket: string,
-  log: (line: string) => void,
   ownPort: number | null,
 ): Promise<Found | Refused> {
   const { root } = project
+  const { install, slots, hostSocket, log } = input
   const stateDir = vmStateDir(process.env, homedir())
-  const leaseNow = () => leaseVm({ stateDir, slots, agent: hostSocket, log })
+  const leaseNow = () =>
+    leaseVm({
+      stateDir,
+      slots,
+      agent: hostSocket,
+      log,
+      building: input.building,
+    })
   const leased = await leaseNow().catch((error: unknown) =>
     refusedWith(errorText(error)),
   )
@@ -287,7 +295,14 @@ async function vmFound(
     await first.close()
     return refusedWith(dockerWords(refusal))
   }
-  const runtime = dockerRuntime({ target, lanesDir, root, install, log })
+  const runtime = dockerRuntime({
+    target,
+    lanesDir,
+    root,
+    install,
+    log,
+    building: imageBuilding(input),
+  })
   const held = createShares({
     lease: first,
     ownPort,
@@ -315,9 +330,10 @@ async function vmFound(
     runtime,
     folder: runtime.folder,
     async ready(wanted) {
-      runtime.serveFrom(wanted.mounts)
+      const served = runtime.serveFrom(wanted.mounts)
       await held.share(wanted)
       sweptLog(await runtime.sweepProjects(), log)
+      return served
     },
     shareAndGrant: held.share,
     async close() {

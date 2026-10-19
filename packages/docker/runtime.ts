@@ -22,6 +22,7 @@ import {
   MACHINE_SOCKET,
   OBSERVER_CONTAINERFILE,
   type ObserverChannel,
+  type ObserverClient,
   observerClient,
   observerSources,
   observerVersion,
@@ -31,12 +32,14 @@ import {
 } from "@pinetrie/lanehost"
 import {
   type FolderDisks,
+  type ImageBuild,
   type ImagePlan,
   type LaneRuntime,
   type Mount,
   planContainer,
   RUNTIME_MOUNT,
   RUNTIME_NODE,
+  type Served,
   specHash,
 } from "@pinetrie/lanes"
 import {
@@ -149,9 +152,11 @@ export interface DockerRuntime extends LaneRuntime {
   /**
    * Where lanehost's server runs from: the mounts every lane gets, whose
    * targets are pine·trie's install and the lane runtime. Until then a disk
-   * operation is refused, since a role's container mounts both.
+   * operation is refused, since a role's container mounts both. The
+   * observer is built from the same two, and is reached only through what
+   * this returns. Called once per runtime.
    */
-  serveFrom(mounts: readonly Mount[]): void
+  serveFrom(mounts: readonly Mount[]): Served
   /**
    * This project's root recorded beside its disks and its lanes' network
    * made, then the containers and disks of every project whose root is
@@ -197,6 +202,8 @@ export function dockerRuntime(input: {
    * here, or, for a host inside a lane, its helper's socket (`planObserver`).
    */
   readonly observer?: "container" | "forwarded"
+  /** Told before each image this runtime builds. */
+  readonly building?: (image: ImageBuild) => void
 }): DockerRuntime {
   const { target, lanesDir, root, install } = input
   /** `name` started in a container, from the install as it is mounted there. */
@@ -247,23 +254,23 @@ export function dockerRuntime(input: {
     }
   }
   async function build(recipe: ImageRecipe): Promise<void> {
+    input.building?.(
+      recipe.kind === "observer"
+        ? "observer"
+        : recipe.plan.file === LANEHOST_CONTAINERFILE
+          ? "lanehost"
+          : "lane",
+    )
     if (recipe.kind === "containerfile") await buildImage(target, recipe.plan)
     else await buildObserverImage(target, recipe)
     // Only after a build: a host that builds nothing has nothing newer to
     // keep, and may share this Docker with a host of the older version.
     await removeUnneededImages()
   }
-  /**
-   * Record `recipe` as needed, and build its tag unless Docker has it,
-   * telling `building` first.
-   */
-  async function ensureImage(
-    recipe: ImageRecipe,
-    building: () => void = () => {},
-  ): Promise<void> {
+  /** Record `recipe` as needed, and build its tag unless Docker has it. */
+  async function ensureImage(recipe: ImageRecipe): Promise<void> {
     recipes.set(recipeTag(recipe), recipe)
     if (await imageExists(target, recipeTag(recipe))) return
-    building()
     await build(recipe)
   }
   /** A tag another host removed after this one ensured it, built again. */
@@ -292,6 +299,7 @@ export function dockerRuntime(input: {
     }
     return built
   }
+  /** What `serveFrom` named; lanehost's roles refuse to start before it. */
   let serving: { install: string; runtime: string } | null = null
   let rootless: Promise<boolean> | null = null
   const facts = async () => {
@@ -333,19 +341,17 @@ export function dockerRuntime(input: {
    * first. A container whose server is exiting, idle, refuses the
    * connection, and the next call makes it again.
    */
-  async function openObserver(): Promise<ObserverChannel> {
-    if (serving === null)
-      throw new Error(
-        "the observer cannot start yet: setup has not named pine·trie's install and the lane runtime",
-      )
+  async function openObserver(
+    from: NonNullable<typeof serving>,
+  ): Promise<ObserverChannel> {
     const v = await version
     const name = observerContainer(v)
     await ensureImage({
       kind: "observer",
       tag: observerImage(v),
       file: OBSERVER_CONTAINERFILE,
-      runtime: serving.runtime,
-      packages: `${serving.install}/packages`,
+      runtime: from.runtime,
+      packages: `${from.install}/packages`,
     })
     await ensureContainer(target, renderObserver(v, install), buildMissing)
     return openChannel(
@@ -353,16 +359,19 @@ export function dockerRuntime(input: {
       "the machine's observer",
     )
   }
-  const observer = observerClient({
-    open:
-      input.observer === "forwarded"
-        ? async () =>
-            connectObserver(
-              scriptCommand(install, "observerConnect", [process.execPath]),
-              OBSERVER_SOCKET,
-            )
-        : openObserver,
-  })
+  /** Made by `serveFrom`, from what it names. */
+  let observer: ObserverClient | null = null
+  const observerFrom = (from: NonNullable<typeof serving>): ObserverClient =>
+    observerClient({
+      open:
+        input.observer === "forwarded"
+          ? async () =>
+              connectObserver(
+                scriptCommand(install, "observerConnect", [process.execPath]),
+                OBSERVER_SOCKET,
+              )
+          : () => openObserver(from),
+    })
 
   /** The project's lanes' network, labelled for the sweep; made once per VM. */
   let network: Promise<void> | null = null
@@ -430,7 +439,28 @@ export function dockerRuntime(input: {
         throw new Error(
           `lanehost runs from the mounts at ${PINETRIE_MOUNT} and ${RUNTIME_MOUNT}, and setup gave none`,
         )
-      serving = { install: mounted, runtime }
+      const from = { install: mounted, runtime }
+      serving = from
+      const client = observerFrom(from)
+      observer = client
+      return {
+        async observer() {
+          await client.connect()
+          return {
+            observe: (container, shared, fold) =>
+              client.observe({
+                fold,
+                pid: async () => {
+                  const pid = await containerPid(target, container)
+                  if (pid === null)
+                    throw new Error(`${container} is not running`)
+                  return pid
+                },
+                remote: target.remoteHostPaths ? shared : [],
+              }),
+          }
+        },
+      }
     },
     disk: async op => {
       if (op.kind === "inner-docker-data-root")
@@ -509,16 +539,6 @@ export function dockerRuntime(input: {
         throw new Error(`docker run ${spec.name} failed: ${apiMessage(made)}`)
     },
     containerFacts: name => inspectContainer(target, name),
-    observe: (container, shared, fold) =>
-      observer.observe({
-        fold,
-        pid: async () => {
-          const pid = await containerPid(target, container)
-          if (pid === null) throw new Error(`${container} is not running`)
-          return pid
-        },
-        remote: target.remoteHostPaths ? shared : [],
-      }),
     async start(name) {
       await startContainer(target, name)
     },
@@ -530,12 +550,12 @@ export function dockerRuntime(input: {
       await removeContainer(target, name)
     },
     execArgv,
-    async ensureLaneImages(plans, building) {
+    async ensureLaneImages(plans) {
       // Every plan recorded before any builds: a build removes what is not.
       for (const plan of plans)
         recipes.set(plan.tag, { kind: "containerfile", plan })
       for (const plan of plans)
-        await ensureImage({ kind: "containerfile", plan }, () => building(plan))
+        await ensureImage({ kind: "containerfile", plan })
     },
     imagePath: async tag => imageEnvPath(await imageEnv(target, tag)),
     runInImage: (tag, argv) => runInImage(target, tag, argv),
@@ -569,7 +589,7 @@ export function dockerRuntime(input: {
     },
     vmRestarted() {
       lanehost.reset()
-      observer.reset()
+      observer?.reset()
       built = null
       network = null
     },

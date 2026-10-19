@@ -58,6 +58,7 @@ describe.skipIf(process.platform === "darwin")(
         slots: 16,
         hostSocket: path.join(dir, ".no-ssh.sock"),
         log: () => {},
+        building: () => {},
       })
     test("a Docker that does not answer, in the runtime's words", () =>
       inRepo(["jj", "git", "init", "--colocate"], async dir => {
@@ -82,6 +83,7 @@ describe.skipIf(process.platform === "darwin")(
           slots: 16,
           hostSocket: "/no-ssh.sock",
           log: () => {},
+          building: () => {},
         }),
       ).toBeNull()
     })

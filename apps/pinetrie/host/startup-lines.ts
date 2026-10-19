@@ -1,15 +1,17 @@
 // host/startup-lines — the words of the lines a starting host logs about what
 // it serves and what it read: the project, the session, the store, each config file and
-// what it refused, the model, and where to open the host. Config words are
+// what it refused, the model, and where to open the host; and its start's
+// checklist (`start-checklist.ts`), drawn or as a line per step. Config words are
 // `@pinetrie/interface`'s, shared with the setup page.
 // A line about the session's state stays beside what computes it, such as
 // `rootsOpenedWords` in `docs.ts`.
 
-import type {
-  ConfigFileState,
-  ConfigOrigin,
-  ConfigRefusal,
-  ThreadId,
+import {
+  assertNever,
+  type ConfigFileState,
+  type ConfigOrigin,
+  type ConfigRefusal,
+  type ThreadId,
 } from "@pinetrie/core"
 import {
   fileStateWords,
@@ -29,6 +31,16 @@ import type {
 } from "@pinetrie/ssh"
 import type { StoreChoice } from "./invocation.ts"
 import type { OpenedPlan } from "./sessions.ts"
+import {
+  type Build,
+  type Checklist,
+  canBuild,
+  type Ended,
+  type LaneMachine,
+  type StartStep,
+  type StartTimes,
+  stepEstimate,
+} from "./start-checklist.ts"
 
 /** `[host] label` padded so the values line up. */
 const line = (label: string, value: string): string =>
@@ -207,24 +219,135 @@ export const sshOutsideLine = (
 ): string =>
   `[host] lane ${lane}: your ssh identity can't sign for ${refusal.host ?? "a host"}${refusal.key === null ? "" : ` (${refusal.key})`}: its host key is outside lanes.ssh.hosts`
 
-/** A start-up phase that took a second or more, worded; a quicker one says nothing. */
-const startupPhaseLine = (what: string, ms: number): string | null =>
-  ms < 1000 ? null : `[host] starting: ${what} took ${Math.round(ms)} ms`
-
-/**
- * A stopwatch over a host's start: each `lap(what)` logs the time since the
- * last lap, or since it was made, when that is a second or more
- * (`startupPhaseLine`).
- */
-export function startupLaps(
-  log: (line: string) => void,
-  clock: () => number = () => performance.now(),
-): (what: string) => void {
-  let last = clock()
-  return what => {
-    const now = clock()
-    const said = startupPhaseLine(what, now - last)
-    if (said !== null) log(said)
-    last = now
+/** A step's name, as the checklist says it. */
+export function startStepWords(step: StartStep, machine: LaneMachine): string {
+  switch (step) {
+    case "lane-machine":
+      return machine === "lane-vm" ? "the lane VM" : "Docker"
+    case "store":
+      return "the store and the session"
+    case "project":
+      return "the project and its config"
+    case "model":
+      return "the model"
+    case "roots":
+      return "the threads a crash interrupted"
+    case "lane-work":
+      return "lanes' configs and ssh"
+    case "lane-images":
+      return "the lane images"
+    case "lane-runtime":
+      return "the lane runtime"
+    case "lanehost":
+      return "the lanes' disks and grants"
+    case "observer":
+      return "the observer"
+    case "base-snapshot":
+      return "the base snapshot"
+    case "agent":
+      return "the agent"
+    case "listening":
+      return "the server"
+    default:
+      return assertNever(step)
   }
 }
+
+/** What a step builds, as the checklist says it. */
+export function buildWords(build: Build): string {
+  switch (build.kind) {
+    case "vm-launcher":
+      return "building the lane VM's launcher"
+    case "vm-image": {
+      const first = [
+        ...(build.compile ? ["compiling its builder"] : []),
+        ...(build.fetch
+          ? ["fetching Alpine's kernel and root, 43 MB, once"]
+          : []),
+      ]
+      return first.length === 0
+        ? "building the lane VM's image"
+        : `building the lane VM's image: ${first.join(" and ")} first`
+    }
+    case "image":
+      return build.image === "lane"
+        ? "building the lane image"
+        : build.image === "lanehost"
+          ? "building lanehost's image"
+          : "building the observer's image"
+    case "runtime":
+      return "extracting the lane runtime"
+    case "base-snapshot":
+      return "making the base snapshot"
+    default:
+      return assertNever(build)
+  }
+}
+
+/** A duration in ms, as a person reads it: `4.2 s` under a minute, else `2:05`. */
+export function durationWords(ms: number): string {
+  const seconds = Math.max(0, ms) / 1000
+  if (seconds < 60) return `${seconds.toFixed(1)} s`
+  const whole = Math.round(seconds)
+  return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`
+}
+
+/** How a step that ended came out, after its name. */
+const endedWords = (e: Ended, machine: LaneMachine): string => {
+  const name = startStepWords(e.step, machine)
+  if (e.kind === "never-ran") return `✗ ${name}: never ran`
+  const how =
+    e.built !== null ? ", built" : canBuild(e.step) ? ", up to date" : ""
+  return `✓ ${name}${how} (${durationWords(e.took)})`
+}
+
+/**
+ * The checklist as a terminal draws it, one line per step, at `now` (ms,
+ * on the events' clock).
+ */
+export function checklistLines(
+  list: Checklist,
+  machine: LaneMachine,
+  now: number,
+): readonly string[] {
+  const lines = list.ended.map(e => `  ${endedWords(e, machine)}`)
+  const current = list.now
+  if (current?.kind === "failed")
+    lines.push(`  ✗ ${startStepWords(current.step, machine)}: ${current.why}`)
+  else if (current?.kind === "running") {
+    const doing =
+      current.building === null ? "" : `: ${buildWords(current.building)}`
+    const estimate = stepEstimate(
+      current.step,
+      current.building !== null,
+      list.times,
+    )
+    lines.push(
+      `  ▸ ${startStepWords(current.step, machine)}${doing} · ${durationWords(now - current.since)} of about ${durationWords(estimate)}`,
+    )
+  }
+  for (const step of list.waiting)
+    lines.push(`  · ${startStepWords(step, machine)}`)
+  return lines
+}
+
+/** A step's end, or a never-ran step, as the line form prints it. */
+export const endedLine = (e: Ended, machine: LaneMachine): string =>
+  `[host] ${endedWords(e, machine)}`
+
+/** A failed step, as the line form prints it. */
+export const failedLine = (
+  step: StartStep,
+  why: string,
+  machine: LaneMachine,
+): string => `[host] ✗ ${startStepWords(step, machine)}: ${why}`
+
+/** A build beginning, as the line form prints it, with what it is expected to take. */
+export const buildingLine = (
+  build: Build,
+  step: StartStep | null,
+  times: StartTimes,
+): string =>
+  step === null
+    ? `[host] ${buildWords(build)}`
+    : `[host] ${buildWords(build)} (about ${durationWords(stepEstimate(step, true, times))})`

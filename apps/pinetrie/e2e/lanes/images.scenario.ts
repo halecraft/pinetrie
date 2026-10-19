@@ -4,6 +4,7 @@
 import { ROOT } from "@pinetrie/core"
 import { PINETRIE_MOUNT } from "@pinetrie/install"
 import { readRevisions } from "@pinetrie/reads"
+import { HostRefused } from "../../host/host-refused.ts"
 import type { Checks } from "../checks.ts"
 import { heldRootRecords, START_AGENT } from "../harness.ts"
 import type { LaneHosts, SectionHost } from "../lane-hosts.ts"
@@ -19,7 +20,7 @@ export const scenario: Scenario = {
 // Alpine has musl, no Node and no rg, fd or sd; the helper runs on the lane
 // runtime's Node, through its own loader, the search tools on the
 // runtime's static rg and fd, and every command is a run, attributed.
-// An image with no git cannot host a lane.
+// An image with no git refuses the host's start.
 
 async function imagesSection(
   check: Checks["check"],
@@ -86,22 +87,23 @@ async function imagesSection(
     await alpine.close()
   }
 
-  const bare = await imageHost(lanes, "FROM docker.io/library/alpine:3.22\n")
-  try {
-    bare.script.use([
-      { tool: "bash", args: { command: "echo hello" } },
-      { text: "done" },
-    ])
-    await bare.user.send("say hello", ROOT, START_AGENT)
-    const refused = (await bare.results("say hello")).join("\n")
-    check(
-      "an image with no git cannot host a lane, and says so",
-      refused.includes("has no git") && !refused.includes("hello\n"),
-      `${refused.slice(0, 90)}`,
-    )
-  } finally {
-    await bare.close()
-  }
+  // The host refuses to start: its lanes cannot be made ready. The hosts
+  // after it start, so the refused one let go of what it held.
+  const bare = await imageHost(
+    lanes,
+    "FROM docker.io/library/alpine:3.22\n",
+  ).then(
+    async host => {
+      await host.close()
+      return null
+    },
+    (error: unknown) => error,
+  )
+  check(
+    "an image with no git refuses the host's start, and says so",
+    bare instanceof HostRefused && bare.message.includes("has no git"),
+    bare instanceof Error ? bare.message.slice(0, 120) : "it started",
+  )
 
   // pinetrie's default image carries the browser its Playwright drives.
   // The check is an agent's command, so it sees the image's

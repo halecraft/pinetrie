@@ -202,7 +202,7 @@ export function createTurns(deps: {
                   handle,
                   changed,
                   shared,
-                  image: (await deps.setup.ready).image,
+                  image: deps.setup.ready.image,
                 }).catch(error => {
                   failed(basics, "classing the turn's writes", lane)(error)
                   return null

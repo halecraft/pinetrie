@@ -25,20 +25,24 @@
 //                    where pine·trie's config, credentials and the
 //                    machine's file are (`@pinetrie/config`'s places)
 //
-// As it starts, the host prints the project, its session, the store, each config file it
-// read and what it refused, and where its model came from, or why it has
-// none and where the setup page is.
+// As it starts, the host draws its steps as a checklist, redrawn in place on
+// a terminal, and prints above it the project, its session, the store, each
+// config file it read and what it refused, and where its model came from, or
+// why it has none and where the setup page is. It listens once lanes work.
 //
 // A refused folder, argument or session prints why and exits 2, before
 // anything opens;
 // a host with tools that cannot run its lanes prints why and exits 1.
 // The first SIGINT or SIGTERM shuts the host down; a second ends the process.
+
+import { readFile } from "node:fs/promises"
 import { homedir } from "node:os"
 import { configPlaces, sessionWords } from "@pinetrie/config"
 import { prepareProjectDir } from "@pinetrie/jj"
 import { sessionFiles } from "@pinetrie/lanes"
 import { bindAgentDir } from "@pinetrie/pi"
-import { HostRefused, startHost } from "./index.ts"
+import { HostRefused } from "./host-refused.ts"
+import { startHost } from "./index.ts"
 import {
   type HostCommand,
   planInvocation,
@@ -47,7 +51,15 @@ import {
   storeChoice,
 } from "./invocation.ts"
 import type { PageSource } from "./page.ts"
+import { replaceFileSync } from "./replace-file.ts"
 import { openSession } from "./sessions.ts"
+import {
+  decodeStartTimes,
+  encodeStartTimes,
+  laneMachine,
+  planStartSteps,
+} from "./start-checklist.ts"
+import { startProgress } from "./start-terminal.ts"
 import {
   listeningLine,
   openLine,
@@ -90,9 +102,22 @@ export async function runHost(
   }
   const files = sessionFiles(opened.dir)
   const store = storeChoice(files.store, env)
-  console.log(projectLine(root))
-  for (const l of sessionLines(opened.plan, home)) console.log(l)
-  console.log(storeLine(store))
+  const tools = env.PINETRIE_TOOLS !== "0"
+  const progress = startProgress(
+    { out: process.stdout, err: process.stderr, isTTY: process.stdout.isTTY },
+    {
+      steps: planStartSteps({ tools }),
+      machine: laneMachine(process.platform),
+      times: decodeStartTimes(
+        await readFile(files.startTimes, "utf8").catch(() => null),
+      ),
+      save: times => replaceFileSync(files.startTimes, encodeStartTimes(times)),
+    },
+  )
+  const log = (line: string) => progress.log(line)
+  log(projectLine(root))
+  for (const l of sessionLines(opened.plan, home)) log(l)
+  log(storeLine(store))
   const places = configPlaces(env, home, opened.name)
   const host = await startHost({
     port: Number.parseInt(env.PINETRIE_PORT ?? "7391", 10),
@@ -102,13 +127,14 @@ export async function runHost(
     places,
     // Before pi loads anything: an extension finds its own config through it.
     binding: bindAgentDir(places.dirs.config),
-    project:
-      env.PINETRIE_TOOLS === "0"
-        ? { dir: root, tools: false }
-        : { dir: root, tools: true, files: files.lanes },
+    project: tools
+      ? { dir: root, tools: true, files: files.lanes }
+      : { dir: root, tools: false },
     served: { name: opened.name, path: opened.path },
     store: store.file,
     page: await page(),
+    log,
+    progress,
   }).catch(async error => {
     await opened.release()
     // Lanes cannot run here: the words say how to fix it.

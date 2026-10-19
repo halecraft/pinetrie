@@ -53,7 +53,6 @@ test("the default image's tag follows the files it copies in", async () => {
     },
     here("no-such-project"),
     "1.64.1",
-    () => {},
   )
   const containerfile = here("image", "Containerfile")
   const tagWith = async (sources: readonly string[]) =>

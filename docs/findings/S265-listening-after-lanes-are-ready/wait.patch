@@ -1,0 +1,43 @@
+diff --git a/apps/pinetrie/host/index.ts b/apps/pinetrie/host/index.ts
+index f24a769ec6..abba8501d6 100644
+--- a/apps/pinetrie/host/index.ts
++++ b/apps/pinetrie/host/index.ts
+@@ -1024,6 +1024,9 @@
+     handle: commands.handle,
+   })
+ 
++  log("[s265] awaiting lanes")
++  await work.ready()
++  log("[s265] lanes awaited")
+   const server = await startHttp({
+     port,
+     bind,
+diff --git a/apps/pinetrie/host/work/index.ts b/apps/pinetrie/host/work/index.ts
+index 5a5119fcef..b685cae03a 100644
+--- a/apps/pinetrie/host/work/index.ts
++++ b/apps/pinetrie/host/work/index.ts
+@@ -79,6 +79,8 @@
+      * records they write when they finish.
+      */
+     quiet(): Promise<void>
++    /** S265 probe. */
++    ready(): Promise<void>
+     /** `listener` hears each lane whose base record changed. */
+     onBaseChanged(listener: (lane: ThreadId) => void): void
+     /** `listener` hears each change to a lane's use of its owner's ssh, once. */
+@@ -318,6 +320,7 @@
+       await keeper.idle()
+       await destination.quiet()
+     },
++    ready: () => setup.ready.then(() => {}),
+     async close() {
+       await sharedWatch.close()
+       await containers.close()
+@@ -362,6 +365,7 @@
+   // No lineage is written without tools: there is no lane to forget.
+   forgetReaders: async () => {},
+   quiet: async () => {},
++  ready: async () => {},
+   close: async () => {},
+   onBaseChanged: () => {},
+   onSshNews: () => {},

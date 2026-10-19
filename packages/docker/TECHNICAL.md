@@ -57,6 +57,9 @@ declares it (`workspace.test.ts`).
   observer's. Each is recorded as needed with how it is built (an
   `ImageRecipe`), then built unless Docker has it. The needed set is those
   recorded, and this host's lanehost and observer tags, built or not.
+- **Every build is told first** (`dockerRuntime`'s `building`, with an
+  `ImageBuild`), a tag another host removed included: the host's start
+  shows what it builds (ADR-0191).
 - **After any build of its own, the host removes pine·trie's images it does
   not need** (`unneededImageTags`): a tag of `pinetrie-lane`,
   `pinetrie-lanehost` or `pinetrie-observer` not in the needed set, on no
@@ -277,8 +280,11 @@ directory, so the person's hosts are untouched. Its checks:
   name would fail as a conflict. A start that fails leaves nothing: Docker
   removes the container then (measured with Docker 29.8). Each host's
   channel is a `docker exec -i` of its connect script.
-  A new lease closes the channel; the next lane's start opens it again and
-  registers every lane again.
+  The host reaches it only through what `serveFrom` returns (`Served`):
+  `observer()` builds and joins it and holds this host's channel, which
+  keeps the role from exiting idle while the host runs; the host's start
+  calls it before any lane (ADR-0191). A new lease closes the channel; the
+  next lane's observe opens it again and registers every lane again.
 - **A lane is registered by its first process** (`containerPid`, the pid
   in Docker's machine's namespace), with its shared directories as remote
   where host paths reach the machine over virtiofs

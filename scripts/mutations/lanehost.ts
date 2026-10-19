@@ -8,6 +8,16 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/lanehost"]
 const disks = "packages/lanehost/disks.ts"
 
 export const mutations: readonly Mutation[] = [
+  // ── the observer's client ──
+  {
+    name: "connect opens no channel",
+    file: "packages/lanehost/observer-client.ts",
+    from: "    async connect() {\n      await opened()\n    },\n",
+    to: "    async connect() {},\n",
+    command: unit,
+    expect:
+      "connect opens the channel once, and a lane observed after it registers on that channel",
+  },
   // ── a nested lane's inner Docker data root ──
   {
     name: "a lane's data root is dropped for a source that has gone",

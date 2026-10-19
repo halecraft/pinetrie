@@ -7,7 +7,7 @@
 // puts back an accept a stopped host left; a read after the watcher saw the
 // folder quiet checks the asides accepts kept first.
 
-import { readFile, rename, writeFile } from "node:fs/promises"
+import { readFile } from "node:fs/promises"
 import {
   type FolderStamp,
   lineStateId,
@@ -18,6 +18,7 @@ import {
 import { folderNewest, planRead, planState, stateGraph } from "@pinetrie/folder"
 import type { FolderDisks, LaneQueue } from "@pinetrie/lanes"
 import { decodeFolderStamps, encodeFolderStamps } from "@pinetrie/rules"
+import { replaceFile } from "../replace-file.ts"
 import { scanFolder } from "./scan.ts"
 
 /** How many reads in a row may find a path moved before the read gives up. */
@@ -134,9 +135,7 @@ export function createFolderLine(deps: {
     readFile(deps.stampsFile, "utf8").then(decodeFolderStamps, () => null)
 
   async function writeStamps(stamps: ReadonlyMap<string, FolderStamp>) {
-    const tmp = `${deps.stampsFile}.tmp`
-    await writeFile(tmp, encodeFolderStamps(stamps))
-    await rename(tmp, deps.stampsFile)
+    await replaceFile(deps.stampsFile, encodeFolderStamps(stamps))
   }
 
   async function readNow(quiet: boolean): Promise<PointId> {

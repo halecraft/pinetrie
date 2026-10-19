@@ -32,6 +32,7 @@ import {
   type SessionPlan,
   type SessionRefusal,
 } from "@pinetrie/config"
+import { replaceFile } from "./replace-file.ts"
 
 /**
  * realpath(3): through symlinks and, on a disk that ignores case, in the case
@@ -47,7 +48,6 @@ const LOCK_WAIT = 5000
 export const registryFiles = (data: string) => ({
   registry: path.join(data, "sessions.json"),
   lock: path.join(data, "sessions.json.lock"),
-  temp: path.join(data, "sessions.json.tmp"),
 })
 
 /** pine·trie's own directories (`places.dirs`). */
@@ -182,14 +182,12 @@ export async function sessionOfFolder(
     : { name: entry.name, dir: sessionDirs(dirs, entry.name).data }
 }
 
-/** Write the registry whole: a temporary file renamed over it, so no reader sees half. Under the lock only. */
+/** Write the registry whole (`replaceFile`). Under the lock only. */
 export async function writeRegistry(
   data: string,
   registry: Registry,
 ): Promise<void> {
-  const files = registryFiles(data)
-  await writeFile(files.temp, encodeSessions(registry))
-  await rename(files.temp, files.registry)
+  await replaceFile(registryFiles(data).registry, encodeSessions(registry))
 }
 
 /** The paths of `registry`'s entries whose folder is gone, or no longer has that real path. */

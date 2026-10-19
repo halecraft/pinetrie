@@ -74,17 +74,6 @@ export interface LaneRuntime {
   /** Make the container from `shape`, labelled with its spec hash, and start it. */
   run(shape: ContainerShape): Promise<void>
   containerFacts(container: string): Promise<ContainerFacts>
-  /**
-   * The running container's runs, observed from now: its first process
-   * registered with the machine's observer, `shared` its shared
-   * directories as the lane sees them, and its notices folded by `fold`
-   * as they arrive. Throws, saying why, where nothing can observe lanes.
-   */
-  observe(
-    container: string,
-    shared: readonly string[],
-    fold: FoldNotices,
-  ): Promise<LaneObservation>
   start(container: string): Promise<void>
   /** Stop it; its disk stays as it is. */
   stop(container: string): Promise<void>
@@ -93,18 +82,41 @@ export interface LaneRuntime {
   /** `argv` run in a running container with stdin attached (`exec -i`). */
   execArgv(container: string, argv: readonly string[]): readonly string[]
   /**
-   * The lane images a host needs: each built unless the runtime has it,
-   * `building` told first. The runtime keeps them as needed, removes its
-   * other images of pine·trie's that nothing uses after any build, and
-   * builds one again when a container is made from it after another host
-   * removed it.
+   * The lane images a host needs: each built unless the runtime has it. The
+   * runtime keeps them as needed, removes its other images of pine·trie's
+   * that nothing uses after any build, and builds one again when a
+   * container is made from it after another host removed it.
    */
-  ensureLaneImages(
-    plans: readonly ImagePlan[],
-    building: (plan: ImagePlan) => void,
-  ): Promise<void>
+  ensureLaneImages(plans: readonly ImagePlan[]): Promise<void>
   /** The image's own `PATH`. */
   imagePath(tag: string): Promise<string>
   /** `argv` in a throwaway container of `tag`; its stdout as bytes. */
   runInImage(tag: string, argv: readonly string[]): Promise<Ran<Uint8Array>>
+}
+
+/** An image the runtime builds, announced before its build. */
+export type ImageBuild = "lane" | "lanehost" | "observer"
+
+/** The machine's observer, connected: the one way to observe a lane. */
+export interface Observer {
+  /**
+   * The running container's runs, observed from now: its first process
+   * registered with the observer, `shared` its shared directories as the
+   * lane sees them, and its notices folded by `fold` as they arrive.
+   */
+  observe(
+    container: string,
+    shared: readonly string[],
+    fold: FoldNotices,
+  ): Promise<LaneObservation>
+}
+
+/** A runtime whose slot is served: what is reached only once it is. */
+export interface Served {
+  /**
+   * The observer's image built unless the runtime has it, its container
+   * running, and this host's connection to it held while the host runs.
+   * Rejects, saying why, where it cannot load.
+   */
+  observer(): Promise<Observer>
 }
