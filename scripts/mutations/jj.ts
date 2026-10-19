@@ -256,8 +256,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a step's own commands are not timed",
     file: "packages/jj/owner.ts",
-    from: "await executeRepo(root, steps, timed)",
-    to: "await executeRepo(root, steps)",
+    from: "executeRepo(root, steps, timed)",
+    to: "executeRepo(root, steps)",
     command: ["pnpm", "exec", "vitest", "run", "packages/jj/owner.test.ts"],
     expect: "every command over the threshold is told",
   },
@@ -740,7 +740,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the owner's own write is not observed",
     file: "packages/jj/owner.ts",
-    from: "        } finally {\n          await observe().catch(e => input.onError?.(e))\n        }\n",
+    from: "        } finally {\n          await observeIn(times)\n        }\n",
     to: "        } finally {\n        }\n",
     command: ["pnpm", "exec", "vitest", "run", "packages/jj/owner.test.ts"],
     expect: "a read inside a step, after its write, sees the write",
@@ -748,8 +748,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a step that only read observes",
     file: "packages/jj/owner.ts",
-    from: "        if (wrote.value) await observe().catch(e => input.onError?.(e))\n",
-    to: "        await observe().catch(e => input.onError?.(e))\n",
+    from: "        if (wrote.value) await observeIn(times)\n",
+    to: "        await observeIn(times)\n",
     command: ["pnpm", "exec", "vitest", "run", "packages/jj/owner.test.ts"],
     expect: "a write by the owner moves only what it moved",
   },
@@ -1451,5 +1451,28 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "the shared facts' one read gives accepted work's commit, its accepted thread commits, and the files @ changes as jj diff lists them",
+  },
+  {
+    name: "a part's time counts the parts inside it",
+    file: "packages/jj/step-times.ts",
+    from: "        totals.set(name, (totals.get(name) ?? 0) + elapsed - frame.inner)",
+    to: "        totals.set(name, (totals.get(name) ?? 0) + elapsed)",
+    command: [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "packages/jj/step-times.test.ts",
+    ],
+    expect: "a part's time leaves out the parts inside it",
+  },
+  {
+    name: "a pinned read's commands count toward the step beside it",
+    file: "packages/jj/owner.ts",
+    from: "    runnerFor(root, { at }, commandWatch(false))",
+    to: "    runnerFor(root, { at }, commandWatch(true))",
+    command: ["pnpm", "exec", "vitest", "run", "packages/jj/owner.test.ts"],
+    expect:
+      "a slow step's split holds its parts and its own commands, not a pinned read's beside it",
   },
 ]

@@ -29,6 +29,12 @@ import {
 } from "./run.ts"
 import { readShared, type SharedFacts } from "./shared.ts"
 import type { RepoStep } from "./step.ts"
+import {
+  createStepTimes,
+  NO_SPLIT,
+  type StepSplit,
+  type StepTimes,
+} from "./step-times.ts"
 
 /** jj and git on your repo, as the owner hands them to a step. */
 export interface RepoOps {
@@ -47,6 +53,16 @@ export interface RepoOps {
   shared(): Promise<SharedFacts>
   /** What accepted work's record reads (`acceptedFacts`), as the head is now: kept as `shared` is. */
   acceptedFacts(): Promise<AcceptedFacts>
+  /**
+   * Time `work` as a named part of this step, for its slow report
+   * (`RepoSlowStep`). Parts run one after another, or one inside another.
+   */
+  part<T>(name: string, work: () => Promise<T>): Promise<T>
+}
+
+/** A slow step on the owner, and where its time went: its parts, the shared facts and observations among them, and its commands. */
+export interface RepoSlowStep extends SlowStep {
+  readonly split: StepSplit
 }
 
 /** What a read may run: jj pinned to the last observed operation, its stdout as text or as bytes, and git. */
@@ -100,7 +116,7 @@ export function startRepoOwner(input: {
   readonly root: string
   readonly repoConfig: RepoConfig
   readonly onError?: (error: unknown) => void
-  readonly onSlow?: (step: SlowStep) => void
+  readonly onSlow?: (step: RepoSlowStep) => void
   readonly slowMs?: number
   /** Each jj or git command, a step's or a read's, that ran longer than `slowCommandMs`. */
   readonly onSlowCommand?: (command: TimedCommand) => void
@@ -112,20 +128,44 @@ export function startRepoOwner(input: {
   readonly backstopMs?: number
 }): RepoOwner {
   const { root, repoConfig } = input
-  const keeper = createKeeper<RepoKey>({
+  const { onSlow } = input
+  /** The running step's times: the keeper runs one step at a time. */
+  let current: StepTimes | null = null
+  const keeper = createKeeper<RepoKey, StepTimes>({
+    context: {
+      open: () => {
+        current = createStepTimes(() => performance.now())
+        return current
+      },
+      close: () => {
+        current = null
+      },
+    },
     ...(input.onError === undefined ? {} : { onError: input.onError }),
-    ...(input.onSlow === undefined ? {} : { onSlow: input.onSlow }),
+    ...(onSlow === undefined
+      ? {}
+      : {
+          onSlow: (step: SlowStep, times: StepTimes | null) =>
+            onSlow({ ...step, split: times?.split() ?? NO_SPLIT }),
+        }),
     ...(input.slowMs === undefined ? {} : { slowMs: input.slowMs }),
   })
   const listeners = new Set<(moved: Moved) => void>()
   const slowCommandMs = input.slowCommandMs ?? 500
-  const timed: CommandWatch = command => {
-    input.onCommand?.(command)
-    if (command.ms > slowCommandMs) input.onSlowCommand?.(command)
-  }
-  /** Every runner the owner makes, each command of it watched. */
+  /** A command watch; a step's commands count toward its times, a pinned read's, run beside it, do not. */
+  const commandWatch =
+    (counts: boolean): CommandWatch =>
+    command => {
+      input.onCommand?.(command)
+      if (counts) current?.command(command.ms)
+      if (command.ms > slowCommandMs) input.onSlowCommand?.(command)
+    }
+  const timed = commandWatch(true)
+  /** Every runner a step reaches, each command of it watched. */
   const runner = (as: Parameters<typeof runnerFor>[1]) =>
     runnerFor(root, as, timed)
+  const readRunner = (at: string) =>
+    runnerFor(root, { at }, commandWatch(false))
   const host = runner("host")
   const git = runner("git")
   let seen: Fingerprint | null = null
@@ -139,7 +179,7 @@ export function startRepoOwner(input: {
     } finally {
       const ran = performance.now() - started
       if (ran > (input.slowMs ?? 1_000))
-        input.onSlow?.({ key: "observe", waited: 0, ran })
+        onSlow?.({ key: "observe", waited: 0, ran, split: NO_SPLIT })
     }
   }
   async function observeNow(): Promise<void> {
@@ -198,8 +238,12 @@ export function startRepoOwner(input: {
     return keptAccepted.facts
   }
 
-  /** A step's ops, flagging the step as one that wrote. */
-  function opsOf(wrote: { value: boolean }): RepoOps {
+  /** A step's ops, flagging the step as one that wrote, its parts timed in `times`. */
+  /** An observation inside a step, timed as its part; a failure is the step's to log, not to throw. */
+  const observeIn = (times: StepTimes) =>
+    times.part("observe", observe).catch(e => input.onError?.(e))
+
+  function opsOf(wrote: { value: boolean }, times: StepTimes): RepoOps {
     const asYou = runner("you")
     return {
       jj: host,
@@ -208,26 +252,28 @@ export function startRepoOwner(input: {
         return asYou(args)
       },
       git,
-      shared,
-      acceptedFacts: accepted,
+      shared: () => times.part("shared facts", shared),
+      acceptedFacts: () => times.part("accepted facts", accepted),
+      part: (name, work) => times.part(name, work),
       async execute(steps) {
         if (steps.length === 0) return
         try {
-          await executeRepo(root, steps, timed)
+          await times.part("steps", () => executeRepo(root, steps, timed))
         } finally {
-          await observe().catch(e => input.onError?.(e))
+          await observeIn(times)
         }
       },
     }
   }
   const owned =
     <T>(step: OwnedStep<T>) =>
-    async (): Promise<T> => {
+    async (times: StepTimes): Promise<T> => {
       const wrote = { value: false }
+      const ops = opsOf(wrote, times)
       try {
-        return await step(opsOf(wrote))
+        return await step(ops)
       } finally {
-        if (wrote.value) await observe().catch(e => input.onError?.(e))
+        if (wrote.value) await observeIn(times)
       }
     }
 
@@ -241,10 +287,10 @@ export function startRepoOwner(input: {
   const pinned: Runner = async args => {
     await first.promise
     const at = seen?.op ?? ""
-    const ran = await runner({ at })(args)
+    const ran = await readRunner(at)(args)
     if (!operationGone(ran)) return ran
     await keeper.once("observe", observeNow)
-    return runner({ at: seen?.op ?? at })(args)
+    return readRunner(seen?.op ?? at)(args)
   }
 
   // The watch, and its backstop: a head that is not the last observed queues

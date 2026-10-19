@@ -1,7 +1,7 @@
 # S87 — a jj read pinned to an operation writes nothing
 
 - **Status:** Answered
-- **Led to:** ADR-0065, ADR-0104, ADR-0105
+- **Led to:** ADR-0065, ADR-0104, ADR-0105, ADR-0181
 
 **Question.** S57 item 6 found that a plain jj read, run while the repo has
 divergent operation heads, reconciles them: it writes an operation and

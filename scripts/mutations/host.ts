@@ -3185,4 +3185,34 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "a second plan over its own output finds nothing",
   },
+  {
+    name: "a slow step's line leaves out the rest of its time",
+    file: "apps/pinetrie/host/basics.ts",
+    from: "    ...(parts.length > 0 && rest >= 1 ? [`the rest ${ms(rest)}`] : []),\n",
+    to: "",
+    command: [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "apps/pinetrie/host/basics.test.ts",
+    ],
+    expect:
+      "a slow step's line says where its time went, the rest and its commands",
+  },
+  {
+    name: "a refresh's base record write is not a part of its step",
+    file: "apps/pinetrie/host/jj/proposed/refresh.ts",
+    from: '      writeBase: base => ops.part("base record", () => records.writeBase(base)),',
+    to: "      writeBase: base => records.writeBase(base),",
+    command: [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "apps/pinetrie/host/jj/proposed/refresh.test.ts",
+    ],
+    expect:
+      "a refresh that builds reports its gather, its base record, its steps and its record as parts",
+  },
 ]

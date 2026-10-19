@@ -23,6 +23,10 @@
     `Pinetrie-Source`; a lane whose base moved runs two more jj processes,
     once per move.
   - ADR-0083: a take is an *offer integration*; it names what it was shown.
+  - ADR-0181: a lane's refresh gathers with jj pinned to an operation, off the
+    owner, up to four lanes at once; only what it writes runs on the owner,
+    and only at the head it gathered at. After accepted work moves, a lane's
+    refresh runs five jj processes, not four.
 
 **Context.** A take ("add to the project") sometimes took 30–60 s, and the
 page showed nothing meanwhile. S89 measured it on a clone of pine·trie's repo:

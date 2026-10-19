@@ -1,0 +1,26 @@
+list 15807 chars, 304 commits; occurrences in revset 1 in template 1
+as the host runs it: median 148 ms, 180 rows
+revset only, ids: median 139 ms, 180 rows
+list as an alias: median 60 ms, 180 rows
+  same output: true
+list alone, ids: median 51 ms, 304 rows
+template without the accepted flag: median 147 ms, 180 rows
+  flag T's revset alone (60 chars): median 14 ms, 0 rows
+  flag O's revset alone (94 chars): median 15 ms, 0 rows
+  flag H's revset alone (122 chars): median 14 ms, 0 rows
+  flag R's revset alone (131 chars): median 16 ms, 0 rows
+  flag B's revset alone (128 chars): median 16 ms, 0 rows
+  flag L's revset alone (110 chars): median 14 ms, 0 rows
+  flag U's revset alone (130 chars): median 17 ms, 0 rows
+  flag K's revset alone (15807 chars): median 32 ms, 0 rows
+  flag X's revset alone (6 chars): median 14 ms, 0 rows
+list as a --config alias: median 51 ms, 180 rows
+  same output: true
+second log (readStart): 8990 chars; holds the list: false
+  commit lists in it, chars: 8891
+second log as the host runs it: median 39 ms, 1 rows
+second log as the host runs it: median 38 ms, 1 rows
+second log, its list as an alias: median 25 ms, 1 rows
+  same output: true
+lane read, the list as the expression readShared reads it by: median 22 ms, 180 rows
+  same output: true

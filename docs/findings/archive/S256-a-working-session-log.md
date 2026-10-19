@@ -1,4 +1,6 @@
-# S234 — after the refresh fix, a working session's waits are a run's end compacting a 45 MB session, a lane's start listing every snapshot inside a step, and a second of jj per refresh
+# S256 — after the refresh fix, a working session's waits are a run's end compacting a 45 MB session, a lane's start listing every snapshot inside a step, and a second of jj per refresh
+
+Numbered S234 until 2026-10-19, when two files held that number.
 
 - **Status:** Answered
 
@@ -51,7 +53,7 @@ next.
    acceptance every lane is refreshed, one after another: the last ones
    waited 17-26 s. Not counted here: how many commands an unchanged
    refresh runs.
-5. **The tab still asked for 17 roots at connect** (S233).
+5. **The tab still asked for 17 roots at connect** (S255).
 6. **One start ran the store's migrations for 17 s,** once.
 7. **`privileged diff` took 1.4-3.4 s now and then,** with no stall beside
    it: lanehost's own time, not the host's.
@@ -66,4 +68,4 @@ next.
   awaited inside a step of the documents' keeper.
 - **Count an unchanged refresh's jj commands,** as a test's value, and cut
   them; S100 began on one read for every lane.
-- **A tab holds the canvas on screen and its inventory** (S233).
+- **A tab holds the canvas on screen and its inventory** (S255).

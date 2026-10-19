@@ -95,7 +95,13 @@ async function yourRepo(tag: string) {
  * nothing to your repo: it must by the second. Then the proposed changes'
  * files, or null for none.
  */
-async function settles(dir: string, lane: ThreadId, name: ThreadName) {
+/** `parts` gets each step's parts, by name, as its slow report gives them: every step reports. */
+async function settles(
+  dir: string,
+  lane: ThreadId,
+  name: ThreadName,
+  parts: string[][] = [],
+) {
   const fake = basics()
   /** Each lease the refresh takes, by root or by lane: each one loads a root. */
   let leased = 0
@@ -116,7 +122,14 @@ async function settles(dir: string, lane: ThreadId, name: ThreadName) {
   const scribe = record<Records>({
     writeValues: async writes => applyWrites(b, writes),
   })
-  const owner = startRepoOwner({ root: dir, repoConfig: DEFAULT_REPO })
+  const owner = startRepoOwner({
+    root: dir,
+    repoConfig: DEFAULT_REPO,
+    slowMs: -1,
+    onSlow: s => {
+      if (s.split.parts.length > 0) parts.push(s.split.parts.map(p => p.name))
+    },
+  })
   try {
     const deps = createProposedChangesDeps({
       owner,
@@ -347,6 +360,21 @@ test("proposed changes the host builds are its version, tracked, and the round a
     `present(${proposedBookmark(THREAD)})`,
   )
   expect(await commitsAt(you.dir, tracked(THREAD))).toEqual(proposed)
+}, 60_000)
+
+test("a refresh that builds reports its gather, its base record, its steps and its record as parts", async () => {
+  const you = await yourRepo("parts")
+  const work = await you.commit(
+    [you.base],
+    { "a.txt": "a\n" },
+    `turn\n\nPinetrie-Lane: ${LANE}\nPinetrie-Entry: e1\n`,
+  )
+  await you.setTip(LANE, work)
+  const parts: string[][] = []
+  await settles(you.dir, LANE, THREAD, parts)
+  expect(parts[0]).toEqual(
+    expect.arrayContaining(["gather", "base record", "steps", "record"]),
+  )
 }, 60_000)
 
 test("proposed changes the host built before proposed changes had a version of the host's is marked by its refresh", async () => {

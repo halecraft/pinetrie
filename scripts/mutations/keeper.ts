@@ -122,4 +122,12 @@ export const mutations: readonly Mutation[] = [
     expect:
       "each step is handed its own context, closed once it settles, a throw included",
   },
+  {
+    name: "a slow step is reported without its context",
+    file,
+    from: "            opened === null ? null : opened.value,\n",
+    to: "            null,\n",
+    command: unit,
+    expect: "a slow step is reported with its own context",
+  },
 ]

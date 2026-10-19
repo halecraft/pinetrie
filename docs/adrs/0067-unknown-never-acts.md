@@ -19,6 +19,9 @@
     once per move.
 - **Amended by:**
   - ADR-0083: a take above the base is an *integrated-offer commit*.
+  - ADR-0181: a refresh of a lane whose base moved runs three more jj
+    processes, not two: the start read too, while accepted work sits above the
+    lane's base.
 
 **Context.** On pine·trie's own repo the page contradicted itself: vernal-pine's
 strip said "nothing to add yet" while its tab warned that archiving drops

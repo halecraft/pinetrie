@@ -240,6 +240,23 @@ describe("idle, close and slow steps", () => {
 })
 
 describe("a step context", () => {
+  test("a slow step is reported with its own context", async () => {
+    let t = 0
+    let made = 0
+    const slow: [string | null, number | null][] = []
+    const keeper = createKeeper<never, { n: number }>({
+      now: () => t,
+      slowMs: 10,
+      context: { open: () => ({ n: ++made }), close: () => {} },
+      onSlow: (s, context) => slow.push([s.key, context?.n ?? null]),
+    })
+    await keeper.run(async () => {})
+    await keeper.run(async () => {
+      t += 20
+    })
+    expect(slow).toEqual([[null, 2]])
+  })
+
   test("each step is handed its own context, closed once it settles, a throw included", async () => {
     const events: string[] = []
     let made = 0

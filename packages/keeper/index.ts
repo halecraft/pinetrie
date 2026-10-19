@@ -94,8 +94,12 @@ export function createKeeper<K extends string = never, C = void>(
     readonly context?: StepContext<C>
     /** Hears each failed step once; its callers still get the rejection. */
     readonly onError?: (error: unknown) => void
-    /** Called for each `SlowStep`. */
-    readonly onSlow?: (step: SlowStep) => void
+    /**
+     * Called for each `SlowStep`, with the step's context, already closed:
+     * what the step kept there says what it spent. Null when the context
+     * never opened.
+     */
+    readonly onSlow?: (step: SlowStep, context: C | null) => void
     readonly slowMs?: number
     readonly now?: () => number
   } = {},
@@ -157,7 +161,10 @@ export function createKeeper<K extends string = never, C = void>(
         const ran = now() - started
         const waited = started - next.queued
         if (ran > slowMs || (!isUpkeep && waited > slowMs))
-          options.onSlow?.({ key: next.key, waited, ran })
+          options.onSlow?.(
+            { key: next.key, waited, ran },
+            opened === null ? null : opened.value,
+          )
         running = false
         schedule()
         notify()

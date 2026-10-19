@@ -121,6 +121,14 @@ everything else reads at the head it last saw.**
   `slowCommandMs` (500 ms) goes to `onSlowCommand`, by the arguments its
   caller gave, with no runner flags. A slow step (`onSlow`) then names the
   command that made it slow.
+- **A slow step says where its time went** (`RepoSlowStep`'s `split`,
+  `step-times.ts`). Each step gets its own `StepTimes` as its keeper
+  context. `RepoOps.part` times a named part, without the parts inside it;
+  the owner itself times `shared facts`, `accepted facts`, `steps` and
+  `observe`. The step's jj and git commands are counted with their time
+  together. A pinned read's are not: it runs beside the step, not in it.
+  Parts run one after another or nested; two side by side would be timed
+  as nested.
 - **Only the owner runs a `RepoStep`** (`RepoOps.execute`), but for a
   tidy's (`executeTidy`), which runs while no host, and so no owner, serves
   the repo. The package exports no other runner: a step gets `RepoOps` (`jj`
@@ -197,7 +205,7 @@ operation is read once and kept until the head moves.**
   `acceptedFacts`): nine reads and six more when your `@-` is behind (its
   configs, the WIPs, the publish bookmark, your `@-` and `@`), once per
   operation, read only when that record is written. In the shared facts,
-  every refresh at a new operation paid them, twice when it wrote (S232).
+  every refresh at a new operation paid them, twice when it wrote (S254).
 - **`yourEdits` is `files ∩ editing`**, decided in `proposedChangesRecord`
   (`@pinetrie/rules`): no lane reads `@`. `@` alone moving rewrites every open
   record's from one shared read (`planYourEdits`).
@@ -227,15 +235,19 @@ operation is read once and kept until the head moves.**
   again on every observation, without end (S89).
 - **The budget:** unchanged proposed changes' refresh runs at most 2 jj processes,
   and no evolog (`repo.test.ts` counts 2: the read and `filesTouched`);
-  S89 measured 18 before, and 3 with the evolog (ADR-0154). A lane whose base moved runs two more, once per move,
-  and one more for each further head of its proposed changes' start.
+  S89 measured 18 before, and 3 with the evolog (ADR-0154). Once accepted
+  work moves past a lane's base, its refresh runs 5 (ADR-0181): the start
+  read too (`readStart`), on every refresh while an accepted thread commit
+  sits above the base, since `known` keeps only the catch-up diffs; those
+  two run once per move, plus one for each further head of its proposed
+  changes' start. S253 counted 5 for 60 of 73 lanes.
 - **A whole refresh, as the host runs it, is counted** (the host's
   `refresh.test.ts`, every command the owner heard, `onCommand`): 2
   unchanged, 3 after any new operation (the shared facts' read), 13 for a
   rebase when accepted work moved, 15 for a first build, 16 for a rebuild
   after a turn. A writing refresh's steps and mark, the observation after
   them (2), the record's read (1) and the shared facts read again (1) are
-  most of it. S232 measured 43 and 60 before the shared facts were split
+  most of it. S254 measured 43 and 60 before the shared facts were split
   and proposed changes read in one `jj log`; on the Mac a jj process is
   about 20 ms.
 - **One rule decides both.** `repo.test.ts` holds `gatherLane` beside the

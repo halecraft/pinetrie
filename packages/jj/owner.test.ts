@@ -7,7 +7,12 @@ import { run } from "@pinetrie/lanes"
 import { afterAll, beforeAll, describe, expect, test } from "vitest"
 import { DEFAULT_REPO } from "./lane/names.ts"
 import type { Moved } from "./observe.ts"
-import { headsDir, type RepoOwner, startRepoOwner } from "./owner.ts"
+import {
+  headsDir,
+  type RepoOwner,
+  type RepoSlowStep,
+  startRepoOwner,
+} from "./owner.ts"
 import { operationGone, runnerFor } from "./run.ts"
 import { host } from "./step.ts"
 
@@ -151,6 +156,36 @@ describe("the owner of your repo", () => {
       lanes: new Set(),
       proposed: new Set(),
     })
+    close(owner)
+  })
+
+  test("a slow step's split holds its parts and its own commands, not a pinned read's beside it", async () => {
+    const { dir } = await repo("split")
+    const splits: RepoSlowStep["split"][] = []
+    const owner = startRepoOwner({
+      root: dir,
+      repoConfig: DEFAULT_REPO,
+      slowMs: -1,
+      onSlow: s => {
+        if (s.key === null) splits.push(s.split)
+      },
+    })
+    await owner.idle()
+    const held = Promise.withResolvers<void>()
+    const reading = Promise.withResolvers<void>()
+    const step = owner.command(async ops => {
+      await ops.part("look", () =>
+        ops.jj(["log", "--no-graph", "-r", "@", "-T", "commit_id"]),
+      )
+      reading.resolve()
+      await held.promise
+    })
+    await reading.promise
+    await owner.read(ops => ops.jj(["log", "--no-graph", "-r", "@-"]))
+    held.resolve()
+    await step
+    expect(splits.map(s => s.parts.map(p => p.name))).toEqual([["look"]])
+    expect(splits.map(s => s.commands.count)).toEqual([1])
     close(owner)
   })
 

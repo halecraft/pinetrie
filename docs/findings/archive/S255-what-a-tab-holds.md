@@ -1,4 +1,6 @@
-# S233 — a tab holds every sidebar canvas's roots, but only the canvas on screen and your inventory read them; the sidebar reads the session
+# S255 — a tab holds every sidebar canvas's roots, but only the canvas on screen and your inventory read them; the sidebar reads the session
+
+Numbered S233 until 2026-10-19, when two files held that number.
 
 - **Status:** Answered
 

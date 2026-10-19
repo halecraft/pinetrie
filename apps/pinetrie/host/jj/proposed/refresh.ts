@@ -53,38 +53,42 @@ export function createRefresh(
     name: ThreadName,
   ): ProposedChangesPorts {
     const read = (place: Placed) =>
-      readProposedChanges(ops.jj, { name, target: place.target })
+      ops.part("read", () =>
+        readProposedChanges(ops.jj, { name, target: place.target }),
+      )
+    // Each port is a part of the step's slow report.
     return {
-      writeBase: records.writeBase,
+      writeBase: base => ops.part("base record", () => records.writeBase(base)),
       run: steps => ops.execute(steps),
       read,
       // Divergent proposed changes are recorded once repaired.
-      async record(proposed, place) {
-        if (proposed === null || proposed.kind === "divergent") return
-        await records.write(
-          proposedChangesRecord({
-            lane,
-            name,
-            proposed,
-            place,
-            editing: (await ops.shared()).editing,
-            now: basics.now(),
-          }),
-        )
-      },
-      async repair(changeIds) {
-        await repairProposedChanges(ops, {
-          bookmark: proposedBookmark(name),
-          changeIds,
-        })
-        log(
-          `[host] ${readThreadName(session, lane)}: your edit and the host's crossed; kept yours`,
-        )
-      },
-      remove: () => records.remove(lane),
-      async accepted(record) {
-        await records.writeAcceptedProposed(record)
-      },
+      record: (proposed, place) =>
+        ops.part("record", async () => {
+          if (proposed === null || proposed.kind === "divergent") return
+          await records.write(
+            proposedChangesRecord({
+              lane,
+              name,
+              proposed,
+              place,
+              editing: (await ops.shared()).editing,
+              now: basics.now(),
+            }),
+          )
+        }),
+      repair: changeIds =>
+        ops.part("repair", async () => {
+          await repairProposedChanges(ops, {
+            bookmark: proposedBookmark(name),
+            changeIds,
+          })
+          log(
+            `[host] ${readThreadName(session, lane)}: your edit and the host's crossed; kept yours`,
+          )
+        }),
+      remove: () => ops.part("record", () => records.remove(lane)),
+      accepted: record =>
+        ops.part("record", () => records.writeAcceptedProposed(record)),
     }
   }
 
@@ -92,14 +96,16 @@ export function createRefresh(
     ports,
     async refresh(ops, lane) {
       // gather
-      const now = await gatherRefresh(ops, {
-        ...docs.input(lane),
-        archived: docs.archived(lane),
-      })
+      const now = await ops.part("gather", () =>
+        gatherRefresh(ops, {
+          ...docs.input(lane),
+          archived: docs.archived(lane),
+        }),
+      )
       if (now.kind === "none") return "other"
       // A WIP gone without landing: nothing moves, and the page says so.
       if (now.kind === "gone") {
-        await records.writeBase(now.base)
+        await ops.part("base record", () => records.writeBase(now.base))
         return "other"
       }
       const { name, facts } = now
@@ -110,7 +116,9 @@ export function createRefresh(
             lane,
             name,
             nonce: newNonce(),
-            ...(await docs.messageFacts(lane, name)),
+            ...(await ops.part("message facts", () =>
+              docs.messageFacts(lane, name),
+            )),
           })
         : proposedChangesEffects(decision, name)
       // execute

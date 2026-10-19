@@ -77,6 +77,10 @@ current.
   step's wait is not reported: upkeep waits behind commands and other
   upkeep by design, so a burst of it (a refresh per lane, queued at once)
   would report every step behind the first second. The host logs it.
+  `onSlow` is handed the step's context too, already closed (null when it
+  never opened), so a step can keep there what it spent: the owner of your
+  repo keeps each step's parts and commands in it (`@pinetrie/jj`'s
+  `StepTimes`).
 
 ## Tests
 

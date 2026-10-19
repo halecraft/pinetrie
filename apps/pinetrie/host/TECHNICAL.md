@@ -1598,7 +1598,11 @@ adapter's.
 - **Each jj or git command on your repo over half a second is logged**
   (`onSlowCommand`, `slowCommand`): `[host] your repo: <command> ran <n>
   ms`, its arguments as its caller gave them, cut to a line. The owner's
-  `slow` names only the step; this names the command in it.
+  `slow` names the step, and where its time went (`slowStepLine`): each
+  part of 1 ms or more, the rest, and its jj and git commands, whose time
+  is inside the parts. A refresh's parts are its `gather`, `message facts`,
+  `base record`, `read`, `record` and `repair` (`jj/proposed/refresh.ts`),
+  beside the owner's own.
 - **A starting host says when a tidy is due** (ADR-0155): one pinned read of
   your whole op log (`readOpLog`), tracked and never awaited, so the start
   does not wait for it; when its oldest operation is more than twice the

@@ -1,7 +1,7 @@
 import { threadIdFor } from "@pinetrie/core"
 import { KeeperClosed } from "@pinetrie/keeper"
 import { expect, test } from "vitest"
-import { failed } from "./basics.ts"
+import { failed, slowStepLine } from "./basics.ts"
 import { basics } from "./fakes.ts"
 
 test("failed logs the host's line, with the thread when it names a lane", () => {
@@ -13,6 +13,38 @@ test("failed logs the host's line, with the thread when it names a lane", () => 
     "[host] compaction failed: disk full",
     "[host] 89abcdef: forking failed: no volume",
   ])
+})
+
+test("a slow step's line says where its time went, the rest and its commands", () => {
+  expect(
+    slowStepLine("your repo", {
+      key: "refresh:t-1",
+      waited: 14.2,
+      ran: 1233,
+      split: {
+        parts: [
+          { name: "gather", ms: 190.4 },
+          { name: "shared facts", ms: 0.3 },
+          { name: "base record", ms: 900 },
+        ],
+        commands: { count: 5, ms: 160 },
+      },
+    }),
+  ).toBe(
+    "[host] your repo: a step (refresh:t-1) waited 14 ms and ran 1233 ms: gather 190 ms, base record 900 ms, the rest 142 ms, jj and git 160 ms of it, in 5 commands",
+  )
+})
+
+test("a slow step with nothing split, or no split, keeps the short line", () => {
+  const step = { key: null, waited: 1200, ran: 3 }
+  const short = "[host] a step waited 1200 ms and ran 3 ms"
+  expect(slowStepLine(undefined, step)).toBe(short)
+  expect(
+    slowStepLine(undefined, {
+      ...step,
+      split: { parts: [], commands: { count: 0, ms: 0 } },
+    }),
+  ).toBe(short)
 })
 
 test("failed logs nothing for a step a closed keeper refused", () => {

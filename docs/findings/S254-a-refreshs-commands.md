@@ -1,6 +1,9 @@
-# S232 — a refresh runs 13 to 60 jj processes, most of them reads of accepted work's record it never uses; at about 20 ms each on the Mac, that is Duane's second
+# S254 — a refresh runs 13 to 60 jj processes, most of them reads of accepted work's record it never uses; at about 20 ms each on the Mac, that is Duane's second
+
+Numbered S232 until 2026-10-19, when two files held that number.
 
 - **Status:** Answered
+- **Led to:** ADR-0181
 
 Run in a lane (Linux, jj 0.45.1) on a disposable colocated repo, with the
 host's own refresh (`createRefresh`, `apps/pinetrie/host/jj/proposed/`) on
@@ -10,7 +13,7 @@ the owner (`startRepoOwner`), every command heard through its command watch
 ## Brief
 
 **Question.** Duane's refreshes take 1.0-1.2 s with no command over
-500 ms (S234, item 4). How many jj and git processes does one run, in each
+500 ms (S256, item 4). How many jj and git processes does one run, in each
 common case, which are they, and what does one cost?
 
 **Kill criterion.** If a refresh runs a handful of commands, each one is

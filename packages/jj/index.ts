@@ -14,6 +14,7 @@ export {
   type RepoOps,
   type RepoOwner,
   type RepoReads,
+  type RepoSlowStep,
   startRepoOwner,
 } from "./owner.ts"
 export {
@@ -61,6 +62,7 @@ export {
   prepareShared,
 } from "./startup.ts"
 export type { RepoStep } from "./step.ts"
+export type { StepPart, StepSplit } from "./step-times.ts"
 export {
   executeTidy,
   gatherTidy,

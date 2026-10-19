@@ -1,0 +1,175 @@
+# jj jj 0.45.1-7c41cdeb16b6b321c64e789a966b6adf723816a5, op a8943d45f9b7
+lanes: 73, named by proposed changes: 11
+shared facts: 13 calls, 207 ms (log 25, diff 24, log 14, config 6, config 6, log 14, log 17, log 14, log 18, log 14, log 16, log 13, file 22)
+one empty jj log: median 15.2 ms
+
+## serial: 73 lanes, 386 jj calls, wall 17045 ms
+  [t-01a11e6a-af] 138 ms, 33868 chars: log --no-graph -r present(tip@pinetrie-t-01a11e6a-af5e-77fb-8452-1c6f2930c58b) | latest(heads(::present(tip@pinetrie-t-01a11e6a-af5e-77fb-84
+  [t-01a11e6a-af] 49 ms, 9051 chars: log --ignore-working-copy --no-graph -r heads(::20ecdab38d729ad7aca6d558391c6fd13abf3382 & (e8917938c7c3145bf8ada67955f3321dbfcd84d5 | ::(pr
+  [t-01a11e6a-af] 26 ms, 110 chars: diff --from e8917938c7c3145bf8ada67955f3321dbfcd84d5 --to 20ecdab38d729ad7aca6d558391c6fd13abf3382 --name-only
+  [t-01a11e6a-af] 30 ms, 120 chars: diff --from e8917938c7c3145bf8ada67955f3321dbfcd84d5 --to 3d486611b1410aa1dc110e4facd19bfa320181f5 -T json(path) ++ "\n"
+  [t-01a11e6a-af] 33 ms, 120 chars: diff --from 20ecdab38d729ad7aca6d558391c6fd13abf3382 --to 3d486611b1410aa1dc110e4facd19bfa320181f5 -T json(path) ++ "\n"
+  [t-01a10dd2-4f] 152 ms, 33646 chars: log --no-graph -r present(tip@pinetrie-t-01a10dd2-4fea-793f-85a4-95f3397550fb) | latest(heads(::present(tip@pinetrie-t-01a10dd2-4fea-793f-85
+  [t-01a10dd2-4f] 64 ms, 11495 chars: log --ignore-working-copy --no-graph -r heads(::514f3643f0dbbfae8e8d8fa644bd0363cd6a2a00 & (28b00b9ebbd68bcef2eb236df91d09d0bcb16d35 | ::(pr
+  [t-01a10dd2-4f] 32 ms, 83 chars: file list -r 92bfacb58ca5e7e5a3c92de7dcf6eb959fd203e5 -T if(conflict, path ++ "\n")
+  [t-01a10dd2-4f] 16 ms, 83 chars: file list -r 28b00b9ebbd68bcef2eb236df91d09d0bcb16d35 -T if(conflict, path ++ "\n")
+  [t-01a10dd2-4f] 44 ms, 110 chars: diff --from 28b00b9ebbd68bcef2eb236df91d09d0bcb16d35 --to 514f3643f0dbbfae8e8d8fa644bd0363cd6a2a00 --name-only
+  [t-01a10dd2-4f] 35 ms, 120 chars: diff --from 28b00b9ebbd68bcef2eb236df91d09d0bcb16d35 --to 3d486611b1410aa1dc110e4facd19bfa320181f5 -T json(path) ++ "\n"
+  [t-01a10dd2-4f] 29 ms, 120 chars: diff --from 514f3643f0dbbfae8e8d8fa644bd0363cd6a2a00 --to 3d486611b1410aa1dc110e4facd19bfa320181f5 -T json(path) ++ "\n"
+  log: 144 calls, 12028 ms, mean 83.5
+  file: 20 calls, 320 ms, mean 16.0
+  diff --name-only: 73 calls, 1157 ms, mean 15.8
+  diff -T: 149 calls, 3436 ms, mean 23.1
+  t-01a10dd2-4fea-793f-85a4-95f3397550fb proposed 7 calls 376 ms plan/placed
+  t-01a10ddf-8326-7bd7-a21b-5a40bb8a2ccf proposed 7 calls 344 ms plan/placed
+  t-01a11e6a-af5e-77fb-8452-1c6f2930c58b - 5 calls 278 ms plan/placed
+  t-01a125ee-afcf-7d13-99dc-58aa74a6e0fe - 5 calls 276 ms plan/placed
+  t-01a12dbe-aef3-7d4b-85f5-1c50fdf4bd99 - 5 calls 275 ms plan/placed
+  t-01a12dc6-024c-78cd-b85c-8cf2f5640ba7 - 5 calls 286 ms plan/placed
+  t-01a12dc7-a0e8-7b18-8e0e-ded704284cd4 - 5 calls 254 ms plan/placed
+  t-01a12dc7-ce47-7b5d-a384-3fbdfbd0c065 - 5 calls 234 ms plan/placed
+  t-01a12e4b-6c73-7322-97e9-4ca17597bbcc - 5 calls 216 ms plan/placed
+  t-01a12e54-b414-77b5-aeb7-3b84dd5a1cc2 - 5 calls 219 ms plan/placed
+  t-01a12e84-b79f-7341-b763-1a87b24a5fdd - 5 calls 215 ms plan/placed
+  t-01a12eab-8410-7b89-938d-a145d79b8f50 - 5 calls 243 ms plan/placed
+  t-01a12eaf-fe47-78f8-adf2-5bae65f284a2 - 5 calls 239 ms plan/placed
+  t-01a13043-77f3-7acf-ba1c-663bf425e4f1 - 5 calls 262 ms plan/placed
+  t-01a1304f-26d5-7f6a-961d-175ca6f5101f - 5 calls 224 ms plan/placed
+  t-01a1305e-9f11-7db1-b1ad-6ac1ffd57d08 - 5 calls 229 ms plan/placed
+  t-01a130a6-2641-7408-a6f4-46f88547adec - 5 calls 271 ms plan/placed
+  t-01a130b3-78e6-7eb2-9961-1f7ecef27d92 - 5 calls 291 ms plan/placed
+  t-01a130bc-8314-7ce0-a080-0b04d04cc9ba - 5 calls 272 ms plan/placed
+  t-01a130c7-9a9e-7ace-a3f8-8e5d93728e1f - 5 calls 281 ms plan/placed
+  t-01a130cc-80bc-74c3-be53-7a292506c618 - 5 calls 323 ms plan/placed
+  t-01a13395-1754-7104-a00a-f0a8e399974f - 5 calls 272 ms plan/placed
+  t-01a133b7-88a1-71d0-a457-03812af551c0 proposed 7 calls 298 ms plan/placed
+  t-01a1380c-28d5-7985-8e7c-7eca1fc93610 - 5 calls 250 ms plan/placed
+  t-01a13ce4-63bf-72dc-afd2-4ddcf1e85ecd - 5 calls 270 ms plan/placed
+  t-01a13dba-2b5d-73b3-bc5d-97da4d955084 - 5 calls 212 ms plan/placed
+  t-01a13de6-54cb-749f-8ae4-d4ced39c5754 - 5 calls 222 ms plan/placed
+  t-01a13de6-cf9c-7936-a43c-75cd1fe6de3d - 5 calls 216 ms plan/placed
+  t-01a14030-1609-7560-9202-f9cbdc0c1706 - 5 calls 208 ms plan/placed
+  t-01a14081-fb45-77eb-84f3-e9e6f640a99c - 5 calls 206 ms plan/placed
+  t-01a140d0-0cef-702d-bcdf-3d3cfa4ba80b - 5 calls 213 ms plan/placed
+  t-01a14116-a9f7-7cb9-8eae-6e81b316c4fb - 5 calls 208 ms plan/placed
+  t-01a141b9-31ef-7ec5-a77b-b470e8684209 - 5 calls 202 ms plan/placed
+  t-01a141ba-fa5d-7677-bd46-3e69c07c19d8 - 5 calls 205 ms plan/placed
+  t-01a141cb-bcb0-7228-8a8b-bc3ae959061c - 5 calls 206 ms plan/placed
+  t-01a142a1-baa8-7101-a798-527b8c95c88a - 5 calls 211 ms plan/placed
+  t-01a1463f-5b9f-7699-b351-cfd2d0dd9dd9 - 5 calls 211 ms plan/placed
+  t-01a14744-42d2-70ed-aa88-6d31b85b413f - 5 calls 215 ms plan/placed
+  t-01a14744-42d2-7302-ba20-ee70207aaa5d - 5 calls 209 ms plan/placed
+  t-01a14744-42d2-74d4-9003-efc0b85607e6 - 5 calls 207 ms plan/placed
+  t-01a14744-42d2-78ed-ad75-6d52fa27c690 - 5 calls 208 ms plan/placed
+  t-01a14744-42d2-7a77-9e33-f8103f9735ca - 5 calls 210 ms plan/placed
+  t-01a14751-7403-744f-975f-d17e91e0d87d - 5 calls 227 ms plan/placed
+  t-01a147a1-fd98-704a-a2a0-d595435d1d80 - 5 calls 211 ms plan/placed
+  t-01a147a1-fd98-709a-86c5-69cc6e5b52bb - 5 calls 206 ms plan/placed
+  t-01a147a1-fd98-7296-87b1-3d0855f2887f - 5 calls 255 ms plan/placed
+  t-01a147a1-fd98-739b-9953-d55707bc131d - 6 calls 219 ms plan/placed
+  t-01a147a1-fd98-7919-bcda-b4d07f5ef13d - 5 calls 208 ms plan/placed
+  t-01a147a1-fd98-79d4-9f81-2921ec06eca7 - 5 calls 207 ms plan/placed
+  t-01a147a1-fd98-7cc9-8f9f-0c6c9ed453cb - 5 calls 215 ms plan/placed
+  t-01a147a1-fd98-7f1e-b1b6-3229a13a2a27 - 5 calls 205 ms plan/placed
+  t-01a147c1-ae9b-729e-824c-0e056b2b6a3a - 6 calls 212 ms plan/placed
+  t-01a14815-115d-7fad-b581-07e9c319acba - 5 calls 202 ms plan/placed
+  t-01a14950-aecc-79e5-ba4d-bfce0c6311dc proposed 9 calls 259 ms plan/placed
+  t-01a14a71-6f87-7749-873c-c22b899ff845 - 5 calls 202 ms plan/placed
+  t-01a14aac-6321-733c-8df0-c271cac119b2 - 5 calls 208 ms plan/placed
+  t-01a14abd-6037-758d-b7fc-4619e3087923 - 5 calls 210 ms plan/placed
+  t-01a14abf-677f-72f2-82ec-795c1cbabee1 proposed 5 calls 253 ms plan/placed
+  t-01a14b35-a5b5-7294-9449-1887cdffd535 - 5 calls 212 ms plan/placed
+  t-01a14c5f-89fe-746b-bc53-617b7be98210 - 5 calls 205 ms plan/placed
+  t-01a14cd4-fdc2-709d-a577-d995ce58a1d1 proposed 9 calls 283 ms plan/placed
+  t-01a14cd4-fdc2-7fda-88c4-ce1ea371d309 proposed 6 calls 232 ms plan/placed
+  t-01a14cdd-ac2f-7b94-88a0-e9832b16cb54 - 5 calls 218 ms plan/placed
+  t-01a14cdd-ac2f-7f83-b09a-3a2bbd62e0bb proposed 9 calls 264 ms plan/placed
+  t-01a15095-e633-753d-b0af-e54a5bb6a166 - 5 calls 198 ms plan/placed
+  t-01a150a9-6b67-7e40-91bc-0fe90e161bea - 2 calls 150 ms plan/placed
+  t-01a150c0-ab95-77af-b152-080a54383783 proposed 7 calls 241 ms plan/placed
+  t-01a150c0-ab95-78f3-9cb7-aa8579fa783d - 5 calls 254 ms plan/placed
+  t-01a150c0-ab95-7ab3-94b4-342733d4be66 - 5 calls 190 ms plan/placed
+  t-01a150c0-ab95-7f05-8b25-fe2f8edd7ff1 proposed 9 calls 297 ms plan/placed
+  t-01a150c0-ab95-7fdc-bb8e-4263c5730f0c - 5 calls 189 ms plan/placed
+  t-01a150c5-1098-74f2-ae24-c1afefe9d751 - 5 calls 184 ms plan/placed
+  t-01a1518b-593b-7371-84f5-7b946e64d722 proposed 2 calls 160 ms plan/placed
+
+## parallel ×2: 73 lanes, 386 jj calls, wall 8219 ms, lanes whose facts differ: 0
+
+## parallel ×4: 73 lanes, 386 jj calls, wall 4141 ms, lanes whose facts differ: 0
+
+## parallel ×8: 73 lanes, 386 jj calls, wall 2441 ms, lanes whose facts differ: 0
+
+## parallel ×16: 73 lanes, 386 jj calls, wall 2108 ms, lanes whose facts differ: 0
+
+## memo: 73 lanes, 386 jj calls, wall 15084 ms, lanes whose facts differ: 0
+  distinct commands run: 321
+
+## alias: 73 lanes, 386 jj calls, wall 7638 ms, lanes whose facts differ: 0
+  log: 144 calls, 2917 ms, mean 20.3
+  file: 20 calls, 320 ms, mean 16.0
+  diff --name-only: 73 calls, 1121 ms, mean 15.4
+  diff -T: 149 calls, 3197 ms, mean 21.5
+
+## alias, parallel ×2: 73 lanes, 386 jj calls, wall 3785 ms, lanes whose facts differ: 0
+
+## alias, parallel ×4: 73 lanes, 386 jj calls, wall 2021 ms, lanes whose facts differ: 0
+
+## alias, parallel ×8: 73 lanes, 386 jj calls, wall 1275 ms, lanes whose facts differ: 0
+
+## alias, parallel ×16: 73 lanes, 386 jj calls, wall 1137 ms, lanes whose facts differ: 0
+
+accepted thread commits: 304, their list 15807 chars; a lane read 33646 chars
+
+one jj log for 73 lane reads: 518 ms, 3125091 bytes; the separate reads: 10290 ms
+
+## onelog (then serial): 73 lanes, 386 jj calls, wall 6864 ms, lanes whose facts differ: 0
+
+## onelog, then alias ×1: 73 lanes, 386 jj calls, wall 6869 ms, lanes whose facts differ: 0
+
+## onelog, then alias ×4: 73 lanes, 386 jj calls, wall 2677 ms, lanes whose facts differ: 0
+
+## onelog, then alias ×8: 73 lanes, 386 jj calls, wall 1982 ms, lanes whose facts differ: 0
+
+## git: 152 distinct two-commit diffs (of 215 calls), 112 the same in git
+  unlike: 28b00b9e..3d486611 jj 2543 git 2553
+  unlike: 514f3643..3d486611 jj 2558 git 2568
+  unlike: e5595370..3d486611 jj 2360 git 2363
+  unlike: 3e032e0a..3d486611 jj 2424 git 2427
+  unlike: 305a9b5e..3d486611 jj 1861 git 1862
+  unlike: 0e58965e..3d486611 jj 1964 git 1965
+  unlike: 19bda924..3d486611 jj 1964 git 1965
+  unlike: ce392348..3d486611 jj 1960 git 1961
+  unlike: 4646fc50..3d486611 jj 1955 git 1956
+  unlike: 74c39f02..3d486611 jj 1952 git 1953
+  unlike: 91934923..3d486611 jj 1931 git 1932
+  unlike: a1493a80..3d486611 jj 1923 git 1924
+  unlike: 6960cdae..3d486611 jj 1918 git 1919
+  unlike: 234dac3c..3d486611 jj 1918 git 1919
+  unlike: 058c7e40..3d486611 jj 1918 git 1919
+  unlike: 5f816c90..3d486611 jj 1869 git 1870
+  unlike: 919f9b1a..3d486611 jj 1911 git 1912
+  unlike: 46cb823c..3d486611 jj 1880 git 1881
+  unlike: f47a9590..3d486611 jj 1871 git 1872
+  unlike: e9c6dbcc..3d486611 jj 1867 git 1868
+  unlike: 21f61430..3d486611 jj 1865 git 1866
+  unlike: 61dd8211..3d486611 jj 1796 git 1801
+  unlike: 36404733..3d486611 jj 1776 git 1777
+  unlike: 2fa5cf1d..3d486611 jj 1776 git 1777
+  unlike: cc28b30c..3d486611 jj 144 git 147
+  unlike: a0889cbb..3d486611 jj 306 git 315
+  unlike: 281f35c0..3d486611 jj 144 git 147
+  unlike: acbaf549..3d486611 jj 82 git 83
+  unlike: d811d380..3d486611 jj 84 git 85
+  unlike: 7b4cce6d..3d486611 jj 291 git 294
+  unlike: 590b124f..3d486611 jj 144 git 147
+  unlike: 1d5f7894..3d486611 jj 290 git 293
+  unlike: fe5c62b3..3d486611 jj 187 git 190
+  unlike: 71a65375..3d486611 jj 297 git 300
+  unlike: af43c827..3d486611 jj 82 git 83
+  unlike: a2b7b71f..3d486611 jj 220 git 223
+  unlike: 1953d4ab..3d486611 jj 220 git 223
+  unlike: 3651f52a..3d486611 jj 344 git 347
+  unlike: abae3975..3d486611 jj 181 git 184
+  unlike: c91c9ad5..3d486611 jj 124 git 127
+  one git rev-parse + one git diff-tree --stdin for all 152: 72 ms, 98156 lines; the jj diffs: 4513 ms

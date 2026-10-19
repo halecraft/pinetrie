@@ -4,16 +4,16 @@
 // each makes the host write, and in what order.
 
 import type {
+  JjBaseRecord,
   Placed,
   ProposedChangesInRepo,
   ProposedChangesRecord,
 } from "@pinetrie/core"
 import type { ProposedChangesEffects, RepoStep } from "@pinetrie/jj"
-import type { BaseRecord } from "@pinetrie/rules"
 
 export interface ProposedChangesPorts {
   /** The lane's base record, written when it differs from the page's. */
-  writeBase(base: BaseRecord | null): Promise<void>
+  writeBase(base: JjBaseRecord | null): Promise<void>
   /** Run jj steps on your repo, in order. */
   run(steps: readonly RepoStep[]): Promise<void>
   /** The proposed changes as your repo holds it now, at the place's target. */
@@ -36,7 +36,7 @@ export interface ProposedChangesPorts {
 export async function executeProposedChanges(
   ports: ProposedChangesPorts,
   step: {
-    readonly base: BaseRecord | null
+    readonly base: JjBaseRecord | null
     readonly effects: ProposedChangesEffects
   },
   before: ProposedChangesInRepo | null,
