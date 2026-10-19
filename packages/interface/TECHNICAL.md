@@ -1110,8 +1110,9 @@ stored), and `searchOn` applies it only on the canvas it was opened on.
   `callLabel`'s cut words. Outline's live line and a turn's revision title
   use it; a message's copy keeps `callLabel`, since pasting wants the
   command.
-- A call's intent is read for any tool, from its arguments (`callOf`,
-  `packages/core/tree.ts`); which tools require one is pi's
+- A call's intent is read for any tool, from its arguments (`callIntent`,
+  `packages/core/tools.ts`, beside `callSubject`, with `INTENT_FIELD`, the
+  argument's one name for core and pi); which tools require one is pi's
   (`TAKES_INTENT`, `packages/pi/intent.ts`).
 
 ## A message's tools (`message-tools.ts`, ADR-0043)

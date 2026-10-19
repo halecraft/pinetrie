@@ -121,3 +121,14 @@ export function callSubject(name: string, args: unknown): string | undefined {
   const id = knownToolId(name)
   return id === undefined ? undefined : SUBJECTS[id]?.(args)
 }
+
+/** The argument a call says what it is for in (`TAKES_INTENT`, `@pinetrie/pi`). */
+export const INTENT_FIELD = "intent"
+
+/**
+ * What a call is for, in the model's words: its `intent`, trimmed, for any
+ * tool; undefined for none, or an empty one.
+ */
+export function callIntent(args: unknown): string | undefined {
+  return field(args, INTENT_FIELD)?.trim() || undefined
+}

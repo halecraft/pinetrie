@@ -9,13 +9,14 @@ import { validateToolArguments } from "@earendil-works/pi-ai"
 import {
   BANNER_TOOL,
   type EDIT_TOOL,
+  INTENT_FIELD,
   TOOL_IDS,
   type ToolId,
   threadIdFor,
   WRITE_TOOL,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
-import { INTENT_FIELD, requireIntent, TAKES_INTENT } from "./intent.ts"
+import { requireIntent, TAKES_INTENT } from "./intent.ts"
 import { threadContext } from "./thread-context.ts"
 import { parseCatchUpArgs, proposeTool } from "./thread-tools.ts"
 import { assembleTools, TOOLS, toolsChanged } from "./tools.ts"
@@ -196,6 +197,7 @@ describe("a tool's intent", () => {
   test("pi's execute never sees the intent", async () => {
     const seen: unknown[] = []
     const tool = requireIntent({
+      name: "bash",
       parameters: { properties: { command: {} }, required: ["command"] },
       execute: async (...args: unknown[]) => {
         seen.push(args[1])

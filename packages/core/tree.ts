@@ -25,7 +25,7 @@ import { type ImageRef, isImageMime, isSha256, type Share } from "./images.ts"
 import type { SendAt } from "./intents.ts"
 import type { AnswerDetails, HeardDetails, RelayDetails } from "./mentions.ts"
 import type { Proposal } from "./threads.ts"
-import { callSubject } from "./tools.ts"
+import { callIntent, callSubject } from "./tools.ts"
 
 // ── entries and messages ──────────────────────────────────────────────────
 
@@ -239,7 +239,7 @@ export interface TranscriptMessage {
 
 /**
  * A tool call, as stored: what it is, not how it reads. Its words are
- * `@pinetrie/interface`'s (`callLabel`).
+ * `@pinetrie/interface`'s (`callLabel`, `callPurpose`).
  */
 export interface ToolCall {
   readonly id: string
@@ -247,7 +247,7 @@ export interface ToolCall {
   readonly name: string
   /** What it touched, whole: a path, a command, or a search's pattern and path (`callSubject`). */
   readonly subject?: string
-  /** What it is for, in the model's plain words: the call's `intent`, which a tool that takes one requires. */
+  /** What it is for, in the model's plain words (`callIntent`), which a tool that takes one requires. */
   readonly intent?: string
   /** Its result, when the result is on the same path. */
   readonly result?: ToolResult
@@ -438,17 +438,12 @@ export function entryMessage(
 /** One call, before its result is paired with it. */
 function callOf(id: string, name: string, args: unknown): ToolCall {
   const subject = callSubject(name, args)
-  const intent =
-    typeof args === "object" && args !== null && "intent" in args
-      ? args.intent
-      : undefined
+  const intent = callIntent(args)
   return {
     id,
     name,
     ...(subject === undefined ? {} : { subject }),
-    ...(typeof intent === "string" && intent.trim() !== ""
-      ? { intent: intent.trim() }
-      : {}),
+    ...(intent === undefined ? {} : { intent }),
   }
 }
 

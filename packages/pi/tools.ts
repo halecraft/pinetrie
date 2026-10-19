@@ -34,7 +34,7 @@ import {
 import type { BannerAnswer, BannerAsk } from "@pinetrie/rules"
 import { bannerTool } from "./banner.ts"
 import { readImageProcessor } from "./images.ts"
-import { requireIntent, TAKES_INTENT } from "./intent.ts"
+import { type PiTool, requireIntent, TAKES_INTENT } from "./intent.ts"
 import { conflictTool, type LaneHooks } from "./lanes.ts"
 import { saveBlobTool } from "./save-blob.ts"
 import { findTool, grepTool } from "./search.ts"
@@ -61,9 +61,7 @@ interface ToolsInput {
  * pi upgrade renaming one of its own. pi-agent-core makes `read`, `write`,
  * `edit` and `bash`; pine·trie makes the rest.
  */
-export const TOOLS: Readonly<
-  Record<ToolId, (input: ToolsInput) => { readonly name: string }>
-> = {
+export const TOOLS: Readonly<Record<ToolId, (input: ToolsInput) => PiTool>> = {
   // `read` fits an image and stores it before pi writes the result, so the
   // session keeps a reference.
   [READ_TOOL]: input =>
@@ -172,7 +170,7 @@ export function assembleTools(input: ToolsInput): {
 } {
   const made = (id: ToolId) => {
     const tool = TOOLS[id](input)
-    return TAKES_INTENT[id] ? requireIntent(tool as never) : tool
+    return TAKES_INTENT[id] ? requireIntent(tool) : tool
   }
   return {
     registered: TOOL_IDS.map(made),

@@ -10,6 +10,7 @@ import {
   EDIT_TOOL,
   FIND_TOOL,
   GREP_TOOL,
+  INTENT_FIELD,
   LEAVE_TOOL,
   PROPOSE_TOOL,
   READ_TOOL,
@@ -44,8 +45,7 @@ export const TAKES_INTENT: Readonly<Record<ToolId, boolean>> = {
   [PROPOSE_TOOL]: false,
 }
 
-/** The argument's name, and what the model is told it is. */
-export const INTENT_FIELD = "intent"
+/** What the model is told the intent is. */
 const INTENT_SCHEMA = {
   type: "string",
   description:
@@ -53,7 +53,8 @@ const INTENT_SCHEMA = {
 } as const
 
 /** A tool as pi makes it: what the wrapper reads and replaces. */
-interface Wrapped {
+export interface PiTool {
+  readonly name: string
   readonly parameters: {
     readonly properties?: Readonly<Record<string, unknown>>
     readonly required?: readonly string[]
@@ -69,7 +70,7 @@ interface Wrapped {
  * written as plain JSON Schema: rebuilding pi's with TypeBox would mark its
  * optional parameters required.
  */
-export function requireIntent<T extends Wrapped>(tool: T): T {
+export function requireIntent<T extends PiTool>(tool: T): T {
   const execute = tool.execute as (...args: unknown[]) => Promise<unknown>
   const { properties = {}, required = [] } = tool.parameters
   return {

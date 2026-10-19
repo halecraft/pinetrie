@@ -13,8 +13,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a call's intent goes unread",
     file: "packages/core/tree.ts",
-    from: '    ...(typeof intent === "string" && intent.trim() !== ""\n',
-    to: '    ...(false && typeof intent === "string" && intent.trim() !== ""\n',
+    from: "    ...(intent === undefined ? {} : { intent }),\n",
+    to: "",
     command: unit,
     expect: "a call's intent is read from its arguments, for any tool",
   },

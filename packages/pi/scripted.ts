@@ -21,13 +21,13 @@ import {
   type Provider,
   type TranscriptContext,
 } from "@earendil-works/pi-ai"
-import type { ToolId } from "@pinetrie/core"
+import { INTENT_FIELD, type ToolId } from "@pinetrie/core"
 import {
   FOCUS_REQUEST_HEAD,
   URGENCY_ALONE,
   URGENCY_THEN_DIGEST,
 } from "@pinetrie/rules"
-import { INTENT_FIELD, TAKES_INTENT } from "./intent.ts"
+import { TAKES_INTENT } from "./intent.ts"
 
 /**
  * One scripted reply: text; text made from the context the model was given,
