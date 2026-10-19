@@ -8,6 +8,7 @@ import {
   ownLane,
   type ThreadId,
 } from "@pinetrie/core"
+import type { Install } from "@pinetrie/install"
 import {
   helperCommand,
   type LaneHandle,
@@ -38,9 +39,9 @@ import type { HistoryAnswer } from "./adapter.ts"
  * channel is open.
  */
 export const laneLinkOpener =
-  (runtime: LaneRuntime): OpenLink<LaneChannel> =>
+  (runtime: LaneRuntime, install: Install): OpenLink<LaneChannel> =>
   async container => {
-    const channel = openChannel(helperCommand(runtime, container))
+    const channel = openChannel(helperCommand(runtime, container, install))
     const hello = await channel.ready
     const runs = await runtime
       .observe(
@@ -102,13 +103,15 @@ export function createRegistry(input: {
   readonly session: SessionDocHandle
   /** What lanes run on. */
   readonly runtime: LaneRuntime
+  /** The pine·trie install lanes run their helper from. */
+  readonly install: Install
   /** The adapter's history of a lane, over its runners, or why it is not the adapter's kind. */
   readonly history: (lane: OwnLane, runners: LaneRunners) => HistoryAnswer
 }): LaneRegistry {
   const { runtime } = input
   const handles = new Map<ThreadId, LaneHandle<LaneChannel>>()
   const recordOf = (lane: ThreadId) => readLaneRecords(input.session).get(lane)
-  const open = laneLinkOpener(runtime)
+  const open = laneLinkOpener(runtime, input.install)
   function handleOf(lane: ThreadId): LaneHandle<LaneChannel> {
     let handle = handles.get(lane)
     if (handle === undefined) {

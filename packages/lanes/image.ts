@@ -3,8 +3,8 @@
 // pine·trie's default image is built from `image/Containerfile`; a project's
 // own `pinetrie.Containerfile` at its root replaces it for the project's lanes.
 // Either is built once per change of its content and build arguments: the
-// host's jj version for both, and the app's Playwright version for pine·trie's
-// (`planImages`). pine·trie's also changes with each file it copies in from
+// host's jj version for both, and the Playwright version the host names for
+// pine·trie's (`planImages`). pine·trie's also changes with each file it copies in from
 // beside it (`daemon.json`). The runtime builds and runs them.
 
 import { readFile } from "node:fs/promises"
@@ -38,9 +38,8 @@ export async function hostJjVersion(): Promise<string> {
 /**
  * The images a project's lanes need: pine·trie's default, always, since the lane
  * runtime comes from it; and the project's own when it has a
- * `pinetrie.Containerfile`. `playwrightVersion` is the app's
- * `@playwright/test`, whose browser pine·trie's image carries. Returns the tag
- * lanes run.
+ * `pinetrie.Containerfile`. `playwrightVersion` is the Playwright whose
+ * browser pine·trie's image carries. Returns the tag lanes run.
  */
 export async function prepareImages(
   runtime: Pick<LaneRuntime, "ensureLaneImages">,

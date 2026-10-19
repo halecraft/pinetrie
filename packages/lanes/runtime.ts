@@ -5,9 +5,10 @@
 // without Node, on musl as well as glibc. After building pine·trie's default
 // image, the host copies out of it:
 // - `node/`: the `node` binary, the shared libraries `ldd` lists for it
-//   (`node/lib/`), and glibc's dynamic loader. The helper is started through
-//   that loader with those libraries, so the image's own libc and Node are
-//   never used. Its `process.execPath` is then the loader.
+//   (`node/lib/`), and glibc's dynamic loader as `ld.so`, whatever the
+//   machine's architecture names it. The helper is started through that
+//   loader with those libraries, so the image's own libc and Node are never
+//   used. Its `process.execPath` is then the loader.
 // - `bin/`: each of core's `RUNTIME_PROGRAMS`, a static musl build that runs
 //   on any Linux. Debian's own builds of rg and fd link glibc, so the default
 //   image downloads release builds instead.
@@ -21,15 +22,12 @@ import { RUNTIME_MOUNT } from "./plan.ts"
 import { describeFailure, run } from "./run.ts"
 import type { LaneRuntime } from "./runtime-port.ts"
 
-export const LOADER = "ld-linux-aarch64.so.1"
-
-/** The command that starts `script` with the runtime's Node, in a lane. */
-export const runtimeNode = (script: string): readonly string[] => [
-  `${RUNTIME_MOUNT}/node/${LOADER}`,
+/** How the runtime's Node starts, in a lane: a script's path follows it (`scriptCommand`). */
+export const RUNTIME_NODE: readonly string[] = [
+  `${RUNTIME_MOUNT}/node/ld.so`,
   "--library-path",
   `${RUNTIME_MOUNT}/node/lib`,
   `${RUNTIME_MOUNT}/node/node`,
-  script,
 ]
 
 /**
@@ -43,7 +41,9 @@ export const EXTRACT = [
   "mkdir -p /out/node/lib /out/bin",
   'cp "$(command -v node)" /out/node/node',
   "ldd /out/node/node | awk '/=> \\// {print $3}' | while read -r lib; do cp -L \"$lib\" /out/node/lib/; done",
-  `cp -L /lib/${LOADER} /out/node/${LOADER}`,
+  // The loader is the one line without `=>`: `ld-linux-aarch64.so.1` on
+  // arm64, `ld-linux-x86-64.so.2` on x86_64.
+  "cp -L \"$(ldd /out/node/node | awk '!/=>/ && $1 ~ /^\\// {print $1}')\" /out/node/ld.so",
   ...RUNTIME_PROGRAMS.map(
     p =>
       `p=$(command -v ${p}) || { echo "the lane image has no ${p}" >&2; exit 1; }; cp "$p" /out/bin/${p}`,
@@ -51,8 +51,12 @@ export const EXTRACT = [
   "tar -C /out -cf - .",
 ].join("\n")
 
-/** Whether a runtime's `bin/` holds every program, given its entries' names. */
-export const runtimeComplete = (binEntries: readonly string[]): boolean =>
+/** Whether a runtime holds its loader and every program, given the names in its `node/` and `bin/`. */
+export const runtimeComplete = (
+  nodeEntries: readonly string[],
+  binEntries: readonly string[],
+): boolean =>
+  nodeEntries.includes("ld.so") &&
   RUNTIME_PROGRAMS.every(p => binEntries.includes(p))
 
 /**
@@ -68,8 +72,11 @@ export async function ensureRuntime(
 ): Promise<string> {
   const name = image.replace(/[^A-Za-z0-9._-]/g, "-")
   const final = path.join(dir, name)
-  const bin = await readdir(path.join(final, "bin")).catch(() => [])
-  if (!runtimeComplete(bin)) await extract(runtime, final, image)
+  const [node, bin] = await Promise.all(
+    ["node", "bin"].map(d => readdir(path.join(final, d)).catch(() => [])),
+  )
+  if (!runtimeComplete(node ?? [], bin ?? []))
+    await extract(runtime, final, image)
   for (const old of await readdir(dir))
     if (old !== name)
       await rm(path.join(dir, old), { recursive: true, force: true })

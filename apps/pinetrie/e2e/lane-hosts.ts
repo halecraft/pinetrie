@@ -11,6 +11,7 @@ import { homedir } from "node:os"
 import path from "node:path"
 import { ancestry, entryId, messageText, type ThreadId } from "@pinetrie/core"
 import { dockerWords } from "@pinetrie/docker"
+import { thisInstall } from "@pinetrie/install"
 import { type SessionFiles, sessionFiles } from "@pinetrie/lanes"
 import { scriptedModel } from "@pinetrie/pi"
 import { readLaneRecords, readPlaces } from "@pinetrie/reads"
@@ -21,6 +22,7 @@ import {
   type StartHostOptions,
   startHost,
 } from "../host/index.ts"
+import { livePage } from "../host/page-build.ts"
 import { findProject } from "../host/work/runtime.ts"
 import { CommandFailed, command } from "./command.ts"
 import {
@@ -61,6 +63,7 @@ export async function runtimeProblem(): Promise<string | null> {
   try {
     const found = await findProject({
       root: dir,
+      install: thisInstall,
       slots: 16,
       // Nothing listens there: this probe makes no lane.
       hostSocket: path.join(dir, ".no-ssh.sock"),
@@ -150,6 +153,7 @@ const startLaneHost = async (options: LaneHostOptions): Promise<RunningHost> =>
       binding: suiteBinding(),
       env: {},
       keepRootsRead: true,
+      page: livePage(),
       ...options,
       project: {
         ...options.project,

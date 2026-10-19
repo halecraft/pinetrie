@@ -3,10 +3,11 @@
 # - git 2.47: jj needs 2.41 or later.
 # - pnpm, through corepack.
 # - python3.
-# - Static musl builds of jj (pinned to the host's version), rg, fd and sd
-#   (aarch64 alone, like the release builds). The lane runtime copies them out of this image, so every lane has them
-#   whatever its image (`runtime.ts`). Debian's own rg and fd link glibc, and
-#   would not run on a musl image.
+# - Static musl builds of jj (pinned to the host's version), rg, fd and sd,
+#   for the machine the image is built on, aarch64 or x86_64 (`uname -m`
+#   in the build, which needs no BuildKit). The lane runtime copies them out
+#   of this image, so every lane has them whatever its image (`runtime.ts`).
+#   Debian's own rg and fd link glibc, and would not run on a musl image.
 # - Chromium's headless shell and its libraries, at the build pinetrie's
 #   Playwright drives (`PLAYWRIGHT_VERSION`).
 # - Rootless Docker, the docker CLI and buildx, for a lane granted lanes of
@@ -24,10 +25,12 @@ RUN apt-get update -qq \
  && apt-get install -y -qq --no-install-recommends git ca-certificates curl procps python3 openssh-client \
  && rm -rf /var/lib/apt/lists/* \
  && printf 'Include /pinetrie-ssh/config\n' > /etc/ssh/ssh_config.d/10-pinetrie.conf \
- && curl -fsSL "https://github.com/jj-vcs/jj/releases/download/v${JJ_VERSION}/jj-v${JJ_VERSION}-aarch64-unknown-linux-musl.tar.gz" \
+ && arch=$(uname -m) \
+ && case "$arch" in aarch64|x86_64) ;; *) echo "no release builds for $arch" >&2; exit 1 ;; esac \
+ && curl -fsSL "https://github.com/jj-vcs/jj/releases/download/v${JJ_VERSION}/jj-v${JJ_VERSION}-${arch}-unknown-linux-musl.tar.gz" \
     | tar -xz -C /usr/local/bin ./jj \
- && musl() { curl -fsSL "https://github.com/$1/releases/download/$2/$3-aarch64-unknown-linux-musl.tar.gz" \
-      | tar -xz -C /usr/local/bin --strip-components=1 "$3-aarch64-unknown-linux-musl/$4"; } \
+ && musl() { curl -fsSL "https://github.com/$1/releases/download/$2/$3-${arch}-unknown-linux-musl.tar.gz" \
+      | tar -xz -C /usr/local/bin --strip-components=1 "$3-${arch}-unknown-linux-musl/$4"; } \
  && musl BurntSushi/ripgrep "${RG_VERSION}" "ripgrep-${RG_VERSION}" rg \
  && musl sharkdp/fd "v${FD_VERSION}" "fd-v${FD_VERSION}" fd \
  && musl chmln/sd "v${SD_VERSION}" "sd-v${SD_VERSION}" sd \
@@ -55,16 +58,19 @@ RUN npx -y "playwright@${PLAYWRIGHT_VERSION}" install --with-deps chromium-headl
 # its PATH has.
 ARG DOCKER_VERSION=29.8.2
 ARG BUILDX_VERSION=0.37.2
+# Docker names the architectures as `uname -m` does; buildx as Go does.
 RUN apt-get update -qq \
  && apt-get install -y -qq --no-install-recommends btrfs-progs uidmap slirp4netns iptables iproute2 libcap2-bin \
  && rm -rf /var/lib/apt/lists/* \
- && curl -fsSL "https://download.docker.com/linux/static/stable/aarch64/docker-${DOCKER_VERSION}.tgz" \
+ && arch=$(uname -m) \
+ && case "$arch" in aarch64) goarch=arm64 ;; x86_64) goarch=amd64 ;; *) echo "no release builds for $arch" >&2; exit 1 ;; esac \
+ && curl -fsSL "https://download.docker.com/linux/static/stable/${arch}/docker-${DOCKER_VERSION}.tgz" \
     | tar -xz -C /usr/local/bin --strip-components=1 \
- && curl -fsSL "https://download.docker.com/linux/static/stable/aarch64/docker-rootless-extras-${DOCKER_VERSION}.tgz" \
+ && curl -fsSL "https://download.docker.com/linux/static/stable/${arch}/docker-rootless-extras-${DOCKER_VERSION}.tgz" \
     | tar -xz -C /usr/local/bin --strip-components=1 \
  && mkdir -p /usr/local/lib/docker/cli-plugins \
  && curl -fsSL -o /usr/local/lib/docker/cli-plugins/docker-buildx \
-    "https://github.com/docker/buildx/releases/download/v${BUILDX_VERSION}/buildx-v${BUILDX_VERSION}.linux-arm64" \
+    "https://github.com/docker/buildx/releases/download/v${BUILDX_VERSION}/buildx-v${BUILDX_VERSION}.linux-${goarch}" \
  && chmod +x /usr/local/lib/docker/cli-plugins/docker-buildx \
  && chmod u-s /usr/bin/newuidmap /usr/bin/newgidmap \
  && setcap cap_setuid+ep /usr/bin/newuidmap \

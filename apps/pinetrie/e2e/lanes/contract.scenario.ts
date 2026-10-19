@@ -25,14 +25,13 @@ import {
   threadIdFor,
 } from "@pinetrie/core"
 import { LANEHOST_LABEL, projectKey } from "@pinetrie/docker"
+import { PINETRIE_MOUNT, thisInstall } from "@pinetrie/install"
 import {
   ensureRuntime,
   executeOrThrow,
   type LaneRuntime,
   laneContainer,
   type Mount,
-  PINETRIE_INSTALL,
-  PINETRIE_MOUNT,
   planSnapshot,
   prepareImages,
   RUNTIME_MOUNT,
@@ -40,7 +39,7 @@ import {
 } from "@pinetrie/lanes"
 import { GVPROXY_HOST_ADDRESS } from "@pinetrie/vm"
 import { findProject } from "../../host/work/runtime.ts"
-import { playwrightVersion } from "../../host/work/setup.ts"
+import { PLAYWRIGHT_VERSION } from "../../host/work/setup.ts"
 import type { Checks } from "../checks.ts"
 import { CommandFailed } from "../command.ts"
 import { committedProject, filterAsync, waitFor } from "../harness.ts"
@@ -127,6 +126,7 @@ async function dockerContract(
   await ownForInnerLanes(path.join(projA, ".plans"))
   const a = await findProject({
     root: projA,
+    install: thisInstall,
     slots,
     // No lane here holds an ssh identity: nothing listens there.
     hostSocket: path.join(projA, ".no-ssh.sock"),
@@ -209,11 +209,11 @@ async function dockerContract(
     const { runtimeFrom } = await prepareImages(
       runtime,
       projA,
-      playwrightVersion(),
+      PLAYWRIGHT_VERSION,
       log,
     )
     const serverMounts: readonly Mount[] = [
-      { source: PINETRIE_INSTALL, target: PINETRIE_MOUNT, readonly: true },
+      { source: thisInstall.root, target: PINETRIE_MOUNT, readonly: true },
       {
         source: await ensureRuntime(
           runtime,
@@ -484,6 +484,7 @@ async function dockerContract(
     ] as const
     const b = await findProject({
       root: projB,
+      install: thisInstall,
       slots,
       hostSocket: path.join(projB, ".no-ssh.sock"),
       log,

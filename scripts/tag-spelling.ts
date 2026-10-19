@@ -233,6 +233,7 @@ export const OUTSIDE_TABLES: Readonly<Record<string, string>> = {
   ENV_METHODS: "pi's `ExecutionEnv` methods",
   STREAM_SOURCES: "pi's harness events",
   IMAGE_MIMES: "MIME types",
+  DEEP_PACKAGES: "npm package names",
 }
 
 const isOutside = (tag: TagLiteral): boolean =>

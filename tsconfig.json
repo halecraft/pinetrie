@@ -21,6 +21,10 @@
     // keeps Node's globals in every config that extends this one, as before.
     "types": ["node"],
 
+    // Node's stripper and the package build's take only syntax that erases
+    // to nothing: no enums, namespaces or parameter properties.
+    "erasableSyntaxOnly": true,
+
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
     "noFallthroughCasesInSwitch": true

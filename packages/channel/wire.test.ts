@@ -9,13 +9,13 @@ const roundTrip = <T>(m: T): T => {
 
 /** What pi's environment returns: an error inside a result, never thrown. */
 class FileError extends Error {
-  constructor(
-    public code: string,
-    message: string,
-    public path?: string,
-  ) {
+  code: string
+  path?: string
+  constructor(code: string, message: string, path?: string) {
     super(message)
     this.name = "FileError"
+    this.code = code
+    this.path = path
   }
 }
 

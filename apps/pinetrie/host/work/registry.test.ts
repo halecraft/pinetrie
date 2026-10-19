@@ -5,6 +5,7 @@ import {
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
+import { thisInstall } from "@pinetrie/install"
 import type { LaneHistory, LaneRuntime } from "@pinetrie/lanes"
 import { foreignLaneWords, LANE, planLaneRecords } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
@@ -40,6 +41,7 @@ function registryWith(
   const registry = createRegistry({
     session: b.session,
     runtime: record<LaneRuntime>().port,
+    install: thisInstall,
     history: lane => {
       asked.push(lane)
       return adapter()

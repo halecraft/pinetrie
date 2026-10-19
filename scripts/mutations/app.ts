@@ -514,9 +514,9 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "Vite's HMR socket gets a port of its own",
-    file: "apps/pinetrie/host/http.ts",
-    from: "      ws: { server: viteUpgrades },",
-    to: "      ws: {},",
+    file: "apps/pinetrie/host/page-build.ts",
+    from: "        ws: { server: upgrades },",
+    to: "        ws: {},",
     suite: "host",
     scenario: "admission",
     expect: "with the key, Vite's HMR socket opens on the host's port",

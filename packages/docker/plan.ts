@@ -8,10 +8,15 @@
 import { createHash } from "node:crypto"
 import { WORKSPACE_ROOT } from "@pinetrie/core"
 import {
+  type Install,
+  inMount,
+  PINETRIE_MOUNT,
+  scriptCommand,
+} from "@pinetrie/install"
+import {
   FOLDER_MOUNT,
   MACHINE_SOCKET,
   OBSERVER_LOADER,
-  OBSERVER_SERVER,
   type ProjectDisks,
   ROLES,
   ROOTLESS_UID,
@@ -20,9 +25,8 @@ import {
 import {
   type ContainerShape,
   type Mount,
-  PINETRIE_MOUNT,
   RUNTIME_MOUNT,
-  runtimeNode,
+  RUNTIME_NODE,
   SPEC_LABEL,
   STATES_MOUNT,
 } from "@pinetrie/lanes"
@@ -361,14 +365,17 @@ const OBSERVER_GRANT = {
  * the version's alone, so every host of a version renders the same one and
  * joins the container another made.
  */
-export function renderObserver(version: string): ContainerSpec {
+export function renderObserver(
+  version: string,
+  install: Pick<Install, "form">,
+): ContainerSpec {
   return {
     name: observerContainer(version),
     hostname: null,
     image: observerImage(version),
     // Its server, on the runtime copied into its image.
     cmd: [
-      ...runtimeNode(`${PINETRIE_MOUNT}/${OBSERVER_SERVER}`),
+      ...scriptCommand(inMount(install), "observerServer", RUNTIME_NODE),
       MACHINE_SOCKET,
       OBSERVER_LOADER,
       version,

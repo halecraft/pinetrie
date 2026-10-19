@@ -15,11 +15,10 @@ import {
 } from "@kyneta/websocket-transport/server"
 import { type BlobStore, errorText, type Sha256 } from "@pinetrie/core"
 import type { ReviewAsk } from "@pinetrie/rules"
-import { createServer as createViteServer } from "vite"
 import { WebSocketServer } from "ws"
 import { KEY_COOKIE, planInvites, requestFacts, urlHost } from "./admission.ts"
 import { classifyUpload, MAX_UPLOAD_BYTES, planUploadHeaders } from "./blobs.ts"
-import { type PageSource, pageDir } from "./page.ts"
+import type { PageSource } from "./page.ts"
 import {
   blobResponse,
   type HttpAnswer,
@@ -83,27 +82,12 @@ export async function startHttp(input: {
 
   const httpServer = http.createServer()
   // Vite's HMR listener sits on this stand-in, which never binds, so an upgrade
-  // reaches it only through the `"vite"` route below, admitted. Without one,
-  // Vite opens port 24678 and its client connects there.
+  // reaches it only through the `"vite"` route below, admitted.
   const viteUpgrades = http.createServer()
 
-  // Vite serves the page under `pnpm dev`: index.html, module transforms,
-  // wasm, HMR. One node:http server is shared, so there is a single port and
-  // a single origin. A built page has no Vite.
-  const vite =
-    page.kind === "vite"
-      ? await createViteServer({
-          root: pageDir(),
-          configFile: path.join(pageDir(), "vite.config.ts"),
-          server: {
-            middlewareMode: true,
-            ws: { server: viteUpgrades },
-            // Admission decides which `Host` gets in (admission.ts): off
-            // loopback, any name with the key, such as a tunnel's.
-            allowedHosts: true,
-          },
-        })
-      : null
+  // Vite serves the page under `pnpm dev` (`page-build.ts`), on this one
+  // server. A built page has no Vite.
+  const vite = page.kind === "vite" ? await page.open(viteUpgrades) : null
 
   /** A file of the built page, or a 404 (`planPageRequest`). */
   async function serveBuilt(

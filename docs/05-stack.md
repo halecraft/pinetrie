@@ -49,6 +49,16 @@ are branded (`EntryId`, `RunId`, `ThreadId`), minted only where they enter,
 which `biome.json`'s `noRestrictedImports` enforces in core, the interface,
 the page and the host.
 
+**Publishing is the one build, and it is not built yet** (ADR-0189).
+Node will not strip types under `node_modules`, so the npm package
+`pinetrie` will be the repo's layout with each file's types stripped in
+place by Node's own stripper and its `.ts` imports rewritten to `.js`,
+built into `dist/pinetrie/`. Development keeps running `.ts` from the
+repo. The lane helper alone will ship as one file with its third-party
+packages inside it, so a lane runs from `/pinetrie` whatever the install
+layout; the package is MIT, for macOS on Apple silicon and Linux on arm64
+and x86_64 (ADR-0190).
+
 ## pnpm, with Kyneta linked
 
 Kyneta is the local checkout, declared with `link:` (`link:../../../kyneta/…`,

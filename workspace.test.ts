@@ -41,6 +41,7 @@ const allDeps = (m: Manifest) => [
 const ROOT_TOOLING = [
   "@biomejs/biome",
   "@types/node",
+  "esbuild",
   "oxc-parser",
   "typescript",
   "vitest",
@@ -103,11 +104,8 @@ test("session declares only Kyneta's exchange and WebSocket transport, core, pro
   // It runs unchanged in a browser and in Node: the page draws from it, and
   // the suites drive a host through it. Declaring no React, it cannot draw.
   assert.deepEqual(deps(read("packages/session")).sort(), [
-    "@kyneta/changefeed",
     "@kyneta/exchange",
-    "@kyneta/machine",
     "@kyneta/schema",
-    "@kyneta/transport",
     "@kyneta/websocket-transport",
     "@pinetrie/core",
     "@pinetrie/protocol",
@@ -150,22 +148,26 @@ test("only the page and the app depend on interface: nothing below it does", () 
   assert.deepEqual(declaring, ["apps/pinetrie", "packages/web"])
 })
 
-test("lanes declares only core: it runs jj and git in a lane, on a runtime it is handed, never pi or the document", () => {
-  assert.deepEqual(deps(read("packages/lanes")), ["@pinetrie/core"])
+test("lanes declares only core and install: it runs jj and git in a lane, on a runtime it is handed, never pi or the document", () => {
+  assert.deepEqual(deps(read("packages/lanes")).sort(), [
+    "@pinetrie/core",
+    "@pinetrie/install",
+  ])
 })
 
 /** The packages that run lanes, and the VM Docker runs in on the Mac. */
 const RUNTIMES = ["@pinetrie/docker", "@pinetrie/vm"]
 
-/** What a runtime may declare: core, lanes when it runs lanes, and lanehost with its channel for the disks. */
+/** What a runtime may declare: core, lanes when it runs lanes, lanehost with its channel for the disks, and install for the scripts it starts. */
 const RUNTIME_MAY = [
   "@pinetrie/channel",
   "@pinetrie/core",
+  "@pinetrie/install",
   "@pinetrie/lanehost",
   "@pinetrie/lanes",
 ]
 
-test("a runtime declares only core, lanes, and lanehost with its channel; never another runtime", () => {
+test("a runtime declares only core, lanes, lanehost with its channel, and install; never another runtime", () => {
   for (const dir of WORKSPACE) {
     const m = read(dir)
     if (m.name === undefined || !RUNTIMES.includes(m.name)) continue
@@ -202,6 +204,17 @@ test("only the app declares config: one table, declared in one place", () => {
     allDeps(read(dir)).includes("@pinetrie/config"),
   ).sort()
   assert.deepEqual(declaring, ["apps/pinetrie"])
+})
+
+test("install declares nothing: every package that runs pine·trie's own files reaches it", () => {
+  assert.deepEqual(allDeps(read("packages/install")), [])
+})
+
+test("only lanes, docker and the app declare install", () => {
+  const declaring = WORKSPACE.filter(dir =>
+    allDeps(read(dir)).includes("@pinetrie/install"),
+  ).sort()
+  assert.deepEqual(declaring, ["apps/pinetrie", "packages/docker", "packages/lanes"])
 })
 
 test("keeper declares nothing", () => {

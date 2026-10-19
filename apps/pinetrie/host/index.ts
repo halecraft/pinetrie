@@ -22,6 +22,7 @@ import {
   type RootId,
   type ThreadId,
 } from "@pinetrie/core"
+import { type Install, thisInstall } from "@pinetrie/install"
 import { prepareProjectDir } from "@pinetrie/jj"
 import { createKeeper } from "@pinetrie/keeper"
 import type { LaneFiles } from "@pinetrie/lanes"
@@ -122,7 +123,6 @@ import {
 import { memoryLedger } from "./migrations/ledger.ts"
 import { createMoveHistories } from "./move-history.ts"
 import { createNames } from "./names.ts"
-import type { PageSource } from "./page.ts"
 import { createPinned } from "./pinned.ts"
 import { createPlaces } from "./places.ts"
 import { hostPolicy, resolveDoc, SCHEMA_OF } from "./policy.ts"
@@ -162,6 +162,7 @@ import { recover, recoverRoot } from "./startup.ts"
 import { agentReadyLine, reportLines, startupLaps } from "./startup-lines.ts"
 import { type OpenedStore, openStore } from "./store.ts"
 import { createTitles } from "./titles.ts"
+import { NO_PAGE, type PageSource } from "./page.ts"
 import { startLaneWork } from "./work/index.ts"
 import { findProject } from "./work/runtime.ts"
 import { openProject } from "./work/setup.ts"
@@ -171,6 +172,11 @@ import { type PersonalSshPlaces, prepareSshDir } from "./work/ssh.ts"
 export const BLOB_GRACE_MS = 24 * 60 * 60 * 1000
 
 export interface StartHostOptions {
+  /**
+   * The pine·trie install lanes run from: this process's own by default. A
+   * suite names an installed package's, to run its scripts in lanes.
+   */
+  readonly install?: Install
   readonly port?: number
   /** The address to listen on. Default loopback: only this machine. */
   readonly bind?: string
@@ -231,7 +237,7 @@ export interface StartHostOptions {
    * session's in-memory op log.
    */
   readonly store?: string | OpenedStore | null
-  /** Where the page comes from: Vite unless given (`pnpm serve` gives the built page). */
+  /** Where the page comes from: none unless given (`pnpm dev` gives Vite's, `pinetrie serve` the built page). */
   readonly page?: PageSource
   /**
    * Where the host reads the time: its own (`Basics.now`) and the blobs it
@@ -307,6 +313,7 @@ export interface RunningHost {
 export class HostRefused extends Error {}
 
 export async function startHost({
+  install = thisInstall,
   port = 0,
   bind = DEFAULT_BIND,
   key: givenKey,
@@ -321,7 +328,7 @@ export async function startHost({
     agent: process.env.SSH_AUTH_SOCK ?? null,
   },
   store: storeFile = null,
-  page = { kind: "vite" },
+  page = NO_PAGE,
   now = Date.now,
   presenceDecay = PRESENCE_DECAY,
   keepRootsRead = false,
@@ -349,6 +356,7 @@ export async function startHost({
     throw new HostRefused(chosen.refused)
   }
   const found = await findProject({
+    install,
     hostSocket: hostSocketIn(sshDir),
     root: chosen?.root ?? null,
     // A port of 0 is chosen when the host listens, after this.

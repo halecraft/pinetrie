@@ -1,37 +1,13 @@
 // scripts/import-cycles — no module is in a cycle of the modules it loads
 // (`AGENTS.md`, House rules). Pure, apart from `readImportCycles`.
 //
-// An import loads its module unless the whole statement is `import type` or
-// `export type`: with `verbatimModuleSyntax`, `import { type A }` is kept as
-// `import {}`, which Node still loads. Only relative specifiers are followed,
-// since a package is imported by its name and never by a path into it.
+// What a file loads is `imports.ts`'s reading. Only relative specifiers are
+// followed, since a package is imported by its name and never by a path into
+// it.
 
 import path from "node:path"
-import { parseSync } from "oxc-parser"
+import { loadedSpecifiers, reachable } from "./imports.ts"
 import { readSources } from "./sources.ts"
-
-/** The relative specifiers `text` loads, in order, each once. */
-export function loadedSpecifiers(
-  file: string,
-  text: string,
-): readonly string[] {
-  const loaded: string[] = []
-  for (const statement of parseSync(file, text).program.body) {
-    const source =
-      statement.type === "ImportDeclaration"
-        ? statement.importKind === "type"
-          ? null
-          : statement.source
-        : statement.type === "ExportNamedDeclaration" ||
-            statement.type === "ExportAllDeclaration"
-          ? statement.exportKind === "type"
-            ? null
-            : statement.source
-          : null
-    if (source?.value.startsWith(".")) loaded.push(source.value)
-  }
-  return [...new Set(loaded)]
-}
 
 /**
  * The cycles of `graph` (a module -> the modules it loads): the modules
@@ -42,16 +18,11 @@ export function importCycles(
   graph: ReadonlyMap<string, readonly string[]>,
 ): readonly (readonly string[])[] {
   const reached = new Map<string, ReadonlySet<string>>()
+  /** What `start` loads, and what that loads: `start` itself only through a cycle. */
   const reach = (start: string): ReadonlySet<string> => {
     const known = reached.get(start)
     if (known !== undefined) return known
-    const seen = new Set<string>()
-    const todo = [...(graph.get(start) ?? [])]
-    for (let next = todo.pop(); next !== undefined; next = todo.pop())
-      if (!seen.has(next)) {
-        seen.add(next)
-        todo.push(...(graph.get(next) ?? []))
-      }
+    const seen = reachable(graph, graph.get(start) ?? [])
     reached.set(start, seen)
     return seen
   }

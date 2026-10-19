@@ -54,18 +54,15 @@ export type ObserverChannel = Channel<
 
 /**
  * A channel to the machine role through a socket on this machine: a host
- * inside a lane opens its helper's this way, with `observer-connect.ts` on
- * its own Node.
+ * inside a lane opens its helper's this way. `connect` is the command that
+ * runs `observer-connect.ts` on this machine's Node, which the caller makes:
+ * this package does not know where pine·trie's install is.
  */
-export const connectObserver = (socket: string): ObserverChannel =>
-  openChannel(
-    [
-      process.execPath,
-      path.join(import.meta.dirname, "observer-connect.ts"),
-      socket,
-    ],
-    `the observer at ${socket}`,
-  )
+export const connectObserver = (
+  connect: readonly string[],
+  socket: string,
+): ObserverChannel =>
+  openChannel([...connect, socket], `the observer at ${socket}`)
 
 export interface ObserverClient {
   /**

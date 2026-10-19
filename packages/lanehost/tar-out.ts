@@ -39,9 +39,6 @@ export async function checkOutPaths(
   }
 }
 
-/** The command that writes the tar of a snapshot's paths, given on its stdin NUL-separated. */
-export const TAR_OUT = "packages/lanehost/tar-out.ts"
-
 /**
  * The tar of `paths` under `root`, as it comes: pax, so long and UTF-8
  * names survive, each path alone (no recursion). Throws when a path is

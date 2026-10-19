@@ -1,9 +1,8 @@
 import {
   MACHINE_SOCKET,
   OBSERVER_LOADER,
-  OBSERVER_SERVER,
 } from "@pinetrie/lanehost"
-import { PINETRIE_MOUNT, runtimeNode } from "@pinetrie/lanes"
+import { RUNTIME_NODE } from "@pinetrie/lanes"
 import { describe, expect, test } from "vitest"
 import {
   createBody,
@@ -84,11 +83,12 @@ test("memoryBytes reads -m as the CLI does: units of 1024", () => {
 })
 
 test("the machine role's container is made with its grant and nothing more", () => {
-  const body = createBody(renderObserver("abc"), () => "")
+  const body = createBody(renderObserver("abc", { form: "built" }), () => "")
   expect(body).toEqual({
     Image: "pinetrie-observer:abc",
     Cmd: [
-      ...runtimeNode(`${PINETRIE_MOUNT}/${OBSERVER_SERVER}`),
+      ...RUNTIME_NODE,
+      "/pinetrie/packages/lanehost/observer-server.js",
       MACHINE_SOCKET,
       OBSERVER_LOADER,
       "abc",

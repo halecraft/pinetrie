@@ -10,8 +10,8 @@
     "./writers": "./writers.ts"
   },
   "dependencies": {
-    "@kyneta/exchange": "link:../../../kyneta/workspace/pineta/packages/exchange",
-    "@kyneta/schema": "link:../../../kyneta/workspace/pineta/packages/schema",
+    "@kyneta/exchange": "4.0.0",
+    "@kyneta/schema": "4.0.0",
     "@pinetrie/core": "workspace:*"
   }
 }

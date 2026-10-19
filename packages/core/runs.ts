@@ -90,7 +90,7 @@ export interface RunNotice {
   readonly event: RunEvent
 }
 
-/** Linux's open flags, aarch64's values, as a `RunEvent` carries them. */
+/** Linux's open flags, as a `RunEvent` carries them: asm-generic's values, the same on arm64 and x86_64. */
 export const OPEN_FLAGS = {
   accmode: 0o3,
   creat: 0o100,

@@ -13,13 +13,10 @@
   "scripts": {
     "build": "vite build"
   },
-  "//dependencies": "@kyneta/changefeed and @kyneta/reactive are never imported here. They are PEER dependencies of @kyneta/react, and pnpm's strict tree requires them declared. Removing them because nothing imports them will break the browser client at resolution time.",
   "dependencies": {
-    "@kyneta/changefeed": "link:../../../kyneta/workspace/pineta/packages/changefeed",
-    "@kyneta/exchange": "link:../../../kyneta/workspace/pineta/packages/exchange",
-    "@kyneta/react": "link:../../../kyneta/workspace/pineta/packages/react",
-    "@kyneta/reactive": "link:../../../kyneta/workspace/pineta/packages/reactive",
-    "@kyneta/schema": "link:../../../kyneta/workspace/pineta/packages/schema",
+    "@kyneta/exchange": "4.0.0",
+    "@kyneta/react": "4.0.0",
+    "@kyneta/schema": "4.0.0",
     "@pinetrie/core": "workspace:*",
     "@pinetrie/interface": "workspace:*",
     "@pinetrie/protocol": "workspace:*",

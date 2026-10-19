@@ -26,6 +26,8 @@
     "e2e:observer": "pnpm --filter @pinetrie/app run e2e:observer",
     "vm:build": "pnpm --filter @pinetrie/app run vm:build",
     "build": "pnpm --filter @pinetrie/app run build",
+    "package": "node scripts/package.ts && cd dist && npm pack ./pinetrie",
+    "publish:npm": "pnpm run package && cd dist && npm publish \"pinetrie-$(node -p \"require('../package.json').version\").tgz\"",
     "verify": "pnpm run lint && pnpm run typecheck && pnpm test && pnpm run proofs:unit && pnpm run conformance && pnpm run e2e && pnpm run e2e:lanes",
     "verify:all": "pnpm run verify && pnpm run e2e:live && pnpm run e2e:browser",
     "mutate": "node scripts/mutate.ts",
@@ -35,6 +37,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.5.15",
     "@types/node": "24.10.1",
+    "esbuild": "0.28.2",
     "oxc-parser": "0.154.0",
     "typescript": "7.0.2",
     "vitest": "5.0.5"

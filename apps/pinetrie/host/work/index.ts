@@ -168,6 +168,7 @@ export async function startLaneWork(input: {
   const registry = createRegistry({
     session,
     runtime,
+    install: setup.install,
     history: (lane, runners) => started.history(lane, runners),
   })
   // The adapter's fetches start a container only from a queued step, after

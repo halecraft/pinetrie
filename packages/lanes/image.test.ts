@@ -73,3 +73,13 @@ test("the default image's tag follows the files it copies in", async () => {
   )
   expect(runtimeFrom).not.toBe(await tagWith([]))
 })
+
+test("the default image downloads each tool for the machine it is built on, naming no architecture", () => {
+  const urls =
+    readFileSync(here("image", "Containerfile"), "utf8").match(
+      /https:\/\/\S+/g,
+    ) ?? []
+  expect(urls.length).toBeGreaterThan(0)
+  for (const url of urls)
+    expect(url, url).not.toMatch(/aarch64|x86_64|arm64|amd64/)
+})

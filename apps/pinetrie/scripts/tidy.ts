@@ -1,10 +1,9 @@
-// pnpm tidy [folder] [--days N] [--dry-run] — your repo's op log cut to a
+// tidy [folder] [--days N] [--dry-run] — your repo's op log cut to a
 // window, while no host serves it. It holds the session store's
 // lock the whole time, so a host cannot start beside it. A refusal prints
 // why and exits 2; a failed step exits 1.
 
 import { homedir } from "node:os"
-import path from "node:path"
 import { configPlaces, sessionWords } from "@pinetrie/config"
 import {
   executeTidy,
@@ -21,11 +20,11 @@ import {
   tidyWords,
 } from "../host/tidy.ts"
 
-async function main(): Promise<number> {
+/** `tidy [folder] [--days N] [--dry-run]`: its exit code. */
+export async function main(args: readonly string[]): Promise<number> {
   const invocation = planTidyInvocation(
-    process.argv.slice(2),
+    args,
     process.env.INIT_CWD ?? process.cwd(),
-    path.resolve(import.meta.dirname, "../../.."),
   )
   if (invocation.kind === "refused") {
     console.error(`${invocation.why}\n${TIDY_USAGE}`)
@@ -89,5 +88,3 @@ async function tidy(
   )
   return 0
 }
-
-process.exitCode = await main()

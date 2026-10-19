@@ -4,11 +4,11 @@
 // fork of accepted work starts from.
 
 import { mkdir, stat, writeFile } from "node:fs/promises"
-import { createRequire } from "node:module"
 import { homedir } from "node:os"
 import path from "node:path"
 import { type ConfigPlaces, ownDirs, type StartLayers } from "@pinetrie/config"
 import { errorText, isThreadId, isWithin } from "@pinetrie/core"
+import type { Install } from "@pinetrie/install"
 import { createKeeper, type Keeper } from "@pinetrie/keeper"
 import {
   BASE_LANE,
@@ -24,7 +24,6 @@ import {
   laneGitConfig,
   laneIgnores,
   type Mount,
-  PINETRIE_INSTALL,
   planHostMounts,
   planLinks,
   planMounts,
@@ -61,16 +60,11 @@ import { type LaneSsh, type PersonalSshPlaces, startLaneSsh } from "./ssh.ts"
 const LANE_MEMORY = "4G"
 
 /**
- * The `@playwright/test` this app resolves, whose browser the default lane
- * image carries. A dev dependency: the host runs from pinetrie's repo, where
- * `pnpm install` installs it.
+ * The Playwright whose browser the default lane image carries: the app's
+ * `@playwright/test`, a dev dependency an installed package does not have,
+ * so its version is kept here (`playwright.test.ts` holds them equal).
  */
-export const playwrightVersion = (): string =>
-  (
-    createRequire(import.meta.url)("@playwright/test/package.json") as {
-      version: string
-    }
-  ).version
+export const PLAYWRIGHT_VERSION = "1.64.1"
 
 /** What lanes of their own need, once the images, runtime and grants are ready. */
 export interface Ready {
@@ -98,6 +92,8 @@ export interface Setup {
   readonly opened: OpenProject
   /** What lanes run on. */
   readonly runtime: LaneRuntime
+  /** The pine·trie install lanes run from. */
+  readonly install: Install
   /** Each lane's grants and shared directories, as facts of states. */
   readonly configs: LaneConfigs
   /**
@@ -256,6 +252,7 @@ export async function startSetup(input: {
     owner: project.owner,
     personal: input.personalSsh,
     dir: input.sshDir,
+    install: found.install,
   })
   // Read at startup, as `prepareImages` reads it, so a lane's prompt says
   // what its image has before the images are ready.
@@ -285,7 +282,7 @@ export async function startSetup(input: {
   ): readonly Mount[] =>
     planMounts({
       hostWorkingCopy: root,
-      pinetrie: PINETRIE_INSTALL,
+      pinetrie: found.install.root,
       runtime: r.runtime,
       ignoreDir: files.laneGit,
       links: r.links,
@@ -376,7 +373,7 @@ export async function startSetup(input: {
     runtime,
     spec: specOf(BASE_LANE, r, true),
     env: process.env,
-    open: laneLinkOpener(runtime),
+    open: laneLinkOpener(runtime, found.install),
   })
 
   // --- the images, runtime and base snapshot, in the background ----------
@@ -413,6 +410,7 @@ export async function startSetup(input: {
     root,
     opened,
     runtime,
+    install: found.install,
     configs,
     defaultImage,
     ready,
@@ -445,7 +443,7 @@ async function prepare(input: {
   const { lane, runtimeFrom } = await prepareImages(
     runtime,
     at,
-    playwrightVersion(),
+    PLAYWRIGHT_VERSION,
     log,
   )
   const refused = await checkImage(runtime, lane)

@@ -301,8 +301,9 @@ paths are its diff." would compare a function with itself.
   (`ensureRuntime`), extracted as a tar on a throwaway container's stdout
   (`EXTRACT`, `runInImage`): every runtime has that way out, and a slot of
   the lane VM shares it read-only like any other directory.
-- **The helper runs on the lane runtime** (`runtimeNode`):
-  `/pinetrie-runtime/node/ld-linux-aarch64.so.1 --library-path … node …`. The
+- **The helper runs on the lane runtime** (`RUNTIME_NODE`):
+  `/pinetrie-runtime/node/ld.so --library-path … node …`, the loader `ldd`
+  names for Node copied to one name whatever the architecture. The
   runtime is copied out of pine·trie's default image into
   `runtime/<image tag>/`: Node, the libraries `ldd` lists for it,
   glibc's loader, and in `bin/` static builds of core's `RUNTIME_PROGRAMS`

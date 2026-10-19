@@ -82,6 +82,7 @@ import {
   type StartHostOptions,
   startHost,
 } from "../host/index.ts"
+import { livePage } from "../host/page-build.ts"
 import { command } from "./command.ts"
 
 /** A message's position, or the root's for null. */
@@ -522,6 +523,7 @@ export const startSuiteHost = async (
       binding: suiteBinding(),
       env: {},
       keepRootsRead: true,
+      page: livePage(),
       ...options,
     }),
   )

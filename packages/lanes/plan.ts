@@ -27,10 +27,9 @@ import {
   WORKSPACE_ROOT,
   wideningWords,
 } from "@pinetrie/core"
+import { PINETRIE_MOUNT } from "@pinetrie/install"
 import type { ForkSetup } from "./history-port.ts"
 import type { LaneRuntime, RuntimeOp } from "./runtime-port.ts"
-/** pine·trie's own install, read-only: the helper's code and pi's. */
-export const PINETRIE_MOUNT = "/pinetrie"
 /**
  * pine·trie's lane runtime, read-only: Node and its libraries, and in
  * `bin/` the static programs core's `RUNTIME_PROGRAMS` lists.

@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { describe, expect, test } from "vitest"
+import { thisInstall } from "@pinetrie/install"
 import { findProject, planRuntime } from "./runtime.ts"
 
 describe("planRuntime: Docker, in the VM on the Mac and the host's own on Linux", () => {
@@ -53,6 +54,7 @@ describe.skipIf(process.platform === "darwin")(
     const find = (dir: string) =>
       findProject({
         root: dir,
+        install: thisInstall,
         slots: 16,
         hostSocket: path.join(dir, ".no-ssh.sock"),
         log: () => {},
@@ -76,6 +78,7 @@ describe.skipIf(process.platform === "darwin")(
       expect(
         await findProject({
           root: null,
+          install: thisInstall,
           slots: 16,
           hostSocket: "/no-ssh.sock",
           log: () => {},

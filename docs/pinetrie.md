@@ -250,7 +250,8 @@ performs the decision. This mirrors pi's own lane loop.
 
 **No build step.** Node 24 strips types natively, so imports name the real file
 (`./index.ts`). Native stripping does **not** support enums, namespaces,
-parameter properties, or decorators.
+parameter properties, or decorators. Publishing to npm is the one build,
+decided and not yet built (`docs/05-stack.md`).
 
 ---
 

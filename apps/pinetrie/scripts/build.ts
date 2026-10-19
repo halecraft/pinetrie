@@ -2,7 +2,7 @@
 // where this machine runs one (`pnpm vm:build`'s path, never forced).
 // Exits 1 when the image is needed and cannot be built.
 
-import { buildPage } from "../host/page.ts"
+import { buildPage } from "../host/page-build.ts"
 
 console.log("[build] the page")
 const started = Date.now()

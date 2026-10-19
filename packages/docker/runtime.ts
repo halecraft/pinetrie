@@ -7,14 +7,19 @@ import { readFile } from "node:fs/promises"
 import { commandStream, openChannel } from "@pinetrie/channel"
 import { OBSERVER_SOCKET, type PointId, snapshotId } from "@pinetrie/core"
 import {
+  type Install,
+  inMount,
+  PINETRIE_MOUNT,
+  type ScriptName,
+  scriptCommand,
+} from "@pinetrie/install"
+import {
   connectObserver,
-  FILE_OUT,
   LANE_FILES,
   LANEHOST_CONTAINERFILE,
   type LanehostChannel,
   lanehostClient,
   MACHINE_SOCKET,
-  OBSERVER_CONNECT,
   OBSERVER_CONTAINERFILE,
   type ObserverChannel,
   observerClient,
@@ -22,19 +27,16 @@ import {
   observerVersion,
   projectDisks,
   type Role,
-  SERVER,
   serverArgs,
-  TAR_OUT,
 } from "@pinetrie/lanehost"
 import {
   type FolderDisks,
   type ImagePlan,
   type LaneRuntime,
   type Mount,
-  PINETRIE_MOUNT,
   planContainer,
   RUNTIME_MOUNT,
-  runtimeNode,
+  RUNTIME_NODE,
   specHash,
 } from "@pinetrie/lanes"
 import {
@@ -180,6 +182,12 @@ export function dockerRuntime(input: {
   /** The project's root on the host. */
   readonly root: string
   /**
+   * The pine·trie install lanehost and the observer run: its root on the
+   * host, read for the observer's image, and its form, which names each
+   * script it starts in the mount.
+   */
+  readonly install: Install
+  /**
    * Where each call to lanehost, and an image it could not remove, is
    * logged; none in the suites' own runtimes.
    */
@@ -190,7 +198,10 @@ export function dockerRuntime(input: {
    */
   readonly observer?: "container" | "forwarded"
 }): DockerRuntime {
-  const { target, lanesDir, root } = input
+  const { target, lanesDir, root, install } = input
+  /** `name` started in a container, from the install as it is mounted there. */
+  const inContainer = (name: ScriptName) =>
+    scriptCommand(inMount(install), name, RUNTIME_NODE)
   const key = projectKey(root)
   const disks = projectDisks(lanesDir, key)
   const runSpec = (shape: Parameters<LaneRuntime["runSpec"]>[0]) =>
@@ -207,7 +218,7 @@ export function dockerRuntime(input: {
     content =>
       `pinetrie-lanehost:${createHash("sha256").update(content).digest("hex").slice(0, 12)}`,
   )
-  const version = observerSources().then(observerVersion)
+  const version = observerSources(install.root).then(observerVersion)
 
   /** Every image this host has ensured, by tag: what it needs, and how to build each again. */
   const recipes = new Map<string, ImageRecipe>()
@@ -304,7 +315,7 @@ export function dockerRuntime(input: {
     await ensureContainer(target, renderHelper(shape, target), buildMissing)
     return openChannel(
       execArgv(name, [
-        ...runtimeNode(`${PINETRIE_MOUNT}/${SERVER}`),
+        ...inContainer("lanehostServer"),
         ...serverArgs(role, lanesDir, await facts()),
       ]),
       `lanehost's ${role} role`,
@@ -336,19 +347,20 @@ export function dockerRuntime(input: {
       runtime: serving.runtime,
       packages: `${serving.install}/packages`,
     })
-    await ensureContainer(target, renderObserver(v), buildMissing)
+    await ensureContainer(target, renderObserver(v, install), buildMissing)
     return openChannel(
-      execArgv(name, [
-        ...runtimeNode(`${PINETRIE_MOUNT}/${OBSERVER_CONNECT}`),
-        MACHINE_SOCKET,
-      ]),
+      execArgv(name, [...inContainer("observerConnect"), MACHINE_SOCKET]),
       "the machine's observer",
     )
   }
   const observer = observerClient({
     open:
       input.observer === "forwarded"
-        ? async () => connectObserver(OBSERVER_SOCKET)
+        ? async () =>
+            connectObserver(
+              scriptCommand(install, "observerConnect", [process.execPath]),
+              OBSERVER_SOCKET,
+            )
         : openObserver,
   })
 
@@ -372,7 +384,7 @@ export function dockerRuntime(input: {
    * is gone before the command is asked.
    */
   async function* snapshotOut(
-    command: string,
+    command: ScriptName,
     state: PointId,
     stdin: string,
   ): AsyncIterable<Uint8Array> {
@@ -386,7 +398,7 @@ export function dockerRuntime(input: {
       throw new Error(`the state ${state} has no snapshot`)
     yield* commandStream(
       execArgv(lanehostContainer("disks", key, target), [
-        ...runtimeNode(`${PINETRIE_MOUNT}/${command}`),
+        ...inContainer(command),
         disks.snapshot(snapshotId(state)),
       ]),
       { stdin },
@@ -412,13 +424,13 @@ export function dockerRuntime(input: {
   return {
     serveFrom(mounts) {
       const at = (where: string) => mounts.find(m => m.target === where)?.source
-      const install = at(PINETRIE_MOUNT)
+      const mounted = at(PINETRIE_MOUNT)
       const runtime = at(RUNTIME_MOUNT)
-      if (install === undefined || runtime === undefined)
+      if (mounted === undefined || runtime === undefined)
         throw new Error(
           `lanehost runs from the mounts at ${PINETRIE_MOUNT} and ${RUNTIME_MOUNT}, and setup gave none`,
         )
-      serving = { install, runtime }
+      serving = { install: mounted, runtime }
     },
     disk: async op => {
       if (op.kind === "inner-docker-data-root")
@@ -464,8 +476,8 @@ export function dockerRuntime(input: {
         lanehost.call({ kind: "read", project: key, snapshot, path, limit }),
       readIn: read => lanehost.call({ kind: "read-in", project: key, ...read }),
       tarOut: (state, paths) =>
-        snapshotOut(TAR_OUT, state, paths.map(p => `${p}\0`).join("")),
-      fileOut: (state, path) => snapshotOut(FILE_OUT, state, path),
+        snapshotOut("tarOut", state, paths.map(p => `${p}\0`).join("")),
+      fileOut: (state, path) => snapshotOut("fileOut", state, path),
       states: async (lane, op) => {
         await lanehost.call({ kind: "states", project: key, lane, op })
       },

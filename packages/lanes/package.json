@@ -8,6 +8,7 @@
     "./testing": "./testing/history-suite.ts"
   },
   "dependencies": {
-    "@pinetrie/core": "workspace:*"
+    "@pinetrie/core": "workspace:*",
+    "@pinetrie/install": "workspace:*"
   }
 }

@@ -12,7 +12,6 @@ export {
   lanehostClient,
 } from "./client.ts"
 export { ROOTLESS_UID } from "./disks.ts"
-export { FILE_OUT } from "./file-out.ts"
 export { type Grant, grantChain } from "./grants.ts"
 export {
   FOLDER_MOUNT,
@@ -56,8 +55,7 @@ export {
   type RoleFacts,
   type RoleSpec,
 } from "./roles.ts"
-export { ONCE, SERVER, serverArgs } from "./serving.ts"
-export { TAR_OUT } from "./tar-out.ts"
+export { serverArgs } from "./serving.ts"
 
 /** The observer's loader and its suite's guest, built for the machine's architecture. */
 export const OBSERVER_CONTAINERFILE = path.join(
@@ -78,24 +76,26 @@ export {
   observerClient,
 } from "./observer-client.ts"
 
-/** The machine role's server and a host's connection to it, from the root of pine·trie's install. */
-export const OBSERVER_SERVER = "packages/lanehost/observer-server.ts"
-export const OBSERVER_CONNECT = "packages/lanehost/observer-connect.ts"
 /** The loader, in the machine role's image. */
 export const OBSERVER_LOADER = "/usr/local/bin/observe"
 
-/** Every source the machine role's image is made from, by path from pine·trie's root. */
-export async function observerSources(): Promise<
-  readonly { readonly path: string; readonly content: string }[]
-> {
-  const root = path.join(import.meta.dirname, "../..")
-  const dirs = [
-    "packages/lanehost/observer",
-    "packages/lanehost",
-    "packages/channel",
-    "packages/core",
-  ]
-  const files = dirs.flatMap(d =>
+/**
+ * The folders the machine role's image is made from, by path from pine·trie's
+ * root: the observer's server and every module it loads must be in them
+ * (`scripts/shipped.test.ts`).
+ */
+export const OBSERVER_SOURCE_DIRS = [
+  "packages/lanehost/observer",
+  "packages/lanehost",
+  "packages/channel",
+  "packages/core",
+] as const
+
+/** Every source the machine role's image is made from, from the install at `root`, by path from it. */
+export async function observerSources(
+  root: string,
+): Promise<readonly { readonly path: string; readonly content: string }[]> {
+  const files = OBSERVER_SOURCE_DIRS.flatMap(d =>
     readdirSync(path.join(root, d), { withFileTypes: true })
       .filter(e => e.isFile() && !e.name.endsWith(".test.ts"))
       .map(e => `${d}/${e.name}`),

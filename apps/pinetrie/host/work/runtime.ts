@@ -18,6 +18,7 @@ import {
   SLOT_LABEL,
   sweepSlot,
 } from "@pinetrie/docker"
+import type { Install } from "@pinetrie/install"
 import { planObserver } from "@pinetrie/lanehost"
 import {
   createQueue,
@@ -47,6 +48,8 @@ export interface Found {
   readonly kind: "found"
   /** Where the project is; setup adds the rest of its record. */
   readonly project: Pick<ProjectRecord, "root">
+  /** The pine·trie install lanes run from: mounted in each, and lanehost's. */
+  readonly install: Install
   readonly runtime: LaneRuntime
   /** A folder project's calls of its disks, beside `runtime`: its adapter's alone. */
   readonly folder: FolderDisks
@@ -112,6 +115,8 @@ export function planRuntime(f: RuntimeFacts): RuntimePlan {
 export async function findProject(input: {
   /** The project's root, its adapter chosen (`host/project.ts`); null with no tools. */
   readonly root: string | null
+  /** The pine·trie install lanes run from. */
+  readonly install: Install
   /** The port this host listens on, refused to lanes; null when it is not known yet. */
   readonly ownPort?: number | null
   /** How many folders the lane VM shares: `lanes.vm.slots`, settled. */
@@ -127,6 +132,7 @@ export async function findProject(input: {
   if (input.root === null) return null
   return runtimeFound(
     input.root,
+    input.install,
     input.slots,
     input.hostSocket,
     input.log,
@@ -138,6 +144,7 @@ const refusedWith = (words: string): Refused => ({ kind: "refused", words })
 
 async function runtimeFound(
   root: string,
+  install: Install,
   slots: number,
   hostSocket: string,
   log: (line: string) => void,
@@ -151,13 +158,14 @@ async function runtimeFound(
   })
   const project = { root }
   return planned.kind === "docker-vm"
-    ? vmFound(project, planned.lanesDir, slots, hostSocket, log, ownPort)
-    : hostDockerFound(project, planned.lanesDir, hostSocket, log)
+    ? vmFound(project, install, planned.lanesDir, slots, hostSocket, log, ownPort)
+    : hostDockerFound(project, install, planned.lanesDir, hostSocket, log)
 }
 
 /** Docker on this machine (Linux): its socket, paths as they are. */
 async function hostDockerFound(
   project: Found["project"],
+  install: Install,
   lanesDir: string,
   hostSocket: string,
   log: (line: string) => void,
@@ -185,6 +193,7 @@ async function hostDockerFound(
     target,
     lanesDir,
     root,
+    install,
     log,
     observer: observed.kind,
   })
@@ -200,6 +209,7 @@ async function hostDockerFound(
   return {
     kind: "found",
     project,
+    install,
     runtime,
     folder: runtime.folder,
     ready: async ({ mounts, hostPorts }) => {
@@ -221,6 +231,7 @@ async function hostDockerFound(
  */
 async function vmFound(
   project: Found["project"],
+  install: Install,
   lanesDir: string,
   slots: number,
   hostSocket: string,
@@ -268,7 +279,7 @@ async function vmFound(
     await first.close()
     return refusedWith(dockerWords(refusal))
   }
-  const runtime = dockerRuntime({ target, lanesDir, root, log })
+  const runtime = dockerRuntime({ target, lanesDir, root, install, log })
   const held = createShares({
     lease: first,
     ownPort,
@@ -292,6 +303,7 @@ async function vmFound(
   return {
     kind: "found",
     project,
+    install,
     runtime,
     folder: runtime.folder,
     async ready(wanted) {

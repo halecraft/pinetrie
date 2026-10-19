@@ -1,11 +1,8 @@
-// host/serve — `pnpm serve [folder]`: a host serving Vite's build of the
-// page, with no Vite in the process. A page whose inputs changed since its
-// build, or that was never built, is built first (`ensurePage`). The rest
-// is `server.ts`.
-import { ensurePage, readBuiltPage } from "./page.ts"
-import { runHost } from "./server.ts"
+// host/serve — `pnpm serve [folder]`: the page rebuilt first when its inputs
+// changed since its build, or it was never built (`ensurePage`), then the
+// host `pinetrie serve` runs (`serve-built.ts`).
+import { ensurePage } from "./page-build.ts"
+import { serveBuilt } from "./serve-built.ts"
 
-await runHost("serve", async () => {
-  await ensurePage(console.log)
-  return readBuiltPage()
-})
+await ensurePage(console.log)
+await serveBuilt(process.argv.slice(2))

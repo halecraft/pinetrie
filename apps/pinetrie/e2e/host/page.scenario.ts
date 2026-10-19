@@ -4,7 +4,8 @@
 // unit-tested; this proves the server carries it out.
 
 import { scriptedModel } from "@pinetrie/pi"
-import { buildPage, readBuiltPage } from "../../host/page.ts"
+import { readBuiltPage } from "../../host/page.ts"
+import { buildPage } from "../../host/page-build.ts"
 import type { Checks } from "../checks.ts"
 import { withHost } from "../harness.ts"
 import type { Scenario } from "../scenario.ts"

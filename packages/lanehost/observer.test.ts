@@ -36,6 +36,12 @@ import {
 } from "./observer.ts"
 import { connectObserver } from "./observer-client.ts"
 
+/** `observer-connect.ts` on this Node, as the host builds it from its install. */
+const CONNECT = [
+  process.execPath,
+  path.join(import.meta.dirname, "observer-connect.ts"),
+]
+
 const release = (s: string, raced: string | null): RunEvent => ({
   kind: "call",
   op: "release",
@@ -437,7 +443,7 @@ describe("the machine role's server, with a stand-in loader", () => {
   test("a host's lane's notices reach it, and a flush answers after them", async () => {
     const role = await standInRole()
     try {
-      const channel = connectObserver(role.socket)
+      const channel = connectObserver(CONNECT, role.socket)
       expect(await channel.ready).toEqual({
         version: "v1",
         loader: { kind: "ready" },
@@ -466,8 +472,8 @@ describe("the machine role's server, with a stand-in loader", () => {
   test("a forwarded host registers only below its lane, and no host takes another live one's lane", async () => {
     const role = await standInRole()
     try {
-      const outer = connectObserver(role.socket)
-      const inner = connectObserver(role.socket)
+      const outer = connectObserver(CONNECT, role.socket)
+      const inner = connectObserver(CONNECT, role.socket)
       expect(await outer.call(direct(4))).toBe("40")
       expect(
         await inner.call({
@@ -491,7 +497,7 @@ describe("the machine role's server, with a stand-in loader", () => {
       expect(await outer.call(direct(4))).toBe("40")
       outer.close()
       await outer.closed
-      const again = connectObserver(role.socket)
+      const again = connectObserver(CONNECT, role.socket)
       expect(await again.call(direct(4))).toBe("40")
       expect(await inner.call({ kind: "unregister", lane: "50" })).toBeNull()
       again.close()
@@ -508,7 +514,7 @@ test("a connection waits for a socket made after it starts", async () => {
     mkdtempSync(path.join(tmpdir(), "observer-")),
     "late.sock",
   )
-  const channel = connectObserver(socket)
+  const channel = connectObserver(CONNECT, socket)
   await new Promise(r => setTimeout(r, 500))
   const server = net
     .createServer(s =>

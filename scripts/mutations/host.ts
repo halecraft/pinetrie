@@ -2086,11 +2086,20 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a relative folder is read from the working directory",
     file: "apps/pinetrie/host/invocation.ts",
-    from: "): string => (arg === undefined ? pinetrieRoot : path.resolve(base, arg))",
-    to: "): string => (arg === undefined ? pinetrieRoot : path.resolve(arg))",
+    from: "  arg === undefined ? base : path.resolve(base, arg)",
+    to: "  arg === undefined ? base : path.resolve(arg)",
     command: unit,
     expect:
-      "no folder serves pinetrie's repo; one folder is read from the base, never the working directory",
+      "no folder serves the base; one folder is read from the base, never the working directory",
+  },
+  {
+    name: "no folder named serves the working directory, not the base",
+    file: "apps/pinetrie/host/invocation.ts",
+    from: "  arg === undefined ? base : path.resolve(base, arg)",
+    to: "  arg === undefined ? process.cwd() : path.resolve(base, arg)",
+    command: unit,
+    expect:
+      "no folder serves the base; one folder is read from the base, never the working directory",
   },
   {
     name: "a flag is taken for a folder",

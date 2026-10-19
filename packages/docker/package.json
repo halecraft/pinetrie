@@ -9,6 +9,7 @@
   "dependencies": {
     "@pinetrie/channel": "workspace:*",
     "@pinetrie/core": "workspace:*",
+    "@pinetrie/install": "workspace:*",
     "@pinetrie/lanehost": "workspace:*",
     "@pinetrie/lanes": "workspace:*"
   }

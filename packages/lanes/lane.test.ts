@@ -1,19 +1,22 @@
 import { readFileSync, statSync } from "node:fs"
 import path from "node:path"
 import { describe, expect, test } from "vitest"
+import { PINETRIE_MOUNT, thisInstall } from "@pinetrie/install"
 import {
   createQueue,
-  HELPER,
   laneNote,
-  PINETRIE_INSTALL,
-  PINETRIE_MOUNT,
+  nestedLaneDockerNote,
 } from "./index.ts"
 
-test("every pinetrie file a lane is pointed at exists", () => {
-  for (const inLane of [HELPER, laneNote("jj"), laneNote("folder")]) {
+test("every note a lane is pointed at exists in the install", () => {
+  for (const inLane of [
+    laneNote("jj"),
+    laneNote("folder"),
+    nestedLaneDockerNote,
+  ]) {
     expect(inLane.startsWith(`${PINETRIE_MOUNT}/`)).toBe(true)
     const onHost = path.join(
-      PINETRIE_INSTALL,
+      thisInstall.root,
       inLane.slice(PINETRIE_MOUNT.length),
     )
     expect(statSync(onHost, { throwIfNoEntry: false })?.isFile(), onHost).toBe(

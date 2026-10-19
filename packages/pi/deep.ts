@@ -4,7 +4,8 @@
 // stable parts of pi's surface but are not listed in either package's
 // `exports` map, so a package specifier is refused. A file URL bypasses the
 // map. Every such import is collected here, so a change in pi's files
-// breaks this one file.
+// breaks this one file, and each package it reaches is declared in
+// `deep-packages.ts`, which the package build reads for its dependencies.
 //
 // Verified export maps at 0.99.2:
 //   @earendil-works/pi-agent-core  -> ".", "./node", "./harness/context",
@@ -31,7 +32,10 @@
 // The type paths are RELATIVE, not package specifiers, for the same reason the
 // runtime import is a URL: the export map refuses these subpaths, and it
 // refuses them to the type resolver too. `node_modules/@earendil-works/*` is a
-// stable symlink, so this does not bake in a pnpm content hash.
+// stable symlink in the repo, so this does not bake in a pnpm content hash;
+// the types are gone from the built package, whose layout is npm's.
+
+import type { DeepPackage } from "./deep-packages.ts"
 
 type UsageModule =
   typeof import("./node_modules/@earendil-works/pi-agent-core/dist/harness/utils/usage.js")
@@ -54,40 +58,60 @@ type MimeModule =
 type ImageResizeModule =
   typeof import("./node_modules/@earendil-works/pi-coding-agent/dist/utils/image-resize.js")
 
-const base = new URL("./node_modules/", import.meta.url)
-const deep = (p: string): Promise<unknown> => import(new URL(p, base).href)
+/**
+ * A package's own folder, from where Node resolves its entry: pnpm keeps
+ * each package in a store folder of its own, so one shared base would find
+ * only the first; npm keeps them side by side.
+ */
+export function deepPackageDir(pkg: DeepPackage): URL {
+  const entry = import.meta.resolve(pkg)
+  const marker = `/node_modules/${pkg}/`
+  const at = entry.lastIndexOf(marker)
+  if (at < 0) throw new Error(`${pkg} resolved outside node_modules: ${entry}`)
+  return new URL(entry.slice(0, at + marker.length))
+}
+
+const deep = (pkg: DeepPackage, file: string): Promise<unknown> =>
+  import(new URL(file, deepPackageDir(pkg)).href)
+
+const AGENT_CORE = "@earendil-works/pi-agent-core"
+const CODING_AGENT = "@earendil-works/pi-coding-agent"
 
 const usage = (await deep(
-  "@earendil-works/pi-agent-core/dist/harness/utils/usage.js",
+  AGENT_CORE,
+  "dist/harness/utils/usage.js",
 )) as UsageModule
 const runtime = (await deep(
-  "@earendil-works/pi-agent-core/dist/harness/runtime/index.js",
+  AGENT_CORE,
+  "dist/harness/runtime/index.js",
 )) as RuntimeModule
 const modelRuntime = (await deep(
-  "@earendil-works/pi-coding-agent/dist/core/model-runtime.js",
+  CODING_AGENT,
+  "dist/core/model-runtime.js",
 )) as ModelRuntimeModule
 
 const settings = (await deep(
-  "@earendil-works/pi-coding-agent/dist/core/settings-manager.js",
+  CODING_AGENT,
+  "dist/core/settings-manager.js",
 )) as SettingsModule
 const resourceLoader = (await deep(
-  "@earendil-works/pi-coding-agent/dist/core/resource-loader.js",
+  CODING_AGENT,
+  "dist/core/resource-loader.js",
 )) as ResourceLoaderModule
 const systemPrompt = (await deep(
-  "@earendil-works/pi-coding-agent/dist/core/system-prompt.js",
+  CODING_AGENT,
+  "dist/core/system-prompt.js",
 )) as SystemPromptModule
 
-const skills = (await deep(
-  "@earendil-works/pi-coding-agent/dist/core/skills.js",
-)) as SkillsModule
+const skills = (await deep(CODING_AGENT, "dist/core/skills.js")) as SkillsModule
 const promptTemplates = (await deep(
-  "@earendil-works/pi-coding-agent/dist/core/prompt-templates.js",
+  CODING_AGENT,
+  "dist/core/prompt-templates.js",
 )) as PromptTemplatesModule
-const mime = (await deep(
-  "@earendil-works/pi-coding-agent/dist/utils/mime.js",
-)) as MimeModule
+const mime = (await deep(CODING_AGENT, "dist/utils/mime.js")) as MimeModule
 const imageResize = (await deep(
-  "@earendil-works/pi-coding-agent/dist/utils/image-resize.js",
+  CODING_AGENT,
+  "dist/utils/image-resize.js",
 )) as ImageResizeModule
 
 export const { addUsage, emptyUsage } = usage

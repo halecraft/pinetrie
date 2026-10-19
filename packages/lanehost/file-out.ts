@@ -11,9 +11,6 @@ import { createReadStream } from "node:fs"
 import path from "node:path"
 import { checkOutPaths } from "./tar-out.ts"
 
-/** The command that writes one file of a snapshot, its path on stdin. */
-export const FILE_OUT = "packages/lanehost/file-out.ts"
-
 /** The bytes of `p` under `root`, as they come; throws, before any, when `p` is no regular file of the snapshot. */
 export async function* fileStream(
   root: string,

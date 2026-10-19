@@ -2,7 +2,7 @@
 // default image's browser and python3.
 
 import { ROOT } from "@pinetrie/core"
-import { PINETRIE_MOUNT } from "@pinetrie/lanes"
+import { PINETRIE_MOUNT } from "@pinetrie/install"
 import { readRevisions } from "@pinetrie/reads"
 import type { Checks } from "../checks.ts"
 import { heldRootRecords, START_AGENT } from "../harness.ts"

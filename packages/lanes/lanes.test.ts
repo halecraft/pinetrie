@@ -1,10 +1,10 @@
 import { type RunSource, snapshotId, threadIdFor } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { execute } from "./execute.ts"
-import { HELPER, helperCommand, laneHandle } from "./lane.ts"
+import { helperCommand, laneHandle } from "./lane.ts"
 import type { Step } from "./plan.ts"
 import type { Ran, Runner } from "./run.ts"
-import { runtimeNode } from "./runtime.ts"
+import { RUNTIME_NODE } from "./runtime.ts"
 import type { LaneRuntime } from "./runtime-port.ts"
 
 /** A lane no observer sees: no run did anything. */
@@ -83,11 +83,17 @@ describe("execute", () => {
   })
 })
 
-test("helperCommand: the runtime's exec of the helper on the lane runtime's Node", () => {
-  expect(helperCommand(recordingRuntime([]), "pinetrie-t-1")).toEqual([
+test("helperCommand: the runtime's exec of the install's helper, mounted, on the lane runtime's Node", () => {
+  expect(
+    helperCommand(recordingRuntime([]), "pinetrie-t-1", {
+      root: "/home/ada/pinetrie",
+      form: "built",
+    }),
+  ).toEqual([
     "exec",
     "pinetrie-t-1",
-    ...runtimeNode(HELPER),
+    ...RUNTIME_NODE,
+    "/pinetrie/packages/pi/lane-helper.js",
   ])
 })
 

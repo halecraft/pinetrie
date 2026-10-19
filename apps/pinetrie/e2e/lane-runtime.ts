@@ -14,8 +14,9 @@ import {
   projectKey,
   ROOTLESS_UID,
 } from "@pinetrie/docker"
-import { type LanehostCall, ONCE, serverArgs } from "@pinetrie/lanehost"
-import { PINETRIE_MOUNT, runtimeNode } from "@pinetrie/lanes"
+import { inMount, scriptCommand, thisInstall } from "@pinetrie/install"
+import { type LanehostCall, serverArgs } from "@pinetrie/lanehost"
+import { RUNTIME_NODE } from "@pinetrie/lanes"
 import { vmStateDir } from "@pinetrie/vm"
 import { planRuntime } from "../host/work/runtime.ts"
 import { command, commandOutput } from "./command.ts"
@@ -99,7 +100,7 @@ async function lanehostOnce(
   const out = await cli([
     "exec",
     await disksContainer(root),
-    ...runtimeNode(`${PINETRIE_MOUNT}/${ONCE}`),
+    ...scriptCommand(inMount(thisInstall), "lanehostOnce", RUNTIME_NODE),
     ...serverArgs("disks", lanesDir(), { rootless: existsSync(NESTED_MOUNT) }),
     JSON.stringify(call),
   ])

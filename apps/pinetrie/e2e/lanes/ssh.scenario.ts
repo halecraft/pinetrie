@@ -22,11 +22,11 @@ import {
   shellWord,
   type ThreadId,
 } from "@pinetrie/core"
-import { runtimeNode } from "@pinetrie/lanes"
+import { thisInstall } from "@pinetrie/install"
 import { readAccess } from "@pinetrie/reads"
 import { decodeCarryOn, decodeSshFact } from "@pinetrie/rules"
 import { rowMessage } from "@pinetrie/schema"
-import { HOP_IN_LANE } from "../../host/work/ssh.ts"
+import { hopCommand } from "../../host/work/ssh.ts"
 import type { Checks } from "../checks.ts"
 import { command, commandOutput } from "../command.ts"
 import {
@@ -49,7 +49,7 @@ export const scenario: Scenario = {
 
 const OWNER = "owner@ssh.test"
 const BANNER = "SSH-2.0-pinetrie-e2e\r\n"
-const HOP = [...runtimeNode(HOP_IN_LANE)].map(shellWord).join(" ")
+const HOP = hopCommand(thisInstall)
 /** `script` in a running lane's container, awaited without blocking the host. */
 function inLaneLater(lane: ThreadId, script: string): Promise<string> {
   const [program = "docker", ...rest] = runtimeCli()

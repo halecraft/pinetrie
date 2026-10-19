@@ -2,6 +2,7 @@
 
 - **Status:** Open (every gate but `e2e:lanes` read; that one waits on a
   baseline)
+- **Led to:** ADR-0189
 
 Every `@kyneta/*` dependency is a `link:` to the local checkout at
 `~/halecraft/kyneta/workspace/pineta` (`apps/pinetrie`, `packages/pi`,

@@ -545,7 +545,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the helper is started with the image's node",
     file: "packages/lanes/runtime.ts",
-    from: '  `${RUNTIME_MOUNT}/node/${LOADER}`,\n  "--library-path",\n  `${RUNTIME_MOUNT}/node/lib`,\n  `${RUNTIME_MOUNT}/node/node`,',
+    from: '  `${RUNTIME_MOUNT}/node/ld.so`,\n  "--library-path",\n  `${RUNTIME_MOUNT}/node/lib`,\n  `${RUNTIME_MOUNT}/node/node`,',
     to: '  "node",',
     suite: "lanes",
     scenario: "images",
@@ -618,7 +618,7 @@ export const mutations: readonly Mutation[] = [
     from: "    ? `${PINETRIE_MOUNT}/packages/pi/lane.md`",
     to: "    ? `${PINETRIE_MOUNT}/packages/pi/lane-notes.md`",
     command: unit,
-    expect: "every pinetrie file a lane is pointed at exists",
+    expect: "every note a lane is pointed at exists in the install",
   },
   {
     name: "the folder's lane note is not where the prompt says",
@@ -626,7 +626,7 @@ export const mutations: readonly Mutation[] = [
     from: "    : `${PINETRIE_MOUNT}/packages/pi/lane-folder.md`",
     to: "    : `${PINETRIE_MOUNT}/packages/pi/lane-folders.md`",
     command: unit,
-    expect: "every pinetrie file a lane is pointed at exists",
+    expect: "every note a lane is pointed at exists in the install",
   },
   {
     name: "the lane note is not where the prompt says, in a real lane",
@@ -776,7 +776,24 @@ export const mutations: readonly Mutation[] = [
     from: "  RUNTIME_PROGRAMS.every(p => binEntries.includes(p))",
     to: '  binEntries.includes("jj")',
     command: unit,
-    expect: "runtimeComplete: every program, not only jj",
+    expect: "runtimeComplete: the loader and every program, not only jj",
+  },
+  {
+    name: "a runtime without its loader is taken as complete",
+    file: "packages/lanes/runtime.ts",
+    from: '  nodeEntries.includes("ld.so") &&\n',
+    to: "",
+    command: unit,
+    expect: "runtimeComplete: the loader and every program, not only jj",
+  },
+  {
+    name: "the runtime's loader keeps arm64's name",
+    file: "packages/lanes/runtime.ts",
+    from: '/out/node/ld.so",',
+    to: '/out/node/ld-linux-aarch64.so.1",',
+    command: unit,
+    expect:
+      "EXTRACT copies the loader ldd names to node/ld.so, which RUNTIME_NODE starts",
   },
   {
     name: "the lane runtime leaves rg behind",

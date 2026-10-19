@@ -14,19 +14,18 @@
 // package cannot import: the host passes an `OpenLink` that opens
 // one and wraps it as runners.
 
-import path from "node:path"
 import type { ProjectKind, RunSource } from "@pinetrie/core"
+import {
+  type Install,
+  inMount,
+  PINETRIE_MOUNT,
+  scriptCommand,
+} from "@pinetrie/install"
 import type { Runners } from "./execute.ts"
-import { type LaneOwner, laneContainer, PINETRIE_MOUNT } from "./plan.ts"
+import { type LaneOwner, laneContainer } from "./plan.ts"
 import type { BytesRunner, Runner } from "./run.ts"
-import { runtimeNode } from "./runtime.ts"
+import { RUNTIME_NODE } from "./runtime.ts"
 import type { ContainerFacts, LaneRuntime } from "./runtime-port.ts"
-
-/** pinetrie's own install on the host, mounted read-only at `/pinetrie` in every lane. */
-export const PINETRIE_INSTALL = path.resolve(import.meta.dirname, "../..")
-
-/** The helper's own path, inside every lane. */
-export const HELPER = `${PINETRIE_MOUNT}/packages/pi/lane-helper.ts`
 
 /** The note a lane's agent is pointed at, inside the lane: its history's kind's own. */
 export const laneNote = (kind: ProjectKind): string =>
@@ -37,11 +36,16 @@ export const laneNote = (kind: ProjectKind): string =>
 /** The note on its inner Docker that a nested lane is pointed at, inside the lane. */
 export const nestedLaneDockerNote = `${PINETRIE_MOUNT}/packages/pi/lane-docker.md`
 
-/** The command that opens a lane's channel: the helper on the runtime's Node. */
+/** The command that opens a lane's channel: `install`'s helper, mounted, on the runtime's Node. */
 export const helperCommand = (
   runtime: Pick<LaneRuntime, "execArgv">,
   container: string,
-): readonly string[] => runtime.execArgv(container, runtimeNode(HELPER))
+  install: Install,
+): readonly string[] =>
+  runtime.execArgv(
+    container,
+    scriptCommand(inMount(install), "laneHelper", RUNTIME_NODE),
+  )
 
 /** An open channel into a lane, as runners; `channel` is the host's own. */
 export interface LaneLink<C> {

@@ -27,14 +27,14 @@ import {
   type ThreadId,
   type WriterId,
 } from "@pinetrie/core"
+import { type Install, inMount, scriptCommand } from "@pinetrie/install"
 import {
   type LaneAttached,
   type LaneFiles,
   type LaneOwner,
   type Mount,
   NOTHING_ATTACHED,
-  PINETRIE_MOUNT,
-  runtimeNode,
+  RUNTIME_NODE,
 } from "@pinetrie/lanes"
 import { readRecords } from "@pinetrie/reads"
 import {
@@ -85,8 +85,9 @@ import { sshLines, sshOutsideLine } from "../startup-lines.ts"
 
 /** Where a lane finds the host's socket. */
 const HOST_SOCKET_IN_LANE = "/run/pinetrie/ssh-host.sock"
-/** The hop, in pine·trie's install as every lane mounts it. */
-export const HOP_IN_LANE = `${PINETRIE_MOUNT}/packages/ssh/hop.ts`
+/** The hop's command in a lane, as shell words: `install`'s, as every lane mounts it, on the runtime's Node. */
+export const hopCommand = (install: Install): string =>
+  scriptCommand(inMount(install), "hop", RUNTIME_NODE).map(shellWord).join(" ")
 
 /** Where the person's ssh files are, and their agent. */
 export interface PersonalSshPlaces {
@@ -239,6 +240,8 @@ export async function startLaneSsh(input: {
   readonly personal: PersonalSshPlaces
   /** The directory the host's socket is in (`prepareSshDir`). */
   readonly dir: string
+  /** The pine·trie install whose hop lanes run. */
+  readonly install: Install
 }): Promise<LaneSsh> {
   const { basics, records, personal: places } = input
   const { log } = basics
@@ -300,7 +303,7 @@ export async function startLaneSsh(input: {
           )
   const checks = keyFiles.map(serviceKeyCheck)
   const usable = checks.flatMap(c => (c.kind === "usable" ? [c.key] : []))
-  const hop = runtimeNode(HOP_IN_LANE).map(shellWord).join(" ")
+  const hop = hopCommand(input.install)
   const connect = hasSsh ? `${hop} connect` : null
   const files = planLaneSsh(
     { service, personal, pubs, knownHosts },

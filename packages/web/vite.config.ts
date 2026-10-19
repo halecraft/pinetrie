@@ -37,9 +37,9 @@ export default defineConfig(({ mode }) => ({
   // This file lives in the page's package, so that directory is Vite's root.
   root,
   plugins: [react(), stamp(mode)],
-  // The linked Kyneta checkout resolves its own React: without this the
-  // build bundles two, and the page fails on its first hook. Vite's dev
-  // server hides it.
+  // Two copies of React in one page fail at its first hook, and Vite's dev
+  // server hides it: whatever a dependency resolves, the build keeps one
+  // (`stamp.test.ts` counts it).
   resolve: { dedupe: ["react", "react-dom"] },
   // One dependency cache per React build (`pnpm dev` is production,
   // `pnpm dev:react` and the suites development). Vite's cache hash
@@ -50,9 +50,4 @@ export default defineConfig(({ mode }) => ({
       ? "node_modules/.vite-react-prod"
       : "node_modules/.vite",
   build: { target: "esnext" },
-  // The linked Kyneta sources sit outside the package, in the sibling kyneta
-  // checkout.
-  server: {
-    fs: { allow: [fileURLToPath(new URL("../../..", import.meta.url))] },
-  },
 }))

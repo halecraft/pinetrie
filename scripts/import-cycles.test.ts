@@ -3,9 +3,9 @@ import { describe, expect, test } from "vitest"
 import {
   ALLOWED_CYCLES,
   importCycles,
-  loadedSpecifiers,
   readImportCycles,
 } from "./import-cycles.ts"
+import { loadedSpecifiers } from "./imports.ts"
 
 const ROOT = path.join(import.meta.dirname, "..")
 

@@ -58,11 +58,13 @@ import {
 } from "./startup-lines.ts"
 
 /**
- * Start a host for `command`, its page from `page`, which runs once the
- * invocation is accepted, before anything opens. Runs until a signal.
+ * Start a host for `command` with its arguments, `args`, its page from
+ * `page`, which runs once the invocation is accepted, before anything opens.
+ * Runs until a signal.
  */
 export async function runHost(
   command: HostCommand,
+  args: readonly string[],
   page: () => Promise<PageSource>,
 ): Promise<void> {
   const env = process.env
@@ -70,11 +72,7 @@ export async function runHost(
     console.error(refusalText(refusal, command))
     process.exit(2)
   }
-  const invocation = planInvocation(
-    process.argv.slice(2),
-    env.INIT_CWD ?? process.cwd(),
-    path.resolve(import.meta.dirname, "../../.."),
-  )
+  const invocation = planInvocation(args, env.INIT_CWD ?? process.cwd())
   if (invocation.kind === "refused") refuse(invocation.refusal)
   const prepared = await prepareProjectDir(invocation.folder)
   if (prepared.kind === "refused")

@@ -3,7 +3,6 @@
 // refusal.
 
 import path from "node:path"
-import { PRODUCT_NAME } from "@pinetrie/core"
 import { TIDY_DAYS } from "@pinetrie/jj"
 import { type ProjectDirRefusal, projectDirWords } from "@pinetrie/lanes"
 
@@ -18,15 +17,15 @@ type Invocation =
   | { readonly kind: "refused"; readonly refusal: Refusal }
 
 /**
- * The folder the host serves: pinetrie's own repo without an argument, else the
- * one named, a relative one read from `base`. `args` is
- * `process.argv.slice(2)`; `base` is `INIT_CWD`, else the working directory.
- * pnpm sets `INIT_CWD` to pinetrie's root, not the shell's directory.
+ * The folder the host serves: `base` without an argument, else the one
+ * named, a relative one read from `base`. `args` are the command's own;
+ * `base` is `INIT_CWD`, else the working directory. pnpm sets `INIT_CWD` to
+ * the directory pnpm was started in, and runs the app's scripts from the
+ * app's own.
  */
 export function planInvocation(
   args: readonly string[],
   base: string,
-  pinetrieRoot: string,
 ): Invocation {
   const flag = args.find(a => a.startsWith("-"))
   if (flag !== undefined)
@@ -34,18 +33,12 @@ export function planInvocation(
   const [folder, ...extra] = args
   if (extra.length > 0)
     return { kind: "refused", refusal: { kind: "extra", args } }
-  return { kind: "start", folder: invokedFolder(folder, base, pinetrieRoot) }
+  return { kind: "start", folder: invokedFolder(folder, base) }
 }
 
-/**
- * The folder a command names: pinetrie's own repo without one, else the one
- * named, a relative one read from `base`.
- */
-const invokedFolder = (
-  arg: string | undefined,
-  base: string,
-  pinetrieRoot: string,
-): string => (arg === undefined ? pinetrieRoot : path.resolve(base, arg))
+/** The folder a command names: `base` without one, else the one named, a relative one read from `base`. */
+const invokedFolder = (arg: string | undefined, base: string): string =>
+  arg === undefined ? base : path.resolve(base, arg)
 
 /** `pnpm tidy [folder] [--days N] [--dry-run]`: what to tidy, and how. */
 type TidyInvocation =
@@ -63,7 +56,6 @@ type TidyInvocation =
 export function planTidyInvocation(
   args: readonly string[],
   base: string,
-  pinetrieRoot: string,
 ): TidyInvocation {
   const folders: string[] = []
   let days = TIDY_DAYS
@@ -81,7 +73,7 @@ export function planTidyInvocation(
       days = n
       i += 1
     } else if (arg.startsWith("-"))
-      return { kind: "refused", why: `${arg}: not an option of pnpm tidy` }
+      return { kind: "refused", why: `${arg}: not an option of tidy` }
     else folders.push(arg)
   }
   if (folders.length > 1)
@@ -91,14 +83,15 @@ export function planTidyInvocation(
     }
   return {
     kind: "tidy",
-    folder: invokedFolder(folders[0], base, pinetrieRoot),
+    folder: invokedFolder(folders[0], base),
     days,
     dryRun,
   }
 }
 
-/** `pnpm tidy`'s usage line. */
-export const TIDY_USAGE = `usage: pnpm tidy [folder] [--days N] [--dry-run]  (a relative folder is read from ${PRODUCT_NAME}'s root)`
+/** `tidy`'s usage line. */
+export const TIDY_USAGE =
+  "usage: pinetrie tidy [folder] [--days N] [--dry-run]  (the current folder when none is named)"
 
 /** The session's SQLite file, and what named it. */
 export interface StoreChoice {
@@ -124,7 +117,7 @@ export function storeChoice(
 export type HostCommand = "dev" | "serve"
 
 const usage = (command: HostCommand) =>
-  `usage: pnpm ${command} [folder]  (a relative folder is read from ${PRODUCT_NAME}'s root)`
+  `usage: ${command === "dev" ? "pnpm dev" : "pinetrie serve"} [folder]  (the current folder when none is named)`
 
 /** A refusal's words, with `command`'s usage line. */
 export function refusalText(r: Refusal, command: HostCommand): string {

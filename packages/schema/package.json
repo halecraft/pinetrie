@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "@pinetrie/core": "workspace:*",
-    "@kyneta/schema": "link:../../../kyneta/workspace/pineta/packages/schema",
-    "@kyneta/yjs-schema": "link:../../../kyneta/workspace/pineta/packages/schema/backends/yjs"
+    "@kyneta/schema": "4.0.0",
+    "@kyneta/yjs-schema": "4.0.0"
   }
 }
