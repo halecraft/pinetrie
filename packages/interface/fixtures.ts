@@ -79,7 +79,7 @@ export const NEW_NOTE_COLUMN = cardIdOfKind(
   "01a0ffd2-0000-7000-8000-0000000000cc",
 )
 
-/** The media column a test's `addColumn` mints. */
+/** The media column a test's `add-column` mints. */
 export const NEW_MEDIA = cardIdOfKind(
   "media",
   "01a0ffd2-0000-7000-8000-0000000000cd",

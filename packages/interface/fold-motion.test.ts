@@ -170,7 +170,7 @@ describe("foldMotion", () => {
         kind: "view",
         canvas,
         first: null,
-        change: { kind: "foldCanvas", unfolded: true },
+        change: { kind: "fold-canvas", unfolded: true },
       }),
     ).toEqual({ column: { kind: "canvas", canvas }, unfolded: true })
     expect(
@@ -181,6 +181,6 @@ describe("foldMotion", () => {
         change: { kind: "details", card, open: true },
       }),
     ).toBeNull()
-    expect(foldMotion({ kind: "closeCanvas", canvas })).toBeNull()
+    expect(foldMotion({ kind: "close-canvas", canvas })).toBeNull()
   })
 })

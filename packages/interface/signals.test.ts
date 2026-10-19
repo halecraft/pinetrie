@@ -16,7 +16,7 @@ import {
 } from "@pinetrie/core"
 import { landedThreadCard } from "@pinetrie/rules/fixtures"
 import { describe, expect, test } from "vitest"
-import { LEVELS, type Status } from "./attention.ts"
+import type { LEVELS, Status } from "./attention.ts"
 import { canvasesWith, entry, indexEntries } from "./fixtures.ts"
 import { initialLayout, type Layout } from "./layout.ts"
 import {
@@ -24,7 +24,6 @@ import {
   holdsText,
   ownCards,
   type Signal,
-  signalOfLevel,
   signalWords,
   statusSignal,
   unsentSignals,
@@ -148,15 +147,10 @@ const sets = (m: ReturnType<typeof marks>) => ({
 })
 
 describe("signals as one family", () => {
-  test("each attention level maps to one signal of its own", () => {
-    const signals = LEVELS.map(signalOfLevel)
-    expect(signals).toEqual(["worth-a-read", "needs-you"])
-    expect(signals.every(s => SIGNALS.includes(s))).toBe(true)
-  })
   test("signalWords is total: every signal has words of its own", () => {
     for (const signal of SIGNALS) expect(signalWords(signal)).not.toBe("")
     expect(new Set(SIGNALS.map(signalWords)).size).toBe(SIGNALS.length)
-    expect(elsewhereWords("needsYou")).toBe(
+    expect(elsewhereWords("needs-you")).toBe(
       "a canvas not in the sidebar: needs you",
     )
   })
@@ -164,8 +158,8 @@ describe("signals as one family", () => {
     const raised = (level: (typeof LEVELS)[number]): Status =>
       ({ kind: level, item: {} }) as unknown as Status
     expect(statusSignal({ kind: "working" }, true)).toBe("running")
-    expect(statusSignal(raised("needsYou"), true)).toBe("needs-you")
-    expect(statusSignal(raised("worthARead"), false)).toBe("worth-a-read")
+    expect(statusSignal(raised("needs-you"), true)).toBe("needs-you")
+    expect(statusSignal(raised("worth-a-read"), false)).toBe("worth-a-read")
     expect(statusSignal(null, true)).toBe("done")
     expect(statusSignal(null, false)).toBeNull()
   })

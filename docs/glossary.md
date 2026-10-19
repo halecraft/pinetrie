@@ -106,7 +106,7 @@ words they were written with.
 | **the sidebar** | The column down the left of the page, of your open canvases; its ＋ makes a canvas (ADR-0158). | `Sidebar`, `sidebarView`, `OpenThreads` | your list |
 | **your open canvases** | The canvases in the sidebar, yours on every device. | `open:<you>` (stored), `OpenThreads` | your list, your open threads, your open tasks |
 | **the stage** | The page's main area, beside the sidebar: it shows the board or a canvas's strip, and a page such as the profile covers it (ADR-0126). | `#stage`, `Stage`, `showsStage` | the workspace |
-| **signal** | What a card or a list says by a mark, each named for what it says: unsent text of yours, needs you, worth a read, running, done (ADR-0126). | `Signal`, `signalWords`, `signalOfLevel`, `statusSignal`, `unsentSignals`, `SignalMark`, `.signal[data-signal]` | card marks, pips; `LEVEL_WORDS`, `LEVEL_CLASS`, `.root-status` |
+| **signal** | What a card or a list says by a mark, each named for what it says: unsent text of yours, needs you, worth a read, running, done (ADR-0126). | `Signal`, `signalWords`, `statusSignal`, `unsentSignals`, `SignalMark`, `.signal[data-signal]` | card marks, pips; `LEVEL_WORDS`, `LEVEL_CLASS`, `.root-status` |
 
 ## Threads
 
@@ -142,7 +142,7 @@ a value is stored.
 | **ask** | The message that started a run (ADR-0106). | `askOf`, `indexAsks` (by prompt) | |
 | **fork** | The point, at an entry, where threads diverge; not an entry. Forking before an entry edits it (ADR-0043); after it, branches. | `ThreadOrigin.fork` | |
 | **margin** | An entry's or an image's surface, for comments on it; shut, a count beside it; open, the comments under it (ADR-0126, ADR-0182). | place `margin`, `marginCards`, `marginCounts`, `Margin`, `MarginCount` | |
-| **comment** | A note on an entry or an image, in its margin: people read it; the agent does once a reference to a comment on an entry is queued (ADR-0126, ADR-0182). | `comment`, `planComment`, `queueReference`, `commentMarkdown` | annotation |
+| **comment** | A note on an entry or an image, in its margin: people read it; the agent does once a reference to a comment on an entry is queued (ADR-0126, ADR-0182). | `comment`, `planComment`, `queue-reference`, `commentMarkdown` | annotation |
 | **derivation** | What the host computes from a thread's entries and replaces as they grow: a digest, a run-end report. Never an entry, never a card, never read by the agent; one a model made says so. | `DigestRecord`, `RunEndReportRecord` | host record (for these), annotation |
 
 ## The board

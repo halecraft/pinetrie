@@ -37,8 +37,8 @@ const R2 = entryId("r2")
 const K1 = canvasIdFor("1")
 const _K2 = canvasIdFor("2")
 
-const said = (s: "needsYou" | "worthARead" | "done"): RunEndReport => ({
-  kind: "modelSaid",
+const said = (s: "needs-you" | "worth-a-read" | "done"): RunEndReport => ({
+  kind: "model-said",
   urgency: s,
   reason: s === "done" ? null : `why ${s}`,
 })
@@ -70,7 +70,7 @@ const input = (over: Partial<AttentionInput> = {}): AttentionInput => ({
     [A, [BEA, ADA]],
     [B, [BEA]],
   ]),
-  runEndReports: new Map([[A, report(A, said("needsYou"))]]),
+  runEndReports: new Map([[A, report(A, said("needs-you"))]]),
   openProposed: [],
   sshAsks: [],
   owner: null,
@@ -91,8 +91,8 @@ const proposed = (
 })
 
 test("highest: needs you over worth a read, and null for none", () => {
-  expect(highest(["worthARead", "needsYou", null])).toBe("needsYou")
-  expect(highest(["needsYou", "worthARead"])).toBe("needsYou")
+  expect(highest(["worth-a-read", "needs-you", null])).toBe("needs-you")
+  expect(highest(["needs-you", "worth-a-read"])).toBe("needs-you")
   expect(highest([null])).toBeNull()
 })
 
@@ -101,14 +101,14 @@ test("you follow a thread you wrote on", () => {
   expect(follows(ADA, [BEA])).toBe(false)
 })
 
-test.each<[string, RunEndReport, "needsYou" | "worthARead" | null]>([
-  ["said needs you", said("needsYou"), "needsYou"],
-  ["said worth a read", said("worthARead"), "worthARead"],
+test.each<[string, RunEndReport, "needs-you" | "worth-a-read" | null]>([
+  ["said needs you", said("needs-you"), "needs-you"],
+  ["said worth a read", said("worth-a-read"), "worth-a-read"],
   ["said done", said("done"), null],
-  ["failed", { kind: "failed", error: "rate limited" }, "needsYou"],
-  ["unclassified", { kind: "unclassified" }, "needsYou"],
+  ["failed", { kind: "failed", error: "rate limited" }, "needs-you"],
+  ["unclassified", { kind: "unclassified" }, "needs-you"],
   ["stopped by you", { kind: "stopped", by: ADA }, null],
-  ["stopped by someone else", { kind: "stopped", by: BEA }, "worthARead"],
+  ["stopped by someone else", { kind: "stopped", by: BEA }, "worth-a-read"],
   ["pending", { kind: "pending" }, null],
 ])("attentionLevel: %s", (_, v, level) => {
   expect(attentionLevel(v, ADA)).toBe(level)
@@ -131,7 +131,7 @@ describe("attentionItems", () => {
       {
         lane: C,
         end: entryId("e-c"),
-        level: "needsYou",
+        level: "needs-you",
         raised: { kind: "ssh", host: "pop" },
       },
     ])
@@ -146,8 +146,8 @@ describe("attentionItems", () => {
       {
         lane: A,
         end: "e-5",
-        level: "needsYou",
-        raised: { kind: "runEnd", report: said("needsYou"), ask: "p-1" },
+        level: "needs-you",
+        raised: { kind: "run-end", report: said("needs-you"), ask: "p-1" },
       },
     ])
   })
@@ -156,7 +156,7 @@ describe("attentionItems", () => {
     expect(
       attentionItems(
         input({
-          runEndReports: new Map([[B, report(B, said("needsYou"))]]),
+          runEndReports: new Map([[B, report(B, said("needs-you"))]]),
           openProposed: [proposed(B, cardIdFor("c1"))],
         }),
       ),
@@ -191,7 +191,7 @@ describe("attentionItems", () => {
         input({
           person: dismissed,
           runEndReports: new Map([
-            [A, report(A, said("needsYou"), "e-9", "p-2")],
+            [A, report(A, said("needs-you"), "e-9", "p-2")],
           ]),
         }),
       ),
@@ -213,7 +213,7 @@ describe("attentionItems", () => {
       }),
     )
     expect(items.map(i => [i.level, i.raised.kind])).toEqual([
-      ["needsYou", "ready"],
+      ["needs-you", "ready"],
     ])
     const dismissed = person({
       dismissedReady: new Map([[A, cardIdFor("c1")]]),
@@ -241,8 +241,8 @@ describe("attentionItems", () => {
 
 test("the sidebar and the column read one standing report", () => {
   const reports = [
-    said("needsYou"),
-    said("worthARead"),
+    said("needs-you"),
+    said("worth-a-read"),
     said("done"),
     { kind: "pending" } as const,
     { kind: "failed", error: "x" } as const,
@@ -268,7 +268,7 @@ test("the sidebar and the column read one standing report", () => {
           busy,
         })
         const raised = attentionItems(facts).some(
-          i => i.lane === A && i.raised.kind === "runEnd",
+          i => i.lane === A && i.raised.kind === "run-end",
         )
         expect(standingRunEnds(facts).get(A)?.raised ?? false).toBe(raised)
       }
@@ -285,7 +285,7 @@ describe("threadStatus and canvasStatus", () => {
       items,
       work: new Map([[B, "running"]]),
     })
-    expect(status.get(A)?.kind).toBe("needsYou")
+    expect(status.get(A)?.kind).toBe("needs-you")
     expect(status.get(B)).toEqual({ kind: "working" })
     expect(
       threadStatus({
@@ -305,7 +305,7 @@ describe("threadStatus and canvasStatus", () => {
       [B, "held"],
     ] as const)
     const status = threadStatus({ ...facts, items, work })
-    expect(status.get(A)?.kind).toBe("needsYou")
+    expect(status.get(A)?.kind).toBe("needs-you")
     expect(status.has(B)).toBe(false)
   })
 
@@ -320,8 +320,8 @@ describe("threadStatus and canvasStatus", () => {
     // The higher first, so a later, lower thread cannot win by coming last.
     const threads = new Map<ThreadId, Status>([
       [C, { kind: "working" }],
-      [B, { kind: "needsYou", item }],
-      [A, { kind: "worthARead", item }],
+      [B, { kind: "needs-you", item }],
+      [A, { kind: "worth-a-read", item }],
     ])
     const of = (canvasOf: [ThreadId, CanvasId][]) =>
       canvasStatus(threads, new Map(canvasOf))
@@ -330,7 +330,7 @@ describe("threadStatus and canvasStatus", () => {
         [A, K1],
         [B, K1],
       ]).get(K1)?.kind,
-    ).toBe("needsYou")
+    ).toBe("needs-you")
     expect(
       of([
         [A, K1],
@@ -343,7 +343,7 @@ describe("threadStatus and canvasStatus", () => {
 
 describe("arrivals", () => {
   const needs: Status = {
-    kind: "needsYou",
+    kind: "needs-you",
     item: attentionItems(input())[0] as never,
   }
   const working: Status = { kind: "working" }
@@ -397,10 +397,10 @@ test("attentionWords: each reason, as a value worded once", () => {
   const nameOf = (w: string) => (w === BEA ? "Bea" : w)
   const of = (v: RunEndReport) =>
     attentionWords(
-      { kind: "runEnd", report: v, ask: entryId("p") as EntryId },
+      { kind: "run-end", report: v, ask: entryId("p") as EntryId },
       nameOf,
     )
-  expect(of(said("needsYou"))).toBe("why needsYou")
+  expect(of(said("needs-you"))).toBe("why needs-you")
   expect(of({ kind: "stopped", by: BEA })).toBe("Bea stopped it")
   expect(of({ kind: "failed", error: "rate limited" })).toBe(
     "the run failed: rate limited",
@@ -412,7 +412,7 @@ test("attentionWords: each reason, as a value worded once", () => {
 })
 
 test("markLevel: the highest level among the canvases it covers; working raises nothing", () => {
-  const item = (level: "needsYou" | "worthARead") => ({
+  const item = (level: "needs-you" | "worth-a-read") => ({
     lane: threadIdFor("m"),
     end: entryId("e"),
     level,
@@ -421,11 +421,11 @@ test("markLevel: the highest level among the canvases it covers; working raises 
   const [a, b, c] = [canvasIdFor("a"), canvasIdFor("b"), canvasIdFor("c")]
   const status = new Map<CanvasId, Status>([
     [a, { kind: "working" }],
-    [b, { kind: "worthARead", item: item("worthARead") }],
-    [c, { kind: "needsYou", item: item("needsYou") }],
+    [b, { kind: "worth-a-read", item: item("worth-a-read") }],
+    [c, { kind: "needs-you", item: item("needs-you") }],
   ])
   expect(markLevel(status, [a])).toBeNull()
-  expect(markLevel(status, [a, b])).toBe("worthARead")
-  expect(markLevel(status, [b, c])).toBe("needsYou")
+  expect(markLevel(status, [a, b])).toBe("worth-a-read")
+  expect(markLevel(status, [b, c])).toBe("needs-you")
   expect(markLevel(status, [])).toBeNull()
 })

@@ -569,7 +569,7 @@ async function dockerContract(
     closedPort.stop()
     grantedPort.stop()
     await runtime
-      .disk({ kind: "deleteSnapshots", ids: snapshots })
+      .disk({ kind: "delete-snapshots", ids: snapshots })
       .catch(() => {})
     await a.close()
     if (own !== null) {

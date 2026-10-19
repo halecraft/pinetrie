@@ -990,7 +990,7 @@ describe("a chat from a card that found its lane busy", () => {
   })
 })
 
-test("setCommand: the command set, its place and placer kept", async () => {
+test("set-command: the command set, its place and placer kept", async () => {
   const { b, commands, put } = setUp()
   put({ placer: BEA })
   const done = await commands.setCommand(ADA, C1, "get-latest")

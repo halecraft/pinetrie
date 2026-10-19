@@ -31,22 +31,22 @@ describe("parseUrgencyLine", () => {
   test.each([
     [
       "needs you: asks whether to drop the v1 table",
-      { urgency: "needsYou", reason: "asks whether to drop the v1 table" },
+      { urgency: "needs-you", reason: "asks whether to drop the v1 table" },
     ],
     [
       "Needs you: which database to use?",
-      { urgency: "needsYou", reason: "which database to use?" },
+      { urgency: "needs-you", reason: "which database to use?" },
     ],
     [
       "worth a read: explains why the cache misses.",
-      { urgency: "worthARead", reason: "explains why the cache misses" },
+      { urgency: "worth-a-read", reason: "explains why the cache misses" },
     ],
     ["done", { urgency: "done", reason: null }],
     ["Done.", { urgency: "done", reason: null }],
     ["done: nothing more to do", { urgency: "done", reason: null }],
     [
       '"needs you: pick a name"',
-      { urgency: "needsYou", reason: "pick a name" },
+      { urgency: "needs-you", reason: "pick a name" },
     ],
     ["needs you", null],
     ["needs you:", null],
@@ -61,7 +61,7 @@ describe("parseUrgencyLine", () => {
 describe("parseEndReply", () => {
   test("an urgency line alone is the reply's only line", () => {
     expect(parseEndReply("needs you: pick a name", "urgency")).toEqual({
-      urgency: { urgency: "needsYou", reason: "pick a name" },
+      urgency: { urgency: "needs-you", reason: "pick a name" },
       digest: null,
     })
     expect(parseEndReply("done\nAll tests pass.", "urgency")).toEqual({
@@ -74,10 +74,10 @@ describe("parseEndReply", () => {
     expect(
       parseEndReply(
         "worth a read: why the rail drifts\n\nRail drift traced to rounding\n- `rail.tsx` rounds twice",
-        "urgency and digest",
+        "urgency-and-digest",
       ),
     ).toEqual({
-      urgency: { urgency: "worthARead", reason: "why the rail drifts" },
+      urgency: { urgency: "worth-a-read", reason: "why the rail drifts" },
       digest: {
         headline: "Rail drift traced to rounding",
         points: ["`rail.tsx` rounds twice"],
@@ -87,13 +87,13 @@ describe("parseEndReply", () => {
 
   test("each half is refused on its own", () => {
     expect(
-      parseEndReply("I think it is done\nFixed the rail", "urgency and digest"),
+      parseEndReply("I think it is done\nFixed the rail", "urgency-and-digest"),
     ).toEqual({
       urgency: null,
       digest: { headline: "Fixed the rail", points: [] },
     })
     expect(
-      parseEndReply("done\n- a point with no headline", "urgency and digest"),
+      parseEndReply("done\n- a point with no headline", "urgency-and-digest"),
     ).toEqual({ urgency: { urgency: "done", reason: null }, digest: null })
   })
 
@@ -126,7 +126,7 @@ describe("planRunEnded", () => {
     ).toEqual({
       report: null,
       request: {
-        answer: "urgency and digest",
+        answer: "urgency-and-digest",
         lines: digest,
         previous: "Reading",
       },
@@ -191,10 +191,10 @@ describe("runEndedToWrite", () => {
       lane: LANE,
       ask: ASK,
       end: END,
-      answer: "urgency and digest",
+      answer: "urgency-and-digest",
       stored: { report: pending, digest: undefined },
       reply: {
-        urgency: { urgency: "needsYou", reason: "pick a name" },
+        urgency: { urgency: "needs-you", reason: "pick a name" },
         digest: { headline: "Named the rail", points: [] },
       },
       at: 5,
@@ -219,8 +219,8 @@ describe("runEndedToWrite", () => {
         ask: ASK,
         end: END,
         report: {
-          kind: "modelSaid",
-          urgency: "needsYou",
+          kind: "model-said",
+          urgency: "needs-you",
           reason: "pick a name",
         },
       },
@@ -283,7 +283,7 @@ test("digestRequest asks for the urgency line, alone or with the summary", () =>
     "Answer with the urgency line alone.",
   )
   expect(
-    digestRequest({ ...base, answer: "urgency and digest" }).user,
+    digestRequest({ ...base, answer: "urgency-and-digest" }).user,
   ).toContain("Answer with the urgency line, then the summary.")
   expect(digestRequest({ ...base, answer: "digest" }).user).not.toContain(
     "Answer with",

@@ -433,7 +433,7 @@ model for the thread's focus from its asks and their headlines, or `same`
 **A thread's followers are told how its runs end** (ADR-0077). You follow a
 thread once you have written on it (`RootRecord.threads`). At each run's end
 the same request asks a model for an urgency line, digests on or off: needs you,
-worth a read, or done, with a one-line reason (`pinetrie.runEndReport`, one per
+worth a read, or done, with a one-line reason (`pinetrie.run-end-report`, one per
 lane); a failed or stopped run's end report is its facts. A canvas's item in
 the sidebar says what its threads need of you: a still ring while the agent works, an amber
 dot that pulses as it arrives when something needs you (a question, an

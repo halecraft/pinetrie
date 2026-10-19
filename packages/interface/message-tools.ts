@@ -42,7 +42,7 @@ export interface MessageTools {
   readonly comment: boolean
   /** Send it again: a sibling at its parent, or a root's first message on a new canvas. */
   readonly edit:
-    | Extract<MessageAct, { kind: "branch" | "newCanvas" }>
+    | Extract<MessageAct, { kind: "branch" | "new-canvas" }>
     | undefined
   /** `→`: a branch at the message. */
   readonly branch: Extract<MessageAct, { kind: "branch" }> | undefined
@@ -59,9 +59,9 @@ export const branchPrefill = (lane: ThreadLane): Prefill | undefined =>
 /** What a reader asked of a message. */
 export type MessageAct =
   | { readonly kind: "branch"; readonly branch: OpenBranch }
-  | { readonly kind: "newCanvas"; readonly prefill: Prefill }
+  | { readonly kind: "new-canvas"; readonly prefill: Prefill }
   /** Show an entry: a closed branch's first message. */
-  | { readonly kind: "openAt"; readonly entry: EntryId }
+  | { readonly kind: "open-at"; readonly entry: EntryId }
   /**
    * Comment on the message `entry`, in `thread`: a new, empty note `card`
    * in its margin.
@@ -131,7 +131,7 @@ function editOf(
     blank: false,
   }
   return parentId === null
-    ? { kind: "newCanvas", prefill }
+    ? { kind: "new-canvas", prefill }
     : { kind: "branch", branch: { at: parentId, prefill } }
 }
 

@@ -60,7 +60,7 @@ export function planSpinOff(
   }
   return [
     {
-      kind: "spinOff",
+      kind: "spin-off",
       request,
       sidebar: to.kind === "sidebar" ? { before: to.before } : null,
     },

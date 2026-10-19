@@ -176,10 +176,10 @@ describe("take into the inventory", () => {
   test("into the selected slot when it is empty, else the first empty", () => {
     const s = state({ cards: [card(C1, atEnd)], selected: 4 })
     const move = { card: C1, from: atEnd, to: inventory }
-    expect(plan({ kind: "putAway", card: C1 }, s)).toEqual([
+    expect(plan({ kind: "put-away", card: C1 }, s)).toEqual([
       { kind: "inventory", act: { kind: "show", how: "peek" } },
       {
-        kind: "moveCard",
+        kind: "move-card",
         move,
         how: { actedAt: { kind: "inventory" }, slot: 4 },
         queuedBy: null,
@@ -188,7 +188,7 @@ describe("take into the inventory", () => {
       },
     ])
     const intoInventory = plan(
-      { kind: "putAway", card: C1 },
+      { kind: "put-away", card: C1 },
       state({ cards: [card(C1, atEnd)], selected: 4, slots: { "4": C2 } }),
     )
     expect(intoInventory[1]).toMatchObject({ how: { slot: 0 } })
@@ -200,7 +200,7 @@ describe("take into the inventory", () => {
     )
     expect(
       plan(
-        { kind: "putAway", card: C1 },
+        { kind: "put-away", card: C1 },
         state({ cards: [card(C1, atEnd)], slots }),
       )[1],
     ).toEqual({
@@ -250,7 +250,7 @@ describe("which kinds are taken and put (KINDS)", () => {
     for (const c of ofEveryKind()) {
       const s = state({ cards: [c] })
       const holds = fitsPlace(c.kind, "inventory")
-      const take = plan({ kind: "putAway", card: c.id }, s)
+      const take = plan({ kind: "put-away", card: c.id }, s)
       const put = plan(
         {
           kind: "put",
@@ -327,7 +327,7 @@ describe("a queued reference", () => {
       ),
     ).toEqual([
       {
-        kind: "moveCard",
+        kind: "move-card",
         move: {
           card: id,
           from,
@@ -341,7 +341,7 @@ describe("a queued reference", () => {
     ])
     expect(plan(inColumn({ kind: "trash", card: id }, column), s)).toEqual([
       {
-        kind: "moveCard",
+        kind: "move-card",
         move: { card: id, from, to: TRASH_PLACE },
         how,
         queuedBy: null,
@@ -358,7 +358,7 @@ describe("comments", () => {
     expect(
       plan(
         inColumn(
-          { kind: "queueReference", card, entry: A, thread: TEST_THREAD },
+          { kind: "queue-reference", card, entry: A, thread: TEST_THREAD },
           { kind: "card", card: TEST_THREAD },
         ),
         state(),
@@ -404,7 +404,7 @@ describe("put", () => {
       ),
     ).toEqual([
       {
-        kind: "moveCard",
+        kind: "move-card",
         move,
         how: { actedAt: { kind: "column", key: threadKey }, slot: null },
         queuedBy: null,
@@ -433,7 +433,7 @@ describe("put", () => {
       ),
     ).toEqual([
       {
-        kind: "moveCard",
+        kind: "move-card",
         move: {
           card: C1,
           from: inventory,
@@ -462,7 +462,7 @@ describe("put", () => {
         },
         s,
       ),
-    ).toEqual([{ kind: "swapSlots", a: 3, b: 7 }])
+    ).toEqual([{ kind: "swap-slots", a: 3, b: 7 }])
     expect(
       plan(
         {
@@ -473,7 +473,7 @@ describe("put", () => {
         },
         s,
       )[1],
-    ).toMatchObject({ kind: "moveCard", how: { slot: 7 } })
+    ).toMatchObject({ kind: "move-card", how: { slot: 7 } })
   })
 
   test("a column no composer publishes, or where the card already is: nothing", () => {
@@ -530,7 +530,7 @@ describe("your message", () => {
     const s = state({ cards: [card(C1, note)] })
     expect(plan(toComposer(), s)).toEqual([
       {
-        kind: "moveCard",
+        kind: "move-card",
         move: { card: C1, from: noteKey, to: atEnd },
         how: { actedAt: { kind: "column", key: threadKey }, slot: null },
         queuedBy: null,
@@ -543,7 +543,7 @@ describe("your message", () => {
   test("a message with text takes the note's place, in one move of the two: one undo", () => {
     expect(plan(toComposer(), withMessage(true, [card(C1, note)]))).toEqual([
       {
-        kind: "moveCards",
+        kind: "move-cards",
         moves: [
           { move: { card: C1, from: noteKey, to: atEnd }, slot: null },
           { move: { card: MSG, from: atEnd, to: noteKey }, slot: null },
@@ -558,7 +558,7 @@ describe("your message", () => {
   test("a message with text goes to the slot a card from your inventory leaves", () => {
     const [keep] = plan(toComposer(), withMessage(true, [card(C1, inventory)]))
     expect(keep).toMatchObject({
-      kind: "moveCards",
+      kind: "move-cards",
       moves: [
         { move: { card: C1, to: atEnd }, slot: null },
         { move: { card: MSG, to: inventory }, slot: 3 },
@@ -569,7 +569,7 @@ describe("your message", () => {
   test("an empty message is trashed as the card takes its place", () => {
     const [keep] = plan(toComposer(), withMessage(false, [card(C1, note)]))
     expect(keep).toMatchObject({
-      kind: "moveCards",
+      kind: "move-cards",
       moves: [
         { move: { card: C1, to: atEnd } },
         { move: { card: MSG, to: { kind: "trash" } } },
@@ -580,10 +580,10 @@ describe("your message", () => {
   test("Move to ▸ notes: your message goes to the note column nearest its thread", () => {
     const s = state({ cards: [card(C1, atEnd)] })
     expect(
-      plan(inColumn({ kind: "toNote", card: C1 }, TRUNK_COLUMN), s),
+      plan(inColumn({ kind: "to-note", card: C1 }, TRUNK_COLUMN), s),
     ).toEqual([
       {
-        kind: "moveCard",
+        kind: "move-card",
         move: { card: C1, from: atEnd, to: toNote },
         how: { actedAt: { kind: "column", key: threadKey }, slot: null },
         queuedBy: null,
@@ -611,7 +611,7 @@ describe("a note column", () => {
     const s = state({ cards: [card(C1, atEnd), card(C3, note)] })
     expect(plan(into(C1), s)).toEqual([
       {
-        kind: "moveCard",
+        kind: "move-card",
         move: { card: C1, from: atEnd, to: { kind: "note", column: OTHER } },
         how: { actedAt: { kind: "column", key: OTHER }, slot: null },
         queuedBy: null,
@@ -636,7 +636,7 @@ describe("a note column", () => {
       ),
     ).toEqual([
       {
-        kind: "reorderCard",
+        kind: "reorder-card",
         reorder: {
           card: C3,
           at: { kind: "note", column: NOTES },
@@ -654,7 +654,7 @@ describe("pin and unpin", () => {
     const s = state({ cards: [card(C1, atEnd)] })
     expect(plan(inColumn({ kind: "pin", card: C1 }, TRUNK_COLUMN), s)).toEqual([
       {
-        kind: "moveCard",
+        kind: "move-card",
         move: { card: C1, from: atEnd, to: pinnedKey },
         how: { actedAt: { kind: "column", key: threadKey }, slot: null },
         queuedBy: null,
@@ -669,7 +669,7 @@ describe("pin and unpin", () => {
     expect(
       plan(inColumn({ kind: "unpin", card: C1 }, TRUNK_COLUMN), s)[0],
     ).toMatchObject({
-      kind: "moveCard",
+      kind: "move-card",
       move: { card: C1, from: pinnedKey, to: toNote },
     })
   })
@@ -689,10 +689,10 @@ describe("pin and unpin", () => {
     } as const
     const s = state({ cards: [card(C1, atEnd), card(C2, pinnedToCanvas)] })
     expect(
-      plan(inColumn({ kind: "pinToCanvas", card: C1 }, TRUNK_COLUMN), s),
+      plan(inColumn({ kind: "pin-to-canvas", card: C1 }, TRUNK_COLUMN), s),
     ).toEqual([
       {
-        kind: "moveCard",
+        kind: "move-card",
         move: {
           card: C1,
           from: atEnd,
@@ -705,7 +705,7 @@ describe("pin and unpin", () => {
       },
     ])
     // Pinned to it already: nothing.
-    expect(plan(inColumn({ kind: "pinToCanvas", card: C2 }), s)).toEqual([])
+    expect(plan(inColumn({ kind: "pin-to-canvas", card: C2 }), s)).toEqual([])
     expect(plan(inColumn({ kind: "unpin", card: C2 }), s)[0]).toMatchObject({
       move: {
         card: C2,
@@ -720,7 +720,7 @@ describe("pin and unpin", () => {
           kind: "put",
           source: { kind: "card", card: C1 },
           how: "move",
-          target: { kind: "canvasPinned", canvas: TEST_CANVAS },
+          target: { kind: "canvas-pinned", canvas: TEST_CANVAS },
         },
         state({ cards: [card(C1, inventory)], slots: { "3": C1 } }),
       )[0],
@@ -743,7 +743,7 @@ describe("pin and unpin", () => {
         s,
       )[0],
     ).toMatchObject({
-      kind: "moveCard",
+      kind: "move-card",
       move: { card: C1, from: inventory, to: pinnedKey },
     })
   })
@@ -756,17 +756,17 @@ test("afterKeep closes only when the keep was accepted", () => {
 })
 
 describe("undo and redo of moves", () => {
-  const undo: Intent = { kind: "undoMove", direction: "undo", inPanel: false }
+  const undo: Intent = { kind: "undo-move", direction: "undo", inPanel: false }
 
   test("on a canvas: that canvas's history", () => {
     expect(plan(undo, state({}, onR1))).toEqual([
-      { kind: "undoMoves", canvas: TEST_CANVAS, direction: "undo" },
+      { kind: "undo-moves", canvas: TEST_CANVAS, direction: "undo" },
     ])
   })
 
   test("with the inventory panel focused: this tab's swaps", () => {
     expect(plan({ ...undo, inPanel: true } as Intent, state())).toEqual([
-      { kind: "undoSwap", direction: "undo" },
+      { kind: "undo-swap", direction: "undo" },
     ])
   })
 
@@ -776,16 +776,16 @@ describe("undo and redo of moves", () => {
       here: { kind: "nothing" },
     })
     expect(plan(undo, state({}, nothing))).toEqual([
-      { kind: "undoMoves", canvas: null, direction: "undo" },
+      { kind: "undo-moves", canvas: null, direction: "undo" },
     ])
   })
 })
 
 describe("afterUndo: what an undo's answer brings into view", () => {
   const answered = (outcome: Outcome, s: IntentState = state({}, onR1)) =>
-    plan({ kind: "undoAnswered", outcome }, s)
+    plan({ kind: "undo-answered", outcome }, s)
 
-  test("a card back at a thread's end: shown as openAt shows it", () => {
+  test("a card back at a thread's end: shown as open-at shows it", () => {
     expect(
       answered({ kind: "undone", cards: [{ card: C1, place: atEnd }] }),
     ).toContainEqual({ kind: "reveal", entry: A })
@@ -820,7 +820,7 @@ describe("afterUndo: what an undo's answer brings into view", () => {
       ],
     })
     expect(effects).toContainEqual({ kind: "reveal", entry: A })
-    expect(effects.at(-1)).toEqual({ kind: "revealCard", card: C1 })
+    expect(effects.at(-1)).toEqual({ kind: "reveal-card", card: C1 })
   })
 
   test("back in your inventory: the panel", () => {
@@ -912,7 +912,7 @@ describe("afterUndo: what an undo's answer brings into view", () => {
   })
 })
 
-describe("openTrace: where a trace leads", () => {
+describe("open-trace: where a trace leads", () => {
   const BEA = writerId("bea@x.io")
   const trace = (message: ReturnType<typeof entryId> | null) =>
     ({
@@ -926,7 +926,7 @@ describe("openTrace: where a trace leads", () => {
       at: 1,
     }) as const
   const follow = (s: IntentState, message: ReturnType<typeof entryId> | null) =>
-    plan({ kind: "openTrace", trace: trace(message) }, s)
+    plan({ kind: "open-trace", trace: trace(message) }, s)
 
   test("a card still here: shown where it is now, as an undo shows it", () => {
     expect(
@@ -992,7 +992,7 @@ describe("a card made a thread", () => {
       ),
     ).toEqual([
       {
-        kind: "spinOff",
+        kind: "spin-off",
         request: {
           kind: "spin-off",
           move: { card: C1, from: want.from, to: spun },
@@ -1011,7 +1011,7 @@ describe("a card made a thread", () => {
     const s = state({ cards: [card(C1, note)] })
     expect(
       plan(
-        inColumn({ kind: "spinOff", card: C1, state: STATE1 }, TRUNK_COLUMN),
+        inColumn({ kind: "spin-off", card: C1, state: STATE1 }, TRUNK_COLUMN),
         s,
       ),
     ).toEqual(
@@ -1081,7 +1081,7 @@ describe("a new card", () => {
     text: string,
     key: string,
   ): Effect => ({
-    kind: "createCard",
+    kind: "create-card",
     card: { kind: "text", id: C1, owner: ADA, placer: ADA, place, content },
     text,
     how: { actedAt: { kind: "column", key }, slot: null },
@@ -1115,7 +1115,7 @@ describe("a new card", () => {
     (_, to, column, place) => {
       expect(
         plan(
-          inColumn({ kind: "newCard", card: C1, to, text: "j" }, column),
+          inColumn({ kind: "new-card", card: C1, to, text: "j" }, column),
           state(),
         ),
       ).toEqual([made(place, "j", keyText(column))])
@@ -1142,7 +1142,7 @@ describe("a new card", () => {
         "",
         TEST_THREAD,
       ),
-      { kind: "armFocus", key: { kind: "card", card: C1 } },
+      { kind: "arm-focus", key: { kind: "card", card: C1 } },
     ])
   })
 })
@@ -1273,7 +1273,7 @@ describe("landing a copy", () => {
       MINTED,
     )
     expect(onto[0]).toMatchObject({
-      kind: "moveCard",
+      kind: "move-card",
       move: { card: F1, to: { kind: "canvas-at", canvas: TEST_CANVAS } },
     })
     const between = planPut(
@@ -1285,7 +1285,7 @@ describe("landing a copy", () => {
     )
     expect(between).toEqual([
       {
-        kind: "moveCards",
+        kind: "move-cards",
         moves: [
           {
             move: {
@@ -1368,7 +1368,7 @@ describe("landing a copy", () => {
     ).toMatchObject([
       { kind: "inventory" },
       {
-        kind: "moveCards",
+        kind: "move-cards",
         moves: [
           { move: { card: C2, to: TRASH_PLACE } },
           { move: { card: C1, to: inventory }, slot: 4 },
@@ -1447,7 +1447,7 @@ describe("landing a copy", () => {
     const s = state({ cards: [reference], slots: { "6": ref } })
     expect(
       plan(
-        { kind: "editAsText", reference: ref, card: NEW_TEXT, text: "q" },
+        { kind: "edit-as-text", reference: ref, card: NEW_TEXT, text: "q" },
         s,
       ),
     ).toEqual([
@@ -1507,7 +1507,7 @@ describe("images in media columns", () => {
       }),
     ).toMatchObject([
       {
-        kind: "reorderCard",
+        kind: "reorder-card",
         reorder: {
           card: newImage(3),
           at: { kind: "image", column: M1 },
@@ -1519,7 +1519,7 @@ describe("images in media columns", () => {
     expect(
       put(newImage(1), { kind: "images", column: M1, on: null }),
     ).toMatchObject([
-      { kind: "reorderCard", reorder: { after: newImage(3), before: null } },
+      { kind: "reorder-card", reorder: { after: newImage(3), before: null } },
     ])
   })
 
@@ -1541,7 +1541,7 @@ describe("images in media columns", () => {
       put(newImage(1), { kind: "images", column: M2, on: null }),
     ).toMatchObject([
       {
-        kind: "moveCard",
+        kind: "move-card",
         move: {
           card: newImage(1),
           to: { kind: "image-at", column: M2, before: null },
@@ -1568,7 +1568,7 @@ describe("images in media columns", () => {
       }),
     ).toMatchObject([
       {
-        kind: "reorderCard",
+        kind: "reorder-card",
         reorder: { after: newImage(2), before: newImage(3) },
       },
     ])
@@ -1589,7 +1589,7 @@ describe("images in media columns", () => {
       ),
     ).toMatchObject([
       {
-        kind: "moveCard",
+        kind: "move-card",
         move: { to: { kind: "image-at", column: M2, before: newImage(5) } },
       },
     ])
@@ -1600,7 +1600,7 @@ describe("images in media columns", () => {
       put(newImage(1), { kind: "canvas", canvas: TEST_CANVAS, after: null }),
     ).toMatchObject([
       {
-        kind: "moveCard",
+        kind: "move-card",
         move: { to: { kind: "canvas-at", canvas: TEST_CANVAS, after: null } },
       },
     ])

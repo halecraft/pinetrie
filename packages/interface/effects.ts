@@ -69,14 +69,14 @@ export type Effect =
       readonly moves: boolean
     }
   /** Show the sidebar at `width`, and keep that choice for this tab. */
-  | { readonly kind: "listWidth"; readonly width: ListWidth }
+  | { readonly kind: "list-width"; readonly width: ListWidth }
   /** Show a page over the stage, or, with null, the stage. */
   | { readonly kind: "page"; readonly to: PageName | null }
   /** Open, type in, clear or close the search of the root you are on. */
   | { readonly kind: "search"; readonly act: SearchAct }
   /** Mark what `lane` raised "not needed", in your attention document. */
   | {
-      readonly kind: "notNeeded"
+      readonly kind: "not-needed"
       readonly lane: ThreadId
       readonly raised: Raised
     }
@@ -89,7 +89,7 @@ export type Effect =
    * answer what follows: for the sidebar, the new canvas placed and shown.
    */
   | {
-      readonly kind: "spinOff"
+      readonly kind: "spin-off"
       readonly request: Extract<HostRequest, { kind: "spin-off" }>
       readonly sidebar: { readonly before: CanvasId | null } | null
     }
@@ -98,7 +98,7 @@ export type Effect =
    * whether `moved` runs.
    */
   | {
-      readonly kind: "moveCanvas"
+      readonly kind: "move-canvas"
       readonly move: Extract<HostRequest, { kind: "move-canvas" }>
       readonly moved: readonly Effect[]
     }
@@ -113,7 +113,7 @@ export type Effect =
       readonly card: TextCardId | null
     }
   | {
-      readonly kind: "createCard"
+      readonly kind: "create-card"
       readonly card: TextCard
       readonly text: string
       readonly how: MoveHow
@@ -134,12 +134,12 @@ export type Effect =
       readonly here: CanvasId | null
     }
   /** What the clipboard cell shows: the copy this tab just made. */
-  | { readonly kind: "clipboardCell"; readonly clip: Clip }
+  | { readonly kind: "clipboard-cell"; readonly clip: Clip }
   /** Text at the caret of the text box that has focus. */
-  | { readonly kind: "insertText"; readonly text: string }
+  | { readonly kind: "insert-text"; readonly text: string }
   /** A move: a take into the inventory, a put, an unqueue, a trash. */
   | {
-      readonly kind: "moveCard"
+      readonly kind: "move-card"
       readonly move: TypedMove
       readonly how: MoveHow
       /** Who queued the card, for an unqueue: a refusal names them. */
@@ -154,7 +154,7 @@ export type Effect =
    * with no `from` makes the card there, carrying `command`.
    */
   | {
-      readonly kind: "queueCard"
+      readonly kind: "queue-card"
       readonly move: QueueMove
       readonly hold: QueueHoldChange
       readonly command: CardCommand | null
@@ -162,12 +162,12 @@ export type Effect =
     }
   /** A reorder, drawn at once, as a move is. */
   | {
-      readonly kind: "reorderCard"
+      readonly kind: "reorder-card"
       readonly reorder: Reorder
       readonly how: MoveHow
     }
   /** Swap two slots of your inventory, as one step of this tab's swaps. */
-  | { readonly kind: "swapSlots"; readonly a: number; readonly b: number }
+  | { readonly kind: "swap-slots"; readonly a: number; readonly b: number }
   /**
    * Moves sent as one, which the host accepts or refuses whole:
    * an unstarted branch's cards kept in your inventory as it closes, a card
@@ -176,12 +176,12 @@ export type Effect =
    * `close` runs.
    */
   | {
-      readonly kind: "moveCards"
+      readonly kind: "move-cards"
       /** At least one. */
       readonly moves: readonly [SlotMove, ...SlotMove[]]
       readonly actedAt: ActedAt
       readonly close: readonly Effect[]
-      /** As `moveCard`'s. */
+      /** As `move-card`'s. */
       readonly here: CanvasId | null
     }
   /**
@@ -189,12 +189,12 @@ export type Effect =
    * on the host.
    */
   | {
-      readonly kind: "undoMoves"
+      readonly kind: "undo-moves"
       readonly canvas: CanvasId | null
       readonly direction: MoveDirection
     }
   /** Undo or redo this tab's newest swap in your inventory. */
-  | { readonly kind: "undoSwap"; readonly direction: MoveDirection }
+  | { readonly kind: "undo-swap"; readonly direction: MoveDirection }
   /** Keep a refusal made before anything was sent. */
   | { readonly kind: "refuse"; readonly refusal: CardNotice }
   /** An act on your inventory panel: shown, its selection, its bench (`inventoryReducer`). */
@@ -213,20 +213,20 @@ export type Effect =
       readonly path: string
       readonly choose: ConflictChoice
     }
-  /** Once this tab holds entry `entry`, show it (`openAt`). */
-  | { readonly kind: "openWhenHeld"; readonly entry: EntryId }
+  /** Once this tab holds entry `entry`, show it (`open-at`). */
+  | { readonly kind: "open-when-held"; readonly entry: EntryId }
   /** Scroll to entry `entry` once it is drawn (`useReveal`). */
   | { readonly kind: "reveal"; readonly entry: EntryId }
   /** Outline entry `entry` briefly, once drawn: where leaving a search landed. */
   | { readonly kind: "landed"; readonly entry: EntryId }
   /** Scroll a queued card into view in its column's dock. */
-  | { readonly kind: "revealCard"; readonly card: CardId }
+  | { readonly kind: "reveal-card"; readonly card: CardId }
   /** Open ask `ask`'s fold, so what is revealed in it is drawn. */
-  | { readonly kind: "openFold"; readonly ask: EntryId }
+  | { readonly kind: "open-fold"; readonly ask: EntryId }
   /** What `key` names takes focus when it mounts (`claimFocus`). */
-  | { readonly kind: "armFocus"; readonly key: FocusKey }
-  | { readonly kind: "storeIdentity"; readonly identity: Identity }
-  | { readonly kind: "forgetIdentity" }
+  | { readonly kind: "arm-focus"; readonly key: FocusKey }
+  | { readonly kind: "store-identity"; readonly identity: Identity }
+  | { readonly kind: "forget-identity" }
   | { readonly kind: "reload" }
 
 /** A change to the sidebar, by canvas: your document's key. */
@@ -329,7 +329,7 @@ export const list = (act: ListAct): Effect => ({ kind: "list", act })
 /** `canvas` leaves the sidebar, and if you are on it, its neighbour is shown. */
 export const closeCanvasEffects = (canvas: CanvasId): readonly Effect[] => [
   list({ kind: "close", canvas }),
-  layout({ kind: "closeCanvas", canvas }),
+  layout({ kind: "close-canvas", canvas }),
 ]
 
 /** Show `here`; a canvas shown is opened in the sidebar, at its end if it was not there. */
@@ -368,7 +368,7 @@ export const viewChangeEffect = (
 export const foldViewEffect = (
   state: Pick<IntentState, "canvases">,
   canvas: CanvasId,
-  change: Extract<ViewChange, { kind: "fold" | "foldCanvas" }>,
+  change: Extract<ViewChange, { kind: "fold" | "fold-canvas" }>,
 ): Effect => ({
   kind: "layout",
   action: viewAction(state, canvas, change),
@@ -396,7 +396,7 @@ export function planOpenEntry(
   if (plan === null) return []
   const ask = state.asks.askOf.get(id)
   const fold: readonly Effect[] =
-    ask === undefined ? [] : [{ kind: "openFold", ask }]
+    ask === undefined ? [] : [{ kind: "open-fold", ask }]
   switch (plan.kind) {
     case "scroll":
       return [

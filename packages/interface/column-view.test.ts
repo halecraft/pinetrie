@@ -352,7 +352,7 @@ describe("columnView: the header", () => {
         end: entryId("b2"),
         report: { kind: "stopped", by: ADA } as const,
       },
-      level: "worthARead" as const,
+      level: "worth-a-read" as const,
       raised: true,
     }
     const shows = columnView(
@@ -368,7 +368,7 @@ describe("columnView: the header", () => {
     expect(shows.identity).toMatchObject({
       kind: "agent",
       status: {
-        level: "worthARead",
+        level: "worth-a-read",
         quiet: false,
         words: "worth a read: Ada stopped it",
         end: entryId("b2"),

@@ -39,7 +39,7 @@ describe("a root's drop lands where a key could move it", () => {
         null,
       ),
     ).toEqual({
-      kind: "moveCanvas",
+      kind: "move-canvas",
       canvas: R1,
       from: DOING,
       to: DONE,
@@ -49,7 +49,7 @@ describe("a root's drop lands where a key could move it", () => {
     // Before another in the sidebar.
     expect(
       planRootDrop(drag, { kind: "list", before: R2 }, DONE, null),
-    ).toEqual({ kind: "moveInList", canvas: R1, before: R2 })
+    ).toEqual({ kind: "move-in-list", canvas: R1, before: R2 })
   })
 
   test("a root dropped before itself does nothing", () => {

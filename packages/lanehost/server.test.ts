@@ -37,13 +37,13 @@ describe("names: every path is built from names checked first", () => {
   test("a call naming another path is refused before anything runs", async () => {
     const serving = servingFrom(["disks", "/var/lib/lanehost", "{}"])
     await expect(
-      answer({ kind: "diskExists", project: "../../etc", lane: "x" }, serving),
+      answer({ kind: "disk-exists", project: "../../etc", lane: "x" }, serving),
     ).rejects.toThrow("not a project's key")
     await expect(
-      answer({ kind: "diskExists", project: KEY, lane: "../x" }, serving),
+      answer({ kind: "disk-exists", project: KEY, lane: "../x" }, serving),
     ).rejects.toThrow("not a disk's name")
     expect(() =>
-      planDisk({ kind: "deleteSnapshots", ids: ["ok", "../../x"] }, disks),
+      planDisk({ kind: "delete-snapshots", ids: ["ok", "../../x"] }, disks),
     ).toThrow("not a disk's name")
   })
 })
@@ -95,7 +95,7 @@ describe("planDisk: each disk operation as steps", () => {
       { kind: "drop", path: disks.states("l") },
     ])
     expect(
-      planDisk({ kind: "deleteSnapshots", ids: ["a", "b"] }, disks),
+      planDisk({ kind: "delete-snapshots", ids: ["a", "b"] }, disks),
     ).toEqual([
       { kind: "drop", path: disks.snapshot("a") },
       { kind: "drop", path: disks.snapshot("b") },
@@ -103,8 +103,8 @@ describe("planDisk: each disk operation as steps", () => {
   })
   describe("a nested lane's inner Docker data root", () => {
     const facts = (
-      ownDataRoot: "subvolume" | "notSubvolume" | "absent",
-      sourceDataRoot: "subvolume" | "notSubvolume" | "absent" | null = null,
+      ownDataRoot: "subvolume" | "not-subvolume" | "absent",
+      sourceDataRoot: "subvolume" | "not-subvolume" | "absent" | null = null,
     ) => ({ ownDataRoot, sourceDataRoot })
     const nestedDisk = [
       { kind: "parent", path: disks.nested("l") },
@@ -156,7 +156,7 @@ describe("planDisk: each disk operation as steps", () => {
         uid: 1000,
       }
       expect(
-        planInnerDockerDataRootSteps("l", null, facts("notSubvolume"), disks),
+        planInnerDockerDataRootSteps("l", null, facts("not-subvolume"), disks),
       ).toEqual([
         ...nestedDisk,
         { kind: "drop", path: disks.innerDockerDataRoot("l") },

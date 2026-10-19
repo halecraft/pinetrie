@@ -136,13 +136,13 @@ async function makeRig(): Promise<FolderRig> {
   }
   const runtime: LaneRuntime = {
     disk: async op => {
-      if (op.kind === "innerDockerDataRoot")
+      if (op.kind === "inner-docker-data-root")
         throw new Error("the rig's lanes are not nested")
       await call({ kind: "disk", project: key, op })
     },
-    diskExists: lane => call({ kind: "diskExists", project: key, lane }),
+    diskExists: lane => call({ kind: "disk-exists", project: key, lane }),
     snapshotExists: id =>
-      call({ kind: "snapshotExists", project: key, snapshot: id }),
+      call({ kind: "snapshot-exists", project: key, snapshot: id }),
     snapshots: async () =>
       (await call({ kind: "snapshots", project: key })).map(snapshotId),
     diff: (from, to) => call({ kind: "diff", project: key, from, to }),
@@ -161,19 +161,19 @@ async function makeRig(): Promise<FolderRig> {
   }
   const folderDisks: FolderDisks = {
     pathFacts: (snapshot, paths) =>
-      call({ kind: "pathFacts", project: key, snapshot, paths }),
+      call({ kind: "path-facts", project: key, snapshot, paths }),
     fileDiff: (a, b, p, limit) =>
-      call({ kind: "fileDiff", project: key, a, b, path: p, limit }),
+      call({ kind: "file-diff", project: key, a, b, path: p, limit }),
     diffStats: (a, b, paths) =>
-      call({ kind: "diffStats", project: key, a, b, paths }),
+      call({ kind: "diff-stats", project: key, a, b, paths }),
     filesUnder: (snapshot, paths) =>
-      call({ kind: "filesUnder", project: key, snapshot, paths }),
+      call({ kind: "files-under", project: key, snapshot, paths }),
     sameContent: (a, b, pairs) =>
-      call({ kind: "sameContent", project: key, a, b, pairs }),
-    applyMerge: m => call({ kind: "applyMerge", project: key, ...m }),
+      call({ kind: "same-content", project: key, a, b, pairs }),
+    applyMerge: m => call({ kind: "apply-merge", project: key, ...m }),
     read: (snapshot, p, limit) =>
       call({ kind: "read", project: key, snapshot, path: p, limit }),
-    readIn: r => call({ kind: "readIn", project: key, ...r }),
+    readIn: r => call({ kind: "read-in", project: key, ...r }),
     tarOut: (state, paths) =>
       tarStream(disks.snapshot(snapshotId(state)), paths),
     fileOut: (state, p) => fileStream(disks.snapshot(snapshotId(state)), p),
@@ -349,7 +349,7 @@ async function makeRig(): Promise<FolderRig> {
       kept = planned.kept
       if (planned.gone.length > 0)
         await runtime.disk({
-          kind: "deleteSnapshots",
+          kind: "delete-snapshots",
           ids: planned.gone.map(snapshotId),
         })
       return planned
@@ -377,7 +377,7 @@ async function makeRig(): Promise<FolderRig> {
     fileBytes: (state, file) => readFolderFile(reader, state, file),
     snapshotExists: state => runtime.snapshotExists(snapshotId(state)),
     deleteSnapshot: state =>
-      runtime.disk({ kind: "deleteSnapshots", ids: [snapshotId(state)] }),
+      runtime.disk({ kind: "delete-snapshots", ids: [snapshotId(state)] }),
     graph,
 
     fileAt: (site, p) =>
@@ -435,7 +435,7 @@ async function makeRig(): Promise<FolderRig> {
     statesDir: async lane => disks.states(lane),
 
     close: async () => {
-      await call({ kind: "removeProject", project: key })
+      await call({ kind: "remove-project", project: key })
       await rm(dir, { recursive: true, force: true })
     },
   }

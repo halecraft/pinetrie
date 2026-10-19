@@ -1,5 +1,6 @@
+import type { ReviewPrefs } from "@pinetrie/interface"
 import { describe, expect, test } from "vitest"
-import { NO_PREFS, type ReviewPrefs, reviewPrefsCodec } from "./review-prefs.ts"
+import { NO_PREFS, reviewPrefsCodec } from "./review-prefs.ts"
 
 describe("reviewPrefsCodec", () => {
   test.each<ReviewPrefs>([

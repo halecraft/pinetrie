@@ -4,7 +4,7 @@
 // by the attributes the page marks it with (`rootDropProps`), and
 // `planRootDrop` turns it into an intent: on the board, the one a board
 // item's Move to ▸, Move up or Move down (`stepsIn`) sends; on the sidebar, a
-// `moveInList`. Where in a group of places (`rootGroupProps`) the pointer
+// `move-in-list`. Where in a group of places (`rootGroupProps`) the pointer
 // lands is `landingIn`'s.
 
 import {
@@ -158,10 +158,10 @@ export function planRootDrop(
   if (target.kind === "list")
     return target.before === drag.canvas
       ? null
-      : { kind: "moveInList", canvas: drag.canvas, before: target.before }
+      : { kind: "move-in-list", canvas: drag.canvas, before: target.before }
   if (drag.state === null || target.before === drag.canvas) return null
   return {
-    kind: "moveCanvas",
+    kind: "move-canvas",
     canvas: drag.canvas,
     from: drag.state,
     to: target.state,

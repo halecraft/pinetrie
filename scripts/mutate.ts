@@ -92,11 +92,14 @@ export const mutationCommand = (m: Mutation): readonly string[] =>
   "suite" in m ? SUITES[m.suite].command : m.command
 
 export type MutantResult =
-  | "KILLED"
-  | "SURVIVED"
-  | "BROKEN"
-  | "ELSEWHERE"
-  | "ANCHOR"
+  | "killed"
+  | "survived"
+  | "broken"
+  | "elsewhere"
+  | "anchor"
+
+/** A result as the run prints it: in capitals, so it stands out in a log. */
+export const resultWord = (result: MutantResult): string => result.toUpperCase()
 
 /** Signs that the mutant never ran: the change itself does not load. */
 const LOAD_FAILURES = [
@@ -119,13 +122,13 @@ export function judge(
   },
   expect: string | undefined,
 ): MutantResult {
-  if (run.timedOut) return "KILLED"
-  if (LOAD_FAILURES.some(sign => run.output.includes(sign))) return "BROKEN"
-  if (run.status === 0) return "SURVIVED"
-  if (expect === undefined) return "KILLED"
+  if (run.timedOut) return "killed"
+  if (LOAD_FAILURES.some(sign => run.output.includes(sign))) return "broken"
+  if (run.status === 0) return "survived"
+  if (expect === undefined) return "killed"
   return failingChecks(run.output).some(line => line.includes(expect))
-    ? "KILLED"
-    : "ELSEWHERE"
+    ? "killed"
+    : "elsewhere"
 }
 
 /** A terminal colour code. Vitest colours its marks even into a pipe. */
@@ -209,10 +212,10 @@ async function withMutant<T>(
   root: string,
   m: Mutation,
   body: () => Promise<T>,
-): Promise<T | "ANCHOR"> {
+): Promise<T | "anchor"> {
   const file = path.join(root, m.file)
   const original = readFileSync(file, "utf8")
-  if (original.split(m.from).length !== 2) return "ANCHOR"
+  if (original.split(m.from).length !== 2) return "anchor"
   const restore = () => writeFileSync(file, original)
   process.once("SIGINT", restore)
   writeFileSync(file, original.replace(m.from, m.to))
@@ -272,7 +275,7 @@ const apply = (
 }> =>
   withMutant(root, m, async () => {
     const [cmd, ...args] = mutationCommand(m)
-    if (cmd === undefined) return { result: "BROKEN" as const, failing: [] }
+    if (cmd === undefined) return { result: "broken" as const, failing: [] }
     const ran = await run(
       cmd,
       args,
@@ -284,14 +287,14 @@ const apply = (
       result: judge(ran, m.expect),
       failing: [...new Set(failingChecks(ran.output).map(l => l.trim()))],
     }
-  }).then(r => (r === "ANCHOR" ? { result: r, failing: [] } : r))
+  }).then(r => (r === "anchor" ? { result: r, failing: [] } : r))
 
 /** The checks `against` fails with the mutant in place, each once, trimmed. */
 const probe = (
   root: string,
   m: Mutation,
   against: readonly string[],
-): Promise<readonly string[] | "ANCHOR"> =>
+): Promise<readonly string[] | "anchor"> =>
   withMutant(root, m, async () => {
     const [cmd, ...args] = against
     if (cmd === undefined) return []
@@ -322,7 +325,8 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   if (against !== undefined) {
     for (const m of chosen) {
       const failing = await probe(root, m, against)
-      if (failing === "ANCHOR") console.log(`  ANCHOR    ${m.name}`)
+      if (failing === "anchor")
+        console.log(`  ${resultWord(failing).padEnd(9)} ${m.name}`)
       else if (failing.length === 0) console.log(`  MISSED    ${m.name}`)
       else
         console.log(
@@ -334,12 +338,12 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   let bad = 0
   for (const m of chosen) {
     const { result, failing } = await apply(root, m)
-    console.log(`  ${result.padEnd(9)} ${m.name}`)
+    console.log(`  ${resultWord(result).padEnd(9)} ${m.name}`)
     // Caught by another check: the expect has drifted from the test that
     // catches it, which is one of these.
-    if (result === "ELSEWHERE")
+    if (result === "elsewhere")
       for (const line of failing.slice(0, 5)) console.log(`      ${line}`)
-    if (result !== "KILLED") bad += 1
+    if (result !== "killed") bad += 1
   }
   console.log(`\n=== mutations: ${chosen.length - bad} killed, ${bad} not ===`)
   process.exit(bad)

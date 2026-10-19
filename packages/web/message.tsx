@@ -191,7 +191,7 @@ function MessageView(p: MessageProps) {
               <button
                 className="open-branch"
                 key={b.rootId}
-                onClick={() => p.onAct({ kind: "openAt", entry: b.rootId })}
+                onClick={() => p.onAct({ kind: "open-at", entry: b.rootId })}
                 type="button"
               >
                 ⑂ {plural(b.messageCount, "message")}
@@ -260,7 +260,7 @@ function Tools({
           edit
         </button>
       )}
-      {edit?.kind === "newCanvas" && (
+      {edit?.kind === "new-canvas" && (
         <button
           className="edit-new-canvas"
           onClick={() => onAct(edit)}

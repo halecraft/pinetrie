@@ -92,8 +92,8 @@ page's (`storage-keys.ts`, `tab-state.ts`, `same-props.ts`, `colors.ts`).
   columns sync only while it is held; `prune` waits for the stored tabs'
   roots to settle, and drops only what the directory lacks.
 - **What the footer and the board open may be in a root not held**
-  (`openLink`): one held opens as `openAt`; any other root is shown, archived
-  or not, which holds it, and `openWhenHeld` shows the entry once the index
+  (`open-link`): one held opens as `open-at`; any other root is shown, archived
+  or not, which holds it, and `open-when-held` shows the entry once the index
   has it.
 - **A link to a thread is a `ThreadLink`** (`thread-link.ts`, ADR-0117,
   ADR-0124), which only `threadLink(thread, cards, me)` makes (a brand): `open`
@@ -103,9 +103,9 @@ page's (`storage-keys.ts`, `tab-state.ts`, `same-props.ts`, `colors.ts`).
   (following it restores it, `planRestore`), `gone` with no card, worded
   "deleted". The inbox's rows, a
   mention, a reader's thread, a copy's or a parent elsewhere's fork row and
-  a rail stub all follow one through the `openLink` intent
+  a rail stub all follow one through the `open-link` intent
   (`planOpenLink`); `linkWords` words it, "Bea has it" (`heldWords`).
-  `openAt` serves only what is drawn: an entry whose thread is in no canvas
+  `open-at` serves only what is drawn: an entry whose thread is in no canvas
   gets no plan from `planOpen`.
 - **A write names its root**: `send` and `mark` find it from the held
   document with the entry (`rootOf`), and a send at the root mints one
@@ -164,14 +164,14 @@ function is proven by a unit test in a second.
   under its key (`{ kind: "column", column, act }`), a `ColumnKey` by kind
   (a card's column, the canvas column), and a message's `MessageAct`s are
   among them. What one kind alone does is an intent of its own naming a key
-  of that kind: `moveColumn` a card's (`CardKey`), so moving the canvas
-  column does not compile; `sentFirst` names a thread's card, once
+  of that kind: `move-column` a card's (`CardKey`), so moving the canvas
+  column does not compile; `sent-first` names a thread's card, once
   its first message is sent (ADR-0126). `Column` takes one `onIntent`, which `App`
   makes once with `useStable`, so it never redraws a list.
 - **`planIntent` turns an intent into `Effect`s**, from the layout, the
   index and the archive of the render it was made in. It owns what a click
   does: which canvas a column act belongs to, that × closes a tab and writes
-  nothing, that a column you open takes focus (`armFocus`). Ids come from
+  nothing, that a column you open takes focus (`arm-focus`). Ids come from
   the shell as an argument (`Minted`): a key, a new canvas's root and canvas id, the
   thread a column opens, a note column's id.
   `afterCanvasMove` plans a move on the board's answer, and `nameEffects` the settle's
@@ -184,8 +184,8 @@ function is proven by a unit test in a second.
   and no case. What the session tracks keeps a method of its own: a chat
   and a move (`moves`), an action on proposed changes and a line action (`acting`), and a
   mark, whose root it finds. Whether a move animates is the plan's too
-  (`moveCard`'s `fly`), and whether a fold moves (the `layout` effect's
-  `moves`, set by `foldViewEffect` for the `fold` and `foldCanvas` intents
+  (`move-card`'s `fly`), and whether a fold moves (the `layout` effect's
+  `moves`, set by `foldViewEffect` for the `fold` and `fold-canvas` intents
   alone): `perform` hands a moving fold to the `foldColumn` port with the
   dispatch as its commit, which the port calls once.
 - **`appView` decides; it does not project.** The projections
@@ -228,11 +228,11 @@ canvas's threads (`canvasRail`). A canvas's signals are its threads', whatever r
   out of your document; the screen you are on does not lose it.
 - **Who writes the sidebar.** `show` of a root ensures it in your document
   (`intent.ts`'s `show`, a `list` effect), so every way of opening goes
-  through it: the board, your inbox, `openAt`. A root you
+  through it: the board, your inbox, `open-at`. A root you
   start joins it in the session, as its send is answered (`startsRoot`). ×
-  is a `list` close and a `closeCanvas` (`closeCanvasEffects`), which moves you on only if you were
+  is a `list` close and a `close-canvas` (`closeCanvasEffects`), which moves you on only if you were
   on it: `afterClosing`'s choice, the sidebar's next item below, else above,
-  else nothing. `moveInList` places a root before another, or at the end.
+  else nothing. `move-in-list` places a root before another, or at the end.
   The session's repair deletes archived roots but the one the page reports
   it is on (`openThreads.here`), so a restore brings a root back only for
   whoever restores it.
@@ -270,7 +270,7 @@ canvas's threads (`canvasRail`). A canvas's signals are its threads', whatever r
 - **The sidebar folds to icons** (ADR-0088). The width is a value
   (`ListWidth`, `list-width.ts`): your choice in this tab, else icons on a
   small window (`shownWidth`, `useSmallWindow`). Folding is an intent,
-  `foldList`, from the control at the list's foot or Ctrl+Shift+L
+  `fold-list`, from the control at the list's foot or Ctrl+Shift+L
   (`keyAct`); `planIntent` asks for the width not shown, and `perform`'s
   `listWidth` port sets it and saves it. `App` writes it as `data-list` on
   the root element, and the CSS sets `--side` from that, so the body's
@@ -299,7 +299,7 @@ canvas's threads (`canvasRail`). A canvas's signals are its threads', whatever r
   strip counts as the board's own, so what is in it acts alone: ▦ toggles,
   and while the board is open, the search field, its × and "mine" (which
   stand in the state buttons' place then, ADR-0115) keep it open.
-- **Moving a canvas on the board** is a `moveCanvas` effect: the host's
+- **Moving a canvas on the board** is a `move-canvas` effect: the host's
   `move-canvas`, and, into the archive, the effects that close it for you
   (`moved`), which `afterCanvasMove` runs only once the host answers
   `moved`, as `afterKeep` does for a keep.
@@ -331,7 +331,7 @@ canvas's threads (`canvasRail`). A canvas's signals are its threads', whatever r
   `projectColumns` lays the paths out over the unfolded columns), else
   unfold its thread's card (`unfold`). An archived canvas opens as any
   other; its columns are read-only (`appView`). The rail and fork dots go
-  through it, as an `openAt` intent: `planIntent` turns its plan into
+  through it, as an `open-at` intent: `planIntent` turns its plan into
   effects, and `perform` carries them out.
 - **Columns of other canvases are unmounted.** Alignment forgets their keys, so a
   canvas shown again places its columns as if opened, left to right: each at
@@ -432,7 +432,7 @@ canvas's threads (`canvasRail`). A canvas's signals are its threads', whatever r
   own canvas, else the canvas you are on.
   `afterSpinOff` places and shows a sidebar drop's root once the host has
   written its first message. A note's and your message's ⋯ offer the same
-  per open state (`CardMoveTo`'s `thread`, the `spinOff` act).
+  per open state (`CardMoveTo`'s `thread`, the `spin-off` act).
 
 ## The canvas (`canvas-columns.ts`, ADR-0116)
 
@@ -467,10 +467,10 @@ canvas's threads (`canvasRail`). A canvas's signals are its threads', whatever r
   (`branchAfter`, `@pinetrie/rules`), and unfolds it with what it starts
   with (`opened`). Its column appears as the card arrives.
 - **Every thread's column opens one way** (`openThreadColumn`, `intent.ts`):
-  the `open-thread` request, its `opened` view change and `armFocus` on its
+  the `open-thread` request, its `opened` view change and `arm-focus` on its
   thread, for a new canvas, a branch and ＋ past the last column alike.
 - **＋ past the last column makes a column** (`newColumnButton`,
-  `start-button.ts`, ADR-0138): one `addColumn` intent per item, carrying
+  `start-button.ts`, ADR-0138): one `add-column` intent per item, carrying
   what it makes (`NewColumn`) and the spot it lands at (`CanvasPut`), the
   same value as the strip's drop past its last column, so the button exists
   exactly when that drop does, and its plan reads the canvas from the spot,
@@ -494,9 +494,9 @@ canvas's threads (`canvasRail`). A canvas's signals are its threads', whatever r
   unfolded column. Going to a card unfolds it: `planOpen`'s `unfold`, a
   reveal of a note or a canvas place (`revealEffects`), your new branch, a note
   column you made.
-- **A column moves for everyone**: `moveColumn` is a reorder of its card
+- **A column moves for everyone**: `move-column` is a reorder of its card
   on the canvas (`planColumnMove`), host-ordered and undone by the undo
-  key; its width is the card's too (`cardWidth`, `columnHeadEnd`).
+  key; its width is the card's too (`card-width`, `columnHeadEnd`).
 - **A card column's head ends in ⋯ and one button** (`columnHeadEnd`,
   `column-menu.ts`, ADR-0161): ⇤, the `fold` intent, on a started thread
   or a note column; a bin (ADR-0177) on a thread not yet started for a
@@ -504,10 +504,10 @@ canvas's threads (`canvasRail`). A canvas's signals are its threads', whatever r
   `trash` section, Move to trash, on every column for a reader who may
   write; the bin and it ask one `trash` intent, built once.
 - **A thread column's ⋯ copies and takes it** (`columnHeadEnd`'s `thread`
-  section, ADR-0127): `copyThread` (a `copy-thread` request at the
+  section, ADR-0127): `copy-thread` (a `copy-thread` request at the
   source's end, `threadAnchor`, its id `Minted.thread`), `here` just after
   the source on its canvas (`canvasOfCard`) or into your inventory, and
-  `putAway`. It lists no canvas: a thread reaches another canvas
+  `put-away`. It lists no canvas: a thread reaches another canvas
   through your inventory. A thread's card put
   from your inventory lands on the canvas you are on after the column it
   was put on (`putOnCanvas`).
@@ -583,7 +583,7 @@ take the same scene and differ only in which way their frames run.
 - **Nothing moves** under reduced motion, during a drag, for a column out
   of the strip's view, or one already no wider than its strip.
 - **`foldMotion` reads the motion from the action**: a `view` action's `fold`
-  or `foldCanvas` names its column and which way. The effect carries only
+  or `fold-canvas` names its column and which way. The effect carries only
   `moves`, so nothing says it twice.
 
 ## The column model (`columns.ts`)
@@ -618,7 +618,7 @@ density?, details?, mode }`, `mode` `bound` or `unstarted`
 - **An unstarted thread's column can carry a `Prefill`**, which its
   composer starts with, and a `pending` first message it sends as it opens
   ("branch here" after a conflict), both from your `CardView` (`opened`),
-  spent by its first send (`sentFirst`). A blank prefill means nothing
+  spent by its first send (`sent-first`). A blank prefill means nothing
   sent alone: `@agent ` in a branch from an agent thread (`branchPrefill`)
   or a new canvas's or ＋'s agent thread (`AGENT_PREFILL`), which
   `sendable` (`send.ts`) will not send by itself. Anything else is content:
@@ -626,7 +626,7 @@ density?, details?, mode }`, `mode` `bound` or `unstarted`
   canvas (an edit of a root's first message). The prefill is stored with the
   layout; `pending` is not, since it is sent on opening.
 - **What you open or make takes focus, once** (`focus-claim.ts`). A plan
-  arms one `FocusKey` (`armFocus`): a column's (`→`, "Branch here" and ＋
+  arms one `FocusKey` (`arm-focus`): a column's (`→`, "Branch here" and ＋
   open their column with a fresh key), the board's search's, or a card's.
   The element it names claims it as it mounts (`claimFocus`: the armed key
   focuses once, and nothing else does); a column's composer then puts the
@@ -639,8 +639,8 @@ density?, details?, mode }`, `mode` `bound` or `unstarted`
   strip; the board opening by itself with nothing to show (`pruneLayout`)
   sends no intent, so it takes no focus. A card is armed by the plan that
   makes or hands it over: a comment (`planComment`), "+ add to queue"
-  (`queueNew` with no command; a command's card is never typed in, so it
-  takes none), and `focusCard`, a new card's box handing its card to its
+  (`queue-new` with no command; a command's card is never typed in, so it
+  takes none), and `focus-card`, a new card's box handing its card to its
   list. One key is armed at a time: the newest arm wins.
   Exact: no other message at the same point, the lane's own next append
   included, can be mistaken for it. "branch here" opens one holding the text
@@ -835,7 +835,7 @@ pending.
   computed once in `App`, is the inbox's badge and the window title's.
   `pageTitle` (`sidebar-view.ts`) puts it before the selected root's label.
 - **Words:** `attentionWords` words each item's reason; a level is a
-  signal (`signalOfLevel`, *Signals*), named by `signalWords`, and an
+  signal (`Signal` holds `Level`, *Signals*), named by `signalWords`, and an
   inbox row's class is its signal. Selectors: `.signal[data-signal]`
   (`running`, `needs-you`, `worth-a-read`, `done`, with `data-arrived`),
   `.here-thread.raised`, `.not-needed`.
@@ -903,7 +903,7 @@ else reads those rows (tab summaries, archive search, `branchColors`).
   keyboard has `detail` 0 and no point, and picks the first message. A
   browser check clicks at a point with `mouse.click`; `page.click` clicks
   the centre, which is the stretch's middle message. A pick into an ask's
-  work opens its fold first (`openFold`, below).
+  work opens its fold first (`open-fold`, below).
 - **Selectors:** `.rail-stretch[data-entry]` is a stretch's first message,
   with `data-count`, `data-span`, `data-fill` (`agent`, `people` or
   `mixed`) and, for a long ask's work, `data-ask`. The browser suite's
@@ -995,7 +995,7 @@ the columns read one. `segmentPath` (`ask-segments.ts`) decides what a column fo
 - **The first fold is `Segment.first`, not the first fold in `parts`:**
   `segmentPath` sets it across the path, so an ask drawn as two rows would
   still give its summary and its files to one fold.
-- **`openFold`:** `planIntent`'s `openAt` puts it before the reveal when
+- **`open-fold`:** `planIntent`'s `open-at` puts it before the reveal when
   the entry is in an ask's work. `perform` sets the fold's memory and
   renders `App` once, so `useReveal`'s wait finds the message drawn.
   Forks, branch starts and people's messages are never in a fold.
@@ -1089,7 +1089,7 @@ stored), and `searchOn` applies it only on the canvas it was opened on.
   opens or unfolds a column, or shows another canvas, a new canvas or the board gets the
   search's close first and, for a revealed message, `landed` last, which
   outlines it. Every way of showing a message is a plan, so a match row
-  sends plain `openAt`. The `landed` effect is not `mark`: that name is a
+  sends plain `open-at`. The `landed` effect is not `mark`: that name is a
   title's mark on a canvas.
 - **`open` names no canvas in an intent** (`SearchAsk`): `searchActOn` gives it
   the canvas you are on, so `keyAct` needs none.
@@ -1187,7 +1187,7 @@ which names the entry and its thread (`packages/rules/TECHNICAL.md`,
   *+ comment* and *shut*. The list carries the open margin as a slot
   (`marginSlot`), so opening it rebuilds the list once and typing in it
   rebuilds nothing.
-- **A comment's ⋯ has *Send to the agent, quoting this comment*** (`queueReference`): a
+- **A comment's ⋯ has *Send to the agent, quoting this comment*** (`queue-reference`): a
   reference to it (`{ kind: "card" }`) queued on its thread. Its quote is
   the comment's text as it is then, under a link to its entry
   (`commentMarkdown`), kept as a blob (`planQueueReference`'s `paste`,
@@ -1372,7 +1372,7 @@ composer*).
   above the footer, which keeps the `acting` entry you dismissed so the
   same one does not come back. It offers nothing: a conflict in the
   working copy is the person's, in jj (ADR-0102).
-- **The origin row and the details' "where it started" are `openAt`
+- **The origin row and the details' "where it started" are `open-at`
   intents** (`planOpen`), which reveal the entry in whichever column shows
   it. A column's lane may have started in a column to its left.
 - **A named thread's details (ADR-0073) are `ThreadDetails`**, built by
@@ -1510,7 +1510,7 @@ composer*).
   host queues when the lane is busy: the host pops the card only once it
   holds that much of the text, since the request can reach it first (S96).
 - **Queue, unqueue and a command are requests to the host, outside the
-  card's own undo** (`moveCard`, and `request` with `set-command`): a
+  card's own undo** (`move-card`, and `request` with `set-command`): a
   card's box undoes only its text (ADR-0052). A queue and an unqueue are
   moves, so the host records them in the root's history of your moves, and
   the page undoes them, not a box (ADR-0066). An unqueue the host's pop got
@@ -1532,11 +1532,11 @@ composer*).
   ⋯ items (resume, hold, release, unqueue all) and where ▸ sits.
   `nextWords`, `nextButtonWords` and `nextItemWords` word them. The dock
   computes it, not `columnView`: it needs presence's typing (S59). Each
-  button and item is a `ColumnAct` (`holdQueue`, `unqueueAll`) or a
+  button and item is a `ColumnAct` (`hold-queue`, `unqueue-all`) or a
   request (`stop`, `carry-on`).
-- **Every queue is a `queueCard` effect** (ADR-0113): the `queue` act and
-  `queueNew` carry what the queue does to its hold, and the session sends
-  one `queue-card` request. `queueNew` makes the card in the queue
+- **Every queue is a `queue-card` effect** (ADR-0113): the `queue` act and
+  `queue-new` carry what the queue does to its hold, and the session sends
+  one `queue-card` request. `queue-new` makes the card in the queue
   (`queueNew` in `card-intents.ts`, a move with no `from`) with its
   command: a command button's (`keep`) and "+ add to queue"'s
   (`hold-if-idle`). Neither is made as a note first, which would draw it
@@ -1591,7 +1591,7 @@ composer*).
   opens it beside the thread or downloads it (an opaque file).
 - **The host decides what a message shares.** The composer shows links,
   not thumbnails. On send, the host reads the `/blob/` links from the text,
-  and refuses the send if one is no longer stored (`image_missing`), which
+  and refuses the send if one is no longer stored (`image-missing`), which
   `settleSend` returns to the box.
 
 ## The setup page (`setup-view.ts`, `setup-words.ts`, ADR-0146)
@@ -1627,7 +1627,7 @@ composer*).
 - **A restore sends what its preview drew** (`RestorePreview`, `{ of,
   from }`): `from` is the newest the tab shows, the preview the review
   `from..of`; a record that moves redraws it with a new `from`. The host
-  refuses one whose `from` is no longer the newest (`not_as_shown`).
+  refuses one whose `from` is no longer the newest (`not-as-shown`).
 - **The footer offers the history in the publish button's place**
   (`historyLink`): a folder project's accepted work has nothing to set up
   or publish to, so `publishView` is `absent` there.
@@ -1736,8 +1736,9 @@ What a mark says is one value, `Signal` (`signals.ts`): `unsent`,
 place each is worded (its mark's name and title), and `packages/web` draws
 every one through `SignalMark`, `.signal[data-signal]`, the one selector
 the suites use. Attention keeps its `LEVELS` as what it decides
-(`attention.ts`); `signalOfLevel` is the one mapping of a level to its
-signal, and `statusSignal` a thread's or a canvas's status to its mark
+(`attention.ts`), and each level is a signal by construction: `Signal`
+holds `Level`, spelled alike, so no function maps one to the other.
+`statusSignal` maps a thread's or a canvas's status to its mark
 (running while its agent works, ADR-0069, its level's when raised, done while a
 finished run fades). The plan's four signals are five: worth a read is a
 level of its own, with its own dim mark.
@@ -1840,12 +1841,12 @@ one status line (the newest notice).
 - **The history of moves is the host's** (ADR-0066): one per person and
   canvas, and one per person outside any canvas (ADR-0126), which the host
   chooses for each move (`movesHistory`). The page keeps none, and names no
-  history when it moves a card. `undoMove` names the canvas you are on
+  history when it moves a card. `undo-move` names the canvas you are on
   (`planUndoMove`, `canvasOfTab`), or on none your history outside any canvas. The session sends `undo-move` and answers once its
   copy of the places reaches the reply's `rev` (`whenRev`).
-- **The answer is planned afresh** (`undoAnswered`, `afterUndo`): each place
+- **The answer is planned afresh** (`undo-answered`, `afterUndo`): each place
   a card went back to, once, brought into view (`revealEffects`, `reveal.ts`):
-  the panel, a thread's end through `openAt`, or, at a thread with no end
+  the panel, a thread's end through `open-at`, or, at a thread with no end
   here (one not yet started), its card unfolded in its canvas. A refusal shows the
   card where it is now and says who moved it there. An undo shows its place
   as it acts, not before, and flies nothing: the reply comes after the copy
@@ -1896,7 +1897,7 @@ one status line (the newest notice).
   out by `perform`. Several moves sent as one (a closing branch's cards
   kept in your inventory, a slot's replacement, a new canvas's only thread
   trashed with its canvas closed, a column dropped between canvases with the
-  new canvas placed) are the `moveCards` effect, which the host accepts or
+  new canvas placed) are the `move-cards` effect, which the host accepts or
   refuses whole, `full` among its refusals; what follows (`close`) is done
   once accepted (`afterKeep`).
 - **Drag** is the one pointer engine's (*Drags*, below): a card's handle
@@ -1956,12 +1957,12 @@ values; the engine gathers and applies.
 - **A stored image is a source too** (`ImageSource`, ADR-0182): a blob a
   message, a tool's row or the pane draws, with the name it is put under.
   It is over what a card is (`CardOver`), and lands only on a media column
-  or at a spot on a canvas (`putImages`, a media column made there),
+  or at a spot on a canvas (`put-images`, a media column made there),
   marked `copy`. On a media column (`images` target) it lands by the image
   under it and that image's edge (`image-edge.ts`: `imageEdge`, a fixed
   band at each edge, `EDGE_BAND_PX` or a quarter of a small image, along
   its height, or its width two to a row; `imageSpot` turns it into a spot):
-  onto the image, a version of it (`addVersion`); at an edge, a new image
+  onto the image, a version of it (`add-version`); at an edge, a new image
   just before it or before the next (`image-at`); on the column, at its end.
   An image card lands the same way, onto an image meaning just before it:
   a reorder in its own column, a move to that spot in another
@@ -1977,7 +1978,7 @@ values; the engine gathers and applies.
   drop** (`planDrop`), so what is drawn is what happens. Alt is read
   each frame as `how: "copy"`.
 - **A drop sends the intents a key or a menu would** (`dropIntents`):
-  `moveColumn`, `put` with its source, target and how, or the root drop's
+  `move-column`, `put` with its source, target and how, or the root drop's
   own; each runs its own planner. A refused landing sends nothing. A
   landing's planned drop carries its target, so a drop reads only the
   source and the planned drop.
@@ -2109,13 +2110,13 @@ gone.
   `column` intent with a `card` key), so a refusal is said there: ↑ and ↓
   reorder it among the column's notes (`reorderByStep`, a `note` key), and its
   ⋯ takes it into your inventory or makes it a thread; a drag takes it
-  anywhere else. The box under the notes makes one with `newCard`, at
+  anywhere else. The box under the notes makes one with `new-card`, at
   its first input worth keeping and holding that input.
 - **A new card at a list's end is one rule, `newCardEffects`**
   (`card-intents.ts`): a text card of yours at `drawnPlace(to)`, drawn last
   until the host gives it its order (`LAST_ORDER`), in no history. `to` is
   a `ListKey`, a note column, a thread's pinned cards or an entry's margin;
-  `newCard` (a new note or pinned card, with its first text) and a comment
+  `new-card` (a new note or pinned card, with its first text) and a comment
   (empty) both make theirs with it. The box they are written in is drawn
   as its list is (`newCardBox`: its tone and words), and its keys are
   `newCardKeys` (`card-keys.ts`): the acts a key asks for, in order, and

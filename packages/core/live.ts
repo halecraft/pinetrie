@@ -14,13 +14,13 @@ export type StreamEvent =
   /** Text the model is writing, as a delta. */
   | { readonly kind: "text"; readonly lane: ThreadId; readonly delta: string }
   | {
-      readonly kind: "toolStart"
+      readonly kind: "tool-start"
       readonly lane: ThreadId
       readonly callId: string
     }
   /** The tool's output so far: a whole snapshot, not a delta. */
   | {
-      readonly kind: "toolOutput"
+      readonly kind: "tool-output"
       readonly lane: ThreadId
       readonly callId: string
       readonly text: string

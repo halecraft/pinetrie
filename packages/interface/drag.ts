@@ -217,9 +217,9 @@ function imageDrop(
         kind: "image",
         intent:
           spot.kind === "version"
-            ? { kind: "addVersion", image: spot.image, sha256 }
+            ? { kind: "add-version", image: spot.image, sha256 }
             : {
-                kind: "putImages",
+                kind: "put-images",
                 images: [{ sha256, name }],
                 to: {
                   kind: "image-at",
@@ -233,7 +233,7 @@ function imageDrop(
       return {
         kind: "image",
         intent: {
-          kind: "putImages",
+          kind: "put-images",
           images: [{ sha256, name }],
           to: { kind: "canvas-at", canvas: target.canvas, after: target.after },
         },
@@ -245,7 +245,7 @@ function imageDrop(
 
 /**
  * The intents a drop sends: the ones a key or a menu would. A reorder is
- * `moveColumn`, a landing a `put`, a canvas's drop its own; each runs its
+ * `move-column`, a landing a `put`, a canvas's drop its own; each runs its
  * own planner, so a drop does what the put key or Move up does. The
  * planned drop holds all it needs besides its source.
  */
@@ -260,7 +260,7 @@ export function dropIntents(
         ? []
         : [
             {
-              kind: "moveColumn",
+              kind: "move-column",
               column: { kind: "card", card: source.card },
               to: drop.to,
             },

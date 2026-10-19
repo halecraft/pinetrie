@@ -246,7 +246,7 @@ mount claims it (*A card's focus*, below).
   same state, so no render follows, and an effect waiting for one never runs
   (S33: the rail's scroll-to did nothing). Otherwise the id waits for the render
   the pick causes, in a layout effect with no dependencies.
-- **Unless a fold opens for it.** `openAt` opens the fold a message is in,
+- **Unless a fold opens for it.** `open-at` opens the fold a message is in,
   then reveals it. An ask's last word is drawn while its fold is closed, so
   a reveal at once scrolled to it, and the fold's render then pushed it
   down. `App`'s `openFold` port notes that a fold opened, and its `reveal`
@@ -406,7 +406,7 @@ type (`Strip = [CanvasColumn, ...CardColumn[]]`), so no strip lacks one.
   (`drawnAt`), which the suite's `col(n)` selects by; `position`, its index
   on the canvas, is what Alt+arrows move by.
 - **A column's ⋯** (`column-menu.tsx`, `columnHeadEnd`'s `menu`) is its
-  card's, for everyone: its width, one column or two (`cardWidth`); a
+  card's, for everyone: its width, one column or two (`card-width`); a
   thread's adds a section of Copy to this canvas, Copy to your inventory
   and Move to your inventory, and no canvas (ADR-0127); and, for a reader
   who may write, it ends in a `trash` section, Move to trash, on every
@@ -600,7 +600,7 @@ set `data-card-drag`.
   `data-hover-open` on the target's own element (a sidebar row a card is
   onto, ▦) while its ring fills. It reads the intent state from a function each frame, never
   rebuilt for it. The order changes once, on the drop: a reorder's
-  `moveColumn`, a landing's `put`, a canvas's own drop, the intents a key or
+  `move-column`, a landing's `put`, a canvas's own drop, the intents a key or
   a menu would send.
 - **The click a release sends after a drag is swallowed**, so a header's
   buttons start drags too and a press that moves less than 5 px is their
@@ -811,7 +811,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   nothing that reads it.
   - **The header's one button** (`.next-button`) is `.stop` (sending
     `stop`), `.resume` (`carry-on`) or `.release-queue` ("send queue (n)",
-    the `holdQueue` act). Its ⋯ (`.queue-menu-trigger`) holds `.resume`,
+    the `hold-queue` act). Its ⋯ (`.queue-menu-trigger`) holds `.resume`,
     `.hold-queue`, `.release-queue` ("unpause") and `.unqueue-all`.
     The browser suite reads `.stop` as "the lane runs" (`page.ts`), and a
     carry-on message's row is `.msg.carry-on`. No header is drawn
@@ -823,7 +823,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
     (`.card-editor.queued:not(:focus-within)`). A component that swapped a
     face for the editor would remount the box and lose the caret, which
     Alt+↑ must keep.
-  - **"+ add to queue"** is the `queueNew` act with `hold-if-idle`, which
+  - **"+ add to queue"** is the `queue-new` act with `hold-if-idle`, which
     arms the new card's focus; its box claims it once drawn (*A card's
     focus*).
   - **A queued card revealed** (an undo, a trace) is scrolled to in its
@@ -893,7 +893,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   prompt's role) comes first: while it runs, accepted work counts files so far
   and offers nothing. A lane with no copy of its own has no strip.
 - **Getting the latest and splitting are a card queued at once** (ADR-0108,
-  ADR-0061, ADR-0080): the button is the `queueNew` act, which makes a card
+  ADR-0061, ADR-0080): the button is the `queue-new` act, which makes a card
   in the queue with the command and no text, in one `queue-card` request:
   it is never drawn as a note. A split waits while the thread works, and a
   queued one makes the strip's split button quiet (`workStripView`'s
@@ -920,7 +920,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
 - **A fact waiting for a run's end** is drawn above the line as a quiet row
   (`.queued-fact`, worded by `factLine`), with no controls: nobody moves it
   (ADR-0080).
-- **"Needs you" comes from the tree** (ADR-0080): the strip's `needs_you`
+- **"Needs you" comes from the tree** (ADR-0080): the strip's `needs-you`
   is the thread's newest `ask_about_conflict` (`conflictAskTime`) when it is
   newer than the proposed changes' record.
 - **Open proposed changes in your repo** ("changes ready to accept") are your inbox's
@@ -1183,8 +1183,8 @@ the session sends moves and draws them until its copy holds them
   (`Margin` with `beside="image"`; a comment records the version it was
   written on, and says so under a newer one, `commentVersionWords`). Files
   dropped on the column are uploaded (`image-upload.ts` over `uploadBlob`),
-  the images kept, and put at its end (`putImages`); one dropped on an image
-  is a version (`addVersion`), or at its edge a new image before or after it
+  the images kept, and put at its end (`put-images`); one dropped on an image
+  is a version (`add-version`), or at its edge a new image before or after it
   (`fileDropAtProps` hands the point, and its `onOver` the point while a
   file is over, which draws the edge). It, and the strip, say how many files a drop
   left out (`leftOutWords`). The pane's put is a split button
@@ -1193,7 +1193,7 @@ the session sends moves and draws them until its copy holds them
 - **A new note or pinned card is written in one box, as your message is**
   (`NewCardBox`, `card-editor.tsx`, over `useCardBox`): local until it holds
   something worth keeping, then the same element bound to the card it
-  makes (`newCard`), so no keystroke falls between and focus never moves.
+  makes (`new-card`), so no keystroke falls between and focus never moves.
   It holds that card until focus leaves it (`release`), and its list leaves
   the card out meanwhile (`onShows`): drawn there too, it would be two boxes
   on one text. Its tone and words follow from its list (`newCardBox`), and
@@ -1393,7 +1393,7 @@ stays in view; the strip scrolls past 30vh.
   (`changeVerb`), and `traceWords` words it ("Bea queued this", "3 cards moved
   by Bea"). Only a column that can be written draws them: an archived
   root's is a glance.
-- **A click is `openTrace`** (`planOpenTrace`, `card-intents.ts`): the card's
+- **A click is `open-trace`** (`planOpenTrace`, `card-intents.ts`): the card's
   place now, as an undo's answer shows it (`revealEffects`); a sent card's
   message; nothing for a card in someone else's inventory.
 - **Seen is the host's.** An effect in `Column` sends `traces-seen` for the

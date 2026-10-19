@@ -67,7 +67,7 @@ export type PutTarget =
   /** The pinned strip at the top of a thread's column. */
   | { readonly kind: "pinned"; readonly key: string }
   /** The cards pinned to a canvas, in its canvas column. */
-  | { readonly kind: "canvasPinned"; readonly canvas: CanvasId }
+  | { readonly kind: "canvas-pinned"; readonly canvas: CanvasId }
   /**
    * Your inventory: a slot aimed at (a drop on it, a paste on it), or, with
    * null, none (a take, keep): the selected slot if empty, else the first
@@ -133,7 +133,7 @@ export function dropProps(target: PutTarget): Readonly<Record<string, string>> {
       return { [PUT_COMPOSER]: target.key }
     case "pinned":
       return { [PUT_PINNED]: target.key }
-    case "canvasPinned":
+    case "canvas-pinned":
       return { [PUT_CANVAS_PINNED]: target.canvas }
     case "inventory":
       return {
@@ -174,7 +174,7 @@ export function targetOfElement(el: {
   if (pinned !== null && pinned !== "") return { kind: "pinned", key: pinned }
   const canvas = el.getAttribute(PUT_CANVAS_PINNED)
   if (canvas !== null && isCanvasId(canvas))
-    return { kind: "canvasPinned", canvas }
+    return { kind: "canvas-pinned", canvas }
   const state = el.getAttribute(PUT_STATE)
   if (state !== null && isWorkflowStateId(state))
     return { kind: "state", state }
@@ -251,7 +251,7 @@ export function placeOfTarget(
 ): Exclude<TargetOf<"text">, CanvasTarget | BackTarget> | null {
   if (target.kind === "inventory") return { kind: "inventory", holder: me }
   if (target.kind === "notes") return { kind: "note", column: target.column }
-  if (target.kind === "canvasPinned")
+  if (target.kind === "canvas-pinned")
     return { kind: "canvas-pinned", canvas: target.canvas }
   if (
     target.kind === "state" ||

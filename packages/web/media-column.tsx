@@ -70,7 +70,7 @@ export function MediaColumn(p: {
     const up = await uploadImages(files)
     setLeft(up.left)
     p.onIntent({
-      kind: "putImages",
+      kind: "put-images",
       images: up.images,
       to,
     })
@@ -197,7 +197,7 @@ function MediaImage(p: {
     const [first] = up.images
     if (first !== undefined)
       p.onIntent({
-        kind: "addVersion",
+        kind: "add-version",
         image: image.image,
         sha256: first.sha256,
       })
@@ -339,12 +339,12 @@ function MediaImage(p: {
           onComment={() => {
             const card = newCardId()
             p.act({
-              kind: "newCard",
+              kind: "new-card",
               card,
               to: { kind: "margin", on, seen: shown.sha256 },
               text: "",
             })
-            p.act({ kind: "focusCard", card })
+            p.act({ kind: "focus-card", card })
           }}
           onShut={() => setOpen(false)}
           onTyping={p.onTyping}

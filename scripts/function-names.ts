@@ -6,9 +6,8 @@
 // its code is next changed. A function is a function declaration, or a
 // `const` or `let` whose value is an arrow or a function expression.
 
-import { globSync, readFileSync } from "node:fs"
-import path from "node:path"
 import { parseSync } from "oxc-parser"
+import { readSources } from "./sources.ts"
 
 /** An exported function, by the file that declares it. */
 export interface ExportedFunction {
@@ -47,19 +46,14 @@ export function exportedFunctionNames(
 export const isLeaningName = (name: string): boolean =>
   /[a-z0-9](?:Of|To|At)$/.test(name)
 
-const FILES = ["packages/**/*.{ts,tsx}", "apps/**/*.{ts,tsx}", "scripts/*.ts"]
-const NOT_SOURCE = ["**/node_modules/**", "**/dist/**", "**/*.test.{ts,tsx}"]
-
 /** Every exported function in the source under `root`, tests left out. */
 export function readExportedFunctions(
   root: string,
 ): readonly ExportedFunction[] {
-  return globSync(FILES, { cwd: root, exclude: NOT_SOURCE })
-    .toSorted()
-    .flatMap(file =>
-      exportedFunctionNames(
-        file,
-        readFileSync(path.join(root, file), "utf8"),
-      ).map(name => ({ file, name })),
-    )
+  return readSources(root, { tests: false }).flatMap(source =>
+    exportedFunctionNames(source.file, source.text).map(name => ({
+      file: source.file,
+      name,
+    })),
+  )
 }

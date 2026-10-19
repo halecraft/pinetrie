@@ -151,7 +151,7 @@ export async function dropUnrecordedBase(
 ): Promise<void> {
   if (plan.kind === "virtual" && !recorded(plan.name))
     await runtime.disk({
-      kind: "deleteSnapshots",
+      kind: "delete-snapshots",
       ids: [snapshotId(plan.name)],
     })
 }

@@ -117,7 +117,7 @@ export function putOnCanvasButton(input: {
     name: `put into ${c.title}`,
     title: `put this image at the end of the media column ${c.title}, for everyone`,
     intent: {
-      kind: "putImages",
+      kind: "put-images",
       images: [{ sha256, name }],
       to: { kind: "image-at", column: c.id, before: null },
     } as const,
@@ -130,7 +130,7 @@ export function putOnCanvasButton(input: {
       title:
         "put this image in a new media column just after this thread, for everyone",
       intent: {
-        kind: "putImages",
+        kind: "put-images",
         images: [{ sha256, name }],
         to: { kind: "canvas-at", canvas: input.canvas, after: input.thread },
       },

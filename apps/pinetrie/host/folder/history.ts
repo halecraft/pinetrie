@@ -146,7 +146,7 @@ export function folderHistory(
     const paths = await sourceChanges(reader, newest, state)
     if (paths.length === 0) {
       await runtime.disk({
-        kind: "deleteSnapshots",
+        kind: "delete-snapshots",
         ids: [snapshotId(state)],
       })
       return { committed: null, newest, paths }

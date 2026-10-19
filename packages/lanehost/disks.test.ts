@@ -39,7 +39,7 @@ const disks = projectDisks(HERE, KEY)
 const disk = (call: LanehostCall) => answer(call, serving)
 
 afterAll(async () => {
-  if (onBtrfs) await answer({ kind: "removeProject", project: KEY }, serving)
+  if (onBtrfs) await answer({ kind: "remove-project", project: KEY }, serving)
   await rm(HERE, { recursive: true, force: true })
 })
 
@@ -69,7 +69,7 @@ describe.skipIf(!onBtrfs)(
       )
       expect(
         await answer(
-          { kind: "snapshotExists", project: KEY, snapshot: "s" },
+          { kind: "snapshot-exists", project: KEY, snapshot: "s" },
           serving,
         ),
       ).toBe(true)
@@ -106,11 +106,11 @@ describe.skipIf(!onBtrfs)(
       await disk({
         kind: "disk",
         project: KEY,
-        op: { kind: "deleteSnapshots", ids: ["ro"] },
+        op: { kind: "delete-snapshots", ids: ["ro"] },
       })
       expect(
         await answer(
-          { kind: "snapshotExists", project: KEY, snapshot: "ro" },
+          { kind: "snapshot-exists", project: KEY, snapshot: "ro" },
           serving,
         ),
       ).toBe(false)
@@ -251,7 +251,7 @@ describe.skipIf(!onBtrfs)(
         op: { kind: "create", lane: "n" },
       })
       await disk({
-        kind: "nestedDisk",
+        kind: "nested-disk",
         project: KEY,
         lane: "n",
         cloneFromLane: null,
@@ -290,7 +290,7 @@ describe.skipIf(!onBtrfs)(
     })
     test("a nested disk's data root: made the rootless user's, then a clone of another lane's", async () => {
       const nestedDisk = (lane: string, cloneFromLane: string | null) =>
-        disk({ kind: "nestedDisk", project: KEY, lane, cloneFromLane })
+        disk({ kind: "nested-disk", project: KEY, lane, cloneFromLane })
       // As a lane made before its data root was a subvolume left it.
       await mkdir(path.join(disks.nested("old"), "docker", "image"), {
         recursive: true,
@@ -323,7 +323,7 @@ describe.skipIf(!onBtrfs)(
       expect(await answer({ kind: "projects" }, serving)).toEqual([
         { key: KEY, root: "/Users/ada/p" },
       ])
-      await answer({ kind: "removeProject", project: KEY }, serving)
+      await answer({ kind: "remove-project", project: KEY }, serving)
       expect(await answer({ kind: "projects" }, serving)).toEqual([])
     })
   },

@@ -16,14 +16,14 @@ const TOPICS = { id: workflowStateIdFor("t"), name: "Topics" }
 test("＋ past the last column makes an agent thread; its ▾, a chat, a note column and a media column, all at its spot", () => {
   const button = newColumnButton(at)
   expect(button.main.intent).toEqual({
-    kind: "addColumn",
+    kind: "add-column",
     make: { kind: "thread", opens: "agent" },
     at,
   })
   expect(button.more?.items.map(i => i.intent)).toEqual([
-    { kind: "addColumn", make: { kind: "thread", opens: "chat" }, at },
-    { kind: "addColumn", make: { kind: "note-column" }, at },
-    { kind: "addColumn", make: { kind: "media" }, at },
+    { kind: "add-column", make: { kind: "thread", opens: "chat" }, at },
+    { kind: "add-column", make: { kind: "note-column" }, at },
+    { kind: "add-column", make: { kind: "media" }, at },
   ])
   expect(button.more?.items.map(i => i.label)).toEqual([
     "chat",
@@ -34,7 +34,7 @@ test("＋ past the last column makes an agent thread; its ▾, a chat, a note co
 
 test("＋ canvas makes a canvas, with no ▾", () => {
   const button = newCanvasButton({ from: "sidebar", landsIn: TOPICS })
-  expect(button.main.intent).toEqual({ kind: "newCanvas" })
+  expect(button.main.intent).toEqual({ kind: "new-canvas" })
   expect(button.main.label).toBe("canvas")
   expect(button.main.title).toBe(
     "a new canvas at the end of Topics: its first thread starts with @agent typed",
@@ -45,7 +45,7 @@ test("＋ canvas makes a canvas, with no ▾", () => {
 test("a board column's ＋ lands its canvas in that column's state", () => {
   const active = { id: workflowStateIdFor("a"), name: "Active" }
   const button = newCanvasButton({ from: "board", landsIn: active })
-  expect(button.main.intent).toEqual({ kind: "newCanvas", state: active.id })
+  expect(button.main.intent).toEqual({ kind: "new-canvas", state: active.id })
   expect(button.main.title).toContain("at the end of Active")
 })
 

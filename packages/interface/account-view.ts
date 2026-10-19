@@ -14,7 +14,7 @@ export type AccountItem =
     }
   | { readonly kind: "profile" }
   | { readonly kind: "setup" }
-  | { readonly kind: "signOut" }
+  | { readonly kind: "sign-out" }
 
 interface AccountView {
   readonly items: readonly AccountItem[]
@@ -31,7 +31,7 @@ export function accountView(input: {
   const always: readonly AccountItem[] = [
     { kind: "profile" },
     { kind: "setup" },
-    { kind: "signOut" },
+    { kind: "sign-out" },
   ]
   if (!input.folded) return { items: always, badge: null }
   return {
@@ -65,7 +65,7 @@ export function accountWords(item: AccountItem): ControlWords {
         label: "Setup",
         title: "the host's model, sign-in and config files",
       }
-    case "signOut":
+    case "sign-out":
       return {
         label: "Sign in as someone else",
         title: "forget who this device says you are, and ask again",

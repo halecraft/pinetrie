@@ -389,7 +389,7 @@ describe("planBegin: accepted work, or a WIP's copy", () => {
       ...unfinished,
     })
   })
-  test("no line: not_set_up; a base that is no WIP above accepted work: bad_base", () => {
+  test("no line: not-set-up; a base that is no WIP above accepted work: bad-base", () => {
     expect(begin(null, { acceptedCommit: null, unfinished: null })).toBe(
       ERR.NOT_SET_UP,
     )

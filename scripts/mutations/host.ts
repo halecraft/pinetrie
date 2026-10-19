@@ -689,7 +689,7 @@ export const mutations: readonly Mutation[] = [
     from: "      if (begin !== null)",
     to: "      if (false)",
     command: unit,
-    expect: "createAndRun from a base that cannot begin refuses",
+    expect: "create-and-run from a base that cannot begin refuses",
   },
   {
     name: "a step refused in shutdown is logged as a failure",
@@ -882,10 +882,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the lane stops before its streams close",
     file: "apps/pinetrie/host/runs.ts",
-    from: '  return [...outcome, "runEndReportPending", "endRun", "laneStopped", "ended"]',
-    to: '  return [...outcome, "runEndReportPending", "laneStopped", "endRun", "ended"]',
+    from: '    "run-end-report-pending",\n    "end-run",\n    "lane-stopped",\n',
+    to: '    "run-end-report-pending",\n    "lane-stopped",\n    "end-run",\n',
     command: unit,
-    expect: "endRun comes before laneStopped",
+    expect: "end-run comes before lane-stopped",
   },
   {
     name: "a failed end step skips endRun",
@@ -893,7 +893,7 @@ export const mutations: readonly Mutation[] = [
     from: '      failed(basics, "run end")(error)',
     to: "      throw error",
     command: unit,
-    expect: "a failing step before endRun is logged",
+    expect: "a failing step before end-run is logged",
   },
   {
     name: "a refused run's message is lost",
@@ -1098,11 +1098,11 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a split's stack is never checked",
     file: "apps/pinetrie/host/runs.ts",
-    from: '  const outcome: readonly RunEndStep[] = role === "stack" ? ["splitEnded"] : []',
+    from: '  const outcome: readonly RunEndStep[] = role === "stack" ? ["split-ended"] : []',
     to: "  const outcome: readonly RunEndStep[] = []",
     command: unit,
     expect:
-      "a stack prompt adds splitEnded before endRun; a land prompt ends as any run",
+      "a stack prompt adds split-ended before end-run; a land prompt ends as any run",
   },
   {
     name: "the drain goes on after a run starts",
@@ -1939,7 +1939,7 @@ export const mutations: readonly Mutation[] = [
     to: "      void (deps.basics.roots, {",
     command: unit,
     expect:
-      "createAndRun creates the lane, prepares it, may title its root, and runs there",
+      "create-and-run creates the lane, prepares it, may title its root, and runs there",
   },
   {
     name: "a retitle is answered without asking",
@@ -2050,10 +2050,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the run-end report is pending only after the run has stopped",
     file: "apps/pinetrie/host/runs.ts",
-    from: '  return [...outcome, "runEndReportPending", "endRun", "laneStopped", "ended"]',
-    to: '  return [...outcome, "endRun", "runEndReportPending", "laneStopped", "ended"]',
+    from: '    "run-end-report-pending",\n    "end-run",\n',
+    to: '    "end-run",\n    "run-end-report-pending",\n',
     command: unit,
-    expect: "the run-end report is pending before endRun",
+    expect: "the run-end report is pending before end-run",
   },
   {
     name: "a starting host leaves run-end reports pending",
@@ -2464,7 +2464,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a thread is not named once recorded",
     file: "apps/pinetrie/host/commands/send.ts",
-    from: '    if (planned.kind === "appendToTree") void deps.names.ensure()\n',
+    from: '    if (planned.kind === "append-to-tree") void deps.names.ensure()\n',
     to: "",
     command: unit,
     expect: "a branch's record is written with its first, then named",
@@ -2764,8 +2764,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a record the rewrite leaves is written all the same",
     file: "apps/pinetrie/host/migrations/rewrite.ts",
-    from: "    const value = rewrite(contents)\n",
-    to: "    const value = rewrite(contents) ?? (contents as object)\n",
+    from: "      const value = input.rewrite(contents)\n",
+    to: "      const value = input.rewrite(contents) ?? (contents as object)\n",
     command: unit,
     expect: "no step when no record is in the old shape",
   },
@@ -3006,7 +3006,7 @@ export const mutations: readonly Mutation[] = [
     to: "          await lease[Symbol.asyncDispose]()\n          await end(lane, id)\n",
     command: unit,
     expect:
-      "a run holds its lane's root from its start until its end's last step, through a failed step before endRun",
+      "a run holds its lane's root from its start until its end's last step, through a failed step before end-run",
   },
   {
     name: "a late step plans before it loads its thread's root",
@@ -3398,6 +3398,23 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "a run that wrote its lane's prompt anew logs the sections it changed, and one that did not logs none",
+  },
+  {
+    name: "a record moved to another namespace stays in the old one",
+    file: "apps/pinetrie/host/migrations/rewrite.ts",
+    from: '        { kind: "delete", target, namespace: from, key },\n',
+    to: "",
+    command: unit,
+    expect:
+      "a record moved to another namespace is rewritten there and leaves the old one",
+  },
+  {
+    name: "the run-end report migration keeps the old urgency",
+    file: "apps/pinetrie/host/migrations/0025-run-end-report.ts",
+    from: '  needsYou: "needs-you",\n',
+    to: "",
+    command: unit,
+    expect: "a model's report and its urgency get the new spellings",
   },
   {
     name: "the reply migration rewrites a counted reply again",

@@ -33,7 +33,7 @@ describe("admission: an invite key off loopback", () => {
 
   test("a page with the right ?key= is admitted, then sent to the URL without it", () => {
     expect(admits({ url: "/?key=s3cret&x=1" }, "s3cret")).toEqual({
-      kind: "admitAndForget",
+      kind: "admit-and-forget",
       location: "/?x=1",
     })
   })

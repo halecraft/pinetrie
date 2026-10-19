@@ -28,7 +28,7 @@ import type { IconLookup, ThreadIcon } from "./thread-icon.ts"
 export type ItemMenuItem =
   | { readonly kind: "rename" }
   /** What the canvas raises is not needed. */
-  | { readonly kind: "notNeeded"; readonly intent: Intent }
+  | { readonly kind: "not-needed"; readonly intent: Intent }
   /** Ask a model for a title from the canvas's first thread. */
   | { readonly kind: "retitle"; readonly intent: Intent }
   /**
@@ -37,7 +37,7 @@ export type ItemMenuItem =
    * works there (`busy`), and it withdraws the proposed changes of its threads
    * named in `drops`.
    */
-  | ({ readonly kind: "moveTo" } & ThreadMove)
+  | ({ readonly kind: "move-to" } & ThreadMove)
 
 /**
  * What an item draws while the sidebar is folded: the icon of the canvas's
@@ -211,9 +211,9 @@ function menuOf(
       ? []
       : [
           {
-            kind: "notNeeded",
+            kind: "not-needed",
             intent: {
-              kind: "notNeeded",
+              kind: "not-needed",
               lane: status.item.lane,
               raised: status.item.raised,
             },
@@ -221,7 +221,7 @@ function menuOf(
         ]),
     { kind: "rename" },
     { kind: "retitle", intent: { kind: "retitle", canvas } },
-    ...head.moves.map(m => ({ kind: "moveTo", ...m }) as const),
+    ...head.moves.map(m => ({ kind: "move-to", ...m }) as const),
   ]
 }
 

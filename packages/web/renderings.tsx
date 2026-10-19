@@ -391,7 +391,7 @@ function ReferenceFull(p: { card: CardOf<"reference">; width: CardWidth }) {
         onClick={() => {
           if (quote !== null)
             onIntent({
-              kind: "editAsText",
+              kind: "edit-as-text",
               reference: p.card.id,
               card: newCardId(),
               text: quote,

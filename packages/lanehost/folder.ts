@@ -205,7 +205,7 @@ interface ApplyPlanned {
   readonly ops: readonly MergeStep[]
 }
 
-/** `applyMerge` as absolute paths; throws on a name that is no disk's or a path that leaves one. */
+/** `apply-merge` as absolute paths; throws on a name that is no disk's or a path that leaves one. */
 export function planApply(
   call: {
     readonly disk: string
@@ -482,7 +482,7 @@ interface ReadInPlanned {
   readonly deleted: readonly string[]
 }
 
-/** `readIn` as steps and paths; throws on a name that is no disk's or a path that leaves one. */
+/** `read-in` as steps and paths; throws on a name that is no disk's or a path that leaves one. */
 export function planReadIn(
   call: {
     readonly from: string | null

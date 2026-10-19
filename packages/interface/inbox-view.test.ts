@@ -14,15 +14,15 @@ const report = (lane: string, level: Level): Item => ({
   end: entryId(`e-${lane}`),
   level,
   raised: {
-    kind: "runEnd",
-    report: { kind: "modelSaid", urgency: level, reason: "why" },
+    kind: "run-end",
+    report: { kind: "model-said", urgency: level, reason: "why" },
     ask: entryId(`p-${lane}`),
   },
 })
 const proposed = (lane: string): Item => ({
   lane: threadIdFor(lane),
   end: entryId(`e-${lane}`),
-  level: "needsYou",
+  level: "needs-you",
   raised: { kind: "ready", source: cardIdFor("c1") },
 })
 
@@ -49,37 +49,37 @@ describe("inboxCount", () => {
   test("counts what needs you, proposed changes of threads you follow and unseen mentions; never what is worth a read", () => {
     expect(
       inboxCount(
-        [report("a", "needsYou"), proposed("b"), report("c", "worthARead")],
+        [report("a", "needs-you"), proposed("b"), report("c", "worth-a-read")],
         1,
       ),
     ).toBe(3)
-    expect(inboxCount([report("c", "worthARead")], 0)).toBe(0)
+    expect(inboxCount([report("c", "worth-a-read")], 0)).toBe(0)
   })
 })
 
 describe("inboxView", () => {
   test("each run-end report under its level, each proposed changes under ready, in the order given", () => {
-    const a = report("a", "needsYou")
+    const a = report("a", "needs-you")
     const b = proposed("b")
-    const c = report("c", "worthARead")
-    const d = report("d", "needsYou")
+    const c = report("c", "worth-a-read")
+    const d = report("d", "needs-you")
     expect(view({ items: [a, b, c, d] }).items).toEqual({
-      needsYou: [a, d],
+      "needs-you": [a, d],
       ready: [b],
-      worthARead: [c],
+      "worth-a-read": [c],
     })
   })
   test("sections come needs you, ready, worth a read, mentions, each only with rows", () => {
     expect(
       view({
         items: [
-          report("c", "worthARead"),
+          report("c", "worth-a-read"),
           proposed("b"),
-          report("a", "needsYou"),
+          report("a", "needs-you"),
         ],
         mentions: 1,
       }).sections,
-    ).toEqual(["needsYou", "ready", "worthARead", "mentions"])
+    ).toEqual(["needs-you", "ready", "worth-a-read", "mentions"])
     expect(view({ items: [proposed("b")] }).sections).toEqual(["ready"])
     expect(view().sections).toEqual([])
   })
@@ -92,7 +92,7 @@ describe("inboxView", () => {
     expect(view({ items: [proposed("b")] }).sections).not.toContain("mentions")
   })
   test("an open menu keeps its emptied section", () => {
-    expect(view({ kept: ["needsYou"] }).sections).toEqual(["needsYou"])
+    expect(view({ kept: ["needs-you"] }).sections).toEqual(["needs-you"])
   })
 })
 
@@ -100,7 +100,7 @@ describe("inboxWords", () => {
   test("the label says what needs you, and never where the agent works", () => {
     const words = inboxWords(
       view({
-        items: [report("a", "needsYou"), proposed("b"), proposed("c")],
+        items: [report("a", "needs-you"), proposed("b"), proposed("c")],
         mentions: 1,
         unseen: 1,
       }),
@@ -115,13 +115,13 @@ describe("inboxWords", () => {
   })
   test("a section kept open after its rows went says it has emptied", () => {
     const words = inboxWords(
-      view({ kept: ["needsYou", "ready", "worthARead", "mentions"] }),
+      view({ kept: ["needs-you", "ready", "worth-a-read", "mentions"] }),
     )
     expect(words.heading).toBe("Nothing needs you")
     expect(words.sections).toEqual({
-      needsYou: "Nothing needs you now.",
+      "needs-you": "Nothing needs you now.",
       ready: "Nothing left to accept.",
-      worthARead: "Nothing left to read.",
+      "worth-a-read": "Nothing left to read.",
       mentions: "No one has mentioned you.",
     })
   })
@@ -130,17 +130,17 @@ describe("inboxWords", () => {
       inboxWords(
         view({
           items: [
-            report("a", "needsYou"),
+            report("a", "needs-you"),
             proposed("b"),
-            report("c", "worthARead"),
+            report("c", "worth-a-read"),
           ],
           mentions: 1,
         }),
       ).sections,
     ).toEqual({
-      needsYou: "Needs you",
+      "needs-you": "Needs you",
       ready: "Ready to accept",
-      worthARead: "Worth a read",
+      "worth-a-read": "Worth a read",
       mentions: "Mentions of you",
     })
   })

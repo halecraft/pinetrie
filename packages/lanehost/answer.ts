@@ -73,20 +73,20 @@ async function answerAny(
     case "disk":
       await executeDiskSteps(planDisk(call.op, disksOf(serving, call.project)))
       return null
-    case "diskExists":
+    case "disk-exists":
       return isSubvolume(disksOf(serving, call.project).lane(named(call.lane)))
-    case "snapshotExists":
+    case "snapshot-exists":
       return isSubvolume(
         disksOf(serving, call.project).snapshot(named(call.snapshot)),
       )
     case "snapshots":
       return snapshotsIn(disksOf(serving, call.project))
-    case "statesDir":
+    case "states-dir":
       await mkdir(disksOf(serving, call.project).states(named(call.lane)), {
         recursive: true,
       })
       return null
-    case "nestedDisk": {
+    case "nested-disk": {
       const disks = disksOf(serving, call.project)
       await executeDiskSteps(
         planInnerDockerDataRootSteps(
@@ -105,13 +105,13 @@ async function answerAny(
         call.path,
         call.limit,
       )
-    case "pathFacts":
+    case "path-facts":
       return pathFacts(
         disksOf(serving, call.project),
         call.snapshot,
         call.paths,
       )
-    case "fileDiff":
+    case "file-diff":
       return fileDiff(
         disksOf(serving, call.project),
         call.a,
@@ -119,32 +119,32 @@ async function answerAny(
         call.path,
         call.limit,
       )
-    case "diffStats":
+    case "diff-stats":
       return diffStats(
         disksOf(serving, call.project),
         call.a,
         call.b,
         call.paths,
       )
-    case "filesUnder":
+    case "files-under":
       return filesUnder(
         disksOf(serving, call.project),
         call.snapshot,
         call.paths,
       )
-    case "sameContent":
+    case "same-content":
       return sameContent(
         disksOf(serving, call.project),
         call.a,
         call.b,
         call.pairs,
       )
-    case "applyMerge":
+    case "apply-merge":
       return executeApply(
         planApply(call, disksOf(serving, call.project)),
         call.markers,
       )
-    case "readIn":
+    case "read-in":
       return executeReadIn(
         planReadIn(call, serving.folder, disksOf(serving, call.project)),
       )
@@ -158,7 +158,7 @@ async function answerAny(
       return null
     case "projects":
       return listProjects(serving.lanesDir)
-    case "removeProject":
+    case "remove-project":
       await removeProject(disksOf(serving, call.project))
       return null
     case "grant": {

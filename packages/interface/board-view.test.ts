@@ -163,24 +163,24 @@ describe("boardView", () => {
     const view = boardView(input({ cardRoots: new Set([E(1)]) }))
     const doing = view.open[1]
     expect(doing?.items.map(t => t.pip)).toEqual([false, true])
-    expect(doing?.add.main.intent).toEqual({ kind: "newCanvas", state: DOING })
+    expect(doing?.add.main.intent).toEqual({ kind: "new-canvas", state: DOING })
   })
 
   test("a column's mark and the strip's are its canvases' highest; the archive has none", () => {
     const item = {
       lane: threadIdFor("a"),
       end: entryId("e-1"),
-      level: "needsYou" as const,
+      level: "needs-you" as const,
       raised: { kind: "ready" as const, source: "c" },
     }
     const status = new Map<CanvasId, Status>([
-      [E(1), { kind: "needsYou", item }],
+      [E(1), { kind: "needs-you", item }],
       [E(3), { kind: "working" }],
-      [E(4), { kind: "needsYou", item }],
+      [E(4), { kind: "needs-you", item }],
     ])
     const view = boardView(input({ status }))
-    expect(view.open.map(c => c.mark)).toEqual([null, "needsYou"])
-    expect(view.strip.map(s => s.mark)).toEqual([null, "needsYou", null])
+    expect(view.open.map(c => c.mark)).toEqual([null, "needs-you"])
+    expect(view.strip.map(s => s.mark)).toEqual([null, "needs-you", null])
   })
 
   test("a column counts its items working and ready, not threads; an item's ⇡ names its threads", () => {
@@ -227,7 +227,7 @@ describe("boardView", () => {
       ["Done", true, "running"],
     ])
     expect(first?.moves[1]?.intent).toEqual({
-      kind: "moveCanvas",
+      kind: "move-canvas",
       canvas: ID(2),
       from: DOING,
       to: DONE,
@@ -240,7 +240,7 @@ describe("boardView", () => {
     const [first, second] = boardView(input()).open[1]?.items ?? []
     expect(first?.up).toBeNull()
     expect(first?.down).toEqual({
-      kind: "moveCanvas",
+      kind: "move-canvas",
       canvas: ID(2),
       from: DOING,
       to: DOING,
@@ -248,7 +248,7 @@ describe("boardView", () => {
       closes: false,
     })
     expect(second?.up).toEqual({
-      kind: "moveCanvas",
+      kind: "move-canvas",
       canvas: ID(1),
       from: DOING,
       to: DOING,
@@ -262,11 +262,11 @@ describe("boardView", () => {
     const [backlog, doing] = boardView(input()).open
     expect(backlog?.left).toBeNull()
     expect(backlog?.right).toEqual({
-      kind: "editWorkflow",
+      kind: "edit-workflow",
       edit: { action: "move", state: BACKLOG, name: "", before: null },
     })
     expect(doing?.left).toEqual({
-      kind: "editWorkflow",
+      kind: "edit-workflow",
       edit: { action: "move", state: DOING, name: "", before: BACKLOG },
     })
     expect(doing?.right).toBeNull()
@@ -333,10 +333,10 @@ describe("the board's search", () => {
     const item = {
       lane: threadIdFor("a"),
       end: entryId("e-2"),
-      level: "needsYou" as const,
+      level: "needs-you" as const,
       raised: { kind: "ready" as const, source: "c" },
     }
-    status.set(E(2), { kind: "needsYou", item })
+    status.set(E(2), { kind: "needs-you", item })
     const view = boardView(input({ labels, status, ready, ...find("board") }))
     const doing = view.open[1]
     expect(view.shown).toEqual({
@@ -348,7 +348,7 @@ describe("the board's search", () => {
     expect(doing?.items.map(t => t.canvas)).toEqual([E(1)])
     expect(doing?.count).toEqual({ kind: "kept", kept: 1, total: 2 })
     expect(doing?.signals).toEqual({ working: 1, ready: 0, canvases: [E(1)] })
-    expect(doing?.mark).toBe("needsYou")
+    expect(doing?.mark).toBe("needs-you")
     expect(doing?.remove.why).not.toBeNull()
     expect(view.open[0]?.items).toEqual([])
     expect(view.open[0]?.remove.why).not.toBeNull()
@@ -425,10 +425,10 @@ describe("boardKeyAct", () => {
       "Escape clears a filter, in the search field too",
       key("Escape"),
       at({ filtered: true, inText: true }),
-      "clearFilter",
+      "clear-filter",
     ],
     ["Escape with no filter closes the board", key("Escape"), at(), "close"],
-    ["/ focuses the search", key("/"), at(), "focusSearch"],
+    ["/ focuses the search", key("/"), at(), "focus-search"],
     ["/ in a text box is typed", key("/"), at({ inText: true }), null],
     ["Ctrl+/ is not the board's", key("/", { ctrlKey: true }), at(), null],
     ["Cmd+/ is not the board's", key("/", { metaKey: true }), at(), null],
@@ -489,15 +489,15 @@ describe("board words", () => {
 
 test("nameStateIntent renames a state; addStateIntent adds one where it was asked for", () => {
   expect(nameStateIntent(DOING, "Now")).toEqual({
-    kind: "editWorkflow",
+    kind: "edit-workflow",
     edit: { action: "rename", state: DOING, name: "Now", before: null },
   })
   expect(addStateIntent(DOING, "Review")).toEqual({
-    kind: "editWorkflow",
+    kind: "edit-workflow",
     edit: { action: "add", state: null, name: "Review", before: DOING },
   })
   expect(addStateIntent(null, "Review")).toEqual({
-    kind: "editWorkflow",
+    kind: "edit-workflow",
     edit: { action: "add", state: null, name: "Review", before: null },
   })
 })

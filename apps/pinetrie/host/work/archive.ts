@@ -46,7 +46,7 @@ export function createArchive(deps: {
       if (snapshots.length > 0)
         void keeper.track(
           runtime
-            .disk({ kind: "deleteSnapshots", ids: snapshots })
+            .disk({ kind: "delete-snapshots", ids: snapshots })
             .catch(failed(basics, "deleting snapshots")),
         )
     },

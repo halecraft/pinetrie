@@ -20,6 +20,7 @@ import {
 } from "./rewrite.ts"
 
 const NS = "pinetrie.test" as const
+const TO = "pinetrie.moved" as const
 const ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 
 /** A stand-in rewrite: `old` becomes `new`; a record without `old` is left. */
@@ -52,8 +53,14 @@ async function storeWith(
     }))
   applyRecordWrites(s, set(SESSION_TARGET, session))
   applyRecordWrites(r, set({ kind: "root", root: ROOT }, root))
-  const run = (home: "session" | "root") =>
-    rewriteRecords({ name: "test", namespace: NS, home, rewrite: rename }).run({
+  const run = (home: "session" | "root", to?: typeof TO) =>
+    rewriteRecords({
+      name: "test",
+      namespace: NS,
+      ...(to === undefined ? {} : { to }),
+      home,
+      rewrite: rename,
+    }).run({
       exchange,
       docIds: [SESSION_DOC_ID, rootDocId(ROOT), "pinetrie:places"],
       hydrated: id => exchange.whenHydrated(id),
@@ -62,6 +69,7 @@ async function storeWith(
     run,
     session: () => readNamespace(s, NS),
     root: () => readNamespace(r, NS),
+    moved: () => readNamespace(s, TO),
   }
 }
 
@@ -84,6 +92,18 @@ describe("rewriteRecords: a namespace's records, each by a pure rewrite", () => 
     const store = await storeWith({ b: { new: 2 } }, {})
     expect(await store.run("session")).toBeNull()
     expect(await store.run("root")).toBeNull()
+  })
+
+  test("a record moved to another namespace is rewritten there and leaves the old one", async () => {
+    const store = await storeWith({ a: { old: 1 }, b: { new: 2 } }, {})
+    await (await store.run("session", TO))?.()
+    expect(store.moved()).toEqual({ a: { new: 1 }, b: { new: 2 } })
+    expect(store.session()).toEqual({})
+  })
+
+  test("no step when the old namespace is empty", async () => {
+    const store = await storeWith({}, {})
+    expect(await store.run("session", TO)).toBeNull()
   })
 })
 

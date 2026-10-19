@@ -207,7 +207,7 @@ paths are its diff." would compare a function with itself.
 - **Every disk operation is a `DiskOp`** (`runtime-port.ts`), carried out by
   the runtime the host hands in: create, restore from a snapshot, snapshot,
   delete, delete snapshots, and a nested lane's inner Docker data root
-  (`innerDockerDataRoot`: a clone of another lane's in place of its own,
+  (`inner-docker-data-root`: a clone of another lane's in place of its own,
   or its own as it is). Docker's keeps both as btrfs subvolumes,
   and carries each operation out as a call to lanehost's `disks` role over a
   held channel (ADR-0129, `packages/lanehost/TECHNICAL.md`).

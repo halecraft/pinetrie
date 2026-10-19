@@ -104,7 +104,7 @@ export const moveCard = (
   fly: boolean,
   queuedBy: WriterId | null = null,
   here: CanvasId | null = null,
-): Effect => ({ kind: "moveCard", move, how, queuedBy, fly, here })
+): Effect => ({ kind: "move-card", move, how, queuedBy, fly, here })
 
 /**
  * `card` queued on `to.lane` from `to.at`. Its text's version is left
@@ -512,9 +512,9 @@ function effectsOfLanding(
             { kind: "refuse", refusal: refusedAt(landing.code, landing.card) },
           ]
     case "swap":
-      return [{ kind: "swapSlots", a: landing.a, b: landing.b }]
+      return [{ kind: "swap-slots", a: landing.a, b: landing.b }]
     case "insert":
-      return [{ kind: "insertText", text: landing.text }]
+      return [{ kind: "insert-text", text: landing.text }]
     case "replace": {
       const old = findCard(state.cards, landing.old)
       return old === undefined || !isTrashable(old, state.cards.me)
@@ -535,7 +535,7 @@ function effectsOfLanding(
       return [
         ...show,
         {
-          kind: "moveCards",
+          kind: "move-cards",
           moves: [
             { move: cardMove(replacing, TRASH_PLACE), slot: null },
             { move: into, slot: landing.to.slot },
@@ -651,7 +651,7 @@ function putCard(
       return planSpinOff(now.id, target, minted, state)
     return [
       {
-        kind: "moveCards",
+        kind: "move-cards",
         moves: [
           {
             move: cardMove(now, { kind: "new-canvas", canvas: minted.canvas }),
@@ -716,7 +716,7 @@ const actedAtOf = (target: PutTarget): ActedAt => {
     case "notes":
     case "images":
       return atColumn(target.column)
-    case "canvasPinned":
+    case "canvas-pinned":
       return atColumn(target.canvas)
     case "column":
     case "composer":
@@ -807,7 +807,7 @@ function putImage(
     return []
   return [
     {
-      kind: "reorderCard",
+      kind: "reorder-card",
       reorder: {
         card: now.id,
         at: { kind: "image", column: target.column },
@@ -854,7 +854,7 @@ function spotOnCanvas(
   switch (target.kind) {
     case "canvas":
       return { canvas: target.canvas, after: target.after }
-    case "canvasPinned":
+    case "canvas-pinned":
       return { canvas: target.canvas, after: null }
     // Onto a canvas in the sidebar: at the end of its canvas.
     case "item":
@@ -903,7 +903,7 @@ function putInMessage(
     const away = cardMove(message, TRASH_PLACE)
     return [
       {
-        kind: "moveCards",
+        kind: "move-cards",
         moves: [into, { move: away, slot: null }],
         actedAt,
         close: [],
@@ -916,7 +916,7 @@ function putInMessage(
     slot: now.place.kind === "inventory" ? cardSlot(facts.slots, now.id) : null,
   }
   return [
-    { kind: "moveCards", moves: [into, back], actedAt, close: [], here: null },
+    { kind: "move-cards", moves: [into, back], actedAt, close: [], here: null },
   ]
 }
 
@@ -950,7 +950,7 @@ function newCardEffects(
   const content = { command: null, unsent: null, origin: null }
   return [
     {
-      kind: "createCard",
+      kind: "create-card",
       card: { kind: "text", id: card, owner: me, placer: me, place, content },
       text,
       how,
@@ -960,7 +960,7 @@ function newCardEffects(
 
 /** A new card holding its first text, at the end of its list, said in the column keyed `key`. */
 export const planNewCard = (
-  act: Extract<ColumnAct, { kind: "newCard" }>,
+  act: Extract<ColumnAct, { kind: "new-card" }>,
   key: string,
   state: IntentState,
 ): readonly Effect[] =>
@@ -981,7 +981,7 @@ export const planComment = (
     IN_COLUMN(act.thread),
     state,
   ),
-  { kind: "armFocus", key: { kind: "card", card: act.card } },
+  { kind: "arm-focus", key: { kind: "card", card: act.card } },
 ]
 
 /**
@@ -1157,7 +1157,7 @@ export function planTrash(
   // sidebar too, once the host accepts, as the host trashes its card.
   return [
     {
-      kind: "moveCards",
+      kind: "move-cards",
       moves: [{ move, slot: null }],
       actedAt: how.actedAt,
       close: closeCanvasEffects(emptied),
@@ -1219,8 +1219,8 @@ export function planUndoMove(
   inPanel: boolean,
   state: IntentState,
 ): readonly Effect[] {
-  if (inPanel) return [{ kind: "undoSwap", direction }]
-  return [{ kind: "undoMoves", canvas: canvasOfTab(state), direction }]
+  if (inPanel) return [{ kind: "undo-swap", direction }]
+  return [{ kind: "undo-moves", canvas: canvasOfTab(state), direction }]
 }
 
 /**

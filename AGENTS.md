@@ -74,6 +74,12 @@ spent spikes: history, which search skips unless you name the folder.
   arguments to finish the phrase. `scripts/function-names.test.ts` fails
   on an exported one; a module's own helper that does is renamed when its
   code is next changed for its own reasons.
+- A tag is kebab-case (`move-card`, `not-owner`): a union's `kind`, a
+  literal union's member, an error code, a stored schema's literal, a
+  namespace after `pinetrie.`. A spelling that is not ours (an HTTP method,
+  pi's names) is listed with its reason in `OUTSIDE_TAGS`, and a
+  migration's old shapes in `OLD_SHAPES`. `scripts/tag-spelling.test.ts`
+  fails on any other.
 - No module is in a cycle of the modules it loads: what two modules share
   goes in a third that imports neither. `import { type A }` loads its
   module; only `import type` does not. `scripts/import-cycles.test.ts`

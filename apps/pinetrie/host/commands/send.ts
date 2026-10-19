@@ -357,7 +357,7 @@ export async function sendMessage(
   if (planned.kind === "get-latest-first")
     return getLatestFirst(deps, writer, sendId, send, planned.thread)
   const begun =
-    planned.kind === "appendToTree" || planned.kind === "createAndRun"
+    planned.kind === "append-to-tree" || planned.kind === "create-and-run"
       ? planned
       : null
   // A thread opened as its column opened, or made by a copy or a
@@ -463,7 +463,7 @@ async function getLatestFirst(
 }
 
 /**
- * Carry out a chat's decision. `createAndRun` still checks its directory and
+ * Carry out a chat's decision. `create-and-run` still checks its directory and
  * asks pi to create the lane, under the id `planMessage` chose, here: both are
  * ports that may refuse.
  */
@@ -491,7 +491,7 @@ export async function executeSend(
     )
     // A chat's thread is named once its record is; a new lane's is
     // named as its lane is made, which draws its banner.
-    if (planned.kind === "appendToTree") void deps.names.ensure()
+    if (planned.kind === "append-to-tree") void deps.names.ensure()
   }
   switch (planned.kind) {
     case "refused":
@@ -504,10 +504,10 @@ export async function executeSend(
         kind: "failed",
         message: "getting the latest was not carried out",
       }
-    case "appendToTree":
-    case "appendToLane": {
+    case "append-to-tree":
+    case "append-to-lane": {
       const appended =
-        planned.kind === "appendToTree"
+        planned.kind === "append-to-tree"
           ? await deps.scribe.appendToTree(
               message(planned.details),
               { root, at: planned.parent },
@@ -529,7 +529,7 @@ export async function executeSend(
         message: message(planned.details),
         pinnedSeen: context.pinned,
       })
-    case "createAndRun": {
+    case "create-and-run": {
       const begin = await work.checkBegin(view, planned.at, context.base)
       if (begin !== null)
         return {

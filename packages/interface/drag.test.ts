@@ -81,13 +81,13 @@ test("a column over the strip reorders, over its own gap moves nothing; a canvas
     ),
   ).toEqual({
     kind: "root",
-    intent: { kind: "moveInList", canvas: K, before: NEXT },
+    intent: { kind: "move-in-list", canvas: K, before: NEXT },
   })
 })
 
-test("a drop sends what a key or a menu would: moveColumn, put or the canvas's drop, nothing else", () => {
+test("a drop sends what a key or a menu would: move-column, put or the canvas's drop, nothing else", () => {
   expect(dropIntents(card, { kind: "reorder", to: 2 }, "move")).toEqual([
-    { kind: "moveColumn", column: { kind: "card", card: T }, to: 2 },
+    { kind: "move-column", column: { kind: "card", card: T }, to: 2 },
   ])
   const target = { kind: "item", canvas: K } as const
   expect(
@@ -251,7 +251,7 @@ test("a card's drag opens a sidebar canvas from its middle and ▦ the board; be
 })
 
 test("a canvas's landing is marked as a root drop; a card's as its move or copy", () => {
-  const intent = { kind: "moveInList", canvas: K, before: NEXT } as const
+  const intent = { kind: "move-in-list", canvas: K, before: NEXT } as const
   expect(dropMark({ kind: "root", intent }, "move")).toBe("root")
   const target = { kind: "column", key: "k" } as const
   const land = {
@@ -295,12 +295,12 @@ test("a stored image dropped onto an image is a version, elsewhere on a media co
     drop({ kind: "images", column, on: { image: onto, edge: "onto" } }),
   ).toEqual({
     kind: "image",
-    intent: { kind: "addVersion", image: onto, sha256 },
+    intent: { kind: "add-version", image: onto, sha256 },
   })
   expect(drop({ kind: "images", column, on: null })).toEqual({
     kind: "image",
     intent: {
-      kind: "putImages",
+      kind: "put-images",
       images: [{ sha256, name: "shot.png" }],
       to: { kind: "image-at", column, before: null },
     },
@@ -309,7 +309,7 @@ test("a stored image dropped onto an image is a version, elsewhere on a media co
     drop({ kind: "images", column, on: { image: onto, edge: "before" } }),
   ).toMatchObject({
     intent: {
-      kind: "putImages",
+      kind: "put-images",
       to: { kind: "image-at", column, before: onto },
     },
   })

@@ -54,7 +54,6 @@ import {
   type StateSignals,
   type StripState,
   searchWords,
-  signalOfLevel,
   stateWords,
   type ThreadCard,
 } from "@pinetrie/interface"
@@ -134,10 +133,7 @@ export function BoardStrip({
         </span>{" "}
         Board
         {elsewhere !== null && (
-          <SignalMark
-            signal={signalOfLevel(elsewhere)}
-            title={elsewhereWords(elsewhere)}
-          />
+          <SignalMark signal={elsewhere} title={elsewhereWords(elsewhere)} />
         )}
         {filter !== null && !open && (
           <span
@@ -290,7 +286,7 @@ function StateSignalMarks({
       {signals.canvases.length > 0 && (
         <Readers {...readers} canvases={signals.canvases} />
       )}
-      {mark !== null && <SignalMark signal={signalOfLevel(mark)} />}
+      {mark !== null && <SignalMark signal={mark} />}
       {signals.working > 0 && (
         <span className="state-working" title={words.working}>
           ◌{signals.working}
@@ -346,10 +342,10 @@ export function Board({
         filtered,
         inText: isTextBox(document.activeElement),
       })
-      if (act === "focusSearch") {
+      if (act === "focus-search") {
         e.preventDefault()
         searchRef.current?.focus()
-      } else if (act === "clearFilter") onClearFilter()
+      } else if (act === "clear-filter") onClearFilter()
       else if (act === "close") close()
     }
     const side = (at: EventTarget | null): BoardSide =>

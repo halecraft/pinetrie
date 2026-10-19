@@ -296,8 +296,8 @@ export type ForkBegin = Extract<
  * Where a new lane begins when it has no agent work to inherit,
  * from the thread's base and what the host read of your repo: accepted work's
  * commit, or a copy of the WIP on accepted commit under it. Refused with no
- * line (`not_set_up`), and for a base that is not a WIP bookmark above accepted work
- * (`bad_base`).
+ * line (`not-set-up`), and for a base that is not a WIP bookmark above accepted work
+ * (`bad-base`).
  */
 export function planBegin(input: {
   /** The WIP bookmark chosen at the first message; null for accepted work. */
@@ -344,9 +344,9 @@ export type UpdateRefusal =
  * merged. A WIP thread merges a fresh copy of its WIP, on the lane's
  * previous copy, unless the lane's base already names the WIP's commit now. A
  * thread on accepted work, a lane with no base, and a landed WIP merge accepted work's commit.
- * A WIP gone without landing refuses (`base_gone`) until `toAccepted` ("continue
+ * A WIP gone without landing refuses (`base-gone`) until `toAccepted` ("continue
  * on accepted work") moves the thread to accepted work, marking the move even when
- * nothing is merged. With no line, refused (`not_set_up`).
+ * nothing is merged. With no line, refused (`not-set-up`).
  */
 export function planUpdateFrom(input: {
   /** The lane's base, from its own history; null for a lane with none, on accepted work. */

@@ -36,7 +36,7 @@ describe("lanehostClient", () => {
     })
     expect(opened).toEqual([])
     await client.call({ kind: "projects" })
-    await client.call({ kind: "diskExists", project: "k", lane: "l" })
+    await client.call({ kind: "disk-exists", project: "k", lane: "l" })
     expect(opened).toEqual(["disks"])
     expect(lines[0]).toMatch(/^\[lanehost\] disks projects [\d.]+ ms$/)
   })

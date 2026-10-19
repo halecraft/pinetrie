@@ -50,7 +50,7 @@ export function callModule(call: LanehostCall): Module {
   switch (call.kind) {
     case "record":
     case "projects":
-    case "removeProject":
+    case "remove-project":
       return "projects"
     case "grant":
       return "grants"

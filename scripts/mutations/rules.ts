@@ -1492,7 +1492,7 @@ export const mutations: readonly Mutation[] = [
     to: "  if (facts.unfinished === null)",
     command: unit,
     expect:
-      "no line: not_set_up; a base that is no WIP above accepted work: bad_base",
+      "no line: not-set-up; a base that is no WIP above accepted work: bad-base",
   },
   {
     name: "the host's own rewrite reads as your edit",
@@ -1998,8 +1998,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the host writes a plain message to a running lane",
     file: "packages/rules/message.ts",
-    from: '    return busy ? { kind: "busy" } : { kind: "appendToLane", thread }',
-    to: '    return { kind: "appendToLane", thread }',
+    from: '    return busy ? { kind: "busy" } : { kind: "append-to-lane", thread }',
+    to: '    return { kind: "append-to-lane", thread }',
     command: unit,
     expect: "a running lane, or one with cards queued: busy",
   },
@@ -3365,8 +3365,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a lane-less message's decision names no thread",
     file: "packages/rules/message.ts",
-    from: '        kind: "appendToTree",\n        thread: at.thread,\n',
-    to: '        kind: "appendToTree",\n',
+    from: '        kind: "append-to-tree",\n        thread: at.thread,\n',
+    to: '        kind: "append-to-tree",\n',
     command: unit,
     expect: "every decision that writes names its thread once",
   },

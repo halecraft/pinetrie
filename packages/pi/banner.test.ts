@@ -81,7 +81,7 @@ test("fitDrawnImage: a model's image is fitted as an upload is; bytes that are n
   })
   expect(
     await fitDrawnImage(Buffer.from("not an image at all").toString("base64")),
-  ).toEqual({ kind: "failed", reason: "not an image" })
+  ).toEqual({ kind: "failed", reason: "not-image" })
 })
 
 describe("banners in a harness", () => {

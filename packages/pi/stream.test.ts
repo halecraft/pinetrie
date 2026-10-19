@@ -19,7 +19,7 @@ test("a text delta, a tool's start and its output's first text", () => {
   ).toEqual({ kind: "text", lane, delta: "hi" })
   expect(
     harnessStreamEvent(event({ type: "tool_start", lane, toolCallId: "c1" })),
-  ).toEqual({ kind: "toolStart", lane, callId: "c1" })
+  ).toEqual({ kind: "tool-start", lane, callId: "c1" })
   expect(
     harnessStreamEvent(
       event({
@@ -34,7 +34,7 @@ test("a text delta, a tool's start and its output's first text", () => {
         },
       }),
     ),
-  ).toEqual({ kind: "toolOutput", lane, callId: "c1", text: "out" })
+  ).toEqual({ kind: "tool-output", lane, callId: "c1", text: "out" })
 })
 
 test("nothing for an empty delta, another update, or a lane that is not a thread's", () => {

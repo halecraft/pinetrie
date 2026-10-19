@@ -78,7 +78,7 @@ export type ViewChange =
   /** Unfold a column, or fold it to a strip with its title. */
   | { readonly kind: "fold"; readonly card: CardId; readonly unfolded: boolean }
   /** Unfold the canvas column, or fold it. */
-  | { readonly kind: "foldCanvas"; readonly unfolded: boolean }
+  | { readonly kind: "fold-canvas"; readonly unfolded: boolean }
   /** How much of each ask a column draws. */
   | {
       readonly kind: "density"
@@ -108,7 +108,7 @@ export type LayoutAction =
    * A canvas leaves the sidebar (its document is written apart): if you are on
    * it, show its neighbour. Your view of it is kept.
    */
-  | { readonly kind: "closeCanvas"; readonly canvas: CanvasId }
+  | { readonly kind: "close-canvas"; readonly canvas: CanvasId }
   /**
    * A change to your view of `canvas`. `first` is its canvas's first card,
    * which a view made by this change starts with unfolded (`defaultView`).
@@ -208,7 +208,7 @@ function changeView(view: YourCanvasView, change: ViewChange): YourCanvasView {
       return withCard(view, change.card, c =>
         set(c, "unfolded", change.unfolded ? true : undefined),
       )
-    case "foldCanvas":
+    case "fold-canvas":
       return view.canvas.unfolded === change.unfolded
         ? view
         : { ...view, canvas: { unfolded: change.unfolded } }
@@ -283,7 +283,7 @@ export function layoutReducer(state: Layout, action: LayoutAction): Layout {
         ? state
         : { ...state, active: action.here, board }
     }
-    case "closeCanvas": {
+    case "close-canvas": {
       const here: Here = { kind: "canvas", canvas: action.canvas }
       if (!sameHere(state.active, here)) return state
       return { ...state, active: afterClosing(state, here) }

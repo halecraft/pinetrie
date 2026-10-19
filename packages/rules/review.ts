@@ -57,7 +57,7 @@ const WideningSchema = Type.Union([
   Type.Object({ kind: Type.Literal("nested") }),
   Type.Object({ kind: Type.Literal("env"), name: Type.String() }),
   Type.Object({ kind: Type.Literal("mount"), target: Type.String() }),
-  Type.Object({ kind: Type.Literal("hostPort"), port: Type.Integer() }),
+  Type.Object({ kind: Type.Literal("host-port"), port: Type.Integer() }),
   Type.Object({ kind: Type.Literal("shared"), path: Type.String() }),
 ])
 
@@ -81,7 +81,7 @@ export const decodeRevisionReview = (
  * flags, and the URLs' spans. Every answer is cached as immutable under a URL holding it,
  * so a change to any of them bumps it, or pages keep the old shape.
  */
-export const REVIEW_WIRE = 4
+export const REVIEW_WIRE = 5
 
 /** Which side of a span a file is read at: its first state's, or its last's. */
 export type ReviewSide = "before" | "after"

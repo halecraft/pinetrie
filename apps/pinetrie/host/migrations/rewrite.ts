@@ -55,19 +55,35 @@ export const renamedFields =
     return out
   }
 
-/** Each stored record `rewrite` changes, as its write to `target`. */
-const planRewrites = (
-  namespace: HostNamespace,
-  target: Target,
-  stored: Readonly<Record<string, unknown>>,
-  rewrite: Rewrite,
-): readonly ValueWrite[] =>
-  Object.entries(stored).flatMap(([key, contents]) => {
-    const value = rewrite(contents)
-    return value === null
-      ? []
-      : [{ kind: "set", target, namespace, key, value } as const]
-  })
+/**
+ * The writes to `target` that rewrite `stored`, `from`'s records. In place
+ * (`to` is `from`), a set for each record `rewrite` changes. Into another
+ * namespace, every record is set under `to`, rewritten or as stored, and
+ * deleted from `from`: over its own output `from` is empty, so nothing is
+ * planned.
+ */
+const planRewrites = (input: {
+  readonly from: HostNamespace
+  readonly to: HostNamespace
+  readonly target: Target
+  readonly stored: Readonly<Record<string, unknown>>
+  readonly rewrite: Rewrite
+}): readonly ValueWrite[] => {
+  const { from, to, target } = input
+  return Object.entries(input.stored).flatMap(
+    ([key, contents]): readonly ValueWrite[] => {
+      const value = input.rewrite(contents)
+      if (to === from)
+        return value === null
+          ? []
+          : [{ kind: "set", target, namespace: to, key, value }]
+      return [
+        { kind: "set", target, namespace: to, key, value: value ?? contents },
+        { kind: "delete", target, namespace: from, key },
+      ]
+    },
+  )
+}
 
 /**
  * Every document a home's records live in, the session's or every root's,
@@ -109,11 +125,15 @@ export async function recordDocs(
 
 /**
  * A record migration that rewrites each of `namespace`'s records in its
- * home: the session's document, or every root's.
+ * home, the session's document or every root's: in place, or moved to `to`.
+ * A document's writes are one batch (`applyRecordWrites`), so no run leaves
+ * a record in both namespaces.
  */
 export function rewriteRecords(spec: {
   readonly name: string
   readonly namespace: HostNamespace
+  /** The namespace the records move to; `namespace` itself when absent. */
+  readonly to?: HostNamespace
   readonly home: "session" | "root"
   readonly rewrite: Rewrite
 }): RecordMigration {
@@ -122,12 +142,13 @@ export function rewriteRecords(spec: {
     async run(input) {
       const planned = (await recordDocs(input, spec.home)).flatMap(
         ({ doc, target }) => {
-          const writes = planRewrites(
-            spec.namespace,
+          const writes = planRewrites({
+            from: spec.namespace,
+            to: spec.to ?? spec.namespace,
             target,
-            readNamespace(doc, spec.namespace),
-            spec.rewrite,
-          )
+            stored: readNamespace(doc, spec.namespace),
+            rewrite: spec.rewrite,
+          })
           return writes.length === 0 ? [] : [{ doc, writes }]
         },
       )

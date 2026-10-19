@@ -113,21 +113,21 @@ describe("planStream: replies and tools are streams of edits", () => {
     const replaced = drive([
       { kind: "text", lane: L, delta: "Let me run it." },
       { commit: "a1" },
-      { kind: "toolStart", lane: L, callId: "c1" },
+      { kind: "tool-start", lane: L, callId: "c1" },
     ])[2]
     expect(replaced?.map(s => s.kind)).toEqual(["tool"])
     const current = drive([
       { kind: "text", lane: L, delta: "still going" },
-      { kind: "toolStart", lane: L, callId: "c1" },
+      { kind: "tool-start", lane: L, callId: "c1" },
     ])[1]
     expect(current?.map(s => s.kind)).toEqual(["reply", "tool"])
   })
 
   test("a reply opening closes its lane's tools, whose results are written, and no other lane's", () => {
     const seen = drive([
-      { kind: "toolStart", lane: M, callId: "m1" },
-      { kind: "toolStart", lane: L, callId: "c1" },
-      { kind: "toolStart", lane: L, callId: "c2" },
+      { kind: "tool-start", lane: M, callId: "m1" },
+      { kind: "tool-start", lane: L, callId: "c1" },
+      { kind: "tool-start", lane: L, callId: "c2" },
       { commit: "r2" },
       { kind: "text", lane: L, delta: "Both ran." },
     ])
@@ -142,8 +142,8 @@ describe("planStream: replies and tools are streams of edits", () => {
     const seen = drive([
       { kind: "text", lane: L, delta: "Now the tests." },
       { commit: "a1" },
-      { kind: "toolStart", lane: L, callId: "c1" },
-      { kind: "toolOutput", lane: L, callId: "c1", text: "ok\n" },
+      { kind: "tool-start", lane: L, callId: "c1" },
+      { kind: "tool-output", lane: L, callId: "c1", text: "ok\n" },
       { commit: "r1" },
       { kind: "text", lane: L, delta: "And " },
       { kind: "text", lane: L, delta: "done." },
@@ -160,9 +160,9 @@ describe("planStream: replies and tools are streams of edits", () => {
         (_, k) => `line ${from + k}\n`,
       ).join("")
     const seen = drive([
-      { kind: "toolStart", lane: L, callId: "c1" },
-      { kind: "toolOutput", lane: L, callId: "c1", text: view(1, 5) },
-      { kind: "toolOutput", lane: L, callId: "c1", text: view(3, 9) },
+      { kind: "tool-start", lane: L, callId: "c1" },
+      { kind: "tool-output", lane: L, callId: "c1", text: view(1, 5) },
+      { kind: "tool-output", lane: L, callId: "c1", text: view(3, 9) },
     ])
     expect(seen[2]?.[0]).toMatchObject({
       kind: "tool",
@@ -177,7 +177,7 @@ describe("planStream: replies and tools are streams of edits", () => {
       text: view(1, 5),
     }
     const ops = planStream({
-      event: { kind: "toolOutput", lane: L, callId: "c", text: view(3, 9) },
+      event: { kind: "tool-output", lane: L, callId: "c", text: view(3, 9) },
       streams: [tool],
       tip: entryId("p"),
       running: true,

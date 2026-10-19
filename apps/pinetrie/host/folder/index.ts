@@ -244,7 +244,7 @@ export function startFolderProject(dir: {
             )
             if (planned.gone.length > 0)
               await runtime.disk({
-                kind: "deleteSnapshots",
+                kind: "delete-snapshots",
                 ids: planned.gone.map(snapshotId),
               })
           }

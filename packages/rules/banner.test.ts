@@ -41,7 +41,7 @@ describe("planAsk", () => {
       })
       expect(planAsk(ask({ image: B }), stored, draws)).toEqual({
         kind: "refused",
-        reason: "not_stored",
+        reason: "not-stored",
       })
     },
   )

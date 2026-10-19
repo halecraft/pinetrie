@@ -158,8 +158,8 @@ describe("sidebarView", () => {
     const menus = items({ archived: new Set([K("r1")]) }).map(kinds)
     expect(menus).toEqual([
       [],
-      ["rename", "retitle", "moveTo", "moveTo"],
-      ["rename", "retitle", "moveTo", "moveTo"],
+      ["rename", "retitle", "move-to", "move-to"],
+      ["rename", "retitle", "move-to", "move-to"],
     ])
   })
 
@@ -174,14 +174,14 @@ describe("sidebarView", () => {
   test("Move to ▸ offers every state but its own, each a move on the board for everyone", () => {
     const [r1] = items()
     const moves =
-      r1?.kind === "canvas" ? r1.menu.filter(i => i.kind === "moveTo") : []
-    expect(moves.map(m => m.kind === "moveTo" && [m.name, m.closes])).toEqual([
+      r1?.kind === "canvas" ? r1.menu.filter(i => i.kind === "move-to") : []
+    expect(moves.map(m => m.kind === "move-to" && [m.name, m.closes])).toEqual([
       ["Backlog", false],
       ["Done", true],
     ])
     expect(moves[1]).toMatchObject({
       intent: {
-        kind: "moveCanvas",
+        kind: "move-canvas",
         canvas: K("r1"),
         from: DOING,
         to: DONE,
@@ -195,7 +195,7 @@ describe("sidebarView", () => {
     const [r1] = items({ work: new Map([[K("r1"), "running"]]) })
     const done =
       r1?.kind === "canvas"
-        ? r1.menu.find(i => i.kind === "moveTo" && i.closes)
+        ? r1.menu.find(i => i.kind === "move-to" && i.closes)
         : null
     expect(done).toMatchObject({ busy: "running", drops: [] })
   })
@@ -205,7 +205,7 @@ describe("sidebarView", () => {
     const [r1, r2] = items({ proposed: new Map([[K("r1"), [amber]]]) })
     const done = (r: typeof r1) =>
       r?.kind === "canvas"
-        ? r.menu.find(i => i.kind === "moveTo" && i.closes)
+        ? r.menu.find(i => i.kind === "move-to" && i.closes)
         : null
     expect(done(r1)).toMatchObject({ drops: [amber] })
     expect(done(r2)).toMatchObject({ drops: [] })
@@ -254,34 +254,34 @@ describe("sidebarView", () => {
     const item: Item = {
       lane: threadIdFor("a"),
       end: entryId("e"),
-      level: "needsYou",
+      level: "needs-you",
       raised: { kind: "ready", source: cardIdFor("c1") },
     }
     const status = new Map<CanvasId, Status>([
       [K("r1"), { kind: "working" }],
-      [K("r2"), { kind: "needsYou", item }],
+      [K("r2"), { kind: "needs-you", item }],
     ])
     const [r1, r2] = items({
       status,
       arrivals: { arrived: new Map([[K("r2"), 5]]), done: new Map() },
     })
     expect(r1).toMatchObject({ status: { kind: "working" }, arrived: null })
-    expect(r2).toMatchObject({ status: { kind: "needsYou" }, arrived: 5 })
+    expect(r2).toMatchObject({ status: { kind: "needs-you" }, arrived: 5 })
   })
 
   test("a root that raises something offers not needed first in its ⋯; a working one does not", () => {
     const item: Item = {
       lane: threadIdFor("a"),
       end: entryId("e"),
-      level: "worthARead",
+      level: "worth-a-read",
       raised: { kind: "ready", source: cardIdFor("c1") },
     }
     const [raised] = items({
-      status: new Map([[K("r1"), { kind: "worthARead", item }]]),
+      status: new Map([[K("r1"), { kind: "worth-a-read", item }]]),
     })
     expect(raised?.kind === "canvas" && raised.menu[0]).toEqual({
-      kind: "notNeeded",
-      intent: { kind: "notNeeded", lane: item.lane, raised: item.raised },
+      kind: "not-needed",
+      intent: { kind: "not-needed", lane: item.lane, raised: item.raised },
     })
     const [working] = items({
       status: new Map([[K("r1"), { kind: "working" }]]),
@@ -299,7 +299,7 @@ describe("sidebarView", () => {
 
 test("＋ makes a canvas at the end of the first open state, with no menu", () => {
   const { add } = sidebarView(input())
-  expect(add.main.intent).toEqual({ kind: "newCanvas" })
+  expect(add.main.intent).toEqual({ kind: "new-canvas" })
   expect(add.main.title).toContain("at the end of Backlog")
   expect(add.more).toBeNull()
 })

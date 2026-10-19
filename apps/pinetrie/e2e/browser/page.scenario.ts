@@ -1045,7 +1045,7 @@ async function run(check: Checks["check"]): Promise<void> {
       )
       check(
         "with your own message last in line, it says it will queue after yours",
-        await queueButton(queueWords({ kind: "afterMine", ahead: 2 })),
+        await queueButton(queueWords({ kind: "after-mine", ahead: 2 })),
         `"${await label(0)}"`,
       )
       // ── the queue's own controls ────────────────────────

@@ -311,8 +311,8 @@ test("at a run's end, one request for the urgency line and the final digest, wri
         ask: entryId("e-1"),
         end: entryId("e-4"),
         report: {
-          kind: "modelSaid",
-          urgency: "needsYou",
+          kind: "model-said",
+          urgency: "needs-you",
           reason: "which rail to keep",
         },
       }),
@@ -360,7 +360,7 @@ test("with digests off, a run's end asks for its urgency line alone, and no live
       lane,
       ask: entryId("e-1"),
       end: entryId("e-4"),
-      report: { kind: "modelSaid", urgency: "done", reason: null },
+      report: { kind: "model-said", urgency: "done", reason: null },
     }),
   )
   const asked = pi.calls.findLast(c => c.method === "complete")?.args[0] as {
@@ -423,7 +423,7 @@ test("the scripted model answers a run's end with an urgency line and a digest, 
   expect(
     parseEndReply(
       `${SCRIPTED_URGENCY}\n${SCRIPTED_DESCRIPTION}`,
-      "urgency and digest",
+      "urgency-and-digest",
     ),
   ).toEqual({
     urgency: { urgency: "done", reason: null },

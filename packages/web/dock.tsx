@@ -122,7 +122,7 @@ export function Dock(p: {
   const addToQueue = () => {
     if (lane === null || p.queueAt === null) return
     p.onAct({
-      kind: "queueNew",
+      kind: "queue-new",
       card: newCardId(),
       lane: lane.name,
       at: p.queueAt.at,
@@ -252,7 +252,7 @@ function HeadButton(p: {
       case "resume":
         return void p.session.request({ kind: "carry-on", lane })
       case "send-queue":
-        return p.onAct({ kind: "holdQueue", lane, held: false })
+        return p.onAct({ kind: "hold-queue", lane, held: false })
     }
   }
   return (
@@ -276,6 +276,6 @@ function itemAct(
 ): void {
   const { lane } = head
   if (item === "resume") void session.request({ kind: "carry-on", lane })
-  else if (item === "unqueue-all") onAct({ kind: "unqueueAll", lane })
-  else onAct({ kind: "holdQueue", lane, held: item === "hold" })
+  else if (item === "unqueue-all") onAct({ kind: "unqueue-all", lane })
+  else onAct({ kind: "hold-queue", lane, held: item === "hold" })
 }

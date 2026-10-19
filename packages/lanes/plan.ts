@@ -464,7 +464,7 @@ export function configWidenings(
       .map(m => ({ kind: "mount" as const, target: m.target })),
     ...a.hostPorts
       .filter(p => !b.hostPorts.includes(p))
-      .map(port => ({ kind: "hostPort" as const, port })),
+      .map(port => ({ kind: "host-port" as const, port })),
     ...after.shared
       .filter(p => !before.shared.includes(p))
       .map(path => ({ kind: "shared" as const, path })),
@@ -1181,7 +1181,7 @@ export function innerDockerDataRootStep(
 ): Step | null {
   if (!spec.grants.nested) return null
   return onRuntime({
-    kind: "innerDockerDataRoot",
+    kind: "inner-docker-data-root",
     lane: spec.lane,
     cloneFromLane: source.kind === "clone" ? source.cloneFromLane : null,
   })

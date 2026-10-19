@@ -81,10 +81,10 @@ export function createDelivery(deps: {
       case "steer":
         await deps.agent.lane(to.thread).steer(message)
         return "delivered"
-      case "appendToLane":
+      case "append-to-lane":
         await deps.agent.lane(to.thread).append(message)
         return "delivered"
-      case "appendToTree": {
+      case "append-to-tree": {
         const root = readThreads(deps.basics.session).get(thread)?.root
         if (root !== undefined && found.end !== null)
           await deps.scribe.appendToTree(
@@ -96,7 +96,7 @@ export function createDelivery(deps: {
       }
       case "busy":
         return "busy"
-      case "createAndRun":
+      case "create-and-run":
       case "conflict":
         // A host's message never creates a lane, nor races anyone.
         return "delivered"

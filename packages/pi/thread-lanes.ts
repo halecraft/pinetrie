@@ -190,7 +190,7 @@ export interface ThreadLaneHandle {
 export interface ThreadLanes {
   /**
    * Create a thread's lane at `at`, named `lane` (the host decides the id).
-   * Called only where no lane is; refused `lane_id_in_use` for an id pi
+   * Called only where no lane is; refused `lane-id-in-use` for an id pi
    * holds, since `harness.lane` would return that lane instead.
    */
   createThreadLane(at: Position, lane: ThreadId): Promise<CreateOutcome>

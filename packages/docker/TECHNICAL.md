@@ -85,7 +85,7 @@ declares it (`workspace.test.ts`).
 - **`folder.tarOut` and `folder.fileOut` are the disk operations that are
   no call:** a stream answers each, so each runs lanehost's `tar-out.ts`
   or `file-out.ts` by a `docker exec -i` of its own in the disks role's
-  container (`snapshotOut`), after a `snapshotExists` call that starts the
+  container (`snapshotOut`), after a `snapshot-exists` call that starts the
   container and refuses a gone snapshot. On the Mac both cross the lane
   VM as any exec does.
 - **Every other disk operation is a call to lanehost** (`@pinetrie/lanehost`,

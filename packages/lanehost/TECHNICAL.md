@@ -19,7 +19,7 @@ responsibility. It declares `@pinetrie/core` and `@pinetrie/channel` only
 | `serving.ts` | a server's arguments (`serverArgs`) and their reading (`servingFrom`) |
 | `client.ts` | the host's side: one channel per role, each call routed and logged |
 | `disks.ts` | subvolumes: each operation planned as `DiskStep`s, then executed; a file read from a snapshot |
-| `folder.ts` | a folder project's merges: path facts, alike content, a merge's steps applied, a lane's states directory; a read of the project's folder into its line (`readIn`) |
+| `folder.ts` | a folder project's merges: path facts, alike content, a merge's steps applied, a lane's states directory; a read of the project's folder into its line (`read-in`) |
 | `projects.ts` | a project's root recorded, the listing, a project's removal |
 | `grants.ts` | a project's grant of the Mac's ports in the lane VM's firewall |
 | `diff.ts` | what differs between two snapshots: by `btrfs send`, or by a walk |
@@ -241,7 +241,7 @@ host, whatever their projects.
 - **A nested lane's disk holds its inner Docker's data root as a subvolume
   of its own** (`INNER_DOCKER_DATA_ROOT_DIR`, `docker`), so it is cloned
   without the inner lanehost's `projects/` beside it (ADR-0169). The
-  `nestedDisk` call makes the nested disk the rootless user's, then the
+  `nested-disk` call makes the nested disk the rootless user's, then the
   data root (`planInnerDockerDataRootSteps`, from facts gathered first):
   - a lane named to clone from whose data root is a subvolume: the lane's
     own dropped, then a writable snapshot of that one, which keeps its
@@ -258,19 +258,19 @@ host, whatever their projects.
 out, every call checked and planned into paths first (`planApply`,
 `planStates`), then executed.
 
-- **`pathFacts`** answers what a snapshot holds at each path: absent, a
+- **`path-facts`** answers what a snapshot holds at each path: absent, a
   directory, a symlink and its target, a file with its executable bit
   (the owner's), its size, and what it holds (`content`, core's
   `fileContent` over the first 8,000 bytes: text where no NUL is among
   them, as git decides (S181), else an image by its magic bytes, else
   binary; an SVG is text); its kind from the `lstat` the walk reads
   (`statKind`). A path under a symlink is absent.
-- **`sameContent`** answers the pairs of paths, one in each snapshot,
+- **`same-content`** answers the pairs of paths, one in each snapshot,
   whose files hold the same bytes: a path with itself for a merge, a path
   gone with a path added for a move. Sizes first, then a read of both.
   Shared extents (FIEMAP) would prove a clone alike without a read (S183),
   but Node has no ioctl and only pairs of one size are asked, so it reads.
-- **`applyMerge`** applies a merge's steps to a disk: a lane's, or a
+- **`apply-merge`** applies a merge's steps to a disk: a lane's, or a
   virtual base's scratch disk (the host restores it, merges into it with
   `markers`, and snapshots it as the virtual base's name).
   - **A `take` clones** theirs' file by reflink (`COPYFILE_FICLONE_FORCE`),
@@ -297,7 +297,7 @@ out, every call checked and planned into paths first (`planApply`,
   `resolved` removes a path's versions and its emptied directories. A
   lane's `delete` disk operation drops it, and a project's removal takes
   its whole directory.
-- **A read of the project's folder into its line** (`readIn`, S185): the
+- **A read of the project's folder into its line** (`read-in`, S185): the
   host scans the project's folder and names each path to copy with the stamp it read (size and
   ctime, which the lane VM reads alike, S169); the disks role makes the
   `folder-line` disk (`FOLDER_LINE`) from accepted work's newest state, or
@@ -312,12 +312,12 @@ out, every call checked and planned into paths first (`planApply`,
   Where the root is mounted is a `Serving` fact (`servingFrom`'s
   `folder`), so a test serves a folder of its own (`fixtures.ts`'
   `disksInProcess`).
-- **What a folder project reads of its states:** `filesUnder` (the files
+- **What a folder project reads of its states:** `files-under` (the files
   and links at or under each path: a diff names a directory made or
-  renamed by its path alone), `fileDiff` (one file's unified diff, `git diff
+  renamed by its path alone), `file-diff` (one file's unified diff, `git diff
   --no-index` of the two snapshots, its paths from the disk's root as jj's
-  `--git` prints them, cut one byte past its limit) and `diffStats` (lines
-  added and removed per path, a binary 0 and 0). `statesDir` makes a
+  `--git` prints them, cut one byte past its limit) and `diff-stats` (lines
+  added and removed per path, a binary 0 and 0). `states-dir` makes a
   lane's states directory before its container mounts it; a project's
   removal drops each states directory, whose read-only copies a plain
   removal cannot delete.

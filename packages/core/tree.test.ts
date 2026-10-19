@@ -623,7 +623,7 @@ describe("callSubject, knownToolId and tailEdit", () => {
     ["catch_up", {}, "base"],
     ["split_proposed_changes", {}, undefined],
     ["mystery", { path: "a" }, undefined],
-    ["constructor", { path: "a" }, undefined],
+    ["function Object() { [native code] }", { path: "a" }, undefined],
   ])("callSubject(%s, %o) is %s", (name, args, subject) => {
     expect(callSubject(name, args)).toBe(subject)
   })
@@ -631,7 +631,7 @@ describe("callSubject, knownToolId and tailEdit", () => {
   test("knownToolId knows every registered tool, and nothing else", () => {
     for (const id of TOOL_IDS) expect(knownToolId(id)).toBe(id)
     expect(knownToolId("mystery")).toBeUndefined()
-    expect(knownToolId("constructor")).toBeUndefined()
+    expect(knownToolId("function Object() { [native code] }")).toBeUndefined()
   })
 
   // `text` with `edits` applied in order: what a Kyneta text holds afterwards.

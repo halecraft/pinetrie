@@ -64,7 +64,7 @@ export interface WorkStripView {
     | "nothing"
     | "running"
     | "busy"
-    | "needs_you"
+    | "needs-you"
     | "conflicts"
     | "ready"
     | "stack"
@@ -278,7 +278,7 @@ export function workStripView(input: {
   if (proposed.kind === "accepted") return view("accepted", [], ["update"])
   const { record } = proposed
   if (asked !== null && asked > record.at)
-    return view("needs_you", ["accept"], ["update"])
+    return view("needs-you", ["accept"], ["update"])
   if (proposed.kind === "held") return view("nothing", [], ["update"])
   if (record.kind === "jj" && record.edited)
     return view("edited", ["accept", "refresh"], ["update"])

@@ -23,7 +23,7 @@ import {
 import { type RecordSpec, setRecord } from "./records.ts"
 import { bareLine, oneLine } from "./request.ts"
 
-const READER_URGENCIES = ["needsYou", "worthARead", "done"] as const
+const READER_URGENCIES = ["needs-you", "worth-a-read", "done"] as const
 
 const Id = Type.String({ minLength: 1 })
 const RunEndReportSchema = Type.Object({
@@ -32,7 +32,7 @@ const RunEndReportSchema = Type.Object({
   report: Type.Union([
     Type.Object({ kind: Type.Literal("pending") }),
     Type.Object({
-      kind: Type.Literal("modelSaid"),
+      kind: Type.Literal("model-said"),
       urgency: choiceSchema(READER_URGENCIES),
       reason: Type.Union([Type.String(), Type.Null()]),
     }),
@@ -57,7 +57,7 @@ export type RunEndReport =
   | { readonly kind: "pending" }
   /** The model's answer; `reason` is null for `done`. */
   | {
-      readonly kind: "modelSaid"
+      readonly kind: "model-said"
       readonly urgency: ReaderUrgency
       readonly reason: string | null
     }
@@ -87,7 +87,7 @@ export const RUN_END_REPORT: RecordSpec<
   ThreadId,
   "session"
 > = {
-  namespace: "pinetrie.runEndReport",
+  namespace: "pinetrie.run-end-report",
   home: "session",
   keyOf: r => r.lane,
   encode: ({ lane, ...contents }) => contents,
@@ -123,8 +123,8 @@ export const REASON_WORDS = 20
 
 /** How the skill asks each urgency to be written. */
 const URGENCY_WORDS: Readonly<Record<string, ReaderUrgency>> = {
-  "needs you": "needsYou",
-  "worth a read": "worthARead",
+  "needs you": "needs-you",
+  "worth a read": "worth-a-read",
   done: "done",
 }
 
@@ -238,7 +238,7 @@ export function planRunEnded(input: {
         return {
           report: null,
           request: {
-            answer: "urgency and digest",
+            answer: "urgency-and-digest",
             lines: digest,
             previous: digest.previous,
           },
@@ -293,7 +293,11 @@ export function runEndedToWrite(input: {
         report:
           line === null
             ? { kind: "unclassified" }
-            : { kind: "modelSaid", urgency: line.urgency, reason: line.reason },
+            : {
+                kind: "model-said",
+                urgency: line.urgency,
+                reason: line.reason,
+              },
       }),
     )
   }

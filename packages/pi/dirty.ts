@@ -3,10 +3,18 @@
 
 import type { Segment } from "@kyneta/schema"
 
-/** The root fields that back pi's `Storage` port. */
-export type Field = "entries" | "usageRows" | "values" | "lists"
+/** Nothing to re-index: one key for each root field that backs pi's `Storage` port. */
+const NOTHING = {
+  entries: new Set<string>(),
+  usageRows: new Set<string>(),
+  values: new Set<string>(),
+  lists: new Set<string>(),
+} as const
 
-const FIELDS: readonly Field[] = ["entries", "usageRows", "values", "lists"]
+/** A root field that backs pi's `Storage` port. */
+export type Field = keyof typeof NOTHING
+
+const FIELDS = Object.keys(NOTHING) as readonly Field[]
 
 const isField = (field: string): field is Field =>
   (FIELDS as readonly string[]).includes(field)
@@ -24,12 +32,7 @@ type Dirty =
 /** What the next read must re-index: per field, some keys or all of them. */
 export type Scope = Readonly<Record<Field, ReadonlySet<string> | "all">>
 
-export const CLEAN: Scope = {
-  entries: new Set(),
-  usageRows: new Set(),
-  values: new Set(),
-  lists: new Set(),
-}
+export const CLEAN: Scope = NOTHING
 
 export const EVERYTHING: Scope = {
   entries: "all",

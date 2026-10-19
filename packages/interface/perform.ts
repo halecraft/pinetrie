@@ -63,7 +63,7 @@ export interface AppPorts {
   readonly foldColumn: (motion: ColumnMotion, commit: () => void) => void
   /** Plan and carry out an intent afresh, after something it waited for. */
   readonly intent: (intent: Intent) => void
-  /** Show an entry once this tab holds it (`openAt`). */
+  /** Show an entry once this tab holds it (`open-at`). */
   readonly openWhenHeld: (entry: EntryId) => void
   /** Scroll to an entry once it is drawn (`useReveal`). */
   readonly reveal: (entry: string) => void
@@ -172,7 +172,7 @@ function performOne(effect: Effect, ports: AppPorts): void {
       else ports.foldColumn(motion, () => ports.dispatch(effect.action))
       return
     }
-    case "listWidth":
+    case "list-width":
       ports.listWidth(effect.width)
       return
     case "page":
@@ -198,7 +198,7 @@ function performOne(effect: Effect, ports: AppPorts): void {
       else openThreads.close(act.canvas)
       return
     }
-    case "spinOff":
+    case "spin-off":
       void ports.session
         .request(effect.request)
         .then(outcome =>
@@ -208,15 +208,15 @@ function performOne(effect: Effect, ports: AppPorts): void {
           ),
         )
       return
-    case "moveCanvas":
+    case "move-canvas":
       // A move made on the board: the refusal said there before goes.
       ports.session.acted(AT_BOARD)
       void ports.session
         .request(effect.move)
         .then(outcome => perform(afterCanvasMove(outcome, effect.moved), ports))
       return
-    case "notNeeded":
-      if (effect.raised.kind === "runEnd")
+    case "not-needed":
+      if (effect.raised.kind === "run-end")
         ports.attention.dismiss(effect.lane, effect.raised.ask)
       else if (effect.raised.kind === "ready" && effect.raised.source !== null)
         ports.attention.dismissReady(effect.lane, effect.raised.source)
@@ -228,19 +228,19 @@ function performOne(effect: Effect, ports: AppPorts): void {
         effect.card === null ? {} : { card: effect.card },
       )
       return
-    case "createCard":
+    case "create-card":
       void ports.session.createCard(effect.card, effect.text, effect.how)
       return
     case "paste":
       paste(effect, ports)
       return
-    case "clipboardCell":
+    case "clipboard-cell":
       ports.clipboardCell(effect.clip)
       return
-    case "insertText":
+    case "insert-text":
       ports.insertText(effect.text)
       return
-    case "moveCard":
+    case "move-card":
       if (effect.fly) ports.fly(effect.move.card, cardFlight(effect.move.to))
       void ports.session.moveCard(
         effect.move,
@@ -249,7 +249,7 @@ function performOne(effect: Effect, ports: AppPorts): void {
         effect.here,
       )
       return
-    case "queueCard":
+    case "queue-card":
       // A card made in the queue comes from nowhere on the page.
       if (effect.move.from !== null)
         ports.fly(effect.move.card, cardFlight(effect.move.to))
@@ -260,25 +260,25 @@ function performOne(effect: Effect, ports: AppPorts): void {
         effect.command,
       )
       return
-    case "reorderCard":
+    case "reorder-card":
       void ports.session.reorderCard(effect.reorder, effect.how)
       return
-    case "swapSlots":
+    case "swap-slots":
       ports.session.swapSlots(effect.a, effect.b)
       return
-    case "moveCards":
+    case "move-cards":
       for (const { move } of effect.moves)
         ports.fly(move.card, cardFlight(move.to))
       void ports.session
         .moveCards(effect.moves, effect.actedAt, effect.here)
         .then(answer => perform(afterKeep(answer, effect.close), ports))
       return
-    case "undoMoves":
+    case "undo-moves":
       void ports.session
         .undoMoves(effect.canvas, effect.direction)
-        .then(outcome => ports.intent({ kind: "undoAnswered", outcome }))
+        .then(outcome => ports.intent({ kind: "undo-answered", outcome }))
       return
-    case "undoSwap":
+    case "undo-swap":
       void ports.session.undoSwap(effect.direction)
       return
     case "refuse":
@@ -287,10 +287,10 @@ function performOne(effect: Effect, ports: AppPorts): void {
     case "inventory":
       ports.inventory(effect.act)
       return
-    case "openFold":
+    case "open-fold":
       ports.openFold(effect.ask)
       return
-    case "revealCard":
+    case "reveal-card":
       ports.revealCard(effect.card)
       return
     case "reveal":
@@ -299,16 +299,16 @@ function performOne(effect: Effect, ports: AppPorts): void {
     case "landed":
       ports.landed(effect.entry)
       return
-    case "openWhenHeld":
+    case "open-when-held":
       ports.openWhenHeld(effect.entry)
       return
-    case "armFocus":
+    case "arm-focus":
       ports.arm(effect.key)
       return
-    case "storeIdentity":
+    case "store-identity":
       ports.identity.save(effect.identity)
       return
-    case "forgetIdentity":
+    case "forget-identity":
       ports.identity.clear()
       return
     case "reload":

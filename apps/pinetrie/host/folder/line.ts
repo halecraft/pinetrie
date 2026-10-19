@@ -1,6 +1,6 @@
 // host/folder/line — the project's folder read into its line: the Mac scans (`scan.ts`),
 // the read is planned from the last read's stamps (`planRead`), and the disks
-// role copies only what changed into a new state (`readIn`), checking each
+// role copies only what changed into a new state (`read-in`), checking each
 // path's stamp. One read at a time, on the project's queue. The stamps are
 // written only once the state they made is recorded, so a read that failed
 // is planned again from the last one that held. The first read finishes or

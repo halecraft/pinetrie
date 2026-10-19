@@ -515,10 +515,10 @@ export async function connectSession(
   })
   // A client does not reconnect: once the host has gone, nothing this tab
   // sent or sends will be answered. The moves the host accepted are dropped
-  // too (`hostLeft`): no copy of the places will reach their `rev`.
+  // too (`host-left`): no copy of the places will reach their `rev`.
   const unsubscribePeers = exchange.peers.subscribe(() => {
     if (exchange.peers.current.has(host.peerId)) return
-    step({ kind: "hostLeft" })
+    step({ kind: "host-left" })
     line.close("the host left")
   })
 

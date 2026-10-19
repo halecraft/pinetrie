@@ -164,7 +164,7 @@ export function boardView(input: BoardViewInput): BoardView {
     state: WorkflowStateId,
     before: CanvasId | null,
   ): Intent => ({
-    kind: "moveCanvas",
+    kind: "move-canvas",
     canvas,
     from: state,
     to: state,
@@ -238,7 +238,7 @@ export function boardView(input: BoardViewInput): BoardView {
     const { all, cards, count } = stateCanvases(column)
     const { state } = column
     const before = (to: WorkflowStateId | null): Intent => ({
-      kind: "editWorkflow",
+      kind: "edit-workflow",
       edit: { action: "move", state: state.id, name: "", before: to },
     })
     const next = board.open[i + 1]
@@ -257,7 +257,7 @@ export function boardView(input: BoardViewInput): BoardView {
       addBefore: { left: state.id, right: next?.state.id ?? null },
       remove: {
         intent: {
-          kind: "editWorkflow",
+          kind: "edit-workflow",
           edit: { action: "remove", state: state.id, name: "", before: null },
         },
         why: removeWords(all.length, board.open.length),
@@ -368,7 +368,7 @@ export function archiveRows(input: {
 }
 
 /** What a key does on the open board (`boardKeyAct`). */
-export type BoardKey = "focusSearch" | "clearFilter" | "close"
+export type BoardKey = "focus-search" | "clear-filter" | "close"
 
 /** Where focus is, and what is open, when a key is pressed on the open board. */
 export interface BoardKeyFocus {
@@ -393,9 +393,9 @@ export function boardKeyAct(
   focus: BoardKeyFocus,
 ): BoardKey | null {
   if (event.key === "Escape")
-    return focus.menuOpen ? null : focus.filtered ? "clearFilter" : "close"
+    return focus.menuOpen ? null : focus.filtered ? "clear-filter" : "close"
   const modifier = event.ctrlKey || event.metaKey || event.altKey
-  if (event.key === "/" && !focus.inText && !modifier) return "focusSearch"
+  if (event.key === "/" && !focus.inText && !modifier) return "focus-search"
   return null
 }
 
@@ -429,7 +429,7 @@ export const nameStateIntent = (
   state: WorkflowStateId,
   name: string,
 ): Intent => ({
-  kind: "editWorkflow",
+  kind: "edit-workflow",
   edit: { action: "rename", state, name, before: null },
 })
 
@@ -438,7 +438,7 @@ export const addStateIntent = (
   before: WorkflowStateId | null,
   name: string,
 ): Intent => ({
-  kind: "editWorkflow",
+  kind: "edit-workflow",
   edit: { action: "add", state: null, name, before },
 })
 

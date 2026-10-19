@@ -57,6 +57,7 @@ import {
   trashedRows,
   trashedTraces,
 } from "./0024-trashed-rows.ts"
+import { runEndReportMigration } from "./0025-run-end-report.ts"
 import type { MigrationLedger } from "./ledger.ts"
 
 /** What a migration reads with, and writes with once every read loaded. */
@@ -142,6 +143,7 @@ export const RECORD_MIGRATIONS: readonly RecordMigration[] = [
   trashedRows,
   trashedHistories,
   trashedTraces,
+  runEndReportMigration,
 ]
 
 /**

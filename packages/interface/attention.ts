@@ -19,7 +19,7 @@ import { sshAskWords } from "./access-view.ts"
 import type { OpenProposedChanges, SshAsk } from "./app-view.ts"
 
 /** Lowest first: `highest` and every comparison read this order. */
-export const LEVELS = ["worthARead", "needsYou"] as const
+export const LEVELS = ["worth-a-read", "needs-you"] as const
 export type Level = (typeof LEVELS)[number]
 
 /** The highest of `levels`, or null for none. */
@@ -54,13 +54,13 @@ export function attentionLevel(
   switch (report.kind) {
     case "pending":
       return null
-    case "modelSaid":
+    case "model-said":
       return report.urgency === "done" ? null : report.urgency
     case "failed":
     case "unclassified":
-      return "needsYou"
+      return "needs-you"
     case "stopped":
-      return report.by === me ? null : "worthARead"
+      return report.by === me ? null : "worth-a-read"
   }
 }
 
@@ -77,7 +77,7 @@ export const threadWriters = (
 /** What raised a thread's attention, and what "not needed" marks. */
 export type Raised =
   | {
-      readonly kind: "runEnd"
+      readonly kind: "run-end"
       readonly report: RunEndReport
       /** The run's prompt: what "not needed" dismisses. */
       readonly ask: EntryId
@@ -181,7 +181,7 @@ export function attentionItems(input: AttentionInput): readonly Item[] {
       lane: v.lane,
       end: v.end,
       level,
-      raised: { kind: "runEnd", report: v.report, ask: v.ask },
+      raised: { kind: "run-end", report: v.report, ask: v.ask },
     })
   }
   for (const o of input.openProposed) {
@@ -191,7 +191,7 @@ export function attentionItems(input: AttentionInput): readonly Item[] {
     items.push({
       lane: o.lane,
       end: o.end,
-      level: "needsYou",
+      level: "needs-you",
       raised: { kind: "ready", source: o.source },
     })
   }
@@ -203,7 +203,7 @@ export function attentionItems(input: AttentionInput): readonly Item[] {
         items.push({
           lane: a.lane,
           end: a.end,
-          level: "needsYou",
+          level: "needs-you",
           raised: { kind: "ssh", host: a.host },
         })
   return items
@@ -313,7 +313,7 @@ export function arrivals(
   const ended = new Set<CanvasId>()
   if (before === null) return { arrived, done: ended }
   for (const [canvas, now] of after)
-    if (now.kind === "needsYou" && before.get(canvas)?.kind !== "needsYou")
+    if (now.kind === "needs-you" && before.get(canvas)?.kind !== "needs-you")
       arrived.add(canvas)
   for (const [canvas, was] of before)
     if (was.kind === "working" && !after.has(canvas) && done.has(canvas))
@@ -350,7 +350,7 @@ export function attentionWords(
   if (raised.kind === "ssh") return sshAskWords("your ssh", raised.host)
   const v = raised.report
   switch (v.kind) {
-    case "modelSaid":
+    case "model-said":
       return v.reason ?? "done"
     case "failed":
       return v.error === "" ? "the run failed" : `the run failed: ${v.error}`

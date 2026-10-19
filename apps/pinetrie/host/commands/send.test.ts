@@ -125,11 +125,11 @@ function setUp(begin: ErrCode | null = null) {
 }
 
 describe("executeSend", () => {
-  test("createAndRun creates the lane, prepares it, may title its root, and runs there", async () => {
+  test("create-and-run creates the lane, prepares it, may title its root, and runs there", async () => {
     const { pi, work, started, titles, deps, context } = setUp()
     const out = await executeSend(
       deps,
-      { kind: "createAndRun", at: ROOT, thread: LANE, details, starts: null },
+      { kind: "create-and-run", at: ROOT, thread: LANE, details, starts: null },
       context,
     )
     expect(out).toEqual({ kind: "started", runId: "r-1" })
@@ -168,7 +168,7 @@ describe("executeSend", () => {
     )
     await executeSend(
       deps,
-      { kind: "createAndRun", at: ROOT, thread: LANE, details, starts: null },
+      { kind: "create-and-run", at: ROOT, thread: LANE, details, starts: null },
       { ...context, pinned },
     )
     expect(seen).toEqual([pinned, pinned])
@@ -199,11 +199,11 @@ describe("executeSend", () => {
     ])
   })
 
-  test("createAndRun from a base that cannot begin refuses, and never creates the lane", async () => {
+  test("create-and-run from a base that cannot begin refuses, and never creates the lane", async () => {
     const { pi, started, deps, context } = setUp(ERR.BAD_BASE)
     const out = await executeSend(
       deps,
-      { kind: "createAndRun", at: ROOT, thread: LANE, details, starts: null },
+      { kind: "create-and-run", at: ROOT, thread: LANE, details, starts: null },
       { ...context, base: "wip/gone" },
     )
     expect(out).toMatchObject({ kind: "refused", code: ERR.BAD_BASE })

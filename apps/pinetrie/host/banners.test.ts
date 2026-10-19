@@ -196,7 +196,7 @@ describe("set_banner", () => {
     expect(readBanners(b.session).get(LANE)?.sha).toBe(pasted)
     expect(
       await banners.request(LANE, ask({ image: "f".repeat(64) as Sha256 })),
-    ).toEqual({ kind: "refused", reason: "not_stored" })
+    ).toEqual({ kind: "refused", reason: "not-stored" })
   })
 
   test("with icons not drawn, a pasted image is still set, and nothing is drawn", async () => {

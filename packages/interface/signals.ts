@@ -35,12 +35,7 @@ import { AGENT_PREFILL } from "./message-tools.ts"
  * you follow ended asking nothing). `SignalMark` draws every one, as
  * `.signal[data-signal]`.
  */
-export type Signal =
-  | "unsent"
-  | "needs-you"
-  | "worth-a-read"
-  | "running"
-  | "done"
+export type Signal = "unsent" | Level | "running" | "done"
 
 const SIGNAL_WORDS: Readonly<Record<Signal, string>> = {
   unsent: "you have an unsent message here",
@@ -53,13 +48,9 @@ const SIGNAL_WORDS: Readonly<Record<Signal, string>> = {
 /** What a signal says, its mark's name and title: the one place each is worded. */
 export const signalWords = (signal: Signal): string => SIGNAL_WORDS[signal]
 
-/** The signal an attention level raises (`LEVELS`): the one mapping of the two. */
-export const signalOfLevel = (level: Level): Signal =>
-  level === "needsYou" ? "needs-you" : "worth-a-read"
-
 /** ▦'s mark's title: what the canvases not in the sidebar raise. */
 export const elsewhereWords = (level: Level): string =>
-  `a canvas not in the sidebar: ${signalWords(signalOfLevel(level))}`
+  `a canvas not in the sidebar: ${signalWords(level)}`
 
 /**
  * The signal a thread's or a canvas's status draws: running while its agent
@@ -71,7 +62,7 @@ export const statusSignal = (
   doneFading: boolean,
 ): Signal | null => {
   if (status === null) return doneFading ? "done" : null
-  return status.kind === "working" ? "running" : signalOfLevel(status.kind)
+  return status.kind === "working" ? "running" : status.kind
 }
 
 /**

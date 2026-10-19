@@ -37,7 +37,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a plain docker/ is kept as it is",
     file: disks,
-    from: '    ...(facts.ownDataRoot === "notSubvolume"\n',
+    from: '    ...(facts.ownDataRoot === "not-subvolume"\n',
     to: "    ...(false\n",
     command: unit,
     expect:

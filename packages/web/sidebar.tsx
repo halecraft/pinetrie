@@ -247,7 +247,7 @@ function FoldControl({
     <button
       aria-label={words.label}
       className="list-fold"
-      onClick={() => onIntent({ kind: "foldList" })}
+      onClick={() => onIntent({ kind: "fold-list" })}
       title={words.title}
       type="button"
     >
@@ -414,7 +414,7 @@ function menuItem(
   onIntent: (intent: Intent) => void,
 ): MenuItem {
   switch (item.kind) {
-    case "notNeeded":
+    case "not-needed":
       return {
         key: "not-needed",
         className: "not-needed",
@@ -438,7 +438,7 @@ function menuItem(
         label: SIDEBAR_WORDS.retitle.label,
         onChoose: () => onIntent(item.intent),
       }
-    case "moveTo": {
+    case "move-to": {
       const drops = item.busy === null ? dropsWords(item.drops) : null
       return {
         key: `move-to:${item.name}`,

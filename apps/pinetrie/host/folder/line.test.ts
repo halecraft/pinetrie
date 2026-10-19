@@ -140,7 +140,7 @@ describe("createFolderLine", () => {
       asides: async () => {},
       disks: {
         readIn: async () => {
-          order.push("readIn")
+          order.push("read-in")
           return answers.shift() ?? { kind: "made" }
         },
       },
@@ -157,7 +157,7 @@ describe("createFolderLine", () => {
       moved: newest => moved.push(newest),
     })
     const newest = await line.read()
-    expect(order).toEqual(["readIn", "readIn", "state"])
+    expect(order).toEqual(["read-in", "read-in", "state"])
     expect(newest).toBe("line-00000001")
     expect(moved).toEqual([newest])
     expect(JSON.parse(await readFile(stampsFile, "utf8"))).toHaveProperty(
@@ -165,7 +165,7 @@ describe("createFolderLine", () => {
     )
     // Read again with nothing changed: no call, no state.
     expect(await line.read()).toBe(newest)
-    expect(order).toEqual(["readIn", "readIn", "state"])
+    expect(order).toEqual(["read-in", "read-in", "state"])
   })
 
   test("the first read recovers once; asides are checked at a quiet read, never at an accept's own", async () => {

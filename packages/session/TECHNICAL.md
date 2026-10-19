@@ -77,7 +77,7 @@ it.
   `failed`, and every later one at once, with nothing sent: a client does
   not reconnect, so it would otherwise wait for good. Failed, not refused:
   the host may have acted on one waiting. The host leaving also drops the
-  moves the host accepted (`hostLeft`), since no copy of the places will
+  moves the host accepted (`host-left`), since no copy of the places will
   reach their `rev`.
 - **`close()` rejects only when the exchange's shutdown does**, as the
   host's `shutdown()` rejects only at its last step: every other part's

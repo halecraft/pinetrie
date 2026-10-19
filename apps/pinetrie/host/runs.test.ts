@@ -57,32 +57,34 @@ const said = encodeMessage(
 )
 
 describe("planRunEnd", () => {
-  test("endRun comes before laneStopped, and ended is last, for every role", () => {
+  test("end-run comes before lane-stopped, and ended is last, for every role", () => {
     for (const role of [undefined, "person", "land", "stack"]) {
       const steps = planRunEnd(role)
-      expect(steps.indexOf("endRun")).toBeLessThan(steps.indexOf("laneStopped"))
+      expect(steps.indexOf("end-run")).toBeLessThan(
+        steps.indexOf("lane-stopped"),
+      )
       expect(steps.at(-1)).toBe("ended")
     }
   })
 
-  test("a stack prompt adds splitEnded before endRun; a land prompt ends as any run", () => {
+  test("a stack prompt adds split-ended before end-run; a land prompt ends as any run", () => {
     expect(planRunEnd("land")).toEqual(planRunEnd("person"))
     expect(planRunEnd("stack")).toEqual([
-      "splitEnded",
-      "runEndReportPending",
-      "endRun",
-      "laneStopped",
+      "split-ended",
+      "run-end-report-pending",
+      "end-run",
+      "lane-stopped",
       "ended",
     ])
-    expect(planRunEnd(undefined)).not.toContain("splitEnded")
+    expect(planRunEnd(undefined)).not.toContain("split-ended")
   })
 
-  test("the run-end report is pending before endRun, for every role", () => {
+  test("the run-end report is pending before end-run, for every role", () => {
     for (const role of [undefined, "person", "land", "stack"]) {
       const steps = planRunEnd(role)
-      expect(steps.indexOf("runEndReportPending")).toBeGreaterThanOrEqual(0)
-      expect(steps.indexOf("runEndReportPending")).toBeLessThan(
-        steps.indexOf("endRun"),
+      expect(steps.indexOf("run-end-report-pending")).toBeGreaterThanOrEqual(0)
+      expect(steps.indexOf("run-end-report-pending")).toBeLessThan(
+        steps.indexOf("end-run"),
       )
     }
   })
@@ -204,7 +206,7 @@ describe("a run's end", () => {
     expect((await ended).prompt).toBe("p-1")
   })
 
-  test("a failing step before endRun is logged, and endRun and ended still run", async () => {
+  test("a failing step before end-run is logged, and end-run and ended still run", async () => {
     const { b, lane, runs, ended } = setUp(fakeLane(LANE), async () => {
       throw new Error("pi is gone")
     })
@@ -490,7 +492,7 @@ test("a run's end forgets the lane's base news as the lane stops, before ended",
   expect(order).toEqual([`work ${LANE}`, `news ${LANE}`, `ended ${LANE}`])
 })
 
-test("a run holds its lane's root from its start until its end's last step, through a failed step before endRun", async () => {
+test("a run holds its lane's root from its start until its end's last step, through a failed step before end-run", async () => {
   const b = basics()
   putLane(b, LANE)
   const { keeper, roots } = hostRoots({ session: b.session })

@@ -201,9 +201,9 @@ describe("planDelivery: one table for sends, relays and answers", () => {
     planDelivery({ lane, compelled, mode: "queue", race: null, steers })
   test("an idle lane runs or appends; no lane appends to the tree or is made", () => {
     expect(go(idle, true)).toEqual({ kind: "run", thread: fox })
-    expect(go(idle, false)).toEqual({ kind: "appendToLane", thread: fox })
-    expect(go({ kind: "none" }, false)).toEqual({ kind: "appendToTree" })
-    expect(go({ kind: "none" }, true)).toEqual({ kind: "createAndRun" })
+    expect(go(idle, false)).toEqual({ kind: "append-to-lane", thread: fox })
+    expect(go({ kind: "none" }, false)).toEqual({ kind: "append-to-tree" })
+    expect(go({ kind: "none" }, true)).toEqual({ kind: "create-and-run" })
   })
   test("a running lane is busy, unless the message steers into it", () => {
     const running = { ...idle, running: true }

@@ -129,7 +129,7 @@ export function newCanvasButton(start: CanvasStart): StartButton {
       name: "new canvas",
       title: `a new canvas${landsIn === null ? "" : ` at the end of ${landsIn.name}`}: its first thread starts with @agent typed`,
       intent: {
-        kind: "newCanvas",
+        kind: "new-canvas",
         ...(start.from === "board" ? { state: start.landsIn.id } : {}),
       },
     },
@@ -140,7 +140,7 @@ export function newCanvasButton(start: CanvasStart): StartButton {
 /** ＋ past a canvas's last column: a new column of each kind, at `at`. */
 export function newColumnButton(at: CanvasPut): StartButton {
   const make = (m: NewColumn): StartItem =>
-    item(m, { kind: "addColumn", make: m, at })
+    item(m, { kind: "add-column", make: m, at })
   const [first, ...rest] = Object.values(NEW_COLUMNS)
     .flat()
     .filter((m: NewColumn) => m !== AGENT)

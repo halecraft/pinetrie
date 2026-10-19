@@ -370,7 +370,7 @@ export type QueuePlace =
   /** Nothing waits: it is popped when the run ends. */
   | { readonly kind: "next" }
   /** Behind `ahead` queued cards, the last of them yours. */
-  | { readonly kind: "afterMine"; readonly ahead: number }
+  | { readonly kind: "after-mine"; readonly ahead: number }
   /** Behind `ahead` queued cards, the last of them `name`'s. */
   | { readonly kind: "after"; readonly name: string; readonly ahead: number }
 
@@ -382,7 +382,7 @@ export function queuePlace(lane: ThreadLane, reader: Reader): QueuePlace {
   if (lane.kind === "none") return { kind: "next" }
   const last = lane.lastWaiting
   if (last === null) return { kind: "next" }
-  if (last === reader.me) return { kind: "afterMine", ahead: lane.waiting }
+  if (last === reader.me) return { kind: "after-mine", ahead: lane.waiting }
   return {
     kind: "after",
     name: displayName(last, reader.nameOf.get(last)),
@@ -403,11 +403,11 @@ export function queueWords(place: QueuePlace): ButtonWords {
       }
     case "next":
       return { label: "queue up next", title: null }
-    case "afterMine":
+    case "after-mine":
     case "after":
       return {
         label:
-          place.kind === "afterMine"
+          place.kind === "after-mine"
             ? "queue after yours"
             : `queue after ${place.name}`,
         title: place.ahead > 1 ? `${place.ahead} waiting ahead` : null,

@@ -192,7 +192,7 @@ describe("planMessage: a command", () => {
   test("it is for the agent, whoever else it names", () => {
     expect(
       plan({ command, mentions: parseMentions("@bo look") }),
-    ).toMatchObject({ kind: "createAndRun" })
+    ).toMatchObject({ kind: "create-and-run" })
   })
   test("stored, its details still encode to the expansion", () => {
     const d = plan({ command, mode: "queue", lane: lane() })
@@ -238,11 +238,11 @@ describe("planMessage: plain messages never conflict", () => {
   const TO_BO = parseMentions("@bo look")
   test("no lane: appended at the thread's end, with no lane", () => {
     const d = plan({ end: atEntry(E2) })
-    expect(d).toMatchObject({ kind: "appendToTree", parent: atEntry(E2) })
+    expect(d).toMatchObject({ kind: "append-to-tree", parent: atEntry(E2) })
   })
   test("an idle lane: appended through it", () => {
     expect(plan({ mentions: TO_BO, lane: lane() })).toMatchObject({
-      kind: "appendToLane",
+      kind: "append-to-lane",
       thread: LANE,
     })
   })
@@ -260,31 +260,31 @@ describe("planMessage: plain messages never conflict", () => {
     })
   })
   test("another writer's compelled message below: still appended, never a conflict", () => {
-    expect(kind(plan({ race: { by: BO } }))).toBe("appendToTree")
+    expect(kind(plan({ race: { by: BO } }))).toBe("append-to-tree")
     expect(
       kind(plan({ mentions: TO_BO, race: { by: BO }, lane: lane() })),
-    ).toBe("appendToLane")
+    ).toBe("append-to-lane")
   })
   test("naming only people leaves the agent out, even where it is the default", () => {
     expect(kind(plan({ mentions: parseMentions("hi @bo") }))).toBe(
-      "appendToTree",
+      "append-to-tree",
     )
     expect(
       kind(plan({ mentions: parseMentions("hi @bo"), lane: lane() })),
-    ).toBe("appendToLane")
+    ).toBe("append-to-lane")
   })
 })
 
 describe("planMessage: a compelled message", () => {
   test("no lane: creates the thread's lane at the end and runs", () => {
     expect(plan({ mentions: ASK, end: atEntry(E2) })).toMatchObject({
-      kind: "createAndRun",
+      kind: "create-and-run",
       at: atEntry(E2),
     })
   })
   test("a new lane is named by its thread's id: the thread a send continues, or the one a branch starts", () => {
     const laneOf = (d: ReturnType<typeof plan>) =>
-      d.kind === "createAndRun" ? d.thread : d.kind
+      d.kind === "create-and-run" ? d.thread : d.kind
     expect(laneOf(plan({ mentions: ASK }))).toBe(LANE)
     expect(laneOf(plan({ mode: "branch", mentions: ASK }))).toBe(NEW)
   })
@@ -303,7 +303,9 @@ describe("planMessage: a compelled message", () => {
   })
   test("a branch's decision carries its card's canvas and board state, in one value; no other does", () => {
     const startsOf = (d: ReturnType<typeof plan>) =>
-      d.kind === "appendToTree" || d.kind === "createAndRun" ? d.starts : d.kind
+      d.kind === "append-to-tree" || d.kind === "create-and-run"
+        ? d.starts
+        : d.kind
     const state = "s-doing" as WorkflowStateId
     const want = {
       canvas: canvasIdFor("01a0ffd2-0000-7000-8000-00000000000c"),
@@ -318,8 +320,8 @@ describe("planMessage: a compelled message", () => {
   })
   test("only a thread with a lane compels without a mention; elsewhere @agent does", () => {
     expect(kind(plan({ lane: lane() }))).toBe("run")
-    expect(kind(plan({}))).not.toBe("createAndRun")
-    expect(kind(plan({ mentions: ASK, mode: "branch" }))).toBe("createAndRun")
+    expect(kind(plan({}))).not.toBe("create-and-run")
+    expect(kind(plan({ mentions: ASK, mode: "branch" }))).toBe("create-and-run")
   })
   test("an idle lane: runs on it", () => {
     expect(plan({ mentions: ASK, lane: lane() })).toMatchObject({
@@ -361,7 +363,7 @@ describe("planMessage: a compelled message", () => {
           lane: lane({ waiting: 2 }),
         }),
       ),
-    ).toBe("appendToLane")
+    ).toBe("append-to-lane")
     expect(
       plan({ mentions: ASK, mode: "queue", lane: lane({ running: true }) }),
     ).toEqual({ kind: "busy" })
@@ -370,7 +372,7 @@ describe("planMessage: a compelled message", () => {
       kind(plan({ mentions: ASK, mode: "queue", lane: lane({ heldBy: BO }) })),
     ).toBe("run")
     expect(kind(plan({ mentions: ASK, mode: "queue", race: { by: BO } }))).toBe(
-      "createAndRun",
+      "create-and-run",
     )
   })
 })
@@ -378,7 +380,7 @@ describe("planMessage: a compelled message", () => {
 describe("planMessage: branch", () => {
   test("plain: appended at the branch point with no lane; compelled: always a new lane there", () => {
     expect(plan({ mode: "branch", at: atEntry(E2) })).toMatchObject({
-      kind: "appendToTree",
+      kind: "append-to-tree",
       parent: atEntry(E2),
     })
     expect(
@@ -389,18 +391,18 @@ describe("planMessage: branch", () => {
         race: { by: BO },
       }),
     ).toMatchObject({
-      kind: "createAndRun",
+      kind: "create-and-run",
       at: atEntry(E2),
     })
   })
   test("a branch never continues a lane, even at its idle tip: that is stepping down", () => {
     expect(plan({ mode: "branch", lane: lane() })).toMatchObject({
-      kind: "appendToTree",
+      kind: "append-to-tree",
       parent: atEntry(E1),
     })
     expect(
       plan({ mode: "branch", mentions: ASK, lane: lane({ running: true }) }),
-    ).toMatchObject({ kind: "createAndRun", at: atEntry(E1) })
+    ).toMatchObject({ kind: "create-and-run", at: atEntry(E1) })
   })
 })
 
@@ -645,7 +647,7 @@ describe("settling and starting up", () => {
       pendingRunEndReport(lane, entryId(`p-${lane}`), entryId(`w-${lane}`))
     const modelSaid = {
       ...pending(LANE2),
-      report: { kind: "modelSaid", urgency: "done", reason: null } as const,
+      report: { kind: "model-said", urgency: "done", reason: null } as const,
     }
     const plan = planStartup({
       cards: [],
@@ -782,12 +784,12 @@ describe("planMessage: a lane with no work of its own catches up first", () => {
           news: "get-latest",
         }),
       ),
-    ).toBe("appendToLane")
+    ).toBe("append-to-lane")
     expect(
       kind(plan({ ...ask, lane: lane({ running: true }), news: "get-latest" })),
     ).toBe("conflict")
     expect(kind(plan({ ...ask, lane: NONE, news: "get-latest" }))).toBe(
-      "createAndRun",
+      "create-and-run",
     )
   })
 })

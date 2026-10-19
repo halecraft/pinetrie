@@ -161,22 +161,22 @@ const moveItems = (
   const pin: CardMoveItem = { to: "pinned", act: { kind: "pin", card: id } }
   const pinCanvas: CardMoveItem = {
     to: "canvas",
-    act: { kind: "pinToCanvas", card: id },
+    act: { kind: "pin-to-canvas", card: id },
   }
   const take: CardMoveItem = {
     to: "inventory",
-    act: { kind: "putAway", card: id },
+    act: { kind: "put-away", card: id },
   }
   const threads = (facts.threadIn ?? []).map(
     (state): CardMoveItem => ({
       to: { kind: "thread", state },
-      act: { kind: "spinOff", card: id, state: state.id },
+      act: { kind: "spin-off", card: id, state: state.id },
     }),
   )
   switch (place.kind) {
     case "composing":
       return [
-        { to: "note", act: { kind: "toNote", card: id } },
+        { to: "note", act: { kind: "to-note", card: id } },
         ...queue,
         pin,
         pinCanvas,
@@ -215,7 +215,7 @@ const moveItems = (
             {
               to: "reference",
               act: {
-                kind: "queueReference",
+                kind: "queue-reference",
                 card: id,
                 entry: place.on.entry,
                 thread: place.on.thread,

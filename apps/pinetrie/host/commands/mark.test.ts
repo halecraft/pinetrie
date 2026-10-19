@@ -1,4 +1,4 @@
-import { cardIdOfKind, threadIdFor, writerId } from "@pinetrie/core"
+import { cardIdOfKind, ERR, threadIdFor, writerId } from "@pinetrie/core"
 import { CARD_TITLE, deleteRecord, MARK, setRecord } from "@pinetrie/rules"
 import { expect, test } from "vitest"
 import {
@@ -38,7 +38,7 @@ test("a canvas the session does not hold takes no title", async () => {
     writerId("ada@example.com"),
     { kind: "mark", of: { kind: "canvas", canvas: CANVAS_ID }, title: "Plans" },
   )
-  expect(out).toMatchObject({ kind: "refused", code: "unknown_target" })
+  expect(out).toMatchObject({ kind: "refused", code: ERR.UNKNOWN_TARGET })
   expect(scribe.calls).toEqual([])
 })
 

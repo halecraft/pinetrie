@@ -101,7 +101,7 @@ function columnMenu(input: {
         title: wide
           ? "draw it one column wide, for everyone"
           : "draw it two columns wide, for everyone",
-        intent: { kind: "cardWidth", card: input.card, width: wide ? 1 : 2 },
+        intent: { kind: "card-width", card: input.card, width: wide ? 1 : 2 },
       },
     ],
   }
@@ -131,20 +131,20 @@ function columnMenu(input: {
           key: "copy",
           label: "Copy to this canvas",
           title: "a new thread forked at this one's end, just after it",
-          intent: { kind: "copyThread", source, to: "here" },
+          intent: { kind: "copy-thread", source, to: "here" },
         },
         {
           key: "copy-inventory",
           label: "Copy to your inventory",
           title: "a new thread forked at this one's end, in your inventory",
-          intent: { kind: "copyThread", source, to: "inventory" },
+          intent: { kind: "copy-thread", source, to: "inventory" },
         },
         {
           key: "take",
           label: moveWords("inventory").label,
           title:
             "put this thread away: its run stops, and only you can open it",
-          intent: { kind: "putAway", card: source },
+          intent: { kind: "put-away", card: source },
         },
       ],
     },

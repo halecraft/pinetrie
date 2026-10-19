@@ -507,7 +507,7 @@ export type MessageDecision =
    * `parent`, in `thread`; first, on a branch, what its card `starts`.
    */
   | {
-      readonly kind: "appendToTree"
+      readonly kind: "append-to-tree"
       readonly thread: ThreadId
       readonly parent: Position
       readonly details: MessageDetails
@@ -515,7 +515,7 @@ export type MessageDecision =
     }
   /** The thread's lane is idle: append through it. */
   | {
-      readonly kind: "appendToLane"
+      readonly kind: "append-to-lane"
       readonly thread: ThreadId
       readonly details: MessageDetails
     }
@@ -531,7 +531,7 @@ export type MessageDecision =
    * its card `starts`.
    */
   | {
-      readonly kind: "createAndRun"
+      readonly kind: "create-and-run"
       readonly at: Position
       readonly thread: ThreadId
       readonly details: MessageDetails
@@ -606,9 +606,9 @@ export function addressMessage(input: {
  *   finds it raced or busy is a conflict, so its sender chooses.
  */
 export type Delivery =
-  | { readonly kind: "appendToTree" }
-  | { readonly kind: "createAndRun" }
-  | { readonly kind: "appendToLane"; readonly thread: ThreadId }
+  | { readonly kind: "append-to-tree" }
+  | { readonly kind: "create-and-run" }
+  | { readonly kind: "append-to-lane"; readonly thread: ThreadId }
   | { readonly kind: "run"; readonly thread: ThreadId }
   | { readonly kind: "steer"; readonly thread: ThreadId }
   | { readonly kind: "busy" }
@@ -624,16 +624,16 @@ export function planDelivery(input: {
 }): Delivery {
   const { lane, compelled, mode, race } = input
   if (lane.kind === "none") {
-    if (!compelled) return { kind: "appendToTree" }
+    if (!compelled) return { kind: "append-to-tree" }
     if (mode === "reply" && race !== null)
       return { kind: "conflict", by: race.by }
-    return { kind: "createAndRun" }
+    return { kind: "create-and-run" }
   }
   const thread: ThreadId = lane.name
   if (input.steers && lane.running) return { kind: "steer", thread }
   const busy = mode === "queue" ? lane.running : sendWaits(lane)
   if (!compelled)
-    return busy ? { kind: "busy" } : { kind: "appendToLane", thread }
+    return busy ? { kind: "busy" } : { kind: "append-to-lane", thread }
   if (mode === "reply" && (race !== null || busy))
     return { kind: "conflict", by: race?.by ?? lane.askedBy }
   return busy ? { kind: "busy" } : { kind: "run", thread }
@@ -760,8 +760,8 @@ export function planMessage(input: {
     const starts = { canvas: at.canvas, state: input.state }
     const thread = at.thread
     return compelled
-      ? { kind: "createAndRun", at: end, thread, details, starts }
-      : { kind: "appendToTree", thread, parent: end, details, starts }
+      ? { kind: "create-and-run", at: end, thread, details, starts }
+      : { kind: "append-to-tree", thread, parent: end, details, starts }
   }
 
   const to = planDelivery({
@@ -772,24 +772,24 @@ export function planMessage(input: {
     steers: false,
   })
   switch (to.kind) {
-    case "appendToTree":
+    case "append-to-tree":
       return {
-        kind: "appendToTree",
+        kind: "append-to-tree",
         thread: at.thread,
         parent: end,
         details,
         starts: null,
       }
-    case "createAndRun":
+    case "create-and-run":
       return {
-        kind: "createAndRun",
+        kind: "create-and-run",
         at: end,
         thread: at.thread,
         details,
         starts: null,
       }
-    case "appendToLane":
-      return { kind: "appendToLane", thread: to.thread, details }
+    case "append-to-lane":
+      return { kind: "append-to-lane", thread: to.thread, details }
     case "busy":
     case "conflict":
       return to

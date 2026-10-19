@@ -115,7 +115,7 @@ test("SVG, BMP and text are not images; a truncated PNG is unreadable", async ()
   for (const bytes of [svg, bmp, Buffer.from("hello"), new Uint8Array()])
     expect(await prepareImage(bytes)).toEqual({
       ok: false,
-      reason: "not an image",
+      reason: "not-image",
     })
   expect(await prepareImage(RED.subarray(0, 40))).toEqual({
     ok: false,

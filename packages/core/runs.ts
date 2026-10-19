@@ -471,7 +471,7 @@ export type ConfigWidening =
   | { readonly kind: "nested" }
   | { readonly kind: "env"; readonly name: string }
   | { readonly kind: "mount"; readonly target: string }
-  | { readonly kind: "hostPort"; readonly port: number }
+  | { readonly kind: "host-port"; readonly port: number }
   | { readonly kind: "shared"; readonly path: string }
 
 /** A widening in a person's words: the agent's reply and the review say it alike. */
@@ -485,7 +485,7 @@ export function wideningWords(w: ConfigWidening): string {
       return `$${w.name}`
     case "mount":
       return `read-only files at ${w.target}`
-    case "hostPort":
+    case "host-port":
       return `the Mac's port ${w.port}`
     case "shared":
       return `${w.path}/, shared live`

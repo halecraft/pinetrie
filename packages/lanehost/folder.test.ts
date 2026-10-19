@@ -84,7 +84,7 @@ async function mergeInto(input: {
     op: { kind: "restore", lane: disk, from: input.from },
   })
   const texts = await call({
-    kind: "applyMerge",
+    kind: "apply-merge",
     project: KEY,
     disk,
     base: input.base,
@@ -112,7 +112,7 @@ const text = (snapshot: string, p: string) =>
 const lines = (...ls: string[]) => `${ls.join("\n")}\n`
 
 afterAll(async () => {
-  if (onBtrfs) await call({ kind: "removeProject", project: KEY })
+  if (onBtrfs) await call({ kind: "remove-project", project: KEY })
   await rm(HERE, { recursive: true, force: true })
 })
 
@@ -280,7 +280,7 @@ describe.skipIf(!onBtrfs)(
       )
       expect(
         await call({
-          kind: "pathFacts",
+          kind: "path-facts",
           project: KEY,
           snapshot: "facts",
           paths: ["clean.txt", "bin.dat", "a.gif", "up", "dir", "up/f", "none"],
@@ -304,7 +304,7 @@ describe.skipIf(!onBtrfs)(
       )
       expect(
         await call({
-          kind: "sameContent",
+          kind: "same-content",
           project: KEY,
           a: "base",
           b: "copy",
@@ -316,7 +316,7 @@ describe.skipIf(!onBtrfs)(
       ).toEqual(["same.txt", "clean.txt"].map(p => ({ a: p, b: p })))
       expect(
         await call({
-          kind: "sameContent",
+          kind: "same-content",
           project: KEY,
           a: "ours",
           b: "theirs",
@@ -336,7 +336,7 @@ describe.skipIf(!onBtrfs)(
       )
       expect(
         await call({
-          kind: "sameContent",
+          kind: "same-content",
           project: KEY,
           a: "base",
           b: "moved",

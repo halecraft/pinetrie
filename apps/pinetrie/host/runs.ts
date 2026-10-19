@@ -124,24 +124,30 @@ export interface Runs {
 
 /** One step of a run's end, in the order `planRunEnd` returns them. */
 export type RunEndStep =
-  | "splitEnded"
-  | "runEndReportPending"
-  | "endRun"
-  | "laneStopped"
+  | "split-ended"
+  | "run-end-report-pending"
+  | "end-run"
+  | "lane-stopped"
   | "ended"
 
 /**
  * A run's end, in order, from its prompt's role. A split checks its stack,
  * however it started. A resolution ends as any run does: its outcome is the
  * proposed changes' conflicts and the agent's asks in the tree. The run's
- * end report is pending before `endRun`: written after, a reader would see
- * the lane stopped beside the last run's end report. `endRun` comes before
- * `laneStopped` and `ended`: it closes the lane's streams, and what follows
+ * end report is pending before `end-run`: written after, a reader would see
+ * the lane stopped beside the last run's end report. `end-run` comes before
+ * `lane-stopped` and `ended`: it closes the lane's streams, and what follows
  * reads the lane as idle.
  */
 export function planRunEnd(role: string | undefined): readonly RunEndStep[] {
-  const outcome: readonly RunEndStep[] = role === "stack" ? ["splitEnded"] : []
-  return [...outcome, "runEndReportPending", "endRun", "laneStopped", "ended"]
+  const outcome: readonly RunEndStep[] = role === "stack" ? ["split-ended"] : []
+  return [
+    ...outcome,
+    "run-end-report-pending",
+    "end-run",
+    "lane-stopped",
+    "ended",
+  ]
 }
 
 /**
@@ -203,25 +209,25 @@ export function createRuns(deps: {
   const waiting = new Map<ThreadId, AbortController>()
 
   /**
-   * Carry out `planRunEnd`. The steps before `endRun` may fail, and a failure
-   * is logged; `endRun` and every step after it always run.
+   * Carry out `planRunEnd`. The steps before `end-run` may fail, and a failure
+   * is logged; `end-run` and every step after it always run.
    */
   async function end(lane: ThreadId, id: RunId): Promise<void> {
     const doc = runDocs.docOf(lane)
     const prompt = doc === null ? null : readLatestPrompt(doc, lane)
     const steps = planRunEnd(prompt?.role)
-    const cut = steps.indexOf("endRun")
+    const cut = steps.indexOf("end-run")
     const carry = async (step: RunEndStep) => {
       switch (step) {
-        case "splitEnded":
+        case "split-ended":
           if (prompt !== null) await work.splitEnded(lane, prompt.id)
           return
-        case "runEndReportPending":
+        case "run-end-report-pending":
           if (prompt !== null) await deps.pending(lane, prompt.id)
           return
-        case "endRun":
+        case "end-run":
           return endRun(live, lane, id)
-        case "laneStopped":
+        case "lane-stopped":
           work.runEnded(lane)
           baseNews.runEnded(lane)
           log(`[host] run ${id.slice(-8)} done`)

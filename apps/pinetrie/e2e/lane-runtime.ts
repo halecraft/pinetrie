@@ -131,7 +131,7 @@ export const snapshotExists = async (
   id: SnapshotId,
 ): Promise<boolean> =>
   (await lanehostOnce(root, {
-    kind: "snapshotExists",
+    kind: "snapshot-exists",
     project: projectKey(root),
     snapshot: id,
   })) === true
@@ -143,7 +143,7 @@ export async function deleteSnapshot(
   await lanehostOnce(root, {
     kind: "disk",
     project: projectKey(root),
-    op: { kind: "deleteSnapshots", ids: [id] },
+    op: { kind: "delete-snapshots", ids: [id] },
   })
 }
 

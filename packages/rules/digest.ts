@@ -281,7 +281,7 @@ export function digestToWrite(input: {
  * for the urgency line too, first, then the digest when there is one
  * to ask for.
  */
-export type Answer = "digest" | "urgency" | "urgency and digest"
+export type Answer = "digest" | "urgency" | "urgency-and-digest"
 
 /** The closing line of a request for the urgency line alone. */
 export const URGENCY_ALONE = "Answer with the urgency line alone."

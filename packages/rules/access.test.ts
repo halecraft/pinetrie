@@ -1,4 +1,4 @@
-import { type AccessAnswer, threadIdFor, writerId } from "@pinetrie/core"
+import { type AccessAnswer, ERR, threadIdFor, writerId } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
   ACCESS_ANSWERS,
@@ -34,7 +34,7 @@ const answer = (record: AccessRecord, a: AccessAnswer, sender = DUANE) =>
 describe("planAccessAnswer", () => {
   test("only the owner answers", () => {
     expect(answer(at(STATES.waiting), "allow", BEA)).toEqual({
-      refused: "not_owner",
+      refused: ERR.NOT_OWNER,
     })
     expect(
       planAccessAnswer({
@@ -44,7 +44,7 @@ describe("planAccessAnswer", () => {
         owner: null,
         now: 2,
       }),
-    ).toEqual({ refused: "not_owner" })
+    ).toEqual({ refused: ERR.NOT_OWNER })
   })
 
   test("each answer the table allows is taken, and every other is refused", () => {
@@ -59,7 +59,7 @@ describe("planAccessAnswer", () => {
 
   test("a lane that never asked has nothing to answer", () => {
     expect(answer(at(null), "allow")).toEqual({
-      refused: "nothing_to_answer",
+      refused: ERR.NOTHING_TO_ANSWER,
     })
     expect(answersFor(at(null))).toEqual([])
   })

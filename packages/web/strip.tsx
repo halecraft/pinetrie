@@ -261,7 +261,7 @@ export function Strip(p: {
     const up = await uploadImages(files)
     setLeft(up.left)
     p.onIntent({
-      kind: "putImages",
+      kind: "put-images",
       images: up.images,
       to: { kind: "canvas-at", canvas: canvasAt, after },
     })

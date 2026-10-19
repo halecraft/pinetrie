@@ -49,7 +49,7 @@ test("in a new card's box, a move hands the card to its list, focused; trashing 
   expect(newCardKeys(key("ArrowUp"), C, among)).toEqual({
     acts: [
       { kind: "reorder", card: C, among, step: -1 },
-      { kind: "focusCard", card: C },
+      { kind: "focus-card", card: C },
     ],
     release: true,
   })

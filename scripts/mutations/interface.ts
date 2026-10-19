@@ -220,8 +220,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the undo key on no canvas does nothing",
     file: "packages/interface/card-intents.ts",
-    from: '  return [{ kind: "undoMoves", canvas: canvasOfTab(state), direction }]\n',
-    to: '  const canvas = canvasOfTab(state)\n  return canvas === null ? [] : [{ kind: "undoMoves", canvas, direction }]\n',
+    from: '  return [{ kind: "undo-moves", canvas: canvasOfTab(state), direction }]\n',
+    to: '  const canvas = canvasOfTab(state)\n  return canvas === null ? [] : [{ kind: "undo-moves", canvas, direction }]\n',
     command: unit,
     expect: "on no canvas: your history outside any canvas",
   },
@@ -1231,8 +1231,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "your own message is someone else's",
     file: "packages/interface/send.ts",
-    from: '  if (last === reader.me) return { kind: "afterMine", ahead: lane.waiting }',
-    to: '  if (false) return { kind: "afterMine", ahead: lane.waiting }',
+    from: '  if (last === reader.me) return { kind: "after-mine", ahead: lane.waiting }',
+    to: '  if (false) return { kind: "after-mine", ahead: lane.waiting }',
     command: unit,
     expect: "behind your own message, as yours",
   },
@@ -1481,8 +1481,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a first message's edit drops its @agent on a new canvas",
     file: "packages/interface/message-tools.ts",
-    from: '    ? { kind: "newCanvas", prefill }\n',
-    to: '    ? { kind: "newCanvas", prefill: { text: node.text, blank: false } }\n',
+    from: '    ? { kind: "new-canvas", prefill }\n',
+    to: '    ? { kind: "new-canvas", prefill: { text: node.text, blank: false } }\n',
     command: unit,
     expect:
       "a root's first message opens a new canvas, with @agent in front when it asked the agent",
@@ -1651,7 +1651,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "Escape closes the board over a filter",
     file: "packages/interface/board-view.ts",
-    from: '    return focus.menuOpen ? null : focus.filtered ? "clearFilter" : "close"',
+    from: '    return focus.menuOpen ? null : focus.filtered ? "clear-filter" : "close"',
     to: '    return focus.menuOpen ? null : "close"',
     command: unit,
     expect: "Escape clears a filter, in the search field too",
@@ -1659,8 +1659,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "/ takes a slash typed in a text box",
     file: "packages/interface/board-view.ts",
-    from: '  if (event.key === "/" && !focus.inText && !modifier) return "focusSearch"',
-    to: '  if (event.key === "/" && !modifier) return "focusSearch"',
+    from: '  if (event.key === "/" && !focus.inText && !modifier) return "focus-search"',
+    to: '  if (event.key === "/" && !modifier) return "focus-search"',
     command: unit,
     expect: "/ in a text box is typed",
   },
@@ -1838,15 +1838,15 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a card handed to its list is not armed",
     file: "packages/interface/intent.ts",
-    from: '    case "focusCard":\n      return [{ kind: "armFocus", key: { kind: "card", card: act.card } }]',
-    to: '    case "focusCard":\n      return []',
+    from: '    case "focus-card":\n      return [{ kind: "arm-focus", key: { kind: "card", card: act.card } }]',
+    to: '    case "focus-card":\n      return []',
     command: unit,
     expect: "a card handed to its list is armed to take focus there",
   },
   {
     name: "a moved new card is not handed over",
     file: "packages/interface/card-keys.ts",
-    from: '    acts: act.kind === "reorder" ? [act, { kind: "focusCard", card }] : [act],',
+    from: '    acts: act.kind === "reorder" ? [act, { kind: "focus-card", card }] : [act],',
     to: "    acts: [act],",
     command: unit,
     expect:
@@ -1909,7 +1909,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a comment's box is not armed",
     file: "packages/interface/card-intents.ts",
-    from: '  { kind: "armFocus", key: { kind: "card", card: act.card } },\n]',
+    from: '  { kind: "arm-focus", key: { kind: "card", card: act.card } },\n]',
     to: "]",
     command: unit,
     expect:
@@ -2081,7 +2081,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "Ctrl+Shift+L does nothing",
     file: "packages/interface/page-keys.ts",
-    from: '  if (chord && key === "l") return { kind: "foldList" }',
+    from: '  if (chord && key === "l") return { kind: "fold-list" }',
     to: "",
     command: unit,
     expect: "Ctrl+Shift+L folds or unfolds the sidebar",
@@ -2089,10 +2089,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "folding saves the width it shows",
     file: "packages/interface/intent.ts",
-    from: '      return [{ kind: "listWidth", width: otherWidth(state.listWidth) }]',
-    to: '      return [{ kind: "listWidth", width: state.listWidth }]',
+    from: '      return [{ kind: "list-width", width: otherWidth(state.listWidth) }]',
+    to: '      return [{ kind: "list-width", width: state.listWidth }]',
     command: unit,
-    expect: "foldList asks for the width the sidebar does not show",
+    expect: "fold-list asks for the width the sidebar does not show",
   },
   {
     name: "an archived canvas lights ▦",
@@ -2116,7 +2116,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "Not you? reloads without forgetting who you are",
     file: "packages/interface/intent.ts",
-    from: '      return [{ kind: "forgetIdentity" }, { kind: "reload" }]',
+    from: '      return [{ kind: "forget-identity" }, { kind: "reload" }]',
     to: '      return [{ kind: "reload" }]',
     command: unit,
     expect: "signing out forgets who you are, then reloads",
@@ -2164,7 +2164,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the session's name is never stored on this device",
     file: "packages/interface/intent.ts",
-    from: '      return [{ kind: "storeIdentity", identity: step.identity }]',
+    from: '      return [{ kind: "store-identity", identity: step.identity }]',
     to: "      return []",
     command: unit,
     expect:
@@ -2176,7 +2176,7 @@ export const mutations: readonly Mutation[] = [
     from: "      ports.identity.save(effect.identity)\n",
     to: "",
     command: unit,
-    expect: "the storeIdentity effect is one port call",
+    expect: "the store-identity effect is one port call",
   },
   {
     name: "switching tabs keeps reporting the old tab",
@@ -2217,7 +2217,7 @@ export const mutations: readonly Mutation[] = [
     name: "the sidebar's ＋ gets its ▾ back",
     file: "packages/interface/start-button.ts",
     from: "    more: null,\n",
-    to: '    more: {\n      items: [item(NEW_COLUMNS.thread[1], { kind: "newCanvas" })],\n      label: "other ways to start",\n    },\n',
+    to: '    more: {\n      items: [item(NEW_COLUMNS.thread[1], { kind: "new-canvas" })],\n      label: "other ways to start",\n    },\n',
     command: unit,
     expect: "＋ canvas makes a canvas, with no ▾",
   },
@@ -2397,7 +2397,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a pick into an ask's work leaves its fold closed",
     file: "packages/interface/effects.ts",
-    from: '    ask === undefined ? [] : [{ kind: "openFold", ask }]',
+    from: '    ask === undefined ? [] : [{ kind: "open-fold", ask }]',
     to: "    []",
     command: unit,
     expect: "opens its fold before it is revealed",
@@ -2445,8 +2445,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "catching up leaves its card unqueued",
     file: "packages/interface/intent.ts",
-    from: '    case "queueNew":\n      return [\n',
-    to: '    case "queueNew":\n      return []\n      return [\n',
+    from: '    case "queue-new":\n      return [\n',
+    to: '    case "queue-new":\n      return []\n      return [\n',
     command: unit,
     expect:
       "catching up makes its card in the queue, with the command and no text, never drawn as a note; nothing takes focus",
@@ -2479,8 +2479,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a drop on the composer leaves the message there",
     file: "packages/interface/card-intents.ts",
-    from: '    { kind: "moveCards", moves: [into, back], actedAt, close: [], here: null },',
-    to: '    { kind: "moveCards", moves: [into], actedAt, close: [], here: null },',
+    from: '    { kind: "move-cards", moves: [into, back], actedAt, close: [], here: null },',
+    to: '    { kind: "move-cards", moves: [into], actedAt, close: [], here: null },',
     command: unit,
     expect: "a message with text takes the note's place",
   },
@@ -2914,10 +2914,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "openIn opens nothing in a root not held",
     file: "packages/interface/intent.ts",
-    from: '  return [...showCanvas(canvas), { kind: "openWhenHeld", entry }]',
+    from: '  return [...showCanvas(canvas), { kind: "open-when-held", entry }]',
     to: "  return []",
     command: unit,
-    expect: "openLink: an entry this tab holds opens as openAt does",
+    expect: "open-link: an entry this tab holds opens as open-at does",
   },
   {
     name: "the header lists no proposed changes in a root not held",
@@ -2948,7 +2948,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the panel's undo undoes moves",
     file: "packages/interface/card-intents.ts",
-    from: '  if (inPanel) return [{ kind: "undoSwap", direction }]\n',
+    from: '  if (inPanel) return [{ kind: "undo-swap", direction }]\n',
     to: "",
     command: unit,
     expect: "with the inventory panel focused: this tab's swaps",
@@ -3039,7 +3039,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the inbox badge counts what is worth a read",
     file: "packages/interface/inbox-view.ts",
-    from: '  items.filter(i => i.level === "needsYou").length + unseen',
+    from: '  items.filter(i => i.level === "needs-you").length + unseen',
     to: "  items.length + unseen",
     command: unit,
     expect:
@@ -3048,8 +3048,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the inbox badge leaves out unseen mentions",
     file: "packages/interface/inbox-view.ts",
-    from: '  items.filter(i => i.level === "needsYou").length + unseen',
-    to: '  items.filter(i => i.level === "needsYou").length',
+    from: '  items.filter(i => i.level === "needs-you").length + unseen',
+    to: '  items.filter(i => i.level === "needs-you").length',
     command: unit,
     expect:
       "counts what needs you, proposed changes of threads you follow and unseen mentions",
@@ -3082,8 +3082,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the inbox sections are out of order",
     file: "packages/interface/inbox-view.ts",
-    from: 'const ORDER: readonly InboxSection[] = [\n  "needsYou",\n  "ready",',
-    to: 'const ORDER: readonly InboxSection[] = [\n  "ready",\n  "needsYou",',
+    from: 'const ORDER: readonly InboxSection[] = [\n  "needs-you",\n  "ready",',
+    to: 'const ORDER: readonly InboxSection[] = [\n  "ready",\n  "needs-you",',
     command: unit,
     expect: "sections come needs you, ready, worth a read, mentions",
   },
@@ -3249,7 +3249,7 @@ export const mutations: readonly Mutation[] = [
     name: "a column's status line words every level as needs you",
     file: "packages/interface/column-status.ts",
     from: "    words: columnStatusWords(\n      level,",
-    to: '    words: columnStatusWords(\n      "needsYou",',
+    to: '    words: columnStatusWords(\n      "needs-you",',
     command: unit,
     expect:
       "a stop is worth a read for others and shows nothing for whoever stopped it",
@@ -3273,16 +3273,16 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a stop raises worth a read for whoever stopped it",
     file: "packages/interface/attention.ts",
-    from: '      return report.by === me ? null : "worthARead"',
-    to: '      return "worthARead"',
+    from: '      return report.by === me ? null : "worth-a-read"',
+    to: '      return "worth-a-read"',
     command: unit,
     expect: "attentionLevel: stopped by you",
   },
   {
     name: "proposed changes are counted twice",
     file: "packages/interface/inbox-view.ts",
-    from: '  items.filter(i => i.level === "needsYou").length + unseen',
-    to: '  items.filter(i => i.level === "needsYou").length +\n  items.filter(i => i.raised.kind === "ready").length + unseen',
+    from: '  items.filter(i => i.level === "needs-you").length + unseen',
+    to: '  items.filter(i => i.level === "needs-you").length +\n  items.filter(i => i.raised.kind === "ready").length + unseen',
     command: unit,
     expect:
       "counts what needs you, proposed changes of threads you follow and unseen mentions",
@@ -3430,7 +3430,7 @@ export const mutations: readonly Mutation[] = [
     name: "markLevel counts a working root as raised",
     file: "packages/interface/attention.ts",
     from: '      return s === undefined || s.kind === "working" ? null : s.kind',
-    to: '      return s === undefined ? null : s.kind === "working" ? "needsYou" : s.kind',
+    to: '      return s === undefined ? null : s.kind === "working" ? "needs-you" : s.kind',
     command: unit,
     expect: "markLevel: the highest level among the canvases it covers",
   },
@@ -3708,7 +3708,7 @@ export const mutations: readonly Mutation[] = [
     from: "  if (!searching) return effects\n",
     to: "  return effects\n",
     command: unit,
-    expect: "openAt while searching closes the search first",
+    expect: "open-at while searching closes the search first",
   },
   {
     name: "a search is left with no search open",
@@ -3716,7 +3716,7 @@ export const mutations: readonly Mutation[] = [
     from: "  if (!searching) return effects\n",
     to: "",
     command: unit,
-    expect: "while not searching, openAt plans exactly as before",
+    expect: "while not searching, open-at plans exactly as before",
   },
   {
     name: "leaving a search marks nothing",
@@ -3952,8 +3952,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a branch's column is keyed apart from its thread",
     file: "packages/interface/intent.ts",
-    from: '    { kind: "armFocus", key: { kind: "column", key: thread } },\n',
-    to: '    { kind: "armFocus", key: { kind: "column", key: "k" } },\n',
+    from: '    { kind: "arm-focus", key: { kind: "column", key: thread } },\n',
+    to: '    { kind: "arm-focus", key: { kind: "column", key: "k" } },\n',
     command: unit,
     expect: "a branch is opened on the host, just after its thread",
   },
@@ -4065,7 +4065,7 @@ export const mutations: readonly Mutation[] = [
     to: '      return slot === slot\n        ? []\n        : [\n            { kind: "inventory", act: { kind: "show", how: "held" } },',
     command: unit,
     expect:
-      "openLink: a thread in your inventory opens its preview there; one someone else holds, or with no card, nothing",
+      "open-link: a thread in your inventory opens its preview there; one someone else holds, or with no card, nothing",
   },
   {
     name: "a copy lands first on the canvas, not after its source",
@@ -4074,7 +4074,7 @@ export const mutations: readonly Mutation[] = [
     to: '        : { kind: "canvas", canvas, after: null }\n',
     command: unit,
     expect:
-      "copyThread: a copy lands after its source, or in your inventory; none into a full one or from no canvas",
+      "copy-thread: a copy lands after its source, or in your inventory; none into a full one or from no canvas",
   },
   {
     name: "a copy here from no canvas is sent anyway",
@@ -4083,7 +4083,7 @@ export const mutations: readonly Mutation[] = [
     to: '      : canvas === undefined\n        ? { kind: "inventory", slot: null }\n',
     command: unit,
     expect:
-      "copyThread: a copy lands after its source, or in your inventory; none into a full one or from no canvas",
+      "copy-thread: a copy lands after its source, or in your inventory; none into a full one or from no canvas",
   },
   {
     name: "a thread put from the inventory goes in a note column",
@@ -4212,7 +4212,7 @@ export const mutations: readonly Mutation[] = [
     name: "Cmd+X takes into the inventory again",
     file: "packages/interface/page-keys.ts",
     from: '  if (command && key === "z")',
-    to: '  if (command && key === "x" && focus.card !== null)\n    return { kind: "putAway", card: focus.card }\n  if (command && key === "z")',
+    to: '  if (command && key === "x" && focus.card !== null)\n    return { kind: "put-away", card: focus.card }\n  if (command && key === "z")',
     command: unit,
     expect:
       "Cmd+C, Cmd+X and Cmd+V are no keys here: they are the page's copy, cut and paste events",
@@ -4356,18 +4356,10 @@ export const mutations: readonly Mutation[] = [
     expect: "a canvas's card back on the board",
   },
   {
-    name: "every level is needs you",
-    file: "packages/interface/signals.ts",
-    from: '  level === "needsYou" ? "needs-you" : "worth-a-read"',
-    to: '  "needs-you"',
-    command: unit,
-    expect: "each attention level maps to one signal of its own",
-  },
-  {
     name: "a working status signals done",
     file: "packages/interface/signals.ts",
-    from: '  return status.kind === "working" ? "running" : signalOfLevel(status.kind)',
-    to: '  return status.kind === "working" ? "done" : signalOfLevel(status.kind)',
+    from: '  return status.kind === "working" ? "running" : status.kind',
+    to: '  return status.kind === "working" ? "done" : status.kind',
     command: unit,
     expect: "a status's signal",
   },
@@ -4518,7 +4510,7 @@ export const mutations: readonly Mutation[] = [
     to: '      return source.kind === "card"',
     command: unit,
     expect:
-      "a drop sends what a key or a menu would: moveColumn, put or the canvas's drop, nothing else",
+      "a drop sends what a key or a menu would: move-column, put or the canvas's drop, nothing else",
   },
   {
     name: "a sidebar row is all onto its canvas",

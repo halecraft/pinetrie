@@ -85,7 +85,7 @@ export async function baseState(
   } finally {
     if (made.length > 0)
       await r.runtime.disk({
-        kind: "deleteSnapshots",
+        kind: "delete-snapshots",
         ids: made.map(snapshotId),
       })
   }

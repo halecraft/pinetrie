@@ -48,7 +48,7 @@ describe("keyAct", () => {
   })
 
   test("Ctrl+Shift+L folds or unfolds the sidebar, in a text box too, and not with Meta or Alt", () => {
-    const fold = { kind: "foldList" }
+    const fold = { kind: "fold-list" }
     expect(keyAct(key("L", chord), focus())).toEqual(fold)
     expect(keyAct(key("L", chord), focus({ inText: true }))).toEqual(fold)
     expect(keyAct(key("L", { ...chord, metaKey: true }), focus())).toBeNull()
@@ -58,7 +58,7 @@ describe("keyAct", () => {
 
   test("Ctrl+Shift+I takes the focused card, in a text box too; Ctrl+Shift+O puts the selected one in the last focused column", () => {
     expect(keyAct(key("I", chord), focus({ card: C1, inText: true }))).toEqual({
-      kind: "putAway",
+      kind: "put-away",
       card: C1,
     })
     expect(keyAct(key("I", chord), focus())).toBeNull()
@@ -75,8 +75,8 @@ describe("keyAct", () => {
   })
 
   test("undo and redo with Meta or Ctrl, only outside a text box; in the panel, the panel's", () => {
-    const undo = { kind: "undoMove", direction: "undo", inPanel: false }
-    const redo = { kind: "undoMove", direction: "redo", inPanel: false }
+    const undo = { kind: "undo-move", direction: "undo", inPanel: false }
+    const redo = { kind: "undo-move", direction: "redo", inPanel: false }
     expect(
       keyAct(key("z", { metaKey: true }), focus({ inPanel: true })),
     ).toEqual({ ...undo, inPanel: true })
@@ -100,7 +100,7 @@ describe("keyAct", () => {
     const inColumn = { card: T, position: 1, count: 3 }
     const alt = (k: string) => key(k, { altKey: true })
     expect(keyAct(alt("ArrowRight"), focus({ inColumn }))).toEqual({
-      kind: "moveColumn",
+      kind: "move-column",
       column: { kind: "card", card: T },
       to: 2,
     })
@@ -131,7 +131,7 @@ describe("keyAct", () => {
 
 test("while a page covers the stage only the list's fold acts", () => {
   const onPage = focus({ page: true, card: C1 })
-  expect(keyAct(key("L", chord), onPage)).toEqual({ kind: "foldList" })
+  expect(keyAct(key("L", chord), onPage)).toEqual({ kind: "fold-list" })
   expect(keyAct(key("I", chord), onPage)).toBeNull()
   expect(keyAct(key("O", chord), onPage)).toBeNull()
   expect(keyAct(key("z", { metaKey: true }), onPage)).toBeNull()

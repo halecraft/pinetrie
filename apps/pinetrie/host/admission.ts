@@ -29,7 +29,7 @@ export type Admission =
    * A valid `?key=`: set the cookie and redirect to `location`, the same URL
    * without the key, so the key leaves the address bar and the history.
    */
-  | { readonly kind: "admitAndForget"; readonly location: string }
+  | { readonly kind: "admit-and-forget"; readonly location: string }
   | { readonly kind: "refuse" }
 
 const ADMIT: Admission = { kind: "admit" }
@@ -77,7 +77,10 @@ export function admits(request: RequestFacts, key: string | null): Admission {
   if (given !== null) {
     if (!same(given, key)) return REFUSE
     url.searchParams.delete("key")
-    return { kind: "admitAndForget", location: `${url.pathname}${url.search}` }
+    return {
+      kind: "admit-and-forget",
+      location: `${url.pathname}${url.search}`,
+    }
   }
   const cookie = cookieValue(request.cookie, KEY_COOKIE)
   return cookie !== undefined && same(cookie, key) ? ADMIT : REFUSE

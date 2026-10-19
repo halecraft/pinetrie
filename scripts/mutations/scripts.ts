@@ -50,6 +50,13 @@ const functionNames = [
   "scripts/function-names.test.ts",
 ]
 const words = ["pnpm", "exec", "vitest", "run", "scripts/words.test.ts"]
+const tagSpelling = [
+  "pnpm",
+  "exec",
+  "vitest",
+  "run",
+  "scripts/tag-spelling.test.ts",
+]
 const importCycles = [
   "pnpm",
   "exec",
@@ -92,6 +99,14 @@ export const mutations: readonly Mutation[] = [
     command: words,
     expect:
       "no identifier holds a retired name, but in a migration's old shapes",
+  },
+  {
+    name: "a migration's old shapes may not hold a retired name",
+    file: "scripts/words.ts",
+    from: "  if (OLD_SHAPES.includes(source.file)) return []\n",
+    to: "",
+    command: words,
+    expect: "a file of a migration's old shapes may hold a retired name",
   },
   {
     name: "a retired name in capitals hides",
@@ -533,6 +548,39 @@ export const mutations: readonly Mutation[] = [
       "Of = (name: string) => name\nexport const isLeaningName = (name: string): boolean =>\n",
     command: functionNames,
     expect: "no exported function's name ends in a bare Of, To or At",
+  },
+  {
+    name: "a tag may hold a capital",
+    file: "scripts/tag-spelling.ts",
+    from: "  /^(?:[a-z0-9]+(?:-",
+    to: "  /^(?:[a-zA-Z0-9]+(?:-",
+    command: tagSpelling,
+    expect: "camelCase, snake_case and spaced tags are refused",
+  },
+  {
+    name: "a Pick's key is read as a tag",
+    file: "scripts/tag-spelling.ts",
+    from: 'const KEY_PICKERS = new Set(["Pick", "Omit"])\n',
+    to: 'const KEY_PICKERS = new Set(["Omit"])\n',
+    command: tagSpelling,
+    expect: "a literal naming a property is no tag",
+  },
+  {
+    name: "an outside tag nothing holds stays listed",
+    file: "scripts/tag-spelling.ts",
+    from: '  GET: "an HTTP method, as Docker\'s API reads it",\n',
+    to: '  PATCH: "an HTTP method, as Docker\'s API reads it",\n  GET: "an HTTP method, as Docker\'s API reads it",\n',
+    command: tagSpelling,
+    expect: "every outside tag is still held by the source",
+  },
+  {
+    name: "a camelCase tag joins a union",
+    file: "packages/rules/review.ts",
+    from: 'export type ReviewSide = "before" | "after"\n',
+    // Split in two, so this file does not hold the tag it adds.
+    to: 'export type ReviewSide = "before" | "after" | "be' + 'foreNow"\n',
+    command: tagSpelling,
+    expect: "no tag in the source is spelled other than kebab-case",
   },
   {
     name: "an import type loads its module",

@@ -235,7 +235,7 @@ describe("the tab's moves", () => {
   })
 
   test("the host left: nothing stays drawn", () => {
-    const s = run([sent(queueIt), { kind: "hostLeft" }])
+    const s = run([sent(queueIt), { kind: "host-left" }])
     expect(s.pending).toEqual([])
   })
 })
@@ -442,7 +442,7 @@ describe("records, moves and cards, in one step", () => {
   })
 
   test("a step that changes nothing gives the same state", () => {
-    expect(localStep(start, { kind: "hostLeft" }, ME)).toBe(start)
+    expect(localStep(start, { kind: "host-left" }, ME)).toBe(start)
     expect(
       localStep(start, { kind: "records", records: host, rev: 0 }, ME),
     ).toBe(start)

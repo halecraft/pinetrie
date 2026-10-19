@@ -119,7 +119,7 @@ export function createBanners(deps: {
       }),
     async request(lane, ask) {
       // A thread its gate refuses gets no banner, as one with no thread.
-      let answer: BannerAnswer = { kind: "refused", reason: "no_thread" }
+      let answer: BannerAnswer = { kind: "refused", reason: "no-thread" }
       await later.step(scope(lane), "a banner", () => {
         const plan = planAsk(ask, sha => blobs.ref(sha) !== undefined, draws)
         answer = bannerAnswer(plan)

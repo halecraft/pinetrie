@@ -58,7 +58,7 @@ const names = (call: DiskCall): readonly string[] => {
       return [call.lane, call.snapshot]
     case "delete":
       return [call.lane]
-    case "deleteSnapshots":
+    case "delete-snapshots":
       return call.ids
   }
 }
@@ -114,13 +114,13 @@ export function planDisk(
         { kind: "drop", path: disks.nested(call.lane) },
         { kind: "drop", path: disks.states(call.lane) },
       ]
-    case "deleteSnapshots":
+    case "delete-snapshots":
       return call.ids.map(id => ({ kind: "drop", path: disks.snapshot(id) }))
   }
 }
 
 /** What is at a path a data root may be at. */
-export type DataRootState = "subvolume" | "notSubvolume" | "absent"
+export type DataRootState = "subvolume" | "not-subvolume" | "absent"
 
 /** What is on disk for a lane's inner Docker data root, and for the one it may clone. */
 export interface InnerDockerDataRootFacts {
@@ -171,7 +171,7 @@ export function planInnerDockerDataRootSteps(
   if (facts.ownDataRoot === "subvolume") return disk
   return [
     ...disk,
-    ...(facts.ownDataRoot === "notSubvolume"
+    ...(facts.ownDataRoot === "not-subvolume"
       ? [{ kind: "drop", path: dataRoot } as const]
       : []),
     { kind: "ensure", path: dataRoot, uid: ROOTLESS_UID },
@@ -188,7 +188,7 @@ export async function innerDockerDataRootFacts(
     (await isSubvolume(at))
       ? "subvolume"
       : (await exists(at))
-        ? "notSubvolume"
+        ? "not-subvolume"
         : "absent"
   return {
     ownDataRoot: await state(disks.innerDockerDataRoot(lane)),

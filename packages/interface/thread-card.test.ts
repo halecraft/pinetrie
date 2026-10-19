@@ -59,7 +59,7 @@ describe("threadCardHead", () => {
       ["Done", true, "running", ["amber-fox"]],
     ])
     expect(head.moves[1]?.intent).toEqual({
-      kind: "moveCanvas",
+      kind: "move-canvas",
       canvas: K1,
       from: DOING,
       to: DONE,

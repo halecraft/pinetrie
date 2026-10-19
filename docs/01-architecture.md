@@ -319,7 +319,7 @@ A branch is a new thread whose first entry's parent is an earlier entry
 (ADR-0120): no lane is navigated, and nothing calls pi's `navigateTree`.
 pi owns the tree operation; we do not reimplement it. See
 `packages/pi/TECHNICAL.md` for the limits, including that a foreign-written
-entry is refused (`unknown_target`).
+entry is refused (`unknown-target`).
 
 ### Two projections over the same `parentId` edges
 

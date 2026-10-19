@@ -103,7 +103,7 @@ The records it reads, and the decisions that made them:
 | `readMarks` | `pinetrie.mark` | ADR-0045, ADR-0116 |
 | `readCardTitles` | `pinetrie.card-title` | ADR-0116, ADR-0182 |
 | `readWorkflow`, `readArchived` | `pinetrie.workflow` | ADR-0122; the archive, ADR-0029 |
-| `readRunEndReports` | `pinetrie.runEndReport` | ADR-0077 |
+| `readRunEndReports` | `pinetrie.run-end-report` | ADR-0077 |
 | `readDigests` | `pinetrie.digest` | ADR-0106 |
 | `readCardHistories`, `readTraces` | `pinetrie.card-history`, `pinetrie.trace` | ADR-0048 step 6 |
 | `readQueueHolds` | `pinetrie.queue-hold` | ADR-0048 step 7 |

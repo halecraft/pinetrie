@@ -12,7 +12,7 @@ import type { Ran } from "./run.ts"
 
 /**
  * A lane's disk, as the host asks of whichever runtime keeps it. `delete`
- * and `deleteSnapshots` succeed when there is nothing to delete.
+ * and `delete-snapshots` succeed when there is nothing to delete.
  */
 export type DiskOp =
   | {
@@ -30,14 +30,14 @@ export type DiskOp =
       readonly snapshot: SnapshotId
     }
   | { readonly kind: "delete"; readonly lane: LaneOwner }
-  | { readonly kind: "deleteSnapshots"; readonly ids: readonly SnapshotId[] }
+  | { readonly kind: "delete-snapshots"; readonly ids: readonly SnapshotId[] }
   /**
    * A nested lane's inner Docker data root: a clone of `cloneFromLane`'s in
    * place of its own when that one is there, else its own as it is. Only
    * while the lane's container is stopped or not yet made.
    */
   | {
-      readonly kind: "innerDockerDataRoot"
+      readonly kind: "inner-docker-data-root"
       readonly lane: LaneOwner
       readonly cloneFromLane: LaneOwner | null
     }

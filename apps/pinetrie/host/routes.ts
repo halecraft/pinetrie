@@ -49,7 +49,7 @@ export function planRequest(
   | Route {
   const admission = admits(facts, key)
   if (admission.kind === "refuse") return { kind: "refuse" }
-  if (admission.kind === "admitAndForget")
+  if (admission.kind === "admit-and-forget")
     return { kind: "redirect", location: admission.location }
   return route(method, new URL(facts.url, "http://host"))
 }

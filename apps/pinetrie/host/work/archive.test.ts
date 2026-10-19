@@ -18,7 +18,7 @@ test("a lane whose removal fails leaves the other lanes removed and the snapshot
     disk: async op => {
       if (op.kind === "delete" && op.lane === STUCK)
         throw new Error("EROFS: read-only file system")
-      if (op.kind === "deleteSnapshots") deleted.push(...op.ids)
+      if (op.kind === "delete-snapshots") deleted.push(...op.ids)
     },
   }).port
   const registry = record<LaneRegistry>({ forget: async () => {} }).port

@@ -69,7 +69,7 @@ export function CanvasColumn(p: {
   const placeWords = boardPlaceWords(view.place)
   const [renaming, setRenaming] = useState(false)
   const fold = (unfolded: boolean) =>
-    p.onIntent({ kind: "foldCanvas", unfolded })
+    p.onIntent({ kind: "fold-canvas", unfolded })
   // A pin's acts are said in the canvas column, by its canvas's id.
   const act = (a: ColumnAct) =>
     p.onIntent({
@@ -171,7 +171,7 @@ export function CanvasColumn(p: {
           data-empty={p.pins.length === 0 || undefined}
           {...(view.readOnly
             ? {}
-            : dropProps({ kind: "canvasPinned", canvas: view.canvas }))}
+            : dropProps({ kind: "canvas-pinned", canvas: view.canvas }))}
         >
           <span className="canvas-pins-heading">{CANVAS_PINS_HEADING}</span>
           {p.pins.length === 0 && (

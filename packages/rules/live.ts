@@ -79,7 +79,7 @@ export function planStream(input: {
         },
       ]
     }
-    case "toolStart":
+    case "tool-start":
       return [
         ...closeStreams(
           mine.filter(s => s.kind === "reply" && !isCurrentReply(s, tip)),
@@ -94,7 +94,7 @@ export function planStream(input: {
           },
         },
       ]
-    case "toolOutput": {
+    case "tool-output": {
       const tool = mine.find(
         s => s.kind === "tool" && s.callId === event.callId,
       )

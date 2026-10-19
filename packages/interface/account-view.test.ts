@@ -9,10 +9,10 @@ import {
 describe("accountView", () => {
   const inventory = { count: 1, open: false }
   test.each([
-    [false, 0, ["profile", "setup", "signOut"], null],
-    [false, 4, ["profile", "setup", "signOut"], null],
-    [true, 0, ["inbox", "inventory", "profile", "setup", "signOut"], null],
-    [true, 4, ["inbox", "inventory", "profile", "setup", "signOut"], 4],
+    [false, 0, ["profile", "setup", "sign-out"], null],
+    [false, 4, ["profile", "setup", "sign-out"], null],
+    [true, 0, ["inbox", "inventory", "profile", "setup", "sign-out"], null],
+    [true, 4, ["inbox", "inventory", "profile", "setup", "sign-out"], 4],
   ])("folded %s, %i needing you", (folded, badge, kinds, onAvatar) => {
     const view = accountView({ folded, badge, inventory })
     expect(view.items.map(i => i.kind)).toEqual(kinds)
@@ -37,7 +37,7 @@ describe("accountWords", () => {
     [{ kind: "inventory", count: 2, open: true }, { label: "Close inventory" }],
     [{ kind: "profile" }, { label: "Profile", title: "your name and picture" }],
     [
-      { kind: "signOut" },
+      { kind: "sign-out" },
       {
         label: "Sign in as someone else",
         title: "forget who this device says you are, and ask again",

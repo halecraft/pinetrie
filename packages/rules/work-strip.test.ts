@@ -463,7 +463,7 @@ describe("workStripView: the work strip's states", () => {
     expect([v.buttons, v.destinations]).toEqual([["split"], []])
   })
   test("an ask about a conflict counts only when newer than the proposed changes", () => {
-    expect(view(proposed, "idle", 20).state).toBe("needs_you")
+    expect(view(proposed, "idle", 20).state).toBe("needs-you")
     expect(view(proposed, "idle", 5).state).toBe("ready")
     expect(view(proposed, "idle", null).state).toBe("ready")
   })

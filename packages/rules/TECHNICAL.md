@@ -169,7 +169,9 @@ root's record is written only through a step's documents (ADR-0162).
   last run's end report, keyed by lane, in the session: the run's prompt and
   last entry, and what happened (pending, the model's urgency, failed,
   stopped, unclassified), never a level,
-  which each client decides for its person.
+  which each client decides for its person. Its namespace and tags are
+  kebab-case (`pinetrie.run-end-report`, `model-said`, `needs-you`,
+  ADR-0184); `0025-run-end-report` moved the records stored before.
 - **`LANE`** is written for every lane as it is created, naming its root;
   `history` is null for a lane with no copy of its own. `planLaneRecords`
   is its one maker, and writes a lane of its own's fork owed beside it
@@ -308,8 +310,8 @@ are the only code that builds or reads the shape.
 
   | a message… | no lane | idle lane | busy lane (running, cards queued, or its queue held: `sendWaits`) |
   |---|---|---|---|
-  | plain | `appendToTree` at the end | `appendToLane` | `busy` |
-  | compelled `reply`, not raced | `createAndRun` at the end | `run` | `conflict` |
+  | plain | `append-to-tree` at the end | `append-to-lane` | `busy` |
+  | compelled `reply`, not raced | `create-and-run` at the end | `run` | `conflict` |
   | compelled `reply`, raced | `conflict` | `conflict` | `conflict` |
   | `queue` (the host's pop) | as `reply` | as `reply` | as `reply` when only cards are queued; `busy` while it runs |
 
@@ -317,13 +319,13 @@ are the only code that builds or reads the shape.
   the dispatcher queues the chat's card in the same step, and answers `queued` (ADR-0059).
   `queue` is the host's own mode (`PlanMode`; a client sends a `SendMode`), for a card it pops, which heads the queue
   it is in: so only a run makes the lane busy, and a race does not count.
-  | `branch` | plain: `appendToTree` at its fork; compelled: `createAndRun` at its fork | the same: a branch never continues a lane | the same |
+  | `branch` | plain: `append-to-tree` at its fork; compelled: `create-and-run` at its fork | the same: a branch never continues a lane | the same |
 
   A race is another writer's compelled message on the thread's path since what
   the sender saw; plain remarks, agent replies and sibling forks are not. A
   `branch` at a lane's tip is stepping down: a new thread there, the lane left
   where it is.
-- **A lane is named by its thread's id** (ADR-0117): `createAndRun` takes
+- **A lane is named by its thread's id** (ADR-0117): `create-and-run` takes
   the thread the send continues, or the one a branch starts. No other name is
   chosen; pi makes none. A branch naming a thread that has an entry or a
   lane is `taken` (core), refused before planning.
@@ -1080,7 +1082,7 @@ not gated here: they ask `threadReach` (`reach.ts`).
   read (`runThreads` reads a missing tree as no thread); then a thread held
   or trashed (`runThreads`, `heldIn`); then a lane of another kind
   (`foreignIn`).
-- **Its words are its own** (`gateRefusal`): `canvas_archived` naming the
+- **Its words are its own** (`gateRefusal`): `canvas-archived` naming the
   archiver through a `nameOf`, as `reachWords` takes one; `holdingWords`;
   `foreignRefusal`. The host words none.
 - **A pass proves the check ran, nothing more.** It does not say the facts
@@ -1157,7 +1159,7 @@ and made read-only, never removed.
   newest and the one nearest each thread's end in the trees given. An
   archive's teardown and the trash sweep both ask it.
 - **`planArchive` decides what crossing the edge does**, pure, for a
-  `Crossing` (`close` or `reopen`). Closing is refused `canvas_busy` while
+  `Crossing` (`close` or `reopen`). Closing is refused `canvas-busy` while
   any lane of the canvas's threads runs or has cards queued (`threadsWork`).
   `CANVAS_BUSY_REASON` is the one wording, which your list's and the board's
   Move to ▸ show too. Reopening is never busy.
@@ -1182,7 +1184,7 @@ and made read-only, never removed.
   each card goes to and the one it leaves), or none for one that writes in
   no canvas (a name, a stop, a move on the board or a change to its states,
   a reservation, a command on a card, traces seen), so an archived canvas can
-  always be restored, and nothing moves out of one (`canvas_archived`,
+  always be restored, and nothing moves out of one (`canvas-archived`,
   "restore the canvas first"). `archivedIn` finds an archived one by its
   `CanvasId`. One rule, the gate's first (`planGate`), for every command and
   every send, a popped queued card's among them (its thread's canvas),
@@ -1203,7 +1205,7 @@ deleted at startup (`planUndeclaredSweep`: stored outside its spec's
 home).
 
 - **`planMark` decides**, pure: a canvas the session does not hold is
-  refused `unknown_target`; the title already stored, or clearing a canvas
+  refused `unknown-target`; the title already stored, or clearing a canvas
   with none, is `unchanged` and writes nothing; otherwise `write`, or
   `remove` for a cleared title. The last write wins: nobody types a title
   together, so it is session JSON, not a text (ADR-0023).
@@ -1726,10 +1728,10 @@ commit-message request `request.ts` (`describeRequest`).
 - **`planAcceptance`** decides an acceptance from the proposed changes
   read in its own command and what only an acceptance reads (`AcceptanceFacts`: the unfinished work's commits above accepted work,
   and which bookmarks sit below the proposed changes). Refused, in this order: no
-  proposed changes (`no_offer`), unfinished work gone (`bad_destination`), nothing shown
+  proposed changes (`no_offer`), unfinished work gone (`bad-destination`), nothing shown
   (`offer_changed`), divergent proposed changes (`no_offer`), other work than was
   shown or a new conflict (`offer_changed`, ADR-0065), and a destination
-  that is not one of the proposed changes' or not below it (`bad_destination`). Its
+  that is not one of the proposed changes' or not below it (`bad-destination`). Its
   destinations are `acceptanceDestinations`': the thread's unfinished work, then accepted work,
   with how many of the unfinished work's commits land along. Conflicted proposed changes never
   lands on accepted work: accepted work is immutable, and the conflict would stay in
@@ -1801,7 +1803,7 @@ commit-message request `request.ts` (`describeRequest`).
   below the lane's first prompt merged (`TranscriptMessage.merged`), else
   the fork commit. A lane's commits only move forward, so the parent is
   ahead when the two differ (`parentAhead`). `planParentUpdate` merges its
-  newest commit, or nothing, or refuses `no_parent` and `parent_running`.
+  newest commit, or nothing, or refuses `no-parent` and `parent-running`.
 - **`latestNow`** (`base.ts`) says what getting the latest would do, from `pinetrie.base` and
   accepted work's record: `current` (the base has not moved since the lane last
   got the latest from it, or no line is set up), `unknown` (it moved, and the
@@ -1890,9 +1892,9 @@ commit-message request `request.ts` (`describeRequest`).
   ADR-0090): the host's `planAcceptedAction` decides from it, and the page's
   publish button reads it. Setup and publishing are anyone's, on any host
   (ADR-0099); setup is refused only once accepted work exists. A publish is
-  refused, in order: `no_line`, `no_publish`, `not_fast_forward`; with
+  refused, in order: `no_line`, `no-publish`, `not-fast-forward`; with
   `publish.catchUp` on,
-  `working_copy_conflict` (conflicted commits or files, or a preview that would
+  `working-copy-conflict` (conflicted commits or files, or a preview that would
   conflict) and `refused` for files behind with no commit in common; then
   `refused` when `nothingToPublish(publishWork(record))`, the one "nothing
   to do", which the page's hidden button reads too. `acceptedRefusal` words
@@ -1926,7 +1928,7 @@ commit-message request `request.ts` (`describeRequest`).
   host writes it again. `getLatest` names the lane tip and base commit it was
   read at; the host keeps it while both stay, so it is read once per move.
 - **`planBegin`** refuses a lane with no line (`no_line`), and a base that
-  is not a bookmark with the unfinished work prefix above accepted work (`bad_base`). The
+  is not a bookmark with the unfinished work prefix above accepted work (`bad-base`). The
   host checks it before the lane is created, so a refused send creates
   nothing.
 - **What became of unfinished work base** (`ok`, `landed` or `gone`, S77 item 2) is
@@ -1937,7 +1939,7 @@ commit-message request `request.ts` (`describeRequest`).
   page's button words itself from, so the button names what is merged. A
   unfinished work's copy is made `on` the lane's previous copy (`LaneBase.start`);
   nothing when the lane already holds the unfinished work's commit. Accepted work once unfinished work
-  landed; refused (`base_gone`) for a gone unfinished work until "continue on the
+  landed; refused (`base-gone`) for a gone unfinished work until "continue on the
   line", which `mark`s the move even with nothing to merge; refused
   (`no_line`) with no line. Only those two codes (`UpdateRefusal`).
 

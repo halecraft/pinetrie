@@ -153,7 +153,7 @@ flows, merged by `git merge-file` as lanehost merges.
   side's content and size.
 - **A move is found from bytes, never guessed** (`renameCandidates`, then
   `pairRenames`): each path gone is paired with each path added of its
-  size, the host's `sameContent` reads only those pairs, and a pair is a
+  size, the host's `same-content` reads only those pairs, and a pair is a
   move only when each of its two paths has exactly that one equal partner.
   Two copies of one file pair with nothing. A move's row is `{old => new}`
   (`renameShown`, as jj writes one), its lines 0 and 0.
@@ -189,7 +189,7 @@ run as values rather than by a clock).
   base→theirs; the facts (`PathFact`) at every path theirs changed and
   every path ours changed at, above or under one (`pathsToGather`); whether
   ours and theirs hold alike content where both hold a file of one size
-  (`pathsToCompare`, answered by lanehost's `sameContent`); then
+  (`pathsToCompare`, answered by lanehost's `same-content`); then
   `planPathMerge`. Text steps are answered clean or conflicted when
   lanehost applies them, and those join the plan's conflicts.
 - **S160's laws:** a path changed on one side takes that side; changed
@@ -208,7 +208,7 @@ run as values rather than by a clock).
   at one path conflict, since theirs' content may not be listed.
 - **Nothing is written that the disk holds:** a take whose content ours
   holds already is dropped (its mode still taken), and a text result equal
-  to ours is not written (lanehost's `applyMerge`). So a merge's diff names
+  to ours is not written (lanehost's `apply-merge`). So a merge's diff names
   only what it changed (S183).
 - **Renames are not inferred:** ADR-0142 offers a guessed rename as a
   conflict's resolution, which is the page's.

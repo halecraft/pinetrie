@@ -28,17 +28,17 @@ export type DiskCall =
       readonly snapshot: string
     }
   | { readonly kind: "delete"; readonly lane: string }
-  | { readonly kind: "deleteSnapshots"; readonly ids: readonly string[] }
+  | { readonly kind: "delete-snapshots"; readonly ids: readonly string[] }
 
 export type LanehostCall =
   | { readonly kind: "disk"; readonly project: string; readonly op: DiskCall }
   | {
-      readonly kind: "diskExists"
+      readonly kind: "disk-exists"
       readonly project: string
       readonly lane: string
     }
   | {
-      readonly kind: "snapshotExists"
+      readonly kind: "snapshot-exists"
       readonly project: string
       readonly snapshot: string
     }
@@ -46,7 +46,7 @@ export type LanehostCall =
   | { readonly kind: "snapshots"; readonly project: string }
   /** A folder lane's states directory, made if missing, for its container to mount. */
   | {
-      readonly kind: "statesDir"
+      readonly kind: "states-dir"
       readonly project: string
       readonly lane: string
     }
@@ -57,7 +57,7 @@ export type LanehostCall =
    * when it is not one.
    */
   | {
-      readonly kind: "nestedDisk"
+      readonly kind: "nested-disk"
       readonly project: string
       readonly lane: string
       readonly cloneFromLane: string | null
@@ -79,7 +79,7 @@ export type LanehostCall =
   /** Every project in the lanes directory, with the root it recorded. */
   | { readonly kind: "projects" }
   /** A project's disks, all of them, and its directory. */
-  | { readonly kind: "removeProject"; readonly project: string }
+  | { readonly kind: "remove-project"; readonly project: string }
   /** A project's grant of the host's ports, replacing its last (`grants.ts`). */
   | ({ readonly kind: "grant" } & Grant)
   /** What differs between two of a project's snapshots, both read-only (`diff.ts`). */
@@ -92,21 +92,21 @@ export type LanehostCall =
 
   /** What a snapshot holds at each path, in the order asked (`folder.ts`). */
   | {
-      readonly kind: "pathFacts"
+      readonly kind: "path-facts"
       readonly project: string
       readonly snapshot: string
       readonly paths: readonly string[]
     }
   /** The files and symlinks a snapshot holds at or under each path. */
   | {
-      readonly kind: "filesUnder"
+      readonly kind: "files-under"
       readonly project: string
       readonly snapshot: string
       readonly paths: readonly string[]
     }
   /** One file's unified diff between two snapshots, cut past `limit` bytes. */
   | {
-      readonly kind: "fileDiff"
+      readonly kind: "file-diff"
       readonly project: string
       readonly a: string
       readonly b: string
@@ -115,7 +115,7 @@ export type LanehostCall =
     }
   /** Lines added and removed in each path between two snapshots. */
   | {
-      readonly kind: "diffStats"
+      readonly kind: "diff-stats"
       readonly project: string
       readonly a: string
       readonly b: string
@@ -123,7 +123,7 @@ export type LanehostCall =
     }
   /** The pairs of paths, `a`'s in one snapshot and `b`'s in another, whose files hold alike bytes. */
   | {
-      readonly kind: "sameContent"
+      readonly kind: "same-content"
       readonly project: string
       readonly a: string
       readonly b: string
@@ -136,7 +136,7 @@ export type LanehostCall =
    * keeps git's markers; else ours.
    */
   | {
-      readonly kind: "applyMerge"
+      readonly kind: "apply-merge"
       readonly project: string
       readonly disk: string
       readonly base: string | null
@@ -150,7 +150,7 @@ export type LanehostCall =
    * the folder's mount, each checked against its stamp.
    */
   | {
-      readonly kind: "readIn"
+      readonly kind: "read-in"
       readonly project: string
       readonly from: string | null
       readonly state: string
@@ -174,25 +174,25 @@ export interface ProjectListed {
 /** What each call answers. */
 export interface LanehostResults {
   readonly disk: null
-  readonly diskExists: boolean
-  readonly snapshotExists: boolean
+  readonly "disk-exists": boolean
+  readonly "snapshot-exists": boolean
   readonly snapshots: readonly string[]
-  readonly nestedDisk: null
-  readonly statesDir: null
+  readonly "nested-disk": null
+  readonly "states-dir": null
   readonly read: string | null
   readonly record: null
   readonly projects: readonly ProjectListed[]
-  readonly removeProject: null
+  readonly "remove-project": null
   readonly grant: null
   readonly diff: DiskDiff
-  readonly pathFacts: readonly PathFact[]
-  readonly sameContent: readonly PathPair[]
-  readonly filesUnder: readonly string[]
-  readonly fileDiff: string
-  readonly diffStats: readonly DiffStat[]
-  readonly applyMerge: readonly TextMerged[]
+  readonly "path-facts": readonly PathFact[]
+  readonly "same-content": readonly PathPair[]
+  readonly "files-under": readonly string[]
+  readonly "file-diff": string
+  readonly "diff-stats": readonly DiffStat[]
+  readonly "apply-merge": readonly TextMerged[]
   readonly states: null
-  readonly readIn: ReadInAnswer
+  readonly "read-in": ReadInAnswer
 }
 
 export type LanehostResult<C extends LanehostCall> = LanehostResults[C["kind"]]

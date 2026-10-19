@@ -164,7 +164,7 @@ export interface Stack {
 export interface Agent {
   /**
    * Create a thread's lane at `spot`, in its root, named `lane` (the host
-   * decides the id). Refused `lane_id_in_use` for an id pi holds.
+   * decides the id). Refused `lane-id-in-use` for an id pi holds.
    */
   createThreadLane(spot: Spot, lane: ThreadId): Promise<CreateOutcome>
   lane(name: ThreadId): ThreadLaneHandle

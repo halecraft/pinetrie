@@ -194,7 +194,7 @@ The facade has no way to move a lane: `ThreadLaneHandle` offers `append`,
 `run`, `resume` and `abort`, none of which navigates. Nor is
 there a way to READ a tip through the agent: readers use the document, so
 observing a lane can never create one. A missing lane refuses every write
-`unknown_target` (`onLane`, `thread-lanes.ts`).
+`unknown-target` (`onLane`, `thread-lanes.ts`).
 
 Four facts from pi's source and the probes shape it:
 
@@ -209,9 +209,9 @@ Four facts from pi's source and the probes shape it:
 - **`harness.lane(name, { createAt })` returns a lane it holds**, and ignores
   `createAt` (`dist/harness/runtime/harness.js`, `lane()`, in
   `@earendil-works/pi-agent-core` 0.99.2). So `createThreadLane` refuses an
-  id pi holds, in memory or in the document, with `lane_id_in_use`, before it
+  id pi holds, in memory or in the document, with `lane-id-in-use`, before it
   asks: otherwise a chosen id could write into another thread.
-- **A foreign-written entry is not navigable** (`unknown_target`): pi's session
+- **A foreign-written entry is not navigable** (`unknown-target`): pi's session
   never saw it created. The Node e2e keeps a `writeEntry` fixture for that S3
   case.
 
@@ -269,8 +269,8 @@ not a thread's.
 | pi's event | `StreamEvent` |
 |---|---|
 | `message_update` (a `text_delta`) | `text` |
-| `tool_start` | `toolStart`: its lane and call, no label (its row takes the committed call's) |
-| `tool_update` (the first text part of `partialResult`) | `toolOutput`, a whole snapshot |
+| `tool_start` | `tool-start`: its lane and call, no label (its row takes the committed call's) |
+| `tool_update` (the first text part of `partialResult`) | `tool-output`, a whole snapshot |
 
 `message_end` and `tool_end` are not mapped. The entry pi commits after each
 is what ends its stream on screen (ADR-0044), and an end event comes before
@@ -295,7 +295,7 @@ whose `input` lacks `"image"`, pi-ai replaces each image with a line of text.
 `prepareImage` (`images.ts`) fits an upload for the store: the type from the
 bytes (`detectSupportedImageMimeType`), then `resizeImage`, in a worker
 thread, to 2000×2000 and 4.5 MB of base64. A type no provider takes inline
-(BMP) is "not an image"; a resize that returns null is "unreadable", since
+(BMP) is refused `not-image`; a resize that returns null is `unreadable`, since
 pi's null means either undecodable or impossible to fit. After a resize,
 `resized` is pi's note of the original size (`formatDimensionNote`), and
 `original` is the image as it came, with its own size: the host keeps it,

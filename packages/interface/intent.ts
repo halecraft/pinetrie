@@ -43,6 +43,7 @@ import {
   type ActedAt,
   AT_BOARD,
   AT_INVENTORY,
+  type HostRequest,
   IN_COLUMN,
 } from "@pinetrie/session"
 import type { Density } from "./ask-words.ts"
@@ -125,14 +126,14 @@ export type ColumnAct =
   /** Trash a card here; the undo key brings it back. */
   | { readonly kind: "trash"; readonly card: CardId }
   /** Take a card in this column into your inventory. */
-  | { readonly kind: "putAway"; readonly card: CardId }
+  | { readonly kind: "put-away"; readonly card: CardId }
   /** Read the column at `density`. */
   | { readonly kind: "density"; readonly density: Density }
   /** Open or close the thread's details under the header. */
   | { readonly kind: "details"; readonly open: boolean }
   /** After a conflict: a thread opened at `at`, whose column sends `pending` there. */
   | {
-      readonly kind: "branchInstead"
+      readonly kind: "branch-instead"
       readonly at: EntryId
       readonly pending: Pending
     }
@@ -155,33 +156,33 @@ export type ColumnAct =
    */
   | { readonly kind: "unpin"; readonly card: CardId }
   /** Pin a card to the canvas its column is in: every thread reads it. */
-  | { readonly kind: "pinToCanvas"; readonly card: CardId }
+  | { readonly kind: "pin-to-canvas"; readonly card: CardId }
   /** Your message to the note column nearest its thread. */
-  | { readonly kind: "toNote"; readonly card: CardId }
+  | { readonly kind: "to-note"; readonly card: CardId }
   /** Card `card`'s box takes focus once drawn: a new card handed to its list. */
-  | { readonly kind: "focusCard"; readonly card: CardId }
+  | { readonly kind: "focus-card"; readonly card: CardId }
   /**
    * A reference to the comment `card` on `entry`, queued on `thread`: the
    * agent reads it; the comment stays.
    */
   | {
-      readonly kind: "queueReference"
+      readonly kind: "queue-reference"
       readonly card: CardId
       readonly entry: EntryId
       readonly thread: ThreadId
     }
   /** A new card holding `text`, at the end of the list `to`. */
   | {
-      readonly kind: "newCard"
+      readonly kind: "new-card"
       readonly card: TextCardId
       readonly to: ListKey
       readonly text: string
     }
   /** A card into this column's composer, as your message (`planPut`). */
-  | { readonly kind: "toMessage"; readonly card: CardId }
+  | { readonly kind: "to-message"; readonly card: CardId }
   /** A card made a new thread in `state` on the board. */
   | {
-      readonly kind: "spinOff"
+      readonly kind: "spin-off"
       readonly card: CardId
       readonly state: WorkflowStateId
     }
@@ -204,18 +205,15 @@ export type ColumnAct =
     }
   /** Hold the thread's queue, or release it. */
   | {
-      readonly kind: "holdQueue"
+      readonly kind: "hold-queue"
       readonly lane: ThreadId
       readonly held: boolean
     }
-  /** Take every message card queued on the thread back below the line. */
-  | { readonly kind: "unqueueAll"; readonly lane: ThreadId }
-  /** Set a card's command, or clear it with null. */
-  | {
-      readonly kind: "setCommand"
-      readonly card: CardId
-      readonly command: CardCommand | null
-    }
+  /**
+   * Take every message card queued on the thread back below the line, or set
+   * a card's command (null clears it): the host's requests, sent as they are.
+   */
+  | Extract<HostRequest, { readonly kind: "unqueue-all" | "set-command" }>
   /**
    * A card made in `lane`'s queue, with no text, never drawn anywhere first.
    * A command button's (catching up, continuing on accepted
@@ -226,7 +224,7 @@ export type ColumnAct =
    * it is.
    */
   | {
-      readonly kind: "queueNew"
+      readonly kind: "queue-new"
       readonly card: TextCardId
       readonly lane: ThreadId
       readonly at: Position
@@ -263,12 +261,12 @@ export type Intent =
     }
   /** Move a card's column to index `to` on its canvas, for everyone. */
   | {
-      readonly kind: "moveColumn"
+      readonly kind: "move-column"
       readonly column: CardKey
       readonly to: number
     }
   /** A thread you opened sent its first message: what it started with is spent. */
-  | { readonly kind: "sentFirst"; readonly card: ThreadId }
+  | { readonly kind: "sent-first"; readonly card: ThreadId }
   /** Unfold a column of the canvas you are on, or fold it. */
   | {
       readonly kind: "fold"
@@ -276,10 +274,10 @@ export type Intent =
       readonly unfolded: boolean
     }
   /** Unfold the canvas column of the canvas you are on, or fold it. */
-  | { readonly kind: "foldCanvas"; readonly unfolded: boolean }
+  | { readonly kind: "fold-canvas"; readonly unfolded: boolean }
   /** Make a column, as `make` says, at a spot on a canvas. */
   | {
-      readonly kind: "addColumn"
+      readonly kind: "add-column"
       readonly make: NewColumn
       readonly at: CanvasPut
     }
@@ -289,13 +287,13 @@ export type Intent =
    * inventory.
    */
   | {
-      readonly kind: "copyThread"
+      readonly kind: "copy-thread"
       readonly source: ThreadId
       readonly to: "here" | "inventory"
     }
   /** Draw a card's column one column wide or two, for everyone. */
   | {
-      readonly kind: "cardWidth"
+      readonly kind: "card-width"
       readonly card: CardId
       readonly width: CardWidth
     }
@@ -307,7 +305,7 @@ export type Intent =
    * `@agent ` (`AGENT_PREFILL`).
    */
   | {
-      readonly kind: "newCanvas"
+      readonly kind: "new-canvas"
       readonly prefill?: Prefill
       /** The workflow state its canvas lands in: the board column it came from. */
       readonly state?: WorkflowStateId
@@ -316,7 +314,7 @@ export type Intent =
   | { readonly kind: "close"; readonly here: Here }
   /** Move a canvas of the sidebar before `before`, or to its end. */
   | {
-      readonly kind: "moveInList"
+      readonly kind: "move-in-list"
       readonly canvas: CanvasId
       readonly before: CanvasId | null
     }
@@ -325,7 +323,7 @@ export type Intent =
    * and closed for you once the host accepts; out of it, restored.
    */
   | {
-      readonly kind: "moveCanvas"
+      readonly kind: "move-canvas"
       readonly canvas: CanvasId
       readonly from: WorkflowStateId
       readonly to: WorkflowStateId
@@ -333,17 +331,17 @@ export type Intent =
       /** `to` is the archive. */
       readonly closes: boolean
     }
-  | { readonly kind: "editWorkflow"; readonly edit: WorkflowEdit }
+  | { readonly kind: "edit-workflow"; readonly edit: WorkflowEdit }
   /** Close the board. */
   | { readonly kind: "board"; readonly open: false }
   /**
    * Open the board. `focus`: a person opened it (▦, a state in the strip),
-   * so its search takes focus once (`armFocus`). The board opening by
+   * so its search takes focus once (`arm-focus`). The board opening by
    * itself, with nothing to show (`pruneLayout`), sends no intent.
    */
   | { readonly kind: "board"; readonly open: true; readonly focus: boolean }
   /** Fold the sidebar to icons, or unfold it. */
-  | { readonly kind: "foldList" }
+  | { readonly kind: "fold-list" }
   /** Show a page over the stage, or, with null, the stage. */
   | { readonly kind: "page"; readonly to: PageName | null }
   /** Open, type in, clear or close the search of the canvas you are on. */
@@ -354,13 +352,13 @@ export type Intent =
    * names: each one's id is minted as it is planned.
    */
   | {
-      readonly kind: "putImages"
+      readonly kind: "put-images"
       readonly images: readonly Omit<PutImage, "card">[]
       readonly to: ImagesTarget
     }
   /** An image uploaded, added as a version of `image`. */
   | {
-      readonly kind: "addVersion"
+      readonly kind: "add-version"
       readonly image: ImageId
       readonly sha256: Sha256
     }
@@ -374,12 +372,12 @@ export type Intent =
   | { readonly kind: "retitle"; readonly canvas: CanvasId }
   /** What `lane` raised for you is not needed: it clears on every device. */
   | {
-      readonly kind: "notNeeded"
+      readonly kind: "not-needed"
       readonly lane: ThreadId
       readonly raised: Raised
     }
   /** Show entry `entry`, wherever it is (`planOpen`). */
-  | { readonly kind: "openAt"; readonly entry: EntryId }
+  | { readonly kind: "open-at"; readonly entry: EntryId }
   /**
    * Follow a link to entry `entry` of its thread: in
    * its canvas, whose root this tab may not hold; in your
@@ -387,13 +385,13 @@ export type Intent =
    * a mention, a fork row and a rail's stub open.
    */
   | {
-      readonly kind: "openLink"
+      readonly kind: "open-link"
       readonly link: ThreadLink
       readonly entry: EntryId
     }
-  | { readonly kind: "signOut" }
+  | { readonly kind: "sign-out" }
   /** Take `card` into your inventory, into a free slot: by key, wherever it is. */
-  | { readonly kind: "putAway"; readonly card: CardId }
+  | { readonly kind: "put-away"; readonly card: CardId }
   /**
    * Land `source` at `target` (`planPut`): a put by key or button, a drop,
    * a slot's swap; `how` copies instead, as an Alt-drag does.
@@ -422,7 +420,7 @@ export type Intent =
    * text card `card`, replacing the reference in its place.
    */
   | {
-      readonly kind: "editAsText"
+      readonly kind: "edit-as-text"
       readonly reference: CardId
       readonly card: TextCardId
       readonly text: string
@@ -434,18 +432,18 @@ export type Intent =
    * inventory panel focused, your newest swap.
    */
   | {
-      readonly kind: "undoMove"
+      readonly kind: "undo-move"
       readonly direction: MoveDirection
       readonly inPanel: boolean
     }
   /** The host's answer to an undo of moves: bring what it moved into view. */
-  | { readonly kind: "undoAnswered"; readonly outcome: Outcome }
+  | { readonly kind: "undo-answered"; readonly outcome: Outcome }
   /** Follow a trace to where its card is now, or the message it became. */
-  | { readonly kind: "openTrace"; readonly trace: TraceRecord }
+  | { readonly kind: "open-trace"; readonly trace: TraceRecord }
 
 /**
  * The effects of `intent`. `minted` holds the ids the shell made for it
- * (`Minted`): a column opened with its key takes focus, except one `openAt`
+ * (`Minted`): a column opened with its key takes focus, except one `open-at`
  * opens, which only shows an entry.
  */
 export function planIntent(
@@ -515,16 +513,16 @@ function planOf(
   switch (intent.kind) {
     case "column":
       return planColumn(intent.column, intent.act, state, minted)
-    case "moveColumn": {
+    case "move-column": {
       const active = state.layout.active
       return active?.kind === "canvas"
         ? planColumnMove(intent.column.card, intent.to, active.canvas, state)
         : []
     }
-    case "sentFirst":
+    case "sent-first":
       return onCanvasYouAreOn(state, { kind: "sent", card: intent.card })
     case "fold":
-    case "foldCanvas": {
+    case "fold-canvas": {
       const active = state.layout.active
       return active?.kind === "canvas"
         ? [
@@ -533,17 +531,17 @@ function planOf(
               active.canvas,
               intent.kind === "fold"
                 ? { kind: "fold", card: intent.card, unfolded: intent.unfolded }
-                : { kind: "foldCanvas", unfolded: intent.unfolded },
+                : { kind: "fold-canvas", unfolded: intent.unfolded },
             ),
           ]
         : []
     }
-    case "addColumn":
+    case "add-column":
       return planAddColumn(intent.make, intent.at, state, minted)
-    case "copyThread":
+    case "copy-thread":
       return planCopyThread(intent.source, intent.to, state, minted)
     // From the canvas its sender sees it on: the host refuses it moved since.
-    case "cardWidth": {
+    case "card-width": {
       const canvas = state.canvases.index.canvasOfCard.get(intent.card)
       return canvas === undefined
         ? []
@@ -561,7 +559,7 @@ function planOf(
     }
     case "show":
       return show(intent.here)
-    case "newCanvas":
+    case "new-canvas":
       return [
         ...openThreadColumn(
           minted.canvas,
@@ -577,15 +575,15 @@ function planOf(
       return intent.here.kind === "canvas"
         ? closeCanvas(intent.here.canvas)
         : []
-    case "moveInList":
+    case "move-in-list":
       return [
         list({ kind: "place", canvas: intent.canvas, before: intent.before }),
       ]
-    case "moveCanvas":
+    case "move-canvas":
       // Into the archive: it leaves the sidebar once the host accepts.
       return [
         {
-          kind: "moveCanvas",
+          kind: "move-canvas",
           move: {
             kind: "move-canvas",
             canvas: intent.canvas,
@@ -596,19 +594,19 @@ function planOf(
           moved: intent.closes ? closeCanvas(intent.canvas) : [],
         },
       ]
-    case "editWorkflow":
+    case "edit-workflow":
       return [
         { kind: "request", intent: { kind: "workflow", edit: intent.edit } },
       ]
     case "board":
       return [
         ...(intent.open && intent.focus
-          ? [{ kind: "armFocus", key: { kind: "board" } } as const]
+          ? [{ kind: "arm-focus", key: { kind: "board" } } as const]
           : []),
         layout({ kind: "board", open: intent.open }),
       ]
-    case "foldList":
-      return [{ kind: "listWidth", width: otherWidth(state.listWidth) }]
+    case "fold-list":
+      return [{ kind: "list-width", width: otherWidth(state.listWidth) }]
     case "page":
       return [{ kind: "page", to: intent.to }]
     case "search": {
@@ -628,7 +626,7 @@ function planOf(
       ]
     // A put to a spot makes a media column, minted here so its maker sees
     // it unfolded.
-    case "putImages": {
+    case "put-images": {
       const ids = minted.images(intent.images.length)
       const images = intent.images.flatMap((image, i) => {
         const card = ids[i]
@@ -653,7 +651,7 @@ function planOf(
             ]),
       ]
     }
-    case "addVersion":
+    case "add-version":
       return [
         {
           kind: "request",
@@ -664,26 +662,26 @@ function planOf(
           },
         },
       ]
-    case "notNeeded":
-      return [{ kind: "notNeeded", lane: intent.lane, raised: intent.raised }]
-    case "openAt":
+    case "not-needed":
+      return [{ kind: "not-needed", lane: intent.lane, raised: intent.raised }]
+    case "open-at":
       return planOpenEntry(intent.entry, state)
-    case "openLink":
+    case "open-link":
       return planOpenLink(intent.link, intent.entry, state)
-    case "signOut":
-      return [{ kind: "forgetIdentity" }, { kind: "reload" }]
-    case "putAway":
+    case "sign-out":
+      return [{ kind: "forget-identity" }, { kind: "reload" }]
+    case "put-away":
       return planPutAway(intent.card, state, minted)
     case "put":
       return planPut(intent.source, intent.target, intent.how, state, minted)
-    case "editAsText":
+    case "edit-as-text":
       return planEditAsText(intent, state)
     case "trash":
       return planTrash(intent.card, { actedAt: intent.at, slot: null }, state)
     case "restore":
       return planRestore(intent.card, { actedAt: intent.at, slot: null }, state)
     case "copied":
-      return [{ kind: "clipboardCell", clip: intent.clip }]
+      return [{ kind: "clipboard-cell", clip: intent.clip }]
     case "paste":
       return planPut(
         { kind: "clip", clip: intent.clip },
@@ -704,11 +702,11 @@ function planOf(
           )
     case "inventory":
       return [{ kind: "inventory", act: intent.act }]
-    case "undoMove":
+    case "undo-move":
       return planUndoMove(intent.direction, intent.inPanel, state)
-    case "undoAnswered":
+    case "undo-answered":
       return afterUndo(intent.outcome, state)
-    case "openTrace":
+    case "open-trace":
       return planOpenTrace(intent.trace, state)
   }
 }
@@ -749,10 +747,10 @@ function planColumn(
   switch (act.kind) {
     case "proposal":
       return planProposal(act.proposal, act.press, state, minted)
-    case "openAt":
+    case "open-at":
       return planOpenEntry(act.entry, state)
-    case "newCanvas":
-      return planOf({ kind: "newCanvas", prefill: act.prefill }, state, minted)
+    case "new-canvas":
+      return planOf({ kind: "new-canvas", prefill: act.prefill }, state, minted)
     // A branch is keyed by the thread it minted, as its card is.
     case "branch":
       return planOpenBranch(
@@ -761,7 +759,7 @@ function planColumn(
         act.branch.prefill === undefined ? {} : { prefill: act.branch.prefill },
         state,
       )
-    case "branchInstead":
+    case "branch-instead":
       return planOpenBranch(
         minted.thread,
         act.at,
@@ -770,7 +768,7 @@ function planColumn(
       )
     case "trash":
       return planTrash(act.card, IN_COLUMN(key), state)
-    case "putAway":
+    case "put-away":
       return planPutAway(act.card, state, minted)
     case "density":
       return reading({ kind: "density", density: act.density })
@@ -782,7 +780,7 @@ function planColumn(
         ? []
         : [
             {
-              kind: "queueCard",
+              kind: "queue-card",
               move: queueMove(now, act),
               hold: act.hold,
               command: null,
@@ -812,36 +810,35 @@ function planColumn(
         now === undefined ? null : reorderByStep(now, among, act.step)
       return reorder === null
         ? []
-        : [{ kind: "reorderCard", reorder, how: IN_COLUMN(key) }]
+        : [{ kind: "reorder-card", reorder, how: IN_COLUMN(key) }]
     }
-    case "holdQueue":
+    case "hold-queue":
       return [
         {
           kind: "request",
           intent: { kind: "queue-hold", lane: act.lane, held: act.held },
         },
       ]
-    case "unqueueAll":
-      return [
-        { kind: "request", intent: { kind: "unqueue-all", lane: act.lane } },
-      ]
+    case "unqueue-all":
+    case "set-command":
+      return [{ kind: "request", intent: act }]
     case "pin":
       return planPin(act.card, key, state)
     case "unpin":
       return planUnpin(act.card, key, state)
-    case "pinToCanvas":
+    case "pin-to-canvas":
       return planPinToCanvas(act.card, key, state)
-    case "toNote":
+    case "to-note":
       return planToNote(act.card, key, state)
-    case "newCard":
+    case "new-card":
       return planNewCard(act, key, state)
-    case "focusCard":
-      return [{ kind: "armFocus", key: { kind: "card", card: act.card } }]
+    case "focus-card":
+      return [{ kind: "arm-focus", key: { kind: "card", card: act.card } }]
     case "comment":
       return planComment(act, state)
-    case "queueReference":
+    case "queue-reference":
       return planQueueReference(act, minted.reference, IN_COLUMN(key), state)
-    case "toMessage":
+    case "to-message":
       return planPut(
         { kind: "card", card: act.card },
         { kind: "composer", key },
@@ -849,24 +846,17 @@ function planColumn(
         state,
         minted,
       )
-    case "spinOff":
+    case "spin-off":
       return planSpinOff(
         act.card,
         { kind: "state", state: act.state },
         minted,
         state,
       )
-    case "setCommand":
+    case "queue-new":
       return [
         {
-          kind: "request",
-          intent: { kind: "set-command", card: act.card, command: act.command },
-        },
-      ]
-    case "queueNew":
-      return [
-        {
-          kind: "queueCard",
+          kind: "queue-card",
           move: queueNew(act.card, act),
           hold: act.hold,
           command: act.command,
@@ -876,7 +866,7 @@ function planColumn(
         ...(act.command === null
           ? [
               {
-                kind: "armFocus",
+                kind: "arm-focus",
                 key: { kind: "card", card: act.card },
               } as const,
             ]
@@ -945,7 +935,7 @@ function planOpenIn(
 ): readonly Effect[] {
   if (state.index.entries[entry] !== undefined)
     return planOpenEntry(entry, state)
-  return [...showCanvas(canvas), { kind: "openWhenHeld", entry }]
+  return [...showCanvas(canvas), { kind: "open-when-held", entry }]
 }
 
 /**
@@ -966,7 +956,7 @@ function planColumnMove(
   const rest = cards.filter(c => c.id !== card)
   return [
     {
-      kind: "reorderCard",
+      kind: "reorder-card",
       reorder: {
         card,
         at: { kind: "canvas", canvas },
@@ -1169,7 +1159,7 @@ function planProposal(
       },
     ]
   return [
-    { kind: "armFocus", key: { kind: "column", key: head.thread } },
+    { kind: "arm-focus", key: { kind: "column", key: head.thread } },
     {
       kind: "request",
       intent: {
@@ -1209,7 +1199,7 @@ function openThreadColumn(
   state: IntentState,
 ): readonly Effect[] {
   return [
-    { kind: "armFocus", key: { kind: "column", key: thread } },
+    { kind: "arm-focus", key: { kind: "column", key: thread } },
     {
       kind: "request",
       intent: { kind: "open-thread", thread, root, canvas, start },
@@ -1263,6 +1253,6 @@ export function nameEffects(step: NameStep | null): readonly Effect[] {
     case "send":
       return [{ kind: "request", intent: { kind: "name", name: step.name } }]
     case "store":
-      return [{ kind: "storeIdentity", identity: step.identity }]
+      return [{ kind: "store-identity", identity: step.identity }]
   }
 }

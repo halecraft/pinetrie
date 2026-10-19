@@ -150,7 +150,7 @@ describe("layoutReducer", () => {
   test("the canvas column starts folded, and folds apart from the cards", () => {
     const l = layoutReducer(
       initialLayout(),
-      view("1-r1", { kind: "foldCanvas", unfolded: true }),
+      view("1-r1", { kind: "fold-canvas", unfolded: true }),
     )
     expect(l.canvases.get(TK("1-r1"))?.canvas).toEqual({ unfolded: true })
     expect(defaultView(null).canvas).toEqual({ unfolded: false })
@@ -227,7 +227,7 @@ describe("layoutReducer", () => {
   test("a canvas that leaves the sidebar keeps your view of it, and opening it again brings it back", () => {
     const viewed = layoutReducer(at(initialLayout()), unfold(C))
     const closed = drawn(
-      layoutReducer(viewed, { kind: "closeCanvas", canvas: TK("1-r1") }),
+      layoutReducer(viewed, { kind: "close-canvas", canvas: TK("1-r1") }),
       [],
     )
     expect(columnsOf(at(closed))).toEqual(columnsOf(viewed))
@@ -237,22 +237,24 @@ describe("layoutReducer", () => {
     const list = listed("1-r1", "5-r2", "9-r")
     const middle = drawn(at(initialLayout(), R2), list)
     expect(
-      layoutReducer(middle, { kind: "closeCanvas", canvas: TK("5-r2") }).active,
+      layoutReducer(middle, { kind: "close-canvas", canvas: TK("5-r2") })
+        .active,
     ).toEqual({ kind: "canvas", canvas: TK("9-r") })
     const last = drawn(
       at(initialLayout(), { kind: "canvas", canvas: TK("9-r") }),
       list,
     )
     expect(
-      layoutReducer(last, { kind: "closeCanvas", canvas: TK("9-r") }).active,
+      layoutReducer(last, { kind: "close-canvas", canvas: TK("9-r") }).active,
     ).toEqual(R2)
     const one = drawn(at(initialLayout()), listed("1-r1"))
     expect(
-      layoutReducer(one, { kind: "closeCanvas", canvas: TK("1-r1") }).active,
+      layoutReducer(one, { kind: "close-canvas", canvas: TK("1-r1") }).active,
     ).toEqual(NOTHING)
     // A tab you are not on closes without moving you.
     expect(
-      layoutReducer(middle, { kind: "closeCanvas", canvas: TK("1-r1") }).active,
+      layoutReducer(middle, { kind: "close-canvas", canvas: TK("1-r1") })
+        .active,
     ).toEqual(R2)
   })
 

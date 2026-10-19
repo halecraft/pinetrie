@@ -339,7 +339,7 @@ export function readOnlyWords(
         : {
             title: "Restore",
             intent: {
-              kind: "moveCanvas",
+              kind: "move-canvas",
               canvas: archived.canvas,
               from: workflow.archive.id,
               to: to.id,

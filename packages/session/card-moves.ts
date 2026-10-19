@@ -162,7 +162,7 @@ export type MovesEvent =
   /** The copy of the places document changed, to `rev`. */
   | { readonly kind: "changed"; readonly rev: number }
   /** The host left: the session is over, as a client does not reconnect. */
-  | { readonly kind: "hostLeft" }
+  | { readonly kind: "host-left" }
   /**
    * You acted at `at` (a swap, which asks no host; a move on the board,
    * as it is sent): the notices there go.
@@ -241,7 +241,7 @@ export function movesStep(state: MovesState, event: MovesEvent): MovesState {
           pending.length === state.pending.length ? state.pending : pending,
       }
     }
-    case "hostLeft":
+    case "host-left":
       return state.pending.length === 0 ? state : { ...state, pending: [] }
   }
 }

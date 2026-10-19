@@ -5,7 +5,7 @@
 
 import type { EntryId, WriterId } from "@pinetrie/core"
 import { attentionWords, type Level, type StandingRunEnd } from "./attention.ts"
-import { signalOfLevel, signalWords } from "./signals.ts"
+import { signalWords } from "./signals.ts"
 
 /** A column's status line, under its focus. */
 export interface ColumnStatus {
@@ -20,7 +20,7 @@ export interface ColumnStatus {
 
 /** The line's words: the level as the sidebar says it, then the reason. */
 export const columnStatusWords = (level: Level, reason: string): string =>
-  `${signalWords(signalOfLevel(level))}: ${reason}`
+  `${signalWords(level)}: ${reason}`
 
 /** The status line for a thread's standing run-end report; null for none. */
 export function columnStatus(
@@ -35,7 +35,7 @@ export function columnStatus(
     words: columnStatusWords(
       level,
       attentionWords(
-        { kind: "runEnd", report: record.report, ask: record.ask },
+        { kind: "run-end", report: record.report, ask: record.ask },
         nameOf,
       ),
     ),

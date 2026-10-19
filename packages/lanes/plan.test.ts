@@ -411,7 +411,7 @@ test("planFork: a nested lane's data root is made after the delete and before th
   expect(argvs(steps).slice(0, 4)).toEqual([
     `runtime: ${JSON.stringify({ kind: "remove", container: `pinetrie-${LANE}` })}`,
     `runtime: ${JSON.stringify({ kind: "delete", lane: LANE })}`,
-    `runtime: ${JSON.stringify({ kind: "innerDockerDataRoot", lane: LANE, cloneFromLane: other })}`,
+    `runtime: ${JSON.stringify({ kind: "inner-docker-data-root", lane: LANE, cloneFromLane: other })}`,
     `runtime: ${JSON.stringify({ kind: "restore", lane: LANE, from: "e1" })}`,
   ])
 })
@@ -483,7 +483,7 @@ describe("a nested lane's inner Docker data root: the last run's lane's, cloned"
       ),
     ).toEqual({
       in: "runtime",
-      op: { kind: "innerDockerDataRoot", lane: LANE, cloneFromLane: null },
+      op: { kind: "inner-docker-data-root", lane: LANE, cloneFromLane: null },
     })
   })
 })
@@ -874,8 +874,8 @@ describe("config as a fact of a state: accepted work's, narrowed by the lane's",
       { kind: "env", name: "A" },
       { kind: "env", name: "B" },
       { kind: "mount", target: "/d" },
-      { kind: "hostPort", port: 5432 },
-      { kind: "hostPort", port: 6379 },
+      { kind: "host-port", port: 5432 },
+      { kind: "host-port", port: 6379 },
       { kind: "shared", path: ".plans" },
       { kind: "shared", path: "notes" },
     ])

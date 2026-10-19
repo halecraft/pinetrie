@@ -61,7 +61,7 @@ const readIn = async (
   deleted: readonly string[] = [],
 ) =>
   call({
-    kind: "readIn",
+    kind: "read-in",
     project: KEY,
     from,
     state,
@@ -78,7 +78,7 @@ const exists = (at: string) =>
   )
 
 afterAll(async () => {
-  if (onBtrfs) await answer({ kind: "removeProject", project: KEY }, serving)
+  if (onBtrfs) await answer({ kind: "remove-project", project: KEY }, serving)
   await rm(HERE, { recursive: true, force: true })
 })
 
@@ -158,10 +158,10 @@ describe.skipIf(!onBtrfs)(
       expect(await readFile(inState("line-1", "a.txt"), "utf8")).toBe("a\n")
     })
 
-    test("filesUnder lists the files and links at or under each path, never a directory", async () => {
+    test("files-under lists the files and links at or under each path, never a directory", async () => {
       expect(
         await call({
-          kind: "filesUnder",
+          kind: "files-under",
           project: KEY,
           snapshot: "line-1",
           paths: ["d", "a.txt", "link", "nope"],
@@ -169,9 +169,9 @@ describe.skipIf(!onBtrfs)(
       ).toEqual(["a.txt", "d/b.txt", "link"])
     })
 
-    test("fileDiff is one file's unified diff by its path; diffStats counts lines, a side without the file empty", async () => {
+    test("file-diff is one file's unified diff by its path; diff-stats counts lines, a side without the file empty", async () => {
       const diff = await call({
-        kind: "fileDiff",
+        kind: "file-diff",
         project: KEY,
         a: "line-1",
         b: "line-2",
@@ -183,7 +183,7 @@ describe.skipIf(!onBtrfs)(
       expect(diff).toContain("-a\n+a, again")
       expect(
         await call({
-          kind: "diffStats",
+          kind: "diff-stats",
           project: KEY,
           a: "line-1",
           b: "line-2",
@@ -194,7 +194,7 @@ describe.skipIf(!onBtrfs)(
         { path: "d/b.txt", added: 0, removed: 1 },
       ])
       const cut = await call({
-        kind: "fileDiff",
+        kind: "file-diff",
         project: KEY,
         a: "line-1",
         b: "line-2",
@@ -210,7 +210,7 @@ describe.skipIf(!onBtrfs)(
       await writeFile(path.join(FOLDER, "a.txt"), "saved meanwhile\n")
       expect(
         await call({
-          kind: "readIn",
+          kind: "read-in",
           project: KEY,
           from: "line-2",
           state: "line-3",
@@ -220,7 +220,7 @@ describe.skipIf(!onBtrfs)(
       ).toEqual({ kind: "moved", paths: ["a.txt"] })
       expect(
         await call({
-          kind: "snapshotExists",
+          kind: "snapshot-exists",
           project: KEY,
           snapshot: "line-3",
         }),

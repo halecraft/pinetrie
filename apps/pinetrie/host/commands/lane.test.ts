@@ -236,7 +236,7 @@ test("the owner's answer to a lane's ssh is written; anyone else's is refused", 
   const approve = { kind: "ssh-access", lane, answer: "allow" } as const
   expect(await handleSshAccess(deps, bea, approve)).toMatchObject({
     kind: "refused",
-    code: "not_owner",
+    code: ERR.NOT_OWNER,
   })
   expect(await handleSshAccess(deps, ada, approve)).toEqual({
     kind: "answered",
@@ -249,7 +249,7 @@ test("the owner's answer to a lane's ssh is written; anyone else's is refused", 
   })
   expect(await handleSshAccess(deps, ada, approve)).toMatchObject({
     kind: "refused",
-    code: "nothing_to_answer",
+    code: ERR.NOTHING_TO_ANSWER,
   })
 })
 
@@ -389,7 +389,7 @@ test("a carry-on the rule refuses is answered with its refusal, and starts nothi
       threadIdFor("fedcba9876543210"),
       ada,
     ),
-  ).toMatchObject({ kind: "refused", code: "unknown_target" })
+  ).toMatchObject({ kind: "refused", code: ERR.UNKNOWN_TARGET })
   expect(started).toEqual([])
 })
 

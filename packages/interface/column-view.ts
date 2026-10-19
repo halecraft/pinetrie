@@ -854,7 +854,7 @@ export function workStripWords(
               : "splitting the changes into a stack"
           : state === "accepted"
             ? "accepted ✓"
-            : state === "needs_you"
+            : state === "needs-you"
               ? "the agent has a question about your edits · see the thread"
               : state === "edited"
                 ? `you edited these changes${conflicts === "" ? "" : ` · ${conflicts}`}`
@@ -887,7 +887,7 @@ export function workStripWords(
       ? `accept stack${where}`
       : state === "stale"
         ? `accept stack and the rest${where}`
-        : facts.conflicts > 0 || state === "needs_you"
+        : facts.conflicts > 0 || state === "needs-you"
           ? `accept anyway${where}`
           : `accept changes${where}`
   }

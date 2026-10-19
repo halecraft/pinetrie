@@ -13,11 +13,11 @@ const menuOf = (
 test("a column's ⋯ makes its card wide, or narrow again, for everyone", () => {
   const card = threadIdFor("a")
   expect(menuOf(card, 1)[0]?.items).toMatchObject([
-    { label: "Make wide", intent: { kind: "cardWidth", card, width: 2 } },
+    { label: "Make wide", intent: { kind: "card-width", card, width: 2 } },
   ])
   expect(menuOf(card, 2)[0]?.items[0]).toMatchObject({
     label: "Make narrow",
-    intent: { kind: "cardWidth", card, width: 1 },
+    intent: { kind: "card-width", card, width: 1 },
   })
 })
 
@@ -26,12 +26,12 @@ test("a thread's ⋯ copies it here or into your inventory, and takes it; it lis
   const sections = menuOf(card)
   expect(sections.map(s => s.key)).toEqual(["canvas", "thread", "trash"])
   expect(sections[1]?.items.map(i => [i.label, i.intent])).toEqual([
-    ["Copy to this canvas", { kind: "copyThread", source: card, to: "here" }],
+    ["Copy to this canvas", { kind: "copy-thread", source: card, to: "here" }],
     [
       "Copy to your inventory",
-      { kind: "copyThread", source: card, to: "inventory" },
+      { kind: "copy-thread", source: card, to: "inventory" },
     ],
-    ["Move to your inventory", { kind: "putAway", card }],
+    ["Move to your inventory", { kind: "put-away", card }],
   ])
   expect(menuOf(NOTES).map(s => s.key)).toEqual(["canvas", "trash"])
 })

@@ -175,24 +175,24 @@ wires them.
 ## A run's end
 
 `planRunEnd(role)` returns the order, and `runs.ts` carries it out: a
-split's `splitEnded`, then `runEndReportPending`, `endRun`, `laneStopped`,
+split's `split-ended`, then `run-end-report-pending`, `end-run`, `lane-stopped`,
 `ended`. A resolution ends as any run does (ADR-0080, S104): what it left
 conflicted is the proposed changes', and whether the agent asked is the tree's. A run touches no tools: every lane's list is the
 same for every run (`packages/pi/TECHNICAL.md`, S85).
 
-- **`endRun` comes before `laneStopped` and `ended`.** It closes the lane's
+- **`end-run` comes before `lane-stopped` and `ended`.** It closes the lane's
   streams (ADR-0044: a stream stays open past its message's end) and clears
-  its active run. `laneStopped` is lane work's `runEnded`: the container
+  its active run. `lane-stopped` is lane work's `runEnded`: the container
   stops, and the proposed changes are refreshed; then base news forgets what it
   steered into the lane, so the next run plans from the tree alone. `ended`
   drains the lane; a drain that ran before
-  `endRun` could start the next run with the last one's reply still open.
-- **The run-end report is pending before `endRun`** (ADR-0077,
-  `writePendingRunEndReport`, the step `runEndReportPending`): written
+  `end-run` could start the next run with the last one's reply still open.
+- **The run-end report is pending before `end-run`** (ADR-0077,
+  `writePendingRunEndReport`, the step `run-end-report-pending`): written
   after, a page would see the lane stopped beside the last run's report,
   and draw its arrival. Its `end` is the run's last entry from its
   asks, as at `ended`.
-- **A failure before `endRun` is logged as `run end failed`,** and `endRun`
+- **A failure before `end-run` is logged as `run end failed`,** and `end-run`
   and every step after it still run.
 - **`ended` is one function, set once** in `startHost`: `settle`, banners, and the run-end report with the final digest, then the thread's focus once that has settled (`RunEndSettled`, ADR-0173). It breaks a cycle: a run's end
   drains, the drain may run an update, and an update may start a run.
@@ -312,7 +312,7 @@ same for every run (`packages/pi/TECHNICAL.md`, S85).
 - **A command names its root and its canvas** (`Command.root`,
   `Command.canvas`, ADR-0063, ADR-0116): a chat writes in its root, and a
   chat at the root starts it, under the root and canvas ids the sender's tab
-  minted, refused `root_id_in_use` or `canvas_id_in_use` when the session
+  minted, refused `root-id-in-use` or `canvas-id-in-use` when the session
   holds either already; a branch elsewhere names a canvas the session holds.
   The host's `CanvasIndex` is `canvasesNow(basics)` (`canvases.ts`), from the
   places and the threads' records, built once per command by the
@@ -450,12 +450,22 @@ reading the store once, planning once, then acting:
     relays, answers and ask cards, and facts), `0023-incoming` (each
     `pinetrie.heard` message's type) and `0024` (*trash*: a trashed card's
     place, in the places rows, its history and its trace).
+  - `0025-run-end-report` (ADR-0184) moves each run-end report from
+    `pinetrie.runEndReport` to `pinetrie.run-end-report`, its report's
+    `modelSaid` respelled `model-said` and its urgency `needs-you` or
+    `worth-a-read` (`runEndReportNow`), read raw: the old shape no longer
+    decodes.
 - **A migration that only reshapes one namespace's records,** record by
   record, is a pure rewrite over `rewriteRecords` (`migrations/rewrite.ts`,
   over `recordDocs`, which any record migration reads a home's documents
   with), which reads every document the namespace lives in before it
   writes any. `renamedFields` is the rewrite that renames top-level
-  fields.
+  fields. Given a `to`, it moves every record there, rewritten or as
+  stored, and deletes it from the old namespace in the same batch, so no
+  run leaves a record in both, and over its own output the old namespace is
+  empty. A migration names an old spelling or word on purpose, so its file
+  and its test are in `OLD_SHAPES` (`scripts/sources.ts`), which the words
+  and tag checks both read.
 - **A migration that only reshapes one kind of history message** is a pure
   rewrite of its stored `details` over `rewriteHistory`
   (`planHistoryRewrites`), which reads every root before it writes any and
@@ -846,7 +856,7 @@ rejects `shutdown()`.
   its sender saw.
 - **A chat carries its sender's pinned versions** (`pinned`, each card
   pinned at the sender's thread end with its text version): `executeSend`
-  passes them to `start` for a `run` or `createAndRun`, and the run waits
+  passes them to `start` for a `run` or `create-and-run`, and the run waits
   for them. A popped queued card's chat (`sendOfPoppedQueuedCard`), in
   its thread's root (its `THREAD` record's: a queued place names no root;
   `failed` with none), carries none: its thread's
@@ -1128,7 +1138,7 @@ rejects `shutdown()`.
   `executeSend`.
 - **`reserve` is answered `reserved`** whether it named the id or the id
   had a name already, so a column may send it again; an id pi holds is
-  refused `lane_id_in_use`.
+  refused `lane-id-in-use`.
 - **Stop queues who pressed it before it aborts** (ADR-0106, ADR-0126):
   `planStop` (`@pinetrie/rules`) gives the fact card naming the running
   ask's stopper, unless one is queued or appended already, and
@@ -1390,7 +1400,7 @@ queued cards, which `planArchive` refuses.
   `bannerDue` or `planAsk`; write a pasted image. A new image is asked
   outside the queue (`Later.outside`), then planned in a step of its own,
   only while `bannerStillWanted`. A thread its gate refuses gets none
-  (`set_banner` answers `no_thread`). A thread named for a column before
+  (`set_banner` answers `no-thread`). A thread named for a column before
   its first message is opened in no canvas, and takes one. A missing
   `column-banner` skill is logged.
 - **A thread is due one as it is named for its lane** (`createNames`'
@@ -1410,7 +1420,7 @@ queued cards, which `planArchive` refuses.
 
 ## Titles (`titles.ts`, ADR-0074)
 
-- **Planned inside the command that asks**: `executeSend`'s `createAndRun`
+- **Planned inside the command that asks**: `executeSend`'s `create-and-run`
   calls `laneStarted` after `prepareLane`, so the new lane's record is
   among the root's, and a `retitle` command calls `asked`. Both are steps
   on the documents' keeper already, so `titles.ts` gathers and plans
@@ -1694,7 +1704,7 @@ adapter's.
   the queue (its `from` was read before), so it never waits on itself.
 - **A read** (`line.ts`, one at a time on the project's queue): gather (the last
   read's stamps, from the session's `folder-stamps.json`; the scan,
-  `scan.ts`), plan (`planLineRead`), execute (lanehost's `readIn` into a
+  `scan.ts`), plan (`planLineRead`), execute (lanehost's `read-in` into a
   new state, `line-<uuidv7>`, its parent accepted work's newest). A read
   whose paths moved during their copy is read again, five times at most;
   nothing changed makes no state, but the first read of the project's folder makes one
@@ -1733,7 +1743,7 @@ adapter's.
   end builds the lane's proposed changes and base records (`folder/proposed.ts`) and describes
   the proposed changes with the host's describer (`describe.ts`, jj's too); accepted
   work moving rebuilds every folder lane's. A squash is refused
-  (`not_a_stack`). Accepted work's acts are by kind (`Destination`'s
+  (`not-a-stack`). Accepted work's acts are by kind (`Destination`'s
   `accepted`: jj's `act`, a folder's `restore`), so the command handler
   refuses a setup or publish to a folder project, and a restore to a jj
   one, in one place (`commands/lane.ts`).
@@ -1753,9 +1763,9 @@ adapter's.
   entry, a restore's preview) and a conflict's base and side read as they
   are, each span found by `planReviewRead` (`readableSpan`). Its rows are
   `planFolderReview`'s, a move found from the pairs of equal size whose
-  bytes `sameContent` proves equal. A file's diff is lanehost's `fileDiff`;
+  bytes `same-content` proves equal. A file's diff is lanehost's `file-diff`;
   a side's bytes stream from its state's snapshot (`fileOut`, through the
-  disks role's `file-out.ts`), typed by `pathFacts`' `content`, never by a
+  disks role's `file-out.ts`), typed by `path-facts`' `content`, never by a
   name, and served by `bytesResponse` (`responses.ts`): an image as its
   type, anything else an attachment, every one `nosniff` and sandboxed, as
   a blob is.
@@ -1784,8 +1794,8 @@ adapter's.
   directory dropped (unlinking a staged file moves its target's ctime),
   and the folder's stamps written as the read's with each written path
   stamped anew, so the next read answers current. A check or link that
-  fails puts every path back and refuses `folder_moved`, naming the path;
-  what the folder cannot hold refuses `folder_cannot_hold` before
+  fails puts every path back and refuses `folder-moved`, naming the path;
+  what the folder cannot hold refuses `folder-cannot-hold` before
   anything is written.
 - **The line's first read recovers, and a quiet read checks asides**
   (`line.ts`): before it, each open journal is finished or put back and
@@ -1913,7 +1923,7 @@ adapter's.
   start as a set), or the proposed changes conflict now and did not then. A rebase
   onto a moved target and your edit keep the ledger, and are accepted.
 - **An acceptance names its destination** (`planAcceptance`): one of
-  `acceptanceDestinations`, and refused (`bad_destination`) unless the bookmark is
+  `acceptanceDestinations`, and refused (`bad-destination`) unless the bookmark is
   at or below the proposed changes' bottom's parent, read in the same command
   (`gatherAcceptance`). jj's
   refusal of a backwards move is the second guard (S77 item 1).

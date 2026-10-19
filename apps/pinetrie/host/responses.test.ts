@@ -85,5 +85,5 @@ async function* chunks(): AsyncIterable<Uint8Array> {
 
 test("an upload refused unread closes its connection", () => {
   expect(uploadRefusal(413, "too large", true).headers.connection).toBe("close")
-  expect(uploadRefusal(415, "not an image").headers.connection).toBeUndefined()
+  expect(uploadRefusal(415, "not-image").headers.connection).toBeUndefined()
 })

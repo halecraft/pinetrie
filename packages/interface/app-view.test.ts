@@ -93,7 +93,7 @@ describe("appView's stage", () => {
       action: {
         title: "Restore",
         intent: {
-          kind: "moveCanvas",
+          kind: "move-canvas",
           canvas: K,
           from: WORKFLOW.archive.id,
           to: WORKFLOW.open[0]?.id,

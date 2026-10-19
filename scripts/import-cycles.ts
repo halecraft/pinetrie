@@ -6,9 +6,9 @@
 // `import {}`, which Node still loads. Only relative specifiers are followed,
 // since a package is imported by its name and never by a path into it.
 
-import { globSync, readFileSync } from "node:fs"
 import path from "node:path"
 import { parseSync } from "oxc-parser"
+import { readSources } from "./sources.ts"
 
 /** The relative specifiers `text` loads, in order, each once. */
 export function loadedSpecifiers(
@@ -82,21 +82,14 @@ export const ALLOWED_CYCLES: readonly (readonly string[])[] = [
   ],
 ]
 
-const FILES = ["packages/**/*.{ts,tsx}", "apps/**/*.{ts,tsx}", "scripts/*.ts"]
-const NOT_SOURCE = [
-  "**/node_modules/**",
-  "**/dist/**",
-  "**/*.test.{ts,tsx}",
-  "**/*.d.ts",
-]
-
 /** The import cycles of the source under `root`, tests left out; each module repository-relative. */
 export function readImportCycles(root: string): readonly (readonly string[])[] {
-  const files = new Set(globSync(FILES, { cwd: root, exclude: NOT_SOURCE }))
+  const sources = readSources(root, { tests: false })
+  const files = new Set(sources.map(s => s.file))
   const graph = new Map(
-    [...files].toSorted().map(file => [
+    sources.map(({ file, text }) => [
       file,
-      loadedSpecifiers(file, readFileSync(path.join(root, file), "utf8"))
+      loadedSpecifiers(file, text)
         .map(s => path.normalize(path.join(path.dirname(file), s)))
         .filter(target => files.has(target)),
     ]),

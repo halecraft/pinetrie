@@ -43,10 +43,10 @@ export function harnessStreamEvent(event: StreamSource): StreamEvent | null {
       return delta.length > 0 ? { kind: "text", lane, delta } : null
     }
     case "tool_start":
-      return { kind: "toolStart", lane, callId: event.toolCallId }
+      return { kind: "tool-start", lane, callId: event.toolCallId }
     case "tool_update":
       return {
-        kind: "toolOutput",
+        kind: "tool-output",
         lane,
         callId: event.toolCallId,
         text: firstText(event.partialResult),

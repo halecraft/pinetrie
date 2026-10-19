@@ -36,7 +36,7 @@ export function keyAct(event: KeyLike, focus: Focus): Intent | null {
   const chord =
     event.ctrlKey && event.shiftKey && !event.metaKey && !event.altKey
   // The sidebar's width, from anywhere, as the chords below.
-  if (chord && key === "l") return { kind: "foldList" }
+  if (chord && key === "l") return { kind: "fold-list" }
   if (focus.page) return null
   const plain = !event.ctrlKey && !event.metaKey && !event.altKey
   // Before the text box's guard: the search's field is a text box.
@@ -47,7 +47,7 @@ export function keyAct(event: KeyLike, focus: Focus): Intent | null {
   if (plain && event.key === "Escape" && focus.inPanel)
     return { kind: "inventory", act: { kind: "escape" } }
   if (chord && key === "i")
-    return focus.card === null ? null : { kind: "putAway", card: focus.card }
+    return focus.card === null ? null : { kind: "put-away", card: focus.card }
   if (chord && key === "o")
     return focus.selectedCard === null || focus.column === null
       ? null
@@ -64,7 +64,7 @@ export function keyAct(event: KeyLike, focus: Focus): Intent | null {
     const to = keyMove(position, count, event.key)
     return to === null
       ? null
-      : { kind: "moveColumn", column: { kind: "card", card }, to }
+      : { kind: "move-column", column: { kind: "card", card }, to }
   }
   if (focus.inText || event.altKey) return null
   if (plain && event.key === "/" && focus.search !== "unavailable")
@@ -72,11 +72,11 @@ export function keyAct(event: KeyLike, focus: Focus): Intent | null {
   const command = event.metaKey !== event.ctrlKey
   if (command && key === "z")
     return {
-      kind: "undoMove",
+      kind: "undo-move",
       direction: event.shiftKey ? "redo" : "undo",
       inPanel: focus.inPanel,
     }
   if (event.ctrlKey && !event.metaKey && !event.shiftKey && key === "y")
-    return { kind: "undoMove", direction: "redo", inPanel: focus.inPanel }
+    return { kind: "undo-move", direction: "redo", inPanel: focus.inPanel }
   return null
 }

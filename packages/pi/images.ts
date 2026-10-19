@@ -34,7 +34,7 @@ export type PreparedImage =
        */
       readonly resized: string | undefined
     }
-  | { readonly ok: false; readonly reason: "not an image" | "unreadable" }
+  | { readonly ok: false; readonly reason: "not-image" | "unreadable" }
 
 /** The box an image is fitted within, in pixels, its ratio kept. */
 interface ImageFit {
@@ -56,12 +56,12 @@ export async function prepareImage(
 ): Promise<PreparedImage> {
   const sniffed = detectSupportedImageMimeType(bytes)
   if (sniffed === null || !isImageMime(sniffed))
-    return { ok: false, reason: "not an image" }
+    return { ok: false, reason: "not-image" }
   const resized = await resizeImage(bytes, sniffed, fit)
   if (resized === null) return { ok: false, reason: "unreadable" }
   // A resize gives PNG or JPEG, or the input's own type: never another.
   const mimeType = resized.mimeType
-  if (!isImageMime(mimeType)) return { ok: false, reason: "not an image" }
+  if (!isImageMime(mimeType)) return { ok: false, reason: "not-image" }
   return {
     ok: true,
     image: {
@@ -82,7 +82,7 @@ export async function prepareImage(
 
 const OMITTED: Record<Extract<PreparedImage, { ok: false }>["reason"], string> =
   {
-    "not an image": "[Image omitted: not an image this harness keeps.]",
+    "not-image": "[Image omitted: not an image this harness keeps.]",
     unreadable: "[Image omitted: could not be read or fitted.]",
   }
 

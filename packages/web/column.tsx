@@ -343,7 +343,7 @@ export function Column(p: ColumnProps) {
 
   // A linked thread opened: a fork row's, or a row from another canvas's.
   const openLink = useStable((link: ThreadLink, at: EntryId) =>
-    p.onIntent({ kind: "openLink", link, entry: at }),
+    p.onIntent({ kind: "open-link", link, entry: at }),
   )
 
   // Margins: the comments beside each entry, one open at a time,
@@ -479,7 +479,7 @@ export function Column(p: ColumnProps) {
     }
   }
   const openAt = useStable((entry: EntryId) =>
-    p.onIntent({ kind: "openAt", entry }),
+    p.onIntent({ kind: "open-at", entry }),
   )
   // What the name's `aria-controls` points at.
   const detailsId = `details-${p.column.key}`
@@ -879,7 +879,7 @@ export function Column(p: ColumnProps) {
       })
     if (at.kind !== "entry") return
     act({
-      kind: "queueNew",
+      kind: "queue-new",
       card: newCardId(),
       hold: "keep",
       command:
@@ -918,7 +918,7 @@ export function Column(p: ColumnProps) {
   // it started with.
   const onSend = () => {
     end.follow()
-    if (unstarted) p.onIntent({ kind: "sentFirst", card: p.column.thread })
+    if (unstarted) p.onIntent({ kind: "sent-first", card: p.column.thread })
     return undefined
   }
   // Where a queue from a card's ⋯ puts it: on this thread's lane, at its end.
@@ -968,7 +968,7 @@ export function Column(p: ColumnProps) {
   }, [traceIds, visible])
   const traceRows = traceGroups(keptTraces(keptHere, traces))
   const branchInstead = (pending: Pending) => {
-    if (at.kind === "entry") act({ kind: "branchInstead", at: at.id, pending })
+    if (at.kind === "entry") act({ kind: "branch-instead", at: at.id, pending })
   }
 
   return (
@@ -1285,7 +1285,7 @@ export function Column(p: ColumnProps) {
                           data-trace={g.traces.map(t => t.id).join(" ")}
                           key={last.id}
                           onClick={() =>
-                            p.onIntent({ kind: "openTrace", trace: last })
+                            p.onIntent({ kind: "open-trace", trace: last })
                           }
                           title="show where it is now"
                           type="button"
@@ -1557,7 +1557,7 @@ function StatusRow({
   return (
     <button
       className="head-status"
-      data-level={status.level === "needsYou" ? "needs-you" : "worth-a-read"}
+      data-level={status.level}
       data-quiet={status.quiet || undefined}
       onClick={() => onOpen(status.end)}
       title={status.words}

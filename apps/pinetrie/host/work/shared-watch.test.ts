@@ -69,7 +69,7 @@ describe("the watcher on a shared directory", () => {
   })
 })
 
-describe("filesUnder", () => {
+describe("files-under", () => {
   test("a directory that is gone holds no file", async () => {
     expect(
       await filesUnder(path.join(tmpdir(), "pinetrie-no-such-dir")),

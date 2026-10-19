@@ -23,6 +23,7 @@ import {
   type CardRecord,
   cardMove,
   type EntryId,
+  ERR,
   entryId,
   entryThread,
   type JjAcceptedRecord,
@@ -323,7 +324,7 @@ export const join = async (
 /** A scenario's mark at an entry in no canvas: refused before anything is sent. */
 const NO_CANVAS: Outcome = {
   kind: "refused",
-  code: "unknown_target",
+  code: ERR.UNKNOWN_TARGET,
   message: "no canvas holds that entry",
 }
 

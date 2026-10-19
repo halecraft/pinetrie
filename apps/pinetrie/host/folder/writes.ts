@@ -236,14 +236,14 @@ export function createFolderWrites(deps: {
   /** A failed or stopped write ended from its journal: committed, or put back. */
   async function settle(
     journal: WriteJournal,
-  ): Promise<"finished" | "put back"> {
+  ): Promise<"finished" | "put-back"> {
     const ended = await recoverWrite(root, journal)
     if (ended.kind === "finish") {
       await commitWrite(journal, ended.proof)
       return "finished"
     }
     await endJournal(ended.journal)
-    return "put back"
+    return "put-back"
   }
 
   /**

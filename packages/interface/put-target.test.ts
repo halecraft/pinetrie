@@ -75,7 +75,7 @@ describe("one landing rule: every input has full fidelity", () => {
     { kind: "state", state: workflowStateIdFor("s-1") },
     { kind: "sidebar", before: TEST_CANVAS },
     { kind: "sidebar", before: null },
-    { kind: "canvasPinned", canvas: TEST_CANVAS },
+    { kind: "canvas-pinned", canvas: TEST_CANVAS },
     { kind: "canvas", canvas: TEST_CANVAS, after: LANE },
     { kind: "canvas", canvas: TEST_CANVAS, after: null },
     { kind: "item", canvas: TEST_CANVAS },

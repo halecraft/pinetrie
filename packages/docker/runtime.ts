@@ -378,7 +378,7 @@ export function dockerRuntime(input: {
   ): AsyncIterable<Uint8Array> {
     if (
       !(await lanehost.call({
-        kind: "snapshotExists",
+        kind: "snapshot-exists",
         project: key,
         snapshot: snapshotId(state),
       }))
@@ -421,9 +421,9 @@ export function dockerRuntime(input: {
       serving = { install, runtime }
     },
     disk: async op => {
-      if (op.kind === "innerDockerDataRoot")
+      if (op.kind === "inner-docker-data-root")
         await lanehost.call({
-          kind: "nestedDisk",
+          kind: "nested-disk",
           project: key,
           lane: op.lane,
           cloneFromLane: op.cloneFromLane,
@@ -431,9 +431,9 @@ export function dockerRuntime(input: {
       else await lanehost.call({ kind: "disk", project: key, op })
     },
     diskExists: lane =>
-      lanehost.call({ kind: "diskExists", project: key, lane }),
+      lanehost.call({ kind: "disk-exists", project: key, lane }),
     snapshotExists: id =>
-      lanehost.call({ kind: "snapshotExists", project: key, snapshot: id }),
+      lanehost.call({ kind: "snapshot-exists", project: key, snapshot: id }),
     snapshots: async () =>
       (await lanehost.call({ kind: "snapshots", project: key })).map(
         snapshotId,
@@ -449,20 +449,20 @@ export function dockerRuntime(input: {
       }),
     folder: {
       pathFacts: (snapshot, paths) =>
-        lanehost.call({ kind: "pathFacts", project: key, snapshot, paths }),
+        lanehost.call({ kind: "path-facts", project: key, snapshot, paths }),
       fileDiff: (a, b, path, limit) =>
-        lanehost.call({ kind: "fileDiff", project: key, a, b, path, limit }),
+        lanehost.call({ kind: "file-diff", project: key, a, b, path, limit }),
       diffStats: (a, b, paths) =>
-        lanehost.call({ kind: "diffStats", project: key, a, b, paths }),
+        lanehost.call({ kind: "diff-stats", project: key, a, b, paths }),
       filesUnder: (snapshot, paths) =>
-        lanehost.call({ kind: "filesUnder", project: key, snapshot, paths }),
+        lanehost.call({ kind: "files-under", project: key, snapshot, paths }),
       sameContent: (a, b, pairs) =>
-        lanehost.call({ kind: "sameContent", project: key, a, b, pairs }),
+        lanehost.call({ kind: "same-content", project: key, a, b, pairs }),
       applyMerge: merge =>
-        lanehost.call({ kind: "applyMerge", project: key, ...merge }),
+        lanehost.call({ kind: "apply-merge", project: key, ...merge }),
       read: (snapshot, path, limit) =>
         lanehost.call({ kind: "read", project: key, snapshot, path, limit }),
-      readIn: read => lanehost.call({ kind: "readIn", project: key, ...read }),
+      readIn: read => lanehost.call({ kind: "read-in", project: key, ...read }),
       tarOut: (state, paths) =>
         snapshotOut(TAR_OUT, state, paths.map(p => `${p}\0`).join("")),
       fileOut: (state, path) => snapshotOut(FILE_OUT, state, path),
@@ -474,7 +474,7 @@ export function dockerRuntime(input: {
     async run(shape) {
       if (shape.nested)
         await lanehost.call({
-          kind: "nestedDisk",
+          kind: "nested-disk",
           project: key,
           lane: shape.lane,
           cloneFromLane: null,
@@ -482,7 +482,7 @@ export function dockerRuntime(input: {
       // A bind mount's source must be there before the container is made.
       if (shape.states)
         await lanehost.call({
-          kind: "statesDir",
+          kind: "states-dir",
           project: key,
           lane: shape.lane,
         })
@@ -549,7 +549,7 @@ export function dockerRuntime(input: {
       for (const k of planned.projects) {
         await removeNetwork(target, projectNetwork(k))
         await firewall(k, "", [])
-        await lanehost.call({ kind: "removeProject", project: k })
+        await lanehost.call({ kind: "remove-project", project: k })
       }
       for (const k of planned.unlistedNetworks)
         await removeNetwork(target, projectNetwork(k))

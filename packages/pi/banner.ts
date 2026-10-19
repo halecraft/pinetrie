@@ -70,7 +70,7 @@ export function bannerAnswerText(answer: BannerAnswer): string {
     case "set":
       return "The banner is set."
     case "refused":
-      return answer.reason === "not_stored"
+      return answer.reason === "not-stored"
         ? "That image is not stored: ask the person to paste it again."
         : answer.reason === "off"
           ? 'New banners are drawn only when "icons": { "source": "drawn" } is in your pinetrie.json: paste an image to set one now.'
@@ -118,7 +118,7 @@ export function bannerTool(
         "refused" in ask
           ? ask.refused
           : lane === undefined
-            ? bannerAnswerText({ kind: "refused", reason: "no_thread" })
+            ? bannerAnswerText({ kind: "refused", reason: "no-thread" })
             : bannerAnswerText(await request(lane, ask))
       return {
         content: [{ type: "text" as const, text }],

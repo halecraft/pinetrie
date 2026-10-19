@@ -96,11 +96,11 @@ describe("edit", () => {
 
   test("a root's first message opens a new canvas, with @agent in front when it asked the agent", () => {
     expect(tools(said("start here", true), { parentId: null }).edit).toEqual({
-      kind: "newCanvas",
+      kind: "new-canvas",
       prefill: { text: "@agent start here", blank: false },
     })
     expect(tools(said("start here", false), { parentId: null }).edit).toEqual({
-      kind: "newCanvas",
+      kind: "new-canvas",
       prefill: { text: "start here", blank: false },
     })
   })

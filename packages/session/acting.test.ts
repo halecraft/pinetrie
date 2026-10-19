@@ -1,4 +1,4 @@
-import { type ProposedChangesAction, threadIdFor } from "@pinetrie/core"
+import { ERR, type ProposedChangesAction, threadIdFor } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import { describe, expect, test } from "vitest"
 import {
@@ -154,14 +154,14 @@ describe("sendActing: the session's store, around one command", () => {
       () =>
         Promise.resolve({
           kind: "refused",
-          code: "not_owner",
+          code: ERR.NOT_OWNER,
           message: "not yours",
         }),
       "1",
     )
     expect(store.current().access.get(A)).toEqual({
       kind: "refused",
-      code: "not_owner",
+      code: ERR.NOT_OWNER,
       action: "allow",
       message: "not yours",
     })

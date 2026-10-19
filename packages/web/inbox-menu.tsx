@@ -26,7 +26,6 @@ import {
   NOT_NEEDED,
   opens,
   type Reader,
-  signalOfLevel,
   type ThreadLink,
 } from "@pinetrie/interface"
 import { readableThreadName } from "@pinetrie/rules"
@@ -138,7 +137,7 @@ export function useInboxMenu({
         readableThreadName(names, item.lane),
         attentionWords(item.raised, w => nameFor(nameOf, w)),
       ),
-      className: `here-thread raised ${signalOfLevel(item.level)}`,
+      className: `here-thread raised ${item.level}`,
     },
     // An ssh ask clears when its owner answers it, in the column's header.
     ...((item.raised.kind === "ready" && item.raised.source === null) ||
@@ -153,7 +152,7 @@ export function useInboxMenu({
             title: NOT_NEEDED.title,
             onChoose: () =>
               onIntent({
-                kind: "notNeeded",
+                kind: "not-needed",
                 lane: item.lane,
                 raised: item.raised,
               }),

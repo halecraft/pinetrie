@@ -498,7 +498,7 @@ test("a reservation is answered reserved, and refused for a lane pi holds", asyn
   await reserve(cardIdFor("c5"), HELD)
   expect(replies.map(r => [r.id, r.outcome, r.errorCode])).toEqual([
     [cardIdFor("c4"), "reserved", ""],
-    [cardIdFor("c5"), "refused", "thread_taken"],
+    [cardIdFor("c5"), "refused", ERR.THREAD_TAKEN],
   ])
 })
 

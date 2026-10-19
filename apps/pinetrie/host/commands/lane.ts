@@ -433,17 +433,14 @@ export async function handleSshAccess(
     now: now(),
   })
   if ("refused" in planned)
-    return planned.refused === "not_owner"
-      ? {
-          kind: "refused",
-          code: ERR.NOT_OWNER,
-          message: "only this host's owner answers for their ssh identity",
-        }
-      : {
-          kind: "refused",
-          code: ERR.NOTHING_TO_ANSWER,
-          message: `this lane's ssh takes no ${intent.answer} now`,
-        }
+    return {
+      kind: "refused",
+      code: planned.refused,
+      message:
+        planned.refused === ERR.NOT_OWNER
+          ? "only this host's owner answers for their ssh identity"
+          : `this lane's ssh takes no ${intent.answer} now`,
+    }
   await deps.records.writeValues([setRecord(ACCESS, planned.record)])
   return { kind: "answered" }
 }

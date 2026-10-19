@@ -272,8 +272,19 @@ export function diffLines(text: string): readonly DiffLine[] {
   })
 }
 
-/** A review head's toggle: wrapping long lines, or the file list. */
-export type ReviewPref = "wrap" | "listFolded"
+/**
+ * How you read a review, your reader's settings: kept per device, the same in
+ * every column's review.
+ */
+export interface ReviewPrefs {
+  /** Long diff lines wrap, rather than scrolling sideways. */
+  readonly wrap: boolean
+  /** The file list is folded away, giving the diffs the pane's width. */
+  readonly listFolded: boolean
+}
+
+/** A review head's toggle: one of `ReviewPrefs`. */
+export type ReviewPref = keyof ReviewPrefs
 
 /** A review toggle's glyph and label, by what it does from `on`. */
 export function reviewPrefWords(

@@ -95,7 +95,7 @@ function movesOf(
         busy: closes ? (facts.work.get(canvas) ?? null) : null,
         drops: closes ? (facts.proposed.get(canvas) ?? []) : [],
         intent: {
-          kind: "moveCanvas",
+          kind: "move-canvas",
           canvas,
           from,
           to: to.id,

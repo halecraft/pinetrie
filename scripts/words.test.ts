@@ -5,12 +5,11 @@
 import { readFileSync } from "node:fs"
 import path from "node:path"
 import { describe, expect, test } from "vitest"
+import { OLD_SHAPES, readSources } from "./sources.ts"
 import {
   identifierNames,
-  OLD_SHAPES,
   phrasesNothingSays,
   RETIRED_IN_NAMES,
-  readSources,
   readTexts,
   retiredLines,
   retiredNames,
@@ -36,6 +35,13 @@ describe("the rules", () => {
       "a.ts: afterYours",
       "a.ts: yoursDir",
     ])
+  })
+
+  test("a file of a migration's old shapes may hold a retired name", () => {
+    const [old] = OLD_SHAPES
+    expect(
+      retiredNames({ file: old ?? "", text: "const yours = 1" }, ["yours"]),
+    ).toEqual([])
   })
 
   test("a kept setting key passes whole, and a name that only holds it does not", () => {
@@ -80,9 +86,9 @@ describe("the rules", () => {
 describe("the repository", () => {
   test("no identifier holds a retired name, but in a migration's old shapes", () => {
     expect(
-      readSources(ROOT)
-        .filter(s => !OLD_SHAPES.includes(s.file))
-        .flatMap(s => retiredNames(s, RETIRED_IN_NAMES)),
+      readSources(ROOT, { tests: true }).flatMap(s =>
+        retiredNames(s, RETIRED_IN_NAMES),
+      ),
     ).toEqual([])
   })
 

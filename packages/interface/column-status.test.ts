@@ -21,8 +21,8 @@ const record = (report: RunEndReport): RunEndReportRecord => ({
   report,
 })
 const needsYou: RunEndReport = {
-  kind: "modelSaid",
-  urgency: "needsYou",
+  kind: "model-said",
+  urgency: "needs-you",
   reason: "asks whether to drop the v1 table",
 }
 
@@ -57,7 +57,7 @@ const statusOf = (report: RunEndReport, over: Partial<AttentionInput> = {}) =>
 describe("columnStatus", () => {
   test("a run that needs you shows its reason in the header", () => {
     expect(statusOf(needsYou)).toEqual({
-      level: "needsYou",
+      level: "needs-you",
       quiet: false,
       words: "needs you: asks whether to drop the v1 table",
       end: entryId("e-5"),
@@ -99,9 +99,9 @@ describe("columnStatus", () => {
   })
 
   test("a done run shows nothing", () => {
-    expect(statusOf({ kind: "modelSaid", urgency: "done", reason: null })).toBe(
-      null,
-    )
+    expect(
+      statusOf({ kind: "model-said", urgency: "done", reason: null }),
+    ).toBe(null)
   })
 
   test("a pending report shows nothing", () => {

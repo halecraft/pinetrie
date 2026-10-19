@@ -163,7 +163,7 @@ export async function makeShownMerge(
   if (plan === null || (await baseMissing(reader, plan)) !== null) return null
   if (made)
     await reader.runtime.disk({
-      kind: "deleteSnapshots",
+      kind: "delete-snapshots",
       ids: [snapshotId(shown)],
     })
   try {
@@ -283,7 +283,7 @@ export function startFolderProposedChanges(deps: {
       !stateGraph(deps.states()).states.has(was)
     )
       await reader.runtime.disk({
-        kind: "deleteSnapshots",
+        kind: "delete-snapshots",
         ids: [snapshotId(was)],
       })
     deps.baseChanged(lane)

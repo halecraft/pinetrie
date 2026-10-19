@@ -1,6 +1,6 @@
 // scripts/words — where a retired word may not come back: inside the code's
 // names, and in what people and the agent read. Pure, apart from
-// `readSources` and `readTexts`.
+// `readTexts`; it reads the code through `scripts/sources.ts`.
 //
 // The glossary (`docs/glossary.md`) moves a concept to a new word; these rules
 // keep the code and the page from slipping back to the old one. A word is
@@ -12,13 +12,7 @@
 import { globSync, readFileSync } from "node:fs"
 import path from "node:path"
 import { parseSync } from "oxc-parser"
-
-/** A source file, as the rules read it. */
-export interface Source {
-  /** Repository-relative. */
-  readonly file: string
-  readonly text: string
-}
+import { type Node, OLD_SHAPES, type Source, walk } from "./sources.ts"
 
 /** Names no identifier may contain, matched without regard to case. */
 export const RETIRED_IN_NAMES: readonly string[] = [
@@ -45,70 +39,36 @@ export const RETIRED_IN_NAMES: readonly string[] = [
  */
 export const KEPT_NAMES: readonly string[] = ["catchUp"]
 
-/**
- * Files whose identifiers may hold a retired name: a migration's own words
- * for the shape it reads, and its fixtures in that shape.
- */
-export const OLD_SHAPES: readonly string[] = [
-  "apps/pinetrie/host/migrations/0005-accepted-working-copy.ts",
-  "apps/pinetrie/host/migrations/0005-accepted-working-copy.test.ts",
-  "apps/pinetrie/host/migrations/0006-proposed-working-copy-edits.ts",
-  "apps/pinetrie/host/migrations/0006-proposed-working-copy-edits.test.ts",
-  "apps/pinetrie/host/migrations/0007-land-merged.ts",
-  "apps/pinetrie/host/migrations/0007-land-merged.test.ts",
-  "apps/pinetrie/host/migrations/rewrite.test.ts",
-  "apps/pinetrie/host/migrations/0012-base-get-latest.ts",
-  "apps/pinetrie/host/migrations/0013-accepted-get-latest.ts",
-  "apps/pinetrie/host/migrations/0013-accepted-get-latest.test.ts",
-  "apps/pinetrie/host/migrations/0017-accepted-unfinished.ts",
-]
+const IDENTIFIERS = new Set([
+  "Identifier",
+  "JSXIdentifier",
+  "PrivateIdentifier",
+])
 
 /** Every identifier `text` names, each once, in order: bindings, references and property keys. */
 export function identifierNames(file: string, text: string): readonly string[] {
   const names = new Set<string>()
-  const walk = (node: unknown): void => {
-    if (Array.isArray(node)) {
-      for (const n of node) walk(n)
-      return
-    }
-    if (node === null || typeof node !== "object") return
-    const n = node as { readonly type?: unknown; readonly name?: unknown }
-    if (
-      (n.type === "Identifier" ||
-        n.type === "JSXIdentifier" ||
-        n.type === "PrivateIdentifier") &&
-      typeof n.name === "string"
-    )
-      names.add(n.name)
-    for (const v of Object.values(node)) if (typeof v === "object") walk(v)
-  }
-  walk(parseSync(file, text).program)
+  walk(parseSync(file, text).program as unknown as Node, n => {
+    if (IDENTIFIERS.has(n.type) && typeof n.name === "string") names.add(n.name)
+  })
   return [...names]
 }
 
-/** Each identifier of `source` that holds a word of `retired`, as `file: name`. */
+/**
+ * Each identifier of `source` that holds a word of `retired`, as `file: name`;
+ * none in a file of a migration's old shapes (`OLD_SHAPES`).
+ */
 export function retiredNames(
   source: Source,
   retired: readonly string[],
 ): readonly string[] {
+  if (OLD_SHAPES.includes(source.file)) return []
   const lower = retired.map(w => w.toLowerCase())
   return identifierNames(source.file, source.text)
     .filter(name => !KEPT_NAMES.includes(name))
     .filter(name => lower.some(w => name.toLowerCase().includes(w)))
     .map(name => `${source.file}: ${name}`)
 }
-
-const CODE = ["packages/**/*.{ts,tsx}", "apps/**/*.{ts,tsx}"]
-const NOT_CODE = ["**/node_modules/**", "**/dist/**"]
-
-/** The code under `root` the identifier rule reads. */
-export const readSources = (root: string): readonly Source[] =>
-  globSync(CODE, { cwd: root, exclude: NOT_CODE })
-    .toSorted()
-    .map(file => ({
-      file,
-      text: readFileSync(path.join(root, file), "utf8"),
-    }))
 
 /** The heading of the glossary's list of phrases nothing says. */
 export const NOTHING_SAYS = "## Phrases nothing says"
@@ -143,6 +103,8 @@ export function retiredLines(
     )
 }
 
+const NOT_TEXT = ["**/node_modules/**", "**/dist/**"]
+
 /** The page, the host, the e2e suites, and every skill and lane note (`packages/pi`). */
 const TEXTS = [
   "packages/**/*.{ts,tsx,mjs,md,json,html,css}",
@@ -152,7 +114,7 @@ const TEXTS = [
 
 /** What the text rule reads under `root`: what people and the agent read. */
 export const readTexts = (root: string): readonly Source[] =>
-  globSync(TEXTS, { cwd: root, exclude: NOT_CODE })
+  globSync(TEXTS, { cwd: root, exclude: NOT_TEXT })
     .toSorted()
     .map(file => ({
       file,

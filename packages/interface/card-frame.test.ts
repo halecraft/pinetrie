@@ -75,8 +75,8 @@ const queue = {
   hold: "keep",
 } as const
 const pin = { kind: "pin", card: C1 } as const
-const take = { kind: "putAway", card: C1 } as const
-const pinCanvas = { kind: "pinToCanvas", card: C1 } as const
+const take = { kind: "put-away", card: C1 } as const
+const pinCanvas = { kind: "pin-to-canvas", card: C1 } as const
 
 describe("cardFrame", () => {
   test.each<[string, TextPlace, CardTone, readonly unknown[]]>([
@@ -85,7 +85,7 @@ describe("cardFrame", () => {
       composing,
       "composing",
       [
-        { to: "note", act: { kind: "toNote", card: C1 } },
+        { to: "note", act: { kind: "to-note", card: C1 } },
         { to: "queue", act: queue },
         { to: "pinned", act: pin },
         { to: "canvas", act: pinCanvas },
@@ -148,7 +148,7 @@ describe("cardFrame", () => {
         {
           to: "reference",
           act: {
-            kind: "queueReference",
+            kind: "queue-reference",
             card: C1,
             entry: entryId("e-1"),
             thread: LANE,
@@ -223,7 +223,7 @@ describe("cardFrame", () => {
     })
     expect(view.moves).toEqual([
       { to: "note", act: { kind: "unqueue", card: id, lane: LANE, by: BEA } },
-      { to: "inventory", act: { kind: "putAway", card: id } },
+      { to: "inventory", act: { kind: "put-away", card: id } },
     ])
     expect(view.trashes).toBe(true)
     expect(view.tools.map(t => t.act?.kind ?? null)).toEqual([null, "reorder"])

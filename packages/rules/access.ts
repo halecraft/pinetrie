@@ -4,7 +4,12 @@
 // signature from the record at once, and each change to it is news to the
 // lane.
 
-import type { AccessAnswer, ThreadId, WriterId } from "@pinetrie/core"
+import {
+  type AccessAnswer,
+  ERR,
+  type ThreadId,
+  type WriterId,
+} from "@pinetrie/core"
 import { Type } from "typebox"
 import { decodeRecord, threadKey, WriterIdSchema } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
@@ -143,7 +148,8 @@ export const ACCESS_ANSWERS: Readonly<
 export const answersFor = (record: AccessRecord): readonly AccessAnswer[] =>
   record.personal === null ? [] : ACCESS_ANSWERS[record.personal.kind]
 
-export type AccessRefusal = "not_owner" | "nothing_to_answer"
+/** Why an answer is refused: the host's own codes, which its reply carries unchanged. */
+export type AccessRefusal = typeof ERR.NOT_OWNER | typeof ERR.NOTHING_TO_ANSWER
 
 /** An answer, as the record it makes, or why it is refused. It keeps the host the lane asked for. */
 export function planAccessAnswer(input: {
@@ -155,9 +161,9 @@ export function planAccessAnswer(input: {
 }): { readonly record: AccessRecord } | { readonly refused: AccessRefusal } {
   const { record, answer, sender, now } = input
   if (input.owner === null || sender !== input.owner)
-    return { refused: "not_owner" }
+    return { refused: ERR.NOT_OWNER }
   if (record.personal === null || !answersFor(record).includes(answer))
-    return { refused: "nothing_to_answer" }
+    return { refused: ERR.NOTHING_TO_ANSWER }
   const { host } = record.personal
   const personal: PersonalAccess =
     answer === "allow"

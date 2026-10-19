@@ -145,17 +145,17 @@ test.each<Row>([
     args: [{ kind: "close" }],
   },
   {
-    effect: { kind: "revealCard", card: textCardId("c") },
+    effect: { kind: "reveal-card", card: textCardId("c") },
     port: p => p.revealCard,
     args: [textCardId("c")],
   },
   {
-    effect: { kind: "openWhenHeld", entry: entryId("e") },
+    effect: { kind: "open-when-held", entry: entryId("e") },
     port: p => p.openWhenHeld,
     args: ["e"],
   },
   {
-    effect: { kind: "openFold", ask: entryId("a") },
+    effect: { kind: "open-fold", ask: entryId("a") },
     port: p => p.openFold,
     args: ["a"],
   },
@@ -178,19 +178,23 @@ test.each<Row>([
     args: [TEST_CANVAS],
   },
   {
-    effect: { kind: "armFocus", key: { kind: "board" } },
+    effect: { kind: "arm-focus", key: { kind: "board" } },
     port: p => p.arm,
     args: [{ kind: "board" }],
   },
   {
-    effect: { kind: "storeIdentity", identity },
+    effect: { kind: "store-identity", identity },
     port: p => p.identity.save,
     args: [identity],
   },
-  { effect: { kind: "forgetIdentity" }, port: p => p.identity.clear, args: [] },
+  {
+    effect: { kind: "forget-identity" },
+    port: p => p.identity.clear,
+    args: [],
+  },
   { effect: { kind: "reload" }, port: p => p.reload, args: [] },
   {
-    effect: { kind: "listWidth", width: "icons" },
+    effect: { kind: "list-width", width: "icons" },
     port: p => p.listWidth,
     args: ["icons"],
   },
@@ -200,13 +204,13 @@ test.each<Row>([
     args: ["profile"],
   },
   {
-    effect: { kind: "createCard", card, text: "t", how },
+    effect: { kind: "create-card", card, text: "t", how },
     port: p => p.session.createCard,
     args: [card, "t", how],
   },
   {
     effect: {
-      kind: "moveCard",
+      kind: "move-card",
       move,
       how,
       queuedBy: ada,
@@ -218,7 +222,7 @@ test.each<Row>([
   },
   {
     effect: {
-      kind: "moveCard",
+      kind: "move-card",
       move,
       how,
       queuedBy: null,
@@ -229,17 +233,17 @@ test.each<Row>([
     args: ["c", "ghost"],
   },
   {
-    effect: { kind: "swapSlots", a: 1, b: 2 },
+    effect: { kind: "swap-slots", a: 1, b: 2 },
     port: p => p.session.swapSlots,
     args: [1, 2],
   },
   {
-    effect: { kind: "undoSwap", direction: "redo" },
+    effect: { kind: "undo-swap", direction: "redo" },
     port: p => p.session.undoSwap,
     args: ["redo"],
   },
   {
-    effect: { kind: "undoMoves", canvas: TEST_CANVAS, direction: "undo" },
+    effect: { kind: "undo-moves", canvas: TEST_CANVAS, direction: "undo" },
     port: p => p.session.undoMoves,
     args: [TEST_CANVAS, "undo"],
   },
@@ -262,7 +266,7 @@ test("a keep is one move of every card, and closes its column only once accepted
   ] as const
   const actedAt = { kind: "column", key: "f" } as const
   const keep: Effect = {
-    kind: "moveCards",
+    kind: "move-cards",
     moves,
     actedAt,
     close: [close],
@@ -290,9 +294,9 @@ test("an undo of moves plans what its answer shows, afresh", async () => {
   const p = ports()
   const outcome: Outcome = { kind: "undone", cards: [] }
   p.session.undoMoves.mockImplementationOnce(async () => outcome)
-  perform([{ kind: "undoMoves", canvas: TEST_CANVAS, direction: "undo" }], p)
+  perform([{ kind: "undo-moves", canvas: TEST_CANVAS, direction: "undo" }], p)
   await vi.waitFor(() =>
-    expect(p.intent).toHaveBeenCalledWith({ kind: "undoAnswered", outcome }),
+    expect(p.intent).toHaveBeenCalledWith({ kind: "undo-answered", outcome }),
   )
 })
 
@@ -304,9 +308,9 @@ test("a move on the board runs what follows it only once the host accepts it; a 
     to: workflowStateIdFor("x"),
     before: null,
   } as const
-  const closed = { kind: "closeCanvas", canvas: TEST_CANVAS } as const
+  const closed = { kind: "close-canvas", canvas: TEST_CANVAS } as const
   const effect: Effect = {
-    kind: "moveCanvas",
+    kind: "move-canvas",
     move: request,
     moved: [{ kind: "layout", moves: false, action: closed }],
   }
@@ -351,7 +355,7 @@ test("a spin-off into the sidebar places and shows its thread only once the host
     here: NEW_CANVAS,
   } as const
   const effect: Effect = {
-    kind: "spinOff",
+    kind: "spin-off",
     request,
     sidebar: { before: null },
   }
@@ -443,7 +447,7 @@ test("a pasted text card is sent with its text, to be written first; a kept quot
 test("a move flies only when its plan says so", () => {
   const p = ports()
   perform(
-    [{ kind: "moveCard", move, how, queuedBy: null, fly: false, here: null }],
+    [{ kind: "move-card", move, how, queuedBy: null, fly: false, here: null }],
     p,
   )
   expect(p.fly).not.toHaveBeenCalled()
@@ -479,23 +483,23 @@ test("not needed marks a run-end report by its ask, proposed changes by its sour
   perform(
     [
       {
-        kind: "notNeeded",
+        kind: "not-needed",
         lane,
         raised: {
-          kind: "runEnd",
+          kind: "run-end",
           report: { kind: "unclassified" },
           ask: entryId("p-1"),
         },
       },
       {
-        kind: "notNeeded",
+        kind: "not-needed",
         lane,
         raised: {
           kind: "ready",
           source: cardIdFor("c1"),
         },
       },
-      { kind: "notNeeded", lane, raised: { kind: "ready", source: null } },
+      { kind: "not-needed", lane, raised: { kind: "ready", source: null } },
     ],
     p,
   )

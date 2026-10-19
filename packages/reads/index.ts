@@ -695,7 +695,7 @@ export const readTraces = (
   doc: SessionDocHandle,
 ): ReadonlyMap<string, TraceRecord> => readRecords(doc, TRACE)
 
-/** Each thread's last run's end report (`pinetrie.runEndReport`), by lane. */
+/** Each thread's last run's end report (`pinetrie.run-end-report`), by lane. */
 export const readRunEndReports = (
   doc: SessionDocHandle,
 ): ReadonlyMap<ThreadId, RunEndReportRecord> => readRecords(doc, RUN_END_REPORT)

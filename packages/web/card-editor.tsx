@@ -411,7 +411,7 @@ export function CardEditor(p: {
       onClearCommand={
         card === undefined || readOnly !== null
           ? null
-          : () => p.onAct({ kind: "setCommand", card: card.id, command: null })
+          : () => p.onAct({ kind: "set-command", card: card.id, command: null })
       }
       onTrash={() => {
         if (card !== undefined) p.onAct({ kind: "trash", card: card.id })
@@ -776,7 +776,7 @@ export function NewCardBox(p: {
     },
     readOnly: false,
     make: (card, text) => {
-      p.onAct({ kind: "newCard", card, to: p.to, text })
+      p.onAct({ kind: "new-card", card, to: p.to, text })
       return true
     },
   })

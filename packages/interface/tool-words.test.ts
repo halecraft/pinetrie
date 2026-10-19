@@ -27,7 +27,9 @@ describe("toolWord", () => {
   })
   test("a tool pine·trie does not register goes by its own name", () => {
     expect(toolWord("mystery")).toBe("mystery")
-    expect(toolWord("constructor")).toBe("constructor")
+    expect(toolWord("function Object() { [native code] }")).toBe(
+      "function Object() { [native code] }",
+    )
   })
 })
 

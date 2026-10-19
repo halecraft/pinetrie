@@ -1,5 +1,5 @@
 // interface/focus-claim — what takes focus as it mounts: a plan arms one key
-// (`armFocus`), `App` holds it, and the element it names claims it once
+// (`arm-focus`), `App` holds it, and the element it names claims it once
 // (`claimFocus`). One key is armed at a time, so the newest arm wins.
 
 import type { CardId } from "@pinetrie/core"

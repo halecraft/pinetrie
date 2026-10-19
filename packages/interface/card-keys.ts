@@ -44,7 +44,7 @@ export function newCardKeys(
   const act = cardKeyAct(event, card, among)
   if (act === null) return { acts: [], release: false }
   return {
-    acts: act.kind === "reorder" ? [act, { kind: "focusCard", card }] : [act],
+    acts: act.kind === "reorder" ? [act, { kind: "focus-card", card }] : [act],
     release: true,
   }
 }

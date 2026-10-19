@@ -727,8 +727,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a send does not follow",
     file: "packages/web/column.tsx",
-    from: '    end.follow()\n    if (unstarted) p.onIntent({ kind: "sentFirst", card: p.column.thread })\n',
-    to: '    if (unstarted) p.onIntent({ kind: "sentFirst", card: p.column.thread })\n',
+    from: '    end.follow()\n    if (unstarted) p.onIntent({ kind: "sent-first", card: p.column.thread })\n',
+    to: '    if (unstarted) p.onIntent({ kind: "sent-first", card: p.column.thread })\n',
     suite: "browser",
     scenario: "tools",
     expect: "your own send brings the column back to its end",
@@ -2256,7 +2256,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a closed branch's button opens nothing",
     file: "packages/web/message.tsx",
-    from: '                onClick={() => p.onAct({ kind: "openAt", entry: b.rootId })}',
+    from: '                onClick={() => p.onAct({ kind: "open-at", entry: b.rootId })}',
     to: "                onClick={() => {}}",
     suite: "browser",
     scenario: "page",
@@ -2351,7 +2351,7 @@ export const mutations: readonly Mutation[] = [
     name: "＋ canvas keeps a ▾ of other kinds",
     file: "packages/interface/start-button.ts",
     from: "    more: null,",
-    to: '    more: {\n      items: [\n        { key: "chat", label: "chat", name: "new chat", title: "a chat", intent: { kind: "newCanvas" } },\n      ],\n      label: "other ways to start",\n    },',
+    to: '    more: {\n      items: [\n        { key: "chat", label: "chat", name: "new chat", title: "a chat", intent: { kind: "new-canvas" } },\n      ],\n      label: "other ways to start",\n    },',
     suite: "browser",
     scenario: "page",
     expect:
@@ -2399,7 +2399,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "Not you? forgets no one",
     file: "packages/web/account-menu.tsx",
-    from: '          onChoose: () => onIntent({ kind: "signOut" }),',
+    from: '          onChoose: () => onIntent({ kind: "sign-out" }),',
     to: "          onChoose: () => {},",
     suite: "browser",
     scenario: "page",
@@ -2600,8 +2600,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the page undoes no move",
     file: "packages/interface/perform.ts",
-    from: '    case "undoMoves":\n      void ports.session\n',
-    to: '    case "undoMoves":\n      return\n      void ports.session\n',
+    from: '    case "undo-moves":\n      void ports.session\n',
+    to: '    case "undo-moves":\n      return\n      void ports.session\n',
     suite: "browser",
     scenario: "page",
     expect:
@@ -2611,7 +2611,7 @@ export const mutations: readonly Mutation[] = [
     name: "a drop asks for nothing",
     file: "packages/interface/drag.ts",
     from: '            {\n              kind: "put",\n              source: { kind: "card", card: source.card },',
-    to: '            {\n              kind: "foldList",\n              source: { kind: "card", card: source.card },',
+    to: '            {\n              kind: "fold-list",\n              source: { kind: "card", card: source.card },',
     suite: "browser",
     scenario: "page",
     expect: "dragging a slot onto another column's foot puts its card there",
@@ -2620,7 +2620,7 @@ export const mutations: readonly Mutation[] = [
     name: "a restore brings nothing back",
     file: "packages/web/canvas-column.tsx",
     from: '                      kind: "restore",',
-    to: '                      kind: "foldList",',
+    to: '                      kind: "fold-list",',
     suite: "browser",
     scenario: "page",
     expect:
@@ -2842,7 +2842,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "unqueue all does nothing on the page",
     file: "packages/web/dock.tsx",
-    from: '  else if (item === "unqueue-all") onAct({ kind: "unqueueAll", lane })',
+    from: '  else if (item === "unqueue-all") onAct({ kind: "unqueue-all", lane })',
     to: '  else if (item === "unqueue-all") void 0',
     suite: "browser",
     scenario: "page",
@@ -2982,7 +2982,7 @@ export const mutations: readonly Mutation[] = [
     name: "a column's ⋯ copies nothing",
     file: "packages/web/column-menu.tsx",
     from: "          onChoose: () => p.onIntent(item.intent),\n",
-    to: '          onChoose: () => item.intent.kind === "copyThread" || p.onIntent(item.intent),\n',
+    to: '          onChoose: () => item.intent.kind === "copy-thread" || p.onIntent(item.intent),\n',
     suite: "browser",
     scenario: "page",
     expect:

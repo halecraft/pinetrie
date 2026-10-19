@@ -1,4 +1,4 @@
-import { threadIdFor, writerId } from "@pinetrie/core"
+import { ERR, threadIdFor, writerId } from "@pinetrie/core"
 import {
   type AccessRecord,
   emptyAccess,
@@ -128,7 +128,7 @@ test("an answer out makes the buttons wait; a refused one is said", () => {
   expect(
     accessWords(view, {
       kind: "refused",
-      code: "not_owner",
+      code: ERR.NOT_OWNER,
       action: "allow",
       message: "only this host's owner answers",
     }).note,

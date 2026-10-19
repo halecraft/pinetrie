@@ -128,7 +128,7 @@ type AskPlan =
   | { readonly kind: "generate"; readonly direction: string | null }
   /** Write the record: a pasted image. */
   | { readonly kind: "write"; readonly sha: Sha256 }
-  | { readonly kind: "refused"; readonly reason: "not_stored" | "off" }
+  | { readonly kind: "refused"; readonly reason: "not-stored" | "off" }
 
 /**
  * A pasted image is used when stored and refused otherwise, whatever the
@@ -143,7 +143,7 @@ export const planAsk = (
   ask.image !== null
     ? stored(ask.image)
       ? { kind: "write", sha: ask.image }
-      : { kind: "refused", reason: "not_stored" }
+      : { kind: "refused", reason: "not-stored" }
     : draws
       ? { kind: "generate", direction: ask.direction }
       : { kind: "refused", reason: "off" }
@@ -156,7 +156,7 @@ export type BannerAnswer =
   | { readonly kind: "set" }
   | {
       readonly kind: "refused"
-      readonly reason: "not_stored" | "no_thread" | "off"
+      readonly reason: "not-stored" | "no-thread" | "off"
     }
 
 /** A plan as the tool's answer, given once it is planned. */

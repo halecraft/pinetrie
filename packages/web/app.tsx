@@ -102,6 +102,7 @@ import {
   planIntent,
   planReading,
   projectColumns,
+  type ReviewPrefs,
   type RootDrag,
   type RowMemory,
   railStubWords,
@@ -213,11 +214,7 @@ import { nameFor, presenceColors, writerOrder } from "./presence.tsx"
 import { ProfilePage } from "./profile-page.tsx"
 import { EmptyRail, LiveRail } from "./rail.tsx"
 import { fetchedQuote } from "./renderings.tsx"
-import {
-  NO_PREFS,
-  type ReviewPrefs,
-  ReviewPrefsContext,
-} from "./review-prefs.ts"
+import { NO_PREFS, ReviewPrefsContext } from "./review-prefs.ts"
 import { SearchBar, SearchToggle } from "./search-bar.tsx"
 import { SetupPage } from "./setup-page.tsx"
 import { Sidebar } from "./sidebar.tsx"
@@ -1558,7 +1555,7 @@ export function App({
   useEffect(() => {
     if (whenHeld === null || index.entries[whenHeld] === undefined) return
     setWhenHeld(null)
-    onIntent({ kind: "openAt", entry: whenHeld })
+    onIntent({ kind: "open-at", entry: whenHeld })
   }, [whenHeld, index, onIntent])
   // The keys (`keyAct`): decided there, from where focus is; nothing here.
   useEffect(() => {
@@ -1595,7 +1592,7 @@ export function App({
       e.preventDefault()
       const address = parseAddress(link.dataset.address ?? "")
       if (address !== undefined && isPastAddress(address))
-        onIntent({ kind: "openAt", entry: address.entry })
+        onIntent({ kind: "open-at", entry: address.entry })
     }
     document.addEventListener("click", onClick)
     return () => document.removeEventListener("click", onClick)
@@ -1625,10 +1622,10 @@ export function App({
     canvas,
     state: stateOf.get(canvas) ?? null,
   })
-  const openAt = (entry: EntryId) => onIntent({ kind: "openAt", entry })
+  const openAt = (entry: EntryId) => onIntent({ kind: "open-at", entry })
   /** Follow `link` to `entry`: a held thread's opens nothing. */
   const openLink = (entry: EntryId, link: ThreadLink) =>
-    onIntent({ kind: "openLink", link, entry })
+    onIntent({ kind: "open-link", link, entry })
 
   // This device's name for you and the session's, made to agree once the
   // document has settled: before, a missing name means not yet arrived.
@@ -1813,7 +1810,7 @@ export function App({
                                 stubs={drawnStubs}
                                 onLink={(link, at) =>
                                   onIntent({
-                                    kind: "openLink",
+                                    kind: "open-link",
                                     link,
                                     entry: at,
                                   })

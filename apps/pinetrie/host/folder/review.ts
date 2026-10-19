@@ -3,7 +3,7 @@
 // side. It gathers for `planFolderReview`: the source paths, their stats,
 // each side's facts, and which paths gone and added hold equal bytes. A
 // file's bytes stream from its state's snapshot (`fileOut`), typed by what
-// `pathFacts` read of them, never by its name.
+// `path-facts` read of them, never by its name.
 
 import type { PathFact, PointId, RevisionReview } from "@pinetrie/core"
 import {

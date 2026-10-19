@@ -22,7 +22,7 @@ const at = (key: string): ActedAt => ({ kind: "column", key })
 
 /**
  * The effects that show `place`, and where a refusal there is said: your
- * inventory's panel; a thread's end, or a comment's entry, as `openAt` shows an
+ * inventory's panel; a thread's end, or a comment's entry, as `open-at` shows an
  * entry; a note column, unfolded; your message at a thread not yet started, its
  * card, unfolded in its canvas; a canvas's card, the board. A queued `card` is
  * scrolled to in its column's dock, which scrolls apart from the thread.
@@ -64,7 +64,7 @@ export function revealEffects(
         effects: [
           ...showCanvas(place.canvas),
           viewChangeEffect(state, place.canvas, {
-            kind: "foldCanvas",
+            kind: "fold-canvas",
             unfolded: true,
           }),
         ],
@@ -152,7 +152,7 @@ function showThread(
   return {
     effects: [
       ...planOpenEntry(end, state),
-      ...(card !== null ? [{ kind: "revealCard", card } as const] : []),
+      ...(card !== null ? [{ kind: "reveal-card", card } as const] : []),
     ],
     actedAt:
       plan?.kind === "scroll"
