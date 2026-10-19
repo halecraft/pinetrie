@@ -3,7 +3,7 @@
 // Each ask's work is drawn together, folded or open (`AskWork`), and after it
 // each proposal its run made (`ProposalCard`), outside the fold.
 
-import { ancestry, type EntryId } from "@pinetrie/core"
+import { ancestry, type EntryId, transcriptCalls } from "@pinetrie/core"
 import {
   askView,
   type ColumnRow,
@@ -56,7 +56,7 @@ function MessageListView(p: MessageListProps) {
           density={p.density}
           live={p.live}
           rows={p.rows}
-          streams={callStreams(node.toolCalls, p.tools)}
+          streams={callStreams(transcriptCalls(node), p.tools)}
           closedBranches={node.branches.filter(b => !p.shown.has(b.rootId))}
           forkTracks={p.forks.get(node.id) ?? []}
           join={p.joins.get(node.id)}

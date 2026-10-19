@@ -26,6 +26,7 @@ import {
   canvasCard,
   entriesById,
   entry,
+  personMessage,
   withThreads,
 } from "@pinetrie/core/fixtures"
 import type { ClipLookups } from "./effects.ts"
@@ -35,7 +36,11 @@ export {
   entriesById,
   entry,
   fromParents,
+  lineMessage,
+  personMessage,
   threadOfEntry,
+  toolResultMessage,
+  transcriptMessage,
   withThreads,
 } from "@pinetrie/core/fixtures"
 
@@ -49,7 +54,7 @@ export const indexEntries = (list: Iterable<EntryLike>): TreeIndex =>
   indexTree(withThreads(entriesById(list)))
 
 /**
- * A tree of chat messages from `child: parent` pairs, each message's text its
+ * A tree of people's messages from `child: parent` pairs, each message's text its
  * id; `sends` gives some entries a send id.
  */
 export const tree = (
@@ -58,11 +63,11 @@ export const tree = (
 ): TreeIndex =>
   indexEntries(
     Object.entries(parents).map(([id, parentId]) =>
-      entry(id, parentId, {
-        role: "person",
-        content: id,
-        ...(sends[id] === undefined ? {} : { sendId: sends[id] }),
-      }),
+      entry(
+        id,
+        parentId,
+        personMessage(id, sends[id] === undefined ? {} : { sendId: sends[id] }),
+      ),
     ),
   )
 

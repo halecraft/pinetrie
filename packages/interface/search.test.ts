@@ -1,6 +1,11 @@
 import { canvasIdFor, entryId, projectRail } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
-import { entry, indexEntries } from "./fixtures.ts"
+import {
+  entry,
+  indexEntries,
+  personMessage,
+  toolResultMessage,
+} from "./fixtures.ts"
 import {
   parseQuery,
   type Query,
@@ -103,7 +108,7 @@ test("every match in a message is found, in order", () => {
 
 test("searchCorpus: every message of the root, as a reader sees its text", () => {
   const index = indexEntries([
-    entry("1", null, { role: "person", content: "Fix the rail" }),
+    entry("1", null, personMessage("Fix the rail")),
     entry("2", "1", {
       role: "assistant",
       content: [
@@ -116,8 +121,8 @@ test("searchCorpus: every message of the root, as a reader sees its text", () =>
         },
       ],
     }),
-    entry("3", "2", { role: "toolResult", toolCallId: "c", content: "rail" }),
-    entry("4", "1", { role: "person", content: "a branch" }),
+    entry("3", "2", toolResultMessage({ toolCallId: "c", content: "rail" })),
+    entry("4", "1", personMessage("a branch")),
   ])
   expect(searchCorpus(index, projectRail(index, entryId("1")))).toEqual([
     { id: "1", text: "Fix the rail" },

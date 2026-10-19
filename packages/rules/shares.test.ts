@@ -1,10 +1,18 @@
 import {
+  type AgentMessageLike,
   type BlobRef,
   ERR,
   type ImageRef,
   type Sha256,
   type Share,
+  writerId,
 } from "@pinetrie/core"
+import {
+  cardIdFor,
+  FIXTURE_THREAD,
+  personMessage,
+  toolResultMessage,
+} from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   fenceFor,
@@ -272,14 +280,24 @@ describe("a share's quote", () => {
 })
 
 describe("what a thread may save", () => {
-  const messages = [
-    { role: "custom", content: `look ![a](/blob/${A})` },
+  const messages: readonly AgentMessageLike[] = [
+    personMessage(`look ![a](/blob/${A})`),
     {
-      role: "custom",
-      content: `<pinned-cards>\n<card by="Ada">\n[spec](/blob/${B})\n</card>\n</pinned-cards>`,
+      role: "pinned",
+      content: "",
+      pinned: {
+        lane: FIXTURE_THREAD,
+        cards: [
+          {
+            id: cardIdFor("spec"),
+            text: `[spec](/blob/${B})`,
+            by: writerId("ada@x.io"),
+          },
+        ],
+        retired: [],
+      },
     },
-    {
-      role: "toolResult",
+    toolResultMessage({
       content: [
         {
           type: "image",
@@ -289,10 +307,10 @@ describe("what a thread may save", () => {
           height: 1,
         },
       ],
-    },
+    }),
   ]
 
-  test("readableBlobs: every blob a message on the path showed the model", () => {
+  test("readableBlobs: every blob a message on the path showed the model, a pinned card's too", () => {
     expect([...readableBlobs(messages)].sort()).toEqual([A, B, C])
     expect([...readableBlobs([])]).toEqual([])
   })

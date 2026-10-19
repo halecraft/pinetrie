@@ -11,6 +11,7 @@ import {
   entryId,
   entryThread,
   INVENTORY_SLOTS,
+  messageWriter,
   ROOT,
   type TextCardId,
   type ThreadId,
@@ -261,10 +262,11 @@ async function run(check: Checks["check"]): Promise<void> {
     check(
       "a send that finds its lane busy queues its card in one step, and the card is popped when the run ends: its queuer's message, with the edits made while it waited",
       busy.kind === "queued" &&
-        sent3?.writer === bea.writer &&
+        sent3?.role === "person" &&
+        sent3.writer === bea.writer &&
         sent3.contributors?.join() === ada.writer &&
         onHost(c3) === undefined,
-      `${busy.kind}; ${sent3?.writer ?? "not sent"}`,
+      `${busy.kind}; ${messageWriter(sent3) ?? "not sent"}`,
     )
     const neverSent = !Object.values(index3.entries).some(
       e =>
@@ -912,7 +914,8 @@ async function run(check: Checks["check"]): Promise<void> {
     check(
       "someone else's card, sent after its owner left, names them as contributor",
       sent4.kind === "appended" &&
-        msg4?.message?.writer === bea.writer &&
+        msg4?.message?.role === "person" &&
+        msg4.message.writer === bea.writer &&
         msg4.message.contributors?.join() === ada.writer &&
         onHost(c4) === undefined,
       `${sent4.kind}`,

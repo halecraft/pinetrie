@@ -1,4 +1,4 @@
-import { entryId, writerId } from "@pinetrie/core"
+import { type AgentMessageLike, entryId, writerId } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
   askLine,
@@ -8,7 +8,13 @@ import {
   outcomeWords,
   workWords,
 } from "./ask-words.ts"
-import { entry, indexEntries } from "./fixtures.ts"
+import {
+  entry,
+  indexEntries,
+  lineMessage,
+  personMessage,
+  transcriptMessage,
+} from "./fixtures.ts"
 import type { WorkStats } from "./work-stats.ts"
 
 const ada = writerId("ada@example.com")
@@ -16,29 +22,24 @@ const bea = writerId("bea@example.com")
 const nameOf = (w: string) => (w === ada ? "Ada" : "Bea")
 
 describe("askWords", () => {
-  test.each<[string, Parameters<typeof askWords>[0], string]>([
+  test.each<[string, AgentMessageLike, string]>([
     [
       "a person's message names them as they are named now",
-      {
-        role: "person",
-        text: "Fix the rail\nplease",
-        writer: ada,
-        author: "old",
-      },
+      personMessage("Fix the rail\nplease", { writer: ada, author: "old" }),
       'Ada: "Fix the rail"',
     ],
     [
       "a long first line is cut",
-      { role: "person", text: "x".repeat(60), writer: bea },
+      personMessage("x".repeat(60), { writer: bea }),
       `Bea: "${"x".repeat(48)}…"`,
     ],
     [
       "a land message is its own line",
-      { role: "land", text: "✓ got the latest: no conflicts" },
+      lineMessage("land", "✓ got the latest: no conflicts"),
       "✓ got the latest: no conflicts",
     ],
   ])("%s", (_, prompt, words) => {
-    expect(askWords(prompt, nameOf)).toBe(words)
+    expect(askWords(transcriptMessage("1", prompt), nameOf)).toBe(words)
   })
 })
 
@@ -182,8 +183,8 @@ describe("foldWords", () => {
 
 test("askLine: a prompt by a person, by the host, and none", () => {
   const index = indexEntries([
-    entry("1", null, { role: "person", content: "Fix the rail", writer: ada }),
-    entry("2", "1", { role: "land", content: "✓ catching up" }),
+    entry("1", null, personMessage("Fix the rail", { writer: ada })),
+    entry("2", "1", lineMessage("land", "✓ catching up")),
   ])
   expect(askLine(index, entryId("1"), nameOf)).toBe('Ada: "Fix the rail"')
   expect(askLine(index, entryId("2"), nameOf)).toBe("✓ catching up")

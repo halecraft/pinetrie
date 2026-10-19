@@ -23,13 +23,12 @@ const ASK_LINE = 48
  * and the `↰ answering` reference all say it so.
  */
 export function askWords(
-  prompt: Pick<TranscriptMessage, "role" | "text" | "writer" | "author">,
+  prompt: TranscriptMessage,
   nameOf: (writer: WriterId) => string,
 ): string {
   const line = firstLine(prompt.text, ASK_LINE)
   if (prompt.role !== "person") return line
-  const who =
-    prompt.writer === undefined ? (prompt.author ?? "") : nameOf(prompt.writer)
+  const who = nameOf(prompt.writer)
   return who === "" ? `"${line}"` : `${who}: "${line}"`
 }
 

@@ -905,7 +905,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   up", "get the latest and send", "split"), its queue place in the title. The card is
   then queued like any other (`planSend`, which carries the command), and
   the host carries the command out when it pops it.
-- **One-line messages** (`LINE_ROLES`, core) show as one line each: `land`,
+- **One-line messages** (`isLineRole`, core) show as one line each: `land`,
   `update`, `stack`, `carry-on`, `incoming`, and the host's facts, `fact`
   (what a command on the proposed changes did, ADR-0080; a stop, a member gone, a
   allowance used up, a canvas change) and `behind` (the base's new work). The
@@ -913,7 +913,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   `@pinetrie/interface`). The speaker label says who wrote a line, as it
   does for a person or the agent, and never what happened: the line's own
   words say that. Each row carries `.host` beside its role, so its style
-  follows `LINE_ROLES` rather than a list of roles in the stylesheet. Each
+  follows `isLineRole` rather than a list of roles in the stylesheet. Each
   line is its rule's words function (`updateLine`,
   `factLine`, `canvasFactLine`, `behindLine`, `@pinetrie/rules`); the
   update's names what it merged by `latestSourceName`.

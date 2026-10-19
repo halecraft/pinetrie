@@ -18,6 +18,7 @@ import {
   entry,
   NEW_CANVAS,
   NEW_THREAD,
+  personMessage,
   threadOfEntry,
   tree,
 } from "./fixtures.ts"
@@ -400,9 +401,18 @@ describe("planOpen", () => {
     // prompt. Neither canvas entry is a message a column draws.
     const X = threadIdFor("x")
     const canvasEntry = (id: string, parent: string, thread: ThreadId) =>
-      entry(id, parent, { role: "canvas", content: "<canvas>" }, { thread })
+      entry(
+        id,
+        parent,
+        {
+          role: "canvas",
+          content: "",
+          canvas: { canvas: canvasIdFor("c"), title: "c", lines: [], more: 0 },
+        },
+        { thread },
+      )
     const said = (id: string, parent: string, thread: ThreadId) =>
-      entry(id, parent, { role: "person", content: id }, { thread })
+      entry(id, parent, personMessage(id), { thread })
     const grown = indexTree({
       ...index.entries,
       ...entriesById([

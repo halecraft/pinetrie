@@ -9,6 +9,7 @@
 import {
   type EntryId,
   type Refusal,
+  type Role,
   type RunId,
   type RunnableLane,
   runId,
@@ -139,7 +140,7 @@ export type RunEndStep =
  * `lane-stopped` and `ended`: it closes the lane's streams, and what follows
  * reads the lane as idle.
  */
-export function planRunEnd(role: string | undefined): readonly RunEndStep[] {
+export function planRunEnd(role: Role | undefined): readonly RunEndStep[] {
   const outcome: readonly RunEndStep[] = role === "stack" ? ["split-ended"] : []
   return [
     ...outcome,

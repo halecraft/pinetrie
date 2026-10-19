@@ -1,6 +1,6 @@
 import {
+  type AgentMessageLike,
   type EntryId,
-  type EntryLike,
   entryId,
   indexAsks,
   pointId,
@@ -16,14 +16,16 @@ import {
   columnRows,
   lastEndedAsk,
 } from "./ask-view.ts"
-import { entry, indexEntries } from "./fixtures.ts"
+import {
+  entry,
+  indexEntries,
+  lineMessage,
+  personMessage as person,
+  toolResultMessage,
+} from "./fixtures.ts"
 
-type Message = NonNullable<EntryLike["message"]>
-const personMessage: Message = {
-  role: "person",
-  content: "Fix it",
-  writer: writerId("ada"),
-}
+type Message = AgentMessageLike
+const personMessage: Message = person("Fix it", { writer: writerId("ada") })
 const said = (text: string): Message => ({
   role: "assistant",
   content: [{ type: "text", text }],
@@ -42,7 +44,7 @@ const index = indexEntries([
       },
     ],
   }),
-  entry("4-r", "3-a", { role: "toolResult", toolCallId: "c1", content: "ok" }),
+  entry("4-r", "3-a", toolResultMessage({ toolCallId: "c1", content: "ok" })),
   entry("5-a", "4-r", said("done")),
   entry("6-q", "5-a", personMessage),
 ])
@@ -77,11 +79,11 @@ test("columnRows: a base's news steered into a run is drawn in its ask's row", (
     entry("1-p", null, personMessage),
     entry("2-a", "1-p", said("looking")),
     entry("3-a", "2-a", said("still looking")),
-    entry("4-b", "3-a", { role: "behind", content: "↓ new work" }),
+    entry("4-b", "3-a", lineMessage("behind", "↓ new work")),
     entry("5-a", "4-b", said("more")),
     entry("6-a", "5-a", said("done")),
     entry("7-q", "6-a", personMessage),
-    entry("8-b", "7-q", { role: "behind", content: "↓ newer work" }),
+    entry("8-b", "7-q", lineMessage("behind", "↓ newer work")),
   ])
   const ids = ["1-p", "2-a", "3-a", "4-b", "5-a", "6-a", "7-q", "8-b"]
   const a = indexAsks(steered)
@@ -263,7 +265,11 @@ describe("askView", () => {
   test("a stop names who stopped it", () => {
     const stopped = indexEntries([
       entry("1-p", null, personMessage),
-      entry("2-a", "1-p", { ...said("wo"), stopReason: "aborted" }),
+      entry("2-a", "1-p", {
+        role: "assistant",
+        content: "wo",
+        stopReason: "aborted",
+      }),
       entry("3-f", "2-a", {
         role: "fact",
         content: "■ the run was stopped",

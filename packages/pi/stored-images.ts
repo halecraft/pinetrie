@@ -6,7 +6,6 @@
 import {
   type ImageMime,
   type ImageRef,
-  type MessagePart,
   type Sha256,
   storedImage,
 } from "@pinetrie/core"
@@ -66,7 +65,7 @@ export const splitImages = (message: unknown, refOf: RefOf): unknown =>
  */
 export const rejoinImages = (message: unknown, blobOf: BlobOf): unknown =>
   mapParts(message, p => {
-    const sha = storedImage(p as MessagePart)?.sha256
+    const sha = storedImage(p)?.sha256
     if (sha === undefined) return p
     const blob = blobOf(sha)
     return blob === undefined

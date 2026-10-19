@@ -7,6 +7,8 @@
   - ADR-0051: a message's image parts in `payload` are references to the blob
     store.
   - ADR-0125: the entry row has a sixth typed column, `thread`.
+  - ADR-0185: the row stays flat and its payload sealed; what the reads decode
+    from it is a union keyed by role, not a loose shape.
 
 Supersedes the unstated `Schema.any()` choice in `packages/schema/index.ts`.
 

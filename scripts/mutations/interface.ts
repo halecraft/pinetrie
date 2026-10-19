@@ -146,8 +146,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a host's line is labelled by its role, not by pine·trie",
     file: "packages/interface/names.ts",
-    from: "  if (LINE_ROLES.has(role)) return PRODUCT_NAME\n",
-    to: "",
+    from: "      return isLineRole(message.role) ? PRODUCT_NAME : message.role\n",
+    to: "      return message.role\n",
     command: unit,
     expect: "a host's fact, as pine·trie",
   },
@@ -1303,7 +1303,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a message that only called tools offers no copy",
     file: "packages/interface/message-tools.ts",
-    from: '  const copy = node.text !== "" || (node.toolCalls?.length ?? 0) > 0',
+    from: '  const copy = node.text !== "" || transcriptCalls(node).length > 0',
     to: '  const copy = node.text !== ""',
     command: unit,
     expect: "offered for a message with text or tool calls",
@@ -1465,7 +1465,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an edit never adds @agent",
     file: "packages/interface/message-tools.ts",
-    from: "      node.compelled === true && !named\n",
+    from: '      node.role === "person" && node.compelled && !named\n',
     to: "      false\n",
     command: unit,
     expect: "asks the agent exactly when the original did",
@@ -1473,7 +1473,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an edit always adds @agent",
     file: "packages/interface/message-tools.ts",
-    from: "      node.compelled === true && !named\n",
+    from: '      node.role === "person" && node.compelled && !named\n',
     to: "      true\n",
     command: unit,
     expect: "asks the agent exactly when the original did",
@@ -2297,8 +2297,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a message that only called tools draws an empty text too",
     file: "packages/interface/message-tools.ts",
-    from: '  node.text !== "" || node.toolCalls === undefined',
-    to: '  node.text !== "" && node.toolCalls === undefined',
+    from: '  node.text !== "" || transcriptCalls(node).length === 0',
+    to: '  node.text !== "" && transcriptCalls(node).length === 0',
     command: unit,
     expect: "showsText: a message that only called tools shows only its rows",
   },
@@ -4043,8 +4043,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an edit sends after the canvas list its message's run wrote",
     file: "packages/interface/column-view.ts",
-    from: '    BEFORE_PROMPT.has(index.entries[at]?.message?.role ?? "")\n  )\n    at = index.parentOf(at)\n  return at',
-    to: "    false\n  )\n    at = index.parentOf(at)\n  return at",
+    from: "  while (at !== null && isBeforePrompt(index, at)) at = index.parentOf(at)",
+    to: "  while (at !== null && false) at = index.parentOf(at)",
     command: unit,
     expect:
       "pinnedMarkers: a run's canvas pins and canvas list, above its prompt, mark it too",
@@ -4837,8 +4837,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an edit sends again from below the lane's prompt its run wrote",
     file: "packages/interface/column-view.ts",
-    from: 'const BEFORE_PROMPT: ReadonlySet<string> = new Set([\n  "system",\n',
-    to: "const BEFORE_PROMPT: ReadonlySet<string> = new Set([\n",
+    from: 'const BEFORE_PROMPT: ReadonlySet<Role> = new Set<Role>([\n  "system",\n',
+    to: "const BEFORE_PROMPT: ReadonlySet<Role> = new Set<Role>([\n",
     command: unit,
     expect:
       "promptParent: an edit sends again from above the lane's prompt its run wrote",

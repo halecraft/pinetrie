@@ -1,4 +1,5 @@
 import {
+  canvasIdFor,
   entryId,
   indexTree,
   NO_CONTENT,
@@ -13,6 +14,7 @@ import {
   entriesById,
   entry,
   fromParents,
+  personMessage,
   threadOfEntry,
 } from "@pinetrie/core/fixtures"
 import { NO_INTENTS, type Slots, settleSlots } from "@pinetrie/session"
@@ -153,11 +155,9 @@ describe("inventoryView", () => {
 test("a thread's glance: its name, its first line, where it ended, and its status", () => {
   const T = threadIdFor("t")
   const index = indexTree(
-    fromParents({ "1-r": null, "2-a": "1-r" }, id => ({
-      role: "person",
-      content: "",
-      details: { author: ADA, authorName: "Ada", text: `said ${id}` },
-    })),
+    fromParents({ "1-r": null, "2-a": "1-r" }, id =>
+      personMessage("", { author: "Ada", writer: ADA, sendId: `s-${id}` }),
+    ),
   )
   const thread = threadOfEntry("1-r")
   const glance = threadGlance({
@@ -214,19 +214,18 @@ test("a thread's glance reads its first message, not the context entry its first
   const B = threadIdFor("b")
   const index = indexTree(
     entriesById([
-      entry("1-r", null, { role: "person", content: "plan" }, { thread: T }),
+      entry("1-r", null, personMessage("plan"), { thread: T }),
       entry(
         "2-cb",
         "1-r",
-        { role: "canvas", content: "<canvas>" },
+        {
+          role: "canvas",
+          content: "",
+          canvas: { canvas: canvasIdFor("c"), title: "c", lines: [], more: 0 },
+        },
         { thread: B },
       ),
-      entry(
-        "3-b",
-        "2-cb",
-        { role: "person", content: "an aside" },
-        { thread: B },
-      ),
+      entry("3-b", "2-cb", personMessage("an aside"), { thread: B }),
       entry("4-a", "3-b", { role: "assistant", content: "ok" }, { thread: B }),
     ]),
   )
@@ -243,11 +242,9 @@ test("a thread's glance reads its first message, not the context entry its first
 
 test("a thread's preview is its path from its root, read only", () => {
   const index = indexTree(
-    fromParents({ "1-r": null, "2-a": "1-r", "3-b": "1-r" }, id => ({
-      role: "person",
-      content: id,
-      details: { author: ADA, authorName: "Ada", text: id },
-    })),
+    fromParents({ "1-r": null, "2-a": "1-r", "3-b": "1-r" }, id =>
+      personMessage(id, { author: "Ada", writer: ADA }),
+    ),
   )
   const preview = threadPreview(threadOfEntry("3-b"), index, null)
   expect(preview.kind).toBe("preview")

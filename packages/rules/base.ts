@@ -16,6 +16,7 @@ import {
   type JjBaseRecord,
   type LaneBase,
   laneFirstPrompt,
+  messageMerged,
   nearestRevision,
   type ParentThread,
   type PointId,
@@ -441,7 +442,9 @@ export function parentNow(input: {
   let upToDateWith = fork.point
   for (const id of ancestry(index, tip).path) {
     // An update, a resolution or a `catch_up` result says what it merged.
-    const merged = index.entries[id]?.message?.merged?.find(c => parents.has(c))
+    const merged = messageMerged(index.entries[id]?.message)?.find(c =>
+      parents.has(c),
+    )
     if (merged !== undefined) {
       upToDateWith = merged
       break

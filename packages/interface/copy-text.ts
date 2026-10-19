@@ -1,6 +1,10 @@
 // interface/copy-text — what a message's copy puts on the clipboard, as markdown.
 
-import type { ToolCall, TranscriptMessage } from "@pinetrie/core"
+import {
+  type ToolCall,
+  type TranscriptMessage,
+  transcriptCalls,
+} from "@pinetrie/core"
 import { callLabel } from "./tool-words.ts"
 
 /** A message's copy button: what it copies. Markdown is how, not what. */
@@ -13,7 +17,7 @@ export const COPY_MESSAGE = "copy this message"
  * images are left out. Empty for a message with neither text nor calls.
  */
 export function copyText(node: TranscriptMessage): string {
-  return [node.text, ...(node.toolCalls ?? []).map(callText)]
+  return [node.text, ...transcriptCalls(node).map(callText)]
     .filter(part => part !== "")
     .join("\n\n")
 }

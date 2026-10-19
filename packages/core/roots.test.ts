@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest"
-import { entriesById, entry } from "./fixtures.ts"
+import { entriesById, entry, personMessage } from "./fixtures.ts"
 import {
   entryId,
   indexTree,
@@ -17,7 +17,7 @@ const BEA = writerId("bea")
 
 /** A chat by `writer` at `parent`; "c" entries are not messages. */
 const said = (id: string, parentId: string | null, writer: WriterId) =>
-  entry(id, parentId, { role: "person", content: id, author: "A", writer })
+  entry(id, parentId, personMessage(id, { author: "A", writer }))
 
 // Two roots: r1 (Bea replies, then Ada branches) and r2 (a compaction only
 // between two messages); and a root with no message at all.

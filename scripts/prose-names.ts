@@ -116,7 +116,6 @@ export const OUTSIDE_NAMES: ReadonlySet<string> = new Set([
   "CEREBRAS_API_KEY",
   "CustomMessage",
   "dirnameEnvPath",
-  "EntryType",
   "executionMode",
   "InMemoryStorageState",
   "ModelsImpl",

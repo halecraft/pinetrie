@@ -5,6 +5,7 @@
 
 import {
   entryThread,
+  messageProposal,
   PROPOSE_TOOL,
   projectTranscript,
   ROOT,
@@ -50,7 +51,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     await idle()
     const tree = heldTree(host)
     const result = Object.values(tree.entries).find(
-      e => e.message?.proposal !== undefined,
+      e => messageProposal(e.message) !== undefined,
     )?.id
     const parent = result === undefined ? null : entryThread(tree, result)
     const root =
@@ -91,8 +92,9 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         ids.slice(at + 1, at + 4).join() === threads.join() &&
         prompts.every(
           (m, i) =>
-            m?.writer === user.writer &&
-            m.compelled === true &&
+            m?.role === "person" &&
+            m.writer === user.writer &&
+            m.compelled &&
             m.text === `@agent ${BRANCHES[i]?.brief}`,
         ) &&
         files.every(f => f === "from parent\n"),

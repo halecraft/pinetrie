@@ -1,5 +1,9 @@
 import { writerId } from "@pinetrie/core"
-import { entry, indexEntries } from "@pinetrie/interface/fixtures"
+import {
+  entry,
+  indexEntries,
+  personMessage,
+} from "@pinetrie/interface/fixtures"
 import { expect, test } from "vitest"
 import { presenceColors, writerOrder } from "./presence.tsx"
 
@@ -8,7 +12,7 @@ const BEA = writerId("bea")
 const CAT = writerId("cat")
 const DAN = writerId("dan")
 const said = (id: string, writer: ReturnType<typeof writerId>) =>
-  entry(id, null, { role: "person", content: "hi", writer })
+  entry(id, null, personMessage("hi", { writer }))
 
 test("writerOrder: by first message, then those only named", () => {
   const index = indexEntries([said("2", ADA), said("1", BEA), said("3", BEA)])

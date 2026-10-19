@@ -407,14 +407,15 @@ describe("parentNow and planParentUpdate: the thread a lane branched from", () =
   const node = (
     id: string,
     parentId: string | null,
-    role: string,
-    merged?: PointId[],
+    role: "user" | "assistant" | "update",
+    merged: PointId[] = [],
   ): EntryLike => ({
     id: entryId(id),
     parentId: parentId === null ? null : entryId(parentId),
     thread: FIXTURE_THREAD,
     type: "message",
-    message: { role, content: id, ...(merged === undefined ? {} : { merged }) },
+    message:
+      role === "update" ? { role, content: id, merged } : { role, content: id },
   })
   // P's prompt and two turns; L branches below P's first turn and later
   // catches up with P's third commit; P goes on to a fourth, conflicted.

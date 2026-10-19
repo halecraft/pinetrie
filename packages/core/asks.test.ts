@@ -1,6 +1,15 @@
 import { describe, expect, test } from "vitest"
-import { entriesById, entry, FIXTURE_THREAD } from "./fixtures.ts"
 import {
+  entriesById,
+  entry,
+  FIXTURE_THREAD,
+  lineMessage,
+  personMessage as person,
+  toolResultMessage,
+} from "./fixtures.ts"
+import {
+  type AgentMessageLike,
+  type AssistantMessage,
   askOutcome,
   askSpan,
   type EntryId,
@@ -21,12 +30,12 @@ import {
   writerId,
 } from "./index.ts"
 
-type Message = NonNullable<EntryLike["message"]>
-const personMessage = (text = "hi"): Message => ({
-  role: "person",
-  content: text,
-})
-const said = (text: string, extra: Partial<Message> = {}): Message => ({
+type Message = AgentMessageLike
+const personMessage = (text = "hi"): Message => person(text)
+const said = (
+  text: string,
+  extra: Partial<Omit<AssistantMessage, "role">> = {},
+): Message => ({
   role: "assistant",
   content: [{ type: "text", text }],
   ...extra,
@@ -36,12 +45,8 @@ const calls = (call: string): Message => ({
   content: [{ type: "toolCall", id: call, name: "bash", arguments: {} }],
   stopReason: "toolUse",
 })
-const result = (call: string, text = "ok", isError = false): Message => ({
-  role: "toolResult",
-  toolCallId: call,
-  content: text,
-  isError,
-})
+const result = (call: string, text = "ok", isError = false): Message =>
+  toolResultMessage({ toolCallId: call, content: text, isError })
 const build = (rows: readonly EntryLike[]): TreeIndex =>
   indexTree(entriesById(rows))
 
@@ -52,7 +57,7 @@ describe("indexAsks", () => {
     entry("3-r", "2-a", result("c1")),
     entry("4-a", "3-r", said("done")),
     entry("5-q", "4-a", personMessage("for people only")),
-    entry("6-l", "5-q", { role: "land", content: "resolving" }),
+    entry("6-l", "5-q", lineMessage("land", "resolving")),
     entry("7-a", "6-l", said("resolved")),
   ])
   const asks = indexAsks(index)
@@ -71,7 +76,7 @@ describe("indexAsks", () => {
 })
 
 test("a base's news steered in between a run's entries is steered into it; one after the run or before a prompt is not", () => {
-  const behind = (to: string): Message => ({ role: "behind", content: to })
+  const behind = (to: string): Message => lineMessage("behind", to)
   const index = build([
     entry("1-b", null, behind("before the prompt")),
     entry("2-p", "1-b", personMessage()),
@@ -93,7 +98,7 @@ test("a carry-on message starts an ask of its own; the stopped ask before it sta
   const index = build([
     entry("1-p", null, personMessage()),
     entry("2-a", "1-p", said("word wo", { stopReason: "aborted" })),
-    entry("3-c", "2-a", { role: "carry-on", content: "↻ resumed by Ada" }),
+    entry("3-c", "2-a", lineMessage("carry-on", "↻ resumed by Ada")),
     entry("4-a", "3-c", said("done", { stopReason: "stop" })),
   ])
   const asks = indexAsks(index)
@@ -135,7 +140,7 @@ test("a stop's fact names who stopped its ask, and is drawn in it: the first pre
     entry("2-a", "1-p", said("word wo", { stopReason: "aborted" })),
     entry("3-f", "2-a", stopFact("bea")),
     entry("4-f", "3-f", stopFact("cal")),
-    entry("5-c", "4-f", { role: "carry-on", content: "go on" }),
+    entry("5-c", "4-f", lineMessage("carry-on", "go on")),
   ])
   const asks = indexAsks(index)
   expect(asks.stoppedBy.get(entryId("1-p"))).toBe(writerId("bea"))
@@ -286,12 +291,7 @@ test("a thread's asks are its own runs' prompts, oldest first", () => {
     entry("3-p", "2-a", personMessage("first"), { thread: other }),
     entry("4-a", "3-p", said("one"), { thread: other }),
     entry("5-q", "4-a", personMessage("for people only"), { thread: other }),
-    entry(
-      "6-l",
-      "5-q",
-      { role: "land", content: "land it" },
-      { thread: other },
-    ),
+    entry("6-l", "5-q", lineMessage("land", "land it"), { thread: other }),
     entry("7-a", "6-l", said("landed"), { thread: other }),
   ])
   const asks = indexAsks(index)

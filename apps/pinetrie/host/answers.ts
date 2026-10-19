@@ -219,7 +219,8 @@ export function createAnswers(deps: {
       threads.thread(roots, relay.from),
     )
     if (from === null) return
-    const asked = from.index.entries[relay.source]?.message?.asks ?? []
+    const source = from.index.entries[relay.source]?.message
+    const asked = source?.role === "person" ? (source.asks ?? []) : []
     if (
       asked.length < 2 ||
       !isRoundAnswered(from.index, from.end, relay.source)

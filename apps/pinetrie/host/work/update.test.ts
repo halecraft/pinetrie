@@ -29,7 +29,14 @@ import {
 } from "@pinetrie/rules"
 import { newRootDoc, writeEntry, writeLaneTip } from "@pinetrie/schema/fixtures"
 import { describe, expect, test } from "vitest"
-import { basics, putLane, putValue, record, row } from "../fakes.ts"
+import {
+  basics,
+  putLane,
+  putValue,
+  record,
+  row,
+  storedMessage,
+} from "../fakes.ts"
 import type { LaneRegistry } from "./registry.ts"
 import type { Ready } from "./setup.ts"
 import {
@@ -545,10 +552,7 @@ describe("getLatestInRun", () => {
       name: GET_LATEST_TOOL,
       arguments: {},
     })
-    writeEntry(
-      b.root,
-      row("p-1", null, { role: "person", content: "go", writer: ADA }),
-    )
+    writeEntry(b.root, row("p-1", null, storedMessage("go", { author: ADA })))
     writeEntry(
       b.root,
       row("a-1", "p-1", {

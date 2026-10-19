@@ -198,27 +198,35 @@ export const row = (
   payload: { message },
 })
 
-/** A stored chat in `thread`, as a person's message is written. */
+/**
+ * A person's message saying `text`, as the host stores one: by the starter,
+ * its send named after its text, unless `more` says.
+ */
+export const storedMessage = (
+  text: string,
+  more: {
+    readonly author?: WriterId
+    readonly authorName?: string
+    readonly sendId?: string
+  } = {},
+): unknown =>
+  encodeMessage(
+    {
+      author: more.author ?? STARTER,
+      authorName: more.authorName ?? "Starter",
+      text,
+      compels: NOBODY,
+      sendId: more.sendId ?? `send-${text}`,
+    },
+    0,
+  )
+
+/** A stored person's message in `thread`, saying its id. */
 export const threadRow = (
   id: string,
   parentId: string | null,
   thread: ThreadId,
-): StoredEntryRow =>
-  row(
-    id,
-    parentId,
-    encodeMessage(
-      {
-        author: STARTER,
-        authorName: "Starter",
-        text: id,
-        compels: NOBODY,
-        sendId: `send-${id}`,
-      },
-      0,
-    ),
-    thread,
-  )
+): StoredEntryRow => row(id, parentId, storedMessage(id), thread)
 
 const STARTER = writerId("starter@example.com")
 

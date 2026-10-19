@@ -314,15 +314,30 @@ const BLOB_URL = /\/blob\/([0-9a-f]{64})/g
  * reads as HTML, and the model saw the URL either way.
  */
 export function readableBlobs(
-  messages: readonly (AgentMessageLike | null | undefined)[],
+  messages: readonly (AgentMessageLike | undefined)[],
 ): ReadableBlobs {
   const shas = new Set<Sha256>()
   for (const message of messages) {
-    for (const [, sha] of messageText(message).matchAll(BLOB_URL))
+    for (const [, sha] of shownText(message).matchAll(BLOB_URL))
       if (sha !== undefined && isSha256(sha)) shas.add(sha)
     for (const image of messageImages(message)) shas.add(image.sha256)
   }
   return shas as ReadonlySet<Sha256> as ReadableBlobs
+}
+
+/**
+ * A message's text as the model read it: a cards entry's is its cards',
+ * which the reads keep apart from the content they were sent in.
+ */
+function shownText(message: AgentMessageLike | undefined): string {
+  switch (message?.role) {
+    case "pinned":
+      return message.pinned.cards.map(c => c.text).join("\n")
+    case "canvas-pinned":
+      return message.canvasPinned.cards.map(c => c.text).join("\n")
+    default:
+      return messageText(message)
+  }
 }
 
 /** `save_blob`'s blob as the agent passed it: `/blob/<sha256>`, or the hash alone. */

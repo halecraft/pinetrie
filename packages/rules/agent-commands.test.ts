@@ -207,7 +207,7 @@ describe("planSplitCall", () => {
   }
 
   test("a split card queued by the person behind the run, with no text, from any run", () => {
-    for (const prompt of ["person", "land"])
+    for (const prompt of ["person", "land"] as const)
       expect(split({ prompt })).toMatchObject({
         kind: "queue",
         step: {

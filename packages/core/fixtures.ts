@@ -3,6 +3,7 @@
 // it, and other packages' tests as `@pinetrie/core/fixtures`; production code
 // never imports it.
 
+import { pointId } from "./bases.ts"
 import { type CanvasCard, makeCard, NO_CONTENT } from "./cards.ts"
 import {
   type CanvasId,
@@ -17,7 +18,15 @@ import {
   workflowStateIdFor,
   writerId,
 } from "./ids.ts"
-import type { AgentMessageLike, EntryLike } from "./tree.ts"
+import type {
+  AgentMessageLike,
+  EntryLike,
+  EntryType,
+  PersonMessage,
+  ToolResultMessage,
+  TranscriptMessage,
+} from "./messages.ts"
+import { entryMessage, indexTree } from "./tree.ts"
 
 /**
  * A text card's id for a test, a uuidv7 that `parseCardId` takes, from a
@@ -47,6 +56,68 @@ export const canvasCard = (
 ): CanvasCard =>
   makeCard("canvas", canvas, { kind: "board", state, order }, NO_CONTENT, by)
 
+/**
+ * A person's message as the reads decode one: by `author` ("ada" unless
+ * given), whose writer is `<author>@x.io`, not compelling, its send named
+ * after its text; `more` overrides any of it.
+ */
+export const personMessage = (
+  text: string,
+  more: Partial<Omit<PersonMessage, "role" | "content">> = {},
+): PersonMessage => {
+  const author = more.author ?? "ada"
+  return {
+    role: "person",
+    content: text,
+    author,
+    compelled: false,
+    writer: writerId(`${author.toLowerCase()}@x.io`),
+    sendId: `send-${text}`,
+    ...more,
+  }
+}
+
+/** A tool's result as the reads decode one: answering call `c1`, no error, no text, unless `more` says. */
+export const toolResultMessage = (
+  more: Partial<Omit<ToolResultMessage, "role">> = {},
+): ToolResultMessage => ({
+  role: "toolResult",
+  content: "",
+  toolCallId: "c1",
+  isError: false,
+  ...more,
+})
+
+/**
+ * One of the host's one-line messages as the reads decode one, saying
+ * `content`: a land or an update merged nothing, a base's news told of
+ * state `base` with no files.
+ */
+export function lineMessage(
+  role: "land" | "update" | "behind" | "stack" | "carry-on" | "fact",
+  content: string,
+): AgentMessageLike {
+  switch (role) {
+    case "land":
+    case "update":
+      return { role, content, merged: [] }
+    case "behind":
+      return {
+        role,
+        content,
+        behind: {
+          from: { kind: "accepted" },
+          to: pointId("base"),
+          files: [],
+          overlap: [],
+          conflicts: [],
+        },
+      }
+    default:
+      return { role, content }
+  }
+}
+
 /** The thread a fixture's entry is in when its test names none. */
 export const FIXTURE_THREAD = threadIdFor("fixture")
 
@@ -59,7 +130,7 @@ export const entry = (
   parentId: string | null,
   message?: AgentMessageLike,
   more: {
-    readonly type?: string
+    readonly type?: EntryType
     readonly timestamp?: number
     readonly thread?: ThreadId
   } = {},
@@ -71,6 +142,21 @@ export const entry = (
   ...(message === undefined ? {} : { message }),
   ...(more.timestamp === undefined ? {} : { timestamp: more.timestamp }),
 })
+
+/**
+ * What a reader sees of `message` at entry `id`: core's own projection of
+ * it, in `thread`. Throws for a message no column draws.
+ */
+export function transcriptMessage(
+  id: string,
+  message: AgentMessageLike,
+  thread: ThreadId = FIXTURE_THREAD,
+): TranscriptMessage {
+  const e = entry(id, null, message, { thread })
+  const seen = entryMessage(indexTree({ [e.id]: e }), e.id)
+  if (seen === null) throw new Error(`no reader sees a ${message.role} message`)
+  return seen
+}
 
 /** Entries keyed by their own ids, as the reads key them. */
 export const entriesById = (

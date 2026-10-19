@@ -57,7 +57,13 @@ import {
   workingWords,
   workStripWords,
 } from "./column-view.ts"
-import { entry, indexEntries, TEST_ROOT } from "./fixtures.ts"
+import {
+  entry,
+  indexEntries,
+  personMessage,
+  TEST_ROOT,
+  toolResultMessage,
+} from "./fixtures.ts"
 import { builtInIconUrl } from "./thread-icon.ts"
 import { threadLink } from "./thread-link.ts"
 
@@ -73,13 +79,8 @@ type Line = readonly [
   parent: string | null,
   message: AgentMessageLike,
 ]
-const said = (text: string, compelled = false): AgentMessageLike => ({
-  role: "person",
-  content: text,
-  author: "Ada",
-  writer: ADA,
-  ...(compelled ? { compelled: true } : {}),
-})
+const said = (text: string, compelled = false): AgentMessageLike =>
+  personMessage(text, { author: "Ada", writer: ADA, compelled })
 const reply = (text: string): AgentMessageLike => ({
   role: "assistant",
   content: [{ type: "text", text }],
@@ -595,9 +596,7 @@ describe("columnView: the fork row of a branch opened from a proposal", () => {
       [
         "pr",
         "6",
-        {
-          role: "toolResult",
-          toolCallId: "c1",
+        toolResultMessage({
           content: "ok",
           proposal: {
             branches: [
@@ -605,7 +604,7 @@ describe("columnView: the fork row of a branch opened from a proposal", () => {
               { title: "two", brief: "do two" },
             ],
           },
-        },
+        }),
       ],
     ])
     const thread = entryThread(index, entryId("b1"))
@@ -1443,7 +1442,11 @@ describe("where the agent read pinned cards", () => {
       entry("1-q", null, said("q")),
       entry("2-r", "1-q", { role: "assistant", content: "r" }),
       entry("3-s", "2-r", { role: "system", content: "" }),
-      entry("4-c", "3-s", { role: "canvas", content: "", canvas: undefined }),
+      entry("4-c", "3-s", {
+        role: "canvas",
+        content: "",
+        canvas: { canvas: canvasIdFor("c"), title: "c", lines: [], more: 0 },
+      }),
       entry("5-p", "4-c", said("again", true)),
     ])
     expect(promptParent(index, entryId("5-p"))).toBe("2-r")

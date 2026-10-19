@@ -1,4 +1,4 @@
-import { entryId, type TranscriptMessage } from "@pinetrie/core"
+import { entryId, writerId } from "@pinetrie/core"
 import { FIXTURE_THREAD } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import {
@@ -11,34 +11,29 @@ import {
   wordCount,
 } from "./request.ts"
 
-const message = (
-  role: string,
-  text: string,
-  author?: string,
-): TranscriptMessage => ({
+const at = (text: string) => ({
   id: entryId(text),
   thread: FIXTURE_THREAD,
-  role,
   text,
-  ...(author === undefined ? {} : { author }),
 })
 
 describe("transcriptLines", () => {
   test("people and the agent, by speaker; nothing else", () => {
     expect(
       transcriptLines([
-        message("person", "hello", "ana"),
-        message("person", "anyone?"),
-        message("user", "run it"),
-        message("assistant", "done"),
-        message("toolResult", "ok"),
+        {
+          ...at("hello"),
+          role: "person",
+          author: "ana",
+          compelled: false,
+          writer: writerId("ana@x.io"),
+          sendId: "s-1",
+        },
+        { ...at("run it"), role: "user" },
+        { ...at("done"), role: "assistant" },
+        { ...at("merged"), role: "update", merged: [] },
       ]),
-    ).toEqual([
-      "ana: hello",
-      "someone: anyone?",
-      "someone: run it",
-      "agent: done",
-    ])
+    ).toEqual(["ana: hello", "someone: run it", "agent: done"])
   })
 })
 

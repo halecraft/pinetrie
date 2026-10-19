@@ -10,10 +10,10 @@
 // interface's (`segmentPath`, `compactRail`, `@pinetrie/interface`).
 
 import { atEntry, type EntryId, type ThreadId, type WriterId } from "./ids.ts"
+import type { EntryLike } from "./messages.ts"
 import type { DiffSpan, RevisionRecord } from "./revisions.ts"
 import {
   ancestry,
-  type EntryLike,
   messageText,
   startsRun,
   type TreeIndex,
@@ -110,7 +110,8 @@ export function indexAsks(index: TreeIndex): AskIndex {
   for (const entry of entries) {
     // A stop's fact names its ask, and is drawn in it: the first names
     // who stopped it, as the first press is the one queued.
-    const stop = entry.message?.stopped
+    const stop =
+      entry.message?.role === "fact" ? entry.message.stopped : undefined
     if (stop !== undefined && index.entries[stop.prompt] !== undefined) {
       steered.set(entry.id, stop.prompt)
       if (!stoppedBy.has(stop.prompt)) stoppedBy.set(stop.prompt, stop.by)
@@ -183,8 +184,8 @@ export function askOutcome(
 ): AskOutcome {
   if (facts.running) return { kind: "running" }
   const reply = asks.work.get(prompt)?.at(-1)
-  const message =
-    reply === undefined ? undefined : index.entries[reply]?.message
+  const said = reply === undefined ? undefined : index.entries[reply]?.message
+  const message = said?.role === "assistant" ? said : undefined
   if (message?.stopReason === "error")
     return { kind: "failed", error: message.errorMessage ?? "" }
   const lastId = asks.last.get(prompt)

@@ -15,6 +15,7 @@ import {
   putValue,
   row,
   stepKeeper,
+  storedMessage,
 } from "./fakes.ts"
 import { createSplitCall } from "./split-call.ts"
 
@@ -25,10 +26,7 @@ const ADA = writerId("ada@x.io")
 function runningWithProposed() {
   const b = basics()
   putLane(b, LANE, entryId("p-1"))
-  writeEntry(
-    b.root,
-    row("p-1", null, { role: "person", content: "go", writer: ADA }),
-  )
+  writeEntry(b.root, row("p-1", null, storedMessage("go", { author: ADA })))
   writeLaneTip(b.root, LANE, entryId("p-1"))
   beginRun(b.live, LANE, runId("r-1"))
   putValue(

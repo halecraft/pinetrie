@@ -2247,7 +2247,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an asked message is not marked asked",
     file: "packages/web/message.tsx",
-    from: '    node.compelled === true ? "asked" : "",',
+    from: '    person?.compelled === true ? "asked" : "",',
     to: '    "",',
     suite: "browser",
     scenario: "page",

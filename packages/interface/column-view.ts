@@ -17,6 +17,7 @@ import {
   firstLine,
   type LaneRecord,
   type LaneView,
+  messageProposal,
   messageText,
   type PinnedCardRead,
   type PinnedView,
@@ -25,6 +26,7 @@ import {
   type ProposedChangesRecord,
   pinnedInView,
   type RevisionRecord,
+  type Role,
   runPrompt,
   type StateRecord,
   type TextPlace,
@@ -72,7 +74,7 @@ import type { ColumnView } from "./column-paths.ts"
 import { type ColumnStatus, columnStatus } from "./column-status.ts"
 import type { Column } from "./columns.ts"
 import { ago, count } from "./counts.ts"
-import { speakerWords } from "./names.ts"
+import { personWords } from "./names.ts"
 import { outcomeWords } from "./outcome-words.ts"
 import type { Reader } from "./send.ts"
 import { type ThreadFocus, threadFocus } from "./thread-glance.ts"
@@ -602,7 +604,7 @@ function originOf(
   const worked = stretches.findLast(s => above.has(s.start))
   const speaker =
     message.role === "person"
-      ? speakerWords(message, f.nameOf)
+      ? personWords(message, f.nameOf)
       : ((worked === undefined ? undefined : f.work.names.get(worked.lane)) ??
         "agent")
   return {
@@ -624,7 +626,8 @@ function proposedItem(
   const fork = f.thread === null ? undefined : f.work.forks.get(f.thread)
   if (fork?.how !== "branch" || fork.proposal === undefined) return null
   const { entry, row } = fork.proposal
-  const title = f.index.entries[entry]?.message?.proposal?.branches[row]?.title
+  const title = messageProposal(f.index.entries[entry]?.message)?.branches[row]
+    ?.title
   if (title === undefined) return null
   const lane = entryThread(f.index, entry)
   const agent = (lane === null ? undefined : f.work.names.get(lane)) ?? "agent"
@@ -1066,13 +1069,19 @@ export function pinnedMarker(
  * The roles of the entries a run's prompt is written after, in its commit:
  * `system` is the lane's prompt, written when it changed.
  */
-const BEFORE_PROMPT: ReadonlySet<string> = new Set([
+const BEFORE_PROMPT: ReadonlySet<Role> = new Set<Role>([
   "system",
   "pinned",
   "canvas-pinned",
   "canvas",
   "behind",
 ])
+
+/** Whether the entry at `at` is one a run's prompt is written after (`BEFORE_PROMPT`). */
+const isBeforePrompt = (index: TreeIndex, at: EntryId): boolean => {
+  const role = index.entries[at]?.message?.role
+  return role !== undefined && BEFORE_PROMPT.has(role)
+}
 
 /**
  * What a message was sent after, as a person sees it: its parent, past the
@@ -1084,11 +1093,7 @@ const BEFORE_PROMPT: ReadonlySet<string> = new Set([
  */
 export function promptParent(index: TreeIndex, id: EntryId): EntryId | null {
   let at = index.parentOf(id)
-  while (
-    at !== null &&
-    BEFORE_PROMPT.has(index.entries[at]?.message?.role ?? "")
-  )
-    at = index.parentOf(at)
+  while (at !== null && isBeforePrompt(index, at)) at = index.parentOf(at)
   return at
 }
 
@@ -1109,17 +1114,18 @@ export function pinnedMarkers(
     let canvas: CanvasView | undefined
     for (
       let at = index.parentOf(node.id);
-      at !== null && BEFORE_PROMPT.has(index.entries[at]?.message?.role ?? "");
+      at !== null && isBeforePrompt(index, at);
       at = index.parentOf(at)
     ) {
       const message = index.entries[at]?.message
-      if (message?.pinned !== undefined && pinned === null)
+      if (message?.role === "pinned" && pinned === null)
         pinned = pinnedMarker(
           message.pinned,
           pinnedInView(index, index.parentOf(at)),
         )
-      canvasPinned ??= message?.canvasPinned
-      canvas ??= message?.canvas
+      if (message?.role === "canvas-pinned")
+        canvasPinned ??= message.canvasPinned
+      if (message?.role === "canvas") canvas ??= message.canvas
     }
     const told =
       canvasPinned !== undefined &&

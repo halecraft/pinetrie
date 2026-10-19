@@ -32,24 +32,28 @@ const ARCHIVED: Reach = {
   canvas: canvasIdFor("t"),
   record: { canvas: canvasIdFor("t"), by: BEA, at: 1 },
 }
-const said = (
-  id: string,
-  role: string,
-  text: string,
-  more: Partial<TranscriptMessage> = {},
-): TranscriptMessage => ({
+const at = (id: string, text: string) => ({
   id: entryId(id),
   thread: here,
-  role,
   text,
-  ...more,
+})
+const agent = (id: string, text: string): TranscriptMessage => ({
+  ...at(id, text),
+  role: "assistant",
 })
 const path: readonly TranscriptMessage[] = [
-  said("1", "person", "please talk to @amber-fox", { author: "Ada" }),
-  said("2", "assistant", "I will ask it"),
-  said("3", "answer", "fox said so", { author: "amber-fox", from: fox }),
-  said("4", "assistant", "and now"),
-  said("5", "assistant", "asking again"),
+  {
+    ...at("1", "please talk to @amber-fox"),
+    role: "person",
+    author: "Ada",
+    compelled: true,
+    writer: writerId("ada@x.io"),
+    sendId: "s-1",
+  },
+  agent("2", "I will ask it"),
+  { ...at("3", "fox said so"), role: "answer", author: "amber-fox", from: fox },
+  agent("4", "and now"),
+  agent("5", "asking again"),
 ]
 const relay = (over: Partial<Parameters<typeof planRelay>[0]> = {}) =>
   planRelay({

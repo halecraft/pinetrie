@@ -14,6 +14,7 @@ import {
   type ThreadId,
   type ThreadLane,
   type TranscriptMessage,
+  transcriptCalls,
 } from "@pinetrie/core"
 import type { Taken } from "./clip.ts"
 import type { Prefill } from "./columns.ts"
@@ -86,7 +87,7 @@ export function messageTools(
 ): MessageTools {
   // Copying only reads, so a column that can't be written proposed changes it
   // too.
-  const copy = node.text !== "" || (node.toolCalls?.length ?? 0) > 0
+  const copy = node.text !== "" || transcriptCalls(node).length > 0
   if (!at.writable)
     return {
       copy,
@@ -125,7 +126,7 @@ function editOf(
   const named = parseMentions(node.text).some(m => m.kind === "agent")
   const prefill = {
     text:
-      node.compelled === true && !named
+      node.role === "person" && node.compelled && !named
         ? `${AGENT_PREFIX}${node.text}`
         : node.text,
     blank: false,
@@ -185,4 +186,4 @@ const takenAt = (node: TranscriptMessage, address: Address): Taken => ({
  * shows only its tool rows.
  */
 export const showsText = (node: TranscriptMessage): boolean =>
-  node.text !== "" || node.toolCalls === undefined
+  node.text !== "" || transcriptCalls(node).length === 0

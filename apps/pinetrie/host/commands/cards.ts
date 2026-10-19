@@ -31,6 +31,7 @@ import {
   type Move,
   type MoveDirection,
   type MoveHistoryScope,
+  messageWriter,
   PERSON_HISTORY,
   parseTitle,
   placeKey,
@@ -175,7 +176,7 @@ const NO_LIFT: LiftPlan = { kind: "lift", delete: [] }
 const writersOf = (index: TreeIndex): readonly (WriterId | null)[] =>
   Object.values(index.entries)
     .toSorted((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
-    .map(e => e.message?.writer ?? null)
+    .map(e => messageWriter(e.message) ?? null)
 
 /** The card commands (`createCardCommands`). */
 export type CardCommands = ReturnType<typeof createCardCommands>

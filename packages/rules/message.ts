@@ -6,7 +6,6 @@ import {
   type AgentMessageLike,
   address,
   type CanvasId,
-  CONFLICT_TOOL,
   ERR,
   GET_LATEST_TOOL,
   IMAGE_MIMES,
@@ -15,12 +14,8 @@ import {
   type Mention,
   OPAQUE_MIME,
   type PlanMode,
-  type PointId,
   type Position,
-  PROPOSE_TOOL,
-  type Proposal,
   planMode,
-  pointId,
   type Recipients,
   type Refusal,
   type Responder,
@@ -45,8 +40,8 @@ import { choiceSchema, decodeWith, ThreadIdSchema } from "./decode.ts"
 import { decodeFact, factDetail, factLine } from "./fact.ts"
 import { decodeLand, type LandMessage, landLine } from "./land.ts"
 import { type LinkedQuote, withQuotes } from "./links.ts"
+import { decodePiMessage } from "./pi-message.ts"
 import { decodePinned } from "./pinned.ts"
-import { decodeProposal } from "./proposal.ts"
 import {
   type AnswerMessage,
   decodeAnswer,
@@ -324,57 +319,20 @@ export const decodeMessage = (message: unknown): MessageDetails | undefined =>
   )
 
 /**
- * What a tool result of the host's tools says as a fact, from its
- * `details`, never its text: an `ask_about_conflict` the host took, the
- * states a `catch_up` merged, or what `propose_branches` proposed. Undefined
- * for any other message.
+ * A stored message -> what the projections render, or undefined for none. A
+ * person's message becomes role `person` with its author; a land, update,
+ * stack or carry-on message becomes role `land`, `update`, `stack` or
+ * `carry-on` with its one line, as a fact becomes role `fact` and a base's
+ * news role `behind`; a cards entry becomes role `pinned` with the cards it
+ * read, a canvas's cards entry role `canvas-pinned`, and a canvas entry role
+ * `canvas` with the list it told; an ask relayed from another thread, an
+ * answer and what an asked agent was told become roles `relay`, `answer` and
+ * `incoming` with their details. pi's own messages are decoded by
+ * `decodePiMessage`, and anything else is none.
  */
-function toolResultFacts(
+export function renderableMessage(
   message: unknown,
-):
-  | { readonly asked: true }
-  | { readonly merged: readonly PointId[] }
-  | { readonly proposal: Proposal }
-  | undefined {
-  if (typeof message !== "object" || message === null) return undefined
-  const m = message as {
-    role?: unknown
-    toolName?: unknown
-    details?: unknown
-  }
-  if (m.role !== "toolResult") return undefined
-  const details =
-    typeof m.details === "object" && m.details !== null
-      ? (m.details as { asked?: unknown; merged?: unknown })
-      : {}
-  if (m.toolName === CONFLICT_TOOL && details.asked === true)
-    return { asked: true }
-  if (
-    m.toolName === GET_LATEST_TOOL &&
-    Array.isArray(details.merged) &&
-    details.merged.every(c => typeof c === "string" && c !== "")
-  )
-    return { merged: details.merged.map(c => pointId(c as string)) }
-  if (m.toolName === PROPOSE_TOOL) {
-    const proposal = decodeProposal(m.details)
-    return proposal === undefined ? undefined : { proposal }
-  }
-  return undefined
-}
-
-/**
- * A stored message -> what the projections render. A chat becomes role `chat`
- * with its author; a land, update, stack or carry-on message becomes role
- * `land`, `update`, `stack` or `carry-on` with its one line, as a fact becomes
- * role `fact` and a base's news role `behind`; a cards entry becomes role
- * `pinned` with the cards it read, a canvas's cards entry role `canvas-pinned`, and
- * a canvas entry role `canvas` with the list it told; an ask relayed from
- * another thread, an answer and what an asked agent was told become roles
- * `relay`, `answer` and `incoming` with their details; a host tool's result keeps its role
- * and gains what it says as a fact (`asked`, `merged`, `proposal`); anything else passes
- * through unchanged for `core` to judge.
- */
-export function renderableMessage(message: unknown): AgentMessageLike {
+): AgentMessageLike | undefined {
   const land = decodeLand(message)
   if (land !== undefined)
     return { role: "land", content: landLine(land), merged: land.merged }
@@ -401,7 +359,9 @@ export function renderableMessage(message: unknown): AgentMessageLike {
           stopped: {
             prompt: fact.prompt,
             by: fact.by,
-            ...(fact.allowance === undefined ? {} : { budget: fact.allowance }),
+            ...(fact.allowance === undefined
+              ? {}
+              : { allowance: fact.allowance }),
           },
         }
       : fact.kind === "dismissed" || fact.kind === "left"
@@ -436,12 +396,9 @@ export function renderableMessage(message: unknown): AgentMessageLike {
   const sshFact = decodeSshFact(message)
   if (sshFact !== undefined)
     return { role: "fact", content: sshFactLine(sshFact) }
-  const result = toolResultFacts(message)
-  if (result !== undefined)
-    return { ...(message as AgentMessageLike), ...result }
   const decoded = decodeMessage(message)
   return decoded === undefined
-    ? (message as AgentMessageLike)
+    ? decodePiMessage(message)
     : {
         role: "person",
         content: decoded.text,

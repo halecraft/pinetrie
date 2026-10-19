@@ -21,7 +21,7 @@ import type { MarkRecord } from "./mark.ts"
 import {
   firstAndNewest,
   oneLine,
-  transcriptLine,
+  spokenLine,
   transcriptLines,
 } from "./request.ts"
 
@@ -104,11 +104,7 @@ export function planTitling(input: {
     kind: "ask",
     lines: [
       ...transcriptLines(above),
-      transcriptLine({
-        role: "person",
-        author: trigger.prompt.author,
-        text: trigger.prompt.text,
-      }),
+      spokenLine(trigger.prompt.author, trigger.prompt.text),
     ],
     by: THE_AGENT,
   }

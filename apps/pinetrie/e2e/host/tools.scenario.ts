@@ -13,6 +13,7 @@ import {
   rootDocId,
   runId,
   threadIdFor,
+  transcriptCalls,
 } from "@pinetrie/core"
 import { scriptedModel } from "@pinetrie/pi"
 import { SESSION_DOC_ID } from "@pinetrie/protocol/messages"
@@ -155,7 +156,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     await tidle()
     const resultText = () =>
       projectSpine(ttree(), tlane()?.tip ?? null)
-        .spine.flatMap(n => n.toolCalls ?? [])
+        .spine.flatMap(transcriptCalls)
         .at(-1)?.result?.text ?? ""
     // The last live update may land after the run is idle: wait for the one
     // the result ends with.
@@ -225,7 +226,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         : await u.request({ kind: "stop", lane: l5.name })
     await tidle()
     const aborted = projectSpine(ttree(), tlane()?.tip ?? null)
-      .spine.flatMap(n => n.toolCalls ?? [])
+      .spine.flatMap(transcriptCalls)
       .at(-1)
     check(
       "stop ended the command at once, recorded as aborted",
@@ -244,7 +245,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     const sleepAsk = idOfText(th, "sleep")
     const stopFacts = () =>
       Object.values(ttree().entries).filter(
-        e => e.message?.stopped !== undefined,
+        e => e.message?.role === "fact" && e.message.stopped !== undefined,
       )
     await waitFor(() => stopFacts().length > 0, 10_000)
     const tip = tlane()?.tip ?? null
@@ -257,7 +258,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         sleepAsk !== null &&
         indexAsks(ttree()).stoppedBy.get(sleepAsk) === u.writer &&
         stopFacts().length === 1,
-      `${fact?.role ?? "none"} by ${fact?.stopped?.by ?? "none"}, ${stopFacts().length} stop fact(s)`,
+      `${fact?.role ?? "none"} by ${fact?.role === "fact" ? (fact.stopped?.by ?? "none") : "none"}, ${stopFacts().length} stop fact(s)`,
     )
 
     // Resume: a new run whose prompt is the host's carry-on

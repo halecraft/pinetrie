@@ -1,8 +1,13 @@
 import { describe, expect, test } from "vitest"
-import { entriesById, entry } from "./fixtures.ts"
 import {
+  entriesById,
+  entry,
+  personMessage as person,
+  toolResultMessage,
+} from "./fixtures.ts"
+import {
+  type AgentMessageLike,
   branchesByProposal,
-  type EntryLike,
   entryId,
   indexAsks,
   indexTree,
@@ -15,17 +20,14 @@ import {
   writerId,
 } from "./index.ts"
 
-type Message = NonNullable<EntryLike["message"]>
+type Message = AgentMessageLike
 const PROPOSAL: Proposal = {
   branches: [
     { title: "one", brief: "do one" },
     { title: "two", brief: "do two" },
   ],
 }
-const personMessage = (text = "hi"): Message => ({
-  role: "person",
-  content: text,
-})
+const personMessage = (text = "hi"): Message => person(text)
 const calls = (call: string): Message => ({
   role: "assistant",
   content: [
@@ -33,12 +35,12 @@ const calls = (call: string): Message => ({
   ],
   stopReason: "toolUse",
 })
-const proposed = (call: string): Message => ({
-  role: "toolResult",
-  toolCallId: call,
-  content: "proposed",
-  proposal: PROPOSAL,
-})
+const proposed = (call: string): Message =>
+  toolResultMessage({
+    toolCallId: call,
+    content: "proposed",
+    proposal: PROPOSAL,
+  })
 const said = (text: string): Message => ({
   role: "assistant",
   content: [{ type: "text", text }],

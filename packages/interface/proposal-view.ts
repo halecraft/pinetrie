@@ -9,6 +9,7 @@ import {
   entryAsk,
   entryThread,
   type LaneView,
+  messageProposal,
   type Proposal,
   type ProposalState,
   type ProposedThread,
@@ -75,7 +76,7 @@ export function columnProposals(input: {
     if (prompt === undefined) continue
     // A tool's result is no node: it is a child of the message holding its call.
     for (const entry of index.childrenOf.get(id) ?? []) {
-      const content = index.entries[entry]?.message?.proposal
+      const content = messageProposal(index.entries[entry]?.message)
       if (content === undefined) continue
       const lane = entryThread(index, entry)
       const view = lane === null ? undefined : threadLane(input.lanes, lane)

@@ -1,4 +1,5 @@
 import {
+  type AgentMessageLike,
   type EntryId,
   entryId,
   indexAsks,
@@ -7,7 +8,7 @@ import {
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
-import { entry, indexEntries } from "./fixtures.ts"
+import { entry, indexEntries, personMessage } from "./fixtures.ts"
 import { parseQuery, searchCorpus, searchTexts } from "./search.ts"
 import {
   columnMatches,
@@ -20,7 +21,7 @@ import {
 
 const ada = writerId("ada@x.io")
 const HOUR = 3_600_000
-const said = (text: string) => ({
+const said = (text: string): AgentMessageLike => ({
   role: "assistant",
   content: [{ type: "text", text }],
 })
@@ -29,23 +30,21 @@ const index = indexEntries([
   entry(
     "1",
     null,
-    { role: "person", content: "Fix the rail", writer: ada, author: "Ada" },
+    personMessage("Fix the rail", { writer: ada, author: "Ada" }),
     { timestamp: 0 },
   ),
   entry("2", "1", said("looking at the rail"), { timestamp: HOUR }),
   entry("3", "2", said("done"), { timestamp: 2 * HOUR }),
-  entry("4", "3", {
-    role: "person",
-    content: "thanks, rail fixed",
-    writer: ada,
-    author: "Ada",
-  }),
-  entry("5", "1", {
-    role: "person",
-    content: "and the rail colours?",
-    writer: ada,
-    author: "Ada",
-  }),
+  entry(
+    "4",
+    "3",
+    personMessage("thanks, rail fixed", { writer: ada, author: "Ada" }),
+  ),
+  entry(
+    "5",
+    "1",
+    personMessage("and the rail colours?", { writer: ada, author: "Ada" }),
+  ),
 ])
 const asks = indexAsks(index)
 const nameOf = new Map([[ada, "Ada"]])

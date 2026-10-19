@@ -67,7 +67,7 @@ import {
   writerOfPrincipal,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
-import { cardIdFor, findSeqKeys } from "./fixtures.ts"
+import { cardIdFor, findSeqKeys, toolResultMessage } from "./fixtures.ts"
 
 const _TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 const TEST_THREAD = threadIdFor("e")
@@ -213,7 +213,7 @@ test("projectTranscript: non-message entries and unknown roles are dropped", () 
       id: "s",
       parentId: "m",
       type: "message",
-      message: { role: "toolResult", content: "noise" },
+      message: toolResultMessage({ content: "noise" }),
     },
   }
   assert.deepEqual(
@@ -243,18 +243,19 @@ test("projectTranscript: a cycle is reported, not spun on", () => {
   )
 })
 
-test("messageText: flattens pi's content parts", () => {
-  assert.equal(messageText({ content: "plain" }), "plain")
+test("messageText: a plain content, or its text parts joined", () => {
+  assert.equal(messageText({ role: "user", content: "plain" }), "plain")
   assert.equal(
     messageText({
+      role: "assistant",
       content: [
         { type: "text", text: "a" },
+        { type: "toolCall", id: "c", name: "bash", arguments: {} },
         { type: "text", text: "b" },
       ],
     }),
     "ab",
   )
-  assert.equal(messageText({ content: [{ type: "image" }] }), "")
   assert.equal(messageText(undefined), "")
 })
 

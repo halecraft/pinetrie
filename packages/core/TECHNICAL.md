@@ -40,6 +40,7 @@ it re-exports every module but `fixtures.ts`, which tests import as
 |---|---|
 | `ids.ts`, `kinds.ts` | every branded id and position; every kind of card |
 | `cards.ts`, `places.ts`, `paste.ts`, `grid.ts` | what a card is, where cards are and the moves between places, a paste, your inventory's grid |
+| `messages.ts` | an entry and its message as the reads decode them, one variant per role (`Role`), and what each role carries |
 | `tree.ts`, `asks.ts`, `agents.ts`, `roots.ts`, `address.ts`, `ordering.ts` | the reads of the tree, asks, other threads' agents, each root summarized, an address's codec, entries' arrival order |
 | `threads.ts` | a thread's record and how it began, and the proposal a branch was opened from |
 | `intents.ts` | every command (`Intent`), its refusals (`ERR`), where its writes go (`Target`, `ValueWrite`), a send's place in the tree |
@@ -123,6 +124,15 @@ it re-exports every module but `fixtures.ts`, which tests import as
   sort by creation (S9). Nothing reads seq, which is local to a replica
   (ADR-0013); `orderNewEntries` derives it, and `ordering.test.ts` tests that
   every replica derives the same.
+- A message's role decides its fields (ADR-0185): `AgentMessageLike` and
+  `TranscriptMessage` are unions keyed by `role`, and `MessagePart` one keyed
+  by `type`, decoded once at the edge (`@pinetrie/rules`' `renderableMessage`)
+  from the loose row pi and the host store. A read names the role it means
+  (`m?.role === "person" ? m.writer : undefined`, or `messageWriter`,
+  `messageProposal`, `messageMerged`, `transcriptCalls`). How each role
+  reads (a one-line host message, a run's prompt) is one table keyed by every
+  `Role` (`tree.ts`), so a new role does not compile until it is placed. An
+  entry whose message no role takes has none.
 - Every entry names its thread (ADR-0125), so a thread's first entry and end
   are read from its rows, and a fork's source is not stored. A thread is a
   card, and a copy is a branch at its end (ADR-0117); one taken into an

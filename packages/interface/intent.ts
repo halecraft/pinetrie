@@ -21,6 +21,7 @@ import {
   type ListKey,
   type MarkTarget,
   type MoveDirection,
+  messageProposal,
   nonEmpty,
   notesTarget,
   type Position,
@@ -1105,7 +1106,7 @@ function planProposal(
   if (canvas === undefined || root === undefined) return []
   if (press.kind === "send") {
     const view = state.layout.canvases.get(canvas)
-    const content = state.index.entries[proposal]?.message?.proposal
+    const content = messageProposal(state.index.entries[proposal]?.message)
     return press.threads.flatMap(({ thread, row }): readonly Effect[] => {
       const card = yourCard(
         state.cards.me,

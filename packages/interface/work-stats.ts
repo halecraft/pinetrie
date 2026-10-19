@@ -9,6 +9,7 @@ import {
   resultsOn,
   type ToolCall,
   type TreeIndex,
+  transcriptCalls,
   type WriterId,
 } from "@pinetrie/core"
 
@@ -96,7 +97,7 @@ export function entriesWorkStats(
   for (const id of messages) {
     const message = entryMessage(index, id)
     if (message?.role !== "assistant") people += 1
-    calls.push(...(message?.toolCalls ?? []))
+    if (message !== null) calls.push(...transcriptCalls(message))
     const record = revisions.get(id)
     for (const p of record?.paths ?? []) files.add(p)
     const disk = record?.disk ?? null

@@ -1,4 +1,5 @@
 import {
+  type AgentMessageLike,
   atEntry,
   canvasIdFor,
   type EntryLike,
@@ -12,7 +13,7 @@ import {
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
-import { FIXTURE_THREAD } from "@pinetrie/core/fixtures"
+import { FIXTURE_THREAD, personMessage } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   planTitling,
@@ -31,7 +32,7 @@ const L2 = threadIdFor("2")
 const at = (
   id: string,
   parentId: string | null,
-  message: Record<string, unknown>,
+  message: AgentMessageLike,
 ): EntryLike => ({
   id: entryId(id),
   parentId: parentId === null ? null : entryId(parentId),
@@ -44,20 +45,20 @@ const indexOf = (...entries: EntryLike[]): TreeIndex =>
 
 // A root that began as a chat, then a branch off its first message.
 const said = indexOf(
-  at("c0000000-0000-7000-8000-000000000000", null, {
-    role: "person",
-    author: "Ada",
-    content: "the rail",
-  }),
+  at(
+    "c0000000-0000-7000-8000-000000000000",
+    null,
+    personMessage("the rail", { author: "Ada" }),
+  ),
   at(
     "c0000000-0000-7000-8000-000000000001",
     "c0000000-0000-7000-8000-000000000000",
-    { role: "person", author: "Bea", content: "too tall" },
+    personMessage("too tall", { author: "Bea" }),
   ),
   at(
     "c0000000-0000-7000-8000-000000000002",
     "c0000000-0000-7000-8000-000000000000",
-    { role: "person", author: "Bea", content: "newest" },
+    personMessage("newest", { author: "Bea" }),
   ),
 )
 const lane = (l: typeof L1, root = R): LaneRecord => ({

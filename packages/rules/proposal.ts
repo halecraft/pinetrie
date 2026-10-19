@@ -12,6 +12,7 @@ import {
   type CardRecord,
   type EntryId,
   entryThread,
+  messageProposal,
   type NonEmpty,
   nonEmpty,
   type Proposal,
@@ -134,7 +135,7 @@ export function planBranchOut(input: {
     proposal: press.proposal,
     runningAsk: input.runningAsk,
   })
-  const proposal = index.entries[press.proposal]?.message?.proposal
+  const proposal = messageProposal(index.entries[press.proposal]?.message)
   if (state === null || proposal === undefined)
     return { kind: "refused", why: "no-proposal" }
   if (state.kind !== "ready") return { kind: "refused", why: state.kind }

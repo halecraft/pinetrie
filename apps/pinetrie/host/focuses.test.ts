@@ -14,6 +14,7 @@ import {
   record,
   row,
   stepKeeper,
+  storedMessage,
   writtenValues,
 } from "./fakes.ts"
 import { createFocuses } from "./focuses.ts"
@@ -36,11 +37,11 @@ function threaded(
   const b = basics()
   writeEntry(
     b.root,
-    row(entryId("e-1"), null, {
-      role: "person",
-      author: "Ada",
-      content: "fix the rail",
-    }),
+    row(
+      entryId("e-1"),
+      null,
+      storedMessage("fix the rail", { authorName: "Ada" }),
+    ),
   )
   writeEntry(
     b.root,
@@ -48,11 +49,11 @@ function threaded(
   )
   writeEntry(
     b.root,
-    row(entryId("e-3"), "e-2", {
-      role: "person",
-      author: "Ada",
-      content: "now billing",
-    }),
+    row(
+      entryId("e-3"),
+      "e-2",
+      storedMessage("now billing", { authorName: "Ada" }),
+    ),
   )
   writeEntry(
     b.root,

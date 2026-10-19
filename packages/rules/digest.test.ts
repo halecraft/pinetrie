@@ -1,11 +1,16 @@
 import {
+  type AgentMessageLike,
   type EntryLike,
   entryId,
   indexAsks,
   indexTree,
   rootIdFor,
 } from "@pinetrie/core"
-import { FIXTURE_THREAD } from "@pinetrie/core/fixtures"
+import {
+  FIXTURE_THREAD,
+  lineMessage,
+  personMessage,
+} from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   DIGEST_EVERY,
@@ -270,7 +275,7 @@ describe("planDigest", () => {
   const at = (
     id: string,
     parentId: string | null,
-    message: Record<string, unknown>,
+    message: AgentMessageLike,
   ): EntryLike => ({
     id: entryId(id),
     parentId: parentId === null ? null : entryId(parentId),
@@ -283,17 +288,17 @@ describe("planDigest", () => {
   const index = indexTree(
     Object.fromEntries(
       [
-        at("p-0", null, { role: "person", author: "Ada", content: "first" }),
+        at("p-0", null, personMessage("first", { author: "Ada" })),
         at("w-0", "p-0", { role: "assistant", content: "did first" }),
-        at("p-1", "w-0", { role: "person", author: "Bea", content: "second" }),
+        at("p-1", "w-0", personMessage("second", { author: "Bea" })),
         at("w-1", "p-1", { role: "assistant", content: "reading" }),
         at("w-2", "w-1", { role: "assistant", content: "editing" }),
         at("w-3", "w-2", { role: "assistant", content: "did second" }),
-        at("p-2", "w-3", { role: "land", content: "land it" }),
+        at("p-2", "w-3", lineMessage("land", "land it")),
         at("w-4", "p-2", { role: "assistant", content: "rebasing" }),
         at("w-5", "w-4", { role: "assistant", content: "testing" }),
         at("w-6", "w-5", { role: "assistant", content: "landed" }),
-        at("p-3", "w-6", { role: "person", author: "Ada", content: "thanks" }),
+        at("p-3", "w-6", personMessage("thanks", { author: "Ada" })),
       ].map(e => [e.id, e]),
     ),
   )

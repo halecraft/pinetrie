@@ -11,7 +11,7 @@ import {
   type WriterId,
   writerId,
 } from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
+import { cardIdFor, personMessage } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import { entry, indexEntries } from "./fixtures.ts"
 import {
@@ -32,7 +32,7 @@ const BEA = writerId("bea@x.io")
 /** A prompt and its reply, stopped or answered; stopped, its stop's fact names `by`. */
 const index = (stopped: boolean, by: WriterId | null = null) =>
   indexEntries([
-    entry("1", null, { role: "person", content: "go" }),
+    entry("1", null, personMessage("go")),
     entry("2", "1", {
       role: "assistant",
       content: [{ type: "text", text: "half" }],

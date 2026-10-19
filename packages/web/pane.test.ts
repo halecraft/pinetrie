@@ -8,8 +8,9 @@ import {
   type Sha256,
   type SpineNode,
   threadIdFor,
+  writerId,
 } from "@pinetrie/core"
-import { FIXTURE_THREAD } from "@pinetrie/core/fixtures"
+import { FIXTURE_THREAD, personMessage } from "@pinetrie/core/fixtures"
 import type { ReviewTarget } from "@pinetrie/interface"
 import { entry, indexEntries } from "@pinetrie/interface/fixtures"
 import { describe, expect, test } from "vitest"
@@ -39,11 +40,18 @@ const target: ReviewTarget = {
   conflicts: [],
   workingCopyEdits: [],
 }
-const node = (id: string, text: string): SpineNode => ({
+const node = (
+  id: string,
+  text: string,
+): Extract<SpineNode, { readonly role: "person" }> => ({
   id: entryId(id),
   thread: FIXTURE_THREAD,
   role: "person",
   text,
+  author: "ada",
+  compelled: false,
+  writer: writerId("ada@x.io"),
+  sendId: `s-${id}`,
   branches: [],
 })
 const TABLES = "| State | When |\n|---|---|\n| x | y |\n\n| a |\n|---|\n| 1 |"
@@ -188,7 +196,7 @@ describe("paneView", () => {
 
 describe("askReviewTarget", () => {
   const index = indexEntries([
-    entry("p", null, { role: "person", content: "do it" }),
+    entry("p", null, personMessage("do it")),
     entry("a", "p", {
       role: "assistant",
       content: [{ type: "text", text: "done" }],

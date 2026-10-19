@@ -11,263 +11,28 @@
 // A tool's result is its own entry, but it belongs to its call: `projectSpine`
 // pairs it with the call on the same path, and it is never a message itself.
 
-import type { LatestFrom, PointId } from "./bases.ts"
+import type { PointId } from "./bases.ts"
 import {
   atEntry,
-  type CanvasId,
-  type CardId,
   type EntryId,
   type Position,
   type ThreadId,
   type WriterId,
 } from "./ids.ts"
-import { type ImageRef, isImageMime, isSha256, type Share } from "./images.ts"
+import { type ImageRef, isImageMime, isSha256 } from "./images.ts"
 import type { SendAt } from "./intents.ts"
 import type {
-  AnswerDetails,
-  IncomingDetails,
-  RelayDetails,
-} from "./mentions.ts"
-import type { Proposal } from "./threads.ts"
+  AgentMessageLike,
+  CanvasPinnedView,
+  CanvasView,
+  EntryLike,
+  PinnedView,
+  Role,
+  ToolCall,
+  ToolResult,
+  TranscriptMessage,
+} from "./messages.ts"
 import { callIntent, callSubject } from "./tools.ts"
-
-// ── entries and messages ──────────────────────────────────────────────────
-
-export interface MessagePart {
-  readonly type?: string
-  readonly text?: string
-  /** A `toolCall` part: the call's id, the tool, and its arguments. */
-  readonly id?: string
-  readonly name?: string
-  readonly arguments?: unknown
-  /**
-   * An `image` part as the session stores it: the blob its bytes are in. An
-   * image pi wrote inline has `data` instead.
-   */
-  readonly sha256?: string
-  readonly mimeType?: string
-  readonly width?: number
-  readonly height?: number
-  readonly data?: string
-}
-
-/**
- * What a thread is told when its base has new work: a behind entry's details,
- * decoded. `to` is the base's state it was told of, so it is told once per
- * state.
- */
-export interface BehindView {
-  readonly from: LatestFrom
-  readonly to: PointId
-  /** The files catching up would change. */
-  readonly files: readonly string[]
-  /** Those of `files` this thread's work changes too. */
-  readonly overlap: readonly string[]
-  /** The files the thread's proposed changes conflict in with the base now. */
-  readonly conflicts: readonly string[]
-}
-
-/** One pinned card as a run read it. */
-export interface PinnedCardRead {
-  readonly id: CardId
-  readonly text: string
-  /** The card's owner, named in what the model read by their display name then. */
-  readonly by: WriterId
-}
-
-/** The pinned cards a run read: a cards entry's details, decoded. */
-export interface PinnedView {
-  /** The lane of the run that read them. */
-  readonly lane: ThreadId
-  /** Every card pinned at the run's start, in order. */
-  readonly cards: readonly PinnedCardRead[]
-  /** Cards the model had read that are no longer pinned, with their first line. */
-  readonly retired: readonly {
-    readonly id: CardId
-    readonly line: string
-  }[]
-}
-
-/** The cards pinned to a canvas a run read: a canvas's cards entry, decoded. */
-export interface CanvasPinnedView {
-  /** The canvas they are pinned to. */
-  readonly canvas: CanvasId
-  /** Every card pinned to it at the run's start, in order. */
-  readonly cards: readonly PinnedCardRead[]
-  /** Cards the model had read that are no longer pinned, with their first line. */
-  readonly retired: readonly {
-    readonly id: CardId
-    readonly line: string
-  }[]
-}
-
-/**
- * The canvas's cards a run was told of: a canvas entry's details, decoded. One
- * line per card in the canvas's order, at most a cap of them, and how many more
- * there are.
- */
-export interface CanvasView {
-  readonly canvas: CanvasId
-  /** The canvas's title, as told. */
-  readonly title: string
-  readonly lines: readonly string[]
-  /** How many cards the list left out past its cap. */
-  readonly more: number
-}
-
-/**
- * What a run's context carries besides the conversation: the newest entry of
- * each kind, which a compaction keeps in view.
- */
-export interface ContextInView {
-  readonly pinned?: PinnedView
-  readonly canvasPinned?: CanvasPinnedView
-  readonly canvas?: CanvasView
-}
-
-export interface AgentMessageLike {
-  readonly role?: string
-  readonly content?: string | readonly MessagePart[]
-  /** Role `chat` only: the speaker's display name, as written. */
-  readonly author?: string
-  /** Role `chat` only: whether it compelled the agent to reply. */
-  readonly compelled?: boolean
-  /** Role `chat` only: the writer who sent it, from the transport. */
-  readonly writer?: WriterId
-  /** Role `chat` only: the id of the send that wrote it, for its column. */
-  readonly sendId?: string
-  /** Role `chat` only: the other people who wrote in the card it was sent from. */
-  readonly contributors?: readonly WriterId[]
-  /** Role `chat` only: the command it ran, qualified. */
-  readonly command?: string
-  /** Role `chat` only: the `/blob/` images its text shows. */
-  readonly images?: readonly ImageRef[]
-  /** Role `chat` only: the files its text shares, images among them. */
-  readonly shared?: readonly Share[]
-  /** Role `toolResult` only: the call it answers, and whether it failed. */
-  readonly toolCallId?: string
-  readonly isError?: boolean
-  /**
-   * Role `assistant` only: why pi's request ended. `aborted` is a Stop and
-   * `error` a failure; either carries `errorMessage`.
-   */
-  readonly stopReason?: string
-  readonly errorMessage?: string
-  /** Role `pinned` only: the cards a run read. */
-  readonly pinned?: PinnedView
-  /** Role `canvas-pinned` only: the cards pinned to the canvas a run read. */
-  readonly canvasPinned?: CanvasPinnedView
-  /** Role `canvas` only: the canvas's cards a run was told of. */
-  readonly canvas?: CanvasView
-  /**
-   * Roles `update` and `land`, and a `catch_up` tool result: the states merged
-   * into the lane.
-   */
-  readonly merged?: readonly PointId[]
-  /** An `ask_about_conflict` tool result the host took: the agent asked. */
-  readonly asked?: true
-  /** A `propose_branches` tool result that held a proposal. */
-  readonly proposal?: Proposal
-  /** Role `behind` only: the base's new work the thread was told of. */
-  readonly behind?: BehindView
-  /**
-   * Role `fact` only, for a stop's fact: the ask whose run was stopped, and who
-   * stopped it.
-   */
-  readonly stopped?: {
-    readonly prompt: EntryId
-    readonly by: WriterId
-    /** A spent allowance's message, when the allowance stopped it. */
-    readonly allowance?: EntryId
-  }
-  /** Role `fact` only, for a member's: who left the thread's members. */
-  readonly member?: { readonly gone: ThreadId }
-  /** Role `fact` only: what its line leaves out, such as jj's ids, shown as its title. */
-  readonly detail?: string
-  /** Role `chat` only: the other threads' agents it asks and invites. */
-  readonly asks?: readonly ThreadId[]
-  readonly invites?: readonly ThreadId[]
-  /** Role `relay` only: an ask from another thread. */
-  readonly relay?: RelayDetails
-  /** Role `answer` only: an asked agent's answer. */
-  readonly answer?: AnswerDetails
-  /** Role `incoming` only: what an asked agent was told of the thread that asked. */
-  readonly incoming?: IncomingDetails
-}
-
-export interface EntryLike {
-  readonly id: EntryId
-  readonly parentId: EntryId | null
-  readonly type: string
-  /** The thread whose commit wrote it: the row's column. */
-  readonly thread: ThreadId
-  /** Absent on entries that carry no message, e.g. a compaction. */
-  readonly message?: AgentMessageLike
-  /**
-   * A compaction only: the context entries its retained tail carries (the
-   * newest of each kind), which the model reads after the summary; absent
-   * when it carries none.
-   */
-  readonly carried?: ContextInView
-  /** When it was written, in ms since the epoch: the row's column. */
-  readonly timestamp?: number
-}
-
-export interface TranscriptMessage {
-  readonly id: EntryId
-  /** The thread its entry is in. */
-  readonly thread: ThreadId
-  readonly role: string
-  readonly text: string
-  /** Role `chat` only: the speaker's display name as sent. */
-  readonly author?: string
-  /** Role `chat` only: whether it compelled the agent to reply. */
-  readonly compelled?: boolean
-  /** Role `chat` only: who sent it, so a reader can look up their current name. */
-  readonly writer?: WriterId
-  /** Role `chat` only: the send that wrote it. */
-  readonly sendId?: string
-  /** Role `chat` only: the other people who wrote in the card it was sent from. */
-  readonly contributors?: readonly WriterId[]
-  /** Role `chat` only: the command it ran, qualified. */
-  readonly command?: string
-  /** Role `chat` only: the `/blob/` images its text shows. */
-  readonly images?: readonly ImageRef[]
-  /** Role `chat` only: the files its text shares, images among them. */
-  readonly shared?: readonly Share[]
-  /** Role `assistant` only: the tools it called, each with its result once known. */
-  readonly toolCalls?: readonly ToolCall[]
-  /** Roles `update` and `land` only: the states merged into the lane. */
-  readonly merged?: readonly PointId[]
-  /** Roles `relay`, `answer` and `incoming` only: the thread it came from. */
-  readonly from?: ThreadId
-  /** Role `fact` only: what its line leaves out, as its title. */
-  readonly detail?: string
-}
-
-/**
- * A tool call, as stored: what it is, not how it reads. Its words are
- * `@pinetrie/interface`'s (`callLabel`, `callPurpose`).
- */
-export interface ToolCall {
-  readonly id: string
-  /** The tool's name as the model called it: a `ToolId`, or a tool pine·trie does not register. */
-  readonly name: string
-  /** What it touched, whole: a path, a command, or a search's pattern and path (`callSubject`). */
-  readonly subject?: string
-  /** What it is for, in the model's plain words (`callIntent`), which a tool that takes one requires. */
-  readonly intent?: string
-  /** Its result, when the result is on the same path. */
-  readonly result?: ToolResult
-}
-
-/** A tool's result. */
-export interface ToolResult {
-  readonly text: string
-  readonly isError: boolean
-  /** The images it returned, stored as blobs. */
-  readonly images: readonly ImageRef[]
-}
 
 /**
  * A text as a label: its first non-empty line, cut to `max` characters with
@@ -283,19 +48,13 @@ export function firstLine(text: string, max: number): string {
   return line.length > max ? `${line.slice(0, max)}…` : line
 }
 
-/** Flatten pi's AgentMessage content into display text. */
-export function messageText(
-  message: AgentMessageLike | null | undefined,
-): string {
+/** A message's text: its plain content, or its text parts joined. */
+export function messageText(message: AgentMessageLike | undefined): string {
   const content = message?.content
+  if (content === undefined) return ""
   if (typeof content === "string") return content
-  if (!Array.isArray(content)) return ""
   return content
-    .filter(
-      (part): part is MessagePart & { text: string } =>
-        part?.type === "text" && typeof part.text === "string",
-    )
-    .map(part => part.text)
+    .flatMap(part => (part.type === "text" ? [part.text] : []))
     .join("")
 }
 
@@ -303,138 +62,187 @@ const isDimension = (n: unknown): n is number =>
   typeof n === "number" && Number.isInteger(n) && n > 0
 
 /**
- * An image part as the session stores it, or undefined. A part with its bytes
- * inline is not one: no `/blob/` URL serves it. The session keeps one from
- * before images were blobs, or from a host with no store.
+ * A stored part -> the image it holds as a blob, or undefined. A part with its
+ * bytes inline is not one: no `/blob/` URL serves it. The session keeps one
+ * from before images were blobs, or from a host with no store.
  */
-export function storedImage(
-  part: MessagePart | null | undefined,
-): ImageRef | undefined {
-  return part?.type === "image" &&
-    part.data === undefined &&
-    typeof part.sha256 === "string" &&
-    isSha256(part.sha256) &&
-    typeof part.mimeType === "string" &&
-    isImageMime(part.mimeType) &&
-    isDimension(part.width) &&
-    isDimension(part.height)
+export function storedImage(part: unknown): ImageRef | undefined {
+  if (typeof part !== "object" || part === null) return undefined
+  const p: {
+    readonly type?: unknown
+    readonly data?: unknown
+    readonly sha256?: unknown
+    readonly mimeType?: unknown
+    readonly width?: unknown
+    readonly height?: unknown
+  } = part
+  return p.type === "image" &&
+    p.data === undefined &&
+    typeof p.sha256 === "string" &&
+    isSha256(p.sha256) &&
+    typeof p.mimeType === "string" &&
+    isImageMime(p.mimeType) &&
+    isDimension(p.width) &&
+    isDimension(p.height)
     ? {
-        sha256: part.sha256,
-        mimeType: part.mimeType,
-        width: part.width,
-        height: part.height,
+        sha256: p.sha256,
+        mimeType: p.mimeType,
+        width: p.width,
+        height: p.height,
       }
     : undefined
 }
 
-/** The stored images in a message's content, in order (`storedImage`). */
+/**
+ * The stored images in a stored message's content, in order, whatever its
+ * role: what the blob sweep keeps, so a message the reads leave out loses
+ * none of them.
+ */
+export function storedImages(message: unknown): ImageRef[] {
+  if (typeof message !== "object" || message === null) return []
+  const { content }: { readonly content?: unknown } = message
+  return Array.isArray(content)
+    ? content.flatMap(part => storedImage(part) ?? [])
+    : []
+}
+
+/** The stored images in a message's content, in order. */
 export function messageImages(
-  message: AgentMessageLike | null | undefined,
+  message: AgentMessageLike | undefined,
 ): ImageRef[] {
   const content = message?.content
-  if (!Array.isArray(content)) return []
-  return content.flatMap(part => storedImage(part) ?? [])
+  if (content === undefined || typeof content === "string") return []
+  return content.flatMap(part =>
+    part.type === "image"
+      ? [
+          {
+            sha256: part.sha256,
+            mimeType: part.mimeType,
+            width: part.width,
+            height: part.height,
+          },
+        ]
+      : [],
+  )
 }
 
 /**
  * One entry -> the message a reader sees, or `null` if it is not one.
  *
  * The one rule for which entries are messages, shared by every view so they
- * cannot disagree. Non-message entries, and roles other than user,
- * assistant, chat and the host's own (`LINE_ROLES`), are dropped,
- * `toolResult` included: a result belongs to its call, which `projectSpine`
- * pairs it with. An assistant message carries its tool
- * calls. A `chat` message is a human's, already decoded by the reader
- * (`readTreeIndex` in `@pinetrie/reads`); core only admits the role, so it
- * needs no schema library.
+ * cannot disagree. A person's message, an ask relayed from another thread and
+ * its answer, pi's user and assistant messages and the host's one-line
+ * messages (`isLineRole`) are; a tool's result is not, since it belongs to its
+ * call, which `projectSpine` pairs it with, nor is a run's context entry, nor
+ * pi's system message. An assistant message carries its tool calls.
  */
 function renderableMessage(entry: EntryLike): TranscriptMessage | null {
-  if (entry.type !== "message") return null
-  const role = entry.message?.role ?? "unknown"
-  if (role === "person") {
-    return {
-      id: entry.id,
-      thread: entry.thread,
-      role,
-      text: messageText(entry.message),
-      author: entry.message?.author ?? "",
-      compelled: entry.message?.compelled === true,
-      ...(entry.message?.writer === undefined
-        ? {}
-        : { writer: entry.message.writer }),
-      ...(entry.message?.sendId === undefined
-        ? {}
-        : { sendId: entry.message.sendId }),
-      ...(entry.message?.contributors === undefined
-        ? {}
-        : { contributors: entry.message.contributors }),
-      ...(entry.message?.command === undefined
-        ? {}
-        : { command: entry.message.command }),
-      ...(entry.message?.images === undefined
-        ? {}
-        : { images: entry.message.images }),
-      ...(entry.message?.shared === undefined
-        ? {}
-        : { shared: entry.message.shared }),
+  const m = entry.message
+  if (entry.type !== "message" || m === undefined) return null
+  const said = { id: entry.id, thread: entry.thread, text: messageText(m) }
+  switch (m.role) {
+    case "person":
+      return {
+        ...said,
+        role: m.role,
+        author: m.author,
+        compelled: m.compelled,
+        writer: m.writer,
+        sendId: m.sendId,
+        ...(m.contributors === undefined
+          ? {}
+          : { contributors: m.contributors }),
+        ...(m.command === undefined ? {} : { command: m.command }),
+        ...(m.images === undefined ? {} : { images: m.images }),
+        ...(m.shared === undefined ? {} : { shared: m.shared }),
+      }
+    // An ask from another thread, and an asked agent's answer, are messages as
+    // a person's is, spoken by the asker and by the answering thread.
+    case "relay":
+      return {
+        ...said,
+        role: m.role,
+        author: m.relay.askerName,
+        from: m.relay.from,
+      }
+    case "answer":
+      return {
+        ...said,
+        role: m.role,
+        author: m.answer.fromName,
+        from: m.answer.from,
+      }
+    case "land":
+    case "update":
+      return { ...said, role: m.role, merged: m.merged }
+    case "incoming":
+      return { ...said, role: m.role, from: m.incoming.from }
+    case "fact":
+      return m.detail === undefined
+        ? { ...said, role: m.role }
+        : { ...said, role: m.role, detail: m.detail }
+    case "assistant": {
+      const calls = messageToolCalls(m)
+      return calls.length === 0
+        ? { ...said, role: m.role }
+        : { ...said, role: m.role, toolCalls: calls }
     }
+    case "user":
+    case "stack":
+    case "carry-on":
+    case "behind":
+      return { ...said, role: m.role }
+    case "system":
+    case "toolResult":
+    case "pinned":
+    case "canvas-pinned":
+    case "canvas":
+      return null
   }
-  // An ask from another thread, and an asked agent's answer, are messages as a
-  // chat is, spoken by the asker and by the answering thread.
-  if (role === "relay" || role === "answer") {
-    const came = role === "relay" ? entry.message?.relay : entry.message?.answer
-    const author =
-      role === "relay"
-        ? entry.message?.relay?.askerName
-        : entry.message?.answer?.fromName
-    return {
-      id: entry.id,
-      thread: entry.thread,
-      role,
-      text: messageText(entry.message),
-      author: author ?? "",
-      ...(came === undefined ? {} : { from: came.from }),
-    }
-  }
-  // A one-line message (`LINE_ROLES`) shows as its short line: the reader
-  // decodes it into its role with that line as its content.
-  if (role !== "user" && role !== "assistant" && !LINE_ROLES.has(role))
-    return null
-  const message = {
-    id: entry.id,
-    thread: entry.thread,
-    role,
-    text: messageText(entry.message),
-  }
-  const merged = entry.message?.merged
-  if ((role === "update" || role === "land") && merged !== undefined)
-    return { ...message, merged }
-  const incoming = entry.message?.incoming
-  if (role === "incoming" && incoming !== undefined)
-    return { ...message, from: incoming.from }
-  const detail = entry.message?.detail
-  if (role === "fact" && detail !== undefined) return { ...message, detail }
-  const calls = role === "assistant" ? messageToolCalls(entry.message) : []
-  return calls.length === 0 ? message : { ...message, toolCalls: calls }
 }
 
 /**
- * The host's own messages, which a column shows as one line, from pine·trie: a
- * resolution's prompt (`land`), an update and a split's prompt (`update`,
- * `stack`), a Resume's carry-on (`carry-on`), the host's facts (`fact`: what a
- * command on the proposed changes did, a stop, a member gone, a budget spent, a
- * canvas change), that the base has new work (`behind`), and what an asked
- * agent was told of the thread that asked (`incoming`).
+ * How each role reads. Every role is a key, so a new one does not compile
+ * until it is placed.
+ *
+ * - `line`: the host's own message, which a column shows as one line, from
+ *   pine·trie: a resolution's prompt (`land`), an update and a split's prompt
+ *   (`update`, `stack`), a Resume's carry-on (`carry-on`), the host's facts
+ *   (`fact`: what a command on the proposed changes did, a stop, a member
+ *   gone, an allowance spent, a canvas change), that the base has new work
+ *   (`behind`), and what an asked agent was told of the thread that asked
+ *   (`incoming`).
+ * - `prompt`: a run can start with it: a person's message, pi's own, a land,
+ *   stack or carry-on message, an ask relayed from another thread and the
+ *   answer that wakes its asker. An update never starts one: it is a fact in
+ *   the thread. Nor does a cards entry (role `pinned`): it is written with a
+ *   run's prompt, as its parent.
  */
-export const LINE_ROLES: ReadonlySet<string> = new Set([
-  "land",
-  "update",
-  "stack",
-  "carry-on",
-  "fact",
-  "behind",
-  "incoming",
-])
+const ROLE_READS = {
+  person: { line: false, prompt: true },
+  user: { line: false, prompt: true },
+  system: { line: false, prompt: false },
+  assistant: { line: false, prompt: false },
+  toolResult: { line: false, prompt: false },
+  land: { line: true, prompt: true },
+  update: { line: true, prompt: false },
+  stack: { line: true, prompt: true },
+  "carry-on": { line: true, prompt: true },
+  fact: { line: true, prompt: false },
+  behind: { line: true, prompt: false },
+  relay: { line: false, prompt: true },
+  answer: { line: false, prompt: true },
+  incoming: { line: true, prompt: false },
+  pinned: { line: false, prompt: false },
+  "canvas-pinned": { line: false, prompt: false },
+  canvas: { line: false, prompt: false },
+} as const satisfies Record<
+  Role,
+  { readonly line: boolean; readonly prompt: boolean }
+>
+
+/** Whether `role` is the host's own one-line message (`ROLE_READS`). */
+export const isLineRole = (role: Role): boolean => ROLE_READS[role].line
 
 /** The message a reader sees at `id`, or null (`renderableMessage`). */
 export function entryMessage(
@@ -461,12 +269,10 @@ function callOf(id: string, name: string, args: unknown): ToolCall {
 export function messageToolCalls(
   message: AgentMessageLike | undefined,
 ): ToolCall[] {
-  const content = message?.content
-  if (!Array.isArray(content)) return []
-  return content.flatMap(part =>
-    part?.type === "toolCall" &&
-    typeof part.id === "string" &&
-    typeof part.name === "string"
+  if (message?.role !== "assistant" || typeof message.content === "string")
+    return []
+  return message.content.flatMap(part =>
+    part.type === "toolCall"
       ? [callOf(part.id, part.name, part.arguments)]
       : [],
   )
@@ -478,11 +284,10 @@ function toolResultOf(
 ): ({ readonly callId: string } & ToolResult) | null {
   const m = entry.message
   if (entry.type !== "message" || m?.role !== "toolResult") return null
-  if (typeof m.toolCallId !== "string") return null
   return {
     callId: m.toolCallId,
     text: messageText(m),
-    isError: m.isError === true,
+    isError: m.isError,
     images: messageImages(m),
   }
 }
@@ -523,36 +328,37 @@ export function turnEntry(index: TreeIndex, tip: EntryId): EntryId {
 }
 
 /**
+ * The base states a message says were merged into the lane: an update's, a
+ * resolution's, or a `catch_up` result's; undefined for any other message.
+ */
+export function messageMerged(
+  message: AgentMessageLike | undefined,
+): readonly PointId[] | undefined {
+  switch (message?.role) {
+    case "update":
+    case "land":
+    case "toolResult":
+      return message.merged
+    default:
+      return undefined
+  }
+}
+
+/**
  * Whether a turn merged into the lane: one of its results is a `catch_up` that
  * says what it merged. The merge moved the lane's bookmark, so the turn's
  * record names it.
  */
 export const turnMerged = (index: TreeIndex, tip: EntryId): boolean =>
-  turnTail(index, tip).some(
-    id => index.entries[id]?.message?.merged !== undefined,
-  )
+  turnTail(index, tip).some(id => {
+    const m = index.entries[id]?.message
+    return m?.role === "toolResult" && m.merged !== undefined
+  })
 
-/**
- * The roles a run can start with: a person's message, pi's own, and a land,
- * stack or carry-on message, an ask relayed from another thread and the answer
- * that wakes its asker. An update never starts one: it is a fact in the thread.
- * Nor does a cards entry (role `pinned`): it is written with a run's prompt, as
- * its parent.
- */
-const PROMPT_ROLES: ReadonlySet<string> = new Set([
-  "person",
-  "user",
-  "land",
-  "stack",
-  "carry-on",
-  "relay",
-  "answer",
-])
-
-/** Whether a run can start with `entry` (`PROMPT_ROLES`). */
+/** Whether a run can start with `entry` (`ROLE_READS`). */
 export const startsRun = (entry: EntryLike | undefined): boolean => {
   const role = entry?.message?.role
-  return role !== undefined && PROMPT_ROLES.has(role)
+  return role !== undefined && ROLE_READS[role].prompt
 }
 
 /**
@@ -607,7 +413,7 @@ export const pinnedInView = (
   newestOnPath(
     index,
     tip,
-    e => e.message?.pinned,
+    e => (e.message?.role === "pinned" ? e.message.pinned : undefined),
     e => e.carried?.pinned ?? null,
   )
 
@@ -619,7 +425,8 @@ export const canvasPinnedInView = (
   newestOnPath(
     index,
     tip,
-    e => e.message?.canvasPinned,
+    e =>
+      e.message?.role === "canvas-pinned" ? e.message.canvasPinned : undefined,
     e => e.carried?.canvasPinned ?? null,
   )
 
@@ -631,7 +438,7 @@ export const canvasInView = (
   newestOnPath(
     index,
     tip,
-    e => e.message?.canvas,
+    e => (e.message?.role === "canvas" ? e.message.canvas : undefined),
     e => e.carried?.canvas ?? null,
   )
 
@@ -649,9 +456,9 @@ export const baseKnown = (
     index,
     tip,
     e =>
-      e.message?.behind === undefined
-        ? e.message?.merged
-        : [e.message.behind.to],
+      e.message?.role === "behind"
+        ? [e.message.behind.to]
+        : messageMerged(e.message),
     () => null,
   )
 
@@ -667,7 +474,10 @@ export const conflictAskTime = (
   newestOnPath(
     index,
     tip,
-    e => (e.message?.asked === true ? (e.timestamp ?? 0) : undefined),
+    e =>
+      e.message?.role === "toolResult" && e.message.asked === true
+        ? (e.timestamp ?? 0)
+        : undefined,
     "pass",
   )
 
@@ -741,7 +551,8 @@ export function indexTree(
   const continued = new Set<EntryId>()
   for (const entry of Object.values(entries)) {
     const id = entry.id
-    const send = entry.message?.sendId
+    const send =
+      entry.message?.role === "person" ? entry.message.sendId : undefined
     if (send !== undefined) bySend.set(send, id)
     const parentEntry =
       entry.parentId === null ? undefined : entries[entry.parentId]
@@ -825,7 +636,8 @@ export function messageWriters(
 ): readonly WriterId[] {
   const out: WriterId[] = []
   for (const id of [...ids].sort()) {
-    const w = index.entries[id]?.message?.writer
+    const m = index.entries[id]?.message
+    const w = m?.role === "person" ? m.writer : undefined
     if (w !== undefined && !out.includes(w)) out.push(w)
   }
   return out
@@ -863,7 +675,7 @@ export interface BranchSummary {
   readonly messageCount: number
 }
 
-export interface SpineNode extends TranscriptMessage {
+export type SpineNode = TranscriptMessage & {
   /** Children of this node that are NOT the next node on the spine. */
   readonly branches: readonly BranchSummary[]
 }
@@ -899,7 +711,7 @@ export function projectSpine(
     const found = entry === undefined ? null : renderableMessage(entry)
     if (found === null) continue
     const message =
-      found.toolCalls === undefined
+      found.role !== "assistant" || found.toolCalls === undefined
         ? found
         : {
             ...found,
@@ -1192,8 +1004,7 @@ function raceAlong(
     const m = index.entries[id]?.message
     if (
       m?.role === "person" &&
-      m.compelled === true &&
-      m.writer !== undefined &&
+      m.compelled &&
       m.writer !== me &&
       (newest === null || id > newest.id)
     )

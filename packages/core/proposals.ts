@@ -5,6 +5,7 @@
 
 import { type AskIndex, entryAsk } from "./asks.ts"
 import type { EntryId, ThreadId, WriterId } from "./ids.ts"
+import { messageProposal } from "./messages.ts"
 import type { ThreadRecord } from "./threads.ts"
 import type { TreeIndex } from "./tree.ts"
 
@@ -70,7 +71,8 @@ export function proposalState(input: {
   readonly runningAsk: EntryId | null
 }): ProposalState | null {
   const { index, asks, proposal } = input
-  if (index.entries[proposal]?.message?.proposal === undefined) return null
+  if (messageProposal(index.entries[proposal]?.message) === undefined)
+    return null
   const prompt = entryAsk(asks, proposal)
   if (prompt === undefined) return null
   const fork = asks.last.get(prompt)

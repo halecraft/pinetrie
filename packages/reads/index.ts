@@ -7,7 +7,6 @@
 // returns what reading again would.
 
 import {
-  type AgentMessageLike,
   type AgentRun,
   type ArchivedCanvas,
   agentActivity,
@@ -22,11 +21,12 @@ import {
   entryId,
   indexTree,
   isCanvasId,
+  isEntryType,
   isThreadId,
   type LaneRecord,
   type LaneView,
-  messageImages,
   messageText,
+  messageWriter,
   messageWriters,
   type PlanMode,
   type PointId,
@@ -34,11 +34,13 @@ import {
   parseCardId,
   parseMentions,
   type RevisionRecord,
+  type Role,
   type RootId,
   rootFirstLine,
   runPrompt,
   type Sha256,
   type StateRecord,
+  storedImages,
   summarizeRoots,
   type ThreadId,
   type ThreadLane,
@@ -164,23 +166,25 @@ function carriedBy(row: StoredEntryRow): ContextInView | undefined {
 }
 
 /**
- * A row's entry, or null for one whose thread is no thread's id. None is:
- * every commit names its thread, and a store from before the column is
- * refused at startup. Left out, as a malformed lane
- * name is (`readStoredLanes`), rather than read into some thread.
+ * A row's entry, or null for one whose thread is no thread's id, or whose
+ * type is none pi writes. None is: every commit names its thread, and a store
+ * from before the column is refused at startup. Left out, as a malformed lane
+ * name is (`readStoredLanes`), rather than read into some thread. Its message
+ * is absent when it carries none the reads take (`renderableMessage`).
  */
 function renderableEntry(row: StoredEntryRow): EntryLike | null {
   const known = entryOfRow.get(row)
   if (known !== undefined) return known
-  const { thread } = row
-  if (!isThreadId(thread)) return null
+  const { thread, type } = row
+  if (!isThreadId(thread) || !isEntryType(type)) return null
   const carried = carriedBy(row)
+  const message = renderableMessage(rowMessage(row))
   const entry: EntryLike = Object.freeze({
     id: entryId(row.id),
     parentId: row.parentId === null ? null : entryId(row.parentId),
-    type: row.type,
+    type,
     thread,
-    message: renderableMessage(rowMessage(row)),
+    ...(message === undefined ? {} : { message }),
     ...(carried === undefined ? {} : { carried }),
   })
   entryOfRow.set(row, entry)
@@ -190,8 +194,8 @@ function renderableEntry(row: StoredEntryRow): EntryLike | null {
 /**
  * Stored rows -> the shape the projections read, keyed by each entry's own
  * id (`Object.entries` would give plain strings). `message` is pi's variant
- * data, lifted by `rowMessage`; a human's chat is decoded here, by
- * `renderableMessage`, into role `chat` with its author and writer. An
+ * data, lifted by `rowMessage` and decoded by `renderableMessage` into its
+ * role: a person's into role `person` with its author and writer. An
  * unchanged row gives the same entry, frozen.
  */
 function renderableEntries(
@@ -272,13 +276,13 @@ export interface RootView {
 }
 
 /**
- * The prompt of the lane's latest run, and its role (`chat`, `land`,
+ * The prompt of the lane's latest run, and its role (`person`, `land`,
  * `stack`…): what the run is. Null for a lane with no run on its tip's path.
  */
 export function readLatestPrompt(
   doc: RootDocHandle,
   lane: ThreadId,
-): { readonly id: EntryId; readonly role: string | undefined } | null {
+): { readonly id: EntryId; readonly role: Role | undefined } | null {
   const index = readTreeIndex(doc)
   const id = runPrompt(index, readLaneTip(doc, lane))
   return id === null ? null : { id, role: index.entries[id]?.message?.role }
@@ -490,8 +494,8 @@ export function participantsIn(
   index: TreeIndex,
   directory: ReadonlyMap<RootId, RootRecord>,
 ): readonly string[] {
-  const writers = Object.values(index.entries).flatMap(e =>
-    e.message?.writer === undefined ? [] : [e.message.writer],
+  const writers = Object.values(index.entries).flatMap(
+    e => messageWriter(e.message) ?? [],
   )
   for (const root of directory.values()) writers.push(...root.writers)
   return participants(names, writers)
@@ -837,8 +841,7 @@ export function referencedBlobs(facts: {
       shas.add(share.original.sha256)
       if (share.shown !== null) shas.add(share.shown.sha256)
     }
-    for (const image of messageImages(message as AgentMessageLike))
-      shas.add(image.sha256)
+    for (const image of storedImages(message)) shas.add(image.sha256)
   }
   for (const text of facts.texts)
     for (const blob of textBlobs(text)) shas.add(blob.sha256)

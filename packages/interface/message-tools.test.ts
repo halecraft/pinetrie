@@ -6,7 +6,12 @@ import {
   type TranscriptMessage,
   threadIdFor,
 } from "@pinetrie/core"
-import { FIXTURE_THREAD } from "@pinetrie/core/fixtures"
+import {
+  FIXTURE_THREAD,
+  lineMessage,
+  personMessage,
+  transcriptMessage,
+} from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   branchPrefill,
@@ -29,13 +34,8 @@ const agentWork: ThreadLane = {
 }
 const conversation: ThreadLane = { kind: "none" }
 
-const said = (text: string, compelled: boolean): TranscriptMessage => ({
-  id: entryId("5-m"),
-  thread: FIXTURE_THREAD,
-  role: "person",
-  text,
-  compelled,
-})
+const said = (text: string, compelled: boolean): TranscriptMessage =>
+  transcriptMessage("5-m", personMessage(text, { compelled }))
 
 const tools = (
   node: TranscriptMessage,
@@ -73,7 +73,9 @@ describe("edit", () => {
         agents: [],
         agentByDefault: false,
       }).compels.kind
-      expect(asks === "agent", node.text).toBe(node.compelled === true)
+      expect(asks === "agent", node.text).toBe(
+        node.role === "person" && node.compelled,
+      )
     }
   })
 
@@ -106,11 +108,15 @@ describe("edit", () => {
   })
 
   test("only a person's message", () => {
-    for (const role of ["assistant", "land", "update", "stack"])
+    for (const message of [
+      { role: "assistant", content: "x" },
+      lineMessage("land", "x"),
+      lineMessage("update", "x"),
+      lineMessage("stack", "x"),
+    ] as const)
       expect(
-        tools({ id: entryId("5-m"), thread: FIXTURE_THREAD, role, text: "x" })
-          .edit,
-        role,
+        tools(transcriptMessage("5-m", message)).edit,
+        message.role,
       ).toBeUndefined()
   })
 })

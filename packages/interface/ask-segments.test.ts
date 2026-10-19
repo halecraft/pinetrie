@@ -1,4 +1,6 @@
 import {
+  type AgentMessageLike,
+  type AssistantMessage,
   ancestry,
   type EntryId,
   type EntryLike,
@@ -14,16 +16,22 @@ import {
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { askStats, type Segment, segmentPath } from "./ask-segments.ts"
-import { entriesById, entry } from "./fixtures.ts"
+import {
+  entriesById,
+  entry,
+  lineMessage,
+  personMessage as person,
+  toolResultMessage,
+} from "./fixtures.ts"
 import { compactRail, railLandmarks } from "./rail.ts"
 import { workStats } from "./work-stats.ts"
 
-type Message = NonNullable<EntryLike["message"]>
-const personMessage = (text = "hi"): Message => ({
-  role: "person",
-  content: text,
-})
-const said = (text: string, extra: Partial<Message> = {}): Message => ({
+type Message = AgentMessageLike
+const personMessage = (text = "hi"): Message => person(text)
+const said = (
+  text: string,
+  extra: Partial<Omit<AssistantMessage, "role">> = {},
+): Message => ({
   role: "assistant",
   content: [{ type: "text", text }],
   ...extra,
@@ -33,12 +41,8 @@ const calls = (call: string): Message => ({
   content: [{ type: "toolCall", id: call, name: "bash", arguments: {} }],
   stopReason: "toolUse",
 })
-const result = (call: string, text = "ok", isError = false): Message => ({
-  role: "toolResult",
-  toolCallId: call,
-  content: text,
-  isError,
-})
+const result = (call: string, text = "ok", isError = false): Message =>
+  toolResultMessage({ toolCallId: call, content: text, isError })
 const build = (rows: readonly EntryLike[]): TreeIndex =>
   indexTree(entriesById(rows))
 
@@ -185,11 +189,7 @@ describe("compactRail and asks", () => {
     let parent = "01"
     for (const id of ["02", "03", "04", "05", "06"]) {
       rows.push(
-        entry(
-          id,
-          parent,
-          id === "04" ? { role: "behind", content: "↓" } : said(id),
-        ),
+        entry(id, parent, id === "04" ? lineMessage("behind", "↓") : said(id)),
       )
       parent = id
     }
@@ -299,7 +299,7 @@ test("over every tree of 6 entries, the column's folds agree with the rail's cap
             role[i] === "agent"
               ? said("x")
               : role[i] === "update"
-                ? { role: "update", content: "u" }
+                ? lineMessage("update", "u")
                 : personMessage(),
           ),
         ),

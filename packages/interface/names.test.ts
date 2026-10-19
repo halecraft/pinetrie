@@ -1,4 +1,10 @@
-import { PRODUCT_NAME, writerId } from "@pinetrie/core"
+import {
+  entryId,
+  PRODUCT_NAME,
+  type TranscriptMessage,
+  writerId,
+} from "@pinetrie/core"
+import { FIXTURE_THREAD } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import { speakerLabel, speakerWords, writerNames } from "./names.ts"
 
@@ -29,31 +35,43 @@ describe("speakerWords: who a message is from, as its column names it", () => {
   const ADA = writerId("ada@x.io")
   const BEA = writerId("bea@x.io")
   const nameOf = new Map([[ADA, "Ada"]])
-  test.each<[string, Parameters<typeof speakerWords>[0], string]>([
-    [
-      "a person, by their name now",
-      { role: "person", writer: ADA, author: "ada" },
-      "Ada (ada)",
-    ],
+  const at = { id: entryId("1"), thread: FIXTURE_THREAD, text: "" }
+  const person = (
+    more: Partial<Extract<TranscriptMessage, { role: "person" }>>,
+  ): TranscriptMessage => ({
+    ...at,
+    role: "person",
+    author: "ada",
+    compelled: false,
+    writer: ADA,
+    sendId: "s-1",
+    ...more,
+  })
+  test.each<[string, TranscriptMessage, string]>([
+    ["a person, by their name now", person({}), "Ada (ada)"],
     [
       "with those who wrote it with them",
-      { role: "person", writer: ADA, author: "Ada", contributors: [BEA] },
+      person({ author: "Ada", contributors: [BEA] }),
       "Ada, with bea",
     ],
-    ["the agent", { role: "assistant" }, "agent"],
-    ["a host's line, as pine·trie", { role: "update" }, PRODUCT_NAME],
-    ["a host's fact, as pine·trie", { role: "fact" }, PRODUCT_NAME],
+    ["the agent", { ...at, role: "assistant" }, "agent"],
+    [
+      "a host's line, as pine·trie",
+      { ...at, role: "update", merged: [] },
+      PRODUCT_NAME,
+    ],
+    ["a host's fact, as pine·trie", { ...at, role: "fact" }, PRODUCT_NAME],
     [
       "another thread's ask, by its asker",
-      { role: "relay", author: "amber-fox" },
+      { ...at, role: "relay", author: "amber-fox", from: FIXTURE_THREAD },
       "amber-fox",
     ],
     [
       "an answer, by the thread that answered",
-      { role: "answer", author: "copper-owl" },
+      { ...at, role: "answer", author: "copper-owl", from: FIXTURE_THREAD },
       "copper-owl",
     ],
-    ["a role it does not know, by the role", { role: "other" }, "other"],
+    ["pi's own user message, by its role", { ...at, role: "user" }, "user"],
   ])("%s", (_, message, words) => {
     expect(speakerWords(message, nameOf)).toBe(words)
   })

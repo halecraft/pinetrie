@@ -39,6 +39,7 @@ import {
   NO_CLIPS,
   newImage,
   threadOfEntry,
+  toolResultMessage,
   tree,
 } from "./fixtures.ts"
 import {
@@ -1244,12 +1245,7 @@ describe("a press on a proposal", () => {
       entry(
         "9-res",
         "3-b",
-        {
-          role: "toolResult",
-          toolCallId: "c1",
-          content: "ok",
-          proposal: PROPOSAL,
-        },
+        toolResultMessage({ content: "ok", proposal: PROPOSAL }),
         { thread: TRUNK },
       ),
     ]),

@@ -3,7 +3,7 @@
 Each shape pine·trie stores, and every pure rule about it: the host's
 decisions, the prompts built from it, and what the page reads of it, one
 topic per module. A shape is a host record (`records.ts`, ADR-0095), a pi
-custom message (chat, land, update, stack, pinned cards), or a card's record
+custom message (a person's message, land, update, stack, pinned cards), or a card's record
 in the places document. pine·trie types each one here, and is its single
 authority. Nothing here does I/O or reads the clock: the host gathers, these
 modules decide, and the host writes.
@@ -338,10 +338,18 @@ are the only code that builds or reads the shape.
 - **Each chat stores its send's id** (`sendId`, the command's id), so the
   column that sent it finds it exactly (`TreeIndex.bySend`).
   `detailsFromStored` is the one conversion of stored details.
-- **`renderableMessage`** turns a stored person's message (`MESSAGE_TYPE`,
-  `pinetrie.message`) into role `person` with its author
-  and whether it compelled the agent, for `core`'s projections, which only
-  admit the role and so need no schema library.
+- **`renderableMessage` is the one decoder of a stored message** (ADR-0185):
+  a person's (`MESSAGE_TYPE`, `pinetrie.message`) becomes role `person`
+  with its author, its writer, its send and whether it compelled the agent;
+  each history message its own role; pi's own (`user`, `system`,
+  `assistant`, `toolResult`) are checked and their parts decoded
+  (`decodePiMessage`, `pi-message.ts`), a host tool's result gaining what it
+  says as a fact. Anything else is no message: a role pi does not write
+  into a root, or a `custom` message no decoder takes. core's types
+  (`AgentMessageLike`, `TranscriptMessage`) are unions keyed by role, so
+  every read past this narrows on `role`, and core needs no schema library.
+  The blob sweep alone reads a stored message raw (`storedImages`), so a
+  message left out here loses none of its images.
 - **A chat's images are references** (ADR-0042). `details.images` lists an
   `ImageRef` (hash, type, size) for each `/blob/` image its text shows, in
   order: the host fills it when the message is sent. `content` stays the attributed text, so no image's bytes are stored.
@@ -1252,7 +1260,7 @@ queue (`holdOnStop`, ADR-0048 step 7), written before the abort.
 what it was writing when stopped was not kept; its `details` hold the lane,
 who resumed and their name then, for the column's line ("↻ resumed by
 Ada"), and why (`reason`). It is a prompt, so its run is an ask of its own
-(`PROMPT_ROLES`), and its run is the resumer's (`promptAuthor`): their
+(`startsRun`), and its run is the resumer's (`promptAuthor`): their
 allowance, and their inbox when it ends.
 - **A carry-on also wakes a lane its owner let use their ssh** (ADR-0178):
   its reason `ssh-allowed`, with the host, and its line "↻ resumed by
@@ -2071,9 +2079,9 @@ reads, `details` what pine·trie reads back.
   code's type as it is now, and `historyMessage(customType, schema)` gives
   each kind its `encode` and `decode`: encoding stores the value, and
   decoding is the schema's check alone. A shape change is not migrated by
-  default, so a message stored before it does not decode: the column
-  leaves it out (core's `renderableMessage` drops a `custom` message it was
-  not given a role for), and the model still reads its `content`. When a
+  default, so a message stored before it does not decode: the reads leave
+  it out (`renderableMessage` decodes no `custom` message it was not given
+  a role for), and the model still reads its `content`. When a
   stored word changes, a record migration renames `customType` and
   `details` in every root, raw, and never `content`
   (`apps/pinetrie/host/TECHNICAL.md`, "The stored schemas"). Its
@@ -2282,7 +2290,7 @@ a round is done are read from the path (`threadMembers`, `lastIncomingEntry`,
   its asker, its chain's allowance and the person behind it (`by`).
   `pinetrie.answer` (role `answer`): the asked agent's last message, in the
   asking thread, a prompt when it `wakes` its asker. Both are prompts
-  (`PROMPT_ROLES`), so each is an ask; `transcriptLines` speaks them by
+  (`startsRun`), so each is an ask; `transcriptLines` speaks them by
   asker and by thread.
 - **`planDelivery`** (`message.ts`) is the one table of where a message into a
   thread goes by its lane's state; `planMessage` and the host's relays and

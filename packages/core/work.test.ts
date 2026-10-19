@@ -1,5 +1,11 @@
 import { describe, expect, test } from "vitest"
-import { entriesById, entry } from "./fixtures.ts"
+import {
+  entriesById,
+  entry,
+  lineMessage,
+  personMessage,
+  toolResultMessage,
+} from "./fixtures.ts"
 import {
   atEntry,
   type EntryId,
@@ -23,13 +29,37 @@ import {
   writerId,
 } from "./index.ts"
 
-/** An entry with a role, under `parent`. */
+/** An entry with a role, under `parent`, saying its id; an agent's or a result's call `call`. */
 const at = (
   id: string,
   parentId: string | null,
-  role: string,
-  extra: object = {},
-) => entry(id, parentId, { role, content: id, ...extra })
+  role: "person" | "assistant" | "toolResult" | "land",
+  call?: string,
+) =>
+  entry(
+    id,
+    parentId,
+    role === "person"
+      ? personMessage(id)
+      : role === "toolResult"
+        ? toolResultMessage({ content: id, toolCallId: call })
+        : role === "land"
+          ? lineMessage("land", id)
+          : {
+              role,
+              content:
+                call === undefined
+                  ? id
+                  : [
+                      {
+                        type: "toolCall",
+                        id: call,
+                        name: "write",
+                        arguments: {},
+                      },
+                    ],
+            },
+  )
 
 const A = threadIdFor("a")
 const B = threadIdFor("b")
@@ -51,10 +81,8 @@ const SB = snapshotId("6-pb")
 // Below mb: lane D, working directly, with its prompt pd and answer md.
 const entries = entriesById([
   at("1-p1", null, "person"),
-  at("2-m1", "1-p1", "assistant", {
-    content: [{ type: "toolCall", id: "call-1", name: "write" }],
-  }),
-  at("3-r1", "2-m1", "toolResult", { toolCallId: "call-1" }),
+  at("2-m1", "1-p1", "assistant", "call-1"),
+  at("3-r1", "2-m1", "toolResult", "call-1"),
   at("4-m2", "3-r1", "assistant"),
   at("5-x1", "3-r1", "person"),
   at("6-pb", "3-r1", "person"),

@@ -96,8 +96,9 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       await idle()
       const inA = said(host, a)
       const inB = said(host, b)
-      const invited = Object.values(heldTree(host).entries).some(e =>
-        (e.message?.invites ?? []).includes(b),
+      const invited = Object.values(heldTree(host).entries).some(
+        e =>
+          e.message?.role === "person" && (e.message.invites ?? []).includes(b),
       )
       check(
         "a first mention of another thread's agent invites it, and the thread's own agent is asked",

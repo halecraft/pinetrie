@@ -33,6 +33,7 @@ import {
   record,
   row,
   runnableFor,
+  storedMessage,
 } from "./fakes.ts"
 import {
   createRunDocs,
@@ -58,7 +59,7 @@ const said = encodeMessage(
 
 describe("planRunEnd", () => {
   test("end-run comes before lane-stopped, and ended is last, for every role", () => {
-    for (const role of [undefined, "person", "land", "stack"]) {
+    for (const role of [undefined, "person", "land", "stack"] as const) {
       const steps = planRunEnd(role)
       expect(steps.indexOf("end-run")).toBeLessThan(
         steps.indexOf("lane-stopped"),
@@ -80,7 +81,7 @@ describe("planRunEnd", () => {
   })
 
   test("the run-end report is pending before end-run, for every role", () => {
-    for (const role of [undefined, "person", "land", "stack"]) {
+    for (const role of [undefined, "person", "land", "stack"] as const) {
       const steps = planRunEnd(role)
       expect(steps.indexOf("run-end-report-pending")).toBeGreaterThanOrEqual(0)
       expect(steps.indexOf("run-end-report-pending")).toBeLessThan(
@@ -176,10 +177,7 @@ describe("a run's end", () => {
       message: said,
       pinnedSeen: [],
     })
-    writeEntry(
-      b.root,
-      row(entryId("p-1"), null, { role: "person", content: "hi" }),
-    )
+    writeEntry(b.root, row(entryId("p-1"), null, storedMessage("hi")))
     writeLaneTip(b.root, LANE, entryId("p-1"))
     lane.finish(RAN)
     await ended
@@ -193,10 +191,7 @@ describe("a run's end", () => {
       message: said,
       pinnedSeen: [],
     })
-    writeEntry(
-      b.root,
-      row(entryId("p-1"), null, { role: "person", content: "hi" }),
-    )
+    writeEntry(b.root, row(entryId("p-1"), null, storedMessage("hi")))
     writeEntry(
       b.root,
       row(entryId("a-1"), "p-1", { role: "assistant", content: "hello" }),
@@ -217,7 +212,21 @@ describe("a run's end", () => {
     })
     writeEntry(
       b.root,
-      row(entryId("p-1"), null, { role: "stack", content: "stack" }),
+      row(
+        entryId("p-1"),
+        null,
+        planStack({
+          skill: null,
+          bookmark: "pinetrie-stack/x",
+          details: {
+            lane: LANE,
+            start: [],
+            tip: commitId("t"),
+            by: writerId("a@x.io"),
+          },
+          timestamp: 1,
+        }),
+      ),
     )
     writeLaneTip(b.root, LANE, entryId("p-1"))
     lane.finish(RAN)

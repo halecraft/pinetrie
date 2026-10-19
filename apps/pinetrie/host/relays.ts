@@ -315,13 +315,8 @@ export function createRelays(deps: {
       const source = from.index.bySend.get(sendId)
       const personMessage =
         source === undefined ? undefined : from.index.entries[source]?.message
-      const author = personMessage?.writer
-      if (
-        source === undefined ||
-        personMessage === undefined ||
-        author === undefined
-      )
-        return
+      if (source === undefined || personMessage?.role !== "person") return
+      const author = personMessage.writer
       const asks = personMessage.asks ?? []
       if (asks.length === 0 && (personMessage.invites ?? []).length === 0)
         return
@@ -335,7 +330,7 @@ export function createRelays(deps: {
           {
             source,
             asker: { kind: "person", writer: author },
-            askerName: personMessage.author ?? "",
+            askerName: personMessage.author,
             text: messageText(personMessage),
             allowance: source,
             by: author,

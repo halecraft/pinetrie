@@ -12,6 +12,7 @@ import {
   lastWord,
   type RevisionRecord,
   type TreeIndex,
+  transcriptCalls,
   type WriterId,
 } from "@pinetrie/core"
 import type { DigestBody, DigestRecord } from "@pinetrie/rules"
@@ -109,7 +110,7 @@ function liveLine(
   const work = asks.work.get(ask) ?? []
   const newest = work.at(-1)
   const message = newest === undefined ? null : entryMessage(index, newest)
-  const call = message?.toolCalls?.at(-1)
+  const call = message === null ? undefined : transcriptCalls(message).at(-1)
   if (call !== undefined && asks.last.get(ask) === newest)
     return callPurpose(call)
   for (const id of work.toReversed()) {

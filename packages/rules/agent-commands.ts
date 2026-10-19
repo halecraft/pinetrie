@@ -11,6 +11,7 @@ import {
   makeCard,
   type PointId,
   type ProjectKind,
+  type Role,
   type TextCardId,
   type ThreadId,
   type WriterId,
@@ -217,7 +218,7 @@ export function planSplitCall(input: {
   readonly cards: readonly CardRecord[]
   readonly lane: ThreadId
   /** The role of the lane's latest prompt, and whether it runs. */
-  readonly prompt: string | undefined
+  readonly prompt: Role | undefined
   readonly running: boolean
   readonly by: WriterId
   readonly id: TextCardId

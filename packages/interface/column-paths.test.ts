@@ -1,4 +1,5 @@
 import {
+  canvasIdFor,
   entryId,
   entryThread,
   indexTree,
@@ -15,14 +16,20 @@ import {
   threadTrack,
   trackIndex,
 } from "./column-paths.ts"
-import { entriesById, entry, fromParents, threadOfEntry } from "./fixtures.ts"
+import {
+  entriesById,
+  entry,
+  fromParents,
+  personMessage,
+  threadOfEntry,
+} from "./fixtures.ts"
 
 /**
  * A tree from `child: parent` pairs. Ids are uuidv7-like: the digit prefix
  * sorts by age, so "2-…" is older than "3-…". Every entry is a chat message.
  */
 const tree = (parents: Record<string, string | null>) =>
-  fromParents(parents, id => ({ role: "person", content: id, author: "A" }))
+  fromParents(parents, id => personMessage(id, { author: "A" }))
 
 // An example: a trunk T1 -> T2 -> T3, a branch A off T1, a branch B off
 // T2. The trunk's continuation is older than each branch.
@@ -158,9 +165,18 @@ describe("a branch whose first entry is a context entry no column draws", () => 
   const T = threadIdFor("t")
   const B = threadIdFor("b")
   const canvas = (id: string, parent: string, thread: ThreadId) =>
-    entry(id, parent, { role: "canvas", content: "<canvas>" }, { thread })
+    entry(
+      id,
+      parent,
+      {
+        role: "canvas",
+        content: "",
+        canvas: { canvas: canvasIdFor("c"), title: "c", lines: [], more: 0 },
+      },
+      { thread },
+    )
   const said = (id: string, parent: string | null, thread: ThreadId) =>
-    entry(id, parent, { role: "person", content: id, author: "A" }, { thread })
+    entry(id, parent, personMessage(id, { author: "A" }), { thread })
   const i = indexTree(
     entriesById([
       said("1-t1", null, T),

@@ -214,10 +214,11 @@ const trees = new WeakMap<SpineNode, Root>()
 function treeOf(node: SpineNode): Root {
   const known = trees.get(node)
   if (known !== undefined) return known
+  const person = node.role === "person" ? node : undefined
   const tree = messageTree(
     node.text,
     "committed",
-    blobLookup(node.images, node.shared),
+    blobLookup(person?.images, person?.shared),
   )
   trees.set(node, tree)
   return tree

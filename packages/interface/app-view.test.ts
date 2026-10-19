@@ -12,7 +12,12 @@ import {
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
-import { cardIdFor, entriesById, entry } from "@pinetrie/core/fixtures"
+import {
+  cardIdFor,
+  entriesById,
+  entry,
+  personMessage,
+} from "@pinetrie/core/fixtures"
 import type { Workflow } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
 import {
@@ -249,14 +254,18 @@ test("a rail stub opens at its branch's first message, below a context entry", (
   const B = threadIdFor("b")
   const index = indexTree(
     entriesById([
-      entry("1-r", null, { role: "person", content: "1-r" }, { thread: T }),
+      entry("1-r", null, personMessage("1-r"), { thread: T }),
       entry(
         "2-cb",
         "1-r",
-        { role: "canvas", content: "<canvas>" },
+        {
+          role: "canvas",
+          content: "",
+          canvas: { canvas: canvasIdFor("c"), title: "c", lines: [], more: 0 },
+        },
         { thread: B },
       ),
-      entry("3-b", "2-cb", { role: "person", content: "3-b" }, { thread: B }),
+      entry("3-b", "2-cb", personMessage("3-b"), { thread: B }),
     ]),
   )
   const R = rootIdFor("01a0ffd2-0000-7000-8000-0000000000a1")

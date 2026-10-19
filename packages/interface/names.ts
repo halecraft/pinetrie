@@ -6,7 +6,13 @@
 // that person is NOW, with the name they sent it under when it differs, so a
 // message sent before someone named themselves does not read as a stranger's.
 
-import { LINE_ROLES, PRODUCT_NAME, type WriterId } from "@pinetrie/core"
+import {
+  isLineRole,
+  type PersonMessage,
+  PRODUCT_NAME,
+  type TranscriptMessage,
+  type WriterId,
+} from "@pinetrie/core"
 import { displayName } from "@pinetrie/rules"
 
 /**
@@ -30,29 +36,35 @@ export function speakerLabel(
  * Who a message is from, as its column names it: a person by their name now
  * (`speakerLabel`), with those who wrote it with them (`withContributors`);
  * another thread's ask by its asker, and an answer by the thread that
- * answered; the agent as "agent"; a line the host wrote (`LINE_ROLES`) as
+ * answered; the agent as "agent"; a line the host wrote (`isLineRole`) as
  * pine·trie, since its own words say what happened; else the role itself.
  */
 export function speakerWords(
-  message: {
-    readonly role?: string
-    readonly writer?: WriterId
-    readonly author?: string
-    readonly contributors?: readonly WriterId[]
-  },
+  message: TranscriptMessage,
   nameOf: ReadonlyMap<WriterId, string>,
 ): string {
-  const role = message.role ?? "unknown"
-  if (role === "person")
-    return withContributors(
-      speakerLabel(nameOf, message.writer, message.author ?? ""),
-      (message.contributors ?? []).map(w => displayName(w, nameOf.get(w))),
-    )
-  if (role === "relay" || role === "answer") return message.author ?? role
-  if (role === "assistant") return "agent"
-  if (LINE_ROLES.has(role)) return PRODUCT_NAME
-  return role
+  switch (message.role) {
+    case "person":
+      return personWords(message, nameOf)
+    case "relay":
+    case "answer":
+      return message.author
+    case "assistant":
+      return "agent"
+    default:
+      return isLineRole(message.role) ? PRODUCT_NAME : message.role
+  }
 }
+
+/** A person's message's speaker, as `speakerWords` names it. */
+export const personWords = (
+  message: Pick<PersonMessage, "writer" | "author" | "contributors">,
+  nameOf: ReadonlyMap<WriterId, string>,
+): string =>
+  withContributors(
+    speakerLabel(nameOf, message.writer, message.author),
+    (message.contributors ?? []).map(w => displayName(w, nameOf.get(w))),
+  )
 
 /** "Ada, Bea": each writer by their current name, in the order given. */
 export const writerNames = (

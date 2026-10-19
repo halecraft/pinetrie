@@ -9,7 +9,12 @@ import {
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
-import { entriesById, entry } from "@pinetrie/core/fixtures"
+import {
+  entriesById,
+  entry,
+  personMessage,
+  toolResultMessage,
+} from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   columnProposals,
@@ -37,17 +42,14 @@ const on = (id: string, parent: string | null, m: Message) =>
   entry(id, parent, m, { thread: P })
 const index = indexTree(
   entriesById([
-    on("1-p", null, { role: "person", content: "split it" }),
+    on("1-p", null, personMessage("split it")),
     on("2-a", "1-p", {
       role: "assistant",
-      content: [{ type: "toolCall", id: "c1", name: "propose_branches" }],
+      content: [
+        { type: "toolCall", id: "c1", name: "propose_branches", arguments: {} },
+      ],
     }),
-    on("3-r", "2-a", {
-      role: "toolResult",
-      toolCallId: "c1",
-      content: "ok",
-      proposal: PROPOSAL,
-    }),
+    on("3-r", "2-a", toolResultMessage({ content: "ok", proposal: PROPOSAL })),
     on("4-a", "3-r", {
       role: "assistant",
       content: [{ type: "text", text: "three things" }],

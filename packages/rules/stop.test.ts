@@ -12,7 +12,13 @@ import {
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
-import { cardIdFor, FIXTURE_THREAD } from "@pinetrie/core/fixtures"
+import {
+  cardIdFor,
+  FIXTURE_THREAD,
+  lineMessage,
+  personMessage,
+  toolResultMessage,
+} from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import { encodeFact } from "./fact.ts"
 import { renderableMessage } from "./message.ts"
@@ -153,7 +159,7 @@ describe("planStop", () => {
       id: entryId("3-f"),
       parentId: work.id,
       thread: FIXTURE_THREAD,
-      type: "custom_message",
+      type: "message",
       message: renderableMessage(encodeFact(stopped(bea), "Bea", 8)),
     }
     expect(
@@ -234,7 +240,7 @@ describe("carrying on", () => {
       facts: { index, asks: indexAsks(index) },
     }
   }
-  const ask: AgentMessageLike = { role: "person", content: "fix it" }
+  const ask: AgentMessageLike = personMessage("fix it")
   const aborted: AgentMessageLike = {
     role: "assistant",
     content: [{ type: "text", text: "half a reply" }],
@@ -245,10 +251,9 @@ describe("carrying on", () => {
     content: [{ type: "toolCall", id: "c1", name: "bash", arguments: {} }],
     stopReason: "toolUse",
   }
-  const result: AgentMessageLike = {
-    role: "toolResult",
+  const result: AgentMessageLike = toolResultMessage({
     content: "Command aborted",
-  }
+  })
   const state = (o: ReturnType<typeof over>) => carryOnState(o.view, o.facts)
   const refusedWith = (code: string) => ({ kind: "refused", code })
 
@@ -266,13 +271,14 @@ describe("carrying on", () => {
         3,
       ),
     )
+    if (fact === undefined) throw new Error("the stop's fact does not decode")
     const withFact = over([ask, aborted, fact])
     expect(state(withFact)).toEqual({ kind: "ok" })
     expect(withFact.facts.asks.stoppedBy.get(prompt)).toBe(writerId("bea"))
     expect(o.facts.asks.stoppedBy.size).toBe(0)
   })
   test("an update after the stop is no ask: the lane may still carry on", () => {
-    const update = { role: "update", content: "caught up" }
+    const update = lineMessage("update", "caught up")
     expect(state(over([ask, aborted, update]))).toEqual({ kind: "ok" })
   })
   test("a lane with no tip is unknown, and so, to the planner, is no lane", () => {
@@ -309,7 +315,7 @@ describe("carrying on", () => {
   test("an answered ask, or a message after the stop, refuses", () => {
     const answered = { ...aborted, stopReason: "stop" }
     expect(state(over([ask, answered]))).toEqual(refusedWith(ERR.REFUSED))
-    const after = { role: "person", content: "to Bea only" }
+    const after = personMessage("to Bea only")
     expect(state(over([ask, aborted, after]))).toEqual(refusedWith(ERR.REFUSED))
   })
   test("planCarryOn: a run whose prompt names who resumed, read back as its line", () => {

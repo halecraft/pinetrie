@@ -71,7 +71,8 @@ the identity at run time, so the frozen entries and the index's cache are
 unchanged by it.
 
 `readReferencedBlobs` is every image something still shows (ADR-0042): each
-chat's, each tool result's (`messageImages`, ADR-0051), and each in the
+person's message's, each tool result's (`storedImages`, ADR-0051), read
+from the stored message whatever its role, and each in the
 texts people type, cards' (queued ones among them), which its caller must
 pass for every one, not only those it holds (the host gathers them all
 through its card port). `planSweep` decides which
@@ -181,15 +182,20 @@ Kyneta has let go.
   `readRevisions`, `readProposedByLane`…). A `string`-keyed map still accepts an
   `EntryId`, so a key type left `string` compiles and leaves its lookups
   unchecked (S95).
-- **`readTreeIndex` decodes chat** (`renderableMessage`), so the index
-  carries each chat's writer, whether it compelled the agent, and its send
-  id: `threadOfSend`'s race reads the first two, a sender that names its send the third.
+- **`readTreeIndex` decodes each message once** (`renderableMessage`,
+  ADR-0185), into its role, so the index carries each person's message's
+  writer, whether it compelled the agent, and its send id: `threadOfSend`'s
+  race reads the first two, a sender that names its send the third. A
+  message the decoder takes no role for leaves its entry with no message.
 - **Each entry's thread is its row's** (ADR-0125), from which `indexTree`
   builds each thread's first entry and end (`TreeIndex.firstOf`, `endOf`).
   A row whose thread fails `isThreadId` is left out, as `readStoredLanes`
   sets aside a malformed lane name: none should exist, since every commit
   names its thread and a store from before is refused until migrated
-  (ADR-0096).
+  (ADR-0096). So is a row whose type is none of pi's four (`EntryType`):
+  the schema keeps `type` a free string so a new pi needs no schema change
+  (`packages/schema/TECHNICAL.md`), and a new type is read once core
+  names it.
 - **A compaction entry carries the pinned cards its retained tail holds**
   (`carried`, ADR-0048 step 5, S92): the tail's newest cards entry, read from the
   row's payload (`rowRetainedTail`, `@pinetrie/schema`). pi stores the tail on

@@ -3,6 +3,7 @@ import {
   canvasIdFor,
   entryId,
   NO_CONTENT,
+  type TranscriptMessage,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -86,9 +87,16 @@ test("a link is made only by threadLink", () => {
 
 test("a row from another canvas's thread says where it is; from this canvas, nothing", () => {
   const placed = at({ kind: "canvas", canvas: CANVAS, order: "1", width: 1 })
-  const nodes = [
-    { id: entryId("a"), role: "answer", from: T },
-    { id: entryId("b"), role: "assistant" },
+  const nodes: readonly TranscriptMessage[] = [
+    {
+      id: entryId("a"),
+      thread: T,
+      text: "",
+      role: "answer",
+      author: "amber-fox",
+      from: T,
+    },
+    { id: entryId("b"), thread: T, text: "", role: "assistant" },
   ]
   const facts = { cards: placed, reader, labelOf: () => "Sync bug" }
   const came = crossCanvasLinks(nodes, { ...facts, here: null })

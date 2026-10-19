@@ -34,6 +34,7 @@ import {
   record,
   row,
   stepKeeper,
+  storedMessage,
   writtenValues,
 } from "./fakes.ts"
 import { createLater } from "./later.ts"
@@ -179,14 +180,14 @@ test("a live digest that comes back after the final one is dropped", async () =>
 test.each([
   {
     left: "a plain message appended",
-    rows: [row(entryId("e-5"), "e-4", { role: "person", content: "fyi" })],
+    rows: [row(entryId("e-5"), "e-4", storedMessage("fyi"))],
     tip: entryId("e-5"),
     next: false,
   },
   {
     left: "the next run started",
     rows: [
-      row(entryId("e-5"), "e-4", { role: "person", content: "next" }),
+      row(entryId("e-5"), "e-4", storedMessage("next")),
       row(entryId("e-6"), "e-5", { role: "assistant", content: "starting" }),
     ],
     tip: entryId("e-6"),
@@ -254,7 +255,7 @@ test.each([
 test("a short ask is not asked about", async () => {
   const { b, pi, keeper, digests } = running()
   const short = entryId("e-7")
-  writeEntry(b.root, row(short, "e-4", { role: "person", content: "and?" }))
+  writeEntry(b.root, row(short, "e-4", storedMessage("and?")))
   writeEntry(
     b.root,
     row(entryId("e-8"), "e-7", { role: "assistant", content: "done" }),

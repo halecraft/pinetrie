@@ -669,37 +669,33 @@ describe("a host tool's result as a fact", () => {
     details,
     isError: false,
   })
+  /** What a stored result decodes to, as a tool's result. */
+  const read = (stored: unknown) => {
+    const m = renderableMessage(stored)
+    return m?.role === "toolResult" ? m : undefined
+  }
 
   test("an ask_about_conflict the host took is asked, from its details alone", () => {
     expect(
       renderableMessage(result(CONFLICT_TOOL, { asked: true })),
     ).toMatchObject({ role: "toolResult", asked: true })
-    expect(
-      renderableMessage(result(CONFLICT_TOOL, undefined)).asked,
-    ).toBeUndefined()
-    expect(
-      renderableMessage(result("bash", { asked: true })).asked,
-    ).toBeUndefined()
+    expect(read(result(CONFLICT_TOOL, undefined))?.asked).toBeUndefined()
+    expect(read(result("bash", { asked: true }))?.asked).toBeUndefined()
   })
 
   test("a catch_up result carries the commits it merged", () => {
     expect(
-      renderableMessage(result(GET_LATEST_TOOL, { merged: ["c1"] }, "merged"))
-        .merged,
+      read(result(GET_LATEST_TOOL, { merged: ["c1"] }, "merged"))?.merged,
     ).toEqual(["c1"])
     expect(
-      renderableMessage(result(GET_LATEST_TOOL, { merged: [3] })).merged,
+      read(result(GET_LATEST_TOOL, { merged: [3] }))?.merged,
     ).toBeUndefined()
   })
 
   test("a propose_branches result carries its proposal; one that holds none carries nothing", () => {
     const proposal = { branches: [{ title: "a", brief: "do a" }] }
-    expect(renderableMessage(result(PROPOSE_TOOL, proposal)).proposal).toEqual(
-      proposal,
-    )
-    expect(
-      renderableMessage(result(PROPOSE_TOOL, undefined)).proposal,
-    ).toBeUndefined()
+    expect(read(result(PROPOSE_TOOL, proposal))?.proposal).toEqual(proposal)
+    expect(read(result(PROPOSE_TOOL, undefined))?.proposal).toBeUndefined()
   })
 })
 

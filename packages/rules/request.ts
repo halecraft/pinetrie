@@ -4,32 +4,37 @@
 import { firstLine, type TranscriptMessage } from "@pinetrie/core"
 
 /**
- * One message as `speaker: text`. A chat's speaker is its author as sent;
- * a land, update or stack message carries no author, so its role speaks.
+ * One message as `speaker: text`. A person's speaker is its author as sent,
+ * and an ask's or an answer's its asker or its answering thread; pi's user
+ * message names no one, so "someone" speaks, and a land, update or stack
+ * message carries no author, so its role speaks.
  */
-export const transcriptLine = (
-  m: Pick<TranscriptMessage, "role" | "author" | "text">,
-): string => {
-  const speaker =
-    m.role === "assistant"
-      ? "agent"
-      : SPOKEN.has(m.role)
-        ? (m.author ?? "someone")
-        : m.role
-  return `${speaker}: ${m.text}`
-}
+export const transcriptLine = (m: TranscriptMessage): string =>
+  spokenLine(isSpoken(m) ? spokenBy(m) : m.role, m.text)
+
+/** A line of a transcript: who spoke, and what. */
+export const spokenLine = (speaker: string, text: string): string =>
+  `${speaker}: ${text}`
 
 /**
- * The roles spoken by someone a line names: a person's chat, pi's own user
- * message, and an ask from another thread or an asked agent's answer,
- * whose speakers are the asker and the answering thread.
+ * The messages spoken by someone a line names: a person's, pi's own user
+ * message, the agent's, and an ask from another thread or an asked agent's
+ * answer.
  */
-const SPOKEN: ReadonlySet<string> = new Set([
-  "person",
-  "user",
-  "relay",
-  "answer",
-])
+type Spoken = Extract<
+  TranscriptMessage,
+  { readonly role: "person" | "user" | "assistant" | "relay" | "answer" }
+>
+
+const isSpoken = (m: TranscriptMessage): m is Spoken =>
+  m.role === "person" ||
+  m.role === "user" ||
+  m.role === "assistant" ||
+  m.role === "relay" ||
+  m.role === "answer"
+
+const spokenBy = (m: Spoken): string =>
+  m.role === "assistant" ? "agent" : m.role === "user" ? "someone" : m.author
 
 /**
  * Each chat, prompt, agent reply, and what agents in other threads asked and
@@ -37,10 +42,7 @@ const SPOKEN: ReadonlySet<string> = new Set([
  */
 export const transcriptLines = (
   messages: readonly TranscriptMessage[],
-): string[] =>
-  messages
-    .filter(m => m.role === "assistant" || SPOKEN.has(m.role))
-    .map(transcriptLine)
+): string[] => messages.filter(isSpoken).map(transcriptLine)
 
 /**
  * The newest `lines` that fit in `room` characters, each as `- line\n`, and

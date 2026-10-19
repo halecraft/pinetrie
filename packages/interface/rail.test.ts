@@ -1,4 +1,5 @@
 import {
+  type AgentMessageLike,
   type EntryId,
   type EntryLike,
   entryId,
@@ -8,7 +9,7 @@ import {
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
-import { entriesById, entry, fromParents } from "./fixtures.ts"
+import { entriesById, entry, fromParents, personMessage } from "./fixtures.ts"
 import { compactRail, type RailItem, stretchSpan } from "./rail.ts"
 
 /**
@@ -16,7 +17,7 @@ import { compactRail, type RailItem, stretchSpan } from "./rail.ts"
  * sorts by age, so "2-…" is older than "3-…". Every entry is a chat message.
  */
 const tree = (parents: Record<string, string | null>) =>
-  fromParents(parents, id => ({ role: "person", content: id, author: "A" }))
+  fromParents(parents, id => personMessage(id, { author: "A" }))
 
 // The plan's example: a trunk T1 -> T2 -> T3, a branch A off T1, a branch B off
 // T2. The trunk's continuation is older than each branch.
@@ -38,7 +39,9 @@ describe("compactRail", () => {
    * `${pad(2k)}-s`, its result `${pad(2k + 1)}-r`.
    */
   const loop = (steps: number, failAt?: number) => {
-    const out: EntryLike[] = [entry("000-q", null, { role: "user" })]
+    const out: EntryLike[] = [
+      entry("000-q", null, { role: "user", content: "" }),
+    ]
     let parent = "000-q"
     for (let k = 1; k <= steps; k += 1) {
       const step = `${pad(2 * k)}-s`
@@ -173,12 +176,9 @@ describe("compactRail", () => {
   test("a stretch counts the messages people wrote, and who, in order", () => {
     const ada = writerId("w-ada")
     const bea = writerId("w-bea")
-    const said = (writer: typeof ada) => ({
-      role: "person",
-      author: "",
-      writer,
-    })
-    const agent = { role: "assistant", content: "ok" }
+    const said = (writer: typeof ada) =>
+      personMessage("", { author: "", writer })
+    const agent: AgentMessageLike = { role: "assistant", content: "ok" }
     const items = compact(
       entriesById([
         entry("01", null, said(ada)),

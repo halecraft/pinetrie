@@ -4,10 +4,11 @@
 
 import { useSelector } from "@kyneta/react"
 import {
-  LINE_ROLES,
+  isLineRole,
   type StreamId,
   type ToolCall,
   type TranscriptMessage,
+  transcriptCalls,
 } from "@pinetrie/core"
 import {
   COMMENT,
@@ -56,11 +57,12 @@ function MessageView(p: MessageProps) {
   const { node } = p
   const colors = useTrackColors()
   const speaker = speakerWords(node, p.nameOf)
+  const person = node.role === "person" ? node : null
   const classes = [
     "msg",
     node.role,
-    LINE_ROLES.has(node.role) ? "host" : "",
-    node.compelled === true ? "asked" : "",
+    isLineRole(node.role) ? "host" : "",
+    person?.compelled === true ? "asked" : "",
   ].filter(c => c !== "")
   // What its tables and images name it by, in the column's pane.
   const source = useMemo<MessageSource>(
@@ -122,7 +124,7 @@ function MessageView(p: MessageProps) {
       <div
         className={classes.join(" ")}
         data-entry={node.id}
-        title={node.detail}
+        title={node.role === "fact" ? node.detail : undefined}
       >
         <span className="role">{speaker}</span>
         {p.crossCanvasLink !== undefined && (
@@ -141,12 +143,12 @@ function MessageView(p: MessageProps) {
             · {p.crossCanvasLink.words}
           </button>
         )}
-        {node.command !== undefined && (
+        {person?.command !== undefined && (
           <span
             className="command-label"
             title="a command: the agent read its skill or prompt"
           >
-            /{node.command}
+            /{person.command}
           </span>
         )}
         {p.forkTracks.map(t => (
@@ -168,13 +170,13 @@ function MessageView(p: MessageProps) {
         ))}
         {showsText(node) && (
           <MessageText
-            images={node.images}
+            images={person?.images}
             mode="committed"
-            shared={node.shared}
+            shared={person?.shared}
             text={node.text}
           />
         )}
-        {node.toolCalls?.map(call => (
+        {transcriptCalls(node).map(call => (
           <ToolRow
             call={call}
             density={p.density}

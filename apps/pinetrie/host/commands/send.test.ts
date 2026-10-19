@@ -8,6 +8,7 @@ import {
   type ImageRef,
   NOBODY,
   parseMentions,
+  pointId,
   ROOT,
   ROOT_ORIGIN,
   runId,
@@ -26,6 +27,7 @@ import { readPlaces } from "@pinetrie/reads"
 import {
   ACCEPTED,
   BASE,
+  encodeUpdate,
   MESSAGE_TYPE,
   type MessageDetails,
   PARTICIPANT,
@@ -33,6 +35,7 @@ import {
   PROJECT,
   type ProjectRecord,
   planThreadOpen,
+  removalsText,
   setRecord,
   THREAD,
   WORKFLOW,
@@ -657,7 +660,22 @@ describe("sendMessage", () => {
         if (b !== null) {
           writeEntry(
             b.root,
-            row(entryId("u-1"), E1, { role: "update", content: "u" }),
+            row(
+              entryId("u-1"),
+              E1,
+              encodeUpdate(
+                {
+                  lane: LANE,
+                  from: { kind: "accepted" },
+                  merged: pointId("u"),
+                  commits: [],
+                  files: [],
+                  by: ALICE,
+                },
+                1,
+                removalsText([]),
+              ),
+            ),
           )
           writeLaneTip(b.root, LANE, entryId("u-1"))
         }

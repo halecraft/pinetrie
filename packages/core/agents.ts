@@ -20,9 +20,11 @@ export function threadMembers(
   const members: ThreadId[] = []
   for (const id of ancestry(index, tip).path.toReversed()) {
     const message = index.entries[id]?.message
-    for (const thread of message?.invites ?? [])
+    for (const thread of message?.role === "person"
+      ? (message.invites ?? [])
+      : [])
       if (!members.includes(thread)) members.push(thread)
-    const gone = message?.member?.gone
+    const gone = message?.role === "fact" ? message.member?.gone : undefined
     if (gone !== undefined) {
       const at = members.indexOf(gone)
       if (at >= 0) members.splice(at, 1)
@@ -43,7 +45,10 @@ export const lastInvitation = (
   newestOnPath(
     index,
     tip,
-    e => ((e.message?.invites ?? []).includes(thread) ? e.id : undefined),
+    e =>
+      e.message?.role === "person" && (e.message.invites ?? []).includes(thread)
+        ? e.id
+        : undefined,
     "pass",
   )
 
@@ -62,7 +67,8 @@ export const lastIncomingEntry = (
     index,
     tip,
     e => {
-      const incoming = e.message?.incoming
+      const incoming =
+        e.message?.role === "incoming" ? e.message.incoming : undefined
       return incoming?.from === from
         ? (incoming.entries.at(-1) ?? null)
         : undefined
@@ -80,13 +86,15 @@ export function isRoundAnswered(
   tip: EntryId | null,
   asking: EntryId,
 ): boolean {
-  const asked = index.entries[asking]?.message?.asks ?? []
+  const message = index.entries[asking]?.message
+  const asked = message?.role === "person" ? (message.asks ?? []) : []
   if (asked.length === 0) return false
   const answered = new Set<ThreadId>()
   for (const id of ancestry(index, tip).path) {
     if (id === asking) break
-    const answer = index.entries[id]?.message?.answer
-    if (answer?.source === asking) answered.add(answer.from)
+    const m = index.entries[id]?.message
+    if (m?.role === "answer" && m.answer.source === asking)
+      answered.add(m.answer.from)
   }
   return asked.every(t => answered.has(t))
 }

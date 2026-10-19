@@ -5,7 +5,10 @@ import {
   entry,
   FIXTURE_THREAD,
   fromParents,
+  lineMessage,
+  personMessage,
   threadOfEntry,
+  toolResultMessage,
 } from "./fixtures.ts"
 import {
   agentActivity,
@@ -22,6 +25,7 @@ import {
   indexTree,
   knownToolId,
   type MessageAt,
+  type MessagePart,
   messageImages,
   messageToolCalls,
   messageWriters,
@@ -33,16 +37,21 @@ import {
   projectTranscript,
   ROOT,
   runPrompt,
+  type Sha256,
+  type SpineNode,
   startsRun,
+  storedImage,
   type TextEdit,
   type ThreadId,
   TOOL_IDS,
+  type ToolCall,
   tailEdit,
   textCardId,
   threadEnd,
   threadFirstMessage,
   threadIdFor,
   threadOfSend,
+  transcriptCalls,
   treeRoot,
   turnEntry,
   turnMerged,
@@ -54,7 +63,7 @@ import {
  * sorts by age, so "2-…" is older than "3-…". Every entry is a chat message.
  */
 const tree = (parents: Record<string, string | null>) =>
-  fromParents(parents, id => ({ role: "person", content: id, author: "A" }))
+  fromParents(parents, id => personMessage(id, { author: "A" }))
 
 // A trunk T1 -> T2 -> T3, a branch A off T1, a branch B off T2. The trunk's
 // continuation is older than each branch.
@@ -107,7 +116,7 @@ describe("messageWriters", () => {
   test("each writer once, in order of their first message", () => {
     const ada = writerId("w-ada")
     const bea = writerId("w-bea")
-    const by = (writer: typeof ada) => ({ role: "person", author: "", writer })
+    const by = (writer: typeof ada) => personMessage("", { author: "", writer })
     const i = indexTree(
       entriesById([
         entry("1-a", null, by(bea)),
@@ -194,12 +203,7 @@ describe("projectRail", () => {
       ...forks,
       ...entriesById([
         entry("8-c", "3-t3", undefined, { type: "compaction", thread: trunk }),
-        entry(
-          "9-after",
-          "8-c",
-          { role: "person", content: "9-after" },
-          { thread: trunk },
-        ),
+        entry("9-after", "8-c", personMessage("9-after"), { thread: trunk }),
       ]),
     }
     const r = projectRail(indexTree(withCompaction), entryId("1-t1"))
@@ -241,12 +245,10 @@ describe("threads: where each starts and ends, and where a send lands", () => {
     entry(
       id,
       parentId,
-      {
-        role: "person",
-        content: id,
+      personMessage(id, {
         writer: writerId(extra.writer),
         compelled: extra.compelled,
-      },
+      }),
       { thread: threadIdFor(extra.thread ?? "q") },
     )
   const Q = threadIdFor("q")
@@ -301,7 +303,16 @@ describe("threads: where each starts and ends, and where a send lands", () => {
     // reply. The canvas entries carry no message a column draws.
     const B = threadIdFor("b")
     const canvasEntry = (id: string, parentId: string, thread: ThreadId) =>
-      entry(id, parentId, { role: "canvas", content: "<canvas>" }, { thread })
+      entry(
+        id,
+        parentId,
+        {
+          role: "canvas",
+          content: "",
+          canvas: { canvas: canvasIdFor("c"), title: "c", lines: [], more: 0 },
+        },
+        { thread },
+      )
     const i = indexTree({
       ...entries,
       ...entriesById([
@@ -456,8 +467,12 @@ describe("threads: where each starts and ends, and where a send lands", () => {
   })
 })
 
+/** The calls a spine node carries: an assistant message's, none for another. */
+const calls = (node: SpineNode | undefined): readonly ToolCall[] =>
+  node === undefined ? [] : transcriptCalls(node)
+
 describe("tool calls: paired with their results on the path", () => {
-  const call = (id: string, name: string, args: unknown) => ({
+  const call = (id: string, name: string, args: unknown): MessagePart => ({
     type: "toolCall",
     id,
     name,
@@ -469,27 +484,32 @@ describe("tool calls: paired with their results on the path", () => {
       role: "assistant",
       content: [call("c1", "read", { path: "notes.txt" })],
     }),
-    entry("3-r", "2-a", {
-      role: "toolResult",
-      toolCallId: "c1",
-      content: [{ type: "text", text: "MANGO" }],
-      isError: false,
-    }),
+    entry(
+      "3-r",
+      "2-a",
+      toolResultMessage({
+        toolCallId: "c1",
+        content: [{ type: "text", text: "MANGO" }],
+      }),
+    ),
     entry("4-a", "3-r", { role: "assistant", content: "It says MANGO." }),
     // A sibling branch answering the same call id: not on the main path.
-    entry("5-r", "2-a", {
-      role: "toolResult",
-      toolCallId: "c1",
-      content: [{ type: "text", text: "elsewhere" }],
-      isError: true,
-    }),
+    entry(
+      "5-r",
+      "2-a",
+      toolResultMessage({
+        toolCallId: "c1",
+        content: [{ type: "text", text: "elsewhere" }],
+        isError: true,
+      }),
+    ),
   ])
   const i = indexTree(entries)
 
   test("a call and its result on one path pair; a message with only calls keeps them", () => {
     const { spine } = projectSpine(i, entryId("4-a"))
     expect(spine.map(n => n.id)).toEqual(["1-q", "2-a", "4-a"])
-    expect(spine[1]?.toolCalls).toEqual([
+    expect(calls(spine[1])).toEqual([
       {
         id: "c1",
         name: "read",
@@ -499,10 +519,10 @@ describe("tool calls: paired with their results on the path", () => {
     ])
   })
   test("a result's stored images are on its call", () => {
-    const image = {
+    const image: MessagePart = {
       type: "image",
       mimeType: "image/png",
-      sha256: "a".repeat(64),
+      sha256: "a".repeat(64) as Sha256,
       width: 40,
       height: 30,
     }
@@ -513,19 +533,21 @@ describe("tool calls: paired with their results on the path", () => {
           role: "assistant",
           content: [call("c6", "read", { path: "shot.png" })],
         }),
-        entry("7-r", "6-a", {
-          role: "toolResult",
-          toolCallId: "c6",
-          content: [
-            { type: "text", text: "Read image file [image/png]" },
-            image,
-          ],
-          isError: false,
-        }),
+        entry(
+          "7-r",
+          "6-a",
+          toolResultMessage({
+            toolCallId: "c6",
+            content: [
+              { type: "text", text: "Read image file [image/png]" },
+              image,
+            ],
+          }),
+        ),
         entry("8-a", "7-r", { role: "assistant", content: "A red square." }),
       ]),
     })
-    expect(projectSpine(read, entryId("8-a")).spine.at(-2)?.toolCalls).toEqual([
+    expect(calls(projectSpine(read, entryId("8-a")).spine.at(-2))).toEqual([
       {
         id: "c6",
         name: "read",
@@ -535,7 +557,7 @@ describe("tool calls: paired with their results on the path", () => {
           isError: false,
           images: [
             {
-              sha256: image.sha256,
+              sha256: "a".repeat(64) as Sha256,
               mimeType: "image/png",
               width: 40,
               height: 30,
@@ -556,7 +578,7 @@ describe("tool calls: paired with their results on the path", () => {
         }),
       ]),
     })
-    expect(projectSpine(long, entryId("9-a")).spine.at(-1)?.toolCalls).toEqual([
+    expect(calls(projectSpine(long, entryId("9-a")).spine.at(-1))).toEqual([
       {
         id: "c9",
         name: "bash",
@@ -567,11 +589,9 @@ describe("tool calls: paired with their results on the path", () => {
   test("a result off the path does not pair", () => {
     // Path to 5-r: its result pairs; path to 2-a alone: no result yet.
     expect(
-      projectSpine(i, entryId("2-a")).spine[1]?.toolCalls?.[0]?.result,
+      calls(projectSpine(i, entryId("2-a")).spine[1])[0]?.result,
     ).toBeUndefined()
-    expect(
-      projectSpine(i, entryId("5-r")).spine[1]?.toolCalls?.[0]?.result,
-    ).toEqual({
+    expect(calls(projectSpine(i, entryId("5-r")).spine[1])[0]?.result).toEqual({
       text: "elsewhere",
       isError: true,
       images: [],
@@ -583,7 +603,7 @@ describe("tool calls: paired with their results on the path", () => {
   })
 })
 
-describe("messageImages: only stored references", () => {
+describe("storedImage: only stored references", () => {
   const ref = {
     type: "image",
     mimeType: "image/png",
@@ -591,25 +611,41 @@ describe("messageImages: only stored references", () => {
     width: 40,
     height: 30,
   }
-  const images = (...parts: Record<string, unknown>[]) =>
-    messageImages({ role: "toolResult", content: parts })
 
   test("a reference is an image", () => {
-    expect(images({ type: "text", text: "x" }, ref)).toEqual([
-      { sha256: ref.sha256, mimeType: "image/png", width: 40, height: 30 },
-    ])
+    expect(storedImage(ref)).toEqual({
+      sha256: ref.sha256,
+      mimeType: "image/png",
+      width: 40,
+      height: 30,
+    })
   })
-  test.each<[string, Record<string, unknown>]>([
+  test.each<[string, unknown]>([
     ["inline bytes", { type: "image", data: "iVBOR", mimeType: "image/png" }],
     ["bytes beside a reference", { ...ref, data: "iVBOR" }],
     ["a malformed hash", { ...ref, sha256: "B".repeat(64) }],
     ["a type no provider takes", { ...ref, mimeType: "image/svg+xml" }],
     ["no width", { ...ref, width: 0 }],
     ["a fractional height", { ...ref, height: 1.5 }],
+    ["a text part", { type: "text", text: "x" }],
+    ["no part", null],
   ])("%s is not one", (_, part) => {
-    expect(images(part)).toEqual([])
+    expect(storedImage(part)).toBeUndefined()
   })
-  test("text content has none", () => {
+  test("a message's images are its image parts; text content has none", () => {
+    const image = storedImage(ref)
+    expect(
+      image === undefined
+        ? []
+        : messageImages(
+            toolResultMessage({
+              content: [
+                { type: "text", text: "x" },
+                { type: "image", ...image },
+              ],
+            }),
+          ),
+    ).toEqual([image])
     expect(messageImages({ role: "user", content: "hi" })).toEqual([])
   })
 })
@@ -703,12 +739,12 @@ describe("pinned cards in the tree", () => {
   }
   // 1-q -> 2-cards(first) -> 3-p1 -> 4-r1 -> 5-cards(second) -> 6-p2 -> 7-r2
   const list = [
-    entry("1-q", null, { role: "person", content: "q", author: "A" }),
+    entry("1-q", null, personMessage("q", { author: "A" })),
     cards("2-cards", "1-q", first),
-    entry("3-p1", "2-cards", { role: "person", content: "p1", author: "A" }),
+    entry("3-p1", "2-cards", personMessage("p1", { author: "A" })),
     entry("4-r1", "3-p1", { role: "assistant", content: "r1" }),
     cards("5-cards", "4-r1", second),
-    entry("6-p2", "5-cards", { role: "person", content: "p2", author: "A" }),
+    entry("6-p2", "5-cards", personMessage("p2", { author: "A" })),
     entry("7-r2", "6-p2", { role: "assistant", content: "r2" }),
   ]
   const index = indexTree(entriesById(list))
@@ -745,17 +781,9 @@ describe("pinned cards in the tree", () => {
       ...entry("8-c", "7-r2", undefined, { type: "compaction" }),
       carried: { pinned: first },
     }
-    const after = entry("9-p3", "8-c", {
-      role: "person",
-      content: "p3",
-      author: "A",
-    })
+    const after = entry("9-p3", "8-c", personMessage("p3", { author: "A" }))
     const bare = entry("8-d", "7-r2", undefined, { type: "compaction" })
-    const afterBare = entry("9-q", "8-d", {
-      role: "person",
-      content: "q",
-      author: "A",
-    })
+    const afterBare = entry("9-q", "8-d", personMessage("q", { author: "A" }))
     const grown = indexTree(
       entriesById([...list, carried, after, bare, afterBare]),
     )
@@ -768,7 +796,7 @@ describe("pinned cards in the tree", () => {
     const branch = indexTree(
       entriesById([
         ...list,
-        entry("8-b", "3-p1", { role: "person", content: "b", author: "A" }),
+        entry("8-b", "3-p1", personMessage("b", { author: "A" })),
       ]),
     )
     expect(pinnedInView(branch, entryId("8-b"))?.lane).toBe(OTHER)
@@ -777,19 +805,16 @@ describe("pinned cards in the tree", () => {
 
 describe("conflictAskTime", () => {
   const asked = (id: string, parent: string | null, at: number) =>
-    entry(
-      id,
-      parent,
-      { role: "toolResult", content: "Asked.", asked: true },
-      { timestamp: at },
-    )
+    entry(id, parent, toolResultMessage({ content: "Asked.", asked: true }), {
+      timestamp: at,
+    })
   const list = [
-    entry("1-p", null, { role: "person", content: "p", author: "A" }),
+    entry("1-p", null, personMessage("p", { author: "A" })),
     asked("2-a", "1-p", 20),
     entry("3-c", "2-a", undefined, { type: "compaction" }),
-    entry("4-r", "3-c", { role: "toolResult", content: "No conflict." }),
+    entry("4-r", "3-c", toolResultMessage({ content: "No conflict." })),
     asked("5-a", "4-r", 50),
-    entry("6-q", "5-a", { role: "person", content: "q", author: "A" }),
+    entry("6-q", "5-a", personMessage("q", { author: "A" })),
   ]
   const index = indexTree(entriesById(list))
 
@@ -806,20 +831,23 @@ describe("conflictAskTime", () => {
 
 describe("newestOnPath", () => {
   const list = [
-    entry("1-a", null, { role: "person", content: "a", author: "A" }),
+    entry("1-a", null, personMessage("a", { author: "A" })),
     entry("2-c", "1-a", undefined, { type: "compaction" }),
-    entry("3-b", "2-c", { role: "person", content: "b", author: "B" }),
+    entry("3-b", "2-c", personMessage("b", { author: "B" })),
   ]
   const index = indexTree(entriesById(list))
-  const author = (e: EntryLike) => e.message?.author
+  const author = (e: EntryLike) =>
+    e.message?.role === "person" ? e.message.author : undefined
 
   test("the newest entry read, below a compaction", () => {
     expect(newestOnPath(index, entryId("3-b"), author, () => null)).toBe("B")
   })
 
   test("a compaction ends the walk with its answer, unless the read passes it", () => {
-    const skip = (e: EntryLike) =>
-      e.message?.author === "B" ? undefined : e.message?.author
+    const skip = (e: EntryLike) => {
+      const said = author(e)
+      return said === "B" ? undefined : said
+    }
     expect(newestOnPath(index, entryId("3-b"), skip, () => "summary")).toBe(
       "summary",
     )
@@ -827,14 +855,18 @@ describe("newestOnPath", () => {
   })
 })
 
-describe("one-line messages (LINE_ROLES)", () => {
+describe("one-line messages (isLineRole)", () => {
   test("a host's fact and its base's news show as their one line; a pinned entry does not", () => {
     const index = indexTree(
       entriesById([
-        entry("1-p", null, { role: "person", content: "p", author: "A" }),
-        entry("2-f", "1-p", { role: "fact", content: "✓ added" }),
-        entry("3-b", "2-f", { role: "behind", content: "↓ new work" }),
-        entry("4-c", "3-b", { role: "pinned", content: "" }),
+        entry("1-p", null, personMessage("p", { author: "A" })),
+        entry("2-f", "1-p", lineMessage("fact", "✓ added")),
+        entry("3-b", "2-f", lineMessage("behind", "↓ new work")),
+        entry("4-c", "3-b", {
+          role: "pinned",
+          content: "",
+          pinned: { lane: FIXTURE_THREAD, cards: [], retired: [] },
+        }),
       ]),
     )
     expect(
@@ -850,7 +882,7 @@ describe("one-line messages (LINE_ROLES)", () => {
 describe("baseKnown", () => {
   const C = (s: string) => s as never
   const list = [
-    entry("1-p", null, { role: "person", content: "p", author: "A" }),
+    entry("1-p", null, personMessage("p", { author: "A" })),
     entry("2-u", "1-p", { role: "update", content: "u", merged: [C("l1")] }),
     entry("3-b", "2-u", {
       role: "behind",
@@ -863,13 +895,13 @@ describe("baseKnown", () => {
         conflicts: [],
       },
     }),
-    entry("4-r", "3-b", {
-      role: "toolResult",
-      content: "merged",
-      merged: [C("l3")],
-    }),
+    entry(
+      "4-r",
+      "3-b",
+      toolResultMessage({ content: "merged", merged: [C("l3")] }),
+    ),
     entry("5-c", "4-r", undefined, { type: "compaction" }),
-    entry("6-q", "5-c", { role: "person", content: "q", author: "A" }),
+    entry("6-q", "5-c", personMessage("q", { author: "A" })),
   ]
   const index = indexTree(entriesById(list))
 
@@ -888,21 +920,16 @@ describe("baseKnown", () => {
 describe("a turn's tail", () => {
   const C = (s: string) => s as never
   const list = [
-    entry("1-p", null, { role: "person", content: "p", author: "A" }),
+    entry("1-p", null, personMessage("p", { author: "A" })),
     entry("2-a", "1-p", { role: "assistant", content: "calls" }),
-    entry("3-r", "2-a", {
-      role: "toolResult",
-      toolCallId: "c1",
-      content: "merged",
-      merged: [C("l2")],
-    }),
-    entry("4-b", "3-r", { role: "behind", content: "↓ new work" }),
+    entry(
+      "3-r",
+      "2-a",
+      toolResultMessage({ content: "merged", merged: [C("l2")] }),
+    ),
+    entry("4-b", "3-r", lineMessage("behind", "↓ new work")),
     entry("5-a", "4-b", { role: "assistant", content: "next" }),
-    entry("6-r", "5-a", {
-      role: "toolResult",
-      toolCallId: "c2",
-      content: "ok",
-    }),
+    entry("6-r", "5-a", toolResultMessage({ toolCallId: "c2", content: "ok" })),
   ]
   const index = indexTree(entriesById(list))
 
@@ -918,12 +945,13 @@ describe("a turn's tail", () => {
   })
 })
 
-test("entryMessage: the host's own messages show as their line; other roles are none", () => {
+test("entryMessage: the host's own messages show as their line; pi's system message and an entry with none are none", () => {
   const index = indexTree(
     entriesById([
-      entry("1-p", null, { role: "person", content: "hi", author: "A" }),
-      entry("2-c", "1-p", { role: "carry-on", content: "↻ resumed by Ada" }),
-      entry("3-x", "2-c", { role: "custom", content: "raw" }),
+      entry("1-p", null, personMessage("hi", { author: "A" })),
+      entry("2-c", "1-p", lineMessage("carry-on", "↻ resumed by Ada")),
+      entry("3-x", "2-c", { role: "system", content: "raw" }),
+      entry("4-x", "3-x"),
     ]),
   )
   expect(entryMessage(index, entryId("2-c"))).toEqual({
@@ -933,6 +961,7 @@ test("entryMessage: the host's own messages show as their line; other roles are 
     text: "↻ resumed by Ada",
   })
   expect(entryMessage(index, entryId("3-x"))).toBeNull()
+  expect(entryMessage(index, entryId("4-x"))).toBeNull()
 })
 
 test("a call's intent is read from its arguments, for any tool", () => {

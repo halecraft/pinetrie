@@ -1,30 +1,30 @@
 import { describe, expect, test } from "vitest"
-import { entriesById, entry } from "./fixtures.ts"
+import { entriesById, entry, personMessage as person } from "./fixtures.ts"
 import {
+  type AgentMessageLike,
   type EntryLike,
   entryId,
   indexTree,
   isRoundAnswered,
   lastIncomingEntry,
   lastInvitation,
+  type PersonMessage,
   type TreeIndex,
   threadIdFor,
   threadMembers,
   writerId,
 } from "./index.ts"
 
-type Message = NonNullable<EntryLike["message"]>
+type Message = AgentMessageLike
 const fox = threadIdFor("fox")
 const owl = threadIdFor("owl")
 const here = threadIdFor("here")
 const ada = writerId("ada@example.com")
 const build = (rows: readonly EntryLike[]): TreeIndex =>
   indexTree(entriesById(rows))
-const personMessage = (extra: Partial<Message> = {}): Message => ({
-  role: "person",
-  content: "hi",
-  ...extra,
-})
+const personMessage = (
+  extra: Partial<Omit<PersonMessage, "role" | "content">> = {},
+): Message => person("hi", extra)
 const said = (text: string): Message => ({
   role: "assistant",
   content: [{ type: "text", text }],
@@ -66,7 +66,7 @@ describe("threadMembers", () => {
 
 describe("lastHeardEntry", () => {
   const heard = (from: typeof fox, entries: string[]): Message => ({
-    role: "heard",
+    role: "incoming",
     content: "",
     incoming: { from, fromName: "x", entries: entries.map(entryId) },
   })

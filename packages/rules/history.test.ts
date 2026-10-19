@@ -202,7 +202,7 @@ describe("history messages (history.ts)", () => {
       )
       expect(message.details).toEqual(sample)
       expect(spec.decode(structuredClone(message))).toEqual(sample)
-      expect(renderableMessage(message).role).toBe(ROLES[type])
+      expect(renderableMessage(message)?.role).toBe(ROLES[type])
       // Another kind's message, or one whose lane is no lane, is not this one.
       expect(spec.decode({ ...message, customType: "pinetrie.other" })).toBe(
         undefined,

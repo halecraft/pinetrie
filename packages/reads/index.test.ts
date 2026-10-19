@@ -23,14 +23,18 @@ import { readLanes, readTreeIndex } from "./index.ts"
 
 const _TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 
-const row = (id: string, parentId: string | null): StoredEntryRow => ({
+const row = (
+  id: string,
+  parentId: string | null,
+  message: unknown = { role: "user", content: id },
+): StoredEntryRow => ({
   id,
   parentId,
   type: "message",
   timestamp: 0,
   fromId: null,
   thread: threadIdFor("row"),
-  payload: { message: { role: "user", content: id } },
+  payload: { message },
 })
 
 test("readTreeIndex keeps the index, and each unchanged entry, until entries change", () => {
@@ -59,6 +63,18 @@ test("each entry is in the thread its row names; a row whose thread is no thread
   expect(index.entries[entryId("e1")]?.thread).toBe(threadIdFor("row"))
   expect(index.entries[entryId("e2")]).toBeUndefined()
   expect(index.endOf.get(threadIdFor("row"))).toBe("e1")
+})
+
+test("a row of a type pi does not write is left out; a message row with a role the reads do not take has no message", () => {
+  const doc = newRootDoc()
+  writeEntry(doc, row("e1", null))
+  writeEntry(doc, { ...row("e2", "e1"), type: "custom_message" })
+  writeEntry(doc, row("e3", "e1", { role: "bashExecution", command: "ls" }))
+  const index = readTreeIndex(doc)
+  expect(index.entries[entryId("e1")]?.message?.role).toBe("user")
+  expect(index.entries[entryId("e2")]).toBeUndefined()
+  expect(index.entries[entryId("e3")]?.type).toBe("message")
+  expect(index.entries[entryId("e3")]?.message).toBeUndefined()
 })
 
 test("a compaction carries the newest cards entry of its retained tail; one with none carries nothing", () => {

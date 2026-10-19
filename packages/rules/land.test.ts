@@ -310,9 +310,9 @@ describe("planResolution: the land message", () => {
     const m = plan([file("a.ts", 1), file("b.ts", 1)], 100_000)
     expect(m.customType).toBe(LAND_TYPE)
     const shown = renderableMessage(m)
-    expect(shown.role).toBe("land")
-    expect(shown.content).toBe("⚠ got the latest: 2 files conflict")
-    expect(renderableMessage(plan([], 100_000)).content).toBe(
+    expect(shown?.role).toBe("land")
+    expect(shown?.content).toBe("⚠ got the latest: 2 files conflict")
+    expect(renderableMessage(plan([], 100_000))?.content).toBe(
       "✓ got the latest: no conflicts",
     )
   })

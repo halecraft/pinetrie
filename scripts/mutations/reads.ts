@@ -129,8 +129,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "referencedBlobs skips tool results",
     file: "packages/reads/index.ts",
-    from: "    for (const image of messageImages(message as AgentMessageLike))",
-    to: "    for (const image of messageImages(null))",
+    from: "    for (const image of storedImages(message))",
+    to: "    for (const image of storedImages(null))",
     command: unit,
     expect: "referencedBlobs: sends, tool results",
   },
@@ -226,9 +226,17 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a row whose thread is no thread's id is read into the tree",
     file: "packages/reads/index.ts",
-    from: "  if (!isThreadId(thread)) return null\n",
-    to: "",
+    from: "  if (!isThreadId(thread) || !isEntryType(type)) return null\n",
+    to: "  if (!isEntryType(type)) return null\n",
     command: ["pnpm", "exec", "vitest", "run", "packages/reads"],
     expect: "a row whose thread is no thread's id is left out",
+  },
+  {
+    name: "a row of a type pi does not write is read into the tree",
+    file: "packages/reads/index.ts",
+    from: "  if (!isThreadId(thread) || !isEntryType(type)) return null\n",
+    to: "  if (!isThreadId(thread)) return null\n",
+    command: ["pnpm", "exec", "vitest", "run", "packages/reads"],
+    expect: "a row of a type pi does not write is left out",
   },
 ]

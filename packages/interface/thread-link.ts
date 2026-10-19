@@ -12,6 +12,7 @@ import type {
   CardRecord,
   EntryId,
   ThreadId,
+  TranscriptMessage,
   WriterId,
 } from "@pinetrie/core"
 import { displayName, threadReach } from "@pinetrie/rules"
@@ -129,16 +130,12 @@ export interface CrossCanvasLink {
 }
 
 /**
- * Each ask, answer and heard row from another thread, by its entry, with
+ * Each ask, answer and incoming row from another thread, by its entry, with
  * where that thread is: its canvas's label, or who has it. A thread on the
  * column's own canvas (`here`) adds nothing to its name, and has none.
  */
 export function crossCanvasLinks(
-  nodes: readonly {
-    readonly id: EntryId
-    readonly role: string
-    readonly from?: ThreadId
-  }[],
+  nodes: readonly TranscriptMessage[],
   facts: {
     readonly cards: readonly CardRecord[]
     readonly reader: Reader
@@ -148,7 +145,12 @@ export function crossCanvasLinks(
 ): ReadonlyMap<EntryId, CrossCanvasLink> {
   const out = new Map<EntryId, CrossCanvasLink>()
   for (const node of nodes) {
-    if (node.from === undefined) continue
+    if (
+      node.role !== "relay" &&
+      node.role !== "answer" &&
+      node.role !== "incoming"
+    )
+      continue
     const link = threadLink(node.from, facts.cards, facts.reader.me)
     if (link.kind === "open" && link.canvas === facts.here) continue
     out.set(node.id, {

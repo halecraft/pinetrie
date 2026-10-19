@@ -13,7 +13,12 @@ import {
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
-import { entriesById, entry } from "@pinetrie/core/fixtures"
+import {
+  entriesById,
+  entry,
+  personMessage,
+  toolResultMessage,
+} from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import { cardsOnCanvas, proposalDraft } from "./canvas-index.ts"
 import { landedThreadCard } from "./fixtures.ts"
@@ -39,13 +44,20 @@ const RESULT = entryId("3-r")
 const FORK = entryId("4-a")
 const index = indexTree(
   entriesById([
-    entry("1-p", null, { role: "person", content: "split it" }, { thread: P }),
+    entry("1-p", null, personMessage("split it"), { thread: P }),
     entry(
       "2-a",
       "1-p",
       {
         role: "assistant",
-        content: [{ type: "toolCall", id: "c1", name: "propose_branches" }],
+        content: [
+          {
+            type: "toolCall",
+            id: "c1",
+            name: "propose_branches",
+            arguments: {},
+          },
+        ],
         stopReason: "toolUse",
       },
       { thread: P },
@@ -53,12 +65,7 @@ const index = indexTree(
     entry(
       "3-r",
       "2-a",
-      {
-        role: "toolResult",
-        toolCallId: "c1",
-        content: "ok",
-        proposal: PROPOSAL,
-      },
+      toolResultMessage({ content: "ok", proposal: PROPOSAL }),
       { thread: P },
     ),
     entry(
@@ -317,14 +324,9 @@ describe("proposalDraft", () => {
     const started = indexTree(
       entriesById([
         ...Object.values(index.entries),
-        entry(
-          "5-c",
-          "4-a",
-          { role: "person", content: "@agent do two" },
-          {
-            thread: NEW[0] ?? P,
-          },
-        ),
+        entry("5-c", "4-a", personMessage("@agent do two"), {
+          thread: NEW[0] ?? P,
+        }),
       ]),
     )
     expect(

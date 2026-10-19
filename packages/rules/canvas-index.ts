@@ -16,6 +16,7 @@ import {
   livePlace,
   type MoveTarget,
   makeCard,
+  messageProposal,
   NO_CONTENT,
   type PlaceKey,
   type PlaceOf,
@@ -487,7 +488,9 @@ export function proposalDraft(input: {
   if (origin.kind !== "fork" || origin.how !== "branch") return undefined
   if (origin.proposal === undefined || record.by !== input.me) return undefined
   if (index.firstOf.has(record.thread)) return undefined
-  const proposal = index.entries[origin.proposal.entry]?.message?.proposal
+  const proposal = messageProposal(
+    index.entries[origin.proposal.entry]?.message,
+  )
   const brief = proposal?.branches[origin.proposal.row]?.brief
   return brief === undefined ? undefined : agentAsk(brief)
 }

@@ -4,7 +4,7 @@ import { mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { subscribe } from "@kyneta/schema"
-import { projectSpine, ROOT } from "@pinetrie/core"
+import { projectSpine, ROOT, transcriptCalls } from "@pinetrie/core"
 import { blobSha256, scriptedModel } from "@pinetrie/pi"
 import { readPlaces } from "@pinetrie/reads"
 import { BLOB_GRACE_MS } from "../../host/index.ts"
@@ -59,7 +59,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         heldLanes(th, tree, readPlaces(th.places))[0]?.tip ?? null,
       ).spine
       return spine
-        .flatMap(n => n.toolCalls ?? [])
+        .flatMap(transcriptCalls)
         .find(c => c.name === "read" && c.subject === "shot.png")
     }
     const red = blobSha256(RED_PNG)

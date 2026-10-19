@@ -1,5 +1,11 @@
-import { type EntryLike, entryId, indexAsks, indexTree } from "@pinetrie/core"
-import { FIXTURE_THREAD } from "@pinetrie/core/fixtures"
+import {
+  type AgentMessageLike,
+  type EntryLike,
+  entryId,
+  indexAsks,
+  indexTree,
+} from "@pinetrie/core"
+import { FIXTURE_THREAD, personMessage } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import type { DigestRecord } from "./digest.ts"
 import type { FocusRecord } from "./focus.ts"
@@ -17,7 +23,7 @@ const T = FIXTURE_THREAD
 const at = (
   id: string,
   parentId: string | null,
-  message: Record<string, unknown>,
+  message: AgentMessageLike,
 ): EntryLike => ({
   id: entryId(id),
   parentId: parentId === null ? null : entryId(parentId),
@@ -30,17 +36,9 @@ const at = (
 const index = indexTree(
   Object.fromEntries(
     [
-      at("p-1", null, {
-        role: "person",
-        author: "Ada",
-        content: "fix the rail",
-      }),
+      at("p-1", null, personMessage("fix the rail", { author: "Ada" })),
       at("w-1", "p-1", { role: "assistant", content: "fixed" }),
-      at("p-2", "w-1", {
-        role: "person",
-        author: "Ada",
-        content: "now billing",
-      }),
+      at("p-2", "w-1", personMessage("now billing", { author: "Ada" })),
       at("w-2", "p-2", { role: "assistant", content: "planned" }),
     ].map(e => [e.id, e]),
   ),

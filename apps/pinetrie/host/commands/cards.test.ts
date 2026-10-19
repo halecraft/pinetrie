@@ -72,6 +72,7 @@ import {
   row,
   seedChange,
   seedPlaces,
+  storedMessage,
   threadRow,
   writeDirectory,
 } from "../fakes.ts"
@@ -1107,10 +1108,7 @@ describe("every command that moves a card records it", () => {
     )
     expect(eventsOf(b)).toHaveLength(2)
     const sent = entryId("e-2")
-    writeEntry(
-      b.root,
-      row(sent, E1, { role: "user", content: "hi", sendId: "s-1" }),
-    )
+    writeEntry(b.root, row(sent, E1, storedMessage("hi", { sendId: "s-1" })))
     await commands.spend(BEA, C1, { sendId: "s-1", send: aSend })
     expect(readCardHistories(b.session).has(C1)).toBe(false)
     expect(tracesOf(b)).toMatchObject([
@@ -1204,11 +1202,11 @@ describe("a card made a thread, and lifted back", () => {
     for (const [i, w] of writers.entries())
       writeEntry(
         doc,
-        row(`t-${i + 1}`, i === 0 ? null : `t-${i}`, {
-          role: "person",
-          content: "x",
-          writer: w,
-        }),
+        row(
+          `t-${i + 1}`,
+          i === 0 ? null : `t-${i}`,
+          storedMessage("x", { author: w, sendId: `s-t-${i + 1}` }),
+        ),
       )
   }
 
