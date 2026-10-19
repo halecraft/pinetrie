@@ -8,7 +8,7 @@
 
 import assert from "node:assert/strict"
 import { spawnSync } from "node:child_process"
-import { readdirSync, readFileSync } from "node:fs"
+import { existsSync, readdirSync, readFileSync } from "node:fs"
 import path from "node:path"
 import { test } from "vitest"
 
@@ -21,9 +21,15 @@ interface Manifest {
 const ROOT = path.dirname(new URL(import.meta.url).pathname)
 const read = (dir: string): Manifest =>
   JSON.parse(readFileSync(path.join(ROOT, dir, "package.json"), "utf8"))
+// A package is a folder holding a manifest, as pnpm's workspace reads one: a
+// renamed package's old folder can outlive it, holding only `node_modules`.
 const dirsIn = (group: string) =>
   readdirSync(path.join(ROOT, group), { withFileTypes: true })
-    .filter(d => d.isDirectory())
+    .filter(
+      d =>
+        d.isDirectory() &&
+        existsSync(path.join(ROOT, group, d.name, "package.json")),
+    )
     .map(d => `${group}/${d.name}`)
 
 const WORKSPACE = [...dirsIn("apps"), ...dirsIn("packages")]

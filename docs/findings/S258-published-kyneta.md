@@ -1,7 +1,6 @@
 # S258 — Does pine·trie run on Kyneta 4.0.0 from npm?
 
-- **Status:** Open (every gate but `e2e:lanes` read; that one waits on a
-  baseline)
+- **Status:** Answered
 - **Led to:** ADR-0189
 
 Every `@kyneta/*` dependency is a `link:` to the local checkout at
@@ -64,3 +63,15 @@ has no Kyneta checkout, so no gate ran on the `link:` for comparison.
    `4.0.0`. That baseline is the Mac's, or a lane that has the checkout.
 4. **The peer** `@kyneta/sql-store-core` resolved for pnpm with the app's
    declaration; npm's install is S257's to check.
+
+## Answered on the Mac
+
+On 2026-10-19 the manifests moved to `4.0.0` with Kyneta's peer-only
+declarations gone, the lockfile updated in a lane with `--lockfile-only`
+(every macOS entry kept), and `pnpm install` then `pnpm run verify` on the
+Mac passed every gate, `e2e:lanes` among them, but for 12 unit tests that
+were not Kyneta's: `workspace.test.ts` read a leftover folder holding only
+`node_modules`, and a file-writing test outlived the default timeout under
+the full suite. pine·trie runs on Kyneta `4.0.0`; no Kyneta release is
+waited on.
+
