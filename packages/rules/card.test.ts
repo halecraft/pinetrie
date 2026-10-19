@@ -1610,7 +1610,7 @@ describe("handoffs", () => {
       })
     })
 
-    test("the nineteenth card is refused full, a creation too; another person's full inventory is not yours", () => {
+    test("a card past the last slot is refused full, a creation too; another person's full inventory is not yours", () => {
       const c = card({ place: atEnd })
       expect(
         planMove([...full(ADA), c], { card: C1, from: atEnd, to: mine }, ADA),

@@ -2456,12 +2456,12 @@ export const mutations: readonly Mutation[] = [
       "a discard from your own inventory records that it left it; from someone else's, refused",
   },
   {
-    name: "an inventory holds a nineteenth card",
+    name: "an inventory holds a card past its last slot",
     file: "packages/rules/place-steps.ts",
     from: "  ).length >= INVENTORY_SLOTS",
     to: "  ).length > INVENTORY_SLOTS",
     command: unit,
-    expect: "the nineteenth card is refused full",
+    expect: "a card past the last slot is refused full",
   },
   {
     name: "a full inventory counts everyone's cards",
@@ -2469,7 +2469,7 @@ export const mutations: readonly Mutation[] = [
     from: "      c.place.holder === holder,\n  ).length",
     to: "      true,\n  ).length",
     command: unit,
-    expect: "the nineteenth card is refused full",
+    expect: "a card past the last slot is refused full",
   },
   {
     name: "a creation skips the inventory's rules",
@@ -2477,7 +2477,7 @@ export const mutations: readonly Mutation[] = [
     from: "      : placeRefusal(to, cards, card.id, sender)\n  return refusal === null",
     to: "      : null\n  return refusal === null",
     command: unit,
-    expect: "the nineteenth card is refused full",
+    expect: "a card past the last slot is refused full",
   },
   {
     name: "a move keeps its old placer",

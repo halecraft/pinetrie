@@ -2575,7 +2575,7 @@ export const mutations: readonly Mutation[] = [
     to: "",
     suite: "host",
     scenario: "cards",
-    expect: "the nineteenth card is refused: the inventory is full",
+    expect: "a card past the last slot is refused: the inventory is full",
   },
   {
     name: "the page hears no keys",

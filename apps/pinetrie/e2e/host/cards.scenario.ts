@@ -11,6 +11,7 @@ import {
   type EntryId,
   entryId,
   entryThread,
+  INVENTORY_SLOTS,
   ROOT,
   type TextCardId,
   type ThreadId,
@@ -552,7 +553,7 @@ async function run(check: Checks["check"]): Promise<void> {
 
     // 4e. Your inventory: a take into it reaches your other
     // session's inventory and nobody else's; nobody else moves a card out of
-    // it; and it holds 18 cards. Each move is a client's request over the wire.
+    // it; and it holds INVENTORY_SLOTS cards. Each move is a client's request over the wire.
     const ada2 = await join(ch, "ada", "cards")
     const mine = { kind: "inventory", holder: ada.writer } as const
     const into = (slot: number) =>
@@ -865,7 +866,7 @@ async function run(check: Checks["check"]): Promise<void> {
 
     const filled = await Promise.all(
       // Every slot but the first take's (3) and the other root's (5).
-      Array.from({ length: 18 }, (_, n) => n)
+      Array.from({ length: INVENTORY_SLOTS }, (_, n) => n)
         .filter(slot => slot !== 3 && slot !== 5)
         .map(slot =>
           ada.createCard(
@@ -879,14 +880,14 @@ async function run(check: Checks["check"]): Promise<void> {
           ),
         ),
     )
-    const nineteenth = newCard(ada, tipOf(), "one too many")
-    await waitFor(() => onHost(nineteenth) !== undefined, 5_000)
+    const oneTooMany = newCard(ada, tipOf(), "one too many")
+    await waitFor(() => onHost(oneTooMany) !== undefined, 5_000)
     const tooMany = await ada.moveCard(
-      { card: nineteenth, from: drafting(tipOf()), to: mine },
+      { card: oneTooMany, from: drafting(tipOf()), to: mine },
       into(2),
     )
     check(
-      "the nineteenth card is refused: the inventory is full",
+      "a card past the last slot is refused: the inventory is full",
       filled.every(a => a.kind === "accepted") &&
         tooMany.kind === "refused" &&
         tooMany.refusal?.code === "full",

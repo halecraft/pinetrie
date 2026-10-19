@@ -978,7 +978,7 @@ rejects `shutdown()`.
   write it is the protocol's (`writersPolicy`, below). Kyneta fires
   `resolve` only for a peer `canShare` grants (S76), so nobody else can
   create someone's document. The host never writes one: it decides only
-  whose inventory a card is in, and refuses a nineteenth card without
+  whose inventory a card is in, and refuses a card past its last slot without
   knowing the slots.
 - **Who may write a document is declared once, on every peer**
   (`writersPolicy`, `@pinetrie/protocol/writers`, Kyneta's `canWrite`): the
