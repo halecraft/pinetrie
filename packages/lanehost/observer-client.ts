@@ -19,7 +19,6 @@
 //   owns that host's lanes by that channel. Each of its registrations is
 //   made forwarded, within the lane, whatever it said (`relayedCall`).
 
-import path from "node:path"
 import { type Channel, openChannel } from "@pinetrie/channel"
 import {
   errorText,

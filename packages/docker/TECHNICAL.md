@@ -101,6 +101,12 @@ declares it (`workspace.test.ts`).
   path, and the host's install and lane runtime read-only at `/pinetrie`
   and `/pinetrie-runtime`, through `pathOf`, as a lane does: each host runs
   its own version of the server.
+- **Every script it starts is the install's** (`dockerRuntime`'s
+  `install`, `@pinetrie/install`'s `scriptCommand`): lanehost's server and
+  its readers, the observer's server and its connection, each in the
+  install's form as a container mounts it. The observer's image is made
+  from that install's files, so a repo host and an installed one build
+  images of their own.
 - **Lanehost starts once setup names the install and the runtime**
   (`serveFrom`, from the mounts `Found.ready` is given): on the Mac they are
   in the slot only after its fill. A disk call before then is refused,
@@ -281,6 +287,6 @@ directory, so the person's hosts are untouched. Its checks:
   `renderRun` sets no `PidMode`, and a test says so.
 - **Under rootless Docker in a lane, the observer is the lane helper's**
   (`dockerRuntime`'s `observer: "forwarded"`): a host there opens each
-  channel by running `observer-connect.ts` on its own Node against core's
-  `OBSERVER_SOCKET`, and makes no container. Its registrations are as a
+  channel by running the install's `observerConnect` on its own Node
+  against core's `OBSERVER_SOCKET`, and makes no container. Its registrations are as a
   direct host's; the host outside makes them forwarded.

@@ -49,25 +49,28 @@ are branded (`EntryId`, `RunId`, `ThreadId`), minted only where they enter,
 which `biome.json`'s `noRestrictedImports` enforces in core, the interface,
 the page and the host.
 
-**Publishing is the one build, and it is not built yet** (ADR-0189).
-Node will not strip types under `node_modules`, so the npm package
-`pinetrie` will be the repo's layout with each file's types stripped in
-place by Node's own stripper and its `.ts` imports rewritten to `.js`,
-built into `dist/pinetrie/`. Development keeps running `.ts` from the
-repo. The lane helper alone will ship as one file with its third-party
-packages inside it, so a lane runs from `/pinetrie` whatever the install
-layout; the package is MIT, for macOS on Apple silicon and Linux on arm64
-and x86_64 (ADR-0190).
+**The npm package is the one build** (ADR-0189). Node will not strip
+types under `node_modules`, so `pnpm run package` (`scripts/package.ts`)
+writes the package `pinetrie` into `dist/pinetrie/`: the repo's layout,
+each file's types stripped in place by Node's own stripper, so lines and
+columns are the source's, and its `.ts` imports rewritten to `.js`.
+Development runs `.ts` from the repo, and builds nothing. The lane helper
+alone ships as one file with its third-party packages inside it, so a lane
+runs from `/pinetrie` whatever the install layout; the package is MIT, for
+macOS on Apple silicon and Linux on arm64 and x86_64 (ADR-0190).
+pine·trie's own files, and the scripts it runs in other processes, are
+found through `@pinetrie/install`, which knows the install's root and
+whether it runs as `.ts` or `.js`. `tsconfig.json` sets
+`erasableSyntaxOnly`, so `tsc` refuses what stripping cannot take. A
+release is `docs/releasing.md`.
 
-## pnpm, with Kyneta linked
+## pnpm, with Kyneta from the registry
 
-Kyneta is the local checkout, declared with `link:` (`link:../../../kyneta/…`,
-from each package), which npm rejects and pnpm resolves. pnpm's
-`node_modules` is strict, so a package reaches only what it declares: that
-is what enforces every package boundary (`docs/01-architecture.md`). A
-Kyneta package's peer dependencies must be declared beside it, though
-nothing imports them, which the `//dependencies` note in
-`packages/session/package.json` and `packages/web/package.json` says.
+Kyneta is the registry's `4.0.0`, as pi is its `0.99.2`, pinned exactly.
+pnpm's `node_modules` is strict, so a package reaches only what it
+declares: that is what enforces every package boundary
+(`docs/01-architecture.md`). A Kyneta package's peer dependencies are met
+by the package manager, so nothing declares a package it never imports.
 
 `packageManager` pins pnpm 10.18.0. Install with `--frozen-lockfile`: in a
 lane, a rewrite of `pnpm-lock.yaml` would drop every macOS package

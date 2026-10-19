@@ -521,7 +521,12 @@ item 18, and in `lanes.test.ts` against the harness.
 - **A lane of its own** gets `laneEnv(dir, gate)`: a proxy whose every method
   first awaits the gate, then forwards the call over the lane's channel.
   - The helper (`lane-helper.ts`) serves pi's own `NodeExecutionEnv` in the
-    container, so pi's tools run there unchanged. They use 8 of its methods:
+    container, so pi's tools run there unchanged. The npm package ships it
+    as one file, its packages inside it (ADR-0190), since a lane sees the
+    package's mount and npm may put them beside it: so no module it loads
+    may read beside itself or ask whether it is the program
+    (`import.meta.dirname`, `import.meta.filename`, `import.meta.url`,
+    `process.argv[1]`), which the build refuses. They use 8 of its methods:
     `absolutePath`, `canonicalPath`, `exists`, `fileInfo`, `readTextFile`,
     `readBinaryFile`, `writeFile`, `exec` (S43 item 1). The search tools use
     `exec` alone.
@@ -1071,16 +1076,20 @@ a counter.
 
 ### `deep.ts`
 
-Reaches pi entry points that are absent from its `exports` map, by relative path
-into `node_modules`: `createAgentHarness`, `addUsage`/`emptyUsage`,
+Reaches pi entry points that are absent from its `exports` map, by file,
+from each pi package's own folder (`deep-packages.ts`' `deepPackageDir`,
+which resolves the package as Node does: pnpm keeps each in a store
+folder of its own, npm keeps them side by side): `createAgentHarness`, `addUsage`/`emptyUsage`,
 `ModelRuntime`, `SettingsManager` and `DefaultResourceLoader` (only
 through `openRuntime` and `openLoader`), and `buildSystemPromptSections` and
 `diffSystemPromptSections`. For commands:
 `loadSkillsFromDir`, `loadPromptTemplates`, `substituteArgs`
 and `parseCommandArgs`. For images (ADR-0042):
-`detectSupportedImageMimeType`, `resizeImage` and `formatDimensionNote`. Those paths are depth-sensitive: they broke when this
-package moved under `packages/`. If they break again, the failure is
-`ERR_MODULE_NOT_FOUND` at import time, not a type error.
+`detectSupportedImageMimeType`, `resizeImage` and `formatDimensionNote`.
+`deep()` takes only a package `DEEP_PACKAGES` lists, by its type, and the
+package build reads that list for the dependencies no import names. A file
+pi moves fails as `ERR_MODULE_NOT_FOUND` at import time; its type paths
+(relative, into this package's `node_modules`) fail at compile time.
 
 ## The contract test
 

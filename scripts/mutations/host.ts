@@ -2,6 +2,13 @@
 import type { Mutation } from "../mutate.ts"
 
 const unit = ["pnpm", "exec", "vitest", "run", "apps/pinetrie/host"]
+const command = [
+  "pnpm",
+  "exec",
+  "vitest",
+  "run",
+  "apps/pinetrie/command.test.ts",
+]
 
 export const mutations: readonly Mutation[] = [
   // ── a lane's fork ──
@@ -3561,5 +3568,21 @@ export const mutations: readonly Mutation[] = [
     scenario: "tools",
     expect:
       "a run's pending state is in its root's scratch document, which its end destroys",
+  },
+  {
+    name: "the lane image's Playwright is not the app's",
+    file: "apps/pinetrie/host/work/setup.ts",
+    from: 'export const PLAYWRIGHT_VERSION = "1.64.1"',
+    to: 'export const PLAYWRIGHT_VERSION = "1.64.0"',
+    command: unit,
+    expect: "the lane image's Playwright is the app's own",
+  },
+  {
+    name: "an unknown command runs serve",
+    file: "apps/pinetrie/command.ts",
+    from: '    : { kind: "refused", named: first }',
+    to: '    : { kind: "run", command: "serve", args }',
+    command,
+    expect: "an unknown command is refused, by its name",
   },
 ]

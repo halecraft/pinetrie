@@ -59,14 +59,9 @@ test("pnpm tidy's arguments: a folder as the host reads one, a window, a dry run
     dryRun: false,
   })
   expect(
-    planTidyInvocation(
-      ["../app", "--days", "3", "--dry-run"],
-      "/src/pinetrie",
-    ),
+    planTidyInvocation(["../app", "--days", "3", "--dry-run"], "/src/pinetrie"),
   ).toEqual({ kind: "tidy", folder: "/src/app", days: 3, dryRun: true })
-  expect(planTidyInvocation(["--days", "0"], "/b").kind).toBe(
-    "refused",
-  )
+  expect(planTidyInvocation(["--days", "0"], "/b").kind).toBe("refused")
   expect(planTidyInvocation(["--days"], "/b").kind).toBe("refused")
   expect(planTidyInvocation(["--now"], "/b").kind).toBe("refused")
   expect(planTidyInvocation(["/a", "/b"], "/b").kind).toBe("refused")

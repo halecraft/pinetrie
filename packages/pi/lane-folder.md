@@ -30,7 +30,7 @@ changes pine·trie can keep this note true. You can skip them.
   of your proposed changes. <!-- packages/lanes/plan.ts planMounts -->
 - `/pinetrie` is the install of pine·trie that runs this lane, read-only. It
   is not your project, even when your project is pine·trie: its code can
-  differ from yours. <!-- packages/lanes/plan.ts PINETRIE_MOUNT -->
+  differ from yours. <!-- packages/install/index.ts PINETRIE_MOUNT -->
 - A dependency the project links from outside itself (`link:`) is mounted
   read-only at its own path. <!-- packages/lanes/plan.ts planLinks -->
 - A skill's files are at `/mnt/host` followed by their path on the

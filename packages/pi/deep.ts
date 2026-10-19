@@ -35,7 +35,7 @@
 // stable symlink in the repo, so this does not bake in a pnpm content hash;
 // the types are gone from the built package, whose layout is npm's.
 
-import type { DeepPackage } from "./deep-packages.ts"
+import { type DeepPackage, deepPackageDir } from "./deep-packages.ts"
 
 type UsageModule =
   typeof import("./node_modules/@earendil-works/pi-agent-core/dist/harness/utils/usage.js")
@@ -57,19 +57,6 @@ type MimeModule =
   typeof import("./node_modules/@earendil-works/pi-coding-agent/dist/utils/mime.js")
 type ImageResizeModule =
   typeof import("./node_modules/@earendil-works/pi-coding-agent/dist/utils/image-resize.js")
-
-/**
- * A package's own folder, from where Node resolves its entry: pnpm keeps
- * each package in a store folder of its own, so one shared base would find
- * only the first; npm keeps them side by side.
- */
-export function deepPackageDir(pkg: DeepPackage): URL {
-  const entry = import.meta.resolve(pkg)
-  const marker = `/node_modules/${pkg}/`
-  const at = entry.lastIndexOf(marker)
-  if (at < 0) throw new Error(`${pkg} resolved outside node_modules: ${entry}`)
-  return new URL(entry.slice(0, at + marker.length))
-}
 
 const deep = (pkg: DeepPackage, file: string): Promise<unknown> =>
   import(new URL(file, deepPackageDir(pkg)).href)

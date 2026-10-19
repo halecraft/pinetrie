@@ -30,6 +30,8 @@ export type Target =
 
 /** Everything the plan decides from, read from the repo. */
 export interface Gathered {
+  /** What the package starts from (`ENTRIES`), the lane helper among them. */
+  readonly entries: readonly string[]
   /** Each source file, repo-relative, tests left out. */
   readonly sources: ReadonlyMap<string, string>
   /** Every other file a shipped package could hold, repo-relative. */
@@ -146,7 +148,7 @@ export function planPackage(g: Gathered): PackagePlan {
       [...targets.values()].flatMap(t => (t.kind === "file" ? [t.path] : [])),
     ]),
   )
-  const shipped = [...reachable(graph, ENTRIES)].toSorted()
+  const shipped = [...reachable(graph, g.entries)].toSorted()
 
   for (const file of reachable(graph, [HELPER]))
     for (const read of selfReads(file, g.sources.get(file) ?? ""))
@@ -258,9 +260,12 @@ export function gatherPackage(root: string): Gathered {
       return [file, resolved] as const
     }),
   )
-  const manifests = globSync(["packages/*/package.json", "apps/*/package.json"], {
-    cwd: root,
-  }).map(
+  const manifests = globSync(
+    ["packages/*/package.json", "apps/*/package.json"],
+    {
+      cwd: root,
+    },
+  ).map(
     f =>
       JSON.parse(readFileSync(path.join(root, f), "utf8")) as {
         readonly dependencies?: Record<string, string>
@@ -277,6 +282,7 @@ export function gatherPackage(root: string): Gathered {
     readFileSync(path.join(root, "package.json"), "utf8"),
   ) as { readonly version: string; readonly description: string }
   return {
+    entries: ENTRIES,
     sources,
     others: globSync(["packages/**/*", "apps/pinetrie/**/*"], {
       cwd: root,

@@ -85,6 +85,12 @@ the host does: ADR-0129). A suite's own helpers are beside its scenarios:
   e2e:lanes` 134 s (64 passed; the Mac's network checks and ssh skipped)
   and `pnpm run e2e:browser` 223 s (177 passed). `pnpm run verify` runs
   the first two.
+- **`lanes/package` installs what it builds:** `scripts/package.ts`, `npm
+  pack`, then `npm install` of the tarball into an empty project, which
+  needs the registry; most of its time is that install. Its folders are
+  made with `mkdtemp`, private, and opened (`0755`) where a rootless
+  Docker binds them as another user: the install, and the installed
+  host's home, where its session's lane runtime is.
 - **A lane builds the lane image from its own checkout,** tagged by its
   inputs: `packages/lanes/image/Containerfile`, the files it copies in
   (its `daemon.json`), the host's jj version and the app's Playwright
@@ -156,6 +162,7 @@ here, so a superseded ADR leads to the scenarios to revisit.
 | `lanes/folder` | a folder project: its lanes, proposed changes, getting the latest and its conflicts (ADR-0142), and a folder lane refused once the folder is a jj repo (ADR-0150) |
 | `lanes/images` | the default image's browser (ADR-0041) |
 | `lanes/proposal` | an agent's proposal of branches, Start's lanes, order and messages, and its fact (ADR-0157, S218) |
+| `lanes/package` | the npm package, built, packed and installed by npm, its own `pinetrie serve` and a lane run from its files (ADR-0189), its helper bundled (ADR-0190) |
 | `lanes/main` | lane containers (ADR-0034), proposed changes (ADR-0105), thread names (ADR-0039), the review (ADR-0047), accepted work (ADR-0104), publish (ADR-0090), the repo's owner (ADR-0065), commands on a thread (ADR-0080); a lane's jj config for its own repo (S50), an agent's own commit (S56) |
 | `lanes/recipe` | derived state rebuilt from its key (ADR-0131) |
 | `lanes/shared` | shared directories (ADR-0035) |

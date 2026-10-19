@@ -43,6 +43,7 @@ browser ──commands (Kyneta Line)──▶ host ──▶ pi agent core
 | `lanehost` | what the host asks of the machine its lanes' disks are on, outside any lane (ADR-0129): one protocol, server and client, a module per role; it declares only `core` and `channel`, and knows nothing of lanes or Docker |
 | `channel` | a held channel to a server process, one JSON line per message: lanehost's server and a lane's helper speak it; it declares nothing, since both run it from pine·trie's install |
 | `ssh` | a lane's ssh through its host (ADR-0140): settings, the files every lane is given, the agent protocol and the relay's decisions; it declares nothing, and only the app declares it |
+| `install` | pine·trie's own install (ADR-0189): its root, whether it runs as the repo's `.ts` or the package's `.js`, the mount lanes see it at, and the registry of scripts it runs in other processes, handed out only as whole commands; it declares nothing |
 | `keeper` | one step at a time on a resource that needs exclusive access, in an order the caller can reason about; it declares nothing |
 | `jj` | jj's adapter: your repo as the host reads and writes it (its one owner, proposed changes, accepted work and lanes' refs in it), each lane's own repo as a `LaneHistory`, your repo at startup, and every jj name |
 | `folder` | a folder project's history as values (ADR-0142): its graph of states and their merge bases, the path merge's plan, and the snapshots kept; it declares only `core`, does no I/O, and lanehost carries out what it decides |

@@ -107,10 +107,12 @@ describe("misspelledTags and spentOutside", () => {
     const held = Object.keys(OUTSIDE_TAGS)
       .filter(v => v !== "GET")
       .map(v => tag(v))
-    const tables = ["ENV_METHODS", "STREAM_SOURCES", "DEEP_PACKAGES"].map(table => ({
-      ...tag("x"),
-      table,
-    }))
+    const tables = ["ENV_METHODS", "STREAM_SOURCES", "DEEP_PACKAGES"].map(
+      table => ({
+        ...tag("x"),
+        table,
+      }),
+    )
     expect(spentOutside([...held, ...tables])).toEqual(["GET", "IMAGE_MIMES"])
   })
 })

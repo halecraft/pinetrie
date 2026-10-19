@@ -1,12 +1,8 @@
 import { readFileSync, statSync } from "node:fs"
 import path from "node:path"
-import { describe, expect, test } from "vitest"
 import { PINETRIE_MOUNT, thisInstall } from "@pinetrie/install"
-import {
-  createQueue,
-  laneNote,
-  nestedLaneDockerNote,
-} from "./index.ts"
+import { describe, expect, test } from "vitest"
+import { createQueue, laneNote, nestedLaneDockerNote } from "./index.ts"
 
 test("every note a lane is pointed at exists in the install", () => {
   for (const inLane of [

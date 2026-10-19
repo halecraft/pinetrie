@@ -64,6 +64,15 @@ const importCycles = [
   "run",
   "scripts/import-cycles.test.ts",
 ]
+const imports = ["pnpm", "exec", "vitest", "run", "scripts/imports.test.ts"]
+const shipped = ["pnpm", "exec", "vitest", "run", "scripts/shipped.test.ts"]
+const packageBuild = [
+  "pnpm",
+  "exec",
+  "vitest",
+  "run",
+  "scripts/package.test.ts",
+]
 const scenarios = [
   "pnpm",
   "exec",
@@ -682,5 +691,76 @@ export const mutations: readonly Mutation[] = [
     command: proseNames,
     expect:
       "every code name a living doc or a comment cites is in the code, or an outside name",
+  },
+  // ── the npm package ──
+  {
+    name: "an import() call loads nothing",
+    file: "scripts/imports.ts",
+    from: "      if (source !== null) literal(source, true)\n",
+    to: "      if (source !== null) void source\n",
+    command: imports,
+    expect:
+      "static imports, re-exports and literal import() calls, each once, at their string's place",
+  },
+  {
+    name: "the shipped files' imports are left naming .ts",
+    file: "scripts/package.ts",
+    from: '      else if (target.kind === "file")\n        edits.push({',
+    to: "      else if (false)\n        edits.push({",
+    command: packageBuild,
+    expect:
+      "each import of a file becomes its .js path, a type-only one stays as stripped, and no other position moves",
+  },
+  {
+    name: "the package leaves out what deep.ts reaches",
+    file: "scripts/package.ts",
+    from: "  const thirdParty = new Set<string>(g.deepPackages)\n",
+    to: "  const thirdParty = new Set<string>()\n",
+    command: packageBuild,
+    expect:
+      "dependencies are what shipped files import, and what deep.ts declares, at the workspace's versions",
+  },
+  {
+    name: "the page ships its stamp",
+    file: "scripts/package.ts",
+    from: '  file.startsWith(`${PAGE}/dist/`) && !file.endsWith("/inputs.json")',
+    to: "  file.startsWith(`${PAGE}/dist/`)",
+    command: packageBuild,
+    expect:
+      "other files of a shipped package are copied; tests, fixtures, notes and the page's stamp are not",
+  },
+  {
+    name: "any module may import a computed name",
+    file: "scripts/package.ts",
+    from: "        if (file !== DEEP)\n",
+    to: "        if (false)\n",
+    command: packageBuild,
+    expect: "an import() of a computed name refuses the plan, outside deep.ts",
+  },
+  {
+    name: "the helper's modules may read beside themselves",
+    file: "scripts/package.ts",
+    from: "  for (const file of reachable(graph, [HELPER]))\n",
+    to: "  for (const file of reachable(graph, []))\n",
+    command: packageBuild,
+    expect:
+      "a file the lane helper reaches that reads beside itself refuses the plan",
+  },
+  {
+    name: "lanehost's server is named by its .ts path",
+    file: "packages/docker/runtime.ts",
+    from: '        ...inContainer("lanehostServer"),\n',
+    to: '        ...RUNTIME_NODE,\n        "/pinetrie/packages/lanehost/server.ts",\n',
+    command: shipped,
+    expect:
+      "no shipped file names a .ts path in a string, outside @pinetrie/install",
+  },
+  {
+    name: "the observer's image leaves out the channel",
+    file: "packages/lanehost/index.ts",
+    from: '  "packages/channel",\n',
+    to: "",
+    command: shipped,
+    expect: "the observer's image holds every module its server loads",
   },
 ]

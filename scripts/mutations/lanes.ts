@@ -959,4 +959,13 @@ export const mutations: readonly Mutation[] = [
     expect:
       "an accept after your save since the review is refused as not shown, and writes nothing",
   },
+  {
+    name: "the default image downloads arm64's jj",
+    file: "packages/lanes/image/Containerfile",
+    from: "jj-v${JJ_VERSION}-${arch}-unknown-linux-musl.tar.gz",
+    to: "jj-v${JJ_VERSION}-aarch64-unknown-linux-musl.tar.gz",
+    command: unit,
+    expect:
+      "the default image downloads each tool for the machine it is built on, naming no architecture",
+  },
 ]

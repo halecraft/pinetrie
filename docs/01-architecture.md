@@ -121,7 +121,8 @@ packages/     libraries; their boundaries are enforced by resolution
   reads/         @pinetrie/reads        document reads shared by the host and the client
   channel/       @pinetrie/channel      declares NOTHING; a held JSON-lines channel to a server process (TECHNICAL.md)
   ssh/           @pinetrie/ssh          declares NOTHING; a lane's ssh through its host, the only code that knows ssh (TECHNICAL.md)
-  lanes/         @pinetrie/lanes        core only; what a lane is and runs: the LaneRuntime and LaneHistory ports, no runtime, no jj (TECHNICAL.md)
+  install/       @pinetrie/install      declares NOTHING; pine·trie's own install: its root, its form, the scripts it runs by path (TECHNICAL.md)
+  lanes/         @pinetrie/lanes        core and install; what a lane is and runs: the LaneRuntime and LaneHistory ports, no runtime, no jj (TECHNICAL.md)
   lanehost/      @pinetrie/lanehost     the lanes' machine: disks, diffs, merges, grants, by role (TECHNICAL.md)
   docker/        @pinetrie/docker       lanes on Docker, on btrfs subvolumes (TECHNICAL.md)
   vm/            @pinetrie/vm           core only; the Mac's lane VM: image, launcher, a host's lease on a slot (TECHNICAL.md)
@@ -179,8 +180,8 @@ declared them.
 
 `workspace.test.ts` checks the manifest rules resolution cannot express: the
 root's tooling allowlist, that only `packages/pi` and `apps/conformance` declare
-pi, what each package may declare (`core`, `keeper`, `channel` and `ssh`
-nothing; `protocol` only Kyneta and core; `session` no React; `interface`
+pi, what each package may declare (`core`, `keeper`, `channel`, `ssh` and
+`install` nothing, and only `lanes`, `docker` and the app `install`; `protocol` only Kyneta and core; `session` no React; `interface`
 no React and no DOM), that the page declares no server package, that only
 the app declares a runtime, config or ssh, and that nothing depends on an
 app. It also re-measures the resolution claim itself in a child process.

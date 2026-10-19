@@ -1,7 +1,4 @@
-import {
-  MACHINE_SOCKET,
-  OBSERVER_LOADER,
-} from "@pinetrie/lanehost"
+import { MACHINE_SOCKET, OBSERVER_LOADER } from "@pinetrie/lanehost"
 import { RUNTIME_NODE } from "@pinetrie/lanes"
 import { describe, expect, test } from "vitest"
 import {

@@ -5,6 +5,12 @@ Numbered ADR-0186 until 2026-10-19, when two files held ADR-0186.
 - **Status:** Accepted (Duane, 2026-10-19)
 - **Area:** `docs/05-stack.md`
 - **Evidence:** S257, S258
+- **Revised:**
+  - 2026-10-19: the registry hands out whole commands, so no path leaves it,
+    rather than a branded `ScriptPath` held by checks; the build reads the
+    packages `deep.ts` reaches from its own list, refuses an `import()` of a
+    computed name and a lane helper that reads beside itself; Kyneta's
+    peer-only declarations are gone.
 - **Amended by:**
   - ADR-0190: the lane helper is the one script built as a bundle, its
     third-party packages inside it; the package is MIT, for macOS and Linux,
@@ -51,19 +57,21 @@ Numbered ADR-0186 until 2026-10-19, when two files held ADR-0186.
   is, and the page is Vite's build, shipped without its `inputs.json`. The
   build writes the package to `dist/pinetrie/`, with a `package.json`
   whose `dependencies` are the third-party packages the import graph
-  reaches, at the versions the workspace declares, and the few no import
-  names (a module loaded by a computed `import()`, a peer met for a
-  dependency) listed by hand. `npm pack` makes the tarball that is tested
+  reaches, at the versions the workspace declares, and the pi packages
+  `packages/pi/deep.ts` loads by file, which it declares in a list the
+  build reads; an `import()` of a computed name anywhere else refuses the
+  build. Kyneta's peers are met by the package manager, so no manifest
+  declares a package it never imports. `npm pack` makes the tarball that is tested
   and published. Development runs `.ts` from the repo as now: nothing in
   the daily loop builds.
 - **pine·trie's own files are found through one package**, which knows
   the install's root from its own position, the mount (`/pinetrie`), and
   which form is running, `.ts` or `.js`, from its own file's extension:
   - **The scripts the host runs by path are a registry**: each by name,
-    its path from the root without an extension. Only the registry makes a
-    `ScriptPath`, a branded string, for a script in the mount or on this
-    machine; `runtimeNode` and its sibling for the host's own Node take a
-    `ScriptPath`, not a string. A script is added by one line; the build
+    its path from the root without an extension. It hands out only a
+    script's whole command (`scriptCommand`: how Node starts there, then
+    the script in the install's form), so no script path exists outside
+    it to misspell or forge. A script is added by one line; the build
     takes the registry as its entries, so a registered script cannot be
     left out of the package.
   - The page's folder, which `pageDir` resolves by name today, is a path
@@ -78,14 +86,12 @@ Numbered ADR-0186 until 2026-10-19, when two files held ADR-0186.
 - **`tsconfig.json` sets `erasableSyntaxOnly`**, so `tsc` refuses what
   stripping cannot take.
 - **Checks, each with a mutation that proves it can fail:** the tarball
-  built, installed by npm into an empty directory, serves its page and
-  starts a lane; `npm pack`'s file list holds every file the code reads at
-  run time and nothing of `docs`, `e2e` or the tests; the registry's
-  paths are files; no runtime string names a `.ts` path, no cast makes a
-  `ScriptPath`, and no child process is started on `process.execPath`,
-  outside the registry's package; the generated `dependencies` equal what
-  the reached packages declare; and the observer image's folders cover
-  what the observer's server imports.
+  built, installed by npm into an empty project, serves its page, gets its
+  lanes ready, and a lane runs from its files; the build's plan, unit-tested
+  (its rewrites, its dependencies, the files it copies and leaves out, its
+  refusals); the registry's paths are files; no shipped file names a `.ts`
+  path in a string outside `@pinetrie/install`; and the observer image's
+  folders hold every module its server loads.
 
 **Consequences.**
 

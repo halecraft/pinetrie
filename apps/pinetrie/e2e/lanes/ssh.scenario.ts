@@ -15,13 +15,7 @@ import {
 import net from "node:net"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import {
-  ancestry,
-  entryId,
-  ROOT,
-  shellWord,
-  type ThreadId,
-} from "@pinetrie/core"
+import { ancestry, entryId, ROOT, type ThreadId } from "@pinetrie/core"
 import { thisInstall } from "@pinetrie/install"
 import { readAccess } from "@pinetrie/reads"
 import { decodeCarryOn, decodeSshFact } from "@pinetrie/rules"

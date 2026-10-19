@@ -25,10 +25,10 @@ The page is served through Vite by `pnpm dev`, and as Vite's build by
   time, and the host reads `stamp.ts` (`@pinetrie/web/stamp`). The page
   must never import it.
 
-- **React and React DOM are deduplicated** (`resolve.dedupe`). The linked
-  Kyneta checkout resolves its own React, a different version: without
-  this the build bundles two, and the page fails on its first hook, after
-  the join form draws (S196). Vite's dev server hides it, so a test builds
+- **React and React DOM are deduplicated** (`resolve.dedupe`). A
+  dependency that resolves a React of its own, as the linked Kyneta
+  checkout once did, makes the build bundle two, and the page fails on its
+  first hook, after the join form draws (S196). Vite's dev server hides it, so a test builds
   the page and counts one React by its chunks' module paths
   (`stamp.test.ts`).
 - **A build writes its stamp,** `dist/inputs.json`: the SHA-256 of each
@@ -37,7 +37,9 @@ The page is served through Vite by `pnpm dev`, and as Vite's build by
   when any differs or is gone (`isStampFresh`): content, not mtimes, since
   a jj checkout rewrites mtimes. Hashing every input takes about 28 ms
   (S196). A new file nothing imports yet cannot change the page until an
-  import of it changes a listed file.
+  import of it changes a listed file. The stamp names the builder's paths,
+  so the npm package ships the build without it, and an installed host
+  never rebuilds the page.
 
 ## Renders (S54, S59)
 

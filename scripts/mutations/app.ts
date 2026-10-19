@@ -3333,4 +3333,43 @@ export const mutations: readonly Mutation[] = [
     scenario: "images",
     expect: "an image dragged to the next one's bottom edge lands after it",
   },
+  // ── the npm package, installed ──
+  {
+    name: "the package's imports are left naming .ts",
+    file: "scripts/package.ts",
+    from: "          text: JSON.stringify(relativeImport(file, shippedPath(target.path))),",
+    to: "          text: JSON.stringify(relativeImport(file, target.path)),",
+    suite: "lanes",
+    scenario: "package",
+    expect:
+      "the installed pinetrie serves the folder it starts in, its page built",
+  },
+  {
+    name: "the package leaves out Kyneta's websocket transport",
+    file: "scripts/package.ts",
+    from: "  const dependencies: Record<string, string> = {}\n",
+    to: '  const dependencies: Record<string, string> = {}\n  thirdParty.delete("@kyneta/websocket-transport")\n',
+    suite: "lanes",
+    scenario: "package",
+    expect: "a person joins the installed pinetrie",
+  },
+  {
+    name: "the package leaves out the lane image",
+    file: "scripts/package.ts",
+    from: "  /(^|\\/)(node_modules|fixtures|testing|testdata|e2e|public|\\.vite[^/]*)\\//,",
+    to: "  /(^|\\/)(node_modules|fixtures|testing|testdata|e2e|public|image|\\.vite[^/]*)\\//,",
+    suite: "lanes",
+    scenario: "package",
+    expect: "the installed pinetrie gets lanes of their own ready",
+  },
+  {
+    name: "the lane helper ships unbundled",
+    file: "scripts/package.ts",
+    from: '  const { build } = await import("esbuild")\n',
+    to: "  const build = async (_: unknown) => {}\n",
+    suite: "lanes",
+    scenario: "package",
+    expect:
+      "a lane runs its command through the installed package's bundled helper",
+  },
 ]

@@ -2,8 +2,8 @@ import { execFileSync } from "node:child_process"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import { describe, expect, test } from "vitest"
 import { thisInstall } from "@pinetrie/install"
+import { describe, expect, test } from "vitest"
 import { findProject, planRuntime } from "./runtime.ts"
 
 describe("planRuntime: Docker, in the VM on the Mac and the host's own on Linux", () => {

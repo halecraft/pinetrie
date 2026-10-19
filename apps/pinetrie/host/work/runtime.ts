@@ -158,7 +158,15 @@ async function runtimeFound(
   })
   const project = { root }
   return planned.kind === "docker-vm"
-    ? vmFound(project, install, planned.lanesDir, slots, hostSocket, log, ownPort)
+    ? vmFound(
+        project,
+        install,
+        planned.lanesDir,
+        slots,
+        hostSocket,
+        log,
+        ownPort,
+      )
     : hostDockerFound(project, install, planned.lanesDir, hostSocket, log)
 }
 

@@ -214,7 +214,11 @@ test("only lanes, docker and the app declare install", () => {
   const declaring = WORKSPACE.filter(dir =>
     allDeps(read(dir)).includes("@pinetrie/install"),
   ).sort()
-  assert.deepEqual(declaring, ["apps/pinetrie", "packages/docker", "packages/lanes"])
+  assert.deepEqual(declaring, [
+    "apps/pinetrie",
+    "packages/docker",
+    "packages/lanes",
+  ])
 })
 
 test("keeper declares nothing", () => {

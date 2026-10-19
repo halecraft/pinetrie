@@ -1,7 +1,8 @@
-// host/server — what `pnpm dev` and `pnpm serve` share (`dev.ts`,
-// `serve.ts`): `[folder]` serves the project at that folder's root, and
-// without one, pinetrie's own repo. A relative folder is read from
-// `INIT_CWD`, which pnpm sets to pinetrie's root.
+// host/server — what `pnpm dev`, `pnpm serve` and `pinetrie serve` share
+// (`dev.ts`, `serve.ts`, `serve-built.ts`): `[folder]` serves the project at
+// that folder's root, and without one, the folder the command started in.
+// A relative folder is read from `INIT_CWD`, where pnpm was started, else
+// the working directory.
 //
 //   PINETRIE_PORT      the port (default 7391; 0 = any free port)
 //   PINETRIE_BIND      the address (default 127.0.0.1: this machine only)
@@ -33,7 +34,6 @@
 // a host with tools that cannot run its lanes prints why and exits 1.
 // The first SIGINT or SIGTERM shuts the host down; a second ends the process.
 import { homedir } from "node:os"
-import path from "node:path"
 import { configPlaces, sessionWords } from "@pinetrie/config"
 import { prepareProjectDir } from "@pinetrie/jj"
 import { sessionFiles } from "@pinetrie/lanes"

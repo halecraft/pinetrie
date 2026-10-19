@@ -32,8 +32,7 @@ export type PageSource =
 export const NO_PAGE: PageSource = { kind: "built", dir: "", files: new Set() }
 
 /** Where the page's build is. */
-export const pageDistDir = (): string =>
-  path.join(pageDir(thisInstall), "dist")
+export const pageDistDir = (): string => path.join(pageDir(thisInstall), "dist")
 
 /**
  * The built page to serve: every file in `dist/` but the stamp, which names

@@ -335,8 +335,11 @@ paths are its diff." would compare a function with itself.
   shell** and its libraries, in `PLAYWRIGHT_BROWSERS_PATH=/ms-playwright`
   (ADR-0041). Its
   build is pinned by `PLAYWRIGHT_VERSION`: `prepareImages` takes it from the
-  host, which resolves the app's `@playwright/test`, so a Playwright upgrade
-  builds the image again. Each file the Containerfile copies in from beside
+  host, which keeps it as a value held equal to the app's `@playwright/test`
+  (an installed package has no dev dependencies), so a Playwright upgrade
+  builds the image again. The image downloads jj, rg, fd, sd, Docker and
+  buildx for the machine it is built on, aarch64 or x86_64, by `uname -m` in
+  the build: no URL in it names an architecture (`image.test.ts`). Each file the Containerfile copies in from beside
   it (`daemon.json`, the inner Docker's config) is one of its sources
   (`filesContainerfileCopies`), so a change to one is a new tag. The
   image's `ENV` reaches an agent's commands, so `chromium.launch()` finds
@@ -567,8 +570,10 @@ paths are its diff." would compare a function with itself.
 - **`history-port.test.ts`**: the brands, by type: a merge takes only a
   `ReadyCopy`, `planFork` only a `ForkSetup`, `refreshBase` only a
   `BaseCheckout`; `executeFork` only `ForkSteps`.
-- **`lane.test.ts`**: the queue, and that each file a lane is pointed at
-  inside pine·trie's mount (`HELPER`, each kind's `laneNote`) exists in the install.
+- **`lane.test.ts`**: the queue, and that each note a lane is pointed at
+  inside pine·trie's mount (each kind's `laneNote`, the nested lane's
+  Docker note) exists in the install. The helper's path is
+  `@pinetrie/install`'s, and its test's.
 - **`runtime.test.ts`**: `runtimeComplete`, and that `EXTRACT` copies every
   program in `RUNTIME_PROGRAMS`.
 - **`lanes.test.ts`**: the executor, the helper's command, config files

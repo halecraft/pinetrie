@@ -10,7 +10,7 @@ describe("loadedImports", () => {
     'export type { D } from "./d.ts"',
     "type E = typeof import('./e.ts')",
     'const f = await import("./f.ts")',
-    "const g = await import(`./${name}.ts`)",
+    `const g = await import(\`./${"$"}{name}.ts\`)`,
   ].join("\n")
 
   test("static imports, re-exports and literal import() calls, each once, at their string's place", () => {

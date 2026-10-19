@@ -6,6 +6,14 @@ responsibility. It declares `@pinetrie/core` and `@pinetrie/channel` only
 (`workspace.test.ts`), and knows nothing of lanes or Docker: the runtime
 (`@pinetrie/docker`) makes each role's container and opens its channel.
 
+
+Its scripts run in other processes, by path: the server, its one-shot,
+the tar and file readers, the observer's server and its connection. Their
+paths are `@pinetrie/install`'s, which this package does not declare: the
+host builds each command (`connectObserver` takes its argv), and passes
+the install's root for the observer's image (`observerSources`), whose
+folders (`OBSERVER_SOURCE_DIRS`) must hold every module the observer's
+server loads (`scripts/shipped.test.ts`).
 ## Where things are
 
 | file | owns |

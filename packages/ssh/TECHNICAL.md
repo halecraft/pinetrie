@@ -3,7 +3,8 @@
 A lane's ssh through its host (ADR-0140): the settings, the files every lane is given,
 the agent protocol, and what the relay does with each request. It declares
 nothing (`workspace.test.ts`), as `@pinetrie/channel` does, since a lane's
-hop runs it from pine·trie's install on the lane runtime's Node. Only the
+hop runs it from pine·trie's install on the lane runtime's Node, by
+`@pinetrie/install`'s command for it. Only the
 app declares it: `@pinetrie/lanes` and `@pinetrie/docker` know a host
 socket, mounts, variables and start-up commands, never ssh. It is the only
 code that speaks the agent protocol or reads ssh config. A lane is an

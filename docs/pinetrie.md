@@ -189,13 +189,11 @@ is a gate.
 
 ### Kyneta
 
-The local checkout, at `~/halecraft/kyneta`, wired by `link:` deps to its
-`pineta` workspace. **Published `@kyneta/*` is unusable**: it predates the
-O(δ) write fix and what the host imports. A stale build is refused at
-load: Node refuses a module whose named import is missing before any of
-it runs (S47), and the host imports what v4 added (`whenPeer`,
-`yjsClientId`). pine·trie tracks the local checkout's `needed-by-pineta`
-bookmark.
+The registry's `4.0.0`, pinned exactly, as pi is (S258). It holds the
+O(δ) write fix and what v4 added that the host imports (`whenPeer`,
+`yjsClientId`). A Kyneta without a name the host imports is refused at
+load: Node refuses a module whose named import is missing before any of it
+runs (S47).
 
 Three issues were filed to the Kyneta team (`docs/findings/archive/kyneta-issues-verification.md`):
 `compact()` throws on live Loro docs (**moot for pine·trie**, which uses no
@@ -250,8 +248,9 @@ performs the decision. This mirrors pi's own lane loop.
 
 **No build step.** Node 24 strips types natively, so imports name the real file
 (`./index.ts`). Native stripping does **not** support enums, namespaces,
-parameter properties, or decorators. Publishing to npm is the one build,
-decided and not yet built (`docs/05-stack.md`).
+parameter properties, or decorators (`erasableSyntaxOnly` makes `tsc`
+refuse them). The npm package is the one build, `pnpm run package`
+(`docs/05-stack.md`, `docs/releasing.md`).
 
 ---
 
@@ -330,7 +329,8 @@ context file.
 }
 ```
 
-- **Sign in** on the host's machine: `pnpm sign-in anthropic` (a
+- **Sign in** on the host's machine (`pinetrie sign-in` installed, `pnpm
+  sign-in` from a clone): `pnpm sign-in anthropic` (a
   subscription, in a browser: paste the code, or the URL you land on, when
   the redirect cannot reach this machine), `pnpm sign-in openai` (an API
   key, hidden as you type), `pnpm sign-in` to list providers, `pnpm
@@ -521,8 +521,11 @@ Decided, and waiting for their turn:
 
 ### Running pine·trie
 
-- `pnpm dev` starts a host on pine·trie's own repo, its page through
-  Vite: loopback, your config's model, the session in
+- Installed from npm, `pinetrie serve [folder]` serves the folder, or the
+  one it was started in, from the page it ships built; `pinetrie` lists its
+  commands. From a clone:
+- `pnpm dev` starts a host on the folder it was started in (pine·trie's own
+  repo from its root), its page through Vite: loopback, your config's model, the session in
   `pinetrie.db` in its data directory,
   `~/.local/share/pinetrie/sessions/<name>/`. `pnpm build` then `pnpm serve` runs one that
   serves the built page, with no Vite (ADR-0148); `serve` rebuilds a page
@@ -531,8 +534,8 @@ Decided, and waiting for their turn:
   (`--days N`, `--dry-run`), while no host serves it (ADR-0155); a starting
   host logs when one is due.
   `pnpm dev <folder>` (or `pnpm serve <folder>`) serves another project instead, at that folder's
-  jj or git root (ADR-0086). A relative folder is read from pine·trie's root,
-  not the shell's directory. Each folder is a session of its own, found by
+  jj or git root (ADR-0086). A relative folder is read from the directory
+  pnpm was started in (`INIT_CWD`). Each folder is a session of its own, found by
   its real path and named for it (ADR-0149); pine·trie keeps the session's
   files in its data directory and writes nothing in the project
   (ADR-0150). A jj repo with no git directory beside it is refused. A

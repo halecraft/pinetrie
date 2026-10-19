@@ -6,8 +6,8 @@
 import { existsSync } from "node:fs"
 import path from "node:path"
 import type { LaneObservation } from "@pinetrie/core"
-import { connectObserver, observerClient } from "@pinetrie/lanehost"
 import { scriptCommand, thisInstall } from "@pinetrie/install"
+import { connectObserver, observerClient } from "@pinetrie/lanehost"
 import { standInRole } from "@pinetrie/lanehost/fixtures"
 import { type LaneChannel, relayObserver, serveRelay } from "@pinetrie/pi"
 import { laneFold } from "@pinetrie/rules"
@@ -55,7 +55,9 @@ test("a host inside a lane registers its lane below the lane, and receives only 
     const stop = relayObserver(channel, () => lane.relay())
     await until(() => existsSync(helper))
 
-    const inner = observerClient({ open: async () => connectObserver(CONNECT, helper) })
+    const inner = observerClient({
+      open: async () => connectObserver(CONNECT, helper),
+    })
     const below = await inner.observe({ pid: async () => 7, remote: [], fold })
     expect(await runsIn(below)).toEqual(["2"])
     expect(await runsIn(lane)).toEqual(["1"])

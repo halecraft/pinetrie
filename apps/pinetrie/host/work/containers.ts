@@ -8,6 +8,7 @@ import {
   type ThreadId,
   WORKSPACE_ROOT,
 } from "@pinetrie/core"
+import { PINETRIE_MOUNT } from "@pinetrie/install"
 import type { Keeper } from "@pinetrie/keeper"
 import {
   decideLaneStart,
@@ -28,7 +29,6 @@ import {
   RUNTIME_BIN,
   shapeSpecHash,
 } from "@pinetrie/lanes"
-import { PINETRIE_MOUNT } from "@pinetrie/install"
 import type { LaneAccess, LaneFacts } from "@pinetrie/pi"
 import {
   readLaneForks,

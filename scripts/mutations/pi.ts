@@ -1144,4 +1144,12 @@ export const mutations: readonly Mutation[] = [
     expect:
       "a commit ending a reply writes the root, waits for the store, then deletes the frames",
   },
+  {
+    name: "deep.ts finds pi beside itself, as pnpm lays it out",
+    file: "packages/pi/deep-packages.ts",
+    from: "  const marker = `/node_modules/${pkg}/`\n",
+    to: "  const marker = `/packages/pi/node_modules/${pkg}/`\n",
+    command: unit,
+    expect: "each package deep.ts declares resolves to its own folder",
+  },
 ]
