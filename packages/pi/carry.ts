@@ -18,7 +18,6 @@ import type {
 } from "@earendil-works/pi-agent-core"
 import {
   getCurrentSystemMessage,
-  type Message,
   type SystemMessage,
 } from "@earendil-works/pi-ai"
 import { CONTEXT, CONTEXT_KINDS } from "@pinetrie/rules"
@@ -34,11 +33,11 @@ export function carryPrompt(
     "messagesToSummarize" | "turnPrefixMessages"
   >,
 ): readonly SystemMessage[] {
-  const summarised = [
+  // pi-ai's fold reads the system messages among any others.
+  const folded = getCurrentSystemMessage([
     ...preparation.messagesToSummarize,
     ...preparation.turnPrefixMessages,
-  ].filter((m): m is Message => m.role === "system")
-  const folded = getCurrentSystemMessage(summarised)
+  ])
   return folded === undefined ? [] : [folded]
 }
 

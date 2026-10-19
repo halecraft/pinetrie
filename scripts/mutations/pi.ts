@@ -1068,8 +1068,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a compaction carries the first prompt it summarises alone",
     file: "packages/pi/carry.ts",
-    from: "  const folded = getCurrentSystemMessage(summarised)\n",
-    to: "  const folded = getCurrentSystemMessage(summarised.slice(0, 1))\n",
+    from: "    ...preparation.turnPrefixMessages,\n  ])\n",
+    to: "  ])\n",
     command: unit,
     expect: "every summarised system message, folded in order into one",
   },
