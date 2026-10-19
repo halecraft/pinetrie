@@ -15,25 +15,17 @@
 import {
   type BlobStore,
   type BranchOut,
-  branchesByProposal,
   type CanvasId,
   type CardCommand,
   type CardId,
-  cardMove,
   type EntryId,
   ERR,
-  entryThread,
-  historyScope,
   type Intent,
-  indexAsks,
   isTextCardId,
-  MAX_TITLE,
   type Move,
   type MoveDirection,
   type MoveHistoryScope,
-  messageWriter,
-  PERSON_HISTORY,
-  parseTitle,
+  type MoveTarget,
   placeKey,
   type QueuedFact,
   type QueueHoldChange,
@@ -41,17 +33,12 @@ import {
   type Reorder,
   type RootId,
   refused,
-  runPrompt,
   type Send,
   type SentCard,
   type Sha256,
   type TextCardId,
   type ThreadId,
-  TRASH_PLACE,
   type TreeIndex,
-  threadEnd,
-  threadOfSend,
-  type ValueWrite,
   type WriterId,
 } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
@@ -64,66 +51,54 @@ import {
   readPlaces,
   readQueueHolds,
   readRoots,
-  readRunning,
   readThreads,
   readTreeIndex,
   readWorkflow,
 } from "@pinetrie/reads"
 import {
-  afterSteps,
   type BoardMove,
   type BranchOutRefusal,
-  CARD_TITLE,
   type CanvasIndex,
+  type CardFacts,
+  type CardPlan,
+  type CardRefusal,
   type CopyPlan,
   type CopyThread,
-  canvasOfPlace,
-  canvasOfTarget,
-  cardsOfParts,
-  crossesArchive,
-  emptiedCanvases,
   type GatheredStart,
-  type LiftPlan,
-  lanesToDrain,
-  type MoveStep,
-  type MovesStep,
+  type ImageRefusal,
   mintContainer,
-  mintWith,
-  movesHistory,
-  type NewImage,
-  type Opening,
+  NO_CANVAS_INDEX,
   type OpenPlan,
   type OpenThread,
-  planBranchOut,
-  planCanvasesTrashed,
-  planCopy,
-  planLiftRoot,
-  planMoveCommand,
-  planMoveRequest,
-  planMoveTargets,
-  planOpenThread,
-  planPaste,
-  planPutImages,
-  planQueueCard,
-  planReorder,
+  planBusyQueue,
+  planCanvasPlacement,
+  planCardCommandSet,
+  planCardMove,
+  planCardPaste,
+  planCardQueue,
+  planCardReorder,
+  planCardSpend,
+  planCardSpinOff,
+  planCardWidth,
+  planImagesPut,
+  planImageVersion,
+  planProposalPress,
   planRootDelete,
-  planSetCommand,
-  planSpinOff,
+  planThreadCopy,
+  planThreadOpening,
+  planUndo,
+  planUndoAnswer,
+  planUndoReach,
   planUnqueueAll,
-  planVersion,
-  planWidth,
-  type ReorderStep,
   type SpinOff,
-  type SpunThread,
-  setRecord,
-  undoAnswer,
-  type VersionBlobs,
+  type StoredBlob,
 } from "@pinetrie/rules"
+import { readActiveLanes } from "@pinetrie/schema"
 import type { StepBasics } from "../basics.ts"
 import { canvasesNow } from "../canvases.ts"
 import type { CardPort } from "../cards.ts"
 import type { MoveHistories } from "../move-history.ts"
-import type { Gesture, OpenChange, PersonCause, Places } from "../places.ts"
+import type { OpenChange, PersonCause, Places } from "../places.ts"
 import type { Provenance } from "../provenance.ts"
 import type { StepRecords } from "../records.ts"
 import { spendsCard } from "./send.ts"
@@ -169,17 +144,17 @@ export interface CardCommandDeps {
   readonly blobs: Pick<BlobStore, "ref" | "fitted">
 }
 
-/** A lift that deletes no thread: a redo, or an undo of no spin-off. */
-const NO_LIFT: LiftPlan = { kind: "lift", delete: [] }
-
-/** Who wrote each entry of a tree, oldest first; null where no person did. */
-const writersOf = (index: TreeIndex): readonly (WriterId | null)[] =>
-  Object.values(index.entries)
-    .toSorted((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
-    .map(e => messageWriter(e.message) ?? null)
-
 /** The card commands (`createCardCommands`). */
 export type CardCommands = ReturnType<typeof createCardCommands>
+
+/** The cause of a card command's change: whose, and why. */
+type CardCause = Extract<
+  PersonCause,
+  { kind: "move" | "spend" | "queued-busy" }
+>
+
+/** A plan refused for no reason of its own: its `why` is `never`. */
+const NO_WHY = (why: never): Outcome => why
 
 /**
  * The card commands of one step of the documents' keeper: made in each step,
@@ -188,34 +163,73 @@ export type CardCommands = ReturnType<typeof createCardCommands>
 export function createCardCommands(deps: CardCommandDeps) {
   const { roots, live, places, session } = deps.basics
   const docs = roots
-  const running = (lane: ThreadId) => readRunning(deps.basics.live, lane)
   /** A column's id, for one made for a card dropped where its kind is not taken. */
   const newContainer = mintContainer(deps.basics.newId)
 
+  /** A blob as the store holds it, read without its bytes. */
+  const storedBlob = (sha: Sha256): StoredBlob => ({
+    ref: deps.blobs.ref(sha),
+    fitted: deps.blobs.fitted(sha),
+  })
+
+  /** What every card command's plan reads of the places, read once. */
+  const cardFacts = (writer: WriterId, canvases: CanvasIndex): CardFacts => ({
+    cards: readPlaces(places),
+    canvases,
+    sender: writer,
+    now: deps.basics.now(),
+    running: new Set(readActiveLanes(live)),
+    newContainer,
+  })
+
   /**
-   * A version's blobs from the store: the fitted copy drawn and the original
-   * kept, or why there are none.
+   * Carry out a card command's plan, the one way a card command writes the
+   * places: the history's stack the plan names loaded (nothing writes the
+   * places while it loads, on the keeper), the records before the change,
+   * the steps as one change under `cause`, the drains, the records after,
+   * then the names of the threads it recorded. A refusal says where the card
+   * is now and who put it there; a plan's own reason is worded by `word`.
    */
-  function versionBlobs(
-    sha: Sha256,
-  ):
-    | { readonly kind: "blobs"; readonly blobs: VersionBlobs }
-    | ReturnType<typeof refused> {
-    const ref = deps.blobs.ref(sha)
-    if (ref === undefined)
-      return refused(ERR.IMAGE_MISSING, `no blob is stored as ${sha}`)
-    if (ref.width === null)
-      return refused(ERR.NOT_AN_IMAGE, "only images go in a media column")
-    return {
-      kind: "blobs",
-      blobs: { ...(deps.blobs.fitted(sha) ?? ref), original: sha },
+  async function carryPlan<W>(
+    plan: CardPlan<W>,
+    cause: CardCause,
+    word: (why: W) => Outcome,
+  ): Promise<Settled> {
+    switch (plan.kind) {
+      case "refused":
+        return unmoved(plan)
+      case "nothing":
+        return settled({ kind: "nothing" })
+      case "declined":
+        return settled(word(plan.why))
+      case "steps": {
+        const gesture =
+          plan.history === null
+            ? undefined
+            : await deps.histories.gestureOf(cause.by, plan.history)
+        if (plan.before.length > 0) await deps.records.writeValues(plan.before)
+        const rev = await deps.placesWriter.change(
+          cause,
+          open => open.apply(plan.steps, gesture),
+          roots,
+        )
+        for (const lane of plan.drain) deps.drain(lane)
+        if (plan.after.length > 0) await deps.records.writeValues(plan.after)
+        if (plan.names) await deps.ensureNames()
+        return settled({ kind: "moved" }, rev)
+      }
     }
   }
 
+  /** `plan` carried as a move of `writer`'s. */
+  const moved = <W>(
+    plan: CardPlan<W>,
+    writer: WriterId,
+    word: (why: W) => Outcome,
+  ): Promise<Settled> => carryPlan(plan, { kind: "move", by: writer }, word)
+
   /** A refused move: where the card is now and who put it there. */
-  const unmoved = (
-    refusal: Extract<MoveStep | ReorderStep, { kind: "refused" }>,
-  ): Settled =>
+  const unmoved = (refusal: CardRefusal): Settled =>
     settled(
       {
         kind: "unmoved",
@@ -227,56 +241,16 @@ export function createCardCommands(deps: CardCommandDeps) {
     )
 
   /**
-   * One or more threads' opening written: the records first, so a reader
-   * that finds a card finds its thread's root; then every card in one
-   * change of the opener's; then each thread's name.
-   */
-  async function executeOpening(
-    writer: WriterId,
-    opening: Opening,
-  ): Promise<Settled> {
-    await deps.records.writeValues(opening.records)
-    const done = await carry({ kind: "steps", steps: opening.steps }, [], {
-      kind: "move",
-      by: writer,
-    })
-    await deps.ensureNames()
-    return done
-  }
-
-  /**
-   * Carry out steps as one change under `cause`, as one step of a history of
-   * moves when `gesture` is given; then the drains. A refusal says where the
-   * card is now and who put it there.
-   */
-  async function carry(
-    step: MovesStep | MoveStep | ReorderStep,
-    drain: readonly ThreadId[],
-    cause: PersonCause,
-    gesture?: Gesture,
-  ): Promise<Settled> {
-    if (step.kind === "refused") return unmoved(step)
-    const steps = step.kind === "steps" ? step.steps : [step]
-    const rev = await deps.placesWriter.change(
-      cause,
-      open => open.apply(steps, gesture),
-      roots,
-    )
-    for (const lane of drain) deps.drain(lane)
-    return settled({ kind: "moved" }, rev)
-  }
-
-  /**
    * The thread of each entry whose margin a move sends a card to, from its
    * root's index, so `planMoveTargets` can refuse a margin that names another
    * thread. An entry not found is left out.
    */
   async function marginEntryThreads(
-    moves: readonly Move[],
+    targets: readonly MoveTarget[],
   ): Promise<ReadonlyMap<EntryId, ThreadId>> {
     const threads = readThreads(session)
     const found = new Map<EntryId, ThreadId>()
-    for (const { to } of moves) {
+    for (const to of targets) {
       if (to.kind !== "margin" || to.on.kind !== "entry") continue
       const { on } = to
       const root = threads.get(on.thread)?.root
@@ -285,38 +259,6 @@ export function createCardCommands(deps: CardCommandDeps) {
       if (entry !== undefined) found.set(on.entry, entry.thread)
     }
     return found
-  }
-
-  /**
-   * What an undo of a step does to the threads its cards were spun into:
-   * `lifting`, the cards its step moves, read before it is tried, and each
-   * thread whose record says it was spun from one of them, as its tree is now.
-   */
-  async function liftOf(
-    lifting: readonly CardId[],
-    canvases: CanvasIndex,
-  ): Promise<LiftPlan> {
-    const known = readRoots(session)
-    const spun: SpunThread[] = []
-    for (const [thread, record] of readThreads(session)) {
-      const { origin, root } = record
-      if (origin.kind !== "spun" || !lifting.includes(origin.card)) continue
-      const held = known.has(root)
-      spun.push({
-        thread,
-        root,
-        known: held,
-        writers: held ? writersOf(readTreeIndex(await docs.root(root))) : [],
-      })
-    }
-    return planLiftRoot({
-      lifting,
-      spun,
-      cards: readPlaces(places),
-      lanes: [...readLaneRecords(session).values()],
-      rootOfThread: canvases.rootOfThread,
-      histories: readCardHistories(session),
-    })
   }
 
   /** An undo refused because its thread was replied to: nothing reverted. */
@@ -366,8 +308,7 @@ export function createCardCommands(deps: CardCommandDeps) {
 
   /**
    * Handoffs, whole or refused: applied when every card is where its sender saw
-   * it. Recorded as one step of the sender's history of moves in the root
-   * `movesHistory` names, when it names one.
+   * it, in the history `planCardMove` names.
    */
   async function move(
     writer: WriterId,
@@ -375,93 +316,38 @@ export function createCardCommands(deps: CardCommandDeps) {
     here: CanvasId | null,
     canvases: CanvasIndex,
   ): Promise<Settled> {
-    // gather. `Trashes` names trashing's history (`movesHistory`).
-    const trashes = { canvases, here }
-    const entryThreads = await marginEntryThreads(moves)
-    const cards = readPlaces(places)
-    // plan: each move to a thread's notes to its nearest note column, made
-    // first where its canvas has none, then the moves
-    const planned = planMoveRequest(
-      cards,
+    const plan = planCardMove({
+      ...cardFacts(writer, canvases),
       moves,
-      writer,
-      running,
-      newContainer,
-      entryThreads,
-      readWorkflow(session),
-    )
-    // A new canvas closed before its first send leaves its canvas empty: its
-    // card goes to the trash in the same step, its closer its placer, in
-    // their history outside any canvas, since the canvas leaves their view.
-    const emptied =
-      planned.step.kind === "steps"
-        ? emptiedCanvases({
-            before: cards,
-            after: afterSteps(cards, planned.step.steps),
-            threads: readThreads(session),
-            started: new Set(readRoots(session).keys()),
-          })
-        : []
-    const step: MovesStep =
-      planned.step.kind === "steps" && emptied.length > 0
-        ? {
-            kind: "steps",
-            steps: [
-              ...planned.step.steps,
-              ...planCanvasesTrashed(cards, emptied, writer),
-            ],
-          }
-        : planned.step
-    const scope =
-      emptied.length > 0
-        ? PERSON_HISTORY
-        : movesHistory(moves, cards, trashes, "move")
-    // gather the history's stack: nothing writes the places while it loads,
-    // on the keeper
-    const gesture =
-      scope === null ? undefined : await deps.histories.gestureOf(writer, scope)
-    // execute
-    return carry(step, planned.drain, { kind: "move", by: writer }, gesture)
+      here,
+      threads: readThreads(session),
+      started: new Set(readRoots(session).keys()),
+      workflow: readWorkflow(session),
+      entryThreads: await marginEntryThreads(moves.map(m => m.to)),
+    })
+    return moved(plan, writer, NO_WHY)
   }
 
   /**
-   * A card queued, and its queue's hold changed with it, in one step: planned
-   * whole (`planQueueCard`), then the hold written, then the move carried as
-   * any move is, so the drain it asks for finds the hold as planned. Recorded
-   * in the sender's history as a move is; the hold is not, so an undo puts the
-   * card back and leaves the queue held or released.
+   * A card queued, and its queue's hold changed with it, in one step
+   * (`planCardQueue`): the hold written first, so the drain the move asks
+   * for finds it as planned.
    */
-  async function queueCard(
+  function queueCard(
     writer: WriterId,
     queued: QueueMove,
     hold: QueueHoldChange,
     command: CardCommand | null,
     canvases: CanvasIndex,
   ): Promise<Settled> {
-    // gather: the history's stack, loaded before the places are read
-    // A queueing trashes nothing: its history is the queue's canvas.
-    const scope = movesHistory(
-      [queued],
-      readPlaces(places),
-      { canvases, here: null },
-      "move",
-    )
-    const gesture =
-      scope === null ? undefined : await deps.histories.gestureOf(writer, scope)
-    // plan
-    const plan = planQueueCard({
-      cards: readPlaces(places),
-      holds: readQueueHolds(session),
+    const plan = planCardQueue({
+      ...cardFacts(writer, canvases),
       move: queued,
       hold,
       command,
-      by: writer,
-      now: deps.basics.now(),
-      running,
+      holds: readQueueHolds(session),
     })
-    // execute
-    if (plan.holds.length > 0) await deps.records.writeValues(plan.holds)
-    return carry(plan.step, plan.drain, { kind: "move", by: writer }, gesture)
+    return moved(plan, writer, NO_WHY)
   }
 
   return {
@@ -473,104 +359,48 @@ export function createCardCommands(deps: CardCommandDeps) {
      * sender's history of moves in its canvas, so the page can undo it. It
      * changes no lane's turn, so it drains nothing.
      */
-    async reorder(
+    reorder(
       writer: WriterId,
       reorder: Reorder,
       canvases: CanvasIndex,
     ): Promise<Settled> {
-      // gather: the history's stack, loaded before the places are read
-      const canvas = canvasOfPlace(canvases, reorder.at)
-      const gesture =
-        canvas === null
-          ? undefined
-          : await deps.histories.gestureOf(writer, historyScope(canvas))
-      // plan
-      const step = planReorder(readPlaces(places), reorder)
-      // execute
-      return carry(step, [], { kind: "move", by: writer }, gesture)
+      const plan = planCardReorder({ ...cardFacts(writer, canvases), reorder })
+      return moved(plan, writer, NO_WHY)
     },
 
     /**
      * New images in a media column, as one step of the sender's history in
-     * the canvas they land in: each blob read from the store first (its
-     * fitted copy drawn, its original kept), then `planPutImages`, then each
-     * image titled by its file's name. Refused for a blob the store does not
-     * hold, or one it sorted as text or opaque.
+     * the canvas they land in: each blob read from the store first, then
+     * `planImagesPut`. Refused for a blob the store does not hold, or one it
+     * sorted as text or opaque.
      */
-    async putImages(
+    putImages(
       writer: WriterId,
       put: Extract<Intent, { kind: "put-images" }>,
       canvases: CanvasIndex,
     ): Promise<Settled> {
-      // gather: each blob as stored, then the history's stack, loaded
-      // before the places are read
-      const images: NewImage[] = []
-      for (const image of put.images) {
-        const version = versionBlobs(image.sha256)
-        if (version.kind === "refused") return settled(version)
-        images.push({ card: image.card, image: version.blobs })
-      }
-      const canvas = canvasOfTarget(canvases, put.to)
-      const gesture =
-        canvas === null
-          ? undefined
-          : await deps.histories.gestureOf(writer, historyScope(canvas))
-      // plan
-      const now = deps.basics.now()
-      const step = planPutImages({
-        cards: readPlaces(places),
-        images,
-        to: put.to,
-        sender: writer,
-        now,
-        newContainer: mintWith(newContainer, put.made),
-      })
-      const titles = put.images.flatMap(i => {
-        const title = parseTitle(i.name.slice(0, MAX_TITLE))
-        return title.kind === "set"
-          ? [
-              setRecord(CARD_TITLE, {
-                card: i.card,
-                title: title.title,
-                by: writer,
-                at: now,
-              }),
-            ]
-          : []
-      })
-      // execute: the images, then their titles
-      const done = await carry(step, [], { kind: "move", by: writer }, gesture)
-      if (done.outcome.kind === "moved") await deps.records.writeValues(titles)
-      return done
+      const blobs = new Map(
+        put.images.map(i => [i.sha256, storedBlob(i.sha256)] as const),
+      )
+      const plan = planImagesPut({ ...cardFacts(writer, canvases), put, blobs })
+      return moved(plan, writer, imageRefusal)
     },
 
     /**
      * A new version of an image, from a blob the store holds, as one step of
-     * the sender's history in the image's canvas (`planVersion`).
+     * the sender's history in the image's canvas (`planImageVersion`).
      */
-    async version(
+    version(
       writer: WriterId,
       change: Extract<Intent, { kind: "version" }>,
       canvases: CanvasIndex,
     ): Promise<Settled> {
-      // gather
-      const version = versionBlobs(change.sha256)
-      if (version.kind === "refused") return settled(version)
-      const canvas = canvases.canvasOfCard.get(change.image)
-      const gesture =
-        canvas === undefined
-          ? undefined
-          : await deps.histories.gestureOf(writer, historyScope(canvas))
-      // plan
-      const step = planVersion({
-        cards: readPlaces(places),
-        image: change.image,
-        version: version.blobs,
-        sender: writer,
-        now: deps.basics.now(),
+      const plan = planImageVersion({
+        ...cardFacts(writer, canvases),
+        change,
+        blob: storedBlob(change.sha256),
       })
-      // execute
-      return carry(step, [], { kind: "move", by: writer }, gesture)
+      return moved(plan, writer, imageRefusal)
     },
 
     /**
@@ -578,21 +408,13 @@ export function createCardCommands(deps: CardCommandDeps) {
      * sender's history of moves in its canvas, as a reorder is. The width it has
      * already writes nothing.
      */
-    async cardWidth(
+    cardWidth(
       writer: WriterId,
       change: Extract<Intent, { kind: "card-width" }>,
+      canvases: CanvasIndex,
     ): Promise<Settled> {
-      // gather: the history's stack, loaded before the places are read
-      const gesture = await deps.histories.gestureOf(
-        writer,
-        historyScope(change.at.canvas),
-      )
-      // plan
-      const step = planWidth(readPlaces(places), change)
-      // execute
-      return step === null
-        ? settled({ kind: "nothing" })
-        : carry(step, [], { kind: "move", by: writer }, gesture)
+      const plan = planCardWidth({ ...cardFacts(writer, canvases), change })
+      return moved(plan, writer, NO_WHY)
     },
 
     /**
@@ -613,8 +435,11 @@ export function createCardCommands(deps: CardCommandDeps) {
 
     /**
      * Undo or redo the sender's newest move in `scope`, a canvas's history or
-     * theirs outside any canvas, whole or refused. Kyneta writes the revert, then
-     * `rev` is raised apart from it.
+     * theirs outside any canvas, whole or refused, in phases: what its step
+     * would move (`planUndoReach`, from the stack's top); the trees of the
+     * threads it would lift, read; whether it may go ahead (`planUndo`); then
+     * Kyneta writes the revert, and its answer (`planUndoAnswer`) takes the
+     * revert `planUndo` let through. `rev` is raised apart from the revert.
      */
     async undoMove(
       writer: WriterId,
@@ -622,37 +447,43 @@ export function createCardCommands(deps: CardCommandDeps) {
       direction: MoveDirection,
       canvases: CanvasIndex,
     ): Promise<Settled> {
-      // gather and plan: no undo crosses the archive's edge, and one that
-      // lifts a thread back into its card happens only while the thread
-      // holds its first message alone
       const top = await deps.histories.top(writer, scope, direction)
-      const touched =
-        top === undefined ? [] : cardsOfParts(top.parts, PLACES_DOC_ID)
-      if (
-        crossesArchive(
-          touched,
-          readCardHistories(session),
-          readWorkflow(session),
-        )
-      ) {
-        const card = readPlaces(places).find(c => c.id === touched[0]) ?? null
-        return unmoved({ kind: "refused", code: "archived", now: card })
-      }
-      const lift =
-        direction === "undo" ? await liftOf(touched, canvases) : NO_LIFT
-      if (lift.kind === "replied") return notLifted(lift.by)
-      // execute: Kyneta writes the revert, in one change with the threads
-      // it lifts
+      const cards = readPlaces(places)
+      const histories = readCardHistories(session)
+      const reach = planUndoReach({
+        parts: top?.parts ?? [],
+        placesId: PLACES_DOC_ID,
+        direction,
+        cards,
+        histories,
+        workflow: readWorkflow(session),
+        threads: readThreads(session),
+        roots: new Set(readRoots(session).keys()),
+      })
+      if (reach.kind === "refused") return unmoved(reach)
+      const trees = new Map<RootId, TreeIndex>()
+      for (const { root, known } of reach.spun)
+        if (known) trees.set(root, readTreeIndex(await docs.root(root)))
+      const plan = planUndo({
+        reach,
+        trees,
+        cards,
+        lanes: [...readLaneRecords(session).values()],
+        rootOfThread: canvases.rootOfThread,
+        histories,
+      })
+      if (plan.kind === "replied") return notLifted(plan.by)
+      // Kyneta writes the revert, in one change with the threads it lifts.
       return deps.placesWriter.change(
         { kind: direction, by: writer },
         async open => {
-          const reverted = await open.revert(touched, () =>
+          const reverted = await open.revert(plan.cards, () =>
             deps.histories.step(writer, scope, direction),
           )
-          const answer = undoAnswer(
+          const answer = planUndoAnswer(
+            plan,
             reverted.result,
             readPlaces(places),
-            PLACES_DOC_ID,
           )
           switch (answer.kind) {
             case "nothing":
@@ -660,7 +491,7 @@ export function createCardCommands(deps: CardCommandDeps) {
             case "refused":
               return unmoved(answer)
             case "undone": {
-              for (const { root, thread } of lift.delete)
+              for (const { root, thread } of plan.lift)
                 await deleteRoot(open, root, thread)
               return settled(
                 { kind: "undone", cards: answer.cards },
@@ -674,12 +505,12 @@ export function createCardCommands(deps: CardCommandDeps) {
     },
 
     /**
-     * A text card made a thread, in one step of the keeper: planned
-     * (`planSpinOff`), then the thread's records (its own, spun from the card,
-     * and its new canvas's), its first message, the card's text, sent by `start`
-     * (through the gate, as every send is), then its card on its canvas's
-     * canvas and the card's move to the trash, in its history's step. A send that took nothing deletes the records again.
-     * The answer is the thread's start, its first message's id among it.
+     * A text card made a thread, in one step of the keeper, in phases: planned
+     * (`planCardSpinOff`), then the thread's records, its first message, the
+     * card's text, sent by `start` (through the gate, as every send is), then
+     * its card on its canvas and the card's move to the trash, in its history's
+     * step. A send that took nothing deletes the records again. The answer is
+     * the thread's start, its first message's id among it.
      */
     async spinOff(
       writer: WriterId,
@@ -687,59 +518,31 @@ export function createCardCommands(deps: CardCommandDeps) {
       start: (outgoing: Send) => Promise<Outcome>,
       canvases: CanvasIndex,
     ): Promise<Settled> {
-      const { move } = request
-      const card = move.card
-      // Only a text card has a text to start a thread with.
-      if (!isTextCardId(card))
-        return unmoved({ kind: "refused", code: "no-place", now: null })
-      // gather: the card's text, loaded whole, and the history's stack
-      await deps.cards.hydrate([card])
-      const text = deps.cards.textNow(card)
-      const trashes = { canvases, here: request.here }
-      const scope = movesHistory([move], readPlaces(places), trashes, "move")
-      const gesture =
-        scope === null
-          ? undefined
-          : await deps.histories.gestureOf(writer, scope)
-      // plan
-      const cards = readPlaces(places)
-      const plan = planSpinOff({
-        cards,
+      const card = request.move.card
+      // gather: the card's text, loaded whole; only a text card has one
+      if (isTextCardId(card)) await deps.cards.hydrate([card])
+      const text = isTextCardId(card) ? deps.cards.textNow(card) : ""
+      const plan = planCardSpinOff({
+        ...cardFacts(writer, canvases),
         request,
-        sender: writer,
-        canvases,
         text,
         roots: new Set(readRoots(session).keys()),
         threads: new Set(readThreads(session).keys()),
-        opens: {
-          state: request.state,
-          workflow: readWorkflow(session),
-        },
-        now: deps.basics.now(),
+        workflow: readWorkflow(session),
       })
       switch (plan.kind) {
         case "refused":
-          return unmoved({
-            kind: "refused",
-            code: plan.code,
-            now: cards.find(c => c.id === move.card) ?? null,
-          })
-        case "blank":
-          return settled({
-            kind: "refused",
-            code: ERR.REFUSED,
-            message: "nothing in the card to start a thread with",
-          })
-        case "root-in-use":
-          return settled({
-            kind: "refused",
-            code: ERR.ROOT_ID_IN_USE,
-            message: "that root's id is in use",
-          })
+          return unmoved(plan)
+        case "declined":
+          return settled(spinOffRefusal(plan.why))
       }
-      // execute: the thread's records, its first message, then its card and
-      // the card's move; a send that took nothing takes its records back
-      await deps.records.writeValues(plan.open.records)
+      const gesture =
+        plan.history === null
+          ? undefined
+          : await deps.histories.gestureOf(writer, plan.history)
+      // the thread's records, its first message, then its card and the
+      // card's move; a send that took nothing takes its records back
+      await deps.records.writeValues(plan.records)
       const sent = await start({
         kind: "send",
         text: plan.text,
@@ -751,13 +554,13 @@ export function createCardCommands(deps: CardCommandDeps) {
           canvas: request.canvas,
         },
         mentions: plan.mentions,
-        card: { id: card, seen: "" },
+        card: { id: plan.card, seen: "" },
         pinned: [],
         base: null,
         state: request.state,
       })
       if (!spendsCard(sent)) {
-        await deps.records.writeValues(plan.open.records.map(unwritten))
+        await deps.records.writeValues(plan.unwrite)
         return settled(sent)
       }
       // The thread's card outside the history, the card's move to the trash
@@ -765,9 +568,9 @@ export function createCardCommands(deps: CardCommandDeps) {
       const rev = await deps.placesWriter.change(
         { kind: "move", by: writer },
         async open => {
-          open.apply(plan.open.steps)
+          open.apply(plan.opening)
           await deps.ensureNames()
-          return open.apply([plan.step], gesture)
+          return open.apply(plan.move, gesture)
         },
         roots,
       )
@@ -775,33 +578,21 @@ export function createCardCommands(deps: CardCommandDeps) {
     },
 
     /**
-     * A canvas's card moved on the board (`planBoardMove`'s writes): between
-     * states, one step of its sender's history outside any canvas; within one, a
-     * reorder, in none. Its card's history and traces are written as any
-     * move's.
+     * A canvas's card moved on the board (`planBoardMove`'s writes), in the
+     * history `planCanvasPlacement` names. Its card's history and traces are
+     * written as any move's.
      */
-    async placeCanvas(
+    placeCanvas(
       writer: WriterId,
       move: Extract<BoardMove, { kind: "move" | "reorder" }>,
     ): Promise<Settled> {
-      const gesture =
-        move.kind === "move"
-          ? await deps.histories.gestureOf(writer, PERSON_HISTORY)
-          : undefined
-      return carry(
-        { kind: "steps", steps: move.steps },
-        [],
-        { kind: "move", by: writer },
-        gesture,
-      )
+      return moved(planCanvasPlacement(move), writer, NO_WHY)
     },
 
     /**
-     * A thread opened as its column opens, in one step of the keeper: planned
-     * (`planOpenThread`) from its root's tree for a branch, then its record
-     * (and a new canvas's), its card on its canvas and the canvas
-     * re-ranked for it, then its name. No entry is written: its first send is a
-     * branch at its fork, or a new root.
+     * A thread opened as its column opens, in one step of the keeper
+     * (`planThreadOpening`), from its root's tree for a branch. No entry is
+     * written: its first send is a branch at its fork, or a new root.
      */
     async openThread(writer: WriterId, open: OpenThread): Promise<Settled> {
       // gather: a branch's root's tree; a new root has none yet
@@ -812,29 +603,24 @@ export function createCardCommands(deps: CardCommandDeps) {
               index: readTreeIndex(await docs.root(open.root)),
             }
           : open.start
-      // plan
-      const plan = planOpenThread({
+      const plan = planThreadOpening({
+        ...cardFacts(writer, NO_CANVAS_INDEX),
         open,
         start,
-        sender: writer,
-        cards: readPlaces(places),
         threads: readThreads(session),
         roots: new Set(readRoots(session).keys()),
-        canvases: readCanvases(places),
+        held: readCanvases(places),
         workflow: readWorkflow(session),
-        now: deps.basics.now(),
       })
-      if (plan.kind === "refused") return settled(openRefusal(plan.why))
-      return executeOpening(writer, plan)
+      return moved(plan, writer, openRefusal)
     },
 
     /**
-     * A press on an agent's proposal, in one step of the keeper: planned
-     * (`planBranchOut`) from its root's tree, the thread records and whether
-     * the proposing lane runs; every branch opened in one change; for Start,
-     * each branch's message sent in order through `start`, which clears it
-     * as any send; then the press's fact. A refused send is logged and leaves
-     * its thread opened, unsent. The answer is the opening's.
+     * A press on an agent's proposal, in one step of the keeper, planned
+     * (`planProposalPress`) from its root's tree: every branch opened in one
+     * change; for Start, each branch's message sent in order through `start`,
+     * which clears it as any send; then the press's fact. A refused send is
+     * logged and leaves its thread opened, unsent. The answer is the opening's.
      */
     async branchOut(
       writer: WriterId,
@@ -843,198 +629,107 @@ export function createCardCommands(deps: CardCommandDeps) {
       start: (outgoing: Send) => Promise<Outcome>,
       queueFact: (fact: QueuedFact) => Promise<void>,
     ): Promise<Settled> {
-      // gather
-      const index = readTreeIndex(await docs.root(press.root))
-      const threads = readThreads(session)
-      const lane = entryThread(index, press.proposal)
-      const runningAsk =
-        lane !== null && running(lane)
-          ? runPrompt(index, threadEnd(index, lane))
-          : null
-      // plan
-      const plan = planBranchOut({
+      const plan = planProposalPress({
+        ...cardFacts(writer, canvases),
         press,
-        index,
-        asks: indexAsks(index),
-        branches: branchesByProposal(threads),
-        runningAsk,
-        sender: writer,
-        cards: readPlaces(places),
-        threads,
-        canvasOfThread: canvases.canvasOfThread,
-        canvases: readCanvases(places),
-        now: deps.basics.now(),
+        index: readTreeIndex(await docs.root(press.root)),
+        threads: readThreads(session),
+        held: readCanvases(places),
       })
-      if ("kind" in plan) return settled(branchOutRefusal(plan.why))
-      // execute
-      const opened = await executeOpening(writer, plan.opening)
-      if (plan.how === "start")
-        for (const send of plan.sends) {
-          const sent = await start(send)
-          if (sent.kind === "refused" || sent.kind === "failed")
-            deps.basics.log(
-              `[host] a proposal's branch was opened but not started: ${sent.message}`,
-            )
-        }
+      if (plan.kind === "declined") return settled(branchOutRefusal(plan.why))
+      const opened = await moved(plan.opening, writer, NO_WHY)
+      for (const send of plan.sends) {
+        const sent = await start(send)
+        if (sent.kind === "refused" || sent.kind === "failed")
+          deps.basics.log(
+            `[host] a proposal's branch was opened but not started: ${sent.message}`,
+          )
+      }
       await queueFact(plan.fact)
       return opened
     },
 
     /**
-     * A paste: the card it replaces trashed, then a card made from a copy
-     * where its target resolves to (a thread's nearest notes, made where its
-     * canvas has none; a margin checked against its entry's thread), or a cut
-     * card out of a trash by its cutter (`planPaste`). One step of the sender's
-     * history in the canvas it lands in, so the undo key takes it back. Queued on
-     * an idle thread, it is drained.
+     * A paste (`planCardPaste`): the card it replaces trashed, then a card
+     * made from a copy where its target resolves to, or a cut card out of a
+     * trash by its cutter. One step of the sender's history in the canvas it
+     * lands in, so the undo key takes it back. Queued on an idle thread, it
+     * is drained.
      */
     async paste(
       writer: WriterId,
       pasted: Extract<Intent, { kind: "paste" }>,
       canvases: CanvasIndex,
     ): Promise<Settled> {
-      // gather: the history's stack, loaded before the places are read
-      const trashes = { canvases, here: pasted.here }
-      const main = {
-        card: pasted.paste.card,
-        from: pasted.paste.kind === "uncut" ? TRASH_PLACE : null,
-        to: pasted.to,
-      }
-      const moves = [
-        ...(pasted.replacing === null
-          ? []
-          : [{ ...pasted.replacing, to: TRASH_PLACE }]),
-        main,
-      ]
-      const scope = movesHistory(moves, readPlaces(places), trashes, "paste")
-      const gesture =
-        scope === null
-          ? undefined
-          : await deps.histories.gestureOf(writer, scope)
-      const entryThreads = await marginEntryThreads([main])
-      // plan
-      const cards = readPlaces(places)
-      const resolved = planMoveTargets({
-        cards,
-        moves: [main],
-        sender: writer,
-        newContainer,
-        entryThreads,
+      const plan = planCardPaste({
+        ...cardFacts(writer, canvases),
+        pasted,
+        entryThreads: await marginEntryThreads([pasted.to]),
       })
-      if (resolved.kind === "refused") return unmoved(resolved)
-      const [move] = resolved.moves
-      if (move === undefined) return settled({ kind: "nothing" })
-      const step = planPaste(
-        afterSteps(cards, resolved.first),
-        pasted.paste,
-        move,
-        pasted.replacing,
-        writer,
-      )
-      if (step.kind === "refused") return unmoved(step)
-      const steps = [...resolved.first, ...step.steps]
-      // execute: a card queued on an idle thread is popped at once
-      return carry(
-        { kind: "steps", steps },
-        lanesToDrain(cards, steps, running),
-        { kind: "move", by: writer },
-        gesture,
-      )
+      return moved(plan, writer, NO_WHY)
     },
 
     /**
-     * A thread copied, in one step of the keeper: planned (`planCopy`) from the
-     * source's record and tree, then the copy's record, its card and the canvas
+     * A thread copied, in one step of the keeper (`planThreadCopy`), from the
+     * source's record and tree: the copy's record, its card and the canvas
      * re-ranked for it, then its name. No entry is written: its first send
-     * branches at its fork. As a paste is, it is one step of the copier's
-     * history in the canvas it lands in, or outside any canvas in an inventory, so
-     * the undo key takes it back; an undo leaves the copy's record, with no
-     * card and no entry.
+     * branches at its fork. An undo leaves the copy's record, with no card
+     * and no entry.
      */
     async copyThread(
       writer: WriterId,
       copy: CopyThread,
       canvases: CanvasIndex,
     ): Promise<Settled> {
-      // gather: the history's stack, loaded before the places are read
-      const scope = movesHistory(
-        [copy.move],
-        readPlaces(places),
-        { canvases, here: null },
-        "paste",
-      )
-      const gesture =
-        scope === null
-          ? undefined
-          : await deps.histories.gestureOf(writer, scope)
       const threads = readThreads(session)
       const root = threads.get(copy.source)?.root
-      const index =
-        root === undefined ? null : readTreeIndex(await docs.root(root))
-      const cards = readPlaces(places)
-      // plan
-      const plan =
-        index === null
-          ? ({ kind: "refused", why: "unknown" } as const)
-          : planCopy({
-              copy,
-              sender: writer,
-              cards,
-              threads,
-              index,
-              now: deps.basics.now(),
-            })
-      if (plan.kind === "refused") return settled(copyRefusal(plan.why))
-      // execute: the record first, so a reader that finds the card finds
-      // its thread's root
-      await deps.records.writeValues(plan.records)
-      const done = await carry(
-        { kind: "steps", steps: plan.steps },
-        [],
-        { kind: "move", by: writer },
-        gesture,
-      )
-      await deps.ensureNames()
-      return done
+      const plan = planThreadCopy({
+        ...cardFacts(writer, canvases),
+        copy,
+        threads,
+        index: root === undefined ? null : readTreeIndex(await docs.root(root)),
+      })
+      return moved(plan, writer, copyRefusal)
     },
 
-    /** Set a card's command, or clear it. */
+    /** Set a card's command, or clear it (`planCardCommandSet`). */
     setCommand(
       writer: WriterId,
       card: CardId,
       command: CardCommand | null,
     ): Promise<Settled> {
-      return carry(planSetCommand(readPlaces(places), card, command), [], {
-        kind: "move",
-        by: writer,
+      const plan = planCardCommandSet({
+        ...cardFacts(writer, NO_CANVAS_INDEX),
+        card,
+        command,
       })
+      return moved(plan, writer, NO_WHY)
     },
 
-    /** A sent card's record goes, then its text. Its `rev` after. */
+    /** A sent card's record goes, then its text (`planCardSpend`). Its `rev` after. */
     async spend(
       writer: WriterId,
       card: TextCardId,
       sent: { readonly sendId: string; readonly send: Send },
     ): Promise<number> {
       const message = await sentMessage(sent)
-      const held = readPlaces(places).some(c => c.id === card)
-      const { rev } = await carry(
-        {
-          kind: "steps",
-          steps: held ? [{ kind: "remove", id: card }] : [],
-        },
-        [],
+      const { plan, destroyText } = planCardSpend({
+        ...cardFacts(writer, NO_CANVAS_INDEX),
+        card,
+      })
+      const { rev } = await carryPlan(
+        plan,
         { kind: "spend", by: writer, message },
+        NO_WHY,
       )
-      // A card the host no longer holds may still have a text.
-      if (!held) await deps.cards.destroy(card)
+      if (destroyText) await deps.cards.destroy(card)
       return rev ?? places.rev()
     },
 
     /**
      * A chat from a card that found its lane busy: the card is queued behind
-     * the others in this step, so no other send gets between. Null when it
-     * cannot be: the chat's `busy` answer stands.
+     * the others in this step (`planBusyQueue`), so no other send gets
+     * between. Null when it cannot be: the chat's `busy` answer stands.
      */
     async queueBusy(
       writer: WriterId,
@@ -1042,37 +737,26 @@ export function createCardCommands(deps: CardCommandDeps) {
     ): Promise<Settled | null> {
       const doc = await docs.root(outgoing.root)
       const index = readTreeIndex(doc)
-      const cards = readPlaces(places)
-      const blank = await deps.cards.blankQueued(cards)
-      const thread = threadOfSend(
+      const facts = cardFacts(writer, NO_CANVAS_INDEX)
+      const blank = await deps.cards.blankQueued(facts.cards)
+      const plan = planBusyQueue({
+        ...facts,
         index,
-        readLanes({ doc, live }, index, cards, readQueueHolds(session), blank),
-        { at: outgoing.at, me: writer },
-      )
-      const now = cards.find(c => c.id === outgoing.card.id)
-      if (
-        thread.kind !== "thread" ||
-        thread.lane.kind !== "lane" ||
-        now?.kind !== "text"
-      )
-        return null
-      const { step, drain } = planMoveCommand(
-        cards,
-        [
-          cardMove(now, {
-            kind: "queued",
-            thread: thread.lane.name,
-            seen: outgoing.card.seen,
-          }),
-        ],
-        writer,
-        running,
-      )
-      if (step.kind !== "steps") return null
-      const { rev } = await carry(step, drain, {
-        kind: "queued-busy",
-        by: writer,
+        lanes: readLanes(
+          { doc, live },
+          index,
+          facts.cards,
+          readQueueHolds(session),
+          blank,
+        ),
+        outgoing,
       })
+      if (plan.kind !== "steps") return null
+      const { rev } = await carryPlan(
+        plan,
+        { kind: "queued-busy", by: writer },
+        NO_WHY,
+      )
       return settled({ kind: "queued" }, rev)
     },
 
@@ -1087,16 +771,25 @@ export function createCardCommands(deps: CardCommandDeps) {
   }
 }
 
-/** A record's write undone: the same record deleted. */
-const unwritten = (write: ValueWrite): ValueWrite =>
-  write.kind === "set"
-    ? {
-        kind: "delete",
-        target: write.target,
-        namespace: write.namespace,
-        key: write.key,
-      }
-    : write
+/** Why a blob makes no image, as its sender is answered. */
+function imageRefusal(why: ImageRefusal): Outcome {
+  switch (why.kind) {
+    case "missing":
+      return refused(ERR.IMAGE_MISSING, `no blob is stored as ${why.sha256}`)
+    case "not-an-image":
+      return refused(ERR.NOT_AN_IMAGE, "only images go in a media column")
+  }
+}
+
+/** Why a spin-off started no thread, as its sender is answered. */
+function spinOffRefusal(why: "blank" | "root-in-use"): Outcome {
+  switch (why) {
+    case "blank":
+      return refused(ERR.REFUSED, "nothing in the card to start a thread with")
+    case "root-in-use":
+      return refused(ERR.ROOT_ID_IN_USE, "that root's id is in use")
+  }
+}
 
 /** Why an opening was refused, as its sender is answered. */
 function openRefusal(

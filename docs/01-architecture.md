@@ -239,6 +239,21 @@ config (ADR-0194). Saying a package is pure is a line in its `include`.
   reviewed line in a short file.
 - **It is the type checker's**, like the branded ids: it fails `pnpm run
   typecheck`, never a run, since Node strips types.
+### One plan per operation
+
+The shell reads an operation's facts once, calls one plan, and carries out
+what it returns (ADR-0193). A deciding package exports that plan, its
+facts' type and its result's type, and keeps the planners and helpers the
+plan builds on out of its index; since a manifest exports only the index,
+the host cannot reach them to combine. The shell calls a second plan only
+across a phase, I/O the first plan's result asks for. Whether to write, and
+whether to refuse, is the plan's; the refusal's words are the shell's. A
+plan's facts are values read before it runs; minting ids is the one
+function a plan may call. Where a family of plans has one way to be
+carried out, it takes only lists the deciding module branded, so the
+shell can neither build a plan nor edit one: card commands
+(`packages/rules/card-commands.ts`) are the first.
+
 ### Writers, lanes and the host
 
 The host owns one pi harness and is **not a writer**. Each connected client is

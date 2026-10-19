@@ -13,6 +13,10 @@ directories and their exclude lines, your repo's names); and every jj name
 (`apps/pinetrie/host/jj/`), chosen by the project's kind
 (`apps/pinetrie/host/project.ts`). The client may not depend on it.
 
+For an operation the host carries out, this package exports one plan,
+its facts and its result, and keeps the helpers that plan builds on out of
+its index (`docs/01-architecture.md`, One plan per operation).
+
 What proposed changes or a setup or publish means is decided in
 `@pinetrie/rules`, which this package cannot declare: it returns
 each decision as a value typed in `@pinetrie/core` (`core/proposed.ts`), this

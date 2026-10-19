@@ -5,7 +5,6 @@ import {
   entryId,
   indexAsks,
   type LaneView,
-  type TextCard,
   textCardId,
   threadIdFor,
   type WriterId,

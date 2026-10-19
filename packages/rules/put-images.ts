@@ -59,6 +59,7 @@ export function planPutImages(input: {
   // a spot on a canvas, at its end.
   let column: MediaId
   let before: ImageId | null
+  let now = input.cards
   if (input.to.kind === "canvas-at") {
     const resolved = planMoveTargets({
       cards: input.cards,
@@ -74,6 +75,7 @@ export function planPutImages(input: {
     steps.push(...resolved.first)
     column = to.column
     before = null
+    now = resolved.cards
   } else {
     const { to } = input
     const held = input.cards.find(c => c.id === to.column)
@@ -82,7 +84,6 @@ export function planPutImages(input: {
     column = to.column
     before = to.before
   }
-  let now = afterSteps(input.cards, steps)
   // Each just before the same image, so they keep their order.
   for (const image of input.images) {
     const ranked = rankInColumn(now, image.card, column, before)

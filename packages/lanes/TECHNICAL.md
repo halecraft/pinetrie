@@ -10,6 +10,10 @@ lanes (ADR-0142), a lane's history (`LaneHistory`, The ports), which
 `@pinetrie/jj` implements. Every lane has its own copy: none works directly
 in a directory (ADR-0102).
 
+For an operation the host carries out, this package exports one plan,
+its facts and its result, and keeps the helpers that plan builds on out of
+its index (`docs/01-architecture.md`, One plan per operation).
+
 **This package runs no jj** (`boundary.test.ts`): a lane's history, your
 repo and every jj name are `@pinetrie/jj`'s (`packages/jj/TECHNICAL.md`),
 which builds on this package. The one exception is the image check's `jj

@@ -244,7 +244,9 @@ above); `projectTranscript(entries, tipId)` cannot even accept a seq.
 **FC/IS — gather → plan → execute. Decisions are values.** `packages/core` is
 pure and imports nothing, and `@pinetrie/rules` decides from what
 `@pinetrie/reads` and the adapters gather; the shell in `apps/pinetrie/host/`
-performs the decision. This mirrors pi's own lane loop.
+performs the decision. This mirrors pi's own lane loop. Each operation reads
+its facts once and calls one plan, which its package exports in place of
+the helpers it builds on (`docs/01-architecture.md`, One plan per operation).
 
 **No build step.** Node 24 strips types natively, so imports name the real file
 (`./index.ts`). Native stripping does **not** support enums, namespaces,

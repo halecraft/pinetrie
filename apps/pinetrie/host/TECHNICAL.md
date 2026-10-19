@@ -4,7 +4,11 @@ The host gathers facts, calls the pure decisions in the packages
 (`@pinetrie/rules`, `@pinetrie/reads`, `@pinetrie/schema`, `@pinetrie/lanes`),
 and carries them out. This directory is that imperative shell. Each module
 does one thing and takes its dependencies as a parameter; `index.ts` alone
-wires them.
+wires them. An operation reads its facts once, calls one plan and carries
+out what it returns; it combines no helpers around the plan, and builds no
+record a plan did not return (ADR-0193, `docs/01-architecture.md`, One
+plan per operation). A `plan…` declared here decides what only the host
+knows of.
 
 ## Where things are
 
@@ -907,7 +911,7 @@ rejects `shutdown()`.
   as the taker: the one stop planner, so a take's stop is a fact too. A
   host's change takes nothing. Provenance itself writes no fact. A move, an
   undo or a redo take alike.
-- **A copy** (`copyThread`, `commands/cards.ts`): `planCopy` over the
+- **A copy** (`copyThread`, `commands/cards.ts`): `planThreadCopy` over the
   source's record and tree; the copy's `THREAD` record first, then its card,
   then its name (`names.ensure`). Its first send is a branch at its fork:
   `sendMessage` refuses a branch naming a recorded thread anywhere else, and
@@ -998,8 +1002,12 @@ rejects `shutdown()`.
   `failed`): a voided async function that rejects ends the process
   (`packages/keeper/TECHNICAL.md`).
 - **`move` and `set-command` are handoffs** (`commands/cards.ts`): gather
-  the places and whether the lane runs, plan (`planMoveCommand` over
-  several moves, `planSetCommand`), then write. Trashing's history is the
+  the places and whether the lane runs, plan (`planCardMove`, or
+  `planSetCommand`), then write. A move, a paste, images put, a version, a
+  reorder and a width each read their facts once (`cardFacts`), plan whole
+  (`@pinetrie/rules`' `card-commands.ts`), and are carried out by one
+  function (`carryPlan`): the history's stack the plan names loaded, the
+  steps as one change, the drains, then the records written after it. Trashing's history is the
   host's to name (ADR-0066, ADR-0116): `Trashes` is the canvases now and the
   `here` the `move` carries, the canvas its sender is on. A move's list is accepted
   whole or refused by its first refusal (`planMoves`): a keep's cards are
@@ -1010,11 +1018,16 @@ rejects `shutdown()`.
   (`drain:<lane>`) behind the move's own step.
 - **Every change records its provenance as it closes** (`planClose`): the
   cards' history and the traces (`planProvenance` over the touched cards),
-  in one `writeValues`. In `commands/cards.ts`, `carry` is the one path for
-  a move, a busy chat's queue, a spend and a command set on a card (which
-  changes no place, so records nothing), each with its cause. `undoMove`
-  carries Kyneta's revert through `revert`, in one change with the threads
-  it lifts (`deleteRoot`). A spin-off's thread card and its card's move to
+  in one `writeValues`. In `commands/cards.ts`, `carryPlan` is the one path
+  for every card command's plan (`CardPlan`, `@pinetrie/rules`' card
+  plans), each with its cause: a move, a busy chat's queue, a spend, a
+  command set on a card (which changes no place, so records nothing). It
+  takes only the lists a plan stamped (`Planned`), so the shell can neither
+  build a plan nor edit one, and a history left out does not compile
+  (ADR-0193). `undoMove` runs in phases (`planUndoReach`, the spun threads'
+  trees read, `planUndo`), carries Kyneta's revert through `revert`, in one
+  change with the threads it lifts (`deleteRoot`), and answers with
+  `planUndoAnswer`, which takes the revert `planUndo` let through. A spin-off's thread card and its card's move to
   the trash are one change, its sender's. A thread's card placed by its
   first send (`executeSend`) is its sender's change, so `canvas-news.ts`
   tells the canvas's running threads, as for an opened or copied thread. The
@@ -1049,33 +1062,34 @@ rejects `shutdown()`.
   retire. A redo after a lift moves the card back to the trash, its thread
   deleted: trashing it.
 - **`spin-off` makes a text card a thread** (ADR-0111, ADR-0126,
-  `spinOff`), in one keeper step: the card's text loaded whole,
-  `planSpinOff` (refused for a blank card, a root or thread id in use, or
-  as `planMove` refuses the move), then the thread's records (its own,
+  `spinOff`), in one keeper step, in phases: the card's text loaded whole,
+  `planCardSpinOff` (refused for a card that is no text card, a blank card,
+  a root or thread id in use, or as `planMove` refuses the move), then the
+  thread's records (its own,
   spun from the card, and its new canvas's), a chat at the root of the new
   root its tab minted (`sendMessage`, cleared as every send is, never asking
   the agent, the card's writers its contributors), then, once the chat took the card's text, the
   thread's card on its canvas and the card's move to its sender's
   trash, in the history of the canvas it leaves, or from an inventory the
-  new canvas's; a chat that took nothing deletes the records again. The
+  new canvas's; a chat that took nothing deletes the records again (the
+  plan's `unwrite`). The
   answer is the chat's: `appended`, with the first message's id.
 - **`open-thread` opens a thread before its first entry** (ADR-0126,
   `openThread`), in one keeper step: a branch's root's tree loaded (a new
   root has none: a new canvas's, or one in a canvas the session holds, ADR-0138),
-  `planOpenThread`, then its record, its card and the canvas re-ranked for
+  `planThreadOpening`, then its record, its card and the canvas re-ranked for
   it (and a new canvas's card on the board), then its name
   (`names.ensure`). No entry is written. A move that takes a new canvas's only
   thread to a trash before its first send sends its emptied canvas's card
-  to the closer's trash in the same step (`emptiedCanvases`,
-  `planCanvasesTrashed`), in their history outside any canvas, so the undo key
+  to the closer's trash in the same step (`planCardMove` decides it), in their history outside any canvas, so the undo key
   on no canvas brings both back.
 - **`branch-out` is a press on an agent's proposal** (ADR-0157,
-  `branchOut`), in one keeper step: the root's tree and asks, the thread
-  records and whether the proposing lane runs (its `runningAsk`, the
-  prompt of its running run) gathered with no await before the first
-  write; `planBranchOut` (`@pinetrie/rules`); then every branch's records
-  and cards written as one opening (`executeOpening`, which `open-thread`
-  shares: records first, one places change of the presser's, names); for
+  `branchOut`), in one keeper step: the root's tree, the thread records
+  and which lanes run gathered with no await before the first write;
+  `planProposalPress` (`@pinetrie/rules`), which reads the asks and the
+  proposing lane's running run from them; then every branch's records
+  and cards carried as one opening (`carryPlan`, as `open-thread`'s is:
+  records first, one places change of the presser's, names); for
   Start, each branch's message cleared and sent in order through `send`,
   as a spin-off's is; then the press's fact (`queueFact`). A refused send
   is logged and leaves its thread opened, unsent. The host writes no
@@ -1113,7 +1127,9 @@ rejects `shutdown()`.
   only the host writes `places`, so the stacks are the host's: `policy.ts`
   shares them with no one and rejects one a client announces, and
   `writersPolicy` gives them to the host alone.
-- **Which history a move enters is the host's** (`movesHistory`): the canvas the
+- **Which history a move enters is its plan's** (`movesHistory`, inside
+  `@pinetrie/rules`' card plans), and the shell loads the stack the plan
+  names: the canvas the
   card goes to, else the one it leaves, read from its record; trashing's,
   the canvas it leaves, else, from an inventory, the canvas its sender is on
   (`here`), else, on none, its sender's history outside any canvas; a
@@ -1248,7 +1264,7 @@ rejects `shutdown()`.
   whether it wrote or the queue was already so. A release asks for the lane's drain: nothing else
   would pop what waited.
 - **`queue-card` queues a card and changes its queue's hold in one step**
-  (`queueCard`, `planQueueCard`, ADR-0113): the hold is written first, then
+  (`queueCard`, `planCardQueue`, ADR-0113): the hold is written first, then
   the move carried as `move` carries one, so its drain finds the queue held
   or released as planned. The move is in the sender's history; the hold is
   not, so an undo takes the card back and leaves the hold. One with no
@@ -1263,7 +1279,7 @@ rejects `shutdown()`.
   proposed changes; the thread's record stays, since its entries name it.
 - **`reorder` and `unqueue-all` are moves of their own** (`commands/cards.ts`).
   A reorder is written in the sender's history of its place's root
-  (`planReorder`), through `carry`, and drains nothing. Unqueue all plans
+  (`planCardReorder`), through `carryPlan`, and drains nothing. Unqueue all plans
   its moves from the queue as it is (`planUnqueueAll`) and hands them to
   `move`, so it is one step one undo reverses; with nothing queued it
   answers `nothing`.

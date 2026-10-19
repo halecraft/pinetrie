@@ -184,3 +184,16 @@ export function setIfChanged<R, K extends string>(
     },
   ]
 }
+
+/** A record's write undone: the same record deleted. A delete is left as is. */
+export const unwritten = <H extends Home>(
+  write: ValueWrite<H>,
+): ValueWrite<H> =>
+  write.kind === "set"
+    ? {
+        kind: "delete",
+        target: write.target,
+        namespace: write.namespace,
+        key: write.key,
+      }
+    : write

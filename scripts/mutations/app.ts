@@ -3093,8 +3093,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a closed new canvas leaves outside the close's step",
     file: "apps/pinetrie/host/commands/cards.ts",
-    from: '    return carry(step, planned.drain, { kind: "move", by: writer }, gesture)\n',
-    to: '    const out = await carry(planned.step, planned.drain, { kind: "move", by: writer }, gesture)\n    if (step.kind === "steps" && planned.step.kind === "steps")\n      await deps.placesWriter.change({ kind: "move", by: writer }, open =>\n        open.apply(step.steps.slice(planned.step.steps.length)),\n      )\n    return out\n',
+    from: "          open => open.apply(plan.steps, gesture),\n          roots,\n        )\n",
+    to: "          open => open.apply(plan.steps.slice(0, 1), gesture),\n          roots,\n        )\n        if (plan.steps.length > 1)\n          await deps.placesWriter.change(cause, open => open.apply(plan.steps.slice(1)), roots)\n",
     suite: "host",
     scenario: "board",
     expect:
@@ -3161,9 +3161,9 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the host records no paste",
-    file: "apps/pinetrie/host/commands/cards.ts",
-    from: '      const scope = movesHistory(moves, readPlaces(places), trashes, "paste")',
-    to: '      const scope = movesHistory(moves, readPlaces(places), trashes, "move")',
+    file: "packages/rules/card-commands.ts",
+    from: '    { canvases: facts.canvases, here: pasted.here },\n    "paste",\n',
+    to: '    { canvases: facts.canvases, here: pasted.here },\n    "move",\n',
     suite: "host",
     scenario: "cards",
     expect:
@@ -3171,9 +3171,9 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a paste is no gesture of its history",
-    file: "apps/pinetrie/host/commands/cards.ts",
-    from: "      const gesture =\n        scope === null\n          ? undefined\n          : await deps.histories.gestureOf(writer, scope)\n      const entryThreads = await marginEntryThreads([main])",
-    to: "      const gesture = undefined\n      const entryThreads = await marginEntryThreads([main])",
+    file: "packages/rules/card-commands.ts",
+    from: "  return carried(step, history, {\n    drain: lanesToDrain",
+    to: "  return carried(step, null, {\n    drain: lanesToDrain",
     suite: "host",
     scenario: "cards",
     expect:
@@ -3220,8 +3220,8 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "an emptied new canvas stays on the board",
-    file: "apps/pinetrie/host/commands/cards.ts",
-    from: "              ...planCanvasesTrashed(cards, emptied, writer),\n",
+    file: "packages/rules/card-commands.ts",
+    from: "        ...planCanvasesTrashed(cards, emptied, sender),\n",
     to: "",
     suite: "browser",
     scenario: "page",

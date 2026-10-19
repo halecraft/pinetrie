@@ -13,6 +13,10 @@ folder (ADR-0142). The stored shapes (`StateRecord`, `ConflictRecord`) and what
 lanehost reads (`PathFact`, `MergeStep`, `BasePlan`) are core's, since
 lanehost declares only core and channel.
 
+For an operation the host carries out, this package exports one plan,
+its facts and its result, and keeps the helpers that plan builds on out of
+its index (`docs/01-architecture.md`, One plan per operation).
+
 ## The graph (`graph.ts`)
 
 - **A state is a snapshot with parents, recorded when it is made**

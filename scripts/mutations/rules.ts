@@ -5,6 +5,192 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/rules"]
 const archive = "packages/rules/archive.ts"
 
 export const mutations: readonly Mutation[] = [
+  // ── a card command planned whole ──
+  {
+    name: "a closed new canvas stays",
+    file: "packages/rules/card-commands.ts",
+    from: "planCanvasesTrashed(cards, emptied, sender)",
+    to: "planCanvasesTrashed(cards, [], sender)",
+    command: unit,
+    expect:
+      "an unsent new canvas's thread trashed takes the canvas's card to the trash in the same step",
+  },
+  {
+    name: "a closed new canvas is in the history of the canvas it closed",
+    file: "packages/rules/card-commands.ts",
+    from: "    PERSON_HISTORY,\n    { drain: request.drain },\n",
+    to: '    movesHistory(moves, cards, { canvases: facts.canvases, here: facts.here }, "move"),\n    { drain: request.drain },\n',
+    command: unit,
+    expect:
+      "an unsent new canvas's thread trashed takes the canvas's card to the trash in the same step",
+  },
+  {
+    name: "a move is recorded in no history",
+    file: "packages/rules/card-commands.ts",
+    from: '      movesHistory(\n        moves,\n        cards,\n        { canvases: facts.canvases, here: facts.here },\n        "move",\n      ),\n',
+    to: "      null,\n",
+    command: unit,
+    expect:
+      "a card trashed from a canvas is one step of the history of the canvas it leaves",
+  },
+  {
+    name: "the host's trash history ignores the sender's canvas",
+    file: "packages/rules/card-commands.ts",
+    from: "        { canvases: facts.canvases, here: facts.here },\n",
+    to: "        { canvases: facts.canvases, here: null },\n",
+    command: unit,
+    expect:
+      "a card trashed from no canvas is one step of the history of the canvas its sender is on",
+  },
+  {
+    name: "a paste is recorded as a move",
+    file: "packages/rules/card-commands.ts",
+    from: '    { canvases: facts.canvases, here: pasted.here },\n    "paste",\n',
+    to: '    { canvases: facts.canvases, here: pasted.here },\n    "move",\n',
+    command: unit,
+    expect:
+      "a new text card pasted on a canvas is one step of its paster's history there",
+  },
+  {
+    name: "a blob that is no image is put",
+    file: "packages/rules/card-commands.ts",
+    from: '  if (ref.width === null) return { why: { kind: "not-an-image" } }\n',
+    to: "",
+    command: unit,
+    expect: "a blob that is no image, or none, is refused, and nothing is put",
+  },
+  {
+    name: "a put's images are titled by nothing",
+    file: "packages/rules/card-commands.ts",
+    from: "{ after: titles }",
+    to: "{}",
+    command: unit,
+    expect:
+      "images land in their canvas's history, each titled by its file's name once they have",
+  },
+  {
+    name: "a put is recorded in no history",
+    file: "packages/rules/card-commands.ts",
+    from: "  const canvas = canvasOfTarget(facts.canvases, put.to)\n",
+    to: "  const canvas = null\n",
+    command: unit,
+    expect:
+      "images land in their canvas's history, each titled by its file's name once they have",
+  },
+  {
+    name: "a version is recorded in no history",
+    file: "packages/rules/card-commands.ts",
+    from: "  const canvas = facts.canvases.canvasOfCard.get(change.image)\n",
+    to: "  const canvas = undefined\n",
+    command: unit,
+    expect: "a new version is one step of the history of its image's canvas",
+  },
+  {
+    name: "a reorder is recorded in no history",
+    file: "packages/rules/card-commands.ts",
+    from: "  return carried(step, canvasHistory(canvas))\n",
+    to: "  return carried(step, null)\n",
+    command: unit,
+    expect:
+      "a reorder is one step of its canvas's history; one of a card gone is refused",
+  },
+  {
+    name: "a press during its proposing run is planned",
+    file: "packages/rules/proposal.ts",
+    from: "      proposing !== null && input.running(proposing)\n",
+    to: "      false\n",
+    command: unit,
+    expect:
+      "refuses while its run runs, once a record names the proposal, and past its last row",
+  },
+  {
+    name: "an undo of a spin-off lifts no thread",
+    file: "packages/rules/card-commands.ts",
+    from: '          origin.kind === "spun" && touched.includes(origin.card)\n',
+    to: "          false\n",
+    command: unit,
+    expect:
+      "an undo reads the threads spun from the cards it moves; a redo none",
+  },
+  {
+    name: "a redo reads the threads an undo would lift",
+    file: "packages/rules/card-commands.ts",
+    from: '    facts.direction === "undo"\n',
+    to: "    true\n",
+    command: unit,
+    expect:
+      "an undo reads the threads spun from the cards it moves; a redo none",
+  },
+  {
+    name: "an undo lifts a thread anyone wrote in",
+    file: "packages/rules/card-commands.ts",
+    from: "      return { ...s, writers: tree === undefined ? [] : writersOfTree(tree) }\n",
+    to: "      return { ...s, writers: [] }\n",
+    command: unit,
+    expect:
+      "an undo that would lift a thread someone replied in is refused, naming who wrote second",
+  },
+  {
+    name: "a move on the board is in no history",
+    file: "packages/rules/card-commands.ts",
+    from: '    move.kind === "move" ? PERSON_HISTORY : null,',
+    to: '    move.kind === "reorder" ? PERSON_HISTORY : null,',
+    command: unit,
+    expect:
+      "a canvas moved between states is in your history outside any canvas; a reorder within one, in none",
+  },
+  {
+    name: "a queued card's hold is written after it",
+    file: "packages/rules/card-commands.ts",
+    from: "{ drain: plan.drain, before: plan.holds }",
+    to: "{ drain: plan.drain }",
+    command: unit,
+    expect:
+      "a card queued with its queue held writes the hold first, in the queue's canvas's history",
+  },
+  {
+    name: "a spent card's text outlives a record already gone",
+    file: "packages/rules/card-commands.ts",
+    from: "    destroyText: !held,\n",
+    to: "    destroyText: false,\n",
+    command: unit,
+    expect:
+      "a held card's record is removed in no history; one gone writes nothing and leaves its text to destroy",
+  },
+  {
+    name: "an opened thread is never named",
+    file: "packages/rules/card-commands.ts",
+    from: '  return carried({ kind: "steps", steps: plan.steps }, null, {\n    before: plan.records,\n    names: true,\n',
+    to: '  return carried({ kind: "steps", steps: plan.steps }, null, {\n    before: plan.records,\n    names: false,\n',
+    command: unit,
+    expect:
+      "a thread opens with its records first and its names after, in no history",
+  },
+  {
+    name: "a copy of a source with no tree is planned",
+    file: "packages/rules/card-commands.ts",
+    from: '  if (facts.index === null) return { kind: "declined", why: "unknown" }\n',
+    to: "",
+    command: unit,
+    expect: "a copy of a source whose root holds no tree is refused unknown",
+  },
+  {
+    name: "a spin-off from any card is tried",
+    file: "packages/rules/card-commands.ts",
+    from: '  if (!isTextCardId(card)) return unmoved("no-place")\n',
+    to: "",
+    command: unit,
+    expect: "only a text card with text starts a thread",
+  },
+  {
+    name: "a width is recorded in no history",
+    file: "packages/rules/card-commands.ts",
+    from: "    : carried(step, canvasHistory(facts.change.at.canvas))\n",
+    to: "    : carried(step, null)\n",
+    command: unit,
+    expect:
+      "a width is one step of its canvas's history; the width it has writes nothing",
+  },
   // ── a lane's fork record ──
   {
     name: "a lane of its own is recorded with no fork",
@@ -3552,8 +3738,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a made column is not written with its move",
     file: "packages/rules/moves.ts",
-    from: '        ? { kind: "steps", steps: [...resolved.first, ...step.steps] }',
-    to: "        ? step",
+    from: '    : { kind: "steps", steps: [...first, ...step.steps] }',
+    to: "    : step",
     command: ["pnpm", "exec", "vitest", "run", "packages/rules"],
     expect:
       "planMoveRequest: a column made for a move is written before the move",

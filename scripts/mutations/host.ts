@@ -435,28 +435,11 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a refused spin-off keeps its thread's records",
     file: "apps/pinetrie/host/commands/cards.ts",
-    from: "        await deps.records.writeValues(plan.open.records.map(unwritten))\n",
+    from: "        await deps.records.writeValues(plan.unwrite)\n",
     to: "",
     command: unit,
     expect:
       "a thread that is not started leaves the card where it was; a blank card starts none",
-  },
-  {
-    name: "a closed new canvas stays",
-    file: "apps/pinetrie/host/commands/cards.ts",
-    from: "              ...planCanvasesTrashed(cards, emptied, writer),\n",
-    to: "              ...planCanvasesTrashed(cards, [], writer),\n",
-    command: unit,
-    expect: "the canvas's card goes to your trash in the same step",
-  },
-  {
-    name: "an undo of a spin-off lifts no thread",
-    file: "apps/pinetrie/host/commands/cards.ts",
-    from: '      if (origin.kind !== "spun" || !lifting.includes(origin.card)) continue\n',
-    to: "      continue\n",
-    command: unit,
-    expect:
-      "an undo while the thread holds its first message alone lifts it back",
   },
   {
     name: "a relay opens its threads before their reach is read",
@@ -1662,7 +1645,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a busy chat's card is not queued",
     file: "apps/pinetrie/host/commands/cards.ts",
-    from: '      if (step.kind !== "steps") return null',
+    from: '      if (plan.kind !== "steps") return null',
     to: "      return null",
     command: unit,
     expect: "its card is queued behind the others",
@@ -1670,7 +1653,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a lifted thread is kept",
     file: "apps/pinetrie/host/commands/cards.ts",
-    from: "              for (const { root, thread } of lift.delete)\n                await deleteRoot(open, root, thread)\n",
+    from: "              for (const { root, thread } of plan.lift)\n                await deleteRoot(open, root, thread)\n",
     to: "",
     command: unit,
     expect:
@@ -1769,15 +1752,6 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "idleWriters: the writers with stacks of moves loaded and no seat left",
-  },
-  {
-    name: "a move is recorded in no history",
-    file: "apps/pinetrie/host/commands/cards.ts",
-    from: '    return carry(step, planned.drain, { kind: "move", by: writer }, gesture)\n',
-    to: '    return carry(step, planned.drain, { kind: "move", by: writer })\n',
-    command: unit,
-    expect:
-      "a take into the inventory is one step of the taker's history in the root it left; a creation is in none",
   },
   {
     name: "an undo raises no rev",
@@ -2279,14 +2253,6 @@ export const mutations: readonly Mutation[] = [
     expect: "a hold is written once, its release deleted and the lane drained",
   },
   {
-    name: "a reorder is recorded in no history",
-    file: "apps/pinetrie/host/commands/cards.ts",
-    from: '      const step = planReorder(readPlaces(places), reorder)\n      // execute\n      return carry(step, [], { kind: "move", by: writer }, gesture)',
-    to: '      const step = planReorder(readPlaces(places), reorder)\n      // execute\n      return carry(step, [], { kind: "move", by: writer })',
-    command: unit,
-    expect: "a reorder writes only the card's order",
-  },
-  {
     name: "untilNotTyped waits for a card nobody types in",
     file: "apps/pinetrie/host/queued-card-pop.ts",
     from: "    if (signal.aborted || !readTypingIn(presence).has(card)) done()",
@@ -2548,22 +2514,6 @@ export const mutations: readonly Mutation[] = [
     expect: "a branch's record is written with its first, then named",
   },
   {
-    name: "the host's trash history ignores the sender's canvas",
-    file: "apps/pinetrie/host/commands/cards.ts",
-    from: "    const trashes = { canvases, here }\n",
-    to: "    const trashes = { canvases, here: null }\n",
-    command: unit,
-    expect: "the host names trashing's history",
-  },
-  {
-    name: "a width is recorded in no history",
-    file: "apps/pinetrie/host/commands/cards.ts",
-    from: '        : carry(step, [], { kind: "move", by: writer }, gesture)',
-    to: '        : carry(step, [], { kind: "move", by: writer })',
-    command: unit,
-    expect: "a width writes only the card's width",
-  },
-  {
     name: "a run is told nothing of its canvas",
     file: "apps/pinetrie/host/runs.ts",
     from: "          const before = [\n            start.incoming ?? null,\n            behind,\n            ...canvas,\n            pinned,\n",
@@ -2683,14 +2633,6 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "a queued reference whose quote is not found is skipped, not sent empty; the card behind it is sent",
-  },
-  {
-    name: "a move on the board is in no history",
-    file: "apps/pinetrie/host/commands/cards.ts",
-    from: '        move.kind === "move"',
-    to: '        move.kind === "reorder"',
-    command: unit,
-    expect: "between states in your history outside any canvas",
   },
   {
     name: "a board move refused says nowhere",
@@ -3550,14 +3492,6 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "a note column's title is written as its card's title, and deleted where it was",
-  },
-  {
-    name: "a blob that is no image is put",
-    file: "apps/pinetrie/host/commands/cards.ts",
-    from: "    if (ref.width === null)\n",
-    to: "    if (false)\n",
-    command: unit,
-    expect: "a blob that is no image, or none, is refused, and nothing is put",
   },
   {
     name: "read_card shows no image",

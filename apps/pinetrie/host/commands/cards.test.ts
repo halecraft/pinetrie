@@ -211,6 +211,8 @@ function setUp() {
       raw.putImages(w, p, canvasesNow(b)),
     version: (w: WriterId, v: Parameters<Raw["version"]>[1]) =>
       raw.version(w, v, canvasesNow(b)),
+    cardWidth: (w: WriterId, c: Parameters<Raw["cardWidth"]>[1]) =>
+      raw.cardWidth(w, c, canvasesNow(b)),
   }
   const undoes = (result: UndoResult, revert: () => void = () => {}) => {
     undoing = result

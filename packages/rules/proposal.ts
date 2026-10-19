@@ -4,14 +4,14 @@
 // `canvas.ts`' (`proposalDraft`), beside the threads not yet started.
 
 import {
-  type AskIndex,
   agentAsk,
   type BranchedFact,
   type BranchOut,
+  branchesByProposal,
   type CanvasId,
   type CardRecord,
-  type EntryId,
   entryThread,
+  indexAsks,
   messageProposal,
   type NonEmpty,
   nonEmpty,
@@ -20,11 +20,13 @@ import {
   type ProposedBranch,
   parseMentions,
   proposalState,
+  runPrompt,
   type Send,
   type StartedRow,
   type ThreadId,
   type ThreadRecord,
   type TreeIndex,
+  threadEnd,
   type ValueWrite,
   type WriterId,
 } from "@pinetrie/core"
@@ -113,9 +115,8 @@ export function planBranchOut(input: {
   readonly press: BranchOut
   /** The root's tree. */
   readonly index: TreeIndex
-  readonly asks: AskIndex
-  readonly branches: Parameters<typeof proposalState>[0]["branches"]
-  readonly runningAsk: EntryId | null
+  /** Whether a lane runs now: the proposing lane's run holds its press. */
+  readonly running: (lane: ThreadId) => boolean
   readonly sender: WriterId
   readonly cards: readonly CardRecord[]
   readonly threads: ReadonlyMap<ThreadId, ThreadRecord>
@@ -128,12 +129,16 @@ export function planBranchOut(input: {
   | BranchOutPlan
   | { readonly kind: "refused"; readonly why: BranchOutRefusal } {
   const { press, index } = input
+  const proposing = entryThread(index, press.proposal)
   const state: ProposalState | null = proposalState({
     index,
-    asks: input.asks,
-    branches: input.branches,
+    asks: indexAsks(index),
+    branches: branchesByProposal(input.threads),
     proposal: press.proposal,
-    runningAsk: input.runningAsk,
+    runningAsk:
+      proposing !== null && input.running(proposing)
+        ? runPrompt(index, threadEnd(index, proposing))
+        : null,
   })
   const proposal = messageProposal(index.entries[press.proposal]?.message)
   if (state === null || proposal === undefined)

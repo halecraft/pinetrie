@@ -451,6 +451,8 @@ export function planMoveTargets(input: {
       readonly moves: readonly ResolvedMove[]
       /** What is written before the moves: each column made, and the canvas re-ranked for it. */
       readonly first: readonly PlaceStep[]
+      /** The cards as `first` leaves them, which the moves are planned over. */
+      readonly cards: readonly CardRecord[]
     }
   | Extract<MoveStep, { kind: "refused" }> {
   const first: PlaceStep[] = []
@@ -589,7 +591,7 @@ export function planMoveTargets(input: {
         moves.push({ ...move, to })
     }
   }
-  return { kind: "resolved", moves, first }
+  return { kind: "resolved", moves, first, cards: now }
 }
 
 /**
@@ -616,20 +618,22 @@ export function planMoveRequest(
   })
   if (resolved.kind === "refused") return REFUSED(resolved)
   const command = planMoveCommand(
-    afterSteps(cards, resolved.first),
+    resolved.cards,
     resolved.moves,
     sender,
     running,
   )
-  const { step } = command
-  return {
-    ...command,
-    step:
-      step.kind === "steps"
-        ? { kind: "steps", steps: [...resolved.first, ...step.steps] }
-        : step,
-  }
+  return { ...command, step: prefixedSteps(resolved.first, command.step) }
 }
+
+/** `step` after `first`, the steps a target's resolution writes; a refusal as is. */
+export const prefixedSteps = (
+  first: readonly PlaceStep[],
+  step: MovesStep,
+): MovesStep =>
+  step.kind === "refused"
+    ? step
+    : { kind: "steps", steps: [...first, ...step.steps] }
 
 /** What the host makes of several moves: every step, or the first refusal. */
 export type MovesStep =

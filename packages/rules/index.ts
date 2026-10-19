@@ -184,7 +184,6 @@ export {
   type CardOnCanvas,
   canvasOfCard,
   canvasOfPlace,
-  canvasOfTarget,
   cardsOnCanvas,
   indexCanvases,
   isCardOnCanvas,
@@ -218,6 +217,31 @@ export {
   planCardSweep,
   yourCard,
 } from "./card.ts"
+export {
+  type CardFacts,
+  type CardPlan,
+  type CardRefusal,
+  type ImageRefusal,
+  planBusyQueue,
+  planCanvasPlacement,
+  planCardCommandSet,
+  planCardMove,
+  planCardPaste,
+  planCardQueue,
+  planCardReorder,
+  planCardSpend,
+  planCardSpinOff,
+  planCardWidth,
+  planImagesPut,
+  planImageVersion,
+  planProposalPress,
+  planThreadCopy,
+  planThreadOpening,
+  planUndo,
+  planUndoAnswer,
+  planUndoReach,
+  type StoredBlob,
+} from "./card-commands.ts"
 export {
   CARD_HISTORY,
   type CardEvent,
@@ -271,7 +295,6 @@ export {
   type MintContainer,
   makeContainer,
   mintContainer,
-  mintWith,
 } from "./containers.ts"
 export {
   CONTEXT,
@@ -371,12 +394,7 @@ export {
   takenIn,
   threadCardHolding,
 } from "./held.ts"
-export {
-  planReorder,
-  planSetCommand,
-  planWidth,
-  type ReorderStep,
-} from "./in-place.ts"
+export { planReorder } from "./in-place.ts"
 export {
   type ConflictShown,
   decodeLand,
@@ -440,25 +458,15 @@ export {
   withMessageImages,
 } from "./message.ts"
 export {
-  cardsOfParts,
-  crossesArchive,
-  movesHistory,
   planHistorySweep,
   type Trashes,
   type UndoResult,
-  undoAnswer,
 } from "./move-history.ts"
 export {
   type FromTrash,
-  lanesToDrain,
   type MoveCommand,
-  type MovesStep,
   pastedCard,
   planFromTrash,
-  planMoveCommand,
-  planMoveRequest,
-  planMoveTargets,
-  planPaste,
   RESTORE,
 } from "./moves.ts"
 export {
@@ -478,11 +486,10 @@ export {
   notesNear,
   toNotes,
 } from "./notes.ts"
-export {
-  type GatheredStart,
-  type OpenPlan,
-  type OpenThread,
-  planOpenThread,
+export type {
+  GatheredStart,
+  OpenPlan,
+  OpenThread,
 } from "./open.ts"
 export {
   keyAfter,
@@ -512,18 +519,14 @@ export {
   planPinnedRead,
 } from "./pinned.ts"
 export {
-  afterSteps,
   inventoryFull,
   type MakeStep,
-  type MoveStep,
   type PlaceStep,
   planMake,
 } from "./place-steps.ts"
 export {
   type BranchOutRefusal,
-  type Opening,
   parseProposal,
-  planBranchOut,
 } from "./proposal.ts"
 export {
   type AcceptanceDestination,
@@ -544,12 +547,8 @@ export {
 } from "./proposed.ts"
 export {
   type ImageAskPlan,
-  type NewImage,
   type PutImageAsk,
   planImageAsk,
-  planPutImages,
-  planVersion,
-  type VersionBlobs,
 } from "./put-images.ts"
 export {
   blankQueued,
@@ -573,7 +572,6 @@ export {
 } from "./queue.ts"
 export {
   planHoldSweep,
-  planQueueCard,
   planQueueHold,
   QUEUE_HOLD,
   type QueueHold,
@@ -649,8 +647,6 @@ export {
   type SpanReader,
 } from "./review.ts"
 export {
-  emptiedCanvases,
-  planCanvasesTrashed,
   planRootDelete,
   type RootDelete,
 } from "./root.ts"
@@ -738,14 +734,10 @@ export {
   RECORD_SPECS,
   type StoredRecords,
 } from "./specs.ts"
-export {
-  type LiftPlan,
-  planLiftRoot,
-  planSpinOff,
-  type SpinOff,
-  type SpinOffPlan,
-  type SpinOffRefusal,
-  type SpunThread,
+export type {
+  SpinOff,
+  SpinOffPlan,
+  SpinOffRefusal,
 } from "./spin-off.ts"
 export {
   decodeSshFact,

@@ -39,6 +39,10 @@ are core's, since jj names them, and `BaseRecord`, the union of
 
 `index.ts` exports, by name, only what another package imports; its groups
 follow this list. A name only this package uses is imported from its module.
+For an operation the host carries out, that is its plan, its facts and its
+result, never the planners the plan builds on (ADR-0193); a planner stays
+exported only where another package decides with it on its own
+(`planReorder`, which the session predicts with).
 
 - `records.ts`, `specs.ts`, `decode.ts`: `RecordSpec`, the writes it builds
   and every spec (`RECORD_SPECS`); the
@@ -76,6 +80,12 @@ follow this list. A name only this package uses is imported from its module.
   columns and where a card leaving a thread goes; the queue's pops and
   carries; handoffs and their targets; reorders, a card's width and its
   command; each sender's history of moves and its undo.
+- `card-commands.ts`: every card command the host carries out, planned
+  whole from the facts its shell reads once (`CardFacts`): the records
+  before its change, the change's steps, the lanes it drains, the history
+  of moves it is a step of, the records after it and whether threads are
+  named (`CardPlan`); an undo's and a spin-off's phases. The planners it
+  builds on stay in their modules.
 - `place-steps.ts`: a write to the places document (`PlaceStep`), the one
   rule every card is made by (`planMake`) and who may move into a place,
   which the planners of moves, queues, notes and canvases all build on.
@@ -803,6 +813,53 @@ which are swept.
   command, and stored `card:` documents with no record, a spent or empty
   card's among them.
 
+# A card command planned whole (`card-commands.ts`, ADR-0193)
+
+- **One plan per command, from facts read once.** The host's shell reads
+  the places and the records a command needs into its facts (`CardFacts`
+  and the command's own), calls the command's plan, and carries out what
+  it returns (`CardPlan`): the records `before` the change, its `steps` as
+  one change, the drains, the records `after` it, then the names of the
+  threads it recorded (`names`). Which history of moves a command enters,
+  whether a closed new canvas's card goes with it, which blobs are images,
+  which titles a put writes, a queue's hold, a spend's text left to
+  destroy: each is the plan's, so a unit test proves it.
+- **Facts are values.** The lanes running are a set read with the facts;
+  minting a column's id (`newContainer`) is the one function a plan calls.
+- **The shell can neither build a plan nor edit one.** `steps`, `before`
+  and `after` are `Planned` lists, branded as the gate's `Cleared` is and
+  stamped only in this module (`carried`). A spread keeps an object's brand
+  but a new list loses it, so the brand is on the lists, and
+  `apps/pinetrie/host/commands/types.test.ts` proves both with
+  `@ts-expect-error`.
+- **A refusal's reason is the plan's, its words the shell's.** A plan
+  refused for a reason of its own returns `declined` with a `why`
+  (`ImageRefusal` for a blob that makes no image, the opening's, the
+  copy's, the press's); the shell words each in one function. A move
+  refused says where the card is now (`CardRefusal`).
+- **The history's stack loads after the plan.** The plan names the history
+  (`history`; `canvasHistory` gives none for a command on no canvas, since
+  `historyScope(null)` is your history outside any); the shell loads that
+  stack, then writes the change inside its gesture. Nothing writes the
+  places while it loads (the step runs on the documents' keeper).
+- **Two commands run in phases.** An undo: what its step would move
+  (`planUndoReach`, from the stack's top: refused `archived`, or the
+  threads spun from its cards, whose trees the shell reads), whether it may
+  go ahead (`planUndo`: refused `replied`, or an `UndoRevert`, which only it
+  makes), then Kyneta's revert, then the answer (`planUndoAnswer`, which
+  takes that `UndoRevert`). A spin-off (`planCardSpinOff`): its records,
+  its first message sent, and only then its change; a send that took
+  nothing writes the plan's `unwrite`.
+- **Targets are resolved once.** `planMoveTargets` returns the cards as its
+  resolved steps leave them, and `prefixedSteps` puts those steps before
+  what is planned over them (`planMoveRequest`, `planCardPaste`).
+- **The planners a plan builds on are not exported from `index.ts`**
+  (`planMoveRequest`, `planPaste`, `planQueueCard`, `planSpinOff`,
+  `planLiftRoot`, `movesHistory`, `undoAnswer`…): their modules export them
+  to their siblings and their tests. One another package decides with on
+  its own stays exported (`planReorder`, which a client's session predicts
+  with).
+
 # Queue holds (`queue-hold.ts`, ADR-0048 step 7)
 
 A thread's queue held: while `QUEUE_HOLD` has its lane, the host pops no
@@ -874,8 +931,8 @@ not `pinetrie:live`, so it lasts until a release, across a restart.
 - **`emptiedCanvases`** (`root.ts`): the canvases a step leaves empty that were
   a new canvas's: a thread card that left its canvas for a trash, its thread a
   new root's not yet started (its root one the directory does not name),
-  and nothing left whose owner is the canvas (`surfaceOwner`). The host sends
-  each one's card to the trash in the same step (`planCanvasesTrashed`, its
+  and nothing left whose owner is the canvas (`surfaceOwner`). A move sends
+  each one's card to the trash in the same step (`planCardMove`, through `planCanvasesTrashed`, its
   board place as `left`, its closer the placer), in their history outside any
   canvas, since the canvas leaves their view: the undo key on no canvas brings
   the canvas and its thread back (ADR-0126).

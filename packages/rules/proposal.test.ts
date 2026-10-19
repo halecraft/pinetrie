@@ -1,9 +1,7 @@
 import {
   type BranchOut,
-  branchesByProposal,
   canvasIdFor,
   entryId,
-  indexAsks,
   indexTree,
   nonEmpty,
   type Proposal,
@@ -135,9 +133,7 @@ const plan = (
   planBranchOut({
     press,
     index,
-    asks: indexAsks(index),
-    branches: branchesByProposal(THREADS),
-    runningAsk: null,
+    running: () => false,
     sender: ADA,
     cards: [proposing, older],
     threads: THREADS,
@@ -268,7 +264,7 @@ describe("planBranchOut", () => {
   })
 
   test("refuses while its run runs, once a record names the proposal, and past its last row", () => {
-    expect(plan(rows("open", 0), { runningAsk: entryId("1-p") })).toEqual({
+    expect(plan(rows("open", 0), { running: lane => lane === P })).toEqual({
       kind: "refused",
       why: "running",
     })
@@ -284,9 +280,7 @@ describe("planBranchOut", () => {
         }),
       ],
     ])
-    expect(
-      plan(rows("open", 0), { branches: branchesByProposal(spent) }),
-    ).toEqual({
+    expect(plan(rows("open", 0), { threads: spent })).toEqual({
       kind: "refused",
       why: "spent",
     })
