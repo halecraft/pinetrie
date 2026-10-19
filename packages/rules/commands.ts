@@ -2,15 +2,17 @@
 // commands.
 
 import { Type } from "typebox"
-import { decodeRecord, fixedKey } from "./decode.ts"
+import { choiceSchema, decodeRecord, fixedKey } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 
 /** The one `pinetrie.commands` value's key: what the host's pi loaded. */
 export const COMMANDS_KEY = "commands"
 
+const COMMAND_KINDS = ["skill", "prompt"] as const
+
 const CommandSummarySchema = Type.Object({
   name: Type.String({ minLength: 1 }),
-  kind: Type.Union([Type.Literal("skill"), Type.Literal("prompt")]),
+  kind: choiceSchema(COMMAND_KINDS),
   description: Type.String(),
   argumentHint: Type.Union([Type.String(), Type.Null()]),
 })
@@ -20,7 +22,7 @@ const CommandsRecordSchema = Type.Object({
 })
 
 /** A command runs a pi skill or expands a pi prompt template. */
-type CommandKind = "skill" | "prompt"
+type CommandKind = (typeof COMMAND_KINDS)[number]
 
 /** A command as people see it: in the composer's completion and on a sent message. */
 export interface CommandSummary {

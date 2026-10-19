@@ -41,7 +41,7 @@ import { type BaseNews, behindLine, decodeBehind } from "./behind.ts"
 import { canvasFactLine, decodeCanvas, decodeCanvasFact } from "./canvas.ts"
 import { decodeCanvasPinned } from "./canvas-pinned.ts"
 import type { CommandRef } from "./commands.ts"
-import { decodeWith, ThreadIdSchema } from "./decode.ts"
+import { choiceSchema, decodeWith, ThreadIdSchema } from "./decode.ts"
 import { decodeFact, factLine } from "./fact.ts"
 import { decodeLand, type LandMessage, landLine } from "./land.ts"
 import { type LinkedQuote, withQuotes } from "./links.ts"
@@ -71,7 +71,7 @@ const ResponderSchema = Type.Union([
 
 const ImageRefSchema = Type.Object({
   sha256: Type.String({ pattern: "^[0-9a-f]{64}$" }),
-  mimeType: Type.Union(IMAGE_MIMES.map(m => Type.Literal(m))),
+  mimeType: choiceSchema(IMAGE_MIMES),
   width: Type.Integer({ minimum: 1 }),
   height: Type.Integer({ minimum: 1 }),
 })

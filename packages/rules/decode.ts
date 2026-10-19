@@ -140,6 +140,13 @@ export const ThreadNameSchema = Type.Unsafe<ThreadName>(
   Type.String({ minLength: 1 }),
 )
 
+/**
+ * A closed set's schema, from the `as const` list its type is built from
+ * too, so the stored shape and the type cannot accept different values.
+ */
+export const choiceSchema = <V extends string>(values: readonly V[]) =>
+  Type.Union(values.map(v => Type.Literal(v)))
+
 /** A card's id, as stored: never empty. */
 export const CardIdSchema = Type.Unsafe<CardId>(Type.String({ minLength: 1 }))
 

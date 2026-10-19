@@ -11,7 +11,7 @@ import {
 } from "@pinetrie/core"
 import { Type } from "typebox"
 import type { ModelRef } from "./config.ts"
-import { decodeRecord, fixedKey, threadKey } from "./decode.ts"
+import { choiceSchema, decodeRecord, fixedKey, threadKey } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 
 const BannerRecordSchema = Type.Object({
@@ -85,7 +85,7 @@ export const iconConfig = (
 export const ICONS_KEY = "icons"
 
 const IconsRecordSchema = Type.Object({
-  source: Type.Union(ICON_SOURCES.map(s => Type.Literal(s))),
+  source: choiceSchema(ICON_SOURCES),
 })
 
 /** The host's icon source, at its one key, for the page to read. */

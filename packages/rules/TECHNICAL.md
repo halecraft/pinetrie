@@ -113,7 +113,11 @@ follow this list. A name only this package uses is imported from its module.
   with no repo (`ignoredPaths`, below).
 
 Every module decodes through `decodeWith` (`decode.ts`), which is
-total: a malformed value is dropped, never thrown. `decodeRecords` and
+total: a malformed value is dropped, never thrown. A closed set (a kind, a
+reason, an urgency) is one `as const` list: its type is
+`(typeof LIST)[number]` and its schema `choiceSchema(LIST)`, so the stored
+shape and the type cannot accept different values (`ICON_SOURCES`,
+`NO_MODEL_REASONS`, `READER_URGENCIES`). `decodeRecords` and
 `recordsIn` do it for a namespace's stored records (`records.ts`, below).
 
 **A schema is compiled once, the first time it checks a value**

@@ -11,17 +11,14 @@ import {
   REFUSAL_REASONS,
 } from "@pinetrie/core"
 import { Type } from "typebox"
-import { decodeRecord, fixedKey } from "./decode.ts"
+import { choiceSchema, decodeRecord, fixedKey } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 
 /** The one `pinetrie.setup` value's key. */
 export const SETUP_KEY = "setup"
 
 /** One of `values`, as a schema: the type and its schema share one list. */
-const oneOf = <V extends string>(values: readonly V[]) =>
-  Type.Union(values.map(v => Type.Literal(v)))
-
-const Layer = oneOf(CONFIG_LAYERS)
+const Layer = choiceSchema(CONFIG_LAYERS)
 
 const Origin = Type.Union([
   Type.Object({ kind: Type.Literal("fallback") }),
@@ -108,7 +105,7 @@ const SetupRecordSchema = Type.Object({
     Type.Object({
       layer: Layer,
       file: Type.String(),
-      state: oneOf(CONFIG_FILE_STATES),
+      state: choiceSchema(CONFIG_FILE_STATES),
     }),
   ),
   refusals: Type.Array(
@@ -116,7 +113,7 @@ const SetupRecordSchema = Type.Object({
       layer: Layer,
       file: Type.String(),
       key: Type.String(),
-      why: oneOf(REFUSAL_REASONS),
+      why: choiceSchema(REFUSAL_REASONS),
       detail: Type.String(),
     }),
   ),
@@ -128,7 +125,7 @@ const SetupRecordSchema = Type.Object({
     }),
     Type.Object({
       kind: Type.Literal("none"),
-      why: oneOf(NO_MODEL_REASONS),
+      why: choiceSchema(NO_MODEL_REASONS),
       named: Type.Union([Type.String(), Type.Null()]),
     }),
   ]),

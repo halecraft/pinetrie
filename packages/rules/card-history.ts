@@ -25,7 +25,7 @@ import {
 } from "@pinetrie/core"
 import { Type } from "typebox"
 import { placeEnd } from "./card.ts"
-import { decodeRecord, textKey } from "./decode.ts"
+import { choiceSchema, decodeRecord, textKey } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 
 /** The most events a card's history keeps: its first, and the newest. */
@@ -55,14 +55,16 @@ const FieldsSchema = Type.Object({
 const OrNull = <T extends ReturnType<typeof Type.Object>>(t: T) =>
   Type.Union([t, Type.Null()])
 
+const CARD_EVENT_KINDS = [
+  "created",
+  "moved",
+  "undone",
+  "redone",
+  "unsent",
+] as const
+
 const EventSchema = Type.Object({
-  kind: Type.Union([
-    Type.Literal("created"),
-    Type.Literal("moved"),
-    Type.Literal("undone"),
-    Type.Literal("redone"),
-    Type.Literal("unsent"),
-  ]),
+  kind: choiceSchema(CARD_EVENT_KINDS),
   by: Type.Union([Str, Type.Null()]),
   from: OrNull(FieldsSchema),
   to: FieldsSchema,
@@ -93,7 +95,7 @@ const keyOrNull = (
  * read from the two places when it is worded (`changeVerb`).
  */
 export interface CardEvent {
-  readonly kind: "created" | "moved" | "undone" | "redone" | "unsent"
+  readonly kind: (typeof CARD_EVENT_KINDS)[number]
   /** Who made it; null for the host's own write. */
   readonly by: WriterId | null
   readonly from: PlaceKey | null

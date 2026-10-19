@@ -10,7 +10,7 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import { Type } from "typebox"
-import { decodeRecord, threadKey } from "./decode.ts"
+import { choiceSchema, decodeRecord, threadKey } from "./decode.ts"
 import {
   type Answer,
   type AskLines,
@@ -23,6 +23,8 @@ import {
 import { type RecordSpec, setRecord } from "./records.ts"
 import { bareLine, oneLine } from "./request.ts"
 
+const READER_URGENCIES = ["needsYou", "worthARead", "done"] as const
+
 const Id = Type.String({ minLength: 1 })
 const RunEndReportSchema = Type.Object({
   ask: Id,
@@ -31,11 +33,7 @@ const RunEndReportSchema = Type.Object({
     Type.Object({ kind: Type.Literal("pending") }),
     Type.Object({
       kind: Type.Literal("modelSaid"),
-      urgency: Type.Union([
-        Type.Literal("needsYou"),
-        Type.Literal("worthARead"),
-        Type.Literal("done"),
-      ]),
+      urgency: choiceSchema(READER_URGENCIES),
       reason: Type.Union([Type.String(), Type.Null()]),
     }),
     Type.Object({ kind: Type.Literal("failed"), error: Type.String() }),
@@ -48,7 +46,7 @@ const RunEndReportSchema = Type.Object({
 })
 
 /** How urgently a model says a run's end asks the people in its thread to look. */
-type ReaderUrgency = "needsYou" | "worthARead" | "done"
+type ReaderUrgency = (typeof READER_URGENCIES)[number]
 
 /**
  * How a thread's last run ended: what happened, never what it asks of whom.
