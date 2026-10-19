@@ -750,7 +750,8 @@ which are swept.
   (`0004-card-titles`).
 - **A media column holds images** (ADR-0182, `media.ts`, `put-images.ts`):
   each an image card at a rank in its column (`imagesIn`,
-  `mediaColumnEnd`), with its versions as its content, oldest first, each
+  `mediaColumnEnd`; a spot just before an image, `image-at`, is ranked by
+  `rankInColumn` in `planMoveTargets`, as a spot on a canvas is), with its versions as its content, oldest first, each
   the fitted copy drawn (an `ImageRef`, so its box is held before it loads)
   and its `original`. A put of new images (`planPutImages`) makes each
   through `planMake`; to a spot on a canvas, the first resolves as any drop

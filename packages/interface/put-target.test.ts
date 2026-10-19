@@ -83,12 +83,15 @@ describe("one landing rule: every input has full fidelity", () => {
     {
       kind: "images",
       column: cardIdOfKind("media", "01a0ffd2-0000-7000-8000-0000000000a2"),
-      before: null,
+      on: null,
     },
     {
       kind: "images",
       column: cardIdOfKind("media", "01a0ffd2-0000-7000-8000-0000000000a2"),
-      before: cardIdOfKind("image", "01a0ffd2-0000-7000-8000-0000000000a3"),
+      on: {
+        image: cardIdOfKind("image", "01a0ffd2-0000-7000-8000-0000000000a3"),
+        edge: "onto",
+      },
     },
   ] satisfies PutTarget[]
   /** A kind of target missing from `targets` fails to compile; a text box is never marked. */

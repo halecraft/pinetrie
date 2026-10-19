@@ -535,7 +535,7 @@ describe("planIntent", () => {
       },
       onR1({ kind: "fold", card: NEW_MEDIA, unfolded: true }),
     ])
-    const into = { kind: "image", column: NEW_MEDIA } as const
+    const into = { kind: "image-at", column: NEW_MEDIA, before: null } as const
     expect(plan({ kind: "putImages", images, to: into })).toEqual([
       {
         kind: "request",
@@ -1423,7 +1423,7 @@ test("the pane's put makes a media column after its thread, and its ▾ lists th
         kind: "putStored",
         sha256,
         name: "shot.png",
-        to: { kind: "image", column },
+        to: { kind: "image-at", column, before: null },
       },
     ],
   ])

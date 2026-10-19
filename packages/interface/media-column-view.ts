@@ -120,7 +120,7 @@ export function putOnCanvasButton(input: {
       kind: "putStored",
       sha256,
       name,
-      to: { kind: "image", column: c.id },
+      to: { kind: "image-at", column: c.id, before: null },
     } as const,
   }))
   return {

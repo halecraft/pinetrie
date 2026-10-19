@@ -2,9 +2,10 @@
 // renames, and its images in one order, each drawn at the column's width from
 // its fitted copy at its stored size, so its box is held before its bytes
 // load. Two wide, two to a row, so alternatives sit side by side. Each image
-// has its title, a stepper through its versions, ◀ and ▶ to move it among the
-// others, a bin, and its margin of comments. A file dropped on the column puts
-// the images among it at its end; one dropped on an image adds a version.
+// has its title, a stepper through its versions, ◀ and ▶ and a drag to move
+// it among the others, a bin, and its margin of comments. A file dropped on
+// the column puts its images at the end; on an image's edge, a new image
+// before or after it (`imageEdge`); onto the image, a version of it.
 
 import {
   blobUrl,
@@ -23,6 +24,8 @@ import {
   dropProps,
   type ImageView,
   type Intent,
+  imageEdge,
+  imageSpot,
   MEDIA_EMPTY,
   type MediaColumnView,
   type Reader,
@@ -31,8 +34,8 @@ import {
 } from "@pinetrie/interface"
 import { marginCards, type SeatRecord } from "@pinetrie/rules"
 import { newCardId, newImageId, type SessionClient } from "@pinetrie/session"
-import { useState } from "react"
-import { fileDropProps } from "./file-drop.ts"
+import { useRef, useState } from "react"
+import { fileDropAtProps, fileDropProps } from "./file-drop.ts"
 import { TrashIcon } from "./icons.tsx"
 import { uploadImages } from "./image-upload.ts"
 import { ListColumnHead } from "./list-column-head.tsx"
@@ -83,9 +86,9 @@ export function MediaColumn(p: {
       {...(writable
         ? {
             ...fileDropProps(files => {
-              void put(files, { kind: "image", column })
+              void put(files, { kind: "image-at", column, before: null })
             }),
-            ...dropProps({ kind: "images", column, before: null }),
+            ...dropProps({ kind: "images", column, on: null }),
           }
         : {})}
     >
@@ -105,6 +108,8 @@ export function MediaColumn(p: {
         )}
         {view.images.map(image => (
           <MediaImage
+            across={p.width === 2}
+            put={(files, to) => void put(files, to)}
             act={act}
             among={view.images.map(i => i.image)}
             cards={p.cards}
@@ -143,8 +148,41 @@ function MediaImage(p: {
   seats: readonly SeatRecord[]
   onIntent: (intent: Intent) => void
   onTyping: (card: CardId) => void
+  /** Images sit two to a row: their edges are left and right. */
+  across: boolean
+  /** Files put as new images at a spot of the column. */
+  put: (files: readonly File[], to: ImagesTarget) => void
 }) {
   const { image } = p
+  const figure = useRef<HTMLElement>(null)
+  // Which edge of the image a point is at.
+  const edgeAt = (at: { x: number; y: number }) => {
+    const el = figure.current
+    return el === null
+      ? "onto"
+      : imageEdge(at, el.getBoundingClientRect(), p.across)
+  }
+  // A file dropped at an edge is a new image there; onto the image, a
+  // version of it. While one is dragged over, its edge is drawn.
+  const fileDrop = fileDropAtProps(
+    (files, at) => {
+      const spot = imageSpot(image.image, edgeAt(at), p.among)
+      if (spot.kind === "version") void version(files)
+      else
+        p.put(files, {
+          kind: "image-at",
+          column: p.column,
+          before: spot.before,
+        })
+    },
+    at => {
+      const el = figure.current
+      if (el === null) return
+      const edge = at === null ? "onto" : edgeAt(at)
+      if (edge === "onto") delete el.dataset.dropEdge
+      else el.dataset.dropEdge = edge
+    },
+  )
   const newest = image.versions.length - 1
   // Which version is drawn: the newest until the reader steps back.
   const [step, setStep] = useState<number | null>(null)
@@ -170,15 +208,14 @@ function MediaImage(p: {
     <figure
       className="media-image"
       data-card={image.image}
+      ref={figure}
       {...(writable
         ? {
-            ...fileDropProps(files => {
-              void version(files)
-            }),
+            ...fileDrop,
             ...dropProps({
               kind: "images",
               column: p.column,
-              before: image.image,
+              on: { image: image.image, edge: "onto" },
             }),
           }
         : {})}

@@ -14,7 +14,7 @@ import { canvasCard } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import { mintContainer } from "./containers.ts"
 import { imagesIn } from "./media.ts"
-import { planMoveTargets } from "./moves.ts"
+import { planMove, planMoveTargets } from "./moves.ts"
 import { afterSteps } from "./place-steps.ts"
 import {
   type PutImageAsk,
@@ -90,7 +90,7 @@ describe("putting images", () => {
     const step = planPutImages({
       cards: base,
       images: [{ card: image(1), image: ref("a") }],
-      to: { kind: "image", column: COLUMN },
+      to: { kind: "image-at", column: COLUMN, before: null },
       sender: ADA,
       now: 1,
       newContainer,
@@ -99,7 +99,7 @@ describe("putting images", () => {
     const next = planPutImages({
       cards: afterSteps(base, step.steps),
       images: [{ card: image(2), image: ref("b") }],
-      to: { kind: "image", column: COLUMN },
+      to: { kind: "image-at", column: COLUMN, before: null },
       sender: ADA,
       now: 2,
       newContainer,
@@ -107,6 +107,82 @@ describe("putting images", () => {
     if (next.kind !== "steps") throw new Error(next.code)
     const after = afterSteps(afterSteps(base, step.steps), next.steps)
     expect(imagesIn(after, COLUMN).map(i => i.id)).toEqual([image(1), image(2)])
+  })
+
+  test("images put before an image land just before it, in their order", () => {
+    const first = planPutImages({
+      cards: base,
+      images: [{ card: image(1), image: ref("a") }],
+      to: { kind: "image-at", column: COLUMN, before: null },
+      sender: ADA,
+      now: 1,
+      newContainer,
+    })
+    if (first.kind !== "steps") throw new Error(first.code)
+    const one = afterSteps(base, first.steps)
+    const next = planPutImages({
+      cards: one,
+      images: [
+        { card: image(2), image: ref("b") },
+        { card: image(3), image: ref("c") },
+      ],
+      to: { kind: "image-at", column: COLUMN, before: image(1) },
+      sender: ADA,
+      now: 2,
+      newContainer,
+    })
+    if (next.kind !== "steps") throw new Error(next.code)
+    expect(
+      imagesIn(afterSteps(one, next.steps), COLUMN).map(i => i.id),
+    ).toEqual([image(2), image(3), image(1)])
+  })
+
+  test("an image moved to a spot in another column lands just before the image named there", () => {
+    const OTHER = cardIdOfKind("media", uuid(2))
+    const other = makeCard(
+      "media",
+      OTHER,
+      { kind: "canvas", canvas: CANVAS, order: "n", width: 1 },
+      NO_CONTENT,
+      ADA,
+    )
+    const at = (n: number, column: typeof COLUMN, order: string) =>
+      makeCard(
+        "image",
+        image(n),
+        { kind: "image", column, order },
+        { versions: [{ ...ref("a"), by: ADA, at: 1 }] },
+        ADA,
+      )
+    const cards = [
+      ...base,
+      other,
+      at(1, COLUMN, "0000000005"),
+      at(2, OTHER, "0000000005"),
+      at(3, OTHER, "0000000009"),
+    ]
+    const resolved = planMoveTargets({
+      cards,
+      moves: [
+        {
+          card: image(1),
+          from: { kind: "image", column: COLUMN },
+          to: { kind: "image-at", column: OTHER, before: image(3) },
+        },
+      ],
+      sender: ADA,
+      newContainer,
+      entryThreads: new Map(),
+    })
+    if (resolved.kind !== "resolved") throw new Error(resolved.code)
+    const [move] = resolved.moves
+    const step = move === undefined ? null : planMove(cards, move, ADA)
+    if (step?.kind !== "write") throw new Error("no move")
+    expect(imagesIn(afterSteps(cards, [step]), OTHER).map(i => i.id)).toEqual([
+      image(2),
+      image(1),
+      image(3),
+    ])
   })
 
   test("a trashed media column, or none, takes none", () => {
@@ -119,7 +195,7 @@ describe("putting images", () => {
         planPutImages({
           cards,
           images: [{ card: image(1), image: ref("a") }],
-          to: { kind: "image", column: COLUMN },
+          to: { kind: "image-at", column: COLUMN, before: null },
           sender: ADA,
           now: 1,
           newContainer,
@@ -242,7 +318,7 @@ describe("an agent's put_image ask", () => {
       intent: {
         kind: "put-images",
         images: [{ card: image(1), sha256: sha("b"), name: "shot.png" }],
-        to: { kind: "image", column: COLUMN },
+        to: { kind: "image-at", column: COLUMN, before: null },
         made: null,
       },
       columnTitle: null,

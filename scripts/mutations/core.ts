@@ -1111,16 +1111,16 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a spot on a canvas forgets the card it goes after",
     file: places,
-    from: '        column: place.after ?? "",\n      })\n    case "back":',
-    to: '        column: "",\n      })\n    case "back":',
+    from: '        column: place.after ?? "",\n      })\n    case "image-at":',
+    to: '        column: "",\n      })\n    case "image-at":',
     command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
     expect: "a move's target may be a spot on a canvas",
   },
   {
     name: "a row is written with a field its kind does not store",
     file: places,
-    from: '        column: place.after ?? "",\n      })\n    case "back":',
-    to: '        column: place.after ?? "",\n        order: "",\n      })\n    case "back":',
+    from: '        column: place.after ?? "",\n      })\n    case "image-at":',
+    to: '        column: place.after ?? "",\n        order: "",\n      })\n    case "image-at":',
     // tsc names no failing check (`failingChecks`): with typecheck clean,
     // any error is the mutant's.
     command: ["pnpm", "exec", "tsc", "--noEmit"],

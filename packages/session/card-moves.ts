@@ -372,6 +372,9 @@ export function drawnPlace(
       return now?.place.kind === "trash" ? now.place.left : undefined
     case "new-canvas":
       return { kind: "canvas", canvas: key.canvas, order: LAST_ORDER, width: 1 }
+    // Drawn at its column's end until the host ranks it.
+    case "image-at":
+      return { kind: "image", column: key.column, order: LAST_ORDER }
     // Drawn at the rank the host would give it there.
     case "canvas-at":
       return {

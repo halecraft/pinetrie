@@ -497,7 +497,7 @@ export function decodeCommand(
     if (
       first === undefined ||
       to === undefined ||
-      (to.kind !== "canvas-at" && to.kind !== "image") ||
+      (to.kind !== "canvas-at" && to.kind !== "image-at") ||
       !Array.isArray(blobs) ||
       blobs.length !== moves.length
     )

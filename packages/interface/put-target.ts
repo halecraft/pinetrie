@@ -31,6 +31,7 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import type { Focus } from "./focus.ts"
+import type { ImageEdge } from "./image-edge.ts"
 
 export type PutTarget =
   /**
@@ -42,14 +43,15 @@ export type PutTarget =
   /** A note column: a note at its end. */
   | { readonly kind: "notes"; readonly column: NoteColumnId }
   /**
-   * A media column: its end, or, onto an image of it, `before` that image.
-   * An image moved there takes that spot; a stored image dropped onto an
-   * image is a version of it, and anywhere else on the column a new image.
+   * A media column: its end, or, on an image of it, that image's `edge`
+   * (`imageEdge`): before or after it a spot for an image, onto it a version
+   * of it (`imageSpot`). A drop zone marks the image alone; the drag reads
+   * the edge from where the pointer is.
    */
   | {
       readonly kind: "images"
       readonly column: MediaId
-      readonly before: ImageId | null
+      readonly on: { readonly image: ImageId; readonly edge: ImageEdge } | null
     }
   /**
    * A spot on a canvas, just after `after` (first for null), where
@@ -106,7 +108,7 @@ const PUT_NOTES = "data-put-notes"
 /** The attribute a media column and each of its images carry: the column's id. */
 const PUT_IMAGES = "data-put-images"
 /** Beside `PUT_IMAGES` on an image: the image's id. */
-const PUT_BEFORE = "data-put-before"
+const PUT_ON = "data-put-on"
 /** The attribute a spot on a canvas carries: its canvas. */
 const PUT_CANVAS = "data-put-canvas"
 /** Beside `PUT_CANVAS`: the card the spot is after, absent for first. */
@@ -140,9 +142,9 @@ export function dropProps(target: PutTarget): Readonly<Record<string, string>> {
     case "notes":
       return { [PUT_NOTES]: target.column }
     case "images":
-      return target.before === null
+      return target.on === null
         ? { [PUT_IMAGES]: target.column }
-        : { [PUT_IMAGES]: target.column, [PUT_BEFORE]: target.before }
+        : { [PUT_IMAGES]: target.column, [PUT_ON]: target.on.image }
     case "canvas":
       return target.after === null
         ? { [PUT_CANVAS]: target.canvas }
@@ -186,9 +188,11 @@ export function targetOfElement(el: {
     return { kind: "notes", column: notes }
   const images = el.getAttribute(PUT_IMAGES)
   if (images !== null && isMediaId(images)) {
-    const before = el.getAttribute(PUT_BEFORE)
-    if (before === null) return { kind: "images", column: images, before: null }
-    return isImageId(before) ? { kind: "images", column: images, before } : null
+    const image = el.getAttribute(PUT_ON)
+    if (image === null) return { kind: "images", column: images, on: null }
+    return isImageId(image)
+      ? { kind: "images", column: images, on: { image, edge: "onto" } }
+      : null
   }
   const id = el.getAttribute(PUT_CANVAS)
   if (id !== null && isCanvasId(id)) {

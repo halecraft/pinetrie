@@ -404,6 +404,12 @@ export {
   renameProblem,
 } from "./identity.ts"
 export {
+  EDGE_BAND_PX,
+  type ImageEdge,
+  imageEdge,
+  imageSpot,
+} from "./image-edge.ts"
+export {
   type Inbox,
   type InboxItem,
   inboxMentions,

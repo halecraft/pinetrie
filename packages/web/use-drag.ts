@@ -39,6 +39,7 @@ import {
   type Intent,
   type IntentState,
   ITEM_HOVER_MS,
+  imageEdge,
   landingIn,
   NOT_A_HANDLE,
   type PutHow,
@@ -121,6 +122,20 @@ function nextRowCanvas(row: HTMLElement): CanvasId | null {
 const parsedCanvas = (id: string | undefined): CanvasId | null =>
   id !== undefined && isCanvasId(id) ? id : null
 
+/**
+ * The edge of an image a drag lands at, drawn as a line: before or after it,
+ * and before it for an image card dropped onto one, which moves there; null
+ * onto it for a stored image, a version, and anywhere else.
+ */
+function landingEdge(at: DragAt): "before" | "after" | null {
+  if (at.kind === "canvas" || at.over.kind !== "put") return null
+  const { target } = at.over
+  if (target.kind !== "images" || target.on === null) return null
+  const { edge } = target.on
+  if (edge !== "onto") return edge
+  return at.kind === "card" ? "before" : null
+}
+
 /** Set a style property only when it changes. */
 const write = (
   el: HTMLElement,
@@ -191,6 +206,7 @@ export function useDrag(input: {
     const unmark = (el: HTMLElement) => {
       delete el.dataset.planDrop
       delete el.dataset.rootDrop
+      delete el.dataset.dropEdge
     }
     const mark = (el: HTMLElement | null, value: DropMark | null) => {
       if (el === marked && value === markedAs) return
@@ -307,6 +323,22 @@ export function useDrag(input: {
           el: zone,
         }
       }
+      // On an image of a media column: which edge, from where the pointer is.
+      if (target.kind === "images" && target.on !== null) {
+        const box = zone.getBoundingClientRect()
+        const across =
+          zone.closest<HTMLElement>(".media-images")?.dataset.width === "2"
+        return {
+          over: {
+            kind: "put",
+            target: {
+              ...target,
+              on: { ...target.on, edge: imageEdge({ x, y }, box, across) },
+            },
+          },
+          el: zone,
+        }
+      }
       return { over: { kind: "put", target }, el: zone }
     }
 
@@ -348,7 +380,29 @@ export function useDrag(input: {
       if (p.handle.style.getPropertyValue("--lean") !== lean)
         p.handle.style.setProperty("--lean", lean)
       mark(seen.el, plan.mark)
+      // Where on an image it lands: a line at the edge it goes before or
+      // after; onto it, the image's outline alone.
+      const edge = landingEdge(seen.at)
+      if (seen.el !== null && (seen.el.dataset.dropEdge ?? null) !== edge) {
+        if (edge === null) delete seen.el.dataset.dropEdge
+        else seen.el.dataset.dropEdge = edge
+      }
       setHover(plan.opens, seen.el)
+      // A media column scrolls near its top and bottom while an image is
+      // over it, so an image goes past what the column shows.
+      const images =
+        seen.at.kind !== "canvas" &&
+        seen.at.over.kind === "put" &&
+        seen.at.over.target.kind === "images"
+          ? (seen.el
+              ?.closest<HTMLElement>(".media-column")
+              ?.querySelector<HTMLElement>(".media-images") ?? null)
+          : null
+      if (images !== null) {
+        const box = images.getBoundingClientRect()
+        const by = edgeScroll(y, box.top, box.bottom)
+        if (by !== 0) images.scrollTop += by
+      }
       // The strip scrolls near its edges while a column is over it.
       if (
         p.strip !== null &&

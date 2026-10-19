@@ -18,7 +18,7 @@ import { NEW_MEDIA_TITLE } from "./canvas.ts"
 import { cardsOnCanvas } from "./canvas-index.ts"
 import type { CardTitleRecord } from "./card-title.ts"
 import type { MintContainer } from "./containers.ts"
-import { mediaColumnEnd } from "./media.ts"
+import { rankInColumn } from "./media.ts"
 import { type MovesStep, planMoveTargets } from "./moves.ts"
 import {
   afterSteps,
@@ -40,7 +40,7 @@ export type VersionBlobs = ImageRef & { readonly original: Sha256 }
  * New images, as one step of their sender's history: to a spot on a canvas,
  * the first resolved as any card dropped there (`planMoveTargets`), which
  * makes a media column for it (`WRAPS`), the rest after it in that column; or
- * to a media column's end. Each is made through `planMake`, its one version
+ * to a spot among a media column's images, in their order. Each is made through `planMake`, its one version
  * added by `sender` at `now`. Refused `no-place` for a column that is
  * trashed or has no record, and as a make would be.
  */
@@ -55,7 +55,10 @@ export function planPutImages(input: {
   const [first] = input.images
   if (first === undefined) return { kind: "steps", steps: [] }
   const steps: PlaceStep[] = []
+  // Where the images go: a spot among a column's, or a media column made at
+  // a spot on a canvas, at its end.
   let column: MediaId
+  let before: ImageId | null
   if (input.to.kind === "canvas-at") {
     const resolved = planMoveTargets({
       cards: input.cards,
@@ -70,21 +73,29 @@ export function planPutImages(input: {
       return { kind: "refused", code: "no-place", now: null }
     steps.push(...resolved.first)
     column = to.column
+    before = null
   } else {
     const { to } = input
     const held = input.cards.find(c => c.id === to.column)
     if (held === undefined || held.place.kind === "trash")
       return { kind: "refused", code: "no-place", now: null }
     column = to.column
+    before = to.before
   }
   let now = afterSteps(input.cards, steps)
+  // Each just before the same image, so they keep their order.
   for (const image of input.images) {
+    const ranked = rankInColumn(now, image.card, column, before)
+    const respaced = ranked.respaced.map(
+      (record): PlaceStep => ({ kind: "write", record }),
+    )
+    now = afterSteps(now, respaced)
     const made = planMake(
       now,
       makeCard(
         "image",
         image.card,
-        mediaColumnEnd(now, column),
+        { kind: "image", column, order: ranked.order },
         {
           versions: [{ ...image.image, by: input.sender, at: input.now }],
         },
@@ -93,7 +104,7 @@ export function planPutImages(input: {
       input.sender,
     )
     if (made.kind === "refused") return made
-    steps.push(made)
+    steps.push(...respaced, made)
     now = afterSteps(now, [made])
   }
   return { kind: "steps", steps }
@@ -228,7 +239,7 @@ export function planImageAsk(input: {
       intent: {
         kind: "put-images",
         images,
-        to: { kind: "image", column: found.id },
+        to: { kind: "image-at", column: found.id, before: null },
         made: null,
       },
       columnTitle: null,

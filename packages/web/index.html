@@ -926,6 +926,13 @@
       .card-images { display: grid; grid-template-columns: 1fr 1fr; gap: .3rem; }
       .card-image { display: block; width: 100%; height: auto; }
       body[data-card-drag] .media-column { outline: 1px dashed #6f7784; outline-offset: -2px; }
+      /* Where an image lands on an image's edge: a line before or after it,
+         above and below in a column one image wide, left and right in one
+         two wide (`imageEdge`). */
+      .media-image[data-drop-edge="before"] { box-shadow: 0 -3px 0 #8ab4f8; }
+      .media-image[data-drop-edge="after"] { box-shadow: 0 3px 0 #8ab4f8; }
+      .media-images[data-width="2"] .media-image[data-drop-edge="before"] { box-shadow: -3px 0 0 #8ab4f8; }
+      .media-images[data-width="2"] .media-image[data-drop-edge="after"] { box-shadow: 3px 0 0 #8ab4f8; }
       body[data-card-drag] .note-column { outline: 1px dashed #6f7784; outline-offset: -2px; }
       /* While a card is dragged, the places it can become a thread (ADR-0111):
          a workflow state, on the board or the footer's strip, and the sidebar. */

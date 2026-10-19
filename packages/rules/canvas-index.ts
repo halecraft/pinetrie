@@ -232,6 +232,9 @@ export function canvasOfTarget(
     case "canvas-at":
     case "new-canvas":
       return to.canvas
+    // An image's spot is in its column's canvas.
+    case "image-at":
+      return canvases.canvasOfCard.get(to.column) ?? null
     // A restore's canvas is its card's, read from where the card is.
     case "back":
       return null

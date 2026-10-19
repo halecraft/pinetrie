@@ -15,8 +15,10 @@ import {
   type Sha256,
   type WorkflowStateId,
 } from "@pinetrie/core"
+import { imagesIn } from "@pinetrie/rules"
 import { type Landing, type PutHow, putLanding } from "./card-intents.ts"
 import type { IntentState } from "./effects.ts"
+import { imageSpot } from "./image-edge.ts"
 import type { Intent } from "./intent.ts"
 import type { PutTarget } from "./put-target.ts"
 import { landing, neighbourShifts } from "./reorder.ts"
@@ -164,7 +166,7 @@ export function planDrop(
     const intent = planRootDrop(at.drag, over.target, from.archive, from.home)
     return intent === null ? NOTHING : { kind: "root", intent }
   }
-  if (at.kind === "image") return imageDrop(at, at.over)
+  if (at.kind === "image") return imageDrop(at, at.over, state)
   const { over } = at
   switch (over.kind) {
     case "strip":
@@ -193,24 +195,41 @@ export function planDrop(
  * a version of it; elsewhere on one, a new image at its end; at a spot on a
  * canvas, a new image in a media column made there. Nothing anywhere else.
  */
-function imageDrop(image: ImageSource, over: CardOver): PlannedDrop {
+function imageDrop(
+  image: ImageSource,
+  over: CardOver,
+  state: IntentState,
+): PlannedDrop {
   if (over.kind !== "put") return NOTHING
   const { target } = over
   const { sha256, name } = image
   switch (target.kind) {
-    case "images":
+    case "images": {
+      const spot =
+        target.on === null
+          ? ({ kind: "spot", before: null } as const)
+          : imageSpot(
+              target.on.image,
+              target.on.edge,
+              imagesIn(state.cards.cards, target.column).map(c => c.id),
+            )
       return {
         kind: "image",
         intent:
-          target.before === null
-            ? {
+          spot.kind === "version"
+            ? { kind: "addVersion", image: spot.image, sha256 }
+            : {
                 kind: "putStored",
                 sha256,
                 name,
-                to: { kind: "image", column: target.column },
-              }
-            : { kind: "addVersion", image: target.before, sha256 },
+                to: {
+                  kind: "image-at",
+                  column: target.column,
+                  before: spot.before,
+                },
+              },
       }
+    }
     case "canvas":
       return {
         kind: "image",

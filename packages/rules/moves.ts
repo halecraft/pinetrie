@@ -37,7 +37,7 @@ import type { Workflow } from "./board.ts"
 import { planCanvasOpening, rankOnCanvas } from "./canvas-index.ts"
 import { type MintContainer, makeContainer } from "./containers.ts"
 import { marginEnd } from "./margin.ts"
-import { mediaColumnEnd } from "./media.ts"
+import { mediaColumnEnd, rankInColumn } from "./media.ts"
 import { noteColumnEnd, toNotes } from "./notes.ts"
 import { orderAfter } from "./order.ts"
 import {
@@ -93,11 +93,14 @@ function placeAt(
         cards.filter(c => c.id !== now?.id),
         key.column,
       )
+    // At the rank it was given there (`planMoveTargets`), else at the end.
     case "image":
-      return mediaColumnEnd(
-        cards.filter(c => c.id !== now?.id),
-        key.column,
-      )
+      return "order" in key
+        ? { kind: "image", column: key.column, order: key.order }
+        : mediaColumnEnd(
+            cards.filter(c => c.id !== now?.id),
+            key.column,
+          )
     case "margin":
       return marginEnd(
         cards.filter(c => c.id !== now?.id),
@@ -420,7 +423,10 @@ export function pastedCard(
  *   no canvas takes lands in the container its kind is made in there
  *   (`WRAPS`): a text card or a reference as the first note of a note
  *   column made at that rank, an image as the first of a media column,
- *   written first.
+ *   written first;
+ * - a spot among a media column's images (`image-at`), ranked just before its
+ *   `before`, or at the end when that image is no longer there
+ *   (`rankInColumn`), the images given new ranks to make room written first.
  *
  * A move into an entry's margin is refused `no-place` unless the
  * margin names the thread its entry is in (`entryThreads`): a margin's canvas
@@ -506,6 +512,21 @@ export function planMoveTargets(input: {
         first.push(made.step)
         now = afterSteps(now, [made.step])
         moves.push({ ...move, to: placeKey(made.place) })
+        break
+      }
+      // A spot among a media column's images: ranked just before its image,
+      // the images given new ranks to make room written first.
+      case "image-at": {
+        const ranked = rankInColumn(now, move.card, to.column, to.before)
+        const respaced = ranked.respaced.map(
+          (record): PlaceStep => ({ kind: "write", record }),
+        )
+        first.push(...respaced)
+        now = afterSteps(now, respaced)
+        moves.push({
+          ...move,
+          to: { kind: "image", column: to.column, order: ranked.order },
+        })
         break
       }
       case "margin": {

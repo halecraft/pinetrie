@@ -560,10 +560,13 @@ set `data-card-drag`.
   a media column is a card (its `.media-image-grip`); a stored image a
   message, a tool's row or the pane draws (`BlobImage`, the pane's `<img>`)
   is an `image` source, by its blob. Either lands on a media column's
-  images (`data-put-images`, and `data-put-before` on an image), and
-  between columns at the strip's gap the pointer is in (`spots`, measured
-  at the press, `cardBeforeGap`), as a file dropped there lands, unless a
-  media column takes it. Only a column's own handle drags its column: a
+  images (`data-put-images`, and `data-put-on` on an image, whose edge the
+  engine reads from the pointer, `imageEdge`, and draws as
+  `data-drop-edge`), and between columns at the strip's gap the pointer is
+  in (`spots`, measured at the press, `cardBeforeGap`), as a file dropped
+  there lands, unless a media column takes it. A media column's images
+  scroll near their top and bottom while an image is over them
+  (`edgeScroll`). Only a column's own handle drags its column: a
   card inside it (a dock's card, an image) moves alone.
 - **What the first frame needs is armed at the press**, before the 5 px
   threshold (`DRAG_START`): the strip's box, the columns' widths and
@@ -1181,7 +1184,9 @@ the session sends moves and draws them until its copy holds them
   written on, and says so under a newer one, `commentVersionWords`). Files
   dropped on the column are uploaded (`image-upload.ts` over `uploadBlob`),
   the images kept, and put at its end (`putImages`); one dropped on an image
-  is a version (`addVersion`). It, and the strip, say how many files a drop
+  is a version (`addVersion`), or at its edge a new image before or after it
+  (`fileDropAtProps` hands the point, and its `onOver` the point while a
+  file is over, which draws the edge). It, and the strip, say how many files a drop
   left out (`leftOutWords`). The pane's put is a split button
   (`putOnCanvasButton`): a new column after the thread, or one of the
   canvas's media columns from its ▾.

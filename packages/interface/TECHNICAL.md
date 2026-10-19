@@ -1956,11 +1956,16 @@ values; the engine gathers and applies.
 - **A stored image is a source too** (`ImageSource`, ADR-0182): a blob a
   message, a tool's row or the pane draws, with the name it is put under.
   It is over what a card is (`CardOver`), and lands only on a media column
-  (`images` target: a new image at its end, or onto an image a version of
-  it, `addVersion`) or at a spot on a canvas (`putStored`, a media column
-  made there), marked `copy`. An image card put on an image of its own
-  column is a reorder before it; on another media column, a move to its
-  end (`putImage`, `card-intents.ts`).
+  or at a spot on a canvas (`putStored`, a media column made there),
+  marked `copy`. On a media column (`images` target) it lands by the image
+  under it and that image's edge (`image-edge.ts`: `imageEdge`, a fixed
+  band at each edge, `EDGE_BAND_PX` or a quarter of a small image, along
+  its height, or its width two to a row; `imageSpot` turns it into a spot):
+  onto the image, a version of it (`addVersion`); at an edge, a new image
+  just before it or before the next (`image-at`); on the column, at its end.
+  An image card lands the same way, onto an image meaning just before it:
+  a reorder in its own column, a move to that spot in another
+  (`putImage`, `card-intents.ts`).
 - **A drag is its source paired with what that kind can be over**
   (`DragAt`): a card over the strip, a drop zone or ▦ (`CardOver`), a canvas
   over a place among canvases (`CanvasOver`). A canvas's drag cannot be over a

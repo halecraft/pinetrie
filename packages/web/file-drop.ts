@@ -20,22 +20,27 @@ const bringsFiles = (data: DataTransfer | null): boolean =>
  */
 export function fileDropProps(onFiles: (files: File[]) => void): {
   readonly onDragOver: (e: DragEvent) => void
+  readonly onDragLeave: (e: DragEvent) => void
   readonly onDrop: (e: DragEvent) => void
 } {
   return fileDropAtProps(onFiles)
 }
 
+/** A point in the window. */
+type Point = { readonly x: number; readonly y: number }
+
 /**
  * `fileDropProps`, its drop also handing `onFiles` the point it was dropped
- * at, in the window: where on the strip a drop lands depends on it.
+ * at, in the window: where on the strip or on an image a drop lands depends
+ * on it. `onOver`, given, hears the point while files are dragged over the
+ * element, and null once they leave it or are dropped.
  */
 export function fileDropAtProps(
-  onFiles: (
-    files: File[],
-    at: { readonly x: number; readonly y: number },
-  ) => void,
+  onFiles: (files: File[], at: Point) => void,
+  onOver?: (at: Point | null) => void,
 ): {
   readonly onDragOver: (e: DragEvent) => void
+  readonly onDragLeave: (e: DragEvent) => void
   readonly onDrop: (e: DragEvent) => void
 } {
   return {
@@ -44,11 +49,17 @@ export function fileDropAtProps(
       e.preventDefault()
       e.stopPropagation()
       e.dataTransfer.dropEffect = "copy"
+      onOver?.({ x: e.clientX, y: e.clientY })
+    },
+    onDragLeave: e => {
+      if (!e.currentTarget.contains(e.relatedTarget as Node | null))
+        onOver?.(null)
     },
     onDrop: e => {
       if (!bringsFiles(e.dataTransfer)) return
       e.preventDefault()
       e.stopPropagation()
+      onOver?.(null)
       const files = pastedFiles(e.dataTransfer)
       if (files.length > 0) onFiles(files, { x: e.clientX, y: e.clientY })
     },

@@ -319,16 +319,34 @@ export interface CanvasTarget {
   readonly after: CardId | null
 }
 
-/** Where a put sends new images: a spot on a canvas, or a media column's end. */
-export type ImagesTarget =
-  | CanvasTarget
-  | Extract<PlaceKey, { readonly kind: "image" }>
+/**
+ * A spot among a media column's images: a move's target alone, never where a
+ * card is: just before the image `before`, or with null at the column's end.
+ * The host ranks it there (`planMoveTargets`); a `before` no longer in the
+ * column lands it at the end, a hint and not a compare-and-set.
+ */
+export interface ImageTarget {
+  readonly kind: "image-at"
+  readonly column: MediaId
+  readonly before: ImageId | null
+}
+
+/** Where a put sends new images: a spot on a canvas, or one among a media column's. */
+export type ImagesTarget = CanvasTarget | ImageTarget
+
+/** An image's place with the rank a spot was given there (`ImageTarget`, resolved). */
+export interface RankedImage {
+  readonly kind: "image"
+  readonly column: MediaId
+  readonly order: string
+}
 
 /** Where a move sends a card: a place's key, a thread's nearest notes, or a spot on a canvas. */
 export type MoveTarget =
   | PlaceKey
   | NotesTarget
   | CanvasTarget
+  | ImageTarget
   | BackTarget
   | NewCanvasTarget
 
@@ -471,6 +489,7 @@ export interface Move<To extends MoveTarget = MoveTarget> {
 export type ResolvedTarget =
   | Exclude<PlaceKey, { readonly kind: "canvas" | "board" }>
   | RankedCanvas
+  | RankedImage
 
 /**
  * A move to a place: every move the host plans, once a thread's nearest
@@ -803,6 +822,7 @@ const ROWS = {
   notes: ["lane", "canvas"],
   "canvas-pinned": ["canvas", "order"],
   "canvas-at": ["canvas", "column"],
+  "image-at": ["column", "at"],
   back: [],
   "new-canvas": ["canvas"],
   pinned: ["lane", "order"],
@@ -880,6 +900,8 @@ export function placeFields(place: CardPlace | MoveTarget): PlaceFields {
         canvas: place.canvas,
         column: place.after ?? "",
       })
+    case "image-at":
+      return row("image-at", { column: place.column, at: place.before ?? "" })
     case "back":
       return row("back", {})
     case "new-canvas":
@@ -963,6 +985,7 @@ function livePlaceOfFields(f: PlaceFields): LivePlace | undefined {
     case undefined:
     case "notes":
     case "canvas-at":
+    case "image-at":
     case "back":
     case "new-canvas":
       return undefined
@@ -1099,6 +1122,14 @@ export function targetOfFields(f: PlaceFields): MoveTarget | undefined {
         ? undefined
         : { kind: "canvas-at", canvas: r.canvas, after }
     }
+    case "image-at": {
+      if (!isMediaId(r.column)) return undefined
+      if (r.at === "")
+        return { kind: "image-at", column: r.column, before: null }
+      return isImageId(r.at)
+        ? { kind: "image-at", column: r.column, before: r.at }
+        : undefined
+    }
     case "back":
       return BACK
     case "new-canvas":
@@ -1234,11 +1265,18 @@ export type KeyOf<K extends CardKind> = Extract<
 const TARGET_PLACES = {
   notes: "note",
   "canvas-at": "canvas",
+  "image-at": "image",
   // Only a card a trash takes is ever in one to come back from.
   back: "trash",
   "new-canvas": "canvas",
 } as const satisfies Record<
-  (NotesTarget | CanvasTarget | BackTarget | NewCanvasTarget)["kind"],
+  (
+    | NotesTarget
+    | CanvasTarget
+    | ImageTarget
+    | BackTarget
+    | NewCanvasTarget
+  )["kind"],
   CardPlace["kind"]
 >
 
@@ -1282,7 +1320,7 @@ type TargetKindOf<K extends CardKind> =
 export type TargetOf<K extends CardKind> =
   | KeyOf<K>
   | Extract<
-      NotesTarget | CanvasTarget | BackTarget | NewCanvasTarget,
+      NotesTarget | CanvasTarget | ImageTarget | BackTarget | NewCanvasTarget,
       { readonly kind: TargetKindOf<K> }
     >
 
@@ -1316,6 +1354,7 @@ const placeKindOfTarget = (to: MoveTarget): CardPlace["kind"] => {
   switch (to.kind) {
     case "notes":
     case "canvas-at":
+    case "image-at":
     case "back":
     case "new-canvas":
       return TARGET_PLACES[to.kind]

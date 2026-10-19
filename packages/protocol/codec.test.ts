@@ -323,8 +323,9 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
         },
       ],
       to: {
-        kind: "image",
+        kind: "image-at",
         column: cardIdOfKind("media", "01a0ffd2-0000-7000-8000-0000000000a5"),
+        before: null,
       },
       made: null,
     },

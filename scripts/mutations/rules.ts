@@ -4489,8 +4489,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a put's images after the first make columns of their own",
     file: "packages/rules/put-images.ts",
-    from: "        mediaColumnEnd(now, column),\n",
-    to: '        { kind: "image", column: cardIdOfKind("media", image.card.slice(2)), order: "m" },\n',
+    from: '        { kind: "image", column, order: ranked.order },\n',
+    to: '        { kind: "image", column: `m-${image.card.slice(2)}` as typeof column, order: "m" },\n',
     command: unit,
     expect:
       "a spot on a canvas makes a media column there, the images in it in order, one version each",
@@ -4564,5 +4564,22 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "a media column lists its images; a note column gives its notes' texts",
+  },
+  {
+    name: "an image put before another lands after it",
+    file: "packages/rules/media.ts",
+    from: "  return rankAfter(here, at < 0 ? here.length - 1 : at - 1)\n",
+    to: "  return rankAfter(here, at < 0 ? here.length - 1 : at)\n",
+    command: unit,
+    expect: "images put before an image land just before it, in their order",
+  },
+  {
+    name: "an image moved to a spot lands at the column's end",
+    file: "packages/rules/moves.ts",
+    from: '      return "order" in key\n',
+    to: "      return false\n",
+    command: unit,
+    expect:
+      "an image moved to a spot in another column lands just before the image named there",
   },
 ]

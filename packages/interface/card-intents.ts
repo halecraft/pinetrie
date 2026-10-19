@@ -82,6 +82,7 @@ import {
   planOpenEntry,
   viewChangeEffect,
 } from "./effects.ts"
+import { imageSpot } from "./image-edge.ts"
 import type { ColumnAct } from "./intent.ts"
 import type { MessageAct } from "./message-tools.ts"
 import {
@@ -748,8 +749,9 @@ export const canvasSpot = (target: CanvasPut): CanvasTarget => ({
  */
 /**
  * An image put: on a canvas, in a media column made for it there
- * (`WRAPS`); in its own column, moved before the image it is dropped onto,
- * or to the end; in another media column, at that column's end.
+ * (`WRAPS`); in its own column, moved to the spot it is dropped at (onto an
+ * image, just before it), a reorder; in another media column, moved to that
+ * spot there.
  */
 function putImage(
   now: ImageCard,
@@ -770,29 +772,48 @@ function putImage(
   }
   if (target.kind !== "images") return []
   const how = { actedAt: atColumn(target.column), slot: null }
-  const at = { kind: "image", column: target.column } as const
-  if (now.place.kind !== "image" || now.place.column !== target.column)
-    return [moveCard(cardMove(now, at), how, true)]
   const among = imagesIn(state.cards.cards, target.column)
   const others = among.filter(c => c.id !== now.id)
+  // Onto an image is a version for a stored image; a card moves before it.
+  const spot =
+    target.on === null
+      ? ({ kind: "spot", before: null } as const)
+      : imageSpot(
+          target.on.image,
+          target.on.edge,
+          among.map(c => c.id),
+        )
+  const before = spot.kind === "version" ? spot.image : spot.before
+  if (before === now.id) return []
+  if (now.place.kind !== "image" || now.place.column !== target.column)
+    return [
+      moveCard(
+        cardMove(now, { kind: "image-at", column: target.column, before }),
+        how,
+        true,
+      ),
+    ]
   const to =
-    target.before === null
-      ? others.length
-      : others.findIndex(c => c.id === target.before)
-  if (to < 0 || target.before === now.id) return []
+    before === null ? others.length : others.findIndex(c => c.id === before)
+  if (to < 0) return []
   const after = others[to - 1]?.id ?? null
-  const before = others[to]?.id ?? null
+  const next = others[to]?.id ?? null
   const was = among.findIndex(c => c.id === now.id)
   // Where it already is: between the same two images.
   if (
     (among[was - 1]?.id ?? null) === after &&
-    (among[was + 1]?.id ?? null) === before
+    (among[was + 1]?.id ?? null) === next
   )
     return []
   return [
     {
       kind: "reorderCard",
-      reorder: { card: now.id, at, after, before },
+      reorder: {
+        card: now.id,
+        at: { kind: "image", column: target.column },
+        after,
+        before: next,
+      },
       how,
     },
   ]

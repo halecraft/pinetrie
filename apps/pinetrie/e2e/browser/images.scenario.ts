@@ -478,6 +478,16 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           media.reorderedDetail,
         )
         check(
+          "a file dropped on an image's top edge is a new image before it",
+          media.inserted,
+          media.insertedDetail,
+        )
+        check(
+          "an image dragged to the next one's bottom edge lands after it",
+          media.after,
+          media.afterDetail,
+        )
+        check(
           "the pane's put on canvas makes a media column after its thread",
           media.paned,
           media.panedDetail,
@@ -673,6 +683,16 @@ async function mediaColumns(
   textFile: string,
   messageImage: string,
 ) {
+  // Tall enough that the images a drag moves among sit clear of the bands
+  // where a media column scrolls under a drag (`edgeScroll`).
+  const viewport = pp.viewportSize()
+  await pp.setViewportSize({ width: viewport?.width ?? 1440, height: 1400 })
+  /** The media column's images scrolled to their top. */
+  const toTop = () =>
+    pp.evaluate(() => {
+      const images = document.querySelector(".media-column .media-images")
+      if (images !== null) images.scrollTop = 0
+    })
   const dir = mkdtempSync(path.join(tmpdir(), "pinetrie-media-"))
   const wide = path.join(dir, "wide.png")
   const tall = path.join(dir, "tall.png")
@@ -758,6 +778,7 @@ async function mediaColumns(
       .locator(".media-column .media-image")
       .evaluateAll(els => els.map(e => e.getAttribute("data-card")))
   const before = await order()
+  await toTop()
   await pointerDrag(
     ".media-column .media-image:nth-child(2) .media-image-grip",
     ".media-column .media-image:nth-child(1) img",
@@ -765,6 +786,64 @@ async function mediaColumns(
   const reordered = await until(async () => {
     const now = await order()
     return now.length === 2 && now[0] === before[1] && now[1] === before[0]
+  })
+  // A file dropped on the first image's top edge: a new image before it.
+  const edgeOf = async (sel: string, edge: "top" | "bottom") => {
+    await pp
+      .locator(sel)
+      .first()
+      .scrollIntoViewIfNeeded({ timeout: 5_000 })
+      .catch(() => {})
+    const b = await pp
+      .locator(sel)
+      .first()
+      .boundingBox({ timeout: 5_000 })
+      .catch(() => null)
+    return b === null
+      ? { x: 0, y: 0 }
+      : {
+          x: b.x + b.width / 2,
+          y: edge === "top" ? b.y + 4 : b.y + b.height - 4,
+        }
+  }
+  const twoBefore = await order()
+  const top = await edgeOf(".media-column .media-image:nth-child(1)", "top")
+  await fileDrop(top.x, top.y, [wide])
+  const inserted = await until(async () => {
+    const now = await order()
+    return (
+      now.length === 3 &&
+      !twoBefore.includes(now[0] ?? null) &&
+      now[1] === twoBefore[0] &&
+      now[2] === twoBefore[1]
+    )
+  })
+  // The new first image dragged to the next one's bottom edge: after it.
+  const threeBefore = await order()
+  await toTop()
+  const grip = await visible(
+    ".media-column .media-image:nth-child(1) .media-image-grip",
+  )
+  const next = await pp
+    .locator(".media-column .media-image:nth-child(2)")
+    .boundingBox({ timeout: 5_000 })
+    .catch(() => null)
+  if (grip !== null && next !== null) {
+    await pp.mouse.move(grip.x, grip.y)
+    await pp.mouse.down()
+    await pp.mouse.move(next.x + next.width / 2, next.y + next.height - 4, {
+      steps: 12,
+    })
+    await pp.mouse.up()
+  }
+  const after = await until(async () => {
+    const now = await order()
+    return (
+      now.length === 3 &&
+      now[0] === threeBefore[1] &&
+      now[1] === threeBefore[0] &&
+      now[2] === threeBefore[2]
+    )
   })
   // The pane's put: a second media column, just after the thread.
   await pp.click(messageImage)
@@ -778,6 +857,7 @@ async function mediaColumns(
     .locator("#strip > [data-card]")
     .evaluateAll(els => els.map(e => e.getAttribute("data-kind")))
   await pp.keyboard.press("Escape")
+  if (viewport !== null) await pp.setViewportSize(viewport)
   return {
     made: made && title === "wide.png" && left?.includes("1 file") === true,
     madeDetail: `made ${made}, title ${JSON.stringify(title)}, left ${JSON.stringify(left)}`,
@@ -786,7 +866,11 @@ async function mediaColumns(
     versioned,
     versionedDetail: `versioned ${versioned}`,
     reordered,
-    reorderedDetail: `before ${JSON.stringify(before)}, after ${JSON.stringify(await order())}`,
+    reorderedDetail: `before ${JSON.stringify(before)}`,
+    inserted,
+    insertedDetail: `before ${JSON.stringify(twoBefore)}`,
+    after,
+    afterDetail: `before ${JSON.stringify(threeBefore)}`,
     paned: paned && strip[1] === "media",
     panedDetail: `strip ${JSON.stringify(strip)}`,
   }

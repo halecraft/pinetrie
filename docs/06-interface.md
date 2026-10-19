@@ -1217,8 +1217,12 @@ The rail is E; the column is T. Seeing both at once is the product.
   back through them, ◀ and ▶ and a drag to move it, a bin, and its
   comments, which say "on version 2" under a newer one. Files dropped
   between columns make one there, on a column put new images at its end,
-  and on an image add a version; a file that is no image is left out, and
-  said so. An image dragged out of a message, a tool's row or the pane
+  and on an image add a version; at an image's edge (a band of 24 px, or a
+  quarter of a small image: top and bottom, or left and right two to a
+  row) they go before or after it, a line drawn where. A file that is no
+  image is left out, and said so. An image dragged to an image's edge moves
+  there, in its column or another; the column scrolls near its top and
+  bottom while one is dragged over it. An image dragged out of a message, a tool's row or the pane
   lands the same way, without uploading it again, and the pane's **put on
   canvas** makes a column after the thread, or, from its ▾, adds to one of
   the canvas's. ＋ past the last column makes an empty one. The agent's
@@ -1554,8 +1558,7 @@ board's records (ADR-0122); a card's text is its own document (ADR-0048).
 
 - **What else a canvas holds** (ADR-0116): file cards showing a source's
   file. Threads from any root, note columns and media columns (ADR-0182)
-  are built (above). An image is put at a column's end: a drop places it
-  among the others only by dragging it there after.
+  are built (above).
 - **What is left of cards and the dock** (ADR-0111, ADR-0113): a thread
   card's body on the board drawn from its pinned cards' first lines (today
   its first line, under a title); and who is in a note column now, which

@@ -4863,8 +4863,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a stored image dropped onto an image is a new one",
     file: "packages/interface/drag.ts",
-    from: "          target.before === null\n",
-    to: "          true\n",
+    from: '          spot.kind === "version"\n',
+    to: "          false\n",
     command: unit,
     expect:
       "a stored image dropped onto an image is a version, elsewhere on a media column or at a spot a new image, anywhere else nothing",
@@ -4881,8 +4881,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an image dropped onto another moves after it",
     file: "packages/interface/card-intents.ts",
-    from: "  const after = others[to - 1]?.id ?? null\n  const before = others[to]?.id ?? null\n",
-    to: "  const after = others[to]?.id ?? null\n  const before = others[to + 1]?.id ?? null\n",
+    from: "  const after = others[to - 1]?.id ?? null\n  const next = others[to]?.id ?? null\n",
+    to: "  const after = others[to]?.id ?? null\n  const next = others[to + 1]?.id ?? null\n",
     command: unit,
     expect:
       "an image dropped onto another of its column moves before it; onto the column, to its end",
@@ -4903,5 +4903,49 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "the pane's put makes a media column after its thread, and its ▾ lists the canvas's media columns",
+  },
+  // ── an image's edges ──
+  {
+    name: "a tall image's edges are a quarter of it",
+    file: "packages/interface/image-edge.ts",
+    from: "  const band = Math.min(EDGE_BAND_PX, length / 4)\n",
+    to: "  const band = length / 4\n",
+    command: unit,
+    expect: "a tall image keeps all but a fixed band at each edge for versions",
+  },
+  {
+    name: "two to a row, an image's edges are its top and bottom",
+    file: "packages/interface/image-edge.ts",
+    from: "  const length = across ? box.width : box.height\n  const into = across ? at.x - box.left : at.y - box.top\n",
+    to: "  const length = box.height\n  const into = at.y - box.top\n",
+    command: unit,
+    expect: "two to a row, its edges are left and right",
+  },
+  {
+    name: "after an image is before it",
+    file: "packages/interface/image-edge.ts",
+    from: '  return { kind: "spot", before: at < 0 ? null : (images[at + 1] ?? null) }\n',
+    to: '  return { kind: "spot", before: image }\n',
+    command: unit,
+    expect:
+      "before an image is just before it; after it, just before the next, or the end",
+  },
+  {
+    name: "a stored image at an edge is a version",
+    file: "packages/interface/drag.ts",
+    from: '          spot.kind === "version"\n',
+    to: "          true\n",
+    command: unit,
+    expect:
+      "a stored image dropped onto an image is a version, elsewhere on a media column or at a spot a new image, anywhere else nothing",
+  },
+  {
+    name: "an image moved to another column lands at its end",
+    file: "packages/interface/card-intents.ts",
+    from: '        cardMove(now, { kind: "image-at", column: target.column, before }),\n',
+    to: '        cardMove(now, { kind: "image-at", column: target.column, before: null }),\n',
+    command: unit,
+    expect:
+      "an image dropped after another lands just before the next; in another column, at that spot",
   },
 ]

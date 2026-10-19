@@ -289,19 +289,29 @@ test("a stored image dropped onto an image is a version, elsewhere on a media co
       { ...image, over: { kind: "put", target } },
       { column: null, home: null, archive: ARCHIVE },
       "move",
-      NO_STATE,
+      { cards: { cards: [] } } as unknown as IntentState,
     )
-  expect(drop({ kind: "images", column, before: onto })).toEqual({
+  expect(
+    drop({ kind: "images", column, on: { image: onto, edge: "onto" } }),
+  ).toEqual({
     kind: "image",
     intent: { kind: "addVersion", image: onto, sha256 },
   })
-  expect(drop({ kind: "images", column, before: null })).toEqual({
+  expect(drop({ kind: "images", column, on: null })).toEqual({
     kind: "image",
     intent: {
       kind: "putStored",
       sha256,
       name: "shot.png",
-      to: { kind: "image", column },
+      to: { kind: "image-at", column, before: null },
+    },
+  })
+  expect(
+    drop({ kind: "images", column, on: { image: onto, edge: "before" } }),
+  ).toMatchObject({
+    intent: {
+      kind: "putStored",
+      to: { kind: "image-at", column, before: onto },
     },
   })
   const spot = drop({ kind: "canvas", canvas: K, after: T })
