@@ -154,7 +154,7 @@ export function planMerge(lane: JjLane, from: BaseMerge): MergePlan {
       source: newest,
       message: `catch up: ${from.name}`,
       mark: false,
-      came: { from: commit(from.caughtUpWith), to: newest },
+      came: { from: commit(from.upToDateWith), to: newest },
     }
   }
   return {

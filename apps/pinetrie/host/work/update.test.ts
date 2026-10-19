@@ -1,8 +1,8 @@
 import {
   type BaseMerge,
-  CATCH_UP_TOOL,
   commitId,
   entryId,
+  GET_LATEST_TOOL,
   NOBODY,
   planCopyReady,
   pointId,
@@ -17,10 +17,10 @@ import { readTreeIndex } from "@pinetrie/reads"
 import {
   ACCEPTED as ACCEPTED_RECORD,
   BASE,
-  catchUpRefusal,
   encodeMessage,
   encodeUpdate,
   type Floor,
+  getLatestRefusal,
   type PromptBudget,
   setRecord,
 } from "@pinetrie/rules"
@@ -34,7 +34,7 @@ import {
   changeReason,
   createUpdates,
   type Prepared,
-  planCatchUp,
+  planGetLatest,
   planSettle,
   type Settle,
   withLaneStarted,
@@ -116,7 +116,7 @@ const parentFrom: BaseMerge = {
   lane: threadIdFor("p"),
   name: "amber-fox" as ThreadName,
   point: ACCEPTED,
-  caughtUpWith: OURS,
+  upToDateWith: OURS,
 }
 /** pi's estimate of a custom message: a token per four characters. */
 const budgetOf = (tokens: number): PromptBudget => ({
@@ -124,9 +124,9 @@ const budgetOf = (tokens: number): PromptBudget => ({
   estimate: content => Math.ceil(content.length / 4),
 })
 
-/** The floor `planCatchUp` settles for `from`, with room for anything. */
+/** The floor `planGetLatest` settles for `from`, with room for anything. */
 function floorFor(from: BaseMerge, intent: string): Floor {
-  const planned = planCatchUp(from, {
+  const planned = planGetLatest(from, {
     budget: budgetOf(100_000),
     skill: null,
     intent,
@@ -135,9 +135,9 @@ function floorFor(from: BaseMerge, intent: string): Floor {
   return planned.floor
 }
 
-describe("planCatchUp: whether a catch-up may merge", () => {
+describe("planGetLatest: whether a catch-up may merge", () => {
   test("refused, before the merge, when even the smallest prompt would not fit; it names what can be shortened", () => {
-    const planned = planCatchUp(acceptedFrom, {
+    const planned = planGetLatest(acceptedFrom, {
       budget: budgetOf(50),
       skill: null,
       intent: "x".repeat(400),
@@ -150,7 +150,7 @@ describe("planCatchUp: whether a catch-up may merge", () => {
     }
   })
   test("with room, it merges what it was given, and the prompt names whose work comes in", () => {
-    const planned = planCatchUp(parentFrom, {
+    const planned = planGetLatest(parentFrom, {
       budget: budgetOf(1_000),
       skill: null,
       intent: "",
@@ -476,7 +476,7 @@ describe("askedAboutConflict", () => {
   })
 })
 
-describe("catchUpInRun", () => {
+describe("getLatestInRun", () => {
   /**
    * A lane of its own whose turn is `calls` calls of `catch_up`, its base
    * moved with files to bring, and a history whose copy has `parents` as
@@ -488,7 +488,7 @@ describe("catchUpInRun", () => {
     const call = (id: string) => ({
       type: "toolCall",
       id,
-      name: CATCH_UP_TOOL,
+      name: GET_LATEST_TOOL,
       arguments: {},
     })
     writeEntry(
@@ -511,7 +511,7 @@ describe("catchUpInRun", () => {
         base: { kind: "accepted" },
         start: commitId("l1"),
         state: "ok",
-        catchUp: { tip: commitId("t"), to: commitId("l2"), files: ["a.ts"] },
+        getLatest: { tip: commitId("t"), to: commitId("l2"), files: ["a.ts"] },
         untraced: [],
         work: "some",
       }),
@@ -531,7 +531,7 @@ describe("catchUpInRun", () => {
         workingCopy: {
           behind: 0,
           ahead: 0,
-          catchUp: null,
+          getLatest: null,
           conflicts: { commits: 0, files: [] },
         },
         publishCatchesUp: true,
@@ -577,18 +577,18 @@ describe("catchUpInRun", () => {
 
   test("a call beside another in its turn is refused before anything is queued", async () => {
     const { updates, asked } = inRun(2, "b")
-    expect(await updates.catchUpInRun(LANE, "base")).toMatchObject({
+    expect(await updates.getLatestInRun(LANE, "base")).toMatchObject({
       isError: true,
-      text: catchUpRefusal("alone"),
+      text: getLatestRefusal("alone"),
     })
     expect(asked).toEqual([])
   })
 
   test("a copy off its own line is refused before any edit is committed or merged, and the lane is neither started nor stopped", async () => {
     const { updates, asked } = inRun(1, "x")
-    expect(await updates.catchUpInRun(LANE, "base")).toMatchObject({
+    expect(await updates.getLatestInRun(LANE, "base")).toMatchObject({
       isError: true,
-      text: catchUpRefusal("off-line"),
+      text: getLatestRefusal("off-line"),
     })
     expect(asked).toEqual(["readyToMerge"])
   })

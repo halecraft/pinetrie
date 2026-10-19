@@ -352,7 +352,7 @@ export interface AcceptedFacts
 
 /**
  * A publish, decided before its first step: on the host's own machine, the
- * working copy catches up with accepted work first (`catchUp`), and your
+ * working copy catches up with accepted work first (`getLatest`), and your
  * commits below `@` move onto it with the publish bookmark (`accept`).
  */
 export interface PublishDecision {
@@ -360,7 +360,7 @@ export interface PublishDecision {
   readonly acceptedBookmark: string
   readonly publish: string
   /** Rebase `@` onto accepted work first, as you. */
-  readonly catchUp: boolean
+  readonly getLatest: boolean
   /** Accepted work moves with the publish bookmark, to your `@-`. */
   readonly accept: boolean
 }

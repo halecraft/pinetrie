@@ -11,7 +11,7 @@
 // A tool's result is its own entry, but it belongs to its call: `projectSpine`
 // pairs it with the call on the same path, and it is never a message itself.
 
-import type { CatchUpFrom, PointId } from "./bases.ts"
+import type { LatestFrom, PointId } from "./bases.ts"
 import {
   atEntry,
   type CanvasId,
@@ -53,7 +53,7 @@ export interface MessagePart {
  * state.
  */
 export interface BehindView {
-  readonly from: CatchUpFrom
+  readonly from: LatestFrom
   readonly to: PointId
   /** The files catching up would change. */
   readonly files: readonly string[]

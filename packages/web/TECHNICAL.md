@@ -851,7 +851,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
     from its stream's start, the time in the stream id's uuidv7, minted on
     the host's clock (`streamStart`, core), so a reload or a tab shown
     again counts from the same start. A browser whose clock is behind the
-    host's shows 0s until it catches up. `Elapsed` redraws itself, not its
+    host's shows 0s until it gets the latest. `Elapsed` redraws itself, not its
     row, at each whole second the call has run, by a timeout to the next
     one (`runningFor`'s `next`). Unlike the ring it takes room, in the
     floated head, so it can wrap the command's first line; its figures are
@@ -888,21 +888,21 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   review while the proposed changes are open and hold files (ADR-0047, below), the
   bookmark apart, which a press copies to find it in jj or jjui, its
   buttons, and a `⋯` menu for the rest
-  ("catch up with accepted work", "rewrite description"). What the lane runs
+  ("get the latest from accepted work", "rewrite description"). What the lane runs
   now (`laneActivity`: a turn, a resolution, or a split, from its latest
   prompt's role) comes first: while it runs, accepted work counts files so far
   and offers nothing. A lane with no copy of its own has no strip.
-- **Catching up and splitting are a card queued at once** (ADR-0108,
+- **Getting the latest and splitting are a card queued at once** (ADR-0108,
   ADR-0061, ADR-0080): the button is the `queueNew` act, which makes a card
   in the queue with the command and no text, in one `queue-card` request:
   it is never drawn as a note. A split waits while the thread works, and a
   queued one makes the strip's split button quiet (`workStripView`'s
-  `queued`); only a catch-up makes the proposed changes busy. The card carries its
+  `queued`); only getting the latest makes the proposed changes busy. The card carries its
   command from its first write, so the drain the queueing starts pops it
   with it. Your message in the composer is not touched. A card that carries a command anyway (one unqueued) says above its box what
   sending it does first (`commandNote`), its placeholder says its text is
   optional, and its button names the command (`commandSendWords`: "catch
-  up", "catch up and send", "split"), its queue place in the title. The card is
+  up", "get the latest and send", "split"), its queue place in the title. The card is
   then queued like any other (`planSend`, which carries the command), and
   the host carries the command out when it pops it.
 - **One-line messages** (`LINE_ROLES`, core) show as one line each: `land`,
@@ -916,7 +916,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   follows `LINE_ROLES` rather than a list of roles in the stylesheet. Each
   line is its rule's words function (`updateLine`,
   `factLine`, `canvasFactLine`, `behindLine`, `@pinetrie/rules`); the
-  update's names what it merged by `catchUpName`.
+  update's names what it merged by `latestSourceName`.
 - **A fact waiting for a run's end** is drawn above the line as a quiet row
   (`.queued-fact`, worded by `factLine`), with no controls: nobody moves it
   (ADR-0080).
@@ -1442,7 +1442,7 @@ stays in view; the strip scrolls past 30vh.
 - **The publish button** (`footer.tsx`) says set up before accepted work
   exists, then publish while there is something to publish (ADR-0090).
   Whether a publish catches your files up or moves `main` alone is the
-  host's `offers.catchUp` (ADR-0099, which amends ADR-0076).
+  host's `offers.getLatest` (ADR-0099, which amends ADR-0076).
 
 ## Threads' icons (`thread-icon-image.tsx`, `public/noun-icons/`, ADR-0143)
 

@@ -61,7 +61,7 @@ follow this list. A name only this package uses is imported from its module.
 - `card-words.ts`: `sourceWords`, what a card says from where its kind keeps
   its words (`cardTextSource`).
 - `fact.ts`, `behind.ts`, `agent-commands.ts`: what a command on proposed changes
-  did, as a fact in the thread; the base's new work, told or caught up; the
+  did, as a fact in the thread; the base's new work, told or got the latest; the
   agent's `catch_up` and `split_proposed_changes` (ADR-0080).
 - `live.ts`: what each stream event, and a run's end and a host's start, do
   to `pinetrie:live`, as `LiveOp`s `@pinetrie/schema`'s `applyLiveOps` writes
@@ -103,8 +103,8 @@ follow this list. A name only this package uses is imported from its module.
 - `accepted.ts`: accepted work (`pinetrie.accepted`): its record, setup and
   publishing.
 - `base.ts`: a thread's base (`pinetrie.base`): where a lane begins, what
-  catching up would do and merge, and the thread a lane branched from.
-- `catch-up-from.ts`: what a catch-up merges (`CatchUpFrom`), as history
+  getting the latest would do and merge, and the thread a lane branched from.
+- `latest-from.ts`: what getting the latest merges (`LatestFrom`), as history
   stores it and as every wording names it.
 - `proposed.ts`, `work-strip.ts`, `review.ts`: proposed changes' record and the
   host's decisions about it, the page's view of it, and the review's wire.
@@ -1684,7 +1684,7 @@ commit-message request `request.ts` (`describeRequest`).
   divergent), `mark` (unchanged and the host's, but its top is not the
   host's version: a host step stopped before its mark, or the proposed changes were
   built before proposed changes had one; ADR-0154), `none`, or `untouched`: an untraced start with proposed changes you
-  edited, or one divergent, which nothing touches until the lane catches up
+  edited, or one divergent, which nothing touches until the lane gets the latest
   (a gap ADR-0067's untraced start leaves). Only work known to change a file, from a known
   start, is built (ADR-0067): one built from less would be empty, or bring
   back what you accepted, and withdrawn after a build it would be built again on
@@ -1753,20 +1753,20 @@ commit-message request `request.ts` (`describeRequest`).
   are `quiet` (listed, but drawn disabled: changing nothing now, or not
   yet possible), and the facts its words
   are made from (`WorkStripFacts`: files, size, conflicts, bookmark, held, the
-  base as `effectiveBase` gives it, the catch-up, untraced, …). It writes
+  base as `effectiveBase` gives it, getting the latest, untraced, …). It writes
   no words: accepted work and the button labels are the client's (`workStripWords`,
   `@pinetrie/interface`, ADR-0040). A resolution that asked for you counts only
   when newer than the proposed changes. Held proposed changes are `nothing`, with no
-  destinations. When catching up `brings`, or the thread is untraced,
-  catching up moves from the menu to the buttons; when it is `current` or
+  destinations. When getting the latest `brings`, or the thread is untraced,
+  getting the latest moves from the menu to the buttons; when it is `current` or
   `nothing-new` it stays in the menu, quiet; `unknown` leaves it there,
   enabled. An untraced thread offers no refresh, squash or split: each
   rebuilds from a start it does not have. A card with the command queued
-  makes the proposed changes busy (`catch-up`). Conflicted proposed changes' catch-up is the
+  makes the proposed changes busy (`get-latest`). Conflicted proposed changes' getting the latest is the
   base's `update` (there is no `resolve`), unless its conflict came with
   its copy (`conflictCause`) and the parent, ahead, holds none of those
-  files conflicted: then `catch-up-parent`. While the parent is ahead,
-  `catch-up-parent` is in every idle state's menu, quiet while it runs.
+  files conflicted: then `get-latest-from-parent`. While the parent is ahead,
+  `get-latest-from-parent` is in every idle state's menu, quiet while it runs.
 - **Where an acceptance goes is `workStripView`'s `into`** (`AcceptsInto`):
   a `bookmark` asks `acceptanceDestinations` with it; a `folder`
   asks for none, and keeps `accept`, quiet, since accepting into a folder
@@ -1780,27 +1780,27 @@ commit-message request `request.ts` (`describeRequest`).
 - **`parentNow`** (`base.ts`) is the thread a lane branched from, read from
   the document alone: `forkParent` (core) names it and the fork commit; its
   newest commit is the nearest above its thread's end; what the lane last
-  caught up with (`caughtUpWith`) is the newest of the parent's commits that an update or land message
+  got the latest from (`upToDateWith`) is the newest of the parent's commits that an update or land message
   below the lane's first prompt merged (`TranscriptMessage.merged`), else
   the fork commit. A lane's commits only move forward, so the parent is
   ahead when the two differ (`parentAhead`). `planParentUpdate` merges its
   newest commit, or nothing, or refuses `no_parent` and `parent_running`.
-- **`catchUpNow`** (`base.ts`) says what catching up would do, from `pinetrie.base` and
+- **`latestNow`** (`base.ts`) says what getting the latest would do, from `pinetrie.base` and
   accepted work's record: `current` (the base has not moved since the lane last
-  caught up with it, or no line is set up), `unknown` (it moved, and the
-  host's `catchUp` was not read at the commit it is at now; or there is no
+  got the latest from it, or no line is set up), `unknown` (it moved, and the
+  host's `getLatest` was not read at the commit it is at now; or there is no
   `pinetrie.base` at all: the host has never read the lane, as for a lane
   whose turns never committed, so never reached your repo), `nothing-new`
   (it moved by work the lane holds, as after you accepted its own proposed changes,
   even once the lane edited that work again: S102 item 11)
   or `brings`, with the file count and the move, the one kind that carries
-  it. `catchUpNow` owns those checks; the commit comparison under them
+  it. `latestNow` owns those checks; the commit comparison under them
   (`baseMoved`) is private to it.
-- **`catchUpName`** (`catch-up-from.ts`) is the one wording of what a catch-up
-  merges (`CatchUpFrom`): "accepted work" for accepted work (ADR-0090), the
+- **`latestSourceName`** (`latest-from.ts`) is the one wording of what getting the latest
+  merges (`LatestFrom`): "accepted work" for accepted work (ADR-0090), the
   bookmark for a WIP (ADR-0061), the thread's name for the thread a thread branched from
   (ADR-0072). `updateLine` uses it through the update's `from`, stored as
-  it is (`CatchUpFromSchema`). `incomingWords` names it for the model, and
+  it is (`LatestFromSchema`). `latestWords` names it for the model, and
   `baseMovedOn` says a base moved.
 
 ## The review's wire (`review.ts`)
@@ -1840,8 +1840,8 @@ commit-message request `request.ts` (`describeRequest`).
 
 | record | namespace | key | written |
 |---|---|---|---|
-| accepted work: its commit, the WIP bookmarks above it, the publish bookmark and your work against it (`workingCopy.ahead`, `workingCopy.catchUp`), and `publish.catchUp` (`catchUp`) | `pinetrie.accepted` | `line` | when your repo's operation head moves |
-| a lane's base, as its newest `Pinetrie-Base` says it, whether a WIP base landed or is gone, what catching up would change and where that was read, and its untraced accepted thread commits (S97) | `pinetrie.base` | the lane | when a refresh reads the lane |
+| accepted work: its commit, the WIP bookmarks above it, the publish bookmark and your work against it (`workingCopy.ahead`, `workingCopy.getLatest`), and `publish.catchUp` (`getLatest`) | `pinetrie.accepted` | `line` | when your repo's operation head moves |
+| a lane's base, as its newest `Pinetrie-Base` says it, whether a WIP base landed or is gone, what getting the latest would change and where that was read, and its untraced accepted thread commits (S97) | `pinetrie.base` | the lane | when a refresh reads the lane |
 
 - **`planAcceptedRecord`** is accepted work's record from what the host read
   (`AcceptedFacts`), beside what setting accepted work up would write to your
@@ -1850,24 +1850,24 @@ commit-message request `request.ts` (`describeRequest`).
 - **`planAcceptedAction`** decides a setup or publish from the record read in
   its own step (`AcceptedWorkDecision`): setup writes exactly the heads and log the
   record proposed, the text you were shown; a publish (`PublishDecision`,
-  ADR-0090) says whether the working copy catches up first (`catchUp`) and whether
+  ADR-0090) says whether the working copy gets the latest first (`getLatest`) and whether
   your commits move with accepted work (`accept`), both false with
   `publish.catchUp` off. `@pinetrie/jj` turns it into steps (`planSetup`,
-  `planPublishCatchUp`, `planPublishMove`).
+  `planPublishGetLatest`, `planPublishMove`).
 - **`planPublishFinish` is a publish's second round** (ADR-0090): from the
-  record read again after the catch-up, the move, or the catch-up's
+  record read again after getting the latest, the move, or getting the latest's
   operation reverted (`undo`, S111) when your commits came out conflicted
   (`workingCopy.conflicts.commits`, which the preview of `@` alone cannot show)
   or the publish bookmark moved meanwhile. `accept` is read from the
   record after, not the decision. `publishUndone` words an undo from that
-  record: the conflicts the catch-up would have left, since the revert took
+  record: the conflicts getting the latest would have left, since the revert took
   them away, so `acceptedRefusal`'s "your commits have conflicts" would be
   untrue. It lives here, not beside the steps,
   because `@pinetrie/jj` does not import this package.
-- **`effectiveBase`**, **`catchUpNow`** and **`parentNow`** are in `base.ts`,
-  with the `pinetrie.base` record; **`catchUpName`** (accepted work is
+- **`effectiveBase`**, **`latestNow`** and **`parentNow`** are in `base.ts`,
+  with the `pinetrie.base` record; **`latestSourceName`** (accepted work is
   "accepted work", ADR-0090) and **`baseMovedOn`** (a base that moved,
-  worded once) in `catch-up-from.ts`. How the page reads them is under
+  worded once) in `latest-from.ts`. How the page reads them is under
   Proposed changes, "What the page reads".
 - **`acceptedActionState` is the one rule for a setup or publish** (ADR-0076,
   ADR-0090): the host's `planAcceptedAction` decides from it, and the page's
@@ -1888,25 +1888,25 @@ commit-message request `request.ts` (`describeRequest`).
   their own fields: proposed changes its `start` and `tip` states, files,
   conflicts and whether it is described; accepted work its
   `newest` state and the states it keeps (`kept`, which the host's
-  `refreshKept` alone writes); a base its `start` state and what catching up would
+  `refreshKept` alone writes); a base its `start` state and what getting the latest would
   change. Every reader switches on `kind`: folder proposed changes are never a stack
   and never split (`workStripView`), starts on no conflict (`conflictCause`),
   and is reviewed as its `start..tip` range (`planReviewRead`, whose
   `parseSpan` takes a folder state's id in a range, never as a revision);
   conflicted, it offers `choose-versions` (`workStripView`), which opens
   the lane's conflicts in its pane; a folder project's accepted work has
-  nothing to set up or publish to (`acceptedActionState` refuses both); `catchUpNow` compares a folder
+  nothing to set up or publish to (`acceptedActionState` refuses both); `latestNow` compares a folder
   base's `start` with accepted work's `newest`. At start the host deletes those of the other kind
   (`planKindSweep`, `specs.ts`); a folder's `STATE` and `CONFLICT` records
   are never among them.
 - **`pinetrie.accepted` and `pinetrie.base` are caches** (ADR-0104): the repo is
   the ledger, and the host rewrites each from it. A lost one costs a read.
   A `pinetrie.accepted` from before `publish` and `published` (ADR-0076), or
-  before `workingCopy.catchUp` and a numeric `workingCopy.ahead` (ADR-0090), does not
+  before `workingCopy.getLatest` and a numeric `workingCopy.ahead` (ADR-0090), does not
   decode, and is read as unknown until the host writes it again.
-  A `pinetrie.base` from before `catchUp` and `untraced` does not decode, and
-  is dropped (ADR-0067): the page reads catching up as unknown until the
-  host writes it again. `catchUp` names the lane tip and base commit it was
+  A `pinetrie.base` from before `getLatest` and `untraced` does not decode, and
+  is dropped (ADR-0067): the page reads getting the latest as unknown until the
+  host writes it again. `getLatest` names the lane tip and base commit it was
   read at; the host keeps it while both stay, so it is read once per move.
 - **`planBegin`** refuses a lane with no line (`no_line`), and a base that
   is not a bookmark with the WIP prefix above accepted work (`bad_base`). The
@@ -2067,10 +2067,10 @@ reads, `details` what pine·trie reads back.
   `update`'s `merged`, `land`'s `merged`, `behind`'s `to` and a
   `catch_up`'s `merged` are points; proposed changes, WIPs, accepted work's and a
   base's jj records (`JjProposedChangesRecord`, `JjAcceptedRecord`, `JjBaseRecord`,
-  `CatchUpRead`) and the stack's message are jj's, and commits; a base's
+  `GetLatestRead`) and the stack's message are jj's, and commits; a base's
   move (`BaseMove`) is points. Where a
   jj-only fact meets the shared history, the rule converts it at that
-  site with `pointFromCommit` (`planUpdateFrom`'s WIP, `catchUpNow`'s
+  site with `pointFromCommit` (`planUpdateFrom`'s WIP, `latestNow`'s
   base move), so each crossing is visible; nothing here turns a point back
   into a commit, or tests one for more than equality (core's rule).
 - **The schema is the type.** Ids are branded schemas (`decode.ts`:
@@ -2089,8 +2089,8 @@ update (`pinetrie.update`,
 role `update`) is a fact in the thread, never a prompt: which of your commits
 came in and which files changed, so the agent's next run reads them again,
 or that none did. A merge that changed no file is still an update: the
-`merged` commit it carries is how `parentNow` knows what the lane caught up
-with, and its revision is where a branch below it starts. `incomingWords`
+`merged` commit it carries is how `parentNow` knows what the lane got the latest
+with, and its revision is where a branch below it starts. `latestWords`
 words whose work came in, for the update and for a resolution's prompt.
 The card that brought the thread up to date carries what the person wants
 done with it (ADR-0108); its text is sent after the update. A stack message (`pinetrie.stack`, role `stack`) is the prompt of the run that
@@ -2119,27 +2119,27 @@ the tip it must match, and the bookmark to leave on it.
   running one. It is never written into a running lane. It has no text
   document: the drain loads and destroys none for it.
 - **The drain plans before it acts** (`planCarry`, `queue.ts`): a fact, a
-  catch-up and what follows it (`after`: the text, or nothing), a split
+  getting the latest and what follows it (`after`: the text, or nothing), a split
   with its brief, or a message; every case but a fact carries the text
   card (`QueuedText`), so the shell acts on a typed card. A property named
   `then` is forbidden by the linter, hence `after`.
 - **`planBaseNews` is one decision** for a lane whose base has new work:
   `tell` (a behind entry, `pinetrie.behind`, before the run's prompt and its
-  cards entry, or a steer into a running lane, S103), `catch-up` (a lane whose
-  work changes no file, `BaseRecord.work`, is caught up quietly before a
-  chat's run: `planMessage`'s `catch-up-first`), or `nothing`. What the thread
+  cards entry, or a steer into a running lane, S103), `get-latest` (a lane whose
+  work changes no file, `BaseRecord.work`, is got the latest quietly before a
+  chat's run: `planMessage`'s `get-latest-first`), or `nothing`. What the thread
   already heard of or merged is read from the tree (`baseKnown`, core), so
   a commit is told once, and again only past a compaction.
-- **`planCatchUpCall`** decides `catch_up` from the documents before
+- **`planGetLatestCall`** decides `catch_up` from the documents before
   anything is queued: a lane of its own, the only call in its turn (a
   sibling's edit would leave the copy, S103), and new
   work (`brings`, or `unknown`, which the merge's own read decides). The
   parent only when it is ahead and idle. `planCopyReady` (`@pinetrie/core`,
   the one maker of the `ReadyCopy` a merge takes) refuses a working copy
   off its lane's line (`off-line`), and a repo with no bookmark of the
-  lane's (`no-bookmark`), for every catch-up. The two are worded apart: the
+  lane's (`no-bookmark`), for every time it gets the latest. The two are worded apart: the
   missing bookmark was the rename's, not a split's (S114). Each refusal
-  says what to do (`catchUpRefusal`); `catchUpAnswer` is the tool's result,
+  says what to do (`getLatestRefusal`); `getLatestAnswer` is the tool's result,
   whose `details.merged` the turn's record reads.
 - **`planSplitCall`** queues a split card, made through `planMake`, or
   refuses: a folder lane, whose proposed changes are its files, never a stack; no proposed changes open, a split running (the lane's latest prompt is a
@@ -2212,7 +2212,7 @@ line, never the prompt.
   the one `planResolution` returns when nothing fuller fits. Only
   `resolutionFloor` makes a `Floor`, and `planResolution` requires one, so
   it always has a message within the budget. A floor too large is the
-  host's refusal (`planCatchUp`), with the lane untouched.
+  host's refusal (`planGetLatest`), with the lane untouched.
 - **`jj resolve --list` is the list of what is left**, and every prompt says
   so: a file not shown whole is read in the lane.
 - In every way but the `count`, each file keeps its path and both labelled

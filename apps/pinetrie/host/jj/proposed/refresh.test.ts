@@ -242,7 +242,7 @@ test("a catch-up that merged your acceptance of the lane's work leaves nothing t
   expect(await settles(you.dir, LANE, THREAD)).toEqual({
     files: null,
     record: null,
-    base: expect.objectContaining({ catchUp: null, untraced: [] }),
+    base: expect.objectContaining({ getLatest: null, untraced: [] }),
     leased: 0,
   })
 }, 60_000)
@@ -279,7 +279,7 @@ test("an accepted thread commit with no Pinetrie-Source builds nothing until the
     record: null,
     base: expect.objectContaining({
       untraced: [accepted],
-      catchUp: { tip: more, to: repoCommit, files: ["a.txt"] },
+      getLatest: { tip: more, to: repoCommit, files: ["a.txt"] },
     }),
     leased: 0,
   })
@@ -295,7 +295,7 @@ test("an accepted thread commit with no Pinetrie-Source builds nothing until the
   expect(await settles(you.dir, LANE, THREAD)).toMatchObject({
     files: ["b.txt"],
     record: { files: ["b.txt"], acceptedAs: null },
-    base: { untraced: [], catchUp: null },
+    base: { untraced: [], getLatest: null },
   })
 }, 60_000)
 
@@ -320,7 +320,7 @@ test("work you landed yourself leaves the proposed changes held: kept, with no f
   expect(await settles(you.dir, LANE, THREAD)).toMatchObject({
     files: [],
     record: { files: [], acceptedAs: null },
-    base: { catchUp: { tip: work, to: repoCommit, files: [] } },
+    base: { getLatest: { tip: work, to: repoCommit, files: [] } },
   })
 }, 60_000)
 

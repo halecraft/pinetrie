@@ -13,7 +13,6 @@
 import { isTextCard, type WriterId } from "@pinetrie/core"
 import {
   type CardFrameView,
-  type CatchUps,
   CLEAR_COMMAND,
   CLOSE_CARD,
   type ColumnAct,
@@ -24,6 +23,7 @@ import {
   HISTORY_TITLE,
   historyItemWords,
   KIND_ICON,
+  type LatestSources,
   moveKey,
   moveWords,
   type Reader,
@@ -50,7 +50,7 @@ export function CardFrame(p: {
   card: DrawnCard | null
   reader: Reader
   /** What a command catches up with at its thread; null in your inventory. */
-  catchUps: CatchUps | null
+  latestSources: LatestSources | null
   /** Who has text in the card, which someone else's note names. */
   writers?: readonly WriterId[]
   /** A move chosen in its ⋯, or a ↑ or ↓. */
@@ -75,7 +75,7 @@ export function CardFrame(p: {
   children: ReactNode
 }) {
   const { view, card } = p
-  const words = cardFrameWords(view, p.reader, p.catchUps, p.writers ?? [])
+  const words = cardFrameWords(view, p.reader, p.latestSources, p.writers ?? [])
   const [history, setHistory] = useState(false)
   const sections = [
     {

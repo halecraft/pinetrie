@@ -20,9 +20,9 @@ import {
 } from "@pinetrie/rules"
 import { reorderByStep } from "./card-intents.ts"
 import {
-  type CatchUps,
   commandNote,
   commandWords,
+  type LatestSources,
   PUT_AWAY,
   pinnedStatusWords,
   reorderWords,
@@ -443,14 +443,14 @@ const whoWords = (
 
 /**
  * `view` in words, for `reader`. `writers`: who has text in the card, which
- * someone else's note names. `catchUps`: what a command catches up with at
+ * someone else's note names. `latestSources`: what a command catches up with at
  * the card's thread; null away from one, in your inventory, where a command
  * has nothing to name and no chip is drawn.
  */
 export function cardFrameWords(
   view: CardFrameView,
   reader: Reader,
-  catchUps: CatchUps | null,
+  latestSources: LatestSources | null,
   writers: readonly WriterId[],
 ): CardFrameWords {
   return {
@@ -458,11 +458,11 @@ export function cardFrameWords(
     state: stateWords(view.state),
     who: whoWords(view, reader, writers),
     command:
-      view.command === null || catchUps === null
+      view.command === null || latestSources === null
         ? null
         : {
-            label: commandWords(view.command, catchUps),
-            title: commandNote(view.command, catchUps),
+            label: commandWords(view.command, latestSources),
+            title: commandNote(view.command, latestSources),
           },
     tools: view.tools.map(t => reorderWords(t.step)),
   }

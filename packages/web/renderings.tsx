@@ -256,7 +256,7 @@ function TextFull(p: { card: CardOf<"text">; width: CardWidth }) {
     <BoundCardEditor
       among={null}
       card={p.card}
-      catchUps={null}
+      latestSources={null}
       foot={null}
       key={p.card.id}
       onClose={onClose ?? undefined}

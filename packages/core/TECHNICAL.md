@@ -50,7 +50,7 @@ it re-exports every module but `fixtures.ts`, which tests import as
 | `config.ts`, `access.ts` | config as other packages name it; the owner's answers to a lane's use of their ssh identity |
 | `product.ts`, `lane-env.ts` | the product's name and the host's operator; what every lane of its own sees: paths, home, programs, variables |
 | `lanes.ts`, `bases.ts`, `disks.ts` | a lane's record and its proof it may run; a thread's base, history states and a copy ready to merge; a lane's disk and snapshots |
-| `revisions.ts`, `accepted.ts`, `proposed.ts`, `trailers.ts`, `work.ts` | a turn's revision record, proposed changes recorded and reviewed; a jj project's accepted work and thread's base, as recorded, and a catch-up's read; proposed changes' facts and decisions, the commit trailers, where a lane works |
+| `revisions.ts`, `accepted.ts`, `proposed.ts`, `trailers.ts`, `work.ts` | a turn's revision record, proposed changes recorded and reviewed; a jj project's accepted work and thread's base, as recorded, and the read that got the latest; proposed changes' facts and decisions, the commit trailers, where a lane works |
 | `folder.ts`, `runs.ts`, `live.ts`, `edits.ts`, `images.ts`, `tools.ts` | a folder project's history; what a command did to a disk; what a turn streams; a text's edits; blobs; the tools |
 | `paths.ts`, `errors.ts` | paths as strings, and a thrown value as text |
 
@@ -236,12 +236,12 @@ it re-exports every module but `fixtures.ts`, which tests import as
 - What the host cannot tell, it does not act on (ADR-0067): proposed changes are
   built only from work known to change a file, from a known start, and an
   accepted thread commit that names no source (S97) leaves its lane
-  untraced until it catches up past it. Proposed changes already held are `held`
+  untraced until it gets the latest past it. Proposed changes already held are `held`
   (S89).
-- A thread catches up with its base or the thread it branched from
+- A thread gets the latest from its base or the thread it branched from
   (ADR-0072); a publish catches your files up first (ADR-0090, ADR-0099),
   then moves the publish bookmark (ADR-0076). A publish's undo reverts its
-  operation (S111); what catching up would change is read before (S80).
+  operation (S111); what getting the latest would change is read before (S80).
   Diff stats and review reads are jj's (S57, ADR-0047).
 - Every trailer is written and read in `trailers.ts`. jj's `trailers`
   template reads only a message's last paragraph, and a squash keeps two,

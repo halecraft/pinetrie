@@ -78,7 +78,7 @@ export function NoteColumn(p: {
               <NoteCardEditor
                 among={view.notes}
                 card={note}
-                catchUps={null}
+                latestSources={null}
                 onAct={act}
                 onTyping={p.onTyping}
                 readOnly={p.readOnly}

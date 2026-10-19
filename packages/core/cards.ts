@@ -4,7 +4,7 @@
 // they move, is `places.ts`'.
 
 import type { Address } from "./address.ts"
-import type { CatchUpFrom } from "./bases.ts"
+import type { LatestFrom } from "./bases.ts"
 import type {
   BranchedFact,
   BudgetSpentFact,
@@ -23,17 +23,17 @@ import type { IdOf, PlaceOf } from "./places.ts"
 /**
  * The commands that catch a thread up. The first two bring the thread up to
  * date with its base, `continue-on-accepted` moving a thread whose WIP is gone
- * to accepted work first; `catch-up-with-parent` merges the thread it branched
+ * to accepted work first; `get-latest-from-parent` merges the thread it branched
  * from.
  */
-export type CatchUpCommand =
-  | "bring-up-to-date"
+export type GetLatestCommand =
+  | "get-latest"
   | "continue-on-accepted"
-  | "catch-up-with-parent"
-export const CATCH_UP_COMMANDS: readonly CatchUpCommand[] = [
-  "bring-up-to-date",
+  | "get-latest-from-parent"
+export const GET_LATEST_COMMANDS: readonly GetLatestCommand[] = [
+  "get-latest",
   "continue-on-accepted",
-  "catch-up-with-parent",
+  "get-latest-from-parent",
 ]
 
 /**
@@ -41,15 +41,17 @@ export const CATCH_UP_COMMANDS: readonly CatchUpCommand[] = [
  * commands, and `split`, which splits the thread's proposed changes into a
  * stack in a run of its own, its text the person's intent.
  */
-export type CardCommand = CatchUpCommand | "split"
+export type CardCommand = GetLatestCommand | "split"
 export const CARD_COMMANDS: readonly CardCommand[] = [
-  ...CATCH_UP_COMMANDS,
+  ...GET_LATEST_COMMANDS,
   "split",
 ]
 
 /** Whether `command` catches the thread up, rather than doing something else. */
-export const isCatchUp = (command: CardCommand): command is CatchUpCommand =>
-  (CATCH_UP_COMMANDS as readonly string[]).includes(command)
+export const isGetLatest = (
+  command: CardCommand,
+): command is GetLatestCommand =>
+  (GET_LATEST_COMMANDS as readonly string[]).includes(command)
 
 /**
  * What a command on a thread's proposed changes did, as a fact in the thread:
@@ -66,7 +68,7 @@ export type ProposedChangesFact =
       /** The change id the proposed changes were added as. */
       readonly as: string
       readonly bookmark: string
-      readonly to: CatchUpFrom
+      readonly to: LatestFrom
     }
   /** A folder project's accept: the files it wrote into the project's folder. */
   | {

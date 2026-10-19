@@ -44,7 +44,6 @@ import {
   agentsWords,
   askLine,
   behind,
-  type CatchUps,
   type ColumnAct,
   type ColumnHow,
   type ColumnKey,
@@ -78,6 +77,7 @@ import {
   isNextSendBranch,
   keepSpot,
   keptTraces,
+  type LatestSources,
   type LiveWork,
   leftLine,
   type MediaColumnView,
@@ -692,7 +692,7 @@ export function Column(p: ColumnProps) {
     lane.kind === "lane" ? (p.work.bases.get(lane.name) ?? null) : null
   const parentLane = shows.parent?.lane ?? null
   const parentName = shows.parent?.name ?? null
-  const catchUps: CatchUps = useMemo(
+  const latestSources: LatestSources = useMemo(
     () => ({
       base: effectiveBase(baseRecord),
       parent:
@@ -868,7 +868,7 @@ export function Column(p: ColumnProps) {
     if (
       button !== "update" &&
       button !== "continue" &&
-      button !== "catch-up-parent" &&
+      button !== "get-latest-from-parent" &&
       button !== "split"
     )
       return act({
@@ -885,11 +885,11 @@ export function Column(p: ColumnProps) {
       command:
         button === "continue"
           ? "continue-on-accepted"
-          : button === "catch-up-parent"
-            ? "catch-up-with-parent"
+          : button === "get-latest-from-parent"
+            ? "get-latest-from-parent"
             : button === "split"
               ? "split"
-              : "bring-up-to-date",
+              : "get-latest",
       lane: lane.name,
       at,
     })
@@ -1147,7 +1147,7 @@ export function Column(p: ColumnProps) {
                     ) : null
                   }
                   cards={pinned.filter(c => c.id !== pinShown)}
-                  catchUps={catchUps}
+                  latestSources={latestSources}
                   inView={inView}
                   onNewPin={newPin === "strip" ? openPin : null}
                   onAct={act}
@@ -1301,7 +1301,7 @@ export function Column(p: ColumnProps) {
                 asks={p.asks}
                 blank={p.blank}
                 cards={p.cards}
-                catchUps={catchUps}
+                latestSources={latestSources}
                 index={index}
                 lane={lane.kind === "lane" ? lane : null}
                 notices={refused.map(r => (
@@ -1338,7 +1338,7 @@ export function Column(p: ColumnProps) {
                   onCreatesLane={setCreatesLane}
                   onIntent={p.onIntent}
                   onTyping={p.onTyping}
-                  catchUps={catchUps}
+                  latestSources={latestSources}
                   putColumn={putColumn}
                   participants={p.participants}
                   agents={agents}

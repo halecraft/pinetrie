@@ -10,9 +10,9 @@
 
 import {
   type ConflictRecord,
-  catchUpStateId,
   type ForkStart,
   folderCopyReady,
+  getLatestStateId,
   type LaneStatesOp,
   type PointId,
   resolveStateId,
@@ -50,10 +50,10 @@ import {
 } from "@pinetrie/lanes"
 import {
   CONFLICT,
-  catchUpName,
   conflictKey,
   deleteRecord,
-  folderIncoming,
+  folderLatest,
+  latestSourceName,
   mergedFrom,
   STATE,
   setRecord,
@@ -233,7 +233,7 @@ export function folderHistory(
 
     async merge(_ready, from, edits) {
       if (from.kind === "wip")
-        throw new Error("a folder project has no WIP to catch up with")
+        throw new Error("a folder project has no WIP to get the latest from")
       if (edits !== null) await turn(edits)
       const g = graph()
       const ours = newestOf(g)
@@ -248,10 +248,10 @@ export function folderHistory(
       if ((await baseMissing(reader, plan)) !== null)
         return {
           kind: "refused",
-          reason: `the state this thread shares with ${catchUpName(mergedFrom(from))} is no longer kept`,
+          reason: `the state this thread shares with ${latestSourceName(mergedFrom(from))} is no longer kept`,
           follow: null,
         }
-      const state = catchUpStateId(input.newId())
+      const state = getLatestStateId(input.newId())
       /**
        * The base had, the lane merged over it and snapshotted, and the
        * records written. A virtual base is named by its bases, so two lanes
@@ -279,7 +279,7 @@ export function folderHistory(
         const record: StateRecord = {
           id: state,
           parents: [ours, theirs],
-          made: { kind: "catch-up", lane },
+          made: { kind: "get-latest", lane },
           at: input.now(),
           by: null,
         }
@@ -327,9 +327,7 @@ export function folderHistory(
         ours,
         merge: state,
         files: await sourceChanges(reader, ours, state),
-        commits: [
-          folderIncoming(from.kind === "accepted" ? "folder" : "parent"),
-        ],
+        commits: [folderLatest(from.kind === "accepted" ? "folder" : "parent")],
         follow: null,
       }
     },

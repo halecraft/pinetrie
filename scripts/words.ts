@@ -21,7 +21,7 @@ export interface Source {
 }
 
 /** Names no identifier may contain, matched without regard to case. */
-export const RETIRED_IN_NAMES: readonly string[] = ["yours"]
+export const RETIRED_IN_NAMES: readonly string[] = ["yours", "catchup"]
 
 /**
  * Files whose identifiers may hold a retired name: a migration's own words
@@ -35,6 +35,9 @@ export const OLD_SHAPES: readonly string[] = [
   "apps/pinetrie/host/migrations/0007-land-merged.ts",
   "apps/pinetrie/host/migrations/0007-land-merged.test.ts",
   "apps/pinetrie/host/migrations/rewrite.test.ts",
+  "apps/pinetrie/host/migrations/0012-base-get-latest.ts",
+  "apps/pinetrie/host/migrations/0013-accepted-get-latest.ts",
+  "apps/pinetrie/host/migrations/0013-accepted-get-latest.test.ts",
 ]
 
 /** Every identifier `text` names, each once, in order: bindings, references and property keys. */

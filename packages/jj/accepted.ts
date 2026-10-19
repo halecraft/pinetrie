@@ -15,8 +15,8 @@ import { revsetName } from "./lane/names.ts"
 import { readCommits, readConflictedFiles } from "./lane/revisions.ts"
 import { readChangeId } from "./proposed.ts"
 
-/** What `planPublishCatchUp`'s rebase would do to the working copy: `AcceptedRecord`'s shape. */
-type CatchUpPreview = NonNullable<AcceptedFacts["workingCopy"]["catchUp"]>
+/** What `planPublishGetLatest`'s rebase would do to the working copy: `AcceptedRecord`'s shape. */
+type LatestPreview = NonNullable<AcceptedFacts["workingCopy"]["getLatest"]>
 
 const count = async (jj: Runner, revset: string): Promise<number> =>
   (await readCommits(jj, revset)).length
@@ -49,7 +49,7 @@ export async function acceptedFacts(
       workingCopy: {
         behind: 0,
         ahead: 0,
-        catchUp: null,
+        getLatest: null,
         conflicts: { commits: 0, files: [] },
       },
     }
@@ -93,8 +93,8 @@ export async function acceptedFacts(
     workingCopy: {
       behind,
       ahead: await count(jj, `::@- ~ ::${acceptedBookmark}`),
-      catchUp:
-        behind === 0 ? null : await catchUpPreview(jj, git, acceptedBookmark),
+      getLatest:
+        behind === 0 ? null : await latestPreview(jj, git, acceptedBookmark),
       conflicts: {
         commits: await count(jj, `(::@ ~ ::${acceptedBookmark}) & conflicts()`),
         files: await readConflictedFiles(jj, "@").catch(() => []),
@@ -126,11 +126,11 @@ async function publishedFacts(
  * conflicting paths, then a blank line and its messages. Null
  * when `@` descends from no commit of accepted work, or git cannot merge.
  */
-async function catchUpPreview(
+async function latestPreview(
   jj: Runner,
   git: Runner,
   acceptedBookmark: string,
-): Promise<CatchUpPreview | null> {
+): Promise<LatestPreview | null> {
   if ((await count(jj, `(::@ & ::${acceptedBookmark}) ~ root()`)) === 0)
     return null
   const [base] = await readCommits(jj, `fork_point(${acceptedBookmark} | @)`)

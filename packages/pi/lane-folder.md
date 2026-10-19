@@ -52,7 +52,7 @@ changes pine·trie can keep this note true. You can skip them.
   `pnpm install`, a build, as you would in a fresh copy. pine·trie watches
   what each command reads and writes, and keeps a recipe for each that made
   ignored files from source (`/workspace/.pinetrie-lane/recipes.json`).
-  When a catch up changes a file a recipe read (a lockfile, a
+  When getting the latest changes a file a recipe read (a lockfile, a
   `package.json`), pine·trie removes what that recipe made, so nothing a
   deleted package installed stays behind; caches such as pnpm's store
   stay. Make the rest again as you would after a pull.
@@ -193,8 +193,8 @@ changes pine·trie can keep this note true. You can skip them.
   the newest work of the thread this one branched from. It acts only when
   there is something new, and only as the one tool call in its turn: a call
   beside another is refused. A conflicted merge answers with the conflicts,
-  to resolve here. <!-- packages/rules/agent-commands.ts planCatchUpCall -->
-  <!-- packages/core/tools.ts CATCH_UP_TOOL -->
+  to resolve here. <!-- packages/rules/agent-commands.ts planGetLatestCall -->
+  <!-- packages/core/tools.ts GET_LATEST_TOOL -->
 - `split_proposed_changes` is refused here: a folder project's proposed
   changes are its files, never a stack of revisions. <!-- packages/rules/agent-commands.ts planSplitCall -->
 - `propose_branches` proposes new threads that branch from the end of

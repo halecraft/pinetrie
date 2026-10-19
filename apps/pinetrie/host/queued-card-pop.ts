@@ -308,8 +308,8 @@ async function carryOut(
   switch (plan.kind) {
     case "fact":
       return appendFact(deps, lane, plan.fact)
-    case "catch-up":
-      return catchUpThenSend(
+    case "get-latest":
+      return getLatestThenSend(
         deps,
         open,
         lane,
@@ -384,12 +384,12 @@ async function appendFact(
  * A card that catches the thread up: the update, then the card's text sent, or
  * carried into the resolution run when the merge conflicts.
  */
-async function catchUpThenSend(
+async function getLatestThenSend(
   deps: QueuedCardPopDeps,
   open: OpenChange,
   lane: ThreadId,
   popped: PoppedText,
-  plan: Extract<CarryPlan, { readonly kind: "catch-up" }>,
+  plan: Extract<CarryPlan, { readonly kind: "get-latest" }>,
 ): Promise<"ran" | "next"> {
   const { card } = popped
   const prepared = await deps.work

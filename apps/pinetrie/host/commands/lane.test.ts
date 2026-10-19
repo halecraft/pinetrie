@@ -395,7 +395,7 @@ test("a carry-on the rule refuses is answered with its refusal, and starts nothi
 
 test("proposedChangesRefusal names the path a folder accept found changed", () => {
   expect(proposedChangesRefusal(ERR.FOLDER_MOVED, "src/a.ts")).toBe(
-    "src/a.ts changed in the project's folder while it was accepted: catch up, then accept again",
+    "src/a.ts changed in the project's folder while it was accepted: get the latest, then accept again",
   )
   expect(proposedChangesRefusal(ERR.FOLDER_CANNOT_HOLD, "README.md")).toMatch(
     /^README\.md cannot be written into the project's folder/,

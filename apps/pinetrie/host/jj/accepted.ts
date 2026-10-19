@@ -13,8 +13,8 @@ import type {
   ValueWrite,
 } from "@pinetrie/core"
 import {
-  planCatchUpUndo,
-  planPublishCatchUp,
+  planGetLatestUndo,
+  planPublishGetLatest,
   planPublishMove,
   planSetup,
   type RepoOps,
@@ -80,20 +80,20 @@ export function createAcceptedWork(deps: {
     decision: PublishDecision,
   ): Promise<AcceptedAnswer> {
     let op: string | null = null
-    if (decision.catchUp) {
-      await ops.execute(planPublishCatchUp(decision))
+    if (decision.getLatest) {
+      await ops.execute(planPublishGetLatest(decision))
       op = (await ops.shared()).op
     }
     const after = await record(ops)
     const finish = planPublishFinish({ decision, after, op })
     if (finish.kind === "undo") {
-      await ops.execute(planCatchUpUndo(finish.op))
+      await ops.execute(planGetLatestUndo(finish.op))
       return { code: finish.code, message: publishUndone(finish.code, after) }
     }
     try {
       await ops.execute(planPublishMove(finish))
     } catch (e) {
-      if (op !== null) await ops.execute(planCatchUpUndo(op))
+      if (op !== null) await ops.execute(planGetLatestUndo(op))
       throw e
     }
     return null

@@ -1,10 +1,10 @@
 import { commitId } from "@pinetrie/core"
 import { expect, test } from "vitest"
 import {
-  catchUpChangedFiles,
-  catchUpHolds,
-  planCatchUpRead,
-} from "./catch-up.ts"
+  getLatestChangedFiles,
+  getLatestHolds,
+  planGetLatestRead,
+} from "./get-latest.ts"
 
 const C1 = commitId("c1")
 const C2 = commitId("c2")
@@ -28,8 +28,8 @@ test.each([
     { start: C1, known: { tip: T, to: C2, files: [] } },
     "read",
   ],
-] as const)("planCatchUpRead: %s", (_, input, expected) => {
-  expect(planCatchUpRead({ ...input, to: TO, tip: T })).toBe(expected)
+] as const)("planGetLatestRead: %s", (_, input, expected) => {
+  expect(planGetLatestRead({ ...input, to: TO, tip: T })).toBe(expected)
 })
 const BASE = {
   base: { kind: "accepted" },
@@ -59,8 +59,8 @@ test.each([
     },
     [C1],
   ],
-] as const)("catchUpHolds: %s", (_, input, expected) => {
-  expect(catchUpHolds({ base: BASE, ...input })).toEqual(expected)
+] as const)("getLatestHolds: %s", (_, input, expected) => {
+  expect(getLatestHolds({ base: BASE, ...input })).toEqual(expected)
 })
 test.each([
   [
@@ -84,6 +84,6 @@ test.each([
     { moved: [["a"], []], lacking: ["a"] },
     [],
   ],
-] as const)("catchUpChangedFiles: %s", (_, input, expected) => {
-  expect(catchUpChangedFiles(input)).toEqual(expected)
+] as const)("getLatestChangedFiles: %s", (_, input, expected) => {
+  expect(getLatestChangedFiles(input)).toEqual(expected)
 })

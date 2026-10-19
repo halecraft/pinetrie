@@ -11,11 +11,11 @@ import type {
   ThreadLane,
 } from "@pinetrie/core"
 import {
-  type CatchUps,
   type ColumnAct,
   type ColumnHow,
   dropProps,
   type Intent,
+  type LatestSources,
   type Pending,
   type Prefill,
   type Reader,
@@ -66,7 +66,7 @@ export function Composer(p: {
   onAct: (act: ColumnAct) => void
   readOnly: ReadOnly | null
   /** What a card's command catches up with: the thread's base, or the thread it branched from. */
-  catchUps: CatchUps
+  latestSources: LatestSources
   /** The column's key when a card may be dropped here (`put-target.ts`). */
   putColumn: string | null
 }) {
@@ -96,7 +96,7 @@ export function Composer(p: {
         onAct={p.onAct}
         onCreatesLane={p.onCreatesLane}
         onIntent={p.onIntent}
-        catchUps={p.catchUps}
+        latestSources={p.latestSources}
         onSend={p.onSend}
         onTyping={p.onTyping}
         participants={p.participants}

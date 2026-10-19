@@ -41,7 +41,7 @@ const strip = (
   over: Partial<{
     files: readonly string[]
     conflicts: readonly string[]
-    catchUp: Parameters<typeof workStripView>[0]["catchUp"]
+    getLatest: Parameters<typeof workStripView>[0]["getLatest"]
   }> = {},
 ) =>
   workStripWords(
@@ -61,7 +61,7 @@ const strip = (
       base: { kind: "folder" },
       into: { kind: "folder" },
       wipAhead: 0,
-      catchUp: over.catchUp ?? { kind: "current" },
+      getLatest: over.getLatest ?? { kind: "current" },
       untraced: false,
       queued: [],
       parent: null,
@@ -76,7 +76,7 @@ test("no label a folder project's views produce names a commit, a bookmark, a re
     conflicted: strip({ conflicts: ["a.txt"] }),
     empty: strip({ files: [] }),
     moved: strip({
-      catchUp: {
+      getLatest: {
         kind: "brings",
         move: { base: { kind: "accepted" }, bookmark: null, from: L0, to: L1 },
         files: 2,

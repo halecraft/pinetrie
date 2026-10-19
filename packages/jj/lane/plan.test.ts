@@ -179,7 +179,7 @@ describe("planMerge: an update's steps", () => {
         lane: threadIdFor("p"),
         name: "amber-fox" as ThreadName,
         point: pointFromCommit(C2),
-        caughtUpWith: pointFromCommit(C1),
+        upToDateWith: pointFromCommit(C1),
       }),
     ).toEqual({
       steps: [fetchById([C2])],

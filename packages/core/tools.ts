@@ -17,7 +17,7 @@ export const FIND_TOOL = "find"
 /** Leave a conflict whose two sides meant different things for the person. */
 export const CONFLICT_TOOL = "ask_about_conflict"
 /** Merge the thread's base, or its parent's work, into its copy during a run. */
-export const CATCH_UP_TOOL = "catch_up"
+export const GET_LATEST_TOOL = "catch_up"
 /** Queue a split of the thread's proposed changes, run when the thread is free. */
 export const SPLIT_TOOL = "split_proposed_changes"
 /** Close a folder lane's conflicted path, with the version chosen. */
@@ -55,7 +55,7 @@ export const TOOL_IDS = [
   GREP_TOOL,
   FIND_TOOL,
   CONFLICT_TOOL,
-  CATCH_UP_TOOL,
+  GET_LATEST_TOOL,
   SPLIT_TOOL,
   BANNER_TOOL,
   ASK_TOOL,
@@ -106,7 +106,7 @@ const SUBJECTS: Readonly<
   [GREP_TOOL]: searched,
   [FIND_TOOL]: searched,
   [CONFLICT_TOOL]: undefined,
-  [CATCH_UP_TOOL]: args => field(args, "from") ?? "base",
+  [GET_LATEST_TOOL]: args => field(args, "from") ?? "base",
   [SPLIT_TOOL]: undefined,
   [BANNER_TOOL]: undefined,
   [ASK_TOOL]: args => field(args, "to"),

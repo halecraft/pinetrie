@@ -673,7 +673,7 @@ describe("drain", () => {
 })
 
 describe("drain: bring up to date", () => {
-  const CMD = "bring-up-to-date" as const
+  const CMD = "get-latest" as const
 
   test("clean: the update, then the card's text as a message", async () => {
     const { b, events, deps } = setUp(

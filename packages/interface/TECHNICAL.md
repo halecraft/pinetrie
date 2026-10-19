@@ -722,7 +722,7 @@ pending.
   `@pinetrie/rules`' `nothingToPublish` says so, the same function the host
   refuses by; else `publish`, carrying `acceptedActionState`. `publishWords`
   words it: "publish", or "publishing…" while out, and a title that says
-  what it does from `publishWork` and the catch-up's preview (files it
+  what it does from `publishWork` and the preview that got the latest (files it
   changes, other lines of your work that move), "the working copy does not
   move (publish.catchUp is off)" when the setting leaves the working copy behind or
   your commits unaccepted, then the jj, led by
@@ -1258,17 +1258,17 @@ composer*).
   column's lane's running prompt, so it falls back to the column's lane.
   With no revisions at all (a host without a project), every asked message
   falls back, and the whole path reads as the column's lane.
-- **What a catch-up merges is worded by `catchUpName` alone**
+- **What getting the latest merges is worded by `latestSourceName` alone**
   (`@pinetrie/rules`, ADR-0061, ADR-0072, ADR-0090, ADR-0100): accepted
   work is "accepted work", a WIP its bookmark, the thread a thread branched from its name. The words
-  take core's `CatchUpFrom`, never a bookmark string, and accepted work's
+  take core's `LatestFrom`, never a bookmark string, and accepted work's
   bookmark goes only in titles: `workStripWords`' button titles ("moves
   pinetrie-accepted forward to pinetrie-proposed/amber-fox"), `behindMark`'s,
   `baseChoices`'. Accepted work is named one way for every kind of
   project: a folder project's is "accepted work" too, and no word names
   the folder as the person's (pine·trie may run hosted, where the folder
   is no one's own; `scripts/words.test.ts` holds it). Having no bookmark,
-  it is named so in titles as well. A card's command (ADR-0108) is worded from `CatchUps` (the thread's
+  it is named so in titles as well. A card's command (ADR-0108) is worded from `LatestSources` (the thread's
   base and its parent), which `Column` keeps as one object while it says
   the same, since the composer is memoised. A base that moved is worded by
   `baseMovedOn` beside it ("accepted work has moved on"), never as "has new
@@ -1279,9 +1279,9 @@ composer*).
   strip's `workStripView` takes it with whether its lane runs, and `Column`
   words the composer's commands from it. Conflicted proposed changes whose conflict came with its copy says
   "began from a copy with an unresolved conflict in N files", adding "·
-  \<parent\> has resolved it" with "catch up with \<parent\>" as its button
+  \<parent\> has resolved it" with "get the latest from \<parent\>" as its button
   when the parent holds those files resolved; every other conflicted proposed changes'
-  button is "catch up with \<base\> and resolve". The parent's catch-up,
+  button is "get the latest from \<base\> and resolve". The parent's getting the latest,
   quiet while it runs, is titled why.
 - **A branch from a conflicted copy is warned** (`forkWords`, ADR-0072): a
   column whose next send creates a lane of its own (its own jj workspace,
@@ -1334,10 +1334,10 @@ composer*).
   the project's folder"; conflicted, it has no accept, a folder having no
   WIP. A quiet button's title always says why: it would change nothing
   now, or cannot yet be done.
-- **What catching up would do** (`catchUpNow`, from `pinetrie.base`'s `start`
-  and `catchUp` against `pinetrie.accepted`'s commits, S97): when it `brings`
+- **What getting the latest would do** (`latestNow`, from `pinetrie.base`'s `start`
+  and `getLatest` against `pinetrie.accepted`'s commits, S97): when it `brings`
   files, the strip's line adds "· accepted work has moved on", or is that
-  alone with nothing to accept, catching up moves from the `⋯` menu to the
+  alone with nothing to accept, getting the latest moves from the `⋯` menu to the
   buttons, its title counts the files, and the header shows `behindMark`'s
   ↓, titled with the count and the move (the bookmark, and the commits it
   went from and to). When it would change nothing (`current`, or
@@ -1347,24 +1347,24 @@ composer*).
   stays in the menu, enabled, and claims nothing. So does a lane with no
   base record at all: the host has never read it. An untraced thread
   (`pinetrie.base`'s `untraced`) says "an earlier accept of this thread
-  can't be traced: catch up with accepted work to show what's new", with catching up
+  can't be traced: get the latest from accepted work to show what's new", with getting the latest
   beside it. `ColumnFacts.queuedCommands` are the commands of the cards
-  queued on the lane: a catch-up among them is `workStripView`'s `catch-up`
-  activity ("catching up with accepted work…"); a split only quiets the
+  queued on the lane: getting the latest among them is `workStripView`'s `get-latest`
+  activity ("getting the latest from accepted work…"); a split only quiets the
   split button (ADR-0080).
 - **A thread's base** shows in its header only when it is not accepted work
   (`baseWords`): "on wip/search", or "wip/search is gone", when the menu's
   update becomes "continue from accepted work" and no acceptance is
   offered.
-  Catching up says its base: "catch up with wip/search". Two known limits,
+  Getting the latest says its base: "get the latest from wip/search". Two known limits,
   both in words only:
   - until a lane has a base record, the page names accepted work as its base
     (`effectiveBase(null)`), so a WIP thread that never changed a file says
-    "catch up with accepted work". The host merges the WIP, read from the
+    "get the latest from accepted work". The host merges the WIP, read from the
     lane's own history;
-  - with no line set up, `catchUpNow` is `current`, so the menu says
-    "already caught up with accepted work" where it is not set up.
-    The host refuses the catch-up (`no_line`).
+  - with no line set up, `latestNow` is `current`, so the menu says
+    "already got the latest from accepted work" where it is not set up.
+    The host refuses getting the latest (`no_line`).
 - **The footer's publish button** (`PublishButton`, `footer.tsx`,
   ADR-0090): a plain button for a publish, a one-section `Menu` for setting
   up (the config text it writes: `immutable_heads()` and `revsets.log`),

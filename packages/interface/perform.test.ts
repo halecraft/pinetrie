@@ -104,7 +104,7 @@ const card: CardRecord = {
   owner: ada,
   placer: ada,
   place: { kind: "composing", thread: lane },
-  content: { command: "bring-up-to-date", unsent: null, origin: null },
+  content: { command: "get-latest", unsent: null, origin: null },
 }
 
 interface Row {

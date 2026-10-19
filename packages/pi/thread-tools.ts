@@ -11,7 +11,7 @@
 
 import {
   ASK_TOOL,
-  CATCH_UP_TOOL,
+  GET_LATEST_TOOL,
   LEAVE_TOOL,
   type PointId,
   PROPOSE_TOOL,
@@ -27,7 +27,7 @@ import { threadOfContext } from "./thread-context.ts"
 type Context = Parameters<typeof threadOfContext>[0]
 
 /** `catch_up`'s `from` as the agent passed it: the base unless it named the parent. */
-export const parseCatchUpArgs = (args: {
+export const parseGetLatestArgs = (args: {
   readonly from?: string
 }): "base" | "parent" => (args.from === "parent" ? "parent" : "base")
 
@@ -54,12 +54,12 @@ const NO_LANE: ToolAnswer = {
  * its turn, or with nothing new. Every lane has it, so a lane's tool list
  * never changes between runs.
  */
-export function catchUpTool(
-  catchUp: (lane: ThreadId, from: "base" | "parent") => Promise<ToolAnswer>,
+export function getLatestTool(
+  getLatest: (lane: ThreadId, from: "base" | "parent") => Promise<ToolAnswer>,
 ) {
   return {
-    name: CATCH_UP_TOOL,
-    label: "catch up",
+    name: GET_LATEST_TOOL,
+    label: "get the latest",
     description:
       "Merge the new work of this thread's base (accepted work, or its WIP), or with from: parent of the thread this one branched from, into this thread's own copy, now. It acts only when there is new work, and must be the only tool call in its turn. A clean merge answers what came in; a conflicted one answers the conflicts, to resolve here.",
     parameters: Type.Object({
@@ -81,7 +81,7 @@ export function catchUpTool(
       const answer =
         lane === undefined
           ? NO_LANE
-          : await catchUp(lane, parseCatchUpArgs(params))
+          : await getLatest(lane, parseGetLatestArgs(params))
       return resultOf(answer)
     },
   }

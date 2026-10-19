@@ -641,7 +641,7 @@ item 18, and in `lanes.test.ts` against the harness.
   adds a block of guidelines, `laneGuidelines(facts)` in `lanes.ts`
   (ADR-0121): what holds in every lane, filled in with the lane's own
   values, in about 300 tokens, among them that nothing installs for it, and
-  that a catch up removes what was made from files that changed (ADR-0135).
+  that getting the latest removes what was made from files that changed (ADR-0135).
   The model is sent the conversation as stored: nothing is rewritten.
   - **A lane granted `lanes.nested` is told its Docker** answers at
     `$DOCKER_HOST`, and that there is no `/var/run/docker.sock`; its
@@ -783,8 +783,8 @@ item 18, and in `lanes.test.ts` against the harness.
   - **The guidelines name nothing that changes**, the proposed changes' bookmark among
     them: it changes when a thread is named. `lane.md` says how it is named.
 - **`catch_up` and `split_proposed_changes`** (`thread-tools.ts`, ADR-0080) read their
-  arguments (`parseCatchUpArgs`) and hand the call to the host
-  (`LaneHooks.catchUp`, `LaneHooks.askSplit`), whose `ToolAnswer`
+  arguments (`parseGetLatestArgs`) and hand the call to the host
+  (`LaneHooks.getLatest`, `LaneHooks.askSplit`), whose `ToolAnswer`
   (`@pinetrie/rules`) becomes the result: its text, and as `details` the
   commits a `catch_up` merged, which `parentNow` and the turn's record read.
   The host's answer to `catch_up` arrives while the run waits on it: the

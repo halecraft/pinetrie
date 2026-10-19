@@ -105,7 +105,7 @@ export const moveForward = (
  * commits under them. A conflict is recorded, not refused, and
  * `planPublishFinish` reads it.
  */
-export const planPublishCatchUp = (input: {
+export const planPublishGetLatest = (input: {
   readonly acceptedBookmark: string
 }): RepoStep[] => [
   you("rebase", "-b", "@", "-d", revsetName(input.acceptedBookmark)),
@@ -126,7 +126,7 @@ export const planPublishMove = (input: PublishMove): RepoStep[] => [
  * Undo a publish's catch-up: its operation reverted, as you. Never `op
  * restore`, which deletes from disk an edit made since.
  */
-export const planCatchUpUndo = (op: string): RepoStep[] => [
+export const planGetLatestUndo = (op: string): RepoStep[] => [
   you("op", "revert", op),
 ]
 

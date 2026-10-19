@@ -4,11 +4,11 @@
 // them side by side).
 
 import {
-  type CatchUpRead,
   type CommitBase,
   type CommitId,
   commitId,
   type FilesTouched,
+  type GetLatestRead,
   hasTrailer,
   messageBase,
   type ProposedChangesInRepo,
@@ -21,7 +21,7 @@ import {
   trailerRevset,
 } from "@pinetrie/core"
 import { describeFailure, lines, type Runner } from "@pinetrie/lanes"
-import { readCatchUp } from "./catch-up.ts"
+import { readGetLatest } from "./get-latest.ts"
 import {
   bookmarkRevset,
   hostProposedRevset,
@@ -317,8 +317,8 @@ interface LaneGather {
   /** The host's version of the proposed changes are here with no proposed changes beside it. */
   readonly hostLeft: boolean
   readonly work: FilesTouched
-  /** What catching up with accepted work would change (`readCatchUp`). */
-  readonly catchUp: CatchUpRead | null
+  /** What catching up with accepted work would change (`readGetLatest`). */
+  readonly getLatest: GetLatestRead | null
 }
 
 /**
@@ -340,7 +340,7 @@ export async function gatherLane(
     readonly repoConfig: RepoConfig
     readonly shared: SharedFacts
     /** What catching up would change, as last read: kept at the same tip and line. */
-    readonly known: CatchUpRead | null
+    readonly known: GetLatestRead | null
   },
 ): Promise<LaneGather | "none" | "wip"> {
   const acceptedBookmark = input.shared.acceptedCommit
@@ -389,7 +389,7 @@ export async function gatherLane(
   // proposed changes, an empty one was withdrawn and then built again, without
   // end.
   const work = await filesTouched(jj, { start, tip })
-  const catchUp = await readCatchUp(jj, {
+  const getLatest = await readGetLatest(jj, {
     base,
     start,
     target: { kind: "accepted", commit: acceptedBookmark },
@@ -404,7 +404,7 @@ export async function gatherLane(
     proposed,
     hostLeft: proposed === null && planned.host !== null,
     work,
-    catchUp,
+    getLatest,
   }
 }
 

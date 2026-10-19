@@ -3,10 +3,10 @@
 // something true the agent can change.
 
 import {
-  CATCH_UP_TOOL,
   type CardRecord,
-  type CatchUpCommand,
   cardCommand,
+  GET_LATEST_TOOL,
+  type GetLatestCommand,
   type MoveRefusal,
   makeCard,
   type PointId,
@@ -15,7 +15,7 @@ import {
   type ThreadId,
   type WriterId,
 } from "@pinetrie/core"
-import { type CatchUpNow, type ParentNow, parentAhead } from "./base.ts"
+import { type LatestNow, type ParentNow, parentAhead } from "./base.ts"
 import type { LandMessage } from "./land.ts"
 import { orderAfter } from "./order.ts"
 import { type PlaceStep, planMake } from "./place-steps.ts"
@@ -32,7 +32,7 @@ export interface ToolAnswer {
 }
 
 /** Why `catch_up` did not merge. */
-export type CatchUpRefusal =
+export type GetLatestRefusal =
   /** Another call is in the same batch: a sibling's edit would leave the copy. */
   | "alone"
   /** The base, or the parent, has nothing the copy lacks. */
@@ -51,23 +51,23 @@ export type CatchUpRefusal =
   | { readonly reason: string }
 
 /** `catch_up`'s refusals, worded once, each saying what to do. */
-export function catchUpRefusal(code: CatchUpRefusal): string {
-  if (typeof code !== "string") return `Not caught up: ${code.reason}.`
+export function getLatestRefusal(code: GetLatestRefusal): string {
+  if (typeof code !== "string") return `Did not get the latest: ${code.reason}.`
   switch (code) {
     case "alone":
-      return `Not caught up: call \`${CATCH_UP_TOOL}\` alone in its turn, with no other tool call beside it.`
+      return `Did not get the latest: call \`${GET_LATEST_TOOL}\` alone in its turn, with no other tool call beside it.`
     case "nothing-new":
       return "Nothing new: this copy already has everything there."
     case "no-copy":
       return "This thread has no copy of its own to merge into."
     case "off-line":
-      return "Not caught up: your working copy is not on this thread's own line (a split's stack?). Return to this thread's tip first."
+      return "Did not get the latest: your working copy is not on this thread's own line (a split's stack?). Return to this thread's tip first."
     case "no-bookmark":
-      return "Not caught up: this thread's copy has lost its bookmark."
+      return "Did not get the latest: this thread's copy has lost its bookmark."
     case "no-parent":
       return "This thread did not branch from another thread's copy."
     case "parent-running":
-      return "The thread this one branched from is working: catch up when its run ends."
+      return "The thread this one branched from is working: get its latest when its run ends."
   }
 }
 
@@ -78,29 +78,29 @@ export function catchUpRefusal(code: CatchUpRefusal): string {
  * or a lane the host has not read, which the merge's own read decides
  * (`unknown`); from the parent, one ahead and idle.
  */
-export function planCatchUpCall(input: {
+export function planGetLatestCall(input: {
   readonly from: "base" | "parent"
   readonly own: boolean
   /** The calls in the turn's assistant message. */
   readonly calls: number
-  readonly base: CatchUpNow
+  readonly base: LatestNow
   readonly parent: ParentNow | null
   readonly parentRunning: boolean
 }):
-  | { readonly kind: "merge"; readonly command: CatchUpCommand }
-  | { readonly kind: "refused"; readonly why: CatchUpRefusal } {
-  const refused = (why: CatchUpRefusal) => ({ kind: "refused", why }) as const
+  | { readonly kind: "merge"; readonly command: GetLatestCommand }
+  | { readonly kind: "refused"; readonly why: GetLatestRefusal } {
+  const refused = (why: GetLatestRefusal) => ({ kind: "refused", why }) as const
   if (!input.own) return refused("no-copy")
   if (input.calls !== 1) return refused("alone")
   if (input.from === "parent") {
     if (input.parent === null) return refused("no-parent")
     if (input.parentRunning) return refused("parent-running")
     return parentAhead(input.parent)
-      ? { kind: "merge", command: "catch-up-with-parent" }
+      ? { kind: "merge", command: "get-latest-from-parent" }
       : refused("nothing-new")
   }
   return input.base.kind === "brings" || input.base.kind === "unknown"
-    ? { kind: "merge", command: "bring-up-to-date" }
+    ? { kind: "merge", command: "get-latest" }
     : refused("nothing-new")
 }
 
@@ -109,7 +109,7 @@ export function planCatchUpCall(input: {
  * merged; or, conflicted, the conflicts and the resolution skill, which the
  * agent resolves in the same run.
  */
-export function catchUpAnswer(
+export function getLatestAnswer(
   settled:
     | {
         readonly kind: "clean"
@@ -138,8 +138,8 @@ export function catchUpAnswer(
 }
 
 /** A refusal as `catch_up` answers it. */
-export const refusedAnswer = (why: CatchUpRefusal): ToolAnswer => ({
-  text: catchUpRefusal(why),
+export const refusedAnswer = (why: GetLatestRefusal): ToolAnswer => ({
+  text: getLatestRefusal(why),
   isError: true,
   details: null,
 })

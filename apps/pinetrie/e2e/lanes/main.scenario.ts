@@ -90,7 +90,7 @@ async function mainSection(
   const project = await committedProject("pinetrie-lanes-", {
     "shared.txt": "one\ntwo\nthree\n",
     ".gitignore": "node_modules/\n.vite/\n",
-    "pinetrie.json": `${JSON.stringify({ lanes: { ssh: { personal: true } }, publish: { catchUp: true } })}\n`,
+    "pinetrie.json": `${JSON.stringify({ lanes: { ssh: { personal: true } }, publish: { getLatest: true } })}\n`,
   })
   const script = scriptedModel()
   const logs: string[] = []
@@ -876,14 +876,15 @@ async function mainSection(
     writeFileSync(path.join(project, "yours.txt"), "yours\n")
     await jj(project, "commit", "-m", "you add yours.txt")
     const previewed = await waitFor(
-      () => (readJjAccepted(wh.session)?.workingCopy.catchUp ?? null) !== null,
+      () =>
+        (readJjAccepted(wh.session)?.workingCopy.getLatest ?? null) !== null,
       30_000,
     )
-    const preview = readJjAccepted(wh.session)?.workingCopy.catchUp
+    const preview = readJjAccepted(wh.session)?.workingCopy.getLatest
     const unpublished = readJjAccepted(wh.session)?.published.behind ?? 0
     const published = await wu.actOnAccepted("publish")
     /** Who ran the newest rebase in your op log: the catch-up. */
-    const caughtUpBy =
+    const upToDateBy =
       (
         await jj(
           project,
@@ -906,18 +907,18 @@ async function mainSection(
         published.kind === "accepted-moved" &&
         (await commitAt("pinetrie-accepted")) === (await commitAt("@-")) &&
         existsSync(path.join(project, "yours.txt")) &&
-        caughtUpBy !== "" &&
-        !caughtUpBy.startsWith(HOST_OPERATOR),
-      `${JSON.stringify({ preview, published, caughtUpBy })}`,
+        upToDateBy !== "" &&
+        !upToDateBy.startsWith(HOST_OPERATOR),
+      `${JSON.stringify({ preview, published, upToDateBy })}`,
     )
-    const caughtUp = await waitFor(
+    const upToDate = await waitFor(
       () => readJjAccepted(wh.session)?.published.behind === 0,
       30_000,
     )
     check(
       "publish moves main forward to accepted work, and nothing is left unpublished",
       unpublished > 0 &&
-        caughtUp >= 0 &&
+        upToDate >= 0 &&
         (await commitAt("main")) === (await commitAt("pinetrie-accepted")),
       `${JSON.stringify({ unpublished, line: readJjAccepted(wh.session)?.published })}`,
     )
@@ -1279,7 +1280,7 @@ async function mainSection(
           path: "pinetrie.json",
           content: JSON.stringify({
             lanes: { env: ["PINETRIE_E2E_WIDE"] },
-            publish: { catchUp: true },
+            publish: { getLatest: true },
           }),
         },
       },

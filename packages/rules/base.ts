@@ -53,7 +53,7 @@ const JjBaseSchema = Type.Object({
     Type.Literal("landed"),
     Type.Literal("gone"),
   ]),
-  catchUp: Type.Union([
+  getLatest: Type.Union([
     Type.Object({
       tip: CommitSchema,
       to: CommitSchema,
@@ -68,7 +68,7 @@ const JjBaseSchema = Type.Object({
 const FolderBaseSchema = Type.Object({
   kind: Type.Literal("folder"),
   start: PointSchema,
-  catchUp: Type.Union([
+  getLatest: Type.Union([
     Type.Object({
       tip: PointSchema,
       to: PointSchema,
@@ -101,7 +101,7 @@ export interface FolderBaseRecord {
    * What catching up would change, read at the lane's newest state and your
    * folder's then; null when accepted work had not moved.
    */
-  readonly catchUp: {
+  readonly getLatest: {
     readonly tip: PointId
     readonly to: PointId
     readonly files: readonly string[]
@@ -119,15 +119,15 @@ export const BASE: RecordSpec<BaseRecord, ThreadId, "session"> = {
   home: "session",
   keyOf: r => r.lane,
   encode: ({ lane, ...contents }) => {
-    const catchUp =
-      contents.catchUp === null
+    const getLatest =
+      contents.getLatest === null
         ? null
-        : { ...contents.catchUp, files: [...contents.catchUp.files] }
+        : { ...contents.getLatest, files: [...contents.getLatest.files] }
     return contents.kind === "folder"
-      ? { ...contents, catchUp }
+      ? { ...contents, getLatest }
       : {
           ...contents,
-          catchUp,
+          getLatest,
           base: { ...contents.base },
           untraced: [...contents.untraced],
         }
@@ -146,13 +146,13 @@ export const BASE: RecordSpec<BaseRecord, ThreadId, "session"> = {
               base: r.base,
               start: commitId(r.start),
               state: r.state,
-              catchUp:
-                r.catchUp === null
+              getLatest:
+                r.getLatest === null
                   ? null
                   : {
-                      tip: commitId(r.catchUp.tip),
-                      to: commitId(r.catchUp.to),
-                      files: r.catchUp.files,
+                      tip: commitId(r.getLatest.tip),
+                      to: commitId(r.getLatest.to),
+                      files: r.getLatest.files,
                     },
               untraced: r.untraced.map(commitId),
               work: r.work,
@@ -191,7 +191,7 @@ interface BaseMove {
  * caught up, or null: the commit its newest `Pinetrie-Base` names
  * (`start`) against where the base is now, accepted work's `commit` or the WIP's.
  * Never for a WIP gone, which only "continue on accepted work" moves. Commits
- * only: whether catching up would change a file is `catchUpNow`'s, which
+ * only: whether catching up would change a file is `latestNow`'s, which
  * also decides what a missing record or line means.
  */
 function baseMoved(
@@ -227,7 +227,7 @@ function baseMoved(
  * - `brings`: catching up changes `files` files in the lane. Only this one
  *   says the move, for the header's ↓ (`behindMark`).
  */
-export type CatchUpNow =
+export type LatestNow =
   | { readonly kind: "current" }
   | { readonly kind: "unknown" }
   | { readonly kind: "nothing-new" }
@@ -238,22 +238,22 @@ export type CatchUpNow =
     }
 
 /**
- * `CatchUpNow` from the lane's base record and accepted work's, of one
+ * `LatestNow` from the lane's base record and accepted work's, of one
  * kind. With no line set up there is nothing to catch up with. With no
  * record, or one of another kind (swept at start), the host has not read
- * the lane, so nothing is claimed. The host's read (`catchUp`) counts only
+ * the lane, so nothing is claimed. The host's read (`getLatest`) counts only
  * when it was made at the state the base is at now; else what it would
  * change is unknown.
  */
-export function catchUpNow(
+export function latestNow(
   base: BaseRecord | undefined,
   accepted: AcceptedRecord | null,
-): CatchUpNow {
+): LatestNow {
   if (accepted === null) return { kind: "current" }
   if (accepted.kind === "folder") {
     if (base?.kind !== "folder") return { kind: "unknown" }
     if (base.start === accepted.newest) return { kind: "current" }
-    return catchUpRead(base.catchUp, {
+    return getLatestRead(base.getLatest, {
       base: { kind: "accepted" },
       bookmark: null,
       from: base.start,
@@ -264,22 +264,22 @@ export function catchUpNow(
   if (base?.kind !== "jj") return { kind: "unknown" }
   const move = baseMoved(base, accepted, accepted.commit)
   if (move === null) return { kind: "current" }
-  return catchUpRead(
-    base.catchUp === null
+  return getLatestRead(
+    base.getLatest === null
       ? null
-      : { to: pointFromCommit(base.catchUp.to), files: base.catchUp.files },
+      : { to: pointFromCommit(base.getLatest.to), files: base.getLatest.files },
     move,
   )
 }
 
-/** A moved base's `CatchUpNow`, from the host's read of what catching up changes. */
-const catchUpRead = (
+/** A moved base's `LatestNow`, from the host's read of what catching up changes. */
+const getLatestRead = (
   read: {
     readonly to: PointId
     readonly files: readonly string[]
   } | null,
   move: BaseMove,
-): CatchUpNow => {
+): LatestNow => {
   if (read === null || read.to !== move.to) return { kind: "unknown" }
   return read.files.length === 0
     ? { kind: "nothing-new" }
@@ -389,7 +389,7 @@ export interface ParentNow extends ParentThread {
   /** Its newest state: the nearest above its thread's end. */
   readonly newest: PointId
   /** The newest of its states this lane holds: its fork state, or what a catch-up merged. */
-  readonly caughtUpWith: PointId
+  readonly upToDateWith: PointId
   /** The files conflicted in `newest` (`pointConflicts`). */
   readonly conflicts: readonly string[]
 }
@@ -430,12 +430,12 @@ export function parentNow(input: {
     ),
   )
   const first = laneFirstPrompt(index, revisions, input.lane, tip)
-  let caughtUpWith = fork.point
+  let upToDateWith = fork.point
   for (const id of ancestry(index, tip).path) {
     // An update, a resolution or a `catch_up` result says what it merged.
     const merged = index.entries[id]?.message?.merged?.find(c => parents.has(c))
     if (merged !== undefined) {
-      caughtUpWith = merged
+      upToDateWith = merged
       break
     }
     if (id === first) break
@@ -445,7 +445,7 @@ export function parentNow(input: {
     lane: fork.lane,
     name,
     newest,
-    caughtUpWith,
+    upToDateWith,
     conflicts: pointConflicts(revisions, newest),
   }
 }
@@ -471,10 +471,10 @@ export function planParentUpdate(
     lane: parent.lane,
     name: parent.name,
     point: parent.newest,
-    caughtUpWith: parent.caughtUpWith,
+    upToDateWith: parent.upToDateWith,
   }
 }
 
 /** The parent's newest state is not the one the lane last caught up with (`ParentNow`). */
 export const parentAhead = (parent: ParentNow): boolean =>
-  parent.newest !== parent.caughtUpWith
+  parent.newest !== parent.upToDateWith

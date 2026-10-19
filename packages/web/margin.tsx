@@ -66,7 +66,7 @@ export function Margin(p: {
             <NoteCardEditor
               among={p.comments}
               card={c}
-              catchUps={null}
+              latestSources={null}
               onAct={p.onAct}
               onTyping={p.onTyping}
               readOnly={p.readOnly}

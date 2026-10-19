@@ -6,10 +6,10 @@
 
 import type {
   AcceptanceFacts,
-  CatchUpRead,
   CommitBase,
   CommitId,
   FilesTouched,
+  GetLatestRead,
   JjBaseRecord,
   ProposedChangesGather,
   ProposedChangesInRepo,
@@ -24,7 +24,7 @@ import type {
 } from "@pinetrie/core"
 import { lines, type Runner } from "@pinetrie/lanes"
 import { readWipState } from "./accepted.ts"
-import { type CatchUpTarget, readCatchUp } from "./catch-up.ts"
+import { type GetLatestTarget, readGetLatest } from "./get-latest.ts"
 import { laneBase } from "./lane/base.ts"
 import { proposedBookmark, revsetName } from "./lane/names.ts"
 import { readCommits, readTitles } from "./lane/revisions.ts"
@@ -45,8 +45,8 @@ export interface ProposedChangesInput {
   /** The thread's name: proposed changes are found by it. Undefined before it is named. */
   readonly name: ThreadName | undefined
   readonly repoConfig: RepoConfig
-  /** What catching up would change, as the page's base record last said: kept at the same tip and base commit (`readCatchUp`). */
-  readonly known: CatchUpRead | null
+  /** What catching up would change, as the page's base record last said: kept at the same tip and base commit (`readGetLatest`). */
+  readonly known: GetLatestRead | null
 }
 
 /** A split's stack, after its run: where it starts and ends, and its bookmark's commit. */
@@ -78,7 +78,7 @@ const baseRecord = (
     readonly base: CommitBase
     readonly state: JjBaseRecord["state"]
     readonly start: StartRead
-    readonly catchUp: CatchUpRead | null
+    readonly getLatest: GetLatestRead | null
     readonly work: FilesTouched
   },
 ): JjBaseRecord => ({
@@ -87,7 +87,7 @@ const baseRecord = (
   base: input.base.base,
   start: input.base.start,
   state: input.state,
-  catchUp: input.catchUp,
+  getLatest: input.getLatest,
   untraced:
     input.start.kind === "untraced" ? input.start.acceptedThreadCommits : [],
   work: input.work,
@@ -129,9 +129,9 @@ const commitOf = async (jj: Runner, bookmark: string) =>
 
 /** A target of `kind` at `commit`; null when the bookmark names none. */
 const targetOf = (
-  kind: CatchUpTarget["kind"],
+  kind: GetLatestTarget["kind"],
   commit: CommitId | null,
-): CatchUpTarget | null => (commit === null ? null : { kind, commit })
+): GetLatestTarget | null => (commit === null ? null : { kind, commit })
 
 /**
  * Where a lane's proposed changes sit and start, and its base record, by the
@@ -162,10 +162,16 @@ async function placeOf(
         ? null
         : targetOf("accepted", await commitOf(jj, repoConfig.acceptedBookmark))
   const start = await startOfProposed(jj, { tip, base, repoConfig, lane })
-  const catchUp =
+  const getLatest =
     target === null
       ? null
-      : await readCatchUp(jj, { base, start, target, tip, known: input.known })
+      : await readGetLatest(jj, {
+          base,
+          start,
+          target,
+          tip,
+          known: input.known,
+        })
   // An untraced start reads nothing: its work is unknown, which builds no
   // proposed changes.
   const work = await filesTouched(jj, { start, tip })
@@ -177,7 +183,7 @@ async function placeOf(
       target: target?.commit ?? null,
       start,
     }),
-    base: baseRecord(lane, { base, state, start, catchUp, work }),
+    base: baseRecord(lane, { base, state, start, getLatest, work }),
     work,
   }
 }
@@ -266,12 +272,12 @@ export async function gatherRefresh(
   })
   if (gathered === "none") return { kind: "none" }
   if (gathered !== "wip") {
-    const { tip, base, target, start, proposed, hostLeft, work, catchUp } =
+    const { tip, base, target, start, proposed, hostLeft, work, getLatest } =
       gathered
     return {
       kind: "plan",
       name,
-      base: baseRecord(lane, { base, state: "ok", start, catchUp, work }),
+      base: baseRecord(lane, { base, state: "ok", start, getLatest, work }),
       facts: factsOf(sited({ tip, base, state: "ok", target, start }), {
         work,
         proposed,

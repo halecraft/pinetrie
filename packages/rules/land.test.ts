@@ -23,13 +23,13 @@ const budgetOf = (tokens: number): PromptBudget => ({
 const floorOf = (
   tokens: number,
   intent = "",
-  incoming = "Accepted work",
+  latest = "Accepted work",
 ): Floor => {
   const found = resolutionFloor({
     budget: budgetOf(tokens),
     skill: { path: "/s/SKILL.md", content: "SKILL TEXT", hash: "h" },
     intent,
-    incoming,
+    latest,
   })
   if (found.kind !== "fits") throw new Error("the floor does not fit")
   return found.floor
@@ -225,7 +225,7 @@ describe("planResolution: the land message", () => {
         budget: budgetOf(100),
         skill: null,
         intent: "x".repeat(1_000),
-        incoming: "Accepted work",
+        latest: "Accepted work",
       }),
     ).toMatchObject({ kind: "too-large", budget: 100 })
     const floor = floorOf(90)
@@ -243,9 +243,9 @@ describe("planResolution: the land message", () => {
     expect(m.customType).toBe(LAND_TYPE)
     const shown = renderableMessage(m)
     expect(shown.role).toBe("land")
-    expect(shown.content).toBe("⚠ catching up: 2 files conflict")
+    expect(shown.content).toBe("⚠ got the latest: 2 files conflict")
     expect(renderableMessage(plan([], 100_000)).content).toBe(
-      "✓ catching up: no conflicts",
+      "✓ got the latest: no conflicts",
     )
   })
 })

@@ -34,8 +34,8 @@ export const decodeLand = LAND.decode
 /** The one line a column shows for a land message. */
 export const landLine = (d: LandDetails): string =>
   d.files.length === 0
-    ? "✓ catching up: no conflicts"
-    : `⚠ catching up: ${d.files.length} ${d.files.length === 1 ? "file conflicts" : "files conflict"}`
+    ? "✓ got the latest: no conflicts"
+    : `⚠ got the latest: ${d.files.length} ${d.files.length === 1 ? "file conflicts" : "files conflict"}`
 
 /** One side of a conflicted file, labelled: why it changed, as the tree says. */
 interface Side {
@@ -139,7 +139,7 @@ export interface Floor {
   /** The card's text, trimmed: what the person wants done with the new work; "" for nothing. */
   readonly intent: string
   /** Whose work came in, as the model reads it: "Accepted work", a WIP's, or a thread's. */
-  readonly incoming: string
+  readonly latest: string
   /** The `count` message's content. */
   readonly content: string
 }
@@ -162,11 +162,11 @@ const LIST_SENTENCE =
  * same whatever the merge leaves.
  */
 function introOf(
-  incoming: string,
+  latest: string,
   conflicts: number,
   shown: ConflictShown,
 ): string {
-  const merged = `${incoming} was merged into this thread's own copy`
+  const merged = `${latest} was merged into this thread's own copy`
   if (shown === "count")
     return `${merged}, and files conflict. They are too many or too large to show here: read them in this thread's copy, and resolve them there. ${LIST_SENTENCE}`
   if (conflicts === 0)
@@ -204,12 +204,12 @@ export function resolutionFloor(input: {
   readonly budget: PromptBudget
   readonly skill: LandSkill | null
   readonly intent: string
-  readonly incoming: string
+  readonly latest: string
 }): FloorFound {
   const intent = input.intent.trim()
   const content = joined(
     input.skill,
-    introOf(input.incoming, 0, "count"),
+    introOf(input.latest, 0, "count"),
     "",
     askedOf(intent),
   )
@@ -280,7 +280,7 @@ export function planResolution(input: {
   const contentOf = (shown: FileShown, k: number) =>
     joined(
       floor.skill,
-      introOf(floor.incoming, files.length, shown),
+      introOf(floor.latest, files.length, shown),
       files.map(f => renderFile(f, shown, k)).join("\n"),
       asked,
     )

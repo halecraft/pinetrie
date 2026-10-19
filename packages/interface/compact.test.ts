@@ -47,7 +47,7 @@ const text: TextCard = {
   owner: BEA,
   placer: BEA,
   place: { kind: "inventory", holder: ADA },
-  content: { command: "bring-up-to-date", unsent: null, origin: null },
+  content: { command: "get-latest", unsent: null, origin: null },
 }
 const note: NoteCard = {
   ...text,
@@ -186,14 +186,14 @@ describe("cardCompact", () => {
       card: C,
       tone: "inventory",
       mark: { kind: "writer", writer: BEA },
-      command: "bring-up-to-date",
+      command: "get-latest",
       lead: { kind: "text", text: "one" },
       second: "two",
       badge: { kind: "key", key: "1" },
     })
     expect(
       compactWords(compact, { me: ADA, nameOf: new Map([[BEA, "Bea"]]) }),
-    ).toEqual({ owner: "Bea", command: "catch up", badge: "1" })
+    ).toEqual({ owner: "Bea", command: "get the latest", badge: "1" })
   })
 
   test("a reference: its quote, its kind's words until read, then the thread it is from", () => {

@@ -3,9 +3,9 @@
 // refusals read, through `pinetrie.base`.
 
 import type {
-  CatchUpRead,
   CommitBase,
   CommitId,
+  GetLatestRead,
   NonEmpty,
   StartRead,
 } from "@pinetrie/core"
@@ -16,7 +16,7 @@ import { changedPaths } from "./lane/revisions.ts"
  * What an update brings in: accepted work's commit, merged, or a WIP's
  * commit, copied onto the lane's previous copy (`planWipCopy`).
  */
-export type CatchUpTarget =
+export type GetLatestTarget =
   | { readonly kind: "accepted"; readonly commit: CommitId }
   | { readonly kind: "wip"; readonly commit: CommitId }
 
@@ -25,11 +25,11 @@ export type CatchUpTarget =
  * base start, `keep` when `known` was read at this tip and base commit, else
  * `read`: each lane reads it once per move of its tip or of the base.
  */
-export function planCatchUpRead(input: {
+export function planGetLatestRead(input: {
   readonly start: CommitId
   readonly to: CommitId
   readonly tip: CommitId
-  readonly known: CatchUpRead | null
+  readonly known: GetLatestRead | null
 }): "none" | "keep" | "read" {
   const { start, to, tip, known } = input
   if (start === to) return "none"
@@ -47,10 +47,10 @@ export function planCatchUpRead(input: {
  * merge, and an untraced start names no source: both diff from the base's
  * start.
  */
-export function catchUpHolds(input: {
+export function getLatestHolds(input: {
   readonly base: CommitBase
   readonly start: StartRead
-  readonly target: CatchUpTarget
+  readonly target: GetLatestTarget
 }): NonEmpty<CommitId> {
   const { base, start, target } = input
   return target.kind === "accepted" && start.kind === "known"
@@ -68,7 +68,7 @@ export function catchUpHolds(input: {
  * between proposing it and its acceptance, whose start has two heads. In
  * the first diff's order.
  */
-export function catchUpChangedFiles(input: {
+export function getLatestChangedFiles(input: {
   readonly moved: NonEmpty<readonly string[]>
   readonly lacking: readonly string[]
 }): string[] {
@@ -81,12 +81,12 @@ export function catchUpChangedFiles(input: {
 /**
  * The files catching up with a base would change in the lane, or null when
  * jj cannot say: one diff from each commit the lane holds of the base's
- * history (`holds`, from `catchUpHolds`) to the base's commit `to`, and one
- * from the lane's `tip`, decided by `catchUpChangedFiles`. Two diffs for one held
+ * history (`holds`, from `getLatestHolds`) to the base's commit `to`, and one
+ * from the lane's `tip`, decided by `getLatestChangedFiles`. Two diffs for one held
  * commit. Read as `mergeUpdate` reads the files a merge changed
  * (`changedPaths`), so the two compare.
  */
-export async function catchUpFiles(
+export async function getLatestFiles(
   jj: Runner,
   input: {
     readonly holds: NonEmpty<CommitId>
@@ -101,7 +101,7 @@ export async function catchUpFiles(
       await changedPaths(jj, first, to),
     ]
     for (const held of rest) moved.push(await changedPaths(jj, held, to))
-    return catchUpChangedFiles({
+    return getLatestChangedFiles({
       moved,
       lacking: await changedPaths(jj, tip, to),
     })
@@ -112,30 +112,30 @@ export async function catchUpFiles(
 
 /**
  * What catching up would change, read at `tip` and the target's commit as
- * `planCatchUpRead` decides: null when the base has not moved from the
+ * `planGetLatestRead` decides: null when the base has not moved from the
  * lane's base start, or jj cannot say; `known` when it was read at the same
- * tip and commit; else `catchUpFiles` from the commits `catchUpHolds` names.
+ * tip and commit; else `getLatestFiles` from the commits `getLatestHolds` names.
  */
-export async function readCatchUp(
+export async function readGetLatest(
   jj: Runner,
   input: {
     readonly base: CommitBase
     readonly start: StartRead
-    readonly target: CatchUpTarget
+    readonly target: GetLatestTarget
     readonly tip: CommitId
-    readonly known: CatchUpRead | null
+    readonly known: GetLatestRead | null
   },
-): Promise<CatchUpRead | null> {
+): Promise<GetLatestRead | null> {
   const { base, target, tip, known } = input
   const to = target.commit
-  switch (planCatchUpRead({ start: base.start, to, tip, known })) {
+  switch (planGetLatestRead({ start: base.start, to, tip, known })) {
     case "none":
       return null
     case "keep":
       return known
     case "read": {
-      const files = await catchUpFiles(jj, {
-        holds: catchUpHolds(input),
+      const files = await getLatestFiles(jj, {
+        holds: getLatestHolds(input),
         to,
         tip,
       })

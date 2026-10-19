@@ -9,8 +9,8 @@ export type RepoStep =
        * so it never snapshots the working copy, and the evolog says the host
        * made what it made, where the host's version of proposed changes cannot.
        * `you`: as you, for a step that is
-       * your act or moves the working copy (`planPublishCatchUp`, an accepting
-       * `planPublishMove`, `planCatchUpUndo`).
+       * your act or moves the working copy (`planPublishGetLatest`, an accepting
+       * `planPublishMove`, `planGetLatestUndo`).
        */
       readonly as: "host" | "you"
       readonly args: readonly string[]

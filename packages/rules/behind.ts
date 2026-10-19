@@ -3,17 +3,17 @@
 
 import {
   type BehindView,
-  CATCH_UP_TOOL,
+  GET_LATEST_TOOL,
   type PointId,
   type ProposedChangesRecord,
 } from "@pinetrie/core"
 import { Type } from "typebox"
 import type { AcceptedRecord } from "./accepted.ts"
-import { type BaseRecord, catchUpNow } from "./base.ts"
-import { baseMovedOn, CatchUpFromSchema } from "./catch-up-from.ts"
+import { type BaseRecord, latestNow } from "./base.ts"
 import { count } from "./counts.ts"
 import { List, PointSchema } from "./decode.ts"
 import { type HistoryMessage, historyMessage } from "./history.ts"
+import { baseMovedOn, LatestFromSchema } from "./latest-from.ts"
 
 export const BEHIND_TYPE = "pinetrie.behind"
 
@@ -21,7 +21,7 @@ export const BEHIND_TYPE = "pinetrie.behind"
 const NAMED_FILES = 20
 
 const BehindDetailsSchema = Type.Object({
-  from: CatchUpFromSchema,
+  from: LatestFromSchema,
   to: PointSchema,
   files: List(Type.String()),
   overlap: List(Type.String()),
@@ -59,9 +59,9 @@ export function behindContent(v: BehindView): string {
       ? ""
       : `\nThis thread's proposed changes conflict with it in:\n${named(v.conflicts)}`
   return (
-    `${baseMovedOn(v.from)} since this thread's copy was made or last caught up. Catching up would change ${count(v.files.length, "file", "files")}:\n${named(v.files)}\n` +
+    `${baseMovedOn(v.from)} since this thread's copy was made or last got the latest. Getting it would change ${count(v.files.length, "file", "files")}:\n${named(v.files)}\n` +
     `${overlap}${conflicts}\n` +
-    `To merge it into this copy, call \`${CATCH_UP_TOOL}\`, alone in its turn. Nothing is merged until you do.`
+    `To merge it into this copy, call \`${GET_LATEST_TOOL}\`, alone in its turn. Nothing is merged until you do.`
   )
 }
 
@@ -75,13 +75,13 @@ export const encodeBehind = (
 export type BaseNews =
   | { readonly kind: "nothing" }
   /** The lane's work changes no file: catch it up before its run, quietly. */
-  | { readonly kind: "catch-up" }
+  | { readonly kind: "get-latest" }
   /** The lane has work of its own: tell it, and leave catching up to it. */
   | { readonly kind: "tell"; readonly view: BehindView }
 
 /**
  * Whether a thread's base has news for it, and what to do with it: from the
- * lane's base record and accepted work's (`catchUpNow`), its proposed changes,
+ * lane's base record and accepted work's (`latestNow`), its proposed changes,
  * the base states it last heard of or merged (`baseKnown`), and the one the
  * host told it while it runs (`told`). Only a lane of its own has a base.
  * `unknown` work never acts, nor a gone base.
@@ -101,9 +101,9 @@ export function planBaseNews(input: {
     (base.kind === "jj" && base.state === "gone")
   )
     return { kind: "nothing" }
-  const now = catchUpNow(base, input.accepted)
+  const now = latestNow(base, input.accepted)
   if (now.kind !== "brings") return { kind: "nothing" }
-  if (base.work === "none") return { kind: "catch-up" }
+  if (base.work === "none") return { kind: "get-latest" }
   const { to } = now.move
   if (
     base.work !== "some" ||
@@ -111,7 +111,7 @@ export function planBaseNews(input: {
     input.told === to
   )
     return { kind: "nothing" }
-  const files = base.catchUp?.files ?? []
+  const files = base.getLatest?.files ?? []
   const mine = new Set(input.proposed?.files ?? [])
   return {
     kind: "tell",

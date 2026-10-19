@@ -528,13 +528,13 @@ describe.skipIf(!onBtrfs)(
     const withParent = (
       parent: RigLane,
       point: PointId,
-      caughtUpWith: PointId,
+      upToDateWith: PointId,
     ): BaseMerge => ({
       kind: "parent",
       lane: parent.lane,
       name: "amber-fox" as ThreadName,
       point,
-      caughtUpWith,
+      upToDateWith,
     })
     const lines = (...ls: string[]) => `${ls.join("\n")}\n`
 
@@ -640,11 +640,11 @@ describe.skipIf(!onBtrfs)(
         await lane.withHistory(h =>
           h.resolve("a.txt", "ours", { kind: "agent" }),
         )
-      const caughtUp = laneNewest(rig.graph(), lane.lane)
-      if (caughtUp === null) throw new Error("the lane has no state")
-      const plan = planBase(rig.graph(), caughtUp, theirs)
+      const upToDate = laneNewest(rig.graph(), lane.lane)
+      if (upToDate === null) throw new Error("the lane has no state")
+      const plan = planBase(rig.graph(), upToDate, theirs)
       if (plan?.kind !== "virtual") throw new Error("no criss-cross")
-      return { lane, theirs, caughtUp, base: plan.name }
+      return { lane, theirs, upToDate, base: plan.name }
     }
 
     const E2 = {
@@ -666,8 +666,8 @@ describe.skipIf(!onBtrfs)(
     test("a clean catch-up over a virtual base leaves no snapshot of it; two in turn each make it", async () => {
       const rig = await makeRig()
       try {
-        const { lane, theirs, caughtUp, base } = await crissCross(rig, E2)
-        const branch = await rig.branch(caughtUp)
+        const { lane, theirs, upToDate, base } = await crissCross(rig, E2)
+        const branch = await rig.branch(upToDate)
         expect((await merge(lane, withAccepted(theirs))).kind).toBe("clean")
         expect(await rig.snapshotExists(base)).toBe(false)
         expect(rig.graph().states.has(base)).toBe(false)
@@ -681,9 +681,9 @@ describe.skipIf(!onBtrfs)(
     test("a virtual base a conflict names is recorded and kept, a clean catch-up over it after included", async () => {
       const rig = await makeRig()
       try {
-        const { lane, theirs, caughtUp, base } = await crissCross(rig, F)
+        const { lane, theirs, upToDate, base } = await crissCross(rig, F)
         // Branched before the conflict, it takes your line: clean over the same bases.
-        const branch = await rig.branch(caughtUp)
+        const branch = await rig.branch(upToDate)
         await branch.write("a.txt", F.accepted)
         await recorded(branch, 2)
         await lane.write("a.txt", lines("X", "1", "2", "Y1", "3", "4", "Zlane"))

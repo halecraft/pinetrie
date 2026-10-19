@@ -5,10 +5,10 @@ import {
   type AgentId,
   type AgentMessageLike,
   address,
-  CATCH_UP_TOOL,
   type CanvasId,
   CONFLICT_TOOL,
   ERR,
+  GET_LATEST_TOOL,
   IMAGE_MIMES,
   type ImageMime,
   type ImageRef,
@@ -350,7 +350,7 @@ function toolResultFacts(
   if (m.toolName === CONFLICT_TOOL && details.asked === true)
     return { asked: true }
   if (
-    m.toolName === CATCH_UP_TOOL &&
+    m.toolName === GET_LATEST_TOOL &&
     Array.isArray(details.merged) &&
     details.merged.every(c => typeof c === "string" && c !== "")
   )
@@ -542,7 +542,7 @@ export type MessageDecision =
    * changes no file and its base has new work: catch it up, then
    * plan the chat again.
    */
-  | { readonly kind: "catch-up-first"; readonly thread: ThreadId }
+  | { readonly kind: "get-latest-first"; readonly thread: ThreadId }
   /**
    * The lane runs, or has cards queued: nothing is written, and the sender's
    * client queues its card behind them.
@@ -660,7 +660,7 @@ export function planDelivery(input: {
  * - A lane is always named by its thread's id: no other name is
  *   ever chosen.
  * - A run on a lane whose work changes no file, and whose base has new work,
- *   catches the lane up first (`catch-up-first`), once per send.
+ *   catches the lane up first (`get-latest-first`), once per send.
  */
 export function planMessage(input: {
   readonly author: WriterId
@@ -708,7 +708,7 @@ export function planMessage(input: {
    * the next refresh, so it still says the base has news.
    */
   readonly news: BaseNews["kind"]
-  readonly caughtUp: boolean
+  readonly upToDate: boolean
   /** The board state a branch's new canvas lands in; null for the first open one. */
   readonly state: WorkflowStateId | null
 }): MessageDecision {
@@ -798,7 +798,7 @@ export function planMessage(input: {
       break
   }
   const name: ThreadId = to.thread
-  return input.news === "catch-up" && !input.caughtUp
-    ? { kind: "catch-up-first", thread: name }
+  return input.news === "get-latest" && !input.upToDate
+    ? { kind: "get-latest-first", thread: name }
     : { kind: "run", thread: name, details }
 }

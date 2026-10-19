@@ -28,7 +28,7 @@ import {
 } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
 import {
-  type CatchUpNow,
+  type LatestNow,
   type ParentNow,
   type ProjectRecord,
   proposedChangesStatus,
@@ -214,7 +214,7 @@ const ACCEPTED = {
   workingCopy: {
     behind: 0,
     ahead: 0,
-    catchUp: null,
+    getLatest: null,
     conflicts: { commits: 0, files: [] },
   },
   publishCatchesUp: true,
@@ -225,7 +225,7 @@ const BASE: JjBaseRecord = {
   base: { kind: "accepted" as const },
   start: commitId("aaaaaaaaaaaa"),
   state: "ok" as const,
-  catchUp: {
+  getLatest: {
     tip: commitId("t"),
     to: commitId("bbbbbbbbbbbb"),
     files: ["a.txt", "b.txt"],
@@ -779,7 +779,7 @@ describe("columnView: the work strip", () => {
     if (shows.strip === null) throw new Error("no work strip")
     expect(shows.strip.words.menu.find(b => b.button === "update")).toEqual({
       button: "update",
-      label: "catch up with accepted work",
+      label: "get the latest",
       title: "merges accepted work into this thread's copy",
     })
     expect(shows.behind).toBeNull()
@@ -915,7 +915,7 @@ describe("workStripWords", () => {
     activity: "idle" | "turn" | "resolution" = "idle",
     base: Parameters<typeof workStripView>[0]["base"] = ACCEPTED_BASE,
     catching: {
-      catchUp?: CatchUpNow
+      getLatest?: LatestNow
       untraced?: boolean
       queued?: readonly CardCommand[]
       parent?: ParentNow | null
@@ -931,7 +931,7 @@ describe("workStripWords", () => {
         base,
         into: { kind: "bookmark", bookmark: "pinetrie-accepted" },
         wipAhead: 2,
-        catchUp: catching.catchUp ?? { kind: "current" },
+        getLatest: catching.getLatest ?? { kind: "current" },
         untraced: catching.untraced ?? false,
         queued: catching.queued ?? [],
         parent: catching.parent ?? null,
@@ -954,12 +954,7 @@ describe("workStripWords", () => {
     ],
     ["running, nothing yet", undefined, "turn", "no files changed yet"],
     ["running", proposed, "turn", "2 files so far"],
-    [
-      "resolving",
-      proposed,
-      "resolution",
-      "resolving what's new in accepted work into this thread",
-    ],
+    ["resolving", proposed, "resolution", "merging in the latest work"],
     ["ready", proposed, "idle", "2 files changed"],
     [
       "ready, touching your edits",
@@ -1035,7 +1030,7 @@ describe("workStripWords", () => {
     ])
     expect(words(proposed).menu.map(b => b.label)).toEqual([
       "rewrite description",
-      "catch up with accepted work",
+      "get the latest",
     ])
   })
   const MOVE = {
@@ -1053,7 +1048,7 @@ describe("workStripWords", () => {
 
   test("the jj facts are titles: which bookmark an acceptance moves, and what catching up merges, by the base's name", () => {
     const w = words(proposed, "idle", ACCEPTED_BASE, {
-      catchUp: { kind: "unknown" },
+      getLatest: { kind: "unknown" },
     })
     expect(w.buttons[0]?.title).toBe(
       "moves pinetrie-accepted forward to pinetrie-proposed/amber-fox",
@@ -1083,7 +1078,7 @@ describe("workStripWords", () => {
         base: { kind: "folder" },
         into: { kind: "folder" },
         wipAhead: 0,
-        catchUp: { kind: "unknown" },
+        getLatest: { kind: "unknown" },
         untraced: false,
         queued: [],
         parent: null,
@@ -1106,13 +1101,15 @@ describe("workStripWords", () => {
       "merges accepted work into this thread's copy",
     )
   })
-  const brings = { catchUp: { kind: "brings", move: MOVE, files: 3 } } as const
+  const brings = {
+    getLatest: { kind: "brings", move: MOVE, files: 3 },
+  } as const
   test("behind its base, the strip says so and offers catching up beside the proposed changes", () => {
     const behind = words(proposed, "idle", ACCEPTED_BASE, brings)
     expect(behind.line).toBe("2 files changed · accepted work has moved on")
     expect(behind.buttons.find(b => b.button === "update")).toEqual({
       button: "update",
-      label: "catch up with accepted work",
+      label: "get the latest",
       title: "merges accepted work into this thread's copy · changes 3 files",
     })
     expect(words(undefined, "idle", ACCEPTED_BASE, brings).line).toBe(
@@ -1123,61 +1120,57 @@ describe("workStripWords", () => {
     )
   })
   test("catching up that would change nothing is disabled, and says why; one not yet read is not", () => {
-    const update = (catchUp: CatchUpNow) =>
-      words(proposed, "idle", ACCEPTED_BASE, { catchUp }).menu.find(
+    const update = (getLatest: LatestNow) =>
+      words(proposed, "idle", ACCEPTED_BASE, { getLatest }).menu.find(
         b => b.button === "update",
       )
     expect(update({ kind: "current" })).toEqual({
       button: "update",
-      label: "catch up with accepted work",
-      title: "already caught up with accepted work",
+      label: "get the latest",
+      title: "already has the latest from accepted work",
       disabled: true,
     })
     expect(update({ kind: "nothing-new" })).toEqual({
       button: "update",
-      label: "catch up with accepted work",
+      label: "get the latest",
       title:
-        "what's new in accepted work is this thread's own: catching up changes no file",
+        "what's new in accepted work is this thread's own: getting it changes no file",
       disabled: true,
     })
     expect(update({ kind: "unknown" })).toEqual({
       button: "update",
-      label: "catch up with accepted work",
+      label: "get the latest",
       title: "merges accepted work into this thread's copy",
     })
     // Nothing new is no "new work" either.
     expect(
       words(proposed, "idle", ACCEPTED_BASE, {
-        catchUp: { kind: "nothing-new" },
+        getLatest: { kind: "nothing-new" },
       }).line,
     ).toBe("2 files changed")
   })
   test("an untraced thread says why nothing is offered, and offers catching up", () => {
     const w = words(undefined, "idle", ACCEPTED_BASE, { untraced: true })
     expect(w.line).toBe(
-      "an earlier accept of this thread can't be traced: catch up with accepted work to show what's new",
+      "an earlier accept of this thread can't be traced: get the latest from accepted work to show what's new",
     )
     expect(w.buttons.map(b => [b.label, b.disabled])).toEqual([
-      ["catch up with accepted work", undefined],
+      ["get the latest", undefined],
     ])
   })
   test("a queued catch-up is the proposed changes' activity: the strip says it is catching up", () => {
     expect(
-      words(proposed, "idle", ACCEPTED_BASE, { queued: ["bring-up-to-date"] })
-        .line,
-    ).toBe("catching up with accepted work…")
+      words(proposed, "idle", ACCEPTED_BASE, { queued: ["get-latest"] }).line,
+    ).toBe("getting the latest work…")
   })
   test("only clean proposed changes land on accepted work; on a WIP, a conflicted one is added anyway", () => {
     const conflicted = { ...proposed, conflicts: ["a.txt"] }
     expect(words(conflicted).buttons.map(b => b.label)).toEqual([
-      "catch up with accepted work and resolve",
+      "get the latest and resolve",
     ])
     expect(
       words(conflicted, "idle", WIP_BASE).buttons.map(b => b.label),
-    ).toEqual([
-      "catch up with wip/search and resolve",
-      "accept anyway into wip/search",
-    ])
+    ).toEqual(["get the latest and resolve", "accept anyway into wip/search"])
     expect(
       words(conflicted, "idle", WIP_BASE).menu.map(b => b.label),
     ).not.toContain("accept, with your 2 commits beneath it")
@@ -1188,7 +1181,7 @@ describe("workStripWords", () => {
       lane: B,
       name: "copper-owl" as ThreadName,
       newest: pointId("p2"),
-      caughtUpWith: pointId("p1"),
+      upToDateWith: pointId("p1"),
       conflicts: [],
     }
     const fromStart = {
@@ -1201,7 +1194,7 @@ describe("workStripWords", () => {
       "began from a copy with an unresolved conflict in 1 file · copper-owl has resolved it",
     )
     expect(resolved.buttons.map(b => b.label)).toEqual([
-      "catch up with copper-owl",
+      "get copper-owl's latest",
     ])
     const unresolved = words(fromStart, "idle", ACCEPTED_BASE, {
       parent: { ...parent, conflicts: ["a.txt"] },
@@ -1210,16 +1203,16 @@ describe("workStripWords", () => {
       "began from a copy with an unresolved conflict in 1 file",
     )
     expect(unresolved.buttons.map(b => b.label)).toEqual([
-      "catch up with accepted work and resolve",
+      "get the latest and resolve",
     ])
     const running = words(proposed, "idle", ACCEPTED_BASE, {
       parent,
       parentRunning: true,
-    }).menu.find(b => b.button === "catch-up-parent")
+    }).menu.find(b => b.button === "get-latest-from-parent")
     expect(running).toMatchObject({
-      label: "catch up with copper-owl",
+      label: "get copper-owl's latest",
       disabled: true,
-      title: "copper-owl is working: catch up when its run ends",
+      title: "copper-owl is working: get its latest when its run ends",
     })
   })
   test("a WIP thread adds to its WIP, and offers the project with its commits", () => {
@@ -1227,7 +1220,7 @@ describe("workStripWords", () => {
     expect(w.buttons[0]?.label).toBe("accept changes into wip/search")
     expect(w.menu.map(b => b.label)).toEqual([
       "rewrite description",
-      "catch up with wip/search",
+      "get the latest",
       "accept, with 2 of your own changes",
     ])
   })
@@ -1288,7 +1281,7 @@ describe("workStripWords", () => {
     expect(w.buttons.map(b => b.label)).toEqual(["split into a stack"])
     expect(w.menu.map(b => b.label)).toEqual([
       "rewrite description",
-      "continue from accepted work",
+      "continue from the latest work",
     ])
   })
 })
@@ -1319,12 +1312,12 @@ describe("behindMark: the header's mark for a base that moved on", () => {
   test("none once caught up, before the host read the base, or with nothing read to catch up", () => {
     expect(behindMark({ ...BASE, start: ACCEPTED.commit }, ACCEPTED)).toBe(null)
     expect(behindMark(undefined, ACCEPTED)).toBe(null)
-    const read = BASE.catchUp
+    const read = BASE.getLatest
     if (read === null) throw new Error("no read")
     expect(
-      behindMark({ ...BASE, catchUp: { ...read, files: [] } }, ACCEPTED),
+      behindMark({ ...BASE, getLatest: { ...read, files: [] } }, ACCEPTED),
     ).toBe(null)
-    expect(behindMark({ ...BASE, catchUp: null }, ACCEPTED)).toBe(null)
+    expect(behindMark({ ...BASE, getLatest: null }, ACCEPTED)).toBe(null)
   })
 })
 

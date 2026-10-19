@@ -528,7 +528,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
     {
       kind: "set-command",
       card: cardIdFor("c7"),
-      command: "bring-up-to-date",
+      command: "get-latest",
     },
     {
       kind: "set-command",

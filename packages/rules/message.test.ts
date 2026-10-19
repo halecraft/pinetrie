@@ -2,12 +2,12 @@ import assert from "node:assert/strict"
 import {
   address,
   atEntry,
-  CATCH_UP_TOOL,
   CONFLICT_TOOL,
   canvasIdFor,
   commitId,
   ERR,
   entryId,
+  GET_LATEST_TOOL,
   NOBODY,
   type PlanMode,
   type Position,
@@ -54,7 +54,7 @@ function floor(): Floor {
     budget: { tokens: 10_000, estimate: c => Math.ceil(c.length / 4) },
     skill: null,
     intent: "",
-    incoming: "Accepted work",
+    latest: "Accepted work",
   })
   if (found.kind !== "fits") throw new Error("the floor does not fit")
   return found.floor
@@ -110,7 +110,7 @@ const plan = (over: Partial<PlanInput>) => {
     participants: ["Alice", "Bo"],
     sendId: "s-1",
     news: "nothing",
-    caughtUp: false,
+    upToDate: false,
     state: null,
     ...over,
   }
@@ -681,11 +681,11 @@ describe("a host tool's result as a fact", () => {
 
   test("a catch_up result carries the commits it merged", () => {
     expect(
-      renderableMessage(result(CATCH_UP_TOOL, { merged: ["c1"] }, "merged"))
+      renderableMessage(result(GET_LATEST_TOOL, { merged: ["c1"] }, "merged"))
         .merged,
     ).toEqual(["c1"])
     expect(
-      renderableMessage(result(CATCH_UP_TOOL, { merged: [3] })).merged,
+      renderableMessage(result(GET_LATEST_TOOL, { merged: [3] })).merged,
     ).toBeUndefined()
   })
 
@@ -762,11 +762,13 @@ describe("promptAuthor", () => {
 describe("planMessage: a lane with no work of its own catches up first", () => {
   const ask = { mentions: ASK, text: "@agent please", lane: lane() }
   test("a run on a lane whose news is catch-up catches it up first, once per send", () => {
-    expect(plan({ ...ask, news: "catch-up" })).toEqual({
-      kind: "catch-up-first",
+    expect(plan({ ...ask, news: "get-latest" })).toEqual({
+      kind: "get-latest-first",
       thread: LANE,
     })
-    expect(kind(plan({ ...ask, news: "catch-up", caughtUp: true }))).toBe("run")
+    expect(kind(plan({ ...ask, news: "get-latest", upToDate: true }))).toBe(
+      "run",
+    )
     expect(kind(plan({ ...ask, news: "tell" }))).toBe("run")
   })
   test("an append, a busy lane and a new lane never catch up", () => {
@@ -775,14 +777,14 @@ describe("planMessage: a lane with no work of its own catches up first", () => {
         plan({
           lane: lane(),
           mentions: parseMentions("@bo look"),
-          news: "catch-up",
+          news: "get-latest",
         }),
       ),
     ).toBe("appendToLane")
     expect(
-      kind(plan({ ...ask, lane: lane({ running: true }), news: "catch-up" })),
+      kind(plan({ ...ask, lane: lane({ running: true }), news: "get-latest" })),
     ).toBe("conflict")
-    expect(kind(plan({ ...ask, lane: NONE, news: "catch-up" }))).toBe(
+    expect(kind(plan({ ...ask, lane: NONE, news: "get-latest" }))).toBe(
       "createAndRun",
     )
   })

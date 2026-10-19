@@ -58,7 +58,7 @@ describe("accepted work", () => {
     workingCopy: {
       behind: 0,
       ahead: 0,
-      catchUp: null,
+      getLatest: null,
       conflicts: { commits: 0, files: [] },
     },
   } as const
@@ -115,7 +115,7 @@ describe("accepted work", () => {
     ): JjAcceptedRecord["workingCopy"] => ({
       behind: 0,
       ahead: 0,
-      catchUp: null,
+      getLatest: null,
       conflicts: { commits: 0, files: [] },
       ...over,
     })
@@ -143,13 +143,13 @@ describe("accepted work", () => {
         kind: "publish",
         acceptedBookmark: "pinetrie-accepted",
         publish: "main",
-        catchUp: false,
+        getLatest: false,
         accept: false,
       })
       expect(publishWork(r)).toEqual({
         acceptedCommits: 2,
         workingCopyCommits: 0,
-        catchUp: false,
+        getLatest: false,
       })
     })
     test("with publish.catchUp on it catches the working copy up and accepts your commits", () => {
@@ -157,20 +157,20 @@ describe("accepted work", () => {
         workingCopy: workingCopyFacts({
           behind: 2,
           ahead: 1,
-          catchUp: preview,
+          getLatest: preview,
         }),
       })
       expect(planAcceptedAction("publish", r)).toEqual({
         kind: "publish",
         acceptedBookmark: "pinetrie-accepted",
         publish: "main",
-        catchUp: true,
+        getLatest: true,
         accept: true,
       })
       expect(publishWork(r)).toEqual({
         acceptedCommits: 2,
         workingCopyCommits: 1,
-        catchUp: true,
+        getLatest: true,
       })
     })
     test("with nothing unpublished, your commits or files behind are still work", () => {
@@ -180,7 +180,7 @@ describe("accepted work", () => {
       expect(
         code(
           at(published, {
-            workingCopy: workingCopyFacts({ behind: 1, catchUp: preview }),
+            workingCopy: workingCopyFacts({ behind: 1, getLatest: preview }),
           }),
         ),
       ).toBeNull()
@@ -205,7 +205,7 @@ describe("accepted work", () => {
       for (const over of [
         { conflicts: { commits: 1, files: [] } },
         { conflicts: { commits: 0, files: ["a.txt"] } },
-        { behind: 1, catchUp: { ...preview, conflicts: ["a.txt"] } },
+        { behind: 1, getLatest: { ...preview, conflicts: ["a.txt"] } },
       ])
         expect(
           code(at(unpublished, { workingCopy: workingCopyFacts(over) })),
@@ -256,11 +256,11 @@ describe("accepted work", () => {
           at(unpublished, {
             workingCopy: workingCopyFacts({
               behind: 1,
-              catchUp: { ...preview, conflicts: ["x.ts"] },
+              getLatest: { ...preview, conflicts: ["x.ts"] },
             }),
           }),
         ),
-      ).toBe("catching the working copy up would conflict in x.ts")
+      ).toBe("bringing the working copy the latest would conflict in x.ts")
     })
 
     describe("planPublishFinish: the second round, from accepted work read after the catch-up", () => {
@@ -268,7 +268,7 @@ describe("accepted work", () => {
         kind: "publish",
         acceptedBookmark: "pinetrie-accepted",
         publish: "main",
-        catchUp: true,
+        getLatest: true,
         accept: false,
       } as const
       const after = (
@@ -283,7 +283,7 @@ describe("accepted work", () => {
         [
           "without a catch-up: the move as decided",
           {
-            decision: { ...decision, catchUp: false, accept: true },
+            decision: { ...decision, getLatest: false, accept: true },
             after: after({ conflicts: { commits: 1, files: [] } }),
             op: null,
           },
@@ -345,18 +345,18 @@ describe("accepted work", () => {
       workingCopy: {
         behind: 0,
         ahead: 2,
-        catchUp: null,
+        getLatest: null,
         conflicts: { commits: 2, files: [] },
       },
     })
     expect(publishUndone(ERR.WORKING_COPY_CONFLICT, after)).toBe(
-      "catching the working copy up would leave 2 commits of yours with conflicts",
+      "bringing the working copy the latest would leave 2 commits of yours with conflicts",
     )
     expect(publishUndone(ERR.NOT_FAST_FORWARD, after)).toBe(
       acceptedRefusal("publish", ERR.NOT_FAST_FORWARD, after),
     )
   })
-  test("movedOnLine names the base as catchUpName does", () => {
+  test("movedOnLine names the base as latestSourceName does", () => {
     expect(baseMovedOn({ kind: "accepted" })).toBe("accepted work has moved on")
     expect(baseMovedOn({ kind: "wip", bookmark: "wip/search" })).toBe(
       "wip/search has moved on",
@@ -469,15 +469,15 @@ describe("parentNow and planParentUpdate: the thread a lane branched from", () =
       lane: P,
       name: "amber-fox",
       newest: C(4),
-      caughtUpWith: C(2),
+      upToDateWith: C(2),
       conflicts: ["a.txt"],
     })
   })
   test("a catch-up's merged commit is what it caught up with", () => {
-    expect(now("4-u", "6-m")?.caughtUpWith).toBe(C(3))
+    expect(now("4-u", "6-m")?.upToDateWith).toBe(C(3))
     expect(now("4-u", "5-m")).toMatchObject({
       newest: C(3),
-      caughtUpWith: C(3),
+      upToDateWith: C(3),
     })
   })
   test("no parent: a lane that began at its base, or a parent with no name", () => {
@@ -499,7 +499,7 @@ describe("parentNow and planParentUpdate: the thread a lane branched from", () =
       lane: P,
       name: "amber-fox",
       point: C(4),
-      caughtUpWith: C(2),
+      upToDateWith: C(2),
     })
     expect(planParentUpdate(now("4-u", "5-m"), false)).toEqual({
       kind: "nothing",

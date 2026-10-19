@@ -53,7 +53,7 @@ export interface JjAcceptedRecord {
   /**
    * Your `@-` against accepted work: accepted commits it lacks (`behind`), and
    * your commits below `@` accepted work lacks (`ahead`, `::@- ~ ::<accepted>`:
-   * what a publish accepts). `catchUp` is what catching the working copy up
+   * what a publish accepts). `getLatest` is what catching the working copy up
    * would do: how many files change, those that conflict, and your other heads
    * that move with `@`; null when nothing is behind, or `@` shares no commit
    * with accepted work. `conflicts` are your conflicted commits above accepted
@@ -62,7 +62,7 @@ export interface JjAcceptedRecord {
   readonly workingCopy: {
     readonly behind: number
     readonly ahead: number
-    readonly catchUp: {
+    readonly getLatest: {
       readonly changes: number
       readonly conflicts: readonly string[]
       readonly heads: number
@@ -95,7 +95,7 @@ export interface JjBaseRecord {
    * then; null when the base had not moved, or jj could not say. A reader whose
    * base has moved since reads it as unknown.
    */
-  readonly catchUp: CatchUpRead | null
+  readonly getLatest: GetLatestRead | null
   /**
    * Accepted thread commits of this thread on accepted work, above its base,
    * that name no source (`untracedLanes`): nothing is proposed until it catches
@@ -110,8 +110,8 @@ export interface JjBaseRecord {
   readonly work: FilesTouched
 }
 
-/** What catching up would change in a lane (`catchUpFiles`), and what it was read at. */
-export interface CatchUpRead {
+/** What catching up would change in a lane (`getLatestFiles`), and what it was read at. */
+export interface GetLatestRead {
   readonly tip: CommitId
   /** The base's commit: accepted work's, or the WIP's. */
   readonly to: CommitId

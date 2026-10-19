@@ -15,7 +15,7 @@ words they were written with.
 | **accepted thread commit** | A commit in accepted work that a thread's work became, carrying `Pinetrie-Source` (ADR-0153). Every commit in accepted work is accepted, yours too, so the name says it was a thread's. | `AcceptedThreadCommit`, `acceptedThreadCommits` | accepted-offer commit, integrated-offer commit |
 | **proposed changes**, read as **changes** | A thread's work waiting to be accepted: one revision or a stack under `pinetrie-proposed/<thread name>`, or a folder project's files. People read **changes** ("2 files changed", **accept changes**); code, docs and the agent say **proposed changes**, and *changes* is never bare in code (ADR-0156). | `ProposedChangesInRepo`, `ProposedChangesRecord`, `ProposedChangesStatus`, `proposedBookmark`, `PROPOSED_CHANGES` (`pinetrie.proposed`) | offer |
 | **WIP** | A bookmark (prefix `wip/`, config `wip.prefix`) a thread may start from and be accepted into. | `wip`, `wipPrefix` | |
-| **publish** | Move `main` (config `publish.bookmark`) forward to accepted work; with `publish.catchUp` on, catch the working copy up and accept your commits below `@` first (ADR-0099). | `publish`, `publishCatchesUp` | |
+| **publish** | Move `main` (config `publish.bookmark`) forward to accepted work; with `publish.catchUp` on, bring the working copy the latest and accept your commits below `@` first (ADR-0099). | `publish`, `publishCatchesUp` | |
 | **working copy** | `@` in your repo, with your commits below it that accepted work lacks (ADR-0172). A lane's is always "the lane's working copy"; to people, a thread's copy. | `workingCopy`, `ERR.WORKING_COPY_CONFLICT`, `workingCopyEdits` | yours, your files, the host's working copy |
 | **set up** | Create accepted work's bookmark at your `@-` and write its `immutable_heads()` and `revsets.log` to your repo's config. | `setup`, `planSetup`, `setupProposal` | |
 | **tidy** | Cut your repo's op log to a window (seven days by default) with `pnpm tidy`, while no host serves the repo; a starting host logs when one is due (ADR-0155). | `pnpm tidy`, `planTidy` | trim, prune |
@@ -25,7 +25,7 @@ words they were written with.
 | word | what it is | in code | retired |
 |---|---|---|---|
 | **base** | Where a thread started: accepted work, or a copy of a WIP. Its first commit's `Pinetrie-Base` trailer says which (`accepted@<commit>`, or `<wip>@<commit>`). | `base`, `LaneBase`, `BaseTrailer` | the line (as a base) |
-| **catch up** | Bring the working copy, or a thread's copy, up to date with what it is based on. Its commit is titled `catch up: accepted work`, `catch up: <thread>`, or `copy of <wip>`. | `catchUp`, `CatchUpFrom`, `catchUpName` | update, follow, bring up to date |
+| **get the latest** | Bring the working copy, or a thread's copy, up to date with what it is based on (ADR-0172). Its commit keeps its jj title, `catch up: accepted work`, `catch up: <thread>`, or `copy of <wip>`, and the agent's tool its id, `catch_up`. | `getLatest`, `LatestFrom`, `latestSourceName`, `GET_LATEST_TOOL` | catch up, catch-up (ADR-0172); update, follow, bring up to date |
 | **lane** | A thread's own copy of your repo, in a container of its own (ADR-0034), named by its thread's id (ADR-0117). | `lane`, `ThreadId`, `threadLane` | |
 | **work strip** | The row of a column's header that says what became of its thread's files, with its buttons and its ⋯ (ADR-0153). | `WorkStripView`, `workStripView`, `WorkStripButton`, `WorkStripWords`, `.work-strip` | offer view, offer strip |
 | **review** | The pane that shows proposed changes' or an ask's revisions, files and diffs, read by commit id (`/review/…`, ADR-0047, ADR-0153). | `ReviewAsk`, `ReviewAnswer`, `parseReviewPath`, `REVIEW_WIRE` | offer read, `/offer/` |
@@ -38,8 +38,8 @@ words they were written with.
 | word | what it is | in code | retired |
 |---|---|---|---|
 | **folder project** | A project whose folder is no jj repo: pine·trie keeps its history itself, as states (ADR-0142). | `ProjectKind` `"folder"`, `startFolderProject` | |
-| **state** | A snapshot of a folder project's disk, recorded with its parents: a read of the project's folder, a lane's start, turn or catch-up. | `StateRecord`, `PointId` | |
-| **conflict** | A path a catch-up left conflicted in a folder lane: a record of its three versions' states, shown under `/pinetrie-states/conflicts/`. | `ConflictRecord` | |
+| **state** | A snapshot of a folder project's disk, recorded with its parents: a read of the project's folder, a lane's start, turn or getting the latest. | `StateRecord`, `PointId` | |
+| **conflict** | A path getting the latest left conflicted in a folder lane: a record of its three versions' states, shown under `/pinetrie-states/conflicts/`. | `ConflictRecord` | |
 | **resolve** | Close a conflict with the version chosen: the lane's own (`ours`), `theirs` or `base`, by the agent's tool or a person's choice on the page. In a folder project it is a state of the lane's own (`resolve`). | `resolve_conflict`, `LaneHistory.resolve`, `planResolve`, `ResolvedFact` | |
 
 ## A lane's disk
@@ -137,7 +137,7 @@ a value is stored.
 | **block** | Part of a message: a paragraph, a table, code, an image, numbered once by its kind in document order (ADR-0126). | `BlockRef`, `textBlocks`, `markBlocks`, `data-block` | |
 | **address** | What names a thread, an entry, a block, a range of text or a card; of the past, both a snapshot and a link (ADR-0126). | `Address`, `printAddress`, `parseAddress`, `/a/<address>` | |
 | **message** | An entry a person or the agent wrote; a person's is stored as `pinetrie.message`, and sending one is a **send**. | `TranscriptMessage`, roles `person` and `assistant`, `MessageAt`, `MessageDetails`, the `send` command | a chat (as a person's message) |
-| **fact** | An entry the host wrote: a catch-up, an acceptance, the base's news (ADR-0080), who stopped a run (ADR-0126). | roles `fact`, `update`, `land`, `behind`; `ProposedChangesFact`, `StopFact`, `QueuedFact`, `AskIndex.stoppedBy` | `pinetrie.stop` |
+| **fact** | An entry the host wrote: getting the latest, an acceptance, the base's news (ADR-0080), who stopped a run (ADR-0126). | roles `fact`, `update`, `land`, `behind`; `ProposedChangesFact`, `StopFact`, `QueuedFact`, `AskIndex.stoppedBy` | `pinetrie.stop` |
 | **run** | The agent's work in answer to an ask: the entries it wrote, and any fact steered into it. A run has an ask (ADR-0106). | `AskIndex.work`, `entryAsk` | |
 | **ask** | The message that started a run (ADR-0106). | `askOf`, `indexAsks` (by prompt) | |
 | **fork** | The point, at an entry, where threads diverge; not an entry. Forking before an entry edits it (ADR-0043); after it, branches. | `ThreadOrigin.fork` | |

@@ -26,7 +26,7 @@ const TEST_CANVAS = canvasIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 const ME = writerId("ada@x.test")
 const BEA = writerId("bea@x.test")
 const READER = { me: ME, nameOf: new Map([[BEA, "Bea"]]) }
-const CATCH_UPS = { base: { kind: "accepted" }, parent: null } as const
+const GET_LATESTS = { base: { kind: "accepted" }, parent: null } as const
 const LANE = threadIdFor("x")
 const at = atEntry(entryId("e-1"))
 const C1 = cardIdFor("c1")
@@ -197,7 +197,7 @@ describe("cardFrame", () => {
       tools: [],
       discards: false,
     })
-    expect(cardFrameWords(view, READER, CATCH_UPS, [])).toMatchObject({
+    expect(cardFrameWords(view, READER, GET_LATESTS, [])).toMatchObject({
       place: "pinned",
       state: null,
       who: null,
@@ -290,7 +290,7 @@ describe("cardFrameWords", () => {
     cardFrameWords(
       cardFrame(c, tone, { ...FACTS, ...facts }),
       READER,
-      CATCH_UPS,
+      GET_LATESTS,
       [],
     )
   const second = {
@@ -337,7 +337,7 @@ describe("cardFrameWords", () => {
       cardFrameWords(
         cardFrame(card(note, { owner: BEA }), "note", FACTS),
         READER,
-        CATCH_UPS,
+        GET_LATESTS,
         [BEA, ME],
       ).who,
     ).toBe("Bea's note · with ada")
@@ -353,7 +353,7 @@ describe("cardFrameWords", () => {
   test("in your inventory, a command has no thread to name: no chip", () => {
     const c = card(
       { kind: "inventory", holder: ME },
-      { content: { command: "bring-up-to-date", unsent: null, origin: null } },
+      { content: { command: "get-latest", unsent: null, origin: null } },
     )
     expect(
       cardFrameWords(cardFrame(c, "inventory", FACTS), READER, null, [])
@@ -363,11 +363,12 @@ describe("cardFrameWords", () => {
 
   test("a command is a chip, what it does its title", () => {
     const c = card(queued, {
-      content: { command: "bring-up-to-date", unsent: null, origin: null },
+      content: { command: "get-latest", unsent: null, origin: null },
     })
     expect(words(c, "queued").command).toEqual({
-      label: "catch up with accepted work",
-      title: "↓ catches up with accepted work first, then sends what you write",
+      label: "get the latest",
+      title:
+        "↓ gets the latest from accepted work first, then sends what you write",
     })
   })
 

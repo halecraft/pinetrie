@@ -33,7 +33,7 @@ lanehost declares only core and channel.
     mints; a virtual base `bases-<hash>`.
   - **Its parents' number follows how it was made** (`StateMade`): a read
     has one, or none when the graph is empty (the first read of the project's folder); a
-    start, a turn, a restore, a resolve and a concurrent save one; a catch-up and an
+    start, a turn, a restore, a resolve and a concurrent save one; getting the latest and an
     accept two; a merge of bases two or more; none repeats. A concurrent
     save's one parent is a line state (an accept's, or the read a put-back
     accept was built on), and it is never on accepted work's line itself,
@@ -74,7 +74,7 @@ lanehost declares only core and channel.
 
 Each is one test in `graph.test.ts` titled by its sentence
 (`scripts/laws.test.ts` holds each law to exactly one): the first three as
-properties over graphs from a seeded walk of a line, lanes, catch-ups,
+properties over graphs from a seeded walk of a line, lanes, getting the latest,
 accepts and stale accepts, for every pair of states; the last over S182's
 flows, merged by `git merge-file` as lanehost merges.
 

@@ -20,7 +20,7 @@ export type StateMade =
       readonly entry: EntryId
     }
   /** Its parents: the lane's state before, and the state it merged. */
-  | { readonly kind: "catch-up"; readonly lane: ThreadId }
+  | { readonly kind: "get-latest"; readonly lane: ThreadId }
   /** Its parents: accepted work's state before, and the lane's tip. */
   | { readonly kind: "accept"; readonly lane: ThreadId }
   /**
@@ -64,7 +64,7 @@ export const isLineState = (r: StateRecord): boolean =>
 export const stateLane = (r: StateRecord): ThreadId | null =>
   r.made.kind === "start" ||
   r.made.kind === "turn" ||
-  r.made.kind === "catch-up" ||
+  r.made.kind === "get-latest" ||
   r.made.kind === "resolve"
     ? r.made.lane
     : null
@@ -128,7 +128,7 @@ export const isDiskName = (name: string): boolean =>
 
 /**
  * A folder state's id: a disk name holding a dash, so never a jj commit's
- * (40 hex digits). A lane's states are `start-`, `turn-`, `catch-up-` and
+ * (40 hex digits). A lane's states are `start-`, `turn-`, `get-latest-` and
  * `resolve-<uuidv7>`, never its entry's id, which names the entry's own
  * snapshot; accepted work's line's are `line-` and `restore-<uuidv7>`, or an
  * accept's shown merge; a virtual base's is `bases-<hash>`.
@@ -147,8 +147,8 @@ export const startStateId = (uuid: string): PointId =>
   `start-${uuid}` as PointId
 
 /** A folder lane's catch-up state, from a uuidv7 its caller mints. */
-export const catchUpStateId = (uuid: string): PointId =>
-  `catch-up-${uuid}` as PointId
+export const getLatestStateId = (uuid: string): PointId =>
+  `get-latest-${uuid}` as PointId
 
 /** A restore's state of accepted work's line, from a uuidv7 its caller mints. */
 export const restoreStateId = (uuid: string): PointId =>

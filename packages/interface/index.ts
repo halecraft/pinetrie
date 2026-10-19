@@ -173,7 +173,6 @@ export {
   startText,
 } from "./card-state.ts"
 export {
-  type CatchUps,
   CLEAR_COMMAND,
   CLOSE_CARD,
   CLOSE_INVENTORY,
@@ -185,6 +184,7 @@ export {
   historyItemWords,
   historyWords,
   INVENTORY,
+  type LatestSources,
   movedBackWords,
   NEW_PIN,
   NEW_PIN_TITLE,

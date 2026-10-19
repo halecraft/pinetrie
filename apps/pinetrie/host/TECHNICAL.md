@@ -30,7 +30,7 @@ wires them.
 | `canvas-news.ts` | a card added to a running thread's canvas or taken from it, steered into its lane as a fact line (`planCanvasFacts`), heard from `Provenance.onChanged`; never a queued fact card, which would wait for the run's end |
 | `base-news.ts` | what a thread is told of its base's new work (ADR-0080): `atStart`, a chat's run's behind entry; `baseChanged`, a steer into a running lane, at most once per base commit (`told`), heard from lane work's `onBaseChanged`; `runEnded` forgets what was steered. Made after the agent, whose lanes it steers |
 | `split-call.ts` | `split_proposed_changes` (ADR-0080): a split card queued on the thread, popped when its run ends: pi calls it only during a run, so its step is queued before the run's end queues the drain, which the keeper runs after it |
-| `queued-card-pop.ts` | popping a lane's queued cards to send them (ADR-0048, ADR-0083): `popNextQueuedCard`, and `drain`, which carries each out as `planCarry` decides: a fact appended (through the scribe at the thread's end for a thread with no lane, `lanelessSpot`), a catch-up, a split's run, a message sent (ADR-0108, ADR-0080); and `createWaits`, the drain's waits for its top card's text or for someone's typing in it to stop (ADR-0048 step 7) |
+| `queued-card-pop.ts` | popping a lane's queued cards to send them (ADR-0048, ADR-0083): `popNextQueuedCard`, and `drain`, which carries each out as `planCarry` decides: a fact appended (through the scribe at the thread's end for a thread with no lane, `lanelessSpot`), getting the latest, a split's run, a message sent (ADR-0108, ADR-0080); and `createWaits`, the drain's waits for its top card's text or for someone's typing in it to stop (ADR-0048 step 7) |
 | `settle.ts` | what happens between runs: drains, then the upkeep (§ Roots: steps, leases and the upkeep) |
 | `housekeeping.ts` | deleting images nothing shows (ADR-0042), retiring histories of moves (`sweepHistories`), deleting holds on queues nobody can use (`sweepHolds`, ADR-0048 step 7), and trashed cards past their week (`sweepTrash`); which of them a start and an upkeep run, in order (`planSweeps`), carried out in one keeper step by `sweepUnused` |
 | `forward.ts` | `forward`: a call `startHost` hands to a module made before what carries it out, bound once that exists; a call before the bind is held, dropped or refused, as its site says (§ Startup) |
@@ -785,7 +785,7 @@ rejects `shutdown()`.
   through `LaneWork.runnable` (the lane's record and the adapter's kind).
   The gates word the refusal first; every path past them must prove its
   lane too: a chat and a carry-on (`startRun`, `runs.ts`), the drain's
-  catch-up conflict and split, a relay's delivery (`planRelay` refuses an
+  getting the latest conflict and split, a relay's delivery (`planRelay` refuses an
   asked thread of another kind, `RelayRefusal`'s `foreign`) and its answer
   (appended, not run, to an asker of another kind), and a crash's resume
   (`planStartup` leaves it interrupted, logged).
@@ -1052,20 +1052,20 @@ rejects `shutdown()`.
   watched only while a wait is out.
 - **What a popped card comes to is decided first** (`planCarry`,
   ADR-0080), then carried out (`carryOut`): a fact is appended to the
-  thread; a catch-up runs `prepareUpdate`, then sends the text; a split
+  thread; getting the latest runs `prepareUpdate`, then sends the text; a split
   starts the split's own run, its text the brief; a message is sent; a card
   with no text and no command is discarded. A queued reference's quote is
   read from its blob before the pop (`queuedQuotes`) and sent as a
   message; one whose blob is missing is skipped, logged, and the drain goes
-  on (ADR-0126). A catch-up's `prepareUpdate`:
+  on (ADR-0126). getting the latest's `prepareUpdate`:
   clean, the update is written, then the text, if any, is sent;
   conflicted, the resolution run carries the text; nothing new, the text
   alone; refused, the card goes back. The text is sent through
   `sendPoppedQueuedCard` in mode `queue`, cleared by the gate, as its queuer (`by`), with the card's other
   writers as contributors. A card with no text starts no run.
-- **A catch-up holds its step through the lane's start and merge,** a
-  queued card's (`catchUpThenSend`) and a chat's caught up first
-  (`catchUpFirst`, `commands/send.ts`) alike, so every command and drain
+- **Getting the latest holds its step through the lane's start and merge,** a
+  queued card's (`getLatestThenSend`) and a chat's got the latest first
+  (`getLatestFirst`, `commands/send.ts`) alike, so every command and drain
   waits for them. That is what keeps a later message to the lane after the
   merge's entry and the text it carries: let go between the merge and
   its settle, the step would have to mark the lane busy and every command
@@ -1164,10 +1164,10 @@ rejects `shutdown()`.
   lane appends it at once; a running one when its run ends, in order with
   the cards already queued. The client draws it as a quiet row, and nobody
   moves it.
-- **A chat on a thread with no work of its own is caught up first**
-  (ADR-0080): `planMessage`'s `catch-up-first` runs `prepareUpdate` with a run
-  to follow (`follows: "run"`), then sends the chat with `caughtUp`, so it
-  does not loop (`catchUpFirst`, `commands/send.ts`).
+- **A chat on a thread with no work of its own is got the latest first**
+  (ADR-0080): `planMessage`'s `get-latest-first` runs `prepareUpdate` with a run
+  to follow (`follows: "run"`), then sends the chat with `upToDate`, so it
+  does not loop (`getLatestFirst`, `commands/send.ts`).
 - **Resume is `carry-on`** (ADR-0082): `handleCarryOn` starts a run whose
   prompt is `planCarryOn`'s carry-on message, or answers its refusal. It is
   one step on the documents' keeper, as a split is, so a second press finds
@@ -1456,7 +1456,7 @@ adapter's.
 | module | owns |
 |---|---|
 | `adapter.ts` | `ProjectAdapter`, which carries its `kind`: opened by setup where it reads your repo's names, with the runtime, a folder project's `FolderDisks`, the session's lane files and the records, before anything else reads the project (`OpenProject`: `kind`, `fileAt`, `prepareShared`, `identity`, `acceptedNow`, whose checkout is bound to its read, or none for a folder), then started once lane work has its registry, with `ready` (asked, never held: a read waits on it for lanehost) and `keepStates` (`StartedProject`: the `Destination`, each lane's `history` from its record, refused for a lane of another kind, and `Splits`). The registry and the containers it is started with are bound late: neither is asked for before startup ends |
-| `destination.ts` | `Destination`: accepted work and proposed changes as any kind has them: a file at a point (`fileAt`), where a new lane begins (`begin`), what a catch-up's base is now (`baseNow`), an archive's lanes moved (`lanesMoved`), the proposed changes' acts (`ProposedChangesActs`), setup and publish (`AcceptedActs`), `quiet` and `close` |
+| `destination.ts` | `Destination`: accepted work and proposed changes as any kind has them: a file at a point (`fileAt`), where a new lane begins (`begin`), what the base that got the latest is now (`baseNow`), an archive's lanes moved (`lanesMoved`), the proposed changes' acts (`ProposedChangesActs`), setup and publish (`AcceptedActs`), `quiet` and `close` |
 | `setup.ts` | `openProject`: the project opened through its adapter, with your repo's names settled from your files and the working copy's `pinetrie.json`, before anything else reads it, and its lane configs, before pi's setup. `Setup`, all of it or none: the opened project, the lanes' ssh, the shared directories, the default-image check (the default image carries a browser, ADR-0041, and python3, ADR-0064), the images and runtime (`ready`), `specOf`, the granted host paths (planned at its start, from the roots of the commands pi's setup loaded, none inside the project and none holding pine·trie's own directories, ADR-0036), and the base snapshot's refreshes |
 | `config.ts` | `pinetrie.json` as a fact of a state (ADR-0135, ADR-0146): accepted work's copy read at accepted work (`Destination.fileAt`) at startup and when the base moves (`readAccepted`), decoded by the host's table and settled with the start layers, its shared directories (the settled `lanes.shared`) prepared again, and put in force (`takeAccepted`, `onTaken`) once what it names is shared; a lane's own copy and the copy it started on, read at its tip and its start before its container starts (`readLane`), so `specOf` and the prompt's facts use the lane's config; the note on a write of the file (`configNote`, the `configWritten` hook): what it changes, and each key not taken. A lane with no commit in your repo yet runs with accepted work's |
 | `shared.ts` | the shared files' lineages (`pinetrie.shared`, ADR-0135), one recorder for every lane and the watcher, so none reads and writes a lineage at once: a turn's accesses of shared files (`classifyWritesOnQueue` hands them over), based on what the lane last read, numbered and flagged (`planSharedLineages`) after the turn's queued step, since the lineages are every lane's; the watcher's stamps (`seen`); a whole directory's scan (`scanned`), whose missing files' lineages go once every version is older than the host's start (`planGoneLineages`); and a thread deleted from the trash, which leaves every lineage it read (`forgetReaders`, from `sweepTrash`). An earlier turn found concurrent after its rival is learnt has its revision record rewritten; one whose record is not written yet keeps what it says |
@@ -1464,9 +1464,9 @@ adapter's.
 | `registry.ts` | `LaneRegistry`: each lane's handle, its record, whether it is a lane of its own; the only module that touches the handles; `withHistory`, the one way to a lane's `LaneHistory`, which queues its function on the lane's queue with the history, the handle and the lane's record; refused, with nothing queued, for a lane with no record, no copy of its own, no fork record, or a history the adapter does not keep |
 | `containers.ts` | `access` (its prompt's facts from the lane's grants, `laneFacts`, pure), a container's start (`planContainer`, then `decideLaneStart` from the lane's fork record, which reads, only when the container must be made, its disk, and with that gone its revision records' snapshots and `keptSnapshot`, then each snapshot newest first until one is there (`factsOf`); a fork owed runs `create.ts`'s fork; after a restore from a snapshot, the history's `afterRestore`, for jj `pre-rename:`, since a snapshot made before the rename holds the old names (S114); run from a queued step, which hands it the history; every start loses stale outputs, `removeStaleOutputs`), `beforeRun`, `runEnded` |
 | `inner-docker-data-roots.ts` | the host's one `InnerDockerDataRoots` (ADR-0169), in memory: which nested lane's container stopped last after a run, and which run end each lane's inner Docker data root is as of. `containers.ts` names a lane the last in the step that stops it at its run's end, after the stop, so it is stopped when others clone it; a start or a fork asks where a data root comes from, and records it once its step ran. After a host's start there is no last run's lane until a run ends |
-| `turns.ts` | pi's `turnDone`: the turn's revision (`recordTurn`), its classes and snapshot (`disk.ts`), its whole-disk diff, and what follows its commit (`follow`, for jj its fetch), fired once the snapshot step is queued (`queueTurnEnd`); the turn records still being written (`pendingRecords`). A revision is titled by its message's first line, else what its first call is for (`revisionTitle`, `callPurpose` from `@pinetrie/interface`): its intent (ADR-0173), "Run the unit tests", else its words (ADR-0114: `shell pnpm test`, not `bash …`). A lane is fetched into your repo only after a turn that commits, so a lane that never changed a file has no `tip@pinetrie-<lane>`, no refresh and no `pinetrie.base` until it catches up (a clean merge is fetched) |
+| `turns.ts` | pi's `turnDone`: the turn's revision (`recordTurn`), its classes and snapshot (`disk.ts`), its whole-disk diff, and what follows its commit (`follow`, for jj its fetch), fired once the snapshot step is queued (`queueTurnEnd`); the turn records still being written (`pendingRecords`). A revision is titled by its message's first line, else what its first call is for (`revisionTitle`, `callPurpose` from `@pinetrie/interface`): its intent (ADR-0173), "Run the unit tests", else its words (ADR-0114: `shell pnpm test`, not `bash …`). A lane is fetched into your repo only after a turn that commits, so a lane that never changed a file has no `tip@pinetrie-<lane>`, no refresh and no `pinetrie.base` until it gets the latest (a clean merge is fetched) |
 | `create.ts` | a new lane: `checkBegin`; its record, its fork owed, and its name (`prepareLane`, one for hosts with and without lanes, writing `planLaneRecords`; its `history` the kind of the disk it will clone, `sourceHistory`); its fork, which the lane's start runs (`fork`: where it begins read from its thread's record, `forkEntry`; `forkFacts` waits for `pendingRecords`; `forkSource` refuses a disk of another kind than the record's, thrown with `foreignLaneWords`; `planFork`'s steps through `executeFork`; then one write, `forkEnd`) |
-| `update.ts` | an update (`withLaneStarted`, then one queued step, `planSettle` and `applySettle`, which fires the merge's `follow` after `recordUpdate`); `catchUpInRun`, the agent's `catch_up`; `askedAboutConflict`, which asks the lane's history for conflicts in its copy |
+| `update.ts` | an update (`withLaneStarted`, then one queued step, `planSettle` and `applySettle`, which fires the merge's `follow` after `recordUpdate`); `getLatestInRun`, the agent's `catch_up`; `askedAboutConflict`, which asks the lane's history for conflicts in its copy |
 | `archive.ts` | a close's or a reopen's teardown (`planArchive`'s), off the documents' keeper; its lanes' history moved in the destination (`lanesMoved`) |
 | `shares.ts` | what lanes may mount and reach, shared into the lane VM's slots and granted: the decision (`planShareAndGrant`) and, on the Mac, its state behind one queue (`createShares`: a share, a new lease's reset, the extra slots' close) |
 | `runtime.ts` | the one place that picks the runtime, from the project as startup found it (`ProjectDir`): gathers, plans (`planRuntime`), and builds the `LaneRuntime` lanes of their own get (`Setup.runtime`), wiring `@pinetrie/vm`'s lease to `@pinetrie/docker` on the Mac |
@@ -1545,11 +1545,11 @@ adapter's.
   edits committed and, for jj, `mergeUpdate`
   (which first joins each accepted thread commit the lane holds to its source, ADR-0079), so nothing
   changes the lane between what is read and what is merged. Before the
-  merge, `planCatchUp` settles the floor a resolution's prompt must fit
+  merge, `planGetLatest` settles the floor a resolution's prompt must fit
   (ADR-0084), from the resolve-conflicts skill, read before the step, and
-  the card's text: a catch-up whose smallest prompt would not fit is refused
+  the card's text: getting the latest whose smallest prompt would not fit is refused
   with the lane untouched, since a merge left without a prompt is one no
-  later catch-up merges again (S106). Then
+  later getting the latest merges again (S106). Then
   `planSettle`, pure, decides what the thread gets, the land message
   included, and `applySettle` writes it, then fires what follows the merge
   (`MergeDone.follow`): the adapter's own, which lane work never reads. For
@@ -1557,7 +1557,7 @@ adapter's.
   accepted work with nothing to merge, whose mark your repo would otherwise
   learn of only at a later fetch (`packages/jj/TECHNICAL.md`, A lane's
   repo).
-- **A catch-up with the thread a thread branched from** (ADR-0072) is the
+- **Getting the latest from the thread a thread branched from** (ADR-0072) is the
   same step: the card's command picks the rule. Its facts come from the
   lane's root document, not your repo (`parentNow`, with whether the
   parent's lane runs from `pinetrie:live`), and `planParentUpdate` decides;
@@ -1565,12 +1565,12 @@ adapter's.
   A resolution's prompt names the incoming side as that thread's work.
 - **An update stops the lane it started** (`withLaneStarted`), whatever it
   comes to, unless a run follows: a resolution, or the chat a quiet
-  catch-up goes before (`follows: "run"`). That run's end stops it.
-- **The agent's `catch_up` merges during its run** (`catchUpInRun`,
+  getting the latest goes before (`follows: "run"`). That run's end stops it.
+- **The agent's `catch_up` merges during its run** (`getLatestInRun`,
   ADR-0080, S103): the same `updateOnQueue`, with no start or stop of the
   lane and nothing appended: the tool's result is the update, and the
   turn's record names the merge (`turnMerged`). It is refused unless the
-  call is its turn's only one and there is something new. Every catch-up,
+  call is its turn's only one and there is something new. Every time it gets the latest,
   a card's too, is refused when the lane's working copy is off its own line
   (`planCopyReady`), since the merge lands at the lane's bookmark.
 - **`ask_about_conflict` is taken while jj finds a conflict** in the lane's
@@ -1667,17 +1667,17 @@ adapter's.
   as anything on a lane's history does, and its import is the owner's.
 - **A split's prompt, and its end** (`jj/split.ts`, `finishSplit`, which
   moves the lane back to its tip even when a step before it throws: left on
-  the stack, the lane refuses every catch-up).
+  the stack, the lane refuses every time it gets the latest).
 
 ## A folder project's adapter (`folder/`)
 
 - **Only `folder/` touches the project's folder** (ADR-0142); `@pinetrie/folder`
   decides for it, and lanehost's disks role does the copying.
 - **The project's one queue** (`createQueue` in `index.ts`): the folder's
-  reads run on it, and so does every catch-up over a virtual base, from
+  reads run on it, and so does every time it gets the latest over a virtual base, from
   making the base to deleting it. A virtual base is named by its bases, so
   two lanes merging the same bases share its snapshot; one at a time,
-  neither deletes it under the other. Such a catch-up reads no folder on
+  neither deletes it under the other. Such getting the latest reads no folder on
   the queue (its `from` was read before), so it never waits on itself.
 - **A read** (`line.ts`, one at a time on the project's queue): gather (the last
   read's stamps, from the session's `folder-stamps.json`; the scan,
@@ -1704,9 +1704,9 @@ adapter's.
   states directory's `start` op runs before, harmlessly again in a fork
   run again), each turn
   (snapshotted after the lane's `sync`, then diffed against the lane's
-  newest: no state when no source path changed), each catch-up (the path
+  newest: no state when no source path changed), each time it gets the latest (the path
   merge, `merge.ts`, on the graph's base, `virtual-base.ts` merging several
-  first; two parents). A catch-up whose base's snapshot is missing is
+  first; two parents). Getting the latest whose base's snapshot is missing is
   refused (`MergedOf`'s `refused`), before it makes anything, with words
   the card and the agent's `catch_up` show; a virtual base no record names
   is deleted once merged over. What differs between two states is `changes.ts`'s
@@ -1716,7 +1716,7 @@ adapter's.
   `resolve` writes the version chosen and closes it.
   `follow` is always null: nothing is fetched.
 - **The destination** (`index.ts`): `begin` and `baseNow` read the project's
-  folder first, so a catch-up merges its newest state; a WIP is refused. Each run's
+  folder first, so getting the latest merges its newest state; a WIP is refused. Each run's
   end builds the lane's proposed changes and base records (`folder/proposed.ts`) and describes
   the proposed changes with the host's describer (`describe.ts`, jj's too); accepted
   work moving rebuilds every folder lane's. A squash is refused
@@ -1726,14 +1726,14 @@ adapter's.
   one, in one place (`commands/lane.ts`).
 - **Proposed changes are the shown merge** (`folder/proposed.ts`,
   ADR-0159): the lane's tip merged onto accepted work's newest
-  (`mergeToState`, `merge.ts`, shared with a catch-up), made on the
+  (`mergeToState`, `merge.ts`, shared with getting the latest), made on the
   project's queue whenever either moves, on a scratch disk
   (`withScratch`, `scratch.ts`, which a virtual base and a restore's
   snapshot use too), snapshotted as `shownMergeId` and not made again while
   kept; the one it replaces goes unless an accept made it a state. A
   conflicted one keeps git's markers. The record's files are accepted
   work's newest → the shown merge, and the base's forecast the lane's tip
-  → the shown merge: what a catch-up would change in the lane.
+  → the shown merge: what getting the latest would change in the lane.
 - **Every folder review is one reader** (`readFolderReview`,
   `folder/review.ts`): open proposed changes, asked as `start..tip`, read
   `start` → the shown merge; two states accepted work keeps (a history
@@ -1834,7 +1834,7 @@ adapter's.
   is only a hint of where to look: it is how proposed changes you abandoned by hand
   is built again. A bookmark of yours that no proposed changes depend on moves
   nothing. Every named lane, not only those with proposed changes, so each lane's
-  `pinetrie.base` follows accepted work, and with it what catching up would
+  `pinetrie.base` follows accepted work, and with it what getting the latest would
   change. Not an archived root's lanes: they have no base to follow
   (`gatherRefresh` gives them none), and their refresh only withdraws proposed changes. What could still hold one marks such a lane anyway: its ref or its
   proposed bookmark (the first observation reports every bookmark as moved),
@@ -1859,8 +1859,8 @@ adapter's.
 - **What only the documents know is read here, first** (`state.ts`,
   `ProposedChangesDocs`): the thread's name, whether its root is archived (from its
   board place, `readArchived`, never from the lane's tip being missing: a tip missing
-  for one import, S78, must not withdraw live proposed changes), the last catch-up
-  read (`pinetrie.base`, a memo `readCatchUp` keeps at the same tip and base
+  for one import, S78, must not withdraw live proposed changes), the last getting the latest
+  read (`pinetrie.base`, a memo `readGetLatest` keeps at the same tip and base
   commit, never read to decide), the lane's tip entry and the WIP line.
   **The tip and the WIP line are read only after a decision to build or
   rebuild** (`isBuild`), both under one lease (`messageFacts`): reading them
@@ -1911,12 +1911,12 @@ adapter's.
   writes `immutable_heads()` and `revsets.log` to the repo's config, the
   text the publish button's setup showed (`planSetup`). A publish
   (ADR-0076, ADR-0090) is two rounds of gather, plan and execute in one command: the
-  catch-up (`planPublishCatchUp`, as you, only with `publish.catchUp` on
+  getting the latest (`planPublishGetLatest`, as you, only with `publish.catchUp` on
   and only when the working copy is behind), then the record read again, with
-  the catch-up's operation from `SharedFacts.op`, decided by
-  `planPublishFinish` into the move (`planPublishMove`) or the catch-up's
-  undo (`planCatchUpUndo`) and a worded refusal. A move jj refuses after a
-  catch-up runs the undo and rethrows: the one branch that is not a plan's
+  the operation that got the latest from `SharedFacts.op`, decided by
+  `planPublishFinish` into the move (`planPublishMove`) or getting the latest's
+  undo (`planGetLatestUndo`) and a worded refusal. A move jj refuses after a
+  getting the latest runs the undo and rethrows: the one branch that is not a plan's
   value. The record's preview runs `git merge-tree` on your repo (the
   step's `git`). Setup and publish are anyone's, on any host: what a
   publish does is `publish.catchUp` (`RepoConfig`, carried on the record),

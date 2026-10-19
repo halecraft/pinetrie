@@ -9,9 +9,9 @@ import { rmSync, writeFileSync } from "node:fs"
 import path from "node:path"
 import {
   ancestry,
-  CATCH_UP_TOOL,
   type EntryId,
   entryId,
+  GET_LATEST_TOOL,
   messageText,
   type RevisionRecord,
   ROOT,
@@ -57,7 +57,7 @@ async function recipeSection(
     "build.sh":
       'mkdir -p .store && touch .store/CACHEDIR.TAG && for p in $(cat pkgs.txt); do echo "$p" > ".store/$p"; mkdir -p "out-$p" && echo built > "out-$p/marker"; done\n',
     ".gitignore": "out-*/\n.env\n.store/\n",
-    "pinetrie.json": `${JSON.stringify({ publish: { catchUp: true } })}\n`,
+    "pinetrie.json": `${JSON.stringify({ publish: { getLatest: true } })}\n`,
   })
   const script = scriptedModel()
   const wh = await lanes.startHost({
@@ -168,7 +168,7 @@ async function recipeSection(
     await wu.actOnAccepted("publish")
     await wh.quiet()
     script.use([
-      { tool: CATCH_UP_TOOL, args: {} },
+      { tool: GET_LATEST_TOOL, args: {} },
       { tool: "bash", args: { command: `${GONE}; ls .store` } },
       { text: "caught up" },
     ])

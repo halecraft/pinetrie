@@ -205,7 +205,7 @@ While the page syncs, "syncing…" leads its right end.
   (`docs/the-jujutsu-repo.md`), done only when you choose it. After,
   **publish** shows only while there is something to publish, and does it
   in one act, the same whoever presses it and wherever the host listens:
-  - with `publish.catchUp` on, the working copy catches up with accepted work
+  - with `publish.catchUp` on, the working copy gets the latest from accepted work
     (`jj rebase -b @ -d <accepted>`, as you) when they are behind; your
     commits below `@` are accepted; then `main` (`publish.bookmark`) moves
     forward to accepted work. Your commits and `main` move together in one
@@ -213,16 +213,16 @@ While the page syncs, "syncing…" leads its right end.
   - with it off, the default, only `main` moves, as the host. No one's
     files move.
 
-  Its title says what it will do, with how many files catching up
+  Its title says what it will do, with how many files getting the latest
   changes and any other line of your work that moves with it, or, with
   the setting off and the working copy behind or commits waiting, that the
   working copy does not move (`publish.catchUp` is off), then the jj commands. It
   does not push. What can be checked first is (`main` holding commits
   accepted work lacks; with the setting on, the working copy's conflicts and what
-  catching up would conflict), and the title leads with why it would be
+  getting the latest would conflict), and the title leads with why it would be
   refused.
-  If your commits come out of the catch-up conflicted, or the move fails,
-  the catch-up is reverted (`jj op revert`): nothing is left half done.
+  If your commits come out of getting the latest conflicted, or the move fails,
+  getting the latest is reverted (`jj op revert`): nothing is left half done.
 
   While a publish is out the button reads "publishing…". A refusal or a
   failure is a **toast** above the footer ("not done:" and why; "it
@@ -349,7 +349,7 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   stays as it was. Its column says "made when the project had no jj repo:
   nothing runs here now" (or "had a jj repo") in its composer's place, and
   a branch or a copy from it says the same before its first send. The host
-  refuses the same: a message, a carry-on, a catch-up, an action on proposed changes
+  refuses the same: a message, a carry-on, getting the latest, an action on proposed changes
   that asks its agent, another thread's ask, and a crash's resume.
 - **Anyone edits the states**: a state's name is a button that turns into a
   field (Enter or leaving it saves; Escape keeps the old name); its `⋯`
@@ -603,7 +603,7 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   no stack and no split. Its words name accepted work as jj proposed changes' do,
   and its titles name no bookmark. **accept** writes the files into the
   project's folder, as its title says; conflicted proposed changes have
-  none, since a folder has no WIP, and catching up or **choose versions**
+  none, since a folder has no WIP, and getting the latest or **choose versions**
   resolves them: the pane shows each conflicted file's changes on both
   sides from the version both began from, and three choices ("keep this
   thread's", "take accepted work's", "take the version both began from"),
@@ -638,23 +638,23 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   done: the changes are not what you were shown: review them again"), and
   the strip shows the new proposed changes. A rebase onto moved accepted work, or your
   own edit of the proposed changes, is still the proposed changes you saw, and is accepted. Proposed changes that conflict are never accepted into accepted work; their button is
-  **catch up with accepted work and resolve**: the agent resolves what the merge leaves. Proposed changes whose
+  **get the latest from accepted work and resolve**: the agent resolves what the merge leaves. Proposed changes whose
   every conflicted file was already conflicted where its thread's copy
   started says so instead: "began from a copy with an unresolved conflict
   in 1 file", and, when the thread it branched from has since resolved
-  those files, "· amber-fox has resolved it", with **catch up with
+  those files, "· amber-fox has resolved it", with **get the latest from
   amber-fox** as its button (ADR-0072). Its **⋯** menu holds **catch
   up with** the thread's base (accepted work, or its WIP), or, once its WIP
   is gone, **continue from accepted work**; and, while the thread it branched
-  from has new commits, **catch up with** that thread by its name, greyed
-  out while that thread's agent works. When catching up would change files
+  from has new commits, **get the latest from** that thread by its name, greyed
+  out while that thread's agent works. When getting the latest would change files
   in the thread, the strip says so ("2 files changed · accepted work has
-  moved on"), catching up stands beside the proposed changes, titled with how many files it
+  moved on"), getting the latest stands beside the proposed changes, titled with how many files it
   changes, and the column's header shows ↓, titled with the count, the
   bookmark and both commits. When it would change nothing, it stays in the
-  menu, greyed out, and says why: "already caught up with accepted work",
+  menu, greyed out, and says why: "already got the latest from accepted work",
   or, when accepted work moved only by this thread's own work you accepted,
-  "what's new in accepted work is this thread's own: catching up changes no
+  "what's new in accepted work is this thread's own: getting the latest changes no
   file"
   (ADR-0067). A thread whose base pine·trie has not read yet (one whose agent
   never changed a file, so its work never reached your repo) keeps it in
@@ -663,15 +663,15 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   thread's work": the header does not
   count it, and archiving its thread warns of nothing. A thread whose
   earlier accept was made before pine·trie recorded what an accept brought
-  says "an earlier accept of this thread can't be traced: catch up with
-  accepted work to offer what's new", with catching up beside it. Every catch-up button does
+  says "an earlier accept of this thread can't be traced: get the latest from
+  accepted work to offer what's new", with getting the latest beside it. Every time it gets the latest button does
   it at once
   (ADR-0061): each queues a new card holding the command and no text, which
   the host pops when the lane is free, and your composer is left as it
-  was. The queued card says "↓ catches up with accepted work first", and
-  the strip "catching up with accepted work…". A card that already carries a
+  was. The queued card says "↓ gets the latest from accepted work first", and
+  the strip "getting the latest from accepted work…". A card that already carries a
   command (one unqueued, say) says so in a chip above its box, with a × that
-  sends it as a plain message instead, and its button reads "catch up", or "catch up
+  sends it as a plain message instead, and its button reads "get the latest", or "get the latest
   and send"; what you write is what the agent should do with the new work
   (ADR-0108).
 - **The thread hears what was done to its work** (ADR-0080). An
@@ -683,10 +683,10 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   the run ends. When accepted work has moved on with work the thread
   lacks, its next run, or its run in progress, begins with "↓ accepted
   work has moved on: 2 files, 1 this thread changed too". A thread with no work of its own is
-  caught up before it runs, and shows the update's "↓ caught up" line
+  got the latest before it runs, and shows the update's "↓ got the latest" line
   before your message.
 - **Split into a stack waits its turn** (ADR-0080): the button queues a
-  card with the split, as catching up does, sent when the thread is free;
+  card with the split, as getting the latest does, sent when the thread is free;
   the queued card says "⇶ splits the proposed changes into a stack, with what you
   write as its brief", its button reads "split", and while it waits the
   strip's **split** is greyed out. The agent can ask for a split too.

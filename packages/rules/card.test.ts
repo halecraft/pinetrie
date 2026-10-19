@@ -204,15 +204,19 @@ describe("planCarry", () => {
   test.each([
     [
       "a catch-up with text",
-      queued("bring-up-to-date"),
+      queued("get-latest"),
       "then test",
-      { kind: "catch-up", command: "bring-up-to-date", after: "send" },
+      { kind: "get-latest", command: "get-latest", after: "send" },
     ],
     [
       "a catch-up with none",
-      queued("catch-up-with-parent"),
+      queued("get-latest-from-parent"),
       "  ",
-      { kind: "catch-up", command: "catch-up-with-parent", after: "discard" },
+      {
+        kind: "get-latest",
+        command: "get-latest-from-parent",
+        after: "discard",
+      },
     ],
     [
       "a split, its text the brief",
@@ -271,7 +275,7 @@ describe("planCarry", () => {
         ADA,
       ),
     ).toEqual({ kind: "refused", code: "no-place", now: fact })
-    expect(planSetCommand([fact], fact.id, "bring-up-to-date")).toEqual({
+    expect(planSetCommand([fact], fact.id, "get-latest")).toEqual({
       kind: "refused",
       code: "no-place",
       now: fact,
@@ -1257,7 +1261,7 @@ describe("the queue", () => {
     const q: QueuedCard = {
       ...queued(cardIdFor("c1"), "a"),
       placer: BEA,
-      content: { command: "bring-up-to-date", unsent: null, origin: null },
+      content: { command: "get-latest", unsent: null, origin: null },
     }
     const onCanvas = landedThreadCard({
       thread: LANE,
@@ -1387,7 +1391,7 @@ describe("handoffs", () => {
     const before = queued(cardIdFor("c0"), orderAfter([]))
     const c = card({
       place: atEnd,
-      content: { command: "bring-up-to-date", unsent: "refused", origin: null },
+      content: { command: "get-latest", unsent: "refused", origin: null },
     })
     const step = planMove(
       [before, c],
@@ -1430,11 +1434,11 @@ describe("handoffs", () => {
   test("an unqueue keeps the command and why it was not sent", () => {
     const q = {
       ...queued(cardIdFor("c1"), "a"),
-      content: { command: "bring-up-to-date", unsent: "x", origin: null },
+      content: { command: "get-latest", unsent: "x", origin: null },
     } as const
     const step = planMove([q], { card: C1, from: queuedKey, to: atEnd }, ADA)
     expect(step.kind === "write" && step.record).toMatchObject({
-      content: { command: "bring-up-to-date", unsent: "x", origin: null },
+      content: { command: "get-latest", unsent: "x", origin: null },
     })
   })
 
@@ -1580,7 +1584,7 @@ describe("handoffs", () => {
       const c = card({
         owner: BEA,
         place: atEnd,
-        content: { command: "bring-up-to-date", unsent: "x", origin: null },
+        content: { command: "get-latest", unsent: "x", origin: null },
       })
       expect(planMove([c], { card: C1, from: atEnd, to: mine }, ADA)).toEqual({
         kind: "write",
@@ -1725,11 +1729,11 @@ describe("handoffs", () => {
 
   test("planSetCommand: sets it, the place and placer kept; gone when there is no record", () => {
     const c = card({ placer: BEA })
-    expect(planSetCommand([c], C1, "bring-up-to-date")).toEqual({
+    expect(planSetCommand([c], C1, "get-latest")).toEqual({
       kind: "write",
       record: {
         ...c,
-        content: { command: "bring-up-to-date", unsent: null, origin: null },
+        content: { command: "get-latest", unsent: null, origin: null },
       },
     })
     expect(planSetCommand([], C1, null)).toEqual({
@@ -1767,7 +1771,7 @@ test("planCardSweep: empty cards and documents with no record go; a card with te
 
 test("planCardSweep: a card with a command stays, whatever its text", () => {
   const command = card({
-    content: { command: "bring-up-to-date", unsent: null, origin: null },
+    content: { command: "get-latest", unsent: null, origin: null },
   })
   expect(
     planCardSweep({
@@ -2186,7 +2190,7 @@ describe("storage", () => {
       }),
       card({
         content: {
-          command: "bring-up-to-date",
+          command: "get-latest",
           unsent: "refused",
           origin: null,
         },
@@ -2224,7 +2228,7 @@ describe("storage", () => {
     expect(decodeCard(C, { ...ok, fact: stored.fact })).toBeUndefined()
     expect(decodeCard(FACT_ID, { ...stored, fact: "{" })).toBeUndefined()
     expect(
-      decodeCard(FACT_ID, { ...stored, command: "bring-up-to-date" }),
+      decodeCard(FACT_ID, { ...stored, command: "get-latest" }),
     ).toBeUndefined()
     // A fact anywhere but a queue.
     expect(

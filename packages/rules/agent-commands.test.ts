@@ -11,12 +11,12 @@ import {
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
-  catchUpAnswer,
-  catchUpRefusal,
   encodeUpdate,
   type Floor,
+  getLatestAnswer,
+  getLatestRefusal,
   type ParentNow,
-  planCatchUpCall,
+  planGetLatestCall,
   planResolution,
   planSplitCall,
   resolutionFloor,
@@ -30,7 +30,7 @@ function floor(): Floor {
     budget: { tokens: 10_000, estimate: c => Math.ceil(c.length / 4) },
     skill: null,
     intent: "",
-    incoming: "Accepted work",
+    latest: "Accepted work",
   })
   if (found.kind !== "fits") throw new Error("the floor does not fit")
   return found.floor
@@ -53,14 +53,14 @@ const parent = (over: Partial<ParentNow> = {}): ParentNow => ({
   lane: threadIdFor("p"),
   name: "amber-fox" as ThreadName,
   newest: PD,
-  caughtUpWith: PC,
+  upToDateWith: PC,
   conflicts: [],
   ...over,
 })
 
-describe("planCatchUpCall", () => {
-  const call = (over: Partial<Parameters<typeof planCatchUpCall>[0]> = {}) =>
-    planCatchUpCall({
+describe("planGetLatestCall", () => {
+  const call = (over: Partial<Parameters<typeof planGetLatestCall>[0]> = {}) =>
+    planGetLatestCall({
       from: "base",
       own: true,
       calls: 1,
@@ -71,17 +71,17 @@ describe("planCatchUpCall", () => {
     })
 
   test("the base: brings, or a move not yet read, merges", () => {
-    expect(call()).toEqual({ kind: "merge", command: "bring-up-to-date" })
+    expect(call()).toEqual({ kind: "merge", command: "get-latest" })
     expect(call({ base: { kind: "unknown" } })).toEqual({
       kind: "merge",
-      command: "bring-up-to-date",
+      command: "get-latest",
     })
   })
 
   test("the parent: ahead and idle merges", () => {
     expect(call({ from: "parent", parent: parent() })).toEqual({
       kind: "merge",
-      command: "catch-up-with-parent",
+      command: "get-latest-from-parent",
     })
   })
 
@@ -102,7 +102,7 @@ describe("planCatchUpCall", () => {
     ],
     [
       "a parent not ahead",
-      { from: "parent", parent: parent({ caughtUpWith: PD }) },
+      { from: "parent", parent: parent({ upToDateWith: PD }) },
       "nothing-new",
     ],
   ] as const)("refused: %s", (_, over, why) => {
@@ -110,18 +110,20 @@ describe("planCatchUpCall", () => {
   })
 
   test("each refusal says what to do", () => {
-    expect(catchUpRefusal("alone")).toContain("alone in its turn")
-    expect(catchUpRefusal("off-line")).toContain("Return to this thread's tip")
-    expect(catchUpRefusal("no-bookmark")).toBe(
-      "Not caught up: this thread's copy has lost its bookmark.",
+    expect(getLatestRefusal("alone")).toContain("alone in its turn")
+    expect(getLatestRefusal("off-line")).toContain(
+      "Return to this thread's tip",
     )
-    expect(catchUpRefusal({ reason: "set up accepted work first" })).toBe(
-      "Not caught up: set up accepted work first.",
+    expect(getLatestRefusal("no-bookmark")).toBe(
+      "Did not get the latest: this thread's copy has lost its bookmark.",
+    )
+    expect(getLatestRefusal({ reason: "set up accepted work first" })).toBe(
+      "Did not get the latest: set up accepted work first.",
     )
   })
 })
 
-describe("catchUpAnswer", () => {
+describe("getLatestAnswer", () => {
   test("the answer says what it merged, and any conflicts", () => {
     const update = encodeUpdate(
       {
@@ -135,7 +137,7 @@ describe("catchUpAnswer", () => {
       1,
     )
     expect(
-      catchUpAnswer({ kind: "clean", message: update, merged: PC }),
+      getLatestAnswer({ kind: "clean", message: update, merged: PC }),
     ).toEqual({
       text: update.content,
       isError: false,
@@ -147,12 +149,12 @@ describe("catchUpAnswer", () => {
       details: { lane: LANE, merged: [PC], by: ADA },
       timestamp: 1,
     })
-    expect(catchUpAnswer({ kind: "conflicted", message: land })).toEqual({
+    expect(getLatestAnswer({ kind: "conflicted", message: land })).toEqual({
       text: land.content,
       isError: false,
       details: { merged: [PC] },
     })
-    expect(catchUpAnswer({ kind: "nothing" })).toMatchObject({
+    expect(getLatestAnswer({ kind: "nothing" })).toMatchObject({
       isError: true,
       details: null,
     })

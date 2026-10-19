@@ -13,9 +13,10 @@ import {
   type Target,
   type ValueWrite,
 } from "@pinetrie/core"
-import { SESSION_DOC_ID } from "@pinetrie/protocol/messages"
+import { PLACES_DOC_ID, SESSION_DOC_ID } from "@pinetrie/protocol/messages"
 import {
   applyRecordWrites,
+  PlacesDoc,
   type RecordsDocHandle,
   RootDoc,
   type RootDocHandle,
@@ -196,6 +197,36 @@ export function rewriteHistory(spec: {
           batch(doc, d => {
             for (const row of rows) d.entries.set(row.id, row)
           })
+      }
+    },
+  }
+}
+
+/**
+ * A record migration that rewrites each card's row in the places document,
+ * live or trashed, by a pure rewrite of the row's flat fields: null for a row
+ * it leaves.
+ */
+export function rewritePlacesRows(spec: {
+  readonly name: string
+  readonly rewrite: Rewrite
+}): RecordMigration {
+  return {
+    name: spec.name,
+    async run({ exchange, docIds, hydrated }) {
+      if (!docIds.includes(PLACES_DOC_ID)) return null
+      const places = exchange.get(PLACES_DOC_ID, PlacesDoc)
+      await hydrated(PLACES_DOC_ID)
+      const rows = Object.entries(places.cards()).flatMap(([id, row]) => {
+        const now = spec.rewrite(row)
+        return now === null ? [] : [[id, now] as const]
+      })
+      if (rows.length === 0) return null
+      return async () => {
+        batch(places, d => {
+          for (const [id, row] of rows)
+            d.cards.set(id, row as Parameters<typeof d.cards.set>[1])
+        })
       }
     },
   }

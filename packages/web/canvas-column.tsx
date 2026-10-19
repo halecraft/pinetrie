@@ -181,7 +181,7 @@ export function CanvasColumn(p: {
             <PinnedCardEditor
               among={p.pins}
               card={c}
-              catchUps={null}
+              latestSources={null}
               inView={p.pinsInView}
               key={c.id}
               onAct={act}

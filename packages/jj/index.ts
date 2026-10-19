@@ -19,8 +19,8 @@ export {
 } from "./owner.ts"
 export {
   laneRefSteps,
-  planCatchUpUndo,
-  planPublishCatchUp,
+  planGetLatestUndo,
+  planPublishGetLatest,
   planPublishMove,
   planSetup,
   setupProposal,

@@ -201,8 +201,8 @@ export async function sendMessage(
   writer: WriterId,
   sendId: string,
   send: Cleared<Send>,
-  /** This send has caught its lane up already (`catch-up-first`). */
-  caughtUp = false,
+  /** This send has caught its lane up already (`get-latest-first`). */
+  upToDate = false,
 ): Promise<Outcome> {
   const { work, blobs, cards } = deps
   const { roots, session, live } = deps.basics
@@ -334,7 +334,7 @@ export async function sendMessage(
         }).kind
   const planned = planMessage({
     news,
-    caughtUp,
+    upToDate,
     command,
     shares,
     hostWorkingCopy: own ? (work.project?.root ?? null) : null,
@@ -354,8 +354,8 @@ export async function sendMessage(
     contributors,
     state: send.state,
   })
-  if (planned.kind === "catch-up-first")
-    return catchUpFirst(deps, writer, sendId, send, planned.thread)
+  if (planned.kind === "get-latest-first")
+    return getLatestFirst(deps, writer, sendId, send, planned.thread)
   const begun =
     planned.kind === "appendToTree" || planned.kind === "createAndRun"
       ? planned
@@ -435,7 +435,7 @@ export async function sendMessage(
  * resolution run carrying the chat's text. The lane is kept started: a run
  * follows either way.
  */
-async function catchUpFirst(
+async function getLatestFirst(
   deps: SendDeps,
   writer: WriterId,
   sendId: string,
@@ -446,7 +446,7 @@ async function catchUpFirst(
     deps.agent.lane(lane),
     writer,
     send.text,
-    "bring-up-to-date",
+    "get-latest",
     "run",
   )
   if (prepared.kind === "conflicted")
@@ -457,7 +457,7 @@ async function catchUpFirst(
     })
   if (prepared.kind === "refused")
     deps.basics.log(
-      `[host] ${readThreadName(deps.basics.session, lane)}: not caught up before its run: ${prepared.reason}`,
+      `[host] ${readThreadName(deps.basics.session, lane)}: did not get the latest before its run: ${prepared.reason}`,
     )
   return sendMessage(deps, writer, sendId, send, true)
 }
@@ -498,9 +498,12 @@ export async function executeSend(
     case "conflict":
     case "busy":
       return planned
-    case "catch-up-first":
+    case "get-latest-first":
       // `sendMessage` carries it out before it comes here.
-      return { kind: "failed", message: "a catch-up was not carried out" }
+      return {
+        kind: "failed",
+        message: "getting the latest was not carried out",
+      }
     case "appendToTree":
     case "appendToLane": {
       const appended =

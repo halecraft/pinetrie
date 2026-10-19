@@ -36,7 +36,7 @@ const line = (commit = L2): JjAcceptedRecord => ({
   workingCopy: {
     behind: 0,
     ahead: 0,
-    catchUp: null,
+    getLatest: null,
     conflicts: { commits: 0, files: [] },
   },
   publishCatchesUp: true,
@@ -49,7 +49,7 @@ const base = (over: Partial<JjBaseRecord> = {}): JjBaseRecord => ({
   base: { kind: "accepted" },
   start: L1,
   state: "ok",
-  catchUp: { tip: commitId("t"), to: L2, files: ["a.ts", "b.ts"] },
+  getLatest: { tip: commitId("t"), to: L2, files: ["a.ts", "b.ts"] },
   untraced: [],
   work: "some",
   ...over,
@@ -88,7 +88,7 @@ describe("planBaseNews", () => {
 
   test("a lane whose work changes no file is caught up instead", () => {
     expect(news({ base: base({ work: "none" }) })).toEqual({
-      kind: "catch-up",
+      kind: "get-latest",
     })
   })
 
@@ -96,10 +96,10 @@ describe("planBaseNews", () => {
     ["no copy of its own", { own: false }],
     ["no base record", { base: undefined }],
     ["a base that has not moved", { accepted: line(L1) }],
-    ["a move not yet read", { base: base({ catchUp: null }) }],
+    ["a move not yet read", { base: base({ getLatest: null }) }],
     [
       "a move that changes no file",
-      { base: base({ catchUp: { tip: commitId("t"), to: L2, files: [] } }) },
+      { base: base({ getLatest: { tip: commitId("t"), to: L2, files: [] } }) },
     ],
     ["unknown work", { base: base({ work: "unknown" }) }],
     ["a gone base", { base: base({ state: "gone" }) }],

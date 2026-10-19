@@ -18,7 +18,7 @@ import {
 import { describe, expect, test } from "vitest"
 import { requireIntent, TAKES_INTENT } from "./intent.ts"
 import { threadContext } from "./thread-context.ts"
-import { parseCatchUpArgs, proposeTool } from "./thread-tools.ts"
+import { parseGetLatestArgs, proposeTool } from "./thread-tools.ts"
 import { assembleTools, TOOLS, toolsChanged } from "./tools.ts"
 
 const unused = async (): Promise<never> => {
@@ -29,7 +29,7 @@ const input = {
     turnDone: unused,
     askedAboutConflict: unused,
     configWritten: async () => null,
-    catchUp: unused,
+    getLatest: unused,
     resolveConflict: unused,
     askSplit: unused,
     ask: unused,
@@ -146,12 +146,12 @@ describe("propose_branches", () => {
   })
 })
 
-describe("parseCatchUpArgs", () => {
+describe("parseGetLatestArgs", () => {
   test("the parent only when named; the base otherwise", () => {
-    expect(parseCatchUpArgs({ from: "parent" })).toBe("parent")
-    expect(parseCatchUpArgs({ from: "base" })).toBe("base")
-    expect(parseCatchUpArgs({})).toBe("base")
-    expect(parseCatchUpArgs({ from: "elsewhere" })).toBe("base")
+    expect(parseGetLatestArgs({ from: "parent" })).toBe("parent")
+    expect(parseGetLatestArgs({ from: "base" })).toBe("base")
+    expect(parseGetLatestArgs({})).toBe("base")
+    expect(parseGetLatestArgs({ from: "elsewhere" })).toBe("base")
   })
 })
 

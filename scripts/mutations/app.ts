@@ -266,7 +266,7 @@ export const mutations: readonly Mutation[] = [
     from: "        const merged = turnMerged(index, tip)",
     to: "        const merged = false && turnMerged(index, tip)",
     suite: "lanes",
-    scenario: "catch-up",
+    scenario: "get-latest",
     expect:
       "a catch_up mid-run merges accepted work, and a branch at its turn has accepted work's file",
   },
@@ -276,7 +276,7 @@ export const mutations: readonly Mutation[] = [
     from: '    .step({ kind: "thread", thread: lane }, "proposed changes\' fact", () => ({\n      facts: [done.fact],',
     to: '    .step({ kind: "thread", thread: lane }, "proposed changes\' fact", () => ({\n      facts: [],',
     suite: "lanes",
-    scenario: "catch-up",
+    scenario: "get-latest",
     expect: "an acceptance leaves a fact the thread shows",
   },
   // ── card history and traces ──

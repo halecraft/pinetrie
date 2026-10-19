@@ -33,7 +33,6 @@ import {
   baseChoices,
   type CardFrameFacts,
   type CardFrameView,
-  type CatchUps,
   type ColumnAct,
   type ColumnHow,
   type CompletionOption,
@@ -44,6 +43,7 @@ import {
   forkWords,
   free,
   type Intent,
+  type LatestSources,
   newCardBox,
   newCardKeys,
   type Pending,
@@ -169,7 +169,7 @@ export function CardEditor(p: {
   /** The column's acts: queueing a card, clearing its command. */
   onAct: (act: ColumnAct) => void
   /** What a card's command catches up with: the thread's base, or the thread it branched from. */
-  catchUps: CatchUps
+  latestSources: LatestSources
 }) {
   const { session, prefill, pending } = p
   const threadIn = useThreadStates()
@@ -356,7 +356,7 @@ export function CardEditor(p: {
   return (
     <CardFrame
       card={card ?? null}
-      catchUps={p.catchUps}
+      latestSources={p.latestSources}
       {...shareProps(shares)}
       foot={
         frame.primary !== "send" ? null : (
@@ -562,7 +562,7 @@ export function BoundCardEditor(p: {
   view: CardFrameView
   reader: Reader
   /** What a command catches up with at its thread; null in your inventory. */
-  catchUps: CatchUps | null
+  latestSources: LatestSources | null
   readOnly: boolean
   /** The box's least height, in lines. */
   rows: number
@@ -618,7 +618,7 @@ export function BoundCardEditor(p: {
     <CardFrame
       {...shareProps(shares)}
       card={card}
-      catchUps={p.catchUps}
+      latestSources={p.latestSources}
       foot={p.foot}
       onAct={onAct}
       onClearCommand={null}
@@ -702,7 +702,7 @@ export function NoteCardEditor(p: {
   reader: Reader
   readOnly: ReadOnly | null
   /** What a command catches up with; null in a note column, at no thread. */
-  catchUps: CatchUps | null
+  latestSources: LatestSources | null
   seats: readonly SeatRecord[]
   onAct: (act: ColumnAct) => void
   onTyping: (card: CardId) => void
@@ -718,7 +718,7 @@ export function NoteCardEditor(p: {
     <BoundCardEditor
       among={p.among}
       card={card}
-      catchUps={p.catchUps}
+      latestSources={p.latestSources}
       foot={null}
       onAct={p.onAct}
       onDiscard={() => p.onAct({ kind: "discard", card: card.id })}
@@ -797,7 +797,7 @@ export function NewCardBox(p: {
       <CardFrame
         {...shareProps(shares)}
         card={null}
-        catchUps={null}
+        latestSources={null}
         foot={null}
         onAct={p.onAct}
         onClearCommand={null}
@@ -867,7 +867,7 @@ export function QueuedCardEditor(p: {
   reader: Reader
   readOnly: ReadOnly | null
   /** What its command catches up with: the thread's base, or the thread it branched from. */
-  catchUps: CatchUps
+  latestSources: LatestSources
   /** Its lane's queue as drawn, facts included: what a reorder moves it among. */
   among: readonly CardRecord[]
   onAct: (act: ColumnAct) => void
@@ -886,7 +886,7 @@ export function QueuedCardEditor(p: {
     <BoundCardEditor
       among={p.among}
       card={card}
-      catchUps={p.catchUps}
+      latestSources={p.latestSources}
       foot={null}
       onAct={p.onAct}
       onDiscard={() => p.onAct({ kind: "discard", card: card.id })}
@@ -919,7 +919,7 @@ export function PinnedCardEditor(p: {
   reader: Reader
   readOnly: ReadOnly | null
   /** What a command catches up with; null away from a thread: a canvas's pin. */
-  catchUps: CatchUps | null
+  latestSources: LatestSources | null
   onAct: (act: ColumnAct) => void
   onTyping: (card: CardId) => void
 }) {
@@ -937,7 +937,7 @@ export function PinnedCardEditor(p: {
     <BoundCardEditor
       among={p.among}
       card={card}
-      catchUps={p.catchUps}
+      latestSources={p.latestSources}
       foot={
         <span className="pinned-size">{tokenSizeWords(textTokens(text))}</span>
       }

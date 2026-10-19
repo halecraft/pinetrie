@@ -104,7 +104,7 @@ test("the prompt no longer tells the model to search with bash", () => {
       turnDone: async () => {},
       askedAboutConflict: async () => false,
       configWritten: async () => null,
-      catchUp: async () => {
+      getLatest: async () => {
         throw new Error("no catch_up here")
       },
       resolveConflict: async () => {
@@ -291,7 +291,7 @@ describe("laneGuidelines", () => {
 
   test("says what is made is the agent's to make, and to keep out of the repo", () => {
     expect(text(facts())).toContain(
-      "Nothing installs dependencies for you. After a catch up, pine·trie removes what commands made from files that changed (node_modules, a build): make them again as you would after a pull.",
+      "Nothing installs dependencies for you. After getting the latest, pine·trie removes what commands made from files that changed (node_modules, a build): make them again as you would after a pull.",
     )
     expect(text(facts())).toContain("add it to .gitignore")
   })
@@ -395,7 +395,7 @@ describe("lanes in a harness", () => {
           },
           askedAboutConflict: async () => false,
           configWritten: async () => null,
-          catchUp: async () => {
+          getLatest: async () => {
             throw new Error("no catch_up here")
           },
           resolveConflict: async () => {
@@ -662,7 +662,7 @@ describe("lanes in a harness", () => {
           turnDone: async () => {},
           askedAboutConflict: async () => false,
           configWritten: async () => null,
-          catchUp: async () => {
+          getLatest: async () => {
             throw new Error("no catch_up here")
           },
           resolveConflict: async () => {

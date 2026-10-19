@@ -19,9 +19,9 @@ import type {
 } from "@pinetrie/core"
 import {
   ADD_TO_QUEUE,
-  type CatchUps,
   type ColumnAct,
   cardFrame,
+  type LatestSources,
   type NextButton,
   type NextItem,
   nextButtonWords,
@@ -69,7 +69,7 @@ function QueuedReference(p: {
   return (
     <CardFrame
       card={card}
-      catchUps={null}
+      latestSources={null}
       foot={null}
       onAct={p.onAct}
       onClearCommand={null}
@@ -97,7 +97,7 @@ export function Dock(p: {
   queueAt: { readonly at: Position } | null
   reader: Reader
   readOnly: ReadOnly | null
-  catchUps: CatchUps
+  latestSources: LatestSources
   onAct: (act: ColumnAct) => void
   onTyping: (card: CardId) => void
   /** Between the line and your message: what you did here that was refused. */
@@ -205,7 +205,7 @@ export function Dock(p: {
                   <QueuedCardEditor
                     among={queued}
                     card={c}
-                    catchUps={p.catchUps}
+                    latestSources={p.latestSources}
                     held={lane?.heldBy != null}
                     onAct={p.onAct}
                     onTyping={p.onTyping}

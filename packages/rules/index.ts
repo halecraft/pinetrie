@@ -38,10 +38,10 @@ export {
   planPersonalSign,
 } from "./access.ts"
 export {
-  type CatchUpRefusal,
-  catchUpAnswer,
-  catchUpRefusal,
-  planCatchUpCall,
+  type GetLatestRefusal,
+  getLatestAnswer,
+  getLatestRefusal,
+  planGetLatestCall,
   planSplitCall,
   refusedAnswer,
   resolveAnswer,
@@ -81,12 +81,12 @@ export {
 export {
   BASE,
   type BaseRecord,
-  type CatchUpNow,
-  catchUpNow,
   effectiveBase,
   type FolderBaseRecord,
   type FollowedBase,
   type ForkBegin,
+  type LatestNow,
+  latestNow,
   type ParentNow,
   parentNow,
   planBegin,
@@ -251,12 +251,6 @@ export {
 } from "./card-title.ts"
 export { sourceWords } from "./card-words.ts"
 export {
-  baseMovedOn,
-  catchUpName,
-  incomingWords,
-  mergedFrom,
-} from "./catch-up-from.ts"
-export {
   COMMANDS,
   COMMANDS_KEY,
   type CommandRef,
@@ -394,6 +388,12 @@ export {
   planResolution,
   resolutionFloor,
 } from "./land.ts"
+export {
+  baseMovedOn,
+  latestSourceName,
+  latestWords,
+  mergedFrom,
+} from "./latest-from.ts"
 export {
   type AddressLink,
   addressLink,
@@ -772,7 +772,7 @@ export {
 } from "./title.ts"
 export {
   encodeUpdate,
-  folderIncoming,
+  folderLatest,
   type UpdateMessage,
 } from "./update.ts"
 export {

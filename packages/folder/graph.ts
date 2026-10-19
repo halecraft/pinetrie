@@ -87,7 +87,7 @@ export function folderStateHeld(g: StateGraph, of: PointId): PointId | null {
   for (let at = g.states.get(of); at !== undefined; ) {
     if (isLineState(at)) return at.id
     const [first, merged] = at.parents
-    if (at.made.kind === "catch-up" && isLine(merged)) return merged ?? null
+    if (at.made.kind === "get-latest" && isLine(merged)) return merged ?? null
     if (isLine(first)) return first ?? null
     at = first === undefined ? undefined : g.states.get(first)
   }
@@ -227,7 +227,7 @@ function isParentCount(made: StateMade, count: number, empty: boolean) {
     case "resolve":
     case "concurrent":
       return count === 1
-    case "catch-up":
+    case "get-latest":
     case "accept":
       return count === 2
     case "bases-merged":

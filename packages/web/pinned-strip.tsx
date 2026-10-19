@@ -10,9 +10,9 @@
 import type { CardId, PinnedView, TextCard } from "@pinetrie/core"
 import {
   type CardFrameFacts,
-  type CatchUps,
   type ColumnAct,
   dropProps,
+  type LatestSources,
   NEW_PIN,
   NEW_PIN_TITLE,
   PINNED_EMPTY,
@@ -40,7 +40,7 @@ export function PinnedStrip(p: {
   onNewPin: (() => void) | null
   /** Where a queue from this column puts a card; null where nothing can be queued. */
   queueOn: CardFrameFacts["queueOn"]
-  catchUps: CatchUps
+  latestSources: LatestSources
   reader: Reader
   readOnly: ReadOnly | null
   onAct: (act: ColumnAct) => void
@@ -61,7 +61,7 @@ export function PinnedStrip(p: {
         <PinnedCardEditor
           among={p.cards}
           card={c}
-          catchUps={p.catchUps}
+          latestSources={p.latestSources}
           inView={p.inView}
           key={c.id}
           onAct={p.onAct}

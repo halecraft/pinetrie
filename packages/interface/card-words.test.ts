@@ -48,19 +48,19 @@ describe("card words", () => {
   test.each([
     [
       "commandWords, on accepted work",
-      commandWords("bring-up-to-date", {
+      commandWords("get-latest", {
         base: { kind: "accepted" },
         parent: null,
       }),
-      "catch up with accepted work",
+      "get the latest",
     ],
     [
       "commandWords, on a WIP",
-      commandWords("bring-up-to-date", {
+      commandWords("get-latest", {
         base: { kind: "wip", bookmark: "wip/a" },
         parent: null,
       }),
-      "catch up with wip/a",
+      "get the latest",
     ],
     [
       "commandWords, a WIP gone",
@@ -68,19 +68,19 @@ describe("card words", () => {
         base: { kind: "accepted" },
         parent: null,
       }),
-      "continue from accepted work",
+      "continue from the latest work",
     ],
     [
       "commandNote",
-      commandNote("bring-up-to-date", {
+      commandNote("get-latest", {
         base: { kind: "accepted" },
         parent: null,
       }),
-      "↓ catches up with accepted work first, then sends what you write",
+      "↓ gets the latest from accepted work first, then sends what you write",
     ],
     [
       "commandWords, the thread it branched from",
-      commandWords("catch-up-with-parent", {
+      commandWords("get-latest-from-parent", {
         base: { kind: "accepted" },
         parent: {
           kind: "parent",
@@ -88,15 +88,15 @@ describe("card words", () => {
           name: "amber-fox" as ThreadName,
         },
       }),
-      "catch up with amber-fox",
+      "get amber-fox's latest",
     ],
     [
       "commandNote, the thread it branched from, unknown",
-      commandNote("catch-up-with-parent", {
+      commandNote("get-latest-from-parent", {
         base: { kind: "accepted" },
         parent: null,
       }),
-      "↓ catches up with the thread this one branched from first, then sends what you write",
+      "↓ gets the latest from the thread this one branched from first, then sends what you write",
     ],
     ["unsentWords", unsentWords("no such image"), "not sent: no such image"],
     [

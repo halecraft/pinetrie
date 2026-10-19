@@ -50,7 +50,7 @@ export function conflictChoiceWords(
 /** The pane's own words. */
 export const conflictsWords = {
   title: "choose versions",
-  none: "no conflict of this thread's own is open: catch up to find what conflicts",
+  none: "no conflict of this thread's own is open: get the latest to find what conflicts",
   ours: "this thread's changes",
   theirs: (from: string | null) =>
     from === null ? "accepted work's changes" : `${from}'s changes`,

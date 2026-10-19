@@ -28,7 +28,7 @@ export const bringUpToDate = (
   lane: ThreadId,
   tip: string | null,
   text: string,
-): Promise<CardId> => queueCommand(session, lane, tip, text, "bring-up-to-date")
+): Promise<CardId> => queueCommand(session, lane, tip, text, "get-latest")
 
 /**
  * A card with `command` and `text`, made at the thread's end once the

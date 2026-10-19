@@ -140,7 +140,7 @@ describe("banners in a harness", () => {
                 turnDone: async () => {},
                 askedAboutConflict: async () => false,
                 configWritten: async () => null,
-                catchUp: async () => {
+                getLatest: async () => {
                   throw new Error("no catch_up here")
                 },
                 resolveConflict: async () => {

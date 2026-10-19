@@ -81,7 +81,7 @@ the helper, S122 to S131 for Docker and the lane VM.
   `LaneBaseOf<P>`), the port's the `PointId` form.
 - **A lane's history is reached only on its queue.** `LaneHistory` is what
   a lane's copy records and merges: a turn (`commit`, `recordTurn`), its
-  base (`base`), a catch-up (`readyToMerge`, `merge`), its conflicts and
+  base (`base`), getting the latest (`readyToMerge`, `merge`), its conflicts and
   their resolution (`resolve`: a folder lane's; jj's refuses, its conflicts
   being markers in the file), the records of where it began once its
   fork made its disk (`startRecords`: a folder lane's start state; none for
@@ -154,10 +154,10 @@ Its laws, each one test in the port suite titled by the law's sentence
 - **A clean merge descends from both sides.** A clean merge's result
   has the lane's state before it (`ours`) and the state merged (`from`) as
   ancestors.
-- **An accept then a catch-up changes no file.** Once the lane's proposed changes
-  are accepted, its catch-up with accepted work changes no file in the
+- **An accept then getting the latest changes no file.** Once the lane's proposed changes
+  are accepted, its getting the latest from accepted work changes no file in the
   lane: made at once, and made after the lane edits the accepted lines
-  again and records a turn, with no catch-up between and accepted work
+  again and records a turn, with nothing getting the latest between and accepted work
   unchanged since. It answers `nothing`, or `clean` with no files, and the
   lane's files read as before. The second order is the one that needs
   jj's joins (ADR-0079).
@@ -449,7 +449,7 @@ paths are its diff." would compare a function with itself.
   and shared directories). A lane runs with accepted work's, less what its
   own copy dropped from the copy it started on (`effectiveLaneConfig`): it
   can give up a grant, and only accepted work gives one. A grant accepted
-  after a lane started reaches it without a catch up. `configWidenings`
+  after a lane started reaches it without getting the latest. `configWidenings`
   says what one copy lets that another does not, which a write's reply
   (`configChangeNote`) and proposed changes' review show. Your repo's names come
   from your config and your working copy's file at startup: they find
@@ -586,9 +586,9 @@ paths are its diff." would compare a function with itself.
   reads skill files at `/mnt/host`, and checks what a real lane's prompt
   tells it about itself and that the note it names is there (ADR-0121). It
   has seven scenarios (`apps/pinetrie/e2e/lanes/`), `main`, `images`,
-  `shared`, `commands`, `catch-up`, `recipe` and `contract`, and
+  `shared`, `commands`, `get-latest`, `recipe` and `contract`, and
   `PINETRIE_SCENARIO` picks some. `recipe` is ADR-0135's: a turn's record
-  classes what its runs wrote, and a catch up that changes what a recipe
+  classes what its runs wrote, and getting the latest that changes what a recipe
   read removes what it made, its cache kept.
   It runs on Docker, and where Docker cannot run lanes, each scenario
   reports SKIP with the host's own reason (`runtimeProblem`).

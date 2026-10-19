@@ -45,8 +45,8 @@ translates to.
   (`fingerprintRead`, `parseFingerprint`) and `planObserve`.
 - `step.ts`: `RepoStep`, one command on your repo as data.
 - `plan.ts`: the steps, pure: accepted work's setup (`setupProposal`,
-  `planSetup`), a publish's catch-up, move and undo
-  (`planPublishCatchUp`, `planPublishMove`, `planCatchUpUndo`, ADR-0090),
+  `planSetup`), a publish's getting the latest, move and undo
+  (`planPublishGetLatest`, `planPublishMove`, `planGetLatestUndo`, ADR-0090),
   proposed changes' build, rebuild, refresh, repair
   and acceptance, lanes' refs (`laneRefSteps`), a bundle's import
   (`planImport`), where proposed changes start (`proposedStart`, `acceptedThreadCommitsRevset`), the
@@ -71,8 +71,8 @@ translates to.
   (`wipState`, `readWipState`).
 - `shared.ts`: the facts every lane and accepted work share, per operation.
 - `lane-read.ts`: one lane's refresh facts in one `jj log` (`gatherLane`).
-- `catch-up.ts`: what catching up would change in a lane, its rules and
-  its read (`readCatchUp`).
+- `get-latest.ts`: what getting the latest would change in a lane, its rules and
+  its read (`readGetLatest`).
 - `file-at.ts`: a file at accepted work, at a lane's tip or at its start
   (`readRepoFile`), the destination's read of `pinetrie.json`.
 - `tidy.ts`: `pnpm tidy`'s core (ADR-0155): your op log as facts
@@ -186,8 +186,8 @@ operation is read once and kept until the head moves.**
 
 - **A lane with no ref in your repo is `"none"`** to `gatherLane` and
   `gatherRefresh`: one that never committed was never fetched. No
-  `pinetrie.base` is written for it, and the page reads catching up as
-  `unknown` (`catchUpNow`, `@pinetrie/rules`), never as caught up.
+  `pinetrie.base` is written for it, and the page reads getting the latest as
+  `unknown` (`latestNow`, `@pinetrie/rules`), never as got the latest.
 - **`SharedFacts`**, per operation (`RepoOps.shared()`), in one `jj log`
   (`readShared`): accepted work's commit, the accepted thread commits on
   the line (`ACCEPTED_THREAD_COMMITS`: a `Pinetrie-Source` or
@@ -238,7 +238,7 @@ operation is read once and kept until the head moves.**
   S89 measured 18 before, and 3 with the evolog (ADR-0154). Once accepted
   work moves past a lane's base, its refresh runs 5 (ADR-0181): the start
   read too (`readStart`), on every refresh while an accepted thread commit
-  sits above the base, since `known` keeps only the catch-up diffs; those
+  sits above the base, since `known` keeps only getting the latest diffs; those
   two run once per move, plus one for each further head of its proposed
   changes' start. S253 counted 5 for 60 of 73 lanes.
 - **A whole refresh, as the host runs it, is counted** (the host's
@@ -252,44 +252,44 @@ operation is read once and kept until the head moves.**
   about 20 ms.
 - **One rule decides both.** `repo.test.ts` holds `gatherLane` beside the
   separate reads (`laneTipIn`, `laneBase`, `startOfProposed`, `readProposedChanges`,
-  `filesTouched`, `readCatchUp`) at every proposed changes it builds, accepts, follows, repairs and
+  `filesTouched`, `readGetLatest`) at every proposed changes it builds, accepts, follows, repairs and
   stacks, and expects the same values. A lane on a WIP reads the separate
   way (`wipFacts`): its target and state need more of your repo. Which way
   a lane is read is `gatherRefresh`'s choice; the host never makes it.
   Whether one read could serve every lane is S100.
 
-## What catching up would change (`catch-up.ts`, S97, S102)
+## What getting the latest would change (`get-latest.ts`, S97, S102)
 
 **The page's ↓, a base's news and `catch_up`'s refusals read one forecast,
 made in your repo before any update runs, and it must name the files the
 update's merge will change.**
 
 - **One module, rules beside the read** (as `planLaneRead` beside
-  `gatherLane`): `planCatchUpRead`, `catchUpHolds` and `catchUpChangedFiles`
-  are pure; `catchUpFiles` reads the diffs and `readCatchUp` runs the rest.
-  Both gathers call `readCatchUp`: `gatherLane`, and `placeOf` for every
+  `gatherLane`): `planGetLatestRead`, `getLatestHolds` and `getLatestChangedFiles`
+  are pure; `getLatestFiles` reads the diffs and `readGetLatest` runs the rest.
+  Both gathers call `readGetLatest`: `gatherLane`, and `placeOf` for every
   other gather.
-- **The target is one value** (`CatchUpTarget`): accepted work's commit,
+- **The target is one value** (`GetLatestTarget`): accepted work's commit,
   merged, or a WIP's commit, copied. `placeOf` builds it from the WIP's
   state, a landed WIP's update merging accepted work; `gatherLane` reads
-  lanes on accepted work only. The stored `CatchUpRead.to` is its commit.
+  lanes on accepted work only. The stored `GetLatestRead.to` is its commit.
 - **Read once per move.** It is read only once the base has moved from the
   lane's base start, and kept (`known`: the page's `pinetrie.base`, as a
-  memo) while the lane's tip and the target's commit stay: `planCatchUpRead`
+  memo) while the lane's tip and the target's commit stay: `planGetLatestRead`
   decides. The commits it diffs from are decided from the tip and the base,
   so the memo needs no other key.
 - **The forecast diffs from where the next proposed changes would start**
-  (`catchUpHolds`, S102 item 11). It names the files
-  catching up would change in a lane: those the base's commit `to` has
+  (`getLatestHolds`, S102 item 11). It names the files
+  getting the latest would change in a lane: those the base's commit `to` has
   differently from each commit the lane holds of its history
   (`jj diff --from <held> --to <to>`), and from the lane's tip
-  (`jj diff --from <tip> --to <to>`), decided by `catchUpChangedFiles`. On
+  (`jj diff --from <tip> --to <to>`), decided by `getLatestChangedFiles`. On
   accepted work the held commits are the proposed changes' start, which holds every
   accepted source the lane has: the sources `mergeBase` joins before it
   merges, so an acceptance of the lane's own work counts for nothing even
   after the lane edited it again. Diffed from the base's start instead, it
   counted every file the lane touched since. The start has two heads when
-  the lane caught up between its proposed changes and the acceptance (the base's
+  the lane got the latest between its proposed changes and the acceptance (the base's
   commit and the source). A file then counts only when `to` differs from
   both. A union would count every file of the acceptance again, and the
   intersection misses a file only when accepted work puts it back to the
@@ -352,17 +352,17 @@ update's merge will change.**
   and so is a publish's move of the publish bookmark alone
   (`planPublishMove`, ADR-0076), which changes no file and is anyone's
   command.
-  A publish's catch-up (`planPublishCatchUp`: `jj rebase -b @ -d <accepted>`) is
+  A publish's getting the latest (`planPublishGetLatest`: `jj rebase -b @ -d <accepted>`) is
   one exception, since it changes the working copy; an accepting move is the
   other: `jj bookmark move <accepted> <publish> --to @-` moves accepted work to your
   commits, your act, so it runs as you (`as: "you"`, ADR-0090), and its
-  undo (`planCatchUpUndo`) too. Accepted work's config is set as you too: `jj
+  undo (`planGetLatestUndo`) too. Accepted work's config is set as you too: `jj
   config set` is not an operation.
-- **A publish's undo is `jj op revert` of the catch-up's operation, never
+- **A publish's undo is `jj op revert` of the operation that got the latest, never
   `jj op restore`** (S111): a restore to the operation before deletes from
   disk an edit made since, where a revert keeps it (an edit in between
   leaves `@` divergent, which the window of one jj process makes rare).
-  The operation is `SharedFacts.op` after the catch-up's `execute`
+  The operation is `SharedFacts.op` after getting the latest's `execute`
   observed it. Two bookmarks in one `jj bookmark move` move in one
   operation, and a refusal of either moves neither (S111), so the move
   itself needs no undo.
@@ -405,7 +405,7 @@ update's merge will change.**
   descends from no accepted thread commit), else `start`. Proposed changes keep the diff from
   its start's merge to the tip, so a start the target holds as another
   commit is subtracted from the target. An accepted thread commit and a
-  later catch-up are both heads, and their merge conflicts wherever accepted work
+  later getting the latest are both heads, and their merge conflicts wherever accepted work
   changed the accepted lines since: proposed changes conflicted where its lane had nothing left to
   resolve. `present()` around the base's source keeps a commit lost to
   `jj util gc` from failing every refresh; it then excludes nothing.
@@ -415,7 +415,7 @@ update's merge will change.**
   paragraph, on its WIP line and kept through a description. The source is
   the lane tip the whole proposed changes hold, a stack's revisions included:
   accepted, it says you have that tip.
-- **`acceptedFacts` previews catching the working copy up** (`workingCopy.catchUp`, S80):
+- **`acceptedFacts` previews bringing the working copy the latest** (`workingCopy.getLatest`, S80):
   `git merge-tree --write-tree --name-only --merge-base=<fork point> <accepted>
   <@>` exits 1 on conflicts and prints the merged tree, the conflicting
   paths, a blank line, then its messages; the tree against `@`'s names the
@@ -425,16 +425,16 @@ update's merge will change.**
   moves every head on your work, which the preview counts: `-r` would
   strip them of the commits under them. `workingCopy.conflicts` counts your
   conflicted commits above accepted work, and lists `@`'s conflicted files; a
-  publish's second round reads it again after the catch-up, since a commit
+  publish's second round reads it again after getting the latest, since a commit
   of yours that `@`'s tree resolves can conflict where the preview of `@`
   says nothing. `workingCopy.ahead` is `::@- ~ ::<accepted>`, whether or not `@-`
-  descends from accepted work: what a publish accepts once caught up.
+  descends from accepted work: what a publish accepts once got the latest.
 - **`filesTouched`** says whether a lane's work since its start changes any
   file: `none`, `some` or `unknown` (ADR-0067). From one start, `jj diff
   --from <start> --to <tip>`: the diff a build restores, so the two always
   agree. From several, `jj diff -r '(<start>)..<tip>'`, which diffs a range
   from its roots' parents, merged, to its tip. jj refuses a range with gaps,
-  as after a catch-up merged an accepted thread commit (S97): the merge is in the range and
+  as after getting the latest merged an accepted thread commit (S97): the merge is in the range and
   one of its parents is not. A refusal, or an untraced start, is
   `unknown`, which never builds proposed changes. A known start is never empty
   (`NonEmpty`, core): `readStart` reads `proposedStart`'s heads, which hold
@@ -443,14 +443,14 @@ update's merge will change.**
   thread and a lane but no source (`untracedLanes`, core): proposed changes
   accepted before proposed changes carried their ledger. Above a lane's base, it makes the lane's start `untraced`
   (`StartRead`), since no start can leave out what it brought: nothing is
-  proposed until the lane catches up past it, which puts it under the base.
+  proposed until the lane gets the latest past it, which puts it under the base.
   A turn's commit names no thread, so it is never one. Only the lane's own
   accepted thread commits are matched, by `Pinetrie-Lane`: an untraced one of
   a lane it forked from is not found.
 - **An untraced place leaves a gap** (`untouched`, ADR-0067): on a lane
   whose start is untraced, divergent proposed changes are not repaired and proposed changes
   you edited is not recorded again; nothing runs, and its record stays as
-  it was, until the lane catches up past the accepted thread commit. Only proposed changes the host
+  it was, until the lane gets the latest past the accepted thread commit. Only proposed changes the host
   made is withdrawn there. `RefreshDecision` names it, so nothing reaches
   it by accident.
 - **`startOfProposed` is the one path to a start**, or to `untraced`. Every
@@ -627,7 +627,7 @@ with the steps this package gives it (`ForkSetup`, `BaseCheckout`).
   registry asks for the history, and its planners (`planForkSetup`,
   `planMerge`) convert inside.
 - **Reads of your repo stay in commits.** `laneBase`, the proposed changes' gathers,
-  `catch-up.ts` and `readRepoFile` read `CommitBase` (`LaneBaseOf<CommitId>`);
+  `get-latest.ts` and `readRepoFile` read `CommitBase` (`LaneBaseOf<CommitId>`);
   `commitTurn` and `mergeUpdate` answer `TurnCommittedOf<CommitId>` and
   `MergedOf<CommitId>`. `jjLaneHistory` converts at the port (`baseFromCommits`,
   `turnFromCommits`, `mergedFromCommits`); the host's adapter converts a
@@ -799,7 +799,7 @@ with the steps this package gives it (`ForkSetup`, `BaseCheckout`).
 - **`copyFacts`** (ADR-0080) reads where the working copy sits against the
   lane's bookmark, after a snapshot: `@`'s parents, the bookmark, and
   whether the one parent descends from it (`isAncestor`, asked only when it
-  is not the bookmark). Every catch-up checks it before it merges
+  is not the bookmark). Every time it gets the latest checks it before it merges
   (`readyToMerge`, then `planCopyReady`, `@pinetrie/core`, the one maker of
   the `ReadyCopy` a merge takes): a split's stack as the working copy is
   off the lane's line.
@@ -850,7 +850,7 @@ with the steps this package gives it (`ForkSetup`, `BaseCheckout`).
     (`withoutAcceptedThreadCommits`), and keep accepted work's commits under them.
   - **A WIP's copy has no accepted thread commit in its history,** so a WIP thread joins
     nothing.
-  - **The host's forecast starts from the same sources** (`catchUpFiles`,
+  - **The host's forecast starts from the same sources** (`getLatestFiles`,
     `@pinetrie/jj`): it diffs from the proposed changes' start, which holds them,
     not from the base's start (S102 item 11).
 - **`mergeUpdate` is an update's whole run in a lane** after its edits,
@@ -874,7 +874,7 @@ with the steps this package gives it (`ForkSetup`, `BaseCheckout`).
   content with `jj file show`: the host cannot read a lane's disk.
 - **A file both sides hold alike is merged as it is** (`heldAlike`): jj
   keeps a conflict when the merge's base is itself conflicted, as when a
-  branch cloned at a conflicted catch-up and its parent resolved it alike
+  branch cloned at a conflicted getting the latest and its parent resolved it alike
   (S99). `mergeUpdate` restores such files from the side merged in into the
   merge (`jj restore --into`, the bookmark following), then reads the
   conflicts again. With a clean base jj already takes them.
@@ -913,8 +913,8 @@ with the steps this package gives it (`ForkSetup`, `BaseCheckout`).
   your edits differently, after an accepted branch that holds the lane's
   tip, from a branch whose parent was accepted after the fork (S72), and
   from a lane after a branch of it was accepted before its update (S51,
-  S72); an untraced accepted thread commit, read either way until the lane catches up past it, and what catching
-  up changes against what the merge changed (S97), and after the lane
+  S72); an untraced accepted thread commit, read either way until the lane gets the latest past it, and what getting
+  the latest changes against what the merge changed (S97), and after the lane
   edited its accepted work again, with one start and two (S102 item 11);
   and a review of proposed changes' commit (its description, a rename, names with a space and a
   quote, and one file's diff, never a directory's). The gathers are held to
@@ -922,12 +922,12 @@ with the steps this package gives it (`ForkSetup`, `BaseCheckout`).
   acceptance reads on a WIP (`gatherAcceptance`), a split's stack bottom first
   (`gatherStack`), `repairProposedChanges` on divergent proposed changes, and that
   `trailerRevset` finds exactly the commits `hasTrailer` matches. And a
-  catch-up past an accepted thread commit of the lane's own work, of its
+  getting the latest past an accepted thread commit of the lane's own work, of its
   parent's, two of them, a conflict both sides made, and an acceptance of
   proposed changes you edited (S102): the lane holds the accepted thread commit's
   source, so that commit is joined to it and the update is clean. Then a
   lane's ref deleted and imported again, which keeps the history under
-  accepted work (S78); a branch cloned from a conflicted catch-up, whose
+  accepted work (S78); a branch cloned from a conflicted getting the latest, whose
   proposed changes' conflict came with its copy (S99); and a base refreshed after your
   `@-` was rewritten, not built on (S74).
 - **`tidy.test.ts`**: `planTidy`, `isTidyRaced`, `planTidyHint` and

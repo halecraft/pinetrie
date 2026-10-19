@@ -47,7 +47,7 @@ test("planFolderRecords: the proposed changes against accepted work's newest, th
       kind: "folder",
       lane: LANE,
       start: "line-0",
-      catchUp: { tip: "start-a", to: "line-1", files: ["b.txt"] },
+      getLatest: { tip: "start-a", to: "line-1", files: ["b.txt"] },
       work: "some",
     },
   })

@@ -51,7 +51,7 @@ async function sharedSection(
     files: {
       "shared.txt": "one\n",
       // A publish brings your commits into accepted work (section 3).
-      "pinetrie.json": `${JSON.stringify({ publish: { catchUp: true } })}\n`,
+      "pinetrie.json": `${JSON.stringify({ publish: { getLatest: true } })}\n`,
     },
     store,
     places,
@@ -222,14 +222,15 @@ async function sharedSection(
       path.join(dir, "pinetrie.json"),
       JSON.stringify({
         lanes: { shared: ["notes"] },
-        publish: { catchUp: true },
+        publish: { getLatest: true },
       }),
     )
     await jj(dir, "commit", "-m", "you share notes")
     // Published once accepted work's record has seen your commit.
     await waitFor(
       () =>
-        (readJjAccepted(h.host.session)?.workingCopy.catchUp ?? null) !== null,
+        (readJjAccepted(h.host.session)?.workingCopy.getLatest ?? null) !==
+        null,
       30_000,
     )
     await h.user.actOnAccepted("publish")

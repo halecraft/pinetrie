@@ -23,7 +23,7 @@ function behind(to = "l2") {
       base: { kind: "accepted" },
       start: commitId("l1"),
       state: "ok",
-      catchUp: { tip: commitId("t"), to: commitId(to), files: ["a.ts"] },
+      getLatest: { tip: commitId("t"), to: commitId(to), files: ["a.ts"] },
       untraced: [],
       work: "some",
     }),
@@ -43,7 +43,7 @@ function behind(to = "l2") {
       workingCopy: {
         behind: 0,
         ahead: 0,
-        catchUp: null,
+        getLatest: null,
         conflicts: { commits: 0, files: [] },
       },
       publishCatchesUp: true,

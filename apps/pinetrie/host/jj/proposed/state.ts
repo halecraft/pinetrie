@@ -8,7 +8,7 @@
 // write that changes nothing.
 
 import {
-  type CatchUpRead,
+  type GetLatestRead,
   type JjBaseRecord,
   laneFirstPrompt,
   type ProposedChangesRecord,
@@ -48,7 +48,7 @@ export interface ProposedChangesDocs {
   nameOf(lane: ThreadId): ThreadName | undefined
   /** Read from the archive record, never from the lane's tip being missing: a tip missing for one import must not withdraw live proposed changes. */
   archived(lane: ThreadId): boolean
-  /** A gather's input: the lane, its name, accepted work's names, and the last catch-up read, a memo `readCatchUp` keeps at the same tip and base commit. */
+  /** A gather's input: the lane, its name, accepted work's names, and the last catch-up read, a memo `readGetLatest` keeps at the same tip and base commit. */
   input(lane: ThreadId): ProposedChangesInput
   /**
    * The lane's tip entry, for `Pinetrie-Entry`, its root leased; "" for none.
@@ -130,7 +130,7 @@ export function createProposedChangesDeps(input: {
       lane,
       name: nameOf(lane),
       repoConfig,
-      known: jjCatchUp(readBases(doc).get(lane)),
+      known: jjGetLatest(readBases(doc).get(lane)),
     }),
     async laneTip(lane) {
       await using held = basics.leases.lane(lane)
@@ -185,5 +185,5 @@ export function createProposedChangesDeps(input: {
 }
 
 /** A jj lane's base record's read of what catching up changes; none for one of another kind. */
-const jjCatchUp = (base: BaseRecord | undefined): CatchUpRead | null =>
-  base?.kind === "jj" ? base.catchUp : null
+const jjGetLatest = (base: BaseRecord | undefined): GetLatestRead | null =>
+  base?.kind === "jj" ? base.getLatest : null

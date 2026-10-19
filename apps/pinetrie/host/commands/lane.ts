@@ -289,7 +289,7 @@ export function proposedChangesRefusal(
     case ERR.NOT_AS_SHOWN:
       return "the changes are not what you were shown: review them again"
     case ERR.FOLDER_MOVED:
-      return `${path ?? "a file"} changed in the project's folder while it was accepted: catch up, then accept again`
+      return `${path ?? "a file"} changed in the project's folder while it was accepted: get the latest, then accept again`
     case ERR.FOLDER_CANNOT_HOLD:
       return `${path ?? "a file"} cannot be written into the project's folder: another name there is the same once folded, or the folder cannot hold it`
     case ERR.NOT_A_STACK:

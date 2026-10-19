@@ -65,7 +65,7 @@ describe("states and accepted work's line", () => {
     [{ kind: "read" }, true, null],
     [{ kind: "start", lane: LANE }, false, LANE],
     [{ kind: "turn", lane: LANE, entry: entryId("e") }, false, LANE],
-    [{ kind: "catch-up", lane: LANE }, false, LANE],
+    [{ kind: "get-latest", lane: LANE }, false, LANE],
     [{ kind: "accept", lane: LANE }, true, null],
     [{ kind: "restore", of: pointId("line-0") }, true, null],
     [{ kind: "resolve", lane: LANE, path: "a.txt" }, false, LANE],

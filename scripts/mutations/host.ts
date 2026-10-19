@@ -428,7 +428,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a move jj refuses after a publish's catch-up leaves it",
     file: "apps/pinetrie/host/jj/accepted.ts",
-    from: "      if (op !== null) await ops.execute(planCatchUpUndo(op))\n",
+    from: "      if (op !== null) await ops.execute(planGetLatestUndo(op))\n",
     to: "",
     command: unit,
     expect: "a move jj refuses after the catch-up reverts it, then fails",
@@ -436,7 +436,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a publish's refused second round reverts nothing",
     file: "apps/pinetrie/host/jj/accepted.ts",
-    from: "      await ops.execute(planCatchUpUndo(finish.op))\n",
+    from: "      await ops.execute(planGetLatestUndo(finish.op))\n",
     to: "",
     command: unit,
     expect: "your commits conflicted by the catch-up: it is reverted",
@@ -932,7 +932,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a card that brings the thread up to date is sent as a plain one",
     file: "apps/pinetrie/host/queued-card-pop.ts",
-    from: "      return catchUpThenSend(\n        deps,\n        open,\n        lane,\n        { card: plan.card, text: popped.text },\n        plan,\n      )",
+    from: "      return getLatestThenSend(\n        deps,\n        open,\n        lane,\n        { card: plan.card, text: popped.text },\n        plan,\n      )",
     to: "      return sendCard(deps, open, { card: plan.card, text: popped.text }, plan.card)",
     command: unit,
     expect: "clean: the update, then the card's text as a message",
@@ -1833,8 +1833,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the base record leaves out what catching up changes",
     file: "packages/jj/proposed-gather.ts",
-    from: "  catchUp: input.catchUp,\n",
-    to: "  catchUp: null,\n",
+    from: "  getLatest: input.getLatest,\n",
+    to: "  getLatest: null,\n",
     command: unit,
     expect:
       "work you landed yourself leaves the proposed changes held: kept, with no files, and settled",
@@ -3282,6 +3282,32 @@ export const mutations: readonly Mutation[] = [
     to: '  return r.kind === "never"\n',
     command: unit,
     expect: "a carry-on an approval woke reads as one an allowance woke",
+  },
+  {
+    name: "accepted work's working copy keeps getLatest",
+    file: "apps/pinetrie/host/migrations/0013-accepted-get-latest.ts",
+    from: "  return renamed === null ? null : { ...contents, workingCopy: renamed }\n",
+    to: "  return renamed === null ? null : { ...contents, workingCopy }\n",
+    command: unit,
+    expect:
+      "accepted work's working copy names what getting the latest would do by its new name",
+  },
+  {
+    name: "a folder state keeps the old word",
+    file: "apps/pinetrie/host/migrations/0014-state-get-latest.ts",
+    from: '    ? { ...contents, made: { ...made, kind: "get-latest" } }\n',
+    to: "    ? { ...contents, made }\n",
+    command: unit,
+    expect: "a state an old catch-up made reads as one getting the latest made",
+  },
+  {
+    name: "a card's parent command keeps the old word",
+    file: "apps/pinetrie/host/migrations/0015-card-command-get-latest.ts",
+    from: '  "catch-up-with-parent": "get-latest-from-parent",\n',
+    to: "",
+    command: unit,
+    expect:
+      "a card's command in the old words is renamed, its other fields kept",
   },
   // ── a lane's prompt ──
   {

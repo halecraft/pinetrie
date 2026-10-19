@@ -258,7 +258,7 @@ export async function startLaneWork(input: {
     hooks: {
       turnDone: turns.turnDone,
       askedAboutConflict: updates.askedAboutConflict,
-      catchUp: updates.catchUpInRun,
+      getLatest: updates.getLatestInRun,
       async resolveConflict(lane, path, choose) {
         if (!registry.isOwn(lane))
           return resolveAnswer(path, { kind: "refused", why: "no-copy" })
@@ -340,7 +340,7 @@ const NO_LANES: LaneWork = {
   hooks: {
     turnDone: async () => {},
     askedAboutConflict: async () => false,
-    catchUp: async () => refusedAnswer("no-copy"),
+    getLatest: async () => refusedAnswer("no-copy"),
     resolveConflict: async path =>
       resolveAnswer(path, { kind: "refused", why: "no-copy" }),
     configWritten: async () => null,

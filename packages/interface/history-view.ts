@@ -70,7 +70,7 @@ export function madeWords(
     // A lane's own states are never on accepted work's line.
     case "start":
     case "turn":
-    case "catch-up":
+    case "get-latest":
     case "resolve":
     case "bases-merged":
       return "a thread's own state"

@@ -20,7 +20,7 @@ const BASE: JjBaseRecord = {
   base: { kind: "accepted" },
   start: commitId("s1"),
   state: "ok",
-  catchUp: null,
+  getLatest: null,
   untraced: [],
   work: "some",
 }

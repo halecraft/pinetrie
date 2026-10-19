@@ -5,9 +5,9 @@ import { writeFileSync } from "node:fs"
 import path from "node:path"
 import {
   ancestry,
-  CATCH_UP_TOOL,
   type EntryId,
   entryId,
+  GET_LATEST_TOOL,
   messageText,
   ROOT,
   type ThreadId,
@@ -37,18 +37,18 @@ import { jj } from "./support.ts"
 
 export const scenario: Scenario = {
   lanes: true,
-  run: ({ check }, { lanes }) => catchUpSection(check, lanes),
+  run: ({ check }, { lanes }) => getLatestSection(check, lanes),
 }
 
-async function catchUpSection(
+async function getLatestSection(
   check: Checks["check"],
   lanes: LaneHosts,
 ): Promise<void> {
-  const project = await committedProject("pinetrie-catch-up-", {
+  const project = await committedProject("pinetrie-get-latest-", {
     "a.txt": "a\n",
     ".gitignore": "node_modules/\n.vite/\n",
     // A publish here accepts your commit.
-    "pinetrie.json": `${JSON.stringify({ publish: { catchUp: true } })}\n`,
+    "pinetrie.json": `${JSON.stringify({ publish: { getLatest: true } })}\n`,
   })
   const script = scriptedModel()
   const wh = await lanes.startHost({
@@ -58,7 +58,7 @@ async function catchUpSection(
       if (process.env.PINETRIE_E2E_LOG === "1") console.log(m)
     },
   })
-  const wu = await join(wh, "uma", "catch-up")
+  const wu = await join(wh, "uma", "get-latest")
   await wu.request({ kind: "name", name: "Uma" })
   const tree = () => heldTree(wh)
   const idle = async () => {
@@ -106,7 +106,7 @@ async function catchUpSection(
     // The agent catches up in its run, alone in its turn, then reads the
     // file that came in.
     script.use([
-      { tool: CATCH_UP_TOOL, args: {} },
+      { tool: GET_LATEST_TOOL, args: {} },
       { tool: "bash", args: { command: "cat landed.txt" } },
       { text: "caught up" },
     ])
@@ -123,7 +123,7 @@ async function catchUpSection(
         content.some(
           p =>
             (p as { type?: string; name?: string }).type === "toolCall" &&
-            (p as { name?: string }).name === CATCH_UP_TOOL,
+            (p as { name?: string }).name === GET_LATEST_TOOL,
         )
       )
     })

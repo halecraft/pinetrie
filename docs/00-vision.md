@@ -37,7 +37,7 @@ it costs nothing. An agent thread has a lane (ADR-0032, ADR-0034): a
 Linux container on its own disk, holding its own copy of your repo, and a
 branch clones its parent's disk at the turn it branched from. Its file
 changes come back as proposed changes, which you review and accept; a
-catch-up that conflicts is resolved by the agent, or by you (ADR-0033).
+getting the latest that conflicts is resolved by the agent, or by you (ADR-0033).
 There is no read-only kind between the two: every agent's lane has its own
 copy, so none needs a shared one.
 
@@ -52,7 +52,7 @@ This distinction drives the whole architecture:
    LLM-mediated three-way fold (see `01-architecture.md` § Fold).
 3. **Effect merge** — filesystem/world side effects of a branch that ran tools.
    Each agent's thread works in its own lane, and its work reaches your repo
-   as proposed changes; catching up merges what moved on, by jj, or by
+   as proposed changes; getting the latest merges what moved on, by jj, or by
    pine·trie's own path merge in a folder project (ADR-0142). Coupling a
    file merge to a fold's context merge waits for fold.
 

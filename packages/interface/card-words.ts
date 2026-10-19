@@ -4,8 +4,8 @@
 import type {
   CanvasView,
   CardCommand,
-  CatchUpCommand,
-  CatchUpFrom,
+  GetLatestCommand,
+  LatestFrom,
   ListKey,
   ParentThread,
   ThreadBase,
@@ -13,9 +13,9 @@ import type {
 } from "@pinetrie/core"
 import {
   type CardEvent,
-  catchUpName,
   changeVerb,
   displayName,
+  latestSourceName,
   type PinnedStatus,
   type Verb,
 } from "@pinetrie/rules"
@@ -26,7 +26,7 @@ import type { Reader } from "./send.ts"
 import type { TraceGroup } from "./traces.ts"
 
 /** What a thread catches up with, for a command's words. */
-export interface CatchUps {
+export interface LatestSources {
   /** The thread's base (`effectiveBase`). */
   readonly base: ThreadBase
   /** The thread it branched from; null for one that began at its base. */
@@ -34,20 +34,20 @@ export interface CatchUps {
 }
 
 /**
- * What a command merges: the base for `bring-up-to-date`, accepted work for
+ * What a command merges: the base for `get-latest`, accepted work for
  * `continue-on-accepted`, the thread it branched from for
- * `catch-up-with-parent`. Null for that one without a parent.
+ * `get-latest-from-parent`. Null for that one without a parent.
  */
 const commandFrom = (
-  command: CatchUpCommand,
-  { base, parent }: CatchUps,
-): CatchUpFrom | null => {
+  command: GetLatestCommand,
+  { base, parent }: LatestSources,
+): LatestFrom | null => {
   switch (command) {
-    case "bring-up-to-date":
+    case "get-latest":
       return base
     case "continue-on-accepted":
       return { kind: "accepted" }
-    case "catch-up-with-parent":
+    case "get-latest-from-parent":
       return parent
   }
 }
@@ -60,33 +60,44 @@ const SPLIT = "split into a stack"
  * the send button of a card that carries it (`commandWords` names the thread).
  */
 export const COMMAND_VERB: Readonly<Record<CardCommand, string>> = {
-  "bring-up-to-date": "catch up",
+  "get-latest": "get the latest",
   "continue-on-accepted": "continue",
-  "catch-up-with-parent": "catch up with parent",
+  "get-latest-from-parent": "get the parent's latest",
   split: "split",
 }
 
-const fromName = (from: CatchUpFrom | null) =>
-  from === null ? "the thread this one branched from" : catchUpName(from)
+const fromName = (from: LatestFrom | null) =>
+  from === null ? "the thread this one branched from" : latestSourceName(from)
+
+/** Getting the parent thread's latest, naming it when it is known. */
+const parentLatestWords = (from: LatestFrom | null): string =>
+  from === null
+    ? "get the parent thread's latest"
+    : `get ${latestSourceName(from)}'s latest`
 
 /** A command's name as people read it: the strip's button. */
-export const commandWords = (command: CardCommand, at: CatchUps): string =>
+export const commandWords = (
+  command: CardCommand,
+  at: LatestSources,
+): string =>
   command === "split"
     ? SPLIT
     : command === "continue-on-accepted"
-      ? "continue from accepted work"
-      : `catch up with ${fromName(commandFrom(command, at))}`
+      ? "continue from the latest work"
+      : command === "get-latest-from-parent"
+        ? parentLatestWords(commandFrom(command, at))
+        : "get the latest"
 
 /**
  * What a card with a command does when sent, above its box, and on a queued
  * one: the command first, then the card's text as the agent's next message.
  */
-export const commandNote = (command: CardCommand, at: CatchUps): string =>
+export const commandNote = (command: CardCommand, at: LatestSources): string =>
   command === "split"
     ? "⇶ splits the changes into a stack, with what you write as its brief"
     : command === "continue-on-accepted"
       ? "↓ continues from accepted work first, then sends what you write"
-      : `↓ catches up with ${fromName(commandFrom(command, at))} first, then sends what you write`
+      : `↓ gets the latest from ${fromName(commandFrom(command, at))} first, then sends what you write`
 
 /** The × beside a command: what pressing it does. */
 export const CLEAR_COMMAND = "send it as a plain message"

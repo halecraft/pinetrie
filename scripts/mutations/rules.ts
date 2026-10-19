@@ -151,7 +151,7 @@ export const mutations: readonly Mutation[] = [
     from: '    if (base.start === accepted.newest) return { kind: "current" }\n',
     to: "",
     command: unit,
-    expect: "catchUpNow for a folder",
+    expect: "latestNow for a folder",
   },
   {
     name: "folder proposed changes are split like a jj one",
@@ -1148,7 +1148,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a queued split is a catch-up",
     file: "packages/rules/work-strip.ts",
-    from: '    input.activity === "idle" && input.queued.some(isCatchUp)',
+    from: '    input.activity === "idle" && input.queued.some(isGetLatest)',
     to: '    input.activity === "idle" && input.queued.length > 0',
     command: unit,
     expect: "a split queued is not a catch-up",
@@ -1164,7 +1164,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a lane with no work of its own is told",
     file: "packages/rules/behind.ts",
-    from: '  if (base.work === "none") return { kind: "catch-up" }\n',
+    from: '  if (base.work === "none") return { kind: "get-latest" }\n',
     to: "",
     command: unit,
     expect: "a lane whose work changes no file is caught up instead",
@@ -1188,8 +1188,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a send catches up again and again",
     file: "packages/rules/message.ts",
-    from: '  return input.news === "catch-up" && !input.caughtUp',
-    to: '  return input.news === "catch-up"',
+    from: '  return input.news === "get-latest" && !input.upToDate',
+    to: '  return input.news === "get-latest"',
     command: unit,
     expect:
       "a run on a lane whose news is catch-up catches it up first, once per send",
@@ -1275,7 +1275,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a queued catch-up is no activity",
     file: "packages/rules/work-strip.ts",
-    from: '    input.activity === "idle" && input.queued.some(isCatchUp)',
+    from: '    input.activity === "idle" && input.queued.some(isGetLatest)',
     to: "    false",
     command: unit,
     expect:
@@ -1288,7 +1288,7 @@ export const mutations: readonly Mutation[] = [
     to: "  return true\n",
     command: unit,
     expect:
-      "catchUpNow: from the commit a lane last caught up with to the base's now",
+      "latestNow: from the commit a lane last caught up with to the base's now",
   },
   {
     name: "a lane the host has not read is caught up",
@@ -1297,7 +1297,7 @@ export const mutations: readonly Mutation[] = [
     to: '  if (base?.kind !== "jj") return { kind: "current" }',
     command: unit,
     expect:
-      "catchUpNow: from the commit a lane last caught up with to the base's now",
+      "latestNow: from the commit a lane last caught up with to the base's now",
   },
   {
     name: "a WIP thread is measured against accepted work",
@@ -1306,11 +1306,11 @@ export const mutations: readonly Mutation[] = [
     to: "    true\n      ? { bookmark: accepted.acceptedBookmark, commit }",
     command: unit,
     expect:
-      "catchUpNow: from the commit a lane last caught up with to the base's now",
+      "latestNow: from the commit a lane last caught up with to the base's now",
   },
   {
     name: "accepted work is named by its bookmark",
-    file: "packages/rules/catch-up-from.ts",
+    file: "packages/rules/latest-from.ts",
     from: '  from.kind === "accepted"\n    ? "accepted work"',
     to: '  from.kind === "accepted"\n    ? "pinetrie-acceptedBookmark"',
     command: unit,
@@ -1413,7 +1413,7 @@ export const mutations: readonly Mutation[] = [
     to: '  if (read === null) return { kind: "unknown" }',
     command: unit,
     expect:
-      "catchUpNow: from the commit a lane last caught up with to the base's now",
+      "latestNow: from the commit a lane last caught up with to the base's now",
   },
   {
     name: "a record left from a gone proposed changes are kept",
@@ -2209,7 +2209,7 @@ export const mutations: readonly Mutation[] = [
     name: "a plain card is planned as a catch-up",
     file: "packages/rules/queue.ts",
     from: '  return { kind: "send", card }\n}',
-    to: '  return { kind: "catch-up", card, command: "bring-up-to-date", after: "send" }\n}',
+    to: '  return { kind: "get-latest", card, command: "get-latest", after: "send" }\n}',
     command: unit,
     expect: "a message",
   },
@@ -2822,8 +2822,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a catch-up with the parent is forgotten",
     file: "packages/rules/base.ts",
-    from: "    if (merged !== undefined) {\n      caughtUpWith = merged",
-    to: "    if (merged !== undefined) {\n      caughtUpWith = fork.commit",
+    from: "    if (merged !== undefined) {\n      upToDateWith = merged",
+    to: "    if (merged !== undefined) {\n      upToDateWith = fork.commit",
     command: unit,
     expect: "a catch-up's merged commit is what it caught up with",
   },
@@ -2896,7 +2896,7 @@ export const mutations: readonly Mutation[] = [
     name: "publishing needs publish.catchUp on",
     file: "packages/rules/accepted.ts",
     from: "  if (record.commit === null) return refused(ERR.NOT_SET_UP)\n  const { published, workingCopy } = record\n",
-    to: "  if (record.commit === null) return refused(ERR.NOT_SET_UP)\n  if (!record.catchUp) return refused(ERR.REFUSED)\n  const { published, workingCopy } = record\n",
+    to: "  if (record.commit === null) return refused(ERR.NOT_SET_UP)\n  if (!record.getLatest) return refused(ERR.REFUSED)\n  const { published, workingCopy } = record\n",
     command: unit,
     expect: "with publish.catchUp off it moves the publish bookmark alone",
   },
@@ -2920,15 +2920,15 @@ export const mutations: readonly Mutation[] = [
     name: "setting up needs publish.catchUp on",
     file: "packages/rules/accepted.ts",
     from: "    return record.commit === null ? OK : refused(ERR.REFUSED)\n",
-    to: "    return record.commit === null && record.catchUp ? OK : refused(ERR.REFUSED)\n",
+    to: "    return record.commit === null && record.getLatest ? OK : refused(ERR.REFUSED)\n",
     command: unit,
     expect: "setup runs whatever publish.catchUp says",
   },
   {
     name: "with publish.catchUp off a publish catches files up",
     file: "packages/rules/accepted.ts",
-    from: "    catchUp: publishCatchesUp && workingCopy.behind > 0,",
-    to: "    catchUp: workingCopy.behind > 0,",
+    from: "    getLatest: publishCatchesUp && workingCopy.behind > 0,",
+    to: "    getLatest: workingCopy.behind > 0,",
     command: unit,
     expect: "with publish.catchUp off it moves the publish bookmark alone",
   },

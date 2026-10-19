@@ -30,7 +30,7 @@ const StateMadeSchema = Type.Union([
     lane: ThreadIdSchema,
     entry: EntryIdSchema,
   }),
-  Type.Object({ kind: Type.Literal("catch-up"), lane: ThreadIdSchema }),
+  Type.Object({ kind: Type.Literal("get-latest"), lane: ThreadIdSchema }),
   Type.Object({ kind: Type.Literal("accept"), lane: ThreadIdSchema }),
   Type.Object({ kind: Type.Literal("restore"), of: PointSchema }),
   Type.Object({

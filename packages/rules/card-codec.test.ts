@@ -44,7 +44,7 @@ const EACH: { readonly [K in PlacedKind]: CardRecord } = {
     cardIdOfKind("text", uuid("a1")),
     queued,
     {
-      command: "bring-up-to-date",
+      command: "get-latest",
       unsent: "refused",
       origin: { kind: "thread", thread: lane },
     },

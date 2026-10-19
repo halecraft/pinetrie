@@ -110,14 +110,14 @@ function publishSays(
   const { acceptedBookmark, publish } = record
   const steps: string[] = []
   const jj: string[] = []
-  const preview = record.workingCopy.catchUp
-  if (work.catchUp) {
+  const preview = record.workingCopy.getLatest
+  if (work.getLatest) {
     const moves =
       preview === null || preview.heads === 0
         ? ""
         : `; ${count(preview.heads, "other line", "other lines")} of your work ${preview.heads === 1 ? "moves" : "move"} with it`
     steps.push(
-      `catches the working copy up with accepted work (changes ${count(preview?.changes ?? 0, "file", "files")}${moves})`,
+      `brings the working copy the latest accepted work (changes ${count(preview?.changes ?? 0, "file", "files")}${moves})`,
     )
     jj.push(`jj rebase -b @ -d ${acceptedBookmark}`)
   }

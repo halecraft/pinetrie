@@ -14,10 +14,10 @@ import {
   nonceRevset,
   parseEvolog,
   planAcceptanceSteps,
-  planCatchUpUndo,
+  planGetLatestUndo,
   planImport,
   planProposedChanges,
-  planPublishCatchUp,
+  planPublishGetLatest,
   planPublishMove,
   planRebuildProposed,
   planSetup,
@@ -244,7 +244,7 @@ describe("proposed changes", () => {
   })
   test("a publish: your catch-up is yours, the move the host's or yours; its undo reverts, never restores", () => {
     expect(
-      argvs(planPublishCatchUp({ acceptedBookmark: "pinetrie-accepted" })),
+      argvs(planPublishGetLatest({ acceptedBookmark: "pinetrie-accepted" })),
     ).toEqual(['jj as you: rebase -b @ -d "pinetrie-accepted"'])
     const move = { acceptedBookmark: "pinetrie-accepted", publish: "main" }
     expect(argvs(planPublishMove({ ...move, accept: false }))).toEqual([
@@ -253,7 +253,9 @@ describe("proposed changes", () => {
     expect(argvs(planPublishMove({ ...move, accept: true }))).toEqual([
       "jj as you: bookmark move pinetrie-accepted main --to @-",
     ])
-    expect(argvs(planCatchUpUndo("op1"))).toEqual(["jj as you: op revert op1"])
+    expect(argvs(planGetLatestUndo("op1"))).toEqual([
+      "jj as you: op revert op1",
+    ])
   })
 })
 

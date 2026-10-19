@@ -71,7 +71,7 @@ export const folderCopyReady = (): ReadyCopy => {
 }
 
 /** What a catch-up merges from: the thread's base, or the thread it branched from. */
-export type CatchUpFrom = ThreadBase | ParentThread
+export type LatestFrom = ThreadBase | ParentThread
 
 /**
  * A lane's base, read from its history: the shape once, for the states a
@@ -167,5 +167,5 @@ export type BaseMerge =
       /** The parent's newest state (`ParentNow.newest`). */
       readonly point: PointId
       /** The parent's state the lane last caught up with: where what came in starts. */
-      readonly caughtUpWith: PointId
+      readonly upToDateWith: PointId
     })

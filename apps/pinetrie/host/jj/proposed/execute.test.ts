@@ -55,7 +55,7 @@ const BASE: JjBaseRecord = {
   base: { kind: "accepted" },
   start: TIP,
   state: "ok",
-  catchUp: null,
+  getLatest: null,
   untraced: [],
   work: "some",
 }

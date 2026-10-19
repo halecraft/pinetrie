@@ -152,12 +152,10 @@ describe("sendable", () => {
     expect(sendable(edit.text, edit, false)).toBe("@agent try again")
   })
   test("a card with a command is sent with no text", () => {
-    expect(sendable("  ", blank, false, "bring-up-to-date")).toBe("")
-    expect(sendable("@agent ", blank, false, "bring-up-to-date")).toBe("")
-    expect(sendable("check it", blank, false, "bring-up-to-date")).toBe(
-      "check it",
-    )
-    expect(sendable("", blank, true, "bring-up-to-date")).toBeNull()
+    expect(sendable("  ", blank, false, "get-latest")).toBe("")
+    expect(sendable("@agent ", blank, false, "get-latest")).toBe("")
+    expect(sendable("check it", blank, false, "get-latest")).toBe("check it")
+    expect(sendable("", blank, true, "get-latest")).toBeNull()
   })
 })
 
@@ -178,12 +176,12 @@ describe("planSend: what the send does, as the host will decide", () => {
       ...over,
     })
   test("a card's command, and whether it has text to send after", () => {
-    expect(plan("then test", { command: "bring-up-to-date" }).command).toEqual({
-      command: "bring-up-to-date",
+    expect(plan("then test", { command: "get-latest" }).command).toEqual({
+      command: "get-latest",
       text: true,
     })
-    expect(plan("  ", { command: "bring-up-to-date" }).command).toEqual({
-      command: "bring-up-to-date",
+    expect(plan("  ", { command: "get-latest" }).command).toEqual({
+      command: "get-latest",
       text: false,
     })
     expect(plan("hi").command).toBe(null)
@@ -253,14 +251,13 @@ describe("planSend: what the send does, as the host will decide", () => {
     ).toMatchObject({ mode: "queue", hold: "keep", queue: { kind: "next" } })
   })
   test("a card with a command is queued, even on an idle lane; with no lane it is not", () => {
-    expect(
-      plan("check it", { lane: lane(), command: "bring-up-to-date" }).mode,
-    ).toBe("queue")
+    expect(plan("check it", { lane: lane(), command: "get-latest" }).mode).toBe(
+      "queue",
+    )
     expect(plan("check it", { lane: lane() }).mode).toBe("reply")
-    expect(plan("hi", { command: "bring-up-to-date" }).mode).toBe("reply")
+    expect(plan("hi", { command: "get-latest" }).mode).toBe("reply")
     expect(
-      plan("hi", { unstarted: true, lane: lane(), command: "bring-up-to-date" })
-        .mode,
+      plan("hi", { unstarted: true, lane: lane(), command: "get-latest" }).mode,
     ).toBe("branch")
   })
   test("a unstarted column branches, and creates a lane when it asks the agent", () => {
@@ -386,10 +383,10 @@ describe("sendButton: the plan in words, and whether it can be pressed", () => {
       "a card with a command names it, its wait in the title",
       {
         ...sent(AGENT, "queue"),
-        command: { command: "bring-up-to-date", text: false },
+        command: { command: "get-latest", text: false },
       },
       IDLE,
-      "catch up",
+      "get the latest",
       "queue after Bea",
       false,
     ],
@@ -398,10 +395,10 @@ describe("sendButton: the plan in words, and whether it can be pressed", () => {
       {
         ...sent(AGENT, "queue"),
         queue: { kind: "next" },
-        command: { command: "bring-up-to-date", text: true },
+        command: { command: "get-latest", text: true },
       },
       IDLE,
-      "catch up and send",
+      "get the latest and send",
       null,
       false,
     ],
@@ -423,7 +420,7 @@ describe("sendButton: the plan in words, and whether it can be pressed", () => {
     expect(
       placeholderWords({
         ...plan,
-        command: { command: "bring-up-to-date", text: false },
+        command: { command: "get-latest", text: false },
       }),
     ).toBe("what should the agent do with the new work? (optional)")
   })
@@ -513,7 +510,7 @@ describe("what a new lane starts from: its line", () => {
     workingCopy: {
       behind: 0,
       ahead: 0,
-      catchUp: null,
+      getLatest: null,
       conflicts: { commits: 0, files: [] },
     },
     publishCatchesUp: false,

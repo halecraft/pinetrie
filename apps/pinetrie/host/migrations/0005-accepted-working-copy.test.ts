@@ -22,7 +22,7 @@ const OLD = {
   yours: {
     behind: 1,
     ahead: 2,
-    catchUp: null,
+    getLatest: null,
     conflicts: { commits: 0, files: [] },
   },
 }

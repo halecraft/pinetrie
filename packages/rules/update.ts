@@ -3,18 +3,18 @@
 import { firstLine } from "@pinetrie/core"
 import type { Static } from "typebox"
 import { Type } from "typebox"
-import {
-  CatchUpFromSchema,
-  catchUpName,
-  incomingWords,
-} from "./catch-up-from.ts"
 import { count } from "./counts.ts"
 import { List, PointSchema, ThreadIdSchema, WriterIdSchema } from "./decode.ts"
 import { type HistoryMessage, historyMessage } from "./history.ts"
+import {
+  LatestFromSchema,
+  latestSourceName,
+  latestWords,
+} from "./latest-from.ts"
 
 const UpdateDetailsSchema = Type.Object({
   lane: ThreadIdSchema,
-  from: CatchUpFromSchema,
+  from: LatestFromSchema,
   /** The state merged: accepted work's, the WIP's copy, or the parent's newest. */
   merged: PointSchema,
   /** The commits that came in, newest first: each one's first line. */
@@ -35,13 +35,13 @@ export const decodeUpdate = UPDATE.decode
 
 /** The one line a column shows for an update. */
 export const updateLine = (d: UpdateDetails): string =>
-  `↓ caught up with ${catchUpName(d.from)}: ${d.files.length === 0 ? "no file" : count(d.files.length, "file", "files")} changed`
+  `↓ got the latest from ${latestSourceName(d.from)}: ${d.files.length === 0 ? "no file" : count(d.files.length, "file", "files")} changed`
 
 /**
  * What came in to a folder lane, as a catch-up's titles: a folder project's
  * history has no commit messages, so it is named by where it came from.
  */
-export const folderIncoming = (from: "folder" | "parent"): string =>
+export const folderLatest = (from: "folder" | "parent"): string =>
   from === "folder"
     ? "accepted work, as it was last read"
     : "the newest work of the thread this one branched from"
@@ -60,7 +60,7 @@ export function encodeUpdate(
     details.commits.length === 0
       ? "- only work this copy already holds, as accepted thread commits\n"
       : details.commits.map(c => `- ${firstLine(c, 200)}\n`).join("")
-  const what = incomingWords(details.from)
+  const what = latestWords(details.from)
   const files = details.files.map(f => `- ${f}\n`).join("")
   return UPDATE.encode(
     details,

@@ -109,7 +109,9 @@ function walked(
         ),
       )
     else if (action === 3 && !isAncestor(g.graph, folder, tip))
-      lane.push(g.add(`c-${i}`, { kind: "catch-up", lane: LANE }, tip, folder))
+      lane.push(
+        g.add(`c-${i}`, { kind: "get-latest", lane: LANE }, tip, folder),
+      )
     else if (action >= 4) {
       // Mostly the lane's tip; now and then proposed changes shown earlier.
       const proposed = action === 5 ? (lane[pick(lane.length)] ?? tip) : tip
@@ -357,7 +359,7 @@ function flows(): readonly Flow[] {
   const read: StateMade = { kind: "read" }
   const turn: StateMade = { kind: "turn", lane: LANE, entry: entryId("e") }
   const accept: StateMade = { kind: "accept", lane: LANE }
-  const catchUp: StateMade = { kind: "catch-up", lane: LANE }
+  const getLatest: StateMade = { kind: "get-latest", lane: LANE }
   const fresh = () => {
     g = new Growing()
     content = new Map()
@@ -407,7 +409,7 @@ function flows(): readonly Flow[] {
   const p1 = state({ [F]: lines("P", "2", "3", "4") }, turn, h0)
   const c1 = state({ [F]: lines("P", "2", "C", "4") }, turn, p1)
   const p2 = state({ [F]: lines("P", "PP", "3", "4") }, turn, p1)
-  const c2 = state(merged(p1, c1, p2), catchUp, c1, p2)
+  const c2 = state(merged(p1, c1, p2), getLatest, c1, p2)
   const h1 = state(merged(h0, h0, p2), accept, h0, p2)
   const [db] = mergeBases(g.graph, h1, c2)
   const h2 = state(merged(db ?? h0, h1, c2), accept, h1, c2)
@@ -420,7 +422,7 @@ function flows(): readonly Flow[] {
   const k0 = state({ [F]: lines("x", "y", "z") }, read)
   const k1 = state({ [F]: lines("x", "Y1", "z") }, turn, k0)
   const ky = state({ [F]: lines("X", "y", "z") }, read, k0)
-  const k2 = state(merged(k0, k1, ky), catchUp, k1, ky)
+  const k2 = state(merged(k0, k1, ky), getLatest, k1, ky)
   const ka = state(merged(k0, ky, k1), accept, ky, k1)
   const k3 = state({ [F]: lines("X", "Y2", "z") }, turn, k2)
   // In E the virtual base conflicts: a conflict, not the file.
@@ -431,7 +433,7 @@ function flows(): readonly Flow[] {
   const q0 = state({ [F]: lines("x", "1", "2", "y", "3", "4", "z") }, read)
   const q1 = state({ [F]: lines("x", "1", "2", "Y1", "3", "4", "z") }, turn, q0)
   const qy = state({ [F]: lines("X", "1", "2", "y", "3", "4", "z") }, read, q0)
-  const q2 = state(merged(q0, q1, qy), catchUp, q1, qy)
+  const q2 = state(merged(q0, q1, qy), getLatest, q1, qy)
   const qa = state(merged(q0, qy, q1), accept, qy, q1)
   const q3 = state({ [F]: lines("X", "1", "2", "Y2", "3", "4", "z") }, turn, q2)
   flow("E2", q3, qa, { [F]: lines("X", "1", "2", "Y2", "3", "4", "z") })
@@ -447,7 +449,7 @@ function flows(): readonly Flow[] {
   const j0 = state({ [F]: lines("x", "y", "z") }, read)
   const j1 = state({ [F]: lines("x", "Y1", "z") }, turn, j0)
   const jy = state({ [F]: lines("x", "Yy", "z") }, read, j0)
-  const j2 = state({ [F]: lines("x", "Y1", "z") }, catchUp, j1, jy)
+  const j2 = state({ [F]: lines("x", "Y1", "z") }, getLatest, j1, jy)
   const ja = state({ [F]: lines("x", "Yy", "z") }, accept, jy, j1)
   flow("F", j2, ja, "conflict")
   return out
@@ -472,7 +474,7 @@ test("laneNewest and folderStateHeld: a lane's newest state, and the state of ac
     s,
   )
   const l1 = g.add("line-1", { kind: "read" }, l0)
-  const c = g.add("catch-up-1", { kind: "catch-up", lane: LANE }, t, l1)
+  const c = g.add("catch-up-1", { kind: "get-latest", lane: LANE }, t, l1)
   const t2 = g.add(
     "turn-2",
     { kind: "turn", lane: LANE, entry: entryId("f") },
@@ -645,7 +647,7 @@ describe("planState", () => {
     expect(
       planState(
         graph,
-        proposed("c-1", { kind: "catch-up", lane: LANE }, lane, lane),
+        proposed("c-1", { kind: "get-latest", lane: LANE }, lane, lane),
       ),
     ).toEqual(refused)
     expect(

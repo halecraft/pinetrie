@@ -14,10 +14,10 @@ import {
   BANNER_TOOL,
   BASH_TOOL,
   type BlobStore,
-  CATCH_UP_TOOL,
   CONFLICT_TOOL,
   EDIT_TOOL,
   FIND_TOOL,
+  GET_LATEST_TOOL,
   GREP_TOOL,
   LEAVE_TOOL,
   PROJECT_CONFIG_FILE,
@@ -45,7 +45,7 @@ import { findTool, grepTool } from "./search.ts"
 import { threadOfContext } from "./thread-context.ts"
 import {
   askTool,
-  catchUpTool,
+  getLatestTool,
   leaveTool,
   proposeTool,
   resolveTool,
@@ -85,8 +85,8 @@ export const TOOLS: Readonly<Record<ToolId, (input: ToolsInput) => PiTool>> = {
   [FIND_TOOL]: () => findTool(),
   [CONFLICT_TOOL]: input =>
     conflictTool((lane, q) => input.hooks.askedAboutConflict(lane, q)),
-  [CATCH_UP_TOOL]: input =>
-    catchUpTool((lane, from) => input.hooks.catchUp(lane, from)),
+  [GET_LATEST_TOOL]: input =>
+    getLatestTool((lane, from) => input.hooks.getLatest(lane, from)),
   [SPLIT_TOOL]: input => splitTool(lane => input.hooks.askSplit(lane)),
   [BANNER_TOOL]: input => bannerTool(input.bannerAsks),
   [ASK_TOOL]: input =>

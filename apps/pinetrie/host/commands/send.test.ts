@@ -610,7 +610,11 @@ describe("sendMessage", () => {
           base: { kind: "accepted" },
           start: commitId("l1"),
           state: "ok",
-          catchUp: { tip: commitId("t"), to: commitId("l2"), files: ["a.ts"] },
+          getLatest: {
+            tip: commitId("t"),
+            to: commitId("l2"),
+            files: ["a.ts"],
+          },
           untraced: [],
           work,
         }),
@@ -630,7 +634,7 @@ describe("sendMessage", () => {
           workingCopy: {
             behind: 0,
             ahead: 0,
-            catchUp: null,
+            getLatest: null,
             conflicts: { commits: 0, files: [] },
           },
           publishCatchesUp: true,
@@ -664,7 +668,7 @@ describe("sendMessage", () => {
       const out = await sendCleared(deps, ALICE, "s-1", ask())
       expect(out).toEqual({ kind: "started", runId: "r-1" })
       expect(updates).toEqual([
-        [LANE, ALICE, "@agent go on", "bring-up-to-date", "run"],
+        [LANE, ALICE, "@agent go on", "get-latest", "run"],
       ])
       expect(started).toHaveLength(1)
     })

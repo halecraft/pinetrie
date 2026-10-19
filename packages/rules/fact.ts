@@ -6,15 +6,14 @@
 import type {
   AcceptanceDecision,
   Away,
-  CatchUpFrom,
   ConflictChoice,
+  LatestFrom,
   ProposedChangesFact,
   QueuedFact,
   ThreadId,
   WriterId,
 } from "@pinetrie/core"
 import { Type } from "typebox"
-import { CatchUpFromSchema, catchUpName } from "./catch-up-from.ts"
 import {
   CanvasIdSchema,
   EntryIdSchema,
@@ -24,6 +23,7 @@ import {
   WriterIdSchema,
 } from "./decode.ts"
 import { type HistoryMessage, historyMessage } from "./history.ts"
+import { LatestFromSchema, latestSourceName } from "./latest-from.ts"
 
 const QueuedFactSchema = Type.Union([
   Type.Object({
@@ -32,7 +32,7 @@ const QueuedFactSchema = Type.Union([
     by: WriterIdSchema,
     as: Type.String({ minLength: 1 }),
     bookmark: Type.String({ minLength: 1 }),
-    to: CatchUpFromSchema,
+    to: LatestFromSchema,
   }),
   Type.Object({
     kind: Type.Literal("accepted-into-folder"),
@@ -151,8 +151,8 @@ export const decodeFact = (message: unknown): QueuedFact | undefined =>
   FACT.decode(message)
 
 /** Where an acceptance went, after "accepted": nothing for accepted work, else a WIP's name. */
-const into = (to: CatchUpFrom) =>
-  to.kind === "accepted" ? "" : ` into ${catchUpName(to)}`
+const into = (to: LatestFrom) =>
+  to.kind === "accepted" ? "" : ` into ${latestSourceName(to)}`
 
 /**
  * Why a thread is out of reach, naming no person: a fact's words are fixed
@@ -213,7 +213,7 @@ const choiceWords = (choose: ConflictChoice): string =>
   choose === "ours"
     ? "this thread's own version"
     : choose === "theirs"
-      ? "the version it caught up with"
+      ? "the latest version it got"
       : "the version both sides began from"
 
 const branchesWords = (n: number): string =>

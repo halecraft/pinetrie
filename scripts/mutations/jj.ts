@@ -14,12 +14,12 @@ const portSuite = [
   "run",
   "packages/jj/lane/history.test.ts",
 ]
-const catchUpTest = [
+const getLatestTest = [
   "pnpm",
   "exec",
   "vitest",
   "run",
-  "packages/jj/catch-up.test.ts",
+  "packages/jj/get-latest.test.ts",
 ]
 const repoTest = ["pnpm", "exec", "vitest", "run", "packages/jj/repo.test.ts"]
 const tidyTest = ["pnpm", "exec", "vitest", "run", "packages/jj/tidy.test.ts"]
@@ -841,15 +841,16 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "catching up counts every file the base changed",
-    file: "packages/jj/catch-up.ts",
+    file: "packages/jj/get-latest.ts",
     from: "  return first.filter(f => lacking.has(f) && others.every(o => o.has(f)))\n",
     to: "  return first.filter(f => others.every(o => o.has(f)))\n",
-    command: catchUpTest,
-    expect: "catchUpChangedFiles: one held commit: the files the tip lacks too",
+    command: getLatestTest,
+    expect:
+      "getLatestChangedFiles: one held commit: the files the tip lacks too",
   },
   {
     name: "catching up counts a file any held commit has differently",
-    file: "packages/jj/catch-up.ts",
+    file: "packages/jj/get-latest.ts",
     from: "  return first.filter(f => lacking.has(f) && others.every(o => o.has(f)))\n",
     to: "  return [...new Set([first, ...rest].flat())].filter(f => lacking.has(f))\n",
     command: repoTest,
@@ -858,12 +859,12 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "catching up is forecast from the base's start",
-    file: "packages/jj/catch-up.ts",
+    file: "packages/jj/get-latest.ts",
     from: "    ? start.start\n",
     to: "    ? [base.start]\n",
-    command: catchUpTest,
+    command: getLatestTest,
     expect:
-      "catchUpHolds: accepted work merged: where the next proposed changes start",
+      "getLatestHolds: accepted work merged: where the next proposed changes start",
   },
   {
     name: "the one read forecasts a lane on accepted work as a WIP's copy",
@@ -876,19 +877,19 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "what catching up changes is read on every refresh",
-    file: "packages/jj/catch-up.ts",
+    file: "packages/jj/get-latest.ts",
     from: "  return known !== null && known.tip === tip && known.to === to\n",
     to: "  return false\n",
-    command: catchUpTest,
-    expect: "planCatchUpRead: read at this tip and commit",
+    command: getLatestTest,
+    expect: "planGetLatestRead: read at this tip and commit",
   },
   {
     name: "what catching up changes is kept past a move",
-    file: "packages/jj/catch-up.ts",
+    file: "packages/jj/get-latest.ts",
     from: "  return known !== null && known.tip === tip && known.to === to\n",
     to: "  return known !== null\n",
-    command: catchUpTest,
-    expect: "planCatchUpRead: read at another tip",
+    command: getLatestTest,
+    expect: "planGetLatestRead: read at another tip",
   },
   {
     name: "the shared facts are read for every step",
@@ -1225,7 +1226,7 @@ export const mutations: readonly Mutation[] = [
     to: '  return readConflictedFiles(jj, "root()")\n',
     command: portSuite,
     expect:
-      "a catch-up that changed a line the lane changed differently is conflicted there",
+      "getting the latest that changed a line the lane changed differently is conflicted there",
   },
   {
     name: "a lane's start reads as its tip",
@@ -1316,7 +1317,7 @@ export const mutations: readonly Mutation[] = [
     from: "  const parents = [ours, ...(last === null ? [] : [last]), from]",
     to: "  const parents = [ours, from]",
     command: portSuite,
-    expect: "An accept then a catch-up changes no file.",
+    expect: "An accept then getting the latest changes no file.",
   },
   {
     name: "no accepted thread commit is joined (port suite: an accept then a catch-up changes no file)",
@@ -1324,7 +1325,7 @@ export const mutations: readonly Mutation[] = [
     from: "  const joins = planJoins(accepted, held)\n",
     to: "  const joins: ReturnType<typeof planJoins> = []\n",
     command: portSuite,
-    expect: "An accept then a catch-up changes no file.",
+    expect: "An accept then getting the latest changes no file.",
   },
   {
     name: "proveJjLane proves any lane with a copy",

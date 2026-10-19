@@ -269,8 +269,8 @@ matcher (`@pinetrie/rules/ignores`), and the search tools read it with no
 repo too. The folder's adapter is built (`apps/pinetrie/host/folder/`, the
 only code that touches the project's folder; `@pinetrie/folder` decides for
 it): the project's folder is read into states of accepted work's line, by the host's scan and the
-disks role's checked copy; a lane's turns and catch-ups are states of the
-graph, a catch-up the path merge on its base, a conflict a record whose
+disks role's checked copy; a lane's turns and times it got the latest are states of the
+graph, getting the latest the path merge on its base, a conflict a record whose
 three versions the lane reads under `/pinetrie-states`, closed by
 `resolve_conflict`; proposed changes are the shown merge, a lane's newest
 state merged onto accepted work's newest, reviewed as files. An accept

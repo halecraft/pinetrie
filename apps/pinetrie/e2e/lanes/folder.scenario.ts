@@ -21,9 +21,9 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import {
   ancestry,
-  CATCH_UP_TOOL,
   ERR,
   entryId,
+  GET_LATEST_TOOL,
   messageText,
   RESOLVE_TOOL,
   ROOT,
@@ -179,7 +179,7 @@ async function folderSection(
 
     // 3. A clean catch-up brings your file into the lane.
     script.use([
-      { tool: CATCH_UP_TOOL, args: {} },
+      { tool: GET_LATEST_TOOL, args: {} },
       { tool: "bash", args: { command: "cat c.txt" } },
       { text: "caught up" },
     ])
@@ -200,7 +200,7 @@ async function folderSection(
     await idle()
     writeFileSync(path.join(dir, "a.txt"), "one\nyours\nthree\n")
     await waitFor(() => newestOf() !== moved, 60_000)
-    script.use([{ tool: CATCH_UP_TOOL, args: {} }, { text: "conflicted" }])
+    script.use([{ tool: GET_LATEST_TOOL, args: {} }, { text: "conflicted" }])
     await wu.send("@agent catch up again", at(laneTip(lane)), { thread: lane })
     await idle()
     const theirs = await inLane(
@@ -246,7 +246,10 @@ async function folderSection(
     const beforeF = newestOf()
     writeFileSync(path.join(dir, "f.txt"), "yours f\n")
     await waitFor(() => newestOf() !== beforeF, 60_000)
-    script.use([{ tool: CATCH_UP_TOOL, args: {} }, { text: "conflicted on f" }])
+    script.use([
+      { tool: GET_LATEST_TOOL, args: {} },
+      { text: "conflicted on f" },
+    ])
     await wu.send("@agent catch up with f", at(laneTip(lane)), {
       thread: lane,
     })
@@ -290,7 +293,7 @@ async function folderSection(
         told,
         // The catch-up's answer, by its first line (a conflict's is the
         // whole resolution skill), and the records it decided from.
-        caughtUp: toolResults(lane).at(-1)?.split("\n")[0],
+        upToDate: toolResults(lane).at(-1)?.split("\n")[0],
         proposed: readProposedByLane(wh.session).get(lane),
         base: readBases(wh.session).get(lane),
       }),

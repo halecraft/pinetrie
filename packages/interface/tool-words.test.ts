@@ -11,7 +11,7 @@ describe("toolWord", () => {
     grep: "searched",
     find: "looked for",
     ask_about_conflict: "asked you",
-    catch_up: "catch up",
+    catch_up: "got the latest",
     split_proposed_changes: "split",
     set_banner: "banner",
     ask: "asked",

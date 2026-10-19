@@ -16,7 +16,7 @@ const facts = (
   workingCopy: {
     behind: 1,
     ahead: 0,
-    catchUp: { changes: 1, conflicts: [], heads: 0 },
+    getLatest: { changes: 1, conflicts: [], heads: 0 },
     conflicts: { commits: 0, files: [] },
     ...over,
   },
@@ -30,8 +30,8 @@ function rig(
   after: AcceptedFacts,
   {
     moveFails = false,
-    catchUp = true,
-  }: { moveFails?: boolean; catchUp?: boolean } = {},
+    getLatest = true,
+  }: { moveFails?: boolean; getLatest?: boolean } = {},
 ) {
   const b = basics()
   const ran: RepoStep[][] = []
@@ -63,7 +63,7 @@ function rig(
   const accepted = createAcceptedWork({
     owner,
     basics: b,
-    repoConfig: { ...DEFAULT_REPO, publishCatchesUp: catchUp },
+    repoConfig: { ...DEFAULT_REPO, publishCatchesUp: getLatest },
     writeValues: async w => applyWrites(b, w),
   })
   const argv = () => ran.map(steps => steps.map(s => s.args.join(" ")))
@@ -72,7 +72,7 @@ function rig(
 
 describe("a publish with publish.catchUp off moves main alone", () => {
   test("the working copy behind and your commits below @ stay where they are", async () => {
-    const { line, argv } = rig(facts(), { catchUp: false })
+    const { line, argv } = rig(facts(), { getLatest: false })
     expect(await line.act("publish")).toBeNull()
     expect(argv()).toEqual([['bookmark move main --to "pinetrie-accepted"']])
   })
@@ -80,7 +80,7 @@ describe("a publish with publish.catchUp off moves main alone", () => {
 
 describe("a publish with publish.catchUp on, in two rounds", () => {
   test("the catch-up, then the move, from accepted work read after it", async () => {
-    const { line, argv } = rig(facts({ behind: 0, ahead: 0, catchUp: null }))
+    const { line, argv } = rig(facts({ behind: 0, ahead: 0, getLatest: null }))
     expect(await line.act("publish")).toBeNull()
     expect(argv()).toEqual([
       ['rebase -b @ -d "pinetrie-accepted"'],
@@ -99,9 +99,12 @@ describe("a publish with publish.catchUp on, in two rounds", () => {
     ])
   })
   test("a move jj refuses after the catch-up reverts it, then fails", async () => {
-    const { line, argv } = rig(facts({ behind: 0, ahead: 0, catchUp: null }), {
-      moveFails: true,
-    })
+    const { line, argv } = rig(
+      facts({ behind: 0, ahead: 0, getLatest: null }),
+      {
+        moveFails: true,
+      },
+    )
     await expect(line.act("publish")).rejects.toThrow("jj refused the move")
     expect(argv()).toEqual([
       ['rebase -b @ -d "pinetrie-accepted"'],

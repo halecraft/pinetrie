@@ -13,8 +13,8 @@ import { describe, expect, test } from "vitest"
 import type { FolderAcceptedRecord } from "./accepted.ts"
 import type { FolderBaseRecord } from "./base.ts"
 import {
-  type CatchUpNow,
-  catchUpNow,
+  type LatestNow,
+  latestNow,
   type ParentNow,
   proposedChangesStatus,
   workStripView,
@@ -56,7 +56,7 @@ describe("workStripView: the work strip's states", () => {
     activity: "idle" | "turn" | "resolution" | "split" = "idle",
     asked: number | null = null,
     catching: {
-      catchUp?: CatchUpNow
+      getLatest?: LatestNow
       untraced?: boolean
       queued?: readonly CardCommand[]
       parent?: ParentNow | null
@@ -70,7 +70,7 @@ describe("workStripView: the work strip's states", () => {
       base: null,
       into: { kind: "bookmark", bookmark: "pinetrie-accepted" },
       wipAhead: 0,
-      catchUp: catching.catchUp ?? { kind: "current" },
+      getLatest: catching.getLatest ?? { kind: "current" },
       untraced: catching.untraced ?? false,
       queued: catching.queued ?? [],
       parent: catching.parent ?? null,
@@ -141,7 +141,7 @@ describe("workStripView: the work strip's states", () => {
       acceptedAs: null,
       base: { kind: "accepted" },
       into: { kind: "bookmark", bookmark: "pinetrie-accepted" },
-      catchUp: { kind: "current" },
+      getLatest: { kind: "current" },
       untraced: false,
       conflictCause: "work",
       parent: null,
@@ -182,7 +182,7 @@ describe("workStripView: the work strip's states", () => {
   })
   test("behind its base, catching up stands beside the proposed changes; with nothing to accept, alone", () => {
     const behind = {
-      catchUp: { kind: "brings", move: MOVE, files: 2 },
+      getLatest: { kind: "brings", move: MOVE, files: 2 },
     } as const
     expect(at(view(proposed, "idle", null, behind))).toEqual([
       "ready",
@@ -194,8 +194,8 @@ describe("workStripView: the work strip's states", () => {
       ["update"],
       [],
     ])
-    expect(view(undefined, "idle", null, behind).facts.catchUp).toEqual(
-      behind.catchUp,
+    expect(view(undefined, "idle", null, behind).facts.getLatest).toEqual(
+      behind.getLatest,
     )
     // Running, nothing to catch up with is offered at all.
     expect(at(view(proposed, "turn", null, behind))).toEqual([
@@ -205,8 +205,8 @@ describe("workStripView: the work strip's states", () => {
     ])
   })
   test("catching up that would change nothing is listed, but quiet; one not yet read is not", () => {
-    const quiet = (catchUp: CatchUpNow) =>
-      view(proposed, "idle", null, { catchUp }).quiet
+    const quiet = (getLatest: LatestNow) =>
+      view(proposed, "idle", null, { getLatest }).quiet
     expect(quiet({ kind: "current" })).toEqual(["update"])
     expect(quiet({ kind: "nothing-new" })).toEqual(["update"])
     expect(quiet({ kind: "unknown" })).toEqual([])
@@ -225,7 +225,7 @@ describe("workStripView: the work strip's states", () => {
       parentRunning: false,
       into: { kind: "bookmark", bookmark: "pinetrie-accepted" },
       wipAhead: 0,
-      catchUp: { kind: "current" },
+      getLatest: { kind: "current" },
       untraced: false,
       queued: [],
     })
@@ -249,16 +249,15 @@ describe("workStripView: the work strip's states", () => {
   })
   test("a card bringing the thread up to date, queued on an idle lane: the proposed changes are busy with it", () => {
     const queued = view(proposed, "idle", null, {
-      queued: ["bring-up-to-date"],
+      queued: ["get-latest"],
     })
     expect([queued.state, queued.buttons, queued.facts.activity]).toEqual([
       "busy",
       [],
-      "catch-up",
+      "get-latest",
     ])
     expect(
-      view(proposed, "turn", null, { queued: ["bring-up-to-date"] }).facts
-        .activity,
+      view(proposed, "turn", null, { queued: ["get-latest"] }).facts.activity,
     ).toBe("turn")
   })
   test("a split queued is not a catch-up: the proposed changes stay ready, its split button quiet", () => {
@@ -267,9 +266,9 @@ describe("workStripView: the work strip's states", () => {
     expect(queued.quiet).toContain("split")
     expect(view(proposed, "idle", null).quiet).not.toContain("split")
   })
-  test("catchUpNow: from the commit a lane last caught up with to the base's now", () => {
-    const moved = (...args: Parameters<typeof catchUpNow>) =>
-      catchUpNow(...args).kind !== "current"
+  test("latestNow: from the commit a lane last caught up with to the base's now", () => {
+    const moved = (...args: Parameters<typeof latestNow>) =>
+      latestNow(...args).kind !== "current"
     const L1 = commitId("l1")
     const L2 = commitId("l2")
     const W1 = commitId("w1")
@@ -289,7 +288,7 @@ describe("workStripView: the work strip's states", () => {
       workingCopy: {
         behind: 0,
         ahead: 0,
-        catchUp: null,
+        getLatest: null,
         conflicts: { commits: 0, files: [] },
       },
       publishCatchesUp: true,
@@ -300,7 +299,7 @@ describe("workStripView: the work strip's states", () => {
       base: { kind: "accepted" as const },
       start: L1,
       state: "ok" as const,
-      catchUp: null,
+      getLatest: null,
       untraced: [],
       work: "some",
     }
@@ -310,7 +309,7 @@ describe("workStripView: the work strip's states", () => {
       base: { kind: "wip" as const, bookmark: "wip/a" },
       start: W1,
       state: "ok" as const,
-      catchUp: null,
+      getLatest: null,
       untraced: [],
       work: "some",
     }
@@ -319,8 +318,8 @@ describe("workStripView: the work strip's states", () => {
     expect(moved(onAccepted, line(null))).toBe(false)
     // A lane the host never read (no record): nothing is claimed, unless
     // there is no line to catch up with.
-    expect(catchUpNow(undefined, line(L2))).toEqual({ kind: "unknown" })
-    expect(catchUpNow(undefined, line(null))).toEqual({ kind: "current" })
+    expect(latestNow(undefined, line(L2))).toEqual({ kind: "unknown" })
+    expect(latestNow(undefined, line(null))).toEqual({ kind: "current" })
     expect(moved(onWip, line(L2, [{ bookmark: "wip/a", commit: W1 }]))).toBe(
       false,
     )
@@ -330,12 +329,12 @@ describe("workStripView: the work strip's states", () => {
     // Landed: on accepted work now, and caught up with it only once merged.
     expect(moved({ ...onWip, state: "landed" }, line(L2))).toBe(true)
     expect(moved({ ...onWip, state: "gone" }, line(L2))).toBe(false)
-    expect(catchUpNow(onAccepted, line(L2))).toEqual({ kind: "unknown" })
+    expect(latestNow(onAccepted, line(L2))).toEqual({ kind: "unknown" })
     expect(
-      catchUpNow(
+      latestNow(
         {
           ...onWip,
-          catchUp: { tip: commitId("t"), to: commitId("w2"), files: ["w"] },
+          getLatest: { tip: commitId("t"), to: commitId("w2"), files: ["w"] },
         },
         line(L2, [{ bookmark: "wip/a", commit: commitId("w2") }]),
       ),
@@ -343,9 +342,9 @@ describe("workStripView: the work strip's states", () => {
     // The host's read counts only at the commit the base is at now.
     const read = (to: typeof L1, files: string[]): JjBaseRecord => ({
       ...onAccepted,
-      catchUp: { tip: commitId("t"), to, files },
+      getLatest: { tip: commitId("t"), to, files },
     })
-    expect(catchUpNow(read(L2, []), line(L2))).toEqual({ kind: "nothing-new" })
+    expect(latestNow(read(L2, []), line(L2))).toEqual({ kind: "nothing-new" })
     // Only what brings files says the move: the header's ↓ names it.
     const move = {
       base: { kind: "accepted" },
@@ -353,16 +352,16 @@ describe("workStripView: the work strip's states", () => {
       from: L1,
       to: L2,
     }
-    expect(catchUpNow(read(L2, ["a", "b"]), line(L2))).toEqual({
+    expect(latestNow(read(L2, ["a", "b"]), line(L2))).toEqual({
       kind: "brings",
       move,
       files: 2,
     })
-    expect(catchUpNow(read(commitId("l0"), []), line(L2))).toEqual({
+    expect(latestNow(read(commitId("l0"), []), line(L2))).toEqual({
       kind: "unknown",
     })
   })
-  test("catchUpNow for a folder: from the state a lane last caught up with to accepted work's newest", () => {
+  test("latestNow for a folder: from the state a lane last caught up with to accepted work's newest", () => {
     const FIRST = pointId("line-0192aaaa")
     const SECOND = pointId("line-0192bbbb")
     const folder = (newest: typeof FIRST): FolderAcceptedRecord => ({
@@ -372,23 +371,23 @@ describe("workStripView: the work strip's states", () => {
       at: 1,
     })
     const base = (
-      catchUp: FolderBaseRecord["catchUp"] = null,
+      getLatest: FolderBaseRecord["getLatest"] = null,
     ): FolderBaseRecord => ({
       kind: "folder",
       lane: LANE,
       start: FIRST,
-      catchUp,
+      getLatest,
       work: "some",
     })
     const read = (to: typeof FIRST, files: string[]) =>
       base({ tip: pointId("turn-0192cccc"), to, files })
-    expect(catchUpNow(base(), folder(FIRST))).toEqual({ kind: "current" })
-    expect(catchUpNow(base(), folder(SECOND))).toEqual({ kind: "unknown" })
-    expect(catchUpNow(undefined, folder(SECOND))).toEqual({ kind: "unknown" })
-    expect(catchUpNow(read(SECOND, []), folder(SECOND))).toEqual({
+    expect(latestNow(base(), folder(FIRST))).toEqual({ kind: "current" })
+    expect(latestNow(base(), folder(SECOND))).toEqual({ kind: "unknown" })
+    expect(latestNow(undefined, folder(SECOND))).toEqual({ kind: "unknown" })
+    expect(latestNow(read(SECOND, []), folder(SECOND))).toEqual({
       kind: "nothing-new",
     })
-    expect(catchUpNow(read(SECOND, ["a"]), folder(SECOND))).toEqual({
+    expect(latestNow(read(SECOND, ["a"]), folder(SECOND))).toEqual({
       kind: "brings",
       move: {
         base: { kind: "accepted" },
@@ -398,7 +397,7 @@ describe("workStripView: the work strip's states", () => {
       },
       files: 1,
     })
-    expect(catchUpNow(read(FIRST, ["a"]), folder(SECOND))).toEqual({
+    expect(latestNow(read(FIRST, ["a"]), folder(SECOND))).toEqual({
       kind: "unknown",
     })
   })
@@ -421,7 +420,7 @@ describe("workStripView: the work strip's states", () => {
       parentRunning: false,
       into: { kind: "folder" },
       wipAhead: 0,
-      catchUp: { kind: "current" },
+      getLatest: { kind: "current" },
       untraced: false,
       queued: [],
     })
@@ -454,7 +453,7 @@ describe("workStripView: the work strip's states", () => {
       parentRunning: false,
       into: null,
       wipAhead: 0,
-      catchUp: { kind: "current" },
+      getLatest: { kind: "current" },
       untraced: false,
       queued: [],
     })
@@ -474,7 +473,7 @@ describe("a conflict that came with the copy, and the thread it branched from", 
     lane: P,
     name: "amber-fox" as ThreadName,
     newest: pointFromCommit(T2),
-    caughtUpWith: pointFromCommit(TIP),
+    upToDateWith: pointFromCommit(TIP),
     conflicts: [],
     ...over,
   })
@@ -490,7 +489,7 @@ describe("a conflict that came with the copy, and the thread it branched from", 
       base: null,
       into: { kind: "bookmark", bookmark: "pinetrie-accepted" },
       wipAhead: 0,
-      catchUp: { kind: "current" },
+      getLatest: { kind: "current" },
       untraced: false,
       queued: [],
       parent: p,
@@ -519,7 +518,7 @@ describe("a conflict that came with the copy, and the thread it branched from", 
     const v = view(fromStart, parent())
     expect([v.state, v.buttons, v.menu]).toEqual([
       "conflicts",
-      ["catch-up-parent"],
+      ["get-latest-from-parent"],
       [],
     ])
     expect(v.facts).toMatchObject({
@@ -544,12 +543,16 @@ describe("a conflict that came with the copy, and the thread it branched from", 
     expect(view(proposed, parent()).menu).toEqual([
       "describe",
       "update",
-      "catch-up-parent",
+      "get-latest-from-parent",
     ])
     expect(
       view(proposed, parent({ newest: pointFromCommit(TIP) })).menu,
     ).toEqual(["describe", "update"])
-    expect(view(proposed, parent(), true).quiet).toContain("catch-up-parent")
-    expect(view(fromStart, parent(), true).quiet).toEqual(["catch-up-parent"])
+    expect(view(proposed, parent(), true).quiet).toContain(
+      "get-latest-from-parent",
+    )
+    expect(view(fromStart, parent(), true).quiet).toEqual([
+      "get-latest-from-parent",
+    ])
   })
 })

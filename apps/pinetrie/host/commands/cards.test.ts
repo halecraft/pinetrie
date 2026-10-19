@@ -742,7 +742,7 @@ test("a card made in the queue is written there with its command, never in anoth
     ADA,
     { card: C1, from: null, to: queuedKey },
     "keep",
-    "bring-up-to-date",
+    "get-latest",
   )
   expect(done.outcome).toEqual({ kind: "moved" })
   expect(textsIn(b.places)).toMatchObject([
@@ -750,7 +750,7 @@ test("a card made in the queue is written there with its command, never in anoth
       kind: "text" as const,
       id: C1,
       place: { kind: "queued", by: ADA },
-      content: { command: "bring-up-to-date" },
+      content: { command: "get-latest" },
     },
   ])
   expect(drains).toEqual([LANE])
@@ -989,10 +989,10 @@ describe("a chat from a card that found its lane busy", () => {
 test("setCommand: the command set, its place and placer kept", async () => {
   const { b, commands, put } = setUp()
   put({ placer: BEA })
-  const done = await commands.setCommand(ADA, C1, "bring-up-to-date")
+  const done = await commands.setCommand(ADA, C1, "get-latest")
   expect(done).toEqual({ outcome: { kind: "moved" }, rev: 4 })
   expect(textsIn(b.places)[0]).toMatchObject({
-    content: { command: "bring-up-to-date" },
+    content: { command: "get-latest" },
     placer: BEA,
     place: atEnd,
   })

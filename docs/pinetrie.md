@@ -58,7 +58,7 @@ Conflating these wasted time early, so keep them separate:
 3. **Effect** — filesystem side effects of a branch that ran tools. Each
    agent's thread works in its own lane (ADR-0034), a revision per turn
    (ADR-0032), and its work reaches your repo as proposed changes you
-   accept; a catch-up that conflicts is resolved by the agent, and the
+   accept; getting the latest that conflicts is resolved by the agent, and the
    repository decides the outcome (ADR-0033). Built, but for coupling a
    file merge to a fold, which waits for fold.
 
@@ -159,7 +159,7 @@ it, and the ADR says why. Every decision in force is in `docs/adrs/`, and
 | What the host cannot tell, it does not act on: an unknown answer never builds proposed changes. | ADR-0067 | `packages/jj/TECHNICAL.md` |
 | Every thread's agent works in a lane of its own; nothing works directly in a directory. | ADR-0102, ADR-0130 | `ARCHITECTURE.md`, `packages/lanes/TECHNICAL.md` |
 | What a person sees and does is decided in `@pinetrie/interface`, with no DOM and no React. | ADR-0093 | `packages/interface/TECHNICAL.md` |
-| One word per concept: accepted work, accept, proposed changes, WIP, publish, catch up. | ADR-0100 | `docs/glossary.md` |
+| One word per concept: accepted work, accept, proposed changes, WIP, publish, get the latest. | ADR-0100 | `docs/glossary.md` |
 
 ---
 
@@ -613,13 +613,13 @@ Decided, and waiting for their turn:
   while the thread works it waits in the queue, and the agent can ask for
   one too (ADR-0080). The thread is told what you did to its proposed changes, an
   acceptance included, and when accepted work has moved on: the agent can
-  catch up itself (`catch_up`). **publish** moves `main` forward to
+  get the latest itself (`catch_up`). **publish** moves `main` forward to
   accepted work (ADR-0090, ADR-0099). Set `accepted.bookmark` in
   `pinetrie.json` to have proposed changes land on another bookmark instead;
   `jj git push --all` would push it: push by name.
-- **Catching a thread up:** the work strip's `⋯` offers **catch up with**
+- **Getting a thread the latest:** the work strip's `⋯` offers **get the latest from**
   the thread's base (accepted work, or its WIP), **continue from accepted
-  work** once its WIP is gone, and **catch up with** the thread it branched
+  work** once its WIP is gone, and **get the latest from** the thread it branched
   from while that thread has new work (ADR-0072). Each queues a card
   holding the command, which the host pops when the lane is free
   (ADR-0108). When it conflicts, the agent resolves it, or asks you

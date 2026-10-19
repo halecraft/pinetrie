@@ -103,7 +103,7 @@ export function planFolderRecords(input: {
       kind: "folder",
       lane: input.lane,
       start,
-      catchUp:
+      getLatest:
         start === newest ? null : { tip, to: newest, files: input.brings },
       work: input.worked ? "some" : "none",
     },

@@ -971,7 +971,7 @@ describe("planIntent", () => {
           column({
             kind: "queueNew",
             card: mine.id,
-            command: "bring-up-to-date",
+            command: "get-latest",
             hold: "keep",
             lane,
             at: where,
@@ -986,7 +986,7 @@ describe("planIntent", () => {
             to: { kind: "queued", thread: lane, seen: "" },
           },
           hold: "keep",
-          command: "bring-up-to-date",
+          command: "get-latest",
           how: inColumn,
         },
       ])

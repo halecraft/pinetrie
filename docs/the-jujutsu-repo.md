@@ -18,7 +18,7 @@ work reaches the repo as proposed changes.
 
 pine·trie names these things by what they are for, one word each, in the
 page, the code and here (ADR-0100, `docs/glossary.md`): **accepted work**,
-**accept**, **proposed changes**, **WIP**, **catch up**, and **publish**. The jj names
+**accept**, **proposed changes**, **WIP**, **get the latest**, and **publish**. The jj names
 are in the page's titles.
 
 ## Bookmarks
@@ -75,7 +75,7 @@ listens (ADR-0099). It does not push.
 Publishing is refused before its first step when `main` has commits
 accepted work lacks (someone pushed to it outside pine·trie), which must be brought
 into accepted work first; and, with `publish.catchUp` on, when the owner's files
-have conflicts or the preview says catching up would conflict. When the rebase leaves one of the
+have conflicts or the preview says getting the latest would conflict. When the rebase leaves one of the
 owner's commits conflicted (one that `@`'s own tree resolves, so the
 preview could not see it), or the move fails, the host reverts the rebase's
 operation with `jj op revert`, as the owner, and the repo is as it was. It
@@ -183,7 +183,7 @@ and jj's `trailers` template reads only the last.
 
 | trailer | on | says |
 |---|---|---|
-| `Pinetrie-Base: accepted@<commit>`, `Pinetrie-Base: <wip>@<commit>` | a lane's start (`base: accepted work`, `copy of <wip>`), and each catch-up (`catch up: accepted work`) | the thread's base: accepted work, or a `wip/` bookmark, at that commit. A name with the WIP prefix is that WIP; any other, `pinetrie-onto` in older commits included, is accepted work |
+| `Pinetrie-Base: accepted@<commit>`, `Pinetrie-Base: <wip>@<commit>` | a lane's start (`base: accepted work`, `copy of <wip>`), and each time it gets the latest (`catch up: accepted work`) | the thread's base: accepted work, or a `wip/` bookmark, at that commit. A name with the WIP prefix is that WIP; any other, `pinetrie-onto` in older commits included, is accepted work |
 | `Pinetrie-Source: <commit>` | every revision of proposed changes | the lane tip the proposed changes hold; on accepted work, that work has been accepted |
 | `Pinetrie-Start: <commit>` | every revision of proposed changes | where the proposed changes start |
 | `Pinetrie-Thread`, `Pinetrie-Lane`, `Pinetrie-Entry` | every revision of proposed changes | the thread, its lane, and the newest entry its work came from |
@@ -219,7 +219,7 @@ believes:
   thread's proposed changes, archive the thread: the host abandons the proposed changes, and
   builds it again if the thread is restored.
 - **A `wip/` bookmark** is the owner's to rebase, amend or move. A thread
-  started from it catches up with a fresh copy of it. Once the WIP's
+  started from it gets the latest from a fresh copy of it. Once the WIP's
   commits are on accepted work, its threads move to accepted work; if the
-  bookmark is deleted before then, their catch-ups stop until "continue on
+  bookmark is deleted before then, their times it got the latest stop until "continue on
   accepted work".

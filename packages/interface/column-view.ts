@@ -42,14 +42,14 @@ import {
   type BaseRecord,
   type BudgetRecord,
   baseMovedOn,
-  type CatchUpNow,
   type CommandSummary,
-  catchUpName,
-  catchUpNow,
   displayName,
   type FocusRecord,
   type IconsRecord,
   type LaneForkRecord,
+  type LatestNow,
+  latestNow,
+  latestSourceName,
   type ParentNow,
   type PinnedStatus,
   type ProjectRecord,
@@ -361,7 +361,7 @@ export interface ColumnShows {
   readonly reserve: ReserveStep
   /** The thread's base when it is not accepted work, worded; null otherwise. */
   readonly base: string | null
-  /** Catching up would change files in the thread (`catchUpNow`'s `brings`). */
+  /** Catching up would change files in the thread (`latestNow`'s `brings`). */
   readonly behind: { readonly mark: string; readonly title: string } | null
   /** The thread this one branched from, and where both stand; null for none. */
   readonly parent: ParentNow | null
@@ -439,14 +439,14 @@ export function columnView(f: ColumnFacts): ColumnShows {
 
 /**
  * The header's mark for a thread whose base has new work for it: catching
- * up would change files (`catchUpNow`'s `brings`). Its title says how many;
+ * up would change files (`latestNow`'s `brings`). Its title says how many;
  * jj's bookmark and commits are the thread's details', not its mark's.
  */
 export function behindMark(
   base: BaseRecord | undefined,
   accepted: AcceptedRecord | null,
 ): ColumnShows["behind"] {
-  const now = catchUpNow(base, accepted)
+  const now = latestNow(base, accepted)
   if (now.kind !== "brings") return null
   const { move } = now
   return {
@@ -712,7 +712,7 @@ function workStrip(f: ColumnFacts, parent: ParentNow | null): WorkStrip | null {
       accepted?.wips.find(
         w => jjBase?.base.kind === "wip" && w.bookmark === jjBase.base.bookmark,
       )?.ahead ?? 0,
-    catchUp: catchUpNow(base ?? undefined, work.accepted),
+    getLatest: latestNow(base ?? undefined, work.accepted),
     untraced: (jjBase?.untraced.length ?? 0) > 0,
     queued: f.queued.flatMap(c => {
       const command = cardCommand(c)
@@ -750,7 +750,7 @@ const proposedReview = (record: ProposedChangesRecord): ReviewTarget =>
 function laneActivity(
   index: TreeIndex,
   view: LaneView | undefined,
-): Exclude<WorkStripActivity, "catch-up"> {
+): Exclude<WorkStripActivity, "get-latest"> {
   if (view === undefined || !view.running) return "idle"
   const prompt = runPrompt(index, view.tip)
   const role =
@@ -767,7 +767,7 @@ const BUTTON_LABEL: Record<
     | "accept-into-accepted"
     | "update"
     | "continue"
-    | "catch-up-parent"
+    | "get-latest-from-parent"
   >,
   string
 > = {
@@ -816,8 +816,8 @@ export function workStripWords(
   const editing = facts.touchesWorkingCopyEdits
     ? " · touches files you're editing"
     : ""
-  const base = catchUpName(facts.base)
-  const parent = facts.parent === null ? null : catchUpName(facts.parent)
+  const base = latestSourceName(facts.base)
+  const parent = facts.parent === null ? null : latestSourceName(facts.parent)
   const conflicted = count(facts.conflicts, "file", "files")
   // A conflict that came with the lane's copy says so, and whether the
   // thread it branched from has resolved it.
@@ -827,13 +827,13 @@ export function workStripWords(
       : facts.conflictCause === "start"
         ? `began from a copy with an unresolved conflict in ${conflicted}${facts.parentResolves && parent !== null ? ` · ${parent} has resolved it` : ""}`
         : `conflicts with ${base} in ${conflicted}`
-  const catchUps = { base: facts.base, parent: facts.parent }
+  const latestSources = { base: facts.base, parent: facts.parent }
   const moved = `${baseMovedOn(facts.base)} since this thread started`
-  const brings = facts.catchUp.kind === "brings"
+  const brings = facts.getLatest.kind === "brings"
   const said =
     state === "nothing"
       ? facts.untraced
-        ? `an earlier accept of this thread can't be traced: catch up with ${base} to show what's new`
+        ? `an earlier accept of this thread can't be traced: get the latest from ${base} to show what's new`
         : brings
           ? moved
           : facts.held
@@ -844,10 +844,10 @@ export function workStripWords(
           ? "no files changed yet"
           : `${files} so far`
         : state === "busy"
-          ? facts.activity === "catch-up"
-            ? `catching up with ${base}…`
+          ? facts.activity === "get-latest"
+            ? "getting the latest work…"
             : facts.activity === "resolution"
-              ? `resolving what's new in ${base} into this thread`
+              ? "merging in the latest work"
               : "splitting the changes into a stack"
           : state === "accepted"
             ? "accepted ✓"
@@ -912,27 +912,27 @@ export function workStripWords(
           ...titled(intoBookmark === null ? undefined : moves(intoBookmark)),
         }
       case "update": {
-        const label = commandWords("bring-up-to-date", catchUps)
+        const label = commandWords("get-latest", latestSources)
         return {
           button,
           // Catching up is how a conflict is resolved: the agent resolves
           // what the merge leaves.
           label: state === "conflicts" ? `${label} and resolve` : label,
-          title: catchUpTitle(facts.catchUp, base),
+          title: getLatestTitle(facts.getLatest, base),
         }
       }
       case "continue":
         return {
           button,
-          label: commandWords("continue-on-accepted", catchUps),
-          title: `merges ${catchUpName({ kind: "accepted" })} into this thread's copy, its base from then on`,
+          label: commandWords("continue-on-accepted", latestSources),
+          title: `merges ${latestSourceName({ kind: "accepted" })} into this thread's copy, its base from then on`,
         }
-      case "catch-up-parent":
+      case "get-latest-from-parent":
         return {
           button,
-          label: commandWords("catch-up-with-parent", catchUps),
+          label: commandWords("get-latest-from-parent", latestSources),
           title: view.quiet.includes(button)
-            ? `${parent ?? "the thread this one branched from"} is working: catch up when its run ends`
+            ? `${parent ?? "the thread this one branched from"} is working: get its latest when its run ends`
             : `merges ${parent ?? "the thread this one branched from"}'s newest work into this thread's copy`,
         }
       case "split":
@@ -970,17 +970,17 @@ export function workStripWords(
  * Catching up's title: what it merges, and what that changes, or why it
  * changes nothing.
  */
-function catchUpTitle(catchUp: CatchUpNow, base: string): string {
+function getLatestTitle(getLatest: LatestNow, base: string): string {
   const merges = `merges ${base} into this thread's copy`
-  switch (catchUp.kind) {
+  switch (getLatest.kind) {
     case "current":
-      return `already caught up with ${base}`
+      return `already has the latest from ${base}`
     case "nothing-new":
-      return `what's new in ${base} is this thread's own: catching up changes no file`
+      return `what's new in ${base} is this thread's own: getting it changes no file`
     case "unknown":
       return merges
     case "brings":
-      return `${merges} · changes ${count(catchUp.files, "file", "files")}`
+      return `${merges} · changes ${count(getLatest.files, "file", "files")}`
   }
 }
 

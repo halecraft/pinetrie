@@ -12,13 +12,13 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import {
   baseMessage,
-  type CatchUpRead,
   type CommitId,
   commitId,
   type EntryId,
   entryId,
   entryOfMessage,
   firstLine,
+  type GetLatestRead,
   hasTrailer,
   NO_EDITOR,
   type ProposedSource,
@@ -47,7 +47,6 @@ import {
 } from "@pinetrie/lanes"
 import { afterAll, beforeAll, describe, expect, test } from "vitest"
 import { acceptedFacts } from "./accepted.ts"
-import { catchUpFiles, readCatchUp } from "./catch-up.ts"
 import {
   acceptedIn,
   acceptProposedChanges,
@@ -57,6 +56,7 @@ import {
   knownStart as knownStartOf,
   proposedTip,
 } from "./fixtures.ts"
+import { getLatestFiles, readGetLatest } from "./get-latest.ts"
 import { laneBase } from "./lane/base.ts"
 import { readLaneBookmark } from "./lane/bookmarks.ts"
 import {
@@ -105,10 +105,10 @@ import {
   markSteps,
   planAbandonProposed,
   planAcceptanceSteps,
-  planCatchUpUndo,
   planDescribe,
+  planGetLatestUndo,
   planProposedChanges,
-  planPublishCatchUp,
+  planPublishGetLatest,
   planPublishMove,
   planRebuildProposed,
   planRefreshProposed,
@@ -689,10 +689,14 @@ describe("a lane's repo, with jj", () => {
     })
     if (clean.kind !== "clean") throw new Error("not clean")
     expect([...clean.files].sort()).toEqual(["a.txt", "c.txt"])
-    // What `catchUpFiles` said catching up would change, it changed.
+    // What `getLatestFiles` said catching up would change, it changed.
     expect(
       (
-        await catchUpFiles(laneRoot, { holds: [base], to: line1, tip: before })
+        await getLatestFiles(laneRoot, {
+          holds: [base],
+          to: line1,
+          tip: before,
+        })
       )?.sort(),
     ).toEqual(["a.txt", "c.txt"])
     expect(await baseOfLane()).toEqual({
@@ -781,7 +785,7 @@ describe("a lane's repo, with jj", () => {
     })
     if (first.kind !== "clean") throw new Error("not clean")
     expect(
-      await catchUpFiles(laneRoot, {
+      await getLatestFiles(laneRoot, {
         holds: [line2],
         to: w1,
         tip: beforeFirst,
@@ -808,7 +812,7 @@ describe("a lane's repo, with jj", () => {
     expect(await readCommits(laneJj, `${next.from}-`)).toEqual([first.from])
     // From the lane's copy, the WIP's base start, to the WIP's commit.
     expect(
-      await catchUpFiles(laneRoot, {
+      await getLatestFiles(laneRoot, {
         holds: [first.from],
         to: w2,
         tip: beforeNext,
@@ -1107,7 +1111,7 @@ describe("a lane's repo, with jj", () => {
      * `dir`: `planMerge`, then `mergeUpdate`, which joins the accepted thread
      * commits it holds first.
      */
-    const catchUp = async (dir = laneDir, lane: ThreadId = LANE) => {
+    const getLatest = async (dir = laneDir, lane: ThreadId = LANE) => {
       const commit = await acceptedNow()
       const plan = planMerge(jjLaneFor(LANE), {
         kind: "accepted",
@@ -1165,7 +1169,7 @@ describe("a lane's repo, with jj", () => {
           proposed === null &&
           (await readHostVersion(ops, proposedBookmark(NAME))) !== null,
         work: await filesTouched(ops, { start, tip }),
-        catchUp: await readCatchUp(ops, {
+        getLatest: await readGetLatest(ops, {
           base,
           start,
           target: { kind: "accepted", commit: target },
@@ -1222,7 +1226,7 @@ describe("a lane's repo, with jj", () => {
       build,
       turn,
       update,
-      catchUp,
+      getLatest,
       proposed,
       accept,
     }
@@ -1746,7 +1750,7 @@ describe("a lane's repo, with jj", () => {
     // from your repo, where only the parent's ref reaches it.
     const acceptedCommit = await rig.acceptedNow()
     await rig.inLane([fetchById([acceptedCommit])])
-    const caughtUp = await mergeBase(
+    const upToDate = await mergeBase(
       rig.laneJj,
       LANE,
       acceptedCommit,
@@ -1755,7 +1759,7 @@ describe("a lane's repo, with jj", () => {
         commit: acceptedCommit,
       }),
     )
-    expect(caughtUp.merge).not.toBeNull()
+    expect(upToDate.merge).not.toBeNull()
     await rig.fetch([parentResolved])
     const newest = await laneTipIn(ops, LANE)
     if (newest === null) throw new Error("no parent tip")
@@ -1764,7 +1768,7 @@ describe("a lane's repo, with jj", () => {
       lane: LANE,
       name: NAME,
       point: pointFromCommit(newest),
-      caughtUpWith: pointFromCommit(merge),
+      upToDateWith: pointFromCommit(merge),
     })
     // The plan's fetch names your repo by its path in a lane: run it here.
     await rig.inLane(plan.steps, forkDir)
@@ -2031,7 +2035,7 @@ describe("a lane's repo, with jj", () => {
     const before = (await repoJj(["op", "log", "-n", "1", "-T", "id"])).stdout
     const facts = await acceptedFacts(ops, git, line)
     expect(facts.workingCopy.behind).toBe(1)
-    expect(facts.workingCopy.catchUp).toEqual({
+    expect(facts.workingCopy.getLatest).toEqual({
       changes: 2,
       conflicts: ["g.txt"],
       heads: 1,
@@ -2053,11 +2057,11 @@ describe("a lane's repo, with jj", () => {
     ).toBe(before)
     await executeRepo(
       repoDir,
-      planPublishCatchUp({ acceptedBookmark: line.acceptedBookmark }),
+      planPublishGetLatest({ acceptedBookmark: line.acceptedBookmark }),
     )
     const after = await acceptedFacts(ops, git, line)
     expect(after.workingCopy.behind).toBe(0)
-    expect(after.workingCopy.catchUp).toBe(null)
+    expect(after.workingCopy.getLatest).toBe(null)
     // Y1 and @ conflict; the sibling moved too, and conflicts outside @'s line.
     expect(after.workingCopy.conflicts).toEqual({
       commits: 2,
@@ -2155,7 +2159,7 @@ describe("a lane's repo, with jj", () => {
     expect(before.workingCopy).toMatchObject({ behind: 1, ahead: 0 })
     await executeRepo(
       repoDir,
-      planPublishCatchUp({ acceptedBookmark: line.acceptedBookmark }),
+      planPublishGetLatest({ acceptedBookmark: line.acceptedBookmark }),
     )
     await executeRepo(
       repoDir,
@@ -2196,7 +2200,7 @@ describe("a lane's repo, with jj", () => {
     })
     await executeRepo(
       repoDir,
-      planPublishCatchUp({ acceptedBookmark: line.acceptedBookmark }),
+      planPublishGetLatest({ acceptedBookmark: line.acceptedBookmark }),
     )
     expect((await acceptedFacts(ops, git, line)).workingCopy).toMatchObject({
       behind: 0,
@@ -2248,12 +2252,12 @@ describe("a lane's repo, with jj", () => {
     // Not yet snapshotted: the catch-up snapshots it first, as you.
     await edit(repoDir, "e.txt", "edited\n")
     const before = await acceptedFacts(ops, git, line)
-    expect(before.workingCopy.catchUp?.conflicts).toEqual([])
+    expect(before.workingCopy.getLatest?.conflicts).toEqual([])
     expect(before.workingCopy.conflicts.commits).toBe(0)
     const commitsBefore = await readCommits(ops, "::@- ~ ::main")
     await executeRepo(
       repoDir,
-      planPublishCatchUp({ acceptedBookmark: line.acceptedBookmark }),
+      planPublishGetLatest({ acceptedBookmark: line.acceptedBookmark }),
     )
     const op = (
       await repoJj([
@@ -2270,7 +2274,7 @@ describe("a lane's repo, with jj", () => {
     expect(
       (await acceptedFacts(ops, git, line)).workingCopy.conflicts.commits,
     ).toBeGreaterThan(0)
-    await executeRepo(repoDir, planCatchUpUndo(op))
+    await executeRepo(repoDir, planGetLatestUndo(op))
     const undone = await acceptedFacts(ops, git, line)
     expect(undone.workingCopy.behind).toBe(1)
     expect(undone.workingCopy.conflicts.commits).toBe(0)
@@ -2327,7 +2331,7 @@ describe("a lane's repo, with jj", () => {
     await rig.edit(rig.repoDir, "line.txt", "line\n")
     await rig.repoJj(["commit", "-m", "accepted work moves"])
     await rig.repoJj(["bookmark", "move", line.acceptedBookmark, "--to", "@-"])
-    const gather = async (known: CatchUpRead | null) => {
+    const gather = async (known: GetLatestRead | null) => {
       const now = (
         await ops(["op", "log", "--no-graph", "-n", "1", "-T", "id"])
       ).stdout
@@ -2345,19 +2349,19 @@ describe("a lane's repo, with jj", () => {
       return { read, ran }
     }
     const moved = await gather(null)
-    expect(moved.read.catchUp).toEqual({
+    expect(moved.read.getLatest).toEqual({
       tip,
       to: await acceptedNow(),
       files: ["line.txt"],
     })
     expect(moved.ran).toBe(4)
-    expect((await gather(moved.read.catchUp)).ran).toBe(2)
+    expect((await gather(moved.read.getLatest)).ran).toBe(2)
     // Moved again: what was read at accepted work before is read again.
     await rig.edit(rig.repoDir, "line.txt", "line, again\n")
     await rig.repoJj(["commit", "-m", "accepted work moves again"])
     await rig.repoJj(["bookmark", "move", line.acceptedBookmark, "--to", "@-"])
-    const again = await gather(moved.read.catchUp)
-    expect([again.ran, again.read.catchUp?.to]).toEqual([
+    const again = await gather(moved.read.getLatest)
+    expect([again.ran, again.read.getLatest?.to]).toEqual([
       4,
       await acceptedNow(),
     ])
@@ -2512,7 +2516,7 @@ describe("a lane's repo, with jj", () => {
     })
   }, 60_000)
 
-  test("catching up with your own acceptance of the lane's work changes no file, as catchUpFiles says", async () => {
+  test("catching up with your own acceptance of the lane's work changes no file, as getLatestFiles says", async () => {
     const { ops, laneJj, inLane, proposed, accept, acceptedNow, base } =
       await turnRig("own-acceptance")
     await accept(await proposed(base))
@@ -2521,7 +2525,7 @@ describe("a lane's repo, with jj", () => {
     if (tip === null || start === undefined) throw new Error("no tip")
     const to = await acceptedNow()
     expect(to).not.toBe(start)
-    expect(await catchUpFiles(ops, { holds: [start], to, tip })).toEqual([])
+    expect(await getLatestFiles(ops, { holds: [start], to, tip })).toEqual([])
     await inLane([fetchById([to])])
     const { ours, merge } = await mergeBase(laneJj, LANE, to, "update")
     if (merge === null) throw new Error("nothing merged")
@@ -2574,7 +2578,7 @@ describe("a lane's repo, with jj", () => {
       const gathered = await rig.agrees()
       if (gathered === "none" || gathered === "wip")
         throw new Error("not on accepted work")
-      return { files: gathered.catchUp?.files, start: gathered.start }
+      return { files: gathered.getLatest?.files, start: gathered.start }
     }
 
     test("your own acceptance, then your edit to it on accepted work: clean, and the accepted thread commit is not listed as come in", async () => {
@@ -2582,7 +2586,7 @@ describe("a lane's repo, with jj", () => {
       await repoOnAccepted(rig, doc({ 1: "yours" }), "yours: doc line 1")
       await rig.edit(rig.laneDir, "c.txt", "c\n")
       await rig.turn()
-      const merged = await rig.catchUp()
+      const merged = await rig.getLatest()
       if (merged.kind !== "clean") throw new Error(`not clean: ${merged.kind}`)
       expect(await read(rig.laneDir, "doc.txt")).toBe(doc({ 1: "yours" }))
       expect(await read(rig.laneDir, "c.txt")).toBe("c\n")
@@ -2599,7 +2603,7 @@ describe("a lane's repo, with jj", () => {
       await rig.edit(rig.laneDir, "doc.txt", doc({ 5: "lane again" }))
       await rig.turn()
       expect((await forecast(rig)).files).toEqual(["doc.txt"])
-      const merged = await rig.catchUp()
+      const merged = await rig.getLatest()
       if (merged.kind !== "clean") throw new Error(`not clean: ${merged.kind}`)
       expect(merged.files).toEqual(["doc.txt"])
       expect(await read(rig.laneDir, "doc.txt")).toBe(
@@ -2614,7 +2618,7 @@ describe("a lane's repo, with jj", () => {
       const { files, start } = await forecast(rig)
       expect(start).toEqual({ kind: "known", start: [rig.t1] })
       expect(files).toEqual([])
-      const merged = await rig.catchUp()
+      const merged = await rig.getLatest()
       if (merged.kind !== "clean") throw new Error(`not clean: ${merged.kind}`)
       expect(merged.files).toEqual([])
     }, 60_000)
@@ -2635,8 +2639,8 @@ describe("a lane's repo, with jj", () => {
         "--to",
         "@-",
       ])
-      const caughtUp = await rig.catchUp()
-      expect(caughtUp.kind).toBe("clean")
+      const upToDate = await rig.getLatest()
+      expect(upToDate.kind).toBe("clean")
       // The proposed changes, made before, follows accepted work and is
       // accepted.
       const [bottom] = proposed.built.changeIds
@@ -2652,7 +2656,7 @@ describe("a lane's repo, with jj", () => {
       const { files, start } = await forecast(rig)
       expect(start.kind === "known" && start.start.length).toBe(2)
       expect(files).toEqual([])
-      const merged = await rig.catchUp()
+      const merged = await rig.getLatest()
       if (merged.kind !== "clean") throw new Error(`not clean: ${merged.kind}`)
       expect(merged.files).toEqual([])
     }, 60_000)
@@ -2668,7 +2672,7 @@ describe("a lane's repo, with jj", () => {
         doc({ 1: "yours", 5: "yours" }),
         "yours: doc line 5",
       )
-      expect((await rig.catchUp()).kind).toBe("clean")
+      expect((await rig.getLatest()).kind).toBe("clean")
       expect(await read(rig.laneDir, "doc.txt")).toBe(
         doc({ 1: "yours", 5: "yours" }),
       )
@@ -2711,7 +2715,7 @@ describe("a lane's repo, with jj", () => {
         "--to",
         "@-",
       ])
-      expect((await rig.catchUp(forkDir, FORK)).kind).toBe("clean")
+      expect((await rig.getLatest(forkDir, FORK)).kind).toBe("clean")
       expect(await read(forkDir, "doc.txt")).toBe(doc({ 1: "yours" }))
       expect(await read(forkDir, "k.txt")).toBe("k\n")
     }, 60_000)
@@ -2722,7 +2726,7 @@ describe("a lane's repo, with jj", () => {
       await rig.edit(rig.laneDir, "doc.txt", doc({ 1: "lane again" }))
       await rig.edit(rig.laneDir, "c.txt", "c\n")
       await rig.turn()
-      const merged = await rig.catchUp()
+      const merged = await rig.getLatest()
       if (merged.kind !== "conflicted") throw new Error("not conflicted")
       expect(merged.contents.map(c => c.path)).toEqual(["doc.txt"])
       expect(merged.theirs.map(r => firstLine(r.description, 200))).toEqual([
@@ -2754,7 +2758,7 @@ describe("a lane's repo, with jj", () => {
         ),
       ).toHaveLength(1)
       await rig.accept(proposed)
-      const merged = await rig.catchUp()
+      const merged = await rig.getLatest()
       // Merged as before the joins: no join is left in the lane's history.
       expect(merged.kind).toBe("conflicted")
       expect(

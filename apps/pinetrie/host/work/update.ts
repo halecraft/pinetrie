@@ -7,13 +7,13 @@
 
 import {
   type BaseMerge,
-  type CatchUpCommand,
   type CopyRefusal,
   type EntryId,
   ERR,
   entryOfMessage,
   errorText,
   firstLine,
+  type GetLatestCommand,
   indexTree,
   messageText,
   messageToolCalls,
@@ -45,20 +45,20 @@ import {
   readTreeIndex,
 } from "@pinetrie/reads"
 import {
-  catchUpAnswer,
-  catchUpName,
-  catchUpNow,
-  catchUpRefusal,
   encodeUpdate,
   type Floor,
-  incomingWords,
+  getLatestAnswer,
+  getLatestRefusal,
   type LandMessage,
   type LandSkill,
+  latestNow,
+  latestSourceName,
+  latestWords,
   mergedFrom,
   type ParentNow,
   type PromptBudget,
   parentNow,
-  planCatchUpCall,
+  planGetLatestCall,
   planParentUpdate,
   planResolution,
   planUpdateFrom,
@@ -87,7 +87,7 @@ function updateRefusal(code: UpdateRefusal): string {
     case ERR.NO_PARENT:
       return "this thread did not branch from another thread's copy"
     case ERR.PARENT_RUNNING:
-      return "the thread this one branched from is working: catch up when its run ends"
+      return "the thread this one branched from is working: get its latest when its run ends"
   }
 }
 
@@ -105,7 +105,7 @@ function unfittableWords(tokens: number, budget: number): string {
  * the smallest prompt would not fit. Decided before the merge, since a merge
  * left without a prompt is one no later catch-up merges again.
  */
-export function planCatchUp(
+export function planGetLatest(
   from: BaseMerge,
   resolution: {
     readonly budget: PromptBudget
@@ -121,7 +121,7 @@ export function planCatchUp(
     } {
   const found = resolutionFloor({
     ...resolution,
-    incoming: incomingWords(mergedFrom(from)),
+    latest: latestWords(mergedFrom(from)),
   })
   if (found.kind === "too-large")
     return {
@@ -185,7 +185,7 @@ export async function withLaneStarted(
 type SettleFacts =
   | Exclude<Merged, { readonly kind: "conflicted" | "refused" }>
   | (Extract<Merged, { readonly kind: "conflicted" }> & {
-      /** What the prompt must fit, settled before the merge (`planCatchUp`). */
+      /** What the prompt must fit, settled before the merge (`planGetLatest`). */
       readonly floor: Floor
     })
 
@@ -220,7 +220,7 @@ export function planSettle(
   },
 ): Settle {
   const { lane, by, from } = ctx
-  const caughtUp = mergedFrom(from)
+  const upToDate = mergedFrom(from)
   switch (facts.kind) {
     case "nothing":
       return { kind: "nothing" }
@@ -230,7 +230,7 @@ export function planSettle(
         message: encodeUpdate(
           {
             lane,
-            from: caughtUp,
+            from: upToDate,
             merged: facts.from,
             files: facts.files,
             commits: facts.commits,
@@ -258,9 +258,9 @@ export function planSettle(
             theirs: {
               label: "theirs",
               who:
-                caughtUp.kind === "parent"
-                  ? `the thread ${catchUpName(caughtUp)}`
-                  : catchUpName(caughtUp),
+                upToDate.kind === "parent"
+                  ? `the thread ${latestSourceName(upToDate)}`
+                  : latestSourceName(upToDate),
               reasons: touching(facts.theirs, path).map(d => firstLine(d, 200)),
             },
           })),
@@ -306,7 +306,7 @@ export interface Updates {
    * Merge what `command` names into the lane `handle` names, whose handle the
    * caller holds: the thread's base, accepted work's commit or a fresh copy of
    * its WIP; with `continue-on-accepted`, accepted work, moving the thread
-   * there; with `catch-up-with-parent`, the newest commit of the thread it
+   * there; with `get-latest-from-parent`, the newest commit of the thread it
    * branched from. Clean: the update is appended to the thread, through
    * `handle`. Conflicted: the land message for the resolution run, with
    * `intent` (the card's text) after the conflicts. Nothing new: nothing to do
@@ -318,7 +318,7 @@ export interface Updates {
     handle: Pick<ThreadLaneHandle, "name" | "append">,
     by: WriterId,
     intent: string,
-    command: CatchUpCommand,
+    command: GetLatestCommand,
     follows: UpdateFollows,
   ): Promise<Prepared>
   /**
@@ -327,7 +327,7 @@ export interface Updates {
    * the tool's answer is the update. Refused unless the call is the only one in
    * its turn and there is something new.
    */
-  catchUpInRun(lane: ThreadId, from: "base" | "parent"): Promise<ToolAnswer>
+  getLatestInRun(lane: ThreadId, from: "base" | "parent"): Promise<ToolAnswer>
   /**
    * pi's hook: the lane's agent asked about a conflict. Taken while its history
    * finds a conflict in the lane's copy, in any run: read on the lane's queue, never
@@ -428,13 +428,13 @@ export function createUpdates(deps: {
    * is read and what is merged: what the command merges (the lane's base
    * from its own history, accepted work and the WIP from the destination; or
    * the parent, from the document), the plan with the floor its
-   * resolution's prompt must fit (`planCatchUp`), and, unless it is refused
+   * resolution's prompt must fit (`planGetLatest`), and, unless it is refused
    * or has nothing to merge, the edits committed and the merge.
    */
   const updateOnQueue = (
     lane: ThreadId,
-    command: CatchUpCommand,
-    resolution: Parameters<typeof planCatchUp>[1],
+    command: GetLatestCommand,
+    resolution: Parameters<typeof planGetLatest>[1],
   ) =>
     registry.withHistory(
       lane,
@@ -459,16 +459,16 @@ export function createUpdates(deps: {
         const ready = await h.readyToMerge()
         if (typeof ready === "string") return { kind: "copy", why: ready }
         const from =
-          command === "catch-up-with-parent"
+          command === "get-latest-from-parent"
             ? await parentOf(lane).then(p => planParentUpdate(p.now, p.running))
             : await baseUpdate(record, h, command === "continue-on-accepted")
         if (typeof from === "string") return refused(updateRefusal(from))
         if (from.kind === "nothing") return { kind: "nothing" }
-        const catchUp = planCatchUp(from, resolution)
-        if (catchUp.kind === "refused") return refused(catchUp.reason)
+        const getLatest = planGetLatest(from, resolution)
+        if (getLatest.kind === "refused") return refused(getLatest.reason)
         const { follow, ...merged } = await h.merge(
           ready,
-          catchUp.from,
+          getLatest.from,
           await editsOf(lane),
         )
         if (merged.kind === "refused") return refused(merged.reason)
@@ -480,7 +480,7 @@ export function createUpdates(deps: {
         // A conflict's prompt fits the floor settled before the merge.
         const facts: SettleFacts =
           merged.kind === "conflicted"
-            ? { ...merged, floor: catchUp.floor }
+            ? { ...merged, floor: getLatest.floor }
             : merged
         return { kind: "merged", from, facts, follow }
       },
@@ -506,7 +506,7 @@ export function createUpdates(deps: {
   /** What a resolution's prompt must fit, read before a merge. */
   const resolutionOf = async (
     intent: string,
-  ): Promise<Parameters<typeof planCatchUp>[1]> => ({
+  ): Promise<Parameters<typeof planGetLatest>[1]> => ({
     budget: LAND_BUDGET,
     skill: await deps.piSetup.skill("pinetrie:skill:resolve-conflicts"),
     intent,
@@ -519,7 +519,7 @@ export function createUpdates(deps: {
       return conflicts.length > 0
     },
 
-    async catchUpInRun(lane, from) {
+    async getLatestInRun(lane, from) {
       await using held = basics.leases.lane(lane)
       const doc = held === null ? null : await held.ready
       // Who the update is by: the person behind the run.
@@ -531,7 +531,7 @@ export function createUpdates(deps: {
       const tip = readLaneTip(doc, lane)
       const parent = from === "parent" ? await parentOf(lane) : null
       // plan
-      const call = planCatchUpCall({
+      const call = planGetLatestCall({
         from,
         own: true,
         calls:
@@ -539,7 +539,7 @@ export function createUpdates(deps: {
             ? 0
             : messageToolCalls(index.entries[turnEntry(index, tip)]?.message)
                 .length,
-        base: catchUpNow(
+        base: latestNow(
           readBases(docs.session).get(lane),
           readAccepted(docs.session),
         ),
@@ -555,7 +555,7 @@ export function createUpdates(deps: {
       )
       if (done.kind === "copy") return refusedAnswer(done.why)
       if (done.kind === "refused") return refusedAnswer({ reason: done.reason })
-      if (done.kind !== "merged") return catchUpAnswer({ kind: "nothing" })
+      if (done.kind !== "merged") return getLatestAnswer({ kind: "nothing" })
       const settle = planSettle(done.facts, {
         lane,
         by,
@@ -564,7 +564,7 @@ export function createUpdates(deps: {
         now: basics.now(),
       })
       done.follow?.()
-      return catchUpAnswer(
+      return getLatestAnswer(
         settle.kind === "clean"
           ? { kind: "clean", message: settle.message, merged: settle.merge }
           : settle,
@@ -588,7 +588,7 @@ export function createUpdates(deps: {
             command,
             await resolutionOf(intent),
           )
-          if (done.kind === "copy") return refused(catchUpRefusal(done.why))
+          if (done.kind === "copy") return refused(getLatestRefusal(done.why))
           if (done.kind !== "merged") return done
           const { from, facts, follow } = done
           await using held = basics.leases.lane(lane)

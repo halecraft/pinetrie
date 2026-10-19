@@ -151,9 +151,9 @@ here, so a superseded ADR leads to the scenarios to revisit.
 | `host/presence` | presence per open column (ADR-0024) |
 | `host/titles` | a root titled by a model (ADR-0074), its canvas's title (ADR-0116) |
 | `host/tools` | the host (ADR-0107), a lane's own copy (ADR-0034), compaction (ADR-0023, ADR-0063), Stop as a fact (ADR-0106, ADR-0126), Resume (ADR-0082) |
-| `lanes/catch-up` | catching up mid-run (ADR-0080, S103), a publish that accepts (ADR-0099) and moves main (ADR-0090) |
+| `lanes/get-latest` | getting the latest mid-run (ADR-0080, S103), a publish that accepts (ADR-0099) and moves main (ADR-0090) |
 | `lanes/contract` | the Docker runtime (ADR-0130), lanehost's roles and diffs (ADR-0129), the Mac's fence (S136), the images a host keeps (ADR-0169) |
-| `lanes/folder` | a folder project: its lanes, proposed changes, catch-ups and their conflicts (ADR-0142), and a folder lane refused once the folder is a jj repo (ADR-0150) |
+| `lanes/folder` | a folder project: its lanes, proposed changes, getting the latest and its conflicts (ADR-0142), and a folder lane refused once the folder is a jj repo (ADR-0150) |
 | `lanes/images` | the default image's browser (ADR-0041) |
 | `lanes/proposal` | an agent's proposal of branches, Start's lanes, order and messages, and its fact (ADR-0157, S218) |
 | `lanes/main` | lane containers (ADR-0034), proposed changes (ADR-0105), thread names (ADR-0039), the review (ADR-0047), accepted work (ADR-0104), publish (ADR-0090), the repo's owner (ADR-0065), commands on a thread (ADR-0080); a lane's jj config for its own repo (S50), an agent's own commit (S56) |

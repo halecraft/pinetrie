@@ -8,10 +8,10 @@ import {
   type CardInPlace,
   type CardPlace,
   type CardRecord,
-  type CatchUpCommand,
   cardMove,
   type FactCard,
   type FactCardId,
+  type GetLatestCommand,
   hasPlaceKind,
   isTextCard,
   type Move,
@@ -377,9 +377,9 @@ export function planAskCard(input: {
 export type CarryPlan =
   | { readonly kind: "fact"; readonly fact: QueuedFact }
   | {
-      readonly kind: "catch-up"
+      readonly kind: "get-latest"
       readonly card: QueuedText
-      readonly command: CatchUpCommand
+      readonly command: GetLatestCommand
       /** After a clean update or nothing new: the card's text, or nothing to send. */
       readonly after: "send" | "discard"
     }
@@ -414,7 +414,7 @@ export function planCarry(card: QueuedCard, text: string): CarryPlan {
   if (command === "split") return { kind: "split", card, intent: text.trim() }
   if (command !== null)
     return {
-      kind: "catch-up",
+      kind: "get-latest",
       card,
       command,
       after: blank ? "discard" : "send",

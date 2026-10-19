@@ -22,7 +22,6 @@ import {
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
-import { incomingWords } from "./catch-up-from.ts"
 import {
   ACCEPTED,
   BASE as BASE_RECORD,
@@ -43,6 +42,7 @@ import {
   renderableMessage,
   setRecord,
 } from "./index.ts"
+import { latestWords } from "./latest-from.ts"
 import {
   acceptanceDestinations,
   isAsShown,
@@ -397,7 +397,7 @@ describe("isWipLine, isProposedMoved, describeWanted", () => {
             base: { kind: "accepted" },
             start: BASE,
             state: "ok",
-            catchUp: null,
+            getLatest: null,
             untraced: [],
             work: "some",
           },
@@ -438,7 +438,7 @@ describe("records", () => {
       workingCopy: {
         behind: 0,
         ahead: 0,
-        catchUp: null,
+        getLatest: null,
         conflicts: { commits: 0, files: [] },
       },
       publishCatchesUp: true,
@@ -452,7 +452,7 @@ describe("records", () => {
       base: { kind: "wip", bookmark: "wip/x" },
       start: COPY,
       state: "ok",
-      catchUp: { tip: TIP, to: COPY, files: ["a.txt"] },
+      getLatest: { tip: TIP, to: COPY, files: ["a.txt"] },
       untraced: [TIP],
       work: "some",
     }
@@ -462,7 +462,7 @@ describe("records", () => {
     // One stored before what catching up changes was read: dropped, so the
     // page reads it as unknown until the host writes it again.
     const {
-      catchUp: _c,
+      getLatest: _c,
       untraced: _u,
       ...before
     } = b.value as Record<string, unknown>
@@ -489,7 +489,7 @@ describe("the update and stack messages", () => {
     expect(m.content).toContain("- c.txt")
     expect(renderableMessage(m)).toEqual({
       role: "update",
-      content: "↓ caught up with accepted work: 2 files changed",
+      content: "↓ got the latest from accepted work: 2 files changed",
       merged: [pointFromCommit(COPY)],
     })
     expect(m.content).toContain("Accepted work was merged into this thread")
@@ -503,7 +503,7 @@ describe("the update and stack messages", () => {
       from: { kind: "wip" as const, bookmark: "wip/a" },
     }
     expect(renderableMessage(encodeUpdate(wip, 5))).toMatchObject({
-      content: "↓ caught up with wip/a: 2 files changed",
+      content: "↓ got the latest from wip/a: 2 files changed",
     })
     expect(encodeUpdate(wip, 5).content).toContain(
       "The work on wip/a was merged",
@@ -522,7 +522,7 @@ describe("the update and stack messages", () => {
     expect(decodeUpdate(structuredClone(m))).toEqual(fromParent)
     expect(renderableMessage(m)).toEqual({
       role: "update",
-      content: "↓ caught up with amber-fox: 2 files changed",
+      content: "↓ got the latest from amber-fox: 2 files changed",
       merged: [pointFromCommit(COPY)],
     })
     expect(m.content).toContain(
@@ -540,7 +540,7 @@ describe("the update and stack messages", () => {
       "- only work this copy already holds, as accepted thread commits",
     )
     expect(renderableMessage(m)).toMatchObject({
-      content: "↓ caught up with accepted work: no file changed",
+      content: "↓ got the latest from accepted work: no file changed",
     })
   })
   test.each([
@@ -554,8 +554,8 @@ describe("the update and stack messages", () => {
       },
       "The work of the thread this one branched from (amber-fox)",
     ],
-  ] as const)("incomingWords: %o", (from, words) => {
-    expect(incomingWords(from)).toBe(words)
+  ] as const)("latestWords: %o", (from, words) => {
+    expect(latestWords(from)).toBe(words)
   })
   test("a stack message names where it starts and ends, and the bookmark to set", () => {
     const m = planStack({
@@ -667,7 +667,7 @@ describe("the proposed changes' policy over a gather", () => {
     base: { kind: "accepted" },
     start: START,
     state: "ok",
-    catchUp: null,
+    getLatest: null,
     untraced: [],
     work: "some",
   }

@@ -87,15 +87,15 @@ export interface SuiteRunner {
 
 const TURN = { title: "a turn", entry: entryId("e-1") }
 
-/** A catch-up with accepted work's `point`. */
+/** Getting the latest from accepted work's `point`. */
 const acceptedMerge = (point: PointId): BaseMerge => ({
   kind: "accepted",
   point,
   mark: false,
 })
 
-/** `lane` caught up with accepted work's `point`, its copy found ready. */
-const catchUp = (
+/** `lane` got the latest from accepted work's `point`, its copy found ready. */
+const getLatest = (
   lane: RigLane,
   point: PointId,
   edits: Edits | null = null,
@@ -142,14 +142,14 @@ export function historySuite(
     const start = (await lane.withHistory(h => h.base()))?.start
     if (start === undefined) throw new Error("the lane has no base")
     const before = await texts(lane, paths)
-    const own = await catchUp(lane, start)
+    const own = await getLatest(lane, start)
     expect(own.kind).toBe("nothing")
     expect(own.kind === "nothing" ? own.mark : null).toBeNull()
     expect(await texts(lane, paths)).toEqual(before)
     const accepted = await rig.repoOnAccepted({ "b.txt": "b\n" })
-    expect((await catchUp(lane, accepted)).kind).toBe("clean")
+    expect((await getLatest(lane, accepted)).kind).toBe("clean")
     const held = await texts(lane, paths)
-    expect((await catchUp(lane, accepted)).kind).toBe("nothing")
+    expect((await getLatest(lane, accepted)).kind).toBe("nothing")
     expect(await texts(lane, paths)).toEqual(held)
   })
 
@@ -196,7 +196,7 @@ export function historySuite(
     await lane.withHistory(h => h.recordTurn(TURN))
     const accepted = await rig.repoOnAccepted({ "b.txt": "b\n" })
     await lane.write("c.txt", "edited between runs\n")
-    const merged = await catchUp(lane, accepted, {
+    const merged = await getLatest(lane, accepted, {
       title: "edits between runs",
       entry: entryId("e-2"),
     })
@@ -213,7 +213,7 @@ export function historySuite(
   })
 
   withRig(
-    "a catch-up that changed a line the lane changed differently is conflicted there, schedules no fetch, and its conflicts name it",
+    "getting the latest that changed a line the lane changed differently is conflicted there, schedules no fetch, and its conflicts name it",
     async rig => {
       const lane = await rig.lane()
       await lane.write("a.txt", "one\ntwo (lane)\nthree\n")
@@ -221,7 +221,7 @@ export function historySuite(
       const accepted = await rig.repoOnAccepted({
         "a.txt": "one\ntwo (yours)\nthree\n",
       })
-      const merged = await catchUp(lane, accepted)
+      const merged = await getLatest(lane, accepted)
       expect(merged.kind).toBe("conflicted")
       expect(merged.follow).toBeNull()
       expect(await lane.withHistory(h => h.conflicts())).toEqual(["a.txt"])
@@ -259,11 +259,11 @@ export function historySuite(
     },
   )
 
-  withRig("An accept then a catch-up changes no file.", async rig => {
-    /** `lane`'s catch-up with `point`: nothing, or clean with no file, its copy unchanged. */
+  withRig("An accept then getting the latest changes no file.", async rig => {
+    /** `lane` getting the latest from `point`: nothing, or clean with no file, its copy unchanged. */
     const changesNoFile = async (lane: RigLane, point: PointId) => {
       const before = await texts(lane, ["a.txt"])
-      const merged = await catchUp(lane, point)
+      const merged = await getLatest(lane, point)
       expect(
         merged.kind === "conflicted"
           ? merged.kind
@@ -273,12 +273,12 @@ export function historySuite(
       ).toEqual([])
       expect(await texts(lane, ["a.txt"])).toEqual(before)
     }
-    // Caught up at once.
+    // Got the latest at once.
     const a = await rig.lane()
     await a.write("a.txt", "one\ntwo (a)\nthree\n")
     await a.withHistory(h => h.recordTurn(TURN))
     await changesNoFile(a, await rig.accept(a))
-    // The accepted lines edited again first, with no catch-up between.
+    // The accepted lines edited again first, with nothing got between.
     const b = await rig.lane()
     await b.write("a.txt", "one\ntwo (b)\nthree\n")
     await b.withHistory(h => h.recordTurn(TURN))

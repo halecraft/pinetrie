@@ -6,15 +6,15 @@ import {
   type AcceptsInto,
   type CardCommand,
   type ConflictCause,
-  isCatchUp,
+  isGetLatest,
   type ParentThread,
   type ProposedChangesRecord,
   type ThreadBase,
 } from "@pinetrie/core"
 import {
-  type CatchUpNow,
   effectiveBase,
   type FollowedBase,
+  type LatestNow,
   type ParentNow,
   parentAhead,
 } from "./base.ts"
@@ -38,7 +38,7 @@ export type WorkStripButton =
   | "describe"
   | "refresh"
   | "update"
-  | "catch-up-parent"
+  | "get-latest-from-parent"
   /** A folder lane's conflicts opened in its pane, each version to choose. */
   | "choose-versions"
 
@@ -52,7 +52,7 @@ export type WorkStripActivity =
   | "turn"
   | "resolution"
   | "split"
-  | "catch-up"
+  | "get-latest"
 
 /**
  * One state of a lane's proposed changes, what can be done in it (the work
@@ -106,8 +106,8 @@ interface WorkStripFacts {
   readonly base: ThreadBase
   /** Where an acceptance goes, for titles; null for a jj project's before its record is read. */
   readonly into: AcceptsInto | null
-  /** What catching up would do (`catchUpNow`). */
-  readonly catchUp: CatchUpNow
+  /** What catching up would do (`latestNow`). */
+  readonly getLatest: LatestNow
   /** An accepted thread commit of this thread names no source: nothing is proposed until it catches up. */
   readonly untraced: boolean
   /** Where its conflict comes from (`conflictCause`); `work` with none. */
@@ -144,14 +144,14 @@ export function conflictCause(record: ProposedChangesRecord): ConflictCause {
  */
 export function workStripView(input: {
   readonly proposed: ProposedChangesStatus
-  readonly activity: Exclude<WorkStripActivity, "catch-up">
+  readonly activity: Exclude<WorkStripActivity, "get-latest">
   readonly asked: number | null
   readonly base: FollowedBase | null
   /** Null for a jj project whose accepted work is not read yet: nothing to accept into. */
   readonly into: AcceptsInto | null
   readonly wipAhead: number
-  /** What catching up would do (`catchUpNow`). */
-  readonly catchUp: CatchUpNow
+  /** What catching up would do (`latestNow`). */
+  readonly getLatest: LatestNow
   /** Accepted thread commits of this thread that name no source (`BaseRecord.untraced`). */
   readonly untraced: boolean
   /**
@@ -166,8 +166,8 @@ export function workStripView(input: {
 }): WorkStripView {
   const { proposed, asked } = input
   const activity: WorkStripActivity =
-    input.activity === "idle" && input.queued.some(isCatchUp)
-      ? "catch-up"
+    input.activity === "idle" && input.queued.some(isGetLatest)
+      ? "get-latest"
       : input.activity
   const notYetAccepted =
     proposed.kind === "open" || proposed.kind === "held"
@@ -194,7 +194,7 @@ export function workStripView(input: {
     acceptedAs: proposed.kind === "accepted" ? proposed.as : null,
     base: effectiveBase(input.base),
     into: input.into,
-    catchUp: input.catchUp,
+    getLatest: input.getLatest,
     untraced: input.untraced,
     conflictCause: cause,
     parent: ahead,
@@ -230,14 +230,14 @@ export function workStripView(input: {
     // already stands beside the proposed changes.
     const menu = [
       ...toAccepted(listed),
-      ...(ahead !== null && !buttons.includes("catch-up-parent")
-        ? (["catch-up-parent"] as const)
+      ...(ahead !== null && !buttons.includes("get-latest-from-parent")
+        ? (["get-latest-from-parent"] as const)
         : []),
     ]
     // When it brings work, or must come before any proposed changes, catching
     // up stands beside the proposed changes; when it would change nothing, it
     // is quiet.
-    const { kind } = input.catchUp
+    const { kind } = input.getLatest
     const shown =
       (kind === "brings" || input.untraced) && menu.includes("update")
         ? {
@@ -251,7 +251,7 @@ export function workStripView(input: {
         : []),
       // The parent's copy moves with every turn: not while it runs.
       ...(ahead !== null && input.parentRunning
-        ? (["catch-up-parent"] as const)
+        ? (["get-latest-from-parent"] as const)
         : []),
       // A split already waits in the queue.
       ...(input.queued.includes("split") ? (["split"] as const) : []),
@@ -291,7 +291,7 @@ export function workStripView(input: {
       record.kind === "folder"
         ? ["choose-versions", "update", "accept"]
         : cause === "start" && parentResolves
-          ? ["catch-up-parent", "accept"]
+          ? ["get-latest-from-parent", "accept"]
           : ["update", "accept"],
       [],
     )

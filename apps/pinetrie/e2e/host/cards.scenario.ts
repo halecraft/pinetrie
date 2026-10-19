@@ -278,7 +278,7 @@ async function run(check: Checks["check"]): Promise<void> {
     )
 
     // 4b. A card queued on an idle thread is popped at once. It is queued as
-    // soon as it is made, as the bring-up-to-date button's card can be: its
+    // soon as it is made, as the get-latest button's card can be: its
     // record can reach the host before its text, and the pop waits.
     const idleEnd = tipOf()
     const c6 = newCard(ada, idleEnd, "@Bea while it is quiet")

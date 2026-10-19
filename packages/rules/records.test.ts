@@ -208,7 +208,7 @@ const SAMPLES: readonly Sample[] = [
       workingCopy: {
         behind: 0,
         ahead: 0,
-        catchUp: null,
+        getLatest: null,
         conflicts: { commits: 0, files: [] },
       },
       publishCatchesUp: true,
@@ -224,7 +224,7 @@ const SAMPLES: readonly Sample[] = [
       base: { kind: "accepted" },
       start: C,
       state: "ok",
-      catchUp: { tip: C, to: C, files: ["a.txt"] },
+      getLatest: { tip: C, to: C, files: ["a.txt"] },
       untraced: [C],
       work: "some",
     },
@@ -258,7 +258,7 @@ const SAMPLES: readonly Sample[] = [
       kind: "folder",
       lane: L,
       start: pointId("line-0192aaaa"),
-      catchUp: {
+      getLatest: {
         tip: pointId("turn-0192bbbb"),
         to: pointId("line-0192cccc"),
         files: ["a.txt"],
@@ -578,7 +578,7 @@ test("planKindSweep deletes the proposed changes, accepted work and bases of the
     kind: "folder",
     lane: F,
     start: pointId("line-0192aaaa"),
-    catchUp: null,
+    getLatest: null,
     work: "none",
   } as const
   const records = {

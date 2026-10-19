@@ -29,6 +29,10 @@ import { turnDiskPrivateMigration } from "./0008-turn-disk-private.ts"
 import { accessAnswersMigration } from "./0009-access-answers.ts"
 import { sshFactWordsMigration } from "./0010-ssh-fact-words.ts"
 import { carryOnSshAllowedMigration } from "./0011-carry-on-ssh-allowed.ts"
+import { baseGetLatest } from "./0012-base-get-latest.ts"
+import { acceptedGetLatestMigration } from "./0013-accepted-get-latest.ts"
+import { stateGetLatestMigration } from "./0014-state-get-latest.ts"
+import { cardCommandGetLatestMigration } from "./0015-card-command-get-latest.ts"
 import type { MigrationLedger } from "./ledger.ts"
 
 /** What a migration reads with, and writes with once every read loaded. */
@@ -94,6 +98,10 @@ export const RECORD_MIGRATIONS: readonly RecordMigration[] = [
   accessAnswersMigration,
   sshFactWordsMigration,
   carryOnSshAllowedMigration,
+  baseGetLatest,
+  acceptedGetLatestMigration,
+  stateGetLatestMigration,
+  cardCommandGetLatestMigration,
 ]
 
 /**

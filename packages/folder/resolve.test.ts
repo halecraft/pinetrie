@@ -32,7 +32,7 @@ const graph = stateGraph([
     "start-1",
   ),
   record("line-2", { kind: "read" }, "line-1"),
-  record("catch-up-1", { kind: "catch-up", lane: LANE }, "turn-1", "line-2"),
+  record("catch-up-1", { kind: "get-latest", lane: LANE }, "turn-1", "line-2"),
 ])
 const open: ConflictRecord = {
   lane: LANE,

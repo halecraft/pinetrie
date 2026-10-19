@@ -14,7 +14,7 @@ const workingCopyFacts = (
 ): JjAcceptedRecord["workingCopy"] => ({
   behind: 0,
   ahead: 0,
-  catchUp: null,
+  getLatest: null,
   conflicts: { commits: 0, files: [] },
   ...over,
 })
@@ -120,12 +120,12 @@ describe("publishWords: what the button says it will do", () => {
         workingCopy: workingCopyFacts({
           behind: 1,
           ahead: 2,
-          catchUp: { changes: 4, conflicts: [], heads: 1 },
+          getLatest: { changes: 4, conflicts: [], heads: 1 },
         }),
       }),
     )
     expect(w.title).toBe(
-      "catches the working copy up with accepted work (changes 4 files; 1 other line of your work moves with it), accepts your 2 commits, then moves main forward over 1 accepted commit",
+      "brings the working copy the latest accepted work (changes 4 files; 1 other line of your work moves with it), accepts your 2 commits, then moves main forward over 1 accepted commit",
     )
     expect(w.kind === "publish" && w.jj).toEqual([
       "jj rebase -b @ -d pinetrie-accepted",
@@ -200,7 +200,7 @@ describe("the thread's base in its header, and the bases a new lane may start fr
       base: { kind: "wip", bookmark: "wip/search" },
       start: commitId("c"),
       state,
-      catchUp: null,
+      getLatest: null,
       untraced: [],
       work: "some",
     }) as const
